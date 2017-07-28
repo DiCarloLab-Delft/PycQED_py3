@@ -1297,7 +1297,8 @@ class QuDev_transmon(Qubit):
 
         self.measure_resonator_spectroscopy(freqs, MC, analyze=False)
         label = 'resonator_scan' + self.msmt_suffix
-        HA = ma.Homodyne_Analysis(label=label, close_fig=close_fig,
+        HA = ma.Homodyne_Analysis(qb_name=self.name,
+                                  label=label, close_fig=close_fig,
                                   fitting_model=fitting_model,**kw)
         f0 = HA.fit_res.params['f0'].value
         df0 = HA.fit_res.params['f0'].stderr
@@ -1448,7 +1449,11 @@ class QuDev_transmon(Qubit):
         if analyze:
             amp_only = hasattr(self.heterodyne, 'RF')
             SpecA = ma.Qubit_Spectroscopy_Analysis(
-                analyze_ef=analyze_ef, label=label, amp_only=amp_only, close_fig=close_fig,**kw)
+                qb_name=self.name,
+                analyze_ef=analyze_ef,
+                label=label,
+                amp_only=amp_only,
+                close_fig=close_fig,**kw)
             self.f_qubit(SpecA.fitted_freq)
             f0 = SpecA.fitted_freq
             if update:
@@ -1600,9 +1605,10 @@ class QuDev_transmon(Qubit):
 
         #get pi and pi/2 amplitudes from the analysis results
         if analyze:
-            RabiA = ma.Rabi_Analysis(label=label, NoCalPoints=no_cal_points,
-                                         close_fig=close_fig, for_ef=for_ef,
-                                         last_ge_pulse=last_ge_pulse, **kw)
+            RabiA = ma.Rabi_Analysis(label=label, qb_name=self.name,
+                                     NoCalPoints=no_cal_points,
+                                     close_fig=close_fig, for_ef=for_ef,
+                                     last_ge_pulse=last_ge_pulse, **kw)
 
             rabi_amps = RabiA.rabi_amplitudes    #This is a dict with keywords
             #'piPulse',  'piPulse_std',
@@ -1734,7 +1740,8 @@ class QuDev_transmon(Qubit):
 
         #Extract T1 and T1_stddev from ma.T1_Analysis
         if kw.pop('analyze',True):
-            T1_Analysis = ma.T1_Analysis(label=label, NoCalPoints=no_cal_points,
+            T1_Analysis = ma.T1_Analysis(label=label, qb_name=self.name,
+                                         NoCalPoints=no_cal_points,
                                          for_ef=for_ef,
                                          last_ge_pulse=last_ge_pulse, **kw)
             T1_dict = T1_Analysis.T1
@@ -1853,7 +1860,8 @@ class QuDev_transmon(Qubit):
 
         if analyze:
 
-            RamseyA = ma.Ramsey_Analysis(auto=True, NoCalPoints=no_cal_points, label=label,
+            RamseyA = ma.Ramsey_Analysis(auto=True, qb_name=self.name,
+                                         NoCalPoints=no_cal_points, label=label,
                                          for_ef=for_ef, last_ge_pulse=last_ge_pulse,
                                          artificial_detuning=artificial_detuning,
                                          **kw)
@@ -1973,6 +1981,7 @@ class QuDev_transmon(Qubit):
         # Analyze data if analyze==True
         if kw.pop('analyze',True):
             RamseyA = ma.Ramsey_Analysis_multiple_detunings(auto=True,
+                                qb_name=self.name,
                                 NoCalPoints=no_cal_points,
                                 for_ef=for_ef,
                                 last_ge_pulse=last_ge_pulse,
@@ -2144,7 +2153,8 @@ class QuDev_transmon(Qubit):
         # Perform analysis and extract the optimal qscale parameter
         # Returns the optimal qscale parameter
         if kw.pop('analyze',True):
-            QscaleA = ma.QScale_Analysis(auto=True, label=label,
+            QscaleA = ma.QScale_Analysis(auto=True, qb_name=self.name,
+                                         label=label,
                                          NoCalPoints=no_cal_points,
                                          for_ef=for_ef,
                                          last_ge_pulse=last_ge_pulse, **kw)

@@ -58,7 +58,7 @@ imp.reload(dm_tools)
 class MeasurementAnalysis(object):
 
     def __init__(self, TwoD=False, folder=None, auto=True,
-                 cmap_chosen='viridis', no_of_columns=1, **kw):
+                 cmap_chosen='viridis', no_of_columns=1, qb_name=None, **kw):
 
         if folder is None:
             self.folder = a_tools.get_folder(**kw)
@@ -88,6 +88,13 @@ class MeasurementAnalysis(object):
         # self.marker_size_special=5
         self.box_props = dict(boxstyle='Square', facecolor='white',
                           alpha=0.8, lw=self.axes_line_width)
+
+        if qb_name is None:
+            logging.warning('qb_name is None. Default value qb_name="qb" is '
+                            'used. Old parameter values might be retrieved.')
+            self.qb_name = 'qb'
+        else:
+            self.qb_name = qb_name
 
         if auto is True:
             self.run_default_analysis(TwoD=TwoD, **kw)
@@ -1814,7 +1821,7 @@ class Rabi_Analysis(TD_Analysis):
         #Set up fit parameters and perform fit
         cos_mod.set_param_hint('amplitude',
                                value=amp_guess,
-                               vary=True)
+                               vary=False)
         cos_mod.set_param_hint('phase',
                                value=0,
                                vary=False)
@@ -1898,16 +1905,14 @@ class Rabi_Analysis(TD_Analysis):
         pi_pulse = self.rabi_amplitudes['piPulse']
         pi_half_pulse = self.rabi_amplitudes['piHalfPulse']
         # Get old values
-        q_idx=self.measurementstring.index('q')
-        key=self.measurementstring[q_idx::]
         instr_set = self.data_file['Instrument settings']
         try:
             if self.analyze_ef:
-                pi_pulse_old = float(instr_set[key].attrs['amp180_ef'])
-                pi_half_pulse_old = pi_pulse_old*float(instr_set[key].attrs['amp90_scale_ef'])
+                pi_pulse_old = float(instr_set[self.qb_name].attrs['amp180_ef'])
+                pi_half_pulse_old = pi_pulse_old*float(instr_set[self.qb_name].attrs['amp90_scale_ef'])
             else:
-                pi_pulse_old = float(instr_set[key].attrs['amp180'])
-                pi_half_pulse_old = pi_pulse_old*float(instr_set[key].attrs['amp90_scale'])
+                pi_pulse_old = float(instr_set[self.qb_name].attrs['amp180'])
+                pi_half_pulse_old = pi_pulse_old*float(instr_set[self.qb_name].attrs['amp90_scale'])
         except KeyError:
             pi_pulse_old = 0
             pi_half_pulse_old = 0.5
@@ -2653,14 +2658,12 @@ class QScale_Analysis(TD_Analysis):
         # label=r'$X_{\frac{\pi}{2}}Y_{-\pi}$')
 
         # Get old values
-        q_idx=self.measurementstring.index('q')
-        key=self.measurementstring[q_idx::]
         instr_set = self.data_file['Instrument settings']
         try:
             if self.analyze_ef:
-                qscale_old = float(instr_set[key].attrs['motzoi_ef'])
+                qscale_old = float(instr_set[self.qb_name].attrs['motzoi_ef'])
             else:
-                qscale_old = float(instr_set[key].attrs['motzoi'])
+                qscale_old = float(instr_set[self.qb_name].attrs['motzoi'])
         except KeyError:
             qscale_old = 0
 
@@ -4030,14 +4033,12 @@ class T1_Analysis(TD_Analysis):
         if make_fig:
 
             # Get old values
-            q_idx=self.measurementstring.index('q')
-            key=self.measurementstring[q_idx::]
             instr_set = self.data_file['Instrument settings']
             try:
                 if self.analyze_ef:
-                    T1_old = float(instr_set[key].attrs['T1_ef'])*1e6
+                    T1_old = float(instr_set[self.qb_name].attrs['T1_ef'])*1e6
                 else:
-                    T1_old = float(instr_set[key].attrs['T1'])*1e6
+                    T1_old = float(instr_set[self.qb_name].attrs['T1'])*1e6
             except KeyError:
                 T1_old = 0
 
@@ -4248,15 +4249,13 @@ class Ramsey_Analysis(TD_Analysis):
 
         self.artificial_detuning = kw.pop('artificial_detuning',0)
         show_guess = kw.get('show_guess', False)
-        #self.qubit_freq_spec = kw.pop('qubit_frequency_spec',0)
-        q_idx=self.measurementstring.index('q')
-        key=self.measurementstring[q_idx::]
+        # Get old values for qubit frequency
         instr_set = self.data_file['Instrument settings']
         try:
             if self.analyze_ef:
-                self.qubit_freq_spec = float(instr_set[key].attrs['f_ef_qubit'])
+                self.qubit_freq_spec = float(instr_set[self.qb_name].attrs['f_ef_qubit'])
             else:
-                self.qubit_freq_spec = float(instr_set[key].attrs['f_qubit'])
+                self.qubit_freq_spec = float(instr_set[self.qb_name].attrs['f_qubit'])
         except KeyError:
             self.qubit_freq_spec = 0
 
@@ -4338,46 +4337,178 @@ class Ramsey_Analysis(TD_Analysis):
         return self.T2_star
 
 
-class Ramsey_Analysis_multiple_detunings(Ramsey_Analysis):
+class Ramsey_Analysis_multiple_detunings(TD_Analysis):
 
     def __init__(self, label='Ramsey_mult_det', **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
-        super(Ramsey_Analysis_multiple_detunings, self).__init__(**kw)
+        super(Ramsey_Analysis_multiple_detunings, self).__init__(make_fig=False, **kw)
 
-    def run_default_analysis(self, print_fit_results=False,
-                             unit_prefix='u', show=False,
+    def fit_Ramsey(self, x, y, **kw):
+
+        print_fit_results = kw.pop('print_fit_results',True)
+        damped_osc_mod = fit_mods.ExpDampOscModel
+        average = np.mean(y)
+
+        ft_of_data = np.fft.fft(y)
+        index_of_fourier_maximum = np.argmax(np.abs(
+            ft_of_data[1:len(ft_of_data)//2]))+1
+        max_ramsey_delay = x[-1] - x[0]
+
+        fft_axis_scaling = 1/(max_ramsey_delay)
+        freq_est = fft_axis_scaling*index_of_fourier_maximum
+        est_number_of_periods = index_of_fourier_maximum
+
+        if ((average > 0.7*max(y)) or
+                (est_number_of_periods < 2) or
+                    est_number_of_periods > len(ft_of_data)/2.):
+            print('the trace is too short to find multiple periods')
+
+            if print_fit_results:
+                print('Setting frequency to 0 and ' +
+                      'fitting with decaying exponential.')
+            damped_osc_mod.set_param_hint('frequency',
+                                          value=freq_est,
+                                          vary=False)
+            damped_osc_mod.set_param_hint('phase',
+                                          value=0,
+                                          vary=False)
+        else:
+            damped_osc_mod.set_param_hint('frequency',
+                                          value=freq_est,
+                                          vary=True,
+                                          min=(1/(100 *x[-1])),
+                                          max=(20/x[-1]))
+
+        if (np.average(y[:4]) >
+                np.average(y[4:8])):
+            phase_estimate = 0
+        else:
+            phase_estimate = np.pi
+        damped_osc_mod.set_param_hint('phase',
+                                      value=phase_estimate, vary=True)
+
+        amplitude_guess = 1
+        damped_osc_mod.set_param_hint('amplitude',
+                                      value=amplitude_guess,
+                                      min=0.4,
+                                      max=2.0)
+        damped_osc_mod.set_param_hint('tau',
+                                      value=x[1]*10,
+                                      min=x[1],
+                                      max=x[1]*1000)
+        damped_osc_mod.set_param_hint('exponential_offset',
+                                      value=0.5,
+                                      min=0.4,
+                                      max=1.1)
+        damped_osc_mod.set_param_hint('oscillation_offset',
+                                      value=0,
+                                      vary=False)
+        damped_osc_mod.set_param_hint('n',
+                                      value=1,
+                                      vary=False)
+        self.params = damped_osc_mod.make_params()
+
+        fit_res = damped_osc_mod.fit(data=y,
+                                     t=x,
+                                     params=self.params)
+        if fit_res.chisqr > .35:
+            logging.warning('Fit did not converge, varying phase')
+            fit_res_lst = []
+
+            for phase_estimate in np.linspace(0, 2*np.pi, 8):
+                damped_osc_mod.set_param_hint('phase',
+                                              value=phase_estimate)
+                self.params = damped_osc_mod.make_params()
+                fit_res_lst += [damped_osc_mod.fit(
+                    data=y,
+                    t=x,
+                    params=self.params)]
+
+            chisqr_lst = [fit_res.chisqr for fit_res in fit_res_lst]
+            fit_res = fit_res_lst[np.argmin(chisqr_lst)]
+        self.fit_results.append(fit_res)
+
+        if print_fit_results:
+            print(fit_res.fit_report())
+
+        return fit_res
+
+    def plot_results(self, fit_res, scale=1, show_guess=False, art_det=0,
+                     fig=None, ax=None, textbox=True):
+        units = self.parameter_units[0]
+
+        if textbox:
+            textstr = ('$f_{qubit \_ old}$ = %.7g GHz'
+                       % (self.qubit_freq_spec*1e-9) +
+                       '\n$f_{qubit \_ new}$ = %.7g $ GHz \pm$ (%.5g) GHz'
+                       % (self.qubit_frequency*1e-9,
+                          fit_res.params['frequency'].stderr*1e-9) +
+                       '\n$f_{Ramsey}$ = %.5g $ MHz \pm$ (%.5g) MHz'
+                       % (fit_res.params['frequency'].value*1e-6,
+                          fit_res.params['frequency'].stderr*1e-6) +
+                       '\n$T_2^\star$ = %.6g '
+                       % (fit_res.params['tau'].value*scale)  +
+                       units + ' $\pm$ (%.6g) '
+                       % (fit_res.params['tau'].stderr*scale) +
+                       units +
+                       '\nartificial detuning = %.2g MHz'
+                       % (art_det*1e-6))
+
+            fig.text(0.5, 0, textstr, fontsize=self.font_size,
+                     transform=ax.transAxes,
+                     verticalalignment='top',
+                     horizontalalignment='center', bbox=self.box_props)
+
+        x = np.linspace(self.sweep_points[0],
+                        self.sweep_points[-self.NoCalPoints-1],
+                        len(self.sweep_points)*100)
+
+        if show_guess:
+            y_init = fit_mods.ExpDampOscFunc(x, **fit_res.init_values)
+            ax.plot(x*scale, y_init, 'k--', linewidth=self.line_width)
+
+        best_vals = fit_res.best_values
+        y = fit_mods.ExpDampOscFunc(
+            x, tau=best_vals['tau'],
+            n=best_vals['n'],
+            frequency=best_vals['frequency'],
+            phase=best_vals['phase'],
+            amplitude=best_vals['amplitude'],
+            oscillation_offset=best_vals['oscillation_offset'],
+            exponential_offset=best_vals['exponential_offset'])
+        ax.plot(x*scale, y, 'r-',linewidth=self.line_width)
+
+    def run_default_analysis(self, unit_prefix='u', show=False,
                              close_file=False, **kw):
 
-        # super().run_default_analysis(show=show,
-        #                              close_file=close_file,unit_prefix=unit_prefix,
-        #                              close_main_figure=True,save_fig=False,**kw)
+        super().run_default_analysis(show=show,
+                                     close_file=close_file,unit_prefix=unit_prefix,
+                                     close_main_figure=True,save_fig=False,**kw)
 
-        self.get_naming_and_values()
-        self.add_analysis_datagroup_to_file()
-
-        norm = self.normalize_data_to_calibration_points(
-            self.measured_values[0], calsteps=self.NoCalPoints)
-        self.normalized_values = norm[0]
-        self.normalized_data_points = norm[1]
-        self.normalized_cal_vals = norm[2]
-
-        self.add_dataset_to_analysisgroup('Corrected data',
-                                          self.corr_data)
-        self.analysis_group.attrs.create('corrected data based on',
-                                         'calibration points'.encode('utf-8'))
+        # self.get_naming_and_values()
+        # self.add_analysis_datagroup_to_file()
+        #
+        # norm = self.normalize_data_to_calibration_points(
+        #     self.measured_values[0], calsteps=self.NoCalPoints)
+        # self.normalized_values = norm[0]
+        # self.normalized_data_points = norm[1]
+        # self.normalized_cal_vals = norm[2]
+        #
+        # self.add_dataset_to_analysisgroup('Corrected data',
+        #                                   self.corr_data)
+        # self.analysis_group.attrs.create('corrected data based on',
+        #                                  'calibration points'.encode('utf-8'))
 
         self.artificial_detunings = kw.pop('artificial_detunings',[-4e6,4e6])
 
         # Get old qubit frequency from data file
-        q_idx=self.measurementstring.index('q')
-        key=self.measurementstring[q_idx::]
         instr_set = self.data_file['Instrument settings']
         try:
             if self.analyze_ef:
-                self.qubit_freq_spec = float(instr_set[key].attrs['f_ef_qubit'])
+                self.qubit_freq_spec = float(instr_set[self.qb_name].attrs['f_ef_qubit'])
             else:
-                self.qubit_freq_spec = float(instr_set[key].attrs['f_qubit'])
+                self.qubit_freq_spec = float(instr_set[self.qb_name].attrs['f_qubit'])
         except KeyError:
             self.qubit_freq_spec = 0
         scale = self.scales_dict[unit_prefix]
@@ -4391,9 +4522,9 @@ class Ramsey_Analysis_multiple_detunings(Ramsey_Analysis):
 
         #Perform fit
         fit_res_1 = self.fit_Ramsey(x=sweep_pts_1,
-                                       y=ramsey_data_1, **kw)
+                                    y=ramsey_data_1, **kw)
         fit_res_2 = self.fit_Ramsey(x=sweep_pts_2,
-                                         y=ramsey_data_2, **kw)
+                                    y=ramsey_data_2, **kw)
 
         ramsey_freq_dict_1 = self.get_measured_freq(fit_res=fit_res_1, **kw)
         ramsey_freq_1 = ramsey_freq_dict_1['freq']
@@ -4439,7 +4570,7 @@ class Ramsey_Analysis_multiple_detunings(Ramsey_Analysis):
             self.fit_res = fit_res_1
             self.ramsey_data = ramsey_data_1
             self.sweep_pts = sweep_pts_1
-            self.ramsey_freq = ramsey_freq_1
+            self.good_ramsey_freq = ramsey_freq_1
             qb_stderr = ramsey_freq_dict_1['freq_stderr']
         else:
             # art_det 2 was correct direction
@@ -4448,7 +4579,7 @@ class Ramsey_Analysis_multiple_detunings(Ramsey_Analysis):
             self.fit_res = fit_res_2
             self.ramsey_data = ramsey_data_2
             self.sweep_pts = sweep_pts_2
-            self.ramsey_freq = ramsey_freq_2
+            self.good_ramsey_freq = ramsey_freq_2
             qb_stderr = ramsey_freq_dict_2['freq_stderr']
 
         self.save_fitted_parameters(self.fit_res, var_name=self.value_names[0])
@@ -4479,14 +4610,16 @@ class Ramsey_Analysis_multiple_detunings(Ramsey_Analysis):
 
         units = self.parameter_units[0]
         fit_res_array = [fit_res_1, fit_res_2]
+        ramsey_data_dict = {'0':ramsey_data_1,
+                            '1':ramsey_data_2}
         for i in range(len_art_det):
             ax = self.axs[i]
             self.plot_results_vs_sweepparam(x=self.sweep_pts*scale,
-                                            y=self.ramsey_data,
+                                            y=ramsey_data_dict[str(i)],
                                             fig=self.fig, ax=ax,
                                             xlabel=self.xlabel,
                                             ylabel=ylabel,
-                                            marker='o-',
+                                            marker='o',
                                             save=False)
             self.plot_results(fit_res_array[i], show_guess=show_guess,
                               scale=scale, art_det=self.artificial_detunings[i],
@@ -4522,7 +4655,7 @@ class Ramsey_Analysis_multiple_detunings(Ramsey_Analysis):
                               transform=self.axs[i].transAxes,
                               verticalalignment='top',
                               horizontalalignment='center', bbox=self.box_props)
-        
+
         #Print the T2_star values on screen
         unit = self.parameter_units[0][-1]
         if kw.pop('print_parameters',True):
@@ -5507,11 +5640,10 @@ class Homodyne_Analysis(MeasurementAnalysis):
 
         fig, ax = self.default_ax()
 
-        q_idx=self.measurementstring.index('q')
-        key=self.measurementstring[q_idx::]
+
         instr_set = self.data_file['Instrument settings']
         try:
-            old_RO_freq = float(instr_set[key].attrs['f_RO'])
+            old_RO_freq = float(instr_set[self.qb_name].attrs['f_RO'])
         except KeyError:
             old_RO_freq = 0
 
@@ -6113,17 +6245,15 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                                     var_name='distance', save_peaks=True)
 
         # Plotting distance from |0>
-        q_idx=self.measurementstring.index('q')
-        key=self.measurementstring[q_idx::]
         instr_set = self.data_file['Instrument settings']
 
         if analyze_ef:
             try:
-                old_freq = float(instr_set[key].attrs['f_qubit'])
+                old_freq = float(instr_set[self.qb_name].attrs['f_qubit'])
             except KeyError:
                 old_freq = 0
             try:
-                old_freq_ef = float(instr_set[key].attrs['f_ef_qubit'])
+                old_freq_ef = float(instr_set[self.qb_name].attrs['f_ef_qubit'])
             except KeyError:
                 old_freq_ef = 0
             label = 'f0={:.5f} GHz $\pm$ ({:.2f}) MHz ' \
@@ -6144,7 +6274,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                 self.fit_res.params['kappa_gf_over_2'].stderr/1e6)
         else:
             try:
-                old_freq = float(instr_set[key].attrs['f_qubit'])
+                old_freq = float(instr_set[self.qb_name].attrs['f_qubit'])
             except KeyError:
                 old_freq = 0
             label = 'f0={:.5f} GHz $\pm$ ({:.2f}) MHz ' \
