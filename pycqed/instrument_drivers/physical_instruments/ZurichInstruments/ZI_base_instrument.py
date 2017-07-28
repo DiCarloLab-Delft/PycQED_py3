@@ -1,5 +1,6 @@
 import time
 import json
+import os
 import numpy as np
 
 from qcodes.instrument.base import Instrument
@@ -9,8 +10,7 @@ from qcodes.utils import validators as vals
 class ZI_base_instrument(Instrument):
 
     """
-    This is an abstract base class for Zuric Instruments instrument drivers.
-
+    This is an abstract base class for Zurich Instruments instrument drivers.
     """
 
     def add_s_node_pars(self, filename: str):
@@ -117,10 +117,14 @@ class ZI_base_instrument(Instrument):
         # set the file names to write to
         dev_type = self._dev.daq.getByte(
             '/{}/features/devtype'.format(self._devname))
-        # Watch out this writes the file to the directory from which you
-        # call this command
-        s_file_name = 's_node_pars_{}.json'.format(dev_type)
-        d_file_name = 'd_node_pars_{}.json'.format(dev_type)
+
+        # Watch out this overwrites the existing json parameter files
+        path = os.path.abspath(__file__)
+        dir_path = os.path.dirname(path)
+        s_file_name = os.path.join(dir_path, 'zi_parameter_files',
+                                   's_node_pars_{}.json'.format(dev_type))
+        d_file_name = os.path.join(dir_path, 'zi_parameter_files',
+                                   'd_node_pars_{}.json'.format(dev_type))
 
         s_node_pars = []
         d_node_pars = []

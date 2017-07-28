@@ -9,7 +9,7 @@ from qcodes.instrument.parameter import ManualParameter
 
 class ZI_HDAWG8(ZI_base_instrument):
     """
-    This is PycQED/QCoDeS driver driver for the ZI_HDAWG8.
+    This is PycQED/QCoDeS driver driver for the Zurich Instruments HD AWG-8.
 
     Parameter files are generated from the python API of the instrument
     using the "create_parameter_files" method in the ZI_base_instrument class.
