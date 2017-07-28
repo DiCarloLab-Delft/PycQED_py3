@@ -2,10 +2,12 @@
 Currently empty should contain the plotting tools portion of the
 analysis toolbox
 '''
+import matplotlib.pyplot as plt
+import colorsys as colors
 import numpy as np
 
-SI_PREFIXES = 'yzafpnum kMGTPEZY'
-SI_UNITS = 'm,s,g,W,J,V,A,F,T,Hz,Ohm,S,N,C,px,b,B'.split(',')
+SI_PREFIXES = 'yzafpnμm kMGTPEZY'
+SI_UNITS = 'm,s,g,W,J,V,A,F,T,Hz,Ohm,S,N,C,px,b,B,K,Bar'.split(',')
 
 
 def set_xlabel(axis, label, unit=None, **kw):
@@ -83,6 +85,32 @@ def SI_prefix_and_scale_factor(val, unit=None):
     return scale_factor, unit
 
 
+def data_to_table_png(data: list, filename: str, title: str='',
+                      close_fig: bool=True):
+    """
+    Takes in a list of list containing the data to be
+    put in a table and saves this as a png.
+    """
+    # Determine the shape of the table
+    nrows, ncols = np.shape(data)
+    hcell, wcell = 0.3, 2.
+    hpad, wpad = 0.5, 0
+
+    fig = plt.figure(figsize=(ncols*wcell+wpad, nrows*hcell+hpad))
+    ax = fig.add_subplot(111)
+    ax.axis('off')
+    # make the table
+    table = ax.table(cellText=data,
+                     loc='center')
+    # rescale to make it more readable
+    table.scale(1, 1.5)
+    ax.set_title(title)
+    fig.tight_layout()
+    plt.savefig(filename, dpi=450)
+    if close_fig:
+        plt.close(fig)
+
+
 def annotate_point_pair(ax, text, xy_start, xy_end, xycoords='data',
                         text_offset=(-10, -5), arrowprops=None, **kw):
     '''
@@ -119,11 +147,6 @@ def annotate_point_pair(ax, text, xy_start, xy_end, xycoords='data',
                 text_offset[1] * np.cos(text_angle)),
         textcoords='offset points', **kw)
     return label
-
-
-import numpy as np
-import matplotlib.pyplot as plt
-import colorsys as colors
 
 
 def get_color_order(i, max_num):
@@ -200,8 +223,6 @@ def flex_color_plot_vs_x(xvals, yvals, zvals, ax=None,
             colormaps.append(
                 ax.pcolor(xvertices[xx], yvertices[xx], tempzvals, cmap=cmap,
                           alpha=alpha))
-        #XX, YY = np.meshgrid(xvertices[xx:xx+2],yvertices[xx])
-        # ax1.pcolor(XX,YY,tempzvals,cmap=cmap)
 
     return {'fig': ax.figure, 'ax': ax,
             'cmap': colormaps[0], 'cmaps': colormaps}
@@ -212,8 +233,10 @@ def flex_colormesh_plot_vs_xy(xvals, yvals, zvals, ax=None,
                               save_name=None, **kw):
     """
     Add a rectangular block to a color plot using pcolormesh.
-    xvals and yvals should be single vectors with values for the two sweep points.
-    zvals should be a list of arrays with the measured values with shape (len(yvals), len(xvals)).
+    xvals and yvals should be single vectors with values for the
+    two sweep points.
+    zvals should be a list of arrays with the measured values with shape
+    (len(yvals), len(xvals)).
     """
     # create a figure and set of axes
     if ax is None:
@@ -251,8 +274,6 @@ def flex_colormesh_plot_vs_xy(xvals, yvals, zvals, ax=None,
         for xx in range(len(xvals)):
             zvals[xx] = np.log(zvals[xx])/np.log(10)
 
-    alpha = kw.pop('alpha', 1)
-
     # add blocks to plot
     # hold = kw.pop('hold',False)
     do_transpose = kw.pop('transpose', False)
@@ -266,3 +287,14 @@ def flex_colormesh_plot_vs_xy(xvals, yvals, zvals, ax=None,
                                  vmin=clim[0], vmax=clim[1])
 
     return {'fig': ax.figure, 'ax': ax, 'cmap': colormap}
+
+
+def autolabel_barplot(ax, rects, rotation=90):
+    """
+    Attach a text label above each bar displaying its height
+    """
+    for rect in rects:
+        height = rect.get_height()
+        ax.text(rect.get_x() + rect.get_width()/2., 0.5*height,
+                '%.2f' % (height),
+                ha='center', va='bottom', rotation=rotation)

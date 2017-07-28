@@ -1258,7 +1258,8 @@ class UHFQC_input_average_detector(Hard_Detector):
     Has two acq_modes, 'IQ' and 'AmpPhase'
     '''
 
-    def __init__(self, UHFQC, AWG=None, channels=[0, 1], nr_averages=1024, nr_samples=4096, **kw):
+    def __init__(self, UHFQC, AWG=None, channels=(0, 1),
+                 nr_averages=1024, nr_samples=4096, **kw):
         super(UHFQC_input_average_detector, self).__init__()
         self.UHFQC = UHFQC
         self.name = 'UHFQC_Streaming_data'
@@ -1310,30 +1311,68 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
     '''
 
-    def __init__(self, UHFQC, AWG=None, integration_length=1e-6,
-                 nr_averages=1024, rotate=False, real_imag=True,
-                 channels=[0, 1, 2, 3], cross_talk_suppression=False,
+    def __init__(self, UHFQC, AWG=None,
+                 integration_length=1e-6, nr_averages=1024,
+                 channels=(0, 1, 2, 3), result_logging_mode='raw',
+                 real_imag=True,
                  seg_per_point=1, single_int_avg=False,
                  **kw):
-        super(UHFQC_integrated_average_detector, self).__init__()
+        """
+        Args:
+        UHFQC (instrument) : data acquisition device
+        AWG   (instrument) : device responsible for starting and stopping
+                the experiment, can also be a central controller
+
+        integration_length (float): integration length in seconds
+        nr_averages (int)         : nr of averages per data point
+
+        result_logging_mode (str) :  options are
+            - raw        -> returns raw data in V
+            - lin_trans  -> applies the linear transformation matrix and
+                            subtracts the offsets defined in the UFHQC.
+                            This is typically used for crosstalk suppression
+                            and normalization. Requires optimal weights.
+            - digitized  -> returns fraction of shots based on the threshold
+                            defined in the UFHQC. Requires optimal weights.
+
+        real_imag (bool)     : if False returns data in polar coordinates
+                                useful for e.g., spectroscopy
+                                #FIXME -> should be named "polar"
+        seg_per_point (int)  : number of segments per sweep point
+        single_int_avg (bool): if True makes this a soft detector
+        """
+
+        super().__init__()
         self.UHFQC = UHFQC
-        self.name = 'UHFQC_integrated_average'
+        self.name = '{}_UHFQC_integrated_average'.format(result_logging_mode)
         self.channels = channels
         self.value_names = ['']*len(self.channels)
-        self.value_units = ['']*len(self.channels)
-        self.cal_points = kw.get('cal_points', None)
-        self.single_int_avg = single_int_avg
+        for i, channel in enumerate(self.channels):
+            self.value_names[i] = '{} w{}'.format(result_logging_mode,
+                                                  channel)
+        if result_logging_mode == 'raw':
+            self.value_units = ['V']*len(self.channels)
+            self.scaling_factor = 1/(1.8e9*integration_length*nr_averages)
+        else:
+            self.value_units = ['']*len(self.channels)
+            self.scaling_factor = 1/nr_averages
 
-        self._set_real_imag(real_imag)
+        self.single_int_avg = single_int_avg
+        if self.single_int_avg:
+            self.detector_control = 'soft'
+
         self.seg_per_point = seg_per_point
-        self.rotate = rotate
 
         self.AWG = AWG
         self.nr_averages = nr_averages
         self.integration_length = integration_length
-        self.rotate = rotate
-        self.cross_talk_suppression = cross_talk_suppression
-        self.scaling_factor = 1/(1.8e9*integration_length*self.nr_averages)
+
+        # 0/1/2 crosstalk supressed /digitized/raw
+        res_logging_indices = {'lin_trans': 0, 'digitized': 1, 'raw': 2}
+        self.result_logging_mode_idx = res_logging_indices[result_logging_mode]
+        self.result_logging_mode = result_logging_mode
+
+        self._set_real_imag(real_imag)
 
     def _set_real_imag(self, real_imag=False):
         """
@@ -1341,18 +1380,19 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         """
 
         self.real_imag = real_imag
-        for i, channel in enumerate(self.channels):
-            self.value_names[i] = 'w{}'.format(channel)
-            self.value_units[i] = 'V'
+        if self.result_logging_mode == 'raw':
+            self.value_units = ['V']*len(self.channels)
+        else:
+            self.value_units = ['']*len(self.channels)
 
         if not self.real_imag:
+            if len(self.channels) != 2:
+                raise ValueError()
             self.value_names[0] = 'Magn'
             self.value_names[1] = 'Phase'
             self.value_units[1] = 'deg'
 
     def get_values(self):
-        self.scaling_factor = 1 / \
-            (1.8e9*self.integration_length*self.nr_averages)
         if self.AWG is not None:
             self.AWG.stop()
         self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
@@ -1361,67 +1401,56 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         if self.AWG is not None:
             self.AWG.start()
 
-        data_raw = self.UHFQC.acquisition_poll(samples=self.nr_sweep_points,
-                                               arm=False, acquisition_time=0.01)
+        data_raw = self.UHFQC.acquisition_poll(
+            samples=self.nr_sweep_points, arm=False, acquisition_time=0.01)
         data = np.array([data_raw[key]
                          for key in data_raw.keys()])*self.scaling_factor
-        if not self.real_imag:
-            I = data[0]
-            Q = data[1]
-            S21 = I + 1j*Q
-            data[0] = np.abs(S21)
-            data[1] = np.angle(S21)/(2*np.pi)*360
 
-        if self.rotate:
-            return self.rotate_and_normalize(data)
-        else:
-            return data
+        # Corrects offsets after crosstalk suppression matrix in UFHQC
+        if self.result_logging_mode == 'lin_trans':
+            for i, channel in enumerate(self.channels):
+                data[i] = data[i]-self.UHFQC.get(
+                    'quex_trans_offset_weightfunction_{}'.format(channel))
+
+        if not self.real_imag:
+            data = self.convert_to_polar(data)
+
+        return data
+
+    def convert_to_polar(self, data):
+        I = data[0]
+        Q = data[1]
+        S21 = I + 1j*Q
+        data[0] = np.abs(S21)
+        data[1] = np.angle(S21)/(2*np.pi)*360
+        return data
 
     def acquire_data_point(self):
         return self.get_values()
 
-    def rotate_and_normalize(self, data):
-        """
-        Rotates and normalizes
-        """
-        if self.cal_points is None:
-            self.corr_data, self.zero_coord, self.one_coord = \
-                a_tools.rotate_and_normalize_data(
-                    data=data,
-                    cal_zero_points=list(range(-4, -2)),
-                    cal_one_points=list(range(-2, 0)))
-        else:
-            self.corr_data, self.zero_coord, self.one_coord = \
-                a_tools.rotate_and_normalize_data(
-                    data=self.measured_values[0:2],
-                    cal_zero_points=self.cal_points[0],
-                    cal_one_points=self.cal_points[1])
-        return self.corr_data, self.corr_data
-
     def prepare(self, sweep_points=None):
         if self.AWG is not None:
             self.AWG.stop()
-        if sweep_points is None or self.single_int_avg:
 
+        # Determine the number of sweep points and set them
+        if sweep_points is None or self.single_int_avg:
+            # this case will be used when it is a soft detector
             self.nr_sweep_points = self.seg_per_point
         else:
             self.nr_sweep_points = len(sweep_points)*self.seg_per_point
         # this sets the result to integration and rotation outcome
-        if self.cross_talk_suppression:
-            # 2/0/1 raw/crosstalk supressed /digitized
-            self.UHFQC.quex_rl_source(0)
-        else:
-            # 2/0/1 raw/crosstalk supressed /digitized
-            self.UHFQC.quex_rl_source(2)
+
+        self.UHFQC.awgs_0_userregs_0(
+            int(self.nr_averages*self.nr_sweep_points))
+        self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)
+        # The AWG program uses userregs/0 to define the number of iterations in
+        # the loop
+
         self.UHFQC.quex_rl_length(self.nr_sweep_points)
         self.UHFQC.quex_rl_avgcnt(int(np.log2(self.nr_averages)))
         self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
-        # Configure the result logger to not do any averaging
-        # The AWG program uses userregs/0 to define the number o iterations in
-        # the loop
-        self.UHFQC.awgs_0_userregs_0(
-            int(self.nr_averages*self.nr_sweep_points))
-        self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg
+
+        self.UHFQC.quex_rl_source(self.result_logging_mode_idx)
         self.UHFQC.acquisition_initialize(channels=self.channels, mode='rl')
 
     def finish(self):
@@ -1440,15 +1469,15 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
 
     def __init__(self, UHFQC, AWG=None, integration_length=1e-6,
                  nr_averages=1024, rotate=False, real_imag=True,
-                 channels=[0, 1], correlations=[(0, 1)],
+                 channels=(0, 1), correlations=[(0, 1)],
                  seg_per_point=1, single_int_avg=False,
                  **kw):
-        super(UHFQC_correlation_detector, self).__init__(
+        super().__init__(
             UHFQC, AWG=AWG, integration_length=integration_length,
-            nr_averages=nr_averages, rotate=rotate, real_imag=real_imag,
+            nr_averages=nr_averages, real_imag=real_imag,
             channels=channels,
             seg_per_point=seg_per_point, single_int_avg=single_int_avg,
-            cross_talk_suppression=False,
+            result_logging_mode='raw',  # FIXME -> do the proper thing (MAR)
             **kw)
         self.correlations = correlations
 
@@ -1531,6 +1560,54 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             self.UHFQC.set('quex_corr_{}_source'.format(correlation_channel),
                            corr[1])
 
+            # If thresholding is enabled, set the threshold for the correlation
+            # channel.
+            if self.thresholding:
+                thresh_level = \
+                    self.UHFQC.get('quex_thres_{}_level'.format(corr[0]))
+                self.UHFQC.set(
+                    'quex_thres_{}_level'.format(correlation_channel),
+                    thresh_level)
+
+    def get_values(self):
+        # Slightly different way to deal with scaling factor
+        self.scaling_factor = 1 / (1.8e9*self.integration_length)
+
+        if self.AWG is not None:
+            self.AWG.stop()
+        self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
+        self.UHFQC.acquisition_arm()
+        # starting AWG
+        if self.AWG is not None:
+            self.AWG.start()
+
+        data_raw = self.UHFQC.acquisition_poll(samples=self.nr_sweep_points,
+                                               arm=False,
+                                               acquisition_time=0.01)
+
+        data = []
+        if self.thresholding:
+            for key in data_raw.keys():
+                data.append(np.array(data_raw[key]))
+        else:
+            for key in data_raw.keys():
+                if key in self.correlation_channels:
+                    data.append(np.array(data_raw[key]) *
+                                (self.scaling_factor**2 / self.nr_averages))
+                else:
+                    data.append(np.array(data_raw[key]) *
+                                (self.scaling_factor / self.nr_averages))
+
+        if not self.real_imag:
+            I = data[0]
+            Q = data[1]
+            S21 = I + 1j*Q
+            data[0] = np.abs(S21)
+            data[1] = np.angle(S21)/(2*np.pi)*360
+
+        else:
+            return data
+
 
 class UHFQC_integration_logging_det(Hard_Detector):
 
@@ -1539,26 +1616,54 @@ class UHFQC_integration_logging_det(Hard_Detector):
 
     '''
 
-    def __init__(self, UHFQC, AWG, integration_length=1e-6,
-                 channels=[0, 1], nr_shots=4094,
-                 cross_talk_suppression=False,  **kw):
-        super(UHFQC_integration_logging_det, self).__init__()
+    def __init__(self, UHFQC, AWG=None,
+                 integration_length=1e-6,
+                 nr_shots=4094,
+                 channels=(0, 1),
+                 result_logging_mode='raw', **kw):
+        """
+        Args:
+        UHFQC (instrument) : data acquisition device
+        AWG   (instrument) : device responsible for starting and stopping
+                             the experiment, can also be a central controller.
+        integration_length (float): integration length in seconds
+        nr_shots (int)     : nr of shots (max is 4095)
+        channels (list)    : index (channel) of UHFQC weight functions to use
+
+        result_logging_mode (str):  options are
+            - raw        -> returns raw data in V
+            - lin_trans  -> applies the linear transformation matrix and
+                            subtracts the offsets defined in the UFHQC.
+                            This is typically used for crosstalk suppression
+                            and normalization. Requires optimal weights.
+            - digitized  -> returns fraction of shots based on the threshold
+                            defined in the UFHQC. Requires optimal weights.
+        """
+        super().__init__()
         self.UHFQC = UHFQC
-        self.name = 'UHFQC_integration_logging_det'
+        self.name = '{}_UHFQC_integration_logging_det'.format(
+            result_logging_mode)
         self.channels = channels
+
         self.value_names = ['']*len(self.channels)
-        self.value_units = ['']*len(self.channels)
         for i, channel in enumerate(self.channels):
-            self.value_names[i] = 'w{}'.format(channel)
-            self.value_units[i] = 'V'
-        if len(self.channels) == 2:
-            self.value_names = ['I', 'Q']
-            self.value_units = ['V', 'V']
+            self.value_names[i] = '{} w{}'.format(result_logging_mode,
+                                                  channel)
+        if result_logging_mode == 'raw':
+            self.value_units = ['V']*len(self.channels)
+            self.scaling_factor = 1/(1.8e9*integration_length)
+        else:
+            self.value_units = ['']*len(self.channels)
+            self.scaling_factor = 1
+
         self.AWG = AWG
         self.integration_length = integration_length
         self.nr_shots = nr_shots
-        self.cross_talk_suppression = cross_talk_suppression
-        self.scaling_factor = 1/(1.8e9*integration_length)
+
+        # 0/1/2 crosstalk supressed /digitized/raw
+        res_logging_indices = {'lin_trans': 0, 'digitized': 1, 'raw': 2}
+        self.result_logging_mode_idx = res_logging_indices[result_logging_mode]
+        self.result_logging_mode = result_logging_mode
 
     def get_values(self):
         if self.AWG is not None:
@@ -1574,32 +1679,31 @@ class UHFQC_integration_logging_det(Hard_Detector):
         data = np.array([data_raw[key]
                          for key in data_raw.keys()])*self.scaling_factor
 
-        # offset suppression to be reimplemented
-        # if self.cross_talk_suppression:
-        #     data[i]=data[i]-eval("self.UHFQC.quex_trans_offset_weightfunction_{}()".format(channel))
+        # Corrects offsets after crosstalk suppression matrix in UFHQC
+        if self.result_logging_mode == 'lin_trans':
+            for i, channel in enumerate(self.channels):
+                data[i] = data[i]-self.UHFQC.get(
+                    'quex_trans_offset_weightfunction_{}'.format(channel))
         return data
 
     def prepare(self, sweep_points):
         if self.AWG is not None:
             self.AWG.stop()
+
         # The averaging-count is used to specify how many times the AWG program
         # should run
 
-        # The AWG program uses userregs/0 to define the number o iterations in
-        # the loop
         self.UHFQC.awgs_0_single(1)
-        self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg
         self.UHFQC.awgs_0_userregs_0(self.nr_shots)
+        self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)
+        # The AWG program uses userregs/0 to define the number of iterations
+        # in the loop
+
         self.UHFQC.quex_rl_length(self.nr_shots)
-        self.UHFQC.quex_rl_avgcnt(0)  # 1 for single shot readout
+        self.UHFQC.quex_rl_avgcnt(0)  # log2(1) for single shot readout
         self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
-        # this sets the result to integration and rotation outcome
-        if self.cross_talk_suppression:
-            # 0/1/2 crosstalk supressed /digitized/raw
-            self.UHFQC.quex_rl_source(0)
-        else:
-            # 0/1/2 crosstalk supressed /digitized/raw
-            self.UHFQC.quex_rl_source(2)
+
+        self.UHFQC.quex_rl_source(self.result_logging_mode_idx)
         self.UHFQC.acquisition_initialize(channels=self.channels, mode='rl')
 
     def finish(self):
@@ -1789,7 +1893,7 @@ class DDM_integrated_average_detector(Hard_Detector):
     '''
 
     def __init__(self, DDM, AWG, integration_length=1e-6, nr_averages=1024, rotate=False,
-                 channels=[1, 2, 3, 4, 5], cross_talk_suppression=False,
+                 channels=[1, 2, 3, 4, 5], crosstalk_suppression=False,
                  **kw):
         super(DDM_integrated_average_detector, self).__init__()
         self.DDM = DDM
@@ -1806,7 +1910,7 @@ class DDM_integrated_average_detector(Hard_Detector):
         self.nr_averages = nr_averages
         self.integration_length = integration_length
         self.rotate = rotate
-        self.cross_talk_suppression = cross_talk_suppression
+        self.crosstalk_suppression = crosstalk_suppression
         self.scaling_factor = 1/(500e6*integration_length)/127
 
     def prepare(self, sweep_points=None):
