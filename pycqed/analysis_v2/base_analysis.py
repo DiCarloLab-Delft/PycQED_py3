@@ -1,9 +1,6 @@
 """
 File containing the BaseDataAnalyis class.
 This is based on the REM analysis from PycQED_py2 (as of July 7 2017)
-
-
-
 """
 import os
 import numpy as np
@@ -11,11 +8,9 @@ import numpy as np
 
 from matplotlib import pyplot as plt
 from pycqed.analysis import analysis_toolbox as a_tools
-from pycqed.analysis import fitting_models as fit_mods
 import pycqed.analysis_v2.default_figure_settings_analysis as def_fig
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import datetime
-# import SSRO_generic
 import json
 import lmfit
 gco = a_tools.get_color_order
@@ -96,7 +91,7 @@ class BaseDataAnalysis(object):
         self.tight_fig = options_dict.get('tight_fig', True)
         self.do_timestamp_blocks = options_dict.get('do_blocks', False)
         self.filter_no_analysis = options_dict.get('filter_no_analysis', False)
-        self.exact_label_match = options_dict.get('exact_label_match',False)
+        self.exact_label_match = options_dict.get('exact_label_match', False)
         self.verbose = options_dict.get('verbose', False)
         self.auto_keys = options_dict.get('auto_keys', None)
         if type(self.auto_keys) is str:
@@ -317,10 +312,12 @@ class BaseDataAnalysis(object):
         pass
 
     def run_fitting(self):
-        # This function does the fitting and saving of the parameters
-        # based on the fit_dict options.
-        # Only model fitting is implemented yet. Minimizing fitting should
-        # be implemented here.
+        '''
+        This function does the fitting and saving of the parameters
+        based on the fit_dict options.
+        Only model fitting is implemented here. Minimizing fitting should
+        be implemented here.
+        '''
         fit_guess_fn = self.fit_dict['fit_guess_fn']
         fit_fn = self.fit_dict['fit_fn']
         fit_yvals = self.fit_dict['fit_yvals']
@@ -334,17 +331,15 @@ class BaseDataAnalysis(object):
                 for key, val in list(guess_dict.items()):
                     model.set_param_hint(key, **val)
                 params = model.make_params()
-                self.fit_dict['fit_results'].append(model.fit(fit_yvals[tt],
-                                                              params=params,
-                                                              **fit_xvals[tt]))
+                self.fit_dict['fit_results'].append(
+                    model.fit(fit_yvals[tt], params=params, **fit_xvals[tt]))
         else:
             guess_dict = fit_guess_fn(fit_yvals, **fit_xvals)
             for key, val in list(guess_dict.items()):
-                    model.set_param_hint(key, **val)
+                model.set_param_hint(key, **val)
             params = model.make_params()
-            self.fit_dict['fit_results'] = model.fit(fit_yvals,
-                                                     params=params,
-                                                     **fit_xvals)
+            self.fit_dict['fit_results'] = model.fit(
+                fit_yvals, params=params, **fit_xvals)
 
     def plot(self, key_list=None, axs_dict=None,
              presentation_mode=None, no_label=False):
@@ -462,7 +457,6 @@ class BaseDataAnalysis(object):
 
         if do_legend:
             legend_pos = pdict.get('legend_pos', 'best')
-            # box_props = dict(boxstyle='Square', facecolor='white', alpha=0.6)
             legend = axs.legend(loc=legend_pos, frameon=1)
             frame = legend.get_frame()
             frame.set_alpha(0.8)
@@ -669,7 +663,7 @@ class BaseDataAnalysis(object):
         plot_zrange = pdict.get('zrange', None)
         plot_yrange = pdict.get('yrange', None)
         plot_xrange = pdict.get('xrange', None)
-        plot_xwidth = pdict.get('xwidth',None)
+        plot_xwidth = pdict.get('xwidth', None)
         plot_transpose = pdict.get('transpose', False)
         plot_nolabel = pdict.get('no_label', False)
         plot_normalize = pdict.get('normalize', False)
@@ -690,7 +684,6 @@ class BaseDataAnalysis(object):
             fig_clim = plot_zrange
         else:
             fig_clim = [None, None]
-
 
         if self.do_timestamp_blocks:
             for tt in range(len(plot_zvals)):
@@ -720,10 +713,10 @@ class BaseDataAnalysis(object):
 
         if plot_xrange is None:
             if plot_xwidth is not None:
-                xmin, xmax = min([min(xvals)-plot_xwidth[tt]/2 \
-                                for tt, xvals in enumerate(plot_xvals)]), \
-                            max([max(xvals)+plot_xwidth[tt]/2 \
-                                for tt, xvals in enumerate(plot_xvals)])
+                xmin, xmax = min([min(xvals)-plot_xwidth[tt]/2
+                                  for tt, xvals in enumerate(plot_xvals)]), \
+                    max([max(xvals)+plot_xwidth[tt]/2
+                         for tt, xvals in enumerate(plot_xvals)])
             else:
                 xmin, xmax = plot_xvals.min()-plot_xvals_step / \
                     2., plot_xvals.max()+plot_xvals_step/2.
@@ -736,10 +729,10 @@ class BaseDataAnalysis(object):
 
         if plot_yrange is None:
             if plot_xwidth is not None:
-                ymin, ymax = min([min(yvals[0]) \
-                                for tt, yvals in enumerate(plot_yvals)]), \
-                            max([max(yvals[0])\
-                                for tt, yvals in enumerate(plot_yvals)])
+                ymin, ymax = min([min(yvals[0])
+                                  for tt, yvals in enumerate(plot_yvals)]), \
+                    max([max(yvals[0])
+                         for tt, yvals in enumerate(plot_yvals)])
 
             else:
                 ymin, ymax = plot_yvals.min()-plot_yvals_step / \
