@@ -1,4 +1,3 @@
-import numpy as np
 import unittest
 import pycqed as pq
 import os
@@ -26,9 +25,8 @@ class Test_flipping_analysis(unittest.TestCase):
         self._check_scaling('20170726_164619', 0.95, 2)
         self._check_scaling('20170726_164635', 0.99, 2)
         self._check_scaling('20170726_164649', 0.99, 2)
-
-        # self._check_scaling('20170726_164704', 1, 2)
-        # self._check_scaling('20170726_164718', 1, 2)
+        self._check_scaling('20170726_164704', 1, 2)
+        self._check_scaling('20170726_164718', 1, 2)
         self._check_scaling('20170726_164733', 1.01, 2)
         self._check_scaling('20170726_164747', 1.01, 2)
         self._check_scaling('20170726_164802', 1.05, 1)
@@ -39,9 +37,13 @@ class Test_flipping_analysis(unittest.TestCase):
         # 20% detuning only works for coarse
         self._check_scaling('20170726_164901', 1.2, 1)
 
+        # Test running it once with showing the initial fit
+        ma.FlippingAnalysis(t_start='20170726_164901',
+                            options_dict={'plot_init': True})
+
     def _check_scaling(self, timestamp, known_detuning, places):
         a = ma.FlippingAnalysis(t_start=timestamp)
-        s = a.get_scaling_factor()
+        s = a.get_scale_factor()
         self.assertAlmostEqual(s*known_detuning, 1, places=places)
         print('Scale factor {:.4f} known detuning {:.4f}'.format(
             s, known_detuning))

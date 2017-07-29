@@ -73,6 +73,7 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
         # This analysis makes a hardcoded assumption on the calibration points
         self.options_dict['cal_points'] = [list(range(-4, -2)),
                                            list(range(-2, 0))]
+
         self.numeric_params = []
         if auto:
             self.run_analysis()
@@ -92,33 +93,24 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
             'do_legend': True}
 
         if self.do_fitting:
-            self.plot_dicts['poly_fit'] = {
+            self.plot_dicts['line_fit'] = {
                 'ax_id': 'main',
                 'plotfn': self.plot_fit,
-                'fit_res': self.fit_res['poly_fit'],
-                'plot_init': True,
-                'setlabel': 'poly fit',
+                'fit_res': self.fit_res['line_fit'],
+                'plot_init': self.options_dict['plot_init'],
+                'setlabel': 'line fit',
                 'do_legend': True}
 
             self.plot_dicts['cos_fit'] = {
                 'ax_id': 'main',
                 'plotfn': self.plot_fit,
                 'fit_res': self.fit_res['cos_fit'],
-                'plot_init': True,
+                'plot_init': self.options_dict['plot_init'],
                 'setlabel': 'cos fit',
                 'do_legend': True}
 
     def run_fitting(self):
         self.fit_res = {}
-
-        poly_mod = lmfit.models.PolynomialModel(degree=2)
-        guess_pars = poly_mod.guess(x=self.data_dict['sweep_points'][:-4],
-                                    data=self.data_dict['corr_data'][:-4])
-        self.fit_res['poly_fit'] = poly_mod.fit(
-            x=self.data_dict['sweep_points'][:-4],
-            data=self.data_dict['corr_data'][:-4],
-            params=guess_pars)
-
         # Even though we expect an exponentially damped oscillation we use
         # a simple cosine as this gives more reliable fitting and we are only
         # interested in extracting the frequency of the oscillation
@@ -141,10 +133,41 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
             data=self.data_dict['corr_data'][:-4],
             params=guess_pars)
 
-    def get_scaling_factor(self):
+        # In the case there are very few periods we fall back on a small
+        # angle approximation to extract the drive detuning
+        poly_mod = lmfit.models.PolynomialModel(degree=1)
+        # the detuning can be estimated using on a small angle approximation
+        # c1 = d/dN (cos(2*pi*f N) ) evaluated at N = 0 -> c1 = -2*pi*f
+        poly_mod.set_param_hint('frequency', expr='-c1/(2*pi)')
+        guess_pars = poly_mod.guess(x=self.data_dict['sweep_points'][:-4],
+                                    data=self.data_dict['corr_data'][:-4])
+        # Constraining the line ensures that it will only give a good fit
+        # if the small angle approximation holds
+        guess_pars['c0'].vary = False
+        guess_pars['c0'].value = 0.5
+
+        self.fit_res['line_fit'] = poly_mod.fit(
+            x=self.data_dict['sweep_points'][:-4],
+            data=self.data_dict['corr_data'][:-4],
+            params=guess_pars)
+
+    def analyze_fit_results(self):
+        pass
+
+    def get_scale_factor(self):
         """
-        Returns the scale factor that should correct
+        Returns the scale factor that should correct for the error in the
+        pulse amplitude.
         """
+        # Model selection based on the Bayesian Information Criterion (BIC)
+        #as  calculated by lmfit
+        if self.fit_res['line_fit'].bic < self.fit_res['cos_fit'].bic:
+            scale_factor = self._get_scale_factor_line()
+        else:
+            scale_factor = self._get_scale_factor_cos()
+        return scale_factor
+
+    def _get_scale_factor_cos(self):
         # 1/period of the oscillation corresponds to the (fractional)
         # over/under rotation error per gate
         frequency = self.fit_res['cos_fit'].params['frequency']
@@ -162,3 +185,12 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
 
         return scale_factor
 
+    def _get_scale_factor_line(self):
+        # 1/period of the oscillation corresponds to the (fractional)
+        # over/under rotation error per gate
+        frequency = self.fit_res['line_fit'].params['frequency']
+        scale_factor = (1+frequency)**2
+        # no phase sign check is needed here as this is contained in the
+        # sign of the coefficient
+
+        return scale_factor

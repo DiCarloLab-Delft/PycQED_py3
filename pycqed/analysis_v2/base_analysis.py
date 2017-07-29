@@ -85,10 +85,16 @@ class BaseDataAnalysis(object):
         self.plot_dicts = dict()
         self.axs = dict()
         self.figs = dict()
+
         self.extract_only = extract_only
         self.do_fitting = do_fitting
         self.presentation_mode = options_dict.get('presentation_mode', False)
         self.tight_fig = options_dict.get('tight_fig', True)
+
+        self.options_dict['plot_init'] = self.options_dict.get('plot_init',
+                                                               False)
+        self.options_dict['save_figs'] = self.options_dict.get('save_figs', True)
+
         self.do_timestamp_blocks = options_dict.get('do_blocks', False)
         self.filter_no_analysis = options_dict.get('filter_no_analysis', False)
         self.exact_label_match = options_dict.get('exact_label_match', False)
