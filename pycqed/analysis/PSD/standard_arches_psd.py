@@ -189,9 +189,9 @@ def plot_coherence_times_freq(flux, freq, sensitivity,
                          figname='Coherence_times.PNG'):
     f, ax = plt.subplots()
 
-    ax.plot(freq/1e9, T1/1e-6, 'o', color='C3', label='$T_1$')
-    ax.plot(freq/1e9, Tramsey/1e-6, 'o', color='C2', label='$T_2^*$')
-    ax.plot(freq/1e9, Techo/1e-6, 'o', color='C0', label='$T_2$')
+    ax.plot(freq/1e9, T1/1e-6, 'o', color='b', label='$T_1$')
+    ax.plot(freq/1e9, Tramsey/1e-6, 'o', color='g', label='$T_2^*$')
+    ax.plot(freq/1e9, Techo/1e-6, 'o', color='r', label='$T_2$')
     ax.set_title('$T_1$, $T_2^*$, $T_2$ vs frequency')
     ax.set_xlabel('Frequency (GHz)')
     ax.legend(loc=0)
@@ -212,25 +212,25 @@ def plot_coherence_times(flux, freq, sensitivity,
 
     f, ax = plt.subplots(1, 3, figsize=(18, 5), sharey=True)
 
-    ax[0].plot(flux/1e-3, T1/1e-6, 'o', color='C3', label='$T_1$')
-    ax[0].plot(flux/1e-3, Tramsey/1e-6, 'o', color='C2', label='$T_2^*$')
-    ax[0].plot(flux/1e-3, Techo/1e-6, 'o', color='C0', label='$T_2$')
+    ax[0].plot(flux/1e-3, T1/1e-6, 'o', color='b', label='$T_1$')
+    ax[0].plot(flux/1e-3, Tramsey/1e-6, 'o', color='g', label='$T_2^*$')
+    ax[0].plot(flux/1e-3, Techo/1e-6, 'o', color='r', label='$T_2$')
     ax[0].set_title('$T_1$, $T_2^*$, $T_2$ vs flux', size=16)
     ax[0].set_ylabel('Coherence time ($\mu$s)', size=16)
     ax[0].set_xlabel('Flux (m$\Phi_0$)', size=16)
 
-    ax[1].plot(freq/1e9, T1/1e-6, 'o', color='C3', label='$T_1$')
-    ax[1].plot(freq/1e9, Tramsey/1e-6, 'o', color='C2', label='$T_2^*$')
-    ax[1].plot(freq/1e9, Techo/1e-6, 'o', color='C0', label='$T_2$')
+    ax[1].plot(freq/1e9, T1/1e-6, 'o', color='b', label='$T_1$')
+    ax[1].plot(freq/1e9, Tramsey/1e-6, 'o', color='g', label='$T_2^*$')
+    ax[1].plot(freq/1e9, Techo/1e-6, 'o', color='r', label='$T_2$')
     ax[1].set_title('$T_1$, $T_2^*$, $T_2$ vs frequency', size=16)
     ax[1].set_xlabel('Frequency (GHz)', size=16)
     ax[1].legend(loc=0)
 
-    ax[2].plot(np.abs(sensitivity)/1e9, T1/1e-6, 'o', color='C3', label='$T_1$')
+    ax[2].plot(np.abs(sensitivity)/1e9, T1/1e-6, 'o', color='b', label='$T_1$')
     ax[2].plot(np.abs(sensitivity)/1e9, Tramsey/1e-6,
-               'o', color='C2', label='$T_2^*$')
+               'o', color='g', label='$T_2^*$')
     ax[2].plot(
-        np.abs(sensitivity)/1e9, Techo/1e-6, 'o', color='C0', label='$T_2$')
+        np.abs(sensitivity)/1e9, Techo/1e-6, 'o', color='r', label='$T_2$')
     ax[2].set_title('$T_1$, $T_2^*$, $T_2$ vs sensitivity', size=16)
     ax[2].set_xlabel(r'$|\partial\nu/\partial\Phi|$ (GHz/$\Phi_0$)', size=16)
 
@@ -249,16 +249,17 @@ def plot_ratios(flux, freq, sensitivity,
     f, ax = plt.subplots(1, 3, figsize=(18, 5), sharey=True)
     ratio_gamma = Gamma_phi_ramsey/Gamma_phi_echo
 
-    ax[0].plot(flux/1e-3, ratio_gamma, 'o', color='C0')
+    ax[0].plot(flux/1e-3, ratio_gamma, 'o', color='r')
+    ax[0].set_ylim([0, max(ratio_gamma)])
     ax[0].set_title('$T_\phi^{\mathrm{Echo}}/T_\phi^{\mathrm{Ramsey}}$ vs flux', size=16)
     ax[0].set_ylabel('Ratio', size=16)
     ax[0].set_xlabel('Flux (m$\Phi_0$)', size=16)
 
-    ax[1].plot(freq/1e9, ratio_gamma, 'o', color='C0')
+    ax[1].plot(freq/1e9, ratio_gamma, 'o', color='r')
     ax[1].set_title('$T_\phi^{\mathrm{Echo}}/T_\phi^{\mathrm{Ramsey}}$ vs frequency', size=16)
     ax[1].set_xlabel('Frequency (GHz)', size=16)
 
-    ax[2].plot(np.abs(sensitivity)/1e9, ratio_gamma, 'o', color='C0')
+    ax[2].plot(np.abs(sensitivity)/1e9, ratio_gamma, 'o', color='r')
     ax[2].set_title('$T_\phi^{\mathrm{Echo}}/T_\phi^{\mathrm{Ramsey}}$ vs sensitivity', size=16)
     ax[2].set_xlabel(r'$|\partial\nu/\partial\Phi|$ (GHz/$\Phi_0$)', size=16)
 
@@ -316,18 +317,17 @@ def plot_gamma_fit(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo,
         f, ax = plt.subplots()
 
     ax.plot(np.abs(sensitivity)/1e9, Gamma_phi_ramsey,
-            'o', color='C2', label='$\Gamma_{\phi,\mathrm{Ramsey}}$')
+            'o', color='g', label='$\Gamma_{\phi,\mathrm{Ramsey}}$')
     ax.plot(np.abs(sensitivity)/1e9, slope_ramsey *
-            np.abs(sensitivity)+intercept, color='C2')
+            np.abs(sensitivity)+intercept, color='g')
 
     ax.plot(np.abs(sensitivity)/1e9, Gamma_phi_echo,
-            'o', color='C0', label='$\Gamma_{\phi,\mathrm{Echo}}$')
+            'o', color='r', label='$\Gamma_{\phi,\mathrm{Echo}}$')
     ax.plot(np.abs(sensitivity)/1e9, slope_echo *
-            np.abs(sensitivity)+intercept, color='C0')
+            np.abs(sensitivity)+intercept, color='r')
 
     ax.legend(loc=0)
-    # ax.set_title('Pure dephasing vs flux sensitivity')
-    ax.set_title('Previous cooldown')
+    ax.set_title('Pure dephasing vs flux sensitivity')
     ax.set_xlabel(r'$|\partial f/\partial\Phi|$ (GHz/$\Phi_0$)')
     ax.set_ylabel('$\Gamma_{\phi}$ (1/s)')
     f.tight_layout()
