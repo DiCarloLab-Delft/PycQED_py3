@@ -11,12 +11,13 @@ import numpy as np
 
 from matplotlib import pyplot as plt
 from pycqed.analysis import analysis_toolbox as a_tools
+from pycqed.analysis import fitting_models as fit_mods
 import pycqed.analysis_v2.default_figure_settings_analysis as def_fig
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import datetime
 # import SSRO_generic
 import json
-
+import lmfit
 gco = a_tools.get_color_order
 
 
@@ -95,6 +96,7 @@ class BaseDataAnalysis(object):
         self.tight_fig = options_dict.get('tight_fig', True)
         self.do_timestamp_blocks = options_dict.get('do_blocks', False)
         self.filter_no_analysis = options_dict.get('filter_no_analysis', False)
+        self.exact_label_match = options_dict.get('exact_label_match',False)
         self.verbose = options_dict.get('verbose', False)
         self.auto_keys = options_dict.get('auto_keys', None)
         if type(self.auto_keys) is str:
@@ -108,6 +110,7 @@ class BaseDataAnalysis(object):
         self.extract_data()    # extract data specified in params dict
         self.process_data()    # binning, filtering etc
         if self.do_fitting:
+            self.prepare_fitting()      # set up fit_dicts
             self.run_fitting()          # fitting to models
             self.analyze_fit_results()  # analyzing the results of the fits
 
@@ -132,12 +135,14 @@ class BaseDataAnalysis(object):
                         self.timestamps.append(
                             a_tools.get_timestamps_in_range(
                                 self.t_start[tt], self.t_stop[tt],
-                                label=self.labels))
+                                label=self.labels,
+                                exact_label_match=self.exact_label_match))
                     else:
                         self.timestamps.extend(
                             a_tools.get_timestamps_in_range(
                                 self.t_start[tt], self.t_stop[tt],
-                                label=self.labels))
+                                label=self.labels,
+                                exact_label_match=self.exact_label_match))
             else:
                 if self.do_timestamp_blocks:
                     self.do_timestamp_blocks = False
@@ -145,7 +150,8 @@ class BaseDataAnalysis(object):
         else:
             self.timestamps = a_tools.get_timestamps_in_range(
                 self.t_start, self.t_stop,
-                label=self.labels)
+                label=self.labels,
+                exact_label_match=self.exact_label_match)
 
         if self.verbose:
             print(len(self.timestamps), type(self.timestamps[0]))
@@ -280,12 +286,6 @@ class BaseDataAnalysis(object):
         """
         pass
 
-    def run_fitting(self):
-        """
-        Perform fits and save results of the fits to file.
-        """
-        pass
-
     def analyze_fit_results(self):
         """
         Do analysis on the results of the fits to extract quantities of
@@ -312,6 +312,39 @@ class BaseDataAnalysis(object):
         for key in key_list:
             savename = os.path.join(savedir, savebase+key+tstag+'.'+fmt)
             self.axs[key].figure.savefig(savename, fmt=fmt)
+
+    def prepare_fitting(self):
+        pass
+
+    def run_fitting(self):
+        # This function does the fitting and saving of the parameters
+        # based on the fit_dict options.
+        # Only model fitting is implemented yet. Minimizing fitting should
+        # be implemented here.
+        fit_guess_fn = self.fit_dict['fit_guess_fn']
+        fit_fn = self.fit_dict['fit_fn']
+        fit_yvals = self.fit_dict['fit_yvals']
+        fit_xvals = self.fit_dict['fit_xvals']
+        model = lmfit.Model(fit_fn)
+        if self.do_timestamp_blocks:
+            self.fit_dict['fit_results'] = []
+            for tt in range(len(fit_yvals)):
+                guess_dict = fit_guess_fn(fit_yvals[tt],
+                                          **fit_xvals[tt])
+                for key, val in list(guess_dict.items()):
+                    model.set_param_hint(key, **val)
+                params = model.make_params()
+                self.fit_dict['fit_results'].append(model.fit(fit_yvals[tt],
+                                                              params=params,
+                                                              **fit_xvals[tt]))
+        else:
+            guess_dict = fit_guess_fn(fit_yvals, **fit_xvals)
+            for key, val in list(guess_dict.items()):
+                    model.set_param_hint(key, **val)
+            params = model.make_params()
+            self.fit_dict['fit_results'] = model.fit(fit_yvals,
+                                                     params=params,
+                                                     **fit_xvals)
 
     def plot(self, key_list=None, axs_dict=None,
              presentation_mode=None, no_label=False):
@@ -636,6 +669,7 @@ class BaseDataAnalysis(object):
         plot_zrange = pdict.get('zrange', None)
         plot_yrange = pdict.get('yrange', None)
         plot_xrange = pdict.get('xrange', None)
+        plot_xwidth = pdict.get('xwidth',None)
         plot_transpose = pdict.get('transpose', False)
         plot_nolabel = pdict.get('no_label', False)
         plot_normalize = pdict.get('normalize', False)
@@ -645,25 +679,37 @@ class BaseDataAnalysis(object):
         else:
             plot_zvals = pdict['zvals']
 
-        plot_xvals_step = plot_xvals[1]-plot_xvals[0]
-        plot_yvals_step = plot_yvals[1]-plot_yvals[0]
+        if plot_xwidth is not None:
+            plot_xvals_step = 0
+            plot_yvals_step = 0
+        else:
+            plot_xvals_step = plot_xvals[1]-plot_xvals[0]
+            plot_yvals_step = plot_yvals[1]-plot_yvals[0]
 
         if plot_zrange is not None:
             fig_clim = plot_zrange
         else:
             fig_clim = [None, None]
 
+
         if self.do_timestamp_blocks:
-            for tt in len(plot_zvals):
+            for tt in range(len(plot_zvals)):
                 if self.verbose:
                     print(plot_xvals[tt].shape, plot_yvals[
                           tt].shape, plot_zvals[tt].shape)
-                out = pfunc(ax=axs, clim=fig_clim, cmap=plot_cmap,
+                if plot_xwidth is not None:
+                    xwidth = plot_xwidth[tt]
+                else:
+                    xwidth = None
+                out = pfunc(ax=axs,
+                            xwidth=xwidth,
+                            clim=fig_clim, cmap=plot_cmap,
                             xvals=plot_xvals[tt],
                             yvals=plot_yvals[tt],
                             zvals=plot_zvals[tt].transpose(),
                             transpose=plot_transpose,
                             normalize=plot_normalize)
+
         else:
             out = pfunc(ax=axs, clim=fig_clim, cmap=plot_cmap,
                         xvals=plot_xvals,
@@ -673,8 +719,14 @@ class BaseDataAnalysis(object):
                         normalize=plot_normalize)
 
         if plot_xrange is None:
-            xmin, xmax = plot_xvals.min()-plot_xvals_step / \
-                2., plot_xvals.max()+plot_xvals_step/2.
+            if plot_xwidth is not None:
+                xmin, xmax = min([min(xvals)-plot_xwidth[tt]/2 \
+                                for tt, xvals in enumerate(plot_xvals)]), \
+                            max([max(xvals)+plot_xwidth[tt]/2 \
+                                for tt, xvals in enumerate(plot_xvals)])
+            else:
+                xmin, xmax = plot_xvals.min()-plot_xvals_step / \
+                    2., plot_xvals.max()+plot_xvals_step/2.
         else:
             xmin, xmax = plot_xrange
         if plot_transpose:
@@ -683,8 +735,15 @@ class BaseDataAnalysis(object):
             axs.set_xlim(xmin, xmax)
 
         if plot_yrange is None:
-            ymin, ymax = plot_yvals.min()-plot_yvals_step / \
-                2., plot_yvals.max()+plot_yvals_step/2.
+            if plot_xwidth is not None:
+                ymin, ymax = min([min(yvals[0]) \
+                                for tt, yvals in enumerate(plot_yvals)]), \
+                            max([max(yvals[0])\
+                                for tt, yvals in enumerate(plot_yvals)])
+
+            else:
+                ymin, ymax = plot_yvals.min()-plot_yvals_step / \
+                    2., plot_yvals.max()+plot_yvals_step/2.
         else:
             ymin, ymax = plot_yrange
         if plot_transpose:
