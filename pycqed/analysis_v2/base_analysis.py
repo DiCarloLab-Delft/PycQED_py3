@@ -4,7 +4,7 @@ This is based on the REM analysis from PycQED_py2 (as of July 7 2017)
 """
 import os
 import numpy as np
-
+import copy
 
 from matplotlib import pyplot as plt
 from pycqed.analysis import analysis_toolbox as a_tools
@@ -796,3 +796,37 @@ class BaseDataAnalysis(object):
 
         if self.tight_fig:
             axs.figure.tight_layout()
+
+    def plot_fit(self, pdict, axs):
+        """
+        Plots an lmfit fit result object using the plot_line function.
+        """
+        model = pdict['fit_res'].model
+        plot_init = pdict.get('plot_init', False)  # plot the initial guess
+        pdict['marker'] = pdict.get('marker', '')  # different default
+        plot_linestyle_init = pdict.get('init_linestyle', '--')
+        plot_numpoints = pdict.get('num_points', 1000)
+
+        if len(model.independent_vars) == 1:
+            independent_var = model.independent_vars[0]
+        else:
+            raise ValueError('Fit can only be plotted if the model function'
+                             ' has one independent variable.')
+
+        x_arr = pdict['fit_res'].userkws[independent_var]
+        pdict['xvals'] = np.linspace(np.min(x_arr), np.max(x_arr),
+                                     plot_numpoints)
+        pdict['yvals'] = model.eval(pdict['fit_res'].params,
+                                    **{independent_var: pdict['xvals']})
+        self.plot_line(pdict, axs)
+
+        if plot_init:
+            # The initial guess
+            pdict_init = copy.copy(pdict)
+            pdict_init['linestyle'] = plot_linestyle_init
+            pdict_init['yvals'] = model.eval(
+                **pdict['fit_res'].init_values,
+                **{independent_var: pdict['xvals']})
+            pdict_init['setlabel'] += ' init'
+            self.plot_line(pdict_init, axs)
+

@@ -91,30 +91,21 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
                       self.data_dict['measurementstring']),
             'do_legend': True}
 
-        fr_poly = self.fit_res['poly_fit']
-        fr_cos = self.fit_res['cos_fit']
-        xv = np.linspace(np.min(self.data_dict['sweep_points']),
-                         np.max(self.data_dict['sweep_points']), 1000)
-
         if self.do_fitting:
-            # TODO: would be good to specify a plot_line_fit method
-            # that creates these plots from a fit_res dict
             self.plot_dicts['poly_fit'] = {
                 'ax_id': 'main',
-                'plotfn': self.plot_line,
-                'xvals': xv,
-                'marker': '',
-                'setlabel': 'poly_fit',
-                'yvals': fr_poly.model.func(x=xv, **fr_poly.best_values),
+                'plotfn': self.plot_fit,
+                'fit_res': self.fit_res['poly_fit'],
+                'plot_init': True,
+                'setlabel': 'poly fit',
                 'do_legend': True}
 
             self.plot_dicts['cos_fit'] = {
                 'ax_id': 'main',
-                'plotfn': self.plot_line,
-                'marker': '',
-                'xvals': xv,
-                'setlabel': 'cos_fit',
-                'yvals': fr_cos.model.func(t=xv, **fr_cos.best_values),
+                'plotfn': self.plot_fit,
+                'fit_res': self.fit_res['cos_fit'],
+                'plot_init': True,
+                'setlabel': 'cos fit',
                 'do_legend': True}
 
     def run_fitting(self):
@@ -128,6 +119,9 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
             data=self.data_dict['corr_data'][:-4],
             params=guess_pars)
 
+        # Even though we expect an exponentially damped oscillation we use
+        # a simple cosine as this gives more reliable fitting and we are only
+        # interested in extracting the frequency of the oscillation
         cos_mod = lmfit.Model(fit_mods.CosFunc)
 
         guess_pars = fit_mods.Cos_guess(model=cos_mod,
