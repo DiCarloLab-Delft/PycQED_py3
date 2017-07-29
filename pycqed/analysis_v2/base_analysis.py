@@ -301,7 +301,7 @@ class BaseDataAnalysis(object):
         if savebase is None:
             savebase = ''
         if tag_tstamp:
-            tstag = self.data_dict['timestamps'][0]
+            tstag = '_'+self.data_dict['timestamps'][0]
         else:
             tstag = ''
 
@@ -310,7 +310,7 @@ class BaseDataAnalysis(object):
         if key_list is None:
             key_list = list(self.plot_dicts.keys())
         for key in key_list:
-            savename = os.path.join(savedir, savebase+'_'+key+tstag+'.'+fmt)
+            savename = os.path.join(savedir, savebase+key+tstag+'.'+fmt)
             self.axs[key].figure.savefig(savename, fmt=fmt)
 
     def plot(self, key_list=None, axs_dict=None,
