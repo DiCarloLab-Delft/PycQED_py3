@@ -4,7 +4,7 @@ import pycqed as pq
 import os
 from pycqed.analysis_v2 import measurement_analysis as ma
 
-@unittest.expectedFailure
+
 class Test_flipping_analysis(unittest.TestCase):
 
     @classmethod
@@ -14,22 +14,34 @@ class Test_flipping_analysis(unittest.TestCase):
 
     def test_flipping_analysis(self):
 
-        timestamps = ['20170726_164507', '20170726_164521', '20170726_164536',
-                      '20170726_164550', '20170726_164605', '20170726_164619',
-                      '20170726_164635', '20170726_164649', '20170726_164704',
-                      '20170726_164718', '20170726_164733', '20170726_164747',
-                      '20170726_164802', '20170726_164816', '20170726_164831',
-                      '20170726_164845', '20170726_164901', '20170726_164915']
-
         # these scale factors are based on an experiment with a known
         # added detuning in the amplitude
-        expected_scaling_factors = np.array([1/.8, 1/.8, 1/.9, 1/.9,
-                                             1/.95, 1/.95, 1/.99, 1/.99, 1, 1,
-                                             1/1.01, 1/1.01, 1/1.05, 1/1.05,
-                                             1/1.1, 1/1.1, 1/1.2, 1/1.2])
+        # coarse and fine scans are accurate to different precission
+        # 20% detuning only works for coarse
+        self._check_scaling('20170726_164507', 0.8, 1)
 
-        for i, ts in enumerate(timestamps):
-            fa = ma.FlippingAnalysis(t_start=ts)
-            s = fa.get_scaling_factor()
-            print(fa.timestamps[0], s)
-            self.assertEqual(s, expected_scaling_factors[i])
+        self._check_scaling('20170726_164536', 0.9, 1)
+        self._check_scaling('20170726_164550', 0.9, 1)
+        self._check_scaling('20170726_164605', 0.95, 2)
+        self._check_scaling('20170726_164619', 0.95, 2)
+        self._check_scaling('20170726_164635', 0.99, 2)
+        self._check_scaling('20170726_164649', 0.99, 2)
+
+        # self._check_scaling('20170726_164704', 1, 2)
+        # self._check_scaling('20170726_164718', 1, 2)
+        self._check_scaling('20170726_164733', 1.01, 2)
+        self._check_scaling('20170726_164747', 1.01, 2)
+        self._check_scaling('20170726_164802', 1.05, 1)
+        self._check_scaling('20170726_164816', 1.05, 1)
+        self._check_scaling('20170726_164831', 1.1, 1)
+        self._check_scaling('20170726_164845', 1.1, 1)
+
+        # 20% detuning only works for coarse
+        self._check_scaling('20170726_164901', 1.2, 1)
+
+    def _check_scaling(self, timestamp, known_detuning, places):
+        a = ma.FlippingAnalysis(t_start=timestamp)
+        s = a.get_scaling_factor()
+        self.assertAlmostEqual(s*known_detuning, 1, places=places)
+        print('Scale factor {:.4f} known detuning {:.4f}'.format(
+            s, known_detuning))

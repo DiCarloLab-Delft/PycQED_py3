@@ -28,14 +28,8 @@ class Single_Qubit_TimeDomainAnalysis(ba.BaseDataAnalysis):
         one_coord = self.options_dict.get('one_coord', None)
 
         if cal_points is None:
-            # Implicit in AllXY experiments
-            if len(self.data_dict['measured_values'][0]) == 42:
-                cal_points = [list(range(2)), list(range(-8, -4))]
-            elif len(self.data_dict['measured_values'][0]) == 21:
-                cal_points = [list(range(1)), list(range(-4, -2))]
-            # default for other experiments
-            else:
-                cal_points = [list(range(-4, -2)), list(range(-2, 0))]
+            # default for all standard Timedomain experiments
+            cal_points = [list(range(-4, -2)), list(range(-2, 0))]
 
         if len(self.data_dict['measured_values']) == 1:
             # if only one weight function is used rotation is not required
@@ -71,6 +65,7 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
 
         self.params_dict = {'xlabel': 'sweep_name',
                             'xunit': 'sweep_unit',
+                            'measurementstring': 'measurementstring',
                             'sweep_points': 'sweep_points',
                             'value_names': 'value_names',
                             'value_units': 'value_units',
@@ -92,7 +87,8 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
             'ylabel': 'Excited state population',
             'yunit': '',
             'setlabel': 'data',
-            'title': self.data_dict['timestamp'] + ' Flipping',
+            'title': (self.data_dict['timestamp'] + ' ' +
+                      self.data_dict['measurementstring']),
             'do_legend': True}
 
         fr_poly = self.fit_res['poly_fit']
@@ -100,23 +96,26 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
         xv = np.linspace(np.min(self.data_dict['sweep_points']),
                          np.max(self.data_dict['sweep_points']), 1000)
 
-        self.plot_dicts['poly_fit'] = {
-            'ax_id': 'main',
-            'plotfn': self.plot_line,
-            'xvals': xv,
-            'marker': '',
-            'setlabel': 'poly_fit',
-            'yvals': fr_poly.model.func(x=xv, **fr_poly.best_values),
-            'do_legend': True}
+        if self.do_fitting:
+            # TODO: would be good to specify a plot_line_fit method
+            # that creates these plots from a fit_res dict
+            self.plot_dicts['poly_fit'] = {
+                'ax_id': 'main',
+                'plotfn': self.plot_line,
+                'xvals': xv,
+                'marker': '',
+                'setlabel': 'poly_fit',
+                'yvals': fr_poly.model.func(x=xv, **fr_poly.best_values),
+                'do_legend': True}
 
-        self.plot_dicts['cos_fit'] = {
-            'ax_id': 'main',
-            'plotfn': self.plot_line,
-            'marker': '',
-            'xvals': xv,
-            'setlabel': 'cos_fit',
-            'yvals': fr_cos.model.func(t=xv, **fr_cos.best_values),
-            'do_legend': True}
+            self.plot_dicts['cos_fit'] = {
+                'ax_id': 'main',
+                'plotfn': self.plot_line,
+                'marker': '',
+                'xvals': xv,
+                'setlabel': 'cos_fit',
+                'yvals': fr_cos.model.func(t=xv, **fr_cos.best_values),
+                'do_legend': True}
 
     def run_fitting(self):
         self.fit_res = {}
@@ -134,11 +133,14 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
         guess_pars = fit_mods.Cos_guess(model=cos_mod,
                                         t=self.data_dict['sweep_points'][:-4],
                                         data=self.data_dict['corr_data'][:-4])
+
         # This enforces the oscillation to start at the equator
         # and ensures that any over/under rotation is absorbed in the
         # frequency
-        guess_pars['phase'].value = np.deg2rad(90)
-        guess_pars['phase'].vary = False
+        guess_pars['amplitude'].value = 0.5
+        guess_pars['amplitude'].vary = False
+        guess_pars['offset'].value = 0.5
+        guess_pars['offset'].vary = False
 
         self.fit_res['cos_fit'] = cos_mod.fit(
             t=self.data_dict['sweep_points'][:-4],
@@ -146,4 +148,23 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
             params=guess_pars)
 
     def get_scaling_factor(self):
-        pass
+        """
+        Returns the scale factor that should correct
+        """
+        # 1/period of the oscillation corresponds to the (fractional)
+        # over/under rotation error per gate
+        frequency = self.fit_res['cos_fit'].params['frequency']
+
+        # the square is needed to account for the difference between
+        # power and amplitude
+        scale_factor = (1+frequency)**2
+
+        phase = np.rad2deg(self.fit_res['cos_fit'].params['phase']) % 360
+        # phase ~90 indicates an under rotation so the scale factor
+        # has to be larger than 1. A phase ~270 indicates an over
+        # rotation so then the scale factor has to be smaller than one.
+        if phase > 180:
+            scale_factor = 1/scale_factor
+
+        return scale_factor
+

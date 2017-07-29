@@ -5,6 +5,7 @@ This is based on the REM analysis from PycQED_py2 (as of July 7 2017)
 
 
 """
+import os
 import numpy as np
 
 
@@ -107,10 +108,13 @@ class BaseDataAnalysis(object):
         self.extract_data()    # extract data specified in params dict
         self.process_data()    # binning, filtering etc
         if self.do_fitting:
-            self.run_fitting()  # fitting to models
+            self.run_fitting()          # fitting to models
+            self.analyze_fit_results()  # analyzing the results of the fits
+
         self.prepare_plots()   # specify default plots
         if not self.extract_only:
             self.plot(key_list='auto')  # make the plots
+            self.save_figures()
 
     def get_timestamps(self):
         """
@@ -119,7 +123,6 @@ class BaseDataAnalysis(object):
             self.t_stop
             self.labels # currently set from options dict
         """
-        print(self.labels)
         if type(self.t_start) is list:
             if (type(self.t_stop) is list and
                     len(self.t_stop) == len(self.t_start)):
@@ -177,6 +180,9 @@ class BaseDataAnalysis(object):
         if self.single_timestamp:
             self.timestamps = [self.timestamps[0]]
         TwoD = self.params_dict.pop('TwoD', False)
+        # this should always be extracted as it is used to determine where
+        # the file is as required for datasaving
+        self.params_dict['folder'] = 'folder'
 
         if self.do_timestamp_blocks:
             self.data_dict = {key: [] for key in list(self.params_dict.keys())}
@@ -242,6 +248,7 @@ class BaseDataAnalysis(object):
                     new_dict[key] = value[0]
             self.data_dict = new_dict
             self.data_dict['timestamp'] = self.timestamps[0]
+        self.data_dict['timestamps'] = self.timestamps
 
     def extract_data_json(self):
         file_name = self.t_start
@@ -279,22 +286,32 @@ class BaseDataAnalysis(object):
         """
         pass
 
-    def save_figures(self, savedir='', savebase=None, tag_tstamp=True,
-                     fmt='pdf', key_list='auto'):
+    def analyze_fit_results(self):
+        """
+        Do analysis on the results of the fits to extract quantities of
+        interest.
+        """
+        pass
+
+    def save_figures(self, savedir: str=None, savebase: str =None,
+                     tag_tstamp: bool=True,
+                     fmt: str ='png', key_list: list='auto'):
+        if savedir is None:
+            savedir = self.data_dict.get('folder', '')
         if savebase is None:
-            savebase = self.data_dict['timestamps'][0]
+            savebase = ''
+        if tag_tstamp:
+            tstag = self.data_dict['timestamps'][0]
         else:
-            if tag_tstamp:
-                tstag = '_'+self.data_dict['timestamps'][0]
-            else:
-                tstag = ''
+            tstag = ''
+
         if key_list is 'auto':
-            key_list = self.auto_keys
+            key_list = self.axs.keys()
         if key_list is None:
             key_list = list(self.plot_dicts.keys())
         for key in key_list:
-            self.axs[key].figure.savefig(
-                savedir+savebase+'_'+key+tstag+'.'+fmt, fmt=fmt)
+            savename = os.path.join(savedir, savebase+'_'+key+tstag+'.'+fmt)
+            self.axs[key].figure.savefig(savename, fmt=fmt)
 
     def plot(self, key_list=None, axs_dict=None,
              presentation_mode=None, no_label=False):
