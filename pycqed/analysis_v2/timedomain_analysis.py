@@ -78,37 +78,6 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
         if auto:
             self.run_analysis()
 
-    def prepare_plots(self):
-        self.plot_dicts['main'] = {
-            'plotfn': self.plot_line,
-            'xvals': self.data_dict['sweep_points'],
-            'xlabel': self.data_dict['xlabel'],
-            'xunit': self.data_dict['xunit'],  # does not do anything yet
-            'yvals': self.data_dict['corr_data'],
-            'ylabel': 'Excited state population',
-            'yunit': '',
-            'setlabel': 'data',
-            'title': (self.data_dict['timestamp'] + ' ' +
-                      self.data_dict['measurementstring']),
-            'do_legend': True}
-
-        if self.do_fitting:
-            self.plot_dicts['line_fit'] = {
-                'ax_id': 'main',
-                'plotfn': self.plot_fit,
-                'fit_res': self.fit_res['line_fit'],
-                'plot_init': self.options_dict['plot_init'],
-                'setlabel': 'line fit',
-                'do_legend': True}
-
-            self.plot_dicts['cos_fit'] = {
-                'ax_id': 'main',
-                'plotfn': self.plot_fit,
-                'fit_res': self.fit_res['cos_fit'],
-                'plot_init': self.options_dict['plot_init'],
-                'setlabel': 'cos fit',
-                'do_legend': True}
-
     def run_fitting(self):
         self.fit_res = {}
         # Even though we expect an exponentially damped oscillation we use
@@ -152,7 +121,20 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
             params=guess_pars)
 
     def analyze_fit_results(self):
-        pass
+        sf_line = self._get_scale_factor_line()
+        sf_cos = self._get_scale_factor_cos()
+        self.data_dict['scale_factor'] = self.get_scale_factor()
+
+        msg = 'Scale fact. based on '
+        if self.data_dict['scale_factor'] == sf_cos:
+            msg += 'cos fit\n'
+        else:
+            msg += 'line fit\n'
+        msg += 'cos fit: {:.4f}\n'.format(sf_cos)
+        msg += 'line fit: {:.4f}'.format(sf_line)
+
+        self.data_dict['scale_factor_msg'] = msg
+        # TODO: save scale factor to file
 
     def get_scale_factor(self):
         """
@@ -160,7 +142,7 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
         pulse amplitude.
         """
         # Model selection based on the Bayesian Information Criterion (BIC)
-        #as  calculated by lmfit
+        # as  calculated by lmfit
         if self.fit_res['line_fit'].bic < self.fit_res['cos_fit'].bic:
             scale_factor = self._get_scale_factor_line()
         else:
@@ -194,3 +176,46 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
         # sign of the coefficient
 
         return scale_factor
+
+    def prepare_plots(self):
+        self.plot_dicts['main'] = {
+            'plotfn': self.plot_line,
+            'xvals': self.data_dict['sweep_points'],
+            'xlabel': self.data_dict['xlabel'],
+            'xunit': self.data_dict['xunit'],  # does not do anything yet
+            'yvals': self.data_dict['corr_data'],
+            'ylabel': 'Excited state population',
+            'yunit': '',
+            'setlabel': 'data',
+            'title': (self.data_dict['timestamp'] + ' ' +
+                      self.data_dict['measurementstring']),
+            'do_legend': True,
+            'legend_pos': 'upper right'}
+
+        if self.do_fitting:
+            self.plot_dicts['line_fit'] = {
+                'ax_id': 'main',
+                'plotfn': self.plot_fit,
+                'fit_res': self.fit_res['line_fit'],
+                'plot_init': self.options_dict['plot_init'],
+                'setlabel': 'line fit',
+                'do_legend': True,
+                'legend_pos': 'upper right'}
+
+            self.plot_dicts['cos_fit'] = {
+                'ax_id': 'main',
+                'plotfn': self.plot_fit,
+                'fit_res': self.fit_res['cos_fit'],
+                'plot_init': self.options_dict['plot_init'],
+                'setlabel': 'cos fit',
+                'do_legend': True,
+                'legend_pos': 'upper right'}
+
+            self.plot_dicts['text_msg'] = {
+                'ax_id': 'main',
+                'ypos': 0.15,
+                'plotfn': self.plot_text,
+                'box_props': 'fancy',
+                'text_string': self.data_dict['scale_factor_msg']}
+
+

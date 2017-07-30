@@ -13,9 +13,10 @@ class Test_flipping_analysis(unittest.TestCase):
 
     def test_flipping_analysis(self):
 
-        # these scale factors are based on an experiment with a known
-        # added detuning in the amplitude
-        # coarse and fine scans are accurate to different precission
+        # this test is based on an experiment with a known
+        # added detuning in the amplitude. The test tests that the analysis
+        # works for a range of known scale factors.
+
         # 20% detuning only works for coarse
         self._check_scaling('20170726_164507', 0.8, 1)
 

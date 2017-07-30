@@ -100,6 +100,10 @@ class BaseDataAnalysis(object):
         self.exact_label_match = options_dict.get('exact_label_match', False)
         self.verbose = options_dict.get('verbose', False)
         self.auto_keys = options_dict.get('auto_keys', None)
+
+        # used in self.plot_text, here for future compatibility
+        self.fancy_box_props = dict(boxstyle='round', pad=.4,
+                                    facecolor='white', alpha=0.5)
         if type(self.auto_keys) is str:
             self.auto_keys = [self.auto_keys]
 
@@ -306,10 +310,8 @@ class BaseDataAnalysis(object):
         else:
             tstag = ''
 
-        if key_list is 'auto':
-            key_list = self.axs.keys()
-        if key_list is None:
-            key_list = list(self.plot_dicts.keys())
+        if key_list is 'auto' or key_list is None:
+            key_list = self.figs.keys()
         for key in key_list:
             savename = os.path.join(savedir, savebase+key+tstag+'.'+fmt)
             self.axs[key].figure.savefig(savename, fmt=fmt)
@@ -381,7 +383,7 @@ class BaseDataAnalysis(object):
                     pdict.get('numplotsy', 1), pdict.get('numplotsx', 1),
                     sharex=pdict.get('sharex', False),
                     sharey=pdict.get('sharey', False),
-                    figsize=pdict.get('plotsize', (8, 6)))
+                    figsize=pdict.get('plotsize', None))#(8, 6)))
 
         if presentation_mode:
             self.plot_for_presentation(key_list=key_list, no_label=no_label)
@@ -402,8 +404,10 @@ class BaseDataAnalysis(object):
     def format_datetime_xaxes(self, key_list):
         for key in key_list:
             pdict = self.plot_dicts[key]
-            if type(pdict['xvals'][0]) is datetime.datetime:
-                self.axs[key].figure.autofmt_xdate()
+            # this check is needed as not all plots have xvals e.g., plot_text
+            if 'xvals' in pdict.keys():
+                if type(pdict['xvals'][0]) is datetime.datetime:
+                    self.axs[key].figure.autofmt_xdate()
 
     def plot_for_presentation(self, key_list=None, no_label=False):
         if key_list is None:
@@ -835,4 +839,28 @@ class BaseDataAnalysis(object):
                 **{independent_var: pdict['xvals']})
             pdict_init['setlabel'] += ' init'
             self.plot_line(pdict_init, axs)
+
+    def plot_text(self, pdict, axs):
+        """
+        Helper function that adds text to a plot
+        """
+        pfunc = getattr(axs, pdict.get('func', 'text'))
+        plot_text_string = pdict['text_string']
+        plot_xpos = pdict.get('xpos', .98)
+        plot_ypos = pdict.get('ypos', .98)
+        verticalalignment = pdict.get('verticalalignment', 'top')
+        horizontalalignment = pdict.get('verticalalignment', 'right')
+
+        # fancy box props is based on the matplotlib legend
+        box_props = pdict.get('box_props', 'fancy')
+        if box_props == 'fancy':
+            box_props = self.fancy_box_props
+
+        # pfunc is expected to be ax.text
+        pfunc(x=plot_xpos, y=plot_ypos, s=plot_text_string,
+              transform=axs.transAxes,
+              verticalalignment=verticalalignment,
+              horizontalalignment=horizontalalignment,
+              bbox=box_props)
+
 
