@@ -55,7 +55,7 @@ class Single_Qubit_TimeDomainAnalysis(ba.BaseDataAnalysis):
 
 class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
 
-    def __init__(self, t_start: str, t_stop: str=None,
+    def __init__(self, t_start: str=None, t_stop: str=None,
                  options_dict: dict={}, extract_only: bool=False,
                  do_fitting: bool=True, auto=True):
         super().__init__(t_start=t_start, t_stop=t_stop,

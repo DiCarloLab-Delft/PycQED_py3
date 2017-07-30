@@ -105,7 +105,7 @@ def return_last_n_timestamps(n, contains=''):
 
 
 def latest_data(contains='', older_than=None, newer_than=None, or_equal=False,
-                return_timestamp=False, raise_exc=False,
+                return_timestamp=False, raise_exc=True,
                 folder=None, return_all=False):
     '''
     finds the latest taken data with <contains> in its name.
@@ -139,35 +139,36 @@ def latest_data(contains='', older_than=None, newer_than=None, or_equal=False,
     i = len(daydirs)-1
     while len(measdirs) == 0 and i >= 0:
         daydir = daydirs[i]
-        all_measdirs = [d for d in os.listdir(
-            os.path.join(search_dir, daydir))]
-        all_measdirs.sort()
-
-        measdirs = []
-        for d in all_measdirs:
-            # this routine verifies that any output directory
-            # is a 'valid' directory
-            # (i.e, obeys the regular naming convention)
-            _timestamp = daydir + d[:6]
-            try:
-                dstamp, tstamp = verify_timestamp(_timestamp)
-            except:
-                continue
-            timestamp = dstamp+tstamp
-            if contains in d:
-                if older_than is not None:
-                    if not is_older(timestamp, older_than, or_equal=or_equal):
-                        continue
-                if newer_than is not None:
-                    if not is_older(newer_than, timestamp, or_equal=or_equal):
-                        continue
-                measdirs.append(d)
-
+        # this makes sure hidden folders (OS related) are not searched
+        if not daydir.startswith('.'):
+            all_measdirs = [d for d in os.listdir(
+                os.path.join(search_dir, daydir))]
+            all_measdirs.sort()
+            measdirs = []
+            for d in all_measdirs:
+                # this routine verifies that any output directory
+                # is a 'valid' directory
+                # (i.e, obeys the regular naming convention)
+                _timestamp = daydir + d[:6]
+                try:
+                    dstamp, tstamp = verify_timestamp(_timestamp)
+                except:
+                    continue
+                timestamp = dstamp+tstamp
+                if contains in d:
+                    if older_than is not None:
+                        if not is_older(timestamp, older_than,
+                                        or_equal=or_equal):
+                            continue
+                    if newer_than is not None:
+                        if not is_older(newer_than, timestamp,
+                                        or_equal=or_equal):
+                            continue
+                    measdirs.append(d)
         i -= 1
-
     if len(measdirs) == 0:
         if raise_exc is True:
-            raise Exception('No fitting data found.')
+            raise Exception('No data found.')
         else:
             return False
     else:

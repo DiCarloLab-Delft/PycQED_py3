@@ -41,7 +41,7 @@ class BaseDataAnalysis(object):
             self.plot(key_list='auto')  # make the plots
     """
 
-    def __init__(self, t_start: str, t_stop: str=None,
+    def __init__(self, t_start: str=None, t_stop: str=None,
                  options_dict: dict={}, extract_only: bool=False,
                  do_fitting: bool=False):
         '''
@@ -69,41 +69,59 @@ class BaseDataAnalysis(object):
         dict to prevent double refs? )
         '''
         self.single_timestamp = False
-        self.t_start = t_start
-        if t_stop is None:
-            self.t_stop = t_start
-        else:
-            self.t_stop = t_stop
         self.options_dict = options_dict
         self.ma_type = self.options_dict.get('ma_type', 'MeasurementAnalysis')
+
+        ################################################
+        # These options determine what data to extract #
+        ################################################
         scan_label = options_dict.get('scan_label', '')
         if type(scan_label) is not list:
             self.labels = [scan_label]
         else:
             self.labels = scan_label
+        if t_start is None and t_stop is None:
+            # This is quite a hacky way to support finding the last file
+            # with a certain label, something that was trivial in the old
+            # analysis. A better solution should be implemented.
+            self.t_start = a_tools.latest_data(scan_label,
+                                               return_timestamp=True)[0]
+        else:
+            self.t_start = t_start
+
+        if t_stop is None:
+            self.t_stop = self.t_start
+        else:
+            self.t_stop = t_stop
+        self.do_timestamp_blocks = options_dict.get('do_blocks', False)
+        self.filter_no_analysis = options_dict.get('filter_no_analysis', False)
+        self.exact_label_match = options_dict.get('exact_label_match', False)
+
+        ########################################
+        # These options relate to the plotting #
+        ########################################
         def_fig.apply_default_figure_settings()
         self.plot_dicts = dict()
         self.axs = dict()
         self.figs = dict()
-
-        self.extract_only = extract_only
-        self.do_fitting = do_fitting
         self.presentation_mode = options_dict.get('presentation_mode', False)
         self.tight_fig = options_dict.get('tight_fig', True)
+        # used in self.plot_text, here for future compatibility
+        self.fancy_box_props = dict(boxstyle='round', pad=.4,
+                                    facecolor='white', alpha=0.5)
 
         self.options_dict['plot_init'] = self.options_dict.get('plot_init',
                                                                False)
         self.options_dict['save_figs'] = self.options_dict.get('save_figs', True)
+        ####################################################
+        # These options relate to what analysis to perform #
+        ####################################################
+        self.extract_only = extract_only
+        self.do_fitting = do_fitting
 
-        self.do_timestamp_blocks = options_dict.get('do_blocks', False)
-        self.filter_no_analysis = options_dict.get('filter_no_analysis', False)
-        self.exact_label_match = options_dict.get('exact_label_match', False)
         self.verbose = options_dict.get('verbose', False)
         self.auto_keys = options_dict.get('auto_keys', None)
 
-        # used in self.plot_text, here for future compatibility
-        self.fancy_box_props = dict(boxstyle='round', pad=.4,
-                                    facecolor='white', alpha=0.5)
         if type(self.auto_keys) is str:
             self.auto_keys = [self.auto_keys]
 
