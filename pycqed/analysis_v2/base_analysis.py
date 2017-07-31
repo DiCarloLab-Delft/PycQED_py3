@@ -344,28 +344,41 @@ class BaseDataAnalysis(object):
         Only model fitting is implemented here. Minimizing fitting should
         be implemented here.
         '''
-        fit_guess_fn = self.fit_dict['fit_guess_fn']
-        fit_fn = self.fit_dict['fit_fn']
-        fit_yvals = self.fit_dict['fit_yvals']
-        fit_xvals = self.fit_dict['fit_xvals']
-        model = lmfit.Model(fit_fn)
-        if self.do_timestamp_blocks:
-            self.fit_dict['fit_results'] = []
-            for tt in range(len(fit_yvals)):
-                guess_dict = fit_guess_fn(fit_yvals[tt],
-                                          **fit_xvals[tt])
-                for key, val in list(guess_dict.items()):
-                    model.set_param_hint(key, **val)
-                params = model.make_params()
-                self.fit_dict['fit_results'].append(
-                    model.fit(fit_yvals[tt], params=params, **fit_xvals[tt]))
-        else:
-            guess_dict = fit_guess_fn(fit_yvals, **fit_xvals)
-            for key, val in list(guess_dict.items()):
-                model.set_param_hint(key, **val)
-            params = model.make_params()
-            self.fit_dict['fit_results'] = model.fit(
-                fit_yvals, params=params, **fit_xvals)
+        self.fit_res = {}
+        for key, fit_dict in self.fit_dicts.items():
+            guess_dict = fit_dict.get('guess_dict', None)
+            guess_pars = fit_dict.get('guess_pars', None)
+            fit_guess_fn = fit_dict.get('fit_guess_fn', None)
+            fit_fn = fit_dict.get('fit_fn', None)
+            fit_yvals = fit_dict['fit_yvals']
+            fit_xvals = fit_dict['fit_xvals']
+
+            model = fit_dict.get('model', lmfit.Model(fit_fn))
+            if self.do_timestamp_blocks:
+                fit_dict['fit_res'] = []
+                for tt in range(len(fit_yvals)):
+                    if guess_pars is None:
+                        if guess_dict is None:
+                            guess_dict = fit_guess_fn(fit_yvals[tt],
+                                                      **fit_xvals[tt])
+                        for key, val in list(guess_dict.items()):
+                            model.set_param_hint(key, **val)
+                        guess_pars = model.make_params()
+                    fit_dict['fit_res'].append(
+                        model.fit(params=guess_pars, **fit_xvals[tt],
+                                  **fit_yvals[tt]))
+            else:
+                if guess_pars is None:
+                    if guess_dict is None:
+                        guess_dict = fit_guess_fn(fit_yvals, **fit_xvals)
+                    for key, val in list(guess_dict.items()):
+                        model.set_param_hint(key, **val)
+                    guess_pars = model.make_params()
+
+                fit_dict['fit_res'] = model.fit(
+                    params=guess_pars, **fit_xvals, **fit_yvals)
+
+            self.fit_res[key] = fit_dict['fit_res']
 
     def plot(self, key_list=None, axs_dict=None,
              presentation_mode=None, no_label=False):

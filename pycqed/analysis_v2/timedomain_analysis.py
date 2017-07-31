@@ -78,8 +78,8 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
         if auto:
             self.run_analysis()
 
-    def run_fitting(self):
-        self.fit_res = {}
+    def prepare_fitting(self):
+        self.fit_dicts = {}
         # Even though we expect an exponentially damped oscillation we use
         # a simple cosine as this gives more reliable fitting and we are only
         # interested in extracting the frequency of the oscillation
@@ -97,10 +97,11 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
         guess_pars['offset'].value = 0.5
         guess_pars['offset'].vary = False
 
-        self.fit_res['cos_fit'] = cos_mod.fit(
-            t=self.data_dict['sweep_points'][:-4],
-            data=self.data_dict['corr_data'][:-4],
-            params=guess_pars)
+        self.fit_dicts['cos_fit'] = {
+            'fit_fn': fit_mods.CosFunc,
+            'fit_xvals': {'t': self.data_dict['sweep_points'][:-4]},
+            'fit_yvals': {'data': self.data_dict['corr_data'][:-4]},
+            'guess_pars': guess_pars}
 
         # In the case there are very few periods we fall back on a small
         # angle approximation to extract the drive detuning
@@ -115,10 +116,11 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
         guess_pars['c0'].vary = False
         guess_pars['c0'].value = 0.5
 
-        self.fit_res['line_fit'] = poly_mod.fit(
-            x=self.data_dict['sweep_points'][:-4],
-            data=self.data_dict['corr_data'][:-4],
-            params=guess_pars)
+        self.fit_dicts['line_fit'] = {
+            'model': poly_mod,
+            'fit_xvals': {'x': self.data_dict['sweep_points'][:-4]},
+            'fit_yvals': {'data': self.data_dict['corr_data'][:-4]},
+            'guess_pars': guess_pars}
 
     def analyze_fit_results(self):
         sf_line = self._get_scale_factor_line()
@@ -143,7 +145,8 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
         """
         # Model selection based on the Bayesian Information Criterion (BIC)
         # as  calculated by lmfit
-        if self.fit_res['line_fit'].bic < self.fit_res['cos_fit'].bic:
+        if (self.fit_dicts['line_fit']['fit_res'].bic <
+                self.fit_dicts['cos_fit']['fit_res'].bic):
             scale_factor = self._get_scale_factor_line()
         else:
             scale_factor = self._get_scale_factor_cos()
@@ -152,13 +155,13 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
     def _get_scale_factor_cos(self):
         # 1/period of the oscillation corresponds to the (fractional)
         # over/under rotation error per gate
-        frequency = self.fit_res['cos_fit'].params['frequency']
+        frequency = self.fit_dicts['cos_fit']['fit_res'].params['frequency']
 
         # the square is needed to account for the difference between
         # power and amplitude
         scale_factor = (1+frequency)**2
 
-        phase = np.rad2deg(self.fit_res['cos_fit'].params['phase']) % 360
+        phase = np.rad2deg(self.fit_dicts['cos_fit']['fit_res'].params['phase']) % 360
         # phase ~90 indicates an under rotation so the scale factor
         # has to be larger than 1. A phase ~270 indicates an over
         # rotation so then the scale factor has to be smaller than one.
@@ -170,7 +173,7 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
     def _get_scale_factor_line(self):
         # 1/period of the oscillation corresponds to the (fractional)
         # over/under rotation error per gate
-        frequency = self.fit_res['line_fit'].params['frequency']
+        frequency = self.fit_dicts['line_fit']['fit_res'].params['frequency']
         scale_factor = (1+frequency)**2
         # no phase sign check is needed here as this is contained in the
         # sign of the coefficient
@@ -196,7 +199,7 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
             self.plot_dicts['line_fit'] = {
                 'ax_id': 'main',
                 'plotfn': self.plot_fit,
-                'fit_res': self.fit_res['line_fit'],
+                'fit_res': self.fit_dicts['line_fit']['fit_res'],
                 'plot_init': self.options_dict['plot_init'],
                 'setlabel': 'line fit',
                 'do_legend': True,
@@ -205,7 +208,7 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
             self.plot_dicts['cos_fit'] = {
                 'ax_id': 'main',
                 'plotfn': self.plot_fit,
-                'fit_res': self.fit_res['cos_fit'],
+                'fit_res': self.fit_dicts['cos_fit']['fit_res'],
                 'plot_init': self.options_dict['plot_init'],
                 'setlabel': 'cos fit',
                 'do_legend': True,
@@ -217,5 +220,3 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
                 'plotfn': self.plot_text,
                 'box_props': 'fancy',
                 'text_string': self.data_dict['scale_factor_msg']}
-
-
