@@ -91,4 +91,4 @@ seq.append('second special element', 'Another_element',
            repetitions=5)
 
 # program the Sequence
-station.pulsar.program_awg(seq, test_element, special_element)
+station.pulsar.program_awgs(seq, test_element, special_element)
