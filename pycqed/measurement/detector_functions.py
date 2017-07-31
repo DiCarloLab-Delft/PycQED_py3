@@ -1858,9 +1858,8 @@ class UHFQC_statistics_logging_det(Soft_Detector):
         if self.AWG is not None:
             self.AWG.stop()
 
-
-        max_shots = 4095 # hardware limit of UHFQC
-        self.nr_chunks = self.nr_shots//max_shots +1
+        max_shots = 4095  # hardware limit of UHFQC
+        self.nr_chunks = self.nr_shots//max_shots + 1
         self.shots_per_chunk = np.min([self.nr_shots, max_shots])
 
         # The averaging-count is used to specify how many times the AWG program
@@ -1900,15 +1899,16 @@ class UHFQC_statistics_logging_det(Soft_Detector):
         if self.AWG is not None:
             self.AWG.stop()
         data_concat = np.zeros(7)
-        for i in range(self.nr_chunks): 
-            self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
-            self.UHFQC.quex_sl_readout(0)  # resets UHFQC internal sl counters ?
+        for i in range(self.nr_chunks):
+            # resets UHFQC internal readout counters
+            self.UHFQC.quex_rl_readout(1)
+            # resets UHFQC internal sl counters ?
+            self.UHFQC.quex_sl_readout(0)
 
             self.UHFQC.acquisition_arm()
             # starting AWG
-            if self.AWG is not None and i ==0:
+            if self.AWG is not None and i == 0:
                 self.AWG.start()
-
 
             data = self.UHFQC.acquisition_poll(samples=4,  # double check this
                                                arm=False,
@@ -1920,6 +1920,72 @@ class UHFQC_statistics_logging_det(Soft_Detector):
             return data_concat/(self.nr_chunks*self.shots_per_chunk)
         return data_concat
 
+
+class UHFQC_single_qubit_statistics_logging_det(UHFQC_statistics_logging_det):
+
+    def __init__(self, UHFQC, AWG, nr_shots: int,
+                 integration_length: float,
+                 channel: int,
+                 statemap: dict,
+                 channel_name: str=None,
+                 normalize_counts: bool=True):
+        """
+        Detector for the statistics logger mode in the UHFQC.
+
+            UHFQC (instrument) : data acquisition device
+            AWG   (instrument) : device responsible for starting and stopping
+                the experiment, can also be a central controller.
+            integration_length (float): integration length in seconds
+            nr_shots (int)     : nr of shots (max is 4095)
+            channel  (int)    : index (channel) of UHFQC weight function
+            statemap (dict) : dictionary specifying the expected output state
+                for each 1 bit input state.
+                e.g.:
+                    statemap ={'0': '0', '1':'1'}
+            channel_name (str) : optional name of the channel
+
+
+        """
+        super(UHFQC_statistics_logging_det, self).__init__()
+        self.UHFQC = UHFQC
+        self.AWG = AWG
+        self.nr_shots = nr_shots
+        self.integration_length = integration_length
+        self.normalize_counts = normalize_counts
+
+        self.channels = [channel, int((channel+1) % 5)]
+
+        if channel_name is None:
+            channel_name = ['ch{}'.format(channel)]
+
+        self.value_names = ['{} counts'.format(channel),
+                            '{} flips'.format(channel),
+                            '{} state errors'.format(channel)]
+        if not self.normalize_counts:
+            self.value_units = '#'*len(self.value_names)
+        else:
+            self.value_units = ['frac']*len(self.value_names)
+        self.statemap = statemap
+
+        self.max_shots = 4095  # hardware limit of UHFQC
+
+        self.statemap = self.statemap_one2two_bit(statemap)
+
+    @staticmethod
+    def statemap_one2two_bit(one_bit_sm: dict):
+        """
+        Converts a one bit statemap to an appropriate dummy 2-bit statemap
+        """
+        sm = one_bit_sm
+        two_bit_sm = {'00': '{}{}'.format(sm['0'], sm['0']),
+                      '10': '{}{}'.format(sm['0'], sm['0']),
+                      '01': '{}{}'.format(sm['1'], sm['1']),
+                      '11': '{}{}'.format(sm['1'], sm['1'])}
+        return two_bit_sm
+
+    def acquire_data_point(self, **kw):
+        # Returns only the data for the relevant channel
+        return super().acquire_data_point()[0:3]
 
 class UHFQC_single_qubit_statistics_logging_det(UHFQC_statistics_logging_det):
 
@@ -2303,20 +2369,3 @@ class DDM_integration_logging_det(Hard_Detector):
     def finish(self):
         if self.AWG is not None:
             self.AWG.stop()
-
-
-class RTO1024_detector(Hard_Detector):
-    '''
-    Detector for the Rohde-Schwarz RTO1024 oscilloscope.
-    '''
-
-    def __init__(self, scope):
-        self.scope = scope
-
-    def prepare(self, sweep_points=None):
-        self.sweep_points = sweep_points
-        self.scope.prepare_measurement(t_start=sweep_points[0],
-                                       t_stop=sweep_points[-1])
-
-    def get_values(self):
-        return self.scope.measure_trace()
