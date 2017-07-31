@@ -70,15 +70,16 @@ class BaseDataAnalysis(object):
         '''
         self.single_timestamp = False
         if options_dict is None:
-            self.options_dict = {}
+            self.options_dict = dict()
         else:
             self.options_dict = options_dict
+
         self.ma_type = self.options_dict.get('ma_type', 'MeasurementAnalysis')
 
         ################################################
         # These options determine what data to extract #
         ################################################
-        scan_label = options_dict.get('scan_label', '')
+        scan_label = self.options_dict.get('scan_label', '')
         if type(scan_label) is not list:
             self.labels = [scan_label]
         else:
@@ -96,9 +97,11 @@ class BaseDataAnalysis(object):
             self.t_stop = self.t_start
         else:
             self.t_stop = t_stop
-        self.do_timestamp_blocks = options_dict.get('do_blocks', False)
-        self.filter_no_analysis = options_dict.get('filter_no_analysis', False)
-        self.exact_label_match = options_dict.get('exact_label_match', False)
+        self.do_timestamp_blocks = self.options_dict.get('do_blocks', False)
+        self.filter_no_analysis = self.options_dict.get(
+            'filter_no_analysis', False)
+        self.exact_label_match = self.options_dict.get(
+            'exact_label_match', False)
 
         ########################################
         # These options relate to the plotting #
@@ -107,23 +110,25 @@ class BaseDataAnalysis(object):
         self.plot_dicts = dict()
         self.axs = dict()
         self.figs = dict()
-        self.presentation_mode = options_dict.get('presentation_mode', False)
-        self.tight_fig = options_dict.get('tight_fig', True)
+        self.presentation_mode = self.options_dict.get(
+            'presentation_mode', False)
+        self.tight_fig = self.options_dict.get('tight_fig', True)
         # used in self.plot_text, here for future compatibility
         self.fancy_box_props = dict(boxstyle='round', pad=.4,
                                     facecolor='white', alpha=0.5)
 
         self.options_dict['plot_init'] = self.options_dict.get('plot_init',
                                                                False)
-        self.options_dict['save_figs'] = self.options_dict.get('save_figs', True)
+        self.options_dict['save_figs'] = self.options_dict.get(
+            'save_figs', True)
         ####################################################
         # These options relate to what analysis to perform #
         ####################################################
         self.extract_only = extract_only
         self.do_fitting = do_fitting
 
-        self.verbose = options_dict.get('verbose', False)
-        self.auto_keys = options_dict.get('auto_keys', None)
+        self.verbose = self.options_dict.get('verbose', False)
+        self.auto_keys = self.options_dict.get('auto_keys', None)
 
         if type(self.auto_keys) is str:
             self.auto_keys = [self.auto_keys]
@@ -417,7 +422,7 @@ class BaseDataAnalysis(object):
                     pdict.get('numplotsy', 1), pdict.get('numplotsx', 1),
                     sharex=pdict.get('sharex', False),
                     sharey=pdict.get('sharey', False),
-                    figsize=pdict.get('plotsize', None))#(8, 6)))
+                    figsize=pdict.get('plotsize', None))  # (8, 6)))
 
         if presentation_mode:
             self.plot_for_presentation(key_list=key_list, no_label=no_label)
@@ -896,5 +901,3 @@ class BaseDataAnalysis(object):
               verticalalignment=verticalalignment,
               horizontalalignment=horizontalalignment,
               bbox=box_props)
-
-
