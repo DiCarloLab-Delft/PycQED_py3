@@ -6,7 +6,6 @@ import pycqed.analysis_v2.base_analysis as ba
 
 
 class Single_Qubit_TimeDomainAnalysis(ba.BaseDataAnalysis):
-    pass
 
     def process_data(self):
         '''
@@ -56,7 +55,7 @@ class Single_Qubit_TimeDomainAnalysis(ba.BaseDataAnalysis):
 class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
 
     def __init__(self, t_start: str=None, t_stop: str=None,
-                 options_dict: dict={}, extract_only: bool=False,
+                 options_dict: dict=None, extract_only: bool=False,
                  do_fitting: bool=True, auto=True):
         super().__init__(t_start=t_start, t_stop=t_stop,
                          options_dict=options_dict,

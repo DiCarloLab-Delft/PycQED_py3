@@ -42,7 +42,7 @@ class BaseDataAnalysis(object):
     """
 
     def __init__(self, t_start: str=None, t_stop: str=None,
-                 options_dict: dict={}, extract_only: bool=False,
+                 options_dict: dict=None, extract_only: bool=False,
                  do_fitting: bool=False):
         '''
         This is the __init__ of the abstract base class.
@@ -69,7 +69,10 @@ class BaseDataAnalysis(object):
         dict to prevent double refs? )
         '''
         self.single_timestamp = False
-        self.options_dict = options_dict
+        if options_dict is None:
+            self.options_dict = {}
+        else:
+            self.options_dict = options_dict
         self.ma_type = self.options_dict.get('ma_type', 'MeasurementAnalysis')
 
         ################################################
