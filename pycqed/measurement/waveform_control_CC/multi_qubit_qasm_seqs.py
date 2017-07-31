@@ -531,20 +531,22 @@ def CZ_state_cycling_light(q0: str, q1: str, N: int=1):
     qasm_file.writelines('qubit {} \nqubit {} \n'.format(q0, q1))
 
     U = ''
-    U.append('Y90 {} | mY90 {}\n'.format(q0, q1))
-    U.append('CZ {} {}\n'.format(q0, q1))
-    U.append('Y90 {} | Y90 {}\n'.format(q0, q1))
-    U.append('CZ {} {}\n'.format(q0, q1))
-    U.append('Y90 {} | Y90 {}\n'.format(q0, q1))
+    U += 'Y90 {} | mY90 {}\n'.format(q0, q1)
+    U += 'CZ {} {}\n'.format(q0, q1)
+    U += 'Y90 {} | Y90 {}\n'.format(q0, q1)
+    U += 'CZ {} {}\n'.format(q0, q1)
+    U += 'Y90 {} | Y90 {}\n'.format(q0, q1)
 
     # Input |00>
     qasm_file.writelines('init_all \n')
+    qasm_file.writelines('qwg_trigger_0 {}\n'.format(q0))
     for n in range(N):
         qasm_file.writelines(U)
     qasm_file.writelines('RO {}\n'.format(q0))
 
     # Input |01>
     qasm_file.writelines('init_all \n')
+    qasm_file.writelines('qwg_trigger_0 {}\n'.format(q0))
     qasm_file.writelines('X180 {}\n'.format(q0))
     for n in range(N):
         qasm_file.writelines(U)
@@ -552,6 +554,7 @@ def CZ_state_cycling_light(q0: str, q1: str, N: int=1):
 
     # Input |10>
     qasm_file.writelines('init_all \n')
+    qasm_file.writelines('qwg_trigger_0 {}\n'.format(q0))
     qasm_file.writelines('X180 {}\n'.format(q1))
     for n in range(N):
         qasm_file.writelines(U)
@@ -559,6 +562,7 @@ def CZ_state_cycling_light(q0: str, q1: str, N: int=1):
 
     # Input |11>
     qasm_file.writelines('init_all \n')
+    qasm_file.writelines('qwg_trigger_0 {}\n'.format(q0))
     qasm_file.writelines('X180 {} | X180 {}\n'.format(q0, q1))
     for n in range(N):
         qasm_file.writelines(U)
@@ -589,11 +593,11 @@ def CZ_restless_state_cycling(q0: str, q1: str, N: int=1):
     qasm_file.writelines('qubit {} \nqubit {} \n'.format(q0, q1))
 
     U = ''
-    U.append('Y90 {} | mY90 {}\n'.format(q0, q1))
-    U.append('CZ {} {}\n'.format(q0, q1))
-    U.append('Y90 {} | Y90 {}\n'.format(q0, q1))
-    U.append('CZ {} {}\n'.format(q0, q1))
-    U.append('Y90 {} | Y90 {}\n'.format(q0, q1))
+    U += 'Y90 {} | mY90 {}\n'.format(q0, q1)
+    U += 'CZ {} {}\n'.format(q0, q1)
+    U += 'Y90 {} | Y90 {}\n'.format(q0, q1)
+    U += 'CZ {} {}\n'.format(q0, q1)
+    U += 'Y90 {} | Y90 {}\n'.format(q0, q1)
 
     for n in range(N):
         qasm_file.writelines(U)
