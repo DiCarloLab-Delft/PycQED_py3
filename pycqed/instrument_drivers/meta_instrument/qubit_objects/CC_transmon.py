@@ -2125,7 +2125,7 @@ class CBox_v3_driven_transmon(Transmon):
                                 MC=None, wait_during_flux='auto',
                                 cases=('cos', 'sin'),
                                 flux_type: str='square',
-                                analyze: bool=True):
+                                analyze: bool=True, msmt_suffix=None):
         '''
         Measure the total phase with the sequence
             mX90 -- CZ -- tau -- flux -- rec90
@@ -2162,6 +2162,9 @@ class CBox_v3_driven_transmon(Transmon):
 
         f_lutman = self.flux_LutMan.get_instr()
         CBox = self.CBox.get_instr()
+
+        if msmt_suffix is None:
+            msmt_suffix = self.msmt_suffix
 
         if 'uhfqc' not in self._acquisition_instrument.name.lower():
             raise RuntimeError('Requires acquisition with UHFQC (detector '
@@ -2251,7 +2254,7 @@ class CBox_v3_driven_transmon(Transmon):
             MC.set_sweep_points(taus)
             MC.set_detector_function(d)
 
-            MC.run('CZ_phase_ripple_{}{}'.format(case, self.msmt_suffix))
+            MC.run('CZ_phase_ripple_{}{}'.format(case, msmt_suffix))
             ma.MeasurementAnalysis(label='CZ_phase_ripple_')
 
         if analyze:
