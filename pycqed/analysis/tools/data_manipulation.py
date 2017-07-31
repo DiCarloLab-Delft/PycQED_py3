@@ -161,9 +161,10 @@ def butterfly_data_binning(Z, initial_state=0):
     epsj_i = eps(1st post msmst state, _input state)
     """
     if initial_state == 0:  # measurement induced excitation
-        eps0_0 = np.mean([1 if s == 1 else 0 for s in Z[:, 0]])
         # first is declared second is input state
+        eps0_0 = np.mean([1 if s == 1 else 0 for s in Z[:, 0]])
         eps1_0 = 1-eps0_0
+
         P00_0 = np.mean([1 if (s_row[:2] == [1., 1.]).all() else 0
                          for s_row in Z[:]])
         P01_0 = np.mean([1 if (s_row[:2] == [1., -1.]).all() else 0
@@ -175,9 +176,10 @@ def butterfly_data_binning(Z, initial_state=0):
         return {'eps0_0': eps0_0, 'eps1_0': eps1_0, 'P00_0': P00_0,
                 'P01_0': P01_0, 'P10_0': P10_0, 'P11_0': P11_0}
     else:  # measurement induced relaxation
-        eps0_1 = np.mean([1 if s == 1 else 0 for s in Z[:, 0]])
         # first is declared second is input state
+        eps0_1 = np.mean([1 if s == 1 else 0 for s in Z[:, 0]])
         eps1_1 = 1-eps0_1
+
         P00_1 = np.mean([1 if (s_row[:2] == [1., 1.]).all() else 0
                          for s_row in Z[:]])
         P01_1 = np.mean([1 if (s_row[:2] == [1., -1.]).all() else 0

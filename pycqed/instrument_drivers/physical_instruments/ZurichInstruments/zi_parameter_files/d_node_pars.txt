@@ -28,6 +28,10 @@
     "float"
   ],
   [
+    "quex/sl/statemap",
+    "vector_gs"
+  ],
+  [
     "awgs/0/sweep/awgtrigs/0",
     "float"
   ],

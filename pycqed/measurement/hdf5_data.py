@@ -11,30 +11,9 @@ Contains:
 """
 
 import os
-import logging
 import time
 import h5py
 import numpy as np
-import pycqed as pq
-from uuid import getnode as get_mac
-
-
-try:
-    # This method is currently not working robustly
-    qc_config
-except NameError:
-    try:
-        # The datadict is the first (hard coded) fall back option
-        from pycqed.init.config import setup_dict
-        mac = get_mac()
-        setup_name = setup_dict.mac_dict[str(mac)]
-        qc_config = {'datadir': setup_dict.data_dir_dict[setup_name]}
-    except Exception:
-        # the default data directory location is the last fall back option
-        # Stores data in the default data location (pycqed_py3/data/)
-        datadir = os.path.join(os.path.dirname(pq.__file__), os.pardir, 'data')
-        logging.warning('Setting datadir to default location')
-        qc_config = {'datadir': datadir}
 
 
 class DateTimeGenerator:
@@ -45,15 +24,16 @@ class DateTimeGenerator:
     def __init__(self):
         pass
 
-    def create_data_dir(self, datadir, name=None, ts=None,
-                        datesubdir=True, timesubdir=True):
+    def create_data_dir(self, datadir: str, name: str=None, ts=None,
+                        datesubdir: bool=True, timesubdir: bool=True):
         '''
         Create and return a new data directory.
 
         Input:
             datadir (string): base directory
             name (string): optional name of measurement
-            ts (time.localtime()): timestamp which will be used if timesubdir=True
+            ts (time.localtime()): timestamp which will be used
+                if timesubdir=True
             datesubdir (bool): whether to create a subdirectory for the date
             timesubdir (bool): whether to create a subdirectory for the time
 
@@ -99,11 +79,8 @@ class DateTimeGenerator:
 
         return path, tsd
 
-    def new_filename(self, data_obj, folder=None):
+    def new_filename(self, data_obj, folder):
         '''Return a new filename, based on name and timestamp.'''
-        if folder is None:
-            folder = qc_config['datadir']
-
         path, tstr = self.create_data_dir(folder,
                                           name=data_obj._name,
                                           ts=data_obj._localtime)
@@ -113,22 +90,16 @@ class DateTimeGenerator:
 
 class Data(h5py.File):
 
-    # _data_list = data.Data._data_list
-    _filename_generator = DateTimeGenerator()
-
-    def __init__(self, name='None', filepath=None, *args, **kwargs):
+    def __init__(self, name: str, datadir: str):
         """
         Creates an empty data set including the file, for which the currently
         set file name generator is used.
 
         kwargs:
-            name (string) : default is 'data' (%timemark is interpreted as
-            its timemark)
-            filepath (string) : path to the file. If this is a folder it will
-            generate a folder within it with the standard timestamp structure
+            name (string) : base name of the file
+            datadir (string) : A folder will be created within the datadir
+                using the standard timestamp structure
         """
-        # FIXME: the name generation here is a bit nasty
-        # name = data.Data._data_list.new_item_name(self, name)
         self._name = name
 
         self._localtime = time.localtime()
@@ -136,13 +107,8 @@ class Data(h5py.File):
         self._timemark = time.strftime('%H%M%S', self._localtime)
         self._datemark = time.strftime('%Y%m%d', self._localtime)
 
-        if filepath is not None:
-            if os.path.isdir(filepath):
-                self.filepath = self._filename_generator.new_filename(self, folder=filepath)
-            else:
-                self.filepath = filepath
-        else:
-            self.filepath = self._filename_generator.new_filename(self)
+        self.filepath = DateTimeGenerator().new_filename(
+            self, folder=datadir)
 
         self.filepath = self.filepath.replace("%timemark", self._timemark)
 

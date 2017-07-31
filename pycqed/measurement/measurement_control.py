@@ -6,6 +6,7 @@ from scipy.optimize import fmin_powell
 from pycqed.measurement import hdf5_data as h5d
 from pycqed.utilities import general
 from pycqed.utilities.general import dict_to_ordered_tuples
+from pycqed.utilities.get_default_datadir import get_default_datadir
 
 # Used for auto qcodes parameter wrapping
 from pycqed.measurement import sweep_functions as swf
@@ -40,10 +41,16 @@ class MeasurementControl(Instrument):
     data points.
     '''
 
-    def __init__(self, name,
-                 plotting_interval=3,
-                 live_plot_enabled=True, verbose=True):
+    def __init__(self, name: str,
+                 plotting_interval: float=3,
+                 datadir: str=get_default_datadir(),
+                 live_plot_enabled: bool=True, verbose: bool=True):
         super().__init__(name=name, server_name=None)
+
+        self.add_parameter('datadir',
+                           initial_value=datadir,
+                           vals=vals.Strings(),
+                           parameter_class=ManualParameter)
         # Soft average is currently only available for "hard"
         # measurements. It does not work with adaptive measurements.
         self.add_parameter('soft_avg',
@@ -114,7 +121,8 @@ class MeasurementControl(Instrument):
         return_dict = {}
         self.last_sweep_pts = None  # used to prevent resetting same value
 
-        with h5d.Data(name=self.get_measurement_name()) as self.data_object:
+        with h5d.Data(name=self.get_measurement_name(),
+                      datadir=self.datadir()) as self.data_object:
             self.get_measurement_begintime()
             # Commented out because requires git shell interaction from python
             # self.get_git_hash()
