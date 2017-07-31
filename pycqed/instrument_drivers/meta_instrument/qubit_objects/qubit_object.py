@@ -113,7 +113,8 @@ class Qubit(Instrument):
     def measure_transients(self):
         raise NotImplementedError()
 
-    def calibrate_optimal_weights(self):
+    def calibrate_optimal_weights(self, MC=None, verify=True,
+                                  analyze=False, update=True):
         raise NotImplementedError()
 
     def measure_heterodyne_spectroscopy(self):

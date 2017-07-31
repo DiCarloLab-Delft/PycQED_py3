@@ -10,8 +10,8 @@ Main features we discussed:
 - Plotting methods of the analysis objects can take axes as arguments and draw
         their plots on
   them and also give axes objects as output
-    -> can further manipulate this plots and easily plot several things on top
-        of each other
+    -> can further manipulate these plots and easily plot several things on
+        top of each other
 - Options dictionary instead of **kw: options are saved, and for readability
         and consistency the
   options should be extracted at one single place
