@@ -2125,6 +2125,8 @@ class CBox_v3_driven_transmon(Transmon):
                                 MC=None, wait_during_flux='auto',
                                 cases=('cos', 'sin'),
                                 flux_type: str='square',
+                                pulse_1_params: dict={},
+                                pulse_2_params: dict={},
                                 analyze: bool=True, msmt_suffix=None):
         '''
         Measure the total phase with the sequence
@@ -2154,6 +2156,10 @@ class CBox_v3_driven_transmon(Transmon):
                     Type of pulse to use for the second flux pulse. This
                     string has to exactly match a key of the _wave_dict of
                     self.flux_LutMan.
+            pulse_1_params, pulse_2_parmas (dict):
+                    Dictionaries containing parameters for the flux pulses.
+                    The parameters specified in self.flux_LutMan are used
+                    for the parameters not specified in this dictionary.
             analyze (bool):
                     Do the Ram-Z analysis, extracting the step response.
         '''
@@ -2178,12 +2184,30 @@ class CBox_v3_driven_transmon(Transmon):
         if MC is None:
             MC = self.MC.get_instr()
 
-        # Get the waveforms for the two flux pulses that will be used
+        # Set the specified flux pulse parameters and get the waveforms for
+        # the two flux pulses that will be used.
+        # Old parameters are saved and re-set after the pulses have been
+        # generated.
+        old_pulse_params = {}
+        for param_name in pulse_1_params.keys():
+            # First get all params. This avoids some params being set and
+            # not changed back to the old value in case an error is raised
+            # because a param is not found.
+            old_pulse_params[param_name] = f_lutman.get(param_name)
+        for param_name in pulse_1_params.keys():
+            f_lutman.set(param_name, pulse_1_params[param_name])
         std_wfs = f_lutman.standard_waveforms()
-        wf1 = std_wfs['adiabatic_Z']
-        wf2 = std_wfs[flux_type]
+        wf1 = copy.deepcopy(std_wfs['adiabatic_Z'])
+
+        for param_name in pulse_2_params.keys():
+            f_lutman.set(param_name, pulse_2_params[param_name])
+        wf2 = copy.deepcopy(std_wfs[flux_type])
         max_len = (int(np.round(max(taus) * f_lutman.sampling_rate()))
                    + len(wf1) + len(wf2))
+
+        # Set old values again.
+        for param_name in old_pulse_params:
+            f_lutman.set(param_name, old_pulse_params[param_name])
 
         # Set the delay between the pihalf pulses to be long enough to fit the
         # flux pulse
