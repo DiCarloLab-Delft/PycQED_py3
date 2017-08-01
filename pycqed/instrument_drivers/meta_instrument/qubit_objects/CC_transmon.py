@@ -1709,7 +1709,7 @@ class CBox_v3_driven_transmon(Transmon):
                     Demodulate data befor calculating phase.
             f_demod (float):
                     Modulation frequency used if demodulate is True.
-            fulx_amp_analysis (float):
+            flux_amp_analysis (float):
                     Flux pulse amplitude by which the step response is
                     normalized in the anlaysis. Set this to 1 to see the
                     step response in units of ouput voltage.
@@ -1870,7 +1870,7 @@ class CBox_v3_driven_transmon(Transmon):
                     Demodulate data befor calculating phase.
             f_demod (float):
                     Modulation frequency used if demodulate is True.
-            fulx_amp_analysis (float):
+            flux_amp_analysis (float):
                     Flux pulse amplitude by which the step response is
                     normalized in the anlaysis. Set this to 1 to see the
                     step response in units of ouput voltage.
@@ -2125,6 +2125,7 @@ class CBox_v3_driven_transmon(Transmon):
                                 MC=None, wait_during_flux='auto',
                                 cases=('cos', 'sin'),
                                 flux_type: str='square',
+                                second_pulse_inverted=False,
                                 analyze: bool=True, msmt_suffix=None):
         '''
         Measure the total phase with the sequence
@@ -2182,6 +2183,8 @@ class CBox_v3_driven_transmon(Transmon):
         std_wfs = f_lutman.standard_waveforms()
         wf1 = std_wfs['adiabatic_Z']
         wf2 = std_wfs[flux_type]
+        if second_pulse_inverted:
+            wf2 = wf2 * -1
         max_len = (int(np.round(max(taus) * f_lutman.sampling_rate()))
                    + len(wf1) + len(wf2))
 
