@@ -472,6 +472,7 @@ class BaseDataAnalysis(object):
         dataset_desc = pdict.get('setdesc', '')
         dataset_label = pdict.get('setlabel', list(range(len(plot_yvals))))
         do_legend = pdict.get('do_legend', False)
+        legend_title = pdict.get('legend_title', None)
 
         plot_xleft = plot_xedges[:-1]
         plot_xwidth = (plot_xedges[1:]-plot_xedges[:-1])
@@ -506,7 +507,7 @@ class BaseDataAnalysis(object):
 
         if do_legend:
             legend_pos = pdict.get('legend_pos', 'best')
-            legend = axs.legend(loc=legend_pos, frameon=1)
+            legend = axs.legend(title=legend_title, loc=legend_pos, frameon=1)
             frame = legend.get_frame()
             frame.set_alpha(0.8)
             frame.set_linewidth(0)
@@ -536,6 +537,7 @@ class BaseDataAnalysis(object):
         # lines.
         dataset_label = pdict.get('setlabel', list(range(len(plot_yvals))))
         do_legend = pdict.get('do_legend', False)
+        legend_title = pdict.get('legend_title', None)
 
         plot_xvals_step = plot_xvals[1]-plot_xvals[0]
 
@@ -579,7 +581,7 @@ class BaseDataAnalysis(object):
 
         if do_legend:
             legend_pos = pdict.get('legend_pos', 'best')
-            axs.legend(loc=legend_pos)
+            axs.legend(title=legend_title, loc=legend_pos)
 
         if self.tight_fig:
             axs.figure.tight_layout()
@@ -639,7 +641,7 @@ class BaseDataAnalysis(object):
         if do_legend:
             legend_pos = pdict.get('legend_pos', 'best')
             # box_props = dict(boxstyle='Square', facecolor='white', alpha=0.6)
-            legend = axs.legend(loc=legend_pos, frameon=1)
+            legend = axs.legend(title=legend_title, loc=legend_pos, frameon=1)
             frame = legend.get_frame()
             frame.set_alpha(0.8)
             frame.set_linewidth(0)
