@@ -99,6 +99,20 @@ class Test_Detectors(unittest.TestCase):
         np.testing.assert_array_almost_equal(np.ones(10)*5.5, dset[:, 1])
         self.assertEqual(np.shape(dset), (10, 2))
 
+    def test_UHFQC_state_map(self):
+        """
+        Tests the statemap method of the UHFQC statistics detector
+        """
+        d = det.UHFQC_statistics_logging_det
+        test_statemap = {'00': '00', '01': '10', '10': '10', '11': '00'}
+        sm_arr = d.statemap_to_array(test_statemap)
+        exp_sm_arr = np.array([0, 2, 2, 0], dtype=np.uint32)
+        np.testing.assert_array_equal(sm_arr, exp_sm_arr)
+
+        invalid_sm = {'01': '10'}
+        with self.assertRaises(ValueError):
+            d.statemap_to_array(invalid_sm)
+
     @classmethod
     def tearDownClass(self):
         self.MC.close()

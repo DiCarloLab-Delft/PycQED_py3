@@ -105,7 +105,7 @@ def return_last_n_timestamps(n, contains=''):
 
 
 def latest_data(contains='', older_than=None, newer_than=None, or_equal=False,
-                return_timestamp=False, raise_exc=False,
+                return_timestamp=False, raise_exc=True,
                 folder=None, return_all=False):
     '''
     finds the latest taken data with <contains> in its name.
@@ -139,35 +139,36 @@ def latest_data(contains='', older_than=None, newer_than=None, or_equal=False,
     i = len(daydirs)-1
     while len(measdirs) == 0 and i >= 0:
         daydir = daydirs[i]
-        all_measdirs = [d for d in os.listdir(
-            os.path.join(search_dir, daydir))]
-        all_measdirs.sort()
-
-        measdirs = []
-        for d in all_measdirs:
-            # this routine verifies that any output directory
-            # is a 'valid' directory
-            # (i.e, obeys the regular naming convention)
-            _timestamp = daydir + d[:6]
-            try:
-                dstamp, tstamp = verify_timestamp(_timestamp)
-            except:
-                continue
-            timestamp = dstamp+tstamp
-            if contains in d:
-                if older_than is not None:
-                    if not is_older(timestamp, older_than, or_equal=or_equal):
-                        continue
-                if newer_than is not None:
-                    if not is_older(newer_than, timestamp, or_equal=or_equal):
-                        continue
-                measdirs.append(d)
-
+        # this makes sure hidden folders (OS related) are not searched
+        if not daydir.startswith('.'):
+            all_measdirs = [d for d in os.listdir(
+                os.path.join(search_dir, daydir))]
+            all_measdirs.sort()
+            measdirs = []
+            for d in all_measdirs:
+                # this routine verifies that any output directory
+                # is a 'valid' directory
+                # (i.e, obeys the regular naming convention)
+                _timestamp = daydir + d[:6]
+                try:
+                    dstamp, tstamp = verify_timestamp(_timestamp)
+                except:
+                    continue
+                timestamp = dstamp+tstamp
+                if contains in d:
+                    if older_than is not None:
+                        if not is_older(timestamp, older_than,
+                                        or_equal=or_equal):
+                            continue
+                    if newer_than is not None:
+                        if not is_older(newer_than, timestamp,
+                                        or_equal=or_equal):
+                            continue
+                    measdirs.append(d)
         i -= 1
-
     if len(measdirs) == 0:
         if raise_exc is True:
-            raise Exception('No fitting data found.')
+            raise Exception('No data found.')
         else:
             return False
     else:
@@ -456,8 +457,14 @@ def get_data_from_timestamp_list(timestamps,
                                  TwoD=False,
                                  max_files=None,
                                  filter_no_analysis=False,
-                                 numeric_params=None):
+                                 numeric_params=None,
+                                 ma_type='MeasurementAnalysis'):
+    # dirty import inside this function to prevent circular import
+    # FIXME: this function is at the base of the analysis v2 but relies
+    # on the old analysis in the most dirty way. Also not completely clear
+    # how the data extraction works here
     from pycqed.analysis import measurement_analysis as ma
+    ma_func = getattr(ma, ma_type)
 
     if type(timestamps) is str:
         timestamps = [timestamps]
@@ -479,16 +486,14 @@ def get_data_from_timestamp_list(timestamps,
     remove_timestamps = []
     for timestamp in get_timestamps:
         try:
-            ana = ma.MeasurementAnalysis(timestamp=timestamp, auto=False,
-                                         close_file=False)
-        except:
+            ana = ma_func(timestamp=timestamp, auto=False, close_file=False)
+        except Exception as e:
             try:
                 ana.finish()
                 del ana
-            except:
+            except Exception:
                 pass
-            warnings.warn(
-                'This data file does not exist or has been corrupted.')
+            logging.warning(e)
             remove_timestamps.append(timestamp)
         else:
             try:
@@ -533,7 +538,7 @@ def get_data_from_timestamp_list(timestamps,
                     do_analysis = True
                 ana.finish()
             except Exception as inst:
-                print('Error "%s" when processing timestamp %s' %
+                logging.warning('Error "%s" when processing timestamp %s' %
                       (inst, timestamp))
                 raise
 
@@ -542,7 +547,6 @@ def get_data_from_timestamp_list(timestamps,
             get_timestamps.remove(timestamp)
         print('timestamps removed by filtering:', remove_timestamps)
 
-    # out_data = None
     if type(param_names) is list:
         out_data = data
     elif type(param_names) is dict:
@@ -561,7 +565,6 @@ def get_data_from_timestamp_list(timestamps,
                     else:
                         raise(instance)
 
-    # out_data.update({'timestamps':get_timestamps})
     out_data['timestamps'] = get_timestamps
 
     return out_data
@@ -699,7 +702,7 @@ def compare_instrument_settings(analysis_object_a, analysis_object_b):
 
 
 def get_timestamps_in_range(timestamp_start, timestamp_end=None,
-                            label=None, exact_label_match=True, folder=None):
+                            label=None, exact_label_match=False, folder=None):
     if folder is None:
         folder = datadir
 
@@ -714,6 +717,8 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
         date = datetime_start + datetime.timedelta(days=day)
         datemark = timestamp_from_datetime(date)[:8]
         all_measdirs = [d for d in os.listdir(os.path.join(folder, datemark))]
+        # Remove all hidden folders to prevent errors
+        all_measdirs = [d for d in all_measdirs if not d.startswith('.')]
 
         if exact_label_match:
             all_measdirs = [x for x in all_measdirs if label in x]
@@ -723,14 +728,14 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
         if (date.date() - datetime_start.date()).days == 0:
             # Check if newer than starting timestamp
             timemark_start = timemark_from_datetime(datetime_start)
-            all_measdirs = [dirname for dirname in all_measdirs if int(dirname[:6]) >=
-                            int(timemark_start)]
+            all_measdirs = [dirname for dirname in all_measdirs
+                            if int(dirname[:6]) >= int(timemark_start)]
 
         if (date.date() - datetime_end.date()).days == 0:
             # Check if older than ending timestamp
             timemark_end = timemark_from_datetime(datetime_end)
-            all_measdirs = [dirname for dirname in all_measdirs if int(dirname[:6]) <=
-                            int(timemark_end)]
+            all_measdirs = [dirname for dirname in all_measdirs if
+                            int(dirname[:6]) <= int(timemark_end)]
         timestamps = ['{}_{}'.format(datemark, dirname[:6])
                       for dirname in all_measdirs]
         timestamps.reverse()
@@ -1545,14 +1550,16 @@ def find_min(x, y, return_fit=False, perc=30):
     from functools import reduce
     # filtering through percentiles
     th_perc = np.percentile(y, perc)
-    mask = np.where(y<th_perc,True,False)
+    mask = np.where(y < th_perc, True, False)
     # function that multiplies all elements in vector
-    multiply_vec = lambda vec: reduce(lambda x,y: x*y,vec)
+    multiply_vec = lambda vec: reduce(lambda x, y: x*y, vec)
     # function that multiplies all elements in vector from idx_min
     idx_min = np.argmin(y)
-    mask_ii = lambda ii: multiply_vec(mask[min(idx_min,ii):max(idx_min,ii+1)])
+    mask_ii = lambda ii: multiply_vec(
+        mask[min(idx_min, ii):max(idx_min, ii+1)])
     # function that returns mask_ii applied for all elements of the vector mask
-    continuous_mask = np.array([m for m in map(mask_ii,np.arange(len(mask)))],dtype=np.bool)
+    continuous_mask = np.array(
+        [m for m in map(mask_ii, np.arange(len(mask)))], dtype=np.bool)
     # doing the fit
     my_fit_model = QuadraticModel()
     x_fit = x[continuous_mask]
@@ -1562,12 +1569,13 @@ def find_min(x, y, return_fit=False, perc=30):
                                   x=x_fit,
                                   pars=my_fit_params)
     x_min = -0.5*my_fit_res.best_values['b']/my_fit_res.best_values['a']
-    y_min = my_fit_model.func(x_min,**my_fit_res.best_values)
+    y_min = my_fit_model.func(x_min, **my_fit_res.best_values)
 
     if return_fit:
         return x_min, y_min, my_fit_res
     else:
         return x_min, y_min
+
 
 def get_color_order(i, max_num):
     # take a blue to red scale from 0 to max_num

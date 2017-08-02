@@ -5,14 +5,18 @@ from pycqed.measurement.waveform_control.pulsar import Pulsar
 from pycqed.measurement.waveform_control import element
 from pycqed.measurement.waveform_control.pulse import SquarePulse
 from pycqed.measurement.pulse_sequences.standard_elements import multi_pulse_elt
-
+from pycqed.instrument_drivers.virtual_instruments.virtual_awg5014 import \
+    VirtualAWG5014
+import time
 
 class Test_Element(unittest.TestCase):
 
     def setUp(self):
         # set up a pulsar with some mock settings for the element
-        self.pulsar = Pulsar()
         self.station = qc.Station()
+        self.AWG = VirtualAWG5014('AWG'+str(time.time()))
+        self.AWG.clock_freq(1e9)
+        self.pulsar = Pulsar('Pulsar' + str(time.time()), self.AWG.name)
         self.station.pulsar = self.pulsar
         for i in range(4):
             self.pulsar.define_channel(id='ch{}'.format(i+1),

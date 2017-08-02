@@ -11,7 +11,7 @@ class DeviceObject(Instrument):
 
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
-        self.msmt_suffix = '_' + name  # used to append to measuremnet labels
+        self.msmt_suffix = '_' + name  # used to append to measurement labels
         self._qubits = {}
         self.add_parameter('qubits',
                            get_cmd=self._get_qubits,
