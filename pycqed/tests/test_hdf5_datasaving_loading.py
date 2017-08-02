@@ -128,7 +128,6 @@ class Test_HDF5(unittest.TestCase):
         self.assertEqual(test_dict['tuple_of_mixed_type'][2],
                          new_dict['tuple_of_mixed_type'][2])
 
-
         self.assertEqual(test_dict['some_np_bool'],
                          new_dict['some_np_bool'])
         self.assertEqual(test_dict['some_int'], new_dict['some_int'])
