@@ -29,7 +29,6 @@ class Test_KernelObject(unittest.TestCase):
     def setUpClass(self):
         print('setting up')
         self.station = station.Station()
-        # set up a pulsar with some mock settings for the element
         self.k0 = ko.Distortion('k0')
         self.k1 = ko.Distortion('k1')
         self.station.add_component(self.k0)

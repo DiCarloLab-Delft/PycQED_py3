@@ -19,7 +19,6 @@ class Test_MeasurementControl(unittest.TestCase):
     @classmethod
     def setUpClass(self):
         self.station = station.Station()
-        # set up a pulsar with some mock settings for the element
         self.MC = measurement_control.MeasurementControl(
             'MC', live_plot_enabled=True, verbose=True)
         self.MC.station = self.station
