@@ -2124,7 +2124,8 @@ class CBox_v3_driven_transmon(Transmon):
     def measure_CZ_phase_ripple(self, taus, chunk_size: int=16,
                                 MC=None, wait_during_flux='auto',
                                 cases=('cos', 'sin'),
-                                flux_type: str='square',
+                                pulse_1_type: str='adiabatic_Z',
+                                pulse_2_type: str='square',
                                 second_pulse_inverted: bool=False,
                                 pulse_1_params: dict={},
                                 pulse_2_params: dict={},
@@ -2153,13 +2154,13 @@ class CBox_v3_driven_transmon(Transmon):
                     Possible cases are 'cos' and 'sin'. This determines
                     if an X90 or Y90 pulse is used as second pi-half pulse.
                     Measurement is repeated for all cases given.
-            flux_type (string):
-                    Type of pulse to use for the second flux pulse. This
-                    string has to exactly match a key of the _wave_dict of
+            pulse_1_type, pulse_2_type (string):
+                    Type of pulse to use for the flux pulses. This string has
+                    to exactly match a key of the _wave_dict of
                     self.flux_LutMan.
             second_pulse_inverted (bool):
                     Option to invert the sign of the second pulse.
-            pulse_1_params, pulse_2_parmas (dict):
+            pulse_1_params, pulse_2_params (dict):
                     Dictionaries containing parameters for the flux pulses.
                     The parameters specified in self.flux_LutMan are used
                     for the parameters not specified in this dictionary.
@@ -2200,11 +2201,16 @@ class CBox_v3_driven_transmon(Transmon):
         for param_name in pulse_1_params.keys():
             f_lutman.set(param_name, pulse_1_params[param_name])
         std_wfs = f_lutman.standard_waveforms()
-        wf1 = copy.deepcopy(std_wfs['adiabatic_Z'])
+        wf1 = copy.deepcopy(std_wfs[pulse_1_type])
 
+        # Set old values again, to make sure the second pulse also gets the
+        # correct default values.
+        for param_name in old_pulse_params:
+            f_lutman.set(param_name, old_pulse_params[param_name])
         for param_name in pulse_2_params.keys():
             f_lutman.set(param_name, pulse_2_params[param_name])
-        wf2 = copy.deepcopy(std_wfs[flux_type])
+        std_wfs = f_lutman.standard_waveforms()
+        wf2 = copy.deepcopy(std_wfs[pulse_2_type])
         if second_pulse_inverted:
             wf2 = wf2 * -1
         max_len = (int(np.round(max(taus) * f_lutman.sampling_rate()))
@@ -2272,6 +2278,13 @@ class CBox_v3_driven_transmon(Transmon):
             d = self.int_avg_det
             d.chunk_size = chunk_size
 
+            metadata_dict = {
+                'pulse_1_type': pulse_1_type,
+                'pulse_2_type': pulse_2_type,
+                'pulse_1_params': pulse_1_params,
+                'pulse_2_params': pulse_2_params
+            }
+
             MC.set_sweep_function(swf.QWG_lutman_custom_wave_chunks(
                 LutMan=f_lutman,
                 wave_func=wave_func,
@@ -2283,7 +2296,8 @@ class CBox_v3_driven_transmon(Transmon):
             MC.set_sweep_points(taus)
             MC.set_detector_function(d)
 
-            MC.run('CZ_phase_ripple_{}{}'.format(case, msmt_suffix))
+            MC.run('CZ_phase_ripple_{}{}'.format(case, msmt_suffix),
+                   exp_metadata=metadata_dict)
             ma.MeasurementAnalysis(label='CZ_phase_ripple_')
 
         if analyze:
