@@ -8,6 +8,7 @@ import copy
 
 from matplotlib import pyplot as plt
 from pycqed.analysis import analysis_toolbox as a_tools
+from pycqed.utilities.general import NumpyJsonEncoder
 import pycqed.analysis_v2.default_figure_settings_analysis as def_fig
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import datetime
@@ -42,6 +43,7 @@ class BaseDataAnalysis(object):
     """
 
     def __init__(self, t_start: str=None, t_stop: str=None,
+                 data_file: str=None,
                  options_dict: dict=None, extract_only: bool=False,
                  do_fitting: bool=False):
         '''
@@ -84,14 +86,20 @@ class BaseDataAnalysis(object):
             self.labels = [scan_label]
         else:
             self.labels = scan_label
-        if t_start is None and t_stop is None:
+        if t_start is None and t_stop is None and data_file is None:
             # This is quite a hacky way to support finding the last file
             # with a certain label, something that was trivial in the old
             # analysis. A better solution should be implemented.
             self.t_start = a_tools.latest_data(scan_label,
                                                return_timestamp=True)[0]
-        else:
+        elif data_file is not None:
+            self.extract_from_file=True
+            self.t_start = None
+            self.data_file_path = data_file
+        elif t_start is not None:
             self.t_start = t_start
+        else:
+            raise ValueError('Either t_start or data_file must be given.')
 
         if t_stop is None:
             self.t_stop = self.t_start
@@ -204,12 +212,15 @@ class BaseDataAnalysis(object):
             - single timestamp only
         """
 
-        if self.t_start[-5:] == '.json':
-            self.use_json = True
-            self.extract_data_json()
+        if self.data_file_path is not None:
+            extension = self.data_file_path.split('.')[-1]
+            if extension == 'json':
+                self.data_dict = self.extract_data_json(self.data_file_path)
+            else:
+                raise RuntimeError('Cannot load data from file "{}". '
+                                   'Unknown file extension "{}"'
+                                   .format(self.data_file_path, extension))
             return
-        else:
-            self.use_json = False
 
         self.get_timestamps()
         # this disables the data extraction for other files if there is only
@@ -287,21 +298,31 @@ class BaseDataAnalysis(object):
             self.data_dict['timestamp'] = self.timestamps[0]
         self.data_dict['timestamps'] = self.timestamps
 
-    def extract_data_json(self):
-        file_name = self.t_start
-        with open(file_name, 'r') as f:
-            data_dict = json.load(f)
-        # print [[key, type(val[0]), len(val)] for key, val in
-        # data_dict.items()]
-        self.data_dict = {}
-        for key, val in list(data_dict.items()):
-            if type(val[0]) is dict:
-                self.data_dict[key] = val[0]
-            else:
-                self.data_dict[key] = np.double(val)
-        # print [[key, type(val), len(val)] for key, val in
-        # self.data_dict.items()]
-        self.data_dict['timestamps'] = [self.t_start]
+    def extract_data_json(self, fp: str):
+        '''
+        Extract a data_dict from a json file.
+        '''
+        with open(fp, 'r') as file:
+            data_dict = json.load(file)
+
+        return data_dict
+
+# Old code that can be removed when the new is tested (2017-08-02)
+#    def extract_data_json(self):
+#        file_name = self.t_start
+#        with open(file_name, 'r') as f:
+#            data_dict = json.load(f)
+#        # print [[key, type(val[0]), len(val)] for key, val in
+#        # data_dict.items()]
+#        self.data_dict = {}
+#        for key, val in list(data_dict.items()):
+#            if type(val[0]) is dict:
+#                self.data_dict[key] = val[0]
+#            else:
+#                self.data_dict[key] = np.double(val)
+#        # print [[key, type(val), len(val)] for key, val in
+#        # self.data_dict.items()]
+#        self.data_dict['timestamps'] = [self.t_start]
 
     def process_data(self):
         """
@@ -336,11 +357,54 @@ class BaseDataAnalysis(object):
         else:
             tstag = ''
 
-        if key_list is 'auto' or key_list is None:
+        if key_list == 'auto' or key_list is None:
             key_list = self.figs.keys()
         for key in key_list:
             savename = os.path.join(savedir, savebase+key+tstag+'.'+fmt)
             self.axs[key].figure.savefig(savename, fmt=fmt)
+
+    def save_data(self, savedir: str=None, savebase: str=None,
+                  tag_tstamp: bool=True,
+                  fmt: str='json', key_list='auto'):
+        '''
+        Saves the data from self.data_dict to file.
+
+        Args:
+            savedir (string):
+                    Directory where the file is saved. If this is None, the
+                    file is saved in self.data_dict['folder'] or the working
+                    directory of the console.
+            savebase (string):
+                    Base name for the saved file.
+            tag_tstamp (bool):
+                    Whether to append the timestamp of the first to the base name.
+            fmt (string):
+                    File extension for the format in which the file should
+                    be saved.
+            key_list (list or 'auto'):
+                    Specifies which keys from self.data_dict are saved.
+                    If this is 'auto' or None, all keys-value pairs are
+                    saved.
+        '''
+        if savedir is None:
+            savedir = self.data_dict.get('folder', '')
+        if savebase is None:
+            savebase = ''
+        if tag_tstamp:
+            tstag = '_'+self.data_dict['timestamps'][0]
+        else:
+            tstag = ''
+
+        if key_list == 'auto' or key_list is None:
+            key_list = self.data_dict.keys()
+
+        save_dict = {}
+        for k in key_list:
+            save_dict[k] = self.data_dict[k]
+
+        filepath = savedir + savebase + tstag + '.' + fmt
+        with open(filepath, 'w') as file:
+            json.dump(save_dict, file, cls=NumpyJsonEncoder)
 
     def prepare_fitting(self):
         pass
