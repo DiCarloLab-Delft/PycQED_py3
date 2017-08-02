@@ -834,12 +834,12 @@ class MeasurementControl(Instrument):
         set_grp.attrs['measurement_name'] = self.measurement_name
         set_grp.attrs['live_plot_enabled'] = self.live_plot_enabled()
 
-    def save_exp_metadata(self, attrs: dict, data_object):
+    def save_exp_metadata(self, metadata: dict, data_object):
         '''
         Saves experiment metadata to the data file.
 
         Args:
-            attrs (dict):
+            metadata (dict):
                     Simple dictionary without nesting. An attribute will be
                     created for every key in this dictionary.
             data_object:
@@ -855,8 +855,7 @@ class MeasurementControl(Instrument):
         else:
             metadata_group = data_group.create_group('Experimental Metadata')
 
-        for k, v in attrs.items():
-            metadata_group.attrs[k] = v
+        h5d.write_dict_to_hdf5(metadata, entry_point=metadata_group)
 
     def print_progress(self, stop_idx=None):
         if self.verbose():
