@@ -1,6 +1,8 @@
 import os
 import numpy as np
 import h5py
+import json
+import datetime
 from pycqed.measurement import hdf5_data as h5d
 from pycqed.analysis import analysis_toolbox as a_tools
 import errno
@@ -419,3 +421,17 @@ def setInDict(dataDict: dict, mapList: list, value):
                         'b': 4}
     """
     getFromDict(dataDict, mapList[:-1])[mapList[-1]] = value
+
+
+class NumpyJsonEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, datetime.datetime):
+            return str(obj)
+        else:
+            return super().default(obJ)
