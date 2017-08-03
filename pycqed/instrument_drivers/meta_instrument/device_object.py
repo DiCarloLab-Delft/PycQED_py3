@@ -706,17 +706,16 @@ class TwoQubitDevice(DeviceObject):
 
         def wave_func(val):
             wf1 = std_CZ
-            old_Z_amp = f_lutman_corr.Z_amp()
-            f_lutman_corr.Z_amp(val)
+            f_lutman_corr.Z_amp_grover(val)
             wf2 = deepcopy(
-                f_lutman_corr.standard_waveforms()['adiabatic_Z'])
-            f_lutman_corr.Z_amp(old_Z_amp)
-            return np.concatenate([wf1, zero_samples, wf2])
+                f_lutman_corr.standard_waveforms()['adiabatic_Z_grover'])
+            return np.concatenate([wf1, np.zeros(zero_samples), wf2])
 
         # Waveform for spectator qubit
         spect_CZ = deepcopy(
             f_lutman_spect.standard_waveforms()['adiabatic_Z'])
-        wf_spect = np.concatenate([spect_CZ, zero_samples, spect_CZ])
+        wf_spect = np.concatenate([spect_CZ, np.zeros(zero_samples),
+                                   spect_CZ])
         f_lutman_spect.load_custom_pulse_onto_AWG_lookuptable(
             waveform=wf_spect,
             pulse_name='square_0',
@@ -728,7 +727,7 @@ class TwoQubitDevice(DeviceObject):
         if wait_during_flux == 'auto':
             # Round to the next integer multiple of qubit pulse modulation
             # period and add two periods as buffer
-            T_pulsemod = np.abs(1/self.f_pulse_mod())
+            T_pulsemod = np.abs(1/correction_qubit.f_pulse_mod())
             wait_between = (np.ceil(
                 max_len / f_lutman_corr.sampling_rate() /
                 T_pulsemod) + 2) * T_pulsemod

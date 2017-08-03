@@ -6920,7 +6920,9 @@ class GST_Analysis(TD_Analysis):
 
 
 class CZ_1Q_phase_analysis(TD_Analysis):
-    def __init__(self, **kw):
+    def __init__(self, use_diff: bool=True, meas_vals_idx: int=0, **kw):
+        self.use_diff = use_diff
+        self.meas_vals_idx = meas_vals_idx
         super().__init__(rotate_and_normalize=False, cal_points=False, **kw)
 
     def run_default_analysis(self, **kw):
@@ -6928,15 +6930,21 @@ class CZ_1Q_phase_analysis(TD_Analysis):
 
         model = lmfit.models.QuadraticModel()
 
-        dat_exc = self.measured_values[0][1::2]
-        dat_idx = self.measured_values[0][::2]
-        self.diff_data = dat_idx - dat_exc
-        self.x_points = self.sweep_points[::2]
+        if self.use_diff:
+            dat_exc = self.measured_values[self.meas_vals_idx][1::2]
+            dat_idx = self.measured_values[self.meas_vals_idx][::2]
+            self.full_data = dat_idx - dat_exc
+            self.x_points = self.sweep_points[::2]
 
-        # Remove diff points thate are larger than one (parabola won't fit
-        # there).
-        self.del_indices = np.where(np.array(self.diff_data) > 0)[0]
-        self.fit_data = np.delete(self.diff_data, self.del_indices)
+            # Remove diff points thate are larger than one (parabola won't fit
+            # there).
+            self.del_indices = np.where(np.array(self.full_data) > 0)[0]
+        else:
+            self.del_indices = []
+            self.full_data = self.measured_values[self.meas_vals_idx]
+            self.x_points = self.sweep_points
+
+        self.fit_data = np.delete(self.full_data, self.del_indices)
         self.x_points_del = np.delete(self.x_points, self.del_indices)
 
         if self.fit_data.size == 0:
@@ -6961,9 +6969,9 @@ class CZ_1Q_phase_analysis(TD_Analysis):
     def make_figures(self, **kw):
         xfine = np.linspace(self.x_points[0], self.x_points[-1], 100)
         fig, ax = plt.subplots()
-        ax.plot(self.x_points, self.diff_data, '-o')
+        ax.plot(self.x_points, self.full_data, '-o')
         ax.plot(self.x_points[self.del_indices],
-                self.diff_data[self.del_indices], 'rx',
+                self.full_data[self.del_indices], 'rx',
                 label='excluded in fit')
         ax.plot(xfine,
                 self.fit_res.eval(x=xfine, **self.fit_res.init_values),

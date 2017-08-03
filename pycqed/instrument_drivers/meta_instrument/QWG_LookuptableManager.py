@@ -256,10 +256,18 @@ class QWG_FluxLookuptableManager(Instrument):
                            vals=vals.Numbers(),
                            parameter_class=ManualParameter)
         self.add_parameter('Z_amp',
-                           docstring=('Amplitude of flux pulse as fraction of '
-                                      'the peak amplitude. Beware of factor '
-                                      '2 with Vpp in the QWG'),
+                           docstring=('Amplitude of the single qubit phase '
+                                      'correction in CZ pulses.'),
                            label='Z amplitude',
+                           unit='frac',
+                           initial_value=0.0,
+                           vals=vals.Numbers(),
+                           parameter_class=ManualParameter)
+        self.add_parameter('Z_amp_grover',
+                           docstring=('Amplitude of the single qubit phase '
+                                      'correction for the second CZ pulse '
+                                      "used in Grover's algorithm."),
+                           label='Z amplitude 2',
                            unit='frac',
                            initial_value=0.0,
                            vals=vals.Numbers(),
@@ -280,6 +288,7 @@ class QWG_FluxLookuptableManager(Instrument):
                            initial_value=False)
         self.add_parameter('pulse_map',
                            initial_value={'cz': 'adiabatic_Z',
+                                          'cz_grover': 'adiabatic_Z_grover',
                                           'square': 'square'},
                            parameter_class=ManualParameter,
                            vals=vals.Dict())
@@ -365,16 +374,21 @@ class QWG_FluxLookuptableManager(Instrument):
         # Flux pulse for single qubit phase correction
         z_nr_samples = int(np.round(self.Z_length() * self.sampling_rate()))
         single_qubit_phase_correction = np.ones(z_nr_samples) * self.Z_amp()
+        single_qubit_phase_correction_grover = \
+            np.ones(z_nr_samples) * self.Z_amp_grover()
 
         if self.disable_CZ():
             martinis_pulse_v2 *= 0
         # Construct phase corrected pulses
         martinis_phase_corrected = np.concatenate(
             [martinis_pulse_v2, single_qubit_phase_correction])
+        martinis_phase_corrected_grover = np.concatenate(
+            [martinis_pulse_v2, single_qubit_phase_correction_grover])
 
         return {'square': block,
                 'adiabatic': martinis_pulse_v2,
-                'adiabatic_Z': martinis_phase_corrected}
+                'adiabatic_Z': martinis_phase_corrected,
+                'adiabatic_Z_grover': martinis_phase_corrected_grover}
 
     def generate_standard_pulses(self):
         '''
