@@ -11,7 +11,9 @@ from qcodes.instrument_drivers.tektronix.AWG5014 import Tektronix_AWG5014
 try:
     from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.\
         UHFQuantumController import UHFQC
-except ModuleNotFoundError:
+# except ModuleNotFoundError:
+# exception catching removed because it does not work in python versions before 3.6
+except:
     UHFQC = type(None)
 
 
