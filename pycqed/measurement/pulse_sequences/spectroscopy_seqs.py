@@ -37,5 +37,4 @@ def Pulsed_spec_seq(RO_pars,
         el_list.append(el)
         seq.append_element(el, trigger_wait=trigger_wait)
         # Ensures a continuously running sequence
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
