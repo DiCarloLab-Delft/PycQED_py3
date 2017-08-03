@@ -225,8 +225,12 @@ def read_dict_from_hdf5(data_dict: dict, h5_group):
     corresponding "write_dict_to_hdf5" function defined above.
 
     Args:
-        data_dict (dict): dictionary to which to add entries being read out.
-        h5_group  (hdf5 group): hdf5 file or group from which to read.
+        data_dict (dict):
+                dictionary to which to add entries being read out.
+                This argument exists because it allows nested calls of this
+                function to add the data to an existing data_dict.
+        h5_group  (hdf5 group):
+                hdf5 file or group from which to read.
     """
     # if 'list_type' not in h5_group.attrs:
     for key, item in h5_group.items():
