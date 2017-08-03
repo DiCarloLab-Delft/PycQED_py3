@@ -2121,7 +2121,10 @@ class CBox_v3_driven_transmon(Transmon):
         if analyze:
             return ma.MeasurementAnalysis()
 
-    def measure_CZ_phase_ripple(self, taus, chunk_size: int=16,
+    def measure_CZ_phase_ripple(self, taus,
+                                param_name='delay',
+                                param_unit='s',
+                                chunk_size: int=16,
                                 MC=None, wait_during_flux='auto',
                                 cases=('cos', 'sin'),
                                 pulse_1_type: str='adiabatic_Z',
@@ -2140,6 +2143,11 @@ class CBox_v3_driven_transmon(Transmon):
         Args:
             taus (array of floats):
                     List of the separation taus to use (sweep points).
+            param_name (str):
+                    Name of the sweep param, can be changed for when varying
+                    pulse pars.
+            param_unit (str):
+                    unit of the sweep.
             chunk_size (int):
                     Sweep points are divided into chunks of this size. The
                     total number of sweep points should be an integer multiple
@@ -2158,12 +2166,11 @@ class CBox_v3_driven_transmon(Transmon):
                     Type of pulse to use for the flux pulses. This string has
                     to exactly match a key of the _wave_dict of
                     self.flux_LutMan.
-            second_pulse_inverted (bool):
-                    Option to invert the sign of the second pulse.
             pulse_1_params, pulse_2_params (dict):
                     Dictionaries containing parameters for the flux pulses.
                     The parameters specified in self.flux_LutMan are used
                     for the parameters not specified in this dictionary.
+                    an optional extra  key "inverted" (bool)
             analyze (bool):
                     Do the Ram-Z analysis, extracting the step response.
         '''
@@ -2188,37 +2195,37 @@ class CBox_v3_driven_transmon(Transmon):
         if MC is None:
             MC = self.MC.get_instr()
 
-        # Set the specified flux pulse parameters and get the waveforms for
-        # the two flux pulses that will be used.
-        # Old parameters are saved and re-set after the pulses have been
-        # generated.
-        old_pulse_params = {}
-        for param_name in pulse_1_params.keys():
-            # First get all params. This avoids some params being set and
-            # not changed back to the old value in case an error is raised
-            # because a param is not found.
-            old_pulse_params[param_name] = f_lutman.get(param_name)
-        for param_name in pulse_1_params.keys():
-            f_lutman.set(param_name, pulse_1_params[param_name])
-        std_wfs = f_lutman.standard_waveforms()
-        wf1 = copy.deepcopy(std_wfs[pulse_1_type])
+        def get_wf(pulse_params):
 
-        # Set old values again, to make sure the second pulse also gets the
-        # correct default values.
-        for param_name in old_pulse_params:
-            f_lutman.set(param_name, old_pulse_params[param_name])
-        for param_name in pulse_2_params.keys():
-            f_lutman.set(param_name, pulse_2_params[param_name])
-        std_wfs = f_lutman.standard_waveforms()
-        wf2 = copy.deepcopy(std_wfs[pulse_2_type])
-        if second_pulse_inverted:
-            wf2 = wf2 * -1
+            # Set the specified flux pulse parameters and get the waveforms for
+            # the two flux pulses that will be used.
+            # Old parameters are saved and re-set after the pulses have been
+            # generated.
+            old_pulse_params = {}
+            for param_name in pulse_params.keys():
+                # First get all params. This avoids some params being set and
+                # not changed back to the old value in case an error is raised
+                # because a param is not found.
+                old_pulse_params[param_name] = f_lutman.get(param_name)
+            for param_name in pulse_params.keys():
+                f_lutman.set(param_name, pulse_params[param_name])
+            std_wfs = f_lutman.standard_waveforms()
+            wf = copy.deepcopy(std_wfs[pulse_1_type])
+            if 'inverted' in pulse_params.keys():
+                if pulse_params['inverted']:
+                    wf = -1 * wf
+
+            # Set old values again, to make sure the second pulse also gets the
+            # correct default values.
+            for param_name in old_pulse_params:
+                f_lutman.set(param_name, old_pulse_params[param_name])
+            return wf
+
+        wf1 = get_wf(pulse_1_params)
+        wf2 = get_wf(pulse_2_params)
+
         max_len = (int(np.round(max(taus) * f_lutman.sampling_rate()))
                    + len(wf1) + len(wf2))
-
-        # Set old values again.
-        for param_name in old_pulse_params:
-            f_lutman.set(param_name, old_pulse_params[param_name])
 
         # Set the delay between the pihalf pulses to be long enough to fit the
         # flux pulse
@@ -2232,7 +2239,6 @@ class CBox_v3_driven_transmon(Transmon):
                   .format(np.round(wait_between*f_lutman.sampling_rate())))
         else:
             wait_between = wait_during_flux
-
 
         # Set the flux pulses in the operation dictionary
         # pulse 'square_i' has codeword i
@@ -2291,8 +2297,8 @@ class CBox_v3_driven_transmon(Transmon):
                 sweep_points=taus,
                 chunk_size=chunk_size,
                 codewords=np.arange(chunk_size),
-                param_name='delay',
-                param_unit='s'))
+                param_name=param_name,
+                param_unit=param_unit))
             MC.set_sweep_points(taus)
             MC.set_detector_function(d)
 
