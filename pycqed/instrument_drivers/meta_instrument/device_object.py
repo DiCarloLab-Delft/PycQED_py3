@@ -28,7 +28,7 @@ class DeviceObject(Instrument):
 
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
-        self.msmt_suffix = '_' + name  # used to append to measuremnet labels
+        self.msmt_suffix = '_' + name  # used to append to measurement labels
         self.add_parameter('qasm_config',
                            docstring='used for generating qumis instructions',
                            parameter_class=ManualParameter,
