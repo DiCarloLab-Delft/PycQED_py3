@@ -128,7 +128,8 @@ def encode_to_utf8(s):
     if isinstance(s, str):
         s = s.encode('utf-8')
     # If it is an array of value decodes individual entries
-    elif isinstance(s, (np.ndarray, list)):
+
+    elif isinstance(s, (np.ndarray, list, tuple)):
         s = [s.encode('utf-8') for s in s]
     return s
 
@@ -142,9 +143,14 @@ def write_dict_to_hdf5(data_dict: dict, entry_point):
     """
     for key, item in data_dict.items():
         # Basic types
-        if isinstance(item, (str, tuple, float, int, bool,
+        if isinstance(item, (str, float, int, bool,
                              np.float_, np.int_, np.bool_)):
-            entry_point.attrs[key] = item
+            try:
+                entry_point.attrs[key] = item
+            except Exception as e:
+                print('Exception occurred while writing'
+                      ' {}:{} of type {}'.format(key, item, type(item)))
+                raise e
         elif isinstance(item, np.ndarray):
             entry_point.create_dataset(key, data=item)
         elif item is None:
@@ -157,12 +163,13 @@ def write_dict_to_hdf5(data_dict: dict, entry_point):
             entry_point.create_group(key)
             write_dict_to_hdf5(data_dict=item,
                                entry_point=entry_point[key])
-        elif isinstance(item, list):
+        elif isinstance(item, (list, tuple)):
             if len(item) > 0:
                 elt_type = type(item[0])
                 # Lists of a single type, are stored as an hdf5 dset
                 if (all(isinstance(x, elt_type) for x in item) and
-                        not isinstance(item[0], dict)):
+                        not isinstance(item[0], dict) and
+                        not isinstance(item, tuple)):
                     if isinstance(item[0], (int, float,
                                             np.int32, np.int64)):
                         entry_point.create_dataset(key,
@@ -184,14 +191,17 @@ def write_dict_to_hdf5(data_dict: dict, entry_point):
                             'supported, storing as string'.format(
                                 elt_type, key, item))
                         entry_point.attrs[key] = str(item)
-                # Storing of generic lists
+                # Storing of generic lists/tuples
                 else:
                     entry_point.create_group(key)
                     # N.B. item is of type list
                     list_dct = {'list_idx_{}'.format(idx): entry for
                                 idx, entry in enumerate(item)}
                     group_attrs = entry_point[key].attrs
-                    group_attrs['list_type'] = 'generic_list'
+                    if isinstance(item, tuple):
+                        group_attrs['list_type'] = 'generic_tuple'
+                    else:
+                        group_attrs['list_type'] = 'generic_list'
                     group_attrs['list_length'] = len(item)
                     write_dict_to_hdf5(
                         data_dict=list_dct,
@@ -215,8 +225,12 @@ def read_dict_from_hdf5(data_dict: dict, h5_group):
     corresponding "write_dict_to_hdf5" function defined above.
 
     Args:
-        data_dict (dict): dictionary to which to add entries being read out.
-        h5_group  (hdf5 group): hdf5 file or group from which to read.
+        data_dict (dict):
+                dictionary to which to add entries being read out.
+                This argument exists because it allows nested calls of this
+                function to add the data to an existing data_dict.
+        h5_group  (hdf5 group):
+                hdf5 file or group from which to read.
     """
     # if 'list_type' not in h5_group.attrs:
     for key, item in h5_group.items():
@@ -247,12 +261,18 @@ def read_dict_from_hdf5(data_dict: dict, h5_group):
         data_dict[key] = item
 
     if 'list_type' in h5_group.attrs:
-        if h5_group.attrs['list_type'] == 'generic_list':
+
+        if (h5_group.attrs['list_type'] == 'generic_list' or
+                h5_group.attrs['list_type'] == 'generic_tuple'):
             list_dict = data_dict
             data_list = []
             for i in range(list_dict['list_length']):
                 data_list.append(list_dict['list_idx_{}'.format(i)])
-            return data_list
+
+            if h5_group.attrs['list_type'] == 'generic_tuple':
+                return tuple(data_list)
+            else:
+                return data_list
         else:
             raise NotImplementedError('cannot read "list_type":"{}"'.format(
                 h5_group.attrs['list_type']))
