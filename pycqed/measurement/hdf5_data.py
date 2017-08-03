@@ -196,7 +196,6 @@ def write_dict_to_hdf5(data_dict: dict, entry_point):
                     # N.B. item is of type list
                     list_dct = {'list_idx_{}'.format(idx): entry for
                                 idx, entry in enumerate(item)}
-                    print(list_dct)
                     group_attrs = entry_point[key].attrs
                     if isinstance(item, tuple):
                         group_attrs['list_type'] = 'generic_tuple'
