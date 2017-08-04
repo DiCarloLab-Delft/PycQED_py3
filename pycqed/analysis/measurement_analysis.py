@@ -6940,9 +6940,9 @@ class CZ_1Q_phase_analysis(TD_Analysis):
             # there).
             self.del_indices = np.where(np.array(self.full_data) > 0)[0]
         else:
-            self.del_indices = []
             self.full_data = self.measured_values[self.meas_vals_idx]
             self.x_points = self.sweep_points
+            self.del_indices = np.where(np.array(self.full_data) > 0.5)[0]
 
         self.fit_data = np.delete(self.full_data, self.del_indices)
         self.x_points_del = np.delete(self.x_points, self.del_indices)

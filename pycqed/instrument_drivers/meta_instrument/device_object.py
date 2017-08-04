@@ -623,7 +623,7 @@ class TwoQubitDevice(DeviceObject):
         repeat_calibration = True
 
         while repeat_calibration:
-            amp_pts = gen_sweep_pts(center=old_z_amp, span=span, num=31)
+            amp_pts = gen_sweep_pts(center=old_z_amp, span=span, num=num)
             CZ_cost_Z_amp(correction_qubit, spectator_qubit, MC,
                           Z_amps_q0=amp_pts)
             try:
@@ -664,14 +664,122 @@ class TwoQubitDevice(DeviceObject):
         return True
 
     def calibrate_grover_1Q_phase_fine(self,
-                                       Z_amps,
                                        correction_qubit=None,
                                        spectator_qubit=None,
-                                       QWG_codeword: int=0,
-                                       wait_during_flux='auto',
-                                       # span: float=0.04, num: int=31,
                                        msmt_suffix: str=None,
-                                       MC=None) -> bool:
+                                       span: float=0.04, num: int=31,
+                                       min_fit_pts: int=15, MC=None) -> bool:
+        '''
+        Fine-tune the single qubit phase correction for the second CZ pulse
+        in Grover's algorithm based on the last known value. A range around
+        the last known value is measured and a parabolic fit is used to find
+        the minimum.
+
+        Args:
+            correction_qubit (obj):
+                    Qubit object representing the qubit to which the phase
+                    correction is applied.
+            spectator_qubit (obj):
+                    Qubit object representing the other qubit involved in the
+                    CZ.
+            span (float):
+                    Full span of the range around the last known value for
+                    Z_amp_grover.
+            num (int):
+                    Number of points measured in the specified range.
+            min_fit_pts (int):
+                    Minimum number of points that should be used for the fit.
+                    The measurement is repeated with an adapted range if
+                    there are less points than left after discarding points
+                    that are too far away from the minimum.
+        '''
+        if MC is None:
+            MC = qc.station.components['MC']
+
+        if correction_qubit is None:
+            correction_qubit = self.qubits()[0]
+        if spectator_qubit is None:
+            spectator_qubit = self.qubits()[1]
+
+        old_z_amp = correction_qubit.flux_LutMan.get_instr().Z_amp_grover()
+        repeat_calibration = True
+        while repeat_calibration:
+            amp_pts = gen_sweep_pts(center=old_z_amp, span=span, num=num)
+            self.measure_grover_1Q_phase(
+                amp_pts, correction_qubit, spectator_qubit,
+                msmt_suffix=msmt_suffix, MC=MC)
+            try:
+                a = ma.CZ_1Q_phase_analysis(use_diff=False, meas_vals_idx=1)
+            except RuntimeError as e:
+                # Analysis returns a RuntimeError when the fit fails due to
+                # bad range and it can't fix itself.
+                print(e)
+                return False
+            except Exception as e:
+                raise e
+            new_z_amp = a.opt_z_amp
+
+            if len(a.fit_data) < min_fit_pts:
+                print('Bad measurement range: too large or too far from '
+                      'minimum for parabolic model.\nRetrying...')
+                old_z_amp = new_z_amp
+                if a.del_indices[0] == 0 and a.del_indices[-1] == num-1:
+                    # Values larger than one found on both sides
+                    # -> reduce range
+                    span *= 0.5
+                continue
+
+            if new_z_amp < amp_pts[0]:
+                print('Fitted minimum below scan range. Repeating scan '
+                      'around lowest point {}.'.format(amp_pts[0]))
+                old_z_amp = amp_pts[0]
+            elif new_z_amp > amp_pts[-1]:
+                print('Fitted minimum above scan range. Repeating scan '
+                      'around hightest point {}.'.format(amp_pts[-1]))
+                old_z_amp = amp_pts[-1]
+            else:
+                repeat_calibration = False
+        # This has to be set in the qubit object.
+        # the "prepare_for_fluxing" in turn should ensure the right vals
+        # get updated.
+        correction_qubit.flux_LutMan.get_instr().Z_amp_grover(new_z_amp)
+        return True
+
+
+    def measure_grover_1Q_phase(self,
+                                Z_amps,
+                                correction_qubit=None,
+                                spectator_qubit=None,
+                                QWG_codeword: int=0,
+                                wait_during_flux='auto',
+                                # span: float=0.04, num: int=31,
+                                msmt_suffix: str=None,
+                                MC=None) -> bool:
+        '''
+        Measure the single qubit phase error of the second CZ pulse in
+        Grover's algorithm. This assumes that the first CZ is calibrated
+        properly. Measured values are cos(phi). The sequence is
+            mX90 -- CZ -- wait -- CZ2 -- X90
+        such that the minimum of the curve corresponds to zero phase error.
+
+        Args:
+            Z_amps (list of floats):
+                    Sweep points; amplitudes for the single qubit phase
+                    correction Z-pulse of the second CZ.
+            correction_qubit (obj):
+                    Qubit object representing the qubit to which the phase
+                    correction is applied.
+            spectator_qubit (obj):
+                    Qubit object representing the other qubit involved in the
+                    CZ.
+            QWG_codeword (int):
+                    Codeword which is used for the composite flux pulse.
+            wait_during_flux (float or 'auto'):
+                    Delay between the two pi-half pulses. If this is 'auto',
+                    the time is automatically picked based on the duration of
+                    a microwave and flux pulses (in the Grover sequence ther
+                    is one microwave pulse between the flux pulses).
+        '''
         if MC is None:
             MC = qc.station.components['MC']
 
