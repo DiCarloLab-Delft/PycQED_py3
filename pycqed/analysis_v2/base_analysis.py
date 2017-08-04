@@ -43,7 +43,7 @@ class BaseDataAnalysis(object):
     """
 
     def __init__(self, t_start: str=None, t_stop: str=None,
-                 data_file: str=None,
+                 data_file_path: str=None,
                  options_dict: dict=None, extract_only: bool=False,
                  do_fitting: bool=False):
         '''
@@ -86,16 +86,18 @@ class BaseDataAnalysis(object):
             self.labels = [scan_label]
         else:
             self.labels = scan_label
-        if t_start is None and t_stop is None and data_file is None:
+
+        self.data_file_path = None
+        if t_start is None and t_stop is None and data_file_path is None:
             # This is quite a hacky way to support finding the last file
             # with a certain label, something that was trivial in the old
             # analysis. A better solution should be implemented.
             self.t_start = a_tools.latest_data(scan_label,
                                                return_timestamp=True)[0]
-        elif data_file is not None:
-            self.extract_from_file=True
+        elif data_file_path is not None:
+            self.extract_from_file = True
             self.t_start = None
-            self.data_file_path = data_file
+            self.data_file_path = data_file_path
         elif t_start is not None:
             self.t_start = t_start
         else:
