@@ -6740,9 +6740,9 @@ class GST_Analysis(TD_Analysis):
 
         # Count the results. Method depends on how many qubits were used.
         if self.nr_qubits == 1:
-            self.counts = self.count_results_1Q()
+            self.counts, self.spam_label_order = self.count_results_1Q()
         elif self.nr_qubits == 2:
-            self.counts = self.count_results_2Q()
+            self.counts, self.spam_label_order = self.count_results_2Q()
         else:
             raise NotImplementedError(
                 'GST analysis for {} qubits is not implemented.'
@@ -6750,7 +6750,8 @@ class GST_Analysis(TD_Analysis):
 
         # Write extracted counts to file.
         self.pygsti_fn = os.path.join(self.folder, 'pyGSTi_dataset.txt')
-        self.write_GST_datafile(self.pygsti_fn, self.counts)
+        self.write_GST_datafile(self.pygsti_fn, self.counts,
+                                self.spam_label_order)
 
         # Run pyGSTi analysis and create report.
         self.results = pygsti.do_long_sequence_gst(
@@ -6783,16 +6784,25 @@ class GST_Analysis(TD_Analysis):
                     order in which the counts are written. The order should
                     be the same as in the pyGSTi gateset definition.
         '''
-        with open(filepath, 'w') as file:
-            file.writelines(('## Columns = ' +
-                             '{}-count  ' * len(labels) + '\n')
+        # The directive strings tells the pyGSTi parser which column
+        # corresponds to which SPAM label.
+        directive_string = ('## Columns = ' +
+                            ', '.join(['{} count'] * len(labels))
                             .format(*labels))
+        with open(filepath, 'w') as file:
+            file.writelines(directive_string)
             for tup in counts:
                 file.writelines(('{}  ' * len(tup) + '\n').format(*tup))
 
     def count_results_1Q(self):
         # Find the results that belong to the same GST sequence and sum up the
         # counts.
+
+        # This determines in which order the results are written.
+        # The strings in this list must be the same SPAM labels as defined
+        # in the pyGSTi target gateset.
+        spam_label_order = ['plus', 'minus']  # plus = |0>, minus = |1>
+
         # First, reshape data according to soft repetitions.
         counts = []
         data = np.reshape(self.measured_values[0],
@@ -6813,17 +6823,17 @@ class GST_Analysis(TD_Analysis):
                 # For every sequence in the current segment
                 # The full index is index of the segment plus index
                 # (block_idx) of the sequence in the segment (seq_idx)
-                plus_count = 0
+                one_count = 0
                 for soft_idx in range(self.soft_repetitions):
                     # For all soft repetitions: sum up "1" counts.
-                    plus_count += np.sum(
+                    one_count += np.sum(
                         data[soft_idx, block_idx+seq_idx:block_idx+l:d],
                         dtype=int)
-                minus_count = (self.hard_repetitions * self.soft_repetitions -
-                               plus_count)
+                zero_count = (self.hard_repetitions * self.soft_repetitions -
+                              one_count)
 
                 counts.append((self.exp_list[i+seq_idx].str,
-                               minus_count, plus_count))
+                               zero_count, one_count))
 
         # If the last file has a different number of experiments, count those
         # separately
@@ -6833,23 +6843,30 @@ class GST_Analysis(TD_Analysis):
             block_idx = l * (self.hard_repetitions - 1)
 
             for seq_idx in range(self.exp_last_file):
-                plus_count = 0
+                one_count = 0
                 for soft_idx in range(self.soft_repetitions):
-                    plus_count += np.sum(
+                    one_count += np.sum(
                         data[soft_idx,
                              block_idx+seq_idx:block_idx+l_last:d_last],
                         dtype=int)
-                minus_count = (self.hard_repetitions * self.soft_repetitions -
-                               plus_count)
+                zero_count = (self.hard_repetitions * self.soft_repetitions -
+                              one_count)
 
                 counts.append(
                     (self.exp_list[self.nr_hard_segs-1 + seq_idx].str,
-                     minus_count, plus_count))
-        return counts
+                     zero_count, one_count))
+        return counts, spam_label_order
 
     def count_results_2Q(self):
         # Find the results that belong to the same GST sequence and sum up the
         # counts.
+
+        # This determines in which order the results are written.
+        # The strings in this list must be the same SPAM labels as defined
+        # in the pyGSTi target gateset.
+        # 'up' = |0>, 'dn' = |1>
+        spam_label_order = ['upup', 'updn', 'dnup', 'dndn']
+
         # First, reshape data according to soft repetitions.
         # IMPORTANT NOTE: This assumes that the first column in the measured
         # values is the readout of the least significant qubit. This is
@@ -6919,4 +6936,79 @@ class GST_Analysis(TD_Analysis):
                     (self.exp_list[self.nr_hard_segs-1 + seq_idx].str,
                      *new_count))
 
-        return counts
+        return counts, spam_label_order
+
+
+class CZ_1Q_phase_analysis(TD_Analysis):
+    def __init__(self, use_diff: bool=True, meas_vals_idx: int=0, **kw):
+        self.use_diff = use_diff
+        self.meas_vals_idx = meas_vals_idx
+        super().__init__(rotate_and_normalize=False, cal_points=False, **kw)
+
+    def run_default_analysis(self, **kw):
+        super().run_default_analysis(make_fig=True, close_file=False)
+
+        model = lmfit.models.QuadraticModel()
+
+        if self.use_diff:
+            dat_exc = self.measured_values[self.meas_vals_idx][1::2]
+            dat_idx = self.measured_values[self.meas_vals_idx][::2]
+            self.full_data = dat_idx - dat_exc
+            self.x_points = self.sweep_points[::2]
+
+            # Remove diff points thate are larger than one (parabola won't fit
+            # there).
+            self.del_indices = np.where(np.array(self.full_data) > 0)[0]
+        else:
+            self.full_data = self.measured_values[self.meas_vals_idx]
+            self.x_points = self.sweep_points
+            self.del_indices = np.where(np.array(self.full_data) > 0.5)[0]
+
+        self.fit_data = np.delete(self.full_data, self.del_indices)
+        self.x_points_del = np.delete(self.x_points, self.del_indices)
+
+        if self.fit_data.size == 0:
+            raise RuntimeError('No points left to fit after removing values '
+                               '> 0! Check coarse calibration and adjust '
+                               'measurement range.')
+
+        params = model.guess(x=self.x_points_del, data=self.fit_data)
+
+        self.fit_res = model.fit(self.fit_data, params=params,
+                                 x=self.x_points_del)
+
+        self.opt_z_amp = (-self.fit_res.best_values['b'] /
+                          (2 * self.fit_res.best_values['a']))
+
+        if self.make_fig:
+            self.make_figures()
+
+        if kw.get('close_file', True):
+            self.data_file.close()
+
+    def make_figures(self, **kw):
+        xfine = np.linspace(self.x_points[0], self.x_points[-1], 100)
+        fig, ax = plt.subplots()
+        ax.plot(self.x_points, self.full_data, '-o')
+        ax.plot(self.x_points[self.del_indices],
+                self.full_data[self.del_indices], 'rx',
+                label='excluded in fit')
+        ax.plot(xfine,
+                self.fit_res.eval(x=xfine, **self.fit_res.init_values),
+                # self.fit_res.init_fit,
+                '--',
+                label='initial guess', c='k')
+        ax.plot(xfine,
+                self.fit_res.eval(x=xfine, **self.fit_res.best_values),
+                label='best fit')
+        set_xlabel(ax, self.parameter_names[0], self.parameter_units[0])
+        set_ylabel(ax, 'Z-amp cost', 'a.u.')
+        ax.set_title(kw.get('plot_title',
+                            textwrap.fill(self.timestamp_string + '_' +
+                                          self.measurementstring, 40)))
+        ax.text(.1, .9, 'Optimal amplitude: {:.4f}'.format(self.opt_z_amp),
+                transform=ax.transAxes)
+        ax.legend()
+        plt.tight_layout()
+        self.save_fig(fig, **kw)
+>>>>>>> Stashed changes
