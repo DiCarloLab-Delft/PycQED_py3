@@ -959,6 +959,7 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         # mat
         (self.operators, self.rho) = tomo.execute_pseudo_inverse_tomo()
 
+        self.best_fidelity = -1
         if self.MLE:
             # mle reconstruction of density matrix
             self.rho_2 = tomo.execute_least_squares_physical_tomo(
