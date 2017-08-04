@@ -6,6 +6,7 @@ import h5py
 from matplotlib import pyplot as plt
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis import fitting_models as fit_mods
+import pycqed.measurement.hdf5_data as h5d
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import scipy.optimize as optimize
 import lmfit
@@ -224,13 +225,6 @@ class MeasurementAnalysis(object):
                 del self.analysis_group[datasetname]
                 self.analysis_group.create_dataset(
                     name=datasetname, data=data)
-
-    def load_exp_metadata(self):
-        metadata_dict = {}
-        for k, v in (self.data_file['Experimental Data']
-                     ['Experimental Metadata'].attrs.items()):
-            metadata_dict[k] = v
-        return metadata_dict
 
     def save_dict_to_analysis_group(self, save_dict: dict, group_name: str):
         """
@@ -6722,7 +6716,8 @@ class GST_Analysis(TD_Analysis):
     def run_default_analysis(self, **kw):
         self.close_file = kw.get('close_file', True)
         self.get_naming_and_values()
-        self.exp_metadata = self.load_exp_metadata()
+        self.exp_metadata = h5d.read_dict_from_hdf5(
+            {}, self.data_file['Experimental Data']['Experimental Metadata'])
 
         self.gs_target = pygsti.io.load_gateset(
             self.exp_metadata['gs_target'])
@@ -6856,6 +6851,10 @@ class GST_Analysis(TD_Analysis):
         # Find the results that belong to the same GST sequence and sum up the
         # counts.
         # First, reshape data according to soft repetitions.
+        # IMPORTANT NOTE: This assumes that the first column in the measured
+        # values is the readout of the least significant qubit. This is
+        # important because it has to be consistent with how the pyGSTi spam
+        # labels are defined.
         counts = []
         data_q0 = np.reshape(self.measured_values[0],
                              (self.soft_repetitions, -1))
