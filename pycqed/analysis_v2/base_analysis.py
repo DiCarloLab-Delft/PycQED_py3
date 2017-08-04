@@ -377,7 +377,8 @@ class BaseDataAnalysis(object):
             savebase (string):
                     Base name for the saved file.
             tag_tstamp (bool):
-                    Whether to append the timestamp of the first to the base name.
+                    Whether to append the timestamp of the first to the base
+                    name.
             fmt (string):
                     File extension for the format in which the file should
                     be saved.
@@ -402,7 +403,7 @@ class BaseDataAnalysis(object):
         for k in key_list:
             save_dict[k] = self.data_dict[k]
 
-        filepath = savedir + savebase + tstag + '.' + fmt
+        filepath = os.path.join(savedir, savebase + tstag + '.' + fmt)
         with open(filepath, 'w') as file:
             json.dump(save_dict, file, cls=NumpyJsonEncoder)
 
