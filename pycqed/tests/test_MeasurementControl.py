@@ -432,9 +432,4 @@ class Test_MeasurementControl(unittest.TestCase):
         loaded_dict = read_dict_from_hdf5(
             {}, a.data_file['Experimental Data']['Experimental Metadata'])
 
-        # Remove numpy arrays and test them separately
-        origArray = metadata_dict.pop('arrayParam')
-        loadedArray = loaded_dict.pop('arrayParam')
-
-        self.assertDictEqual(metadata_dict, loaded_dict)
-        np.testing.assert_array_equal(origArray, loadedArray)
+        np.testing.assert_equal(metadata_dict, loaded_dict)

@@ -841,6 +841,7 @@ class MeasurementControl(Instrument):
         set_grp.attrs['measurement_name'] = self.measurement_name
         set_grp.attrs['live_plot_enabled'] = self.live_plot_enabled()
 
+    @classmethod
     def save_exp_metadata(self, metadata: dict, data_object):
         '''
         Saves experiment metadata to the data file.
