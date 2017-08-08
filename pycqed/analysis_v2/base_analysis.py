@@ -235,7 +235,8 @@ class BaseDataAnalysis(object):
         if self.data_file_path is not None:
             extension = self.data_file_path.split('.')[-1]
             if extension == 'json':
-                self.data_dict = self.extract_data_json(self.data_file_path)
+                with open(self.data_file.path, 'r') as file:
+                    self.data_dict = json.load(file)
             else:
                 raise RuntimeError('Cannot load data from file "{}". '
                                    'Unknown file extension "{}"'
@@ -317,15 +318,6 @@ class BaseDataAnalysis(object):
             self.data_dict = new_dict
             self.data_dict['timestamp'] = self.timestamps[0]
         self.data_dict['timestamps'] = self.timestamps
-
-    def extract_data_json(self, fp: str):
-        '''
-        Extract a data_dict from a json file.
-        '''
-        with open(fp, 'r') as file:
-            data_dict = json.load(file)
-
-        return data_dict
 
     def process_data(self):
         """
