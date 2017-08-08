@@ -69,6 +69,19 @@ class BaseDataAnalysis(object):
         and a bunch of stuff specified in the options dict
         (TODO: should this not always be extracted from the
         dict to prevent double refs? )
+
+        There are several ways to specify where the data should be loaded
+        from.
+            data_file_path: directly give the file path of a data file that
+                should be loaded.
+            t_start, t_stop: give a range of timestamps in where data is
+                loaded from. Filtering options can be given through the
+                options dictionary. If t_stop is omitted, the extraction
+                routine looks for the data with time stamp t_start.
+            none of the above: look for the last data which matches the
+                filtering options from the options dictionary.
+        Note: data_file_path has priority, i.e. if this argument is given
+        time stamps are ignored.
         '''
         self.single_timestamp = False
         if options_dict is None:
@@ -87,21 +100,26 @@ class BaseDataAnalysis(object):
         else:
             self.labels = scan_label
 
+        # Initialize to None such that the attribute always exists.
         self.data_file_path = None
         if t_start is None and t_stop is None and data_file_path is None:
+            # Nothing specified -> find last file with label
             # This is quite a hacky way to support finding the last file
             # with a certain label, something that was trivial in the old
             # analysis. A better solution should be implemented.
             self.t_start = a_tools.latest_data(scan_label,
                                                return_timestamp=True)[0]
         elif data_file_path is not None:
+            # Data file path specified ignore timestamps
             self.extract_from_file = True
             self.t_start = None
             self.data_file_path = data_file_path
         elif t_start is not None:
+            # No data file specified -> use timestamps
             self.t_start = t_start
         else:
-            raise ValueError('Either t_start or data_file must be given.')
+            raise ValueError('Either t_start or data_file_path must be '
+                             'given.')
 
         if t_stop is None:
             self.t_stop = self.t_start
