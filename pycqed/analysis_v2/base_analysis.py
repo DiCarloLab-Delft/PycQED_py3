@@ -235,7 +235,7 @@ class BaseDataAnalysis(object):
         if self.data_file_path is not None:
             extension = self.data_file_path.split('.')[-1]
             if extension == 'json':
-                with open(self.data_file.path, 'r') as file:
+                with open(self.data_file_path, 'r') as file:
                     self.data_dict = json.load(file)
             else:
                 raise RuntimeError('Cannot load data from file "{}". '

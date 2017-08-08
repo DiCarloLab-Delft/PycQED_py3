@@ -429,14 +429,14 @@ class NumpyJsonEncoder(json.JSONEncoder):
     for saving in JSON files.
     Also converts datetime objects to strings.
     '''
-    def default(self, obj):
-        if isinstance(obj, np.integer):
-            return int(obj)
-        elif isinstance(obj, np.floating):
-            return float(obj)
-        elif isinstance(obj, np.ndarray):
-            return obj.tolist()
-        elif isinstance(obj, datetime.datetime):
-            return str(obj)
+    def default(self, o):
+        if isinstance(o, np.integer):
+            return int(o)
+        elif isinstance(o, np.floating):
+            return float(o)
+        elif isinstance(o, np.ndarray):
+            return o.tolist()
+        elif isinstance(o, datetime.datetime):
+            return str(o)
         else:
-            return super().default(obJ)
+            return super().default(o)
