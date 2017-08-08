@@ -327,23 +327,6 @@ class BaseDataAnalysis(object):
 
         return data_dict
 
-# Old code that can be removed when the new is tested (2017-08-02)
-#    def extract_data_json(self):
-#        file_name = self.t_start
-#        with open(file_name, 'r') as f:
-#            data_dict = json.load(f)
-#        # print [[key, type(val[0]), len(val)] for key, val in
-#        # data_dict.items()]
-#        self.data_dict = {}
-#        for key, val in list(data_dict.items()):
-#            if type(val[0]) is dict:
-#                self.data_dict[key] = val[0]
-#            else:
-#                self.data_dict[key] = np.double(val)
-#        # print [[key, type(val), len(val)] for key, val in
-#        # self.data_dict.items()]
-#        self.data_dict['timestamps'] = [self.t_start]
-
     def process_data(self):
         """
         process_data: overloaded in child classes,

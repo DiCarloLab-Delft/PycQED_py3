@@ -424,6 +424,11 @@ def setInDict(dataDict: dict, mapList: list, value):
 
 
 class NumpyJsonEncoder(json.JSONEncoder):
+    '''
+    JSON encoder subclass that converts Numpy types to native python types
+    for saving in JSON files.
+    Also converts datetime objects to strings.
+    '''
     def default(self, obj):
         if isinstance(obj, np.integer):
             return int(obj)
