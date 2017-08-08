@@ -128,7 +128,6 @@ def encode_to_utf8(s):
     if isinstance(s, str):
         s = s.encode('utf-8')
     # If it is an array of value decodes individual entries
-
     elif isinstance(s, (np.ndarray, list, tuple)):
         s = [s.encode('utf-8') for s in s]
     return s
@@ -261,7 +260,6 @@ def read_dict_from_hdf5(data_dict: dict, h5_group):
         data_dict[key] = item
 
     if 'list_type' in h5_group.attrs:
-
         if (h5_group.attrs['list_type'] == 'generic_list' or
                 h5_group.attrs['list_type'] == 'generic_tuple'):
             list_dict = data_dict

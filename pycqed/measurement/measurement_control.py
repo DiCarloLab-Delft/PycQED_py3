@@ -107,9 +107,21 @@ class MeasurementControl(Instrument):
     # Functions used to control the measurements #
     ##############################################
 
-    def run(self, name=None, exp_metadata=None, mode='1D', **kw):
+    def run(self, name: str=None, exp_metadata: dict=None,
+            mode: str='1D', **kw):
         '''
         Core of the Measurement control.
+
+        Args:
+            name (string):
+                    Name of the measurement. This name is included in the
+                    name of the data files.
+            exp_metadata (dict):
+                    Dictionary containing experimental metadata that is saved
+                    to the data file at the location
+                        file['Experimental Data']['Experimental Metadata']
+            mode (str):
+                    Measurement mode. Can '1D', '2D', or 'adaptive'.
         '''
         # Setting to zero at the start of every run, used in soft avg
         self.soft_iteration = 0
@@ -145,7 +157,8 @@ class MeasurementControl(Instrument):
             elif self.mode == 'adaptive':
                 self.measure_soft_adaptive()
             else:
-                raise ValueError('mode %s not recognized' % self.mode)
+                raise ValueError('Mode "{}" not recognized.'
+                                 .format(self.mode))
             result = self.dset[()]
             self.save_MC_metadata(self.data_object)  # timing labels etc
             if exp_metadata is not None:
@@ -844,7 +857,8 @@ class MeasurementControl(Instrument):
     @classmethod
     def save_exp_metadata(self, metadata: dict, data_object):
         '''
-        Saves experiment metadata to the data file.
+        Saves experiment metadata to the data file. The metadata is saved at
+            file['Experimental Data']['Experimental Metadata']
 
         Args:
             metadata (dict):
