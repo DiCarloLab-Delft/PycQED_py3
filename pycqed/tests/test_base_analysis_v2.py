@@ -1,4 +1,5 @@
 import unittest
+import json
 import numpy as np
 import os
 import pycqed as pq
@@ -75,12 +76,16 @@ class Test_base_analysis(unittest.TestCase):
             key_list=['detuning', 'folder', 'phase'])
 
         # Reload the data
-        loaded_dict_all = a.extract_data_json(
-            os.path.join(self.datadir, '20170808', '010101_analysis_v2_json',
-                         'saved_by_test_all.json'))
-        loaded_dict_select_keys = a.extract_data_json(
-            os.path.join(self.datadir, '20170808', '010101_analysis_v2_json',
-                         'saved_by_test_select_keys.json'))
+        with open(os.path.join(self.datadir, '20170808',
+                               '010101_analysis_v2_json',
+                               'saved_by_test_all.json'), 'r') as file:
+            loaded_dict_all = json.load(file)
+
+        with open(os.path.join(self.datadir, '20170808',
+                               '010101_analysis_v2_json',
+                               'saved_by_test_select_keys.json'),
+                  'r') as file:
+            loaded_dict_select_keys = json.load(file)
 
         np.testing.assert_equal(loaded_dict_all, a.data_dict)
         np.testing.assert_equal(loaded_dict_select_keys, {
