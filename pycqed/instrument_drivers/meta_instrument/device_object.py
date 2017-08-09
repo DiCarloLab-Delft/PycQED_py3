@@ -582,7 +582,8 @@ class TwoQubitDevice(DeviceObject):
                                    correction_qubit=None,
                                    spectator_qubit=None,
                                    span: float=0.04, num: int=31,
-                                   min_fit_pts: int=15, MC=None) -> bool:
+                                   min_fit_pts: int=15, MC=None,
+                                   msmt_suffix: str=None) -> bool:
         '''
         Measures a the Z-amp cost function in a small range around the value
         from the last calibration, fits a parabola, extracts a new minimum,
@@ -618,6 +619,9 @@ class TwoQubitDevice(DeviceObject):
             correction_qubit = self.qubits()[0]
         if spectator_qubit is None:
             spectator_qubit = self.qubits()[1]
+
+        if msmt_suffix is None:
+            msmt_suffix = '_' + correction_qubit.name
 
         old_z_amp = correction_qubit.flux_LutMan.get_instr().Z_amp()
         repeat_calibration = True
