@@ -69,6 +69,19 @@ class BaseDataAnalysis(object):
         and a bunch of stuff specified in the options dict
         (TODO: should this not always be extracted from the
         dict to prevent double refs? )
+
+        There are several ways to specify where the data should be loaded
+        from.
+            data_file_path: directly give the file path of a data file that
+                should be loaded.
+            t_start, t_stop: give a range of timestamps in where data is
+                loaded from. Filtering options can be given through the
+                options dictionary. If t_stop is omitted, the extraction
+                routine looks for the data with time stamp t_start.
+            none of the above: look for the last data which matches the
+                filtering options from the options dictionary.
+        Note: data_file_path has priority, i.e. if this argument is given
+        time stamps are ignored.
         '''
         self.single_timestamp = False
         if options_dict is None:
@@ -87,21 +100,26 @@ class BaseDataAnalysis(object):
         else:
             self.labels = scan_label
 
+        # Initialize to None such that the attribute always exists.
         self.data_file_path = None
         if t_start is None and t_stop is None and data_file_path is None:
+            # Nothing specified -> find last file with label
             # This is quite a hacky way to support finding the last file
             # with a certain label, something that was trivial in the old
             # analysis. A better solution should be implemented.
             self.t_start = a_tools.latest_data(scan_label,
                                                return_timestamp=True)[0]
         elif data_file_path is not None:
+            # Data file path specified ignore timestamps
             self.extract_from_file = True
             self.t_start = None
             self.data_file_path = data_file_path
         elif t_start is not None:
+            # No data file specified -> use timestamps
             self.t_start = t_start
         else:
-            raise ValueError('Either t_start or data_file must be given.')
+            raise ValueError('Either t_start or data_file_path must be '
+                             'given.')
 
         if t_stop is None:
             self.t_stop = self.t_start
@@ -217,7 +235,8 @@ class BaseDataAnalysis(object):
         if self.data_file_path is not None:
             extension = self.data_file_path.split('.')[-1]
             if extension == 'json':
-                self.data_dict = self.extract_data_json(self.data_file_path)
+                with open(self.data_file_path, 'r') as file:
+                    self.data_dict = json.load(file)
             else:
                 raise RuntimeError('Cannot load data from file "{}". '
                                    'Unknown file extension "{}"'
@@ -299,32 +318,6 @@ class BaseDataAnalysis(object):
             self.data_dict = new_dict
             self.data_dict['timestamp'] = self.timestamps[0]
         self.data_dict['timestamps'] = self.timestamps
-
-    def extract_data_json(self, fp: str):
-        '''
-        Extract a data_dict from a json file.
-        '''
-        with open(fp, 'r') as file:
-            data_dict = json.load(file)
-
-        return data_dict
-
-# Old code that can be removed when the new is tested (2017-08-02)
-#    def extract_data_json(self):
-#        file_name = self.t_start
-#        with open(file_name, 'r') as f:
-#            data_dict = json.load(f)
-#        # print [[key, type(val[0]), len(val)] for key, val in
-#        # data_dict.items()]
-#        self.data_dict = {}
-#        for key, val in list(data_dict.items()):
-#            if type(val[0]) is dict:
-#                self.data_dict[key] = val[0]
-#            else:
-#                self.data_dict[key] = np.double(val)
-#        # print [[key, type(val), len(val)] for key, val in
-#        # self.data_dict.items()]
-#        self.data_dict['timestamps'] = [self.t_start]
 
     def process_data(self):
         """
@@ -539,7 +532,6 @@ class BaseDataAnalysis(object):
         dataset_desc = pdict.get('setdesc', '')
         dataset_label = pdict.get('setlabel', list(range(len(plot_yvals))))
         do_legend = pdict.get('do_legend', False)
-        legend_title = pdict.get('legend_title', None)
 
         plot_xleft = plot_xedges[:-1]
         plot_xwidth = (plot_xedges[1:]-plot_xedges[:-1])
@@ -574,7 +566,7 @@ class BaseDataAnalysis(object):
 
         if do_legend:
             legend_pos = pdict.get('legend_pos', 'best')
-            legend = axs.legend(title=legend_title, loc=legend_pos, frameon=1)
+            legend = axs.legend(loc=legend_pos, frameon=1)
             frame = legend.get_frame()
             frame.set_alpha(0.8)
             frame.set_linewidth(0)
@@ -604,7 +596,6 @@ class BaseDataAnalysis(object):
         # lines.
         dataset_label = pdict.get('setlabel', list(range(len(plot_yvals))))
         do_legend = pdict.get('do_legend', False)
-        legend_title = pdict.get('legend_title', None)
 
         plot_xvals_step = plot_xvals[1]-plot_xvals[0]
 
@@ -648,8 +639,7 @@ class BaseDataAnalysis(object):
 
         if do_legend:
             legend_pos = pdict.get('legend_pos', 'best')
-            legend_ncol = pdict.get('legend_ncol', 1)
-            axs.legend(title=legend_title, loc=legend_pos, ncol=legend_ncol)
+            axs.legend(loc=legend_pos)
 
         if self.tight_fig:
             axs.figure.tight_layout()
@@ -709,7 +699,7 @@ class BaseDataAnalysis(object):
         if do_legend:
             legend_pos = pdict.get('legend_pos', 'best')
             # box_props = dict(boxstyle='Square', facecolor='white', alpha=0.6)
-            legend = axs.legend(title=legend_title, loc=legend_pos, frameon=1)
+            legend = axs.legend(loc=legend_pos, frameon=1)
             frame = legend.get_frame()
             frame.set_alpha(0.8)
             frame.set_linewidth(0)
