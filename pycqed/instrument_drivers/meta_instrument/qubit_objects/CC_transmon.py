@@ -2205,6 +2205,10 @@ class CBox_v3_driven_transmon(Transmon):
         if MC is None:
             MC = self.MC.get_instr()
 
+        for p in (pulse_1_params, pulse_2_params):
+            if p is None:
+                p = {}
+
         def get_wf(pulse_params):
 
             # Set the specified flux pulse parameters and get the waveforms for
