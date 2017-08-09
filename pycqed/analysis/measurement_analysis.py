@@ -6312,6 +6312,7 @@ class Ram_Z_Analysis(MeasurementAnalysis):
 
         self.add_dataset_to_analysisgroup('detuning', self.df)
         self.add_dataset_to_analysisgroup('phase', self.phases)
+        self.add_dataset_to_analysisgroup('raw phase', self.raw_phases)
 
         if (self.f01max is not None and self.E_c is not None and
                 self.flux_amp is not None and self.V_per_phi0 is not None):
