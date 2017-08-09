@@ -18,7 +18,6 @@ class Test_HDF5(unittest.TestCase):
     @classmethod
     def setUpClass(self):
         self.station = station.Station()
-        # set up a pulsar with some mock settings for the element
         self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
         self.MC = measurement_control.MeasurementControl(
             'MC', live_plot_enabled=False, verbose=False)
@@ -84,6 +83,7 @@ class Test_HDF5(unittest.TestCase):
             'dataset2': np.array([[2, 3, 4, 5],
                                   [2, 3, 1, 2]]),
             'list_of_mixed_type': ['hello', 4, 4.2, {'a': 5}, [4, 3]],
+            'tuple_of_mixed_type': tuple(['hello', 4, 4.2, {'a': 5}, [4, 3]]),
             'a list of strings': ['my ', 'name ', 'is ', 'earl.'],
             'some_np_bool': np.bool(True),
             'list_of_dicts': [{'a': 5}, {'b': 3}],
@@ -111,12 +111,22 @@ class Test_HDF5(unittest.TestCase):
 
         self.assertEqual(test_dict['list_of_dicts'],
                          new_dict['list_of_dicts'])
+
         self.assertEqual(test_dict['list_of_mixed_type'],
                          new_dict['list_of_mixed_type'])
         self.assertEqual(test_dict['list_of_mixed_type'][0],
                          new_dict['list_of_mixed_type'][0])
         self.assertEqual(test_dict['list_of_mixed_type'][2],
                          new_dict['list_of_mixed_type'][2])
+
+        self.assertEqual(test_dict['tuple_of_mixed_type'],
+                         new_dict['tuple_of_mixed_type'])
+        self.assertEqual(type(test_dict['tuple_of_mixed_type']),
+                         type(new_dict['tuple_of_mixed_type']))
+        self.assertEqual(test_dict['tuple_of_mixed_type'][0],
+                         new_dict['tuple_of_mixed_type'][0])
+        self.assertEqual(test_dict['tuple_of_mixed_type'][2],
+                         new_dict['tuple_of_mixed_type'][2])
 
         self.assertEqual(test_dict['some_np_bool'],
                          new_dict['some_np_bool'])

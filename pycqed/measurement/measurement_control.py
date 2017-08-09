@@ -107,9 +107,21 @@ class MeasurementControl(Instrument):
     # Functions used to control the measurements #
     ##############################################
 
-    def run(self, name=None, exp_metadata=None, mode='1D', **kw):
+    def run(self, name: str=None, exp_metadata: dict=None,
+            mode: str='1D', **kw):
         '''
         Core of the Measurement control.
+
+        Args:
+            name (string):
+                    Name of the measurement. This name is included in the
+                    name of the data files.
+            exp_metadata (dict):
+                    Dictionary containing experimental metadata that is saved
+                    to the data file at the location
+                        file['Experimental Data']['Experimental Metadata']
+            mode (str):
+                    Measurement mode. Can '1D', '2D', or 'adaptive'.
         '''
         # Setting to zero at the start of every run, used in soft avg
         self.soft_iteration = 0
@@ -117,7 +129,6 @@ class MeasurementControl(Instrument):
         self.print_measurement_start_msg()
         self.mode = mode
         self.iteration = 0  # used in determining data writing indices
-
         # needs to be defined here because of the with statement below
         return_dict = {}
         self.last_sweep_pts = None  # used to prevent resetting same value
@@ -146,7 +157,8 @@ class MeasurementControl(Instrument):
             elif self.mode == 'adaptive':
                 self.measure_soft_adaptive()
             else:
-                raise ValueError('mode %s not recognized' % self.mode)
+                raise ValueError('Mode "{}" not recognized.'
+                                 .format(self.mode))
             result = self.dset[()]
             self.save_MC_metadata(self.data_object)  # timing labels etc
             if exp_metadata is not None:
@@ -173,8 +185,6 @@ class MeasurementControl(Instrument):
             sweep_points = self.get_sweep_points()
             if len(self.sweep_functions) == 1:
                 self.get_measurement_preparetime()
-                if self.sweep_functions[0].sweep_control == 'soft':
-                    self.sweep_functions[0].set_parameter(sweep_points[0])
                 self.detector_function.prepare(
                     sweep_points=self.get_sweep_points())
                 self.measure_hard()
@@ -844,9 +854,11 @@ class MeasurementControl(Instrument):
         set_grp.attrs['measurement_name'] = self.measurement_name
         set_grp.attrs['live_plot_enabled'] = self.live_plot_enabled()
 
+    @classmethod
     def save_exp_metadata(self, metadata: dict, data_object):
         '''
-        Saves experiment metadata to the data file.
+        Saves experiment metadata to the data file. The metadata is saved at
+            file['Experimental Data']['Experimental Metadata']
 
         Args:
             metadata (dict):
