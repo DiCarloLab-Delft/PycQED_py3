@@ -256,7 +256,7 @@ class QASM_Sweep(Hard_Sweep):
 
 class QuMis_Sweep(Hard_Sweep):
 
-    def __init__(self, filename, CBox, 
+    def __init__(self, filename, CBox,
                  parameter_name='Points', unit='a.u.', upload=True):
         super().__init__()
         self.name = 'QASM_Sweep'
@@ -277,28 +277,6 @@ class QX_Hard_Sweep(Hard_Sweep):
     def __init__(self, qxc, filename):  # , num_circuits):
         super().__init__()
         self.name = 'QX_Hard_Sweep'
-        self.filename = filename
-        self.__qxc = qxc
-        # self.num_circuits = num_circuits
-        qasm = ql.qasm_loader(filename)
-        qasm.load_circuits()
-        self.circuits = qasm.get_circuits()
-        # print(self.circuits[0])
-
-    def get_circuits_names(self):
-        ids = []
-        for c in self.circuits:
-            ids.append(c[0])
-        return ids
-
-    def prepare(self, **kw):
-        # self.CBox.trigger_source('internal')
-        print("QX_Hard_Sweep.prepare() called...")
-        self.__qxc.create_qubits(2)
-        for c in self.circuits:
-            # print(c)
-            self.__qxc.create_circuit(c[0], c[1])
-
 
 
 class QX_RB_Hard_Sweep(Hard_Sweep):
