@@ -278,12 +278,12 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.heterodyne_instr.get_instr().RF.power(self.RO_power_cw())
         self.heterodyne_instr.get_instr().RF_power(self.RO_power_cw())
         self.heterodyne_instr.get_instr().nr_averages(self.RO_acq_averages())
-        # Turning of TD source
+        # Turning off TD source
         if self.td_source.get_instr() is not None:
             self.td_source.get_instr().off()
 
         # Updating Spec source
-        if self.cw_source() is not 'None':
+        if self.cw_source() is not None:
             self.cw_source.get_instr().power(self.spec_pow())
             self.cw_source.get_instr().frequency(self.f_qubit())
             self.cw_source.get_instr().off()
@@ -348,12 +348,12 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         self.AWG.get_instr().set(self.pulse_Q_channel.get()+'_offset',
                                  self.pulse_Q_offset.get())
 
-        if self.RO_pulse_type() is 'MW_IQmod_pulse_tek':
+        if self.RO_pulse_type() == 'MW_IQmod_pulse_tek':
             self.AWG.get_instr().set(self.RO_I_channel.get()+'_offset',
                                      self.RO_I_offset.get())
             self.AWG.get_instr().set(self.RO_Q_channel.get()+'_offset',
                                      self.RO_Q_offset.get())
-        elif self.RO_pulse_type() is 'MW_IQmod_pulse_UHFQC':
+        elif self.RO_pulse_type() == 'MW_IQmod_pulse_UHFQC':
             eval('self._acquisition_instr.sigouts_{}_offset({})'.format(
                 self.RO_I_channel(), self.RO_I_offset()))
             eval('self._acquisition_instr.sigouts_{}_offset({})'.format(
@@ -363,7 +363,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             # self._acquisition_instr.awg_sequence_acquisition_and_pulse_SSB(
             #     f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
             # RO_pulse_length=self.RO_pulse_length(), acquisition_delay=270e-9)
-        elif self.RO_pulse_type.get() is 'Gated_MW_RO_pulse':
+        elif self.RO_pulse_type.get() == 'Gated_MW_RO_pulse':
             self.RF_RO_source.get_instr().pulsemod_state('On')
             self.RF_RO_source.get_instr().frequency(self.f_RO.get())
             self.RF_RO_source.get_instr().power(self.RO_pulse_power.get())
