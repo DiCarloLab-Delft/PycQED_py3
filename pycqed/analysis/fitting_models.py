@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import lmfit
+from pycqed.analysis import analysis_toolbox as a_tools
+from pycqed.analysis.tools import data_manipulation as dm_tools
 import logging
 #################################
 #   Fitting Functions Library   #
@@ -286,7 +288,7 @@ def SlopedHangerFuncAmplitudeGuess(data, f, fit_window=None):
                          'vary': False},
                   'Qc': {'expr': 'Qe/cos(theta)',
                          'vary': False},
-                  'theta': {'value': 0, 
+                  'theta': {'value': 0,
                             'min': -np.pi/2,
                             'max': np.pi/2},
                   'slope': {'value':0,

@@ -98,6 +98,7 @@ class BaseDataAnalysis(object):
         else:
             self.t_stop = t_stop
         self.do_timestamp_blocks = self.options_dict.get('do_blocks', False)
+        self.do_individual_traces = self.options_dict.get('do_individual_traces', False)
         self.filter_no_analysis = self.options_dict.get(
             'filter_no_analysis', False)
         self.exact_label_match = self.options_dict.get(
@@ -108,8 +109,10 @@ class BaseDataAnalysis(object):
         ########################################
         def_fig.apply_default_figure_settings()
         self.plot_dicts = dict()
+        self.fit_dicts = dict()
         self.axs = dict()
         self.figs = dict()
+        self.processed_data_dict = dict()
         self.presentation_mode = self.options_dict.get(
             'presentation_mode', False)
         self.tight_fig = self.options_dict.get('tight_fig', True)
@@ -148,7 +151,8 @@ class BaseDataAnalysis(object):
         self.prepare_plots()   # specify default plots
         if not self.extract_only:
             self.plot(key_list='auto')  # make the plots
-            self.save_figures()
+            if self.options_dict['save_figs']:
+                self.save_figures()
 
     def get_timestamps(self):
         """
@@ -196,7 +200,7 @@ class BaseDataAnalysis(object):
         Extracts the data specified in
             self.params_dict
             self.numeric_params
-        and stores it into: self.data_dict
+        and stores it into: self.raw_data_dict
 
         Data extraction is now supported in three different ways
             - using json
@@ -222,8 +226,8 @@ class BaseDataAnalysis(object):
         self.params_dict['folder'] = 'folder'
 
         if self.do_timestamp_blocks:
-            self.data_dict = {key: [] for key in list(self.params_dict.keys())}
-            self.data_dict['timestamps'] = []
+            self.raw_data_dict = {key: [] for key in list(self.params_dict.keys())}
+            self.raw_data_dict['timestamps'] = []
             for tstamps in self.timestamps:
                 if self.verbose:
                     print(len(tstamps), type(tstamps))
@@ -232,76 +236,76 @@ class BaseDataAnalysis(object):
                     ma_type=self.ma_type,
                     TwoD=TwoD, numeric_params=self.numeric_params,
                     filter_no_analysis=self.filter_no_analysis)
-                for key in self.data_dict:
-                    self.data_dict[key].append(temp_dict[key])
+                for key in self.raw_data_dict:
+                    self.raw_data_dict[key].append(temp_dict[key])
 
             # Use timestamps to calculate datetimes and add to dictionary
-            self.data_dict['datetime'] = []
-            for tstamps in self.data_dict['timestamps']:
-                self.data_dict['datetime'].append(
+            self.raw_data_dict['datetime'] = []
+            for tstamps in self.raw_data_dict['timestamps']:
+                self.raw_data_dict['datetime'].append(
                     [a_tools.datetime_from_timestamp(ts) for ts in tstamps])
 
             # Convert temperature data to dictionary form and extract Tmc
             # N.B. This has the hardcoded temperature names from pycqed_py2
-            if 'temperatures' in self.data_dict:
-                self.data_dict['Tmc'] = []
+            if 'temperatures' in self.raw_data_dict:
+                self.raw_data_dict['Tmc'] = []
                 for ii, temperatures in enumerate(
-                        self.data_dict['temperatures']):
+                        self.raw_data_dict['temperatures']):
                     temp = []
-                    self.data_dict['Tmc'].append([])
+                    self.raw_data_dict['Tmc'].append([])
                     for ii in range(len(temperatures)):
                         exec("temp.append(%s)" % (temperatures[ii]))
-                        self.data_dict['Tmc'][ii].append(
+                        self.raw_data_dict['Tmc'][ii].append(
                             temp[ii].get('T_MClo', None))
-                    self.data_dict['temperatures'][ii] = temp
+                    self.raw_data_dict['temperatures'][ii] = temp
 
         else:
-            self.data_dict = a_tools.get_data_from_timestamp_list(
+            self.raw_data_dict = a_tools.get_data_from_timestamp_list(
                 self.timestamps, param_names=self.params_dict,
                 ma_type=self.ma_type,
                 TwoD=TwoD, numeric_params=self.numeric_params,
                 filter_no_analysis=self.filter_no_analysis)
 
             # Use timestamps to calculate datetimes and add to dictionary
-            self.data_dict['datetime'] = [a_tools.datetime_from_timestamp(
-                timestamp) for timestamp in self.data_dict['timestamps']]
+            self.raw_data_dict['datetime'] = [a_tools.datetime_from_timestamp(
+                timestamp) for timestamp in self.raw_data_dict['timestamps']]
 
             # Convert temperature data to dictionary form and extract Tmc
-            if 'temperatures' in self.data_dict:
+            if 'temperatures' in self.raw_data_dict:
                 temp = []
-                self.data_dict['Tmc'] = []
-                for ii in range(len(self.data_dict['temperatures'])):
+                self.raw_data_dict['Tmc'] = []
+                for ii in range(len(self.raw_data_dict['temperatures'])):
                     exec("temp.append(%s)" %
-                         (self.data_dict['temperatures'][ii]))
-                    self.data_dict['Tmc'].append(temp[ii].get('T_MClo', None))
-                self.data_dict['temperatures'] = temp
+                         (self.raw_data_dict['temperatures'][ii]))
+                    self.raw_data_dict['Tmc'].append(temp[ii].get('T_MClo', None))
+                self.raw_data_dict['temperatures'] = temp
 
         # this is a hacky way to use the same data extraction when there is
         # many files as when there is few files.
         if self.single_timestamp:
             new_dict = {}
-            for key, value in self.data_dict.items():
+            for key, value in self.raw_data_dict.items():
                 if key != 'timestamps':
                     new_dict[key] = value[0]
-            self.data_dict = new_dict
-            self.data_dict['timestamp'] = self.timestamps[0]
-        self.data_dict['timestamps'] = self.timestamps
+            self.raw_data_dict = new_dict
+            self.raw_data_dict['timestamp'] = self.timestamps[0]
+        self.raw_data_dict['timestamps'] = self.timestamps
 
     def extract_data_json(self):
         file_name = self.t_start
         with open(file_name, 'r') as f:
-            data_dict = json.load(f)
+            raw_data_dict = json.load(f)
         # print [[key, type(val[0]), len(val)] for key, val in
-        # data_dict.items()]
-        self.data_dict = {}
-        for key, val in list(data_dict.items()):
+        # raw_data_dict.items()]
+        self.raw_data_dict = {}
+        for key, val in list(raw_data_dict.items()):
             if type(val[0]) is dict:
-                self.data_dict[key] = val[0]
+                self.raw_data_dict[key] = val[0]
             else:
-                self.data_dict[key] = np.double(val)
+                self.raw_data_dict[key] = np.double(val)
         # print [[key, type(val), len(val)] for key, val in
-        # self.data_dict.items()]
-        self.data_dict['timestamps'] = [self.t_start]
+        # self.raw_data_dict.items()]
+        self.raw_data_dict['timestamps'] = [self.t_start]
 
     def process_data(self):
         """
@@ -328,11 +332,11 @@ class BaseDataAnalysis(object):
                      tag_tstamp: bool=True,
                      fmt: str ='png', key_list: list='auto'):
         if savedir is None:
-            savedir = self.data_dict.get('folder', '')
+            savedir = self.raw_data_dict.get('folder', '')
         if savebase is None:
             savebase = ''
         if tag_tstamp:
-            tstag = '_'+self.data_dict['timestamps'][0]
+            tstag = '_'+self.raw_data_dict['timestamps'][0]
         else:
             tstag = ''
 
@@ -367,7 +371,7 @@ class BaseDataAnalysis(object):
                 for tt in range(len(fit_yvals)):
                     if guess_pars is None:
                         if guess_dict is None:
-                            guess_dict = fit_guess_fn(fit_yvals[tt],
+                            guess_dict = fit_guess_fn(**fit_yvals[tt],
                                                       **fit_xvals[tt])
                         for key, val in list(guess_dict.items()):
                             model.set_param_hint(key, **val)
@@ -378,7 +382,7 @@ class BaseDataAnalysis(object):
             else:
                 if guess_pars is None:
                     if guess_dict is None:
-                        guess_dict = fit_guess_fn(fit_yvals, **fit_xvals)
+                        guess_dict = fit_guess_fn(**fit_yvals, **fit_xvals)
                     for key, val in list(guess_dict.items()):
                         model.set_param_hint(key, **val)
                     guess_pars = model.make_params()
@@ -734,11 +738,35 @@ class BaseDataAnalysis(object):
         else:
             fig_clim = [None, None]
 
+
+        trace = {}
+        block = {}
+        if self.do_individual_traces:
+            trace['xvals'] = plot_xvals
+            trace['yvals'] = plot_yvals
+            trace['zvals'] = plot_zvals
+        else:
+            trace['yvals'] = [plot_yvals]
+            trace['xvals'] = [plot_xvals]
+            trace['zvals'] = [plot_zvals]
+
         if self.do_timestamp_blocks:
-            for tt in range(len(plot_zvals)):
+            block['xvals'] = trace['xvals']
+            block['yvals'] = trace['yvals']
+            block['zvals'] = trace['zvals']
+        else:
+            block['xvals'] = [trace['xvals']]
+            block['yvals'] = [trace['yvals']]
+            block['zvals'] = [trace['zvals']]
+
+        for ii in range(len(block['zvals'])):
+            traces = {}
+            for key,vals in block.items():
+                traces[key] = vals[ii]
+            for tt in range(len(traces['zvals'])):
                 if self.verbose:
-                    print(plot_xvals[tt].shape, plot_yvals[
-                          tt].shape, plot_zvals[tt].shape)
+                    (print(t_vals[tt].shape) for key,t_vals in traces.items())
+                print(traces['xvals'][tt])
                 if plot_xwidth is not None:
                     xwidth = plot_xwidth[tt]
                 else:
@@ -746,19 +774,19 @@ class BaseDataAnalysis(object):
                 out = pfunc(ax=axs,
                             xwidth=xwidth,
                             clim=fig_clim, cmap=plot_cmap,
-                            xvals=plot_xvals[tt],
-                            yvals=plot_yvals[tt],
-                            zvals=plot_zvals[tt].transpose(),
+                            xvals=traces['xvals'][tt],
+                            yvals=traces['yvals'][tt],
+                            zvals=traces['zvals'][tt].transpose(),
                             transpose=plot_transpose,
                             normalize=plot_normalize)
 
-        else:
-            out = pfunc(ax=axs, clim=fig_clim, cmap=plot_cmap,
-                        xvals=plot_xvals,
-                        yvals=plot_yvals,
-                        zvals=plot_zvals.transpose(),
-                        transpose=plot_transpose,
-                        normalize=plot_normalize)
+        # else:
+        #     out = pfunc(ax=axs, clim=fig_clim, cmap=plot_cmap,
+        #                 xvals=plot_xvals,
+        #                 yvals=plot_yvals,
+        #                 zvals=plot_zvals.transpose(),
+        #                 transpose=plot_transpose,
+        #                 normalize=plot_normalize)
 
         if plot_xrange is None:
             if plot_xwidth is not None:
