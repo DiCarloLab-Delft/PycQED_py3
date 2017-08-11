@@ -1,19 +1,18 @@
 import quantumsim as qsim
 import numpy as np
-from scipy.optimize import minimize
 import qutip
-import pycqed.analysis.tomography as tomo
-import matplotlib.pyplot as plt
 
 
-def grover_circuit(base_t1_flux=np.inf, base_t2_flux=np.inf,
-                   detun_t1_flux=np.inf, detun_t2_flux=np.inf,
-                   t1_idle=np.inf, t2_idle=np.inf,
-                   CZ_duration=240,
-                   CZ_buffer=40,
-                   mw_duration=40,
-                   err_flux=0, err_idle=0, err_conditional=0,
-                   omega=0):
+def grover_circuit(base_t1_flux: int=np.inf, base_t2_flux: int=np.inf,
+                   detun_t1_flux: int=np.inf, detun_t2_flux: int=np.inf,
+                   t1_idle: int=np.inf, t2_idle: int=np.inf,
+                   CZ_duration: int=240,
+                   CZ_buffer: int=40,
+                   mw_duration: int=40,
+                   err_flux: float=0, err_idle: float=0,
+                   err_conditional: float=0,
+                   flux_noise_CZ_phase: float=0,
+                   omega: int=0):
     '''
     Construct a quantumsim circuit that runs Grover's algorithm for the oracle
     state given by omega. The circuit uses VariableDecoherenceQubits.
@@ -24,13 +23,14 @@ def grover_circuit(base_t1_flux=np.inf, base_t2_flux=np.inf,
     The basis used is (idle qubit, fluxing qubit)
 
     Args:
-        base_t1_flux, base_t2_flux (float):
-                T1 and T2echo for the fluxing qubit at its sweet spot.
-        detun_t1_flux, detun_t2_flux (float):
+        base_t1_flux, base_t2_flux (int):
+                T1 and T2echo for the fluxing qubit at its sweet spot
+                (in ns).
+        detun_t1_flux, detun_t2_flux (int):
                 T1 and T2echo for the fluxing qubit when it is detuned to the
-                interaction point.
-        t1_idle, t2_idle (float):
-                T1 and T2echo for the idle qubit at its sweet spot.
+                interaction point (in ns).
+        t1_idle, t2_idle (int):
+                T1 and T2echo for the idle qubit at its sweet spot (in ns).
         CZ_duration (int):
                 Duration of the CZ gate in nanoseconds.
         CZ_buffer (int):
@@ -41,6 +41,8 @@ def grover_circuit(base_t1_flux=np.inf, base_t2_flux=np.inf,
                 Single-qubit phase errors of the second CZ pulse in degrees.
         err_conditional (float):
                 Conditional phase error of the second CZ pulse in degrees.
+        flux_noise_CZ_phase (float):
+                Error on the conditional phase added by flux noise.
         omega (int):
                 Oracle for Grover's algorithm. The binary representation of
                 this integer represents the expected output state of the
@@ -88,9 +90,15 @@ def grover_circuit(base_t1_flux=np.inf, base_t2_flux=np.inf,
     t += mw_duration/2
     t += CZ_duration/2
 
-    c.add_gate(qsim.circuit.CPhaseRotation('q_flux', 'q_idle',
-                                           angle=np.pi,  # +np.deg2rad(err_conditional),
-                                           time=t))
+    c.add_gate(qsim.circuit.CPhaseRotation(
+        'q_flux', 'q_idle',
+        angle=np.pi + np.deg2rad(flux_noise_CZ_phase/2),
+        time=t))
+    t += 0.01
+    c.add_gate(qsim.circuit.RotateZ(
+        'q_flux',
+        angle=np.deg2rad(flux_noise_CZ_phase),
+        time=t))
 
     t += CZ_duration/2
     t += CZ_buffer
@@ -102,16 +110,23 @@ def grover_circuit(base_t1_flux=np.inf, base_t2_flux=np.inf,
     t += mw_duration/2
     t += CZ_duration/2
 
-    c.add_gate(qsim.circuit.CPhaseRotation('q_flux', 'q_idle',
-                                           angle=np.pi+np.deg2rad(err_conditional),
-                                           time=t))
+    c.add_gate(qsim.circuit.CPhaseRotation(
+        'q_flux', 'q_idle',
+        angle=(np.pi + np.deg2rad(err_conditional + flux_noise_CZ_phase)),
+        time=t))
 
     t += CZ_duration/2
 
     if err_flux != 0:
-        c.add_gate(qsim.circuit.RotateZ('q_flux', angle=np.deg2rad(err_flux), time=t))
+        c.add_gate(qsim.circuit.RotateZ(
+            'q_flux',
+            angle=np.deg2rad(err_flux + flux_noise_CZ_phase),
+            time=t))
     if err_idle != 0:
-        c.add_gate(qsim.circuit.RotateZ('q_idle', angle=np.deg2rad(err_idle), time=t))
+        c.add_gate(qsim.circuit.RotateZ(
+            'q_idle',
+            angle=np.deg2rad(err_idle),
+            time=t))
 
     t += CZ_buffer
     t += mw_duration/2
@@ -119,7 +134,8 @@ def grover_circuit(base_t1_flux=np.inf, base_t2_flux=np.inf,
     c.add_gate(qsim.circuit.RotateY('q_flux', angle=np.pi/2, time=t))
     c.add_gate(qsim.circuit.RotateY('q_idle', angle=np.pi/2, time=t))
 
-    c.add_waiting_gates(tmin=0, tmax=3*mw_duration + 2*CZ_duration + 2*CZ_buffer)
+    c.add_waiting_gates(tmin=0,
+                        tmax=3*mw_duration + 2*CZ_duration + 2*CZ_buffer)
     c.order()
     return c
 
