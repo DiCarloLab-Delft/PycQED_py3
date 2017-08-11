@@ -10,7 +10,7 @@ station = None
 def Rabi_2nd_exc_seq(amps, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
                      cal_points=True,
                      post_msmt_delay=3e-6, verbose=False):
-    '''
+    """
     Rabi sequence for the second excited state
     Input pars:
         amps:            array of pulse amplitudes (V)
@@ -19,7 +19,7 @@ def Rabi_2nd_exc_seq(amps, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
         RO_pars:         dict containing the RO parameters
         n:               number of pulses (1 is conventional Rabi)
         post_msmt_delay: extra wait time for resetless compatibility
-    '''
+    """
     seq_name = 'Rabi_2nd_exc_sequence'
     seq = sequence.Sequence(seq_name)
     station.pulsar.update_channel_settings()
@@ -48,8 +48,7 @@ def Rabi_2nd_exc_seq(amps, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
             el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     return seq_name
 
 
@@ -97,8 +96,7 @@ def Ramsey_2nd_exc_seq(times, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
             el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     return seq_name
 
 
@@ -121,6 +119,5 @@ def SSRO_2nd_exc_state(pulse_pars, pulse_pars_2nd, RO_pars, verbose=False):
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     seq.append_element(el, trigger_wait=True)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     return seq_name

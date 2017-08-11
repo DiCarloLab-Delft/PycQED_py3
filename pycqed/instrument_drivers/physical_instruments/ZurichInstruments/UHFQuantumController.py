@@ -90,7 +90,7 @@ class UHFQC(Instrument):
                            parameter_class=ManualParameter)
         for parameter in s_node_pars:
             parname = parameter[0].replace("/", "_")
-            parfunc = "/"+device+"/"+parameter[0]
+            parfunc = "/"+self._device+"/"+parameter[0]
             if parameter[1] == 'float':
                 self.add_parameter(
                     parname,
@@ -133,7 +133,7 @@ class UHFQC(Instrument):
 
         for parameter in d_node_pars:
             parname = parameter[0].replace("/", "_")
-            parfunc = "/"+device+"/"+parameter[0]
+            parfunc = "/"+self._device+"/"+parameter[0]
             if parameter[1] == 'float':
                 self.add_parameter(
                     parname,
@@ -268,6 +268,9 @@ class UHFQC(Instrument):
         def get_func():
             return dev_get_type(ch)
         return get_func
+
+    def clock_freq(self):
+        return 1.8e9/(2**self.awgs_0_time())
 
     def reconnect(self):
         zi_utils.autoDetect(self._daq)
@@ -735,7 +738,7 @@ class UHFQC(Instrument):
         wave_I_string = self.array_to_combined_vector_string(Iwave, "Iwave")
         wave_Q_string = self.array_to_combined_vector_string(Qwave, "Qwave")
         delay_samples = int(acquisition_delay*1.8e9/8)
-        delay_string = '\twait(getUserReg(2));\n'
+        delay_string = '\twait(wait_delay);\n'
         self.awgs_0_userregs_2(delay_samples)
 
         preamble = """
@@ -745,6 +748,7 @@ const IAVG_TRIG = 0x000020;
 const WINT_EN   = 0x1f0000;
 setTrigger(WINT_EN);
 var loop_cnt = getUserReg(0);
+var wait_delay = getUserReg(2);
 var RO_TRIG;
 if(getUserReg(1)){
   RO_TRIG=IAVG_TRIG;
@@ -755,10 +759,10 @@ if(getUserReg(1)){
         loop_start = """
 repeat(loop_cnt) {
 \twaitDigTrigger(1, 1);
-\tplayWave(Iwave,Qwave);\n"""
+\tplayWave(Iwave, Qwave);\n"""
 
         end_string = """
-\tsetTrigger(WINT_EN +RO_TRIG);
+\tsetTrigger(WINT_EN + RO_TRIG);
 \tsetTrigger(WINT_EN);
 \twaitWave();
 }

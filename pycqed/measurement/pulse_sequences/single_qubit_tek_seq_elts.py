@@ -53,7 +53,6 @@ def Pulsed_spec_seq(spec_pars, RO_pars, upload=True, return_seq=False):
 
     seq_name = 'Pulsed_spec'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
 
     pulse_dict = {'spec_pulse': spec_pars, 'RO': RO_pars}
@@ -64,8 +63,7 @@ def Pulsed_spec_seq(spec_pars, RO_pars, upload=True, return_seq=False):
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=False)
+        station.pulsar.program_awgs(seq, *el_list, verbose=False)
     return seq
 
 
@@ -92,7 +90,6 @@ def photon_number_splitting_seq(spec_pars, RO_pars, disp_pars, upload=True, retu
 
     seq_name = 'photon_number_spliting'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
 
     pulse_dict = {'disp': disp_pars, 'spec_pulse': spec_pars, 'RO': RO_pars}
@@ -104,8 +101,7 @@ def photon_number_splitting_seq(spec_pars, RO_pars, disp_pars, upload=True, retu
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=False)
+        station.pulsar.program_awgs(seq, *el_list, verbose=False)
     return seq
 
 
@@ -122,7 +118,6 @@ def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
     '''
     seq_name = 'Rabi_sequence'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
     for i, amp in enumerate(amps):  # seq has to have at least 2 elts
@@ -136,8 +131,7 @@ def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -155,7 +149,6 @@ def Flipping_seq(N, pulse_pars, RO_pars,
     '''
     seq_name = 'Flipping_sequence'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
     for tt, n in enumerate(N):  # seq has to have at least 2 elts
@@ -170,8 +163,7 @@ def Flipping_seq(N, pulse_pars, RO_pars,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -191,7 +183,6 @@ def Rabi_amp90_seq(scales, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
     '''
     seq_name = 'Rabi_amp90_sequence'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
     for i, scale in enumerate(scales):  # seq has to have at least 2 elts
@@ -205,8 +196,7 @@ def Rabi_amp90_seq(scales, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -227,7 +217,6 @@ def T1_seq(times,
     '''
     seq_name = 'T1_sequence'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     RO_pulse_delay = RO_pars['pulse_delay']
     RO_pars = deepcopy(RO_pars)  # Prevents overwriting of the dict
@@ -247,8 +236,7 @@ def T1_seq(times,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -272,7 +260,6 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
     '''
     seq_name = 'Ramsey_sequence'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     # First extract values from input, later overwrite when generating
     # waveforms
@@ -297,8 +284,7 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -321,7 +307,6 @@ def Echo_seq(times, pulse_pars, RO_pars,
     '''
     seq_name = 'Echo_sequence'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
 
     pulses = get_pulse_dict_from_pars(pulse_pars)
@@ -346,8 +331,7 @@ def Echo_seq(times, pulse_pars, RO_pars,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -427,7 +411,6 @@ def AllXY_seq(pulse_pars, RO_pars, double_points=False,
     '''
     seq_name = 'AllXY_seq'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     # Create a dict with the parameters for all the pulses
     pulses = get_pulse_dict_from_pars(pulse_pars)
@@ -453,8 +436,7 @@ def AllXY_seq(pulse_pars, RO_pars, double_points=False,
         seq.append_element(el, trigger_wait=True)
 
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -477,7 +459,6 @@ def OffOn_seq(pulse_pars, RO_pars,
     '''
     seq_name = 'OffOn_sequence'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     # Create a dict with the parameters for all the pulses
     pulses = get_pulse_dict_from_pars(pulse_pars)
@@ -494,8 +475,7 @@ def OffOn_seq(pulse_pars, RO_pars,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -516,7 +496,6 @@ def Butterfly_seq(pulse_pars, RO_pars, initialize=False,
     '''
     seq_name = 'Butterfly_seq'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     # Create a dict with the parameters for all the pulses
     pulses = get_pulse_dict_from_pars(pulse_pars)
@@ -553,8 +532,7 @@ def Butterfly_seq(pulse_pars, RO_pars, initialize=False,
         seq.append_element(el, trigger_wait=True)
 
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     return seq_name
 
 
@@ -602,7 +580,6 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
     if seq_name is None:
         seq_name = 'RandomizedBenchmarking_sequence'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
     net_cliffords = [0, 3]  # Exists purely for the double curves mode
@@ -641,8 +618,7 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
                 el_list.append(el)
                 seq.append_element(el, trigger_wait=True)
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
         return seq, el_list
     else:
         return seq, el_list
@@ -667,7 +643,6 @@ def Freq_XY(freqs, pulse_pars, RO_pars,
     '''
     seq_name = 'MotzoiXY'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     pulse_combinations = [['X180', 'Y90'], ['Y180', 'X90']]
     pulses = get_pulse_dict_from_pars(pulse_pars)
@@ -690,8 +665,7 @@ def Freq_XY(freqs, pulse_pars, RO_pars,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
 
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -717,7 +691,6 @@ def Motzoi_XY(motzois, pulse_pars, RO_pars,
     '''
     seq_name = 'MotzoiXY'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     pulse_combinations = [['X180', 'Y90'], ['Y180', 'X90']]
     pulses = get_pulse_dict_from_pars(pulse_pars)
@@ -741,8 +714,7 @@ def Motzoi_XY(motzois, pulse_pars, RO_pars,
         seq.append_element(el, trigger_wait=True)
 
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -767,7 +739,6 @@ def Rising_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
     '''
     seq_name = 'Rising_sequence'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     pulse_pars = {'pulse_type': 'RisingPulse'}
     pulse_list = [pulse_pars]
@@ -775,8 +746,7 @@ def Rising_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
     el_list.append(el)
     seq.append_element(el, trigger_wait=True)
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:

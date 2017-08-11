@@ -1,16 +1,22 @@
 import numpy as np
 import unittest
+import time
 
 from pycqed.measurement.waveform_control.pulsar import Pulsar
 from pycqed.measurement.waveform_control import element
 from pycqed.measurement.pulse_sequences import single_qubit_tek_seq_elts as sqs
+from pycqed.instrument_drivers.virtual_instruments.virtual_awg5014 import \
+    VirtualAWG5014
+
 
 
 class Test_SingleQubitTek(unittest.TestCase):
 
     def setUp(self):
         # set up a pulsar with some mock settings for the element
-        self.pulsar = Pulsar()
+        self.AWG = VirtualAWG5014('AWG' + str(time.time()))
+        self.AWG.clock_freq(1e9)
+        self.pulsar = Pulsar('Pulsar' + str(time.time()), self.AWG.name)
         for i in range(4):
             self.pulsar.define_channel(id='ch{}'.format(i+1),
                                           name='ch{}'.format(i+1),
@@ -78,7 +84,7 @@ class Test_SingleQubitTek(unittest.TestCase):
             t_ROm = el.effective_pulse_start_time('Acq-trigger-0', 'ch1')
             self.assertAlmostEqual(t_RO, t_ROm, places=10)
             # test if fix point put pulses at the right spot.
-            self.assertAlmostEqual(t_RO % 1e-6, 0)
+            self.assertAlmostEqual(t_RO, np.round(t_RO / 1e-6) * 1e-6)
             # Check pulse delay
             if i < (len(times)-4):
                 t0 = el.effective_pulse_start_time('SSB_DRAG_pulse_0-0', 'ch1')
@@ -121,7 +127,7 @@ class Test_SingleQubitTek(unittest.TestCase):
                     self.assertAlmostEqual(t_RO, t_ROm, places=10)
 
                     # test if fix point put pulses at the right spot.
-                    self.assertAlmostEqual(t_RO % 1e-6, 0)
+                    self.assertAlmostEqual(t_RO, np.round(t_RO/1e-6) * 1e-6)
 
                     # Check Ramsey pulse spacing
                     if i < (len(times)-4):
