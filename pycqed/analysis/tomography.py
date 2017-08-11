@@ -525,7 +525,7 @@ def pauli_ops_from_density_matrix(rho):
     for k in range(16):
         i = int(k % 4)
         j = int(((k - i)/4) % 4)
-        operators[k] = (rho*qtp.tensor(pauli[i], pauli[j])).tr()
+        operators[k] = (rho*qtp.tensor(pauli[j], pauli[i])).tr()
     operators = np.real(operators)
     return operators
 
@@ -946,18 +946,23 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                                                   qtp.sigmaz(), qtp.sigmax(),
                                                   qtp.sigmay()]
         TomoAnalysis_JointRO.measurement_basis_labels = ['I', 'Z', 'X', 'Y']
-        #TomoAnalysis_JointRO.measurement_basis_labels = ['I', 'A', 'B', 'C']
+        # TomoAnalysis_JointRO.measurement_basis_labels = ['I', 'A', 'B', 'C']
         TomoAnalysis_JointRO.readout_basis = [qtp.identity(2), qtp.sigmaz()]
 
         # calculate the tomo
         tomo = TomoAnalysis_JointRO(
-            measurements_cal, measurements_tomo, n_qubits=2, n_quadratures=3, check_labels=True)
+            measurements_cal, measurements_tomo, n_qubits=2, n_quadratures=3,
+            check_labels=(self.verbose > 0))
         self.tomo = tomo
         self.meas_op_labels = np.concatenate(
             order_pauli_output2(tomo.get_basis_labels(2)))
         # operators are expectation values of Pauli operators, rho is density
         # mat
-        (self.operators, self.rho) = tomo.execute_pseudo_inverse_tomo()
+        (ops, self.rho) = tomo.execute_pseudo_inverse_tomo()
+
+        # ops are in the wrong order. The following function gets them from
+        # the density matrix in the correct order:
+        self.operators = pauli_ops_from_density_matrix(self.rho)
 
         self.best_fidelity = -1
         if self.MLE:

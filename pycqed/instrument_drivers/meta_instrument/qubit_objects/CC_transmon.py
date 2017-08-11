@@ -23,6 +23,8 @@ from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
 from pycqed.measurement.waveform_control_CC import waveform as wf
 from pycqed.analysis import measurement_analysis as ma
+from pycqed.analysis_v2 import measurement_analysis as ma2
+
 from pycqed.analysis.tools.data_manipulation import rotation_matrix
 from pycqed.measurement.calibration_toolbox import (
     mixer_carrier_cancellation, mixer_skewness_calibration_CBoxV3)
@@ -1341,7 +1343,9 @@ class CBox_v3_driven_transmon(Transmon):
         MC.set_detector_function(d)
         MC.run('flipping_sequence'+label+self.msmt_suffix)
         if analyze:
-            a = ma.DriveDetuning_Analysis(label='flipping_sequence')
+            # a = ma.DriveDetuning_Analysis(label='flipping_sequence')
+            a = ma2.FlippingAnalysis(
+                options_dict={'scan_label': 'flipping_sequence'})
             return a
 
     def measure_ssro(self, no_fits=False,
@@ -2130,9 +2134,10 @@ class CBox_v3_driven_transmon(Transmon):
                                 pulse_1_type: str='adiabatic_Z',
                                 pulse_2_type: str='square',
                                 second_pulse_inverted: bool=False,
-                                pulse_1_params: dict={},
-                                pulse_2_params: dict={},
-                                analyze: bool=True, msmt_suffix=None):
+                                pulse_1_params: dict=None,
+                                pulse_2_params: dict=None,
+                                analyze: bool=True, msmt_suffix=None,
+                                disable_QWG_reload: bool=False):
         '''
         Measure the total phase with the sequence
             mX90 -- CZ -- tau -- flux -- rec90
@@ -2173,9 +2178,14 @@ class CBox_v3_driven_transmon(Transmon):
                     an optional extra  key "inverted" (bool)
             analyze (bool):
                     Do the Ram-Z analysis, extracting the step response.
+            disable_QWG_reload (bool):
+                    Set the sweep function to a None_Sweep. This way, no new
+                    pulses are uploaded to the QWG.
         '''
         self.prepare_for_timedomain()
-        self.prepare_for_fluxing()
+        if not disable_QWG_reload:
+            # if swf is disabled, we don't want to change the QWG state.
+            self.prepare_for_fluxing()
 
         f_lutman = self.flux_LutMan.get_instr()
         CBox = self.CBox.get_instr()
@@ -2194,6 +2204,10 @@ class CBox_v3_driven_transmon(Transmon):
 
         if MC is None:
             MC = self.MC.get_instr()
+
+        for p in (pulse_1_params, pulse_2_params):
+            if p is None:
+                p = {}
 
         def get_wf(pulse_params):
 
@@ -2223,6 +2237,9 @@ class CBox_v3_driven_transmon(Transmon):
 
         wf1 = get_wf(pulse_1_params)
         wf2 = get_wf(pulse_2_params)
+
+        print('max wf1: {:.5f}'.format(np.max(wf1)))
+        print('max wf2: {:.5f}'.format(np.max(wf2)))
 
         max_len = (int(np.round(max(taus) * f_lutman.sampling_rate()))
                    + len(wf1) + len(wf2))
@@ -2291,14 +2308,19 @@ class CBox_v3_driven_transmon(Transmon):
                 'pulse_2_params': pulse_2_params
             }
 
-            MC.set_sweep_function(swf.QWG_lutman_custom_wave_chunks(
-                LutMan=f_lutman,
-                wave_func=wave_func,
-                sweep_points=taus,
-                chunk_size=chunk_size,
-                codewords=np.arange(chunk_size),
-                param_name=param_name,
-                param_unit=param_unit))
+            if disable_QWG_reload:
+                s = swf.None_Sweep(sweep_points=taus)
+            else:
+                s = swf.QWG_lutman_custom_wave_chunks(
+                    LutMan=f_lutman,
+                    wave_func=wave_func,
+                    sweep_points=taus,
+                    chunk_size=chunk_size,
+                    codewords=np.arange(chunk_size),
+                    param_name=param_name,
+                    param_unit=param_unit)
+
+            MC.set_sweep_function(s)
             MC.set_sweep_points(taus)
             MC.set_detector_function(d)
 

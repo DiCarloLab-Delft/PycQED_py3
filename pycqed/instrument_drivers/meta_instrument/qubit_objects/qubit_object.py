@@ -596,7 +596,7 @@ class Transmon(Qubit):
     def calibrate_pulse_amplitude_flipping(self,
                                            MC=None, update=True,
                                            fine_accuracy=0.005,
-                                           desired_accuracy=0.0005,
+                                           desired_accuracy=0.00005,
                                            max_iterations=10,
                                            verbose=True):
 
@@ -609,7 +609,7 @@ class Transmon(Qubit):
             if fine:
                 number_of_flips = 8*np.arange(60)
             a = self.measure_flipping(MC=MC, number_of_flips=number_of_flips)
-            Q_amp180_scale_factor = a.drive_scaling_factor
+            Q_amp180_scale_factor = a.get_scale_factor()
 
             # Check if Q_amp180_scale_factor is within boundaries
             if Q_amp180_scale_factor > 1.1:
@@ -623,7 +623,7 @@ class Transmon(Qubit):
                     print('Qubit drive scaling %.3f ' % Q_amp180_scale_factor
                           + 'is too low, capping at 0.9')
 
-            self.Q_amp180(np.round(Q_amp180_scale_factor * self.Q_amp180(), 5))
+            self.Q_amp180(np.round(Q_amp180_scale_factor * self.Q_amp180(), 7))
 
             if verbose:
                 print('Q_amp180_scale_factor: {:.4f}, new Q_amp180: {}'.format(
