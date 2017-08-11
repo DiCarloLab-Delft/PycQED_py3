@@ -276,7 +276,7 @@ class TwoQubitDevice(DeviceObject):
             UHFQC=self.acquisition_instrument.get_instr(),
             AWG=self.central_controller.get_instr(),
             channels=[w0, w1],
-            result_logging_mode='lin_trans',
+            result_logging_mode='digitized',
             integratioin_length=q0.RO_acq_integration_length())
         return d
 
@@ -644,8 +644,11 @@ class TwoQubitDevice(DeviceObject):
             if len(a.fit_data) < min_fit_pts:
                 print('Bad measurement range: too large or too far from '
                       'minimum for parabolic model.\nRetrying...')
-                old_z_amp = new_z_amp
-                if a.del_indices[0] == 0 and a.del_indices[-1] == num-1:
+                if a.del_indices[0] == 0:
+                    old_z_amp = amp_pts[-1]
+                elif a.del_indices[-1] == num-1:
+                    old_z_amp = amp_pts[0]
+                elif a.del_indices[0] == 0 and a.del_indices[-1] == num-1:
                     # Values larger than one found on both sides
                     # -> reduce range
                     span *= 0.5
