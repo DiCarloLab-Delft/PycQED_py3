@@ -389,6 +389,8 @@ class BaseDataAnalysis(object):
         '''
         if savedir is None:
             savedir = self.data_dict.get('folder', '')
+            if isinstance(savedir, list):
+                savedir = savedir[0]
         if savebase is None:
             savebase = ''
         if tag_tstamp:
@@ -406,6 +408,7 @@ class BaseDataAnalysis(object):
         filepath = os.path.join(savedir, savebase + tstag + '.' + fmt)
         with open(filepath, 'w') as file:
             json.dump(save_dict, file, cls=NumpyJsonEncoder)
+        print('Data saved to "{}".'.format(filepath))
 
     def prepare_fitting(self):
         pass

@@ -67,13 +67,17 @@ class Test_base_analysis(unittest.TestCase):
             tag_tstamp=False,
             key_list='auto')
 
+        # This time use default argument for savedir
+        oldFolder = a.data_dict['folder']
+        a.data_dict['folder'] = [os.path.join(self.datadir, '20170808',
+                                              '010101_analysis_v2_json')]
         a.save_data(
-            savedir=os.path.join(self.datadir, '20170808',
-                                 '010101_analysis_v2_json'),
             savebase='saved_by_test_select_keys',
             fmt='json',
             tag_tstamp=False,
-            key_list=['detuning', 'folder', 'phase'])
+            key_list=['detuning', 'phase'])
+        # Need to set old folder again to pass assertions below
+        a.data_dict['folder'] = oldFolder
 
         # Reload the data
         with open(os.path.join(self.datadir, '20170808',
@@ -94,8 +98,6 @@ class Test_base_analysis(unittest.TestCase):
                              13822537.166975206, -2590995.820591142,
                              -8951076.834515035, 6067740.757130785,
                              10811363.072895428],
-                'folder': 'D:\\Experiments\\1702_Starmon\\data\\20170731'
-                          '\\010040_CZ_phase_ripple_sin_QR_ker_RT_cryo1',
                 'phase': [65.00124000990506, -6.851530218234939,
                           -6.020656176836422, -38.856093130306355,
                           -25.559965171823812, -8.05129115281107,

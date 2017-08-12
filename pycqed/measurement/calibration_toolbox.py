@@ -35,6 +35,7 @@ def mixer_carrier_cancellation_duplexer(**kw):
 def mixer_carrier_cancellation(SH, source, MC,
                                chI_par, chQ_par,
                                frequency: float=None,
+                               SH_ref_level: float=-40,
                                init_stepsize: float=0.1):
     """
     Varies the mixer offsets to minimize leakage at the carrier frequency.
@@ -58,7 +59,7 @@ def mixer_carrier_cancellation(SH, source, MC,
     '''
     Make coarse sweeps to approximate the minimum
     '''
-
+    SH.ref_level(SH_ref_level)
     detector = det.Signal_Hound_fixed_frequency(
         SH, frequency=(source.frequency()),
         Navg=5, delay=0.0, prepare_each_point=False)
@@ -87,6 +88,7 @@ def mixer_skewness_calibration_QWG(SH, source, QWG,
                                    MC,
                                    ch_pair=1,
                                    frequency=None, f_mod=None,
+                                   SH_ref_level: float=-40,
                                    name='mixer_skewness_calibration_QWG'):
     '''
     Inputs:
@@ -122,7 +124,7 @@ def mixer_skewness_calibration_QWG(SH, source, QWG,
     if frequency is None:
         # Corresponds to the frequency where to minimize with the SH
         frequency = source.frequency.get() - f_mod
-
+    SH.ref_level(SH_ref_level)
     d = det.Signal_Hound_fixed_frequency(SH, frequency)
 
     ad_func_pars = {'adaptive_function': nelder_mead,
@@ -218,7 +220,9 @@ def mixer_skewness_calibration_adaptive(**kw):
 def mixer_carrier_cancellation_5014(AWG, SH, source, MC,
                                     frequency=None,
                                     AWG_channel1=1,
-                                    AWG_channel2=2, **kw):
+                                    AWG_channel2=2,
+                                    SH_ref_level: float=-40,
+                                    **kw):
     '''
     Varies the mixer offsets to minimize leakage at the carrier frequency.
     this is the version for a tektronix AWG.
@@ -248,6 +252,7 @@ def mixer_carrier_cancellation_5014(AWG, SH, source, MC,
     S1 = AWG.ch1_offset  # to be dedicated to actual channel
     S2 = AWG.ch2_offset
 
+    SH.ref_level(SH_ref_level)
     detector = det.Signal_Hound_fixed_frequency(
         SH, frequency=(source.frequency.get()),
         Navg=5, delay=0.0, prepare_each_point=False)
@@ -269,7 +274,9 @@ def mixer_carrier_cancellation_5014(AWG, SH, source, MC,
 
 
 def mixer_carrier_cancellation_UHFQC(UHFQC, SH, source, MC,
-                                     frequency=None, **kw):
+                                     frequency=None,
+                                     SH_ref_level: float=-40,
+                                     **kw):
     '''
     Varies the mixer offsets to minimize leakage at the carrier frequency.
     this is the version for a UHFQC.
@@ -299,6 +306,7 @@ def mixer_carrier_cancellation_UHFQC(UHFQC, SH, source, MC,
     S1 = UHFQC.sigouts_0_offset
     S2 = UHFQC.sigouts_1_offset
 
+    SH.ref_level(SH_ref_level)
     detector = det.Signal_Hound_fixed_frequency(
         SH, frequency=(source.frequency.get()),
         Navg=5, delay=0.0, prepare_each_point=False)
@@ -323,6 +331,7 @@ def mixer_carrier_cancellation_CBox(CBox, SH, source, MC,
                                     frequency=None,
                                     awg_nr=0,
                                     voltage_grid=[50, 20, 10, 5, 2],
+                                    SH_ref_level: float=-40,
                                     xtol=1):
     '''
     Varies the mixer offsets to minimize leakage at the carrier frequency.
@@ -345,6 +354,7 @@ def mixer_carrier_cancellation_CBox(CBox, SH, source, MC,
                                       chI_par=ch0_swf, chQ_par=ch1_swf,
                                       frequency=frequency,
                                       voltage_grid=voltage_grid,
+                                      SH_ref_level=SH_ref_level,
                                       xtol=xtol)
 
 
@@ -564,10 +574,11 @@ def mixer_skewness_cal_UHFQC_adaptive(UHFQC, SH, source, AWG,
                                       acquisition_marker_channel,
                                       LutMan,
                                       MC,
-                                      verbose=True):
+                                      SH_ref_level: float=-40,
+                                      verbose: bool=True):
     '''
     Input args
-        UHFQC
+        UHFQC:  UHFQC acquisition instrument
         SH:     Signal Hound
         source: MW-source connected to the mixer
         LutMan: Used for changing the pars and loading the pulses
@@ -612,7 +623,7 @@ def mixer_skewness_cal_UHFQC_adaptive(UHFQC, SH, source, AWG,
         LutMan, LutMan.mixer_alpha, ['M_ModBlock'], run=True, single=False)
     S2 = swf.UHFQC_Lutman_par_with_reload(
         LutMan, LutMan.mixer_phi, ['M_ModBlock'], run=True, single=False)
-
+    SH.ref_level(SH_ref_level)
     detector = det.Signal_Hound_fixed_frequency(
         SH, frequency=(source.frequency.get() -
                        LutMan.M_modulation()),
@@ -621,7 +632,7 @@ def mixer_skewness_cal_UHFQC_adaptive(UHFQC, SH, source, AWG,
     ad_func_pars = {'adaptive_function': nelder_mead,
                     'x0': [1.0, 0.0],
                     'initial_step': [.15, 10],
-                    'no_improv_break': 10,
+                    'no_improv_break': 15,
                     'minimize': True,
                     'maxiter': 500}
     MC.set_sweep_functions([S1, S2])

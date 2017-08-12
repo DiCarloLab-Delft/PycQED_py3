@@ -498,7 +498,7 @@ def get_operators_label():
 
 def order_pauli_output2(pauli_op_dis):
     '''
-    Converts Pauli counting fromatted as  IXYZ q0 | IXYZ q1  to
+    Converts Pauli counting fromatted as  IZXY q0 | IZXY q1  to
     pauli q0 | paulis q1 | pauli correlators
     '''
     pauli_1 = np.array([pauli_op_dis[2], pauli_op_dis[3], pauli_op_dis[1]])
