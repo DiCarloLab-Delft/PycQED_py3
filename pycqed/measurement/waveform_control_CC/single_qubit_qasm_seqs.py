@@ -526,7 +526,7 @@ def Ram_Z_single(qubit_name,
     return qasm_file
 
 
-def Ram_Z_echo(qubit_name, no_of_points, cal_points=True):
+def Ram_Z_echo(qubit_name: str , nr_of_points: int, cal_points: bool=True):
     '''
     Creates QASM sequence for an entire Ram-Z experiment, including
     calibration points.
@@ -536,7 +536,7 @@ def Ram_Z_echo(qubit_name, no_of_points, cal_points=True):
 
     Args:
         qubit_name      (str): name of the targeted qubit
-        no_of_points    (int): number of points in the hard sweep. This is
+        nr_of_points    (int): number of points in the hard sweep. This is
                                limited by the QWG waveform memory and number of
                                codeword channels used.
     '''
@@ -544,14 +544,14 @@ def Ram_Z_echo(qubit_name, no_of_points, cal_points=True):
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
 
-    # Write  measurement sequence no_of_points times
-    for i in range(no_of_points):
+    # Write  measurement sequence nr_of_points times
+    for i in range(nr_of_points):
         qasm_file.writelines('\ninit_all\n')
 
-        if cal_points and (i == no_of_points - 4 or i == no_of_points - 3):
+        if cal_points and (i == nr_of_points - 4 or i == nr_of_points - 3):
             # Calibration point for |0>
             pass
-        elif cal_points and (i == no_of_points - 2 or i == no_of_points - 1):
+        elif cal_points and (i == nr_of_points - 2 or i == nr_of_points - 1):
             # Calibration point for |1>
             qasm_file.writelines('X180 {} \n'.format(qubit_name))
         else:
@@ -566,11 +566,57 @@ def Ram_Z_echo(qubit_name, no_of_points, cal_points=True):
     return qasm_file
 
 
+def distortion_scope_fine_seq(qubit_name: str, nr_of_points: int,
+                              case: str='interleaved'):
+    '''
+    Create QASM sequence for the enhanced cryo-scope using two flux pulses.
+
+    Sequence:
+        long flux -- X90 -- scoping flux -- X90 or Y90 -- RO
+
+    Args:
+        qubit_name (str):
+                name of the targeted qubit
+        nr_of_points (int):
+                number of points in the hard sweep. This is limited by the QWG
+                waveform memory and number of codeword channels used.
+        case (str):
+                Can be 'cos', 'sin', or 'interleaved.
+                'cos' uses X90 for the last mw pulse.
+                'sin' uses Y90 for the last mw pulse.
+                'interleaved' uses both cases for every point.
+    '''
+    filename = join(base_qasm_path, 'distortion_scope_fine.qasm')
+    qasm_file = mopen(filename, mode='w')
+
+    qasm_file.writelines('qubit {} \n'.format(qubit_name))
+
+    if case == 'interleaved':
+        recPulses = ['X90', 'Y90']
+    elif case == 'cos':
+        recPulses = ['X90']
+    elif case == 'sin':
+        recPulses = ['Y90']
+
+    for i in range(nr_of_points):
+        for recPulse in recPulses:
+            qasm_file.writelines('\ninit_all\n')
+
+            qasm_file.writelines('long_square_{} {}\n'.format(i, qubit_name))
+            qasm_file.writelines('X90 {}\n'.format(qubit_name))
+            qasm_file.writelines('scoping_flux {}\n'.format(qubit_name))
+            qasm_file.writelines('{} {}\n'.format(recPulse, qubit_name))
+            qasm_file.writelines('RO {}  \n'.format(qubit_name))
+
+    qasm_file.close()
+    return qasm_file
+
+
 def flux_timing_seq(qubit_name, taus,
                     wait_between=220e-9, clock_cycle=1e-9, cal_points=True):
     '''
-    Creates the QASM sequence to calibrate the timing of the flux pulse relative
-    to microwave pulses.
+    Creates the QASM sequence to calibrate the timing of the flux pulse
+    relative to microwave pulses.
 
     Timing of the sequence:
         trigger flux pulse -- tau -- X90 -- wait_between -- X90 -- RO
