@@ -718,7 +718,7 @@ class QWG_lutman_custom_wave_chunks(Soft_Sweep):
      '''
 
     def __init__(self, LutMan, wave_func, sweep_points, chunk_size,
-                 codewords=np.arange(128),
+                 codewords=None,
                  param_name='flux pulse parameter',
                  param_unit='a.u.',
                  **kw):
@@ -726,21 +726,27 @@ class QWG_lutman_custom_wave_chunks(Soft_Sweep):
         self.wave_func = wave_func
         self.chunk_size = chunk_size
         self.LutMan = LutMan
-        self.codewords = codewords
+        if codewords is None:
+            self.codewords = np.arange(chunk_size)
+        else:
+            self.codewords = codewords
         self.name = param_name
         self.parameter_name = param_name
         self.unit = param_unit
+        # Setting self.custom_swp_pts because self.sweep_points is overwritten
+        # by the MC.
+        self.custom_swp_pts = sweep_points
 
     def set_parameter(self, val):
         # Find index of val in sweep_points
-        ind = np.where(self.sweep_points == val)[0]
+        ind = np.where(self.custom_swp_pts == val)[0]
         if len(ind) == 0:
             # val was not found in the sweep points
             raise ValueError('Value {} is not in the sweep points'.format(val))
         ind = ind[0]  # set index to the first occurence of val in sweep points
 
-        for i, paramVal in enumerate(self.sweep_points[ind:ind +
-                                                       self.chunk_size]):
+        for i, paramVal in enumerate(self.custom_swp_pts[ind:ind +
+                                                         self.chunk_size]):
             pulseName = 'pulse_{}'.format(i)
 
             self.LutMan.load_custom_pulse_onto_AWG_lookuptable(
