@@ -317,6 +317,21 @@ class QWG_FluxLookuptableManager(Instrument):
                            parameter_class=ManualParameter,
                            initial_value=1,
                            vals=vals.Numbers())
+        self.add_parameter('S_gauss_sigma',
+                           unit='s',
+                           label='gauss sigma',
+                           docstring='Width (sigma) of Gaussian shaped flux '
+                                     'pulse.',
+                           parameter_class=ManualParameter,
+                           initial_value=40e-9,
+                           vals=vals.Numbers())
+        self.add_parameter('S_amp',
+                           unit='frac',
+                           label='S_amp',
+                           docstring='Amplitude of scoping flux pulse.',
+                           parameter_class=ManualParameter,
+                           initial_value=0.5,
+                           vals=vals.Numbers())
 
         self._wave_dict = {}
 
@@ -325,6 +340,7 @@ class QWG_FluxLookuptableManager(Instrument):
 
     def _set_wave_dict_unit(self, val):
         self.F_amp.unit = val
+        self.S_amp.unit = val
         self._wave_dict_unit = val
 
     def standard_waveforms(self):
@@ -336,23 +352,10 @@ class QWG_FluxLookuptableManager(Instrument):
         block = wf.single_channel_block(self.F_amp(), self.F_length(),
                                         sampling_rate=self.sampling_rate())
 
-        # Fast adiabatic pulse
-        # Old version, commented out because we might still need it for
-        # debugging (13 June 2017)
-        # martinis_pulse = wf.martinis_flux_pulse(
-        #     length=self.F_length(),
-        #     lambda_coeffs=[self.F_lambda_1(), self.F_lambda_2(),
-        #                    self.F_lambda_3()],
-        #     theta_f=self.F_theta_f()*2*np.pi/360,
-        #     f_01_max=self.F_f_01_max(),
-        #     g2=self.F_J2(),
-        #     E_c=self.F_E_c(),
-        #     dac_flux_coefficient=self.F_dac_flux_coef(),
-        #     f_interaction=self.F_f_interaction(),
-        #     f_bus=None,
-        #     asymmetry=self.F_asymmetry(),
-        #     sampling_rate=self.sampling_rate(),
-        #     return_unit='V')
+        gaussI, gaussQ = wf.gauss_pulse(self.S_amp(), self.S_gauss_sigma(),
+                                        nr_sigma=4,
+                                        sampling_rate=self.sampling_rate(),
+                                        axis='x', phase=0, motzoi=0, delay=0)
 
         # New version of fast adiabatic pulse
         martinis_pulse_v2 = wf.martinis_flux_pulse_v2(
@@ -388,7 +391,8 @@ class QWG_FluxLookuptableManager(Instrument):
         return {'square': block,
                 'adiabatic': martinis_pulse_v2,
                 'adiabatic_Z': martinis_phase_corrected,
-                'adiabatic_Z_grover': martinis_phase_corrected_grover}
+                'adiabatic_Z_grover': martinis_phase_corrected_grover,
+                'gauss': gaussI}
 
     def generate_standard_pulses(self):
         '''
