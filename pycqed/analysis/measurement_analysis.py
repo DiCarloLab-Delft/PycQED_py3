@@ -6373,20 +6373,6 @@ class Ram_Z_Analysis(MeasurementAnalysis):
         else:
             return df
 
-    # def make_figures(self, plot_step=True, nan_to_zero=False):
-    #     '''
-    #     Plot figures. Step response is only plotted if plot_step == True.
-    #     '''
-    #     if nan_to_zero:
-    #         step = []
-    #         for x in self.step_response:
-    #             if np.isnan(x):
-    #                 step.append(0)
-    #             else:
-    #                 step.append(x)
-    #     else:
-    #         step = self.step_response
-
     def get_stepresponse(self, df, f01max, E_c, F_amp, V_per_phi0,
                          V_offset=0):
         '''
@@ -6789,7 +6775,7 @@ class GST_Analysis(TD_Analysis):
         with open(filepath, 'w') as file:
             file.writelines(directive_string)
             for tup in counts:
-                file.writelines(('{}  ' * len(tup) + '\n').format(*tup))
+                file.writelines(('\n' + '{}  ' * len(tup)).format(*tup))
 
     def count_results_1Q(self):
         # Find the results that belong to the same GST sequence and sum up the
