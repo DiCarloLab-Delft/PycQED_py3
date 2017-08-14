@@ -144,6 +144,21 @@ def Qubit_freq_to_dac(frequency, f_max, E_c,
     return dac_voltage
 
 
+def Qubit_dac_sensitivity(dac_voltage, f_max: float, E_c: float,
+                          dac_sweet_spot: float, V_per_phi0: float,
+                          asymmetry: float=0):
+    '''
+    Derivative of the qubit detuning vs dac at dac_voltage.
+    '''
+    return (np.pi / (2 * V_per_phi0) *
+            np.tan(np.pi / V_per_phi0 * (dac_voltage - dac_sweet_spot)) *
+            (f_max + E_c - Qubit_dac_to_detun(dac_voltage=dac_voltage,
+                                              f_max=f_max,
+                                              E_c=E_c,
+                                              dac_sweet_spot=dac_sweet_spot,
+                                              V_per_phi0=V_per_phi0,
+                                              asymmetry=asymmetry)))
+
 def QubitFreqDac(dac_voltage, f_max, E_c,
                  dac_sweet_spot, dac_flux_coefficient, asymmetry=0):
     logging.warning('deprecated, replace QubitFreqDac with Qubit_dac_to_freq')
