@@ -11,8 +11,10 @@ from matplotlib import cm
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.utilities.general import NumpyJsonEncoder
 from pycqed.analysis.analysis_toolbox import get_color_order as gco
+from pycqed.analysis.analysis_toolbox import get_color_list
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
-import pycqed.analysis_v2.default_figure_settings_analysis as def_fig
+# import pycqed.analysis_v2.default_figure_settings_analysis as def_fig
+from . import default_figure_settings_analysis as def_fig
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import datetime
 import json
@@ -136,7 +138,8 @@ class BaseDataAnalysis(object):
         ########################################
         # These options relate to the plotting #
         ########################################
-        def_fig.apply_default_figure_settings()
+        if self.options_dict.get('apply_default_fig_settings', True):
+            def_fig.apply_default_figure_settings()
         self.plot_dicts = dict()
         self.axs = dict()
         self.figs = dict()
@@ -151,6 +154,8 @@ class BaseDataAnalysis(object):
                                                                False)
         self.options_dict['save_figs'] = self.options_dict.get(
             'save_figs', True)
+        self.options_dict['close_figs'] = self.options_dict.get(
+            'close_figs', True)
         ####################################################
         # These options relate to what analysis to perform #
         ####################################################
@@ -178,7 +183,7 @@ class BaseDataAnalysis(object):
         self.prepare_plots()   # specify default plots
         if not self.extract_only:
             self.plot(key_list='auto')  # make the plots
-            self.save_figures()
+            self.save_figures(close_figs=self.options_dict['close_figs'])
 
     def get_timestamps(self):
         """
@@ -249,7 +254,7 @@ class BaseDataAnalysis(object):
         # this disables the data extraction for other files if there is only
         # one file being used to load data from
         if self.single_timestamp:
-            self.timestamps = [self.timestamps[0]]  # Why???
+            self.timestamps = [self.timestamps[0]]
         TwoD = self.params_dict.pop('TwoD', False)
         # this should always be extracted as it is used to determine where
         # the file is as required for datasaving
@@ -348,6 +353,8 @@ class BaseDataAnalysis(object):
                      close_figs: bool=True):
         if savedir is None:
             savedir = self.data_dict.get('folder', '')
+            if isinstance(savedir, list):
+                savedir = savedir[0]
         if savebase is None:
             savebase = ''
         if tag_tstamp:
@@ -615,8 +622,7 @@ class BaseDataAnalysis(object):
             if cmap == 'Vega10':
                 colors = [cm.Vega10(i) for i in range(len(plot_yvals))]
             else:
-                colors = [cm.get_cmap(cmap)(i)
-                          for i in np.linspace(0.0, 1.0, len_color_cycle)]
+                colors = get_color_list(len_color_cycle, cmap)
 
             for ii, this_yvals in enumerate(plot_yvals):
                 p_out.append(pfunc(plot_xvals, this_yvals,
