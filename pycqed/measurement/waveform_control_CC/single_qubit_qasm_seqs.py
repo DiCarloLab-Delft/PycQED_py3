@@ -591,12 +591,14 @@ def distortion_scope_fine_seq(qubit_name: str, nr_of_points: int,
 
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
 
-    if case == 'interleaved':
+    if case == 'interleaved' or case == 'background':
         recPulses = ['X90', 'Y90']
     elif case == 'cos':
         recPulses = ['X90']
     elif case == 'sin':
         recPulses = ['Y90']
+    else:
+        raise ValueError('Unknown case "{}".'.format(case))
 
     for i in range(nr_of_points):
         for recPulse in recPulses:
