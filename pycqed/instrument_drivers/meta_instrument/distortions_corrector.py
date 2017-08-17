@@ -416,7 +416,6 @@ class Distortion_corrector():
         }
 
     def fit_spline(self, start_time_fit, end_time_fit, s=0.001):
->>>>>>> origin/Distortions
         '''
         Fit the data using a spline interpolation.
         The fit model and result are saved in self.fit_model and self.fit_res,
