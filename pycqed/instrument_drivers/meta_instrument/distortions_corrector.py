@@ -1,13 +1,9 @@
 import pycqed.analysis.fitting_models as fm
 import pycqed.measurement.kernel_functions as kf
-import pycqed.instrument_drivers.physical_instruments.RTO1024 as RTO
-import pycqed.measurement.detector_functions as det
-import pycqed.analysis.measurement_analysis as ma
-import pycqed.measurement.measurement_control as mc
-import pycqed.analysis.fitting_models as fit_mods
 import numpy as np
 import scipy.linalg
 import scipy.interpolate as sc_intpl
+from scipy.signal import argrelmin
 import lmfit
 import os.path
 import datetime
@@ -60,7 +56,8 @@ class Distortion_corrector():
         self.new_step = []
 
         # Fitting
-        self.known_fit_models = ['exponential', 'high-pass', 'spline']
+        self.known_fit_models = ['exponential', 'high-pass', 'damped_osc',
+                                 'spline']
         self.fit_model = None
         self.fit_res = None
 
@@ -142,8 +139,6 @@ class Distortion_corrector():
                               '{}_combined.json'.format(self.filename))
 
         # Configure kernel object
-        # TODO: kernel list should not be emptied for cryo corrections
-        self.ker_obj.kernel_list([])
         self.ker_obj.add_kernel_to_kernel_list(
             '{}_combined.json'.format(self.filename))
 
@@ -161,6 +156,9 @@ class Distortion_corrector():
         # Configure kernel object
         self.ker_obj.kernel_list([])
         self.ker_obj.add_kernel_to_kernel_list(filename)
+
+    def empty_kernel_list(self):
+        self.ker_obj.kernel_list([])
 
     def measure_trace(self, verbuse=True):
         raise NotImplementedError(
@@ -319,19 +317,111 @@ class Distortion_corrector():
             'kernel': list(new_ker)
         }
 
-    def raw_inversion(self, start_time_fit: float, stop_time_fit: float):
+    def fit_damped_osc(self, start_time_fit: float, end_time_fit: float):
         '''
-        Numerically invert the raw step response to calculate the distortion
-        correction.
+        Fits a model for an underdamped oscillation (RLC circuit)
+            A * exp(-t/tau) * cos(omega * t) + C
+        to the last trace that was measured (self.waveform).
+        The fit model and result are saved in self.fit_model and self.fit_res,
+        respectively. The new predistortion kernel and information about the
+        fit is stored in self.new_kernel_dict.
+
+        Args:
+            start_time_fit (float): start of the fitted interval
+            end_time_fit (float):   end of the fitted interval
         '''
         self._start_idx = np.argmin(np.abs(self.time_pts - start_time_fit))
         self._stop_idx = np.argmin(np.abs(self.time_pts - end_time_fit))
-        # Todo: implement this.
 
-    def fit_spline(self, start_time_fit, end_time_fit, s=0.001,
-                   weight_tau='auto'):
+        # Prepare the fit model: exponentially damped oscillation.
+        self.fit_model = lmfit.Model(fm.ExpDampOscFunc)
+        self.fit_model.set_param_hint('amplitude',
+                                      value=1,
+                                      vary=True)
+        zero_crossing_ind = argrelmin(np.abs(self.waveform - 0))[0][0]
+        freq_guess = 1 / (self.time_pts[zero_crossing_ind] * 4)
+        self.fit_model.set_param_hint('frequency',
+                                      value=freq_guess,
+                                      vary=True)
+        self.fit_model.set_param_hint('tau',
+                                      value=end_time_fit - start_time_fit,
+                                      vary=True)
+        self.fit_model.set_param_hint('exponential_offset',
+                                      value=self.waveform[self._stop_idx],
+                                      vary=True)
+
+        self.fit_model.set_param_hint('phase',
+                                      value=0,
+                                      vary=False)
+        self.fit_model.set_param_hint('n',
+                                      value=1,
+                                      vary=False)
+        self.fit_model.set_param_hint('oscillation_offset',
+                                      value=0,
+                                      vary=False)
+        params = self.fit_model.make_params()
+
+        # Do the fit
+        fit_res = self.fit_model.fit(
+            data=self.waveform[self._start_idx:self._stop_idx],
+            t=self.time_pts[self._start_idx:self.stop_idx],
+            params=params)
+        self.fitted_waveform = fit_res.eval(
+            t=self.time_pts[self._start_idx:self.stop_idx])
+
+        # Analytic form of the predistorted square pulse (input that creates a
+        # square pulse at the output)
+        A = fit_res.best_values['amplitude']
+        omega = 2 * np.pi * fit_res.best_values['frequency']
+        tau = fit_res.best_values['tau']
+        C = fit_res.best_values['exponential_offset']
+        l = (omega * tau)**2
+
+        tPts = np.arange(0, self.kernel_length*1e-9, 1e-9)  # TODO: sampling rate
+        predist_step = (1 + tPts / tau * (1 + l) + l *
+                        (np.exp(-tPts / tau) - 1)) / A
+
+        # Check if parameters are physical and print warnings
+        if tau < 0:
+            print('Warning: unphysical tau = {} (expect tau > 0).'
+                  .format(tau))
+        if np.abs(C) > 1e-3:
+            print('Warning: unphysical offset C = {} (expect C = 0). '
+                  'Offset is ignored in kernel inversion.'.format(C))
+        if A < 0:
+            print('Warning: unphysical amplitude A = {} (expect A > 0).'
+                  .format(A))
+
+        # Save the results
+        self.fit_res = fit_res
+        self.new_step = predist_step
+        new_ker = kf.kernel_from_kernel_stepvec(predist_step)
+
+        self.new_kernel_dict = {
+            'name': self.filename + '_' + str(self._iteration),
+            'filter_params': {
+                'b0': 1 / A,
+                'b1': 2 / (tau * A),
+                'b2': (1 + l) / (A * tau**2),
+                'a1': 1 / tau
+            },
+            'fit': {
+                'model': 'damped_osc',
+                'A': A,
+                'omega': omega,
+                'tau': tau,
+                'C': C
+            },
+            'kernel': list(new_ker)
+        }
+
+    def fit_spline(self, start_time_fit, end_time_fit, s=0.001):
+>>>>>>> origin/Distortions
         '''
         Fit the data using a spline interpolation.
+        The fit model and result are saved in self.fit_model and self.fit_res,
+        respectively. The new predistortion kernel and information about the
+        fit is stored in self.new_kernel_dict.
 
         Args:
             start_time_fit (float):
@@ -860,8 +950,10 @@ class RT_distortion_corrector(Distortion_corrector):
 
 
 class Cryo_distortion_corrector(Distortion_corrector):
-    def __init__(self, time_pts, qubit, f_demod=0, square_amp=1,
-                 nr_plot_points=4000, demodulate=False, chunk_size=32):
+    def __init__(self, time_pts, qubit, demodulate: bool=False,
+                 f_demod: float=0, square_amp: float=1,
+                 nr_plot_points: int=4000,
+                 chunk_size: int=32):
         '''
         Instantiate an object.
         This class uses qubit.measure_ram_z to measure the step response.
@@ -870,25 +962,33 @@ class Cryo_distortion_corrector(Distortion_corrector):
             time_pts (array):
                     Time points at which the Ram-Z should be measured
                     (x-axis).
-            quibt (Instrument):
+            qubit (Instrument):
                     Qubit object on which the experiment is performed.
-            AWG_lutman (Instrument):
-                    Lookup table manager for the AWG.
+            demodulate (bool):
+                    Whether to demodulate the signal in the analysis.
+            f_demod (float):
+                    Demodulation frequency used in the analysis.
+            square_amp (float):
+                    Amplitude of the square pulse used to normalize the step
+                    response.
             nr_plot_points (int):
                     Number of points of the waveform that are plotted. Can be
                     changed in self.nr_plot_points.
+            chunk_size (int):
+                    Chunk size used in the measurement.
         '''
         # TODO: add filename initialization
         self.AWG_lutman = qubit.flux_LutMan.get_instr()
         self.qubit = qubit
-        super().__init__(kernel_object=self.AWG_lutman.F_kernel_instr.get_instr(),
-                         nr_plot_points=nr_plot_points)
+        super().__init__(
+            kernel_object=self.AWG_lutman.F_kernel_instr.get_instr(),
+            nr_plot_points=nr_plot_points)
         self.time_pts = time_pts
         self.phases = []
 
-        self.chunk_size=chunk_size
-        self.V_per_phi0 = qubit.V_per_phi0()
-        self.V_0 = qubit.V_offset()
+        self.chunk_size = chunk_size
+        self.V_per_phi0 = self.qubit.V_per_phi0()
+        self.V_0 = self.qubit.V_offset()
         self.f_demod = f_demod
         self.square_amp = square_amp
         self.demodulate = demodulate
