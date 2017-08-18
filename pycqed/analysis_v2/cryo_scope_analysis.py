@@ -24,7 +24,19 @@ class DistortionFineAnalysis(ba.BaseDataAnalysis):
                          options_dict=options_dict,
                          extract_only=extract_only, do_fitting=do_fitting)
 
-        # self.single_timestamp = True
+        # Extract metadata to know where to extract the parameters from
+        self.params_dict = {
+            'qubit_name':
+                'Experimental Data.Experimental Metadata.qubit_name',
+            'QWG_channel':
+                'Experimental Data.Experimental Metadata.QWG_channel',
+            'flux_LutMan':
+                'Experimental Data.Experimental Metadata.flux_LutMan',
+        }
+        self.numeric_params = []
+        self.extract_data()
+
+        # Now actually extract the parameters and the data
         self.params_dict = {
             # Data
             'xlabel': 'sweep_name',
@@ -36,19 +48,26 @@ class DistortionFineAnalysis(ba.BaseDataAnalysis):
             'measured_values': 'measured_values',
 
             # Pulse parameters
-            'gauss_sigma': 'QWG_flux_lutman_QR.S_gauss_sigma',
-            'gauss_amp': 'QWG_flux_lutman_QR.S_amp',
-            'wave_dict_unit': 'QWG_flux_lutman_QR.wave_dict_unit',
-            'sampling_rate': 'QWG_flux_lutman_QR.sampling_rate',
-            'QWG_amp': 'QWG.ch3_amp',
-            'distortions_amp': 'QWG_flux_lutman_QR.F_amp',
+            'gauss_sigma':
+                '{}.S_gauss_sigma'.format(self.data_dict['flux_LutMan'][0]),
+            'gauss_amp': '{}.S_amp'.format(self.data_dict['flux_LutMan'][0]),
+            'wave_dict_unit':
+                '{}.wave_dict_unit'.format(self.data_dict['flux_LutMan'][0]),
+            'sampling_rate':
+                '{}.sampling_rate'.format(self.data_dict['flux_LutMan'][0]),
+            'QWG_amp':
+                'QWG.ch{}_amp'.format(self.data_dict['QWG_channel'][0]),
+            'distortions_amp':
+                '{}.F_amp'.format(self.data_dict['flux_LutMan'][0]),
 
             # Qubit parameters
-            'f_max': 'QR.f_max',
-            'E_c': 'QR.E_c',
-            'V_offset': 'QR.V_offset',
-            'V_per_phi0': 'QR.V_per_phi0',
-            'asymmetry': 'QR.asymmetry',
+            'f_max': '{}.f_max'.format(self.data_dict['qubit_name'][0]),
+            'E_c': '{}.E_c'.format(self.data_dict['qubit_name'][0]),
+            'V_offset': '{}.V_offset'.format(self.data_dict['qubit_name'][0]),
+            'V_per_phi0':
+                '{}.V_per_phi0'.format(self.data_dict['qubit_name'][0]),
+            'asymmetry':
+                '{}.asymmetry'.format(self.data_dict['qubit_name'][0]),
         }
         self.numeric_params = [
             'gauss_sigma',
@@ -87,8 +106,11 @@ class DistortionFineAnalysis(ba.BaseDataAnalysis):
 
         self.data_dict['raw phase'] = np.arctan2(self.data_dict['sin'],
                                                  self.data_dict['cos'])
-        self.data_dict['phase'] = (np.unwrap(self.data_dict['raw phase']) -
-                                   self.data_dict['background phase'])
+        # Unwrap phase back-to-front, because it makes more sense to assume
+        # it's closer to zero at later times.
+        self.data_dict['phase'] = (
+            np.unwrap(self.data_dict['raw phase'][::-1])[::-1] -
+            self.data_dict['background phase'])
 
         # After unwrapping we can convert phases to degrees
         self.data_dict['raw phase'] = np.rad2deg(self.data_dict['raw phase'])
