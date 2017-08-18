@@ -501,7 +501,7 @@ class Transmon(Qubit):
         using flipping sequences.
         '''
         if MC is None:
-            MC = self.MC
+            MC = self.MC.get_instr()
         if np.size(scales) != 1:
             self.measure_rabi_amp90(scales=scales, n=1, MC=MC, analyze=False)
             a = ma.Rabi_Analysis(close_fig=close_fig)
