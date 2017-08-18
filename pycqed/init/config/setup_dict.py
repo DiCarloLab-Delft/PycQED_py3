@@ -56,6 +56,7 @@ data_dir_dict = {'tud276606_FPGA_PC': 'D:\Experiments/CBox_Testing/Data',
                  # 'Aprilia': r'D\\Test_folder\\Data',
                  # 'Aprilia': r'D:\\Experiments\\1706_SixPort_FlipChip_Die9\\Data'
                  # 'Aprilia': r'D:\\Experiments\\1706_S7_VIO_SE22\\Data'
-                 'Aprilia': r'D:\\Experiments\\1707_IntelOctoboxV1\\Data'
+                 # 'Aprilia': r'D:\\Experiments\\1707_IntelOctoboxV1\\Data'
+                 'Aprilia': r'D:\\Experiments\\1708_S7_VIO_NW41\\Data'
 
                  }
