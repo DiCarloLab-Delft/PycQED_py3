@@ -218,8 +218,19 @@ def SPSA(fun, x0,
         delta = np.where(np.random.rand(dim) > p, 1, -1)
         # step 3
         x_plus = x+c_k*delta
+        # randdarray = np.array([np.random.uniform(low=ctrl_min[ii],high=ctrl_max[ii])
+        #                        for ii in np.arange(ctrl_max.shape[0])])
+        # x_plus = np.where(x_plus < ctrl_min, randdarray, x_plus)
+        # x_plus = np.where(x_plus > ctrl_max, randdarray, x_plus)
+
         x_minus = x-c_k*delta
+        # randdarray = np.array([np.random.uniform(low=ctrl_min[ii],high=ctrl_max[ii])
+        #                        for ii in np.arange(ctrl_max.shape[0])])
+        # x_minus = np.where(x_minus < ctrl_min, randdarray, x_minus)
+        # x_minus = np.where(x_minus > ctrl_max, randdarray, x_minus)
+
         y_plus = fun(x_plus)
+
         y_minus = fun(x_minus)
         # res.append([x_plus, y_plus])
         # res.append([x_minus, y_minus])
