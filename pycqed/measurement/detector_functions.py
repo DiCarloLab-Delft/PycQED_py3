@@ -857,7 +857,6 @@ class Function_Detector(Soft_Detector):
 
         # Call the function
         result = self.get_function(**measurement_kwargs)
-        print(result)
         if self.result_keys is None:
             return result
         else:
