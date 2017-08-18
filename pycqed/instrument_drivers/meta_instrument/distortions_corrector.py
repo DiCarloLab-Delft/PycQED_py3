@@ -72,6 +72,8 @@ class Distortion_corrector():
             '        Save the current plot to "filename.png".\n'
             'model <name>:\n'
             '        Choose the fit model that is used.\n'
+            '        Available models:\n'
+            '           ' + str(self.known_fit_models) + '\n'
             'xrange <min> <max>:\n'
             '        Set the x-range of the plot to (min, max). The points\n'
             '        outside this range are not plotted. The number of\n'
@@ -338,10 +340,8 @@ class Distortion_corrector():
         self.fit_model.set_param_hint('amplitude',
                                       value=1,
                                       vary=True)
-        zero_crossing_ind = argrelmin(np.abs(self.waveform - 0))[0][0]
-        freq_guess = 1 / (self.time_pts[zero_crossing_ind] * 4)
         self.fit_model.set_param_hint('frequency',
-                                      value=freq_guess,
+                                      value=1 / (end_time_fit-start_time_fit),
                                       vary=True)
         self.fit_model.set_param_hint('tau',
                                       value=end_time_fit - start_time_fit,
@@ -364,10 +364,10 @@ class Distortion_corrector():
         # Do the fit
         fit_res = self.fit_model.fit(
             data=self.waveform[self._start_idx:self._stop_idx],
-            t=self.time_pts[self._start_idx:self.stop_idx],
+            t=self.time_pts[self._start_idx:self._stop_idx],
             params=params)
         self.fitted_waveform = fit_res.eval(
-            t=self.time_pts[self._start_idx:self.stop_idx])
+            t=self.time_pts[self._start_idx:self._stop_idx])
 
         # Analytic form of the predistorted square pulse (input that creates a
         # square pulse at the output)
@@ -724,6 +724,8 @@ class Distortion_corrector():
                 self.fit_exp_model(fit_start, fit_stop)
             elif self._fit_model_loop == 'high-pass':
                 self.fit_high_pass(fit_start, fit_stop)
+            elif self._fit_model_loop == 'damped_osc':
+                self.fit_damped_osc(fit_start, fit_stop)
             elif self._fit_model_loop == 'spline':
                 self.fit_spline(fit_start, fit_stop)
 
@@ -934,14 +936,15 @@ class RT_distortion_corrector(Distortion_corrector):
         # self.data_dir = a.folder
 
         # Normalize waveform and find rising edge
-        waveform = self.raw_waveform / self.square_amp
         edge_idx = -1
-        for i in range(len(waveform) - 1):
-            if waveform[i+1] - waveform[i] > 0.01:
+        for i in range(len(self.raw_waveform) - 1):
+            if self.raw_waveform[i+1] - self.raw_waveform[i] > 0.01:
                 edge_idx = i
                 break
         if edge_idx < 0:
             raise ValueError('Failed to find rising edge.')
+        waveform = (self.raw_waveform -
+                    np.mean(self.raw_waveform[:edge_idx-1])) / self.square_amp
 
         self.waveform = waveform[edge_idx:]
         # Sampling rate hardcoded to 5 GHz
