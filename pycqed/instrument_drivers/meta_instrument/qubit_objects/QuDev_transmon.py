@@ -915,7 +915,7 @@ class QuDev_transmon(Qubit):
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
-    def set_default_readout_weights(self, channels = (0, 1)):
+    def set_default_readout_weights(self, channels=(0, 1)):
         """
         Sets the integration weights of the channels `RO_acq_weight_I` and
         `RO_acq_weight_Q` to the default sinusoidal values. The integration
@@ -942,7 +942,7 @@ class QuDev_transmon(Qubit):
             self.UHFQC.set('quex_wint_weights_{}_real'.format(c1), cosI)
             self.UHFQC.set('quex_rot_{}_real'.format(c1), 1)
             if c2 is not None:
-                self.UHFQC.set('quex_wint_weights_{}_real'.format(c2), cosI)
+                self.UHFQC.set('quex_wint_weights_{}_real'.format(c2), sinI)
                 self.UHFQC.set('quex_rot_{}_real'.format(c2), 1)
         else:
             self.UHFQC.set('quex_rot_{}_real'.format(c1), 0)
@@ -952,7 +952,7 @@ class QuDev_transmon(Qubit):
             self.UHFQC.set('quex_wint_weights_{}_imag'.format(c1), sinI)
             self.UHFQC.set('quex_rot_{}_imag'.format(c1), 1)
             if c2 is not None:
-                self.UHFQC.set('quex_wint_weights_{}_imag'.format(c2), sinI)
+                self.UHFQC.set('quex_wint_weights_{}_imag'.format(c2), cosI)
                 self.UHFQC.set('quex_rot_{}_imag'.format(c2), -1)
         else:
             self.UHFQC.set('quex_rot_{}_imag'.format(c1), 0)

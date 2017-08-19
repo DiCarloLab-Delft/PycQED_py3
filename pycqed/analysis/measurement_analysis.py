@@ -3,6 +3,7 @@ import logging
 import numpy as np
 from scipy import stats
 import h5py
+import matplotlib
 from matplotlib.ticker import FormatStrFormatter
 import matplotlib.lines as mlines
 from matplotlib import pyplot as plt
@@ -3583,8 +3584,8 @@ class SSRO_Analysis(MeasurementAnalysis):
             # n1, bins1 = np.histogram(shots_I_1_rot, bins=int(min_len/50),
             #                          normed=1)
 
-            pylab.plot(bins1[:-1]+0.5*(bins1[1]-bins1[0]), n1, 'ro')
-            pylab.plot(bins0[:-1]+0.5*(bins0[1]-bins0[0]), n0, 'bo')
+            edat, = pylab.plot(bins1[:-1]+0.5*(bins1[1]-bins1[0]), n1, 'ro')
+            gdat, = pylab.plot(bins0[:-1]+0.5*(bins0[1]-bins0[0]), n0, 'bo')
 
             # n, bins1, patches = np.hist(shots_I_1_rot, bins=int(min_len/50),
             #                               label = '1 I',histtype='step',
@@ -3622,13 +3623,22 @@ class SSRO_Analysis(MeasurementAnalysis):
             plt.xlabel('DAQ voltage integrated (V)')  # , fontsize=14)
             plt.ylabel('Fraction of counts')  # , fontsize=14)
 
-            plt.axvline(self.V_th_a, ls='--', linewidth=2, color='grey',
-                        label='SNR={0:.2f}\n$F_a$={1:.4f}\n$F_d$={2:.4f}\n$p_e$'
-                              '={3:.4f}'.format(SNR, self.F_a, F_d, frac1_0))
-            plt.axvline(self.V_th_d, ls='--', linewidth=2, color='black')
-            plt.legend()
-            leg2 = ax.legend(loc='best')
-            leg2.get_frame().set_alpha(0.5)
+            thaline = plt.axvline(self.V_th_a, ls='--', linewidth=2,
+                                  color='grey')
+            thdline = plt.axvline(self.V_th_d, ls='--', linewidth=2,
+                                  color='black')
+            nomarker = matplotlib.patches.Rectangle((0, 0), 0, 0, alpha=0.0)
+            lgd = plt.legend(
+                [gdat, edat, thaline, thdline, nomarker, nomarker, nomarker],
+                [r'$\left| g \right\rangle$ prepared',
+                 r'$\left| e \right\rangle$ prepared',
+                 '$F_a$ = {:.4f}'.format(self.F_a),
+                 '$F_d$ = {:.4f}'.format(F_d),
+                 'SNR = {:.2f}'.format(SNR),
+                 '$p_e$ = {:.4f}'.format(frac1_0),
+                 '$p_g$ = {:.4f}'.format(1-frac1_1)],
+                bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.,
+                framealpha=0.5)
             #plt.hist(SS_Q_data, bins=40,label = '0 Q')
             self.save_fig(fig, figname='Histograms', **kw)
             plt.show()
