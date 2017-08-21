@@ -481,8 +481,8 @@ def AllXY_seq(pulse_pars, RO_pars, double_points=False,
         return seq_name
 
 
-def OffOn_seq(pulse_pars, RO_pars,
-              verbose=False, pulse_comb='OffOn', upload=True, return_seq=False):
+def OffOn_seq(pulse_pars, RO_pars, verbose=False, pulse_comb='OffOn',
+              upload=True, return_seq=False, preselection=False):
     '''
     OffOn sequence for a single qubit using the tektronix.
     SSB_Drag pulse is used for driving, simple modualtion used for RO
@@ -494,6 +494,7 @@ def OffOn_seq(pulse_pars, RO_pars,
         Post-measurement delay:  should be sufficiently long to avoid
                              photon-induced gate errors when post-selecting.
         pulse_comb:          OffOn/OnOn/OffOff cobmination of pulses to play
+        preselection:        adds an extra readout pulse before other pulses.
     '''
     seq_name = 'OffOn_sequence'
     seq = sequence.Sequence(seq_name)
@@ -510,7 +511,11 @@ def OffOn_seq(pulse_pars, RO_pars,
         pulse_combinations = ['I', 'I']
 
     for i, pulse_comb in enumerate(pulse_combinations):
-        el = multi_pulse_elt(i, station, [pulses[pulse_comb], RO_pars])
+        if preselection:
+            pulse_list = [RO_pars, pulses[pulse_comb], RO_pars]
+        else:
+            pulse_list = [pulses[pulse_comb], RO_pars]
+        el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:
@@ -519,7 +524,6 @@ def OffOn_seq(pulse_pars, RO_pars,
         return seq, el_list
     else:
         return seq_name
-
 
 def Butterfly_seq(pulse_pars, RO_pars, initialize=False,
                   post_msmt_delay=2000e-9, upload=True, verbose=False):

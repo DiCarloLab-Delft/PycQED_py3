@@ -1122,7 +1122,7 @@ class QuDev_transmon(Qubit):
         return tuple(ret)
 
     def find_ssro_fidelity(self, nreps=1, MC=None, analyze=True, close_fig=True,
-                           no_fits=False, upload=True):
+                           no_fits=False, upload=True, preselection_pulse=True):
         """
         Conduct an off-on measurement on the qubit recording single-shot
         results and determine the single shot readout fidelity.
@@ -1147,6 +1147,8 @@ class QuDev_transmon(Qubit):
                        Default `True`.
             no_fits: Boolean flag to disable finding the discrimination
                      fidelity. Default `False`.
+            preselection_pulse: Whether to do an additional readout pulse
+                                before state preparation. Default `True`.
         Returns:
             If `no_fits` is `False` returns assigment fidelity, discrimination
             fidelity and SNR = 2 |mu00 - mu11| / (sigma00 + sigma11). Else
@@ -1162,7 +1164,11 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_function(awg_swf.OffOn(
             pulse_pars=self.get_drive_pars(),
             RO_pars=self.get_RO_pars(),
-            upload=upload))
+            upload=upload,
+            preselection=preselection_pulse))
+        spoints = np.arange(self.RO_acq_shots())
+        if preselection_pulse:
+            spoints //= 2
         MC.set_sweep_points(np.arange(self.RO_acq_shots()))
         MC.set_detector_function(self.int_log_det)
         prev_avg = MC.soft_avg()
@@ -1182,9 +1188,18 @@ class QuDev_transmon(Qubit):
         if analyze:
             rotate = self.RO_acq_weight_function_Q() is not None
             channels = self.int_log_det.value_names
+            if preselection_pulse:
+                nr_samples = 4
+                sample_0 = 2
+                sample_1 = 3
+            else:
+                nr_samples = 2
+                sample_0 = 0
+                sample_1 = 1
             ana = ma.SSRO_Analysis(auto=True, close_fig=close_fig,
                                    rotate=rotate, no_fits=no_fits,
-                                   channels=channels)
+                                   channels=channels, nr_samples=nr_samples,
+                                   sample_0=sample_0, sample_1=sample_1)
             if not no_fits:
                 return ana.F_a, ana.F_d, ana.SNR
             else:
