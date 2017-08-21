@@ -510,9 +510,16 @@ def OffOn_seq(pulse_pars, RO_pars, verbose=False, pulse_comb='OffOn',
     elif pulse_comb == 'OffOff':
         pulse_combinations = ['I', 'I']
 
+    spacer = {'pulse_type': 'SquarePulse',
+              'channel': RO_pars['acq_marker_channel'],
+              'amplitude': 0.0,
+              'length': max(0, 180e-9 - pulse_pars['pulse_delay'] -
+                            - pulse_pars['nr_sigma']*pulse_pars['sigma']),
+              'pulse_delay': 0}
+
     for i, pulse_comb in enumerate(pulse_combinations):
         if preselection:
-            pulse_list = [RO_pars, pulses[pulse_comb], RO_pars]
+            pulse_list = [RO_pars, spacer, pulses[pulse_comb], RO_pars]
         else:
             pulse_list = [pulses[pulse_comb], RO_pars]
         el = multi_pulse_elt(i, station, pulse_list)

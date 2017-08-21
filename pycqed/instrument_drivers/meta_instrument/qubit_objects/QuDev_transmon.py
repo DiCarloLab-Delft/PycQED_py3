@@ -1155,11 +1155,17 @@ class QuDev_transmon(Qubit):
             returns just assignment fidelity.
         """
 
-        self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC
 
         label = 'SSRO_fidelity'
+        prev_shots = self.RO_acq_shots()
+        if preselection_pulse:
+            self.RO_acq_shots(4*(self.RO_acq_shots()//4))
+        else:
+            self.RO_acq_shots(2*(self.RO_acq_shots()//2))
+
+        self.prepare_for_timedomain()
 
         MC.set_sweep_function(awg_swf.OffOn(
             pulse_pars=self.get_drive_pars(),
@@ -1184,13 +1190,14 @@ class QuDev_transmon(Qubit):
         MC.run(name=label+self.msmt_suffix, mode=mode)
 
         MC.soft_avg(prev_avg)
+        self.RO_acq_shots(prev_shots)
 
         if analyze:
             rotate = self.RO_acq_weight_function_Q() is not None
             channels = self.int_log_det.value_names
             if preselection_pulse:
                 nr_samples = 4
-                sample_0 = 2
+                sample_0 = 1
                 sample_1 = 3
             else:
                 nr_samples = 2
