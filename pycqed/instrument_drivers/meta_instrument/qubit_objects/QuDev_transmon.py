@@ -8,6 +8,7 @@ from pycqed.measurement import detector_functions as det
 from pycqed.measurement import composite_detector_functions as cdet
 from pycqed.measurement import mc_parameter_wrapper as pw
 from pycqed.measurement import awg_sweep_functions as awg_swf
+from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement.pulse_sequences import single_qubit_tek_seq_elts as sq
 from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
 from pycqed.analysis import measurement_analysis as ma
@@ -1120,7 +1121,7 @@ class QuDev_transmon(Qubit):
                 ret.append(weights_Q)
         return tuple(ret)
 
-    def find_ssro_fidelity(self, MC=None, analyze=True, close_fig=True,
+    def find_ssro_fidelity(self, nreps=1, MC=None, analyze=True, close_fig=True,
                            no_fits=False, upload=True):
         """
         Conduct an off-on measurement on the qubit recording single-shot
@@ -1134,6 +1135,9 @@ class QuDev_transmon(Qubit):
         prepared datasets.
 
         Args:
+            reps: Number of repetitions. If greater than 1, a 2D sweep will be
+                  made with the second sweep function a NoneSweep with number of
+                  sweep points equal to reps. Default 1.
             MC: MeasurementControl object to use for the measurement. Defaults
                 to `self.MC`.
             analyze: Boolean flag, whether to analyse the measurement results.
@@ -1153,14 +1157,27 @@ class QuDev_transmon(Qubit):
         if MC is None:
             MC = self.MC
 
+        label = 'SSRO_fidelity'
+
         MC.set_sweep_function(awg_swf.OffOn(
             pulse_pars=self.get_drive_pars(),
             RO_pars=self.get_RO_pars(),
             upload=upload))
         MC.set_sweep_points(np.arange(self.RO_acq_shots()))
         MC.set_detector_function(self.int_log_det)
+        prev_avg = MC.soft_avg()
+        MC.soft_avg(1)
 
-        MC.run(name='SSRO_fidelity'+self.msmt_suffix)
+        mode = '1D'
+        if nreps > 1:
+            label += '_nreps{}'.format(nreps)
+            MC.set_sweep_function_2D(swf.None_Sweep())
+            MC.set_sweep_points_2D(np.arange(nreps))
+            mode = '2D'
+
+        MC.run(name=label+self.msmt_suffix, mode=mode)
+
+        MC.soft_avg(prev_avg)
 
         if analyze:
             rotate = self.RO_acq_weight_function_Q() is not None

@@ -225,7 +225,7 @@ class AWG_multi_channel_amplitude(Soft_Sweep):
 class Hard_Sweep(Sweep_function):
 
     def __init__(self, **kw):
-        super(Hard_Sweep, self).__init__()
+        super().__init__()
         self.sweep_control = 'hard'
         self.parameter_name = 'None'
         self.unit = 'a.u.'
@@ -233,6 +233,8 @@ class Hard_Sweep(Sweep_function):
     def start_acquistion(self):
         pass
 
+    def set_parameter(self, value):
+        logging.warning('set_parameter called for hardware sweep.')
 
 class QASM_Sweep(Hard_Sweep):
 

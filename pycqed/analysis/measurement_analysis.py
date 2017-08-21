@@ -3331,8 +3331,8 @@ class SSRO_Analysis(MeasurementAnalysis):
 
         if plot:
             fig, ax = plt.subplots()
-            ax.plot(bins[0:-1], self.cumsum_1, label='cumsum_1', color='red')
-            ax.plot(bins[0:-1], self.cumsum_0, label='cumsum_0', color='blue')
+            ax.plot(bins[0:-1], self.cumsum_1, label='cumsum_1', color='blue')
+            ax.plot(bins[0:-1], self.cumsum_0, label='cumsum_0', color='red')
             ax.axvline(V_th_a, ls='--', label="V_th_a = %.3f" % V_th_a,
                        linewidth=2, color='grey')
             ax.text(.7, .6, '$Fa$ = %.4f' % F_a, transform=ax.transAxes,
@@ -3534,16 +3534,16 @@ class SSRO_Analysis(MeasurementAnalysis):
 
         if plot:
             # plotting s-curves
-            fig, ax = plt.subplots(figsize=(8, 4))
+            fig, ax = plt.subplots(figsize=(7, 4))
             ax.set_title('S-curves (not binned) and fits, determining fidelity '
                          'and threshold optimum, %s shots' % min_len)
             ax.set_xlabel('DAQ voltage integrated (V)')  # , fontsize=14)
             ax.set_ylabel('Fraction of counts')  # , fontsize=14)
             ax.set_ylim((-.01, 1.01))
             ax.plot(S_sorted_I_0, p_norm_I_0, label='0 I', linewidth=2,
-                    color='blue')
-            ax.plot(S_sorted_I_1, p_norm_I_1, label='1 I', linewidth=2,
                     color='red')
+            ax.plot(S_sorted_I_1, p_norm_I_1, label='1 I', linewidth=2,
+                    color='blue')
 
             # ax.plot(S_sorted_I_0, fit_res_0.best_fit,
             #         label='0 I single gaussian fit', ls='--', linewidth=3,
@@ -3553,10 +3553,10 @@ class SSRO_Analysis(MeasurementAnalysis):
 
             ax.plot(S_sorted_I_0, fit_res_double_0.best_fit,
                     label='0 I double gaussfit', ls='--', linewidth=3,
-                    color='lightblue')
+                    color='darkred')
             ax.plot(S_sorted_I_1, fit_res_double_1.best_fit,
                     label='1 I double gaussfit', ls='--', linewidth=3,
-                    color='darkred')
+                    color='lightblue')
             labelstring = 'V_th_a= %.3f V' % (self.V_th_a)
             labelstring_corrected = 'V_th_d= %.3f V' % (self.V_th_d)
 
@@ -3571,21 +3571,21 @@ class SSRO_Analysis(MeasurementAnalysis):
             plt.show()
 
             # plotting the histograms
-            fig, axes = plt.subplots(figsize=(8, 4))
-            n1, bins1, patches = pylab.hist(shots_I_1_rot, bins=int(min_len/50),
+            fig, axes = plt.subplots(figsize=(7, 4))
+            n1, bins1, patches = pylab.hist(shots_I_1_rot, bins=40,
                                             label='1 I', histtype='step',
-                                            color='red', normed=True)
-            n0, bins0, patches = pylab.hist(shots_I_0_rot, bins=int(min_len/50),
+                                            color='red', normed=False)
+            n0, bins0, patches = pylab.hist(shots_I_0_rot, bins=40,
                                             label='0 I', histtype='step',
-                                            color='blue', normed=True)
+                                            color='blue', normed=False)
             pylab.clf()
             # n0, bins0 = np.histogram(shots_I_0_rot, bins=int(min_len/50),
             #                          normed=1)
             # n1, bins1 = np.histogram(shots_I_1_rot, bins=int(min_len/50),
             #                          normed=1)
 
-            edat, = pylab.plot(bins1[:-1]+0.5*(bins1[1]-bins1[0]), n1, 'ro')
-            gdat, = pylab.plot(bins0[:-1]+0.5*(bins0[1]-bins0[0]), n0, 'bo')
+            edat, = pylab.plot(bins1[:-1]+0.5*(bins1[1]-bins1[0]), n1, 'bo')
+            gdat, = pylab.plot(bins0[:-1]+0.5*(bins0[1]-bins0[0]), n0, 'ro')
 
             # n, bins1, patches = np.hist(shots_I_1_rot, bins=int(min_len/50),
             #                               label = '1 I',histtype='step',
@@ -3596,36 +3596,39 @@ class SSRO_Analysis(MeasurementAnalysis):
 
             # add lines showing the fitted distribution
             # building up the histogram fits for off measurements
-            y0 = (1-frac1_0)*pylab.normpdf(bins0, mu0_0, sigma0_0) + \
-                frac1_0*pylab.normpdf(bins0, mu1_0, sigma1_0)
-            y1_0 = frac1_0*pylab.normpdf(bins0, mu1_0, sigma1_0)
-            y0_0 = (1-frac1_0)*pylab.normpdf(bins0, mu0_0, sigma0_0)
+
+            norm0 = (bins0[1]-bins0[0])*min_len
+            norm1 = (bins1[1]-bins1[0])*min_len
+
+            y0 = norm0*(1-frac1_0)*pylab.normpdf(bins0, mu0_0, sigma0_0) + \
+                 norm0*frac1_0*pylab.normpdf(bins0, mu1_0, sigma1_0)
+            y1_0 = norm0*frac1_0*pylab.normpdf(bins0, mu1_0, sigma1_0)
+            y0_0 = norm0*(1-frac1_0)*pylab.normpdf(bins0, mu0_0, sigma0_0)
 
             # building up the histogram fits for on measurements
-            y1 = (1-frac1_1)*pylab.normpdf(bins1, mu0_1, sigma0_1) + \
-                frac1_1*pylab.normpdf(bins1, mu1_1, sigma1_1)
-            y1_1 = frac1_1*pylab.normpdf(bins1, mu1_1, sigma1_1)
-            y0_1 = (1-frac1_1)*pylab.normpdf(bins1, mu0_1, sigma0_1)
+            y1 = norm1*(1-frac1_1)*pylab.normpdf(bins1, mu0_1, sigma0_1) + \
+                 norm1*frac1_1*pylab.normpdf(bins1, mu1_1, sigma1_1)
+            y1_1 = norm1*frac1_1*pylab.normpdf(bins1, mu1_1, sigma1_1)
+            y0_1 = norm1*(1-frac1_1)*pylab.normpdf(bins1, mu0_1, sigma0_1)
 
-            pylab.semilogy(bins0, y0, 'b', linewidth=1.5)
-            pylab.semilogy(bins0, y1_0, 'b--', linewidth=3.5)
-            pylab.semilogy(bins0, y0_0, 'b--', linewidth=3.5)
+            pylab.semilogy(bins0, y0, 'r', linewidth=1.5)
+            pylab.semilogy(bins0, y1_0, 'r--', linewidth=3.5)
+            pylab.semilogy(bins0, y0_0, 'r--', linewidth=3.5)
 
-            pylab.semilogy(bins1, y1, 'r', linewidth=1.5)
-            pylab.semilogy(bins1, y0_1, 'r--', linewidth=3.5)
-            pylab.semilogy(bins1, y1_1, 'r--', linewidth=3.5)
-            #(pylab.gca()).set_ylim(1e-6,1e-3)
+            pylab.semilogy(bins1, y1, 'b', linewidth=1.5)
+            pylab.semilogy(bins1, y0_1, 'b--', linewidth=3.5)
+            pylab.semilogy(bins1, y1_1, 'b--', linewidth=3.5)
             pdf_max = (max(max(y0), max(y1)))
             (pylab.gca()).set_ylim(pdf_max/1000, 2*pdf_max)
 
             plt.title('Histograms of {} shots, {}'.format(
                 min_len, self.timestamp_string))
-            plt.xlabel('DAQ voltage integrated (V)')  # , fontsize=14)
-            plt.ylabel('Fraction of counts')  # , fontsize=14)
+            plt.xlabel('DAQ voltage integrated (V)')
+            plt.ylabel('Number of counts')
 
-            thaline = plt.axvline(self.V_th_a, ls='--', linewidth=2,
+            thaline = plt.axvline(self.V_th_a, ls='--', linewidth=1,
                                   color='grey')
-            thdline = plt.axvline(self.V_th_d, ls='--', linewidth=2,
+            thdline = plt.axvline(self.V_th_d, ls='--', linewidth=1,
                                   color='black')
             nomarker = matplotlib.patches.Rectangle((0, 0), 0, 0, alpha=0.0)
             lgd = plt.legend(
@@ -3639,7 +3642,6 @@ class SSRO_Analysis(MeasurementAnalysis):
                  '$p_g$ = {:.4f}'.format(1-frac1_1)],
                 bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.,
                 framealpha=0.5)
-            #plt.hist(SS_Q_data, bins=40,label = '0 Q')
             self.save_fig(fig, figname='Histograms', **kw)
             plt.show()
 

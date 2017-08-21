@@ -172,6 +172,7 @@ class MeasurementControl(Instrument):
                     swf_sweep_points = sweep_points[:, i]
                     val = swf_sweep_points[0]
                     sweep_function.set_parameter(val)
+                    # bug? can not set parameter value for hard sweep.
                 self.detector_function.prepare(
                     sweep_points=sweep_points[:self.xlen, 0])
                 self.measure_hard()
