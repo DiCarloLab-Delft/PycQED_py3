@@ -82,10 +82,10 @@ def Qubit_dac_to_freq(dac_voltage, f_max, E_c,
                         'physically meaningful "V_per_phi0" instead.')
         V_per_phi0 = np.pi/dac_flux_coefficient
 
-    qubit_freq = (f_max + E_c)*(
-        asymmetry**2 + (1 - asymmetry**2)) *\
-        np.sqrt(abs(np.cos(np.pi / V_per_phi0 *
-                           (dac_voltage - dac_sweet_spot)))) - E_c
+    qubit_freq = (f_max + E_c) * (
+        asymmetry**2 + (1 - asymmetry**2) *
+        np.cos(np.pi / V_per_phi0 *
+               (dac_voltage - dac_sweet_spot))**2)**0.25 - E_c
     return qubit_freq
 
 
@@ -101,10 +101,11 @@ def Qubit_dac_to_detun(dac_voltage, f_max, E_c, dac_sweet_spot, V_per_phi0,
     dac_sweet_spot (V): voltage at which the sweet-spot is found
     asymmetry (dimensionless asymmetry param) = abs((EJ1-EJ2)/(EJ1+EJ2))
     '''
-    return (f_max + E_c)*(
-        1 - (asymmetry**2 + (1 - asymmetry**2)) *
-        np.sqrt(abs(np.cos(np.pi / V_per_phi0 *
-                           (dac_voltage - dac_sweet_spot)))))
+    cos_term = np.cos(np.pi / V_per_phi0 * (dac_voltage - dac_sweet_spot))
+    sin_term = np.sin(np.pi / V_per_phi0 * (dac_voltage - dac_sweet_spot))
+    return ((f_max + E_c)*(asymmetry**2 - 1) * np.pi / (2 * V_per_phi0) *
+            cos_term * sin_term * (asymmetry**2 + (1 - asymmetry**2) *
+                                   cos_term**2)**(-0.75))
 
 
 def Qubit_freq_to_dac(frequency, f_max, E_c,
@@ -126,8 +127,12 @@ def Qubit_freq_to_dac(frequency, f_max, E_c,
     if V_per_phi0 is None and dac_flux_coefficient is None:
         raise ValueError('Please specify "V_per_phi0".')
 
-    asymm_term = (asymmetry**2 + (1-asymmetry**2))
-    dac_term = np.arccos(((frequency+E_c)/((f_max+E_c) * asymm_term))**2)
+    # asymm_term = (asymmetry**2 + (1-asymmetry**2))
+    # dac_term = np.arccos(((frequency+E_c)/((f_max+E_c) * asymm_term))**2)
+
+    dac_term = np.arccos(np.sqrt(
+        (((frequency + E_c) / (f_max + E_c))**4 - asymmetry**2) /
+        (1 - asymmetry**2)))
 
     if dac_flux_coefficient is not None:
         logging.warning('"dac_flux_coefficient" deprecated. Please use the '
@@ -135,9 +140,9 @@ def Qubit_freq_to_dac(frequency, f_max, E_c,
         V_per_phi0 = np.pi/dac_flux_coefficient
 
     if branch == 'positive':
-        dac_voltage = (dac_term) * V_per_phi0 / np.pi + dac_sweet_spot
+        dac_voltage = dac_term * V_per_phi0 / np.pi + dac_sweet_spot
     elif branch == 'negative':
-        dac_voltage = -(dac_term) * V_per_phi0 / np.pi + dac_sweet_spot
+        dac_voltage = -dac_term * V_per_phi0 / np.pi + dac_sweet_spot
     else:
         raise ValueError('branch {} not recognized'.format(branch))
 
