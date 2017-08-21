@@ -101,11 +101,11 @@ def Qubit_dac_to_detun(dac_voltage, f_max, E_c, dac_sweet_spot, V_per_phi0,
     dac_sweet_spot (V): voltage at which the sweet-spot is found
     asymmetry (dimensionless asymmetry param) = abs((EJ1-EJ2)/(EJ1+EJ2))
     '''
-    cos_term = np.cos(np.pi / V_per_phi0 * (dac_voltage - dac_sweet_spot))
-    sin_term = np.sin(np.pi / V_per_phi0 * (dac_voltage - dac_sweet_spot))
-    return ((f_max + E_c)*(asymmetry**2 - 1) * np.pi / (2 * V_per_phi0) *
-            cos_term * sin_term * (asymmetry**2 + (1 - asymmetry**2) *
-                                   cos_term**2)**(-0.75))
+    return f_max - Qubit_dac_to_freq(dac_voltage,
+                                     f_max=f_max, E_c=E_c,
+                                     dac_sweet_spot=dac_sweet_spot,
+                                     V_per_phi0=V_per_phi0,
+                                     asymmetry=asymmetry)
 
 
 def Qubit_freq_to_dac(frequency, f_max, E_c,
@@ -155,14 +155,12 @@ def Qubit_dac_sensitivity(dac_voltage, f_max: float, E_c: float,
     '''
     Derivative of the qubit detuning vs dac at dac_voltage.
     '''
-    return (np.pi / (2 * V_per_phi0) *
-            np.tan(np.pi / V_per_phi0 * (dac_voltage - dac_sweet_spot)) *
-            (f_max + E_c - Qubit_dac_to_detun(dac_voltage=dac_voltage,
-                                              f_max=f_max,
-                                              E_c=E_c,
-                                              dac_sweet_spot=dac_sweet_spot,
-                                              V_per_phi0=V_per_phi0,
-                                              asymmetry=asymmetry)))
+    cos_term = np.cos(np.pi / V_per_phi0 * (dac_voltage - dac_sweet_spot))
+    sin_term = np.sin(np.pi / V_per_phi0 * (dac_voltage - dac_sweet_spot))
+    return ((f_max + E_c)*(asymmetry**2 - 1) * np.pi / (2 * V_per_phi0) *
+            cos_term * sin_term * (asymmetry**2 + (1 - asymmetry**2) *
+                                   cos_term**2)**(-0.75))
+
 
 def QubitFreqDac(dac_voltage, f_max, E_c,
                  dac_sweet_spot, dac_flux_coefficient, asymmetry=0):
