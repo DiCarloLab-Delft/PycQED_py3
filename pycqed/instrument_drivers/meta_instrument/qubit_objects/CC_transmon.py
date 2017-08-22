@@ -2264,8 +2264,7 @@ class CBox_v3_driven_transmon(Transmon):
             cfg['luts'][1]['square_{}'.format(i)] = i  # assign codeword
             cfg["operation dictionary"]["square_{}".format(i)] = {
                 "parameters": 1,
-                "duration": int(np.round(wait_between
-                                         * f_lutman.sampling_rate())),
+                "duration": int(np.round(wait_between * 1e9)),
                 "type": "flux",
                 "matrix": []
             }
@@ -2553,7 +2552,9 @@ class CBox_v3_driven_transmon(Transmon):
         # QASM file(s).
         raw_exp_list = pygsti.construction.make_lsgst_experiment_list(
             gs_target.gates.keys(), fiducials, fiducials, germs, max_lengths)
+        print('Length of GST experiment list: {}'.format(len(raw_exp_list)))
         exp_list = gstCC.get_experiments_from_list(raw_exp_list, gate_dict)
+        print('Length of translated experiment list: {}'.format(len(exp_list)))
         qasm_files, exp_per_file, exp_last_file = gstCC.generate_QASM(
             filename='GST_{}'.format(self.name),
             exp_list=exp_list,
