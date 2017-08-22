@@ -13,12 +13,42 @@ import numpy as np
 from pycqed.analysis.fitting_models import Qubit_freq_to_dac
 
 
-def gauss_pulse(amp, sigma_length, nr_sigma=4, sampling_rate=2e8,
-                axis='x', phase=0,
-                motzoi=0, delay=0):
+def gauss_pulse(amp: float, sigma_length: float, nr_sigma: int=4,
+                sampling_rate: float=2e8, axis: str='x', phase: float=0,
+                motzoi: float=0, delay: float=0,
+                subtract_offset: str='average'):
     '''
     All inputs are in s and Hz.
     phases are in degree.
+
+    Args:
+        amp (float):
+            Amplitude of the Gaussian envelope.
+        sigma_length (float):
+            Sigma of the Gaussian envelope.
+        nr_sigma (int):
+            After how many sigma the Gaussian is cut off.
+        sampling_rate (float):
+            Rate at which the pulse is sampled.
+        axis (str):
+            Rotation axis of the pulse. If this is 'y', a 90-degree phase is
+            added to the pulse, otherwise this argument is ignored.
+        phase (float):
+            Phase of the pulse.
+        motzoi (float):
+            DRAG-pulse parameter.
+        delay (float):
+            Delay of the pulse in s.
+        subtract_offset (str):
+            Instruction on how to subtract the offset in order to avoid jumps
+            in the waveform due to the cut-off.
+            'average': subtract the average of the first and last point.
+            'first': subtract the value of the waveform at the first sample.
+            'last': subtract the value of the waveform at the last sample.
+            'none', None: don't subtract any offset.
+
+    Returns:
+        pulse_I, pulse_Q: Two quadratures of the waveform.
     '''
     sigma = sigma_length  # old legacy naming, to be replaced
     length = sigma*nr_sigma
@@ -29,9 +59,23 @@ def gauss_pulse(amp, sigma_length, nr_sigma=4, sampling_rate=2e8,
 
     gauss_env = amp*np.exp(-(0.5 * ((t-mu)**2) / sigma**2))
     deriv_gauss_env = motzoi * -1 * (t-mu)/(sigma**1) * gauss_env
-    # substract offsets
-    gauss_env -= (gauss_env[0]+gauss_env[-1])/2.
-    deriv_gauss_env -= (deriv_gauss_env[0]+deriv_gauss_env[-1])/2.
+
+    # Subtract offsets
+    if subtract_offset.lower() == 'none' or subtract_offset is None:
+        # Do not subtract offset
+        pass
+    elif subtract_offset.lower() == 'average':
+        gauss_env -= (gauss_env[0]+gauss_env[-1])/2.
+        deriv_gauss_env -= (deriv_gauss_env[0]+deriv_gauss_env[-1])/2.
+    elif subtract_offset.lower() == 'first':
+        gauss_env -= gauss_env[0]
+        deriv_gauss_env -= deriv_gauss_env[0]
+    elif subtract_offset.lower() == 'last':
+        gauss_env -= gauss_env[-1]
+        deriv_gauss_env -= deriv_gauss_env[-1]
+    else:
+        raise ValueError('Unknown value "{}" for keyword argument '
+                         '"subtract_offset".'.format(subtract_offset))
 
     delay_samples = delay*sampling_rate
 
