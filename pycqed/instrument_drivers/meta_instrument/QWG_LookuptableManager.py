@@ -355,7 +355,8 @@ class QWG_FluxLookuptableManager(Instrument):
         gaussI, gaussQ = wf.gauss_pulse(self.S_amp(), self.S_gauss_sigma(),
                                         nr_sigma=4,
                                         sampling_rate=self.sampling_rate(),
-                                        axis='x', phase=0, motzoi=0, delay=0)
+                                        axis='x', phase=0, motzoi=0, delay=0,
+                                        subtract_offset='first')
 
         # New version of fast adiabatic pulse
         martinis_pulse_v2 = wf.martinis_flux_pulse_v2(

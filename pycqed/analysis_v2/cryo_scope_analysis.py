@@ -127,32 +127,22 @@ class DistortionFineAnalysis(ba.BaseDataAnalysis):
             self.data_dict['gauss_amp'],
             self.data_dict['gauss_sigma'],
             nr_sigma=4,
-            sampling_rate=data_dt,
-            axis='x', phase=0, motzoi=0, delay=0)[0]  # Returns I and Q
+            sampling_rate=1/data_dt,
+            axis='x', phase=0, motzoi=0, delay=0,
+            subtract_offset='first')[0]  # Returns I and Q
 
         if self.data_dict['wave_dict_unit'] == 'frac':
             # Convert to volts
             gauss_pulse *= self.data_dict['QWG_amp'] / 2
 
-        # Add zeros to front and back of data because the signal does not
-        # start at tau = 0.
         # t0: time from start to center of scoping pulse
         t0 = self.data_dict['gauss_sigma'] * 2
-        t0_samples = int(np.round(t0 / data_dt))
 
-        y = np.concatenate((
-            np.zeros(t0_samples),
-            self.data_dict['phase'],
-            np.zeros(t0_samples)))
-        N = np.concatenate((
-            np.zeros(t0_samples),
-            self.data_dict['noise power spectrum'],
-            np.zeros(t0_samples)))
-        self.y = y
+        # N = self.data_dict['noise power spectrum']
+        y = self.data_dict['phase']
 
         # Calculate convolution kernel
         # Kernel needs to be sampled at the same rate as data.
-
         h = 360 * fit_mods.Qubit_dac_sensitivity(
             dac_voltage=gauss_pulse,
             f_max=self.data_dict['f_max'],
@@ -160,29 +150,45 @@ class DistortionFineAnalysis(ba.BaseDataAnalysis):
             dac_sweet_spot=self.data_dict['V_offset'],
             V_per_phi0=self.data_dict['V_per_phi0'],
             asymmetry=self.data_dict['asymmetry'])
-        self.h = h
 
-        # Note that we assume now that the magnitude of the phase error is
-        # smaller than 180 degrees, i.e. we assume the phase has not wrapped
-        # due to distortions.
         h = np.hstack((h, np.zeros(len(y) - len(h))))
-        # Abs of fft, because we want the spectrum of a gauss window centered
-        # around zero. Note: f real, symmetric => fft(f) real, symmetric.
         freqs = fftfreq(len(h), d=data_dt)
-        H = np.abs(fft(h))
-        x = np.real(ifft(fft(y) / H)) * (freqs[1] - freqs[0])
+        # Multiply phase to get the spectrum for a Gaussian centered around 0.
+        H = fft(h) * np.exp(2j * np.pi * freqs * t0)
+        X = fft(y) / H
+
+        # Cut off spectrum outisde width of Gaussian, because sampling
+        # artefacts dominate there and we're not even really interested in
+        # these really high frequencies.
+        # TODO: This needs to be understood better. Cutting off does not work
+        # right now.
+        cut_off_freq_indices = np.where(
+            2 * np.pi * np.abs(freqs) > 4 / self.data_dict['gauss_sigma'])[0]
+
+        for ind in cut_off_freq_indices:
+            X[ind] = 0
+
+        x = np.real(ifft(X)) * (freqs[1] - freqs[0])
         # Wiener deconvolution
         # x = np.real(ifft(fft(y) * np.conj(H) /
         #                  (np.conj(H) * H + N / (np.conj(y) * y))))
 
+        self.cut_off_inds = cut_off_freq_indices
+        self.t0 = t0
+        self.y = y
+        self.h = h
+        self.H = H
+        self.X = X
+        self.freqs = freqs
+
         self.data_dict['tau'] += t0
-        self.data_dict['dV'] = x[t0_samples:-t0_samples]
+        self.data_dict['dV'] = x  # [t0_samples:-t0_samples]
 
     def prepare_plots(self):
         self.plot_dicts['raw data'] = {
             'plotfn': self.plot_line,
             'title': self.timestamps[0] + ' raw data',
-            'xvals': self.data_dict['tau'],
+            'xvals': self.data_dict['sweep_points'][1][::2],
             'xlabel': self.data_dict['xlabel'][1],
             'xunit': self.data_dict['xunit'][1][0],
             'yvals': [self.data_dict['cos'], self.data_dict['sin']],
@@ -194,7 +200,7 @@ class DistortionFineAnalysis(ba.BaseDataAnalysis):
         self.plot_dicts['raw_phase'] = {
             'plotfn': self.plot_line,
             'title': self.timestamps[0] + ' raw phase',
-            'xvals': self.data_dict['tau'],
+            'xvals': self.data_dict['sweep_points'][1][::2],
             'xlabel': self.data_dict['xlabel'][1],
             'xunit': self.data_dict['xunit'][1][0],
             'yvals': self.data_dict['raw phase'],
@@ -205,7 +211,7 @@ class DistortionFineAnalysis(ba.BaseDataAnalysis):
         self.plot_dicts['phase'] = {
             'plotfn': self.plot_line,
             'title': self.timestamps[0] + ' phase',
-            'xvals': self.data_dict['tau'],
+            'xvals': self.data_dict['sweep_points'][1][::2],
             'xlabel': self.data_dict['xlabel'][1],
             'xunit': self.data_dict['xunit'][1][0],
             'yvals': self.data_dict['phase'],
@@ -216,7 +222,7 @@ class DistortionFineAnalysis(ba.BaseDataAnalysis):
         self.plot_dicts['dV'] = {
             'plotfn': self.plot_line,
             'title': self.timestamps[0] + ' $\\delta V$',
-            'xvals': self.data_dict['tau'][:len(self.data_dict['dV'])],
+            'xvals': self.data_dict['tau'],
             'xlabel': self.data_dict['xlabel'][1],
             'xunit': self.data_dict['xunit'][1][0],
             'yvals': self.data_dict['dV'],
