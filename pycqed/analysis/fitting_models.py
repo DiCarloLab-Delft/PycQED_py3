@@ -157,7 +157,7 @@ def Qubit_dac_sensitivity(dac_voltage, f_max: float, E_c: float,
     '''
     cos_term = np.cos(np.pi / V_per_phi0 * (dac_voltage - dac_sweet_spot))
     sin_term = np.sin(np.pi / V_per_phi0 * (dac_voltage - dac_sweet_spot))
-    return ((f_max + E_c)*(asymmetry**2 - 1) * np.pi / (2 * V_per_phi0) *
+    return ((f_max + E_c)*(1 - asymmetry**2) * np.pi / (2 * V_per_phi0) *
             cos_term * sin_term * (asymmetry**2 + (1 - asymmetry**2) *
                                    cos_term**2)**(-0.75))
 
