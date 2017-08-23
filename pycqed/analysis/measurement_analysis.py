@@ -3004,7 +3004,6 @@ class Rabi_Analysis_old(TD_Analysis):
 
 
 class SSRO_Analysis(MeasurementAnalysis):
-
     '''
     Analysis class for Single Shot Readout.
     Scripts finds optimum rotation of IQ plane leaving all information in the
@@ -3045,6 +3044,7 @@ class SSRO_Analysis(MeasurementAnalysis):
                              channels=['I', 'Q'],
                              no_fits=False,
                              print_fit_results=False,
+                             preselection=False,
                              n_bins: int=120, **kw):
 
         self.add_analysis_datagroup_to_file()
@@ -3054,11 +3054,19 @@ class SSRO_Analysis(MeasurementAnalysis):
 
         if len(self.channels) == 1:
             shots_I_data = self.get_values(key=self.channels[0])
-            shots_I_data_0, shots_I_data_1 = a_tools.zigzag(shots_I_data,
-                                                            sample_0, sample_1,
-                                                            nr_samples)
+            if not preselection:
+                shots_I_data_0, shots_I_data_1 = a_tools.zigzag(
+                    shots_I_data, sample_0, sample_1, nr_samples)
+            else:
+                shots_I_presel_0, shots_I_presel_1 = a_tools.zigzag(
+                    shots_I_data, sample_0, sample_1, nr_samples)
+                shots_I_data_0, shots_I_data_1 = a_tools.zigzag(
+                    shots_I_data, sample_0+1, sample_1+1, nr_samples)
             shots_Q_data_0 = shots_I_data_0*0
             shots_Q_data_1 = shots_I_data_1*0
+            if preselection:
+                shots_Q_presel_0 = shots_I_presel_0*0
+                shots_Q_presel_1 = shots_I_presel_1*0
 
         else:
             # Try getting data by name first and by index otherwise
@@ -3069,10 +3077,20 @@ class SSRO_Analysis(MeasurementAnalysis):
                 shots_I_data = self.measured_values[0]
                 shots_Q_data = self.measured_values[1]
 
-            shots_I_data_0, shots_I_data_1 = a_tools.zigzag(
-                shots_I_data, sample_0, sample_1, nr_samples)
-            shots_Q_data_0, shots_Q_data_1 = a_tools.zigzag(
-                shots_Q_data, sample_0, sample_1, nr_samples)
+            if not preselection:
+                shots_I_data_0, shots_I_data_1 = a_tools.zigzag(
+                    shots_I_data, sample_0, sample_1, nr_samples)
+                shots_Q_data_0, shots_Q_data_1 = a_tools.zigzag(
+                    shots_Q_data, sample_0, sample_1, nr_samples)
+            else:
+                shots_I_presel_0, shots_I_presel_1 = a_tools.zigzag(
+                    shots_I_data, sample_0, sample_1, nr_samples)
+                shots_Q_presel_0, shots_Q_presel_1 = a_tools.zigzag(
+                    shots_Q_data, sample_0, sample_1, nr_samples)
+                shots_I_data_0, shots_I_data_1 = a_tools.zigzag(
+                    shots_I_data, sample_0+1, sample_1+1, nr_samples)
+                shots_Q_data_0, shots_Q_data_1 = a_tools.zigzag(
+                    shots_Q_data, sample_0+1, sample_1+1, nr_samples)
 
         # cutting off half data points (odd number of data points)
         min_len = np.min([np.size(shots_I_data_0), np.size(shots_I_data_1),
@@ -3081,6 +3099,11 @@ class SSRO_Analysis(MeasurementAnalysis):
         shots_I_data_1 = shots_I_data_1[0:min_len]
         shots_Q_data_0 = shots_Q_data_0[0:min_len]
         shots_Q_data_1 = shots_Q_data_1[0:min_len]
+        if preselection:
+            shots_I_presel_0 = shots_I_presel_0[0:min_len]
+            shots_I_presel_1 = shots_I_presel_1[0:min_len]
+            shots_Q_presel_0 = shots_Q_presel_0[0:min_len]
+            shots_Q_presel_1 = shots_Q_presel_1[0:min_len]
 
         # rotating IQ-plane to transfer all information to the I-axis
         if self.rotate:
@@ -3089,90 +3112,68 @@ class SSRO_Analysis(MeasurementAnalysis):
                                        shots_I_data_0, shots_Q_data_0, min_len,
                                        **kw)
             self.theta = theta
+            if preselection:
+                shots_presel_1_rot = np.cos(theta)*shots_I_presel_1 - \
+                                     np.sin(theta)*shots_Q_presel_1
+                shots_presel_0_rot = np.cos(theta)*shots_I_presel_0 - \
+                                     np.sin(theta)*shots_Q_presel_0
+
         else:
             self.theta = 0
             shots_I_data_1_rot = shots_I_data_1
             shots_I_data_0_rot = shots_I_data_0
+            if preselection:
+                shots_presel_1_rot = shots_I_presel_1
+                shots_presel_0_rot = shots_I_presel_0
 
-            cmap = kw.pop('cmap', 'viridis')
-            # plotting 2D histograms of mmts with pulse
-
-            I_min = min(min(shots_I_data_0), min(shots_I_data_1))
-            I_max = max(max(shots_I_data_0), max(shots_I_data_1))
-            Q_min = min(min(shots_Q_data_0), min(shots_Q_data_1))
-            Q_max = max(max(shots_Q_data_0), max(shots_Q_data_1))
-            edge = max(abs(I_min), abs(I_max), abs(Q_min), abs(Q_max))
-
-            H0, xedges0, yedges0 = np.histogram2d(shots_I_data_0, shots_Q_data_0,
-                                                  bins=n_bins,
-                                                  range=[[I_min, I_max],
-                                                         [Q_min, Q_max]],
-                                                  normed=True)
-            H1, xedges1, yedges1 = np.histogram2d(shots_I_data_1, shots_Q_data_1,
-                                                  bins=n_bins,
-                                                  range=[[I_min, I_max, ],
-                                                         [Q_min, Q_max, ]],
-                                                  normed=True)
-            fig, axarray = plt.subplots(nrows=1, ncols=2)
-            axarray[0].tick_params(axis='both', which='major',
-                                   labelsize=5, direction='out')
-            axarray[1].tick_params(axis='both', which='major',
-                                   labelsize=5, direction='out')
-
-            plt.subplots_adjust(hspace=20)
-
-            axarray[0].set_title('2D histogram, pi pulse')
-            im1 = axarray[0].imshow(np.transpose(H1), interpolation='nearest',
-                                    origin='low',
-                                    extent=[xedges1[0], xedges1[-1],
-                                            yedges1[0], yedges1[-1]],
-                                    cmap=cmap)
-            set_xlabel(axarray[0], self.value_names[0], self.value_units[0])
-            if len(self.channels) == 2:
-                set_ylabel(axarray[0], self.value_names[
-                           1], self.value_units[1])
-            else:
-                set_ylabel(axarray[0], 'Dummy axis')
-            axarray[0].set_xlim(-edge, edge)
-            axarray[0].set_ylim(-edge, edge)
-
-            # plotting 2D histograms of mmts with no pulse
-            axarray[1].set_title('2D histogram, no pi pulse')
-            im0 = axarray[1].imshow(np.transpose(H0), interpolation='nearest',
-                                    origin='low',
-                                    extent=[xedges0[0], xedges0[-1], yedges0[0],
-                                            yedges0[-1]], cmap=cmap)
-            set_xlabel(axarray[1], self.value_names[0], self.value_units[0])
-            if len(self.channels) == 2:
-                set_ylabel(axarray[1], self.value_names[
-                           1], self.value_units[1])
-            else:
-                set_ylabel(axarray[1], 'Dummy axis')
-            axarray[1].set_xlim(-edge, edge)
-            axarray[1].set_ylim(-edge, edge)
-
-            self.save_fig(fig, figname='SSRO_Density_Plots',
-                          close_fig=self.close_fig, **kw)
-
-            self.avg_0_I = np.mean(shots_I_data_0)
-            self.avg_1_I = np.mean(shots_I_data_1)
-            self.avg_0_Q = np.mean(shots_Q_data_0)
-            self.avg_1_Q = np.mean(shots_Q_data_1)
-        # making gaussfits of s-curves
+        if kw.get('plot', True):
+            self.plot_2D_histograms(shots_I_data_0, shots_Q_data_0,
+                                    shots_I_data_1, shots_Q_data_1)
 
         self.no_fits_analysis(shots_I_data_1_rot, shots_I_data_0_rot, min_len,
                               **kw)
         if self.no_fits is False:
+            # making gaussfits of s-curves
             self.s_curve_fits(shots_I_data_1_rot, shots_I_data_0_rot, min_len,
                               **kw)
+
+        if preselection:
+            try:
+                V_th = self.V_th_d
+            except:
+                V_th = self.V_th_a
+            s = np.sign(np.mean(shots_I_data_1_rot - shots_I_data_0_rot))
+            shots_gmask_0 = s*(V_th - shots_presel_0_rot) > 0
+            shots_gmask_1 = s*(V_th - shots_presel_1_rot) > 0
+
+            shots_masked_0 = shots_I_data_0_rot[shots_gmask_0]
+            shots_masked_1 = shots_I_data_1_rot[shots_gmask_1]
+
+            self.total_points = np.size(shots_I_data_0_rot) + \
+                                np.size(shots_I_data_1_rot)
+            self.removed_points = self.total_points - \
+                                  np.size(shots_masked_0) - \
+                                  np.size(shots_masked_1)
+
+            min_len_masked = np.min([np.size(shots_masked_0),
+                                     np.size(shots_masked_1)])
+            shots_masked_0 = shots_masked_0[:min_len_masked]
+            shots_masked_1 = shots_masked_1[:min_len_masked]
+
+
+
+            self.no_fits_analysis(shots_masked_1, shots_masked_0,
+                                  min_len_masked, masked=True, **kw)
+            if self.no_fits is False:
+                # making gaussfits of s-curves
+                self.s_curve_fits(shots_masked_1, shots_masked_0,
+                                  min_len_masked, masked=True, **kw)
+
         self.finish(**kw)
 
     def optimize_IQ_angle(self, shots_I_1, shots_Q_1, shots_I_0,
                           shots_Q_0, min_len, plot_2D_histograms=True,
                           **kw):
-        cmap = kw.pop('cmap', 'viridis')
-        plot = kw.get('plot', True)
-        # plotting 2D histograms of mmts with pulse
 
         n_bins = 120  # the bins we want to have around our data
         I_min = min(min(shots_I_0), min(shots_I_1))
@@ -3190,48 +3191,6 @@ class SSRO_Analysis(MeasurementAnalysis):
                                               range=[[I_min, I_max, ],
                                                      [Q_min, Q_max, ]],
                                               normed=True)
-
-        if plot and plot_2D_histograms:
-            fig, axarray = plt.subplots(nrows=1, ncols=2)
-            axarray[0].tick_params(axis='both', which='major',
-                                   labelsize=5, direction='out')
-            axarray[1].tick_params(axis='both', which='major',
-                                   labelsize=5, direction='out')
-
-            plt.subplots_adjust(hspace=20)
-
-            axarray[0].set_title('2D histogram, pi pulse')
-            im1 = axarray[0].imshow(np.transpose(H1), interpolation='nearest',
-                                    origin='low',
-                                    extent=[xedges1[0], xedges1[-1],
-                                            yedges1[0], yedges1[-1]], cmap=cmap)
-
-            set_xlabel(axarray[0], self.value_names[0], self.value_units[0])
-            if len(self.channels) == 2:
-                set_ylabel(axarray[0], self.value_names[
-                           1], self.value_units[1])
-            else:
-                set_ylabel(axarray[0], 'Dummy axis')
-            #axarray[0].set_xlim(-edge, edge)
-            #axarray[0].set_ylim(-edge, edge)
-
-            # plotting 2D histograms of mmts with no pulse
-            axarray[1].set_title('2D histogram, no pi pulse')
-            im0 = axarray[1].imshow(np.transpose(H0), interpolation='nearest',
-                                    origin='low',
-                                    extent=[xedges0[0], xedges0[-1], yedges0[0],
-                                            yedges0[-1]], cmap=cmap)
-
-            set_xlabel(axarray[1], self.value_names[0], self.value_units[0])
-            if len(self.channels) == 2:
-                set_ylabel(axarray[1], self.value_names[
-                           1], self.value_units[1])
-            else:
-                set_ylabel(axarray[1], 'Dummy axis')
-            #axarray[1].set_xlim(-edge, edge)
-            #axarray[1].set_ylim(-edge, edge)
-            self.save_fig(fig, figname='SSRO_Density_Plots',
-                          close_fig=self.close_fig, **kw)
 
         # this part performs 2D gaussian fits and calculates coordinates of the
         # maxima
@@ -3294,10 +3253,10 @@ class SSRO_Analysis(MeasurementAnalysis):
         shots_I_0_rot = np.cos(theta)*shots_I_0 - np.sin(theta)*shots_Q_0
         shots_Q_0_rot = np.sin(theta)*shots_I_0 + np.cos(theta)*shots_Q_0
 
-        return(theta, shots_I_1_rot, shots_I_0_rot)
+        return (theta, shots_I_1_rot, shots_I_0_rot)
 
     def no_fits_analysis(self, shots_I_1_rot, shots_I_0_rot, min_len,
-                         **kw):
+                         masked=False, **kw):
 
         plot = kw.get('plot', True)
 
@@ -3343,7 +3302,11 @@ class SSRO_Analysis(MeasurementAnalysis):
 
             #plt.hist(SS_Q_data, bins=40,label = '0 Q')
             plt.legend(loc=2)
-            self.save_fig(fig, figname='raw-cumulative-histograms', close_fig=self.close_fig, **kw)
+            if masked:
+                filename = 'raw-cumulative-histograms-masked'
+            else:
+                filename = 'raw-cumulative-histograms'
+            self.save_fig(fig, figname=filename, close_fig=self.close_fig, **kw)
             plt.show()
 
         # saving the results
@@ -3357,7 +3320,7 @@ class SSRO_Analysis(MeasurementAnalysis):
         self.F_a = F_a
         self.V_th_a = V_th_a
 
-    def s_curve_fits(self, shots_I_1_rot, shots_I_0_rot, min_len,
+    def s_curve_fits(self, shots_I_1_rot, shots_I_0_rot, min_len, masked=False,
                      **kw):
 
         plot = kw.get('plot', True)
@@ -3567,7 +3530,11 @@ class SSRO_Analysis(MeasurementAnalysis):
 
             leg = ax.legend(loc='best')
             leg.get_frame().set_alpha(0.5)
-            self.save_fig(fig, figname='S-curves', **kw)
+            if masked:
+                filename = 'S-curves-masked'
+            else:
+                filename = 'S-curves'
+            self.save_fig(fig, figname=filename, **kw)
             plt.show()
 
             # plotting the histograms
@@ -3631,18 +3598,29 @@ class SSRO_Analysis(MeasurementAnalysis):
             thdline = plt.axvline(self.V_th_d, ls='--', linewidth=1,
                                   color='black')
             nomarker = matplotlib.patches.Rectangle((0, 0), 0, 0, alpha=0.0)
-            lgd = plt.legend(
-                [gdat, edat, thaline, thdline, nomarker, nomarker, nomarker],
-                [r'$\left| g \right\rangle$ prepared',
-                 r'$\left| e \right\rangle$ prepared',
-                 '$F_a$ = {:.4f}'.format(self.F_a),
-                 '$F_d$ = {:.4f}'.format(F_d),
-                 'SNR = {:.2f}'.format(SNR),
-                 '$p_e$ = {:.4f}'.format(frac1_0),
-                 '$p_g$ = {:.4f}'.format(1-frac1_1)],
-                bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.,
-                framealpha=0.5)
-            self.save_fig(fig, figname='Histograms', **kw)
+
+            markers = [gdat, edat, thaline, thdline, nomarker, nomarker,
+                       nomarker]
+            labels = [r'$\left| g \right\rangle$ prepared',
+                      r'$\left| e \right\rangle$ prepared',
+                       '$F_a$ = {:.4f}'.format(self.F_a),
+                       '$F_d$ = {:.4f}'.format(F_d),
+                       'SNR = {:.2f}'.format(SNR),
+                       '$p(e|0)$ = {:.4f}'.format(frac1_0),
+                       '$p(g|\pi)$ = {:.4f}'.format(1-frac1_1)]
+            if masked:
+                p_rem = self.removed_points/self.total_points
+                markers += [nomarker]
+                labels += ['$p_{{rem}}$ = {:.4f}'.format(p_rem)]
+            lgd = plt.legend(markers, labels, bbox_to_anchor=(1.05, 1),
+                             loc=2, borderaxespad=0., framealpha=0.5)
+
+            if masked:
+                filename = 'Histograms-masked'
+            else:
+                filename = 'Histograms'
+
+            self.save_fig(fig, figname=filename, **kw)
             plt.show()
 
         self.save_fitted_parameters(fit_res_double_0,
@@ -3678,6 +3656,67 @@ class SSRO_Analysis(MeasurementAnalysis):
         self.F_d = F_d
         self.SNR = SNR
 
+    def plot_2D_histograms(self, shots_I_0, shots_Q_0, shots_I_1, shots_Q_1,
+                           **kw):
+        cmap = kw.pop('cmap', 'viridis')
+
+        n_bins = 120  # the bins we want to have around our data
+        I_min = min(min(shots_I_0), min(shots_I_1))
+        I_max = max(max(shots_I_0), max(shots_I_1))
+        Q_min = min(min(shots_Q_0), min(shots_Q_1))
+        Q_max = max(max(shots_Q_0), max(shots_Q_1))
+        edge = max(abs(I_min), abs(I_max), abs(Q_min), abs(Q_max))
+        H0, xedges0, yedges0 = np.histogram2d(shots_I_0, shots_Q_0,
+                                              bins=n_bins,
+                                              range=[[I_min, I_max],
+                                                     [Q_min, Q_max]],
+                                              normed=True)
+        H1, xedges1, yedges1 = np.histogram2d(shots_I_1, shots_Q_1,
+                                              bins=n_bins,
+                                              range=[[I_min, I_max, ],
+                                                     [Q_min, Q_max, ]],
+                                              normed=True)
+
+        fig, axarray = plt.subplots(nrows=1, ncols=2)
+        axarray[0].tick_params(axis='both', which='major',
+                               labelsize=5, direction='out')
+        axarray[1].tick_params(axis='both', which='major',
+                               labelsize=5, direction='out')
+
+        plt.subplots_adjust(hspace=20)
+
+        axarray[0].set_title('2D histogram, pi pulse')
+        im1 = axarray[0].imshow(np.transpose(H1), interpolation='nearest',
+                                origin='low',
+                                extent=[xedges1[0], xedges1[-1],
+                                        yedges1[0], yedges1[-1]], cmap=cmap)
+
+        set_xlabel(axarray[0], self.value_names[0], self.value_units[0])
+        if len(self.channels) == 2:
+            set_ylabel(axarray[0], self.value_names[
+                1], self.value_units[1])
+        else:
+            set_ylabel(axarray[0], 'Dummy axis')
+        #axarray[0].set_xlim(-edge, edge)
+        #axarray[0].set_ylim(-edge, edge)
+
+        # plotting 2D histograms of mmts with no pulse
+        axarray[1].set_title('2D histogram, no pi pulse')
+        im0 = axarray[1].imshow(np.transpose(H0), interpolation='nearest',
+                                origin='low',
+                                extent=[xedges0[0], xedges0[-1], yedges0[0],
+                                        yedges0[-1]], cmap=cmap)
+
+        set_xlabel(axarray[1], self.value_names[0], self.value_units[0])
+        if len(self.channels) == 2:
+            set_ylabel(axarray[1], self.value_names[
+                1], self.value_units[1])
+        else:
+            set_ylabel(axarray[1], 'Dummy axis')
+        #axarray[1].set_xlim(-edge, edge)
+        #axarray[1].set_ylim(-edge, edge)
+        self.save_fig(fig, figname='SSRO_Density_Plots',
+                      close_fig=self.close_fig, **kw)
 
 class SSRO_discrimination_analysis(MeasurementAnalysis):
 

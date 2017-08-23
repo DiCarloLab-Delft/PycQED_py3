@@ -1197,8 +1197,8 @@ class QuDev_transmon(Qubit):
             channels = self.int_log_det.value_names
             if preselection_pulse:
                 nr_samples = 4
-                sample_0 = 1
-                sample_1 = 3
+                sample_0 = 0
+                sample_1 = 2
             else:
                 nr_samples = 2
                 sample_0 = 0
@@ -1206,7 +1206,8 @@ class QuDev_transmon(Qubit):
             ana = ma.SSRO_Analysis(auto=True, close_fig=close_fig,
                                    rotate=rotate, no_fits=no_fits,
                                    channels=channels, nr_samples=nr_samples,
-                                   sample_0=sample_0, sample_1=sample_1)
+                                   sample_0=sample_0, sample_1=sample_1,
+                                   preselection=preselection_pulse)
             if not no_fits:
                 return ana.F_a, ana.F_d, ana.SNR
             else:
