@@ -24,6 +24,7 @@ from qcodes.instrument.parameter import ManualParameter
 from pycqed.measurement.waveform_control_CC import waveform as wf
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import measurement_analysis as ma2
+import pycqed.analysis.analysis_toolbox as a_tools
 
 from pycqed.analysis.tools.data_manipulation import rotation_matrix
 from pycqed.measurement.calibration_toolbox import (
@@ -1834,7 +1835,12 @@ class CBox_v3_driven_transmon(Transmon):
                     print('No 2D analysis implemented for the interleaved '
                           'case.')
                 else:
-                    return
+                    tStamp = a_tools.latest_data(return_timestamp=True)[0]
+                    tStamp = tStamp[:8] + '_' + tStamp[8:]
+                    return ma2.RamZAnalysisInterleaved(
+                        t_start=tStamp,
+                        f_demod=f_demod,
+                        demodulate=demodulate)
             else:
                 print('No analysis specified for the given cases "{}".'
                       .format(cases))
