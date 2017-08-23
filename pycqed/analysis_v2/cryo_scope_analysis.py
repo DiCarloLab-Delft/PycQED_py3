@@ -5,6 +5,210 @@ import numpy as np
 from numpy.fft import fft, ifft, fftfreq
 
 
+class RamZAnalysisInterleaved(ba.BaseAnalysis):
+    '''
+    Analysis for the Ram-Z measurement (interleaved case).
+    '''
+    def __init__(self, t_start: str=None, t_stop: str=None,
+                 data_file_path: str=None,
+                 options_dict: dict=None, extract_only: bool=False,
+                 do_fitting: bool=True, auto=True,
+                 f_demod: float=0, demodulate: bool=False):
+        if options_dict is None:
+            options_dict = dict()
+        options_dict['scan_label'] = 'Ram_Z'
+        options_dict['tight_fig'] = False
+        options_dict['apply_default_fig_settings'] = False
+
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         extract_only=extract_only, do_fitting=do_fitting)
+        self.single_timestamp = True
+
+        # Extract metadata to know where to extract the parameters from
+        self.params_dict = {
+            'qubit_name':
+                'Experimental Data.Experimental Metadata.qubit_name',
+            'QWG_channel':
+                'Experimental Data.Experimental Metadata.QWG_channel',
+            'flux_LutMan':
+                'Experimental Data.Experimental Metadata.flux_LutMan',
+        }
+        self.numeric_params = []
+        self.extract_data()
+
+        # Now actually extract the parameters and the data
+        self.params_dict = {
+            # Data
+            'xlabel': 'sweep_name',
+            'xunit': 'sweep_unit',
+            'measurementstring': 'measurementstring',
+            'sweep_points': 'sweep_points',
+            'value_names': 'value_names',
+            'value_units': 'value_units',
+            'measured_values': 'measured_values',
+
+            # Pulse parameters
+            'wave_dict_unit':
+                '{}.wave_dict_unit'.format(self.data_dict['flux_LutMan']),
+            'sampling_rate':
+                '{}.sampling_rate'.format(self.data_dict['flux_LutMan']),
+            'QWG_amp':
+                'QWG.ch{}_amp'.format(self.data_dict['QWG_channel']),
+            'F_amp':
+                '{}.F_amp'.format(self.data_dict['flux_LutMan']),
+
+            # Qubit parameters
+            'f_max': '{}.f_max'.format(self.data_dict['qubit_name']),
+            'E_c': '{}.E_c'.format(self.data_dict['qubit_name']),
+            'V_offset': '{}.V_offset'.format(self.data_dict['qubit_name']),
+            'V_per_phi0':
+                '{}.V_per_phi0'.format(self.data_dict['qubit_name']),
+            'asymmetry':
+                '{}.asymmetry'.format(self.data_dict['qubit_name']),
+        }
+        self.demodulate = demodulate
+        self.f_demod = f_demod
+
+        self.numeric_params = [
+            'sampling_rate',
+            'QWG_amp',
+            'F_amp',
+            'f_max',
+            'E_c',
+            'V_offset',
+            'V_per_phi0',
+            'asymmetry',
+        ]
+
+        if auto:
+            self.run_analysis()
+
+    def process_data(self):
+        I = -(self.data_dict['measured_values'][0, ::2] - 0.5) * 2
+        Q = -(self.data_dict['measured_values'][0, 1::2] - 0.5) * 2
+
+        if self.demodulate:
+            I, Q = self.demodulate(I, Q, self.f_demod,
+                                   self.data_dict['sweep_points'][::2])
+
+        raw_phase = np.arctan2(Q, I)
+        phase = np.unwrap(raw_phase)
+        df = np.gradient(phase) / (2 * np.pi)
+
+        if self.demodulate:
+            df += self.f_demod
+
+        if self.data_dict['wave_dict_unit'] == 'V':
+            flux_amp = self.data_dict['F_amp']
+        else:
+            flux_amp = self.data_dict['F_amp'] * self.data_dict['QWG_amp'] / 2
+
+        dV = fit_mods.Qubit_freq_to_dac(
+            frequency=self.data_dict['f_max']-df,
+            f_max=self.data_dict['f_max'],
+            E_c=self.data_dict['E_c'],
+            dac_sweet_spot=self.data_dict['V_offset'],
+            V_per_phi0=self.data_dict['V_per_phi0'],
+            asymmetry=self.data_dict['asymmetry']) / flux_amp
+
+        # Save results
+        self.data_dict['I'] = I
+        self.data_dict['Q'] = Q
+        self.data_dict['raw_phase'] = raw_phase
+        self.data_dict['phase'] = phase
+        self.data_dict['detuning'] = df
+        self.data_dict['waveform'] = dV
+
+    @classmethod
+    def demodulate(self, I, Q, f_demod, t_pts):
+        '''
+        Demodulate signal in I and Q, sampled at points t_pts, with frequency
+        f_demod.
+        '''
+        cosDemod = np.cos(2 * np.pi * f_demod * t_pts)
+        sinDemod = np.sin(2 * np.pi * f_demod * t_pts)
+        Iout = I * cosDemod + Q * sinDemod
+        Qout = Q * cosDemod - I * sinDemod
+
+        return Iout, Qout
+
+    def prepare_plots(self):
+        self.plot_dicts['raw_data'] = {
+            'plotfn': self.plot_line,
+            'title': self.timestamps[0] + ' raw data',
+            'xvals': self.data_dict['sweep_points'][::2],
+            'xlabel': self.data_dict['xlabel'],
+            'xunit': self.data_dict['xunit'][0],
+            'yvals': [self.data_dict['measured_values'][0, ::2],
+                      self.data_dict['measured_values'][0, 1::2]],
+            'multiple': True,
+            'setlabel': ['cos', 'sin'],
+            'do_legend': True,
+        }
+
+        self.plot_dicts['demodulated_data'] = {
+            'plotfn': self.plot_line,
+            'title': self.timestamps[0] + ' demodulated data',
+            'xvals': self.data_dict['sweep_points'][::2],
+            'xlabel': self.data_dict['xlabel'],
+            'xunit': self.data_dict['xunit'][0],
+            'yvals': [self.data_dict['I'],
+                      self.data_dict['Q']],
+            'multiple': True,
+            'setlabel': ['I', 'Q'],
+            'do_legend': True,
+        }
+
+        self.plot_dicts['raw_phase'] = {
+            'plotfn': self.plot_line,
+            'title': self.timestamps[0] + ' raw phase',
+            'xvals': self.data_dict['sweep_points'][::2],
+            'xlabel': self.data_dict['xlabel'],
+            'xunit': self.data_dict['xunit'][0],
+            'yvals': self.data_dict['raw_phase'],
+            'ylabel': 'phase',
+            'yunit': 'deg',
+        }
+
+        self.plot_dicts['phase'] = {
+            'plotfn': self.plot_line,
+            'title': self.timestamps[0] + ' phase',
+            'xvals': self.data_dict['sweep_points'][::2],
+            'xlabel': self.data_dict['xlabel'],
+            'xunit': self.data_dict['xunit'][0],
+            'yvals': self.data_dict['phase'],
+            'ylabel': 'phase',
+            'yunit': 'deg',
+        }
+
+        self.plot_dicts['detuning'] = {
+            'plotfn': self.plot_line,
+            'title': self.timestamps[0] + ' detuning',
+            'xvals': self.data_dict['sweep_points'][::2],
+            'xlabel': self.data_dict['xlabel'],
+            'xunit': self.data_dict['xunit'][0],
+            'yvals': self.data_dict['detuning'],
+            'ylabel': '$\\Delta f$',
+            'yunit': 'Hz',
+        }
+
+        self.plot_dicts['waveform'] = {
+            'plotfn': self.plot_line,
+            'title': self.timestamps[0] + ' waveform',
+            'xvals': self.data_dict['sweep_points'][::2],
+            'xlabel': self.data_dict['xlabel'],
+            'xunit': self.data_dict['xunit'][0],
+            'yvals': self.data_dict['waveform'],
+            'ylabel': 'amplitude',
+            'yunit': 'V',
+        }
+
+    def run_fitting(self):
+        pass
+
+
 class DistortionFineAnalysis(ba.BaseDataAnalysis):
     '''
     Analysis for the enhanced cryogenic oscilloscpe.
@@ -185,7 +389,7 @@ class DistortionFineAnalysis(ba.BaseDataAnalysis):
         self.data_dict['dV'] = x  # [t0_samples:-t0_samples]
 
     def prepare_plots(self):
-        self.plot_dicts['raw data'] = {
+        self.plot_dicts['raw_data'] = {
             'plotfn': self.plot_line,
             'title': self.timestamps[0] + ' raw data',
             'xvals': self.data_dict['sweep_points'][1][::2],

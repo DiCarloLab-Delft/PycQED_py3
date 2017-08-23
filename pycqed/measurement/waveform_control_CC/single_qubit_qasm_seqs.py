@@ -449,7 +449,7 @@ def MotzoiXY(qubit_name, motzois, cal_points=True):
 
 
 def Ram_Z(qubit_name, no_of_points, cal_points=True,
-          rec_Y90=False):
+          case='interleaved'):
     '''
     Creates QASM sequence for an entire Ram-Z experiment, including
     calibration points.
@@ -458,36 +458,48 @@ def Ram_Z(qubit_name, no_of_points, cal_points=True,
         mX90 -- flux_pulse -- X90 -- RO
 
     Args:
-        qubit_name      (str): name of the targeted qubit
-        no_of_points    (int): number of points in the hard sweep. This is
+        qubit_name (str):
+            Name of the targeted qubit
+        no_of_points (int):
+            Number of points in the hard sweep. This is
                                limited by the QWG waveform memory and number of
                                codeword channels used.
-        rec_Y90         (bool): Use Y90 instead of X90 as second mw pulse.
+        case (str):
+            'sin', 'cos', or 'interleaved.
+            'cos': use X90 as the last mw pulse.
+            'sin': use Y90 as the last mw pulse.
+            'interleaved': use both cases, first 'cos', then 'sin'.
+
     '''
     filename = join(base_qasm_path, 'Ram_Z.qasm')
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
 
-    if rec_Y90:
-        recPulse = 'Y90'
+    if case == 'sin':
+        recPulses = ['Y90']
+    elif case == 'cos':
+        recPulses = ['X90']
+    elif case == 'interleaved':
+        recPulses = ['X90', 'Y90']
     else:
-        recPulse = 'X90'
+        raise ValueError('Unknown case "{}".'.format(case))
 
     # Write  measurement sequence no_of_points times
     for i in range(no_of_points):
-        qasm_file.writelines('\ninit_all\n')
+        for recPulse in recPulses:
+            qasm_file.writelines('\ninit_all\n')
 
-        if cal_points and (i == no_of_points - 4 or i == no_of_points - 3):
-            # Calibration point for |0>
-            pass
-        elif cal_points and (i == no_of_points - 2 or i == no_of_points - 1):
-            # Calibration point for |1>
-            qasm_file.writelines('X180 {} \n'.format(qubit_name))
-        else:
-            qasm_file.writelines('mX90 {}\n'.format(qubit_name))
-            qasm_file.writelines('square_{} {}\n'.format(i, qubit_name))
-            qasm_file.writelines('{} {}\n'.format(recPulse, qubit_name))
-        qasm_file.writelines('RO {}  \n'.format(qubit_name))
+            if cal_points and (i == no_of_points - 4 or i == no_of_points - 3):
+                # Calibration point for |0>
+                pass
+            elif cal_points and (i == no_of_points - 2 or i == no_of_points - 1):
+                # Calibration point for |1>
+                qasm_file.writelines('X180 {} \n'.format(qubit_name))
+            else:
+                qasm_file.writelines('mX90 {}\n'.format(qubit_name))
+                qasm_file.writelines('square_{} {}\n'.format(i, qubit_name))
+                qasm_file.writelines('{} {}\n'.format(recPulse, qubit_name))
+            qasm_file.writelines('RO {}  \n'.format(qubit_name))
 
     qasm_file.close()
     return qasm_file
