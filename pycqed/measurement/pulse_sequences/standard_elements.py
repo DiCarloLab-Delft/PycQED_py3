@@ -69,17 +69,14 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
         name='{}-pulse-elt_{}'.format(len(pulse_list), i),
         pulsar=station.pulsar,
         readout_fixed_point=sequencer_config['RO_fixed_point'])
-    refpulse0 = None
-    for cname in station.pulsar.channels:  # Exists to ensure there are no empty channels
-        el.add(pulse.SquarePulse(name='refpulse_0', channel=cname,
-                                 amplitude=0, length=1e-9))
-
-    # exists to ensure that channel is not high when waiting for trigger
-    # and to allow negavtive pulse delay of elements up to 300 ns
-    # last_pulse = el.add(
-    #     pulse.SquarePulse(name='refpulse_0', channel='ch1', amplitude=0,
-    #                       length=1e-9,), start=300e-9)
-    last_pulse = refpulse0
+    last_pulse = None
+    # Make sure that there are no empty channels and we can have a negative
+    # pulse delay of up to 400 ns
+    for cname in station.pulsar.channels:
+        last_pulse = el.add(pulse.SquarePulse(name='refpulse', channel=cname,
+                                              amplitude=0, length=400e-9),
+                            refpulse=last_pulse,
+                            refpoint='start')
 
     ##############################
     # Add all pulses one by one  #

@@ -227,6 +227,9 @@ class QuDev_transmon(Qubit):
 
         self.update_detector_functions()
 
+    def get_idn(self):
+        return {'driver': str(self.__class__), 'name': self.name}
+
     def update_detector_functions(self):
         if self.RO_acq_weight_function_Q() is None:
             channels = [self.RO_acq_weight_function_I()]
