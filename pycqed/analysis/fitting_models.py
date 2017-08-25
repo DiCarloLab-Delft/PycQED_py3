@@ -317,6 +317,12 @@ def gaussian_2D(x, y, amplitude=1,
     return val
 
 
+def DoubleExpDecayFunc(t, tau1, tau2, amp1, amp2, offset, n):
+    return (offset +
+            amp1 * np.exp(-(t / tau1)**n) +
+            amp2 * np.exp(-(t / tau2)**n))
+
+
 def TripleExpDecayFunc(t, tau1, tau2, tau3, amp1, amp2, amp3, offset, n):
     return (offset +
             amp1*np.exp(-(t/tau1)**n) +
