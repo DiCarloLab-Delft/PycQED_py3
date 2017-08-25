@@ -42,11 +42,11 @@ def show_element_dclab(element, delay=True, channels='all', ax=None):
     if add_extra_labs:  # only set it once otherwise we end up with 20 labels
         axs2.set_ylabel('Marker output (V)')
 
-    hi = element._channels['ch1']['high']
-    lo = element._channels['ch1']['low']
+    hi = element.pulsar.channels['ch1']['high']
+    lo = element.pulsar.channels['ch1']['low']
     ax.set_ylim(lo-0.1*(hi-lo), hi+0.1*(hi-lo))
-    hi = element._channels['ch1_marker1']['high']
-    lo = element._channels['ch1_marker1']['low']
+    hi = element.pulsar.channels['ch1_marker1']['high']
+    lo = element.pulsar.channels['ch1_marker1']['low']
     axs2.set_ylim(lo-0.1*(hi-lo), hi+0.1*(hi-lo))
 
     ax.set_xlim(t_vals.min()*1e9, t_vals.max()*1e9)
@@ -134,8 +134,8 @@ def show_element(element, delay=True, channels='all'):
     for wf in wfs:
         if channels == 'all' or wf in channels:
             i += 1
-            hi = element._channels[wf]['high']
-            lo = element._channels[wf]['low']
+            hi = element.pulsar.channels[wf]['high']
+            lo = element.pulsar.channels[wf]['low']
             # some prettifying
             ax = axs[i-1]
             ax.set_axis_bgcolor('gray')

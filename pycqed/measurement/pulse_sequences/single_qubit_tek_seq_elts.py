@@ -53,7 +53,6 @@ def Pulsed_spec_seq(spec_pars, RO_pars, upload=True, return_seq=False):
 
     seq_name = 'Pulsed_spec'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
 
     pulse_dict = {'spec_pulse': spec_pars, 'RO': RO_pars}
@@ -91,7 +90,6 @@ def photon_number_splitting_seq(spec_pars, RO_pars, disp_pars, upload=True, retu
 
     seq_name = 'photon_number_spliting'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
 
     pulse_dict = {'disp': disp_pars, 'spec_pulse': spec_pars, 'RO': RO_pars}
@@ -122,7 +120,6 @@ def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6, no_cal_points
     '''
     seq_name = 'Rabi_sequence'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
 
@@ -170,7 +167,6 @@ def Flipping_seq(pulse_pars, RO_pars, n=1, post_msmt_delay=10e-9,
     '''
     seq_name = 'Flipping_sequence'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
     RO_pulse_delay = RO_pars['pulse_delay']
@@ -210,7 +206,6 @@ def Rabi_amp90_seq(scales, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
     '''
     seq_name = 'Rabi_amp90_sequence'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
     for i, scale in enumerate(scales):  # seq has to have at least 2 elts
@@ -248,7 +243,6 @@ def T1_seq(times,
                         'The units should be seconds.')
     seq_name = 'T1_sequence'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     RO_pulse_delay = RO_pars['pulse_delay']
     RO_pars = deepcopy(RO_pars)  # Prevents overwriting of the dict
@@ -297,7 +291,6 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
 
     seq_name = 'Ramsey_sequence'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     # First extract values from input, later overwrite when generating
     # waveforms
@@ -404,7 +397,6 @@ def Echo_seq(times, pulse_pars, RO_pars,
     '''
     seq_name = 'Echo_sequence'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
 
     pulses = get_pulse_dict_from_pars(pulse_pars)
@@ -448,7 +440,6 @@ def AllXY_seq(pulse_pars, RO_pars, double_points=False,
     '''
     seq_name = 'AllXY_seq'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     # Create a dict with the parameters for all the pulses
     pulses = get_pulse_dict_from_pars(pulse_pars)
@@ -498,7 +489,6 @@ def OffOn_seq(pulse_pars, RO_pars, verbose=False, pulse_comb='OffOn',
     '''
     seq_name = 'OffOn_sequence'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     # Create a dict with the parameters for all the pulses
     pulses = get_pulse_dict_from_pars(pulse_pars)
@@ -546,7 +536,6 @@ def Butterfly_seq(pulse_pars, RO_pars, initialize=False,
     '''
     seq_name = 'Butterfly_seq'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     # Create a dict with the parameters for all the pulses
     pulses = get_pulse_dict_from_pars(pulse_pars)
@@ -631,7 +620,6 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
     if seq_name is None:
         seq_name = 'RandomizedBenchmarking_sequence'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
     net_cliffords = [0, 3]  # Exists purely for the double curves mode
@@ -695,7 +683,6 @@ def Freq_XY(freqs, pulse_pars, RO_pars,
     '''
     seq_name = 'MotzoiXY'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     pulse_combinations = [['X180', 'Y90'], ['Y180', 'X90']]
     pulses = get_pulse_dict_from_pars(pulse_pars)
@@ -744,7 +731,6 @@ def Motzoi_XY(motzois, pulse_pars, RO_pars,
     '''
     seq_name = 'MotzoiXY'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     pulse_combinations = [['X180', 'Y90'], ['Y180', 'X90']]
     pulses = get_pulse_dict_from_pars(pulse_pars)
@@ -844,7 +830,6 @@ def Rising_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
     '''
     seq_name = 'Rising_sequence'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     pulse_pars = {'pulse_type': 'RisingPulse'}
     pulse_list = [pulse_pars]

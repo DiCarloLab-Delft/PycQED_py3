@@ -174,7 +174,6 @@ def two_qubit_ssro_fidelity(label, fig_format='png',
                                  label='input state {}'.format(state),
                                  histtype='step',
                                  color='red', normed=True, visible=False)
-    # pylab.clf()
     fig, axes = plt.subplots(figsize=(8, 5))
     colors = ['blue', 'red', 'grey', 'magenta']
     markers = ['o', 'o', 'o', 'v']
@@ -189,8 +188,6 @@ def two_qubit_ssro_fidelity(label, fig_format='png',
 
     y0 = (1-frac1_0)*pylab.normpdf(bins0, mu0_0, sigma0_0) + \
         frac1_0*pylab.normpdf(bins0, mu1_0, sigma1_0)
-    # y1_0 = frac1_0*pylab.normpdf(bins0, mu1_0, sigma1_0)
-    # y0_0 = (1-frac1_0)*pylab.normpdf(bins0, mu0_0, sigma0_0)
 
     # building up the histogram fits for on measurements
     y1 = (1-frac1_1)*pylab.normpdf(bins1, mu0_1, sigma0_1) + \

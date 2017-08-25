@@ -13,12 +13,13 @@ import time
 
 
 class HeterodyneInstrument(Instrument):
+
     """
     This is a virtual instrument for a homodyne source
 
     Instrument is CBox, UHFQC, ATS and DDM compatible
-    """
 
+    """
     shared_kwargs = ['RF', 'LO', 'AWG']
 
     def __init__(self, name, RF, LO, AWG=None, acquisition_instr=None,
@@ -262,7 +263,7 @@ class HeterodyneInstrument(Instrument):
             self.prepare()
 
         dataset = self._acquisition_instr.acquisition_poll(
-            samples=1, acquisition_time=0.001)
+            samples=1, acquisition_time=0.001, timeout=10)
         dat = (self.scale_factor_UHFQC*dataset[0][0] +
                self.scale_factor_UHFQC*1j*dataset[1][0])
         return dat
@@ -542,6 +543,10 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         self.CBox.nr_samples(1)  # because using integrated avg
 
     def prepare_UHFQC(self):
+        """
+        uses the UHFQC to generate the modulating signal and readout
+        """
+        # only uploads a seq to AWG if something changed
         if (self._awg_seq_filename not in self.AWG.setup_filename() or
                 self._awg_seq_parameters_changed) and self.auto_seq_loading():
             self._awg_seq_filename = \
@@ -550,40 +555,33 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
                     acq_marker_channels=self.acq_marker_channels())
             self._awg_seq_parameters_changed = False
 
-        # Upload the correct integration weigths
+        # reupload the UHFQC pulse generation only if something changed
+        if self._UHFQC_awg_parameters_changed and self.auto_seq_loading():
+            self._acquisition_instr.awg_sequence_acquisition_and_pulse_SSB(
+                self.f_RO_mod.get(), self.mod_amp(), RO_pulse_length=800e-9,
+                acquisition_delay=self.acquisition_delay())
+            self._UHFQC_awg_parameters_changed = False
+
+        # prepare weights and rotation
         if self.single_sideband_demod():
             self._acquisition_instr.prepare_SSB_weight_and_rotation(
                 IF=self.f_RO_mod(), weight_function_I=0, weight_function_Q=1)
         else:
             self._acquisition_instr.prepare_DSB_weight_and_rotation(
                 IF=self.f_RO_mod(), weight_function_I=0, weight_function_Q=1)
-
-        if self._UHFQC_awg_parameters_changed and self.auto_seq_loading():
-            self._acquisition_instr.awg_sequence_acquisition_and_pulse_SSB(
-                self.f_RO_mod.get(), self.mod_amp(),
-                RO_pulse_length=self.RO_length(),
-                acquisition_delay=self.acquisition_delay())
-            self._UHFQC_awg_parameters_changed = False
-
         # this sets the result to integration and rotation outcome
         self._acquisition_instr.quex_rl_source(2)
-        # only one sample to average over
         self._acquisition_instr.quex_rl_length(1)
         self._acquisition_instr.quex_rl_avgcnt(
-            int(np.log2(self.nr_averages())))
-        self._acquisition_instr.quex_wint_length(
-            int(self.RO_length()*1.8e9))
-        # Configure the result logger to not do any averaging
-        # The AWG program uses userregs/0 to define the number o
+             int(np.log2(self.nr_averages())))
+        self._acquisition_instr.quex_wint_length(int(self.RO_length()*1.8e9))
+        # The AWG program uses userregs/0 to define the number of
         # iterations in the loop
-        self._acquisition_instr.awgs_0_userregs_0(
-            int(self.nr_averages()))
-        self._acquisition_instr.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg
+        self._acquisition_instr.awgs_0_userregs_0(int(self.nr_averages()))
+        self._acquisition_instr.awgs_0_userregs_1(0) # 0 for rl, 1 for iavg
         self._acquisition_instr.awgs_0_userregs_2(
             int(self.acquisition_delay()*1.8e9/8))
-        self._acquisition_instr.acquisition_initialize([0, 1], 'rl')
-        self.scale_factor_UHFQC = 1/(1.8e9*self.RO_length() *
-                                     int(self.nr_averages()))
+        self._acquisition_instr.awgs_0_single(1)
 
     def probe_CBox(self):
         if self._awg_seq_parameters_changed:

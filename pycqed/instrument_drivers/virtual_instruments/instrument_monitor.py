@@ -46,7 +46,6 @@ class InstrumentMonitor(Instrument):
             snapshot = self.station.snapshot()
             self.tree.setData(snapshot['instruments'])
 
-
     def _init_qt(self):
         # starting the process for the pyqtgraph plotting
         # You do not want a new process to be created every time you start a
@@ -56,7 +55,6 @@ class InstrumentMonitor(Instrument):
         self.__class__.rpg = self.proc._import('pyqtgraph')
         ins_mon_mod = 'pycqed.instrument_drivers.virtual_instruments.ins_mon.qc_snapshot_widget'
         self.__class__.rpg = self.proc._import(ins_mon_mod)
-
 
     def create_tree(self, figsize=(1000, 600)):
 

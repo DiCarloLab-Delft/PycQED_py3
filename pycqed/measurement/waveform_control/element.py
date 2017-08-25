@@ -4,9 +4,9 @@
 # modified by: Adriaan Rol
 
 import numpy as np
-from copy import deepcopy
 import pprint
-from . import pulsar as ps
+from copy import deepcopy
+from pycqed.measurement.waveform_control import pulsar as ps
 import logging
 
 
@@ -23,6 +23,7 @@ class Element:
 
         # should granularity be device/channel specific
         self.granularity = kw.pop('granularity', 4)
+        self.min_samples = kw.pop('min_samples', 960)
         self.ignore_offset_correction = kw.pop('ignore_offset_correction',
                                                False)
 
@@ -101,6 +102,8 @@ class Element:
         if len(ends) == 0:
             return 0
         samples = max(ends)+1
+        if samples < self.min_samples:
+            samples = self.min_samples
         while samples % self.granularity != 0:
             samples += 1
         return samples
@@ -279,8 +282,6 @@ class Element:
 
     # computing the numerical waveform
     def ideal_waveforms(self):
-
-
         wfs = {}
         tvals = {}
 
@@ -298,6 +299,11 @@ class Element:
                 else:
                     idx0 = self.pulse_start_sample(p, c)
                     idx1 = self.pulse_end_sample(p, c) + 1
+                    if idx0 < 0 or idx1 < 0:
+                        raise Exception(
+                            'Pulse {} on channel {} in element {} starts at a '
+                            'negative time. Please increase the RO_fixpoint.'
+                                .format(p, c, self.name))
                     chan_tvals[c] = np.round(tvals[c].copy()[idx0:idx1] +
                                              self.channel_delay(c) +
                                              self.time_offset,
@@ -330,10 +336,10 @@ class Element:
                 continue
             # truncate all values that are out of bounds
             if self.pulsar.channels[wf]['type'] == 'analog':
-                if max(wfs[wf]) > hi:
+                if np.max(wfs[wf]) > hi:
                     logging.warning('Clipping waveform {} > {}'.format(
                                     max(wfs[wf]), hi))
-                if min(wfs[wf]) < lo:
+                if np.min(wfs[wf]) < lo:
                     logging.warning('Clipping waveform {} < {}'.format(
                                     min(wfs[wf]), lo))
                 wfs[wf][wfs[wf] > hi] = hi
