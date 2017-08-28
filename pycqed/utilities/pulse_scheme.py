@@ -10,6 +10,7 @@ def new_pulse_fig(figsize):
     fig, ax = plt.subplots(1, 1, figsize=figsize, frameon=False)
     ax.axis('off')
     fig.subplots_adjust(bottom=0, top=1, left=0, right=1)
+    ax.axhline(0, color='0.75')
 
     return fig, ax
 
@@ -24,7 +25,6 @@ def mwPulse(ax, pos, width=1.5, label=None, phase=0, labelHeight=1.3,
     envNeg = -np.exp(-(x - (pos + width / 2))**2 / (width / 4)**2)
     mod = envPos * np.sin(2 * np.pi * 3 / width * x + phase)
 
-    ax.plot(x, [0] * len(x), color='0.75')
     ax.plot(x, envPos, '--', color=color)
     ax.plot(x, envNeg, '--', color=color)
     ax.plot(x, mod, '-', color=color)
@@ -46,7 +46,6 @@ def fluxPulse(ax, pos, width=2.5, s=.1, amp=1.5, color='C1'):
     y = amp / ((np.exp(-(x - (pos + 5.5 * s)) / s) + 1) *
                (np.exp((x - (pos + width - 5.5 * s)) / s) + 1))
 
-    ax.plot(x, [0] * len(x), color='0.75')
     ax.fill_between(x, y, color=color, alpha=0.3)
     ax.plot(x, y, color=color)
 
@@ -65,7 +64,6 @@ def ramZPulse(ax, pos, width=2.5, s=0.1, amp=1.5, sep=1.5, color='C1'):
                (np.exp((xFull - (pos + width - 5.5 * s)) / s) + 1))
     yLeft = y[:len(xLeft)]
 
-    ax.plot(xFull, [0] * len(xFull), color='0.75')
     ax.fill_between(xLeft, yLeft, alpha=0.3, color=color, linewidth=0.0)
     ax.plot(xFull, y, color=color)
 
@@ -92,13 +90,3 @@ def interval(ax, start, stop, height=1.5, label=None, labelHeight=None,
     if label is not None:
         ax.text((start + stop) / 2, labelHeight, label, color=color,
                 horizontalalignment='center')
-
-
-def separator(ax, pos, width=.5):
-    '''
-    Draw a separation.
-    '''
-    x = np.linspace(pos, pos + width, 100)
-    ax.plot(x, [0] * len(x), color='0.75')
-
-    return pos + width
