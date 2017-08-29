@@ -1,4 +1,5 @@
 import logging
+import itertools
 import numpy as np
 from copy import deepcopy
 from pycqed.measurement.waveform_control import element
@@ -41,8 +42,7 @@ def avoided_crossing_spec_seq(operation_dict, q0, q1, RO_target,
     el_list.append(el)
     seq.append_element(el, trigger_wait=True)
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     return seq, el_list
 
 
@@ -79,8 +79,7 @@ def two_qubit_off_on(q0_pulse_pars, q1_pulse_pars, RO_pars,
         el = multi_pulse_elt(i, station, pulses)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -127,8 +126,7 @@ def three_qubit_off_on(q0_pulse_pars, q1_pulse_pars, q2_pulse_pars, RO_pars,
         el = multi_pulse_elt(i, station, pulses)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -190,8 +188,7 @@ def four_qubit_off_on(q0_pulse_pars,
         el = multi_pulse_elt(i, station, pulses)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -289,8 +286,7 @@ def five_qubit_off_on(q0_pulse_pars,
         el = multi_pulse_elt(i, station, pulses)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -396,8 +392,7 @@ def two_qubit_AllXY(operation_dict, q0='q0', q1='q1', RO_target='all',
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -516,8 +511,7 @@ def two_qubit_tomo_cardinal(cardinal,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
 
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -688,8 +682,7 @@ def two_qubit_tomo_bell(bell_state,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
 
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
 
     return seq, el_list
 
@@ -824,8 +817,7 @@ def cphase_fringes(phases, q0_pulse_pars, q1_pulse_pars, RO_pars,
 
     # upload
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -961,9 +953,55 @@ def two_qubit_tomo_cphase_cardinal(cardinal_state,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
 
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
 
     return seq, el_list
 
 
+def n_qubit_off_on(pulse_pars_list, RO_pars, return_seq=False, verbose=False,
+                   parallel_pulses=False, preselection=False):
+    n = len(pulse_pars_list)
+    seq_name = '{}_qubit_OffOn_sequence'.format(n)
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+
+    # Create a dict with the parameters for all the pulses
+    pulse_dict = {'RO': RO_pars}
+    for i, pulse_pars in enumerate(pulse_pars_list):
+        pars = pulse_pars.copy()
+        if i != 0 and parallel_pulses:
+            pars['refpoint'] = 'start'
+        pulses = add_suffix_to_dict_keys(
+            get_pulse_dict_from_pars(pars), ' {}'.format(i))
+        pulse_dict.update(pulses)
+    spacerpulse = {'pulse_type': 'SquarePulse',
+                   'channel': RO_pars['acq_marker_channel'],
+                   'amplitude': 0.0,
+                   'length': 180e-9,
+                   'pulse_delay': 0}
+    pulse_dict.update({'spacer': spacerpulse})
+
+    # Create a list of required pulses
+    pulse_combinations = []
+    for pulse_list in itertools.product(*(n*[['I', 'X180']])):
+        pulse_comb = (n+1)*['']
+        for i, pulse in enumerate(pulse_list):
+            pulse_comb[i] = pulse + ' {}'.format(i)
+        pulse_comb[-1] = 'RO'
+        if preselection:
+            pulse_comb = ['RO', 'spacer'] + pulse_comb
+        pulse_combinations.append(pulse_comb)
+
+    for i, pulse_comb in enumerate(pulse_combinations):
+        pulses = []
+        for p in pulse_comb:
+            pulses += [pulse_dict[p]]
+
+        el = multi_pulse_elt(i, station, pulses)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name

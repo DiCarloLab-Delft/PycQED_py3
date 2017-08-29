@@ -1,11 +1,17 @@
+import os
+import pycqed as pq
 import unittest
 import numpy as np
+import pycqed.analysis.analysis_toolbox as a_tools
 from pycqed.measurement import measurement_control
 from pycqed.measurement.sweep_functions import None_Sweep, None_Sweep_idx
 import pycqed.measurement.detector_functions as det
 from pycqed.instrument_drivers.physical_instruments.dummy_instruments \
     import DummyParHolder
 from pycqed.measurement.optimization import nelder_mead, SPSA
+from pycqed.analysis import measurement_analysis as ma
+from pycqed.utilities.get_default_datadir import get_default_datadir
+from pycqed.measurement.hdf5_data import read_dict_from_hdf5
 
 from qcodes import station
 
@@ -15,7 +21,6 @@ class Test_MeasurementControl(unittest.TestCase):
     @classmethod
     def setUpClass(self):
         self.station = station.Station()
-        # set up a pulsar with some mock settings for the element
         self.MC = measurement_control.MeasurementControl(
             'MC', live_plot_enabled=True, verbose=True)
         self.MC.station = self.station
@@ -54,6 +59,36 @@ class Test_MeasurementControl(unittest.TestCase):
         self.assertEqual(dat['sweep_parameter_units'], ['arb. unit'])
         self.assertEqual(dat['value_names'], ['I', 'Q'])
         self.assertEqual(dat['value_units'], ['mV', 'mV'])
+
+    @unittest.skipIf(
+        "TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
+        "Skipping this test on Travis CI.")
+    def test_data_location(self):
+        sweep_pts = np.linspace(0, 10, 30)
+        self.MC.set_sweep_function(None_Sweep())
+        self.MC.set_sweep_points(sweep_pts)
+        self.MC.set_detector_function(det.Dummy_Detector_Soft())
+        self.MC.run('datadir_test_file')
+        # raises an error if the file is not found
+        ma.MeasurementAnalysis(label='datadir_test_file')
+
+        # change the datadir
+        test_dir2 = os.path.abspath(os.path.join(
+            os.path.dirname(pq.__file__), os.pardir, 'data_test_2'))
+        self.MC.datadir(test_dir2)
+
+        sweep_pts = np.linspace(0, 10, 30)
+        self.MC.set_sweep_function(None_Sweep())
+        self.MC.set_sweep_points(sweep_pts)
+        self.MC.set_detector_function(det.Dummy_Detector_Soft())
+        self.MC.run('datadir_test_file_2')
+        # raises an error if the file is not found
+        with self.assertRaises(Exception):
+            ma.MeasurementAnalysis(label='datadir_test_file_2')
+        ma.a_tools.datadir = test_dir2
+        # changing the dir makes it find the file now
+        ma.MeasurementAnalysis(label='datadir_test_file_2')
+        self.MC.datadir(get_default_datadir())
 
     def test_hard_sweep_1D(self):
         sweep_pts = np.linspace(0, 10, 5)
@@ -370,3 +405,31 @@ class Test_MeasurementControl(unittest.TestCase):
         dat = self.MC.run('1D_soft')
         x = dat['dset'][:, 0]
         np.testing.assert_array_almost_equal(x, sweep_pts, decimal=5)
+
+    def test_save_exp_metadata(self):
+        metadata_dict = {
+            'intParam': 1,
+            'floatParam': 2.5e-3,
+            'strParam': 'spam',
+            'listParam': [1, 2, 3, 4],
+            'arrayParam': np.array([4e5, 5e5]),
+            'dictParam': {'a': 1, 'b': 2},
+            'tupleParam': (3, 'c')
+        }
+
+        old_a_tools_datadir = a_tools.datadir
+        a_tools.datadir = self.MC.datadir()
+
+        sweep_pts = np.linspace(0, 10, 30)
+        self.MC.set_sweep_function(None_Sweep())
+        self.MC.set_sweep_points(sweep_pts)
+        self.MC.set_detector_function(det.Dummy_Detector_Soft())
+        self.MC.run('test_exp_metadata', exp_metadata=metadata_dict)
+        a = ma.MeasurementAnalysis(label='test_exp_metadata', auto=False)
+
+        a_tools.datadir = old_a_tools_datadir
+
+        loaded_dict = read_dict_from_hdf5(
+            {}, a.data_file['Experimental Data']['Experimental Metadata'])
+
+        np.testing.assert_equal(metadata_dict, loaded_dict)

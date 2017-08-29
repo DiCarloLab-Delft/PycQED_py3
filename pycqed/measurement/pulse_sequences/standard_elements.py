@@ -59,6 +59,7 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
                                 'Buffer_RO_MW': 0,
                                 'Buffer_RO_RO': 0,
                                 'Flux_comp_dead_time': 3e-6,
+                                'slave_AWG_trig_channels': [],
                                 }
 
     ##########################
@@ -68,15 +69,14 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
         name='{}-pulse-elt_{}'.format(len(pulse_list), i),
         pulsar=station.pulsar,
         readout_fixed_point=sequencer_config['RO_fixed_point'])
-    for i in range(4):  # Exists to ensure there are no empty channels
-        el.add(pulse.SquarePulse(name='refpulse_0',
-                                 channel='ch{}'.format(i+1),
-                                 amplitude=0, length=1e-9))
-    # exists to ensure that channel is not high when waiting for trigger
-    # and to allow negavtive pulse delay of elements up to 300 ns
-    last_pulse = el.add(
-        pulse.SquarePulse(name='refpulse_0', channel='ch1', amplitude=0,
-                          length=1e-9,), start=300e-9)
+    last_pulse = None
+    # Make sure that there are no empty channels and we can have a negative
+    # pulse delay of up to 400 ns
+    for cname in station.pulsar.channels:
+        last_pulse = el.add(pulse.SquarePulse(name='refpulse', channel=cname,
+                                              amplitude=0, length=400e-9),
+                            refpulse=last_pulse,
+                            refpoint='start')
 
     ##############################
     # Add all pulses one by one  #
@@ -123,7 +123,8 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
         # Adding any non special (composite) pulse
         if (pulse_pars['pulse_type'] not in ['MW_IQmod_pulse_tek',
                                              'MW_IQmod_pulse_UHFQC',
-                                             'Gated_MW_RO_pulse']):
+                                             'Gated_MW_RO_pulse',
+                                             'Multiplexed_UHFQC_pulse']):
             try:
                 # Look for the function in pl = pulse_lib
                 pulse_func = getattr(pl, pulse_pars['pulse_type'])
@@ -160,14 +161,15 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
                     refpulse=last_pulse, refpoint=pulse_pars['refpoint'])
             elif pulse_pars['pulse_type'] == 'Gated_MW_RO_pulse':
                 last_pulse = el.add(pulse.SquarePulse(
-                    name='RO_marker', amplitude=1,
+                    name='RO_marker', amplitude=pulse_pars['amplitude'],
                     length=pulse_pars['length'],
                     channel=pulse_pars['RO_pulse_marker_channel']),
                     operation_type=pulse_pars['operation_type'],
                     start=t0, refpulse=last_pulse,
                     refpoint=pulse_pars['refpoint'])
 
-            elif pulse_pars['pulse_type'] == 'MW_IQmod_pulse_UHFQC':
+            elif (pulse_pars['pulse_type'] == 'MW_IQmod_pulse_UHFQC' or
+                  pulse_pars['pulse_type'] == 'Multiplexed_UHFQC_pulse'):
                 # "adding a 0 amp pulse because the sequencer needs an element for timing
                 last_pulse = el.add(pulse.SquarePulse(
                     name='RO_marker', amplitude=0,
@@ -223,10 +225,16 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
         final_len = 500e-9
     else:
         final_len = 1e-9
-    last_pulse = el.add(pulse.SquarePulse(name='final_empty_pulse',
-                                          channel='ch1',
-                                          amplitude=0, length=final_len),
-                        refpulse=last_pulse, refpoint='end')
+    for cname in station.pulsar.channels:
+        el.add(pulse.SquarePulse(name='final_empty_pulse', channel=cname,
+                                 amplitude=0, length=final_len),
+               refpulse=last_pulse, refpoint='end')
+
+    # Trigger the slave AWG-s
+    slave_triggers = sequencer_config.get('slave_AWG_trig_channels', [])
+    for cname in slave_triggers:
+        el.add(pulse.SquarePulse(name='slave_trigger', channel=cname,
+                                 amplitude=1, length=20e-9), start=10e-9)
 
     return el
 
@@ -240,7 +248,6 @@ def distort_and_compensate(element, distortion_dict):
               'chx': np.array(.....),
               'chy': np.array(.....)}
     """
-
     t_vals, outputs_dict = element.waveforms()
     for ch in distortion_dict['ch_list']:
         element._channels[ch]['distorted'] = True

@@ -1,17 +1,18 @@
 # some convenience tools
 #
+import inspect
 import logging
 import numpy as np
 import os
 import time
 import datetime
 import warnings
+from copy import deepcopy
 from collections import OrderedDict as od
 from matplotlib import pyplot as plt
 from matplotlib import colors
 import pandas as pd
-from uuid import getnode as get_mac
-from pycqed.init.config import setup_dict
+from pycqed.utilities.get_default_datadir import get_default_datadir
 from scipy.interpolate import griddata
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import h5py
@@ -22,18 +23,10 @@ from .tools.data_manipulation import *
 from .tools.plotting import *
 import colorsys as colors
 
-try:
-    # currently not recognized, does not do anything
-    datadir = qc_config['datadir']
-    print('Data directory set to:', datadir)
-except:
-    mac = get_mac()
-    try:
-        setup_name = setup_dict.mac_dict[str(mac)]
-        datadir = setup_dict.data_dir_dict[setup_name]
-    except:
-        datadir = None
-    print('Data directory set to:', datadir)
+
+datadir = get_default_datadir()
+print('Data directory set to:', datadir)
+
 
 ######################################################################
 #     Filehandling tools
@@ -114,7 +107,7 @@ def return_last_n_timestamps(n, contains=''):
 
 
 def latest_data(contains='', older_than=None, newer_than=None, or_equal=False,
-                return_timestamp=False, raise_exc=False,
+                return_timestamp=False, raise_exc=True,
                 folder=None, return_all=False):
     '''
     finds the latest taken data with <contains> in its name.
@@ -148,35 +141,36 @@ def latest_data(contains='', older_than=None, newer_than=None, or_equal=False,
     i = len(daydirs)-1
     while len(measdirs) == 0 and i >= 0:
         daydir = daydirs[i]
-        all_measdirs = [d for d in os.listdir(
-            os.path.join(search_dir, daydir))]
-        all_measdirs.sort()
-
-        measdirs = []
-        for d in all_measdirs:
-            # this routine verifies that any output directory
-            # is a 'valid' directory
-            # (i.e, obeys the regular naming convention)
-            _timestamp = daydir + d[:6]
-            try:
-                dstamp, tstamp = verify_timestamp(_timestamp)
-            except:
-                continue
-            timestamp = dstamp+tstamp
-            if contains in d:
-                if older_than is not None:
-                    if not is_older(timestamp, older_than, or_equal=or_equal):
-                        continue
-                if newer_than is not None:
-                    if not is_older(newer_than, timestamp, or_equal=or_equal):
-                        continue
-                measdirs.append(d)
-
+        # this makes sure hidden folders (OS related) are not searched
+        if not daydir.startswith('.'):
+            all_measdirs = [d for d in os.listdir(
+                os.path.join(search_dir, daydir))]
+            all_measdirs.sort()
+            measdirs = []
+            for d in all_measdirs:
+                # this routine verifies that any output directory
+                # is a 'valid' directory
+                # (i.e, obeys the regular naming convention)
+                _timestamp = daydir + d[:6]
+                try:
+                    dstamp, tstamp = verify_timestamp(_timestamp)
+                except:
+                    continue
+                timestamp = dstamp+tstamp
+                if contains in d:
+                    if older_than is not None:
+                        if not is_older(timestamp, older_than,
+                                        or_equal=or_equal):
+                            continue
+                    if newer_than is not None:
+                        if not is_older(newer_than, timestamp,
+                                        or_equal=or_equal):
+                            continue
+                    measdirs.append(d)
         i -= 1
-
     if len(measdirs) == 0:
         if raise_exc is True:
-            raise Exception('No fitting data found.')
+            raise Exception('No data found.')
         else:
             return False
     else:
@@ -359,10 +353,6 @@ def get_data_from_ma_v2(ma, param_names, numeric_params=None):
                 if 'Fitted Params' in key:
                     fit_key = key
             temp = temp[fit_key]
-            # print temp.keys()
-            # for key in temp.keys():
-            # print key
-            # print temp[key].attrs['value']
             data[param] = {key: temp[key].attrs['value']
                            for key in list(temp.keys()) if key != 'covar'}
             free_vars = 0
@@ -469,8 +459,14 @@ def get_data_from_timestamp_list(timestamps,
                                  TwoD=False,
                                  max_files=None,
                                  filter_no_analysis=False,
-                                 numeric_params=None):
+                                 numeric_params=None,
+                                 ma_type='MeasurementAnalysis'):
+    # dirty import inside this function to prevent circular import
+    # FIXME: this function is at the base of the analysis v2 but relies
+    # on the old analysis in the most dirty way. Also not completely clear
+    # how the data extraction works here
     from pycqed.analysis import measurement_analysis as ma
+    ma_func = getattr(ma, ma_type)
 
     if type(timestamps) is str:
         timestamps = [timestamps]
@@ -492,16 +488,14 @@ def get_data_from_timestamp_list(timestamps,
     remove_timestamps = []
     for timestamp in get_timestamps:
         try:
-            ana = ma.MeasurementAnalysis(timestamp=timestamp, auto=False,
-                                         close_file=False)
-        except:
+            ana = ma_func(timestamp=timestamp, auto=False, close_file=False)
+        except Exception as e:
             try:
                 ana.finish()
                 del ana
-            except:
+            except Exception:
                 pass
-            warnings.warn(
-                'This data file does not exist or has been corrupted.')
+            logging.warning(e)
             remove_timestamps.append(timestamp)
         else:
             try:
@@ -546,7 +540,7 @@ def get_data_from_timestamp_list(timestamps,
                     do_analysis = True
                 ana.finish()
             except Exception as inst:
-                print('Error "%s" when processing timestamp %s' %
+                logging.warning('Error "%s" when processing timestamp %s' %
                       (inst, timestamp))
                 raise
 
@@ -555,7 +549,6 @@ def get_data_from_timestamp_list(timestamps,
             get_timestamps.remove(timestamp)
         print('timestamps removed by filtering:', remove_timestamps)
 
-    # out_data = None
     if type(param_names) is list:
         out_data = data
     elif type(param_names) is dict:
@@ -574,7 +567,6 @@ def get_data_from_timestamp_list(timestamps,
                     else:
                         raise(instance)
 
-    # out_data.update({'timestamps':get_timestamps})
     out_data['timestamps'] = get_timestamps
 
     return out_data
@@ -712,7 +704,7 @@ def compare_instrument_settings(analysis_object_a, analysis_object_b):
 
 
 def get_timestamps_in_range(timestamp_start, timestamp_end=None,
-                            label=None, exact_label_match=True, folder=None):
+                            label=None, exact_label_match=False, folder=None):
     if folder is None:
         folder = datadir
 
@@ -727,6 +719,8 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
         date = datetime_start + datetime.timedelta(days=day)
         datemark = timestamp_from_datetime(date)[:8]
         all_measdirs = [d for d in os.listdir(os.path.join(folder, datemark))]
+        # Remove all hidden folders to prevent errors
+        all_measdirs = [d for d in all_measdirs if not d.startswith('.')]
 
         if exact_label_match:
             all_measdirs = [x for x in all_measdirs if label in x]
@@ -736,14 +730,14 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
         if (date.date() - datetime_start.date()).days == 0:
             # Check if newer than starting timestamp
             timemark_start = timemark_from_datetime(datetime_start)
-            all_measdirs = [dirname for dirname in all_measdirs if int(dirname[:6]) >=
-                            int(timemark_start)]
+            all_measdirs = [dirname for dirname in all_measdirs
+                            if int(dirname[:6]) >= int(timemark_start)]
 
         if (date.date() - datetime_end.date()).days == 0:
             # Check if older than ending timestamp
             timemark_end = timemark_from_datetime(datetime_end)
-            all_measdirs = [dirname for dirname in all_measdirs if int(dirname[:6]) <=
-                            int(timemark_end)]
+            all_measdirs = [dirname for dirname in all_measdirs if
+                            int(dirname[:6]) <= int(timemark_end)]
         timestamps = ['{}_{}'.format(datemark, dirname[:6])
                       for dirname in all_measdirs]
         timestamps.reverse()
@@ -869,7 +863,8 @@ def smooth(x, window_len=11, window='hanning'):
 
     if not window in ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']:
         raise ValueError(
-            "Window is on of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'")
+            "Window is on of 'flat', 'hanning', 'hamming', 'bartlett', "
+            "'blackman'")
 
     s = np.r_[x[window_len-1:0:-1], x, x[-1:-window_len:-1]]
 
@@ -886,6 +881,159 @@ def smooth(x, window_len=11, window='hanning'):
     return y[edge:-edge]
 
 
+def find_second_peak(sweep_pts_cut_edges=None, data_dist_smooth=None,
+                     key=None, peaks=None, percentile=20, optimize=False):
+
+    """
+    Used for qubit spectroscopy analysis. Find the second gf/2 peak/dip based on
+    the location of the tallest peak found, given in peaks, which is the result
+    of peak_finder. The algorithm takes the index of this tallest peak and looks
+    to the right and to the left of it for the tallest peaks in these new
+    ranges. The resulting two new peaks are compared and the tallest/deepest
+    one is chosen.
+    """
+
+    tallest_peak = peaks[key] #the ge freq
+    tallest_peak_idx = peaks[key+'_idx']
+    tallest_peak_width = peaks[key+'_width']
+    tallest_peak_val = data_dist_smooth[tallest_peak_idx]
+    print('Tallest peak is at ',tallest_peak)
+
+    # Calculate how many data points away from the tallest peak
+    # to look left and right. Should be 50MHz away.
+    freq_range = sweep_pts_cut_edges[-1]-sweep_pts_cut_edges[0]
+    num_points = sweep_pts_cut_edges.size
+    n = int(50e6*num_points/freq_range)
+    m = int(50e6*num_points/freq_range)
+
+    #serach for 2nd peak (f_ge) to the right of the first
+    while(int(len(sweep_pts_cut_edges)-1) <= int(tallest_peak_idx+n) and
+                  n>0):
+        n -= 1
+    if (int(tallest_peak_idx+n)) == sweep_pts_cut_edges.size:
+        n = 0
+    if not ((int(tallest_peak_idx+n)) >= sweep_pts_cut_edges.size):
+        print('Searching for the gf/2 {:} {:} points to the right of the largest'
+              ' in the range {:.5}-{:.5}'.format(
+            key,
+            n,
+            sweep_pts_cut_edges[int(tallest_peak_idx+n)],
+            sweep_pts_cut_edges[-1]))
+
+        peaks_right = peak_finder(
+            sweep_pts_cut_edges[int(tallest_peak_idx+n)::],
+            data_dist_smooth[int(tallest_peak_idx+n)::],
+            analyze_ef=False,
+            percentile=percentile,
+            num_sigma_threshold=1,
+            optimize=optimize,
+            key=key)
+
+        # The peak/dip found to the right of the tallest is assumed to be
+        # the ge peak, which means that the tallest was in fact the gf/2 peak
+        print('Right peak is at ', peaks_right[key])
+        subset_right = data_dist_smooth[int(tallest_peak_idx+n)::]
+        val_right = subset_right[peaks_right[key+'_idx']]
+        f0_right = peaks_right[key]
+        kappa_guess_right = peaks_right[key+'_width']
+        f0_gf_over_2_right = tallest_peak
+        kappa_guess_ef_right = tallest_peak_width
+    else:
+        print('Right peak is None')
+        val_right = 0
+        f0_right = 0
+        kappa_guess_right = 0
+        f0_gf_over_2_right = tallest_peak
+        kappa_guess_ef_right = tallest_peak_width
+
+    while(int(tallest_peak_idx-m)<0 and m>0):
+        m -= 1
+    if int(tallest_peak_idx-m) == 0:
+        m = 0
+    if not (int(tallest_peak_idx-m) <= 0):
+        print('Searching for the gf/2 {:} {:} points to the left of the '
+              'largest, in the range {:.5}-{:.5}'.format(
+            key,
+            m,
+            sweep_pts_cut_edges[0],
+            sweep_pts_cut_edges[int(tallest_peak_idx-m-1)]))
+
+        #serach for 2nd peak (f_gf/2) to the left of the first
+        peaks_left = peak_finder(
+            sweep_pts_cut_edges[0:int(tallest_peak_idx-m)],
+            data_dist_smooth[0:int(tallest_peak_idx-m)],
+            analyze_ef=False,
+            percentile=percentile,
+            num_sigma_threshold=1,
+            optimize=optimize,
+            key=key)
+
+        # The peak/dip found to the left of the tallest is assumed to be
+        # the gf/2 peak, which means that the tallest was indeed the ge peak
+        print('Left peak is at ', peaks_left[key])
+        subset_left = data_dist_smooth[0:int(tallest_peak_idx-m)]
+        val_left = subset_left[peaks_left[key+'_idx']]
+        f0_left = tallest_peak
+        kappa_guess_left = tallest_peak_width
+        f0_gf_over_2_left = peaks_left[key]
+        kappa_guess_ef_left = peaks_left[key+'_width']
+    else:
+        print('Left peak is None')
+        val_left = 0
+        f0_left = tallest_peak
+        kappa_guess_left = tallest_peak_width
+        f0_gf_over_2_left = 0
+        kappa_guess_ef_left = 0
+
+    if np.abs(val_left) > np.abs(val_right):
+        # If peak on the left taller than peak on the right, then
+        # the second peak is to the left of the tallest and it is indeed
+        # the gf.2 peak, while the tallest is the ge peak.
+        if np.abs(f0_gf_over_2_left - tallest_peak) > 50e6:
+            # If the two peaks found are separated by at least 50MHz,
+            # then both the ge and gf/2 have been found.
+            print('Both f_ge and f_gf/2 have been found. '
+                  'f_ge was assumed to the LEFT of f_gf/2.')
+        else:
+            # If not, then it is just some other signal.
+            print('The f_gf/2 '+key+' was not found. Fitting to '
+                                    'the next largest '+key+' found.')
+
+        f0 = f0_left
+        kappa_guess = kappa_guess_left
+        f0_gf_over_2 = f0_gf_over_2_left
+        kappa_guess_ef = kappa_guess_ef_left
+
+    elif np.abs(val_left) < np.abs(val_right):
+        # If peak on the right taller than peak on the left, then
+        # the second peak is to the right of the tallest and it is in fact
+        # the ge peak, while the tallest is the gf/2 peak.
+        if np.abs(f0_right - tallest_peak) > 50e6:
+            # If the two peaks found are separated by at least 50MHz,
+            # then both the ge and gf/2 have been found.
+            print('Both f_ge and f_gf/2 have been found. '
+                  'f_ge was assumed to the RIGHT of f_gf/2.')
+        else:
+            # If not, then it is just some other signal.
+            print('The f_gf/2 '+key+' was not found. Fitting to '
+                                    'the next largest '+key+' found.')
+        f0 = f0_right
+        kappa_guess = kappa_guess_right
+        f0_gf_over_2 = f0_gf_over_2_right
+        kappa_guess_ef = kappa_guess_ef_right
+
+    else:
+        # If the peaks on the right and left are equal, or cannot be compared,
+        # then there was probably no second peak, and only noise was found.
+        print('Only f_ge has been found.')
+        f0 = tallest_peak
+        kappa_guess = tallest_peak_width
+        f0_gf_over_2 = tallest_peak
+        kappa_guess_ef = tallest_peak_width
+
+
+    return f0, f0_gf_over_2, kappa_guess, kappa_guess_ef
+
 def peak_finder_v2(x, y, perc=90, window_len=11):
     '''
     Peak finder based on argrelextrema function from scipy
@@ -899,12 +1047,69 @@ def peak_finder_v2(x, y, perc=90, window_len=11):
     sort_mask = np.argsort(y[array_peaks])[::-1]
     return peaks_x[sort_mask]
 
+def cut_edges(array, window_len=11):
+    array = array[(window_len//2):-(window_len//2)]
+    return array
 
-def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
+def peak_finder(x, y, percentile=20, num_sigma_threshold=5,
+                window_len=3, key=None, analyze_ef=False, optimize=True):
 
-    def cut_edges(array, window_len=11):
-        array = array[(window_len/2):-(window_len/2)]
-        return array
+    search_result = look_for_peaks_dips(x=x, y_smoothed=y, percentile=percentile,
+                                        num_sigma_threshold=num_sigma_threshold,
+                                        window_len=window_len,
+                                        key=key,
+                                        analyze_ef=analyze_ef)
+
+    y_for_test = deepcopy(y)
+    if key is not None:
+        key_1 = key
+    else:
+        if search_result['dip'] is None:
+            key_1 = 'peak'
+        elif search_result['peak'] is None:
+            key_1 = 'dip'
+            y_for_test = -y_for_test
+        elif np.abs(y[search_result['dip_idx']]) < \
+                np.abs(y[search_result['peak_idx']]):
+            key_1 = 'peak'
+        elif np.abs(y[search_result['dip_idx']]) > \
+             np.abs(y[search_result['peak_idx']]):
+            key_1 = 'dip'
+            y_for_test = -y_for_test
+
+    if optimize:
+
+        if (y_for_test[search_result[key_1+'_idx']] < max(y_for_test)):
+
+            while ((y_for_test[search_result[key_1+'_idx']] < max(y_for_test)) and
+                    (num_sigma_threshold<100) and
+                        (len(search_result[key_1+'s_idx'])>1)):
+
+                search_result_1 = deepcopy(search_result)
+                num_sigma_threshold += 1
+
+                search_result = look_for_peaks_dips(x=x,y_smoothed=y,
+                                    percentile=percentile,
+                                    num_sigma_threshold=(num_sigma_threshold),
+                                    window_len=window_len,
+                                    key=key_1,
+                                    analyze_ef=analyze_ef)
+
+                if search_result[key_1+'_idx'] is None:
+                    search_result = search_result_1
+                    break
+
+            print('Peak Finder: Optimal num_sigma_threshold after optimization '
+                  'is ', num_sigma_threshold)
+
+    return search_result
+
+def look_for_peaks_dips(x, y_smoothed, percentile=20, num_sigma_threshold=5,
+                        window_len=3, analyze_ef=False, key=None):
+
+# def peak_finder(x, y, percentile=20, num_sigma_threshold=5,
+#                         window_len=3, analyze_ef=False):
+
     '''
     Peak finding algorithm designed by Serwan
     1 smooth data
@@ -913,7 +1118,7 @@ def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
     '''
 
     # Smooth the data
-    y_smoothed = smooth(y, window_len=window_len)
+    #y_smoothed = smooth(y, window_len=window_len)
 
     # Finding peaks
     # Defining the threshold
@@ -928,7 +1133,10 @@ def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
     thresholdlst = np.arange(y_smoothed.size)[y_smoothed > threshold]
     datthreshold = y_smoothed[thresholdlst]
 
-    kk = 0
+    if thresholdlst.size is 0:
+        kk = 0
+    else:
+        kk = thresholdlst[0]
     inpeak = False
     peakranges = []
     peak_indices = []
@@ -948,7 +1156,7 @@ def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
                     inpeak = False
                     peakranges.append([peakfmin, peakfmax])
 
-        peakranges.append([peakfmin, peakfmax])
+            peakranges.append([peakfmin, peakfmax])
         for elem in peakranges:
             try:
                 if elem[0] != elem[1]:
@@ -956,17 +1164,35 @@ def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
                                      np.argmax(y_smoothed[elem[0]:elem[1]])]
                 else:
                     peak_indices += [elem[0]]
-                peak_widths += [x[elem[1]] - x[elem[0]]]
+                #peak_widths += [x[elem[1]] - x[elem[0]]]
             except:
                 pass
-        peaks = np.take(x, peak_indices)  # Frequencies of peaks
-        peak_vals = np.take(y_smoothed, peak_indices)  # values of peaks
-        peak_index = peak_indices[np.argmax(peak_vals)]  # idx of highest peak
-        peak = x[peak_index]
+
+        #eliminate duplicates
+        peak_indices = np.unique(peak_indices)
+
+        #Take an approximate peak width for each peak index
+        for i,idx in enumerate(peak_indices):
+            if (idx+i+1)<x.size and (idx-i-1)>=0:          #ensure data points
+                                                           #idx+i+1 and idx-i-1
+                                                           #are inside sweep pts
+                peak_widths += [ (x[idx+i+1] - x[idx-i-1])/5 ]
+            elif (idx+i+1)>x.size and (idx-i-1)>=0:
+                peak_widths += [ (x[idx] - x[idx-i])/5 ]
+            elif (idx+i+1)<x.size and (idx-i-1)<0:
+                peak_widths += [ (x[idx+i] - x[idx])/5 ]
+            else:
+                peak_widths += [ 5e6 ]
+
+        peaks = np.take(x, peak_indices)                   #Frequencies of peaks
+        peak_vals = np.take(y_smoothed, peak_indices)           #values of peaks
+        peak_index = peak_indices[np.argmax(peak_vals)]
         peak_width = peak_widths[np.argmax(peak_vals)]
+        peak = x[peak_index]                          #Frequency of highest peak
 
     else:
         peak = None
+        peak_vals = None
         peak_index = None
         peaks = []
         peak_width = None
@@ -982,7 +1208,11 @@ def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
 
     thresholdlst = np.arange(y_smoothed.size)[y_smoothed < threshold]
     datthreshold = y_smoothed[thresholdlst]
-    kk = 0
+
+    if thresholdlst.size is 0:
+        kk = 0
+    else:
+        kk = thresholdlst[0]
     indip = False
     dipranges = []
     dip_indices = []
@@ -1002,7 +1232,7 @@ def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
                     indip = False
                     dipranges.append([dipfmin, dipfmax])
 
-        dipranges.append([dipfmin, dipfmax])
+            dipranges.append([dipfmin, dipfmax])
         for elem in dipranges:
             try:
                 if elem[0] != elem[1]:
@@ -1010,45 +1240,84 @@ def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
                                     np.argmin(y_smoothed[elem[0]:elem[1]])]
                 else:
                     dip_indices += [elem[0]]
-                dip_widths += [x[elem[1]] - x[elem[0]]]
+                #dip_widths += [x[elem[1]] - x[elem[0]]]
             except:
                 pass
+
+        #eliminate duplicates
+        dip_indices = np.unique(dip_indices)
+
+        #Take an approximate dip width for each dip index
+        for i,idx in enumerate(dip_indices):
+            if (idx+i+1)<x.size and (idx-i-1)>=0:         #ensure data points
+                                                          #idx+i+1 and idx-i-1
+                                                          #are inside sweep pts
+                dip_widths += [ (x[idx+i+1] - x[idx-i-1])/5 ]
+            elif (idx+i+1)>x.size and (idx-i-1)>=0:
+                dip_widths += [ (x[idx] - x[idx-i])/5 ]
+            elif (idx+i+1)<x.size and (idx-i-1)<0:
+                dip_widths += [ (x[idx+i] - x[idx])/5 ]
+            else:
+                dip_widths += [ 5e6 ]
+
         dips = np.take(x, dip_indices)
         dip_vals = np.take(y_smoothed, dip_indices)
         dip_index = dip_indices[np.argmin(dip_vals)]
+        dip_width = dip_widths[np.argmax(dip_vals)]
         dip = x[dip_index]
-        dip_width = dip_widths[np.argmin(dip_vals)]
+
     else:
         dip = None
+        dip_vals = None
         dip_index = None
         dips = []
         dip_width = None
 
-    return {'peak': peak, 'peak_idx': peak_index,
-            'peak_width': peak_width, 'peak_widths': peak_widths,
-            'peaks': peaks, 'peaks_idx': peak_indices,
-            'dip': dip, 'dip_idx': dip_index,
-            'dip_width': dip_width, 'dip_widths': dip_widths,
-            'dips': dips, 'dips_idx': dip_indices}
+    if key == 'peak':
+        return {'peak': peak, 'peak_idx': peak_index, 'peak_values':peak_vals,
+                'peak_width': peak_width, 'peak_widths': peak_widths,
+                'peaks': peaks, 'peaks_idx': peak_indices,
+                'dip': None, 'dip_idx': None, 'dip_values':[],
+                'dip_width': None, 'dip_widths': [],
+                'dips': [], 'dips_idx': []}
+    elif key == 'dip':
+        return {'peak': None, 'peak_idx': None, 'peak_values':[],
+                'peak_width': None, 'peak_widths': [],
+                'peaks': [], 'peaks_idx': [],
+                'dip': dip, 'dip_idx': dip_index, 'dip_values':dip_vals,
+                'dip_width': dip_width, 'dip_widths': dip_widths,
+                'dips': dips, 'dips_idx': dip_indices}
+    else:
+        return {'peak': peak, 'peak_idx': peak_index, 'peak_values':peak_vals,
+                'peak_width': peak_width, 'peak_widths': peak_widths,
+                'peaks': peaks, 'peaks_idx': peak_indices,
+                'dip': dip, 'dip_idx': dip_index, 'dip_values':dip_vals,
+                'dip_width': dip_width, 'dip_widths': dip_widths,
+                'dips': dips, 'dips_idx': dip_indices}
 
 
-def calculate_distance_ground_state(data_real, data_imag, percentile=70,
+def calculate_distance_ground_state(data_amp, data_phase=None, percentile=70,
                                     normalize=False):
     ''' Calculates the distance from the ground state by assuming that
         for the largest part of the data, the system is in its ground state
     '''
-    perc_real = np.percentile(data_real, percentile)
-    perc_imag = np.percentile(data_imag, percentile)
+    if data_phase is not None:
+        data_real = data_amp * np.cos(np.pi * data_phase / 180)
+        data_imag = data_amp * np.sin(np.pi * data_phase / 180)
+        perc_real = np.percentile(data_real, percentile)
+        perc_imag = np.percentile(data_imag, percentile)
+        mean_real = np.mean(np.take(data_real,
+                                    np.where(data_real < perc_real)[0]))
+        mean_imag = np.mean(np.take(data_imag,
+                                    np.where(data_imag < perc_imag)[0]))
+        data_real_dist = data_real - mean_real
+        data_imag_dist = data_imag - mean_imag
+        data_dist = np.abs(data_real_dist + 1.j * data_imag_dist)
+    else:
+        perc = np.percentile(data_amp, percentile)
+        mean = np.mean(np.take(data_amp, np.where(data_amp < perc)[0]))
+        data_dist = data_amp - mean
 
-    mean_real = np.mean(np.take(data_real,
-                                np.where(data_real < perc_real)[0]))
-    mean_imag = np.mean(np.take(data_imag,
-                                np.where(data_imag < perc_imag)[0]))
-
-    data_real_dist = data_real - mean_real
-    data_imag_dist = data_imag - mean_imag
-
-    data_dist = np.abs(data_real_dist + 1.j * data_imag_dist)
     if normalize:
         data_dist /= np.max(data_dist)
     return data_dist
@@ -1073,8 +1342,7 @@ def calculate_rotation_matrix(delta_I, delta_Q):
     '''
 
     angle = np.arctan2(delta_Q, delta_I)
-    rotation_matrix = np.transpose(
-        np.matrix([[np.cos(angle), -1*np.sin(angle)],
+    rotation_matrix = np.transpose(np.matrix([[np.cos(angle), -1*np.sin(angle)],
                    [np.sin(angle), np.cos(angle)]]))
     return rotation_matrix
 
@@ -1084,8 +1352,8 @@ def normalize_TD_data(data, data_zero, data_one):
 
 
 def normalize_data(data):
-    print(
-        'a_tools.normalize_data is deprecated, recommend using a_tools.normalize_data_v2()')
+    print('a_tools.normalize_data is deprecated, recommend using '
+        'a_tools.normalize_data_v2()')
     return data / np.mean(data)
 
 
@@ -1122,39 +1390,156 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
     Inputs:
         data (numpy array) : 2D dataset that has to be rotated and normalized
         zero_coord (tuple) : coordinates of reference zero
-                one_coord (tuple) : coordinates of reference one
+        one_coord (tuple) : coordinates of reference one
         cal_zero_points (range) : range specifying what indices in 'data'
                                   correspond to zero
         cal_one_points (range) : range specifying what indices in 'data'
                                  correspond to one
     '''
     # Extract zero and one coordinates
-    if zero_coord is not None:
-        I_zero = zero_coord[0]
-        Q_zero = zero_coord[1]
-    else:
+    start_at_zero = kw.get('start_at_zero', False)
+
+    if np.all([cal_zero_points==None, cal_one_points==None,
+               zero_coord==None, one_coord==None]):
+        # no cal points were used
+        normalized_data = rotate_and_normalize_data_no_cal_points(data=data,
+                                                                  **kw)
+    elif np.all([cal_one_points==None, one_coord==None]) and \
+        (not np.all([cal_zero_points==None, zero_coord==None])):
+        # only 2 cal points used; both are I pulses
         I_zero = np.mean(data[0][cal_zero_points])
         Q_zero = np.mean(data[1][cal_zero_points])
-        zero_coord = (I_zero, Q_zero)
-    if one_coord is not None:
-        I_one = one_coord[0]
-        Q_one = one_coord[1]
+
+        # Translate the data
+        trans_data = [data[0] - I_zero, data[1] - Q_zero]
+
+        # Least squares fitting to the line through the data, that also
+        # intercepts the calibration point
+
+        from lmfit.models import LinearModel
+
+        x = trans_data[0]
+        y = trans_data[1]
+
+        linear_model = LinearModel()
+        linear_model.set_param_hint('intercept',
+                                    value=0,
+                                    vary=False)
+        linear_model.set_param_hint('slope')
+        params = linear_model.make_params()
+        fit_res = linear_model.fit(data=y,
+                                   x=x,
+                                   params=params)
+
+        line_slope = fit_res.params['slope'].value
+        line_intercept = fit_res.params['intercept'].value
+        #finx the x, y coordinates of the projected points
+        x_proj=(x+line_slope*y-line_slope*line_intercept)/(line_slope**2+1)
+        y_proj= line_slope*(x_proj)+line_intercept
+
+        #find the minimum (on th ey axis) point on the line
+        y_min_line = min(fit_res.best_fit)
+        x_min_line = x[np.argmin(fit_res.best_fit)]
+
+        #find x,y coordinates with respect to end of line
+        x_data = np.abs(x_min_line - x_proj)
+        y_data = y_proj-y_min_line
+
+        #find distance from points on line to end of line
+        rotated_data = np.sqrt(x_data**2+y_data**2)
+        if start_at_zero and (rotated_data[0] > np.mean(rotated_data)):
+            rotated_data = -rotated_data
+            rotated_data -= min(rotated_data)
+
+        normalized_data = rotated_data
+
+        # #normalize data
+        # max_min_distance = max(rotated_data) - min(rotated_data)
+        # normalized_data = (rotated_data - min(rotated_data))/max_min_distance
+
     else:
-        I_one = np.mean(data[0][cal_one_points])
-        Q_one = np.mean(data[1][cal_one_points])
-        one_coord = (I_one, Q_one)
-    # Translate the date
-    trans_data = [data[0] - I_zero, data[1] - Q_zero]
-    # Rotate the data
-    M = calculate_rotation_matrix(I_one-I_zero, Q_one-Q_zero)
-    outp = [np.asarray(elem)[0] for elem in M * trans_data]
-    [rotated_data_ch1, rotated_data_ch2] = outp
-    # Normalize the data
-    one_zero_dist = np.sqrt((I_one-I_zero)**2 + (Q_one-Q_zero)**2)
-    normalized_data = rotated_data_ch1/one_zero_dist
+        # for 4 anf 6 cal points
+        if zero_coord is not None:
+            I_zero = zero_coord[0]
+            Q_zero = zero_coord[1]
+        else:
+            I_zero = np.mean(data[0][cal_zero_points])
+            Q_zero = np.mean(data[1][cal_zero_points])
+            zero_coord = (I_zero, Q_zero)
+
+        if one_coord is not None:
+            I_one = one_coord[0]
+            Q_one = one_coord[1]
+        else:
+            I_one = np.mean(data[0][cal_one_points])
+            Q_one = np.mean(data[1][cal_one_points])
+            one_coord = (I_one, Q_one)
+
+        # Translate the data
+        trans_data = [data[0] - I_zero, data[1] - Q_zero]
+
+        # Rotate the data
+        M = calculate_rotation_matrix(I_one-I_zero, Q_one-Q_zero)
+        outp = [np.asarray(elem)[0] for elem in M * trans_data]
+        [rotated_data_ch1, rotated_data_ch2] = outp
+
+        # Normalize the data
+        one_zero_dist = np.sqrt((I_one-I_zero)**2 + (Q_one-Q_zero)**2)
+        normalized_data = rotated_data_ch1/one_zero_dist
+
+        if start_at_zero and (normalized_data[0] > np.mean(normalized_data)):
+            normalized_data = -normalized_data
+            normalized_data -= min(normalized_data)
 
     return [normalized_data, zero_coord, one_coord]
 
+def rotate_and_normalize_data_no_cal_points(data, **kw):
+
+    """
+    Rotates and normalizes data based on principal component analysis.
+    (Source: http://www.cs.otago.ac.nz/cosc453/student_tutorials/
+    principal_components.pdf)
+    """
+    start_at_zero = kw.pop('start_at_zero', False)
+
+    #translate each column in the data by its mean
+    mean_x = np.mean(data[0])
+    mean_y = np.mean(data[1])
+    trans_x = data[0] - mean_x
+    trans_y = data[1] - mean_y
+
+    #compute the covariance 2x2 matrix
+    cov_matrix = np.cov(np.array([trans_x,trans_y]))
+
+    #find eigenvalues and eigenvectors of the covariance matrix
+    [eigvals, eigvecs] = np.linalg.eig(cov_matrix)
+
+    #compute the transposed feature vector
+    row_feature_vector = np.array([(eigvecs[0,np.argmin(eigvals)],
+                                    eigvecs[1,np.argmin(eigvals)]),
+                                   (eigvecs[0,np.argmax(eigvals)],
+                                    eigvecs[1,np.argmax(eigvals)])])
+    #compute the row_data_trans matrix with (x,y) pairs in each column. Each
+    #row is a dimension (row1 = x_data, row2 = y_data)
+    row_data_trans = np.array([trans_x,trans_y])
+    #compute final, projected data; only the first row is of interest (it is the
+    #principal axis
+    final_data = np.dot(row_feature_vector, row_data_trans)
+    normalized_data = final_data[1,:]
+
+    #normalize data
+    # max_min_distance = np.sqrt(max(final_data[1,:])**2 +
+    #                            min(final_data[1,:])**2)
+    # normalized_data = final_data[1,:]/max_min_distance
+    # max_min_difference = max(normalized_data -  min(normalized_data))
+    # normalized_data = (normalized_data-min(normalized_data))/max_min_difference
+
+    # Ensure trace starts at closest to zero
+    if start_at_zero and (normalized_data[0] > np.mean(normalized_data)):
+        normalized_data = -normalized_data
+        normalized_data -= min(normalized_data)
+
+    return normalized_data
 
 def normalize_data_v3(data, cal_zero_points=np.arange(-4, -2, 1),
                       cal_one_points=np.arange(-2, 0, 1), **kw):
@@ -1389,8 +1774,8 @@ def linecut_plot(x, y, z, fig, ax,
     plt.gca().set_color_cycle([colormap(i) for i in np.linspace(
                               0, 0.9, len(y))])
     for i in range(len(y)):
-        label = '{y_name}: {y_val} {y_unit}'.format(
-            y_name=y_name, y_val=y[i], y_unit=y_unit)
+        label = '{}: {:.4g} {}'.format(
+            y_name, y[i], y_unit)
         ax.plot(x, z[:, i], label=label)
     if log:
         ax.set_yscale('log')
@@ -1444,6 +1829,52 @@ def color_plot_interpolated(x, y, z, ax=None,
         return ax, CS, cbar
     return ax, CS
 
+def plot_errorbars(x, y, fit_results=None, fit_function=None, ax=None,
+                   linewidth=2,markersize=2,marker='none',only_bars=True):
+
+    if ax is None:
+        new_plot_created = True
+        f, ax = plt.subplots()
+    else:
+        new_plot_created = False
+
+    standard_error = np.std(y)/np.sqrt(y.size)
+
+    # if only_bars:
+    #     ax.errorbar( x, y, yerr=standard_error, ecolor='k',
+    #                  fmt='',linewidth=linewidth)
+    # else:
+    ax.errorbar( x, y, yerr=standard_error, ecolor='k', fmt=marker,
+                     linewidth=linewidth, markersize=markersize)
+
+    # best_vals = fit_results.best_values
+    # func_args=inspect.getargspec(fit_function)[0]                   #returns list of function parameters
+    #
+    # plus_list = []
+    # minus_list = []
+    # for i in func_args[1:]:
+    #     plus_list += [best_vals[i] + fit_results.params[i].stderr]
+    #     minus_list += [best_vals[i] - fit_results.params[i].stderr]
+    #
+    # yplus = fit_function(x,*plus_list)
+    # yminus = fit_function(x,*minus_list)
+    #
+    # asymmetric_error=[]
+    # for idx,val in enumerate(y):
+    #     asymmetric_error += [[ val-yminus[idx],yplus[idx]-val ]]
+    # asymmetric_error = np.asarray(asymmetric_error)
+    # asymmetric_error=np.transpose(asymmetric_error)
+    #
+    # if only_bars:
+    #     ax.errorbar( x, y, yerr=asymmetric_error, fmt='' )
+    # else:
+    #     ax.errorbar( x, y, yerr=asymmetric_error, fmt='-o' )
+
+    if new_plot_created:
+        return f,ax
+    else:
+        return
+
 
 ######################################################################
 #    Calculations tools
@@ -1470,7 +1901,7 @@ def calculate_transmon_transitions(EC, EJ, asym=0, reduced_flux=0,
     return transitions[:no_transitions]
 
 
-def fit_EC_EJ(f01, f12):
+def fit_EC_EJ(f01, f12, **kw):
     '''
     Calculates EC and EJ from f01 and f12 by numerical optimization.
     '''
@@ -1479,7 +1910,12 @@ def fit_EC_EJ(f01, f12):
     EC0 = f01-f12
     EJ0 = (f01+EC0)**2/(8*EC0)
 
-    penaltyfn = lambda Es: calculate_transmon_transitions(*Es)-[f01, f12]
+    asym = kw.pop('asym',0)
+    reduced_flux = kw.pop('reduced_flux',0)
+    dim = kw.pop('dim',None)
+
+    penaltyfn = lambda Es: calculate_transmon_transitions(
+        *Es,asym=asym,reduced_flux=reduced_flux,dim=dim)-[f01, f12]
     (EC, EJ), success = optimize.leastsq(penaltyfn, (EC0, EJ0))
     return EC, EJ
 
@@ -1558,14 +1994,16 @@ def find_min(x, y, return_fit=False, perc=30):
     from functools import reduce
     # filtering through percentiles
     th_perc = np.percentile(y, perc)
-    mask = np.where(y<th_perc,True,False)
+    mask = np.where(y < th_perc, True, False)
     # function that multiplies all elements in vector
-    multiply_vec = lambda vec: reduce(lambda x,y: x*y,vec)
+    multiply_vec = lambda vec: reduce(lambda x, y: x*y, vec)
     # function that multiplies all elements in vector from idx_min
     idx_min = np.argmin(y)
-    mask_ii = lambda ii: multiply_vec(mask[min(idx_min,ii):max(idx_min,ii+1)])
+    mask_ii = lambda ii: multiply_vec(
+        mask[min(idx_min, ii):max(idx_min, ii+1)])
     # function that returns mask_ii applied for all elements of the vector mask
-    continuous_mask = np.array([m for m in map(mask_ii,np.arange(len(mask)))],dtype=np.bool)
+    continuous_mask = np.array(
+        [m for m in map(mask_ii, np.arange(len(mask)))], dtype=np.bool)
     # doing the fit
     my_fit_model = QuadraticModel()
     x_fit = x[continuous_mask]
@@ -1575,12 +2013,13 @@ def find_min(x, y, return_fit=False, perc=30):
                                   x=x_fit,
                                   pars=my_fit_params)
     x_min = -0.5*my_fit_res.best_values['b']/my_fit_res.best_values['a']
-    y_min = my_fit_model.func(x_min,**my_fit_res.best_values)
+    y_min = my_fit_model.func(x_min, **my_fit_res.best_values)
 
     if return_fit:
         return x_min, y_min, my_fit_res
     else:
         return x_min, y_min
+
 
 def get_color_order(i, max_num):
     # take a blue to red scale from 0 to max_num

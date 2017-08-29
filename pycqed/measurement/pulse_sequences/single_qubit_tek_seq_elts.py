@@ -53,7 +53,6 @@ def Pulsed_spec_seq(spec_pars, RO_pars, upload=True, return_seq=False):
 
     seq_name = 'Pulsed_spec'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
 
     pulse_dict = {'spec_pulse': spec_pars, 'RO': RO_pars}
@@ -64,8 +63,7 @@ def Pulsed_spec_seq(spec_pars, RO_pars, upload=True, return_seq=False):
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=False)
+        station.pulsar.program_awgs(seq, *el_list, verbose=False)
     return seq
 
 
@@ -92,7 +90,6 @@ def photon_number_splitting_seq(spec_pars, RO_pars, disp_pars, upload=True, retu
 
     seq_name = 'photon_number_spliting'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
 
     pulse_dict = {'disp': disp_pars, 'spec_pulse': spec_pars, 'RO': RO_pars}
@@ -104,13 +101,12 @@ def photon_number_splitting_seq(spec_pars, RO_pars, disp_pars, upload=True, retu
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=False)
+        station.pulsar.program_awgs(seq, *el_list, verbose=False)
     return seq
 
 
-def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
-             verbose=False, upload=True, return_seq=False):
+def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6, no_cal_points=2,
+             cal_points=True, verbose=False, upload=True, return_seq=False):
     '''
     Rabi sequence for a single qubit using the tektronix.
     Input pars:
@@ -119,25 +115,40 @@ def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
         RO_pars:         dict containing the RO parameters
         n:               number of pulses (1 is conventional Rabi)
         post_msmt_delay: extra wait time for resetless compatibility
+        cal_points:      whether to use calibration points or not
+        upload:          whether to upload sequence to instrument or not
     '''
     seq_name = 'Rabi_sequence'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
-    for i, amp in enumerate(amps):  # seq has to have at least 2 elts
-        pulses['X180']['amplitude'] = amp
-        pulse_list = n*[pulses['X180']]+[RO_pars]
 
-        # copy first element and set extra wait
-        pulse_list[0] = deepcopy(pulse_list[0])
-        pulse_list[0]['pulse_delay'] += post_msmt_delay
-        el = multi_pulse_elt(i, station, pulse_list)
+    for i, amp in enumerate(amps):  # seq has to have at least 2 elts
+        if cal_points and no_cal_points==4 and \
+                (i == (len(amps)-4) or i == (len(amps)-3)):
+            el = multi_pulse_elt(i, station,[pulses['I'], RO_pars])
+        elif cal_points and no_cal_points==4 and \
+                (i == (len(amps)-2) or i == (len(amps)-1)):
+            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+        elif cal_points and no_cal_points==2 and \
+                (i == (len(amps)-2) or i == (len(amps)-1)):
+            el = multi_pulse_elt(i, station,[pulses['I'], RO_pars])
+        else:
+            pulses['X180']['amplitude'] = amp
+            pulse_list = n*[pulses['X180']]+[RO_pars]
+
+            # copy first element and set extra wait
+            pulse_list[0] = deepcopy(pulse_list[0])
+            pulse_list[0]['pulse_delay'] += post_msmt_delay
+
+            el = multi_pulse_elt(i, station, pulse_list)
+
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
+
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+
     if return_seq:
         return seq, el_list
     else:
@@ -156,7 +167,6 @@ def Flipping_seq(pulse_pars, RO_pars, n=1, post_msmt_delay=10e-9,
     '''
     seq_name = 'Flipping_sequence'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
     RO_pulse_delay = RO_pars['pulse_delay']
@@ -176,8 +186,7 @@ def Flipping_seq(pulse_pars, RO_pars, n=1, post_msmt_delay=10e-9,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -197,7 +206,6 @@ def Rabi_amp90_seq(scales, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
     '''
     seq_name = 'Rabi_amp90_sequence'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
     for i, scale in enumerate(scales):  # seq has to have at least 2 elts
@@ -211,8 +219,7 @@ def Rabi_amp90_seq(scales, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -225,15 +232,17 @@ def T1_seq(times,
            verbose=False, upload=True, return_seq=False):
     '''
     Rabi sequence for a single qubit using the tektronix.
-    SSB_Drag pulse is used for driving, simple modualtion used for RO
+    SSB_Drag pulse is used for driving, simple modulation used for RO
     Input pars:
         times:       array of times to wait after the initial pi-pulse
         pulse_pars:  dict containing the pulse parameters
         RO_pars:     dict containing the RO parameters
     '''
+    if np.any(times>1e-3):
+        logging.warning('The values in the times array might be too large.'
+                        'The units should be seconds.')
     seq_name = 'T1_sequence'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     RO_pulse_delay = RO_pars['pulse_delay']
     RO_pars = deepcopy(RO_pars)  # Prevents overwriting of the dict
@@ -241,20 +250,20 @@ def T1_seq(times,
 
     for i, tau in enumerate(times):  # seq has to have at least 2 elts
         RO_pars['pulse_delay'] = RO_pulse_delay + tau
-        RO_pars['refpoint'] = 'start'  # time defined between start of ops
-        if cal_points:
-            if (i == (len(times)-4) or i == (len(times)-3)):
-                el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
-            elif(i == (len(times)-2) or i == (len(times)-1)):
-                RO_pars['pulse_delay'] = RO_pulse_delay
-                el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
-            else:
-                el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+        #RO_pars['refpoint'] = 'start'  # time defined between start of ops
+        if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
+            el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+        elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
+            RO_pars['pulse_delay'] = RO_pulse_delay
+            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+        else:
+            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
+
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+
     if return_seq:
         return seq, el_list
     else:
@@ -276,9 +285,12 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
         artificial_detuning: artificial_detuning (Hz) implemented using phase
         cal_points:          whether to use calibration points or not
     '''
+    if np.any(times>1e-3):
+        logging.warning('The values in the times array might be too large.'
+                        'The units should be seconds.')
+
     seq_name = 'Ramsey_sequence'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     # First extract values from input, later overwrite when generating
     # waveforms
@@ -303,8 +315,66 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+
+
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
+
+def Ramsey_seq_multiple_detunings(times, pulse_pars, RO_pars,
+               artificial_detunings=None,
+               cal_points=True,
+               verbose=False,
+               upload=True, return_seq=False):
+    '''
+    Ramsey sequence for a single qubit using the tektronix.
+    SSB_Drag pulse is used for driving, simple modualtion used for RO
+    !!! Each value in the times array must be repeated len(artificial_detunings)
+    times!!!
+    Input pars:
+        times:               array of times between (start of) pulses (s)
+        pulse_pars:          dict containing the pulse parameters
+        RO_pars:             dict containing the RO parameters
+        artificial_detunings: list of artificial_detunings (Hz) implemented
+                              using phase
+        cal_points:          whether to use calibration points or not
+    '''
+    seq_name = 'Ramsey_sequence_multiple_detunings'
+    seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
+    el_list = []
+    # First extract values from input, later overwrite when generating
+    # waveforms
+    pulses = get_pulse_dict_from_pars(pulse_pars)
+
+    pulse_pars_x2 = deepcopy(pulses['X90'])
+    pulse_pars_x2['refpoint'] = 'start'
+    for i, tau in enumerate(times):
+        pulse_pars_x2['pulse_delay'] = tau
+        art_det = artificial_detunings[i % len(artificial_detunings)]
+
+        if art_det is not None:
+            Dphase = ((tau-times[0]) * art_det * 360) % 360
+            pulse_pars_x2['phase'] = Dphase
+
+        if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
+            el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+        elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
+            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+        else:
+            el = multi_pulse_elt(i, station,
+                                 [pulses['X90'], pulse_pars_x2, RO_pars])
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+
+    if upload:
+        print('uploading')
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+        print('upload finished')
+
+    print('moved on')
     if return_seq:
         return seq, el_list
     else:
@@ -327,7 +397,6 @@ def Echo_seq(times, pulse_pars, RO_pars,
     '''
     seq_name = 'Echo_sequence'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
 
     pulses = get_pulse_dict_from_pars(pulse_pars)
@@ -352,8 +421,7 @@ def Echo_seq(times, pulse_pars, RO_pars,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -372,7 +440,6 @@ def AllXY_seq(pulse_pars, RO_pars, double_points=False,
     '''
     seq_name = 'AllXY_seq'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     # Create a dict with the parameters for all the pulses
     pulses = get_pulse_dict_from_pars(pulse_pars)
@@ -398,16 +465,15 @@ def AllXY_seq(pulse_pars, RO_pars, double_points=False,
         seq.append_element(el, trigger_wait=True)
 
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
         return seq_name
 
 
-def OffOn_seq(pulse_pars, RO_pars,
-              verbose=False, pulse_comb='OffOn', upload=True, return_seq=False):
+def OffOn_seq(pulse_pars, RO_pars, verbose=False, pulse_comb='OffOn',
+              upload=True, return_seq=False, preselection=False):
     '''
     OffOn sequence for a single qubit using the tektronix.
     SSB_Drag pulse is used for driving, simple modualtion used for RO
@@ -419,10 +485,10 @@ def OffOn_seq(pulse_pars, RO_pars,
         Post-measurement delay:  should be sufficiently long to avoid
                              photon-induced gate errors when post-selecting.
         pulse_comb:          OffOn/OnOn/OffOff cobmination of pulses to play
+        preselection:        adds an extra readout pulse before other pulses.
     '''
     seq_name = 'OffOn_sequence'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     # Create a dict with the parameters for all the pulses
     pulses = get_pulse_dict_from_pars(pulse_pars)
@@ -434,18 +500,27 @@ def OffOn_seq(pulse_pars, RO_pars,
     elif pulse_comb == 'OffOff':
         pulse_combinations = ['I', 'I']
 
+    spacer = {'pulse_type': 'SquarePulse',
+              'channel': RO_pars['acq_marker_channel'],
+              'amplitude': 0.0,
+              'length': max(0, 180e-9 - pulse_pars['pulse_delay'] -
+                            - pulse_pars['nr_sigma']*pulse_pars['sigma']),
+              'pulse_delay': 0}
+
     for i, pulse_comb in enumerate(pulse_combinations):
-        el = multi_pulse_elt(i, station, [pulses[pulse_comb], RO_pars])
+        if preselection:
+            pulse_list = [RO_pars, spacer, pulses[pulse_comb], RO_pars]
+        else:
+            pulse_list = [pulses[pulse_comb], RO_pars]
+        el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
         return seq_name
-
 
 def Butterfly_seq(pulse_pars, RO_pars, initialize=False,
                   post_msmt_delay=2000e-9, upload=True, verbose=False):
@@ -461,7 +536,6 @@ def Butterfly_seq(pulse_pars, RO_pars, initialize=False,
     '''
     seq_name = 'Butterfly_seq'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     # Create a dict with the parameters for all the pulses
     pulses = get_pulse_dict_from_pars(pulse_pars)
@@ -482,11 +556,11 @@ def Butterfly_seq(pulse_pars, RO_pars, initialize=False,
         for pulse_keys in pulse_keys_sub_list:
             pulse_sub_list = [pulses[key] for key in pulse_keys]
             sub_seq_duration = sum([p['pulse_delay'] for p in pulse_sub_list])
-            if RO_pars['f_RO_mod'] == None:
+            if RO_pars['mod_frequency'] == None:
                 extra_delay = 0
             else:
                 extra_delay = calculate_time_correction(
-                    sub_seq_duration+post_msmt_delay, RO_pars['f_RO_mod'])
+                    sub_seq_duration+post_msmt_delay, 1/RO_pars['mod_frequency'])
             initial_pulse_delay = post_msmt_delay + extra_delay
             start_pulse = deepcopy(pulse_sub_list[0])
             start_pulse['pulse_delay'] += initial_pulse_delay
@@ -498,8 +572,7 @@ def Butterfly_seq(pulse_pars, RO_pars, initialize=False,
         seq.append_element(el, trigger_wait=True)
 
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     return seq_name
 
 
@@ -547,7 +620,6 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
     if seq_name is None:
         seq_name = 'RandomizedBenchmarking_sequence'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
     net_cliffords = [0, 3]  # Exists purely for the double curves mode
@@ -586,8 +658,7 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
                 el_list.append(el)
                 seq.append_element(el, trigger_wait=True)
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
         return seq, el_list
     else:
         return seq, el_list
@@ -612,7 +683,6 @@ def Freq_XY(freqs, pulse_pars, RO_pars,
     '''
     seq_name = 'MotzoiXY'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     pulse_combinations = [['X180', 'Y90'], ['Y180', 'X90']]
     pulses = get_pulse_dict_from_pars(pulse_pars)
@@ -635,8 +705,7 @@ def Freq_XY(freqs, pulse_pars, RO_pars,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
 
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -662,7 +731,6 @@ def Motzoi_XY(motzois, pulse_pars, RO_pars,
     '''
     seq_name = 'MotzoiXY'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     pulse_combinations = [['X180', 'Y90'], ['Y180', 'X90']]
     pulses = get_pulse_dict_from_pars(pulse_pars)
@@ -686,8 +754,58 @@ def Motzoi_XY(motzois, pulse_pars, RO_pars,
         seq.append_element(el, trigger_wait=True)
 
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
+
+def QScale(qscales, pulse_pars, RO_pars,
+              cal_points=True, verbose=False, upload=True, return_seq=False):
+    '''
+    Sequence used for calibrating the QScale factor used in the DRAG pulses.
+    Applies X(pi/2)X(pi), X(pi/2)Y(pi), X(pi/2)Y(-pi) for each value of
+    QScale factor.
+
+    Beware that the elements alternate, in order to perform these 3
+    measurements per QScale factor, the qscales sweep values must be
+    repeated 3 times. This was chosen to be more easily compatible with
+    standard detector functions and sweep pts.
+
+    Input pars:
+        qscales:             array of qscale factors
+        pulse_pars:          dict containing the DRAG pulse parameters
+        RO_pars:             dict containing the RO parameters
+        cal_points:          if True, replaces the last 3*4 segments with
+                             calibration points
+    '''
+    seq_name = 'QScale'
+    seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
+    el_list = []
+    pulse_combinations=[['X90','X180'],['X90','Y180'],['X90','mY180']]
+    pulses = get_pulse_dict_from_pars(pulse_pars)
+    for i, motzoi in enumerate(qscales):
+        pulse_keys = pulse_combinations[i % 3]
+        for p_name in ['X180', 'Y180', 'X90', 'mY180']:
+            pulses[p_name]['motzoi'] = motzoi
+        if cal_points and (i == (len(qscales)-4) or
+                                   i == (len(qscales)-3)):
+            el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+        elif cal_points and (i == (len(qscales)-2) or
+                                     i == (len(qscales)-1)):
+            # pick motzoi for calpoint in the middle of the range
+            pulses['X180']['motzoi'] = np.mean(qscales)
+            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+        else:
+            pulse_list = [pulses[x] for x in pulse_keys]
+            pulse_list += [RO_pars]
+            el = multi_pulse_elt(i, station, pulse_list)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -712,7 +830,6 @@ def Rising_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
     '''
     seq_name = 'Rising_sequence'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     pulse_pars = {'pulse_type': 'RisingPulse'}
     pulse_list = [pulse_pars]
@@ -720,8 +837,7 @@ def Rising_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
     el_list.append(el)
     seq.append_element(el, trigger_wait=True)
     if upload:
-        station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -755,17 +871,18 @@ def get_pulse_dict_from_pars(pulse_pars):
               'Y90': deepcopy(pulse_pars),
               'mY90': deepcopy(pulse_pars)}
 
+
     pulses['I']['amplitude'] = 0
     pulses['mX180']['amplitude'] = -pi_amp
     pulses['X90']['amplitude'] = pi2_amp
     pulses['mX90']['amplitude'] = -pi2_amp
-    pulses['Y180']['phase'] = 90
-    pulses['mY180']['phase'] = 90
+    pulses['Y180']['phase'] += 90
+    pulses['mY180']['phase'] += 90
     pulses['mY180']['amplitude'] = -pi_amp
 
     pulses['Y90']['amplitude'] = pi2_amp
-    pulses['Y90']['phase'] = 90
+    pulses['Y90']['phase'] += 90
     pulses['mY90']['amplitude'] = -pi2_amp
-    pulses['mY90']['phase'] = 90
+    pulses['mY90']['phase'] += 90
 
     return pulses

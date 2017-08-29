@@ -6,7 +6,6 @@ import logging
 #   Fitting Functions Library   #
 #################################
 
-
 def RandomizedBenchmarkingDecay(numCliff, Amplitude, p, offset):
     val = Amplitude * (p**numCliff) + offset
     return val
@@ -51,55 +50,73 @@ def Lorentzian(f, A, offset, f0, kappa):
     return val
 
 
-def TwinLorentzFunc(f, amplitude_a, amplitude_b, center_a, center_b,
-                    sigma_a, sigma_b, background=0):
+def TwinLorentzFunc(f, A_gf_over_2, A, f0_gf_over_2, f0,
+                    kappa_gf_over_2, kappa, background=0):
     'twin lorentz with background'
-    val = (amplitude_a/np.pi * (sigma_a / ((f-center_a)**2 + sigma_a**2)) +
-           amplitude_b/np.pi * (sigma_b / ((f-center_b)**2 + sigma_b**2)) +
-           background)
+    val = (A_gf_over_2/np.pi * (kappa_gf_over_2 / ((f-f0_gf_over_2)**2 + kappa_gf_over_2**2)) +
+           A/np.pi * (kappa / ((f-f0)**2 + kappa**2)) + background)
     return val
 
 
 def Qubit_dac_to_freq(dac_voltage, f_max, E_c,
-                      dac_sweet_spot, dac_flux_coefficient, asymmetry=0):
+                      dac_sweet_spot, V_per_phi0=None, dac_flux_coefficient=None,
+                      asymmetry=0):
     '''
     The cosine Arc model for uncalibrated flux for asymmetric qubit.
 
     dac_voltage (V)
-    f_max (Hz)
-    E_c (Hz)
-    dac_sweet_spot (V)
-    dac_flux_coefficient (1/V)
+    f_max (Hz): sweet-spot frequency of the qubit
+    E_c (Hz): charging energy of the qubit
+    V_per_phi0 (V): volt per phi0 (convert voltage to flux)
+    dac_sweet_spot (V): voltage at which the sweet-spot is found
     asym (dimensionless asymmetry param) = abs((EJ1-EJ2)/(EJ1+EJ2)),
     '''
+    if V_per_phi0 is None and dac_flux_coefficient is None:
+        raise ValueError('Please specify "V_per_phi0".')
+
+    if dac_flux_coefficient is not None:
+        logging.warning('"dac_flux_coefficient" deprecated. Please use the '
+                        'physically meaningful "V_per_phi0" instead.')
+        V_per_phi0 = np.pi/dac_flux_coefficient
+
     qubit_freq = (f_max + E_c)*(
-        asymmetry**2 + (1-asymmetry**2) *
-        np.sqrt(abs(np.cos(dac_flux_coefficient*(dac_voltage-dac_sweet_spot)))))-E_c
+        asymmetry**2 + (1 - asymmetry**2) *
+        np.sqrt(abs(np.cos(np.pi / V_per_phi0 *
+                           (dac_voltage - dac_sweet_spot))))) - E_c
     return qubit_freq
 
 
 def Qubit_freq_to_dac(frequency, f_max, E_c,
-                      dac_sweet_spot, dac_flux_coefficient, asymmetry=0,
+                      dac_sweet_spot, V_per_phi0=None,
+                      dac_flux_coefficient=None, asymmetry=0,
                       branch='positive'):
     '''
     The cosine Arc model for uncalibrated flux for asymmetric qubit.
     This function implements the inverse of "Qubit_dac_to_freq"
 
     frequency (Hz)
-    f_max (Hz)
-    E_c (Hz)
-    dac_sweet_spot (V)
-    dac_flux_coefficient (1/V)
-    asym (dimensionless asymmetry param) = abs((EJ1-EJ2)/(EJ1+EJ2)),
+    f_max (Hz): sweet-spot frequency of the qubit
+    E_c (Hz): charging energy of the qubit
+    V_per_phi0 (V): volt per phi0 (convert voltage to flux)
+    asym (dimensionless asymmetry param) = abs((EJ1-EJ2)/(EJ1+EJ2))
+    dac_sweet_spot (V): voltage at which the sweet-spot is found
     branch (enum: 'positive' 'negative')
     '''
+    if V_per_phi0 is None and dac_flux_coefficient is None:
+        raise ValueError('Please specify "V_per_phi0".')
 
     asymm_term = (asymmetry**2 + (1-asymmetry**2))
     dac_term = np.arccos(((frequency+E_c)/((f_max+E_c) * asymm_term))**2)
+
+    if dac_flux_coefficient is not None:
+        logging.warning('"dac_flux_coefficient" deprecated. Please use the '
+                        'physically meaningful "V_per_phi0" instead.')
+        V_per_phi0 = np.pi/dac_flux_coefficient
+
     if branch == 'positive':
-        dac_voltage = (dac_term)/dac_flux_coefficient+dac_sweet_spot
+        dac_voltage = (dac_term) * V_per_phi0 / np.pi + dac_sweet_spot
     elif branch == 'negative':
-        dac_voltage = -(dac_term)/dac_flux_coefficient+dac_sweet_spot
+        dac_voltage = -(dac_term) * V_per_phi0 / np.pi + dac_sweet_spot
     else:
         raise ValueError('branch {} not recognized'.format(branch))
 
@@ -130,7 +147,7 @@ def CosFunc(t, amplitude, frequency, phase, offset):
         phase in rad
         offset a.u.
     '''
-    return amplitude*np.cos(2*np.pi*frequency*t + phase)+offset
+    return amplitude*np.cos(2*np.pi*t*frequency - phase)+offset
 
 
 def ExpDecayFunc(t, tau, amplitude, offset, n):
@@ -372,13 +389,10 @@ def exp_dec_guess(model, data, t):
     return params
 
 
-def Cos_guess(model, data, t):
+def fft_freq_phase_guess(data, t):
     '''
     Guess for a cosine fit using FFT, only works for evenly spaced points
     '''
-    amp_guess = abs(max(data)-min(data))/2  # amp is positive by convention
-    offs_guess = np.mean(data)
-
     # Freq guess ! only valid with uniform sampling
     # Only first half of array is used, because the second half contains the
     # negative frequecy components, and we want a positive frequency.
@@ -394,6 +408,15 @@ def Cos_guess(model, data, t):
     #               (for example when discretization is visible)
     # to prevent errors we pick the first solution
 
+    return freq_guess, ph_guess
+
+
+def Cos_guess(model, data, t):
+    amp_guess = abs(max(data)-min(data))/2  # amp is positive by convention
+    offs_guess = np.mean(data)
+
+    freq_guess, ph_guess = fft_freq_phase_guess(data, t)
+
     model.set_param_hint('period', expr='1/frequency')
     params = model.make_params(amplitude=amp_guess,
                                frequency=freq_guess,
@@ -402,6 +425,31 @@ def Cos_guess(model, data, t):
     params['amplitude'].min = 0  # Ensures positive amp
     params['frequency'].min = 0
 
+    return params
+
+
+def exp_damp_osc_guess(model, data, t):
+    """
+    Makes a guess for an exponentially damped oscillation.
+    Uses the fft_freq_phase guess to guess the oscillation parameters.
+    The guess for the exponential is simpler as it sets the exponent (n) at 1
+    and the tau at 2/3 of the total range
+    """
+    amp_guess = abs(max(data)-min(data))/2  # amp is positive by convention
+    freq_guess, ph_guess = fft_freq_phase_guess(data, t)
+    osc_offs_guess = 0
+
+    tau_guess = 2/3*max(t)
+    exp_offs_guess = np.mean(data)
+    n_guess = 1
+
+    params = model.make_params(amplitude=amp_guess,
+                               frequency=freq_guess,
+                               phase=ph_guess,
+                               oscillation_offset=osc_offs_guess,
+                               exponential_offset=exp_offs_guess,
+                               n=n_guess,
+                               tau=tau_guess)
     return params
 
 

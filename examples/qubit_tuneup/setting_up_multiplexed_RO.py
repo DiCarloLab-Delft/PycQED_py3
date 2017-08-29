@@ -49,12 +49,12 @@ for i in range(5):
     LutMan.Q_motzoi_parameter(0)
     LutMan.M_amp(M_amps[i])
     LutMan.M_down_amp0(0.0/2)
-    LutMan.M_down_amp1(0.0/2)
     LutMan.M_length(pulse_length-100e-9)
     LutMan.M_up_length(100.0e-9)
     LutMan.M_down_length(1e-9)
     LutMan.Q_gauss_nr_sigma(5)
     LutMan.acquisition_delay(270e-9)
+    LutMan.M_down_amp1(0.0/2)
 
 multiplexed_wave = [['LutMan0', 'M_up_mid_double_dep'],
                     ['LutMan1', 'M_up_mid_double_dep'],

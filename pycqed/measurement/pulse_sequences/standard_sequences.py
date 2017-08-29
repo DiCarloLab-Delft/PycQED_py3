@@ -32,12 +32,12 @@ def generate_marker_element(
     # NOTE: This should be in standard elements
     # make sure tau is a multiple of 1 ns, if it is not the fixed point will
     # not be able to be computed.
+    channels = list(acq_marker_channels.split(','))
     marker_element = element.Element(name=('marker_element %s' % i),
                                      pulsar=station.pulsar)
-    marker_element.add(pulse.SquarePulse(name='refpulse_0', channel='ch1',
+    marker_element.add(pulse.SquarePulse(name='refpulse_0', channel=channels[0],
                        amplitude=0, length=100e-9))
     number_of_pulses = int(200*1e-6/marker_interval)
-    channels = list(acq_marker_channels.split(','))
     for i in range(number_of_pulses):
         for channel in channels:
             marker_element.add(pulse.SquarePulse(channel=channel, amplitude=1,
@@ -55,9 +55,10 @@ def generate_marker_element_with_RF_mod(
     # NOTE: This should be in standard elements
     # make sure tau is a multiple of 1 ns, if it is not the fixed point will
     # not be able to be computed.
+    channels = list(acq_marker_channels.split(','))
     marker_element = element.Element(name=('marker_element %s' % i),
                                      pulsar=station.pulsar)
-    marker_element.add(pulse.SquarePulse(name='refpulse_0', channel='ch1',
+    marker_element.add(pulse.SquarePulse(name='refpulse_0', channel=channels[0],
                        amplitude=0, length=100e-9))
     number_of_pulses = int(200*1e-6/marker_interval)
     marker_element.add(pulse.CosPulse(name='cosI', channel=I_channel,
@@ -65,7 +66,7 @@ def generate_marker_element_with_RF_mod(
     marker_element.add(pulse.CosPulse(name='sinQ', channel=Q_channel,
                        amplitude=mod_amp, frequency=IF,
                        length=200e-6, phase=90))
-    channels = list(acq_marker_channels.split(','))
+
     for i in range(number_of_pulses):
         for channel in channels:
             marker_element.add(pulse.SquarePulse(channel=channel, amplitude=1,
@@ -95,8 +96,7 @@ def generate_and_upload_marker_sequence(
                 acq_marker_channels=acq_marker_channels)
         el_list.append(el)
         seq.append_element(el, trigger_wait=False) # Ensures a continuously running sequence
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=False)
+    station.pulsar.program_awgs(seq, *el_list, verbose=False)
     return seq_name
 
 
@@ -120,8 +120,7 @@ def Pulsed_spec_seq_RF_mod(IF, spec_pulse_length=1e-6,
             mod_amp=mod_amp)
         el_list.append(el)
         seq.append_element(el, trigger_wait=False) # Ensures a continuously running sequence
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=False)
+    station.pulsar.program_awgs(seq, *el_list, verbose=False)
 
 
 def single_marker_seq(verbose=False):
@@ -133,8 +132,7 @@ def single_marker_seq(verbose=False):
         el = st_elts.single_marker_elt(i, station)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     return seq_name
 
 
@@ -151,8 +149,7 @@ def CBox_single_pulse_seq(IF, RO_pulse_delay, RO_trigger_delay,
                                       RO_pulse_length)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     return seq_name
 
 
@@ -171,8 +168,7 @@ def CBox_two_pulse_seq(IF, pulse_delay, RO_pulse_length,
                                    RO_pulse_length=RO_pulse_length)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     return seq_name
 
 
@@ -194,8 +190,7 @@ def CBox_multi_pulse_seq(IF, n_pulses,
                                      n_pulses=n_pulses)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     return seq_name
 
 
@@ -228,8 +223,7 @@ def CBox_resetless_multi_pulse_seq(IF, n_pulses,
     # Extra element is needed because otherwise last elt will always goto 1
     seq.append_element(el_list[2], trigger_wait=False,
                        goto_target=el_list[1].name)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
 
 
 def CBox_T1_marker_seq(IF, times, RO_pulse_delay,
@@ -260,8 +254,7 @@ def CBox_T1_marker_seq(IF, times, RO_pulse_delay,
     el_list.append(cal_0_elt1)
     el_list.append(cal_1_elt0)
     el_list.append(cal_1_elt1)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
 
 
 def CBox_Ramsey_marker_seq(IF, times, RO_pulse_delay, RO_pulse_length,
@@ -283,8 +276,7 @@ def CBox_Ramsey_marker_seq(IF, times, RO_pulse_delay, RO_pulse_length,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
 
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
 
 
 def CBox_marker_train_seq(marker_separation=100e-9,
@@ -305,5 +297,4 @@ def CBox_marker_train_seq(marker_separation=100e-9,
     # Extra element is needed because otherwise last elt will always goto 1
     seq.append_element(el_list[2], trigger_wait=False,
                        goto_target=el_list[1].name)
-    station.components['AWG'].stop()
-    station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)

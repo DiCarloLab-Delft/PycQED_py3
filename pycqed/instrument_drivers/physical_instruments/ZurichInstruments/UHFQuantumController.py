@@ -10,7 +10,6 @@ from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from fnmatch import fnmatch
 from qcodes.instrument.parameter import ManualParameter
-#from instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
 
 
 class UHFQC(Instrument):
@@ -21,10 +20,15 @@ class UHFQC(Instrument):
 
     Requirements:
     Installation instructions for Zurich Instrument Libraries.
-    1. install ziPython 3.5 ucs4 16.04 for 64bit Windows from http://www.zhinst.com/downloads, https://people.zhinst.com/~niels/
+    1. install ziPython 3.5/3.6 ucs4 16.04 for 64bit Windows from
+        http://www.zhinst.com/downloads, https://people.zhinst.com/~niels/
     2. pip install dependencies: httplib2, plotly, pyqtgraph
-    3. upload the latest firmware to the UHFQC by opening reboot.bat in 'Transmon\Inventory\ZurichInstruments\firmware_Nielsb\firmware_x'. WIth x the highest available number.
-    4. find out where sequences are stored by saving a sequence from the GUI and then check :"showLog" to see where it is stored. This is the location where AWG sequences can be loaded from.
+    3. upload the latest firmware to the UHFQC by opening reboot.bat in
+    'Transmon\Inventory\ZurichInstruments\firmware_UHFLI\firmware_x\reboot_dev'.
+        With x the highest available number and dev the device number.
+    4. find out where sequences are stored by saving a sequence from the
+        GUI and then check :"showLog" to see where it is stored. This is the
+        location where AWG sequences can be loaded from.
     misc: when device crashes, check the log file in
     EOM
     """
@@ -86,7 +90,7 @@ class UHFQC(Instrument):
                            parameter_class=ManualParameter)
         for parameter in s_node_pars:
             parname = parameter[0].replace("/", "_")
-            parfunc = "/"+device+"/"+parameter[0]
+            parfunc = "/"+self._device+"/"+parameter[0]
             if parameter[1] == 'float':
                 self.add_parameter(
                     parname,
@@ -129,7 +133,7 @@ class UHFQC(Instrument):
 
         for parameter in d_node_pars:
             parname = parameter[0].replace("/", "_")
-            parfunc = "/"+device+"/"+parameter[0]
+            parfunc = "/"+self._device+"/"+parameter[0]
             if parameter[1] == 'float':
                 self.add_parameter(
                     parname,
@@ -161,8 +165,8 @@ class UHFQC(Instrument):
         # readout
         for i in range(5):
             self.add_parameter("quex_trans_offset_weightfunction_{}".format(i),
-                               unit='V',
-                               label='RO normalization offset (V)',
+                               unit='',  # unit is adc value
+                               label='RO normalization offset',
                                initial_value=0.0,
                                parameter_class=ManualParameter)
         if init:
@@ -264,6 +268,9 @@ class UHFQC(Instrument):
         def get_func():
             return dev_get_type(ch)
         return get_func
+
+    def clock_freq(self):
+        return 1.8e9/(2**self.awgs_0_time())
 
     def reconnect(self):
         zi_utils.autoDetect(self._daq)
@@ -450,13 +457,14 @@ class UHFQC(Instrument):
             self.acquisition_finalize()
             for n, c in enumerate(self.acquisition_paths):
                 if n in data:
-                    print(
-                        "    : Channel {}: Got {} of {} samples", n, len(data[n]), samples)
+                    print("\t: Channel {}: Got {} of {} samples".format(
+                          n, len(data[n]), samples))
             raise TimeoutError("Error: Didn't get all results!")
 
         return data
 
-    def acquisition(self, samples, acquisition_time=0.010, timeout=0, channels=set([0, 1]), mode='rl'):
+    def acquisition(self, samples, acquisition_time=0.010, timeout=0,
+                    channels=set([0, 1]), mode='rl'):
         self.acquisition_initialize(channels, mode)
         data = self.acquisition_poll(samples, acquisition_time, timeout)
         self.acquisition_finalize()
@@ -464,12 +472,13 @@ class UHFQC(Instrument):
         return data
 
     def acquisition_initialize(self, channels=set([0, 1]), mode='rl'):
-        # Define the channels to use
+        # Define the channels to use and subscribe to them
         self.acquisition_paths = []
 
         if mode == 'rl':
             for c in channels:
-                self.acquisition_paths.append('/' + self._device + '/quex/rl/data/{}'.format(c))
+                self.acquisition_paths.append(
+                    '/' + self._device + '/quex/rl/data/{}'.format(c))
             self._daq.subscribe('/' + self._device + '/quex/rl/data/*')
             # Enable automatic readout
             self._daq.setInt('/' + self._device + '/quex/rl/readout', 1)
@@ -596,46 +605,45 @@ class UHFQC(Instrument):
 
     def prepare_SSB_weight_and_rotation(self, IF,
                                         weight_function_I=0,
-                                        weight_function_Q=1):
+                                        weight_function_Q=1,
+                                        phase_correction=0):
         """
         Sets defualt integration weights for SSB modulation, beware does not
         load pulses or prepare the UFHQC progarm to do data acquisition
         """
         trace_length = 4096
         tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
-        cosI = np.array(np.cos(2*np.pi*IF*tbase))
-        sinI = np.array(np.sin(2*np.pi*IF*tbase))
-        eval('self.quex_wint_weights_{}_real(np.array(cosI))'.format(
-            weight_function_I))
-        eval('self.quex_wint_weights_{}_imag(np.array(sinI))'.format(
-            weight_function_I))
-        eval('self.quex_wint_weights_{}_real(np.array(sinI))'.format(
-            weight_function_Q))
-        eval('self.quex_wint_weights_{}_imag(np.array(cosI))'.format(
-            weight_function_Q))
-        eval('self.quex_rot_{}_real(1.0)'.format(weight_function_I))
-        eval('self.quex_rot_{}_imag(1.0)'.format(weight_function_I))
-        eval('self.quex_rot_{}_real(1.0)'.format(weight_function_Q))
-        eval('self.quex_rot_{}_imag(-1.0)'.format(weight_function_Q))
+        realI = np.array(np.cos(2*np.pi*IF*tbase))
+        imagI = np.array(np.sin(2*np.pi*IF*tbase + phase_correction))
+        realQ = np.array(np.sin(2*np.pi*IF*tbase))
+        imagQ = np.array(np.cos(2*np.pi*IF*tbase + phase_correction))
+        self.set('quex_wint_weights_{}_real'.format(weight_function_I),
+                 np.array(realI))
+        self.set('quex_wint_weights_{}_imag'.format(weight_function_I),
+                 np.array(imagI))
+        self.set('quex_wint_weights_{}_real'.format(weight_function_Q),
+                 np.array(realQ))
+        self.set('quex_wint_weights_{}_imag'.format(weight_function_Q),
+                 np.array(imagQ))
+        self.set('quex_rot_{}_real'.format(weight_function_I), 1.0)
+        self.set('quex_rot_{}_imag'.format(weight_function_I), 1.0)
+        self.set('quex_rot_{}_real'.format(weight_function_Q), 1.0)
+        self.set('quex_rot_{}_imag'.format(weight_function_Q), -1.0)
 
     def prepare_DSB_weight_and_rotation(self, IF, weight_function_I=0, weight_function_Q=1):
         trace_length = 4096
         tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
         cosI = np.array(np.cos(2*np.pi*IF*tbase))
         sinI = np.array(np.sin(2*np.pi*IF*tbase))
-        eval('self.quex_wint_weights_{}_real(np.array(cosI))'.format(
-            weight_function_I))
-        eval('self.quex_wint_weights_{}_imag(np.array(sinI))'.format(
-            weight_function_I))
-        eval('self.quex_wint_weights_{}_real(np.array(sinI))'.format(
-            weight_function_Q))
-        eval('self.quex_wint_weights_{}_imag(np.array(cosI))'.format(
-            weight_function_Q))
-        eval('self.quex_rot_{}_real(1.0)'.format(weight_function_I))
-        eval('self.quex_rot_{}_imag(0.0)'.format(weight_function_I))
-        eval('self.quex_rot_{}_real(1.0)'.format(weight_function_Q))
-        eval('self.quex_rot_{}_imag(0.0)'.format(weight_function_Q))
-
+        self.set('quex_wint_weights_{}_real'.format(weight_function_I),
+                 np.array(cosI))
+        self.set('quex_wint_weights_{}_real'.format(weight_function_Q),
+                 np.array(sinI))
+        # the factor 2 is needed so that scaling matches SSB downconversion
+        self.set('quex_rot_{}_real'.format(weight_function_I), 2.0)
+        self.set('quex_rot_{}_imag'.format(weight_function_I), 0.0)
+        self.set('quex_rot_{}_real'.format(weight_function_Q), 2.0)
+        self.set('quex_rot_{}_imag'.format(weight_function_Q), 0.0)
 
     def _make_full_path(self, path):
         if path[0] == '/':
@@ -733,7 +741,8 @@ class UHFQC(Instrument):
         wave_I_string = self.array_to_combined_vector_string(Iwave, "Iwave")
         wave_Q_string = self.array_to_combined_vector_string(Qwave, "Qwave")
         delay_samples = int(acquisition_delay*1.8e9/8)
-        delay_string = '\twait(getUserReg(2));\n'
+        #delay_string = '\twait(wait_delay);\n'
+        delay_string = ''
         self.awgs_0_userregs_2(delay_samples)
 
         preamble = """
@@ -743,6 +752,7 @@ const IAVG_TRIG = 0x000020;
 const WINT_EN   = 0x1f0000;
 setTrigger(WINT_EN);
 var loop_cnt = getUserReg(0);
+var wait_delay = getUserReg(2);
 var RO_TRIG;
 if(getUserReg(1)){
   RO_TRIG=IAVG_TRIG;
@@ -753,10 +763,10 @@ if(getUserReg(1)){
         loop_start = """
 repeat(loop_cnt) {
 \twaitDigTrigger(1, 1);
-\tplayWave(Iwave,Qwave);\n"""
+\tplayWave(Iwave, Qwave);\n"""
 
         end_string = """
-\tsetTrigger(WINT_EN +RO_TRIG);
+\tsetTrigger(WINT_EN + RO_TRIG);
 \tsetTrigger(WINT_EN);
 \twaitWave();
 }
@@ -775,7 +785,7 @@ setTrigger(0);"""
         join = False
         n = 0
         while n < len(array):
-            string += '{:.3f}'.format(array[n])
+            string += '{:.10f}'.format(array[n])
             if ((n+1) % 1024 != 0) and n < len(array)-1:
                 string += ','
 
@@ -809,12 +819,11 @@ if(getUserReg(1)){
 }
 repeat(loop_cnt) {
 \twaitDigTrigger(1, 1);\n
-\tsetTrigger(WINT_EN +RO_TRIG);
+\tsetTrigger(WINT_EN + RO_TRIG);
 \twait(5);
 \tsetTrigger(WINT_EN);
-\twait(300);
 }
-wait(1000);
+wait(10);
 setTrigger(0);"""
         self.awg_string(string)
 
@@ -839,8 +848,6 @@ setTrigger(0);"""
     def upload_transformation_matrix(self, matrix):
         for i in range(np.shape(matrix)[0]):  # looping over the rows
             for j in range(np.shape(matrix)[1]):  # looping over the colums
-                #value =matrix[i,j]
-                # print(value)
                 eval(
                     'self.quex_trans_{}_col_{}_real(matrix[{}][{}])'.format(j, i, i, j))
 

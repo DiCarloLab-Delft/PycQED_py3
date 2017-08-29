@@ -6,6 +6,7 @@ from scipy.optimize import fmin_powell
 from pycqed.measurement import hdf5_data as h5d
 from pycqed.utilities import general
 from pycqed.utilities.general import dict_to_ordered_tuples
+from pycqed.utilities.get_default_datadir import get_default_datadir
 
 # Used for auto qcodes parameter wrapping
 from pycqed.measurement import sweep_functions as swf
@@ -40,10 +41,16 @@ class MeasurementControl(Instrument):
     data points.
     '''
 
-    def __init__(self, name,
-                 plotting_interval=3,
-                 live_plot_enabled=True, verbose=True):
+    def __init__(self, name: str,
+                 plotting_interval: float=3,
+                 datadir: str=get_default_datadir(),
+                 live_plot_enabled: bool=True, verbose: bool=True):
         super().__init__(name=name, server_name=None)
+
+        self.add_parameter('datadir',
+                           initial_value=datadir,
+                           vals=vals.Strings(),
+                           parameter_class=ManualParameter)
         # Soft average is currently only available for "hard"
         # measurements. It does not work with adaptive measurements.
         self.add_parameter('soft_avg',
@@ -100,9 +107,21 @@ class MeasurementControl(Instrument):
     # Functions used to control the measurements #
     ##############################################
 
-    def run(self, name=None, mode='1D', **kw):
+    def run(self, name: str=None, exp_metadata: dict=None,
+            mode: str='1D', **kw):
         '''
         Core of the Measurement control.
+
+        Args:
+            name (string):
+                    Name of the measurement. This name is included in the
+                    name of the data files.
+            exp_metadata (dict):
+                    Dictionary containing experimental metadata that is saved
+                    to the data file at the location
+                        file['Experimental Data']['Experimental Metadata']
+            mode (str):
+                    Measurement mode. Can '1D', '2D', or 'adaptive'.
         '''
         # Setting to zero at the start of every run, used in soft avg
         self.soft_iteration = 0
@@ -114,7 +133,8 @@ class MeasurementControl(Instrument):
         return_dict = {}
         self.last_sweep_pts = None  # used to prevent resetting same value
 
-        with h5d.Data(name=self.get_measurement_name()) as self.data_object:
+        with h5d.Data(name=self.get_measurement_name(),
+                      datadir=self.datadir()) as self.data_object:
             self.get_measurement_begintime()
             # Commented out because requires git shell interaction from python
             # self.get_git_hash()
@@ -137,9 +157,12 @@ class MeasurementControl(Instrument):
             elif self.mode == 'adaptive':
                 self.measure_soft_adaptive()
             else:
-                raise ValueError('mode %s not recognized' % self.mode)
+                raise ValueError('Mode "{}" not recognized.'
+                                 .format(self.mode))
             result = self.dset[()]
             self.save_MC_metadata(self.data_object)  # timing labels etc
+            if exp_metadata is not None:
+                self.save_exp_metadata(exp_metadata, self.data_object)
             return_dict = self.create_experiment_result_dict()
 
         self.finish(result)
@@ -172,11 +195,12 @@ class MeasurementControl(Instrument):
                     swf_sweep_points = sweep_points[:, i]
                     val = swf_sweep_points[0]
                     sweep_function.set_parameter(val)
+                    # bug? can not set parameter value for hard sweep.
                 self.detector_function.prepare(
                     sweep_points=sweep_points[:self.xlen, 0])
                 self.measure_hard()
 
-            # will not be complet if it is a 2D loop, soft avg or many shots
+            # will not be complete if it is a 2D loop, soft avg or many shots
             if not self.is_complete():
                 pts_per_iter = self.dset.shape[0]
                 swp_len = np.shape(sweep_points)[0]
@@ -794,6 +818,13 @@ class MeasurementControl(Instrument):
             logging.warning('No station object specified, could not save',
                             ' instrument settings')
         else:
+            # This saves the snapshot of the entire setup
+            snap_grp = data_object.create_group('Snapshot')
+            snap = self.station.snapshot()
+            h5d.write_dict_to_hdf5(snap, entry_point=snap_grp)
+
+            # Below is old style saving of snapshot, exists for the sake of
+            # preserving deprecated functionality
             set_grp = data_object.create_group('Instrument settings')
             inslist = dict_to_ordered_tuples(self.station.components)
             for (iname, ins) in inslist:
@@ -823,6 +854,31 @@ class MeasurementControl(Instrument):
         set_grp.attrs['mode'] = self.mode
         set_grp.attrs['measurement_name'] = self.measurement_name
         set_grp.attrs['live_plot_enabled'] = self.live_plot_enabled()
+
+    @classmethod
+    def save_exp_metadata(self, metadata: dict, data_object):
+        '''
+        Saves experiment metadata to the data file. The metadata is saved at
+            file['Experimental Data']['Experimental Metadata']
+
+        Args:
+            metadata (dict):
+                    Simple dictionary without nesting. An attribute will be
+                    created for every key in this dictionary.
+            data_object:
+                    An open hdf5 data object.
+        '''
+        if 'Experimental Data' in data_object:
+            data_group = data_object['Experimental Data']
+        else:
+            data_group = data_object.create_group('Experimental Data')
+
+        if 'Experimental Metadata' in data_group:
+            metadata_group = data_group['Experimental Metadata']
+        else:
+            metadata_group = data_group.create_group('Experimental Metadata')
+
+        h5d.write_dict_to_hdf5(metadata, entry_point=metadata_group)
 
     def print_progress(self, stop_idx=None):
         if self.verbose():
