@@ -503,7 +503,7 @@ def OffOn_seq(pulse_pars, RO_pars, verbose=False, pulse_comb='OffOn',
     spacer = {'pulse_type': 'SquarePulse',
               'channel': RO_pars['acq_marker_channel'],
               'amplitude': 0.0,
-              'length': max(0, 180e-9 - pulse_pars['pulse_delay'] -
+              'length': max(0, 300e-9 - pulse_pars['pulse_delay'] -
                             - pulse_pars['nr_sigma']*pulse_pars['sigma']),
               'pulse_delay': 0}
 

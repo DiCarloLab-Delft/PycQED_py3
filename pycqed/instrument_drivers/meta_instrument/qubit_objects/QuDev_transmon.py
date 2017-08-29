@@ -919,7 +919,7 @@ class QuDev_transmon(Qubit):
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
-    def set_default_readout_weights(self, channels=(0, 1)):
+    def set_default_readout_weights(self, channels=(0, 1), theta=0):
         """
         Sets the integration weights of the channels `RO_acq_weight_I` and
         `RO_acq_weight_Q` to the default sinusoidal values. The integration
@@ -936,8 +936,8 @@ class QuDev_transmon(Qubit):
 
         trace_length = 4096
         tbase = np.arange(0, trace_length / 1.8e9, 1 / 1.8e9)
-        cosI = np.array(np.cos(2 * np.pi * self.f_RO_mod() * tbase))
-        sinI = np.array(np.sin(2 * np.pi * self.f_RO_mod() * tbase))
+        cosI = np.array(np.cos(2 * np.pi * self.f_RO_mod() * tbase) + theta)
+        sinI = np.array(np.sin(2 * np.pi * self.f_RO_mod() * tbase) + theta)
 
         c1 = self.RO_acq_weight_function_I()
         c2 = self.RO_acq_weight_function_Q()
