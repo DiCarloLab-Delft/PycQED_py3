@@ -114,7 +114,7 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
         # simultaneous
         if pulse_pars['refpoint'] == 'simultaneous':
             pulse_pars['refpoint'] = 'start'
-            t0 = 0
+            t0 = pulse_pars['pulse_delay']
 
         if cur_op_type == 'Flux':
             # Adds flux pulses to a list for automatic compensation pulses
@@ -251,10 +251,11 @@ def distort_and_compensate(element, distortion_dict):
     """
     t_vals, outputs_dict = element.waveforms()
     for ch in distortion_dict['ch_list']:
-        element._channels[ch]['distorted'] = True
+        element.chan_distorted[ch] = True
         length = len(outputs_dict[ch])
         kernelvec = distortion_dict[ch]
         outputs_dict[ch] = np.convolve(
             outputs_dict[ch], kernelvec)[:length]
-        element.distorted_wfs[ch] = outputs_dict[ch][:len(t_vals)]
+        element.distorted_wfs[ch] = outputs_dict[ch][:len(t_vals[ch])]
+        print(ch, length, len(t_vals[ch]), kernelvec, element.distorted_wfs)
     return element

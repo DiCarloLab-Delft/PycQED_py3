@@ -21,7 +21,7 @@ reload(pulse)
 from pycqed.measurement.waveform_control import pulse_library
 reload(pulse_library)
 
-station = qc.station
+#station = qc.station
 
 
 def single_pulse_seq(pulse_pars=None,
