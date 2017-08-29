@@ -287,6 +287,7 @@ class Rabi_2nd_exc(swf.Hard_Sweep):
 #     def set_parameter(self, val, **kw):
 #         pass
 
+
 class chevron_single_element(swf.Soft_Sweep):
 
     def __init__(self, pulse_length, mw_pulse_pars, RO_pars,
