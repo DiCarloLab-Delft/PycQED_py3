@@ -116,6 +116,14 @@ class QuDev_transmon(Qubit):
                            vals=vals.Ints(0, 4095),
                            parameter_class=ManualParameter)
 
+        self.add_parameter('RO_IQ_angle', initial_value=0,
+                           docstring='The angle of the readout transmission'
+                                     'on the IQ plane that provides the '
+                                     'highest discrimination for the e- '
+                                     'and g- states',
+                           label='RO IQ angle', unit='rad',
+                           parameter_class=ManualParameter)
+
         # add pulsed spectroscopy pulse parameters
         self.add_operation('Spec')
         self.add_pulse_parameter('Spec', 'spec_pulse_type', 'pulse_type',
@@ -216,14 +224,16 @@ class QuDev_transmon(Qubit):
                                  initial_value=None, vals=vals.Strings())
         self.add_pulse_parameter('flux', 'flux_pulse_Q_channel', 'flux_Q_channel',
                                  initial_value=None, vals=vals.Strings())
-        self.add_pulse_parameter('flux', 'flux_pulse_amp', 'flux_amplitude',
+        self.add_pulse_parameter('flux', 'flux_pulse_amp', 'amplitude',
                                  initial_value=1, vals=vals.Numbers())
-        self.add_pulse_parameter('flux', 'flux_pulse_length', 'flux_length',
+        self.add_pulse_parameter('flux', 'flux_pulse_length', 'length',
                                  initial_value=None, vals=vals.Numbers())
         self.add_pulse_parameter('flux', 'flux_pulse_delay', 'flux_pulse_delay',
                                  initial_value=None, vals=vals.Numbers())
         self.add_pulse_parameter('flux', 'flux_f_pulse_mod', 'flux_mod_frequency',
                                  initial_value=None, vals=vals.Numbers())
+
+
 
         self.update_detector_functions()
 
@@ -919,7 +929,7 @@ class QuDev_transmon(Qubit):
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
-    def set_default_readout_weights(self, channels=(0, 1), theta=0):
+    def set_default_readout_weights(self, channels=(0, 1), theta=None):
         """
         Sets the integration weights of the channels `RO_acq_weight_I` and
         `RO_acq_weight_Q` to the default sinusoidal values. The integration
@@ -934,10 +944,13 @@ class QuDev_transmon(Qubit):
                       the default value `(0, 1)`.
         """
 
+        if theta is None:
+            theta = self.RO_IQ_angle()
+
         trace_length = 4096
         tbase = np.arange(0, trace_length / 1.8e9, 1 / 1.8e9)
-        cosI = np.array(np.cos(2 * np.pi * self.f_RO_mod() * tbase) + theta)
-        sinI = np.array(np.sin(2 * np.pi * self.f_RO_mod() * tbase) + theta)
+        cosI = np.array(np.cos(2 * np.pi * self.f_RO_mod() * tbase + theta))
+        sinI = np.array(np.sin(2 * np.pi * self.f_RO_mod() * tbase + theta))
 
         c1 = self.RO_acq_weight_function_I()
         c2 = self.RO_acq_weight_function_Q()
@@ -1215,6 +1228,64 @@ class QuDev_transmon(Qubit):
                 return ana.F_a, ana.F_d, ana.SNR
             else:
                 return ana.F_a
+
+    def find_readout_angle(self, MC=None, upload=True, close_fig=True, update=True, nreps=10):
+        """
+        Finds the optimal angle on the IQ plane for readout (optimal phase for
+        the boxcar integration weights)
+        If the Q wint channel is set to `None`, sets it to the next channel
+        after I.
+
+        Args:
+            MC: MeasurementControl object to use. Default `None`.
+            upload: Whether to update the AWG sequence. Default `True`.
+            close_fig: Wheter to close the figures in measurement analysis.
+                       Default `True`.
+            update: Whether to update the integration weights and the  Default `True`.
+            nreps: Default 10.
+        """
+        if MC is None:
+            MC = self.MC
+
+        label = 'RO_theta'
+        if self.RO_acq_weight_function_Q() is None:
+            self.RO_acq_weight_function_Q((self.RO_acq_weight_function_I() + 1)%5)
+        self.set_default_readout_weights(theta=0)
+        prev_shots = self.RO_acq_shots()
+        self.RO_acq_shots(2*(self.RO_acq_shots()//2))
+        self.prepare_for_timedomain()
+        MC.set_sweep_function(awg_swf.OffOn(
+            pulse_pars=self.get_drive_pars(),
+            RO_pars=self.get_RO_pars(),
+            upload=upload,
+            preselection=False))
+        spoints = np.arange(self.RO_acq_shots())
+        MC.set_sweep_points(np.arange(self.RO_acq_shots()))
+        MC.set_detector_function(self.int_log_det)
+        prev_avg = MC.soft_avg()
+        MC.soft_avg(1)
+
+        mode = '1D'
+        if nreps > 1:
+            MC.set_sweep_function_2D(swf.None_Sweep())
+            MC.set_sweep_points_2D(np.arange(nreps))
+            mode = '2D'
+
+        MC.run(name=label+self.msmt_suffix, mode=mode)
+
+        MC.soft_avg(prev_avg)
+        self.RO_acq_shots(prev_shots)
+
+        rotate = self.RO_acq_weight_function_Q() is not None
+        channels = self.int_log_det.value_names
+        ana = ma.SSRO_Analysis(auto=True, close_fig=close_fig,
+                               rotate=rotate, no_fits=True,
+                               channels=channels,
+                               preselection=False)
+        if update:
+            self.RO_IQ_angle(ana.theta)
+            self.set_default_readout_weights(theta=ana.theta)
+        return ana.theta
 
     def measure_flux_detuning(self, flux_params=None, n=1, ramsey_times=None,
                               artificial_detuning=0, MC=None,
