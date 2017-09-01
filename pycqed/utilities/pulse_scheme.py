@@ -15,14 +15,27 @@ def new_pulse_fig(figsize):
     return fig, ax
 
 
-def mwPulse(ax, pos, width=1.5, label=None, phase=0, labelHeight=1.3,
+def new_pulse_subplot(fig, *args, **kwargs):
+    '''
+    Add a new subplot configured for plotting pulse schemes to a figure.
+    All *args and **kwargs are passed to fig.add_subplot.
+    '''
+    ax = fig.add_subplot(*args, **kwargs)
+    ax.axis('off')
+    fig.subplots_adjust(bottom=0, top=1, left=0, right=1)
+    ax.axhline(0, color='0.75')
+
+    return ax
+
+
+def mwPulse(ax, pos, width=1.5, amp=1, label=None, phase=0, labelHeight=1.3,
             color='C0'):
     '''
     Draw a microwave pulse: Gaussian envelope with modulation.
     '''
     x = np.linspace(pos, pos + width, 100)
-    envPos = np.exp(-(x - (pos + width / 2))**2 / (width / 4)**2)
-    envNeg = -np.exp(-(x - (pos + width / 2))**2 / (width / 4)**2)
+    envPos = amp * np.exp(-(x - (pos + width / 2))**2 / (width / 4)**2)
+    envNeg = -amp * np.exp(-(x - (pos + width / 2))**2 / (width / 4)**2)
     mod = envPos * np.sin(2 * np.pi * 3 / width * x + phase)
 
     ax.plot(x, envPos, '--', color=color)
@@ -36,7 +49,8 @@ def mwPulse(ax, pos, width=1.5, label=None, phase=0, labelHeight=1.3,
     return pos + width
 
 
-def fluxPulse(ax, pos, width=2.5, s=.1, amp=1.5, color='C1'):
+def fluxPulse(ax, pos, width=2.5, s=.1, amp=1.5, label=None, labelHeight=1.7,
+              color='C1'):
     '''
     Draw a smooth flux pulse, where the rising and falling edges are given by
     Fermi-Dirac functions.
@@ -48,6 +62,10 @@ def fluxPulse(ax, pos, width=2.5, s=.1, amp=1.5, color='C1'):
 
     ax.fill_between(x, y, color=color, alpha=0.3)
     ax.plot(x, y, color=color)
+
+    if label is not None:
+        ax.text(pos + width / 2, labelHeight, label,
+                horizontalalignment='center', color=color)
 
     return pos + width
 

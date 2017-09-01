@@ -22,3 +22,30 @@ pls.interval(ax, p1, p2 + 0.5, height=-.6, labelHeight=-0.5, label='$\\tau$',
 ax.set_ylim(-1.2, 2.5)
 
 plt.show()
+
+
+# Two-qubit pulse scheme (Grover's algorithm)
+
+fig = plt.figure(figsize=(9*cm, 5*cm))
+
+labHeight = 1.25
+
+ax1 = pls.new_pulse_subplot(fig, 211)
+p1 = pls.mwPulse(ax1, 0, label='$G_0$', labelHeight=labHeight)
+p2 = pls.fluxPulse(ax1, p1, label='CZ')
+p3 = pls.mwPulse(ax1, p2, label='$Y_{\\pi/2}$', labelHeight=labHeight)
+p4 = pls.fluxPulse(ax1, p3, label='CZ')
+p5 = pls.mwPulse(ax1, p4, label='$Y_{\\pi/2}$', labelHeight=labHeight)
+
+ax1.text(-.5, 0, '$Q_0$', va='center', ha='right')
+
+ax2 = pls.new_pulse_subplot(fig, 212, sharex=ax1, sharey=ax1)
+pls.mwPulse(ax2, 0, label='$G_1$', labelHeight=labHeight)
+pls.mwPulse(ax2, p2, label='$Y_{\\pi/2}$', labelHeight=labHeight)
+pls.mwPulse(ax2, p4, label='$Y_{\\pi/2}$', labelHeight=labHeight)
+
+ax2.text(-.5, 0, '$Q_1$', va='center', ha='right')
+
+fig.subplots_adjust(left=.07, top=.9, hspace=.1)
+
+plt.show()
