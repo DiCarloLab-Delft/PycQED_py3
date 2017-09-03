@@ -93,7 +93,7 @@ class MeasurementAnalysis(object):
 
         if qb_name is None:
             logging.warning('qb_name is None. Default value qb_name="qb" is '
-                            'used. Old parameter values might be retrieved.')
+                            'used. Old parameter values might not be retrieved.')
             self.qb_name = 'qb'
         else:
             self.qb_name = qb_name
@@ -4644,6 +4644,7 @@ class Ramsey_Analysis_multiple_detunings(TD_Analysis):
             self.sweep_pts = sweep_pts_1
             self.good_ramsey_freq = ramsey_freq_1
             qb_stderr = ramsey_freq_dict_1['freq_stderr']
+
         else:
             # art_det 2 was correct direction
             # print('Artificial detuning {:.1f} MHz gave the best results.'.format(
@@ -4684,6 +4685,7 @@ class Ramsey_Analysis_multiple_detunings(TD_Analysis):
         fit_res_array = [fit_res_1, fit_res_2]
         ramsey_data_dict = {'0':ramsey_data_1,
                             '1':ramsey_data_2}
+
         for i in range(len_art_det):
             ax = self.axs[i]
             self.plot_results_vs_sweepparam(x=self.sweep_pts*scale,
@@ -5212,7 +5214,9 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
     '''
 
     def __init__(self, label='RB', T1=None, pulse_delay=None, **kw):
+
         self.T1 = T1
+
         self.pulse_delay = pulse_delay
 
         super().__init__(**kw)
@@ -5244,7 +5248,7 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
         Formula from Asaad et al.
         pulse separation is time between start of pulses
         '''
-        Np = 1.875  # Number of gates per Clifford
+        Np = 1.875  # Number of gates per Clifford for XY_pi/2 decomposition
         F_cl = (1/6*(3 + 2*np.exp(-1*pulse_delay/(2*T1)) +
                      np.exp(-pulse_delay/T1)))**Np
         p = 2*F_cl - 1

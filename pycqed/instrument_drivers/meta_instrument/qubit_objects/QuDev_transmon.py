@@ -742,6 +742,10 @@ class QuDev_transmon(Qubit):
         if MC is None:
             MC = self.MC
 
+        # Define the measurement label
+        if label == '':
+            label = 'Ramsey_mult_det' + self.msmt_suffix
+
         Rams_swf = awg_swf.Ramsey_multiple_detunings(
             pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(),
             artificial_detunings=artificial_detunings, cal_points=cal_points,
@@ -749,7 +753,7 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_function(Rams_swf)
         MC.set_sweep_points(times)
         MC.set_detector_function(self.int_avg_det)
-        MC.run('Ramsey_mult_det'+label+self.msmt_suffix)
+        MC.run(label)
 
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
@@ -845,12 +849,12 @@ class QuDev_transmon(Qubit):
             logging.warning('The values in the times array might be too large.'
                             'The units should be seconds.')
 
-        if label is None:
-            label = 'Ramsey_2nd_multiple_detunings'+self.msmt_suffix
-
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC
+
+        if label is None:
+            label = 'Ramsey_mult_det_2nd'+self.msmt_suffix
 
         Rams_2nd_swf = awg_swf.Ramsey_2nd_exc_multiple_detunings(
             pulse_pars=self.get_drive_pars(),
@@ -907,7 +911,8 @@ class QuDev_transmon(Qubit):
 
     def measure_randomized_benchmarking(self, nr_cliffords=None, nr_seeds=50,
                                         T1=None, MC=None, close_fig=True,
-                                        upload=True, analyze=True):
+                                        upload=True, analyze=True,
+                                        double_curves=False, label=None):
         '''
         Performs a randomized benchmarking fidelity.
         Optionally specifying T1 also shows the T1 limited fidelity.
@@ -918,13 +923,15 @@ class QuDev_transmon(Qubit):
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC
+        if label is None:
+            label = 'RB_{}seeds'.format(nr_seeds)+self.msmt_suffix
 
         MC.set_sweep_function(awg_swf.Randomized_Benchmarking(
             pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(),
-            double_curves=True,
+            double_curves=double_curves,
             nr_cliffords=nr_cliffords, nr_seeds=nr_seeds, upload=upload))
         MC.set_detector_function(self.int_avg_det)
-        MC.run('RB_{}seeds'.format(nr_seeds)+self.msmt_suffix)
+        MC.run(label)
 
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
@@ -1669,8 +1676,8 @@ class QuDev_transmon(Qubit):
             MC = self.MC
 
         if (cal_points) and (no_cal_points is None):
-            logging.warning('no_cal_points is None. Defaults to 4 is for_ef==False,'
-                            'or to 6 is for_ef==True.')
+            logging.warning('no_cal_points is None. Defaults to 4 if for_ef==False,'
+                            'or to 6 if for_ef==True.')
             if for_ef:
                 no_cal_points = 6
             else:
@@ -1744,7 +1751,7 @@ class QuDev_transmon(Qubit):
 
     def find_T1(self, times, label=None, for_ef=False, update=False, MC=None,
                 cal_points=True, no_cal_points=None, close_fig=True,
-                last_ge_pulse=True, **kw):
+                last_ge_pulse=True, upload=True, **kw):
 
         """
         Finds the relaxation time T1 from the fit to an exponential
@@ -1807,8 +1814,8 @@ class QuDev_transmon(Qubit):
                             'large.The units should be seconds.')
 
         if (cal_points) and (no_cal_points is None):
-            logging.warning('no_cal_points is None. Defaults to 4 is for_ef==False,'
-                            'or to 6 is for_ef==True.')
+            logging.warning('no_cal_points is None. Defaults to 4 if for_ef==False,'
+                            'or to 6 if for_ef==True.')
             if for_ef:
                 no_cal_points = 6
             else:
@@ -1845,12 +1852,14 @@ class QuDev_transmon(Qubit):
                                 close_fig=close_fig,
                                 cal_points=cal_points,
                                 no_cal_points=no_cal_points,
-                                last_ge_pulse=last_ge_pulse)
+                                last_ge_pulse=last_ge_pulse,
+                                upload=upload)
 
         else:
             self.measure_T1(times=times, MC=MC,
                             close_fig=close_fig,
-                            cal_points=cal_points)
+                            cal_points=cal_points,
+                            upload=upload)
 
         #Extract T1 and T1_stddev from ma.T1_Analysis
         if kw.pop('analyze',True):
@@ -1870,6 +1879,68 @@ class QuDev_transmon(Qubit):
             return T1_dict
         else:
             return
+
+    def find_RB_gate_fidelity(self, nr_cliffords, label=None, nr_seeds=10,
+                              update=False, MC=None, cal_points=True,
+                              no_cal_points=None, close_fig=True,
+                              upload=True, **kw):
+
+        for_ef = kw.pop('for_ef', False)
+        last_ge_pulse = kw.pop('last_ge_pulse', True)
+        analyze = kw.pop('analyze', True)
+        double_curves = kw.pop('double_curves', False)
+        show = kw.pop('show', False)
+
+        if self.T1() is not None:
+            T1 = self.T1()
+        else:
+            T1 = None
+
+        if not update:
+            logging.warning("Does not automatically update the qubit "
+                            "parameter. Set update=True if you want this!")
+
+        if (cal_points) and (no_cal_points is None):
+            logging.warning('no_cal_points is None. Defaults to 4 if for_ef==False,'
+                            'or to 6 if for_ef==True.')
+            if for_ef:
+                no_cal_points = 6
+            else:
+                no_cal_points = 4
+
+        if not cal_points:
+            no_cal_points = 0
+
+        if MC is None:
+            MC = self.MC
+
+        if nr_cliffords is None:
+            raise ValueError("Unspecified nr_cliffords")
+
+        if label is None:
+            label = 'RB_{}seeds'.format(nr_seeds)+self.msmt_suffix
+
+        #Perform measurement
+        self.measure_randomized_benchmarking(nr_cliffords=nr_cliffords,
+                                             double_curves=double_curves,
+                                             nr_seeds=nr_seeds, MC=MC,
+                                             close_fig=close_fig,
+                                             label=label,
+                                             analyze=analyze,
+                                             upload=upload,
+                                             T1=T1)
+
+        #Analysis
+        if analyze:
+            pulse_delay = self.gauss_sigma() * self.nr_sigma()
+            RB_Analysis = ma.RandomizedBenchmarking_Analysis(label=label,
+                                         qb_name=self.name,
+                                         T1=T1, pulse_delay=pulse_delay,
+                                         NoCalPoints=no_cal_points,
+                                         for_ef=for_ef, show=show,
+                                         last_ge_pulse=last_ge_pulse, **kw)
+
+        return
 
     def find_frequency_T2_ramsey(self, times, for_ef=False, artificial_detuning=0, update=False, MC=None,
                                      cal_points=True, close_fig=True, upload=True,
@@ -1923,8 +1994,8 @@ class QuDev_transmon(Qubit):
                             'large.The units should be seconds.')
 
         if (cal_points is True) and (no_cal_points is None):
-            logging.warning('no_cal_points is None. Defaults to 4 is for_ef==False,'
-                            'or to 6 is for_ef==True.')
+            logging.warning('no_cal_points is None. Defaults to 4 if for_ef==False,'
+                            'or to 6 if for_ef==True.')
             if for_ef:
                 no_cal_points = 6
             else:
@@ -2005,7 +2076,7 @@ class QuDev_transmon(Qubit):
 
 
     def calibrate_ramsey(self, times, for_ef=False,
-                         artificial_detunings=None, update=False,
+                         artificial_detunings=None, update=False, label=None,
                          MC=None, cal_points=True, no_cal_points=None,
                          close_fig=True, upload=True, last_ge_pulse=True, **kw):
 
@@ -2051,8 +2122,8 @@ class QuDev_transmon(Qubit):
             logging.warning('The values in the times array might be too large.')
 
         if (cal_points is True) and (no_cal_points is None):
-            logging.warning('no_cal_points is None. Defaults to 4 is for_ef==False,'
-                            'or to 6 is for_ef==True.')
+            logging.warning('no_cal_points is None. Defaults to 4 if for_ef==False,'
+                            'or to 6 if for_ef==True.')
             if for_ef:
                 no_cal_points = 6
             else:
@@ -2069,6 +2140,12 @@ class QuDev_transmon(Qubit):
                             "which times to do Ramsey. Please specify the "
                             "times_mean or the times function parameter.")
 
+        if label is None:
+            if for_ef:
+                label = 'Ramsey_mult_det_2nd' +self.msmt_suffix
+            else:
+                label = 'Ramsey_mult_det' + self.msmt_suffix
+
         # Each time value must be repeated len(artificial_detunings) times to
         # correspond to the logic in Ramsey_seq_multiple_detunings sequence
         len_art_det = len(artificial_detunings)
@@ -2082,6 +2159,7 @@ class QuDev_transmon(Qubit):
             self.measure_ramsey_multiple_detunings(times=times,
                                 artificial_detunings=artificial_detunings,
                                 MC=MC,
+                                label=label,
                                 cal_points=cal_points,
                                 close_fig=close_fig, upload=upload)
 
@@ -2090,11 +2168,12 @@ class QuDev_transmon(Qubit):
                                 artificial_detunings=artificial_detunings,
                                 cal_points=cal_points, no_cal_points=no_cal_points,
                                 close_fig=close_fig, upload=upload,
-                                last_ge_pulse=last_ge_pulse, MC=MC)
+                                last_ge_pulse=last_ge_pulse, MC=MC, label=label)
 
         # Analyze data if analyze==True
         if kw.pop('analyze',True):
             RamseyA = ma.Ramsey_Analysis_multiple_detunings(auto=True,
+                                label=label,
                                 qb_name=self.name,
                                 NoCalPoints=no_cal_points,
                                 for_ef=for_ef,
@@ -2214,8 +2293,8 @@ class QuDev_transmon(Qubit):
                             "Set update=True if you want this!")
 
         if (cal_points) and (no_cal_points is None):
-            logging.warning('no_cal_points is None. Defaults to 4 is for_ef==False,'
-                            'or to 6 is for_ef==True.')
+            logging.warning('no_cal_points is None. Defaults to 4 if for_ef==False,'
+                            'or to 6 if for_ef==True.')
             if for_ef:
                 no_cal_points = 6
             else:

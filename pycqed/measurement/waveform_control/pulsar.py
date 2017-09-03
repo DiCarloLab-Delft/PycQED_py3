@@ -187,7 +187,7 @@ class Pulsar(Instrument):
             for AWG in self.used_AWGs():
                 if AWG != self.master_AWG():
                     self._start_AWG(AWG)
-            time.sleep(0.2)  # wait 0.2 second for all other awg-s to start
+            time.sleep(0.3)  # wait 0.2 second for all other awg-s to start
             self._start_AWG(self.master_AWG())
 
     def stop(self):
