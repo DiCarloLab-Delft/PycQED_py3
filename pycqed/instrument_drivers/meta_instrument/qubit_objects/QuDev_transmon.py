@@ -159,7 +159,6 @@ class QuDev_transmon(Qubit):
                                  initial_value=None, vals=vals.Strings())
         self.add_pulse_parameter('RO', 'RO_pulse_phase', 'phase',
                                  initial_value=None, vals=vals.Numbers())
-
         # add drive pulse parameters
         self.add_operation('X180')
         self.add_pulse_parameter('X180', 'pulse_type', 'pulse_type',
@@ -210,20 +209,27 @@ class QuDev_transmon(Qubit):
 
         # add flux pulse parameters
         self.add_operation('flux')
-        self.add_pulse_parameter('flux', 'flux_pulse_type', 'flux_pulse_type',
+        self.add_pulse_parameter('flux', 'flux_pulse_type', 'pulse_type',
                                  initial_value=None, vals=vals.Strings())
-        self.add_pulse_parameter('flux', 'flux_pulse_I_channel', 'flux_I_channel',
+        self.add_pulse_parameter('flux', 'flux_pulse_channel', 'channel',
                                  initial_value=None, vals=vals.Strings())
-        self.add_pulse_parameter('flux', 'flux_pulse_Q_channel', 'flux_Q_channel',
-                                 initial_value=None, vals=vals.Strings())
-        self.add_pulse_parameter('flux', 'flux_pulse_amp', 'flux_amplitude',
-                                 initial_value=1, vals=vals.Numbers())
-        self.add_pulse_parameter('flux', 'flux_pulse_length', 'flux_length',
+        self.add_pulse_parameter('flux', 'flux_pulse_amp', 'amplitude',
                                  initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('flux', 'flux_pulse_delay', 'flux_pulse_delay',
+        self.add_pulse_parameter('flux', 'flux_pulse_length', 'length',
                                  initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('flux', 'flux_f_pulse_mod', 'flux_mod_frequency',
+        self.add_pulse_parameter('flux', 'flux_pulse_delay', 'pulse_delay',
                                  initial_value=None, vals=vals.Numbers())
+        self.add_pulse_parameter('flux', 'flux_pulse_buffer', 'buffer',
+                                 initial_value=None, vals=vals.Numbers())
+        self.add_pulse_parameter('flux', 'flux_pulse_sigma', 'sigma',
+                                 initial_value=0, vals=vals.Numbers())
+        # self.add_pulse_parameter('flux', 'flux_f_pulse_mod', 'mod_frequency',
+        #                          initial_value=None, vals=vals.Numbers())
+        # self.add_pulse_parameter('flux','flux_pulse_buffer','pulse_buffer',
+        #                          initial_value=None,vals= vals.Numbers())
+        # self.add_pulse_parameter('flux','kernel_path','kernel_path',
+        #                          initial_value=None,vals=vals.Strings())
+
 
         self.update_detector_functions()
 
