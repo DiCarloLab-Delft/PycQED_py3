@@ -1327,7 +1327,8 @@ class TD_Analysis(MeasurementAnalysis):
     def __init__(self, NoCalPoints=4, center_point=31, make_fig=True,
                  zero_coord=None, one_coord=None, cal_points=None,
                  rotate_and_normalize=True, last_ge_pulse=True,
-                 plot_cal_points=True, for_ef=False, start_at_zero=False, **kw):
+                 plot_cal_points=True, for_ef=False, start_at_zero=False,
+                 qb_name=None, **kw):
         self.NoCalPoints = NoCalPoints
         self.normalized_values = []
         self.normalized_cal_vals = []
@@ -1343,7 +1344,7 @@ class TD_Analysis(MeasurementAnalysis):
         self.analyze_ef = for_ef
         self.start_at_zero = start_at_zero
 
-        super(TD_Analysis, self).__init__(**kw)
+        super(TD_Analysis, self).__init__(qb_name=qb_name, **kw)
 
     # def run_default_analysis(self, close_file=True, **kw):
     #     self.get_naming_and_values()
@@ -1783,10 +1784,11 @@ class Rabi_Analysis(TD_Analysis):
 
     """
 
-    def __init__(self, label='Rabi', **kw):
+    def __init__(self, label='Rabi', qb_name=None, **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
-        super(self.__class__, self).__init__(start_at_zero=True, **kw)
+        super(self.__class__, self).__init__(start_at_zero=True,
+                                             qb_name=qb_name, **kw)
 
     def fit_Rabi(self, print_fit_results=True):
         cos_mod = fit_mods.CosModel
@@ -4418,7 +4420,7 @@ class Ramsey_Analysis_multiple_detunings(TD_Analysis):
 
     def fit_Ramsey(self, x, y, **kw):
 
-        print_fit_results = kw.pop('print_fit_results',True)
+        print_fit_results = kw.pop('print_fit_results', True)
         damped_osc_mod = fit_mods.ExpDampOscModel
         average = np.mean(y)
 
@@ -5216,6 +5218,8 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
     def __init__(self, label='RB', T1=None, pulse_delay=None, **kw):
 
         self.T1 = T1
+        if self.T1==0:
+            self.T1=None
 
         self.pulse_delay = pulse_delay
 
@@ -5337,6 +5341,8 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
         RBModel.set_param_hint('Amplitude', value=-0.5)
         RBModel.set_param_hint('p', value=.99)
         RBModel.set_param_hint('offset', value=.5)
+        # From Magesan et al., Scalable and Robust Randomized Benchmarking
+        # of Quantum Processes
         RBModel.set_param_hint('fidelity_per_Clifford',  # vary=False,
                                expr='(p + (1-p)/2)')
         RBModel.set_param_hint('error_per_Clifford',  # vary=False,

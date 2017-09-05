@@ -397,7 +397,7 @@ class QuDev_transmon(Qubit):
         self.heterodyne.frequency(previous_freq)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
 
     def measure_homodyne_acqusition_delay(self, delays=None, MC=None,
                                           analyze=True, close_fig=True):
@@ -492,7 +492,7 @@ class QuDev_transmon(Qubit):
 
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
 
     def measure_rabi(self, amps=None, MC=None, analyze=True,
                      close_fig=True, cal_points=True, no_cal_points=2,
@@ -545,7 +545,7 @@ class QuDev_transmon(Qubit):
 
         # Create a MeasurementAnalysis object for this measurement
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
 
     def measure_rabi_2nd_exc(self, amps=None, n=1, MC=None, analyze=True,
                              label=None, last_ge_pulse=True,
@@ -575,7 +575,7 @@ class QuDev_transmon(Qubit):
         MC.run(label)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
 
     def measure_rabi_amp90(self, scales=np.linspace(0.3, 0.7, 31), n=1,
                            MC=None, analyze=True, close_fig=True, upload=True):
@@ -619,7 +619,7 @@ class QuDev_transmon(Qubit):
         MC.run(label)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
 
     def measure_T1_2nd_exc(self, times=None, MC=None, analyze=True, upload=True,
                            close_fig=True, cal_points=True, no_cal_points=6,
@@ -652,7 +652,7 @@ class QuDev_transmon(Qubit):
         MC.run(label)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
 
 
     def measure_qscale(self, qscales=None, MC=None, analyze=True, upload=True,
@@ -681,7 +681,7 @@ class QuDev_transmon(Qubit):
         MC.run(label)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
 
     def measure_qscale_2nd_exc(self, qscales=None, MC=None, analyze=True,
                                upload=True, close_fig=True, label=None,
@@ -716,7 +716,7 @@ class QuDev_transmon(Qubit):
         MC.run(label)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
 
     def measure_ramsey_multiple_detunings(self, times=None,
                                           artificial_detunings=None, label='',
@@ -756,7 +756,7 @@ class QuDev_transmon(Qubit):
         MC.run(label)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
 
 
     def measure_ramsey(self, times=None, artificial_detuning=0, label='',
@@ -792,7 +792,7 @@ class QuDev_transmon(Qubit):
         MC.run(label)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
 
     def measure_ramsey_2nd_exc(self, times=None, artificial_detuning=0, label=None,
                        MC=None, analyze=True, close_fig=True, cal_points=True,
@@ -830,7 +830,7 @@ class QuDev_transmon(Qubit):
         MC.run(label)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
 
     def measure_ramsey_2nd_exc_multiple_detunings(self, times=None,
                                artificial_detunings=None, label=None,
@@ -870,7 +870,7 @@ class QuDev_transmon(Qubit):
         MC.run(label)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
 
 
     def measure_echo(self, times=None, MC=None, artificial_detuning=None,
@@ -912,7 +912,8 @@ class QuDev_transmon(Qubit):
     def measure_randomized_benchmarking(self, nr_cliffords=None, nr_seeds=50,
                                         T1=None, MC=None, close_fig=True,
                                         upload=True, analyze=True,
-                                        double_curves=False, label=None):
+                                        double_curves=False, label=None,
+                                        cal_points=True):
         '''
         Performs a randomized benchmarking fidelity.
         Optionally specifying T1 also shows the T1 limited fidelity.
@@ -928,13 +929,13 @@ class QuDev_transmon(Qubit):
 
         MC.set_sweep_function(awg_swf.Randomized_Benchmarking(
             pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(),
-            double_curves=double_curves,
+            double_curves=double_curves, cal_points=cal_points,
             nr_cliffords=nr_cliffords, nr_seeds=nr_seeds, upload=upload))
         MC.set_detector_function(self.int_avg_det)
         MC.run(label)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
 
     def set_default_readout_weights(self, channels=(0, 1), theta=None):
         """
@@ -1886,7 +1887,7 @@ class QuDev_transmon(Qubit):
                               upload=True, **kw):
 
         for_ef = kw.pop('for_ef', False)
-        last_ge_pulse = kw.pop('last_ge_pulse', True)
+        last_ge_pulse = kw.pop('last_ge_pulse', False)
         analyze = kw.pop('analyze', True)
         double_curves = kw.pop('double_curves', False)
         show = kw.pop('show', False)

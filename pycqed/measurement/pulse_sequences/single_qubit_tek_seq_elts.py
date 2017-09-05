@@ -374,7 +374,6 @@ def Ramsey_seq_multiple_detunings(times, pulse_pars, RO_pars,
         station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
         print('upload finished')
 
-    print('moved on')
     if return_seq:
         return seq, el_list
     else:
