@@ -193,9 +193,26 @@ class UHFQC(Instrument):
 
         # QuExpress thresholds on DIO (mode == 2), AWG control of DIO (mode ==
         # 1)
-        self.dios_0_mode(2)
+        #self.dios_0_mode(2)
         # Drive DIO bits 31 to 16
-        self.dios_0_drive(0xc)
+        #self.dios_0_drive(0xc)
+
+        # For temporary verification of the interface towards the CC-lite we
+        # keep the DIO in the default mode. In this mode the DIO cannot be controlled
+        # by the AWG, but it can be read by it. We also make sure to configure all
+        # DIO's as inputs.
+        # self.dios_0_mode(0)
+        # self.dios_0_drive(0x0)
+
+        # In case an 'echo' test should be made where the UHF-QC should return the
+        # DIO values on bits 31 to 16 to the CC-lite on the bits 15 to 0 of the DIO,
+        # then we need to set the mode to '1' for AWG control and also activate the drive
+        # on the upper two bits..
+        self.dios_0_mode(1)
+
+        # UHFQC drives bit 15 to 0. The low two bytes
+        self.dios_0_drive(0x3)
+
 
         # Configure the analog trigger input 1 of the AWG to assert on a rising
         # edge on Ref_Trigger 1 (front-panel of the instrument)
@@ -732,6 +749,7 @@ class UHFQC(Instrument):
         self.awgs_0_userregs_2(delay_samples)
 
         preamble = """
+const DIO_VALID = 0x80000000;
 const TRIGGER1  = 0x000001;
 const WINT_TRIG = 0x000010;
 const IAVG_TRIG = 0x000020;
@@ -790,6 +808,7 @@ setTrigger(0);"""
 
     def awg_sequence_acquisition(self):
         string = """
+const DIO_VALID = 0x80000000;
 const TRIGGER1  = 0x000001;
 const WINT_TRIG = 0x000010;
 const IAVG_TRIG = 0x000020;
