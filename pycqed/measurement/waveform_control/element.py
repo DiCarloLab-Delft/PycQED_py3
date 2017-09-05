@@ -4,9 +4,9 @@
 # modified by: Adriaan Rol
 
 import numpy as np
-from copy import deepcopy
 import pprint
-from . import pulsar
+from copy import deepcopy
+from pycqed.measurement.waveform_control import pulsar as ps
 import logging
 
 
@@ -17,13 +17,13 @@ class Element:
     arrays that form the amplitudes for the hardware (typically an AWG).
     """
 
-    def __init__(self, name, **kw):
+    def __init__(self, name, pulsar, **kw):
         self.name = name
+        self.pulsar = pulsar
 
-        self.clock = kw.pop('clock', 1e9)
+        # should granularity be device/channel specific
         self.granularity = kw.pop('granularity', 4)
         self.min_samples = kw.pop('min_samples', 960)
-        self.pulsar = kw.pop('pulsar', None)
         self.ignore_offset_correction = kw.pop('ignore_offset_correction',
                                                False)
 
@@ -37,31 +37,27 @@ class Element:
         self.fixed_point_applied = False
 
         self.pulses = {}
-        self._channels = {}
         self._last_added_pulse = None
 
-        if self.pulsar is not None:
-            self.clock = self.pulsar.clock
-
-            for c in self.pulsar.channels:
-                chan = self.pulsar.channels[c]
-                delay = chan['delay'] if not(self.ignore_delays) else 0.
-                self.define_channel(name=c, type=chan['type'],
-                                    high=chan['high'], low=chan['low'],
-                                    offset=chan['offset'],
-                                    delay=delay)
         self.distorted_wfs = {}
+        self.chan_distorted = {}
+        for c in self.pulsar.channels:
+            self.chan_distorted[c] = False
+
 
     # tools for time calculations
 
-    def _time2sample(self, t):
-        return int(t * self.clock + 0.5)
+    def _time2sample(self, c, t):
+        return int(t * self._clock(c) + 0.5)
 
-    def _time2sampletime(self, t):
-        return self._sample2time(self._time2sample(t))
+    def _time2sampletime(self, c, t):
+        return self._sample2time(c, self._time2sample(c, t))
 
-    def _sample2time(self, s):
-        return s / self.clock
+    def _sample2time(self, c, s):
+        return s / self._clock(c)
+
+    def _clock(self, c):
+        return self.pulsar.clock(c)
 
     def offset(self):
         """
@@ -75,8 +71,7 @@ class Element:
             for p in self.pulses:
                 for c in self.pulses[p].channels:
                     t0s.append(self.pulses[p].t0() -
-                               self._channels[c]['delay'])
-
+                               self.channel_delay(c))
             return min(t0s)
 
     def ideal_length(self):
@@ -88,50 +83,48 @@ class Element:
         for p in self.pulses:
             for c in self.pulses[p].channels:
                 ts.append(self.pulse_end_time(p, c))
-
         return max(ts)
 
-    def length(self):
+    def length(self, c):
         """
         Returns the actual length of the sequence, including all corrections.
         """
-        return self.samples() / self.clock
+        return self.samples(c) / self._clock(c)
 
-    def samples(self):
+    def samples(self, c):
         """
         Returns the number of samples the elements occupies.
         """
         ends = []
         for p in self.pulses:
-            for c in self.pulses[p].channels:
+            if c in self.pulses[p].channels:
                 ends.append(self.pulse_end_sample(p, c))
-
+        if len(ends) == 0:
+            return 0
         samples = max(ends)+1
         if samples < self.min_samples:
             samples = self.min_samples
-        else:
-            while(samples % self.granularity > 0):
-                samples += 1
+        while samples % self.granularity != 0:
+            samples += 1
         return samples
 
-    def real_time(self, t, channel):
+    def real_time(self, t, c):
         """
         Returns an actual time, i.e., the correction for delay
         is reversed. It is, however, correctly discretized.
         """
-        return int((t + self._channels[channel]['delay'])*self.clock
-                   + 0.5) / self.clock
+        return int((t + self.channel_delay(c))*self._clock(c)
+                   + 0.5) / self._clock(c)
 
-    def real_times(self, tvals, channel):
-        return ((tvals + self._channels[channel]['delay'])*self.clock
-                + 0.5).astype(int) / self.clock
-
+    def real_times(self, tvals, c):
+        return ((tvals + self.channel_delay(c))*self._clock(c)
+                + 0.5).astype(int) / self._clock(c)
 
     def shift_all_pulses(self, dt):
-        '''
+        """
         Shifts all pulses by a time dt, this is used for correcting the phase
         of a fixed reference.
-        '''
+        """
         self.ignore_offset_correction = True
         for name, pulse in self.pulses.items():
             pulse._t0 += dt
@@ -140,20 +133,11 @@ class Element:
     # channel management #
     ######################
 
-    def define_channel(self, name, type='analog', high=1, low=-1, offset=0,
-                       delay=0):
-
-        self._channels[name] = {
-            'type': type,
-            'delay': delay,
-            'offset': offset,
-            'high': high,
-            'low': low,
-            'distorted': False
-            }
-
-    def channel_delay(self, cname):
-        return self._channels[cname]['delay']
+    def channel_delay(self, c):
+        if not self.ignore_delays:
+            return self.pulsar.channels[c]['delay']
+        else:
+            return 0
 
     ####################
     # pulse management #
@@ -167,9 +151,8 @@ class Element:
 
     def add(self, pulse, name=None, start=0,
             refpulse=None, refpoint='end', refpoint_new='start',
-            operation_type='other',
-            fixed_point_freq=None):
-        '''
+            operation_type='other'):
+        """
         Function adds a pulse to the element, there are several options to set
         where in the element the pulse is added.
 
@@ -184,10 +167,7 @@ class Element:
                                             pulse used
         refpoint_new ('start'|'end'|'center'): reference point in added
                                                pulse used
-        fixed_point_freq (float): if not None shifts all pulses so that
-                                  this pulse is at a multiple of 1/fixed_point_freq
-
-        '''
+        """
         pulse = deepcopy(pulse)
         pulse.operation_type = operation_type
         if name is None:
@@ -239,6 +219,7 @@ class Element:
         return name
 
     def append(self, *pulses):
+        n = None
         for i, p in enumerate(pulses):
             if i == 0:
                 n = self.add(p, refpulse=self._last_added_pulse,
@@ -267,28 +248,29 @@ class Element:
         return t0 + self.time_offset - self.offset()
 
     def pulse_start_time(self, pname, cname):
-        return self.pulses[pname].t0() - self._channels[cname]['delay'] - \
+        return self.pulses[pname].t0() - self.channel_delay(cname) - \
             self.offset()
 
     def pulse_end_time(self, pname, cname):
-        return self.pulses[pname].end() - self._channels[cname]['delay'] - \
+        return self.pulses[pname].end() - self.channel_delay(cname) - \
             self.offset()
 
     def pulse_global_end_time(self, pname, cname):
-        return self.pulse_end_time(pname, cname) + self.time_offset - self.offset()
+        return self.pulse_end_time(pname, cname) + self.time_offset - \
+            self.offset()
 
     def pulse_length(self, pname):
         return self.pulses[pname].length
 
     def pulse_start_sample(self, pname, cname):
-        return self._time2sample(self.pulse_start_time(pname, cname))
+        return self._time2sample(cname, self.pulse_start_time(pname, cname))
 
-    def pulse_samples(self, pname):
-        return self._time2sample(self.pulses[pname].length)
+    def pulse_samples(self, pname, cname):
+        return self._time2sample(cname, self.pulses[pname].length)
 
     def pulse_end_sample(self, pname, cname):
         return self.pulse_start_sample(pname, cname) + \
-            self.pulse_samples(pname) - 1
+            self.pulse_samples(pname, cname) - 1
 
     def effective_pulse_start_time(self, pname, cname):
         return self.pulse_start_time(pname, cname) + \
@@ -301,28 +283,34 @@ class Element:
     # computing the numerical waveform
     def ideal_waveforms(self):
         wfs = {}
-        tvals = np.arange(self.samples())/self.clock
+        tvals = {}
 
-        for c in self._channels:
-            wfs[c] = np.zeros(self.samples()) + self._channels[c]['offset']
+        for c in self.pulsar.channels:
+            nsamples = self.samples(c)
+            wfs[c] = np.zeros(nsamples) + \
+                     self.pulsar.channels[c]['offset']
+            tvals[c] = np.arange(nsamples) / self._clock(c)
         # we first compute the ideal function values
         for p in self.pulses:
-            psamples = self.pulse_samples(p)
-            if not self.global_time:
-                pulse_tvals = tvals.copy()[:psamples]
-                pulsewfs = self.pulses[p].get_wfs(pulse_tvals)
-            else:
-                chan_tvals = {}
-                for c in self.pulses[p].channels:
+            chan_tvals = {}
+            for c in self.pulses[p].channels:
+                if not self.global_time:
+                    psamples = self.pulse_samples(p, c)
+                    chan_tvals[c] = tvals[c].copy()[:psamples]
+                else:
                     idx0 = self.pulse_start_sample(p, c)
                     idx1 = self.pulse_end_sample(p, c) + 1
-                    c_tvals = np.round(tvals.copy()[idx0:idx1] +
-                                       self.channel_delay(c) +
-                                       self.time_offset,
-                                       pulsar.SIGNIFICANT_DIGITS)
-                    chan_tvals[c] = c_tvals
+                    if idx0 < 0 or idx1 < 0:
+                        raise Exception(
+                            'Pulse {} on channel {} in element {} starts at a '
+                            'negative time. Please increase the RO_fixpoint.'
+                                .format(p, c, self.name))
+                    chan_tvals[c] = np.round(tvals[c].copy()[idx0:idx1] +
+                                             self.channel_delay(c) +
+                                             self.time_offset,
+                                             ps.SIGNIFICANT_DIGITS)
+            pulsewfs = self.pulses[p].get_wfs(chan_tvals)
 
-                pulsewfs = self.pulses[p].get_wfs(chan_tvals)
             for c in self.pulses[p].channels:
                 idx0 = self.pulse_start_sample(p, c)
                 idx1 = self.pulse_end_sample(p, c) + 1
@@ -341,22 +329,23 @@ class Element:
         """
         tvals, wfs = self.ideal_waveforms()
         for wf in wfs:
-            hi = self._channels[wf]['high']
-            lo = self._channels[wf]['low']
-
-            if self._channels[wf]['distorted'] is True:
+            hi = self.pulsar.channels[wf]['high']
+            lo = self.pulsar.channels[wf]['low']
+            if self.chan_distorted[wf]:
                 wfs[wf] = self.distorted_wfs[wf]
+            if len(wfs[wf]) == 0:
+                continue
             # truncate all values that are out of bounds
-            if self._channels[wf]['type'] == 'analog':
-                if max(wfs[wf]) > hi:
+            if self.pulsar.channels[wf]['type'] == 'analog':
+                if np.max(wfs[wf]) > hi:
                     logging.warning('Clipping waveform {} > {}'.format(
                                     max(wfs[wf]), hi))
-                if min(wfs[wf]) < lo:
+                if np.min(wfs[wf]) < lo:
                     logging.warning('Clipping waveform {} < {}'.format(
                                     min(wfs[wf]), lo))
                 wfs[wf][wfs[wf] > hi] = hi
                 wfs[wf][wfs[wf] < lo] = lo
-            elif self._channels[wf]['type'] == 'marker':
+            elif self.pulsar.channels[wf]['type'] == 'marker':
                 wfs[wf][wfs[wf] > lo] = hi
                 wfs[wf][wfs[wf] < lo] = lo
         return tvals, wfs
@@ -369,40 +358,39 @@ class Element:
         tvals, wfs = self.waveforms()
 
         for wf in wfs:
-            hi = self._channels[wf]['high']
-            lo = self._channels[wf]['low']
+            hi = self.pulsar.channels[wf]['high']
+            lo = self.pulsar.channels[wf]['low']
 
-            if self._channels[wf]['type'] == 'analog':
+            if self.pulsar.channels[wf]['type'] == 'analog':
                 wfs[wf] = (2.0*wfs[wf] - hi - lo) / (hi - lo)
-            elif self._channels[wf]['type'] == 'marker':
+            elif self.pulsar.channels[wf]['type'] == 'marker':
                 wfs[wf][wfs[wf] > lo] = 1
                 wfs[wf][wfs[wf] <= lo] = 0
-
         return tvals, wfs
 
     # testing and inspection
     def print_overview(self):
         overview = {}
-        overview['length'] = self.length()
-        overview['samples'] = self.samples()
         overview['offset'] = self.offset()
         overview['ideal length'] = self.ideal_length()
-
+        overview['channels'] = {}
+        channels = overview['channels']
+        for c in self.pulsar.channels:
+            channels[c] = {}
+            channels[c]['length'] = self.length(c)
+            channels[c]['samples'] = self.samples(c)
         overview['pulses'] = {}
         pulses = overview['pulses']
         for p in self.pulses:
             pulses[p] = {}
-
             pulses[p]['length'] = self.pulse_length(p)
-            pulses[p]['samples'] = self.pulse_samples(p)
-
             for c in self.pulses[p].channels:
                 pulses[p][c] = {}
                 pulses[p][c]['start time'] = self.pulse_start_time(p, c)
                 pulses[p][c]['end time'] = self.pulse_end_time(p, c)
                 pulses[p][c]['start sample'] = self.pulse_start_sample(p, c)
                 pulses[p][c]['end sample'] = self.pulse_end_sample(p, c)
-
+                pulses[p][c]['samples'] = self.pulse_samples(p, c)
         pprint.pprint(overview)
 
 # Helper functions, previously part of the element object but moved outside
@@ -415,13 +403,13 @@ def calculate_time_correction(t0, fixed_point=1e-6):
 
 
 def is_divisible_by_clock(value, clock=1e9):
-    '''
+    """
     checks if "value" is divisible by the clock period.
     This funciton is needed because of floating point errors
 
     It performs this by multiplying everything by 1e11 (looking at 0.01ns
     resolution for divisibility)
-    '''
+    """
     if np.round(value*1e11) % (1/clock*1e11) == 0:
         return True
     else:
