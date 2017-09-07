@@ -8,6 +8,7 @@ from pycqed.measurement import detector_functions as det
 from pycqed.measurement import composite_detector_functions as cdet
 from pycqed.measurement import mc_parameter_wrapper as pw
 from pycqed.measurement import awg_sweep_functions as awg_swf
+from pycqed.measurement import awg_sweep_functions_multi_qubit as awg_swf2
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement.pulse_sequences import single_qubit_tek_seq_elts as sq
 from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
@@ -114,6 +115,14 @@ class QuDev_transmon(Qubit):
                            docstring='Number of single shot measurements to do'
                                      'in single shot experiments.',
                            vals=vals.Ints(0, 4095),
+                           parameter_class=ManualParameter)
+
+        self.add_parameter('RO_IQ_angle', initial_value=0,
+                           docstring='The angle of the readout transmission'
+                                     'on the IQ plane that provides the '
+                                     'highest discrimination for the e- '
+                                     'and g- states',
+                           label='RO IQ angle', unit='rad',
                            parameter_class=ManualParameter)
 
         # add pulsed spectroscopy pulse parameters
@@ -229,6 +238,7 @@ class QuDev_transmon(Qubit):
         #                          initial_value=None,vals= vals.Numbers())
         # self.add_pulse_parameter('flux','kernel_path','kernel_path',
         #                          initial_value=None,vals=vals.Strings())
+
 
 
         self.update_detector_functions()
@@ -393,7 +403,7 @@ class QuDev_transmon(Qubit):
         self.heterodyne.frequency(previous_freq)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
 
     def measure_homodyne_acqusition_delay(self, delays=None, MC=None,
                                           analyze=True, close_fig=True):
@@ -488,7 +498,7 @@ class QuDev_transmon(Qubit):
 
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
 
     def measure_rabi(self, amps=None, MC=None, analyze=True,
                      close_fig=True, cal_points=True, no_cal_points=2,
@@ -541,7 +551,7 @@ class QuDev_transmon(Qubit):
 
         # Create a MeasurementAnalysis object for this measurement
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
 
     def measure_rabi_2nd_exc(self, amps=None, n=1, MC=None, analyze=True,
                              label=None, last_ge_pulse=True,
@@ -571,7 +581,7 @@ class QuDev_transmon(Qubit):
         MC.run(label)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
 
     def measure_rabi_amp90(self, scales=np.linspace(0.3, 0.7, 31), n=1,
                            MC=None, analyze=True, close_fig=True, upload=True):
@@ -615,7 +625,7 @@ class QuDev_transmon(Qubit):
         MC.run(label)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
 
     def measure_T1_2nd_exc(self, times=None, MC=None, analyze=True, upload=True,
                            close_fig=True, cal_points=True, no_cal_points=6,
@@ -648,7 +658,7 @@ class QuDev_transmon(Qubit):
         MC.run(label)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
 
 
     def measure_qscale(self, qscales=None, MC=None, analyze=True, upload=True,
@@ -677,7 +687,7 @@ class QuDev_transmon(Qubit):
         MC.run(label)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
 
     def measure_qscale_2nd_exc(self, qscales=None, MC=None, analyze=True,
                                upload=True, close_fig=True, label=None,
@@ -712,7 +722,7 @@ class QuDev_transmon(Qubit):
         MC.run(label)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
 
     def measure_ramsey_multiple_detunings(self, times=None,
                                           artificial_detunings=None, label='',
@@ -738,6 +748,10 @@ class QuDev_transmon(Qubit):
         if MC is None:
             MC = self.MC
 
+        # Define the measurement label
+        if label == '':
+            label = 'Ramsey_mult_det' + self.msmt_suffix
+
         Rams_swf = awg_swf.Ramsey_multiple_detunings(
             pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(),
             artificial_detunings=artificial_detunings, cal_points=cal_points,
@@ -745,10 +759,10 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_function(Rams_swf)
         MC.set_sweep_points(times)
         MC.set_detector_function(self.int_avg_det)
-        MC.run('Ramsey_mult_det'+label+self.msmt_suffix)
+        MC.run(label)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
 
 
     def measure_ramsey(self, times=None, artificial_detuning=0, label='',
@@ -784,7 +798,7 @@ class QuDev_transmon(Qubit):
         MC.run(label)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
 
     def measure_ramsey_2nd_exc(self, times=None, artificial_detuning=0, label=None,
                        MC=None, analyze=True, close_fig=True, cal_points=True,
@@ -822,7 +836,7 @@ class QuDev_transmon(Qubit):
         MC.run(label)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
 
     def measure_ramsey_2nd_exc_multiple_detunings(self, times=None,
                                artificial_detunings=None, label=None,
@@ -841,12 +855,12 @@ class QuDev_transmon(Qubit):
             logging.warning('The values in the times array might be too large.'
                             'The units should be seconds.')
 
-        if label is None:
-            label = 'Ramsey_2nd_multiple_detunings'+self.msmt_suffix
-
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC
+
+        if label is None:
+            label = 'Ramsey_mult_det_2nd'+self.msmt_suffix
 
         Rams_2nd_swf = awg_swf.Ramsey_2nd_exc_multiple_detunings(
             pulse_pars=self.get_drive_pars(),
@@ -862,7 +876,7 @@ class QuDev_transmon(Qubit):
         MC.run(label)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
 
 
     def measure_echo(self, times=None, MC=None, artificial_detuning=None,
@@ -903,7 +917,9 @@ class QuDev_transmon(Qubit):
 
     def measure_randomized_benchmarking(self, nr_cliffords=None, nr_seeds=50,
                                         T1=None, MC=None, close_fig=True,
-                                        upload=True, analyze=True):
+                                        upload=True, analyze=True,
+                                        double_curves=False, label=None,
+                                        cal_points=True):
         '''
         Performs a randomized benchmarking fidelity.
         Optionally specifying T1 also shows the T1 limited fidelity.
@@ -914,18 +930,20 @@ class QuDev_transmon(Qubit):
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC
+        if label is None:
+            label = 'RB_{}seeds'.format(nr_seeds)+self.msmt_suffix
 
         MC.set_sweep_function(awg_swf.Randomized_Benchmarking(
             pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(),
-            double_curves=True,
+            double_curves=double_curves, cal_points=cal_points,
             nr_cliffords=nr_cliffords, nr_seeds=nr_seeds, upload=upload))
         MC.set_detector_function(self.int_avg_det)
-        MC.run('RB_{}seeds'.format(nr_seeds)+self.msmt_suffix)
+        MC.run(label)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
 
-    def set_default_readout_weights(self, channels=(0, 1)):
+    def set_default_readout_weights(self, channels=(0, 1), theta=None):
         """
         Sets the integration weights of the channels `RO_acq_weight_I` and
         `RO_acq_weight_Q` to the default sinusoidal values. The integration
@@ -940,10 +958,13 @@ class QuDev_transmon(Qubit):
                       the default value `(0, 1)`.
         """
 
+        if theta is None:
+            theta = self.RO_IQ_angle()
+
         trace_length = 4096
         tbase = np.arange(0, trace_length / 1.8e9, 1 / 1.8e9)
-        cosI = np.array(np.cos(2 * np.pi * self.f_RO_mod() * tbase))
-        sinI = np.array(np.sin(2 * np.pi * self.f_RO_mod() * tbase))
+        cosI = np.array(np.cos(2 * np.pi * self.f_RO_mod() * tbase + theta))
+        sinI = np.array(np.sin(2 * np.pi * self.f_RO_mod() * tbase + theta))
 
         c1 = self.RO_acq_weight_function_I()
         c2 = self.RO_acq_weight_function_Q()
@@ -1176,11 +1197,20 @@ class QuDev_transmon(Qubit):
 
         self.prepare_for_timedomain()
 
-        MC.set_sweep_function(awg_swf.OffOn(
-            pulse_pars=self.get_drive_pars(),
+        RO_spacing = self.UHFQC.quex_wint_delay()*2/1.8e9
+        RO_spacing += self.RO_acq_integration_length()
+        RO_spacing += 10e-9 # for slack
+        RO_spacing -= self.gauss_sigma()*self.nr_sigma()
+        RO_spacing -= self.RO_pulse_delay()
+        RO_spacing -= self.pulse_delay()
+        RO_spacing = max(0, RO_spacing)
+
+        MC.set_sweep_function(awg_swf2.n_qubit_off_on(
+            pulse_pars_list=[self.get_drive_pars()],
             RO_pars=self.get_RO_pars(),
             upload=upload,
-            preselection=preselection_pulse))
+            preselection=preselection_pulse,
+            RO_spacing=RO_spacing))
         spoints = np.arange(self.RO_acq_shots())
         if preselection_pulse:
             spoints //= 2
@@ -1221,6 +1251,64 @@ class QuDev_transmon(Qubit):
                 return ana.F_a, ana.F_d, ana.SNR
             else:
                 return ana.F_a
+
+    def find_readout_angle(self, MC=None, upload=True, close_fig=True, update=True, nreps=10):
+        """
+        Finds the optimal angle on the IQ plane for readout (optimal phase for
+        the boxcar integration weights)
+        If the Q wint channel is set to `None`, sets it to the next channel
+        after I.
+
+        Args:
+            MC: MeasurementControl object to use. Default `None`.
+            upload: Whether to update the AWG sequence. Default `True`.
+            close_fig: Wheter to close the figures in measurement analysis.
+                       Default `True`.
+            update: Whether to update the integration weights and the  Default `True`.
+            nreps: Default 10.
+        """
+        if MC is None:
+            MC = self.MC
+
+        label = 'RO_theta'
+        if self.RO_acq_weight_function_Q() is None:
+            self.RO_acq_weight_function_Q((self.RO_acq_weight_function_I() + 1)%5)
+        self.set_default_readout_weights(theta=0)
+        prev_shots = self.RO_acq_shots()
+        self.RO_acq_shots(2*(self.RO_acq_shots()//2))
+        self.prepare_for_timedomain()
+        MC.set_sweep_function(awg_swf.OffOn(
+            pulse_pars=self.get_drive_pars(),
+            RO_pars=self.get_RO_pars(),
+            upload=upload,
+            preselection=False))
+        spoints = np.arange(self.RO_acq_shots())
+        MC.set_sweep_points(np.arange(self.RO_acq_shots()))
+        MC.set_detector_function(self.int_log_det)
+        prev_avg = MC.soft_avg()
+        MC.soft_avg(1)
+
+        mode = '1D'
+        if nreps > 1:
+            MC.set_sweep_function_2D(swf.None_Sweep())
+            MC.set_sweep_points_2D(np.arange(nreps))
+            mode = '2D'
+
+        MC.run(name=label+self.msmt_suffix, mode=mode)
+
+        MC.soft_avg(prev_avg)
+        self.RO_acq_shots(prev_shots)
+
+        rotate = self.RO_acq_weight_function_Q() is not None
+        channels = self.int_log_det.value_names
+        ana = ma.SSRO_Analysis(auto=True, close_fig=close_fig,
+                               rotate=rotate, no_fits=True,
+                               channels=channels,
+                               preselection=False)
+        if update:
+            self.RO_IQ_angle(ana.theta)
+            self.set_default_readout_weights(theta=ana.theta)
+        return ana.theta
 
     def measure_flux_detuning(self, flux_params=None, n=1, ramsey_times=None,
                               artificial_detuning=0, MC=None,
@@ -1604,8 +1692,8 @@ class QuDev_transmon(Qubit):
             MC = self.MC
 
         if (cal_points) and (no_cal_points is None):
-            logging.warning('no_cal_points is None. Defaults to 4 is for_ef==False,'
-                            'or to 6 is for_ef==True.')
+            logging.warning('no_cal_points is None. Defaults to 4 if for_ef==False,'
+                            'or to 6 if for_ef==True.')
             if for_ef:
                 no_cal_points = 6
             else:
@@ -1679,7 +1767,7 @@ class QuDev_transmon(Qubit):
 
     def find_T1(self, times, label=None, for_ef=False, update=False, MC=None,
                 cal_points=True, no_cal_points=None, close_fig=True,
-                last_ge_pulse=True, **kw):
+                last_ge_pulse=True, upload=True, **kw):
 
         """
         Finds the relaxation time T1 from the fit to an exponential
@@ -1742,8 +1830,8 @@ class QuDev_transmon(Qubit):
                             'large.The units should be seconds.')
 
         if (cal_points) and (no_cal_points is None):
-            logging.warning('no_cal_points is None. Defaults to 4 is for_ef==False,'
-                            'or to 6 is for_ef==True.')
+            logging.warning('no_cal_points is None. Defaults to 4 if for_ef==False,'
+                            'or to 6 if for_ef==True.')
             if for_ef:
                 no_cal_points = 6
             else:
@@ -1780,12 +1868,14 @@ class QuDev_transmon(Qubit):
                                 close_fig=close_fig,
                                 cal_points=cal_points,
                                 no_cal_points=no_cal_points,
-                                last_ge_pulse=last_ge_pulse)
+                                last_ge_pulse=last_ge_pulse,
+                                upload=upload)
 
         else:
             self.measure_T1(times=times, MC=MC,
                             close_fig=close_fig,
-                            cal_points=cal_points)
+                            cal_points=cal_points,
+                            upload=upload)
 
         #Extract T1 and T1_stddev from ma.T1_Analysis
         if kw.pop('analyze',True):
@@ -1805,6 +1895,68 @@ class QuDev_transmon(Qubit):
             return T1_dict
         else:
             return
+
+    def find_RB_gate_fidelity(self, nr_cliffords, label=None, nr_seeds=10,
+                              update=False, MC=None, cal_points=True,
+                              no_cal_points=None, close_fig=True,
+                              upload=True, **kw):
+
+        for_ef = kw.pop('for_ef', False)
+        last_ge_pulse = kw.pop('last_ge_pulse', False)
+        analyze = kw.pop('analyze', True)
+        double_curves = kw.pop('double_curves', False)
+        show = kw.pop('show', False)
+
+        if self.T1() is not None:
+            T1 = self.T1()
+        else:
+            T1 = None
+
+        if not update:
+            logging.warning("Does not automatically update the qubit "
+                            "parameter. Set update=True if you want this!")
+
+        if (cal_points) and (no_cal_points is None):
+            logging.warning('no_cal_points is None. Defaults to 4 if for_ef==False,'
+                            'or to 6 if for_ef==True.')
+            if for_ef:
+                no_cal_points = 6
+            else:
+                no_cal_points = 4
+
+        if not cal_points:
+            no_cal_points = 0
+
+        if MC is None:
+            MC = self.MC
+
+        if nr_cliffords is None:
+            raise ValueError("Unspecified nr_cliffords")
+
+        if label is None:
+            label = 'RB_{}seeds'.format(nr_seeds)+self.msmt_suffix
+
+        #Perform measurement
+        self.measure_randomized_benchmarking(nr_cliffords=nr_cliffords,
+                                             double_curves=double_curves,
+                                             nr_seeds=nr_seeds, MC=MC,
+                                             close_fig=close_fig,
+                                             label=label,
+                                             analyze=analyze,
+                                             upload=upload,
+                                             T1=T1)
+
+        #Analysis
+        if analyze:
+            pulse_delay = self.gauss_sigma() * self.nr_sigma()
+            RB_Analysis = ma.RandomizedBenchmarking_Analysis(label=label,
+                                         qb_name=self.name,
+                                         T1=T1, pulse_delay=pulse_delay,
+                                         NoCalPoints=no_cal_points,
+                                         for_ef=for_ef, show=show,
+                                         last_ge_pulse=last_ge_pulse, **kw)
+
+        return
 
     def find_frequency_T2_ramsey(self, times, for_ef=False, artificial_detuning=0, update=False, MC=None,
                                      cal_points=True, close_fig=True, upload=True,
@@ -1858,8 +2010,8 @@ class QuDev_transmon(Qubit):
                             'large.The units should be seconds.')
 
         if (cal_points is True) and (no_cal_points is None):
-            logging.warning('no_cal_points is None. Defaults to 4 is for_ef==False,'
-                            'or to 6 is for_ef==True.')
+            logging.warning('no_cal_points is None. Defaults to 4 if for_ef==False,'
+                            'or to 6 if for_ef==True.')
             if for_ef:
                 no_cal_points = 6
             else:
@@ -1940,7 +2092,7 @@ class QuDev_transmon(Qubit):
 
 
     def calibrate_ramsey(self, times, for_ef=False,
-                         artificial_detunings=None, update=False,
+                         artificial_detunings=None, update=False, label=None,
                          MC=None, cal_points=True, no_cal_points=None,
                          close_fig=True, upload=True, last_ge_pulse=True, **kw):
 
@@ -1986,8 +2138,8 @@ class QuDev_transmon(Qubit):
             logging.warning('The values in the times array might be too large.')
 
         if (cal_points is True) and (no_cal_points is None):
-            logging.warning('no_cal_points is None. Defaults to 4 is for_ef==False,'
-                            'or to 6 is for_ef==True.')
+            logging.warning('no_cal_points is None. Defaults to 4 if for_ef==False,'
+                            'or to 6 if for_ef==True.')
             if for_ef:
                 no_cal_points = 6
             else:
@@ -2004,6 +2156,12 @@ class QuDev_transmon(Qubit):
                             "which times to do Ramsey. Please specify the "
                             "times_mean or the times function parameter.")
 
+        if label is None:
+            if for_ef:
+                label = 'Ramsey_mult_det_2nd' +self.msmt_suffix
+            else:
+                label = 'Ramsey_mult_det' + self.msmt_suffix
+
         # Each time value must be repeated len(artificial_detunings) times to
         # correspond to the logic in Ramsey_seq_multiple_detunings sequence
         len_art_det = len(artificial_detunings)
@@ -2017,6 +2175,7 @@ class QuDev_transmon(Qubit):
             self.measure_ramsey_multiple_detunings(times=times,
                                 artificial_detunings=artificial_detunings,
                                 MC=MC,
+                                label=label,
                                 cal_points=cal_points,
                                 close_fig=close_fig, upload=upload)
 
@@ -2025,11 +2184,12 @@ class QuDev_transmon(Qubit):
                                 artificial_detunings=artificial_detunings,
                                 cal_points=cal_points, no_cal_points=no_cal_points,
                                 close_fig=close_fig, upload=upload,
-                                last_ge_pulse=last_ge_pulse, MC=MC)
+                                last_ge_pulse=last_ge_pulse, MC=MC, label=label)
 
         # Analyze data if analyze==True
         if kw.pop('analyze',True):
             RamseyA = ma.Ramsey_Analysis_multiple_detunings(auto=True,
+                                label=label,
                                 qb_name=self.name,
                                 NoCalPoints=no_cal_points,
                                 for_ef=for_ef,
@@ -2149,8 +2309,8 @@ class QuDev_transmon(Qubit):
                             "Set update=True if you want this!")
 
         if (cal_points) and (no_cal_points is None):
-            logging.warning('no_cal_points is None. Defaults to 4 is for_ef==False,'
-                            'or to 6 is for_ef==True.')
+            logging.warning('no_cal_points is None. Defaults to 4 if for_ef==False,'
+                            'or to 6 if for_ef==True.')
             if for_ef:
                 no_cal_points = 6
             else:

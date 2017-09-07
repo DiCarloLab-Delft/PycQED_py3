@@ -187,7 +187,7 @@ class Pulsar(Instrument):
             for AWG in self.used_AWGs():
                 if AWG != self.master_AWG():
                     self._start_AWG(AWG)
-            time.sleep(0.2)  # wait 0.2 second for all other awg-s to start
+            time.sleep(0.3)  # wait 0.2 second for all other awg-s to start
             self._start_AWG(self.master_AWG())
 
     def stop(self):
@@ -305,9 +305,11 @@ class Pulsar(Instrument):
         elements_with_non_zero_first_points = set()
         for el, cid_wfs in el_wfs.items():
             maxlen = 0
-            for wf in cid_wfs.values():
-                if len(wf) > maxlen:
-                    maxlen = len(wf)
+            for cid in cid_wfs:
+                if len(cid_wfs[cid]) == 0:
+                    cid_wfs[cid] = np.zeros(1)
+                if len(cid_wfs[cid]) > maxlen:
+                    maxlen = len(cid_wfs[cid])
             for grp in grps:
                 grp_wfs = {}
                 # arrange waveforms from input data and pad with zeros for
