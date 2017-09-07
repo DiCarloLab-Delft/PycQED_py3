@@ -1,6 +1,6 @@
-import string
 import logging
 import sys
+
 
 def is_number(s):
     try:
@@ -8,6 +8,7 @@ def is_number(s):
         return True
     except ValueError:
         return False
+
 
 def get_bin(x, n, Unsigned=True):
     '''
@@ -21,12 +22,13 @@ def get_bin(x, n, Unsigned=True):
         return '{0:{fill}{width}b}'.format(int(x), fill='0', width=n)
     else:
         return '{0:{fill}{width}b}'.format((int(x) + 2**n) % 2**n,
-                                       fill='0', width=n)
+                                           fill='0', width=n)
+
 
 def bin_to_hex(bin_val, hex_width):
     if (not is_number(bin_val)):
         raise ValueError('bin_to_hex: parameter {} is not a number'.format(
-                        bin_val))
+            bin_val))
 
     return format(int(bin_val, 2), 'X').zfill(hex_width)
 
@@ -36,16 +38,18 @@ def check_int(d, left_bound, right_bound):
         raise ValueError("The input parameter {} is not an integer.".format(d))
 
     if d < left_bound or d > right_bound:
-        raise ValueError("Parameter {} out of range: [{}, {}].".format(left_bound, right_bound))
+        raise ValueError("Parameter {} out of range: [{}, {}].".format(
+            left_bound, right_bound))
 
     return True
 
 
 def ToFourBytes(int_data):
     if not isinstance(int_data, int):
-        raise ValueError("The input data {} is not an integer".format(int_data))
+        raise ValueError(
+            "The input data {} is not an integer".format(int_data))
 
-    return int_data.to_bytes(4, byteorder='little', signed = False)
+    return int_data.to_bytes(4, byteorder='little', signed=False)
 
 
 class CCLightMicrocode():
@@ -53,6 +57,7 @@ class CCLightMicrocode():
     This is class is used to implement all functionalities required to generate
     the microcode stored in the control store of CCLight.
     """
+
     def __init__(self):
         self.microcode = [0]*256
         self.CS_header = "Condition  OpTypeLeft  CW_Left  OpTypeRight  CW_Right"
@@ -90,7 +95,7 @@ class CCLightMicrocode():
         check_int(cw_right, 0, 255)
 
         final_val = (condition << 20) + (op_type_left << 18) + (cw_left << 10) +\
-                    (op_type_right << 8) + cw_right;
+                    (op_type_right << 8) + cw_right
 
         # return final_val
         bin_str = get_bin(final_val, 32)
@@ -108,7 +113,8 @@ class CCLightMicrocode():
 
     def disa_cs_line(self, int_data):
         if not isinstance(int_data, int):
-            raise ValueError("The input data {} is not an integer".format(int_data))
+            raise ValueError(
+                "The input data {} is not an integer".format(int_data))
 
         condition = (int_data >> 20) & 3
         op_type_left = (int_data >> 18) & 3
@@ -118,14 +124,14 @@ class CCLightMicrocode():
         return condition, op_type_left, cw_left, op_type_right, cw_right
 
     def disa_bin_microcode(self, microcode):
-        cs_line_array= []
+        cs_line_array = []
         if (len(microcode) % 4) != 0:
             raise ValueError("The input binary microcode should be a"
                              " multiple of 4.")
 
         for i in range(int(len(microcode) / 4)):
-            cs_line_array.append(int.from_bytes(microcode[i*4 : i*4 + 4],
-                                byteorder='little', signed=False))
+            cs_line_array.append(int.from_bytes(microcode[i*4: i*4 + 4],
+                                                byteorder='little', signed=False))
 
         return cs_line_array
 
@@ -133,7 +139,7 @@ class CCLightMicrocode():
         (condition, op_type_left, cw_left, op_type_right, cw_right) = \
             self.disa_cs_line(cs_line)
         print(self.CS_format.format(condition, op_type_left, cw_left,
-                               op_type_right, cw_right))
+                                    op_type_right, cw_right))
 
     def print_cs_line(self, line_number):
         print(self.CS_header)
@@ -183,12 +189,12 @@ class CCLightMicrocode():
     def load_microcode_array(self, microcode):
         if len(microcode) > 256:
             raise ValueError("The microcode can be at most 256 long. {} "
-                "are given".format(len(microcode)))
+                             "are given".format(len(microcode)))
 
         for idx, cs_line in enumerate(microcode):
             if cs_line > (1 << 22) - 1:
                 raise ValueError("The maximum value of a cs_line is: 2**22 -1."
-                    "{} is given at position {}.".format(cs_line, idx))
+                                 "{} is given at position {}.".format(cs_line, idx))
 
     def load_microcode(self, filename):
         try:
@@ -209,26 +215,26 @@ class CCLightMicrocode():
                 op_type_right, cw_right = line.split()
 
             line_number = int(line_number)
-            #print("line_number: ", line_number, " ", end= "")
+            # print("line_number: ", line_number, " ", end= "")
             condition = int(condition)
-            #print("condition: ", condition, " ", end= "")
+            # print("condition: ", condition, " ", end= "")
             op_type_left = int(op_type_left)
-            #print("op_type_left: ", op_type_left, " ", end= "")
+            # print("op_type_left: ", op_type_left, " ", end= "")
             cw_left = int(cw_left)
-            #print("cw_left: ", cw_left, " ", end= "")
+            # print("cw_left: ", cw_left, " ", end= "")
             op_type_right = int(op_type_right)
-            #print("op_type_right: ", op_type_right, " ", end= "")
+            # print("op_type_right: ", op_type_right, " ", end= "")
             cw_right = int(cw_right)
-            #print("cw_right: ", cw_right, " ", end= "")
+            # print("cw_right: ", cw_right, " ", end= "")
             if line_number > 256:
                 raise ValueError("line number ({}) in the file "
                                  "exceeds the maximum value (256).")
 
-            self.microcode[line_number] = self.gen_control_store_line(condition,
-                op_type_left, cw_left, op_type_right, cw_right)
-            #print(self.microcode[line_number])
+            self.microcode[line_number] = self.gen_control_store_line(
+                condition, op_type_left, cw_left, op_type_right, cw_right)
+            # print(self.microcode[line_number])
 
-    def write_to_bin(self, filename = None):
+    def write_to_bin(self, filename=None):
         bin_data = bytearray()
         for cs_line in self.microcode:
             bin_data.extend(ToFourBytes(cs_line))
@@ -247,13 +253,13 @@ class CCLightMicrocode():
             return bin_data
 
     def insert_cs_line(self, line_number, condition, op_type_left,
-            cw_left, op_type_right=0, cw_right=0):
+                       cw_left, op_type_right=0, cw_right=0):
         if line_number > 256:
             raise ValueError("line number ({}) in the file "
                              "exceeds the maximum value (256).")
 
         cs_line = self.gen_control_store_line(condition, op_type_left, cw_left,
-            op_type_right, cw_right)
+                                              op_type_right, cw_right)
 
         self.microcode[line_number] = cs_line
 
@@ -263,4 +269,4 @@ def gen_test_ctrl_store_lines(mc):
         mc.insert_cs_line(i, 0, 1, i)
 
     for i in range(128, 256):
-        mc.insert_cs_line(i, 0, 2, (i-128)%7 + 1, 2, (i-124)%7 +1)
+        mc.insert_cs_line(i, 0, 2, (i-128) % 7 + 1, 2, (i-124) % 7 + 1)

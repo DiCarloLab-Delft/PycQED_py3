@@ -6,12 +6,6 @@
 # ## Start by initialization of the driver and any other important modules
 
 from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import CCL
-import time
-import numpy as np
-
-import sys
-
-print(sys.version)
 
 """
 This is the driver initialization. We name this model as CCL_demo,
@@ -21,7 +15,8 @@ and connect to the hardware IP address of 192.168.0.252 using port 5025
 ccl = CCL('CCL_demo', address='192.168.42.11', port=5025)
 
 
-# ## Now that we're finished with the initialization, we can start using the hardware!
+# Now that we're finished with the initialization, we can start using
+# the hardware!
 
 """
 Let's start by listing out all the available parameters we can use
@@ -29,13 +24,15 @@ Let's start by listing out all the available parameters we can use
 ccl.parameters
 
 """
-As we can see, there are quite a few functions we can test out. Let's test them all. We start with IDN
+As we can see, there are quite a few functions we can test out. Let's test
+them all. We start with IDN
 """
-print(ccl.IDN())
+ccl.IDN()
 
 
 """
-Now that the easy part is out of the way, let's ask CCLight if the timing queue is empty
+Now that the easy part is out of the way, let's ask CCLight if the timing
+queue is empty
 """
 ccl.timing_queue_empty()
 
@@ -48,21 +45,24 @@ ccl.vsm_channel_delay12()
 
 
 """
-Nothing interesting there. Let's move on to more fun stuff. Let's set and get the number of append points
+Nothing interesting there. Let's move on to more fun stuff. Let's set and get
+the number of append points
 """
 ccl.num_append_pts(6)
 ccl.num_append_pts()
 
 
 """
-This time, let's mess things up with the setting of the num_append_pts parameter. Let's give a stupidly high value
+This time, let's mess things up with the setting of the num_append_pts
+parameter. Let's give a stupidly high value
 """
-# ccl.num_append_pts(1337)
+ccl.num_append_pts(1337)
 
 
 """
-At least we know now that num_append_pts parameter should be between 0 and 7 inclusive.
-These ranges are automatically obtained from the hardware. No need to mess about with them
+At least we know now that num_append_pts parameter should be between 0 and 7
+inclusive. These ranges are automatically obtained from the hardware.
+No need to mess about with them.
 """
 ccl.num_append_pts(0)
 
@@ -136,10 +136,11 @@ ccl.enable(0)
 
 
 """
-Let's clean up by closing the model
+Let's clean up by disconnecting and tearing down the instrument
 """
 ccl.close()
 
 print("example ran successfully")
 
-# ## So, you are now done with the walkthrough of the various functions on how to use the CCL python driver
+# So, you are now done with the walk through of the various functions on how
+# to use the CCL python driver

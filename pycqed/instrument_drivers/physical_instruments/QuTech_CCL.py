@@ -13,11 +13,7 @@ from .SCPI import SCPI
 from ._CCL.CCLightMicrocode import CCLightMicrocode
 from qcodes import StandardParameter
 from qcodes import validators as vals
-from qcodes.instrument.parameter import Command, no_setter, no_getter
-import numpy as np
-import struct
 import os
-import inspect
 import logging
 import json
 import sys
@@ -35,18 +31,21 @@ from pyQisaAs import QISA_Driver
 log = logging.getLogger(__name__)
 
 """
-Provide the definitions for the maximum and minimum of each expected data types
+Provide the definitions for the maximum and minimum of each expected data
+types.
 """
 INT32_MAX = +2147483647
 INT32_MIN = -2147483648
 CHAR_MAX = +127
 CHAR_MIN = -128
 
+
 class CCL(SCPI):
     """
-    This is class is used to serve as the driver between the user and the CC-Light hardware.
-    The class starts by querying the hardware via the SCPI interface. The hardware then responds
-    by providing the available standard qcode parameters. This class then uses qcodes to automatically
+    This is class is used to serve as the driver between the user and the
+    CC-Light hardware. The class starts by querying the hardware via the
+    SCPI interface. The hardware then responds by providing the available
+    standard qcodes parameters. This class then uses qcodes to automatically
     generate the functions necessary for the user to control the hardware.
     """
     exceptionLevel = logging.CRITICAL
@@ -69,7 +68,6 @@ class CCL(SCPI):
         self.connect_message()
         self._initialize_insn_microcode_parsers()
 
-
     def _initialize_insn_microcode_parsers(self):
         """
         The parser helper objects are initialized in this function.
@@ -80,19 +78,19 @@ class CCL(SCPI):
         self.QISA.enableParserTracing(False)
         self.QISA.setVerbose(False)
 
-
-    def add_parameter( self, name,
-                       parameter_class = StandardParameter, **kwargs):
+    def add_parameter(self, name,
+                      parameter_class=StandardParameter, **kwargs):
         """
-        Function to manually add a qcodes parameter. Useful for nonstandard forms of the scpiCmds.
+        Function to manually add a qcodes parameter. Useful for nonstandard
+        forms of the scpiCmds.
         """
         super(CCL, self).add_parameter(name, parameter_class, **kwargs)
 
-
     def add_standard_parameters(self):
         """
-        Function to automatically generate the CC-Light specific functions from the qcodes parameters.
-        The function uses the add_parameter function internally.
+        Function to automatically generate the CC-Light specific functions
+        from the qcodes parameters. The function uses the add_parameter
+        function internally.
         """
         self.parameter_list = self._read_parameters()
 
@@ -107,18 +105,19 @@ class CCL(SCPI):
 
                     if (val_type == "Bool"):
                         # Bool can naturally only have 2 values, 0 or 1...
-                        parameter["vals"] = vals.Ints(0,1)
+                        parameter["vals"] = vals.Ints(0, 1)
 
                     elif (val_type == "Non_Neg_Number"):
                         # Non negative integers
                         try:
                             if ("range" in validator):
-                                # if range key is specified in the parameter, then,
-                                # the validator is limited to the specified min,max values
+                                # if range key is specified in the parameter,
+                                # then, the validator is limited to the
+                                # specified min,max values
                                 val_min = validator["range"][0]
                                 val_max = validator["range"][1]
 
-                            parameter["vals"] = vals.Ints(val_min,val_max)
+                            parameter["vals"] = vals.Ints(val_min, val_max)
 
                         except Exception as e:
                             parameter["vals"] = vals.Ints(0, INT32_MAX)
@@ -143,39 +142,41 @@ class CCL(SCPI):
                             ", because of a unknown keyword in this" +
                             " parameter.(%s)", str(e))
 
-
     def add_additional_parameters(self):
         """
-        Certain hardware specific parameters cannot be generated automatically. This function generates
-        the upload_instructions and upload_microcode parameters for the user. They are special because
-        these functions use the _upload_instructions and _upload_microcode functions internally, and
-        they output block binary data using the SCPI.py driver, which is not qcodes standard. Therefore,
-        we have to manually create them specifically for CC-Light
+        Certain hardware specific parameters cannot be generated
+        automatically. This function generates the upload_instructions and
+        upload_microcode parameters for the user. They are special because
+        these functions use the _upload_instructions and _upload_microcode
+        functions internally, and they output block binary data using the
+        SCPI.py driver, which is not qcodes standard. Therefore,
+        we have to manually create them specifically for CC-Light.
         """
         self.add_parameter(
-                'upload_instructions',
-                label     = ('Upload instructions'),
-                docstring = 'It uploads the instructions to the CCLight. ' +
-                            'Valid input is a string representing the filename',
-                set_cmd   = self._upload_instructions,
-                vals      = vals.Strings()
+            'upload_instructions',
+            label=('Upload instructions'),
+            docstring='It uploads the instructions to the CCLight. ' +
+            'Valid input is a string representing the filename',
+            set_cmd=self._upload_instructions,
+            vals=vals.Strings()
         )
 
         self.add_parameter(
-                'upload_microcode',
-                label     = ('Upload microcode'),
-                docstring = 'It uploads the microcode to the CCLight. ' +
-                            'Valid input is a string representing the filename',
-                set_cmd   = self._upload_microcode,
-                vals      = vals.Strings()
+            'upload_microcode',
+            label=('Upload microcode'),
+            docstring='It uploads the microcode to the CCLight. ' +
+            'Valid input is a string representing the filename',
+            set_cmd=self._upload_microcode,
+            vals=vals.Strings()
         )
 
     def _read_parameters(self):
         """
-        This function is the 'magic'. It queries the hardware for all the parameters which can be put in
-        standard QCodes parameter form. The hardware is expected to produce a json-formatted string which
-        gets sent via TCP/IP. This function also writes out the json-file, for user inspection. The function
-        returns a json string.
+        This function is the 'magic'. It queries the hardware for all the
+        parameters which can be put in standard QCodes parameter form.
+        The hardware is expected to produce a json-formatted string which
+        gets sent via TCP/IP. This function also writes out the json-file,
+        for user inspection. The function returns a json string.
         """
         path = os.path.abspath(__file__)
         dir_path = os.path.dirname(path)
@@ -217,7 +218,6 @@ class CCL(SCPI):
             results = json.loads(parameters_str)["parameters"]
         return results
 
-
     def get_idn(self):
         # Overloading get_idn function to format CCL versions
         try:
@@ -255,15 +255,17 @@ class CCL(SCPI):
 
 ###############################################################################
 
-
     def _upload_instructions(self, filename):
         """
-        _upload_instructions expects the assembly filename and uses the QISA_Driver as a parser.
-        The QISA_driver then converts it to a binary file which in turn gets read and internally
-        converts the bytes read to a bytearray which is required by binBlockWrite in SCPI.
+        _upload_instructions expects the assembly filename and uses the
+        QISA_Driver as a parser. The QISA_driver then converts it to a binary
+        file which in turn gets read and internally
+        converts the bytes read to a bytearray which is required by
+        binBlockWrite in SCPI.
         """
-        if not isinstance(filename,str):
-            raise ValueError("The parameter filename type({}) is incorrect. It should be str.".format(type(filename)))
+        if not isinstance(filename, str):
+            raise ValueError(
+                "The parameter filename type({}) is incorrect. It should be str.".format(type(filename)))
 
         outputFilename = self._change_file_ext(filename, 'bin')
 
@@ -273,7 +275,7 @@ class CCL(SCPI):
             if success_parser is not True:
                 raise Exception("Instruction parsing failed")
 
-            success_save   = self.QISA.save(outputFilename)
+            success_save = self.QISA.save(outputFilename)
 
             if success_save is not True:
                 raise Exception("Instruction save to binary failed")
@@ -292,42 +294,44 @@ class CCL(SCPI):
         hdr = 'QUTech:UploadInstructions '
         self.binBlockWrite(binBlock, hdr)
 
-
     def _upload_microcode(self, filename):
         """
-        _upload_controls is different from send_instructions because we can generate the microcode from a text file
-        and the generation of the microcode is done by the CCLightMicrocode.py
+        _upload_controls is different from send_instructions because we can
+        generate the microcode from a text file and the generation of the
+        microcode is done by the CCLightMicrocode.py
         """
 
-        if not isinstance(filename,str):
-            raise ValueError("The parameter filename type({}) is incorrect. It should be str.".format(type(filename)))
+        if not isinstance(filename, str):
+            raise ValueError(
+                "The parameter filename type({}) is incorrect. It should be str.".format(type(filename)))
 
         self.CCL_microcode.load_microcode(filename)
         binBlock = self.CCL_microcode.write_to_bin()
-        if not isinstance(binBlock,bytearray):
-            raise ValueError("The parameter binBlock type({}) is incorrect. It should be bytearray.".format(type(binBlock)))
+        if not isinstance(binBlock, bytearray):
+            raise ValueError(
+                "The parameter binBlock type({}) is incorrect. It should be bytearray.".format(type(binBlock)))
 
         # write binblock
         hdr = 'QUTech:UploadMicrocode '
         self.binBlockWrite(binBlock, hdr)
 
-
-    def _set_vsm_chan_delay(self,chanNum,value):
+    def _set_vsm_chan_delay(self, chanNum, value):
         """
-        This function is available for the user to 'hack' the vsm_channel_delay using just a single function name
+        This function is available for the user to 'hack' the
+        vsm_channel_delay using just a single function name
         """
-        self.write('QUTech:VSMChannelDelay%d %d' % ( chanNum , value ) )
+        self.write('QUTech:VSMChannelDelay%d %d' % (chanNum, value))
 
-
-    def _get_vsm_chan_delay(self,chanNum):
+    def _get_vsm_chan_delay(self, chanNum):
         """
-        This function is available for the user to 'hack' the vsm_channel_delay using just a single function name
+        This function is available for the user to 'hack' the
+        vsm_channel_delay using just a single function name
         """
         strCommand = 'QUTech:VSMChannelDelay%d?' % chanNum
         retval = self.ask_int(strCommand)
         return retval
 
-    def _change_file_ext(self,qumis_name, ext):
+    def _change_file_ext(self, qumis_name, ext):
         pathname = os.path.dirname(qumis_name)
         base_name = os.path.splitext(os.path.basename(qumis_name))[0]
         fn = os.path.join(pathname, base_name + ext)
