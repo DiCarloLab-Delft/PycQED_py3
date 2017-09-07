@@ -17,7 +17,8 @@ print(sys.version)
 This is the driver initialization. We name this model as CCL_demo,
 and connect to the hardware IP address of 192.168.0.252 using port 5025
 """
-ccl = CCL('CCL_demo', address='192.168.0.252', port=5025)
+# ccl = CCL('CCL_demo', address='192.168.0.252', port=5025)
+ccl = CCL('CCL_demo', address='192.168.42.11', port=5025)
 
 
 # ## Now that we're finished with the initialization, we can start using the hardware!
@@ -30,7 +31,8 @@ ccl.parameters
 """
 As we can see, there are quite a few functions we can test out. Let's test them all. We start with IDN
 """
-ccl.IDN()
+print(ccl.IDN())
+
 
 """
 Now that the easy part is out of the way, let's ask CCLight if the timing queue is empty
@@ -55,7 +57,7 @@ ccl.num_append_pts()
 """
 This time, let's mess things up with the setting of the num_append_pts parameter. Let's give a stupidly high value
 """
-ccl.num_append_pts(1337)
+# ccl.num_append_pts(1337)
 
 
 """
@@ -138,5 +140,6 @@ Let's clean up by closing the model
 """
 ccl.close()
 
+print("example ran successfully")
 
 # ## So, you are now done with the walkthrough of the various functions on how to use the CCL python driver
