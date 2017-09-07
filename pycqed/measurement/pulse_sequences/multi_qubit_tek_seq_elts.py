@@ -959,7 +959,8 @@ def two_qubit_tomo_cphase_cardinal(cardinal_state,
 
 
 def n_qubit_off_on(pulse_pars_list, RO_pars, return_seq=False, verbose=False,
-                   parallel_pulses=False, preselection=False):
+                   parallel_pulses=False, preselection=False,
+                   RO_spacing=200e-9):
     n = len(pulse_pars_list)
     seq_name = '{}_qubit_OffOn_sequence'.format(n)
     seq = sequence.Sequence(seq_name)
@@ -977,7 +978,7 @@ def n_qubit_off_on(pulse_pars_list, RO_pars, return_seq=False, verbose=False,
     spacerpulse = {'pulse_type': 'SquarePulse',
                    'channel': RO_pars['acq_marker_channel'],
                    'amplitude': 0.0,
-                   'length': 180e-9,
+                   'length': RO_spacing,
                    'pulse_delay': 0}
     pulse_dict.update({'spacer': spacerpulse})
 
@@ -994,9 +995,8 @@ def n_qubit_off_on(pulse_pars_list, RO_pars, return_seq=False, verbose=False,
 
     for i, pulse_comb in enumerate(pulse_combinations):
         pulses = []
-        for p in pulse_comb:
+        for j, p in enumerate(pulse_comb):
             pulses += [pulse_dict[p]]
-
         el = multi_pulse_elt(i, station, pulses)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)

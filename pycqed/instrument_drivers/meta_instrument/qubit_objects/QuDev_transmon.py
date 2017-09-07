@@ -8,6 +8,7 @@ from pycqed.measurement import detector_functions as det
 from pycqed.measurement import composite_detector_functions as cdet
 from pycqed.measurement import mc_parameter_wrapper as pw
 from pycqed.measurement import awg_sweep_functions as awg_swf
+from pycqed.measurement import awg_sweep_functions_multi_qubit as awg_swf2
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement.pulse_sequences import single_qubit_tek_seq_elts as sq
 from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
@@ -1191,11 +1192,20 @@ class QuDev_transmon(Qubit):
 
         self.prepare_for_timedomain()
 
-        MC.set_sweep_function(awg_swf.OffOn(
-            pulse_pars=self.get_drive_pars(),
+        RO_spacing = self.UHFQC.quex_wint_delay()*2/1.8e9
+        RO_spacing += self.RO_acq_integration_length()
+        RO_spacing += 10e-9 # for slack
+        RO_spacing -= self.gauss_sigma()*self.nr_sigma()
+        RO_spacing -= self.RO_pulse_delay()
+        RO_spacing -= self.pulse_delay()
+        RO_spacing = max(0, RO_spacing)
+
+        MC.set_sweep_function(awg_swf2.n_qubit_off_on(
+            pulse_pars_list=[self.get_drive_pars()],
             RO_pars=self.get_RO_pars(),
             upload=upload,
-            preselection=preselection_pulse))
+            preselection=preselection_pulse,
+            RO_spacing=RO_spacing))
         spoints = np.arange(self.RO_acq_shots())
         if preselection_pulse:
             spoints //= 2

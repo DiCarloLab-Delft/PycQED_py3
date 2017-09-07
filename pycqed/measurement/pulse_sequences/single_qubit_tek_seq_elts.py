@@ -472,7 +472,7 @@ def AllXY_seq(pulse_pars, RO_pars, double_points=False,
 
 
 def OffOn_seq(pulse_pars, RO_pars, verbose=False, pulse_comb='OffOn',
-              upload=True, return_seq=False, preselection=False):
+              upload=True, return_seq=False,  preselection=False):
     '''
     OffOn sequence for a single qubit using the tektronix.
     SSB_Drag pulse is used for driving, simple modualtion used for RO
@@ -503,7 +503,7 @@ def OffOn_seq(pulse_pars, RO_pars, verbose=False, pulse_comb='OffOn',
               'channel': RO_pars['acq_marker_channel'],
               'amplitude': 0.0,
               'length': max(0, 300e-9 - pulse_pars['pulse_delay'] -
-                            - pulse_pars['nr_sigma']*pulse_pars['sigma']),
+                            pulse_pars['nr_sigma']*pulse_pars['sigma']),
               'pulse_delay': 0}
 
     for i, pulse_comb in enumerate(pulse_combinations):

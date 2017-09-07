@@ -126,7 +126,7 @@ class n_qubit_off_on(swf.Hard_Sweep):
 
     def __init__(self, pulse_pars_list, RO_pars, upload=True,
                  return_seq=False, preselection=False, parallel_pulses=False,
-                 verbose=False):
+                 verbose=False, RO_spacing=200e-9):
         super().__init__()
         self.pulse_pars_list = pulse_pars_list
         self.RO_pars = RO_pars
@@ -141,6 +141,7 @@ class n_qubit_off_on(swf.Hard_Sweep):
         self.return_seq = return_seq
         self.preselection = preselection
         self.parallel_pulses = parallel_pulses
+        self.RO_spacing = RO_spacing
         self.name = '{}_qubit_off_on'.format(len(pulse_pars_list))
 
     def prepare(self, **kw):
@@ -149,6 +150,7 @@ class n_qubit_off_on(swf.Hard_Sweep):
                                 RO_pars=self.RO_pars,
                                 preselection=self.preselection,
                                 parallel_pulses=self.parallel_pulses,
+                                RO_spacing=self.RO_spacing,
                                 return_seq=self.return_seq,
                                 verbose=self.verbose)
 
