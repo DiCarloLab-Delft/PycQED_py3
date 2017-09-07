@@ -39,7 +39,7 @@ def check_int(d, left_bound, right_bound):
 
     if d < left_bound or d > right_bound:
         raise ValueError("Parameter {} out of range: [{}, {}].".format(
-            left_bound, right_bound))
+            d, left_bound, right_bound))
 
     return True
 
@@ -94,12 +94,12 @@ class CCLightMicrocode():
         check_int(op_type_right, 0, 3)
         check_int(cw_right, 0, 255)
 
-        final_val = (condition << 20) + (op_type_left << 18) + (cw_left << 10) +\
-                    (op_type_right << 8) + cw_right
+        final_val = (condition << 20) + (op_type_left << 18) +\
+            (cw_left << 10) + (op_type_right << 8) + cw_right
 
         # return final_val
         bin_str = get_bin(final_val, 32)
-        hex_str = bin_to_hex(bin_str, 8)
+        # hex_str = bin_to_hex(bin_str, 8)  # commented as not used
 
         if present_format is True:
             bin_str = get_bin(condition, 2) + "|"
@@ -130,8 +130,8 @@ class CCLightMicrocode():
                              " multiple of 4.")
 
         for i in range(int(len(microcode) / 4)):
-            cs_line_array.append(int.from_bytes(microcode[i*4: i*4 + 4],
-                                                byteorder='little', signed=False))
+            cs_line_array.append(int.from_bytes(
+                microcode[i*4: i*4 + 4], byteorder='little', signed=False))
 
         return cs_line_array
 
@@ -168,7 +168,7 @@ class CCLightMicrocode():
         if filename is not None:
             try:
                 mc_config = open(filename, 'w', encoding='utf-8')
-                logging.info("open file", str(filename), "successfully.")
+                logging.info("opened file {} successfully.".format(filename))
             except:
                 raise OSError('\tError: Failed to open file ' +
                               self.filename + ".")
@@ -194,7 +194,8 @@ class CCLightMicrocode():
         for idx, cs_line in enumerate(microcode):
             if cs_line > (1 << 22) - 1:
                 raise ValueError("The maximum value of a cs_line is: 2**22 -1."
-                                 "{} is given at position {}.".format(cs_line, idx))
+                                 "{} is given at position {}.".format(
+                                    cs_line, idx))
 
     def load_microcode(self, filename):
         try:

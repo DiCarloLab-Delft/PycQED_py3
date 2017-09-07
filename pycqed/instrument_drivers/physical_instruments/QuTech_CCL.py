@@ -194,7 +194,7 @@ class CCL(SCPI):
             file = open(self._s_file_name, "a+")
         except Exception as e:
             log.warning("parameter file for gettable parameters {} not" +
-                        " found".format(self._s_file_name) + ".(%s)", str(e))
+                        " found ({})".format(self._s_file_name, e))
         try:
             file_content = json.loads(file.read())
             self.parameter_file_version = file_content["version"]["software"]

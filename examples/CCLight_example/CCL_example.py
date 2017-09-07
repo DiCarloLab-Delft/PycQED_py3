@@ -11,6 +11,7 @@ from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import CCL
 This is the driver initialization. We name this model as CCL_demo,
 and connect to the hardware IP address of 192.168.0.252 using port 5025
 """
+
 # ccl = CCL('CCL_demo', address='192.168.0.252', port=5025)
 ccl = CCL('CCL_demo', address='192.168.42.11', port=5025)
 
@@ -21,7 +22,7 @@ ccl = CCL('CCL_demo', address='192.168.42.11', port=5025)
 """
 Let's start by listing out all the available parameters we can use
 """
-ccl.parameters
+print(ccl.parameters)
 
 """
 As we can see, there are quite a few functions we can test out. Let's test
