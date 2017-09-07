@@ -22,12 +22,12 @@ import logging
 import json
 import sys
 
-# current directory is python
-currentdir = os.path.dirname(os.path.abspath(
-                inspect.getfile(inspect.currentframe())))
-# the parent directory of the prarent directory is CCLight root
-parprarentdir = os.path.dirname(os.path.dirname(currentdir))
-CCLight_Assembler_dir = os.path.join(parprarentdir, "qisa-as\\build")
+# The assembler needs to be build first before it can be imported.
+# The default location is a copy of the build in the _CCL hidden folder next
+# to this instrument driver. A better solution is needed to prevent build
+# issues, this is documented in issue #65 of the CCL repo.
+curdir = (os.path.dirname(__file__))
+CCLight_Assembler_dir = os.path.join(curdir, "_CCL", "qisa-as", "build")
 sys.path.append(CCLight_Assembler_dir)
 from pyQisaAs import QISA_Driver
 
