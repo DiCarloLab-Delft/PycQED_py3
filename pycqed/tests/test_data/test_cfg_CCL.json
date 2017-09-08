@@ -612,7 +612,7 @@
       "disable_optimization": false,
       "type": "mw",
       "cc_light_instr_type": "single_qubit_gate",
-      "cc_light_instr": "x90",
+      "cc_light_instr": "rx90",
       "cc_light_codeword": 120,
       "cc_light_opcode": 12
    },
@@ -624,7 +624,7 @@
       "disable_optimization": false,
       "type": "mw",
       "cc_light_instr_type": "single_qubit_gate",
-      "cc_light_instr": "x90",
+      "cc_light_instr": "rx90",
       "cc_light_codeword": 121,
       "cc_light_opcode": 12
    },
@@ -636,7 +636,7 @@
       "disable_optimization": false,
       "type": "mw",
       "cc_light_instr_type": "single_qubit_gate",
-      "cc_light_instr": "x90",
+      "cc_light_instr": "rx90",
       "cc_light_codeword": 122,
       "cc_light_opcode": 12
    },
@@ -648,7 +648,7 @@
       "disable_optimization": false,
       "type": "mw",
       "cc_light_instr_type": "single_qubit_gate",
-      "cc_light_instr": "x90",
+      "cc_light_instr": "rx90",
       "cc_light_codeword": 123,
       "cc_light_opcode": 12
    },
@@ -660,7 +660,7 @@
       "disable_optimization": false,
       "type": "mw",
       "cc_light_instr_type": "single_qubit_gate",
-      "cc_light_instr": "x90",
+      "cc_light_instr": "rx90",
       "cc_light_codeword": 124,
       "cc_light_opcode": 12
    },
@@ -672,7 +672,7 @@
       "disable_optimization": false,
       "type": "mw",
       "cc_light_instr_type": "single_qubit_gate",
-      "cc_light_instr": "x90",
+      "cc_light_instr": "rx90",
       "cc_light_codeword": 125,
       "cc_light_opcode": 12
    },
@@ -684,7 +684,7 @@
       "disable_optimization": false,
       "type": "mw",
       "cc_light_instr_type": "single_qubit_gate",
-      "cc_light_instr": "x90",
+      "cc_light_instr": "rx90",
       "cc_light_codeword": 126,
       "cc_light_opcode": 12
    },
@@ -780,7 +780,7 @@
       "disable_optimization": false,
       "type": "mw",
       "cc_light_instr_type": "single_qubit_gate",
-      "cc_light_instr": "y90",
+      "cc_light_instr": "ry90",
       "cc_light_codeword": 140,
       "cc_light_opcode": 14
    },
@@ -792,7 +792,7 @@
       "disable_optimization": false,
       "type": "mw",
       "cc_light_instr_type": "single_qubit_gate",
-      "cc_light_instr": "y90",
+      "cc_light_instr": "ry90",
       "cc_light_codeword": 141,
       "cc_light_opcode": 14
    },
@@ -804,7 +804,7 @@
       "disable_optimization": false,
       "type": "mw",
       "cc_light_instr_type": "single_qubit_gate",
-      "cc_light_instr": "y90",
+      "cc_light_instr": "ry90",
       "cc_light_codeword": 142,
       "cc_light_opcode": 14
    },
@@ -816,7 +816,7 @@
       "disable_optimization": false,
       "type": "mw",
       "cc_light_instr_type": "single_qubit_gate",
-      "cc_light_instr": "y90",
+      "cc_light_instr": "ry90",
       "cc_light_codeword": 143,
       "cc_light_opcode": 14
    },
@@ -828,7 +828,7 @@
       "disable_optimization": false,
       "type": "mw",
       "cc_light_instr_type": "single_qubit_gate",
-      "cc_light_instr": "y90",
+      "cc_light_instr": "ry90",
       "cc_light_codeword": 144,
       "cc_light_opcode": 14
    },
@@ -840,7 +840,7 @@
       "disable_optimization": false,
       "type": "mw",
       "cc_light_instr_type": "single_qubit_gate",
-      "cc_light_instr": "y90",
+      "cc_light_instr": "ry90",
       "cc_light_codeword": 145,
       "cc_light_opcode": 14
    },
@@ -852,7 +852,7 @@
       "disable_optimization": false,
       "type": "mw",
       "cc_light_instr_type": "single_qubit_gate",
-      "cc_light_instr": "y90",
+      "cc_light_instr": "ry90",
       "cc_light_codeword": 146,
       "cc_light_opcode": 14
    },
@@ -951,7 +951,7 @@
       "cc_light_instr": "cz",
       "cc_light_right_codeword": 143,
       "cc_light_left_codeword": 151,
-      "cc_light_opcode": 33
+      "cc_light_opcode": 128
    },
    "cz q0,q3": {
       "duration": 80,
@@ -964,7 +964,7 @@
       "cc_light_instr": "cz",
       "cc_light_right_codeword": 144,
       "cc_light_left_codeword": 152,
-      "cc_light_opcode": 33
+      "cc_light_opcode": 128
    },
    "cz q3,q1": {
       "duration": 80,
@@ -977,7 +977,7 @@
       "cc_light_instr": "cz",
       "cc_light_right_codeword": 144,
       "cc_light_left_codeword": 152,
-      "cc_light_opcode": 33
+      "cc_light_opcode": 128
    },
    "cz q1,q4": {
       "duration": 80,
@@ -990,7 +990,7 @@
       "cc_light_instr": "cz",
       "cc_light_right_codeword": 144,
       "cc_light_left_codeword": 152,
-      "cc_light_opcode": 33
+      "cc_light_opcode": 128
    },
    "cz q2,q5": {
       "duration": 80,
@@ -1003,7 +1003,7 @@
       "cc_light_instr": "cz",
       "cc_light_right_codeword": 144,
       "cc_light_left_codeword": 152,
-      "cc_light_opcode": 33
+      "cc_light_opcode": 128
    },
    "cz q5,q3": {
       "duration": 80,
@@ -1016,7 +1016,7 @@
       "cc_light_instr": "cz",
       "cc_light_right_codeword": 144,
       "cc_light_left_codeword": 152,
-      "cc_light_opcode": 33
+      "cc_light_opcode": 128
    },
    "cz q3,q6": {
       "duration": 80,
@@ -1029,7 +1029,7 @@
       "cc_light_instr": "cz",
       "cc_light_right_codeword": 144,
       "cc_light_left_codeword": 152,
-      "cc_light_opcode": 33
+      "cc_light_opcode": 128
    },
    "cz q6,q4": {
       "duration": 80,
@@ -1042,7 +1042,7 @@
       "cc_light_instr": "cz",
       "cc_light_right_codeword": 144,
       "cc_light_left_codeword": 152,
-      "cc_light_opcode": 33
+      "cc_light_opcode": 128
    },
    "cz q0,q2": {
       "duration": 80,
@@ -1055,7 +1055,7 @@
       "cc_light_instr": "cz",
       "cc_light_right_codeword": 144,
       "cc_light_left_codeword": 152,
-      "cc_light_opcode": 33
+      "cc_light_opcode": 128
    },
    "cz q3,q0": {
       "duration": 80,
@@ -1068,7 +1068,7 @@
       "cc_light_instr": "cz",
       "cc_light_right_codeword": 144,
       "cc_light_left_codeword": 152,
-      "cc_light_opcode": 33
+      "cc_light_opcode": 128
    },
    "cz q1,q3": {
       "duration": 80,
@@ -1081,7 +1081,7 @@
       "cc_light_instr": "cz",
       "cc_light_right_codeword": 144,
       "cc_light_left_codeword": 152,
-      "cc_light_opcode": 33
+      "cc_light_opcode": 128
    },
    "cz q4,q1": {
       "duration": 80,
@@ -1094,7 +1094,7 @@
       "cc_light_instr": "cz",
       "cc_light_right_codeword": 144,
       "cc_light_left_codeword": 152,
-      "cc_light_opcode": 33
+      "cc_light_opcode": 128
    },
    "cz q5,q2": {
       "duration": 80,
@@ -1107,7 +1107,7 @@
       "cc_light_instr": "cz",
       "cc_light_right_codeword": 144,
       "cc_light_left_codeword": 152,
-      "cc_light_opcode": 33
+      "cc_light_opcode": 128
    },
    "cz q3,q5": {
       "duration": 80,
@@ -1120,7 +1120,7 @@
       "cc_light_instr": "cz",
       "cc_light_right_codeword": 144,
       "cc_light_left_codeword": 152,
-      "cc_light_opcode": 33
+      "cc_light_opcode": 128
    },
    "cz q6,q3": {
       "duration": 80,
@@ -1133,7 +1133,7 @@
       "cc_light_instr": "cz",
       "cc_light_right_codeword": 144,
       "cc_light_left_codeword": 152,
-      "cc_light_opcode": 33
+      "cc_light_opcode": 128
    },
    "cz q4,q6": {
       "duration": 80,
@@ -1146,7 +1146,7 @@
       "cc_light_instr": "cz",
       "cc_light_right_codeword": 144,
       "cc_light_left_codeword": 152,
-      "cc_light_opcode": 33
+      "cc_light_opcode": 128
    }
    },
 

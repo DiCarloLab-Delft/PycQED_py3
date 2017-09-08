@@ -2,8 +2,8 @@
 '''
 import numpy as np
 from os.path import join, dirname
-import openql as ql
-from openql import Program, Kernel
+import openql.openql as ql
+from openql.openql import Program, Kernel, Platform
 
 from pycqed.utilities.general import mopen
 from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
@@ -38,16 +38,19 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool=True):
     """
     Single qubit AllXY sequence.
     Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
 
     Input pars:
         qubit_idx:      int specifying the target qubit (starting at 0)
         platf_cfg:      filename of the platform config file
         double_points:  if true repeats every element twice
     Returns:
+        p:              OpenQL Program object containing
 
 
     """
-    p = Program(pname="AllXY", nqubits=1, p=platf_cfg)
+    platf = Platform('seven_qubits_chip', platf_cfg)
+    p = Program(pname="AllXY", nqubits=1, p=platf)
 
     allXY = [['i', 'i'], ['rx180', 'rx180'], ['ry180', 'ry180'],
              ['rx180', 'ry180'], ['ry180', 'rx180'],
@@ -62,7 +65,7 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool=True):
     p.set_sweep_points(np.arange(len(allXY), dtype=float), len(allXY))
 
     for i, xy in enumerate(allXY):
-        k = Kernel("allXY"+str(i), p=platf_cfg)
+        k = Kernel("allXY"+str(i), p=platf)
         k.prepz(0)
         k.gate(xy[0], 0)
         k.gate(xy[1], 0)
@@ -70,33 +73,11 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool=True):
         p.add_kernel(k)
 
     p.compile()
+    # attribute get's added to program to allow finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name +'.qisa')
+    return p
 
-
-    # pulse_combinations = [['I', 'I'], ['X180', 'X180'], ['Y180', 'Y180'],
-    #                       ['X180', 'Y180'], ['Y180', 'X180'],
-    #                       ['X90', 'I'], ['Y90', 'I'], ['X90', 'Y90'],
-    #                       ['Y90', 'X90'], ['X90', 'Y180'], ['Y90', 'X180'],
-    #                       ['X180', 'Y90'], ['Y180', 'X90'], ['X90', 'X180'],
-    #                       ['X180', 'X90'], ['Y90', 'Y180'], ['Y180', 'Y90'],
-    #                       ['X180', 'I'], ['Y180', 'I'], ['X90', 'X90'],
-    #                       ['Y90', 'Y90']]
-    # if double_points:
-    #     pulse_combinations = [val for val in pulse_combinations
-    #                           for _ in (0, 1)]
-
-    # filename = join(base_qasm_path, 'AllXY.qasm')
-    # qasm_file = mopen(filename, mode='w')
-    # qasm_file.writelines('qubit {} \n'.format(qubit_name))
-
-    # for pulse_comb in pulse_combinations:
-    #     qasm_file.writelines('\ninit_all\n')
-    #     if pulse_comb[0] != 'I':
-    #         qasm_file.writelines('{} {}\n'.format(pulse_comb[0], qubit_name))
-    #     if pulse_comb[1] != 'I':
-    #         qasm_file.writelines('{} {}\n'.format(pulse_comb[1], qubit_name))
-    #     qasm_file.writelines('RO {}  \n'.format(qubit_name))
-    # qasm_file.close()
-    # return qasm_file
 
 
 def Rabi(qubit_name, amps, n=1):

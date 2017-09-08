@@ -267,21 +267,23 @@ class CCL(SCPI):
             raise ValueError(
                 "The parameter filename type({}) is incorrect. It should be str.".format(type(filename)))
 
-        outputFilename = self._change_file_ext(filename, 'bin')
+        outputFilename = self._change_file_ext(filename, '.bin')
+        print(outputFilename)
+        # try:
+        success_parser = self.QISA.parse(filename)
 
-        try:
-            success_parser = self.QISA.parse(filename)
+        if success_parser is not True:
+            raise RuntimeError(self.QISA.getLastErrorMessage())
+            # raise Exception("Instruction parsing failed")
 
-            if success_parser is not True:
-                raise Exception("Instruction parsing failed")
+        success_save = self.QISA.save(outputFilename)
+        print(outputFilename)
 
-            success_save = self.QISA.save(outputFilename)
+        if success_save is not True:
+            raise Exception("Instruction save to binary failed")
 
-            if success_save is not True:
-                raise Exception("Instruction save to binary failed")
-
-        except Exception as e:
-            logging.exception("{}".format(e))
+        # except Exception as e:
+        #     logging.exception("{}".format(e))
 
         binBlock = None
 
