@@ -31,9 +31,23 @@ def T1(qubit_name, times, clock_cycle=1e-9,
     pass
 
 
-def flipping(qubit_idx: int, number_of_flips: int, platf_cfg: str,
+def flipping(qubit_idx: int, number_of_flips, platf_cfg: str,
              equator: bool=False, cal_points: bool=True):
     """
+    Generates a flipping sequence that performs multiple pi-pulses
+    Basic sequence:
+        - (X)^n - RO
+
+    Input pars:
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        number_of_flips: array of ints specifying the sweep points
+        platf_cfg:      filename of the platform config file
+        equator:        if True add an extra pi/2 pulse at the end to
+                        make the state end at the equator.
+        cal_points:     replaces last 4 points by calibration points
+
+    Returns:
+        p:              OpenQL Program object
     """
     platf = Platform('OpenQL_Platform', platf_cfg)
     p = Program(pname="Flipping", nqubits=platf.get_qubit_number(),
@@ -239,7 +253,6 @@ def single_elt_on(qubit_idx: int, platf_cfg: str):
     return p
 
 
-
 def two_elt_MotzoiXY(qubit_name):
     '''
     Sequence used for calibrating the motzoi parameter.
@@ -291,40 +304,36 @@ def off_on(qubit_name, pulse_comb='off_on'):
     # return qasm_file
 
 
-def butterfly(qubit_name, initialize=False):
+def butterfly(qubit_idx: int, initialize: bool, platf_cfg: str):
     """
-    Initialize adds an exta measurement before state preparation to allow
-    initialization by post-selection
 
-    The duration of the RO + depletion is specified in the definition of RO
     """
-    pass
-    # filename = join(
-    #     base_qasm_path, 'butterfly_init_{}.qasm'.format(initialize))
-    # qasm_file = mopen(filename, mode='w')
-    # qasm_file.writelines('qubit {} \n'.format(qubit_name))
-    # if initialize:
-    #     qasm_file.writelines('\ninit_all\n')
-    #     qasm_file.writelines('RO {}  \n'.format(qubit_name))
-    #     qasm_file.writelines('RO {}  \n'.format(qubit_name))
-    #     qasm_file.writelines('RO {}  \n'.format(qubit_name))
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="Butterfly", nqubits=platf.get_qubit_number(),
+                p=platf)
 
-    #     qasm_file.writelines('\ninit_all\n')
-    #     qasm_file.writelines('RO {}  \n'.format(qubit_name))
-    #     qasm_file.writelines('X180 {}  \n'.format(qubit_name))
-    #     qasm_file.writelines('RO {}  \n'.format(qubit_name))
-    #     qasm_file.writelines('RO {}  \n'.format(qubit_name))
-    # else:
-    #     qasm_file.writelines('\ninit_all\n')
-    #     qasm_file.writelines('RO {}  \n'.format(qubit_name))
-    #     qasm_file.writelines('RO {}  \n'.format(qubit_name))
+    k = Kernel('0', p=platf)
+    k.prepz(qubit_idx)
+    if initialize:
+        k.measure(qubit_idx)
+    k.measure(qubit_idx)
+    k.measure(qubit_idx)
+    p.add_kernel(k)
 
-    #     qasm_file.writelines('\ninit_all\n')
-    #     qasm_file.writelines('X180 {}  \n'.format(qubit_name))
-    #     qasm_file.writelines('RO {}  \n'.format(qubit_name))
-    #     qasm_file.writelines('RO {}  \n'.format(qubit_name))
-    # qasm_file.close()
-    # return qasm_file
+    k = Kernel('1', p=platf)
+    k.prepz(qubit_idx)
+    if initialize:
+        k.measure(qubit_idx)
+    k.x(qubit_idx)
+    k.measure(qubit_idx)
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+
+    p.compile()
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
 
 
 def randomized_benchmarking(qubit_name, nr_cliffords, nr_seeds,
@@ -402,6 +411,7 @@ def MotzoiXY(qubit_name, motzois, cal_points=True):
                              calibration points
     '''
     pass
+
 
 def Ram_Z(qubit_name,
           wait_before=150e-9, wait_between=200e-9, clock_cycle=1e-9):

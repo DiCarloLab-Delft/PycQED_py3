@@ -26,6 +26,10 @@ try:
             sqo.flipping(qubit_idx=0, number_of_flips=number_of_flips,
                          platf_cfg=config_fn)
 
+        def test_butterfly(self):
+            sqo.butterfly(qubit_idx=0, initialize=True,
+                          platf_cfg=config_fn)
+
 
 except ImportError as e:
     class TestMissingDependency(unittest.TestCase):
