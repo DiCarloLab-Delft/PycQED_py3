@@ -2,11 +2,16 @@
 '''
 import numpy as np
 from os.path import join, dirname
+import openql as ql
+from openql import Program, Kernel
 
 from pycqed.utilities.general import mopen
 from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
-base_qasm_path = join(dirname(__file__), 'qasm_files')
 
+
+base_qasm_path = join(dirname(__file__), 'qasm_files')
+output_dir = join(dirname(__file__), 'output')
+ql.set_output_dir(output_dir)
 
 def CW_tone():
     pass
@@ -29,8 +34,44 @@ def flipping_seq(qubit_name, number_of_flips, clock_cycle=1e-9,
     pass
 
 
-def AllXY(qubit_name, double_points=False):
-    pass
+def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool=True):
+    """
+    Single qubit AllXY sequence.
+    Writes output files to the directory specified in openql.
+
+    Input pars:
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+        double_points:  if true repeats every element twice
+    Returns:
+
+
+    """
+    p = Program(pname="AllXY", nqubits=1, p=platf_cfg)
+
+    allXY = [['i', 'i'], ['rx180', 'rx180'], ['ry180', 'ry180'],
+             ['rx180', 'ry180'], ['ry180', 'rx180'],
+             ['rx90', 'i'], ['ry90', 'i'], ['rx90', 'ry90'],
+             ['ry90', 'rx90'], ['rx90', 'ry180'], ['ry90', 'rx180'],
+             ['rx180', 'ry90'], ['ry180', 'rx90'], ['rx90', 'rx180'],
+             ['rx180', 'rx90'], ['ry90', 'ry180'], ['ry180', 'ry90'],
+             ['rx180', 'i'], ['ry180', 'i'], ['rx90', 'rx90'],
+             ['ry90', 'ry90']]
+
+    # this should be implicit
+    p.set_sweep_points(np.arange(len(allXY), dtype=float), len(allXY))
+
+    for i, xy in enumerate(allXY):
+        k = Kernel("allXY"+str(i), p=platf_cfg)
+        k.prepz(0)
+        k.gate(xy[0], 0)
+        k.gate(xy[1], 0)
+        k.measure(0)
+        p.add_kernel(k)
+
+    p.compile()
+
+
     # pulse_combinations = [['I', 'I'], ['X180', 'X180'], ['Y180', 'Y180'],
     #                       ['X180', 'Y180'], ['Y180', 'X180'],
     #                       ['X90', 'I'], ['Y90', 'I'], ['X90', 'Y90'],
