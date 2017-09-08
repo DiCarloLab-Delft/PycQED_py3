@@ -13,6 +13,7 @@ base_qasm_path = join(dirname(__file__), 'qasm_files')
 output_dir = join(dirname(__file__), 'output')
 ql.set_output_dir(output_dir)
 
+
 def CW_tone():
     pass
 
@@ -24,14 +25,43 @@ def CW_RO_sequence(qubit_name, trigger_separation, clock_cycle=1e-9):
 def pulsed_spec_sequence(qubit_name, clock_cycle=1e-9):
     pass
 
+
 def T1(qubit_name, times, clock_cycle=1e-9,
        cal_points=True):
     pass
 
 
-def flipping_seq(qubit_name, number_of_flips, clock_cycle=1e-9,
-                 equator=False, cal_points=True):
-    pass
+def flipping(qubit_idx: int, number_of_flips: int, platf_cfg: str,
+             equator: bool=False, cal_points: bool=True):
+    """
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="Flipping", nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    for i, n in enumerate(number_of_flips):
+        k = Kernel("Flipping_"+str(i), p=platf)
+        k.prepz(qubit_idx)
+        if cal_points and (i == (len(number_of_flips)-4) or
+                           i == (len(number_of_flips)-3)):
+            k.measure(qubit_idx)
+        elif cal_points and (i == (len(number_of_flips)-2) or
+                             i == (len(number_of_flips)-1)):
+            k.x(qubit_idx)
+            k.measure(qubit_idx)
+        else:
+            if equator:
+                k.gate('rx90', qubit_idx)
+            for j in range(n):
+                k.x(qubit_idx)
+            k.measure(qubit_idx)
+        p.add_kernel(k)
+
+    p.compile()
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
 
 
 def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool=True):

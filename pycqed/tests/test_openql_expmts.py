@@ -1,5 +1,7 @@
 import os
 import unittest
+import numpy as np
+
 try:
     from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
     from openql import openql as ql
@@ -18,6 +20,12 @@ try:
 
         def test_single_elt_on(self):
             sqo.single_elt_on(qubit_idx=0, platf_cfg=config_fn)
+
+        def test_flipping(self):
+            number_of_flips = np.arange(10)
+            sqo.flipping(qubit_idx=0, number_of_flips=number_of_flips,
+                         platf_cfg=config_fn)
+
 
 except ImportError as e:
     class TestMissingDependency(unittest.TestCase):
