@@ -12,15 +12,15 @@ try:
     ql.set_output_dir(output_dir)
 
     class Test_single_qubit_seqs_CCL(unittest.TestCase):
-
         def test_allxy(self):
+            # Only test if it compiles
             sqo.AllXY(qubit_idx=0, platf_cfg=config_fn)
 
 
 except ImportError as e:
     class TestMissingDependency(unittest.TestCase):
 
-        @unittest.skip('Missing dependency - ' + e.message)
+        @unittest.skip('Missing dependency - ' + str(e))
         def test_fail():
             pass
 
