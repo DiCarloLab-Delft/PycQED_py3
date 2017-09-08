@@ -775,8 +775,9 @@ if(getUserReg(1)){
 }\n"""
 
         loop_start = """
-repeat(loop_cnt) {
-\twaitDigTrigger(1, 1);
+while(1) {
+while ((getDIO() & DIO_VALID) == 0);
+set
 \tplayWave(Iwave, Qwave);\n"""
 
         end_string = """
@@ -833,7 +834,7 @@ if(getUserReg(1)){
   RO_TRIG=WINT_TRIG;
 }
 repeat(loop_cnt) {
-\twaitDigTrigger(1, 1);\n
+while ((getDIO() & DIO_VALID) == 0);
 \tsetTrigger(WINT_EN +RO_TRIG);
 \twait(5);
 \tsetTrigger(WINT_EN);
