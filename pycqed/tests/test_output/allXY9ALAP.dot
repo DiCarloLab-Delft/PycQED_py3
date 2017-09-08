@@ -1,0 +1,25 @@
+digraph {
+graph [ rankdir=TD; ]; // or rankdir=LR
+edge [fontsize=16, arrowhead=vee, arrowsize=0.5];
+"5" [label=" nop " fontcolor=black, style=filled, fontsize=16];
+"4" [label=" measure q0 " fontcolor=black, style=filled, fontsize=16];
+"3" [label=" ry180 q0 " fontcolor=black, style=filled, fontsize=16];
+"2" [label=" rx90 q0 " fontcolor=black, style=filled, fontsize=16];
+"1" [label=" prepz q0 " fontcolor=black, style=filled, fontsize=16];
+"0" [label=" nop " fontcolor=black, style=filled, fontsize=16];
+{
+node [shape=plaintext, fontsize=16, fontcolor=blue]; 
+Cycle0 -> Cycle1 -> Cycle2 -> Cycle3 -> Cycle4 -> Cycle5 -> Cycle6 -> Cycle7 -> Cycle8 -> Cycle9 -> Cycle10 -> Cycle11 -> Cycle12 -> Cycle13 -> Cycle14 -> Cycle15 -> Cycle16 -> Cycle17 -> Cycle18 -> Cycle19 -> Cycle20 -> Cycle21 -> Cycle22 -> Cycle23 -> Cycle24 -> Cycle25 -> Cycle26 -> Cycle27 -> Cycle28 -> Cycle29 -> Cycle30 -> Cycle31 -> Cycle32 -> Cycle33 -> Cycle34 -> Cycle35 -> Cycle36 -> Cycle37 -> Cycle38 -> Cycle39 -> Cycle40 -> Cycle41 -> Cycle42 -> Cycle43 -> Cycle44 -> Cycle45 -> Cycle46 -> Cycle47 -> Cycle48 -> Cycle49 -> Cycle50 -> Cycle51 -> Cycle52 -> Cycle53 -> Cycle54 -> Cycle55 -> Cycle56 -> Cycle57 -> Cycle58 -> Cycle59 -> Cycle60 -> Cycle61 -> Cycle62 -> Cycle63 -> Cycle64 -> Cycle65 -> Cycle66 -> Cycle67 -> Cycle68 -> Cycle69 -> Cycle70 -> Cycle71 -> Cycle72 -> Cycle73 -> Cycle74 -> Cycle75 -> Cycle76 -> Cycle77 -> Cycle78 -> Cycle79 -> Cycle80 -> Cycle81 -> Cycle82 -> Cycle83 -> Cycle84 -> Cycle85 -> Cycle86 -> Cycle87 -> Cycle88 -> Cycle89 -> Cycle90 -> Cycle91 -> Cycle92 -> Cycle93 -> Cycle94 -> Cycle95 -> Cycle96 -> Cycle97 -> Cycle98 -> Cycle99 -> Cycle100 -> Cycle101 -> Cycle102 -> Cycle103 -> Cycle104 -> Cycle105 -> Cycle106 -> Cycle107 -> Cycle108 -> Cycle109 -> Cycle110 -> Cycle111 -> Cycle112 -> Cycle113 -> Cycle114 -> Cycle115 -> Cycle116 -> Cycle117 -> Cycle118 -> Cycle119 -> Cycle120 -> Cycle121 -> Cycle122;
+}
+{ rank=same; Cycle0; 0; }
+{ rank=same; Cycle1; 1; }
+{ rank=same; Cycle41; 2; }
+{ rank=same; Cycle81; 3; }
+{ rank=same; Cycle121; 4; }
+{ rank=same; Cycle122; 5; }
+"4"->"5"[ label="q0"  color=black ]
+"3"->"4"[ label="q0"  color=black ]
+"2"->"3"[ label="q0"  color=black ]
+"1"->"2"[ label="q0"  color=black ]
+"0"->"1"[ label="q0"  color=black ]
+}
