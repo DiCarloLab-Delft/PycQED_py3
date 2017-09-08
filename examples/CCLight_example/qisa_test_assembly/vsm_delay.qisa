@@ -1,0 +1,34 @@
+SMIS s0, { 0 }
+SMIS s1, { 1, 5 }
+SMIS s2, { 2 }
+SMIS s3, { 3 }
+SMIS s4, { 4 }
+SMIS s5, { 5 }
+SMIS s6, { 6 }
+SMIS s7, 0b1111111
+LDI  r4, 16
+Loop:
+    qwaitr r4
+    # bs 1 X s7
+    # bs 1 X s7
+    # bs 1 X s7
+    # bs 1 X s7
+    bs 1 X s7
+    bs 1 X s7
+    bs 1 X s7
+    bs 1 X s7
+    # bs 2 Y s7
+    # bs 2 Z s7
+    # bs 2 H s7
+    # bs 2 S s7
+    # bs 2 Sdag s7
+    # bs 2 X90 s7
+    # bs 2 Xm90 s7
+    # bs 2 Y90 s7
+    # bs 2 Ym90 s7
+    # bs 2 T s7
+    # bs 2 Tdag s7
+    # bs 2 Xm45 s7
+    BR always, Loop
+    NOP
+    NOP
