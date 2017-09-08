@@ -16,6 +16,8 @@ try:
             # Only test if it compiles
             sqo.AllXY(qubit_idx=0, platf_cfg=config_fn)
 
+        def test_single_elt_on(self):
+            sqo.single_elt_on(qubit_idx=0, platf_cfg=config_fn)
 
 except ImportError as e:
     class TestMissingDependency(unittest.TestCase):

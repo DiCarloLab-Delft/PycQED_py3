@@ -13,9 +13,6 @@ base_qasm_path = join(dirname(__file__), 'qasm_files')
 output_dir = join(dirname(__file__), 'output')
 ql.set_output_dir(output_dir)
 
-# FIXME: This is a hardcoded hack until issue #48 of OpenQL is resolved
-nqubits = 7
-
 def CW_tone():
     pass
 
@@ -53,7 +50,8 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool=True):
 
     """
     platf = Platform('OpenQL_Platform', platf_cfg)
-    p = Program(pname="AllXY", nqubits=7, p=platf)
+    p = Program(pname="AllXY", nqubits=platf.get_qubit_number(),
+                p=platf)
 
     allXY = [['i', 'i'], ['rx180', 'rx180'], ['ry180', 'ry180'],
              ['rx180', 'ry180'], ['ry180', 'rx180'],
@@ -196,17 +194,20 @@ def echo(qubit_name, times, clock_cycle=1e-9,
 
 def single_elt_on(qubit_idx: int, platf_cfg: str):
     platf = Platform('OpenQL_Platform', platf_cfg)
-    p = Program(pname="Single_elt_on", nqubits=7, p=platf)
-    # filename = join(base_qasm_path, 'single_elt_on.qasm')
-    # qasm_file = mopen(filename, mode='w')
-    # qasm_file.writelines('qubit {} \n'.format(qubit_name))
-    # # On
-    # qasm_file.writelines('\ninit_all\n')
-    # qasm_file.writelines('X180 {}     # On \n'.format(qubit_name))
-    # qasm_file.writelines('RO {}  \n'.format(qubit_name))
+    p = Program(pname="Single_elt_on", nqubits=platf.get_qubit_number(),
+                p=platf)
+    k = Kernel("main", p=platf)
+    k.prepz(qubit_idx)
+    k.x(qubit_idx)
+    k.measure(qubit_idx)
+    p.add_kernel(k)
 
-    # qasm_file.close()
-    # return qasm_file
+    p.compile()
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
 
 
 def two_elt_MotzoiXY(qubit_name):
