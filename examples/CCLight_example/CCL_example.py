@@ -106,9 +106,14 @@ ccl.run(0)
 
 
 """
-We then upload our next set of instructions
+We then upload our instructions, below are the names of several example
+files.
 """
+# A generic test
 ccl.upload_instructions('./qisa_test_assembly/test_assembly.qisa')
+# An example that allows playing with the vsm channel delay for viewing
+# it on the scope.
+ccl.upload_instructions('./qisa_test_assembly/vsm_delay.qisa')
 
 
 """
