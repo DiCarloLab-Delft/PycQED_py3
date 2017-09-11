@@ -8,7 +8,7 @@ try:
 
     rootDir = os.path.dirname(os.path.realpath(__file__))
     curdir = os.path.dirname(__file__)
-    config_fn = os.path.join(curdir, 'test_data/test_cfg_CCL.json')
+    config_fn = os.path.join(curdir, 'test_cfg_CCL.json')
 
     output_dir = os.path.join(curdir, 'test_output')
     ql.set_output_dir(output_dir)
