@@ -1,8 +1,8 @@
 import json
 
 mw_pulse_duration = 20
-RO_length = 3500
-
+RO_duration = 3500
+init_duration = 200000
 
 RO_latency = 0
 Flux_latency_q0 = -80  # -95 the last 15 is incorporated in the flux lutman
@@ -59,11 +59,11 @@ def generate_config(filename: str):
 
     for q in qubits:
         cfg["instructions"]["prepz {}".format(q)] = {
-            "duration": mw_pulse_duration,
+            "duration": init_duration,
             "latency": 0,
             "qubits": [q],
             "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
-            "disable_optimization": False,
+            "disable_optimization": True,
             "type": "mw",
             "cc_light_instr_type": "single_qubit_gate",
             "cc_light_instr": "prepz",
@@ -73,7 +73,7 @@ def generate_config(filename: str):
 
     for q in qubits:
         cfg["instructions"]["measure {}".format(q)] = {
-            "duration": mw_pulse_duration,
+            "duration": RO_duration,
             "latency": 0,
             "qubits": [q],
             "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
@@ -97,7 +97,7 @@ def generate_config(filename: str):
                 "cc_light_instr_type": "single_qubit_gate",
                 "cc_light_instr": "CW_{:02}".format(CW),
                 "cc_light_codeword": CW,
-                "cc_light_opcode": 6+CW}
+                "cc_light_opcode": 8+CW}
 
     for CW in range(32):
         for q in qubits:
@@ -111,7 +111,7 @@ def generate_config(filename: str):
                 "cc_light_instr_type": "single_qubit_gate",
                 "cc_light_instr": "CW_{:02}".format(CW),
                 "cc_light_codeword": CW,
-                "cc_light_opcode": 12+CW}
+                "cc_light_opcode": 30+CW}
 
     # N.B. The codewords for CZ pulses need to be further specified.
     # I do not expect this to be correct for now.
