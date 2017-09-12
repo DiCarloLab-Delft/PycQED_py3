@@ -5,7 +5,7 @@ import numpy as np
 from numpy.fft import fft, ifft, fftfreq
 
 
-class RamZAnalysisInterleaved(ba.BaseAnalysis):
+class RamZAnalysisInterleaved(ba.BaseDataAnalysis):
     '''
     Analysis for the Ram-Z measurement (interleaved case).
     '''

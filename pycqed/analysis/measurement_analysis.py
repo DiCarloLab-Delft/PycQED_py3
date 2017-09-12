@@ -6350,7 +6350,7 @@ class Ram_Z_Analysis(MeasurementAnalysis):
 
         # Calcualte phase and undo phase-wrapping
         raw_phases = np.arctan2(Q, I)
-        phases = self.unwrap_phase(raw_phases)
+        phases = np.unwrap(raw_phases)
 
         # Filter phase and/or calculate the derivative
         if filter_deriv_phase:
@@ -6358,9 +6358,7 @@ class Ram_Z_Analysis(MeasurementAnalysis):
                 / (2 * np.pi)
         else:
             # Calculate central derivative
-            phasesPadded = np.concatenate(([0], phases))
-            df = np.array([(phasesPadded[i+1] - phasesPadded[i-1]) / (2*dt)
-                           for i in range(1, len(phases)-1)]) / (2 * np.pi)
+            df = np.gradient(phases, dt) / (2 * np.pi)
 
         # If the signal was demodulated df is now the detuning from f_demod
         if demodulate:
@@ -6368,8 +6366,7 @@ class Ram_Z_Analysis(MeasurementAnalysis):
         df[0] = 0  # detuning must start at 0
 
         if return_all:
-            return (df, raw_phases * 360 / (2*np.pi),
-                    phases * 360 / (2*np.pi), I, Q)
+            return (df, np.rad2deg(raw_phases), np.rad2deg(phases), I, Q)
         else:
             return df
 
@@ -6525,26 +6522,6 @@ class Ram_Z_Analysis(MeasurementAnalysis):
         paddedData = np.concatenate(
             (np.ones(int(filterHalfWidth)) * pad_val, data))
         return np.convolve(paddedData, gaussDerivFilter, mode='valid')
-
-    def unwrap_phase(self, raw_phases):
-        '''
-        Undoes phase-wrapping and returns a continuous version of the phase
-        data.
-        Note: phases are assumed to be given in radians.
-        '''
-        # Phases are now between -pi and pi. But we know that the phase
-        # changes continuously and we want a differentiable function, so we
-        # can undo the phase-wrapping
-        phases = deepcopy(raw_phases)
-        for i, p in enumerate(phases[:-1]):
-            # If a phase wrap is detected, all consecutive points are shifted
-            # by 2*pi
-            if phases[i+1] - phases[i] < -3:  # noise should not be this big.
-                phases[i+1:] += 2*np.pi
-            elif phases[i+1] - phases[i] > 3:
-                phases[i+1:] -= 2*np.pi
-
-        return phases
 
     def run_dac_arc_analysis(self, make_fig=True):
         '''
