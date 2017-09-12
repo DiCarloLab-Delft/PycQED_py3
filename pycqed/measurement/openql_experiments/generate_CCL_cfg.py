@@ -45,11 +45,23 @@ def generate_config(filename: str):
         "instructions": {},
     }
 
+    # cfg["gate_decomposition"]: {
+    #     "x q0": ["x q0"],
+    #     "ry180 q0": ["ry180 q0"],
+    #     "z q0": ["z q0"],
+    #     "h q0": ["h q0"],
+    #     "t q0": ["t q0"],
+    #     "tdag q0": ["tdag q0"],
+    #     "s q0": ["s q0"],
+    #     "sdag q0": ["sdag q0"],
+    #     "cnot q0,q1": ["cnot q0,q1"]
+    # }
+
     for q in qubits:
         cfg["instructions"]["prepz {}".format(q)] = {
             "duration": mw_pulse_duration,
             "latency": 0,
-            "qubits": ["q0"],
+            "qubits": [q],
             "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
             "disable_optimization": False,
             "type": "mw",
@@ -75,7 +87,7 @@ def generate_config(filename: str):
 
     for CW in range(len(lut_map)):
         for q in qubits:
-            cfg["instructions"][lut_map[CW]] = {
+            cfg["instructions"][lut_map[CW].format(q)] = {
                 "duration": 20,
                 "latency": 0,
                 "qubits": [q],
@@ -104,7 +116,7 @@ def generate_config(filename: str):
     # N.B. The codewords for CZ pulses need to be further specified.
     # I do not expect this to be correct for now.
     for ft in flux_tuples:
-        cfg["instructions"]["CZ {} {}".format(ft[0], ft[1])] = {
+        cfg["instructions"]["CZ {}, {}".format(ft[0], ft[1])] = {
             "duration": 80,
             "latency": 0,
             "qubits": [ft[0], ft[1]],
@@ -116,7 +128,7 @@ def generate_config(filename: str):
             "cc_light_right_codeword": 1,
             "cc_light_left_codeword": 2,
             "cc_light_opcode": 128
-        },
+        }
 
     with open(filename, 'w') as f:
         json.dump(cfg, f, indent=4)
