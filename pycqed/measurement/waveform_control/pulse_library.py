@@ -347,7 +347,8 @@ class SquareFluxPulse(Pulse):
 
 class GaussFluxPulse(Pulse):
     '''
-    square pulse smoothed out by convolution with a Gaussian pulse of with sigma.
+    square pulse smoothed out by convolution with a Gaussian pulse of with sigma
+    (sigma specified as flux pulse parameter)
     '''
 
     def __init__(self, channel=None, channels=None, name='gauss flux pulse', **kw):
@@ -383,7 +384,7 @@ class GaussFluxPulse(Pulse):
     def chan_wf(self, chan, tvals):
         dt = tvals[1] - tvals[0]
         n_pulse_start = int(self.buffer/dt)
-        n_pulse_stop = int((self.buffer + self.length_square_pulse)/dt)
+        n_pulse_stop = int(self.length_square_pulse/dt + self.buffer/dt)
         pulse = np.zeros(len(tvals))
         pulse[n_pulse_start:n_pulse_stop] = np.ones(n_pulse_stop - n_pulse_start) * self.amplitude
         if self.sigma != 0:
@@ -392,6 +393,8 @@ class GaussFluxPulse(Pulse):
             gauss_kernel = gauss_kernel/np.sum(gauss_kernel)
             i_max = int(nr_samples/2)
             pulse = np.convolve(pulse, gauss_kernel, mode='full')[i_max:(len(pulse)+i_max)]
+            plt.plot(tvals,pulse)
+            plt.show()
         return pulse
 
 
