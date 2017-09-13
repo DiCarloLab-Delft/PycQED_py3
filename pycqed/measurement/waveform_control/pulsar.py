@@ -13,7 +13,7 @@ try:
         UHFQuantumController import UHFQC
 # except ModuleNotFoundError:
 # exception catching removed because it does not work in python versions before 3.6
-except:
+except Exception:
     UHFQC = type(None)
 
 
