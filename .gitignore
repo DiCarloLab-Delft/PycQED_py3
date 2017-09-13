@@ -121,4 +121,8 @@ $RECYCLE.BIN/
 *.txt
 *.png
 
+# data files
+# test data files should be explicitly added by hand (overriding .gitignore)
 data/*
+*.hdf5
+
