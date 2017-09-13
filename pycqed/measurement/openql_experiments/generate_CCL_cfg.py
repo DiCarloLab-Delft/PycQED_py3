@@ -1,20 +1,10 @@
 import json
 
-mw_pulse_duration = 20
-RO_duration = 3500
-init_duration = 200000
 
-RO_latency = 0
-Flux_latency_q0 = -80  # -95 the last 15 is incorporated in the flux lutman
-Flux_latency_q1 = -80
-MW_latency_q0 = -70
-MW_latency_q1 = -70
-
-square_flux_duration_ns = 100
-CZ_duration_ns = 280  # 280
-
-
-def generate_config(filename: str):
+def generate_config(filename: str,
+                    mw_pulse_duration: int = 20,
+                    RO_duration: int = 800,
+                    init_duration: int = 200000):
 
     qubits = ['q0', 'q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7']
     lut_map = ['i {}', 'rX180 {}', 'rY180 {}', 'rX90 {}', 'rY90 {}',
@@ -111,7 +101,7 @@ def generate_config(filename: str):
                 "cc_light_instr_type": "single_qubit_gate",
                 "cc_light_instr": "CW_{:02}".format(CW),
                 "cc_light_codeword": CW,
-                "cc_light_opcode": 30+CW}
+                "cc_light_opcode": 8+CW}
 
     # N.B. The codewords for CZ pulses need to be further specified.
     # I do not expect this to be correct for now.
