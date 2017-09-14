@@ -1009,18 +1009,25 @@ class ziShellDevice:
         self.awgModule.set('awgModule/compiler/start', 1)
         self.awgModule.set('awgModule/elf/file', '')
 
-    def configure_awg_from_string(self, string):
+    def configure_awg_from_string(self, awg_nr: int, program_string: str,
+                                  timeout:float=5):
         if not self.daq:
             raise(ziShellDAQError())
 
         if not self.awgModule:
             raise(ziShellModuleError())
 
-        self.awgModule.set('awgModule/compiler/sourcestring', string)
+        self.awgModule.set('awgModule/index', awg_nr)
+        self.awgModule.set('awgModule/compiler/sourcestring', program_string)
         self.awgModule.set('awgModule/compiler/start', 1)
         self.awgModule.set('awgModule/elf/file', '')
-        # while self.awgModule.get('awgModule/progress')['progress'][0] < 1.0:
-        #    time.sleep(0.1)
+
+        t0 = time.time()
+        while self.daq.getInt('/'+self.device+'/awgs/'+str(awg_nr)+'/ready') == 0:
+            time.sleep(0.1)
+
+            if time.time()-t0 >= timeout:
+                raise TimeoutError('ERROR: Timeout while configuring AWG.')
 
     def read_from_scope(self, timeout=1.0, enable=True):
         if not self.daq:

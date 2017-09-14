@@ -1,6 +1,7 @@
 import time
 import json
 import os
+import sys
 import numpy as np
 
 from qcodes.instrument.base import Instrument
@@ -13,6 +14,7 @@ class ZI_base_instrument(Instrument):
     """
     This is an abstract base class for Zurich Instruments instrument drivers.
     """
+
 
     def add_s_node_pars(self, filename: str):
         f = open(filename).read()

@@ -1,10 +1,15 @@
 import time
 import logging
 import os
+import sys
+import numpy as np
 from . import zishell_NH as zs
 from qcodes.utils import validators as vals
 from .ZI_base_instrument import ZI_base_instrument
 from qcodes.instrument.parameter import ManualParameter
+
+import ctypes
+from ctypes.wintypes import MAX_PATH
 
 
 class ZI_HDAWG8(ZI_base_instrument):
@@ -34,6 +39,21 @@ class ZI_HDAWG8(ZI_base_instrument):
             port            (int) the port to connect to
         '''
         t0 = time.time()
+        self._num_channels = 8
+        self._num_codewords = 256
+
+        if os.name == 'nt':
+            dll = ctypes.windll.shell32
+            buf = ctypes.create_unicode_buffer(MAX_PATH + 1)
+            if dll.SHGetSpecialFolderPathW(None, buf, 0x0005, False):
+                _basedir = buf.value
+            else:
+                logging.warning('Could not extract my documents folder')
+            # _basedir = os.path.join(os.path.expanduser('~'), 'Documents')
+        else:
+            _basedir = os.path.expanduser('~')
+        self.lab_one_webserver_path = os.path.join(
+            _basedir, 'Zurich Instruments', 'LabOne', 'WebServer')
 
         super().__init__(name=name, **kw)
         self._devname = device
@@ -75,6 +95,7 @@ class ZI_HDAWG8(ZI_base_instrument):
                 vals=vals.Ints(0, 1),  # Ideally this is an Enum
                 docstring='"0" is direct mode\n"1" is amplified mode')
 
+        self._add_codeword_parameters()
         self.connect_message(begin_time=t0)
 
     def add_ZIshell_device_methods_to_instrument(self):
@@ -101,3 +122,127 @@ class ZI_HDAWG8(ZI_base_instrument):
                     'fpga_firmware': self._dev.geti('system/fpgarevision')
                     }
         return idn_dict
+
+    def _add_codeword_parameters(self):
+        """
+        Adds manual parameters that are used for uploading codewords.
+        It also contains initial values for each codeword to ensure
+        that the "upload_codeword_program"
+
+        """
+        docst = ('Specifies a waveform to for a specific codeword. ' +
+                 'The waveforms must be uploaded using ' +
+                 '"upload_codeword_program". The channel number corresponds' +
+                 ' to the channel as indicated on the device (1 is lowest).')
+        for ch in range(self._num_channels):
+            for cw in range(self._num_codewords):
+                parname = 'wave_ch{}_cw{:03}'.format(ch, cw)
+                self.add_parameter(
+                    parname,
+                    label='Waveform channel {} codeword {:03}'.format(
+                        ch+1, cw),
+                    vals=vals.Arrays(),  # min_value, max_value = unknown
+                    set_cmd=self._gen_write_csv(parname),
+                    get_cmd=self._gen_read_csv(parname),
+                    docstring=docst)
+
+    def _gen_write_csv(self, wf_name):
+        def write_func(waveform):
+            return self._write_csv_waveform(
+                wf_name=wf_name, waveform=waveform)
+        return write_func
+
+    def _gen_read_csv(self, wf_name):
+        def read_func():
+            return self._read_csv_waveform(
+                wf_name=wf_name)
+        return read_func
+
+    def _write_csv_waveform(self, wf_name: str, waveform):
+        filename = os.path.join(self.lab_one_webserver_path, wf_name+'.csv')
+        with open(filename, 'w'):
+            np.savetxt(filename, waveform, delimiter=",")
+
+    def _read_csv_waveform(self, wf_name: str):
+        filename = os.path.join(self.lab_one_webserver_path, wf_name+'.csv')
+        try:
+            return np.genfromtxt(filename, delimiter=',')
+        except OSError as e:
+            # if the waveform does not exist yet dont raise exception
+            logging.warning(e)
+            print(e)
+            return None
+
+    def upload_codeword_program(self):
+        """
+        Generates a program that plays the codeword waves for each channel.
+        """
+
+        for awg_nr in range(4):
+            # disable all AWG channels
+            self.set('awgs_{}_enable'.format(awg_nr), 0)
+
+        codeword_mode_snippet = (
+            'while (1) { \n '
+            '\t// Wait for a trigger on the DIO interface\n'
+            '\twaitDIOTrigger();\n'
+            '\t// Play a waveform from the table based on the DIO code-word\n'
+            '\tplayWaveDIO(); \n'
+            '}')
+
+        for ch in [1, 3, 5, 7]:
+            waveform_table = '// Define the waveform table\n'
+            # for cw in range(self._num_codewords):
+            for cw in range(self._num_codewords):
+                wf0_name = 'wave_ch{}_cw{:03}'.format(ch, cw)
+                wf1_name = 'wave_ch{}_cw{:03}'.format(ch, cw+1)
+                waveform_table += 'setWaveDIO({}, {}, {})'.format(
+                    cw, wf0_name, wf1_name)
+            program = waveform_table + codeword_mode_snippet
+            # N.B. awg_nr in goes from 0 to 3 in API while in LabOne it is 1 to
+            # 4
+            awg_nr = ch//2  # channels are coupled in pairs of 2
+            self.configure_awg_from_string(awg_nr=awg_nr,
+                                           program_string=program,
+                                           timeout=self.timeout())
+
+        # TODO: The snippet below uses the direct zi API rather than
+        # parameters (which it should use). This is awaiting fixing
+        # of issue #315.
+
+        # Configure the DIO triggering
+        # This is the bit index of the valid bit, we use bit 16 of the DIO
+        # in this example
+        self._dev.daq.setInt('/' + self._dev.device +
+                             '/awgs/*/dio/valid/index', 31)
+        # Valid polarity is 'high' (hardware value 2), 'low' (hardware value 1),
+        # 'no valid needed' (hardware value 0)
+        self._dev.daq.setInt('/' + self._dev.device +
+                             '/awgs/*/dio/valid/polarity', 2)
+        # This is the bit index of the strobe signal (toggling signal), we use
+        # bit 24
+        self._dev.daq.setInt('/' + self._dev.device +
+                             '/awgs/*/dio/strobe/index', 30)
+        # Configure the DIO interface for triggering on the rising edge of the strobe signal
+        # (could also be set to 2 for falling edge triggering or 3 for both edges)
+        #self._dev.daq.setInt('/' + self._dev.device + '/awgs/*/dio/strobe/slope', 3)
+        self._dev.daq.setInt('/' + self._dev.device +
+                             '/awgs/*/dio/strobe/slope', 0)
+        # Define the mask value, we use bit 0 on the DIO to index the table, so we
+        # set the mask to 1
+        self._dev.daq.setInt('/' + self._dev.device +
+                             '/awgs/*/dio/mask/value', 3)
+        # Define the shift to apply to the DIO input before the mask is applied, as we're using bit 0
+        # we don't need to shift the value, so we set it to 0
+        self._dev.daq.setInt('/' + self._dev.device +
+                             '/awgs/*/dio/mask/shift', 0)
+        time.sleep(1)
+        self._dev.daq.setInt('/' + self._dev.device + '/awgs/*/enable', 1)
+
+        # Turn on all outputs
+        self._dev.daq.setInt('/' + self._dev.device + '/sigouts/*/on', 1)
+        # Disable all function generators
+        self._dev.daq.setInt('/' + self._dev.device +
+                             '/sigouts/*/enables/*', 0)
+        # Switch all outputs in to DAC mode
+        self._dev.daq.setInt('/' + self._dev.device + '/raw/sigouts/*/mode', 0)
