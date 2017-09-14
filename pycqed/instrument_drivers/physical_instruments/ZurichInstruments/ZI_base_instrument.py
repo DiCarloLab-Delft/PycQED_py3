@@ -5,6 +5,7 @@ import numpy as np
 
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
+from zhinst.ziPython import ziListEnum as ziListEnum
 
 
 class ZI_base_instrument(Instrument):
@@ -102,6 +103,32 @@ class ZI_base_instrument(Instrument):
         def get_func():
             return dev_get_type(ch)
         return get_func
+
+    def create_parameter_files_new(self):
+        """
+        This generates a json file Containing the node_docs as extracted
+        from the ZI instrument API.
+
+        In the future this file (instead of the s_node_pars and d_node_pars)
+        should be used to generate the drivers.
+        """
+        # set the file names to write to
+        dev_type = self._dev.daq.getByte(
+            '/{}/features/devtype'.format(self._devname))
+
+        # Watch out this overwrites the existing json parameter files
+        path = os.path.abspath(__file__)
+        dir_path = os.path.dirname(path)
+        par_fn = os.path.join(dir_path, 'zi_parameter_files',
+                              'node_doc_{}.json'.format(dev_type))
+
+        flags = ziListEnum.absolute | ziListEnum.recursive | ziListEnum.leafsonly
+        # Get node documentation for the device's entire node tree
+        node_doc = json.loads(
+            self._dev.daq.listNodesJSON('/{}/'.format(self._devname), flags))
+
+        with open(par_fn, 'w') as file:
+            json.dump(node_doc, file, indent=4)
 
     def create_parameter_files(self):
         '''

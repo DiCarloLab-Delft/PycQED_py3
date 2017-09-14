@@ -28,9 +28,10 @@ class ZI_HDAWG8(ZI_base_instrument):
                  server: str='localhost', port=8004, **kw):
         '''
         Input arguments:
-            name:           (str) name of the instrument
-            server_name:    (str) qcodes instrument server
-            address:        (int) the address of the data server e.g. 8006
+            name:           (str) name of the instrument as seen by the user
+            device          (str) the name of the device e.g., "dev8008"
+            server          (str) the ZI data server
+            port            (int) the port to connect to
         '''
         t0 = time.time()
 
