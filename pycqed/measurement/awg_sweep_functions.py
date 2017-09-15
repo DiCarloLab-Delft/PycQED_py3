@@ -1870,7 +1870,7 @@ class Ramsey_fluxpulse_delay_sweep(swf.Soft_Sweep):
 
 
 
-class Chevron_length_sweep(swf.Hard_Sweep):
+class Chevron_length_swf(swf.Hard_Sweep):
     def __init__(self, qb_control, qb_target, spacing=50e-9, upload=True,
                  distorted=False,distortion_dict=None):
         super().__init__()
@@ -1887,13 +1887,13 @@ class Chevron_length_sweep(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         if self.upload:
-            fsqs.Chevron_sequence_flux_pulse_length_sequence(
+            fsqs.Chevron_flux_pulse_length_seq(
                 lengths=self.sweep_points, qb_control=self.qb_control,
                 qb_target=self.qb_target, spacing=self.spacing,
                 distorted=self.distorted,distortion_dict=self.distortion_dict
                 )
 
-class Chevron_ampl_sweep(swf.Soft_Sweep):
+class Chevron_ampl_swf(swf.Soft_Sweep):
     def __init__(self, qb_control,qb_target, hard_sweep):
         super().__init__()
         self.name = 'Chevron flux pulse amplitude sweep'

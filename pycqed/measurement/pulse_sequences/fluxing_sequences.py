@@ -1594,7 +1594,7 @@ def Ramsey_with_flux_pulse_meas_seq(thetas, qb, X90_separation, verbose=False,
 
 
 
-def Chevron_sequence_flux_pulse_length_sequence(lengths, qb_control, qb_target, spacing=50e-9, verbose=False,
+def Chevron_flux_pulse_length_seq(lengths, qb_control, qb_target, spacing=50e-9, verbose=False,
                                                 upload=True, return_seq=False,
                                                 distorted=False,distortion_dict=None):
     '''
