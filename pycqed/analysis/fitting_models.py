@@ -418,13 +418,10 @@ def exp_dec_guess(model, data, t):
     return params
 
 
-def Cos_guess(model, data, t):
+def fft_freq_phase_guess(data, t):
     '''
     Guess for a cosine fit using FFT, only works for evenly spaced points
     '''
-    amp_guess = abs(max(data)-min(data))/2  # amp is positive by convention
-    offs_guess = np.mean(data)
-
     # Freq guess ! only valid with uniform sampling
     # Only first half of array is used, because the second half contains the
     # negative frequecy components, and we want a positive frequency.
@@ -440,6 +437,15 @@ def Cos_guess(model, data, t):
     #               (for example when discretization is visible)
     # to prevent errors we pick the first solution
 
+    return freq_guess, ph_guess
+
+
+def Cos_guess(model, data, t):
+    amp_guess = abs(max(data)-min(data))/2  # amp is positive by convention
+    offs_guess = np.mean(data)
+
+    freq_guess, ph_guess = fft_freq_phase_guess(data, t)
+
     model.set_param_hint('period', expr='1/frequency')
     params = model.make_params(amplitude=amp_guess,
                                frequency=freq_guess,
@@ -448,6 +454,31 @@ def Cos_guess(model, data, t):
     params['amplitude'].min = 0  # Ensures positive amp
     params['frequency'].min = 0
 
+    return params
+
+
+def exp_damp_osc_guess(model, data, t):
+    """
+    Makes a guess for an exponentially damped oscillation.
+    Uses the fft_freq_phase guess to guess the oscillation parameters.
+    The guess for the exponential is simpler as it sets the exponent (n) at 1
+    and the tau at 2/3 of the total range
+    """
+    amp_guess = abs(max(data)-min(data))/2  # amp is positive by convention
+    freq_guess, ph_guess = fft_freq_phase_guess(data, t)
+    osc_offs_guess = 0
+
+    tau_guess = 2/3*max(t)
+    exp_offs_guess = np.mean(data)
+    n_guess = 1
+
+    params = model.make_params(amplitude=amp_guess,
+                               frequency=freq_guess,
+                               phase=ph_guess,
+                               oscillation_offset=osc_offs_guess,
+                               exponential_offset=exp_offs_guess,
+                               n=n_guess,
+                               tau=tau_guess)
     return params
 
 
