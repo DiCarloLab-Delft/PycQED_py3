@@ -1778,3 +1778,137 @@ class Load_Sequence_Tek(swf.Hard_Sweep):
         if self.upload:
             self.AWG.set_setup_filename(self.sequence_name)
 
+
+
+
+
+class Ramsey_interleaved_fluxpulse_sweep(swf.Hard_Sweep):
+    '''
+    Ramsey type measurement with interleaved fluxpulse
+    for more detailed description see fsqs.Ramsey_with_flux_pulse_meas_seq(..)
+    sequence function
+
+    inputs:
+        qb: qubit object
+        X90_separation: float (separation of the pi/2 pulses)
+    '''
+    def __init__(self, qb, X90_separation, upload=True,
+                 distorted=False,distortion_dict=None):
+        super().__init__()
+        self.qb = qb
+        self.X90_separation = X90_separation
+        self.upload = upload
+        self.distorted = distorted
+        self.distortion_dict = distortion_dict
+
+        self.name = 'Ramsey with interleaved flux pulse'
+        self.parameter_name = 'theta'
+        self.unit = 'rad'
+
+    def prepare(self, **kw):
+        if self.upload:
+            fsqs.Ramsey_with_flux_pulse_meas_seq(thetas=self.sweep_points, qb=self.qb,
+                                                  X90_separation=self.X90_separation,
+                                                  distorted=self.distorted,distortion_dict=self.distortion_dict)
+
+
+class Ramsey_fluxpulse_ampl_sweep(swf.Soft_Sweep):
+    '''
+    flux pulse amplitude sweep for Ramsey type measurement with interleaved
+    fluxpulse; for more detailed description see fsqs.Ramsey_with_flux_pulse_\
+    meas_seq(..)
+    sequence function
+
+    inputs:
+        qb: qubit object
+    '''
+
+    def __init__(self, qb, hard_sweep):
+        super().__init__()
+        self.name = 'Ramsey interleaved fluxpulse amplitude sweep'
+        self.parameter_name = 'Fluxpulse amplitude'
+        self.unit = 'V'
+        self.hard_sweep = hard_sweep
+        self.qb = qb
+
+    def prepare(self):
+        pass
+
+    def set_parameter(self, val, **kw):
+        self.qb.flux_pulse_amp(val)
+        self.hard_sweep.prepare()
+
+    def finish(self):
+        pass
+
+class Ramsey_fluxpulse_delay_sweep(swf.Soft_Sweep):
+    '''
+    flux pulse delay sweep for Ramsey type measurement with interleaved
+    fluxpulse; for more detailed description see fsqs.Ramsey_with_flux_pulse_\
+    meas_seq(..)
+    sequence function
+
+    inputs:
+        qb: qubit object
+        hard_sweep: hard_sweep object with method prepare()
+    '''
+
+    def __init__(self, qb, hard_sweep):
+        super().__init__()
+        self.name = 'Ramsey interleaved fluxpulse delay sweep'
+        self.parameter_name = 'Fluxpulse delay'
+        self.unit = 'delay (s)'
+        self.hard_sweep = hard_sweep
+        self.qb = qb
+    def prepare(self):
+        pass
+    def set_parameter(self, val, **kw):
+        self.qb.flux_pulse_delay(val)
+        self.hard_sweep.prepare()
+    def finish(self):
+        pass
+
+
+
+class Chevron_length_sweep(swf.Hard_Sweep):
+    def __init__(self, qb_control, qb_target, spacing=50e-9, upload=True,
+                 distorted=False,distortion_dict=None):
+        super().__init__()
+        self.qb_control = qb_control
+        self.qb_target = qb_target
+        self.spacing = spacing
+        self.upload = upload
+        self.distorted = distorted
+        self.distortion_dict = distortion_dict
+
+        self.name = 'Chevron flux pulse length sweep'
+        self.parameter_name = 'length'
+        self.unit = 's'
+
+    def prepare(self, **kw):
+        if self.upload:
+            fsqs.Chevron_sequence_flux_pulse_length_sequence(
+                lengths=self.sweep_points, qb_control=self.qb_control,
+                qb_target=self.qb_target, spacing=self.spacing,
+                distorted=self.distorted,distortion_dict=self.distortion_dict
+                )
+
+class Chevron_ampl_sweep(swf.Soft_Sweep):
+    def __init__(self, qb_control,qb_target, hard_sweep):
+        super().__init__()
+        self.name = 'Chevron flux pulse amplitude sweep'
+        self.parameter_name = 'Fluxpulse amplitude'
+        self.unit = 'V'
+        self.hard_sweep = hard_sweep
+        self.qb_control = qb_control
+        self.qb_target = qb_target
+
+    def prepare(self):
+        pass
+
+    def set_parameter(self, val, **kw):
+        self.qb_control.flux_pulse_amp(val)
+        self.hard_sweep.prepare()
+
+    def finish(self):
+        pass
