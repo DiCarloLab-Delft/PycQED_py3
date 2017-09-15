@@ -534,11 +534,11 @@ class Transmon(Qubit):
                 close_fig=close_fig)
         return self.f_qubit()
 
-    def find_frequency_pulsed():
-        pass
+    def find_frequency_pulsed(self):
+        raise NotImplementedError()
 
-    def find_frequency_cw_spec():
-        pass
+    def find_frequency_cw_spec(self):
+        raise NotImplementedError()
 
     def find_resonator_frequency(self, use_min=False,
                                  update=True,
@@ -594,12 +594,31 @@ class Transmon(Qubit):
         return ampl
 
     def calibrate_pulse_amplitude_flipping(self,
-                                           MC=None, update=True,
-                                           fine_accuracy=0.005,
-                                           desired_accuracy=0.00005,
-                                           max_iterations=10,
-                                           verbose=True):
+                                           MC=None, update: bool=True,
+                                           fine_accuracy: float=0.005,
+                                           desired_accuracy: float=0.00005,
+                                           max_iterations: int=10,
+                                           verbose: bool=True):
+        """
+        Calibrates the pulse amplitude using a flipping sequence.
+        The flipping sequence itself should be implemented using the
+        "measure_flipping" method.
+        It converges to the optimal amplitude using first a coarse and then
+        a finer scan with more pulses.
 
+        Args:
+            MC                    : The measurement control used, if None
+                                   uses the one specified in the qubit object.
+            updates       (bool)  : if True updates the Q_amp180 parameter
+            fine_accuracy (float) : the accuracy to switch to the fine scan
+            desired_accuracy (float): the accuracy after which to terminate
+                                      the optimization
+            max_iterations  (int) : always terminate after this number of
+                                     optimizations.
+            verbose         (bool): if true adds additional print statements.
+        returns:
+            success         (bool): True if optimization converged.
+        """
         success = False
         fine = False
         for k in range(max_iterations):
