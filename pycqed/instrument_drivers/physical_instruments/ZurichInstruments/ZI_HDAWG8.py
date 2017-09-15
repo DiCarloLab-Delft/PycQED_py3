@@ -49,7 +49,6 @@ class ZI_HDAWG8(ZI_base_instrument):
                 _basedir = buf.value
             else:
                 logging.warning('Could not extract my documents folder')
-            # _basedir = os.path.join(os.path.expanduser('~'), 'Documents')
         else:
             _basedir = os.path.expanduser('~')
         self.lab_one_webserver_path = os.path.join(
@@ -159,12 +158,16 @@ class ZI_HDAWG8(ZI_base_instrument):
         return read_func
 
     def _write_csv_waveform(self, wf_name: str, waveform):
-        filename = os.path.join(self.lab_one_webserver_path, wf_name+'.csv')
+        filename = os.path.join(
+            self.lab_one_webserver_path, 'awg', 'waves',
+            self._devname+'_'+wf_name+'.csv')
         with open(filename, 'w'):
             np.savetxt(filename, waveform, delimiter=",")
 
     def _read_csv_waveform(self, wf_name: str):
-        filename = os.path.join(self.lab_one_webserver_path, wf_name+'.csv')
+        filename = os.path.join(
+            self.lab_one_webserver_path, 'awg', 'waves',
+            self._devname+'_'+wf_name+'.csv')
         try:
             return np.genfromtxt(filename, delimiter=',')
         except OSError as e:
@@ -194,8 +197,10 @@ class ZI_HDAWG8(ZI_base_instrument):
             waveform_table = '// Define the waveform table\n'
             # for cw in range(self._num_codewords):
             for cw in range(self._num_codewords):
-                wf0_name = 'wave_ch{}_cw{:03}'.format(ch, cw)
-                wf1_name = 'wave_ch{}_cw{:03}'.format(ch, cw+1)
+                wf0_name = '{}_wave_ch{}_cw{:03}'.format(
+                    self._devname, ch, cw)
+                wf1_name = '{}_wave_ch{}_cw{:03}'.format(
+                    self._devname, ch, cw+1)
                 waveform_table += 'setWaveDIO({}, {}, {})'.format(
                     cw, wf0_name, wf1_name)
             program = waveform_table + codeword_mode_snippet
