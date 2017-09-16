@@ -286,9 +286,10 @@ class Element:
         tvals = {}
 
         for c in self.pulsar.channels:
-            wfs[c] = np.zeros(self.samples(c)) + \
+            nsamples = self.samples(c)
+            wfs[c] = np.zeros(nsamples) + \
                      self.pulsar.channels[c]['offset']
-            tvals[c] = np.arange(self.samples(c)) / self._clock(c)
+            tvals[c] = np.arange(nsamples) / self._clock(c)
         # we first compute the ideal function values
         for p in self.pulses:
             chan_tvals = {}
