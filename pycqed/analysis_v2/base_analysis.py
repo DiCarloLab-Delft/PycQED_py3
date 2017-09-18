@@ -402,7 +402,7 @@ class BaseDataAnalysis(object):
 
         filepath = os.path.join(savedir, savebase + tstag + '.' + fmt)
         with open(filepath, 'w') as file:
-            json.dump(save_dict, file, cls=NumpyJsonEncoder)
+            json.dump(save_dict, file, cls=NumpyJsonEncoder, indent=4)
         print('Data saved to "{}".'.format(filepath))
 
     def prepare_fitting(self):

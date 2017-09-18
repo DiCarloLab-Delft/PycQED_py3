@@ -75,6 +75,13 @@ class ziShellModuleError(ziShellError):
     pass
 
 
+class ziShellCompilationError(ziShellError):
+    """
+    Exception raised when the zi AWG-8 compiler encounters an error.
+    """
+    pass
+
+
 class ziShellEnvironment:
     """Holds all the global variables."""
 
@@ -999,6 +1006,7 @@ class ziShellDevice:
         self.daq.sync()
 
     def configure_awg_from_file(self, filename):
+        raise NotImplementedError('Use "configure_awg_from_string" instead')
         if not self.daq:
             raise(ziShellDAQError())
 
@@ -1009,18 +1017,76 @@ class ziShellDevice:
         self.awgModule.set('awgModule/compiler/start', 1)
         self.awgModule.set('awgModule/elf/file', '')
 
-    def configure_awg_from_string(self, string):
+    def configure_awg_from_string(self, awg_nr: int, program_string: str,
+                                  timeout: float=5):
+        """
+        Uploads a program string to one of the AWGs in the AWG8.
+
+        This function is tested to work and give the correct error messages
+        when compilation fails. However, it is quite dirty and contains a lot
+        of sleep statements. This is due to buggy behaviour in the ZI API.
+        """
+        print('Configuring AWG_nr {}.'.format(awg_nr))
         if not self.daq:
             raise(ziShellDAQError())
 
         if not self.awgModule:
             raise(ziShellModuleError())
 
-        self.awgModule.set('awgModule/compiler/sourcestring', string)
+        self.awgModule.set('awgModule/index', awg_nr)
+        self.awgModule.set('awgModule/compiler/sourcestring', program_string)
         self.awgModule.set('awgModule/compiler/start', 1)
         self.awgModule.set('awgModule/elf/file', '')
-        # while self.awgModule.get('awgModule/progress')['progress'][0] < 1.0:
-        #    time.sleep(0.1)
+
+        t0 = time.time()
+        # Hack does not seem to work here
+        time.sleep(.5)
+        succes_msg = 'File successfully uploaded'
+
+        # N.B. the success checking below is dirty becuase of bugs in the API
+        success = True
+        while (self.daq.getInt('/'+self.device+'/awgs/'+str(awg_nr)+'/ready')
+                == 0):
+            time.sleep(0.2)
+            err_msg = (self.awgModule.get(
+                'awgModule/compiler/statusstring')['compiler']
+                ['statusstring'][0])
+            if (time.time()-t0 >= timeout):
+                success = False
+                print('Timeout encountered during compilation.')
+                break
+        # There is also a progress parameter but this does not work
+        # The message needs some time to update after the code is
+        # set, I consider this a bug in the ZIshell.
+        time.sleep(1.5)
+
+        # if (self.awgModule.get('awgModule/compiler/status')
+        #         ['compiler']['status'][0] != 0):
+        # We check on the message instead of on the status because of a bug.
+        busy_msg = 'Compiling string...'
+        complete = False
+        while not complete:
+            err_msg = (self.awgModule.get(
+                'awgModule/compiler/statusstring')['compiler']
+                ['statusstring'][0])
+
+            if not (err_msg.endswith(busy_msg) or
+                    err_msg.endswith('Uploading file to device...')):
+                complete = True
+            time.sleep(1.)
+
+        if not err_msg.endswith(succes_msg):
+            success = False
+
+        if not success:
+            print("Compilation failed, printing program:")
+            for i, line in enumerate(program_string.splitlines()):
+                print(i+1, '\t', line)
+            print('\n')
+            raise ziShellCompilationError(err_msg)
+
+        print(self.awgModule.get('awgModule/compiler/statusstring')
+              ['compiler']['statusstring'][0])
 
     def read_from_scope(self, timeout=1.0, enable=True):
         if not self.daq:
