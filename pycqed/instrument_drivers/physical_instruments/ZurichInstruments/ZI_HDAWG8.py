@@ -135,7 +135,7 @@ class ZI_HDAWG8(ZI_base_instrument):
                  ' to the channel as indicated on the device (1 is lowest).')
         for ch in range(self._num_channels):
             for cw in range(self._num_codewords):
-                parname = 'wave_ch{}_cw{:03}'.format(ch, cw)
+                parname = 'wave_ch{}_cw{:03}'.format(ch+1, cw)
                 self.add_parameter(
                     parname,
                     label='Waveform channel {} codeword {:03}'.format(
@@ -161,7 +161,7 @@ class ZI_HDAWG8(ZI_base_instrument):
         filename = os.path.join(
             self.lab_one_webserver_path, 'awg', 'waves',
             self._devname+'_'+wf_name+'.csv')
-        with open(filename, 'w'):
+        with open(filename, 'w') as f:
             np.savetxt(filename, waveform, delimiter=",")
 
     def _read_csv_waveform(self, wf_name: str):
@@ -175,6 +175,19 @@ class ZI_HDAWG8(ZI_base_instrument):
             logging.warning(e)
             print(e)
             return None
+
+    def initialze_all_codewords_to_zeros(self):
+        """
+        Generates all zeros waveforms for all codewords
+        """
+        t0 = time.time()
+        wf = np.zeros(32)
+        waveform_params = [value for key, value in self.parameters.items()
+                           if 'wave_ch' in key.lower()]
+        for par in waveform_params:
+            par(wf)
+        t1 = time.time()
+        print('Set all zeros waveforms in {:.1f} s'.format(t1-t0))
 
     def upload_codeword_program(self):
         """
@@ -195,13 +208,12 @@ class ZI_HDAWG8(ZI_base_instrument):
 
         for ch in [1, 3, 5, 7]:
             waveform_table = '// Define the waveform table\n'
-            for cw in range(32):
-            # for cw in range(self._num_codewords):
+            for cw in range(self._num_codewords):
                 wf0_name = '{}_wave_ch{}_cw{:03}'.format(
                     self._devname, ch, cw)
                 wf1_name = '{}_wave_ch{}_cw{:03}'.format(
-                    self._devname, ch, cw+1)
-                waveform_table += 'setWaveDIO({}, {}, {});\n'.format(
+                    self._devname, ch+1, cw)
+                waveform_table += 'setWaveDIO({}, "{}", "{}");\n'.format(
                     cw, wf0_name, wf1_name)
             program = waveform_table + codeword_mode_snippet
             # N.B. awg_nr in goes from 0 to 3 in API while in LabOne it is 1 to
