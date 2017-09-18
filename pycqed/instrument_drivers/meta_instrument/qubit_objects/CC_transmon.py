@@ -1123,7 +1123,6 @@ class CBox_v3_driven_transmon(Transmon):
             pulse_delay=self.gauss_width.get()*4)
         if update:
             self.F_RB(a.fit_res.params['fidelity_per_Clifford'].value)
-
         return a.fit_res.params['fidelity_per_Clifford'].value
 
     def measure_randomized_benchmarking_vs_pars(self, amps=None,
@@ -1703,6 +1702,7 @@ class CBox_v3_driven_transmon(Transmon):
                     pi-half pulse. For 'interleaved', the 'cos' and 'sin'
                     cases are measured interleaved. Measurement is repeated
                     for all cases given.
+
             analyze (bool):
                     Do the Ram-Z analysis, extracting the step response.
             filter_raw (bool):
@@ -1763,6 +1763,13 @@ class CBox_v3_driven_transmon(Transmon):
             }
 
         for case in cases:
+            if case == 'cos':
+                rec_Y90 = False
+            elif case == 'sin':
+                rec_Y90 = True
+            else:
+                raise ValueError('Unknown case "{}".'.format(case))
+
             CBox.trigger_source('internal')
             qasm_file = sqqs.Ram_Z(
                 qubit_name=self.name,
@@ -1844,6 +1851,7 @@ class CBox_v3_driven_transmon(Transmon):
             else:
                 print('No analysis specified for the given cases "{}".'
                       .format(cases))
+
 
     def measure_cryo_scope(self, waveform, lengths='full', chunk_size: int=32,
                            MC=None, wait_during_flux: str='auto',

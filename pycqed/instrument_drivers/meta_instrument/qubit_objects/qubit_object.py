@@ -189,6 +189,54 @@ class Qubit(Instrument):
 
         """
         raise NotImplementedError()
+
+    def calibrate_Flux_pulse_latency(self, MC=None, update=True)-> bool:
+        """
+        Calibrates parameter: "latency_Flux"
+
+        Used to calibrate the timing between the MW and Flux pulses.
+
+        Flux pulse latency is calibrated using a Ram-Z experiment.
+        The experiment works as follows:
+        - x90 | square_flux  # defines t = 0
+        - wait (should be slightly longer than the pulse duration)
+        - x90
+        - wait
+        - RO
+
+        The position of the square flux pulse is varied to find the
+        optimal latency.
+        """
+        raise NotImplementedError
+        return True
+
+
+    def calibrate_MW_RO_latency(self, MC=None, update: bool=True)-> bool:
+        """
+        Calibrates parameters:
+            "latency_MW"
+            "RO_acq_delay"
+
+
+        Used to calibrate the delay of the MW pulse with respect to the
+        RO pulse and the RO acquisition delay.
+
+
+        The MW_pulse_latency is calibrated by setting the frequency of
+        the LO to the qubit frequency such that both the MW and the RO pulse
+        will show up in the RO.
+        Measuring the transients will  show what the optimal latency is.
+
+        Note that a lot of averages may be required when using dedicated drive
+        lines.
+
+        This function does NOT overwrite the values that were set in the qubit
+        object and as such can be used to verify the succes of the calibration.
+
+        Currently (28/6/2017) the experiment has to be analysed by hand.
+
+        """
+        raise NotImplementedError()
         return True
 
     def calibrate_Flux_pulse_latency(self, MC=None, update=True)-> bool:
@@ -534,11 +582,12 @@ class Transmon(Qubit):
                 close_fig=close_fig)
         return self.f_qubit()
 
-    def find_frequency_pulsed():
-        pass
 
-    def find_frequency_cw_spec():
-        pass
+    def find_frequency_pulsed(self):
+        raise NotImplementedError()
+
+    def find_frequency_cw_spec(self):
+        raise NotImplementedError()
 
     def find_resonator_frequency(self, use_min=False,
                                  update=True,
@@ -594,12 +643,31 @@ class Transmon(Qubit):
         return ampl
 
     def calibrate_pulse_amplitude_flipping(self,
-                                           MC=None, update=True,
-                                           fine_accuracy=0.005,
-                                           desired_accuracy=0.00005,
-                                           max_iterations=10,
-                                           verbose=True):
+                                           MC=None, update: bool=True,
+                                           fine_accuracy: float=0.005,
+                                           desired_accuracy: float=0.00005,
+                                           max_iterations: int=10,
+                                           verbose: bool=True):
+        """
+        Calibrates the pulse amplitude using a flipping sequence.
+        The flipping sequence itself should be implemented using the
+        "measure_flipping" method.
+        It converges to the optimal amplitude using first a coarse and then
+        a finer scan with more pulses.
 
+        Args:
+            MC                    : The measurement control used, if None
+                                   uses the one specified in the qubit object.
+            updates       (bool)  : if True updates the Q_amp180 parameter
+            fine_accuracy (float) : the accuracy to switch to the fine scan
+            desired_accuracy (float): the accuracy after which to terminate
+                                      the optimization
+            max_iterations  (int) : always terminate after this number of
+                                     optimizations.
+            verbose         (bool): if true adds additional print statements.
+        returns:
+            success         (bool): True if optimization converged.
+        """
         success = False
         fine = False
         for k in range(max_iterations):
