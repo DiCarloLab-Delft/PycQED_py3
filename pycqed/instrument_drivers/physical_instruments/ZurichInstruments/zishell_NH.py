@@ -75,6 +75,13 @@ class ziShellModuleError(ziShellError):
     pass
 
 
+class ziShellCompilationError(ziShellError):
+    """
+    Exception raised when the zi AWG-8 compiler encounters an error.
+    """
+    pass
+
+
 class ziShellEnvironment:
     """Holds all the global variables."""
 
@@ -1010,7 +1017,7 @@ class ziShellDevice:
         self.awgModule.set('awgModule/elf/file', '')
 
     def configure_awg_from_string(self, awg_nr: int, program_string: str,
-                                  timeout:float=5):
+                                  timeout: float=5):
         if not self.daq:
             raise(ziShellDAQError())
 
@@ -1023,8 +1030,17 @@ class ziShellDevice:
         self.awgModule.set('awgModule/elf/file', '')
 
         t0 = time.time()
-        while self.daq.getInt('/'+self.device+'/awgs/'+str(awg_nr)+'/ready') == 0:
-            time.sleep(0.1)
+        while (self.daq.getInt('/'+self.device+'/awgs/'+str(awg_nr)+'/ready')
+                == 0):
+            time.sleep(0.01)
+            if self.awgModule.get('awgModule/compiler/status') != 0:
+                # The message needs some time to update after the code is
+                # set, I consider this a bug in the ZIshell. but some delay
+                time.sleep(.5)
+                err_msg = (self.awgModule.get(
+                    'awgModule/compiler/statusstring')['compiler']
+                    ['statusstring'][0])
+                raise ziShellCompilationError(err_msg)
 
             if time.time()-t0 >= timeout:
                 raise TimeoutError('ERROR: Timeout while configuring AWG.')

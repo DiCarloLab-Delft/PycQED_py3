@@ -195,13 +195,13 @@ class ZI_HDAWG8(ZI_base_instrument):
 
         for ch in [1, 3, 5, 7]:
             waveform_table = '// Define the waveform table\n'
+            for cw in range(32):
             # for cw in range(self._num_codewords):
-            for cw in range(self._num_codewords):
                 wf0_name = '{}_wave_ch{}_cw{:03}'.format(
                     self._devname, ch, cw)
                 wf1_name = '{}_wave_ch{}_cw{:03}'.format(
                     self._devname, ch, cw+1)
-                waveform_table += 'setWaveDIO({}, {}, {})'.format(
+                waveform_table += 'setWaveDIO({}, {}, {});\n'.format(
                     cw, wf0_name, wf1_name)
             program = waveform_table + codeword_mode_snippet
             # N.B. awg_nr in goes from 0 to 3 in API while in LabOne it is 1 to
@@ -210,39 +210,112 @@ class ZI_HDAWG8(ZI_base_instrument):
             self.configure_awg_from_string(awg_nr=awg_nr,
                                            program_string=program,
                                            timeout=self.timeout())
+            self._configure_codeword_protocol()
 
+    def _configure_codeword_protocol(self):
+        """
+        This method configures the AWG-8 codeword protocol.
+        It includes specifying what bits are used to specify codewords
+        as well as setting the delays on the different bits.
+
+        The protocol uses several parts to specify the
+        These parameters are specific to each AWG-8 channel and depend on the
+
+        Protocol definition:
+        protocol
+            - mask/value -> some bits are masked to allow using only a few bits
+                            to specify a codeword.
+            - mask/shift -> all acquired bits are shifted to allow specifying
+                            which bits should be used.
+        The parameters below are global to all AWG channels.
+            - strobe/index -> this specifies which bit is the toggle/strobe bit
+            - strobe/slope -> check for codewords on rissing/falling or both
+                              edges of the toggle bit.
+            - valid/index  -> specifies the codeword valid bit
+            - valid/slope  -> specifies the slope of the valid bit
+
+        Delay configuration
+            In this part the DIO delay indices are set. These should be
+            identical for each AWG channel.
+            - dio/delay/index -> selects which delay to change next
+            - dio/delay/value -> specifies an individual delay
+
+        Trun on device
+            The final step enablse the signal output of each AWG and sets
+            it to the right mode.
+
+        """
         # TODO: The snippet below uses the direct zi API rather than
         # parameters (which it should use). This is awaiting fixing
         # of issue #315.
 
-        # Configure the DIO triggering
-        # This is the bit index of the valid bit, we use bit 16 of the DIO
-        # in this example
+        ####################################################
+        # Protocol definition
+        ####################################################
+
+        # Configure the DIO interface for triggering on
+
+        # This is the bit index of the valid bit,
+        # we use bit 16 of the DIO in this example
         self._dev.daq.setInt('/' + self._dev.device +
                              '/awgs/*/dio/valid/index', 31)
-        # Valid polarity is 'high' (hardware value 2), 'low' (hardware value 1),
-        # 'no valid needed' (hardware value 0)
+        # Valid polarity is 'high' (hardware value 2),
+        # 'low' (hardware value 1), 'no valid needed' (hardware value 0)
         self._dev.daq.setInt('/' + self._dev.device +
                              '/awgs/*/dio/valid/polarity', 2)
-        # This is the bit index of the strobe signal (toggling signal), we use
-        # bit 24
+        # This is the bit index of the strobe signal (toggling signal),
+        # we use bit 24
         self._dev.daq.setInt('/' + self._dev.device +
                              '/awgs/*/dio/strobe/index', 30)
-        # Configure the DIO interface for triggering on the rising edge of the strobe signal
-        # (could also be set to 2 for falling edge triggering or 3 for both edges)
-        #self._dev.daq.setInt('/' + self._dev.device + '/awgs/*/dio/strobe/slope', 3)
+        # Configure the DIO interface for triggering on the both edges of
+        # the strobe/toggle bit signal.
+        # 1 for rising edge, 2 for falling edge triggering or 3 for both edges
         self._dev.daq.setInt('/' + self._dev.device +
-                             '/awgs/*/dio/strobe/slope', 0)
-        # Define the mask value, we use bit 0 on the DIO to index the table, so we
-        # set the mask to 1
+                             '/awgs/*/dio/strobe/slope', 3)
+
+        # Define the mask value, we use bit 0 on the DIO to index the table,
+        # so we set the mask to 1
         self._dev.daq.setInt('/' + self._dev.device +
                              '/awgs/*/dio/mask/value', 3)
-        # Define the shift to apply to the DIO input before the mask is applied, as we're using bit 0
+        # Define the shift to apply to the DIO input before the mask is
+        # applied, as we're using bit 0
         # we don't need to shift the value, so we set it to 0
         self._dev.daq.setInt('/' + self._dev.device +
                              '/awgs/*/dio/mask/shift', 0)
+
+        ####################################################
+        # Delay configuration
+        ####################################################
+
+        codeword_delay = 2
+        self._dev.daq.setInt('/' + self._dev.device +
+                             '/awgs/*/dio/delay/index', 0)
+        self._dev.daq.setInt('/' + self._dev.device +
+                             '/awgs/*/dio/delay/value', codeword_delay)
+        self._dev.daq.setInt('/' + self._dev.device +
+                             '/awgs/*/dio/delay/index', 1)
+        self._dev.daq.setInt('/' + self._dev.device +
+                             '/awgs/*/dio/delay/value', codeword_delay)
+        self._dev.daq.setInt('/' + self._dev.device +
+                             '/awgs/*/dio/delay/index', 2)
+        self._dev.daq.setInt('/' + self._dev.device +
+                             '/awgs/*/dio/delay/value', codeword_delay)
+        self._dev.daq.setInt('/' + self._dev.device +
+                             '/awgs/*/dio/delay/index', 3)
+        self._dev.daq.setInt('/' + self._dev.device +
+                             '/awgs/*/dio/delay/value', codeword_delay)
+        self._dev.daq.setInt('/' + self._dev.device +
+                             '/awgs/*/dio/delay/index', 31)
+        self._dev.daq.setInt('/' + self._dev.device +
+                             '/awgs/*/dio/delay/value', codeword_delay+1)
+
+        ####################################################
+        # Turn on device
+        ####################################################
+
         time.sleep(1)
-        self._dev.daq.setInt('/' + self._dev.device + '/awgs/*/enable', 1)
+        self._dev.daq.setInt('/' + self._dev.device +
+                             '/awgs/*/enable', 1)
 
         # Turn on all outputs
         self._dev.daq.setInt('/' + self._dev.device + '/sigouts/*/on', 1)
