@@ -46,6 +46,7 @@ class Base_LutMan(Instrument):
             parameter_class=ManualParameter)
         self.add_parameter('sampling_rate', unit='Hz',
                            vals=vals.Numbers(1, 1e10),
+                           initial_value=1e9,
                            parameter_class=ManualParameter)
 
         # initialize the _wave_dict to an empty dictionary
@@ -162,7 +163,6 @@ class Base_LutMan(Instrument):
         if show:
             plt.show()
         return fig, ax
-
 
 
 class Base_MW_VSM_LutMan(Base_LutMan):
