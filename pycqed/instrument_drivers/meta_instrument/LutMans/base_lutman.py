@@ -19,7 +19,7 @@ class Base_LutMan(Instrument):
     The LutMan provides
         - A set of basic waveforms that are generated based on
             parameters specified in the LutMan
-        - A LutMapping, relating waveform names to specific lookuptable indices
+        - A LutMap, relating waveform names to specific lookuptable indices
         - Methods to upload and regenerate these waveforms.
         - Methods to render waves.
 
@@ -39,11 +39,14 @@ class Base_LutMan(Instrument):
 
         self._add_waveform_parameters()
         self.add_parameter(
-            'LutMapping', docstring=(
+            'LutMap', docstring=(
                 'Dictionary containing the mapping between waveform'
                 ' names and parameter names (codewords).'),
             initial_value={}, vals=vals.Dict(),
             parameter_class=ManualParameter)
+        self.add_parameter('sampling_rate', unit='Hz',
+                           vals=vals.Numbers(1, 1e10),
+                           parameter_class=ManualParameter)
 
         # initialize the _wave_dict to an empty dictionary
         self._wave_dict = {}
@@ -51,7 +54,7 @@ class Base_LutMan(Instrument):
 
     def set_default_lutmap(self):
         """
-        Sets the "LutMapping" parameter to
+        Sets the "LutMap" parameter to
 
         """
         raise NotImplementedError()
@@ -79,7 +82,7 @@ class Base_LutMan(Instrument):
     def load_waveforms_onto_AWG_lookuptable(
             self, regenerate_waveforms: bool=True, stop_start: bool = True):
         """
-        Loads all waveforms specified in the LutMapping to an AWG.
+        Loads all waveforms specified in the LutMap to an AWG.
 
         Args:
             regenerate_waveforms (bool): if True calls
@@ -93,7 +96,7 @@ class Base_LutMan(Instrument):
         if regenerate_waveforms:
             self.generate_standard_waveforms()
 
-        for waveform_name, lookuptable in self.LutMapping().items():
+        for waveform_name, lookuptable in self.LutMap().items():
             self.load_waveform_onto_AWG_lookuptable(waveform_name)
 
         if stop_start:
