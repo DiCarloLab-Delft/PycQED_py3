@@ -39,24 +39,35 @@ class Base_LutMan(Instrument):
 
         self._add_waveform_parameters()
         self.add_parameter(
-            'LutMapping', docstring='Dictionary containing the mapping ',
+            'LutMapping', docstring=(
+                'Dictionary containing the mapping between waveform'
+                ' names and parameter names (codewords).'),
+            initial_value={}, vals=vals.Dict(),
             parameter_class=ManualParameter)
 
         # initialize the _wave_dict to an empty dictionary
         self._wave_dict = {}
+        self.set_default_lutmap()
+
+    def set_default_lutmap(self):
+        """
+        Sets the "LutMapping" parameter to
+
+        """
+        raise NotImplementedError()
 
     def _add_waveform_parameters(self):
         """
         Adds the parameters required to generate the standard waveforms
         """
-        pass
+        raise NotImplementedError()
 
     def generate_standard_waveforms(self):
         """
-        Generates all the standard waveforms and populates the _wave_dict
+        Generates all the standard waveforms and populates self._wave_dict
 
         """
-        pass
+        raise NotImplementedError()
 
     def load_waveform_onto_AWG_lookuptable(self, waveform_name: str,
                                            regenerate_waveforms: bool=False):
@@ -150,11 +161,8 @@ class Base_LutMan(Instrument):
         return fig, ax
 
 
-class Base_MW_LutMan(Base_LutMan):
-    pass
 
-
-class Base_MS_VSM_LutMan(Base_LutMan):
+class Base_MW_VSM_LutMan(Base_LutMan):
     pass
 
 

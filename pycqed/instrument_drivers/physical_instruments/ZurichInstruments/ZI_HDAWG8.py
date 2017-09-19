@@ -122,6 +122,20 @@ class ZI_HDAWG8(ZI_base_instrument):
                     }
         return idn_dict
 
+    def stop(self):
+        """
+        Stops the program on all AWG's part of this AWG8 unit
+        """
+        for i in range(4):
+            self.set('awgs_{}_enable'.format(i), 0)
+
+    def start(self):
+        """
+        Starts the program on all AWG's part of this AWG8 unit
+        """
+        for i in range(4):
+            self.set('awgs_{}_enable'.format(i), 1)
+
     def _add_codeword_parameters(self):
         """
         Adds parameters parameters that are used for uploading codewords.

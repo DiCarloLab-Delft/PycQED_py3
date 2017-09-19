@@ -16,11 +16,14 @@ class VirtualAWG8(Instrument):
     """
 
     def __init__(self, name):
-        super().__init__(self, name)
+        super().__init__(name)
         self.add_parameter('timeout', unit='s', initial_value=5,
                            parameter_class=ManualParameter,
                            vals=vals.MultiType(vals.Numbers(min_value=0),
                                                vals.Enum(None)))
+
+        self._num_channels = 8
+        self._num_codewords = 256
 
         self._add_codeword_parameters()
 
@@ -46,3 +49,9 @@ class VirtualAWG8(Instrument):
                     parameter_class=ManualParameter,
                     initial_value=np.zeros(32),
                     docstring=docst)
+
+    def stop(self):
+        pass
+
+    def start(self):
+        pass
