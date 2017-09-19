@@ -136,7 +136,7 @@ class Base_MW_LutMan(Base_LutMan):
         self.AWG.get_instr().set(Q_CW, Q_wave)
 
 
-class CBOX_MW_LutMan(Base_MW_LutMan):
+class CBox_MW_LutMan(Base_MW_LutMan):
 
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
@@ -155,6 +155,17 @@ class CBOX_MW_LutMan(Base_MW_LutMan):
         self.AWG.get_instr().set_awg_lookuptable(self.awg_nr(),
                                                  codeword, 1, Q_wave)
 
+    def set_default_lutmap(self):
+        """
+        Set's the default lutmap for standard microwave drive pulses.
+        """
+        def_lm = ['I', 'rX180',  'rY180', 'rX90',  'rY90',
+                  'rXm90',  'rYm90', 'rPhi90', 'rPhim90']
+        LutMap = {}
+        for cw_idx, cw_key in enumerate(def_lm):
+            LutMap[cw_key] = cw_idx
+        self.LutMap(LutMap)
+
 
 class QWG_MW_LutMan(Base_MW_LutMan):
 
@@ -165,7 +176,6 @@ class QWG_MW_LutMan(Base_MW_LutMan):
         """
         Set's the default lutmap for standard microwave drive pulses.
         """
-        raise NotImplementedError('Awaits resolution of issue #322')
         def_lm = ['I', 'rX180',  'rY180', 'rX90',  'rY90',
                   'rXm90',  'rYm90', 'rPhi180', 'rPhi90', 'rPhim90']
         LutMap = {}
@@ -176,6 +186,10 @@ class QWG_MW_LutMan(Base_MW_LutMan):
                 'codeword_{}_ch{}_waveform'.format(cw_idx, self.I_channel()),
                 'codeword_{}_ch{}_waveform'.format(cw_idx, self.Q_channel()))
         self.LutMap(LutMap)
+
+    def load_waveform_onto_AWG_lookuptable(self, waveform_name: str,
+                                           regenerate_waveforms: bool=False):
+        raise NotImplementedError('Awaits resolution of issue #322')
 
 
 class AWG8_MW_LutMan(Base_MW_LutMan):

@@ -11,28 +11,31 @@ class Test_MW_LutMan(unittest.TestCase):
     def setUpClass(self):
         self.AWG = v8.VirtualAWG8('DummyAWG8')
 
-        self.LutMan = mwl.AWG8_MW_LutMan('MW_LutMan')
-        self.LutMan.AWG(self.AWG.name)
-        self.LutMan.I_channel(1)
-        self.LutMan.Q_channel(2)
-        self.LutMan.Q_modulation(100e6)
-        self.LutMan.sampling_rate(2.4e9)
+        self.AWG8_MW_LutMan = mwl.AWG8_MW_LutMan('MW_LutMan')
+        self.AWG8_MW_LutMan.AWG(self.AWG.name)
+        self.AWG8_MW_LutMan.I_channel(1)
+        self.AWG8_MW_LutMan.Q_channel(2)
+        self.AWG8_MW_LutMan.Q_modulation(100e6)
+        self.AWG8_MW_LutMan.sampling_rate(2.4e9)
+
+        self.CBox_MW_LutMan = mwl.CBox_MW_LutMan('CBox_MW_LutMan')
+        self.QWG_MW_LutMan = mwl.QWG_MW_LutMan('QWG_MW_LutMan')
 
     def test_uploading_standard_pulses(self):
         # Tests that all waveforms are present and no error is raised.
-        self.LutMan.load_waveforms_onto_AWG_lookuptable()
+        self.AWG8_MW_LutMan.load_waveforms_onto_AWG_lookuptable()
         expected_wf = wf.mod_gauss(
-            amp=self.LutMan.Q_amp180(),
-            sigma_length=self.LutMan.Q_gauss_width(),
-            f_modulation=self.LutMan.Q_modulation(),
-            sampling_rate=self.LutMan.sampling_rate(), phase=0,
-            motzoi=self.LutMan.Q_motzoi())[0]
+            amp=self.AWG8_MW_LutMan.Q_amp180(),
+            sigma_length=self.AWG8_MW_LutMan.Q_gauss_width(),
+            f_modulation=self.AWG8_MW_LutMan.Q_modulation(),
+            sampling_rate=self.AWG8_MW_LutMan.sampling_rate(), phase=0,
+            motzoi=self.AWG8_MW_LutMan.Q_motzoi())[0]
 
         uploaded_wf = self.AWG.get('wave_ch1_cw001')
         np.testing.assert_array_almost_equal(expected_wf, uploaded_wf)
 
-    def test_lut_mapping(self):
-        self.LutMan.set_default_lutmap()
+    def test_lut_mapping_AWG8(self):
+        self.AWG8_MW_LutMan.set_default_lutmap()
         expected_dict = {
             'rY90': ('wave_ch1_cw004',
                      'wave_ch2_cw004'),
@@ -54,4 +57,19 @@ class Test_MW_LutMan(unittest.TestCase):
                       'wave_ch2_cw005')}
 
         self.assertDictEqual.__self__.maxDiff = None
-        self.assertDictEqual(expected_dict, self.LutMan.LutMap())
+        self.assertDictEqual(expected_dict, self.AWG8_MW_LutMan.LutMap())
+
+    def test_lut_mapping_CBox(self):
+        self.CBox_MW_LutMan.set_default_lutmap()
+        expected_dict = {'I': 0,
+                         'rX180': 1,
+                         'rY180': 2,
+                         'rX90': 3,
+                         'rY90': 4,
+                         'rXm90': 5,
+                         'rYm90': 6,
+                         'rPhi90': 7,
+                         'rPhim90': 8}
+
+        self.assertDictEqual.__self__.maxDiff = None
+        self.assertDictEqual(expected_dict, self.CBox_MW_LutMan.LutMap())
