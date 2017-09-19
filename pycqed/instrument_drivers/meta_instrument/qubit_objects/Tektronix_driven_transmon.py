@@ -20,17 +20,19 @@ from pycqed.measurement.calibration_toolbox import mixer_carrier_cancellation_UH
 from pycqed.measurement.calibration_toolbox import mixer_skewness_calibration_5014
 from pycqed.measurement.optimization import nelder_mead
 
+import pycqed.measurement.pulse_sequences.fluxing_sequences as fluxing_sequences
+
 import pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts as sq
 from pycqed.instrument_drivers.pq_parameters import InstrumentParameter
 
 from .qubit_object import Transmon
-from .CBox_driven_transmon import CBox_driven_transmon
+
 # It would be better to inherit from Transmon directly and put all the common
 # stuff in there but for now I am inheriting from what I already have
 # MAR april 2016
 
 
-class Tektronix_driven_transmon(CBox_driven_transmon):
+class Tektronix_driven_transmon(Transmon):
 
     '''
     Setup configuration:
@@ -46,12 +48,13 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
     '''
 
     def __init__(self, name, **kw):
-        super(CBox_driven_transmon, self).__init__(name, **kw)
+        super().__init__(name, **kw)
         # Change this when inheriting directly from Transmon instead of
         # from CBox driven Transmon.
 
         # Adding instrument parameters
         self.add_parameter('LO', parameter_class=InstrumentParameter)
+        self.add_parameter('pulsar', parameter_class=InstrumentParameter)
         self.add_parameter('cw_source', parameter_class=InstrumentParameter)
         self.add_parameter('td_source', parameter_class=InstrumentParameter)
         self.add_parameter('IVVI', parameter_class=InstrumentParameter)
@@ -177,6 +180,9 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                            initial_value=.25,
                            vals=vals.Numbers(min_value=-2.25, max_value=2.25),
                            parameter_class=ManualParameter)
+
+        self.Q_amp180 = self.amp180
+
         self.add_parameter('amp90_scale',
                            label='pulse amplitude scaling factor', unit='',
                            initial_value=.5,
@@ -355,17 +361,37 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
           amp_to_set = 0.02
         elif amp_to_set > 4.5:
           amp_to_set = 4.5
-        self.AWG.get_instr().set('{}_amp'.format(self.pulse_I_channel()),
-                                 amp_to_set)
-        self.AWG.get_instr().set('{}_amp'.format(self.pulse_Q_channel()),
-                                 amp_to_set)
 
-        self.AWG.get_instr().set(self.pulse_I_channel.get()+'_offset',
-                                 self.pulse_I_offset.get())
-        self.AWG.get_instr().set(self.pulse_Q_channel.get()+'_offset',
-                                 self.pulse_Q_offset.get())
+        p = self.pulsar.get_instr()
+
+        i_high = abs(self.pulse_I_offset()) + amp_to_set
+        i_low = abs(self.pulse_I_offset()) - amp_to_set
+        p.channel_opt(self.pulse_I_channel(), 'high', i_high)
+        p.channel_opt(self.pulse_I_channel(), 'low', i_low)
+        p.channel_opt(self.pulse_I_channel(), 'offset', self.pulse_I_offset())
+
+        q_high = abs(self.pulse_Q_offset()) + amp_to_set
+        q_low = abs(self.pulse_Q_offset()) - amp_to_set
+        p.channel_opt(self.pulse_Q_channel(), 'high', q_high)
+        p.channel_opt(self.pulse_Q_channel(), 'low', q_low)
+        p.channel_opt(self.pulse_Q_channel(), 'offset', self.pulse_Q_offset())
+
+        p.channel_opt(self.fluxing_channel(), 'high', 2)
+        p.channel_opt(self.fluxing_channel(), 'low', -2)
+
+
+        # self.AWG.get_instr().set('{}_amp'.format(self.pulse_I_channel()),
+        #                          amp_to_set)
+        # self.AWG.get_instr().set('{}_amp'.format(self.pulse_Q_channel()),
+        #                          amp_to_set)
+
+        # self.AWG.get_instr().set(self.pulse_I_channel.get()+'_offset',
+        #                          self.pulse_I_offset.get())
+        # self.AWG.get_instr().set(self.pulse_Q_channel.get()+'_offset',
+        #                          self.pulse_Q_offset.get())
         print('ro type',self.RO_pulse_type.get())
         if self.RO_pulse_type() is 'MW_IQmod_pulse_tek':
+            # TODO: change to new pulsar settings
             self.AWG.get_instr().set(self.RO_I_channel.get()+'_offset',
                                      self.RO_I_offset.get())
             self.AWG.get_instr().set(self.RO_Q_channel.get()+'_offset',
@@ -564,7 +590,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         # Upload the AWG sequence
         sq.Pulsed_spec_seq(spec_pars, RO_pars)
 
-        self.AWG.get_instr().start()
+        self.pulsar.get_instr().start()
         if return_detector:
             return det.Heterodyne_probe(self.heterodyne_instr.get_instr())
 
@@ -593,14 +619,21 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         # prepare for timedomain takes care of rescaling
         self.prepare_for_timedomain()
         # # Extra rescaling only happens if the amp180 was far too low for the Rabi
-        if max(abs(amps))*2 > self.AWG.get_instr().get('{}_amp'.format(self.pulse_I_channel())):
-            logging.warning('Auto rescaling AWG amplitude as amp180 {}'.format(
-                            self.amp180()) +
-                            ' was set very low in comparison to Rabi range')
-            self.AWG.get_instr().set('{}_amp'.format(self.pulse_I_channel()),
-                                     np.max(abs(amps))*3.0)
-            self.AWG.get_instr().set('{}_amp'.format(self.pulse_Q_channel()),
-                                     np.max(abs(amps))*3.0)
+
+        p = self.pulsar.get_instr()
+        amp_to_set = 3*max(abs(amps))
+        i_high = self.pulse_I_offset() + amp_to_set
+        i_low = self.pulse_I_offset() - amp_to_set
+        p.channel_opt(self.pulse_I_channel(), 'high', i_high)
+        p.channel_opt(self.pulse_I_channel(), 'low', i_low)
+        p.channel_opt(self.pulse_I_channel(), 'offset', self.pulse_I_offset())
+
+        q_high = self.pulse_Q_offset() + amp_to_set
+        q_low = self.pulse_Q_offset() - amp_to_set
+        p.channel_opt(self.pulse_Q_channel(), 'high', q_high)
+        p.channel_opt(self.pulse_Q_channel(), 'low', q_low)
+        p.channel_opt(self.pulse_Q_channel(), 'offset', self.pulse_Q_offset())
+
         if MC is None:
             MC = self.MC.get_instr()
 
@@ -731,6 +764,39 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
             close_main_fig=close_fig, T1=T1,
             pulse_delay=self.pulse_delay.get())
 
+    def calibrate_optimal_weights(self, MC=None, verify=True, analyze=False,
+                                  update=True):
+        if MC is None:
+            MC = self.MC.get_instr()
+
+        # Ensure that enough averages are used to get accurate weights
+        old_avg = self.RO_acq_averages()
+        self.RO_acq_averages(2**15)
+        transients = self.measure_transients(MC=MC, analyze=analyze)
+
+        self.RO_acq_averages(old_avg)
+
+        # Calculate optimal weights
+        optimized_weights_I = transients[1][0] - transients[0][0]
+        optimized_weights_Q = transients[1][1] - transients[0][1]
+
+        # joint rescaling to +/-1 Volt
+        maxI = np.max(np.abs(optimized_weights_I))
+        maxQ = np.max(np.abs(optimized_weights_Q))
+        weight_scale_factor = 1./np.max([maxI, maxQ])
+        optimized_weights_I = np.array(
+            weight_scale_factor*optimized_weights_I)
+        optimized_weights_Q = np.array(
+            weight_scale_factor*optimized_weights_Q)
+
+        if update:
+            self.RO_optimal_weights_I(optimized_weights_I)
+            self.RO_optimal_weights_Q(optimized_weights_Q)
+            self.RO_acq_weights('optimal')
+
+        if verify:
+            self.measure_ssro()
+
     def measure_ssro(self, no_fits=False,
                      return_detector=False,
                      MC=None,
@@ -763,6 +829,144 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         # if analyze:
         #     return ma.SSRO_Analysis(rotate=soft_rotate, label='SSRO'+self.msmt_suffix,
         #                             no_fits=no_fits, close_fig=close_fig)
+
+    def measure_ram_z(self, lengths, amps=None, chunk_size: int=32, MC=None,
+                      wait_during_flux: str='auto', cal_points: bool=False,
+                      cases=('cos', 'sin'), analyze=True,
+                      filter_raw=False, filter_deriv_phase=False,
+                      demodulate=False, f_demod=0, flux_amp_analysis=1):
+        '''
+        Perform a Ram-Z experiment: Measure the accumulated phase as a function
+        of flux pulse length.
+        Version 2 is for new QASM compiler.
+
+        sequence:
+            mX90 -- flux_pulse -- X90 -- RO
+
+
+        Args:
+            lengths (array of floats):
+                    Array of the flux pulse lengths (sweep points).
+            amps (array of floats):
+                    If not None it will do a 2D sweep of lengths vs amplitude.
+            chunk_size (int):
+                    Sweep points are divided into chunks of this size. The
+                    total number of sweep points should be an integer multiple
+                    of the chunk size.
+            MC (Intsrument):
+                    Measurmenet control instrument.
+            wait_during_flux (float or 'auto'):
+                    Delay between the two pi-half pulses. If this is 'auto',
+                    the time is automatically picked based on the maximum
+                    of the sweep points.
+            cal_points (bool):
+                    Whether calibration points should be used. Note that the
+                    calibration points will be inserted in every chunk,
+                    because they are part of the QASM sequence, which is not
+                    regenerated.
+            cases (tuple of strings):
+                    Possible cases are 'cos' and 'sin'. This determines
+                    if an X90 or Y90 pulse is used as second pi-half pulse.
+                    Measurement is repeated for all cases given.
+            analyze (bool):
+                    Do the Ram-Z analysis, extracting the step response.
+            filter_raw (bool):
+                    Apply a Gaussian low-pass filter to the raw (or
+                    demodulated if demod is True) data.
+            filter_deriv_phase (bool):
+                    Apply a Gaussian derivative filter on the phase, thus
+                    simultaneously low-pass filtering and computing the
+                    derivative.
+            demodulate (bool):
+                    Demodulate data befor calculating phase.
+            f_demod (float):
+                    Modulation frequency used if demodulate is True.
+            flux_amp_analysis (float):
+                    Flux pulse amplitude by which the step response is
+                    normalized in the anlaysis. Set this to 1 to see the
+                    step response in units of ouput voltage.
+        '''
+        self.prepare_for_timedomain()
+        #self.prepare_for_fluxing()
+
+        if 'uhfqc' not in self._acquisition_instrument.name.lower():
+            raise RuntimeError('Requires acquisition with UHFQC (detector '
+                               'function only implemented for UHFQC).')
+
+        if len(lengths) % int(chunk_size) != 0:
+            raise ValueError('Total number of points ({}) should be an'
+                             ' integer multiple of chunk_size ({})'.format(
+                                 len(lengths), chunk_size))
+
+        if MC is None:
+            MC = self.MC.get_instr()
+
+        # Set the delay between the pihalf pulses to be long enough to fit the
+        # flux pulse
+        if wait_during_flux == 'auto':
+            # Round to the next integer multiple of qubit pulse modulation
+            # period and add two periods as buffer
+            T_pulsemod = np.abs(1/self.f_pulse_mod())
+            wait_between = (np.ceil(max(lengths) / T_pulsemod) + 2) \
+                * T_pulsemod
+        else:
+            wait_between = wait_during_flux
+
+        for case in cases:
+            if case == 'cos':
+                rec_phase = 0
+            elif case == 'sin':
+                rec_phase = np.pi/2
+            else:
+                raise ValueError('Unknown case "{}".'.format(case))
+
+            # todo: make and load sequence
+
+            seq = fluxing_sequences.Ram_Z_seq(operations_dict=self.get_operation_dict(),
+                                              q0=self.name(),
+                                              distortion_dict={},
+                                              times=lengths)
+
+            d = self.int_avg_det
+            d.chunk_size = chunk_size
+
+            # todo sweep function
+            MC.set_sweep_function(swf.QWG_lutman_par_chunks(
+                LutMan=f_lutman,
+                LutMan_parameter=f_lutman.F_length,
+                sweep_points=lengths,
+                chunk_size=chunk_size,
+                codewords=range(chunk_size),
+                flux_pulse_type='square'))
+            MC.set_sweep_points(lengths)
+
+            MC.set_detector_function(d)
+
+            if amps is None:
+                MC.run('Ram_Z_{}{}'.format(case, self.msmt_suffix))
+                ma.MeasurementAnalysis(label='Ram_Z')
+            else:
+                s2 = swf.QWG_flux_amp(QWG=f_lutman.QWG.get_instr(),
+                                      channel=f_lutman.F_ch(),
+                                      frac_amp=f_lutman.F_amp())
+                MC.set_sweep_function_2D(s2)
+                MC.set_sweep_points_2D(amps)
+                MC.run('Ram_Z_{}_2D{}'.format(case, self.msmt_suffix),
+                       mode='2D')
+                ma.TwoD_Analysis(label='Ram_Z_')
+
+        if analyze:
+            return ma.Ram_Z_Analysis(
+                filter_raw=filter_raw,
+                filter_deriv_phase=filter_deriv_phase,
+                demodulate=demodulate,
+                f_demod=f_demod,
+                f01max=self.f_max(),
+                E_c=self.E_c(),
+                flux_amp=flux_amp_analysis,
+                V_offset=self.V_offset(),
+                V_per_phi0=self.V_per_phi0(),
+                TwoD=(amps is not None))
 
     def measure_butterfly(self, return_detector=False,
                           MC=None,
@@ -1093,7 +1297,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
         '''
         drive_pars, RO_pars = self.get_pulse_pars()
         pulse_dict.update(add_suffix_to_dict_keys(
-            sq.get_pulse_dict_from_pars(drive_pars), ' ' + self.name))
+            sq.get_dict_from_pars(drive_pars), ' ' + self.name))
         pulse_dict.update({'RO {}'.format(self.name): RO_pars})
 
         spec_pars, RO_pars = self.get_spec_pars()

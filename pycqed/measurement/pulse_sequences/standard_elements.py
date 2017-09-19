@@ -257,5 +257,5 @@ def distort_and_compensate(element, distortion_dict):
         outputs_dict[ch] = np.convolve(
             outputs_dict[ch], kernelvec)[:length]
         element.distorted_wfs[ch] = outputs_dict[ch][:len(t_vals[ch])]
-        print(ch, length, len(t_vals[ch]), kernelvec, element.distorted_wfs)
+        #print(ch, length, len(t_vals[ch]), kernelvec, element.distorted_wfs)
     return element

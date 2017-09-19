@@ -106,9 +106,9 @@ def Ram_Z_seq(operation_dict, q0, distortion_dict,
     '''
     seq_name = 'Ram-Z-seq_{}'.format(q0)
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
+    station.pulsar.update_AWG5014_settings()
     el_list = []
-    sequencer_config = operation_dict['sequencer_config']
+    sequencer_config = None
     # Allows using some other flux pulse to perform the RamZ with
     if (('Z '+q0) not in operation_dict) or (operation_name != 'Z'):
         operation_dict['Z ' + q0] = deepcopy(
@@ -118,12 +118,25 @@ def Ram_Z_seq(operation_dict, q0, distortion_dict,
 
     operation_dict['recPi2 ' + q0] = recPi2
 
+    tmax = max(times)
+
+    idle_op = {
+    'channel': 'ch3',
+    'pulse_delay': 0,
+    "pulse_type": "SquarePulse",
+    "amplitude": 0,
+    "length": 10e-6}
+
     for i, tau in enumerate(times):  # seq has to have at least 2 elts
         if artificial_detuning is not None:
             D_phase = ((tau-times[0]) * artificial_detuning * 360) % 360
             operation_dict['recPi2 ' + q0]['phase'] = D_phase
+        else:
+            operation_dict['recPi2 ' + q0]['phase'] = recovery_phase
         operation_dict['Z ' + q0]['length'] = tau
-        pulse_list = ['mX90 '+q0, 'Z '+q0, 'recPi2 ' + q0, 'RO ' + q0]
+        idle_op['length'] = tmax - tau
+
+        pulse_list = ['mX90 '+q0, 'Z '+q0, idle_op, 'recPi2 ' + q0, 'RO ' + q0]
 
         # calibration points overwrite the pulse_combinations list
         if cal_points and ((i == (len(times)-4) or i == (len(times)-3))):
@@ -133,13 +146,16 @@ def Ram_Z_seq(operation_dict, q0, distortion_dict,
             pulse_list = ['X180 '+q0, 'RO ' + q0]
         pulses = []
         for p in pulse_list:
-            pulses += [operation_dict[p]]
+            try:
+                pulses.append(operation_dict[p])
+            except (KeyError, TypeError):
+                pulses.append(p)
         el = multi_pulse_elt(i, station, pulses, sequencer_config)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
         if distortion_dict is not None:
-            print('\r Distorting element {}/{} '.format(i+1, len(times)),
-                  end='')
+            #print('\r Distorting element {}/{} '.format(i+1, len(times)),
+            #      end='')
             el = distort_and_compensate(
                 el, distortion_dict)
 
