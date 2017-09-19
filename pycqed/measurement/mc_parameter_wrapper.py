@@ -41,7 +41,7 @@ def wrap_vector_par_to_swf(parameter, index):
     sweep_function.sweep_control = 'soft'
     sweep_function.name = parameter.name
     sweep_function.parameter_name = parameter.label
-    sweep_function.unit = parameter.units
+    sweep_function.unit = parameter.unit
 
     def wrapped_set(val):
         old_val = parameter.get()

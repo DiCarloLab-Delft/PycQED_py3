@@ -126,7 +126,7 @@ class ziShellEnvironment:
 
         try:
             self.devices.add(utils.autoDetect(self.daq))
-        except:
+        except Exception:
             pass
 
     def connect_device(self, device, interface='1GbE'):
@@ -157,7 +157,7 @@ class ziShellEnvironment:
         for device in self.devices:
             try:
                 self.daq.disconnectDevice(device)
-            except:
+            except Exception:
                 pass
 
         self.devices = set()
@@ -211,7 +211,7 @@ class ziShellEnvironment:
                 self.daq.sync()
 
             return True
-        except:
+        except Exception:
             return False
 
     def features(self):
@@ -261,7 +261,7 @@ class ziShellEnvironment:
         if not self.daq:
             raise(ziShellDAQError())
 
-        if type(paths) is not list:
+        if not isinstance(paths, list):
             paths = [paths]
             single = 1
         else:
@@ -637,7 +637,7 @@ def check_output(*popenargs, **kwargs):
 
 def check_status(string, function):
     for l in textwrap.wrap(string, 40):
-        print('{0: <70}'.format(l)),
+        print('{0: <70}'.format(l))
     result = function()
     if result:
         print('[SUCCESS]')
@@ -830,7 +830,7 @@ class ziShellDevice:
             self.daq.sync()
 
             return True
-        except:
+        except Exception:
             return False
 
     def features(self):

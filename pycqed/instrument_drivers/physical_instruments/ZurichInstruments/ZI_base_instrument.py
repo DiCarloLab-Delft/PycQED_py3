@@ -3,7 +3,6 @@ import json
 import os
 import sys
 import numpy as np
-
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from zhinst.ziPython import ziListEnum as ziListEnum
@@ -95,15 +94,25 @@ class ZI_base_instrument(Instrument):
                 print("parameter {} type {} from d_node_pars"
                       " not recognized".format(parname, parameter[1]))
 
-    def _gen_set_func(self, dev_set_type, cmd_str):
+    @classmethod
+    def _gen_set_func(self, dev_set_type, node_path: str):
+        """
+        Generates a set function based on the dev_set_type method (e.g., seti)
+        and the node_path (e.g., '/dev8003/sigouts/1/mode'
+        """
         def set_func(val):
-            dev_set_type(cmd_str, val)
-            return dev_set_type(cmd_str, value=val)
+            dev_set_type(node_path, val)
+            return dev_set_type(node_path, value=val)
         return set_func
 
-    def _gen_get_func(self, dev_get_type, ch):
+    @classmethod
+    def _gen_get_func(self, dev_get_type, node_path: str):
+        """
+        Generates a get function based on the dev_set_type method (e.g., geti)
+        and the node_path (e.g., '/dev8003/sigouts/1/mode'
+        """
         def get_func():
-            return dev_get_type(ch)
+            return dev_get_type(node_path)
         return get_func
 
     def create_parameter_files_new(self):
@@ -230,6 +239,9 @@ class ZI_base_instrument(Instrument):
 
             node_types = ['']*len(d_nodes)
 
+            # type determination is now inferred using try except statements.
+            # this is not a very good way to do it. Better would be to
+            # actively check for types.
             for i, d_node in enumerate(d_nodes):
                 try:
                     answer = self._dev.getv(d_node)

@@ -1,12 +1,12 @@
 import os
 import logging
 import numpy as np
-from scipy import stats
+import pickle
 import h5py
 from matplotlib import pyplot as plt
-from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis import fitting_models as fit_mods
+import pycqed.measurement.hdf5_data as h5d
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import scipy.optimize as optimize
 import lmfit
@@ -17,12 +17,11 @@ import pylab
 from pycqed.analysis.tools import data_manipulation as dm_tools
 import imp
 import math
+import pygsti
 from math import erfc
-from scipy.signal import argrelextrema, argrelmax, argrelmin
+from scipy.signal import argrelmax, argrelmin
 from copy import deepcopy
-
 import pycqed.analysis.tools.plotting as pl_tools
-
 from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel,
                                             data_to_table_png)
 
@@ -162,11 +161,11 @@ class MeasurementAnalysis(object):
         if val_len == 4:
             self.figarray, self.axarray = plt.subplots(
                 val_len, 1, figsize=(min(6*len(self.value_names), 11),
-                                     1.5*len(self.value_names)))
+                                     1.5*len(self.value_names)+3))
         else:
             self.figarray, self.axarray = plt.subplots(
                 max(len(self.value_names), 1), 1,
-                figsize=(6, 1.5*len(self.value_names)))
+                figsize=(6, 1.5*len(self.value_names)+4))
         return tuple(self.f + [self.figarray] + self.ax + [self.axarray])
 
     def get_values(self, key):
@@ -315,7 +314,7 @@ class MeasurementAnalysis(object):
                              1.5*len(self.value_names)))
             else:
                 fig, axs = plt.subplots(max(len(self.value_names), 1), 1,
-                                        figsize=(5, 3*len(self.value_names)))
+                                        figsize=(5, 3*len(self.value_names)+2))
                 # Add all the sweeps to the plot 1 by 1
                 # indices are determined by it's shape/number of sweeps
             for i in range(len(self.value_names)):
@@ -456,22 +455,24 @@ class MeasurementAnalysis(object):
             raise ValueError('datasaving_format "%s " not recognized'
                              % datasaving_format)
 
-    def plot_results_vs_sweepparam(self, x, y, fig, ax, show=False, marker='-o',
+    def plot_results_vs_sweepparam(self, x, y, fig, ax, show=False,
+                                   marker='-o',
+                                   xlabel=None, x_unit=None,
+                                   ylabel=None, y_unit=None,
                                    log=False, label=None, **kw):
         save = kw.pop('save', False)
         self.plot_title = kw.pop('plot_title',
                                  textwrap.fill(self.timestamp_string + '_' +
                                                self.measurementstring, 40))
-        xlabel = kw.pop('xlabel', None)
-        ylabel = kw.pop('ylabel', None)
+
         ax.set_title(self.plot_title)
-        if xlabel is not None:
-            ax.set_xlabel(xlabel)
-        if ylabel is not None:
-            ax.set_ylabel(ylabel)
         ax.plot(x, y, marker, label=label)
         if log:
             ax.set_yscale('log')
+        if xlabel is not None:
+            set_xlabel(ax, xlabel, x_unit)
+        if ylabel is not None:
+            set_ylabel(ax, ylabel, y_unit)
         if show:
             plt.show()
         if save:
@@ -668,24 +669,25 @@ class OptimizationAnalysis_v2(MeasurementAnalysis):
         return
 
     def make_figures(self, **kw):
-        base_figname = 'optimization of ' + self.value_names[0]
-        if np.shape(self.sweep_points)[0] == 2:
-            f, ax = plt.subplots()
-            a_tools.color_plot_interpolated(
-                x=self.sweep_points[0], y=self.sweep_points[1],
-                z=self.measured_values[0], ax=ax,
-                zlabel=self.value_names[0])
-            ax.set_xlabel(self.parameter_labels[0])
-            ax.set_ylabel(self.parameter_labels[1])
-            ax.plot(self.sweep_points[0], self.sweep_points[1], '-o', c='grey')
-            ax.plot(self.sweep_points[0][-1], self.sweep_points[1][-1],
-                    'o', markersize=5, c='w')
-            plot_title = kw.pop('plot_title', textwrap.fill(
-                                self.timestamp_string + '_' +
-                                self.measurementstring, 40))
-            ax.set_title(plot_title)
+        for i in range(len(self.value_names)):
+            base_figname = 'optimization of ' + self.value_names[i]
+            if np.shape(self.sweep_points)[0] == 2:
+                f, ax = plt.subplots()
+                a_tools.color_plot_interpolated(
+                    x=self.sweep_points[0], y=self.sweep_points[1],
+                    z=self.measured_values[i], ax=ax,
+                    zlabel=self.value_names[i])
+                ax.set_xlabel(self.parameter_labels[0])
+                ax.set_ylabel(self.parameter_labels[1])
+                ax.plot(self.sweep_points[0], self.sweep_points[1], '-o', c='grey')
+                ax.plot(self.sweep_points[0][-1], self.sweep_points[1][-1],
+                        'o', markersize=5, c='w')
+                plot_title = kw.pop('plot_title', textwrap.fill(
+                                    self.timestamp_string + '_' +
+                                    self.measurementstring, 40))
+                ax.set_title(plot_title)
 
-            self.save_fig(f, figname=base_figname, **kw)
+                self.save_fig(f, figname=base_figname, **kw)
 
 
 class OptimizationAnalysis(MeasurementAnalysis):
@@ -846,7 +848,7 @@ class TD_Analysis(MeasurementAnalysis):
     '''
 
     def __init__(self, NoCalPoints=4, center_point=31, make_fig=True,
-                 zero_coord=None, one_coord=None, cal_points=None,
+                 zero_coord=None, one_coord=None, cal_points: bool=None,
                  rotate_and_normalize=True,
                  plot_cal_points=True, **kw):
         self.NoCalPoints = NoCalPoints
@@ -877,6 +879,7 @@ class TD_Analysis(MeasurementAnalysis):
             return
 
         if self.cal_points is None:
+            # 42 is nr. of points in AllXY
             if len(self.measured_values[0]) == 42:
                 self.corr_data, self.zero_coord, self.one_coord = \
                     a_tools.rotate_and_normalize_data(
@@ -935,6 +938,7 @@ class TD_Analysis(MeasurementAnalysis):
     def run_default_analysis(self,
                              close_main_fig=True,  **kw):
         close_file = kw.pop('close_file', True)
+        make_fig = kw.get('make_fig', self.make_fig)
         self.add_analysis_datagroup_to_file()
         self.get_naming_and_values()
         if self.rotate_and_normalize:
@@ -947,7 +951,7 @@ class TD_Analysis(MeasurementAnalysis):
                                          'calibration points'.encode('utf-8'))
 
         # Plotting
-        if self.make_fig:
+        if make_fig:
             self.fig1, fig2, self.ax1, axarray = self.setup_figures_and_axes()
             # print(len(self.value_names))
             for i in range(len(self.value_names)):
@@ -1277,6 +1281,7 @@ class Rabi_Analysis(TD_Analysis):
 
     def fit_data(self, print_fit_results=False, **kw):
         model = fit_mods.lmfit.Model(fit_mods.CosFunc)
+
         self.fit_res = ['']*self.nr_quadratures
         if self.nr_quadratures != 1:
             # It would be best to do 1 fit to both datasets but since it is
@@ -2178,14 +2183,6 @@ class SSRO_Analysis(MeasurementAnalysis):
         plt.legend(loc=2)
         self.save_fig(fig, figname='raw-cumulative-histograms', **kw, close_fig=self.close_fig)
 
-        # saving the results
-        if 'SSRO_Fidelity' not in self.analysis_group:
-            fid_grp = self.analysis_group.create_group('SSRO_Fidelity')
-        else:
-            fid_grp = self.analysis_group['SSRO_Fidelity']
-        fid_grp.attrs.create(name='V_th_a', data=V_th_a)
-        fid_grp.attrs.create(name='F_a', data=F_a)
-
         self.F_a = F_a
         self.V_th_a = V_th_a
 
@@ -2335,6 +2332,7 @@ class SSRO_Analysis(MeasurementAnalysis):
 
         self.V_th_d = optimize.brent(NormCdfdiff)
         F_d = 1-(1+NormCdfdiff(x=self.V_th_d))/2
+
         # print 'F_corrected',F_corrected
 
         def NormCdfdiffDouble(x, mu0_0=mu0_0,
@@ -2473,6 +2471,9 @@ class SSRO_Analysis(MeasurementAnalysis):
         fid_grp.attrs.create(name='frac1_1', data=frac1_1)
         fid_grp.attrs.create(name='F_d', data=F_d)
         fid_grp.attrs.create(name='SNR', data=SNR)
+        fid_grp.attrs.create(name='V_th_a', data=self.V_th_a)
+        fid_grp.attrs.create(name='V_th_d', data=self.V_th_d)
+        fid_grp.attrs.create(name='F_a', data=self.F_a)
 
         self.sigma0_0 = sigma0_0
         self.sigma1_1 = sigma1_1
@@ -2549,11 +2550,18 @@ class SSRO_discrimination_analysis(MeasurementAnalysis):
             fit_mods.plot_fitres2D_heatmap(self.fit_res, x_tiled, y_rep,
                                            axs=axs, cmap='viridis')
             for ax in axs:
+                ax.ticklabel_format(style='sci', fontsize=4,
+                                    scilimits=(0, 0))
                 set_xlabel(ax, 'I', self.value_units[0])
-                set_ylabel(ax, 'Q', self.value_units[1])
+                edge = max(max(abs(xedges)), max(abs(yedges)))
+                ax.set_xlim(-edge, edge)
+                ax.set_ylim(-edge, edge)
+                # ax.set_axis_bgcolor(plt.cm.viridis(0))
+            set_ylabel(axs[0], 'Q', self.value_units[1])
+            #axs[0].ticklabel_format(style = 'sci',  fontsize=4)
+
             self.save_fig(
-                fig, figname='2D-Histograms_rot_{:.1f} deg'.format(theta_in),
-                **kw)
+                fig, figname='2D-Histograms_rot_{:.1f} deg'.format(theta_in), **kw)
 
         #######################################################
         #         Extract quantities of interest              #
@@ -2821,12 +2829,13 @@ class T1_Analysis(TD_Analysis):
                     ax2 = axarray[i]
                 else:
                     ax2 = axarray[i/2, i % 2]
-
                 self.plot_results_vs_sweepparam(x=self.sweep_points,
                                                 y=self.measured_values[i],
                                                 fig=figarray, ax=ax2,
-                                                xlabel=self.xlabel,
-                                                ylabel=self.ylabels[i],
+                                                xlabel=self.parameter_names[0],
+                                                x_unit=self.parameter_units[0],
+                                                ylabel=self.value_names[i],
+                                                y_unit=self.value_units[i],
                                                 save=False)
 
         if 'I_cal' in self.value_names[i]:  # Fit the data
@@ -4363,8 +4372,9 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                 # 'input has nan values')
                 kappa_guess = 1
 
-            if not peak_flag:  # Change the sign of amplitude_guess for dips
-                amplitude_guess *= -1.
+            # Commented out as this is an undefined variable
+            # if not peak_flag:  # Change the sign of amplitude_guess for dips
+            #     amplitude_guess *= -1.
 
             LorentzianModel = fit_mods.LorentzianModel
             LorentzianModel.set_param_hint('f0',
@@ -6243,12 +6253,12 @@ class Ram_Z_Analysis(MeasurementAnalysis):
                  filter_raw=False, filter_deriv_phase=False, demodulate=True,
                  f_demod=0, f01max=None, E_c=None, flux_amp=None, V_offset=0,
                  V_per_phi0=None, auto=True, make_fig=True, TwoD=False,
-                 mean_count=16, **kw):
-        super().__init__(timestamp=timestamp_cos, label='Ram_Z_cos',
+                 mean_count=16, close_file=True, **kw):
+        super().__init__(timestamp=timestamp_cos, label='cos',
                          TwoD=TwoD, **kw)
         self.cosTrace = np.array(self.measured_values[0])
-        super().__init__(timestamp=timestamp_sin, label='Ram_Z_sin',
-                         TwoD=TwoD, **kw)
+        super().__init__(timestamp=timestamp_sin, label='sin',
+                         TwoD=TwoD, close_file=False, **kw)
         self.sinTrace = np.array(self.measured_values[0])
 
         self.filter_raw = filter_raw
@@ -6272,11 +6282,16 @@ class Ram_Z_Analysis(MeasurementAnalysis):
                 self.sinTrace = self.sinTrace.T
                 self.run_dac_arc_analysis(make_fig=make_fig)
 
+        if close_file:
+            self.data_file.close()
+
     def normalize(self, trace):
         # * -1 because cos starts at -1 instead of 1
+        # trace *= -1
+        # trace -= np.mean(trace)
+        # trace /= max(np.abs(trace))
+        trace = np.array(trace) * 2 - 1
         trace *= -1
-        trace -= np.mean(trace)
-        trace /= max(np.abs(trace))
         return trace
 
     def run_special_analysis(self, make_fig=True):
@@ -6289,8 +6304,9 @@ class Ram_Z_Analysis(MeasurementAnalysis):
                 f_demod=self.f_demod,
                 return_all=True)
 
-        # self.add_dataset_to_analysisgroup('detuning', self.df)
-        # self.add_dataset_to_analysisgroup('phase', self.phases)
+        self.add_dataset_to_analysisgroup('detuning', self.df)
+        self.add_dataset_to_analysisgroup('phase', self.phases)
+        self.add_dataset_to_analysisgroup('raw phase', self.raw_phases)
 
         if (self.f01max is not None and self.E_c is not None and
                 self.flux_amp is not None and self.V_per_phi0 is not None):
@@ -6303,13 +6319,8 @@ class Ram_Z_Analysis(MeasurementAnalysis):
                 V_per_phi0=self.V_per_phi0,
                 asymmetry=0) / self.flux_amp
 
-            # TODO: Remove after testing the above line.
-            # self.step_response = self.get_stepresponse(
-            #     self.df, self.f01max, self.E_c, self.flux_amp,
-            #     V_per_phi0=self.V_per_phi0, V_offset=self.V_offset)
-
-            # self.add_dataset_to_analysisgroup('step_response',
-            #                                   self.step_response)
+            self.add_dataset_to_analysisgroup('step_response',
+                                              self.step_response)
             plotStep = True
         else:
             print('To calculate step response, f01max, E_c, flux_amp, '
@@ -6339,7 +6350,7 @@ class Ram_Z_Analysis(MeasurementAnalysis):
 
         # Calcualte phase and undo phase-wrapping
         raw_phases = np.arctan2(Q, I)
-        phases = self.unwrap_phase(raw_phases)
+        phases = np.unwrap(raw_phases)
 
         # Filter phase and/or calculate the derivative
         if filter_deriv_phase:
@@ -6347,9 +6358,7 @@ class Ram_Z_Analysis(MeasurementAnalysis):
                 / (2 * np.pi)
         else:
             # Calculate central derivative
-            phasesPadded = np.concatenate(([0], phases))
-            df = np.array([(phasesPadded[i+1] - phasesPadded[i-1]) / (2*dt)
-                           for i in range(1, len(phases)-1)]) / (2 * np.pi)
+            df = np.gradient(phases, dt) / (2 * np.pi)
 
         # If the signal was demodulated df is now the detuning from f_demod
         if demodulate:
@@ -6357,7 +6366,7 @@ class Ram_Z_Analysis(MeasurementAnalysis):
         df[0] = 0  # detuning must start at 0
 
         if return_all:
-            return df, raw_phases, phases, I, Q
+            return (df, np.rad2deg(raw_phases), np.rad2deg(phases), I, Q)
         else:
             return df
 
@@ -6394,38 +6403,35 @@ class Ram_Z_Analysis(MeasurementAnalysis):
         pl_tools.set_xlabel(ax, self.parameter_names[0],
                             self.parameter_units[0])
         pl_tools.set_ylabel(ax, 'demodulated normalized trace', 'a.u.')
-        ax.set_title('demodulated normalized data')
+        ax.set_title(self.timestamp_string + ' demod. norm. data')
         ax.legend(['cos', 'sin'], loc=1)
         self.save_fig(fig, 'Ram-Z_normalized_data.png')
-        # fig.savefig('Ram-Z_normalized_data.png', dpi=300)
 
         fig, ax = plt.subplots(1, 1, figsize=(7, 5))
         ax.plot(self.sweep_points[:len(self.phases)], self.phases, '-o')
         pl_tools.set_xlabel(ax, self.parameter_names[0],
                             self.parameter_units[0])
-        pl_tools.set_ylabel(ax, 'phase', 'rad')
-        ax.set_title('Phase')
+        pl_tools.set_ylabel(ax, 'phase', 'deg')
+        ax.set_title(self.timestamp_string + ' Phase')
         self.save_fig(fig, 'Ram-Z_phase.png')
-        # fig.savefig('Ram-Z_phase.png', dpi=300)
 
         fig, ax = plt.subplots(1, 1, figsize=(7, 5))
         ax.plot(self.sweep_points[:len(self.df)], self.df, '-o')
-        # ax.set_ylim((50e6, 300e6))
         pl_tools.set_xlabel(ax, self.parameter_names[0],
                             self.parameter_units[0])
         pl_tools.set_ylabel(ax, 'detuning', 'Hz')
-        ax.set_title('Detuning')
+        ax.set_title(self.timestamp_string + ' Detuning')
         self.save_fig(fig, 'Ram-Z_detuning.png')
-        # fig.savefig('Ram-Z_detuning.png', dpi=300)
 
         if plot_step:
             fig, ax = plt.subplots(1, 1, figsize=(7, 5))
             ax.plot(self.sweep_points[:len(self.step_response)],
                     self.step_response, '-o')
+            ax.axhline(y=1, color='0.75')
             pl_tools.set_xlabel(ax, self.parameter_names[0],
                                 self.parameter_units[0])
             pl_tools.set_ylabel(ax, 'step response', '')
-            ax.set_title('Step Response')
+            ax.set_title(self.timestamp_string + ' Step Response')
             self.save_fig(fig, 'Ram-Z_step_response.png')
             # fig.savefig('Ram-Z_step_response.png', dpi=300)
 
@@ -6516,26 +6522,6 @@ class Ram_Z_Analysis(MeasurementAnalysis):
         paddedData = np.concatenate(
             (np.ones(int(filterHalfWidth)) * pad_val, data))
         return np.convolve(paddedData, gaussDerivFilter, mode='valid')
-
-    def unwrap_phase(self, raw_phases):
-        '''
-        Undoes phase-wrapping and returns a continuous version of the phase
-        data.
-        Note: phases are assumed to be given in radians.
-        '''
-        # Phases are now between -pi and pi. But we know that the phase
-        # changes continuously and we want a differentiable function, so we
-        # can undo the phase-wrapping
-        phases = deepcopy(raw_phases)
-        for i, p in enumerate(phases[:-1]):
-            # If a phase wrap is detected, all consecutive points are shifted
-            # by 2*pi
-            if phases[i+1] - phases[i] < -3:  # noise should not be this big.
-                phases[i+1:] += 2*np.pi
-            elif phases[i+1] - phases[i] > 3:
-                phases[i+1:] -= 2*np.pi
-
-        return phases
 
     def run_dac_arc_analysis(self, make_fig=True):
         '''
@@ -6659,3 +6645,329 @@ class Ram_Z_Analysis(MeasurementAnalysis):
 
         self.save_fig(fig, 'Ram-Z_dac_arc.png')
 
+
+class GST_Analysis(TD_Analysis):
+    '''
+    Analysis for Gate Set Tomography. Extracts data from the files, bins it
+    correctly and writes the counts to a file in the format required by
+    pyGSTi. The actual analysis is then run using the tools from pyGSTi.
+    '''
+    def __init__(self, timestamp=None, nr_qubits: int=1, **kw):
+        '''
+        Args:
+            nr_qubits (int):
+                    Number of qubits with which the GST was run.
+        '''
+        self.exp_per_file = 0
+        self.hard_repetitions = 0
+        self.soft_repetitions = 0
+        self.exp_list = []
+        self.gs_target = None
+        self.prep_fids = None
+        self.meas_fids = None
+        self.germs = None
+        self.max_lengths = []
+
+        self.nr_qubits = nr_qubits
+        self.counts = []
+        super().__init__(cal_points=False, make_fig=False,
+                         timestamp=timestamp, **kw)
+
+    def run_default_analysis(self, **kw):
+        self.close_file = kw.get('close_file', True)
+        self.get_naming_and_values()
+        self.exp_metadata = h5d.read_dict_from_hdf5(
+            {}, self.data_file['Experimental Data']['Experimental Metadata'])
+
+        self.gs_target = pygsti.io.load_gateset(
+            self.exp_metadata['gs_target'])
+        self.meas_fids = pygsti.io.load_gatestring_list(
+            self.exp_metadata['meas_fids'])
+        self.prep_fids = pygsti.io.load_gatestring_list(
+            self.exp_metadata['prep_fids'])
+        self.germs = pygsti.io.load_gatestring_list(
+            self.exp_metadata['germs'])
+        self.max_lengths = self.exp_metadata['max_lengths']
+        self.exp_per_file = self.exp_metadata['exp_per_file']
+        self.exp_last_file = self.exp_metadata['exp_last_file']
+        self.hard_repetitions = self.exp_metadata['hard_repetitions']
+        self.soft_repetitions = self.exp_metadata['soft_repetitions']
+        self.nr_hard_segs = self.exp_metadata['nr_hard_segs']
+
+        self.exp_list = pygsti.construction.make_lsgst_experiment_list(
+            self.gs_target.gates.keys(), self.prep_fids, self.meas_fids,
+            self.germs, self.max_lengths)
+
+        # Count the results. Method depends on how many qubits were used.
+        if self.nr_qubits == 1:
+            self.counts, self.spam_label_order = self.count_results_1Q()
+        elif self.nr_qubits == 2:
+            self.counts, self.spam_label_order = self.count_results_2Q()
+        else:
+            raise NotImplementedError(
+                'GST analysis for {} qubits is not implemented.'
+                .format(self.nr_qubits))
+
+        # Write extracted counts to file.
+        self.pygsti_fn = os.path.join(self.folder, 'pyGSTi_dataset.txt')
+        self.write_GST_datafile(self.pygsti_fn, self.counts,
+                                self.spam_label_order)
+
+        # Run pyGSTi analysis and create report.
+        self.results = pygsti.do_long_sequence_gst(
+            self.pygsti_fn, self.gs_target, self.prep_fids, self.meas_fids,
+            self.germs, self.max_lengths)
+
+        with open(os.path.join(self.folder,
+                               'pyGSTi_results.p'), 'wb') as file:
+            pickle.dump(self.results, file)
+
+        self.report_fn = os.path.join(self.folder, 'pyGSTi_report.pdf')
+        self.results.create_full_report_pdf(confidenceLevel=95,
+                                            filename=self.report_fn,
+                                            verbosity=2)
+
+    def write_GST_datafile(self, filepath: str, counts: list, labels=()):
+        '''
+        Write the measured counts to a file in pyGSTi format.
+        Args:
+            filepath (string):
+                    Full path of the file to be written.
+            counts (list):
+                    List pf tuples (gate_seq_str, ...), where the first
+                    entry is the string representation of the gate sequence,
+                    and the following entries are the counts for the counts
+                    for the different measurement operators.
+            labels (list):
+                    List of the labels for the measurement operators. Note
+                    that is just for readability and does not affect the
+                    order in which the counts are written. The order should
+                    be the same as in the pyGSTi gateset definition.
+        '''
+        # The directive strings tells the pyGSTi parser which column
+        # corresponds to which SPAM label.
+        directive_string = ('## Columns = ' +
+                            ', '.join(['{} count'] * len(labels))
+                            .format(*labels))
+        with open(filepath, 'w') as file:
+            file.writelines(directive_string)
+            for tup in counts:
+                file.writelines(('\n' + '{}  ' * len(tup)).format(*tup))
+
+    def count_results_1Q(self):
+        # Find the results that belong to the same GST sequence and sum up the
+        # counts.
+
+        # This determines in which order the results are written.
+        # The strings in this list must be the same SPAM labels as defined
+        # in the pyGSTi target gateset.
+        spam_label_order = ['plus', 'minus']  # plus = |0>, minus = |1>
+
+        # First, reshape data according to soft repetitions.
+        counts = []
+        data = np.reshape(self.measured_values[0],
+                          (self.soft_repetitions, -1))
+        # Each row (i.e. data[i, :]) now contains one of the soft repetitions
+        # containing all of the required GST experiments. They are however
+        # still ordered in segments according to the hard repetitions.
+        # d: distance between measurements of same sequence
+        # l: length of index range corresponding to one segment
+        d = self.exp_per_file
+        l = self.exp_per_file * self.hard_repetitions
+        for i in range(self.nr_hard_segs - int(self.exp_last_file != 0)):
+            # For every segment... subtract 1 from nr_hard_segs to exclude
+            # last file if the last file has a different number of experiments
+            block_idx = i * l
+
+            for seq_idx in range(self.exp_per_file):
+                # For every sequence in the current segment
+                # The full index is index of the segment plus index
+                # (block_idx) of the sequence in the segment (seq_idx)
+                one_count = 0
+                for soft_idx in range(self.soft_repetitions):
+                    # For all soft repetitions: sum up "1" counts.
+                    one_count += np.sum(
+                        data[soft_idx, block_idx+seq_idx:block_idx+l:d],
+                        dtype=int)
+                zero_count = (self.hard_repetitions * self.soft_repetitions -
+                              one_count)
+
+                counts.append((self.exp_list[i+seq_idx].str,
+                               zero_count, one_count))
+
+        # If the last file has a different number of experiments, count those
+        # separately
+        if self.exp_last_file != 0:
+            d_last = self.exp_last_file
+            l_last = self.exp_last_file * self.hard_repetitions
+            block_idx = l * (self.hard_repetitions - 1)
+
+            for seq_idx in range(self.exp_last_file):
+                one_count = 0
+                for soft_idx in range(self.soft_repetitions):
+                    one_count += np.sum(
+                        data[soft_idx,
+                             block_idx+seq_idx:block_idx+l_last:d_last],
+                        dtype=int)
+                zero_count = (self.hard_repetitions * self.soft_repetitions -
+                              one_count)
+
+                counts.append(
+                    (self.exp_list[self.nr_hard_segs-1 + seq_idx].str,
+                     zero_count, one_count))
+        return counts, spam_label_order
+
+    def count_results_2Q(self):
+        # Find the results that belong to the same GST sequence and sum up the
+        # counts.
+
+        # This determines in which order the results are written.
+        # The strings in this list must be the same SPAM labels as defined
+        # in the pyGSTi target gateset.
+        # 'up' = |0>, 'dn' = |1>
+        spam_label_order = ['upup', 'updn', 'dnup', 'dndn']
+
+        # First, reshape data according to soft repetitions.
+        # IMPORTANT NOTE: This assumes that the first column in the measured
+        # values is the readout of the least significant qubit. This is
+        # important because it has to be consistent with how the pyGSTi spam
+        # labels are defined.
+        counts = []
+        data_q0 = np.reshape(self.measured_values[0],
+                             (self.soft_repetitions, -1))
+        data_q1 = np.reshape(self.measured_values[1],
+                             (self.soft_repetitions, -1))
+
+        # Each row (i.e. data[i, :]) now contains one of the soft repetitions
+        # containing all of the required GST experiments. They are however
+        # still ordered in segments according to the hard repetitions.
+        # d: distance between measurements of same sequence
+        # l: length of index range corresponding to one segment
+        d = self.exp_per_file
+        l = self.exp_per_file * self.hard_repetitions
+
+        for i in range(self.nr_hard_segs - int(self.exp_last_file != 0)):
+            # For every segment... subtract 1 from nr_hard_segs to exclude
+            # last file if the last file has a different number of experiments
+            block_idx = i * l
+
+            for seq_idx in range(self.exp_per_file):
+                # For every sequence in the current segment
+                new_count = (0, 0, 0, 0)
+
+                for soft_idx in range(self.soft_repetitions):
+                    for x in range(0, l, d):
+                        q0_bit = data_q0[soft_idx, block_idx+seq_idx+x]
+                        q1_bit = data_q1[soft_idx, block_idx+seq_idx+x]
+                        if not q0_bit and not q1_bit:
+                            new_count[0] += 1
+                        elif q0_bit and not q1_bit:
+                            new_count[1] += 1
+                        elif not q0_bit and q1_bit:
+                            new_count[2] += 1
+                        else:
+                            new_count[3] += 1
+
+                counts.append((self.exp_list[i+seq_idx].str, *new_count))
+
+        # If the last file has a different number of experiments, count those
+        # separately
+        if self.exp_last_file != 0:
+            d_last = self.exp_last_file
+            l_last = self.exp_last_file * self.hard_repetitions
+            block_idx = l * (self.hard_repetitions - 1)
+
+            for seq_idx in range(self.exp_last_file):
+                new_count = (0, 0, 0, 0)
+                for soft_idx in range(self.soft_repetitions):
+                    for x in range(0, l_last, d_last):
+                        q0_bit = data_q0[soft_idx, block_idx+seq_idx+x]
+                        q1_bit = data_q1[soft_idx, block_idx+seq_idx+x]
+                        if not q0_bit and not q1_bit:
+                            new_count[0] += 1
+                        elif q0_bit and not q1_bit:
+                            new_count[1] += 1
+                        elif not q0_bit and q1_bit:
+                            new_count[2] += 1
+                        else:
+                            new_count[3] += 1
+
+                counts.append(
+                    (self.exp_list[self.nr_hard_segs-1 + seq_idx].str,
+                     *new_count))
+
+        return counts, spam_label_order
+
+
+class CZ_1Q_phase_analysis(TD_Analysis):
+    def __init__(self, use_diff: bool=True, meas_vals_idx: int=0, **kw):
+        self.use_diff = use_diff
+        self.meas_vals_idx = meas_vals_idx
+        super().__init__(rotate_and_normalize=False, cal_points=False, **kw)
+
+    def run_default_analysis(self, **kw):
+        super().run_default_analysis(make_fig=True, close_file=False)
+
+        model = lmfit.models.QuadraticModel()
+
+        if self.use_diff:
+            dat_exc = self.measured_values[self.meas_vals_idx][1::2]
+            dat_idx = self.measured_values[self.meas_vals_idx][::2]
+            self.full_data = dat_idx - dat_exc
+            self.x_points = self.sweep_points[::2]
+
+            # Remove diff points thate are larger than one (parabola won't fit
+            # there).
+            self.del_indices = np.where(np.array(self.full_data) > 0)[0]
+        else:
+            self.full_data = self.measured_values[self.meas_vals_idx]
+            self.x_points = self.sweep_points
+            self.del_indices = np.where(np.array(self.full_data) > 0.5)[0]
+
+        self.fit_data = np.delete(self.full_data, self.del_indices)
+        self.x_points_del = np.delete(self.x_points, self.del_indices)
+
+        if self.fit_data.size == 0:
+            raise RuntimeError('No points left to fit after removing values '
+                               '> 0! Check coarse calibration and adjust '
+                               'measurement range.')
+
+        params = model.guess(x=self.x_points_del, data=self.fit_data)
+
+        self.fit_res = model.fit(self.fit_data, params=params,
+                                 x=self.x_points_del)
+
+        self.opt_z_amp = (-self.fit_res.best_values['b'] /
+                          (2 * self.fit_res.best_values['a']))
+
+        if self.make_fig:
+            self.make_figures()
+
+        if kw.get('close_file', True):
+            self.data_file.close()
+
+    def make_figures(self, **kw):
+        xfine = np.linspace(self.x_points[0], self.x_points[-1], 100)
+        fig, ax = plt.subplots()
+        ax.plot(self.x_points, self.full_data, '-o')
+        ax.plot(self.x_points[self.del_indices],
+                self.full_data[self.del_indices], 'rx',
+                label='excluded in fit')
+        ax.plot(xfine,
+                self.fit_res.eval(x=xfine, **self.fit_res.init_values),
+                # self.fit_res.init_fit,
+                '--',
+                label='initial guess', c='k')
+        ax.plot(xfine,
+                self.fit_res.eval(x=xfine, **self.fit_res.best_values),
+                label='best fit')
+        set_xlabel(ax, self.parameter_names[0], self.parameter_units[0])
+        set_ylabel(ax, 'Z-amp cost', 'a.u.')
+        ax.set_title(kw.get('plot_title',
+                            textwrap.fill(self.timestamp_string + '_' +
+                                          self.measurementstring, 40)))
+        ax.text(.1, .9, 'Optimal amplitude: {:.4f}'.format(self.opt_z_amp),
+                transform=ax.transAxes)
+        ax.legend()
+        plt.tight_layout()
+        self.save_fig(fig, **kw)

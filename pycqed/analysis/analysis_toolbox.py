@@ -20,7 +20,7 @@ from .tools.file_handling import *
 from .tools.data_manipulation import *
 from .tools.plotting import *
 import colorsys as colors
-
+from matplotlib import cm
 
 datadir = get_default_datadir()
 print('Data directory set to:', datadir)
@@ -424,8 +424,7 @@ def get_data_from_ma_v2(ma, param_names, numeric_params=None):
                     if param_end in list(temp.attrs.keys()):
                         data[param] = temp.attrs[param_end]
                     elif param_end in list(temp.keys()):
-                        data[param] = temp[param_end]
-
+                        data[param] = temp[param_end].value
         if numeric_params is not None:
             if param in numeric_params:
                 data[param] = np.double(data[param])
@@ -559,11 +558,7 @@ def get_data_from_timestamp_list(timestamps,
                     out_data[nparam] = np.array(
                         [np.double(val) for val in out_data[nparam]])
                 except ValueError as instance:
-                    if 'could not broadcast' in instance.message:
-                        out_data[nparam] = [
-                            np.double(val) for val in out_data[nparam]]
-                    else:
-                        raise(instance)
+                    raise(instance)
 
     out_data['timestamps'] = get_timestamps
 
@@ -1281,7 +1276,7 @@ def color_plot(x, y, z, fig, ax, cax=None,
     ylim = kw.pop('ylim', None)
 
     if plot_title is not None:
-        ax.set_title(plot_title, y=1.05)
+        ax.set_title(plot_title, y=1.05, fontsize=18)
     if transpose:
         ax.set_xlabel(ylabel)
         ax.set_ylabel(xlabel)
@@ -1577,7 +1572,19 @@ def find_min(x, y, return_fit=False, perc=30):
         return x_min, y_min
 
 
-def get_color_order(i, max_num):
+def get_color_order(i, max_num, cmap='viridis'):
     # take a blue to red scale from 0 to max_num
     # uses HSV system, H_red = 0, H_green = 1/3 H_blue=2/3
-    return colors.hsv_to_rgb(2.*float(i)/(float(max_num)*3.), 1., 1.)
+    # return colors.hsv_to_rgb(2.*float(i)/(float(max_num)*3.), 1., 1.)
+    print('It is recommended to use the updated function "get_color_cycle".')
+    if isinstance(cmap, str):
+        cmap = cm.get_cmap(cmap)
+    return cmap((i/max_num) % 1)
+
+
+def get_color_list(max_num, cmap='viridis'):
+    '''Return an array of max_num colors take in even spacing from the
+    color map cmap.'''
+    if isinstance(cmap, str):
+        cmap = cm.get_cmap(cmap)
+    return [cmap(cmap)(i) for i in np.linspace(0.0, 1.0, max_num)]

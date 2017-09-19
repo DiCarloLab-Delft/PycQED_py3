@@ -24,6 +24,7 @@ from qcodes.instrument.parameter import ManualParameter
 from pycqed.measurement.waveform_control_CC import waveform as wf
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import measurement_analysis as ma2
+import pycqed.analysis.analysis_toolbox as a_tools
 
 from pycqed.analysis.tools.data_manipulation import rotation_matrix
 from pycqed.measurement.calibration_toolbox import (
@@ -1122,7 +1123,6 @@ class CBox_v3_driven_transmon(Transmon):
             pulse_delay=self.gauss_width.get()*4)
         if update:
             self.F_RB(a.fit_res.params['fidelity_per_Clifford'].value)
-
         return a.fit_res.params['fidelity_per_Clifford'].value
 
     def measure_randomized_benchmarking_vs_pars(self, amps=None,
@@ -1664,7 +1664,7 @@ class CBox_v3_driven_transmon(Transmon):
 
     def measure_ram_z(self, lengths, amps=None, chunk_size: int=32, MC=None,
                       wait_during_flux: str='auto', cal_points: bool=False,
-                      cases=('cos', 'sin'), analyze=True,
+                      cases=('interleaved',), analyze=True,
                       filter_raw=False, filter_deriv_phase=False,
                       demodulate=False, f_demod=0, flux_amp_analysis=1):
         '''
@@ -1697,9 +1697,12 @@ class CBox_v3_driven_transmon(Transmon):
                     because they are part of the QASM sequence, which is not
                     regenerated.
             cases (tuple of strings):
-                    Possible cases are 'cos' and 'sin'. This determines
-                    if an X90 or Y90 pulse is used as second pi-half pulse.
-                    Measurement is repeated for all cases given.
+                    Possible cases are 'cos', 'sin', and 'interleaved'.
+                    This determines if an X90 or Y90 pulse is used as second
+                    pi-half pulse. For 'interleaved', the 'cos' and 'sin'
+                    cases are measured interleaved. Measurement is repeated
+                    for all cases given.
+
             analyze (bool):
                     Do the Ram-Z analysis, extracting the step response.
             filter_raw (bool):
@@ -1772,7 +1775,7 @@ class CBox_v3_driven_transmon(Transmon):
                 qubit_name=self.name,
                 no_of_points=chunk_size,
                 cal_points=cal_points,
-                rec_Y90=rec_Y90)
+                case=case)
             qasm_folder, qasm_fn = os.path.split(qasm_file.name)
             qumis_fn = os.path.join(qasm_folder,
                                     qasm_fn.split('.')[0] + '.qumis')
@@ -1783,18 +1786,33 @@ class CBox_v3_driven_transmon(Transmon):
             d = self.int_avg_det
             d.chunk_size = chunk_size
 
+            if case == 'interleaved':
+                d.seg_per_point = 2
+                swp_pts = np.repeat(lengths, 2)
+            else:
+                d.seg_per_point = 1
+                swp_pts = lengths.copy()
+
             MC.set_sweep_function(swf.QWG_lutman_par_chunks(
                 LutMan=f_lutman,
                 LutMan_parameter=f_lutman.F_length,
+                 # Sweep points must not be repeated in interleaved case here!
                 sweep_points=lengths,
                 chunk_size=chunk_size,
                 codewords=range(chunk_size),
                 flux_pulse_type='square'))
-            MC.set_sweep_points(lengths)
+            MC.set_sweep_points(swp_pts)
             MC.set_detector_function(d)
 
+            metadata_dict = {
+                'qubit_name': self.name,
+                'QWG_channel': f_lutman.F_ch(),
+                'flux_LutMan': f_lutman.name
+            }
+
             if amps is None:
-                MC.run('Ram_Z_{}{}'.format(case, self.msmt_suffix))
+                MC.run('Ram_Z_{}{}'.format(case, self.msmt_suffix),
+                       exp_metadata=metadata_dict)
                 ma.MeasurementAnalysis(label='Ram_Z')
             else:
                 s2 = swf.QWG_flux_amp(QWG=f_lutman.QWG.get_instr(),
@@ -1803,21 +1821,37 @@ class CBox_v3_driven_transmon(Transmon):
                 MC.set_sweep_function_2D(s2)
                 MC.set_sweep_points_2D(amps)
                 MC.run('Ram_Z_{}_2D{}'.format(case, self.msmt_suffix),
-                       mode='2D')
+                       mode='2D', exp_metadata=metadata_dict)
                 ma.TwoD_Analysis(label='Ram_Z_')
 
         if analyze:
-            return ma.Ram_Z_Analysis(
-                filter_raw=filter_raw,
-                filter_deriv_phase=filter_deriv_phase,
-                demodulate=demodulate,
-                f_demod=f_demod,
-                f01max=self.f_max(),
-                E_c=self.E_c(),
-                flux_amp=flux_amp_analysis,
-                V_offset=self.V_offset(),
-                V_per_phi0=self.V_per_phi0(),
-                TwoD=(amps is not None))
+            if len(cases) == 2 and 'sin' in cases and 'cos' in cases:
+                return ma.Ram_Z_Analysis(
+                    filter_raw=filter_raw,
+                    filter_deriv_phase=filter_deriv_phase,
+                    demodulate=demodulate,
+                    f_demod=f_demod,
+                    f01max=self.f_max(),
+                    E_c=self.E_c(),
+                    flux_amp=flux_amp_analysis,
+                    V_offset=self.V_offset(),
+                    V_per_phi0=self.V_per_phi0(),
+                    TwoD=(amps is not None))
+            elif len(cases) == 1 and 'interleaved' in cases:
+                if amps is not None:
+                    print('No 2D analysis implemented for the interleaved '
+                          'case.')
+                else:
+                    tStamp = a_tools.latest_data(return_timestamp=True)[0]
+                    tStamp = tStamp[:8] + '_' + tStamp[8:]
+                    return ma2.RamZAnalysisInterleaved(
+                        t_start=tStamp,
+                        f_demod=f_demod,
+                        demodulate=demodulate)
+            else:
+                print('No analysis specified for the given cases "{}".'
+                      .format(cases))
+
 
     def measure_cryo_scope(self, waveform, lengths='full', chunk_size: int=32,
                            MC=None, wait_during_flux: str='auto',
@@ -2264,8 +2298,7 @@ class CBox_v3_driven_transmon(Transmon):
             cfg['luts'][1]['square_{}'.format(i)] = i  # assign codeword
             cfg["operation dictionary"]["square_{}".format(i)] = {
                 "parameters": 1,
-                "duration": int(np.round(wait_between
-                                         * f_lutman.sampling_rate())),
+                "duration": int(np.round(wait_between * 1e9)),
                 "type": "flux",
                 "matrix": []
             }
@@ -2553,7 +2586,9 @@ class CBox_v3_driven_transmon(Transmon):
         # QASM file(s).
         raw_exp_list = pygsti.construction.make_lsgst_experiment_list(
             gs_target.gates.keys(), fiducials, fiducials, germs, max_lengths)
+        print('Length of GST experiment list: {}'.format(len(raw_exp_list)))
         exp_list = gstCC.get_experiments_from_list(raw_exp_list, gate_dict)
+        print('Length of translated experiment list: {}'.format(len(exp_list)))
         qasm_files, exp_per_file, exp_last_file = gstCC.generate_QASM(
             filename='GST_{}'.format(self.name),
             exp_list=exp_list,
