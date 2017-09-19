@@ -124,7 +124,7 @@ class ZI_HDAWG8(ZI_base_instrument):
 
     def _add_codeword_parameters(self):
         """
-        Adds manual parameters that are used for uploading codewords.
+        Adds parameters parameters that are used for uploading codewords.
         It also contains initial values for each codeword to ensure
         that the "upload_codeword_program"
 
