@@ -401,7 +401,22 @@ def mod_gauss(amp, sigma_length, f_modulation, axis='x', phase=0,
 
 
 def mixer_predistortion_matrix(alpha, phi):
+    '''
+    predistortion matrix correcting for a mixer with amplitude
+    mismatch "mixer_alpha" and skewness "phi"
+
+    M = [ 1            tan(phi) ]
+        [ 0   1/mixer_alpha * sec(phi)]
+
+    Notes on the procedure for acquiring this matrix can be found in
+    PycQED/docs/notes/MixerSkewnessCalibration_LDC_150629.pdf
+    '''
     predistortion_matrix = np.array(
         [[1,  np.tan(phi*2*np.pi/360)],
          [0, 1/alpha * 1/np.cos(phi*2*np.pi/360)]])
     return predistortion_matrix
+
+
+
+
+
