@@ -704,7 +704,7 @@ class Transmon(Qubit):
                 self.measure_rabi(amps, n=n, MC=MC, analyze=False)
                 a = ma.Rabi_parabola_analysis(close_fig=close_fig)
                 # Decide which quadrature to take by comparing the contrast
-                if take_fit_I:
+                if take_fit_I or a.nr_quadratures < 2:
                     ampl = a.fit_res[0].params['x0'].value
                 elif (np.abs(max(a.measured_values[0]) -
                              min(a.measured_values[0]))) > (
@@ -720,7 +720,7 @@ class Transmon(Qubit):
                     self.measure_rabi(amps, n=n, MC=MC, analyze=False)
                     a = ma.Rabi_parabola_analysis(close_fig=close_fig)
                     # Decide which quadrature to take by comparing the contrast
-                    if take_fit_I:
+                    if take_fit_I or a.nr_quadratures < 2:
                         ampl = a.fit_res[0].params['x0'].value
                     elif (np.abs(max(a.measured_values[0]) -
                                  min(a.measured_values[0]))) > (
