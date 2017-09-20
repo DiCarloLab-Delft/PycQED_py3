@@ -15,6 +15,7 @@ from pycqed.analysis.fitting_models import Qubit_freq_to_dac
 
 def gauss_pulse(amp: float, sigma_length: float, nr_sigma: int=4,
                 sampling_rate: float=2e8, axis: str='x', phase: float=0,
+                phase_unit: str='deg',
                 motzoi: float=0, delay: float=0,
                 subtract_offset: str='average'):
     '''
@@ -35,6 +36,8 @@ def gauss_pulse(amp: float, sigma_length: float, nr_sigma: int=4,
             added to the pulse, otherwise this argument is ignored.
         phase (float):
             Phase of the pulse.
+        phase_unit (str):
+            Unit of the phase (can be either "deg" or "rad")
         motzoi (float):
             DRAG-pulse parameter.
         delay (float):
@@ -87,8 +90,7 @@ def gauss_pulse(amp: float, sigma_length: float, nr_sigma: int=4,
     if axis == 'y':
         phase += 90
 
-    pulse_I = np.cos(2*np.pi*phase/360)*G - np.sin(2*np.pi*phase/360)*D
-    pulse_Q = np.sin(2*np.pi*phase/360)*G + np.cos(2*np.pi*phase/360)*D
+    pulse_I, pulse_Q = rotate_wave(G, D, phase=phase, unit=phase_unit)
 
     return pulse_I, pulse_Q
 
@@ -210,8 +212,28 @@ def mixer_predistortion_matrix(alpha, phi):
          [0, 1/alpha * 1/np.cos(phi*2*np.pi/360)]])
     return predistortion_matrix
 
-def rotate_wave():
-    pass
+
+def rotate_wave(wave_I, wave_Q, phase: float, unit: str = 'deg'):
+    """
+    Rotate a wave in the complex plane
+        wave_I (array) : real component
+        wave_Q (array) : imaginary component
+        phase (float)  : desired rotation angle
+        unit     (str) : either "deg" or "rad"
+    returns:
+        (rot_I, rot_Q) : arrays containing the rotated waves
+    """
+    if unit == 'deg':
+        angle = np.deg2rad(phase)
+    elif unit == 'rad':
+        angle = angle
+    else:
+        raise ValueError('unit must be either "deg" or "rad"')
+
+    rot_I = np.cos(angle)*wave_I - np.sin(angle)*wave_Q
+    rot_Q = np.sin(angle)*wave_I + np.cos(angle)*wave_Q
+
+    return rot_I, rot_Q
 
 
 #####################################################
@@ -234,24 +256,26 @@ def mod_gauss(amp, sigma_length, f_modulation, axis='x', phase=0,
                                          Q_phase_delay=Q_phase_delay)
     return pulse_I_mod, pulse_Q_mod
 
-def mod_gauss(amp, sigma_length, f_modulation, axis='x', phase=0,
-              nr_sigma=4,
-              motzoi=0, sampling_rate=2e8,
-              Q_phase_delay=0, delay=0):
+
+def mod_gauss_VSM(amp, sigma_length, f_modulation, axis='x', phase=0,
+                  nr_sigma=4,
+                  motzoi=0, sampling_rate=2e8,
+                  Q_phase_delay=0, delay=0):
     '''
     4-channel VSM compatible DRAG pulse
     '''
-    pulse_I, pulse_Q = gauss_pulse(amp, sigma_length, nr_sigma=nr_sigma,
-                                   sampling_rate=sampling_rate, axis=axis,
-                                   phase=0,
-                                   motzoi=motzoi, delay=delay)
+    G, D = gauss_pulse(amp, sigma_length, nr_sigma=nr_sigma,
+                       sampling_rate=sampling_rate, axis=axis,
+                       phase=0,
+                       motzoi=motzoi, delay=delay)
 
-
-    pulse_I_mod, pulse_Q_mod = mod_pulse(pulse_I, pulse_Q, f_modulation,
-                                         sampling_rate=sampling_rate,
-                                         Q_phase_delay=Q_phase_delay)
-    return pulse_I_mod, pulse_Q_mod
-
+    G_I, G_Q = mod_pulse(G, np.zeros(len(G)), f_modulation,
+                         sampling_rate=sampling_rate,
+                         Q_phase_delay=Q_phase_delay)
+    D_I, D_Q = mod_pulse(np.zeros(len(G)), D, f_modulation,
+                         sampling_rate=sampling_rate,
+                         Q_phase_delay=Q_phase_delay)
+    return G_I, G_Q, D_I, D_Q
 
 
 #####################################################
@@ -448,7 +472,6 @@ def martinis_flux_pulse_v2(length, lambda_2, lambda_3, theta_f,
         asymmetry=asymmetry,
         branch='positive')
     return voltage_wave
-
 
 
 ############################################################################
