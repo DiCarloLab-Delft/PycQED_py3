@@ -721,28 +721,28 @@ class UHFQC(Instrument):
 
     # sequencer functions
     def  awg_sequence_acquisition_and_DIO_triggered_pulse(self, Iwaves, Qwaves, acquisition_delay)
-            
+        #setting the acquisition delay samples
         delay_samples = int(acquisition_delay*1.8e9/8)
-        delay_string = '\twait(wait_delay);\n'
         self.awgs_0_userregs_2(delay_samples) #setting the delay in the instrument
-        sequence = """
-const TRIGGER1  = 0x000001;
-const WINT_TRIG = 0x000010;
-const IAVG_TRIG = 0x000020;
-const WINT_EN   = 0x1f0000;
-const DIO_VALID = 0x00010000;
-setTrigger(WINT_EN);
-var loop_cnt = getUserReg(0);
-var wait_delay = getUserReg(2);
-var RO_TRIG;
-if(getUserReg(1)){
-  RO_TRIG=IAVG_TRIG;
-}else{
-  RO_TRIG=WINT_TRIG;
-}
-var trigvalid = 0;
-var dio_in = 0;
-var cw = 0;"""
+        
+        sequence =( 
+        'const TRIGGER1  = 0x000001;\n'+
+        'const WINT_TRIG = 0x000010;\n'+
+        'const IAVG_TRIG = 0x000020;\n'+
+        'const WINT_EN   = 0x1f0000;\n'+
+        'const DIO_VALID = 0x00010000;\n'+
+        'setTrigger(WINT_EN);\n'+
+        'var loop_cnt = getUserReg(0);\n'+
+        'var wait_delay = getUserReg(2);\n'+
+        'var RO_TRIG;\n'+
+        'if(getUserReg(1)){\n'+
+        ' RO_TRIG=IAVG_TRIG;\n'+
+        '}else{\n'+
+        ' RO_TRIG=WINT_TRIG;\n'+
+        '}\n'+
+        'var trigvalid = 0;\n'+
+        'var dio_in = 0;\n'+
+        'var cw = 0;\n')
     
         #loop to generate the wave list
         for i in range(len(Iwaves)):
@@ -763,32 +763,32 @@ var cw = 0;"""
             wave_I_string = self.array_to_combined_vector_string(Iwave, "Iwave{}".format(i))
             wave_Q_string = self.array_to_combined_vector_string(Qwave, "Qwave{}".format(i))
             sequence = sequence+wave_I_string+wave_Q_string
-        case_loop_pre="""
-while (1) {
-\twaitDIOTrigger();
-\tvar dio = getDIOTriggered();
-\tcw = (dio >> 17) & 0x1f;
-\t\tswitch(cw) {
-\n"""
+        #starting the loop and switch statement
+        sequence=sequence+(
+        'while (1) {\n'+
+        ' waitDIOTrigger();\n'+
+        ' var dio = getDIOTriggered();\n'+
+        ' cw = (dio >> 17) & 0x1f;\n'+
+        '  switch(cw) {\n')
         #adding the case statements
         for i in range(len(Iwaves)):
             #generating the case statement string
-            case='\t\tcase {} :\n'.format(i)
-            case_play='\t\t\tplayWave(Iwave{}, Qwave{});\n'.format(i)
+            case='  case {}:\n'.format(i)
+            case_play='   playWave(Iwave{}, Qwave{});\n'.format(i,i)
             sequence = sequence +case+case_play #adding the individual case statements to the sequence
         
         #adding the final part of the sequence including a default wave
-        sequence = sequence+"""
-\t\tdefault:
-\t\t\tplayWave(ones(720), ones(720));
-\t}
-\tsetTrigger(WINT_EN + RO_TRIG);
-\tsetTrigger(WINT_EN);
-\twaitWave();
-}
-wait(300);
-setTrigger(0);"""
-
+        sequence = (sequence+
+        '  default:\n'+
+        '   playWave(ones(720), ones(720));\n'+
+        ' }\n'+
+        ' wait(wait_delay);\n'+
+        ' setTrigger(WINT_EN + RO_TRIG);\n'+
+        ' setTrigger(WINT_EN);\n'+
+        ' waitWave();\n'+
+        '}\n'+
+        'wait(300);\n'+
+        'setTrigger(0);\n')
         self.awg_string(sequence)
 
     def awg_sequence_acquisition_and_pulse(self, Iwave, Qwave, acquisition_delay):
