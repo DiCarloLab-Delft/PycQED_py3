@@ -61,7 +61,8 @@ def TwinLorentzFunc(f, amplitude_a, amplitude_b, center_a, center_b,
 
 
 def Qubit_dac_to_freq(dac_voltage, f_max, E_c,
-                      dac_sweet_spot, V_per_phi0=None, dac_flux_coefficient=None,
+                      dac_sweet_spot, V_per_phi0=None,
+                      dac_flux_coefficient=None,
                       asymmetry=0):
     '''
     The cosine Arc model for uncalibrated flux for asymmetric qubit.
@@ -81,11 +82,30 @@ def Qubit_dac_to_freq(dac_voltage, f_max, E_c,
                         'physically meaningful "V_per_phi0" instead.')
         V_per_phi0 = np.pi/dac_flux_coefficient
 
-    qubit_freq = (f_max + E_c)*(
+    qubit_freq = (f_max + E_c) * (
         asymmetry**2 + (1 - asymmetry**2) *
-        np.sqrt(abs(np.cos(np.pi / V_per_phi0 *
-                           (dac_voltage - dac_sweet_spot))))) - E_c
+        np.cos(np.pi / V_per_phi0 *
+               (dac_voltage - dac_sweet_spot))**2)**0.25 - E_c
     return qubit_freq
+
+
+def Qubit_dac_to_detun(dac_voltage, f_max, E_c, dac_sweet_spot, V_per_phi0,
+                       asymmetry=0):
+    '''
+    The cosine Arc model for uncalibrated flux for asymmetric qubit.
+
+    dac_voltage (V)
+    f_max (Hz): sweet-spot frequency of the qubit
+    E_c (Hz): charging energy of the qubit
+    V_per_phi0 (V): volt per phi0 (convert voltage to flux)
+    dac_sweet_spot (V): voltage at which the sweet-spot is found
+    asymmetry (dimensionless asymmetry param) = abs((EJ1-EJ2)/(EJ1+EJ2))
+    '''
+    return f_max - Qubit_dac_to_freq(dac_voltage,
+                                     f_max=f_max, E_c=E_c,
+                                     dac_sweet_spot=dac_sweet_spot,
+                                     V_per_phi0=V_per_phi0,
+                                     asymmetry=asymmetry)
 
 
 def Qubit_freq_to_dac(frequency, f_max, E_c,
@@ -107,8 +127,12 @@ def Qubit_freq_to_dac(frequency, f_max, E_c,
     if V_per_phi0 is None and dac_flux_coefficient is None:
         raise ValueError('Please specify "V_per_phi0".')
 
-    asymm_term = (asymmetry**2 + (1-asymmetry**2))
-    dac_term = np.arccos(((frequency+E_c)/((f_max+E_c) * asymm_term))**2)
+    # asymm_term = (asymmetry**2 + (1-asymmetry**2))
+    # dac_term = np.arccos(((frequency+E_c)/((f_max+E_c) * asymm_term))**2)
+
+    dac_term = np.arccos(np.sqrt(
+        (((frequency + E_c) / (f_max + E_c))**4 - asymmetry**2) /
+        (1 - asymmetry**2)))
 
     if dac_flux_coefficient is not None:
         logging.warning('"dac_flux_coefficient" deprecated. Please use the '
@@ -116,13 +140,26 @@ def Qubit_freq_to_dac(frequency, f_max, E_c,
         V_per_phi0 = np.pi/dac_flux_coefficient
 
     if branch == 'positive':
-        dac_voltage = (dac_term) * V_per_phi0 / np.pi + dac_sweet_spot
+        dac_voltage = dac_term * V_per_phi0 / np.pi + dac_sweet_spot
     elif branch == 'negative':
-        dac_voltage = -(dac_term) * V_per_phi0 / np.pi + dac_sweet_spot
+        dac_voltage = -dac_term * V_per_phi0 / np.pi + dac_sweet_spot
     else:
         raise ValueError('branch {} not recognized'.format(branch))
 
     return dac_voltage
+
+
+def Qubit_dac_sensitivity(dac_voltage, f_max: float, E_c: float,
+                          dac_sweet_spot: float, V_per_phi0: float,
+                          asymmetry: float=0):
+    '''
+    Derivative of the qubit detuning vs dac at dac_voltage.
+    '''
+    cos_term = np.cos(np.pi / V_per_phi0 * (dac_voltage - dac_sweet_spot))
+    sin_term = np.sin(np.pi / V_per_phi0 * (dac_voltage - dac_sweet_spot))
+    return ((f_max + E_c)*(1 - asymmetry**2) * np.pi / (2 * V_per_phi0) *
+            cos_term * sin_term * (asymmetry**2 + (1 - asymmetry**2) *
+                                   cos_term**2)**(-0.75))
 
 
 def QubitFreqDac(dac_voltage, f_max, E_c,
@@ -168,7 +205,8 @@ def GaussExpDampOscFunc(t, tau, tau_2, frequency, phase, amplitude,
         2*np.pi*frequency*t+phase)+oscillation_offset) + exponential_offset
 
 
-def ExpDampDblOscFunc(t, tau, n, freq_1, freq_2, phase_1, phase_2, amp_1, amp_2,
+def ExpDampDblOscFunc(t, tau, n, freq_1, freq_2, phase_1, phase_2,
+                      amp_1, amp_2,
                       osc_offset_1, osc_offset_2, exponential_offset):
     '''
     Exponential decay with double cosine modulation
@@ -304,6 +342,12 @@ def gaussian_2D(x, y, amplitude=1,
     val = (gaus(x, amplitude, center_x, sigma_x) *
            gaus(y, amplitude, center_y, sigma_y))
     return val
+
+
+def DoubleExpDecayFunc(t, tau1, tau2, amp1, amp2, offset, n):
+    return (offset +
+            amp1 * np.exp(-(t / tau1)**n) +
+            amp2 * np.exp(-(t / tau2)**n))
 
 
 def TripleExpDecayFunc(t, tau1, tau2, tau3, amp1, amp2, amp3, offset, n):

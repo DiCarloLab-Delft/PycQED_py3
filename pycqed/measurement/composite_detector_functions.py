@@ -8,6 +8,7 @@ from pycqed.analysis import measurement_analysis as ma
 from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
 from pycqed.analysis import analysis_toolbox as a_tools
 from qcodes.instrument.parameter import ManualParameter
+from pycqed.measurement.waveform_control_CC import QWG_fluxing_seqs as qwfs
 
 
 class SSRO_Fidelity_Detector_CBox(det.Soft_Detector):
@@ -1450,8 +1451,146 @@ class FluxTrack(det.Soft_Detector):
         self.MC.run('FluxTrack_point_%s' % self.qubit.name)
 
         ma_obj = ma.MeasurementAnalysis(auto=True, label='FluxTrack_point')
-        y = np.mean(ma_obj.measured_values[0, :2])
         y_p = ma_obj.measured_values[0, 0]
         y_m = ma_obj.measured_values[0, 1]
         y_mean = np.mean([y_p, y_m])
         return (y_mean, y_p, y_m)
+
+
+class purity_CZ_detector(det.Soft_Detector):
+
+    def __init__(self, measurement_name: str, MC, device, q0, q1,
+                 return_purity_only: bool=True):
+        self.measurement_name = measurement_name
+        self.MC = MC
+        self.name = 'purity_CZ_detector'
+        self.detector_control = 'soft'
+        self.device = device
+        self.q0 = q0
+        self.q1 = q1
+        self.return_purity_only = return_purity_only
+
+        if self.return_purity_only:
+            self.value_names = ['Purity sum', 'Purity {}'.format(q0.name),
+                                'Purity {}'.format(q1.name)]
+            self.value_units = ['']*3
+        else:
+            self.value_names = ['Ps', 'P_{}'.format(q0.name),
+                                'p_{}'.format(q1.name), 'IX', 'IY',
+                                'IZ', 'XI', 'YI', 'ZI']
+            self.value_units = ['']*3 + ['frac']*6
+
+    def prepare(self):
+        self.i = 0
+        purity_CZ_seq = qwfs.purity_CZ_seq(self.q0.name, self.q1.name)
+        self.s = swf.QASM_Sweep_v2(qasm_fn=purity_CZ_seq.name,
+                                   config=self.device.qasm_config(),
+                                   CBox=self.device.central_controller.get_instr(),
+                                   verbosity_level=0,
+                                   parameter_name='Segment',
+                                   unit='#', disable_compile_and_upload=True)
+
+        self.d = self.device.get_correlation_detector()
+
+        # the sequence only get's compiled and uploaded in the prepare
+        self.s.compile_and_upload(self.s.qasm_fn, self.s.config)
+
+    def acquire_data_point(self, **kw):
+
+        self.MC.set_sweep_function(self.s)
+        self.MC.set_sweep_points(np.arange(3))
+        self.MC.set_detector_function(self.d)
+        dat = self.MC.run(name=self.measurement_name+'_'+str(self.i))
+        dset = dat["dset"]
+
+        q0_states = dset[:, 1]
+        q1_states = dset[:, 2]
+
+        # P_q0 = <sigma_x>^2 + <sigma_y>^2 + <sigma_z>^2
+        purity_q0 = (self.frac_to_pauli_exp(q0_states[0]) +
+                     self.frac_to_pauli_exp(q0_states[1]) +
+                     self.frac_to_pauli_exp(q0_states[2]))
+        purity_q1 = (self.frac_to_pauli_exp(q1_states[0]) +
+                     self.frac_to_pauli_exp(q1_states[1]) +
+                     self.frac_to_pauli_exp(q1_states[2]))
+        ps = purity_q0 + purity_q1
+
+        self.i += 1
+        if self.return_purity_only:
+            return ps, purity_q0, purity_q1
+        else:
+            return ps, purity_q0, purity_q1, q0_states, q1_states
+
+    def frac_to_pauli_exp(self, frac):
+        """
+        converts a measured fraction to a pauli expectation value
+        <sigma_i>^2 = (2 * (frac - 0.5))**2
+        """
+
+        sigma_i2 = (2*(frac - 0.5))**2
+        return sigma_i2
+
+
+class purityN_CZ_detector(purity_CZ_detector):
+
+    def __init__(self, measurement_name: str, N: int,
+                 MC, device, q0, q1,
+                 return_purity_only: bool=True):
+        super().__init__(measurement_name=measurement_name, MC=MC,
+                         device=device, q0=q0, q1=q1,
+                         return_purity_only=return_purity_only)
+        self.N = N
+
+    def prepare(self):
+        self.i = 0
+        purity_CZ_seq = qwfs.purity_N_CZ_seq(self.q0.name, self.q1.name,
+                                             N=self.N)
+        QWG_flux_lutmans = [self.q0.flux_LutMan.get_instr(),
+                            self.q1.flux_LutMan.get_instr()]
+
+        self.s = swf.QWG_flux_QASM_Sweep(
+            qasm_fn=purity_CZ_seq.name,
+            config=self.device.qasm_config(),
+            CBox=self.device.central_controller.get_instr(),
+            QWG_flux_lutmans=QWG_flux_lutmans,
+            parameter_name='Segment',
+            unit='#', disable_compile_and_upload=False,
+            verbosity_level=0)
+
+        self.d = self.device.get_correlation_detector()
+
+    def acquire_data_point(self, **kw):
+
+        self.MC.set_sweep_function(self.s)
+        self.MC.set_sweep_points(np.arange(3))
+        self.MC.set_detector_function(self.d)
+        dat = self.MC.run(name=self.measurement_name+'_'+str(self.i))
+        dset = dat["dset"]
+
+        q0_states = dset[:, 1]
+        q1_states = dset[:, 2]
+
+        # P_q0 = <sigma_x>^2 + <sigma_y>^2 + <sigma_z>^2
+        purity_q0 = (self.frac_to_pauli_exp(q0_states[0]) +
+                     self.frac_to_pauli_exp(q0_states[1]) +
+                     self.frac_to_pauli_exp(q0_states[2]))
+        purity_q1 = (self.frac_to_pauli_exp(q1_states[0]) +
+                     self.frac_to_pauli_exp(q1_states[1]) +
+                     self.frac_to_pauli_exp(q1_states[2]))
+        ps = purity_q0 + purity_q1
+
+        self.i += 1
+        # self.s.disable_compile_and_upload = True
+        if self.return_purity_only:
+            return ps, purity_q0, purity_q1
+        else:
+            return ps, purity_q0, purity_q1, q0_states, q1_states
+
+    def frac_to_pauli_exp(self, frac):
+        """
+        converts a measured fraction to a pauli expectation value
+        <sigma_i>^2 = (2 * (frac - 0.5))**2
+        """
+
+        sigma_i2 = (2*(frac - 0.5))**2
+        return sigma_i2

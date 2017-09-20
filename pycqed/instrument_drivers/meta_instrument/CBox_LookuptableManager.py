@@ -392,3 +392,5 @@ class ControlBox_LookuptableManager(Instrument):
                                                       int(i), I_ch, I_wave)
             self.CBox.get_instr().set_awg_lookuptable(self.awg_nr(),
                                                       int(i), Q_ch, Q_wave)
+        if len(indices) == 0:
+            raise ValueError('Pulse {} not in lut_mapping'.format(pulse_name))

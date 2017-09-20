@@ -338,6 +338,24 @@ def get_all_sampled(file_name, step_width_ns, points_per_ns, max_points=600,
     step_direct = np.double(f.readlines())
     f.close()
 
+def get_all_sampled_vector(vector, step_width_ns, points_per_ns, max_points=600,
+                    step_params=None, norm_type='max'):
+    """
+    step_width_ns (ints):  not all points are selected for inversion,
+                    this selects the stepsize for the inversion
+    points_per_ns (int) : sampling rate in GS/s
+
+
+    Return an output dict containing
+        t_direct     : time values as measured
+        step_direct  : amplitude values as measured
+        t_raw        : time shifted with autodetected start time
+        step_raw     : normalized step
+         FIXME raw should be renamed rescaled (or normalized or shifted)
+    """
+
+    step_direct = vector
+
 #     print step_params
 
     my_step_raw, my_step_params = step_raw(
@@ -389,12 +407,13 @@ matrix_kernel_time = 400.
 def bounce_kernel(amp=0.02, time=4, length=601):
     """
     Generates a bounce kernel, with the specified parameters.
+    amp is the fraction of the signal that is reflected.
 
     kernel_step_function:
-        heaviside(t) + amp*heaviside(t-time)
+        (1-amp) heaviside(t) + amp*heaviside(t-time)
     """
-    bounce = lambda t, amp, time: heaviside(
-        t) - amp*np.double((t+1) > time)*heaviside(t)
+    bounce = lambda t, amp, time: (1-amp) * heaviside(
+        t) + amp*np.double((t+1) > time)*heaviside(t)
     htilde_bounce = lambda t, time: bounce(
         t, amp, time) - bounce(t-1, amp, time)
     t_kernel = np.arange(int(length))
@@ -422,7 +441,7 @@ def decay_kernel(amp=1., tau=11000, length=2000):
     amp_k = amp/(amp-1)
     t_kernel = np.arange(int(length))
     if abs(amp) > 0.:
-        kernel_decay_step = 1 + amp_k*np.exp(-t_kernel/tau_k)
+        kernel_decay_step = 1 - amp_k*np.exp(-t_kernel/tau_k)
         kernel_decay = np.zeros(kernel_decay_step.shape)
         kernel_decay[0] = kernel_decay_step[0]
         kernel_decay[1:] = kernel_decay_step[1:]-kernel_decay_step[:-1]

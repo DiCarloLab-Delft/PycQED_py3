@@ -41,6 +41,7 @@ class Standard_MA(object):
             self.t_stop = t_stop
         self.options_dict = options_dict
         self.labels = options_dict['scan_label']
+        self.exact_label_match = options_dict['exact_label_match']
         self.plot_dicts = dict()
         self.axs = dict()
         self.extract_only = extract_only
@@ -48,7 +49,9 @@ class Standard_MA(object):
 
     def extract_data(self):
         self.TD_timestamps = a_tools.get_timestamps_in_range(
-            self.t_start, self.t_stop, label=self.labels, exact_label_match=True)
+
+            self.t_start, self.t_stop, label=self.labels,
+            exact_label_match=self.exact_label_match)
 
         if len(self.TD_timestamps) < 1:
             raise ValueError(

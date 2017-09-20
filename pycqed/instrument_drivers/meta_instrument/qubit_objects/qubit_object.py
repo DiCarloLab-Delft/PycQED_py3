@@ -540,6 +540,7 @@ class Transmon(Qubit):
     def find_frequency_cw_spec(self):
         raise NotImplementedError()
 
+
     def find_resonator_frequency(self, use_min=False,
                                  update=True,
                                  freqs=None,
