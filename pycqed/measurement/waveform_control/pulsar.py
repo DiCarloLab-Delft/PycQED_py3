@@ -189,8 +189,20 @@ class Pulsar(Instrument):
             for AWG in self.used_AWGs():
                 if AWG != self.master_AWG():
                     self._start_AWG(AWG)
-            time.sleep(0.2)  # wait 0.2 second for all other awg-s to start
-            self._start_AWG(self.master_AWG())
+            tstart = time.time()
+            for AWG in self.used_AWGs():
+                if AWG != self.master_AWG():
+                    good = False
+                    while time.time() - tstart < 10:
+                        if self._is_AWG_running(AWG):
+                            good = True
+                            break
+                        else:
+                            time.sleep(0.1)
+                    if not good:
+                        raise Exception('AWG {} did not start in 10s'.format(AWG))
+
+        self._start_AWG(self.master_AWG())
 
     def stop(self):
         """
@@ -529,6 +541,15 @@ setTrigger(0);
             obj.stop()
         elif isinstance(obj, UHFQC):
             obj._daq.syncSetInt('/' + obj._device + '/awgs/0/enable', 0)
+        else:
+            raise ValueError('Unsupported AWG type: {}'.format(type(obj)))
+
+    def _is_AWG_running(self, AWG):
+        obj = self.AWG_obj(AWG=AWG)
+        if isinstance(obj, Tektronix_AWG5014):
+            return obj.get_state() != 'Idle'
+        elif isinstance(obj, UHFQC):
+            raise NotImplementedError()
         else:
             raise ValueError('Unsupported AWG type: {}'.format(type(obj)))
 
