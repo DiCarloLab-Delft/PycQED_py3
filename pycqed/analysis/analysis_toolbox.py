@@ -882,7 +882,8 @@ def smooth(x, window_len=11, window='hanning'):
 
 
 def find_second_peak(sweep_pts_cut_edges=None, data_dist_smooth=None,
-                     key=None, peaks=None, percentile=20, optimize=False):
+                     key=None, peaks=None, percentile=20, optimize=False,
+                     verbose=False):
 
     """
     Used for qubit spectroscopy analysis. Find the second gf/2 peak/dip based on
@@ -897,7 +898,8 @@ def find_second_peak(sweep_pts_cut_edges=None, data_dist_smooth=None,
     tallest_peak_idx = peaks[key+'_idx']
     tallest_peak_width = peaks[key+'_width']
     tallest_peak_val = data_dist_smooth[tallest_peak_idx]
-    print('Tallest peak is at ',tallest_peak)
+    if verbose:
+        print('Largest peak is at ',tallest_peak)
 
     # Calculate how many data points away from the tallest peak
     # to look left and right. Should be 50MHz away.
@@ -906,24 +908,26 @@ def find_second_peak(sweep_pts_cut_edges=None, data_dist_smooth=None,
     n = int(50e6*num_points/freq_range)
     m = int(50e6*num_points/freq_range)
 
-    #serach for 2nd peak (f_ge) to the right of the first
+    # Search for 2nd peak (f_ge) to the right of the first (tallest)
     while(int(len(sweep_pts_cut_edges)-1) <= int(tallest_peak_idx+n) and
                   n>0):
+        # Reduce n if outside of range
         n -= 1
     if (int(tallest_peak_idx+n)) == sweep_pts_cut_edges.size:
+        # If n points to the right of tallest peak is the range edge:
         n = 0
     if not ((int(tallest_peak_idx+n)) >= sweep_pts_cut_edges.size):
-        print('Searching for the gf/2 {:} {:} points to the right of the largest'
-              ' in the range {:.5}-{:.5}'.format(
-            key,
-            n,
-            sweep_pts_cut_edges[int(tallest_peak_idx+n)],
-            sweep_pts_cut_edges[-1]))
+        if verbose:
+            print('Searching for the gf/2 {:} {:} points to the right of the largest'
+                  ' in the range {:.5}-{:.5}'.format(
+                  key,
+                  n,
+                  sweep_pts_cut_edges[int(tallest_peak_idx+n)],
+                  sweep_pts_cut_edges[-1]) )
 
         peaks_right = peak_finder(
             sweep_pts_cut_edges[int(tallest_peak_idx+n)::],
             data_dist_smooth[int(tallest_peak_idx+n)::],
-            analyze_ef=False,
             percentile=percentile,
             num_sigma_threshold=1,
             optimize=optimize,
@@ -931,7 +935,8 @@ def find_second_peak(sweep_pts_cut_edges=None, data_dist_smooth=None,
 
         # The peak/dip found to the right of the tallest is assumed to be
         # the ge peak, which means that the tallest was in fact the gf/2 peak
-        print('Right peak is at ', peaks_right[key])
+        if verbose:
+            print('Right peak is at ', peaks_right[key])
         subset_right = data_dist_smooth[int(tallest_peak_idx+n)::]
         val_right = subset_right[peaks_right[key+'_idx']]
         f0_right = peaks_right[key]
@@ -939,30 +944,33 @@ def find_second_peak(sweep_pts_cut_edges=None, data_dist_smooth=None,
         f0_gf_over_2_right = tallest_peak
         kappa_guess_ef_right = tallest_peak_width
     else:
-        print('Right peak is None')
+        if verbose:
+            print('Right peak is None')
         val_right = 0
         f0_right = 0
         kappa_guess_right = 0
         f0_gf_over_2_right = tallest_peak
         kappa_guess_ef_right = tallest_peak_width
 
+    # Search for 2nd peak (f_gf/2) to the left of the first (tallest)
     while(int(tallest_peak_idx-m)<0 and m>0):
+        # Reduce m if outside of range
         m -= 1
     if int(tallest_peak_idx-m) == 0:
+        # If m points to the left of tallest peak is the range edge:
         m = 0
     if not (int(tallest_peak_idx-m) <= 0):
-        print('Searching for the gf/2 {:} {:} points to the left of the '
-              'largest, in the range {:.5}-{:.5}'.format(
-            key,
-            m,
-            sweep_pts_cut_edges[0],
-            sweep_pts_cut_edges[int(tallest_peak_idx-m-1)]))
+        if verbose:
+            print('Searching for the gf/2 {:} {:} points to the left of the '
+                  'largest, in the range {:.5}-{:.5}'.format(
+                  key,
+                  m,
+                  sweep_pts_cut_edges[0],
+                  sweep_pts_cut_edges[int(tallest_peak_idx-m-1)]) )
 
-        #serach for 2nd peak (f_gf/2) to the left of the first
         peaks_left = peak_finder(
             sweep_pts_cut_edges[0:int(tallest_peak_idx-m)],
             data_dist_smooth[0:int(tallest_peak_idx-m)],
-            analyze_ef=False,
             percentile=percentile,
             num_sigma_threshold=1,
             optimize=optimize,
@@ -970,7 +978,8 @@ def find_second_peak(sweep_pts_cut_edges=None, data_dist_smooth=None,
 
         # The peak/dip found to the left of the tallest is assumed to be
         # the gf/2 peak, which means that the tallest was indeed the ge peak
-        print('Left peak is at ', peaks_left[key])
+        if verbose:
+            print('Left peak is at ', peaks_left[key])
         subset_left = data_dist_smooth[0:int(tallest_peak_idx-m)]
         val_left = subset_left[peaks_left[key+'_idx']]
         f0_left = tallest_peak
@@ -978,7 +987,8 @@ def find_second_peak(sweep_pts_cut_edges=None, data_dist_smooth=None,
         f0_gf_over_2_left = peaks_left[key]
         kappa_guess_ef_left = peaks_left[key+'_width']
     else:
-        print('Left peak is None')
+        if verbose:
+            print('Left peak is None')
         val_left = 0
         f0_left = tallest_peak
         kappa_guess_left = tallest_peak_width
@@ -988,15 +998,16 @@ def find_second_peak(sweep_pts_cut_edges=None, data_dist_smooth=None,
     if np.abs(val_left) > np.abs(val_right):
         # If peak on the left taller than peak on the right, then
         # the second peak is to the left of the tallest and it is indeed
-        # the gf.2 peak, while the tallest is the ge peak.
+        # the gf/2 peak, while the tallest is the ge peak.
         if np.abs(f0_gf_over_2_left - tallest_peak) > 50e6:
             # If the two peaks found are separated by at least 50MHz,
             # then both the ge and gf/2 have been found.
-            print('Both f_ge and f_gf/2 have been found. '
-                  'f_ge was assumed to the LEFT of f_gf/2.')
+            if verbose:
+                print('Both f_ge and f_gf/2 have been found. '
+                      'f_ge was assumed to the LEFT of f_gf/2.')
         else:
             # If not, then it is just some other signal.
-            print('The f_gf/2 '+key+' was not found. Fitting to '
+            logging.warning('The f_gf/2 '+key+' was not found. Fitting to '
                                     'the next largest '+key+' found.')
 
         f0 = f0_left
@@ -1011,11 +1022,12 @@ def find_second_peak(sweep_pts_cut_edges=None, data_dist_smooth=None,
         if np.abs(f0_right - tallest_peak) > 50e6:
             # If the two peaks found are separated by at least 50MHz,
             # then both the ge and gf/2 have been found.
-            print('Both f_ge and f_gf/2 have been found. '
-                  'f_ge was assumed to the RIGHT of f_gf/2.')
+            if verbose:
+                print('Both f_ge and f_gf/2 have been found. '
+                      'f_ge was assumed to the RIGHT of f_gf/2.')
         else:
             # If not, then it is just some other signal.
-            print('The f_gf/2 '+key+' was not found. Fitting to '
+            logging.warning('The f_gf/2 '+key+' was not found. Fitting to '
                                     'the next largest '+key+' found.')
         f0 = f0_right
         kappa_guess = kappa_guess_right
@@ -1025,12 +1037,11 @@ def find_second_peak(sweep_pts_cut_edges=None, data_dist_smooth=None,
     else:
         # If the peaks on the right and left are equal, or cannot be compared,
         # then there was probably no second peak, and only noise was found.
-        print('Only f_ge has been found.')
+        logging.warning('Only f_ge has been found.')
         f0 = tallest_peak
         kappa_guess = tallest_peak_width
         f0_gf_over_2 = tallest_peak
         kappa_guess_ef = tallest_peak_width
-
 
     return f0, f0_gf_over_2, kappa_guess, kappa_guess_ef
 
@@ -1052,35 +1063,56 @@ def cut_edges(array, window_len=11):
     return array
 
 def peak_finder(x, y, percentile=20, num_sigma_threshold=5,
-                window_len=3, key=None, analyze_ef=False, optimize=True):
+                key=None, optimize=True):
+    """
+    Uses look_for_peak_dips (the old peak_finder routine renamed) to find peaks/
+    dips. If optimize==True, reruns look_for_peak_dips until tallest (for peaks)
+    data point/lowest (for dip) data point has been found.
 
+    :param x:                       x data
+    :param y:                       y data
+    :param percentile:              percentile of data defining background noise
+    :param num_sigma_threshold:     number of std deviations above background
+                                    where to look for data
+    :param key:                     'peak' or 'dip'
+    :param optimize:                re-run look_for_peak_dips until tallest
+                                    (for peaks) data point/lowest (for dip) data
+                                    point has been found
+    :return:                        dict from look_for_peaks_dips
+    """
+
+    # First search for peaks/dips
     search_result = look_for_peaks_dips(x=x, y_smoothed=y, percentile=percentile,
                                         num_sigma_threshold=num_sigma_threshold,
-                                        window_len=window_len,
-                                        key=key,
-                                        analyze_ef=analyze_ef)
-
-    y_for_test = deepcopy(y)
-    if key is not None:
-        key_1 = key
-    else:
-        if search_result['dip'] is None:
-            key_1 = 'peak'
-        elif search_result['peak'] is None:
-            key_1 = 'dip'
-            y_for_test = -y_for_test
-        elif np.abs(y[search_result['dip_idx']]) < \
-                np.abs(y[search_result['peak_idx']]):
-            key_1 = 'peak'
-        elif np.abs(y[search_result['dip_idx']]) > \
-             np.abs(y[search_result['peak_idx']]):
-            key_1 = 'dip'
-            y_for_test = -y_for_test
+                                        key=key)
 
     if optimize:
+    # Rerun if the found peak/dip is smaller/larger than the largest/
+    # smallest data point
+
+        y_for_test = deepcopy(y)
+        # Figure out if the data set has peaks or dips
+        if key is not None:
+            key_1 = key
+        else:
+            if search_result['dip'] is None:
+                key_1 = 'peak'
+            elif search_result['peak'] is None:
+                key_1 = 'dip'
+                y_for_test = -y_for_test
+            elif np.abs(y[search_result['dip_idx']]) < \
+                    np.abs(y[search_result['peak_idx']]):
+                key_1 = 'peak'
+            elif np.abs(y[search_result['dip_idx']]) > \
+                 np.abs(y[search_result['peak_idx']]):
+                key_1 = 'dip'
+                y_for_test = -y_for_test
+            else:
+                logging.error('Cannot determine for sure if data set has peaks '
+                              'or dips. Assume peaks.')
+                key_1 = 'peak'
 
         if (y_for_test[search_result[key_1+'_idx']] < max(y_for_test)):
-
             while ((y_for_test[search_result[key_1+'_idx']] < max(y_for_test)) and
                     (num_sigma_threshold<100) and
                         (len(search_result[key_1+'s_idx'])>1)):
@@ -1091,9 +1123,7 @@ def peak_finder(x, y, percentile=20, num_sigma_threshold=5,
                 search_result = look_for_peaks_dips(x=x,y_smoothed=y,
                                     percentile=percentile,
                                     num_sigma_threshold=(num_sigma_threshold),
-                                    window_len=window_len,
-                                    key=key_1,
-                                    analyze_ef=analyze_ef)
+                                    key=key_1)
 
                 if search_result[key_1+'_idx'] is None:
                     search_result = search_result_1
@@ -1104,9 +1134,10 @@ def peak_finder(x, y, percentile=20, num_sigma_threshold=5,
 
     return search_result
 
-def look_for_peaks_dips(x, y_smoothed, percentile=20, num_sigma_threshold=5,
-                        window_len=3, analyze_ef=False, key=None):
+def look_for_peaks_dips(x, y_smoothed, percentile=20,
+                        num_sigma_threshold=5, key=None):
 
+# Originally:
 # def peak_finder(x, y, percentile=20, num_sigma_threshold=5,
 #                         window_len=3, analyze_ef=False):
 
@@ -1830,7 +1861,7 @@ def color_plot_interpolated(x, y, z, ax=None,
     return ax, CS
 
 def plot_errorbars(x, y, fit_results=None, fit_function=None, ax=None,
-                   linewidth=2,markersize=2,marker='none',only_bars=True):
+                   linewidth=2 ,markersize=2, marker='none', only_bars=True):
 
     if ax is None:
         new_plot_created = True

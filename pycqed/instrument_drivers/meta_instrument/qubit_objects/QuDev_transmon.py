@@ -398,7 +398,8 @@ class QuDev_transmon(Qubit):
         self.heterodyne.frequency(previous_freq)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
+                                   qb_name=self.name)
 
     def measure_homodyne_acqusition_delay(self, delays=None, MC=None,
                                           analyze=True, close_fig=True):
@@ -493,7 +494,8 @@ class QuDev_transmon(Qubit):
 
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
+                                   qb_name=self.name)
 
     def measure_rabi(self, amps=None, MC=None, analyze=True,
                      close_fig=True, cal_points=True, no_cal_points=2,
@@ -546,7 +548,8 @@ class QuDev_transmon(Qubit):
 
         # Create a MeasurementAnalysis object for this measurement
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
+                                   qb_name=self.name)
 
     def measure_rabi_2nd_exc(self, amps=None, n=1, MC=None, analyze=True,
                              label=None, last_ge_pulse=True,
@@ -576,7 +579,8 @@ class QuDev_transmon(Qubit):
         MC.run(label)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
+                                   qb_name=self.name)
 
     def measure_rabi_amp90(self, scales=np.linspace(0.3, 0.7, 31), n=1,
                            MC=None, analyze=True, close_fig=True, upload=True):
@@ -620,7 +624,8 @@ class QuDev_transmon(Qubit):
         MC.run(label)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
+                                   qb_name=self.name)
 
     def measure_T1_2nd_exc(self, times=None, MC=None, analyze=True, upload=True,
                            close_fig=True, cal_points=True, no_cal_points=6,
@@ -653,7 +658,8 @@ class QuDev_transmon(Qubit):
         MC.run(label)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
+                                   qb_name=self.name)
 
 
     def measure_qscale(self, qscales=None, MC=None, analyze=True, upload=True,
@@ -682,7 +688,8 @@ class QuDev_transmon(Qubit):
         MC.run(label)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
+                                   qb_name=self.name)
 
     def measure_qscale_2nd_exc(self, qscales=None, MC=None, analyze=True,
                                upload=True, close_fig=True, label=None,
@@ -717,7 +724,8 @@ class QuDev_transmon(Qubit):
         MC.run(label)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
+                                   qb_name=self.name)
 
     def measure_ramsey_multiple_detunings(self, times=None,
                                           artificial_detunings=None, label='',
@@ -757,7 +765,8 @@ class QuDev_transmon(Qubit):
         MC.run(label)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
+                                   qb_name=self.name)
 
 
     def measure_ramsey(self, times=None, artificial_detuning=0, label='',
@@ -793,7 +802,8 @@ class QuDev_transmon(Qubit):
         MC.run(label)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
+                                   qb_name=self.name)
 
     def measure_ramsey_2nd_exc(self, times=None, artificial_detuning=0, label=None,
                        MC=None, analyze=True, close_fig=True, cal_points=True,
@@ -831,7 +841,8 @@ class QuDev_transmon(Qubit):
         MC.run(label)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
+                                   qb_name=self.name)
 
     def measure_ramsey_2nd_exc_multiple_detunings(self, times=None,
                                artificial_detunings=None, label=None,
@@ -871,7 +882,8 @@ class QuDev_transmon(Qubit):
         MC.run(label)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
+                                   qb_name=self.name)
 
 
     def measure_echo(self, times=None, MC=None, artificial_detuning=None,
@@ -936,7 +948,8 @@ class QuDev_transmon(Qubit):
         MC.run(label)
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig, qb_name=self.name)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
+                                   qb_name=self.name)
 
     def set_default_readout_weights(self, channels=(0, 1), theta=None):
         """
@@ -1621,7 +1634,8 @@ class QuDev_transmon(Qubit):
                 However, the default for Rabi is 2 (2 identity measurements)
                 because we typically do Rabi in order to find the correct amplitude
                 for an X180 pulse. However, if a previous such value exists, this
-                routine also accepts 4 cal pts.
+                routine also accepts 4 cal pts. If X180_ef pulse was also
+                previously calibrated, this routine also accepts 6 cal pts.
             2. The normalized data is fitted to a cosine function.
             3. The pi-pulse and pi/2-pulse amplitudes are calculated from the fit.
             4. The normalized data, the best fit results, and the pi and pi/2
@@ -1697,7 +1711,7 @@ class QuDev_transmon(Qubit):
         if not cal_points:
             no_cal_points = 0
 
-            #how many times to apply the Rabi pulse
+        #how many times to apply the Rabi pulse
         n = kw.get('n',1)
 
         if rabi_amps is None:
@@ -1742,9 +1756,9 @@ class QuDev_transmon(Qubit):
                                      close_fig=close_fig, for_ef=for_ef,
                                      last_ge_pulse=last_ge_pulse, **kw)
 
-            rabi_amps = RabiA.rabi_amplitudes    #This is a dict with keywords
-            #'piPulse',  'piPulse_std',
-            #'piHalfPulse', 'piHalfPulse_std
+            rabi_amps = RabiA.rabi_amplitudes   #This is a dict with keywords
+                                                #'piPulse',  'piPulse_std',
+                                                #'piHalfPulse', 'piHalfPulse_std
 
             amp180 = rabi_amps['piPulse']
             amp90 = rabi_amps['piHalfPulse']
@@ -1860,11 +1874,11 @@ class QuDev_transmon(Qubit):
         #Perform measurement
         if for_ef:
             self.measure_T1_2nd_exc(times=times, MC=MC,
-                                close_fig=close_fig,
-                                cal_points=cal_points,
-                                no_cal_points=no_cal_points,
-                                last_ge_pulse=last_ge_pulse,
-                                upload=upload)
+                                    close_fig=close_fig,
+                                    cal_points=cal_points,
+                                    no_cal_points=no_cal_points,
+                                    last_ge_pulse=last_ge_pulse,
+                                    upload=upload)
 
         else:
             self.measure_T1(times=times, MC=MC,
@@ -1953,10 +1967,11 @@ class QuDev_transmon(Qubit):
 
         return
 
-    def find_frequency_T2_ramsey(self, times, for_ef=False, artificial_detuning=0, update=False, MC=None,
-                                     cal_points=True, close_fig=True, upload=True,
-                                     last_ge_pulse=True, label=None,
-                                     no_cal_points=None, analyze=True, **kw):
+    def find_frequency_T2_ramsey(self, times, for_ef=False, artificial_detuning=0,
+                                 update=False, MC=None,
+                                 cal_points=True, close_fig=True, upload=True,
+                                 last_ge_pulse=True, label=None,
+                                 no_cal_points=None, analyze=True, **kw):
 
         """
         Finds the real qubit frequency and the dephasing rate T2* from the fit
@@ -2048,9 +2063,12 @@ class QuDev_transmon(Qubit):
             qubit_frequency_spec = self.f_qubit()
 
         else:
-            self.measure_ramsey_2nd_exc(times=times, artificial_detuning=artificial_detuning, MC=MC,
-                                        cal_points=cal_points, close_fig=close_fig, upload=upload,
-                                        last_ge_pulse=last_ge_pulse, no_cal_points=no_cal_points, label=label)
+            self.measure_ramsey_2nd_exc(times=times,
+                                        artificial_detuning=artificial_detuning,
+                                        MC=MC, cal_points=cal_points,
+                                        close_fig=close_fig, upload=upload,
+                                        last_ge_pulse=last_ge_pulse,
+                                        no_cal_points=no_cal_points, label=label)
             #Needed for analysis
             qubit_frequency_spec = self.f_ef_qubit()
 
@@ -2437,6 +2455,7 @@ class QuDev_transmon(Qubit):
     def find_dispersive_shift(self, freqs=None, label = 'pulsed-spec',
                               update=False, **kw):
         """
+        NOT IMPLEMENTED YET
         Finds the dispersive shift chi (in MHz) but doing 2 pulsed
         spectroscopies, one where a pi pulse is applied beforehand, and one
         where no pi pulse is applied.
