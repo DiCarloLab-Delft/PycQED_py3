@@ -763,22 +763,24 @@ var cw = 0;"""
             wave_I_string = self.array_to_combined_vector_string(Iwave, "Iwave{}".format(i))
             wave_Q_string = self.array_to_combined_vector_string(Qwave, "Qwave{}".format(i))
             sequence = sequence+wave_I_string+wave_Q_string
-            case_loop_pre="""
+        case_loop_pre="""
 while (1) {
 \twaitDIOTrigger();
 \tvar dio = getDIOTriggered();
 \tcw = (dio >> 17) & 0x1f;
 \t\tswitch(cw) {
 \n"""
-        #adding cases
-        
+        #adding the case statements
+        for i in range(len(Iwaves)):
             #generating the case statement string
-            case='\t\tcase {} :'.format(i)"""
-            \t\t\tplayWave(Iwave{}, Qwave{});\n""".format(i)
-            sequence = sequence + case #adding the individual case statements to the sequence
+            case='\t\tcase {} :\n'.format(i)
+            case_play='\t\t\tplayWave(Iwave{}, Qwave{});\n'.format(i)
+            sequence = sequence +case+case_play #adding the individual case statements to the sequence
         
-        #adding the final part of the sequence
+        #adding the final part of the sequence including a default wave
         sequence = sequence+"""
+\t\tdefault:
+\t\t\tplayWave(ones(720), ones(720));
 \t}
 \tsetTrigger(WINT_EN + RO_TRIG);
 \tsetTrigger(WINT_EN);
