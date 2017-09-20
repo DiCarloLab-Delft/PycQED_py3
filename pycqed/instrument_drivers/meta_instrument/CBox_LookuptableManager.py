@@ -33,6 +33,7 @@ class ControlBox_LookuptableManager(Instrument):
 
         logging.info(__name__ + ' : Initializing instrument')
         super().__init__(name, **kw)
+        logging.warning('The ControlBox_LookuptableManager is deprecated.')
 
         self.add_parameter('CBox',
                            parameter_class=InstrumentParameter)

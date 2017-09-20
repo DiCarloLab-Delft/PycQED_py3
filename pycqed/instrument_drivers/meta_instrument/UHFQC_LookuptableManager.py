@@ -27,6 +27,7 @@ class UHFQC_LookuptableManager(Instrument):
     shared_kwargs = ['UHFQC']
 
     def __init__(self, name, UHFQC, **kw):
+        logging.warning('The UHFQC_LookuptableManager is deprecated')
 
         logging.info(__name__ + ' : Initializing instrument')
         super().__init__(name, **kw)
