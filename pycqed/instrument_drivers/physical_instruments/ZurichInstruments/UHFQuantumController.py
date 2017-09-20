@@ -742,14 +742,9 @@ if(getUserReg(1)){
 }
 var trigvalid = 0;
 var dio_in = 0;
-var cw = 0;
-while (1) {
-  waitDIOTrigger();
-  var dio = getDIOTriggered();
-  cw = (dio >> 17) & 0x1f;
-    switch(cw) {
-\n"""
-        #adding case statements
+var cw = 0;"""
+    
+        #loop to generate the wave list
         for i in range(len(Iwaves)):
             Iwave = Iwaves[i]
             Qwave = Qwaves[i]
@@ -765,12 +760,21 @@ while (1) {
             elif len(Qwave) > 16384:
                 raise KeyError(
                     "exceeding max AWG wave lenght of 16384 samples for Q channel, trying to upload {} samples".format(len(Qwave)))
-            wave_I_string = self.array_to_combined_vector_string(Iwave, "Iwave")
-            wave_Q_string = self.array_to_combined_vector_string(Qwave, "Qwave")
+            wave_I_string = self.array_to_combined_vector_string(Iwave, "Iwave{}".format(i))
+            wave_Q_string = self.array_to_combined_vector_string(Qwave, "Qwave{}".format(i))
+            sequence = sequence+wave_I_string+wave_Q_string
+            case_loop_pre="""
+while (1) {
+\twaitDIOTrigger();
+\tvar dio = getDIOTriggered();
+\tcw = (dio >> 17) & 0x1f;
+\t\tswitch(cw) {
+\n"""
+        #adding cases
+        
             #generating the case statement string
-            case=
-            '\t\tcase {} :'.format(i)+wave_I_string+wave_Q_string+"""
-            \t\t\tplayWave(Iwave, Qwave);\n"""
+            case='\t\tcase {} :'.format(i)"""
+            \t\t\tplayWave(Iwave{}, Qwave{});\n""".format(i)
             sequence = sequence + case #adding the individual case statements to the sequence
         
         #adding the final part of the sequence
