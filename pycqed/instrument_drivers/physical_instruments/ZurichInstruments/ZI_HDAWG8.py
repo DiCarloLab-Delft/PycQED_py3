@@ -300,9 +300,11 @@ class ZI_HDAWG8(ZI_base_instrument):
                              '/awgs/*/dio/strobe/slope', 3)
 
         # Define the mask value, we use bit 0 on the DIO to index the table,
-        # so we set the mask to 1
+        # The acquired bits on the DIO will be masked by the mask.
+        # as en example mask 3 will mask the bits with 00000011 using only the
+        # 2 Least Significant Bits.
         self._dev.daq.setInt('/' + self._dev.device +
-                             '/awgs/*/dio/mask/value', 3)
+                             '/awgs/*/dio/mask/value', 31)
         # Define the shift to apply to the DIO input before the mask is
         # applied, as we're using bit 0
         # we don't need to shift the value, so we set it to 0
