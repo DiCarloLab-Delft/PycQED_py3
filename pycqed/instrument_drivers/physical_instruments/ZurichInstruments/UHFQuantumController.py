@@ -767,7 +767,10 @@ while (1) {
                     "exceeding max AWG wave lenght of 16384 samples for Q channel, trying to upload {} samples".format(len(Qwave)))
             wave_I_string = self.array_to_combined_vector_string(Iwave, "Iwave")
             wave_Q_string = self.array_to_combined_vector_string(Qwave, "Qwave")
-            case='\t\tcase '.format{i}+'playWave('+wave_I_string+','+wave_Q_string+');'
+            #generating the case statement string
+            case=
+            '\t\tcase {} :'.format(i)+wave_I_string+wave_Q_string+"""
+            \t\t\tplayWave(Iwave, Qwave);\n"""
             sequence = sequence + case #adding the individual case statements to the sequence
         
         #adding the final part of the sequence
@@ -781,7 +784,6 @@ wait(300);
 setTrigger(0);"""
 
         self.awg_string(sequence)
-
 
     def awg_sequence_acquisition_and_pulse(self, Iwave, Qwave, acquisition_delay):
         if np.max(Iwave) > 1.0 or np.min(Iwave) < -1.0:
