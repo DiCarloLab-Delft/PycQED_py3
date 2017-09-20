@@ -132,14 +132,15 @@ def block_pulse(amp, length, sampling_rate=2e8, delay=0, phase=0):
     pulse_Q = list(Zeros)+list(block_Q)
     return pulse_I, pulse_Q
 
-####################
-# Pulse modulation #
-####################
+############################################################
+# Pulse modulation  and correction functions               #
+############################################################
 
 
-def mod_pulse(pulse_I, pulse_Q, f_modulation,
-              Q_phase_delay=0, sampling_rate=2e8):
+def mod_pulse(pulse_I, pulse_Q, f_modulation: float,
+              Q_phase_delay: float=0, sampling_rate: float=2e8):
     '''
+    Single sideband modulation (SSB) of an input pulse_I, pulse_Q
     inputs are in s and Hz.
     Q_phase_delay is in degree
 
@@ -166,9 +167,10 @@ def mod_pulse(pulse_I, pulse_Q, f_modulation,
     return pulse_I_mod, pulse_Q_mod
 
 
-def simple_mod_pulse(pulse_I, pulse_Q, f_modulation,
-                     Q_phase_delay=0, sampling_rate=2e8):
+def simple_mod_pulse(pulse_I, pulse_Q, f_modulation: float,
+                     Q_phase_delay: float =0, sampling_rate: float=2e8):
     '''
+    Double sideband modulation (DSB) of an input pulse_I, pulse_Q
     inputs are in s and Hz.
     Q_phase_delay is in degree
 
@@ -190,6 +192,71 @@ def simple_mod_pulse(pulse_I, pulse_Q, f_modulation,
     pulse_Q_mod = pulse_Q*np.sin(2*np.pi*f_mod_samples*pulse_samples +
                                  Q_phase_delay_rad)
     return pulse_I_mod, pulse_Q_mod
+
+
+def mixer_predistortion_matrix(alpha, phi):
+    '''
+    predistortion matrix correcting for a mixer with amplitude
+    mismatch "mixer_alpha" and skewness "phi"
+
+    M = [ 1            tan(phi) ]
+        [ 0   1/mixer_alpha * sec(phi)]
+
+    Notes on the procedure for acquiring this matrix can be found in
+    PycQED/docs/notes/MixerSkewnessCalibration_LDC_150629.pdf
+    '''
+    predistortion_matrix = np.array(
+        [[1,  np.tan(phi*2*np.pi/360)],
+         [0, 1/alpha * 1/np.cos(phi*2*np.pi/360)]])
+    return predistortion_matrix
+
+def rotate_wave():
+    pass
+
+
+#####################################################
+# Modulated standard waveforms
+#####################################################
+
+def mod_gauss(amp, sigma_length, f_modulation, axis='x', phase=0,
+              nr_sigma=4,
+              motzoi=0, sampling_rate=2e8,
+              Q_phase_delay=0, delay=0):
+    '''
+    Simple modulated gauss pulse. All inputs are in s and Hz.
+    '''
+    pulse_I, pulse_Q = gauss_pulse(amp, sigma_length, nr_sigma=nr_sigma,
+                                   sampling_rate=sampling_rate, axis=axis,
+                                   phase=phase,
+                                   motzoi=motzoi, delay=delay)
+    pulse_I_mod, pulse_Q_mod = mod_pulse(pulse_I, pulse_Q, f_modulation,
+                                         sampling_rate=sampling_rate,
+                                         Q_phase_delay=Q_phase_delay)
+    return pulse_I_mod, pulse_Q_mod
+
+def mod_gauss(amp, sigma_length, f_modulation, axis='x', phase=0,
+              nr_sigma=4,
+              motzoi=0, sampling_rate=2e8,
+              Q_phase_delay=0, delay=0):
+    '''
+    4-channel VSM compatible DRAG pulse
+    '''
+    pulse_I, pulse_Q = gauss_pulse(amp, sigma_length, nr_sigma=nr_sigma,
+                                   sampling_rate=sampling_rate, axis=axis,
+                                   phase=0,
+                                   motzoi=motzoi, delay=delay)
+
+
+    pulse_I_mod, pulse_Q_mod = mod_pulse(pulse_I, pulse_Q, f_modulation,
+                                         sampling_rate=sampling_rate,
+                                         Q_phase_delay=Q_phase_delay)
+    return pulse_I_mod, pulse_Q_mod
+
+
+
+#####################################################
+# Flux pulses
+#####################################################
 
 
 def martinis_flux_pulse(length, lambda_coeffs, theta_f,
@@ -383,40 +450,7 @@ def martinis_flux_pulse_v2(length, lambda_2, lambda_3, theta_f,
     return voltage_wave
 
 
-def mod_gauss(amp, sigma_length, f_modulation, axis='x', phase=0,
-              nr_sigma=4,
-              motzoi=0, sampling_rate=2e8,
-              Q_phase_delay=0, delay=0):
-    '''
-    Simple gauss pulse maker for CBOX. All inputs are in s and Hz.
-    '''
-    pulse_I, pulse_Q = gauss_pulse(amp, sigma_length, nr_sigma=nr_sigma,
-                                   sampling_rate=sampling_rate, axis=axis,
-                                   phase=phase,
-                                   motzoi=motzoi, delay=delay)
-    pulse_I_mod, pulse_Q_mod = mod_pulse(pulse_I, pulse_Q, f_modulation,
-                                         sampling_rate=sampling_rate,
-                                         Q_phase_delay=Q_phase_delay)
-    return pulse_I_mod, pulse_Q_mod
 
-
-def mixer_predistortion_matrix(alpha, phi):
-    '''
-    predistortion matrix correcting for a mixer with amplitude
-    mismatch "mixer_alpha" and skewness "phi"
-
-    M = [ 1            tan(phi) ]
-        [ 0   1/mixer_alpha * sec(phi)]
-
-    Notes on the procedure for acquiring this matrix can be found in
-    PycQED/docs/notes/MixerSkewnessCalibration_LDC_150629.pdf
-    '''
-    predistortion_matrix = np.array(
-        [[1,  np.tan(phi*2*np.pi/360)],
-         [0, 1/alpha * 1/np.cos(phi*2*np.pi/360)]])
-    return predistortion_matrix
-
-
-
-
-
+############################################################################
+#
+############################################################################

@@ -6,19 +6,8 @@ from pycqed.measurement.waveform_control_CC import waveform as wf
 
 
 class Base_MW_LutMan(Base_LutMan):
-
-    def __init__(self, name, **kw):
-        super().__init__(name, **kw)
-
     def _add_waveform_parameters(self):
-        self.add_parameter('I_channel',
-                           parameter_class=ManualParameter,
-                           vals=vals.Numbers(1, 8))
-
-        self.add_parameter('Q_channel',
-                           parameter_class=ManualParameter,
-                           vals=vals.Numbers(1, 8))
-
+        self._add_channel_params()
         self.add_parameter('Q_amp180', unit='V', vals=vals.Numbers(-1, 1),
                            parameter_class=ManualParameter,
                            initial_value=0.1)
@@ -55,6 +44,15 @@ class Base_MW_LutMan(Base_LutMan):
                 'If True applies a mixer correction using mixer_phi and '
                 'mixer_alpha to all microwave pulses using.'),
             parameter_class=ManualParameter, initial_value=False)
+
+    def _add_channel_params(self):
+        self.add_parameter('I_channel',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(1, self._num_channels))
+
+        self.add_parameter('Q_channel',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(1, self._num_channels))
 
     def generate_standard_waveforms(self):
         self._wave_dict = {}
@@ -140,6 +138,9 @@ class CBox_MW_LutMan(Base_MW_LutMan):
 
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
+
+    def _add_channel_params(self):
+        # CBox channels come in pairs defined in the AWG nr
         self.add_parameter('awg_nr', parameter_class=ManualParameter,
                            initial_value=0, vals=vals.Numbers(0, 2))
 
@@ -170,6 +171,7 @@ class CBox_MW_LutMan(Base_MW_LutMan):
 class QWG_MW_LutMan(Base_MW_LutMan):
 
     def __init__(self, name, **kw):
+        self._num_channels = 4
         super().__init__(name, **kw)
 
     def set_default_lutmap(self):
@@ -195,6 +197,7 @@ class QWG_MW_LutMan(Base_MW_LutMan):
 class AWG8_MW_LutMan(Base_MW_LutMan):
 
     def __init__(self, name, **kw):
+        self._num_channels = 8
         super().__init__(name, **kw)
 
     def set_default_lutmap(self):
