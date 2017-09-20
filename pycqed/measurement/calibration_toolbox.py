@@ -59,7 +59,7 @@ def mixer_carrier_cancellation(SH, source, MC,
     '''
     Make coarse sweeps to approximate the minimum
     '''
-    SH.ref_level(SH_ref_level)
+    SH.ref_lvl(SH_ref_level)
     detector = det.Signal_Hound_fixed_frequency(
         SH, frequency=(source.frequency()),
         Navg=5, delay=0.0, prepare_each_point=False)
@@ -124,7 +124,7 @@ def mixer_skewness_calibration_QWG(SH, source, QWG,
     if frequency is None:
         # Corresponds to the frequency where to minimize with the SH
         frequency = source.frequency.get() - f_mod
-    SH.ref_level(SH_ref_level)
+    SH.ref_lvl(SH_ref_level)
     d = det.Signal_Hound_fixed_frequency(SH, frequency)
 
     ad_func_pars = {'adaptive_function': nelder_mead,
@@ -252,7 +252,7 @@ def mixer_carrier_cancellation_5014(AWG, SH, source, MC,
     S1 = AWG.ch1_offset  # to be dedicated to actual channel
     S2 = AWG.ch2_offset
 
-    SH.ref_level(SH_ref_level)
+    SH.ref_lvl(SH_ref_level)
     detector = det.Signal_Hound_fixed_frequency(
         SH, frequency=(source.frequency.get()),
         Navg=5, delay=0.0, prepare_each_point=False)
@@ -306,7 +306,7 @@ def mixer_carrier_cancellation_UHFQC(UHFQC, SH, source, MC,
     S1 = UHFQC.sigouts_0_offset
     S2 = UHFQC.sigouts_1_offset
 
-    SH.ref_level(SH_ref_level)
+    SH.ref_lvl(SH_ref_level)
     detector = det.Signal_Hound_fixed_frequency(
         SH, frequency=(source.frequency.get()),
         Navg=5, delay=0.0, prepare_each_point=False)
@@ -623,7 +623,7 @@ def mixer_skewness_cal_UHFQC_adaptive(UHFQC, SH, source, AWG,
         LutMan, LutMan.mixer_alpha, ['M_ModBlock'], run=True, single=False)
     S2 = swf.UHFQC_Lutman_par_with_reload(
         LutMan, LutMan.mixer_phi, ['M_ModBlock'], run=True, single=False)
-    SH.ref_level(SH_ref_level)
+    SH.ref_lvl(SH_ref_level)
     detector = det.Signal_Hound_fixed_frequency(
         SH, frequency=(source.frequency.get() -
                        LutMan.M_modulation()),
