@@ -720,6 +720,68 @@ class UHFQC(Instrument):
             self._daq.vectorWrite('/' + self._device + '/' + path, value)
 
     # sequencer functions
+    def  awg_sequence_acquisition_and_DIO_triggered_pulse(self, Iwaves, Qwaves, acquisition_delay)
+            
+        delay_samples = int(acquisition_delay*1.8e9/8)
+        delay_string = '\twait(wait_delay);\n'
+        self.awgs_0_userregs_2(delay_samples) #setting the delay in the instrument
+        sequence = """
+const TRIGGER1  = 0x000001;
+const WINT_TRIG = 0x000010;
+const IAVG_TRIG = 0x000020;
+const WINT_EN   = 0x1f0000;
+const DIO_VALID = 0x00010000;
+setTrigger(WINT_EN);
+var loop_cnt = getUserReg(0);
+var wait_delay = getUserReg(2);
+var RO_TRIG;
+if(getUserReg(1)){
+  RO_TRIG=IAVG_TRIG;
+}else{
+  RO_TRIG=WINT_TRIG;
+}
+var trigvalid = 0;
+var dio_in = 0;
+var cw = 0;
+while (1) {
+  waitDIOTrigger();
+  var dio = getDIOTriggered();
+  cw = (dio >> 17) & 0x1f;
+    switch(cw) {
+\n"""
+        #adding case statements
+        for i in range(len(Iwaves)):
+            Iwave = Iwaves[i]
+            Qwave = Qwaves[i]
+            if np.max(Iwave) > 1.0 or np.min(Iwave) < -1.0:
+                raise KeyError(
+                    "exceeding AWG range for I channel, all values should be withing +/-1")
+            elif np.max(Qwave) > 1.0 or np.min(Qwave) < -1.0:
+                raise KeyError(
+                    "exceeding AWG range for Q channel, all values should be withing +/-1")
+            elif len(Iwave) > 16384:
+                raise KeyError(
+                    "exceeding max AWG wave lenght of 16384 samples for I channel, trying to upload {} samples".format(len(Iwave)))
+            elif len(Qwave) > 16384:
+                raise KeyError(
+                    "exceeding max AWG wave lenght of 16384 samples for Q channel, trying to upload {} samples".format(len(Qwave)))
+            wave_I_string = self.array_to_combined_vector_string(Iwave, "Iwave")
+            wave_Q_string = self.array_to_combined_vector_string(Qwave, "Qwave")
+            case='\t\tcase '.format{i}+'playWave('+wave_I_string+','+wave_Q_string+');'
+            sequence = sequence + case #adding the individual case statements to the sequence
+        
+        #adding the final part of the sequence
+        sequence = sequence+"""
+\t}
+\tsetTrigger(WINT_EN + RO_TRIG);
+\tsetTrigger(WINT_EN);
+\twaitWave();
+}
+wait(300);
+setTrigger(0);"""
+
+        self.awg_string(sequence)
+
 
     def awg_sequence_acquisition_and_pulse(self, Iwave, Qwave, acquisition_delay):
         if np.max(Iwave) > 1.0 or np.min(Iwave) < -1.0:

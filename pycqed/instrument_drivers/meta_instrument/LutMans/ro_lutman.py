@@ -104,23 +104,43 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
                 # Set to a default because box is not expected to change
         self._voltage_min = -1.0
         self._voltage_max = 1.0-1.0/2**13
-        self.sampling_rate = 1.8000e9
-        def load_pulse_onto_AWG_lookuptable(self, pulse_name,
+        def load_single_pulse_sequence_onto_UHFQC(self, pulse_name,
                                         regenerate_pulses=True):
             '''
-            Load a pulses to the lookuptable, it uses the lut_mapping to
+            Load a single pulse to the lookuptable, it uses the lut_mapping to
                 determine which lookuptable to load to.
             '''
-        if regenerate_pulses:
-            wave_dict = self.generate_standard_pulses()
-        else:
-            wave_dict = self._wave_dict
+            if regenerate_pulses:
+                wave_dict = self.generate_standard_pulses()
+            else:
+                wave_dict = self._wave_dict
 
-        I_wave = np.clip(wave_dict[pulse_name][0],
-                         self._voltage_min, self._voltage_max)
-        Q_wave = np.clip(np.multiply(self.get('mixer_QI_amp_ratio'),
-                                     wave_dict[pulse_name][1]), self._voltage_min,
-                         self._voltage_max)
-        self.UHFQC.awg_sequence_acquisition_and_pulse(I_wave, Q_wave,
-                                                      self.acquisition_delay())
+            I_wave = np.clip(wave_dict[pulse_name][0],
+                             self._voltage_min, self._voltage_max)
+            Q_wave = np.clip(np.multiply(self.get('mixer_QI_amp_ratio'),
+                                         wave_dict[pulse_name][1]), self._voltage_min,
+                             self._voltage_max)
+            self.UHFQC.awg_sequence_acquisition_and_pulse(I_wave, Q_wave,
+                                                          self.acquisition_delay())
+
+        def load_DIO_triggered_sequence_onto_UHFQC(self, pulse_names,
+                                        regenerate_pulses=True):
+            '''
+            Load a single pulse to the lookuptable, it uses the lut_mapping to
+                determine which lookuptable to load to.
+            '''
+            if regenerate_pulses:
+                wave_dict = self.generate_standard_pulses()
+            else:
+                wave_dict = self._wave_dict
+            I_waves = []
+            Q_waves = []
+            for i,pulse_name in np.enumerate(pulse_names):
+                I_waves.append(np.clip(wave_dict[pulse_name][0],
+                             self._voltage_min, self._voltage_max))
+                Q_waves.append(np.clip(np.multiply(self.get('mixer_QI_amp_ratio'),
+                                         wave_dict[pulse_name][1]), self._voltage_min,
+                             self._voltage_max))
+            self.UHFQC.awg_sequence_acquisition_and_DIO_triggered_pulse(I_waves, Q_waves,
+                                                          self.acquisition_delay())
     pass
