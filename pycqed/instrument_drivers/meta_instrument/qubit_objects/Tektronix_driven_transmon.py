@@ -301,7 +301,7 @@ class Tektronix_driven_transmon(Transmon):
     def prepare_for_continuous_wave(self):
         # makes sure the settings of the acquisition instrument are reloaded
         self.acquisition_instrument(self.acquisition_instrument())
-        self.heterodyne_instr.get_instr().acquisition_instrument(self.acquisition_instrument())
+        self.heterodyne_instr.get_instr().acquisition_instr(self.acquisition_instrument())
         # Heterodyne tone configuration
         if not self.f_RO():
             RO_freq = self.f_res()
@@ -577,8 +577,7 @@ class Tektronix_driven_transmon(Transmon):
                               self.heterodyne_instr.get_instr().frequency, retrieve_value=True))
         MC.set_sweep_points(freqs)
         MC.set_detector_function(
-            det.Heterodyne_probe(self.heterodyne_instr.get_instr(),
-                                 trigger_separation=self.RO_acq_integration_length()+5e-6, RO_length=self.RO_acq_integration_length()))
+            det.Heterodyne_probe(self.heterodyne_instr.get_instr()))
         MC.run(name='Resonator_scan'+self.msmt_suffix)
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
@@ -604,9 +603,7 @@ class Tektronix_driven_transmon(Transmon):
         MC.set_sweep_points(freqs)
         MC.set_detector_function(
             det.Heterodyne_probe(
-                self.heterodyne_instr.get_instr(),
-                trigger_separation=5e-6 + self.RO_acq_integration_length(),
-                RO_length=self.RO_acq_integration_length()))
+                self.heterodyne_instr.get_instr()))
         MC.run(name='spectroscopy'+self.msmt_suffix)
 
         if analyze:
@@ -1136,6 +1133,8 @@ class Tektronix_driven_transmon(Transmon):
             if update:
                 self.motzoi.set(a.optimal_motzoi)
             return a
+
+    measure_motzoi = measure_motzoi_XY
 
     def measure_freq_XY(self, f_span, n_f, MC=None, analyze=True, close_fig=True,
                         verbose=True, update=True):
