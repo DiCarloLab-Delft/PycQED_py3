@@ -63,30 +63,30 @@ class Base_RO_LutMan(Base_LutMan):
         # RO pulses
         self._wave_dict = {}
         for res in range(self._num_res)
-            M = wf.block_pulse(self.get('M_amp{}'.format(res)), self.get('M_length{}'.format(res)),  # ns
+            M = wf.block_pulse(self.get('M_amp_R{}'.format(res)), self.get('M_length_R{}'.format(res)),  # ns
                                sampling_rate=self.get('sampling_rate'),
                                delay=0,
-                               phase=self.get('M_phi{}'.format(res)))
+                               phase=self.get('M_phi_R{}'.format(res)))
             Mod_M = wf.mod_pulse(M[0], M[1],
-                                 f_modulation=self.get('M_modulation{}'.format(res)),
+                                 f_modulation=self.get('M_modulation_R{}'.format(res)),
                                  sampling_rate=self.get('sampling_rate'))
             
             # 3-step RO pulse with ramp-up and double depletion
-            M_down0 = wf.block_pulse(self.get('M_down_amp0{}'.format(res)), self.get('M_down_length0{}'.format(res)),  # ns
+            M_down0 = wf.block_pulse(self.get('M_down_amp0_R{}'.format(res)), self.get('M_down_length0_R{}'.format(res)),  # ns
                                      sampling_rate=self.get('sampling_rate'),
                                      delay=0,
-                                     phase=self.get('M_down_phi0{}'.format(res)))
+                                     phase=self.get('M_down_phi0_R{}'.format(res)))
 
-            M_down1 = wf.block_pulse(self.get('M_down_amp1{}'.format(res)), self.get('M_down_length1{}'.format(res)),  # ns
+            M_down1 = wf.block_pulse(self.get('M_down_amp1{}'.format(res)), self.get('M_down_length1_R{}'.format(res)),  # ns
                                      sampling_rate=self.get('sampling_rate'),
                                      delay=0,
-                                     phase=self.get('M_down_phi1{}'.format(res)))
+                                     phase=self.get('M_down_phi1_R{}'.format(res)))
 
             # concatenating up, down, down depletion
             M_up_down_down = (np.concatenate(M[0], M_down0[0], M_down1[0]),
                               np.concatenate(M[1], M_down0[1], M_down1[1]))
             Mod_M_up_down_down = wf.mod_pulse(M_up_down_down[0], M_up_down_down[1],
-                                 f_modulation=self.get('M_modulation{}'.format(res)),
+                                 f_modulation=self.get('M_modulation_R{}'.format(res)),
                                  sampling_rate=self.sampling_rate())
             self._wave_dict.update({'M_R{}'.format(res): Mod_M,
                                'M_up_down_down_R{}'.format(res): Mod_M_up_down_down})
@@ -117,13 +117,12 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
 
             I_wave = np.clip(wave_dict[pulse_name][0],
                              self._voltage_min, self._voltage_max)
-            Q_wave = np.clip(np.multiply(self.get('mixer_QI_amp_ratio'),
-                                         wave_dict[pulse_name][1]), self._voltage_min,
+            Q_wave = np.clip(wave_dict[pulse_name][1], self._voltage_min,
                              self._voltage_max)
             self.UHFQC.awg_sequence_acquisition_and_pulse(I_wave, Q_wave,
                                                           self.acquisition_delay())
 
-        def load_DIO_triggered_sequence_onto_UHFQC(self, pulse_names,
+        def load_DIO_triggered_sequence_onto_UHFQC(self, pulse_type, resonatorcombinations,
                                         regenerate_pulses=True):
             '''
             Load a single pulse to the lookuptable, it uses the lut_mapping to
@@ -135,12 +134,23 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
                 wave_dict = self._wave_dict
             I_waves = []
             Q_waves = []
-            for i,pulse_name in np.enumerate(pulse_names):
-                I_waves.append(np.clip(wave_dict[pulse_name][0],
-                             self._voltage_min, self._voltage_max))
-                Q_waves.append(np.clip(np.multiply(self.get('mixer_QI_amp_ratio'),
-                                         wave_dict[pulse_name][1]), self._voltage_min,
-                             self._voltage_max))
+            for i,resonatorcombination in np.enumerate(resonatorcombinations):
+                for j,resonator in np.enumerate(resonatorcombination):
+                    wavename=pulse_type+resonator
+                    print(wavename)
+                    if j==0:
+                        #starting the entry
+                        I_waves.append(wave_dict[wavename][0])
+                        Q_waves.append(wave_dict[wavename][1])
+                    else:
+                        #adding new wave (not necessarily same length (have to be same length for now)
+                        I_waves[i]+=wave_dict[wavename][0]
+                        Q_waves[i]+=wave_dict[wavename][1]
+                #clipping the waveform
+                I_waves[i]=np.clip(I_waves[i],
+                             self._voltage_min, self._voltage_max)
+                Q_waves[i]=np.clip(Q_waves[i], self._voltage_min,
+                             self._voltage_max)
             self.UHFQC.awg_sequence_acquisition_and_DIO_triggered_pulse(I_waves, Q_waves,
                                                           self.acquisition_delay())
     pass
