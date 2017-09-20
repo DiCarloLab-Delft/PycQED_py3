@@ -1262,7 +1262,7 @@ class Rabi_Analysis(TD_Analysis):
         if fitting_model == 'simple':
             x_fine = np.linspace(min(self.sweep_points), max(self.sweep_points),
                                  1000)
-            for i in [0, 1]:
+            for i in range(self.nr_quadratures):
                 if i == 0:
                     plot_title = kw.pop('plot_title', textwrap.fill(
                                         self.timestamp_string + '_' +
@@ -1301,10 +1301,13 @@ class Rabi_Analysis(TD_Analysis):
                     self.axs[i].legend(loc='best')
 
         elif fitting_model == 'complex':
+            if self.nr_parameters != 2:
+                raise ValueError("Cannot fit a complex cosine\
+                 to only one quadrature")
             fit_values = fit_mods.CosComplex(
                 self.sweep_points, self.fit_res.params)
 
-            for idx_quadrature in [0, 1]:
+            for idx_quadrature in range(self.nr_parameters):
                 if idx_quadrature == 0:
                     plot_title = kw.pop('plot_title', textwrap.fill(
                                         self.timestamp_string + '_' +
@@ -1490,7 +1493,7 @@ class Rabi_parabola_analysis(Rabi_Analysis):
         self.fit_res = ['', '']
         # It would be best to do 1 fit to both datasets but since it is
         # easier to do just one fit we stick to that.
-        for i in [0, 1]:
+        for i in range(self.nr_quadratures):
             model.set_param_hint('x0', expr='-b/(2*a)')
             params = model.guess(data=self.measured_values[i],
                                  x=self.sweep_points)
@@ -1672,9 +1675,10 @@ class Motzoi_XY_analysis(TD_Analysis):
         self.corr_data_Yx = self.corr_data[1:-4:2]
 
         self.fit_data(**kw)
+        opt_motzoi = self.calculate_optimal_motzoi()
+
         self.make_figures(**kw)
 
-        opt_motzoi = self.calculate_optimal_motzoi()
 
         if close_file:
             self.data_file.close()
@@ -1708,6 +1712,14 @@ class Motzoi_XY_analysis(TD_Analysis):
                     fine_fit = self.fit_res[i].model.func(
                         x_fine, **self.fit_res[i].init_values)
                     self.ax.plot(x_fine, fine_fit, c=c[i], label='guess')
+
+
+        self.ax.axvline(self.optimal_motzoi, c="k", ls='--')
+        self.ax.annotate(s = "optimal:\n{:g}".format(self.optimal_motzoi),
+                         fontsize=8,
+                         xy=(self.optimal_motzoi, 0.75), xytext=(10, 0),
+                         xycoords=("data", "figure fraction"),
+                         textcoords="offset points")
 
         self.ax.legend(loc='best')
         if self.cal_points is not None:
