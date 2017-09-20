@@ -12,6 +12,18 @@ class Base_RO_LutMan(Base_LutMan):
         self.add_parameter('mixer_apply_predistortion_matrix', vals=vals.Bool(),
                     parameter_class=ManualParameter,
                     initial_value=False)
+
+        comb_msg=('Resonator combinations specifies blablab needs to be format like bla example ablabj ')
+        self.add_parameter('resonator_combinations', vals=vals.List(),
+                            parameter_class=ManualParameter,
+                            docstring=comb_msg,
+                            initial_value=[[0]])
+        self.add_parameter('pulse_type', vals=vals.Enum('M_up_down_down', 'M'),
+                            parameter_class=ManualParameter,
+                            docstring=comb_msg,
+                            initial_value=[[0]])
+        s
+
         self.add_parameter('mixer_alpha', vals=vals.Numbers(),
                         parameter_class=ManualParameter,
                         initial_value=1.0)
@@ -122,21 +134,33 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
             self.UHFQC.awg_sequence_acquisition_and_pulse(I_wave, Q_wave,
                                                           self.acquisition_delay())
 
-        def load_DIO_triggered_sequence_onto_UHFQC(self, pulse_type, resonatorcombinations,
+
+
+        def load_waveforms_onto_AWG_lookuptable(
+            self, regenerate_waveforms: bool=True, stop_start: bool = True):
+            raise NotImplementedError(
+                'UHFQC needs a full sequence, use '
+                '"load_DIO_triggered_sequence_onto_UHFQC"')
+
+        def load_DIO_triggered_sequence_onto_UHFQC(self,
                                         regenerate_pulses=True):
             '''
             Load a single pulse to the lookuptable, it uses the lut_mapping to
                 determine which lookuptable to load to.
             '''
+
             if regenerate_pulses:
                 wave_dict = self.generate_standard_pulses()
             else:
                 wave_dict = self._wave_dict
             I_waves = []
             Q_waves = []
+            resonator_combinations = self.resonator_combinations()
+            pulse_type = self.pulse_type()
+
             for i,resonatorcombination in np.enumerate(resonatorcombinations):
                 for j,resonator in np.enumerate(resonatorcombination):
-                    wavename=pulse_type+resonator
+                    wavename=pulse_type+'_R'+resonator
                     print(wavename)
                     if j==0:
                         #starting the entry
