@@ -142,15 +142,6 @@ class UHFQC_LookuptableManager(Instrument):
         self._voltage_min = -1.0
         self._voltage_max = 1.0-1.0/2**13
 
-    def run_test_suite(self):
-        # pass the UHFQC to the module so it can be used in the tests
-        from importlib import reload
-        from .tests import test_suite
-        reload(test_suite)
-        test_suite.lm = self
-        suite = unittest.TestLoader().loadTestsFromTestCase(
-            test_suite.LutManTests)
-        unittest.TextTestRunner(verbosity=2).run(suite)
 
     def generate_standard_pulses(self):
         '''
