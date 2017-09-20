@@ -211,7 +211,7 @@ class Tektronix_driven_transmon(Transmon):
         # CBox specific parameter
         self.add_parameter('signal_line', parameter_class=ManualParameter,
                            vals=vals.Enum(0, 1), initial_value=0)
-        self.add_parameter('acquisition_instr',
+        self.add_parameter('acquisition_instrument',
                            set_cmd=self._do_set_acquisition_instr,
                            get_cmd=self._do_get_acquisition_instr,
                            vals=vals.Strings())
@@ -254,6 +254,32 @@ class Tektronix_driven_transmon(Transmon):
                            set_cmd=self.set_dist_dict,
                            vals=vals.Anything())
 
+        self.add_parameter('RO_optimal_weights_I',
+                           vals=vals.Arrays(),
+                           label='Optimized weights for I channel',
+                           parameter_class=ManualParameter)
+        self.add_parameter('RO_optimal_weights_Q',
+                           vals=vals.Arrays(),
+                           label='Optimized weights for Q channel',
+                           parameter_class=ManualParameter)
+
+        RO_acq_docstr = (
+            'Determines what integration weights to use: '
+            '\n\t SSB: Single sideband demodulation\n\t'
+            'DSB: Double sideband demodulation\n\t'
+            'optimal: do not upload anything relying on preset weights')
+        self.add_parameter('RO_acq_weights',
+                           initial_value='DSB',
+                           vals=vals.Enum('SSB', 'DSB', 'optimal'),
+                           docstring=RO_acq_docstr,
+                           parameter_class=ManualParameter)
+
+        self.add_parameter('RO_digitized', vals=vals.Bool(),
+                           initial_value=False,
+                           parameter_class=ManualParameter)
+
+
+
     def get_dist_dict(self):
         return self._dist_dict
 
@@ -274,8 +300,8 @@ class Tektronix_driven_transmon(Transmon):
 
     def prepare_for_continuous_wave(self):
         # makes sure the settings of the acquisition instrument are reloaded
-        self.acquisition_instr(self.acquisition_instr())
-        self.heterodyne_instr.get_instr().acquisition_instr(self.acquisition_instr())
+        self.acquisition_instrument(self.acquisition_instrument())
+        self.heterodyne_instr.get_instr().acquisition_instrument(self.acquisition_instrument())
         # Heterodyne tone configuration
         if not self.f_RO():
             RO_freq = self.f_res()
@@ -329,7 +355,7 @@ class Tektronix_driven_transmon(Transmon):
 
     def prepare_for_timedomain(self, input_averaging=False):
         # makes sure the settings of the acquisition instrument are reloaded
-        self.acquisition_instr(self.acquisition_instr())
+        self.acquisition_instrument(self.acquisition_instrument())
         if self.td_source.get_instr() != None:
             self.td_source.get_instr().pulsemod_state('Off')
         self.LO.get_instr().on()
@@ -337,7 +363,7 @@ class Tektronix_driven_transmon(Transmon):
             self.cw_source.get_instr().off()
         if self.td_source.get_instr() != None:
             self.td_source.get_instr().on()
-        # Ensures the self.pulse_pars and self.RO_pars get created and updated
+        # Ensures the self.pulse_pars and self.RO_pars are created and updated
         self.get_pulse_pars()
 
         # Set source to fs =f-f_mod such that pulses appear at f = fs+f_mod
@@ -364,14 +390,14 @@ class Tektronix_driven_transmon(Transmon):
 
         p = self.pulsar.get_instr()
 
-        i_high = abs(self.pulse_I_offset()) + amp_to_set
-        i_low = abs(self.pulse_I_offset()) - amp_to_set
+        i_high = (self.pulse_I_offset()) + amp_to_set
+        i_low = (self.pulse_I_offset()) - amp_to_set
         p.channel_opt(self.pulse_I_channel(), 'high', i_high)
         p.channel_opt(self.pulse_I_channel(), 'low', i_low)
         p.channel_opt(self.pulse_I_channel(), 'offset', self.pulse_I_offset())
 
-        q_high = abs(self.pulse_Q_offset()) + amp_to_set
-        q_low = abs(self.pulse_Q_offset()) - amp_to_set
+        q_high = (self.pulse_Q_offset()) + amp_to_set
+        q_low = (self.pulse_Q_offset()) - amp_to_set
         p.channel_opt(self.pulse_Q_channel(), 'high', q_high)
         p.channel_opt(self.pulse_Q_channel(), 'low', q_low)
         p.channel_opt(self.pulse_Q_channel(), 'offset', self.pulse_Q_offset())
@@ -379,19 +405,43 @@ class Tektronix_driven_transmon(Transmon):
         p.channel_opt(self.fluxing_channel(), 'high', 2)
         p.channel_opt(self.fluxing_channel(), 'low', -2)
 
+        if 'UHFQC' in self.acquisition_instrument():
+            UHFQC = self._acquisition_instr
+            if self.RO_acq_weights() == 'SSB':
+                UHFQC.prepare_SSB_weight_and_rotation(
+                    IF=self.f_RO_mod(),
+                    weight_function_I=self.RO_acq_weight_function_I(),
+                    weight_function_Q=self.RO_acq_weight_function_Q())
+            elif self.RO_acq_weights() == 'DSB':
+                UHFQC.prepare_DSB_weight_and_rotation(
+                    IF=self.f_RO_mod(),
+                    weight_function_I=self.RO_acq_weight_function_I(),
+                    weight_function_Q=self.RO_acq_weight_function_Q())
+            elif self.RO_acq_weights() == 'optimal':
+                if (self.RO_optimal_weights_I() is None or
+                        self.RO_optimal_weights_Q() is None):
+                    logging.warning('Optimal weights are None,' +
+                                    ' not setting integration weights')
+                else:
+                    # When optimal weights are used, only the RO I weight
+                    # channel is used
+                    UHFQC.set('quex_wint_weights_{}_real'.format(
+                        self.RO_acq_weight_function_I()),
+                        self.RO_optimal_weights_I())
+                    UHFQC.set('quex_wint_weights_{}_imag'.format(
+                        self.RO_acq_weight_function_I()),
+                        self.RO_optimal_weights_Q())
+                    UHFQC.set('quex_rot_{}_real'.format(
+                        self.RO_acq_weight_function_I()), 1.0)
 
-        # self.AWG.get_instr().set('{}_amp'.format(self.pulse_I_channel()),
-        #                          amp_to_set)
-        # self.AWG.get_instr().set('{}_amp'.format(self.pulse_Q_channel()),
-        #                          amp_to_set)
+                    UHFQC.set('quex_rot_{}_imag'.format(
+                        self.RO_acq_weight_function_I()), -1.0)
 
-        # self.AWG.get_instr().set(self.pulse_I_channel.get()+'_offset',
-        #                          self.pulse_I_offset.get())
-        # self.AWG.get_instr().set(self.pulse_Q_channel.get()+'_offset',
-        #                          self.pulse_Q_offset.get())
-        print('ro type',self.RO_pulse_type.get())
+        print('ro type', self.RO_pulse_type.get())
         if self.RO_pulse_type() is 'MW_IQmod_pulse_tek':
-            # TODO: change to new pulsar settings
+            # this won't work. Ask brian for details if you want to fix it.
+            raise Exception("Readout with tektronix awg is broken")
+
             self.AWG.get_instr().set(self.RO_I_channel.get()+'_offset',
                                      self.RO_I_offset.get())
             self.AWG.get_instr().set(self.RO_Q_channel.get()+'_offset',
@@ -414,8 +464,8 @@ class Tektronix_driven_transmon(Transmon):
             self.RF_RO_source.get_instr().power(self.RO_pulse_power.get())
             self.RF_RO_source.get_instr().frequency(self.f_RO())
             self.RF_RO_source.get_instr().on()
-            if 'UHFQC' in self.acquisition_instr():
-                # self._acquisition_instr.awg_sequence_acquisition()
+            if 'UHFQC' in self.acquisition_instrument():
+                self._acquisition_instr.awg_sequence_acquisition()
                 # temperarliy removed for debugging
                 pass
         # else:
@@ -794,8 +844,11 @@ class Tektronix_driven_transmon(Transmon):
             self.RO_optimal_weights_Q(optimized_weights_Q)
             self.RO_acq_weights('optimal')
 
-        if verify:
-            self.measure_ssro()
+        ssro_analysis = self.measure_ssro(analyze=True)
+
+        self.RO_threshold(ssro_analysis.V_th_a)
+
+
 
     def measure_ssro(self, no_fits=False,
                      return_detector=False,
@@ -805,7 +858,12 @@ class Tektronix_driven_transmon(Transmon):
                      verbose=True, optimized_weights=False, SSB=False,
                      one_weight_function_UHFQC=False,
                      multiplier=1, nr_shots=4095):
+
+        old_RO_digit = self.RO_digitized()
+        self.RO_digitized(False)
         self.prepare_for_timedomain()
+        self.RO_digitized(old_RO_digit)
+
         if MC is None:
             MC = self.MC.get_instr()
         d = cdet.SSRO_Fidelity_Detector_Tek(
@@ -826,9 +884,10 @@ class Tektronix_driven_transmon(Transmon):
             return d
         d.prepare()
         d.acquire_data_point()
-        # if analyze:
-        #     return ma.SSRO_Analysis(rotate=soft_rotate, label='SSRO'+self.msmt_suffix,
-        #                             no_fits=no_fits, close_fig=close_fig)
+        if analyze:
+             return ma.SSRO_Analysis(label='SSRO'+self.msmt_suffix,
+                                 channels=d.value_names,
+                                 no_fits=no_fits)
 
     def measure_ram_z(self, lengths, amps=None, chunk_size: int=32, MC=None,
                       wait_during_flux: str='auto', cal_points: bool=False,
@@ -1010,11 +1069,19 @@ class Tektronix_driven_transmon(Transmon):
                            analyze=True,
                            close_fig=True,
                            verbose=True,
-                           nr_samples=512):
+                           nr_samples=None):
 
         self.prepare_for_timedomain()
         if MC is None:
             MC = self.MC.get_instr()
+
+        transients = []
+
+        sampling_rate = 1/1.8e9
+
+        if nr_samples is None:
+            nr_samples = int(self.RO_acq_integration_length()//sampling_rate)
+
 
         self.MC.get_instr().set_sweep_function(awg_swf.OffOn(pulse_pars=self.pulse_pars,
                                                              RO_pars=self.RO_pars,
@@ -1024,9 +1091,13 @@ class Tektronix_driven_transmon(Transmon):
         self.input_average_detector.nr_samples = nr_samples
         self.input_average_detector.AWG = self.AWG.get_instr()
         self.MC.get_instr().set_detector_function(self.input_average_detector)
-        self.MC.get_instr().run(
+        data = self.MC.get_instr().run(
             'Measure_transients_{}_0'.format(self.msmt_suffix))
         a0 = ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+
+        dset = data['dset']
+        transients.append(dset.T[1:])
+
         self.MC.get_instr().set_sweep_function(awg_swf.OffOn(pulse_pars=self.pulse_pars,
                                                              RO_pars=self.RO_pars,
                                                              pulse_comb='OnOn',
@@ -1034,9 +1105,13 @@ class Tektronix_driven_transmon(Transmon):
         # self.MC.get_instr().set_sweep_points(np.arange(nr_samples))
         self.input_average_detector.nr_samples = nr_samples
         self.MC.get_instr().set_detector_function(self.input_average_detector)
-        self.MC.get_instr().run(
+        data = self.MC.get_instr().run(
             'Measure_transients_{}_1'.format(self.msmt_suffix))
         a1 = ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
+
+        dset = data['dset']
+        transients.append(dset.T[1:])
+        return [np.array(t, dtype=np.float64) for t in transients]
 
     def measure_rb_vs_amp(self, amps, nr_cliff=1,
                           resetless=True,
@@ -1215,30 +1290,57 @@ class Tektronix_driven_transmon(Transmon):
                   self.AWG.get_instr(), nr_averages=self.RO_acq_averages())
 
         elif 'UHFQC' in acquisition_instr:
-            logging.info("setting UHFQC acquisition")
+            if self.RO_acq_weights() == 'optimal':
+                RO_channels = [self.RO_acq_weight_function_I()]
+                result_logging_mode = 'lin_trans'
+
+                if self.RO_digitized():
+                    result_logging_mode = 'digitized'
+                # Update the RO theshold
+                acq_ch = self.RO_acq_weight_function_I()
+
+                # The threshold that is set in the hardware  needs to be
+                # corrected for the offset as this is only applied in
+                # software.
+                threshold = self.RO_threshold()
+                offs = self._acquisition_instr.get(
+                    'quex_trans_offset_weightfunction_{}'.format(acq_ch))
+                hw_threshold = threshold + offs
+                self._acquisition_instr.set(
+                    'quex_thres_{}_level'.format(acq_ch), hw_threshold)
+
+            else:
+                RO_channels = [self.RO_acq_weight_function_I(),
+                               self.RO_acq_weight_function_Q()]
+                result_logging_mode = 'raw'
+
             self.input_average_detector = det.UHFQC_input_average_detector(
                 UHFQC=self._acquisition_instr,
-                AWG=self.AWG.get_instr(), nr_averages=self.RO_acq_averages())
+                AWG=self.AWG.get_instr(),
+                nr_averages=self.RO_acq_averages())
 
             self.int_avg_det = det.UHFQC_integrated_average_detector(
-                UHFQC=self._acquisition_instr, AWG=self.AWG.get_instr(),
-                channels=[self.RO_acq_weight_function_I(),
-                          self.RO_acq_weight_function_Q()],
+                UHFQC=self._acquisition_instr,
+                AWG=self.AWG.get_instr(),
+                channels=RO_channels,
+                result_logging_mode=result_logging_mode,
                 nr_averages=self.RO_acq_averages(),
                 integration_length=self.RO_acq_integration_length())
 
-            self.int_avg_det_rot = det.UHFQC_integrated_average_detector(
+            self.int_avg_det_single = det.UHFQC_integrated_average_detector(
                 UHFQC=self._acquisition_instr, AWG=self.AWG.get_instr(),
-                channels=[self.RO_acq_weight_function_I(),
-                          self.RO_acq_weight_function_Q()],
+                channels=RO_channels,
+                result_logging_mode=result_logging_mode,
                 nr_averages=self.RO_acq_averages(),
-                integration_length=self.RO_acq_integration_length(), rotate=True)
+                real_imag=True, single_int_avg=True,
+                integration_length=self.RO_acq_integration_length())
 
             self.int_log_det = det.UHFQC_integration_logging_det(
                 UHFQC=self._acquisition_instr, AWG=self.AWG.get_instr(),
-                channels=[
-                    self.RO_acq_weight_function_I(), self.RO_acq_weight_function_Q()],
+                channels=RO_channels,
+                result_logging_mode=result_logging_mode,
                 integration_length=self.RO_acq_integration_length())
+
         elif 'DDM' in acquisition_instr:
             logging.info("setting DDM acquisition")
             self.input_average_detector = det.DDM_input_average_detector(
@@ -1297,7 +1399,7 @@ class Tektronix_driven_transmon(Transmon):
         '''
         drive_pars, RO_pars = self.get_pulse_pars()
         pulse_dict.update(add_suffix_to_dict_keys(
-            sq.get_dict_from_pars(drive_pars), ' ' + self.name))
+            sq.get_pulse_dict_from_pars(drive_pars), ' ' + self.name))
         pulse_dict.update({'RO {}'.format(self.name): RO_pars})
 
         spec_pars, RO_pars = self.get_spec_pars()
