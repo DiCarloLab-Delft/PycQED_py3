@@ -8,6 +8,9 @@ import pycqed.instrument_drivers.meta_instrument.qubit_objects.CCL_Transmon as c
 from pycqed.measurement import measurement_control
 from qcodes import station
 
+from pycqed.instrument_drivers.meta_instrument.qubit_objects.QuDev_transmon import QuDev_transmon
+from pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon import Tektronix_driven_transmon
+from pycqed.instrument_drivers.meta_instrument.qubit_objects.CC_transmon import CBox_v3_driven_transmon, QWG_driven_transmon
 
 class Test_Qubit_Object(unittest.TestCase):
 
@@ -40,6 +43,23 @@ class Test_Qubit_Object(unittest.TestCase):
         self.CCL_qubit.instr_LO(self.MW1.name)
         self.CCL_qubit.instr_cw_source(self.MW2.name)
         self.CCL_qubit.instr_td_source(self.MW3.name)
+
+    def test_instantiate_QuDevTransmon(self):
+        QDT = QuDev_transmon('QuDev_transmon',
+                             MC=None, heterodyne_instr=None, cw_source=None)
+        QDT.close()
+
+    def test_instantiate_TekTransmon(self):
+        TT = Tektronix_driven_transmon('TT')
+        TT.close()
+
+    def test_instantiate_CBoxv3_transmon(self):
+        CT = CBox_v3_driven_transmon('CT')
+        CT.close()
+
+    def test_instantiate_QWG_transmon(self):
+        QT = QWG_driven_transmon('QT')
+        QT.close()
 
     def test_prepare_for_timedomain(self):
         self.CCL_qubit.prepare_for_timedomain()
