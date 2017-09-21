@@ -198,9 +198,9 @@ class UHFQC(Instrument):
 
         # QuExpress thresholds on DIO (mode == 2), AWG control of DIO (mode ==
         # 1)
-        self.dios_0_mode(2)
-        # Drive DIO bits 31 to 16
-        self.dios_0_drive(0xc)
+        self.dios_0_mode(1)
+        # Drive DIO bits 15 to 0
+        self.dios_0_drive(0x3)
 
         # Configure the analog trigger input 1 of the AWG to assert on a rising
         # edge on Ref_Trigger 1 (front-panel of the instrument)
@@ -720,12 +720,12 @@ class UHFQC(Instrument):
             self._daq.vectorWrite('/' + self._device + '/' + path, value)
 
     # sequencer functions
-    def  awg_sequence_acquisition_and_DIO_triggered_pulse(self, Iwaves, Qwaves, acquisition_delay)
+    def  awg_sequence_acquisition_and_DIO_triggered_pulse(self, Iwaves, Qwaves, acquisition_delay):
         #setting the acquisition delay samples
         delay_samples = int(acquisition_delay*1.8e9/8)
         self.awgs_0_userregs_2(delay_samples) #setting the delay in the instrument
-        
-        sequence =( 
+
+        sequence =(
         'const TRIGGER1  = 0x000001;\n'+
         'const WINT_TRIG = 0x000010;\n'+
         'const IAVG_TRIG = 0x000020;\n'+
@@ -743,17 +743,17 @@ class UHFQC(Instrument):
         'var trigvalid = 0;\n'+
         'var dio_in = 0;\n'+
         'var cw = 0;\n')
-    
+
         #loop to generate the wave list
         for i in range(len(Iwaves)):
             Iwave = Iwaves[i]
             Qwave = Qwaves[i]
             if np.max(Iwave) > 1.0 or np.min(Iwave) < -1.0:
                 raise KeyError(
-                    "exceeding AWG range for I channel, all values should be withing +/-1")
+                    "exceeding AWG range for I channel, all values should be within +/-1")
             elif np.max(Qwave) > 1.0 or np.min(Qwave) < -1.0:
                 raise KeyError(
-                    "exceeding AWG range for Q channel, all values should be withing +/-1")
+                    "exceeding AWG range for Q channel, all values should be within +/-1")
             elif len(Iwave) > 16384:
                 raise KeyError(
                     "exceeding max AWG wave lenght of 16384 samples for I channel, trying to upload {} samples".format(len(Iwave)))
@@ -776,16 +776,16 @@ class UHFQC(Instrument):
             case='  case {}:\n'.format(i)
             case_play='   playWave(Iwave{}, Qwave{});\n'.format(i,i)
             sequence = sequence +case+case_play #adding the individual case statements to the sequence
-        
+
         #adding the final part of the sequence including a default wave
         sequence = (sequence+
         '  default:\n'+
-        '   playWave(ones(720), ones(720));\n'+
+        '   playWave(ones(36), ones(36));\n'+
         ' }\n'+
         ' wait(wait_delay);\n'+
         ' setTrigger(WINT_EN + RO_TRIG);\n'+
         ' setTrigger(WINT_EN);\n'+
-        ' waitWave();\n'+
+        #' waitWave();\n'+ #removing this waitwave for now
         '}\n'+
         'wait(300);\n'+
         'setTrigger(0);\n')
