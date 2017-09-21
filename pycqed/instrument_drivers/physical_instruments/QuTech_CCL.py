@@ -78,6 +78,14 @@ class CCL(SCPI):
         self.QISA.enableParserTracing(False)
         self.QISA.setVerbose(False)
 
+    def stop(self):
+        self.run(0),
+        self.enable(0)
+
+    def start(self):
+        self.enable(1)
+        self.run(1),
+
     def add_parameter(self, name,
                       parameter_class=StandardParameter, **kwargs):
         """
@@ -264,6 +272,7 @@ class CCL(SCPI):
         converts the bytes read to a bytearray which is required by
         binBlockWrite in SCPI.
         """
+        self.stop()
         if not isinstance(filename, str):
             raise ValueError(
                 "The parameter filename type({}) is incorrect. It should be str.".format(type(filename)))
