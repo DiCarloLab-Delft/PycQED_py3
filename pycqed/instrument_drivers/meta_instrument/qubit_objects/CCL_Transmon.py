@@ -66,7 +66,7 @@ class CCLight_Transmon(Qubit):
                        ' using eQASM generated using OpenQL, in the near'
                        ' future will be the CC_Light.'),
             parameter_class=InstrumentRefParameter)
-        self.add_parameter('instr_acquisition_instrument',
+        self.add_parameter('instr_acquisition',
                            parameter_class=InstrumentRefParameter)
         self.add_parameter('instr_VSM', label='Vector Switch Matrix',
                            parameter_class=InstrumentRefParameter)
@@ -346,8 +346,8 @@ class CCLight_Transmon(Qubit):
                            self.RO_acq_weight_function_Q()]
             result_logging_mode = 'raw'
 
-        if 'UHFQC' in self.instr_acquisition_instrument():
-            UHFQC = self.instr_acquisition_instrument.get_instr()
+        if 'UHFQC' in self.instr_acquisition():
+            UHFQC = self.instr_acquisition.get_instr()
 
             self.input_average_detector = det.UHFQC_input_average_detector(
                 UHFQC=UHFQC,
@@ -400,7 +400,7 @@ class CCLight_Transmon(Qubit):
         #####################################
 
     def _generate_RO_pulse(self):
-        if 'CBox' in self.instr_acquisition_instrument():
+        if 'CBox' in self.instr_acquisition():
             if 'multiplexed' not in self.RO_pulse_type().lower():
                 self.RO_LutMan.get_instr().M_modulation(self.f_RO_mod())
                 self.RO_LutMan.get_instr().M_amp(self.RO_amp())
@@ -409,7 +409,7 @@ class CCLight_Transmon(Qubit):
                 if 'awg_nr' in self.RO_LutMan.get_instr().parameters:
                     self.RO_LutMan.get_instr().awg_nr(self.RO_awg_nr())
 
-                if 'CBox' in self.instr_acquisition_instrument():
+                if 'CBox' in self.instr_acquisition():
                     self.CBox.get_instr().set('AWG{:.0g}_dac0_offset'.format(
                                               self.RO_awg_nr.get()),
                                               self.mixer_offs_RO_I.get())
@@ -435,7 +435,7 @@ class CCLight_Transmon(Qubit):
                         int(self.RO_threshold.get()))
                 self.RO_LutMan.get_instr().load_pulses_onto_AWG_lookuptable()
 
-        elif 'UHFQC' in self.instr_acquisition_instrument():
+        elif 'UHFQC' in self.instr_acquisition():
             if 'gated' in self.RO_pulse_type().lower():
                 UHFQC = self._acquisition_instrument
                 UHFQC.awg_sequence_acquisition()
@@ -451,7 +451,7 @@ class CCLight_Transmon(Qubit):
                     RO_lm.load_pulse_onto_AWG_lookuptable('M_square')
 
     def _set_RO_integration_weights(self):
-        if 'UHFQC' in self.instr_acquisition_instrument():
+        if 'UHFQC' in self.instr_acquisition():
             UHFQC = self._acquisition_instrument
             if self.RO_acq_weights() == 'SSB':
                 UHFQC.prepare_SSB_weight_and_rotation(

@@ -8,6 +8,9 @@ import pycqed.instrument_drivers.meta_instrument.qubit_objects.CCL_Transmon as c
 from pycqed.measurement import measurement_control
 from qcodes import station
 
+from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.dummy_UHFQC import dummy_UHFQC
+
+
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.QuDev_transmon import QuDev_transmon
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon import Tektronix_driven_transmon
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.CC_transmon import CBox_v3_driven_transmon, QWG_driven_transmon
@@ -22,6 +25,8 @@ class Test_Qubit_Object(unittest.TestCase):
         self.MW1 = vmw.VirtualMWsource('MW1')
         self.MW2 = vmw.VirtualMWsource('MW2')
         self.MW3 = vmw.VirtualMWsource('MW3')
+
+        self.UHFQC = dummy_UHFQC('UHFQC')
 
         self.MC = measurement_control.MeasurementControl(
             'MC', live_plot_enabled=False, verbose=False)
@@ -43,6 +48,7 @@ class Test_Qubit_Object(unittest.TestCase):
         self.CCL_qubit.instr_LO(self.MW1.name)
         self.CCL_qubit.instr_cw_source(self.MW2.name)
         self.CCL_qubit.instr_td_source(self.MW3.name)
+        self.CCL_qubit.instr_acquisition(self.UHFQC.name)
 
     def test_instantiate_QuDevTransmon(self):
         QDT = QuDev_transmon('QuDev_transmon',
