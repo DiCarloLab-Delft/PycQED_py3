@@ -14,6 +14,8 @@ from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.dummy_UHFQ
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.QuDev_transmon import QuDev_transmon
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon import Tektronix_driven_transmon
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.CC_transmon import CBox_v3_driven_transmon, QWG_driven_transmon
+from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import dummy_CCL
+
 
 class Test_Qubit_Object(unittest.TestCase):
 
@@ -27,6 +29,8 @@ class Test_Qubit_Object(unittest.TestCase):
         self.MW3 = vmw.VirtualMWsource('MW3')
 
         self.UHFQC = dummy_UHFQC('UHFQC')
+
+        self.CCL = dummy_CCL('CCL')
 
         self.MC = measurement_control.MeasurementControl(
             'MC', live_plot_enabled=False, verbose=False)
@@ -49,6 +53,7 @@ class Test_Qubit_Object(unittest.TestCase):
         self.CCL_qubit.instr_cw_source(self.MW2.name)
         self.CCL_qubit.instr_td_source(self.MW3.name)
         self.CCL_qubit.instr_acquisition(self.UHFQC.name)
+        self.CCL_qubit.instr_CC(self.CCL.name)
 
     def test_instantiate_QuDevTransmon(self):
         QDT = QuDev_transmon('QuDev_transmon',
@@ -88,4 +93,3 @@ class Test_Qubit_Object(unittest.TestCase):
                 inst.close()
             except KeyError:
                 pass
-

@@ -10,8 +10,10 @@
 
 
 from .SCPI import SCPI
+from qcodes.instrument.base import Instrument
 from ._CCL.CCLightMicrocode import CCLightMicrocode
 from qcodes import StandardParameter
+from qcodes.instrument.parameter import ManualParameter
 from qcodes import validators as vals
 import os
 import logging
@@ -52,6 +54,7 @@ class CCL(SCPI):
 
     def __init__(self, name, address, port, **kwargs):
         self.model = name
+        self._dummy_instr = False
         try:
             super().__init__(name, address, port, **kwargs)
         except Exception as e:
@@ -199,19 +202,20 @@ class CCL(SCPI):
             os.makedirs(parameters_folder_path)
 
         try:
-            file = open(self._s_file_name, "a+")
+            file = open(self._s_file_name, "r")
         except Exception as e:
             log.warning("parameter file for gettable " +
                         "parameters {} not found ({})".format(
                             self._s_file_name, e))
+        file_content = json.loads(file.read())
         try:
-            file_content = json.loads(file.read())
             self.parameter_file_version = file_content["version"]["software"]
         except Exception as e:
             self.parameter_file_version = 'NaN'
 
-        if ('swBuild' in self.version_info and
-                self.version_info['swBuild'] == self.parameter_file_version):
+        if (('swBuild' in self.version_info and
+                self.version_info['swBuild'] == self.parameter_file_version)
+                or self._dummy_instr):
             # Return the parameter list given by the txt file
             results = file_content["parameters"]
         else:
@@ -219,7 +223,7 @@ class CCL(SCPI):
             parameters_str = self.ask('QUTech:PARAMeters?')
             parameters_str = parameters_str.replace('\t', '\n')
             try:
-                file = open(self._s_file_name, 'w')
+                file = open(self._s_file_name, 'x')
                 file.write(parameters_str)
             except Exception as e:
                 log.warning("failed to write update the parameters in the" +
@@ -350,3 +354,109 @@ class CCL(SCPI):
         return fn
 
 
+class dummy_CCL(CCL):
+    """
+    Dummy CCL all paramaters are manual and all other methods include pass
+    statements
+    """
+
+    def __init__(self, name, **kw):
+        Instrument.__init__(self, name=name, **kw)
+        self._dummy_instr = True
+        self.model = name
+        self.version_info = self.get_idn()
+        self.add_standard_parameters()
+        self.add_additional_parameters()
+        self.connect_message()
+        # required because of annoying IP instrument
+        self._port = ''
+        self._confirmation = ''
+        self._address = ''
+        self._terminator = ''
+        self._timeout = ''
+        self._persistent = ''
+
+    def get_idn(self):
+        return {'driver': str(self.__class__), 'name': self.name}
+
+    def add_standard_parameters(self):
+        """
+        Dummy version, all are manual parameters
+        """
+        self.parameter_list = self._read_parameters()
+
+        for parameter in self.parameter_list:
+            name = parameter["name"]
+            del parameter["name"]
+            # Remove these as this is for a Dummy instrument
+            if "get_cmd" in parameter:
+                del parameter["get_cmd"]
+            if "set_cmd" in parameter:
+                del parameter["set_cmd"]
+
+            if ("vals" in parameter):
+                validator = parameter["vals"]
+                try:
+                    val_type = validator["type"]
+
+                    if (val_type == "Bool"):
+                        # Bool can naturally only have 2 values, 0 or 1...
+                        parameter["vals"] = vals.Ints(0, 1)
+
+                    elif (val_type == "Non_Neg_Number"):
+                        # Non negative integers
+                        try:
+                            if ("range" in validator):
+                                # if range key is specified in the parameter,
+                                # then, the validator is limited to the
+                                # specified min,max values
+                                val_min = validator["range"][0]
+                                val_max = validator["range"][1]
+
+                            parameter["vals"] = vals.Ints(val_min, val_max)
+
+                        except Exception as e:
+                            parameter["vals"] = vals.Ints(0, INT32_MAX)
+                            log.warning("Range of validator not set correctly")
+
+                    else:
+                        log.warning("Failed to set the validator for the" +
+                                    " parameter " + name + ", because of a" +
+                                    " unknown validator type: '" + val_type +
+                                    "'")
+
+                except Exception as e:
+                    log.warning(
+                        "Failed to set the validator for the parameter " +
+                        name + ".(%s)", str(e))
+
+            try:
+                self.add_parameter(name, parameter_class=ManualParameter,
+                                   **parameter)
+
+            except Exception as e:
+                log.warning("Failed to create the parameter " + name +
+                            ", because of a unknown keyword in this" +
+                            " parameter.(%s)", str(e))
+
+    def add_additional_parameters(self):
+        """
+        Dummy version, parameters are added as manual parameters
+        """
+        self.add_parameter(
+            'upload_instructions',
+            label=('Upload instructions'),
+            docstring='It uploads the instructions to the CCLight. ' +
+            'Valid input is a string representing the filename',
+            parameter_class=ManualParameter,
+            vals=vals.Strings()
+        )
+
+        self.add_parameter(
+            'upload_microcode',
+            label=('Upload microcode'),
+            docstring='It uploads the microcode to the CCLight. ' +
+            'Valid input is a string representing the filename',
+            parameter_class=ManualParameter,
+            vals=vals.Strings()
+        )

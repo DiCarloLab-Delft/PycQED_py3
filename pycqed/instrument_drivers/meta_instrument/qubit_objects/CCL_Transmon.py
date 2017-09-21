@@ -315,8 +315,7 @@ class CCLight_Transmon(Qubit):
         - generate the RO pulse
         - set the integration weights
         """
-        pass
-        # self._instantiate_detectors()
+        self._instantiate_detectors()
         # self._set_RO_frequencies_and_sources()
         # self._set_RO_integration_weights()
         # self._generate_RO_pulse()
@@ -351,18 +350,18 @@ class CCLight_Transmon(Qubit):
 
             self.input_average_detector = det.UHFQC_input_average_detector(
                 UHFQC=UHFQC,
-                AWG=self.CBox.get_instr(),
+                AWG=self.instr_CC.get_instr(),
                 nr_averages=self.RO_acq_averages())
 
             self.int_avg_det = det.UHFQC_integrated_average_detector(
-                UHFQC=UHFQC, AWG=self.CBox.get_instr(),
+                UHFQC=UHFQC, AWG=self.instr_CC.get_instr(),
                 channels=RO_channels,
                 result_logging_mode=result_logging_mode,
                 nr_averages=self.RO_acq_averages(),
                 integration_length=self.RO_acq_integration_length())
 
             self.int_avg_det_single = det.UHFQC_integrated_average_detector(
-                UHFQC=UHFQC, AWG=self.CBox.get_instr(),
+                UHFQC=UHFQC, AWG=self.instr_CC.get_instr(),
                 channels=RO_channels,
                 result_logging_mode=result_logging_mode,
                 nr_averages=self.RO_acq_averages(),
@@ -370,7 +369,7 @@ class CCLight_Transmon(Qubit):
                 integration_length=self.RO_acq_integration_length())
 
             self.int_log_det = det.UHFQC_integration_logging_det(
-                UHFQC=UHFQC, AWG=self.CBox.get_instr(),
+                UHFQC=UHFQC, AWG=self.instr_CC.get_instr(),
                 channels=RO_channels,
                 result_logging_mode=result_logging_mode,
                 integration_length=self.RO_acq_integration_length())
