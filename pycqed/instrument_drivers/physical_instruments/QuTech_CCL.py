@@ -27,7 +27,10 @@ import sys
 curdir = (os.path.dirname(__file__))
 CCLight_Assembler_dir = os.path.join(curdir, "_CCL", "qisa-as", "build")
 sys.path.append(CCLight_Assembler_dir)
-from pyQisaAs import QISA_Driver
+try:
+    from pyQisaAs import QISA_Driver
+except ImportError as e:
+    logging.warning(e)
 
 
 log = logging.getLogger(__name__)
