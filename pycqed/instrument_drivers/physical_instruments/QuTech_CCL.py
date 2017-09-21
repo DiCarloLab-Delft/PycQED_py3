@@ -72,7 +72,7 @@ class CCL(SCPI):
         """
         The parser helper objects are initialized in this function.
         """
-        self.CCL_microcode = CCLightMicrocode()
+        self.microcode = CCLightMicrocode()
         self.QISA = QISA_Driver()
         self.QISA.enableScannerTracing(False)
         self.QISA.enableParserTracing(False)
@@ -317,8 +317,8 @@ class CCL(SCPI):
             raise ValueError(
                 "The parameter filename type({}) is incorrect. It should be str.".format(type(filename)))
 
-        self.CCL_microcode.load_microcode(filename)
-        binBlock = self.CCL_microcode.write_to_bin()
+        self.microcode.load_microcode(filename)
+        binBlock = self.microcode.write_to_bin()
         if not isinstance(binBlock, bytearray):
             raise ValueError(
                 "The parameter binBlock type({}) is incorrect. It should be bytearray.".format(type(binBlock)))
@@ -348,3 +348,5 @@ class CCL(SCPI):
         base_name = os.path.splitext(os.path.basename(qumis_name))[0]
         fn = os.path.join(pathname, base_name + ext)
         return fn
+
+
