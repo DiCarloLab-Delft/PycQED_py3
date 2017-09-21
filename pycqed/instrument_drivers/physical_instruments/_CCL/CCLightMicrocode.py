@@ -200,7 +200,7 @@ class CCLightMicrocode():
     def load_microcode(self, filename):
         try:
             mc_config = open(filename, 'r', encoding='utf-8')
-            logging.info("open file", str(filename), "successfully.")
+            logging.info("opened file {} successfully.".format(filename))
         except:
             raise OSError('\tError: Failed to open file ' +
                           self.filename + ".")

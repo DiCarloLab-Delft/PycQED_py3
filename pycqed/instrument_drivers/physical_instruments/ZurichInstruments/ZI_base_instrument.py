@@ -1,10 +1,11 @@
 import time
 import json
 import os
+import sys
 import numpy as np
-
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
+from zhinst.ziPython import ziListEnum as ziListEnum
 
 
 class ZI_base_instrument(Instrument):
@@ -12,6 +13,7 @@ class ZI_base_instrument(Instrument):
     """
     This is an abstract base class for Zurich Instruments instrument drivers.
     """
+
 
     def add_s_node_pars(self, filename: str):
         f = open(filename).read()
@@ -92,16 +94,52 @@ class ZI_base_instrument(Instrument):
                 print("parameter {} type {} from d_node_pars"
                       " not recognized".format(parname, parameter[1]))
 
-    def _gen_set_func(self, dev_set_type, cmd_str):
+    @classmethod
+    def _gen_set_func(self, dev_set_type, node_path: str):
+        """
+        Generates a set function based on the dev_set_type method (e.g., seti)
+        and the node_path (e.g., '/dev8003/sigouts/1/mode'
+        """
         def set_func(val):
-            dev_set_type(cmd_str, val)
-            return dev_set_type(cmd_str, value=val)
+            dev_set_type(node_path, val)
+            return dev_set_type(node_path, value=val)
         return set_func
 
-    def _gen_get_func(self, dev_get_type, ch):
+    @classmethod
+    def _gen_get_func(self, dev_get_type, node_path: str):
+        """
+        Generates a get function based on the dev_set_type method (e.g., geti)
+        and the node_path (e.g., '/dev8003/sigouts/1/mode'
+        """
         def get_func():
-            return dev_get_type(ch)
+            return dev_get_type(node_path)
         return get_func
+
+    def create_parameter_files_new(self):
+        """
+        This generates a json file Containing the node_docs as extracted
+        from the ZI instrument API.
+
+        In the future this file (instead of the s_node_pars and d_node_pars)
+        should be used to generate the drivers.
+        """
+        # set the file names to write to
+        dev_type = self._dev.daq.getByte(
+            '/{}/features/devtype'.format(self._devname))
+
+        # Watch out this overwrites the existing json parameter files
+        path = os.path.abspath(__file__)
+        dir_path = os.path.dirname(path)
+        par_fn = os.path.join(dir_path, 'zi_parameter_files',
+                              'node_doc_{}.json'.format(dev_type))
+
+        flags = ziListEnum.absolute | ziListEnum.recursive | ziListEnum.leafsonly
+        # Get node documentation for the device's entire node tree
+        node_doc = json.loads(
+            self._dev.daq.listNodesJSON('/{}/'.format(self._devname), flags))
+
+        with open(par_fn, 'w') as file:
+            json.dump(node_doc, file, indent=4)
 
     def create_parameter_files(self):
         '''
@@ -201,6 +239,9 @@ class ZI_base_instrument(Instrument):
 
             node_types = ['']*len(d_nodes)
 
+            # type determination is now inferred using try except statements.
+            # this is not a very good way to do it. Better would be to
+            # actively check for types.
             for i, d_node in enumerate(d_nodes):
                 try:
                     answer = self._dev.getv(d_node)

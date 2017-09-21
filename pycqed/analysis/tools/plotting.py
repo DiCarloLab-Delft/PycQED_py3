@@ -108,7 +108,8 @@ def SI_val_to_msg_str(val: float, unit: str=None):
 
     value_str = str(val)
     return value_str, unit
-  
+
+
 def data_to_table_png(data: list, filename: str, title: str='',
                       close_fig: bool=True):
     """
@@ -134,7 +135,7 @@ def data_to_table_png(data: list, filename: str, title: str='',
     if close_fig:
         plt.close(fig)
 
-        
+
 def annotate_point_pair(ax, text, xy_start, xy_end, xycoords='data',
                         text_offset=(-10, -5), arrowprops=None, **kw):
     '''

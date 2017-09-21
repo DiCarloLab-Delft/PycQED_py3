@@ -7,14 +7,18 @@ import numpy as np
 import copy
 
 from matplotlib import pyplot as plt
+from matplotlib import cm
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.utilities.general import NumpyJsonEncoder
-import pycqed.analysis_v2.default_figure_settings_analysis as def_fig
+from pycqed.analysis.analysis_toolbox import get_color_order as gco
+from pycqed.analysis.analysis_toolbox import get_color_list
+from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
+# import pycqed.analysis_v2.default_figure_settings_analysis as def_fig
+from . import default_figure_settings_analysis as def_fig
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import datetime
 import json
 import lmfit
-gco = a_tools.get_color_order
 
 
 class BaseDataAnalysis(object):
@@ -134,7 +138,8 @@ class BaseDataAnalysis(object):
         ########################################
         # These options relate to the plotting #
         ########################################
-        def_fig.apply_default_figure_settings()
+        if self.options_dict.get('apply_default_fig_settings', True):
+            def_fig.apply_default_figure_settings()
         self.plot_dicts = dict()
         self.axs = dict()
         self.figs = dict()
@@ -149,6 +154,8 @@ class BaseDataAnalysis(object):
                                                                False)
         self.options_dict['save_figs'] = self.options_dict.get(
             'save_figs', True)
+        self.options_dict['close_figs'] = self.options_dict.get(
+            'close_figs', True)
         ####################################################
         # These options relate to what analysis to perform #
         ####################################################
@@ -176,7 +183,7 @@ class BaseDataAnalysis(object):
         self.prepare_plots()   # specify default plots
         if not self.extract_only:
             self.plot(key_list='auto')  # make the plots
-            self.save_figures()
+            self.save_figures(close_figs=self.options_dict['close_figs'])
 
     def get_timestamps(self):
         """
@@ -342,9 +349,12 @@ class BaseDataAnalysis(object):
 
     def save_figures(self, savedir: str=None, savebase: str =None,
                      tag_tstamp: bool=True,
-                     fmt: str ='png', key_list: list='auto'):
+                     fmt: str ='png', key_list: list='auto',
+                     close_figs: bool=True):
         if savedir is None:
             savedir = self.data_dict.get('folder', '')
+            if isinstance(savedir, list):
+                savedir = savedir[0]
         if savebase is None:
             savebase = ''
         if tag_tstamp:
@@ -357,6 +367,8 @@ class BaseDataAnalysis(object):
         for key in key_list:
             savename = os.path.join(savedir, savebase+key+tstag+'.'+fmt)
             self.axs[key].figure.savefig(savename, fmt=fmt)
+            if close_figs:
+                plt.close(self.axs[key].figure)
 
     def save_data(self, savedir: str=None, savebase: str=None,
                   tag_tstamp: bool=True,
@@ -402,7 +414,7 @@ class BaseDataAnalysis(object):
 
         filepath = os.path.join(savedir, savebase + tstag + '.' + fmt)
         with open(filepath, 'w') as file:
-            json.dump(save_dict, file, cls=NumpyJsonEncoder)
+            json.dump(save_dict, file, cls=NumpyJsonEncoder, indent=4)
         print('Data saved to "{}".'.format(filepath))
 
     def prepare_fitting(self):
@@ -568,13 +580,10 @@ class BaseDataAnalysis(object):
             axs.set_title(plot_title)
 
         if do_legend:
+            legend_ncol = pdict.get('legend_ncol', 1)
+            legend_title = pdict.get('legend_title', None)
             legend_pos = pdict.get('legend_pos', 'best')
-            legend = axs.legend(loc=legend_pos, frameon=1)
-            frame = legend.get_frame()
-            frame.set_alpha(0.8)
-            frame.set_linewidth(0)
-            frame.set_edgecolor(None)
-            frame.set_facecolor('white')
+            axs.legend(title=legend_title, loc=legend_pos, ncol=legend_ncol)
 
         if self.tight_fig:
             axs.figure.tight_layout()
@@ -587,6 +596,8 @@ class BaseDataAnalysis(object):
         plot_yvals = pdict['yvals']
         plot_xlabel = pdict.get('xlabel', None)
         plot_ylabel = pdict.get('ylabel', None)
+        plot_xunit = pdict.get('xunit', None)
+        plot_yunit = pdict.get('yunit', None)
         plot_title = pdict.get('title', None)
         plot_xrange = pdict.get('xrange', None)
         plot_yrange = pdict.get('yrange', None)
@@ -600,15 +611,24 @@ class BaseDataAnalysis(object):
         dataset_label = pdict.get('setlabel', list(range(len(plot_yvals))))
         do_legend = pdict.get('do_legend', False)
 
-        plot_xvals_step = plot_xvals[1]-plot_xvals[0]
-
         if plot_multiple:
             p_out = []
+            len_color_cycle = pdict.get('len_color_cycle', len(plot_yvals))
+            cmap = pdict.get('cmap', 'Vega10')  # Default matplotlib cycle
+
+            # Colors: default should be following matplotlibs default color
+            # cycle. When a colormap is specified, colors are taken evenly
+            # spaced from that colormap.
+            if cmap == 'Vega10':
+                colors = [cm.Vega10(i) for i in range(len(plot_yvals))]
+            else:
+                colors = get_color_list(len_color_cycle, cmap)
+
             for ii, this_yvals in enumerate(plot_yvals):
                 p_out.append(pfunc(plot_xvals, this_yvals,
                                    linestyle=plot_linestyle,
                                    marker=plot_marker,
-                                   color=gco(ii, len(plot_yvals)-1),
+                                   color=colors[ii % len_color_cycle],
                                    label='%s%s' % (
                                        dataset_desc, dataset_label[ii]),
                                    **plot_linekws))
@@ -630,9 +650,9 @@ class BaseDataAnalysis(object):
         axs.set_xlim(xmin, xmax)
 
         if plot_xlabel is not None:
-            axs.set_xlabel(plot_xlabel)
+            set_xlabel(axs, plot_xlabel, plot_xunit)
         if plot_ylabel is not None:
-            axs.set_ylabel(plot_ylabel)
+            set_ylabel(axs, plot_ylabel, plot_yunit)
         if plot_yrange is not None:
             ymin, ymax = plot_yrange
             axs.set_ylim(ymin, ymax)
@@ -641,11 +661,19 @@ class BaseDataAnalysis(object):
             axs.set_title(plot_title)
 
         if do_legend:
+            legend_ncol = pdict.get('legend_ncol', 1)
+            legend_title = pdict.get('legend_title', None)
             legend_pos = pdict.get('legend_pos', 'best')
-            axs.legend(loc=legend_pos)
+            axs.legend(title=legend_title, loc=legend_pos, ncol=legend_ncol)
 
         if self.tight_fig:
             axs.figure.tight_layout()
+
+            # Need to set labels again, because tight_layout can screw them up
+            if plot_xlabel is not None:
+                set_xlabel(axs, plot_xlabel, plot_xunit)
+            if plot_ylabel is not None:
+                set_ylabel(axs, plot_ylabel, plot_yunit)
 
         pdict['handles'] = p_out
 
@@ -700,6 +728,10 @@ class BaseDataAnalysis(object):
             axs.set_title(plot_title)
 
         if do_legend:
+            legend_ncol = pdict.get('legend_ncol', 1)
+            legend_title = pdict.get('legend_title', None)
+            legend_pos = pdict.get('legend_pos', 'best')
+            axs.legend(title=legend_title, loc=legend_pos, ncol=legend_ncol)
             legend_pos = pdict.get('legend_pos', 'best')
             # box_props = dict(boxstyle='Square', facecolor='white', alpha=0.6)
             legend = axs.legend(loc=legend_pos, frameon=1)
