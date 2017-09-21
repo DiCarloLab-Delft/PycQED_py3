@@ -174,7 +174,6 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
         I_waves = []
         Q_waves = []
         for i, resonator_combination in enumerate(resonator_combinations):
-            print('i',i)
             if not resonator_combination:
                 #empty combination, generating empty 20 ns pulse
                     I_waves.append(np.zeros(36))
@@ -193,7 +192,6 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
                         # same length for now)
                         I_waves[i] += wave_dict[wavename][0]
                         Q_waves[i] += wave_dict[wavename][1]
-                    print(I_waves[i][0])
             # clipping the waveform
             I_waves[i] = np.clip(I_waves[i],
                                  self._voltage_min, self._voltage_max)
