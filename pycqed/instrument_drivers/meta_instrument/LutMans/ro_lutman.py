@@ -5,6 +5,7 @@ from qcodes.utils import validators as vals
 import numpy as np
 import copy as copy
 
+
 class Base_RO_LutMan(Base_LutMan):
 
     def __init__(self, name, num_res: int=1, **kw):
@@ -23,15 +24,16 @@ class Base_RO_LutMan(Base_LutMan):
         self.add_parameter('mixer_phi', vals=vals.Numbers(), unit='deg',
                            parameter_class=ManualParameter,
                            initial_value=0.0)
-        comb_msg=('Resonator combinations specifies blablab needs to be format like bla example ablabj ')
+        comb_msg = (
+            'Resonator combinations specifies blablab needs to be format like bla example ablabj ')
         self.add_parameter('resonator_combinations', vals=vals.Lists(),
-                            parameter_class=ManualParameter,
-                            docstring=comb_msg,
-                            initial_value=[[0]])
+                           parameter_class=ManualParameter,
+                           docstring=comb_msg,
+                           initial_value=[[0]])
         self.add_parameter('pulse_type', vals=vals.Enum('M_up_down_down', 'M'),
-                            parameter_class=ManualParameter,
-                            docstring=comb_msg,
-                            initial_value='M')
+                           parameter_class=ManualParameter,
+                           docstring=comb_msg,
+                           initial_value='M')
         for res in range(self._num_res):
             self.add_parameter('M_modulation_R{}'.format(res),
                                vals=vals.Numbers(), unit='Hz',
@@ -157,7 +159,7 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
         Q_wave = np.clip(wave_dict[pulse_name][1], self._voltage_min,
                          self._voltage_max)
         self.AWG.get_instr().awg_sequence_acquisition_and_pulse(I_wave, Q_wave,
-                                                      self.acquisition_delay())
+                                                                self.acquisition_delay())
 
     def load_DIO_triggered_sequence_onto_UHFQC(self,
                                                regenerate_pulses=True):
@@ -175,9 +177,9 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
         Q_waves = []
         for i, resonator_combination in enumerate(resonator_combinations):
             if not resonator_combination:
-                #empty combination, generating empty 20 ns pulse
-                    I_waves.append(np.zeros(36))
-                    Q_waves.append(np.zeros(36))
+                # empty combination, generating empty 20 ns pulse
+                I_waves.append(np.zeros(36))
+                Q_waves.append(np.zeros(36))
             else:
                 for j, resonator in enumerate(resonator_combination):
                     wavename = pulse_type+'_R'+str(resonator)
@@ -200,11 +202,8 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
         self.AWG.get_instr().awg_sequence_acquisition_and_DIO_triggered_pulse(
             I_waves, Q_waves, self.acquisition_delay())
 
-
         def load_waveforms_onto_AWG_lookuptable(
-            self, regenerate_waveforms: bool=True, stop_start: bool = True):
+                self, regenerate_waveforms: bool=True, stop_start: bool = True):
             raise NotImplementedError(
                 'UHFQC needs a full sequence, use '
                 '"load_DIO_triggered_sequence_onto_UHFQC"')
-
-

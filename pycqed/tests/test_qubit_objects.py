@@ -36,15 +36,16 @@ class Test_Qubit_Object(unittest.TestCase):
         self.AWG8_VSM_MW_LutMan.sampling_rate(2.4e9)
 
         # Assign instruments
-        self.CCL_qubit.LutMan_MW(self.AWG8_VSM_MW_LutMan.name)
-        self.CCL_qubit.LO(self.MW1.name)
-        self.CCL_qubit.cw_source(self.MW2.name)
-        self.CCL_qubit.td_source(self.MW3.name)
+        self.CCL_qubit.instr_LutMan_MW(self.AWG8_VSM_MW_LutMan.name)
+        self.CCL_qubit.instr_LO(self.MW1.name)
+        self.CCL_qubit.instr_cw_source(self.MW2.name)
+        self.CCL_qubit.instr_td_source(self.MW3.name)
 
     def test_prepare_for_timedomain(self):
         self.CCL_qubit.prepare_for_timedomain()
 
     def test_prepare_for_continuous_wave(self):
+        self.CCL_qubit.spec_pow(-20)
         self.CCL_qubit.prepare_for_continuous_wave()
 
     def test_prepare_for_fluxing(self):

@@ -24,14 +24,14 @@ class Qubit(Instrument):
     Possible inheritance tree
     - Qubit (general template class)
         - GateMon
-        - Transmon (contains qubit specific functions)
-            - transmon in setup a (contains setup specific functions)
+        - Transmon (contains qubit specific methods)
+            - transmon in setup a (contains setup specific methods)
 
 
-    Naming conventions for functions
+    Naming conventions for methods
         The qubit object is a combination of a parameter holder and a
         convenient way of performing measurements. As a convention the qubit
-        object contains the following types of functions designated by a prefix
+        object contains the following types of methods designated by a prefix
 
         - measure_xx() -> bool
             A measure_xx method performs a specific experiment such as
@@ -59,6 +59,24 @@ class Qubit(Instrument):
             calculates a quantity based on parameters specified in the qubit
             object e.g. calculate_frequency
 
+    Naming conventions for parameters:
+        (only for qubit objects after Sept 2017)
+        Parameters are grouped based on their functionality. This grouping
+        is achieved through the parameter name.
+
+        Prefixes are listed here:
+            instr_  : references to other instruments
+            ro_     : parameters relating to RO both CW and TD readout.
+            mw_     : parameters of single qubit MW control
+            spec_   : parameters relating to spectroscopy (single qubit CW)
+            fl_     : parameters relating to flux control, this includes both
+                      flux pulsing as well as flux offset (DC).
+            cfg_    : configuration, this can be info relevant for compilers
+                      or configurations that determine how the qubit operates.
+                      examples are cfg_qasm and cfg_f_qubit_calc_method.
+
+            ""      : properties of the qubit do not have a prefix, examples
+                      are T1, T2, etc., F_ssro, F_RB, etc., f_qubit, E_C, etc.
 
     Open for discussion:
         - is a split at the level below qubit really required?
@@ -66,9 +84,7 @@ class Qubit(Instrument):
             or calibrate?
         - Should the pulse-parameters be grouped here in some convenient way?
             (e.g. parameter prefixes)
-
     '''
-
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
         self.msmt_suffix = '_' + name  # used to append to measurement labels
@@ -76,6 +92,54 @@ class Qubit(Instrument):
         self.add_parameter('operations',
                            docstring='a list of all operations available on the qubit',
                            get_cmd=self._get_operations)
+
+    def add_parameters(self):
+        """
+        Add parameters to the qubit object grouped according to the
+        naming conventions described above
+
+        Prefixes are listed here:
+            instr_  : references to other instruments
+            ro_     : parameters relating to RO both CW and TD readout.
+            mw_     : parameters of single qubit MW control
+            spec_   : parameters relating to spectroscopy (single qubit CW)
+            fl_     : parameters relating to flux control, this includes both
+                      flux pulsing as well as flux offset (DC).
+            cfg_    : configuration, this can be info relevant for compilers
+                      or configurations that determine how the qubit operates.
+                      examples are cfg_qasm and cfg_f_qubit_calc_method.
+
+            ""      : properties of the qubit do not have a prefix, examples
+                      are T1, T2, etc., F_ssro, F_RB, etc., f_qubit, E_C, etc.
+        """
+        self.add_instrument_ref_parameters()
+        self.add_ro_parameters()
+        self.add_mw_parameters()
+        self.add_spec_parameters()
+        self.add_flux_parameters()
+        self.add_config_parameters()
+        self.add_generic_qubit_parameters()
+
+    def add_instrument_ref_parameters(self):
+        pass
+
+    def add_ro_parameters(self):
+        pass
+
+    def add_mw_parameters(self):
+        pass
+
+    def add_spec_parameters(self):
+        pass
+
+    def add_flux_parameters(self):
+        pass
+
+    def add_config_parameters(self):
+        pass
+
+    def add_generic_qubit_parameters(self):
+        pass
 
     def get_idn(self):
         return {'driver': str(self.__class__), 'name': self.name}
@@ -494,6 +558,16 @@ class Transmon(Qubit):
         raise NotImplementedError()
 
     def prepare_for_continuous_wave(self):
+        raise NotImplementedError()
+
+    def prepare_readout(self):
+        """
+        Configures the readout. Consists of the following steps
+        - instantiate the relevant detector functions
+        - set the microwave frequencies and sources
+        - generate the RO pulse
+        - set the integration weights
+        """
         raise NotImplementedError()
 
     def calibrate_frequency_ramsey(self, steps=[1, 1, 3, 10, 30, 100, 300, 1000],
