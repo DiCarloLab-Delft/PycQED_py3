@@ -30,6 +30,13 @@ class Test_MW_LutMan(unittest.TestCase):
         self.CBox_MW_LutMan = mwl.CBox_MW_LutMan('CBox_MW_LutMan')
         self.QWG_MW_LutMan = mwl.QWG_MW_LutMan('QWG_MW_LutMan')
 
+    @classmethod
+    def tearDownClass(self):
+        self.AWG.close()
+        self.AWG8_VSM_MW_LutMan.close()
+        self.CBox_MW_LutMan.close()
+        self.QWG_MW_LutMan.close()
+
     def test_uploading_standard_pulses(self):
         # Tests that all waveforms are present and no error is raised.
         self.AWG8_MW_LutMan.load_waveforms_onto_AWG_lookuptable()
