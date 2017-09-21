@@ -163,11 +163,3 @@ class Base_LutMan(Instrument):
         if show:
             plt.show()
         return fig, ax
-
-
-class Base_MW_VSM_LutMan(Base_LutMan):
-    pass
-
-
-class Base_RO_LutMan(Base_LutMan):
-    pass

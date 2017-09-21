@@ -201,3 +201,12 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
                                  self._voltage_max)
         self.AWG.get_instr().awg_sequence_acquisition_and_DIO_triggered_pulse(
             I_waves, Q_waves, self.acquisition_delay())
+
+
+        def load_waveforms_onto_AWG_lookuptable(
+            self, regenerate_waveforms: bool=True, stop_start: bool = True):
+            raise NotImplementedError(
+                'UHFQC needs a full sequence, use '
+                '"load_DIO_triggered_sequence_onto_UHFQC"')
+
+

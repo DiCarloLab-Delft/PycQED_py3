@@ -71,7 +71,7 @@ class Qubit(Instrument):
 
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
-        self.msmt_suffix = '_' + name  # used to append to measuremnet labels
+        self.msmt_suffix = '_' + name  # used to append to measurement labels
         self._operations = {}
         self.add_parameter('operations',
                            docstring='a list of all operations available on the qubit',
