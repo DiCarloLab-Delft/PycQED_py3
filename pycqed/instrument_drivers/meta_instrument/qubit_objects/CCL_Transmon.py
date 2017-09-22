@@ -121,13 +121,13 @@ class CCLight_Transmon(Qubit):
                            parameter_class=ManualParameter)
 
         # Mixer offsets correction, RO pulse
-        self.add_parameter('ro_mixer_offs_I', unit='V',
+        self.add_parameter('ro_pulse_mixer_offs_I', unit='V',
                            parameter_class=ManualParameter, initial_value=0)
-        self.add_parameter('ro_mixer_offs_Q', unit='V',
+        self.add_parameter('ro_pulse_mixer_offs_Q', unit='V',
                            parameter_class=ManualParameter, initial_value=0)
-        self.add_parameter('ro_mixer_alpha', initial_value=1,
+        self.add_parameter('ro_pulse_mixer_alpha', initial_value=1,
                            parameter_class=ManualParameter)
-        self.add_parameter('ro_mixer_phi', initial_value=0,
+        self.add_parameter('ro_pulse_mixer_phi', initial_value=0,
                            parameter_class=ManualParameter)
 
         self.add_parameter('ro_pulse_length',
@@ -462,15 +462,18 @@ class CCLight_Transmon(Qubit):
             ro_pulse_down_phi1
 
 
-            ro_mixer_alpha
-            ro_mixer_phi
+            ro_pulse_mixer_alpha
+            ro_pulse_mixer_phi
 
-            ro_mixer_offs_I
-            ro_mixer_offs_Q
+            ro_pulse_mixer_offs_I
+            ro_pulse_mixer_offs_Q
 
         """
+        if 'UHFQC' not in self.instr_acquisition():
+            raise NotImplementedError()
+        UHFQC = self.instr_acquisition.get_instr()
+
         if 'gated' in self.ro_pulse_type().lower():
-            UHFQC = self.instr_acquisition.get_instr()
             UHFQC.awg_sequence_acquisition()
 
         else:
@@ -479,9 +482,9 @@ class CCLight_Transmon(Qubit):
             # These parameters affect all resonators
             ro_lm.set('pulse_type', 'M_' + self.ro_pulse_type())
             ro_lm.set('mixer_alpha'.format(idx),
-                      self.ro_mixer_alpha())
+                      self.ro_pulse_mixer_alpha())
             ro_lm.set('mixer_phi'.format(idx),
-                      self.ro_mixer_phi())
+                      self.ro_pulse_mixer_phi())
 
             ro_lm.set('M_modulation_R{}'.format(idx), self.ro_freq_mod())
             ro_lm.set('M_length_R{}'.format(idx),
@@ -505,6 +508,9 @@ class CCLight_Transmon(Qubit):
 
             ro_lm.acquisition_delay(self.ro_acq_delay())
             ro_lm.load_DIO_triggered_sequence_onto_UHFQC()
+
+            UHFQC.sigouts_0_offset(self.ro_pulse_mixer_offs_I())
+            UHFQC.sigouts_1_offset(self.ro_pulse_mixer_offs_Q())
 
     def _prep_ro_integration_weights(self):
         """

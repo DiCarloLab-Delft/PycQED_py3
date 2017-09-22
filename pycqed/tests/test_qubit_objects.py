@@ -51,7 +51,7 @@ class Test_Qubit_Object(unittest.TestCase):
         self.AWG8_VSM_MW_LutMan.Q_modulation(100e6)
         self.AWG8_VSM_MW_LutMan.sampling_rate(2.4e9)
 
-        self.ro_lutman = UHFQC_RO_LutMan('RO_lutman')
+        self.ro_lutman = UHFQC_RO_LutMan('RO_lutman', num_res=5)
         self.ro_lutman.AWG(self.UHFQC.name)
 
         # Assign instruments
@@ -133,11 +133,26 @@ class Test_Qubit_Object(unittest.TestCase):
         self.assertEqual(LO.power(), 14)
 
     def test_prep_ro_pulses(self):
+        self.CCL_qubit.ro_pulse_res_nr(3)
+        self.CCL_qubit.ro_pulse_mixer_alpha(1.1)
+        self.CCL_qubit.ro_pulse_mixer_phi(4)
+        self.CCL_qubit.ro_pulse_length(312e-9)
+        self.CCL_qubit.ro_pulse_down_amp0(.1)
+        self.CCL_qubit.ro_pulse_down_length0(23e-9)
+
+        self.CCL_qubit.ro_pulse_mixer_offs_I(.01)
+        self.CCL_qubit.ro_pulse_mixer_offs_Q(.02)
 
         self.CCL_qubit.prepare_readout()
 
-        self.ro_lutman
+        self.assertEqual(self.ro_lutman.mixer_phi(), 4)
+        self.assertEqual(self.ro_lutman.mixer_alpha(), 1.1)
+        self.assertEqual(self.ro_lutman.M_length_R3(), 312e-9)
+        self.assertEqual(self.ro_lutman.M_down_length0_R3(), 23e-9)
+        self.assertEqual(self.ro_lutman.M_down_amp0_R3(), .1)
 
+        self.assertEqual(self.UHFQC.sigouts_0_offset(), .01)
+        self.assertEqual(self.UHFQC.sigouts_1_offset(), .02)
 
 
     def test_prep_ro_integration_weigths(self):
