@@ -92,41 +92,61 @@ class CCLight_Transmon(Qubit):
                            parameter_class=InstrumentRefParameter)
 
     def add_ro_parameters(self):
+        """
+        Adding the parameters relevant for readout.
+        """
+        ##########################
+        # RO stimulus parameters #
+        ##########################
+        self.add_parameter('RO_f_mod',
+                           label='Readout-modulation frequency', unit='Hz',
+                           initial_value=-2e6,
+                           parameter_class=ManualParameter)
+        self.add_parameter('RO_power_cw', label='RO power cw',
+                           unit='dBm',
+                           parameter_class=ManualParameter)
+
+        # Mixer offsets correction, RO pulse
+        self.add_parameter('RO_mixer_offs_I', unit='V',
+                           parameter_class=ManualParameter, initial_value=0)
+        self.add_parameter('RO_mixer_offs_Q', unit='V',
+                           parameter_class=ManualParameter, initial_value=0)
+
+
+        #############################
+        # RO acquisition parameters #
+        #############################
+
         # adding marker channels
         self.add_parameter('RO_acq_pulse_marker_channel',
                            vals=vals.Ints(1, 7),
                            initial_value=6,
                            parameter_class=ManualParameter)
 
-        self.add_parameter('RO_power_cw', label='RO power cw',
-                           unit='dBm',
+        self.add_parameter('RO_acq_integration_length', initial_value=500e-9,
+                           vals=vals.Numbers(min_value=0, max_value=20e6),
                            parameter_class=ManualParameter)
+
+        self.add_parameter('RO_acq_averages', initial_value=1024,
+                           vals=vals.Numbers(min_value=0, max_value=1e6),
+                           parameter_class=ManualParameter)
+
+        self.add_parameter('RO_soft_averages', initial_value=1,
+                           vals=vals.Ints(min_value=1),
+                           parameter_class=ManualParameter)
+
+
+
         self.add_parameter('RO_acq_weight_function_I', initial_value=0,
                            vals=vals.Ints(0, 5),
                            parameter_class=ManualParameter)
         self.add_parameter('RO_acq_weight_function_Q', initial_value=1,
                            vals=vals.Ints(0, 5),
                            parameter_class=ManualParameter)
-        self.add_parameter('f_RO_mod',
-                           label='Readout-modulation frequency', unit='Hz',
-                           initial_value=-2e6,
-                           parameter_class=ManualParameter)
 
-        # Time-domain parameters
-        self.add_parameter('RO_awg_nr', label='CBox RO awg nr', unit='#',
-                           vals=vals.Ints(),
-                           initial_value=1,
-                           parameter_class=ManualParameter)
 
-        self.add_parameter('RO_acq_integration_length', initial_value=500e-9,
-                           vals=vals.Numbers(min_value=0, max_value=20e6),
-                           parameter_class=ManualParameter)
-        self.add_parameter('RO_acq_averages', initial_value=1024,
-                           vals=vals.Numbers(min_value=0, max_value=1e6),
-                           parameter_class=ManualParameter)
-        self.add_parameter('RO_soft_averages', initial_value=1,
-                           vals=vals.Ints(min_value=1),
-                           parameter_class=ManualParameter)
+
+
 
         # Single shot readout specific parameters
         self.add_parameter('RO_digitized', vals=vals.Bool(),
@@ -139,14 +159,7 @@ class CCLight_Transmon(Qubit):
                            initial_value=0,
                            vals=vals.Numbers(0, 360),
                            parameter_class=ManualParameter)
-        self.add_parameter('signal_line', parameter_class=ManualParameter,
-                           vals=vals.Enum(0, 1), initial_value=0)
 
-        # Mixer offsets correction, RO pulse
-        self.add_parameter('mixer_offs_RO_I', unit='V',
-                           parameter_class=ManualParameter, initial_value=0)
-        self.add_parameter('mixer_offs_RO_Q', unit='V',
-                           parameter_class=ManualParameter, initial_value=0)
 
         self.add_parameter('RO_pulse_type', initial_value='Gated_UHFQC',
                            vals=vals.Enum(
@@ -175,13 +188,7 @@ class CCLight_Transmon(Qubit):
                            vals=vals.Numbers(0, 500e-6),
                            initial_value=10e-6)
 
-        self.add_parameter('init_time',
-                           label='Qubit initialization time',
-                           unit='s', initial_value=200e-6,
-                           parameter_class=ManualParameter,
-                           # max value based on register size
-                           vals=vals.Numbers(min_value=1e-6,
-                                             max_value=327668e-9))
+
 
         self.add_parameter('cal_pt_zero',
                            initial_value=None,
@@ -293,7 +300,13 @@ class CCLight_Transmon(Qubit):
         pass
 
     def add_config_parameters(self):
-        pass
+        self.add_parameter(
+            'cfg_trigger_period', label='Trigger period',
+            docstring=('Time between experiments, used to initialize all'
+                       ' qubits in the ground state'),
+            unit='s', initial_value=200e-6,
+            parameter_class=ManualParameter,
+            vals=vals.Numbers(min_value=1e-6, max_value=327668e-9))
 
     def add_generic_qubit_parameters(self):
         pass

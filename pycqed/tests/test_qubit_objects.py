@@ -83,7 +83,20 @@ class Test_Qubit_Object(unittest.TestCase):
         self.CCL_qubit.prepare_for_fluxing()
 
     def test_prepare_readout(self):
+
+        detector_attributes = [
+            'int_avg_det', 'int_log_det', 'int_avg_det_single',
+            'input_average_detector']
+        for det_attr in detector_attributes:
+            if hasattr(self.CCL_qubit, det_attr):
+                delattr(self.CCL_qubit, det_attr)
+        # Test there are no detectors to start with
+        for det_attr in detector_attributes:
+            self.assertFalse(hasattr(self.CCL_qubit, det_attr))
         self.CCL_qubit.prepare_readout()
+        # Test that the detectors have been instantiated
+        for det_attr in detector_attributes:
+            self.assertTrue(hasattr(self.CCL_qubit, det_attr))
 
     @classmethod
     def tearDownClass(self):
