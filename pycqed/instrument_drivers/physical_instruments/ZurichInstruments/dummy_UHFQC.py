@@ -428,7 +428,8 @@ class dummy_UHFQC(Instrument):
         self.set('quex_rot_{}_real'.format(weight_function_Q), 1.0)
         self.set('quex_rot_{}_imag'.format(weight_function_Q), -1.0)
 
-    def prepare_DSB_weight_and_rotation(self, IF, weight_function_I=0, weight_function_Q=1):
+    def prepare_DSB_weight_and_rotation(
+            self, IF, weight_function_I=0, weight_function_Q=1):
         trace_length = 4096
         tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
         cosI = np.array(np.cos(2*np.pi*IF*tbase))

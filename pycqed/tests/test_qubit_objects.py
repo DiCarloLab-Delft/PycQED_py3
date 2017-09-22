@@ -82,20 +82,20 @@ class Test_Qubit_Object(unittest.TestCase):
         QT = QWG_driven_transmon('QT')
         QT.close()
 
-    def test_prepare_for_timedomain(self):
+    def test_prep_for_timedomain(self):
         self.CCL_qubit.prepare_for_timedomain()
 
-    def test_prepare_for_continuous_wave(self):
+    def test_prep_for_continuous_wave(self):
         self.CCL_qubit.spec_pow(-20)
         self.CCL_qubit.prepare_for_continuous_wave()
 
-    def test_prepare_for_fluxing(self):
+    def test_prep_for_fluxing(self):
         self.CCL_qubit.prepare_for_fluxing()
 
     ##############################################
     # Testing prepare for readout
     ##############################################
-    def test_prepare_readout(self):
+    def test_prep_readout(self):
         self.CCL_qubit.prepare_readout()
 
     def test_prep_ro_instantiate_detectors(self):
@@ -117,6 +117,7 @@ class Test_Qubit_Object(unittest.TestCase):
         LO = self.CCL_qubit.instr_LO.get_instr()
         LO.off()
         LO.frequency(4e9)
+        LO.power(10)
         self.assertEqual(LO.status(), 'off')
         self.assertEqual(LO.frequency(), 4e9)
 
@@ -126,7 +127,58 @@ class Test_Qubit_Object(unittest.TestCase):
 
         self.assertEqual(LO.status(), 'on')
         self.assertEqual(LO.frequency(), 5.43e9-200e6)
+        self.assertEqual(LO.power(), 14)
 
+    def test_prep_ro_integration_weigths(self):
+        IF = 50e6
+        self.CCL_qubit.ro_freq_mod(IF)
+        self.CCL_qubit.ro_acq_weight_chI(3)
+        self.CCL_qubit.ro_acq_weight_chQ(4)
+
+
+        # Testing SSB
+        trace_length = 4096
+        self.CCL_qubit.ro_acq_weight_type('SSB')
+        self.CCL_qubit.prepare_readout()
+        tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
+        cosI = np.array(np.cos(2*np.pi*IF*tbase))
+        sinI = np.array(np.sin(2*np.pi*IF*tbase))
+
+        self.assertEqual(self.UHFQC.quex_rot_3_real(), 1)
+        self.assertEqual(self.UHFQC.quex_rot_3_imag(), 1)
+        self.assertEqual(self.UHFQC.quex_rot_4_real(), 1)
+        self.assertEqual(self.UHFQC.quex_rot_4_imag(), -1)
+
+        uploaded_wf = self.UHFQC.quex_wint_weights_3_real()
+        np.testing.assert_array_almost_equal(cosI, uploaded_wf)
+        # Testing DSB case
+        self.CCL_qubit.ro_acq_weight_type('DSB')
+        self.CCL_qubit.prepare_readout()
+        self.assertEqual(self.UHFQC.quex_rot_3_real(), 2)
+        self.assertEqual(self.UHFQC.quex_rot_3_imag(), 0)
+        self.assertEqual(self.UHFQC.quex_rot_4_real(), 2)
+        self.assertEqual(self.UHFQC.quex_rot_4_imag(), 0)
+
+        # Testing Optimal weight uploading
+        test_I = np.ones(10)
+        test_Q = 0.5*test_I
+        self.CCL_qubit.ro_acq_weight_func_I(test_I)
+        self.CCL_qubit.ro_acq_weight_func_Q(test_Q)
+
+        self.CCL_qubit.ro_acq_weight_type('optimal')
+        self.CCL_qubit.prepare_readout()
+
+        self.UHFQC.quex_rot_4_real(.21)
+        self.UHFQC.quex_rot_4_imag(.108)
+        upl_I = self.UHFQC.quex_wint_weights_3_real()
+        upl_Q = self.UHFQC.quex_wint_weights_3_imag()
+        np.testing.assert_array_almost_equal(test_I, upl_I)
+        np.testing.assert_array_almost_equal(test_Q, upl_Q)
+        self.assertEqual(self.UHFQC.quex_rot_3_real(), 1)
+        self.assertEqual(self.UHFQC.quex_rot_3_imag(), -1)
+        # These should not have been touched by optimal weights
+        self.assertEqual(self.UHFQC.quex_rot_4_real(), .21)
+        self.assertEqual(self.UHFQC.quex_rot_4_imag(), .108)
 
     @classmethod
     def tearDownClass(self):
