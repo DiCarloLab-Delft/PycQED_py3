@@ -31,7 +31,8 @@ class Pulsar(Instrument):
     A meta-instrument responsible for all communication with the AWGs.
     Contains information about all the available awg-channels in the setup.
     Starting, stopping and programming and changing the parameters of the AWGs
-    should be done through Pulsar. Supports Tektronix AWG5014 and ZI UHFLI.
+    should be done through Pulsar. Supports Tektronix AWG5014 and partially
+    ZI UHFLI.
 
     Args:
         default_AWG: Name of the AWG that new channels get defined on if no
@@ -180,7 +181,10 @@ class Pulsar(Instrument):
 
     def start(self):
         """
-        Start the active AWGs.
+        Start the active AWGs. If multiple AWGs are used in a setup where the
+        slave AWGs are triggered by the master AWG, then the slave AWGs must be
+        running and waiting for trigger when the master AWG is started to
+        ensure synchronous playback.
         """
         if self.master_AWG() is None:
             for AWG in self.used_AWGs():
@@ -201,8 +205,7 @@ class Pulsar(Instrument):
                             time.sleep(0.1)
                     if not good:
                         raise Exception('AWG {} did not start in 10s'.format(AWG))
-
-        self._start_AWG(self.master_AWG())
+            self._start_AWG(self.master_AWG())
 
     def stop(self):
         """
