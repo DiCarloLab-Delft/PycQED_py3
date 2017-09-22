@@ -1870,14 +1870,21 @@ class Ramsey_fluxpulse_delay_sweep(swf.Soft_Sweep):
 
 
 
-class Chevron_length_swf(swf.Hard_Sweep):
-    def __init__(self, qb_control, qb_target, spacing=50e-9, upload=True,
+class Chevron_length_hard_swf(swf.Hard_Sweep):
+    '''
+    Sweep function class for a single slice of the Chevron experiment where
+    the length of the fluxpulse is swept (hard sweep).
+    For details on the experiment see documentation of
+    'fsqs.Chevron_flux_pulse_length_seq(...)'
+    '''
+    def __init__(self, qb_control, qb_target, spacing=50e-9,cal_points=False, upload=True,
                  distorted=False,distortion_dict=None):
         super().__init__()
         self.qb_control = qb_control
         self.qb_target = qb_target
         self.spacing = spacing
         self.upload = upload
+        self.cal_points = cal_points
         self.distorted = distorted
         self.distortion_dict = distortion_dict
 
@@ -1890,10 +1897,48 @@ class Chevron_length_swf(swf.Hard_Sweep):
             fsqs.Chevron_flux_pulse_length_seq(
                 lengths=self.sweep_points, qb_control=self.qb_control,
                 qb_target=self.qb_target, spacing=self.spacing,
-                distorted=self.distorted,distortion_dict=self.distortion_dict
+                cal_points=self.cal_points, distorted=self.distorted,
+                distortion_dict=self.distortion_dict
                 )
 
+class Chevron_ampl_hard_swf(swf.Hard_Sweep):
+    '''
+    Sweep function class for a single slice of the Chevron experiment where
+    the amplitude of the fluxpulse is swept (hard sweep).
+    For details on the experiment see documentation of
+    'fsqs.Chevron_flux_pulse_ampl_seq(...)'
+    '''
+    def __init__(self, qb_control, qb_target, spacing=50e-9,cal_points=False,upload=True,
+                 distorted=False,distortion_dict=None):
+        super().__init__()
+        self.qb_control = qb_control
+        self.qb_target = qb_target
+        self.spacing = spacing
+        self.upload = upload
+        self.cal_points = cal_points
+        self.distorted = distorted
+        self.distortion_dict = distortion_dict
+
+
+        self.name = 'Chevron flux pulse amplitude sweep'
+        self.parameter_name = 'amplitude'
+        self.unit = 'V'
+
+    def prepare(self, **kw):
+        if self.upload:
+            fsqs.Chevron_flux_pulse_ampl_seq(
+                ampls=self.sweep_points, qb_control=self.qb_control,
+                qb_target=self.qb_target, spacing=self.spacing, cal_points=self.cal_points,
+                distorted=self.distorted,distortion_dict=self.distortion_dict
+            )
+
+
 class Chevron_ampl_swf(swf.Soft_Sweep):
+    '''
+    Sweep function class (soft sweep) for 2D Chevron experiment where
+    the amplitude of the fluxpulse is swept. Used in combination with
+    the Chevron_length_hard_swf class.
+    '''
     def __init__(self, qb_control,qb_target, hard_sweep):
         super().__init__()
         self.name = 'Chevron flux pulse amplitude sweep'

@@ -282,12 +282,10 @@ class QuDev_transmon(Qubit):
 
     def prepare_for_pulsed_spec(self):
         # Not working
-        self.heterodyne.auto_seq_loading(False)
         if self.cw_source is not None:
             self.cw_source.pulsemod_state('On')
             self.cw_source.on()
             self.cw_source.power.set(self.spec_pow())
-
         if self.f_RO() is None:
             f_RO = self.f_RO_resonator()
         else:
@@ -315,6 +313,9 @@ class QuDev_transmon(Qubit):
             self.readout_UC_LO.pulsemod_state('Off')
             self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
             self.readout_UC_LO.on()
+        self.heterodyne.prepare()
+        self.heterodyne.auto_seq_loading(False)
+
 
 
 
