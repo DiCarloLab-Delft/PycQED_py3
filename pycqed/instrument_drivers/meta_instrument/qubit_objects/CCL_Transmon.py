@@ -95,9 +95,9 @@ class CCLight_Transmon(Qubit):
         """
         Adding the parameters relevant for readout.
         """
-        ##########################
-        # RO stimulus parameters #
-        ##########################
+        ################################
+        # RO stimulus/pulse parameters #
+        ################################
         self.add_parameter('ro_freq',
                            label='Readout frequency', unit='Hz',
                            parameter_class=ManualParameter)
@@ -110,25 +110,50 @@ class CCLight_Transmon(Qubit):
                            parameter_class=ManualParameter)
 
         # RO pulse parameters
-
-        self.add_parameter('ro_pulse_type', initial_value='IQmod_UHFQC',
-                           vals=vals.Enum(
-                               # 'Gated_CBox', 'Gated_UHFQC',
-                               # 'IQmod_CBox',
-                               # These other types are currently not supported
-                               'IQmod_UHFQC', 'IQmod_multiplexed_UHFQC'),
+        self.add_parameter('ro_pulse_res_nr',
+                           label='Resonator number', docstring=(
+                               'Resonator number used in lutman for'
+                               ' uploading to the correct UHFQC codeword.'),
+                           initial_value=0, vals=vals.Ints(0, 9),
                            parameter_class=ManualParameter)
-
-
-        # self.add_parameter('ro_power_cw', label='RO power cw',
-        #                    unit='dBm',
-        #                    parameter_class=ManualParameter)
+        self.add_parameter('ro_pulse_type', initial_value='square',
+                           vals=vals.Enum('gated', 'square', 'up_down_down'),
+                           parameter_class=ManualParameter)
 
         # Mixer offsets correction, RO pulse
         self.add_parameter('ro_mixer_offs_I', unit='V',
                            parameter_class=ManualParameter, initial_value=0)
         self.add_parameter('ro_mixer_offs_Q', unit='V',
                            parameter_class=ManualParameter, initial_value=0)
+        self.add_parameter('ro_mixer_alpha', initial_value=1,
+                           parameter_class=ManualParameter)
+        self.add_parameter('ro_mixer_phi', initial_value=0,
+                           parameter_class=ManualParameter)
+
+        self.add_parameter('ro_pulse_length',
+                           initial_value=100e-9,
+                           unit='s',
+                           parameter_class=ManualParameter)
+        self.add_parameter('ro_pulse_amp', unit='V',
+                           initial_value=1,
+                           parameter_class=ManualParameter)
+        self.add_parameter('ro_pulse_phi', unit='deg', initial_value=0,
+                           parameter_class=ManualParameter)
+
+        self.add_parameter('ro_pulse_down_length0', unit='s',
+                           initial_value=1e-9,
+                           parameter_class=ManualParameter)
+        self.add_parameter('ro_pulse_down_amp0', unit='V', initial_value=0,
+                           parameter_class=ManualParameter)
+        self.add_parameter('ro_pulse_down_phi0', unit='deg', initial_value=0,
+                           parameter_class=ManualParameter)
+        self.add_parameter('ro_pulse_down_length1', unit='s',
+                           initial_value=1e-9,
+                           parameter_class=ManualParameter)
+        self.add_parameter('ro_pulse_down_amp1', unit='V', initial_value=0,
+                           parameter_class=ManualParameter)
+        self.add_parameter('ro_pulse_down_phi1', unit='deg', initial_value=0,
+                           parameter_class=ManualParameter)
 
         #############################
         # RO acquisition parameters #
@@ -166,11 +191,16 @@ class CCLight_Transmon(Qubit):
                            vals=vals.Arrays(),
                            label='Optimized weights for Q channel',
                            parameter_class=ManualParameter)
-
-
-
-
-
+        self.add_parameter(
+            'ro_acq_delay',  unit='s',
+            label='Readout acquisition delay',
+            vals=vals.Numbers(min_value=0),
+            initial_value=0,
+            parameter_class=ManualParameter,
+            docstring=('The time between the instruction that trigger the'
+                       ' readout pulse and the instruction that triggers the '
+                       'acquisition. The positive number means that the '
+                       'acquisition is started after the pulse is send.'))
 
         self.add_parameter('ro_acq_integration_length', initial_value=500e-9,
                            vals=vals.Numbers(min_value=0, max_value=20e6),
@@ -184,42 +214,42 @@ class CCLight_Transmon(Qubit):
                            vals=vals.Ints(min_value=1),
                            parameter_class=ManualParameter)
 
-
+        # self.add_parameter('ro_power_cw', label='RO power cw',
+        #                    unit='dBm',
+        #                    parameter_class=ManualParameter)
 
         # Single shot readout specific parameters
-        self.add_parameter('ro_digitized', vals=vals.Bool(),
+        self.add_parameter('ro_acq_digitized', vals=vals.Bool(),
                            initial_value=False,
                            parameter_class=ManualParameter)
-        self.add_parameter('ro_threshold', unit='dac-value',
+        self.add_parameter('ro_acq_threshold', unit='dac-value',
                            initial_value=0,
                            parameter_class=ManualParameter)
-        self.add_parameter('ro_rotation_angle', unit='deg',
-                           initial_value=0,
-                           vals=vals.Numbers(0, 360),
-                           parameter_class=ManualParameter)
+        # self.add_parameter('ro_rotation_angle', unit='deg',
+        #                    initial_value=0,
+        #                    vals=vals.Numbers(0, 360),
+        #                    parameter_class=ManualParameter)
 
+        # self.add_parameter('ro_depletion_time', initial_value=1e-6,
+        #                    unit='s',
+        #                    parameter_class=ManualParameter,
+        #                    vals=vals.Numbers(min_value=0))
 
+        # self.add_parameter('ro_acq_period_cw', unit='s',
+        #                    parameter_class=ManualParameter,
+        #                    vals=vals.Numbers(0, 500e-6),
+        #                    initial_value=10e-6)
 
-        self.add_parameter('ro_depletion_time', initial_value=1e-6,
-                           unit='s',
-                           parameter_class=ManualParameter,
-                           vals=vals.Numbers(min_value=0))
-
-        self.add_parameter('ro_acq_period_cw', unit='s',
-                           parameter_class=ManualParameter,
-                           vals=vals.Numbers(0, 500e-6),
-                           initial_value=10e-6)
-
-        self.add_parameter('cal_pt_zero',
-                           initial_value=None,
-                           vals=vals.Anything(),  # should be a tuple validator
-                           label='Calibration point |0>',
-                           parameter_class=ManualParameter)
-        self.add_parameter('cal_pt_one',
-                           initial_value=None,
-                           vals=vals.Anything(),  # should be a tuple validator
-                           label='Calibration point |1>',
-                           parameter_class=ManualParameter)
+        # self.add_parameter('cal_pt_zero',
+        #                    initial_value=None,
+        #                    vals=vals.Anything(),  # should be a tuple validator
+        #                    label='Calibration point |0>',
+        #                    parameter_class=ManualParameter)
+        # self.add_parameter('cal_pt_one',
+        #                    initial_value=None,
+        #                    vals=vals.Anything(),  # should be a tuple validator
+        #                    label='Calibration point |1>',
+        #                    parameter_class=ManualParameter)
 
     def add_mw_parameters(self):
         self.add_parameter('mod_amp_td', label='RO modulation ampl td',
@@ -341,7 +371,7 @@ class CCLight_Transmon(Qubit):
         """
         self._prep_ro_instantiate_detectors()
         self._prep_ro_sources()
-        # self._generate_ro_pulse()
+        self._prep_ro_pulse()
         self._prep_ro_integration_weights()
 
     def _prep_ro_instantiate_detectors(self):
@@ -349,7 +379,7 @@ class CCLight_Transmon(Qubit):
             ro_channels = [self.ro_acq_weight_chI()]
             result_logging_mode = 'lin_trans'
 
-            if self.ro_digitized():
+            if self.ro_acq_digitized():
                 result_logging_mode = 'digitized'
             # Update the RO theshold
             acq_ch = self.ro_acq_weight_chI()
@@ -357,7 +387,7 @@ class CCLight_Transmon(Qubit):
             # The threshold that is set in the hardware  needs to be
             # corrected for the offset as this is only applied in
             # software.
-            threshold = self.ro_threshold()
+            threshold = self.ro_acq_threshold()
             offs = self.instr_acquisition.get_instr().get(
                 'quex_trans_offset_weightfunction_{}'.format(acq_ch))
             hw_threshold = threshold + offs
@@ -411,63 +441,78 @@ class CCLight_Transmon(Qubit):
             # RF.frequency(self.ro_freq.get())
             # RF.on()
 
-    def _generate_ro_pulse(self):
-        if 'CBox' in self.instr_acquisition():
-            if 'multiplexed' not in self.ro_pulse_type().lower():
-                self.ro_LutMan.get_instr().M_modulation(self.ro_freq_mod())
-                self.ro_LutMan.get_instr().M_amp(self.ro_amp())
-                self.ro_LutMan.get_instr().M_length(self.ro_pulse_length())
+    def _prep_ro_pulse(self):
+        """
+        Sets the appropriate parameters in the RO LutMan and uploads the
+        desired wave.
+        Relevant parameters are:
+            ro_pulse_type ("up_down_down", "square")
+            ro_pulse_res_nr
+            ro_freq_mod
+            ro_acq_delay
 
-                if 'awg_nr' in self.ro_LutMan.get_instr().parameters:
-                    self.ro_LutMan.get_instr().awg_nr(self.ro_awg_nr())
+            ro_pulse_length
+            ro_pulse_amp
+            ro_pulse_phi
+            ro_pulse_down_length0
+            ro_pulse_down_amp0
+            ro_pulse_down_phi0
+            ro_pulse_down_length1
+            ro_pulse_down_amp1
+            ro_pulse_down_phi1
 
-                if 'CBox' in self.instr_acquisition():
-                    self.CBox.get_instr().set('AWG{:.0g}_dac0_offset'.format(
-                                              self.ro_awg_nr.get()),
-                                              self.mixer_offs_ro_I.get())
-                    self.CBox.get_instr().set('AWG{:.0g}_dac1_offset'.format(
-                                              self.ro_awg_nr.get()),
-                                              self.mixer_offs_ro_Q.get())
-                    if self.ro_LutMan() is not None:
-                        self.ro_LutMan.get_instr().lut_mapping(
-                            ['I', 'X180', 'Y180', 'X90', 'Y90', 'mX90', 'mY90', 'M_square'])
 
-                    self.CBox.get_instr().integration_length(
-                        convert_to_clocks(self.ro_acq_integration_length()))
+            ro_mixer_alpha
+            ro_mixer_phi
 
-                    self.CBox.get_instr().set('sig{}_threshold_line'.format(
-                        int(self.signal_line.get())),
-                        int(self.ro_threshold.get()))
-                    self.CBox.get_instr().lin_trans_coeffs(
-                        np.reshape(rotation_matrix(self.ro_rotation_angle(),
-                                                   as_array=True), (4,)))
+            ro_mixer_offs_I
+            ro_mixer_offs_Q
 
-                    self.CBox.get_instr().set('sig{}_threshold_line'.format(
-                        int(self.signal_line.get())),
-                        int(self.ro_threshold.get()))
-                self.ro_LutMan.get_instr().load_pulses_onto_AWG_lookuptable()
+        """
+        if 'gated' in self.ro_pulse_type().lower():
+            UHFQC = self.instr_acquisition.get_instr()
+            UHFQC.awg_sequence_acquisition()
 
-        elif 'UHFQC' in self.instr_acquisition():
-            if 'gated' in self.ro_pulse_type().lower():
-                UHFQC = self.instr_acquisition.get_instr()
-                UHFQC.awg_sequence_acquisition()
-            elif 'iqmod' in self.ro_pulse_type().lower():
-                ro_lm = self.ro_LutMan.get_instr()
-                ro_lm.M_length(self.ro_pulse_length())
-                ro_lm.M_amp(self.ro_amp())
-                ro_lm.M_length(self.ro_pulse_length())
-                ro_lm.M_modulation(self.ro_freq_mod())
-                ro_lm.acquisition_delay(self.ro_acq_marker_delay())
+        else:
+            ro_lm = self.instr_LutMan_RO.get_instr()
+            idx = self.ro_pulse_res_nr()
+            # These parameters affect all resonators
+            ro_lm.set('pulse_type', 'M_' + self.ro_pulse_type())
+            ro_lm.set('mixer_alpha'.format(idx),
+                      self.ro_mixer_alpha())
+            ro_lm.set('mixer_phi'.format(idx),
+                      self.ro_mixer_phi())
 
-                if 'multiplexed' not in self.ro_pulse_type().lower():
-                    ro_lm.load_pulse_onto_AWG_lookuptable('M_square')
+            ro_lm.set('M_modulation_R{}'.format(idx), self.ro_freq_mod())
+            ro_lm.set('M_length_R{}'.format(idx),
+                      self.ro_pulse_length())
+            ro_lm.set('M_amp_R{}'.format(idx),
+                      self.ro_pulse_amp())
+            ro_lm.set('M_phi_R{}'.format(idx),
+                      self.ro_pulse_phi())
+            ro_lm.set('M_down_length0_R{}'.format(idx),
+                      self.ro_pulse_down_length0())
+            ro_lm.set('M_down_amp0_R{}'.format(idx),
+                      self.ro_pulse_down_amp0())
+            ro_lm.set('M_down_phi0_R{}'.format(idx),
+                      self.ro_pulse_down_phi0())
+            ro_lm.set('M_down_length1_R{}'.format(idx),
+                      self.ro_pulse_down_length1())
+            ro_lm.set('M_down_amp1_R{}'.format(idx),
+                      self.ro_pulse_down_amp1())
+            ro_lm.set('M_down_phi1_R{}'.format(idx),
+                      self.ro_pulse_down_phi1())
+
+            ro_lm.acquisition_delay(self.ro_acq_delay())
+            ro_lm.load_DIO_triggered_sequence_onto_UHFQC()
 
     def _prep_ro_integration_weights(self):
         """
         Sets the ro acquisition integration weights.
         The relevant parameters here are
             ro_acq_weight_type   -> 'SSB', 'DSB' or 'Optimal'
-            ro_acq_weight_chI    -> Specifies which integration weight (channel)
+            ro_acq_weight_chI    -> Specifies which integration weight
+                (channel) to use
             ro_acq_weight_chQ    -> The second channel in case of SSB/DSB
             RO_acq_weight_func_I -> A custom integration weight (array)
             RO_acq_weight_func_Q ->  ""

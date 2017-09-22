@@ -17,6 +17,7 @@ from pycqed.instrument_drivers.meta_instrument.qubit_objects.QuDev_transmon impo
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon import Tektronix_driven_transmon
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.CC_transmon import CBox_v3_driven_transmon, QWG_driven_transmon
 from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import dummy_CCL
+from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
 
 
 class Test_Qubit_Object(unittest.TestCase):
@@ -50,6 +51,9 @@ class Test_Qubit_Object(unittest.TestCase):
         self.AWG8_VSM_MW_LutMan.Q_modulation(100e6)
         self.AWG8_VSM_MW_LutMan.sampling_rate(2.4e9)
 
+        self.ro_lutman = UHFQC_RO_LutMan('RO_lutman')
+        self.ro_lutman.AWG(self.UHFQC.name)
+
         # Assign instruments
         self.CCL_qubit.instr_LutMan_MW(self.AWG8_VSM_MW_LutMan.name)
         self.CCL_qubit.instr_LO(self.MW1.name)
@@ -58,10 +62,9 @@ class Test_Qubit_Object(unittest.TestCase):
         self.CCL_qubit.instr_acquisition(self.UHFQC.name)
         self.CCL_qubit.instr_VSM(self.Dux.name)
         self.CCL_qubit.instr_CC(self.CCL.name)
-
+        self.CCL_qubit.instr_LutMan_RO(self.ro_lutman.name)
 
         # Setting some "random" initial parameters
-
         self.CCL_qubit.ro_freq(5.43e9)
         self.CCL_qubit.ro_freq_mod(200e6)
 
@@ -129,12 +132,19 @@ class Test_Qubit_Object(unittest.TestCase):
         self.assertEqual(LO.frequency(), 5.43e9-200e6)
         self.assertEqual(LO.power(), 14)
 
+    def test_prep_ro_pulses(self):
+
+        self.CCL_qubit.prepare_readout()
+
+        self.ro_lutman
+
+
+
     def test_prep_ro_integration_weigths(self):
         IF = 50e6
         self.CCL_qubit.ro_freq_mod(IF)
         self.CCL_qubit.ro_acq_weight_chI(3)
         self.CCL_qubit.ro_acq_weight_chQ(4)
-
 
         # Testing SSB
         trace_length = 4096
@@ -142,7 +152,6 @@ class Test_Qubit_Object(unittest.TestCase):
         self.CCL_qubit.prepare_readout()
         tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
         cosI = np.array(np.cos(2*np.pi*IF*tbase))
-        sinI = np.array(np.sin(2*np.pi*IF*tbase))
 
         self.assertEqual(self.UHFQC.quex_rot_3_real(), 1)
         self.assertEqual(self.UHFQC.quex_rot_3_imag(), 1)

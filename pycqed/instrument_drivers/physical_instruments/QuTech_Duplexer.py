@@ -40,7 +40,7 @@ class QuTech_Duplexer(VisaInstrument):
     def add_parameters(self, nr_input_channels, nr_output_channels):
         dirname, filename = path.split(path.abspath(__file__))
         cal_file_path = path.join(dirname,
-                                  '_duplexer/Duplexer_normalized_gain.hdf5')
+                                  '_duplexer/duplexer_normalized_gain.hdf5')
         cal_file = h5py.File(cal_file_path, 'r')
         self._calibration_array = list(cal_file.values())[0][1]
         self.add_parameter('mode', label='Operating mode',

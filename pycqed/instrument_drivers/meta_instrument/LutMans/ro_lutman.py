@@ -9,6 +9,8 @@ import copy as copy
 class Base_RO_LutMan(Base_LutMan):
 
     def __init__(self, name, num_res: int=1, **kw):
+        if num_res > 9:
+            raise ValueError('At most 9 resonators can be read out.')
         self._num_res = num_res
         super().__init__(name, **kw)
 
@@ -30,10 +32,11 @@ class Base_RO_LutMan(Base_LutMan):
                            parameter_class=ManualParameter,
                            docstring=comb_msg,
                            initial_value=[[0]])
-        self.add_parameter('pulse_type', vals=vals.Enum('M_up_down_down', 'M'),
+        self.add_parameter('pulse_type', vals=vals.Enum(
+                                'M_up_down_down', 'M_square'),
                            parameter_class=ManualParameter,
                            docstring=comb_msg,
-                           initial_value='M')
+                           initial_value='M_square')
         for res in range(self._num_res):
             self.add_parameter('M_modulation_R{}'.format(res),
                                vals=vals.Numbers(), unit='Hz',
@@ -112,7 +115,7 @@ class Base_RO_LutMan(Base_LutMan):
                                               f_modulation=self.get(
                                                   'M_modulation_R{}'.format(res)),
                                               sampling_rate=self.sampling_rate())
-            self._wave_dict.update({'M_R{}'.format(res): Mod_M,
+            self._wave_dict.update({'M_square_R{}'.format(res): Mod_M,
                                     'M_up_down_down_R{}'.format(res): Mod_M_up_down_down})
 
         if self.mixer_apply_predistortion_matrix():
@@ -127,7 +130,8 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
 
     def __init__(self, name, num_res: int=1, **kw):
         super().__init__(name, num_res=num_res, **kw)
-        self.add_parameter('acquisition_delay', vals=vals.Numbers(), unit='ns',
+        self.add_parameter('acquisition_delay',
+                           vals=vals.Numbers(min_value=0), unit='s',
                            parameter_class=ManualParameter,
                            initial_value=270e-9)
 
@@ -158,8 +162,8 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
                          self._voltage_min, self._voltage_max)
         Q_wave = np.clip(wave_dict[pulse_name][1], self._voltage_min,
                          self._voltage_max)
-        self.AWG.get_instr().awg_sequence_acquisition_and_pulse(I_wave, Q_wave,
-                                                                self.acquisition_delay())
+        self.AWG.get_instr().awg_sequence_acquisition_and_pulse(
+            I_wave, Q_wave, self.acquisition_delay())
 
     def load_DIO_triggered_sequence_onto_UHFQC(self,
                                                regenerate_pulses=True):
@@ -190,8 +194,8 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
                         I_waves.append(Icopy)
                         Q_waves.append(Qcopy)
                     else:
-                        # adding new wave (not necessarily same length (have to be
-                        # same length for now)
+                        # adding new wave (not necessarily same length
+                        # (have to be same length for now)
                         I_waves[i] += wave_dict[wavename][0]
                         Q_waves[i] += wave_dict[wavename][1]
             # clipping the waveform
@@ -203,7 +207,8 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
             I_waves, Q_waves, self.acquisition_delay())
 
         def load_waveforms_onto_AWG_lookuptable(
-                self, regenerate_waveforms: bool=True, stop_start: bool = True):
+                self, regenerate_waveforms: bool=True,
+                stop_start: bool = True):
             raise NotImplementedError(
                 'UHFQC needs a full sequence, use '
                 '"load_DIO_triggered_sequence_onto_UHFQC"')
