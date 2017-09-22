@@ -10,6 +10,8 @@ from qcodes import station
 
 from pycqed.instrument_drivers.physical_instruments.ZurichInstruments.dummy_UHFQC import dummy_UHFQC
 
+from pycqed.instrument_drivers.physical_instruments.QuTech_Duplexer import Dummy_Duplexer
+
 
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.QuDev_transmon import QuDev_transmon
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon import Tektronix_driven_transmon
@@ -31,6 +33,7 @@ class Test_Qubit_Object(unittest.TestCase):
         self.UHFQC = dummy_UHFQC('UHFQC')
 
         self.CCL = dummy_CCL('CCL')
+        self.Dux = Dummy_Duplexer('Dux')
 
         self.MC = measurement_control.MeasurementControl(
             'MC', live_plot_enabled=False, verbose=False)
@@ -53,7 +56,14 @@ class Test_Qubit_Object(unittest.TestCase):
         self.CCL_qubit.instr_cw_source(self.MW2.name)
         self.CCL_qubit.instr_td_source(self.MW3.name)
         self.CCL_qubit.instr_acquisition(self.UHFQC.name)
+        self.CCL_qubit.instr_VSM(self.Dux.name)
         self.CCL_qubit.instr_CC(self.CCL.name)
+
+
+        # Setting some "random" initial parameters
+
+        self.CCL_qubit.ro_freq(5.43e9)
+        self.CCL_qubit.ro_freq_mod(200e6)
 
     def test_instantiate_QuDevTransmon(self):
         QDT = QuDev_transmon('QuDev_transmon',
@@ -82,8 +92,13 @@ class Test_Qubit_Object(unittest.TestCase):
     def test_prepare_for_fluxing(self):
         self.CCL_qubit.prepare_for_fluxing()
 
+    ##############################################
+    # Testing prepare for readout
+    ##############################################
     def test_prepare_readout(self):
+        self.CCL_qubit.prepare_readout()
 
+    def test_prep_ro_instantiate_detectors(self):
         detector_attributes = [
             'int_avg_det', 'int_log_det', 'int_avg_det_single',
             'input_average_detector']
@@ -97,6 +112,21 @@ class Test_Qubit_Object(unittest.TestCase):
         # Test that the detectors have been instantiated
         for det_attr in detector_attributes:
             self.assertTrue(hasattr(self.CCL_qubit, det_attr))
+
+    def test_prep_ro_MW_sources(self):
+        LO = self.CCL_qubit.instr_LO.get_instr()
+        LO.off()
+        LO.frequency(4e9)
+        self.assertEqual(LO.status(), 'off')
+        self.assertEqual(LO.frequency(), 4e9)
+
+        self.CCL_qubit.ro_freq(5.43e9)
+        self.CCL_qubit.ro_freq_mod(200e6)
+        self.CCL_qubit.prepare_readout()
+
+        self.assertEqual(LO.status(), 'on')
+        self.assertEqual(LO.frequency(), 5.43e9-200e6)
+
 
     @classmethod
     def tearDownClass(self):
