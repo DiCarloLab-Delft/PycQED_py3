@@ -68,7 +68,7 @@ class RamZAnalysisInterleaved(ba.BaseDataAnalysis):
             'asymmetry':
                 '{}.asymmetry'.format(self.data_dict['qubit_name']),
         }
-        self.demodulate = demodulate
+        self.demod = demodulate
         self.f_demod = f_demod
 
         self.numeric_params = [
@@ -89,7 +89,7 @@ class RamZAnalysisInterleaved(ba.BaseDataAnalysis):
         I = -(self.data_dict['measured_values'][0, ::2] - 0.5) * 2
         Q = -(self.data_dict['measured_values'][0, 1::2] - 0.5) * 2
 
-        if self.demodulate:
+        if self.demod:
             I, Q = self.demodulate(I, Q, self.f_demod,
                                    self.data_dict['sweep_points'][::2])
 
@@ -97,7 +97,7 @@ class RamZAnalysisInterleaved(ba.BaseDataAnalysis):
         phase = np.unwrap(raw_phase)
         df = np.gradient(phase) / (2 * np.pi)
 
-        if self.demodulate:
+        if self.demod:
             df += self.f_demod
 
         if self.data_dict['wave_dict_unit'] == 'V':
