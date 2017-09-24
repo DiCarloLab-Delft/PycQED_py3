@@ -259,8 +259,8 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
         tomo_list_q0 += [tp + q0 + '\n']
         tomo_list_q1 += [tp + q1 + '\n']
 
-    tomo_list_q0[0] = 'I 20\n'.format(q0)
-    tomo_list_q1[0] = 'I 20\n'.format(q1)
+    tomo_list_q0[0] = 'I 20\n'
+    tomo_list_q1[0] = 'I 20\n'
 
     # Choose a bell state and set the corresponding preparation pulses
     if bell_state % 10 == 0:  # |Phi_m>=|00>-|11>
