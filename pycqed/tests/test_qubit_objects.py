@@ -90,6 +90,10 @@ class Test_Qubit_Object(unittest.TestCase):
         self.CCL_qubit.spec_pow(-20)
         self.CCL_qubit.prepare_for_continuous_wave()
 
+        self.assertEqual(self.MW2.power(), -20)
+        self.assertEqual(self.MW2.status(), 'off')
+        self.assertEqual(self.MW3.status(), 'off')
+
     def test_prep_for_fluxing(self):
         self.CCL_qubit.prepare_for_fluxing()
 
