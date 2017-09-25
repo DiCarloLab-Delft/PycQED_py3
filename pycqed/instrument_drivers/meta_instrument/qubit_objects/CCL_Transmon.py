@@ -210,7 +210,9 @@ class CCLight_Transmon(Qubit):
                            vals=vals.Numbers(min_value=0, max_value=1e6),
                            parameter_class=ManualParameter)
 
-        self.add_parameter('ro_soft_averages', initial_value=1,
+        self.add_parameter('ro_soft_avg', initial_value=1,
+                           docstring=('Number of soft averages to be '
+                                      'performed using the MC.'),
                            vals=vals.Ints(min_value=1),
                            parameter_class=ManualParameter)
 
@@ -225,20 +227,6 @@ class CCLight_Transmon(Qubit):
         self.add_parameter('ro_acq_threshold', unit='dac-value',
                            initial_value=0,
                            parameter_class=ManualParameter)
-        # self.add_parameter('ro_rotation_angle', unit='deg',
-        #                    initial_value=0,
-        #                    vals=vals.Numbers(0, 360),
-        #                    parameter_class=ManualParameter)
-
-        # self.add_parameter('ro_depletion_time', initial_value=1e-6,
-        #                    unit='s',
-        #                    parameter_class=ManualParameter,
-        #                    vals=vals.Numbers(min_value=0))
-
-        # self.add_parameter('ro_acq_period_cw', unit='s',
-        #                    parameter_class=ManualParameter,
-        #                    vals=vals.Numbers(0, 500e-6),
-        #                    initial_value=10e-6)
 
         # self.add_parameter('cal_pt_zero',
         #                    initial_value=None,
@@ -252,39 +240,41 @@ class CCLight_Transmon(Qubit):
         #                    parameter_class=ManualParameter)
 
     def add_mw_parameters(self):
-        self.add_parameter('mod_amp_td', label='RO modulation ampl td',
-                           unit='V', initial_value=0.5,
-                           parameter_class=ManualParameter)
-
         # Mixer skewness correction
-        self.add_parameter('mixer_drive_phi', unit='deg',
+        self.add_parameter('Q_G_mixer_phi', unit='deg',
+                           label='Mixer skewness phi Gaussian quadrature',
                            parameter_class=ManualParameter, initial_value=0)
-        self.add_parameter('mixer_drive_alpha', unit='',
+        self.add_parameter('Q_G_mixer_alpha', unit='',
+                           label='Mixer skewness alpha Gaussian quadrature',
                            parameter_class=ManualParameter, initial_value=1)
+        self.add_parameter('Q_D_mixer_phi', unit='deg',
+                           label='Mixer skewness phi Derivative quadrature',
+                           parameter_class=ManualParameter, initial_value=0)
+        self.add_parameter('Q_D_mixer_alpha', unit='',
+                           label='Mixer skewness alpha Derivative quadrature',
+                           parameter_class=ManualParameter, initial_value=1)
+
         # Mixer offsets correction, qubit drive
-        self.add_parameter('mixer_offs_drive_I',
+        self.add_parameter('Q_mixer_offs_I',
                            unit='V',
                            parameter_class=ManualParameter, initial_value=0)
-        self.add_parameter('mixer_offs_drive_Q', unit='V',
+        self.add_parameter('Q_mixer_offs_Q', unit='V',
                            parameter_class=ManualParameter, initial_value=0)
 
-        self.add_parameter('td_source_pow',
+        self.add_parameter('Q_pow_td_source',
                            label='Time-domain power',
                            unit='dBm',
+                           initial_value=14,
                            parameter_class=ManualParameter)
 
-        self.add_parameter('f_pulse_mod',
+        self.add_parameter('Q_freq_mod',
                            initial_value=-2e6,
                            label='pulse-modulation frequency', unit='Hz',
-                           parameter_class=ManualParameter)
-        self.add_parameter('Q_awg_nr', label='CBox awg nr', unit='#',
-                           vals=vals.Ints(),
-                           initial_value=0,
                            parameter_class=ManualParameter)
 
         self.add_parameter('Q_amp180',
                            label='Pi-pulse amplitude', unit='V',
-                           initial_value=0.3,
+                           initial_value=.8,
                            parameter_class=ManualParameter)
         self.add_parameter('Q_amp90_scale',
                            label='pulse amplitude scaling factor',
@@ -293,12 +283,55 @@ class CCLight_Transmon(Qubit):
                            vals=vals.Numbers(min_value=0, max_value=1.0),
                            parameter_class=ManualParameter)
 
-        self.add_parameter('gauss_width', unit='s',
+        self.add_parameter('Q_awg_ch', parameter_class=ManualParameter,
+                           initial_value=1)
+        self.add_parameter('Q_gauss_width', unit='s',
                            initial_value=10e-9,
                            parameter_class=ManualParameter)
-        self.add_parameter('motzoi', label='Motzoi parameter', unit='',
+        self.add_parameter('Q_motzoi', label='Motzoi parameter', unit='',
                            initial_value=0,
                            parameter_class=ManualParameter)
+
+        self.add_parameter('Q_vsm_switch',
+                           label='VSM switch state',
+                           vals=vals.Enum('ON', 'OFF', 'EXT'),
+                           parameter_class=ManualParameter)
+
+        self.add_parameter('Q_vsm_ch_in_G',
+                           label='VSM input channel Gaussian component',
+                           vals=vals.Ints(1, 4),
+                           initial_value=1,
+                           parameter_class=ManualParameter)
+        self.add_parameter('Q_vsm_ch_in_D',
+                           label='VSM input channel Derivative component',
+                           vals=vals.Ints(1, 4),
+                           initial_value=2,
+                           parameter_class=ManualParameter)
+        self.add_parameter('Q_vsm_ch_out',
+                           label='VSM output channel',
+                           vals=vals.Ints(1, 2),
+                           initial_value=1,
+                           parameter_class=ManualParameter)
+        self.add_parameter('Q_vsm_G_att',
+                           label='VSM attenuation Gaussian component',
+                           vals=vals.Numbers(0, 65536),
+                           initial_value=65536/2,
+                           parameter_class=ManualParameter)
+        self.add_parameter('Q_vsm_D_att',
+                           label='VSM attenuation Derivative component',
+                           vals=vals.Numbers(0, 65536),
+                           initial_value=65536/2,
+                           parameter_class=ManualParameter)
+        self.add_parameter('Q_vsm_G_phase',
+                           vals=vals.Numbers(0, 65536),
+                           initial_value=65536/2,
+                           parameter_class=ManualParameter)
+        self.add_parameter('Q_vsm_D_phase',
+                           vals=vals.Numbers(0, 65536),
+                           initial_value=65536/2,
+                           parameter_class=ManualParameter)
+
+
 
     def add_spec_parameters(self):
 
@@ -350,7 +383,47 @@ class CCLight_Transmon(Qubit):
             vals=vals.Numbers(min_value=1e-6, max_value=327668e-9))
 
     def add_generic_qubit_parameters(self):
-        pass
+        self.add_parameter('E_c', unit='Hz',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers())
+        self.add_parameter('E_j', unit='Hz',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers())
+        self.add_parameter('T1', unit='s',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers())
+        self.add_parameter('T2_echo', unit='s',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers())
+        self.add_parameter('T2_star', unit='s',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers())
+
+        self.add_parameter('freq_qubit',
+                           label='Qubit frequency', unit='Hz',
+                           parameter_class=ManualParameter)
+        self.add_parameter('freq_max',
+                           label='Qubit sweet spot frequency', unit='Hz',
+                           parameter_class=ManualParameter)
+        self.add_parameter('freq_res',
+                           label='Resonator frequency', unit='Hz',
+                           parameter_class=ManualParameter)
+
+        self.add_parameter('F_ssro',
+                           initial_value=0,
+                           label='Single shot readout assignment fidelity',
+                           vals=vals.Numbers(0.0, 1.0),
+                           parameter_class=ManualParameter)
+        self.add_parameter('F_discr',
+                           initial_value=0,
+                           label='Single shot readout discrimination fidelity',
+                           vals=vals.Numbers(0.0, 1.0),
+                           parameter_class=ManualParameter)
+        self.add_parameter('F_RB',
+                           initial_value=0,
+                           label='RB single qubit Clifford fidelity',
+                           vals=vals.Numbers(0, 1.0),
+                           parameter_class=ManualParameter)
 
     def prepare_for_continuous_wave(self):
         self.prepare_readout()
@@ -375,6 +448,7 @@ class CCLight_Transmon(Qubit):
         self._prep_ro_integration_weights()
 
     def _prep_ro_instantiate_detectors(self):
+        self.instr_MC.get_instr().soft_avg(self.ro_soft_avg())
         if self.ro_acq_weight_type() == 'optimal':
             ro_channels = [self.ro_acq_weight_chI()]
             result_logging_mode = 'lin_trans'
@@ -559,7 +633,57 @@ class CCLight_Transmon(Qubit):
                 'CBox, DDM or other are currently not supported')
 
     def prepare_for_timedomain(self):
-        pass
+        self.prepare_readout()
+        self._prep_td_sources()
+        self._prep_td_pulses()
+
+    def _prep_td_sources(self):
+        self.instr_cw_source.get_instr().off()
+        self.instr_td_source.get_instr().on()
+        # Set source to fs =f-f_mod such that pulses appear at f = fs+f_mod
+        self.instr_td_source.get_instr().frequency.set(
+            self.freq_qubit.get() - self.Q_freq_mod.get())
+
+        self.instr_td_source.get_instr().power.set(self.Q_pow_td_source.get())
+
+    def _prep_td_pulses(self):
+        MW_LutMan = self.instr_LutMan_MW.get_instr()
+
+        # 4-channels are used for VSM based AWG's.
+        MW_LutMan.channel_GI(0+self.Q_awg_ch())
+        MW_LutMan.channel_GQ(1+self.Q_awg_ch())
+        MW_LutMan.channel_DI(2+self.Q_awg_ch())
+        MW_LutMan.channel_DQ(3+self.Q_awg_ch())
+        # updating the lutmap is required to make sure channels are correct
+        MW_LutMan.set_default_lutmap()
+
+        # Pulse pars
+        MW_LutMan.Q_amp180(self.Q_amp180())
+        MW_LutMan.Q_amp90_scale(self.Q_amp90_scale())
+        MW_LutMan.Q_gauss_width(self.Q_gauss_width())
+        MW_LutMan.Q_motzoi(self.Q_motzoi())
+        MW_LutMan.Q_modulation(self.Q_freq_mod())
+
+        # Mixer params
+        MW_LutMan.G_mixer_phi(self.Q_G_mixer_phi())
+        MW_LutMan.G_mixer_alpha(self.Q_G_mixer_alpha())
+        MW_LutMan.D_mixer_phi(self.Q_D_mixer_phi())
+        MW_LutMan.D_mixer_alpha(self.Q_D_mixer_alpha())
+        MW_LutMan.load_waveforms_onto_AWG_lookuptable()
+
+        # Configure VSM
+        VSM = self.instr_VSM.get_instr()
+        Gin = self.Q_vsm_ch_in_G()
+        Din = self.Q_vsm_ch_in_D()
+        out = self.Q_vsm_ch_out()
+
+        VSM.set('in{}_out{}_att'.format(Gin, out), self.Q_vsm_G_att())
+        VSM.set('in{}_out{}_att'.format(Din, out), self.Q_vsm_D_att())
+
+        # Configure the AWG8 in the right way
+
+
+
 
     def prepare_for_fluxing(self, reset=True):
         pass

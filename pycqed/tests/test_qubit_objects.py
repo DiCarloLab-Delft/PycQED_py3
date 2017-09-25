@@ -63,6 +63,7 @@ class Test_Qubit_Object(unittest.TestCase):
         self.CCL_qubit.instr_VSM(self.Dux.name)
         self.CCL_qubit.instr_CC(self.CCL.name)
         self.CCL_qubit.instr_LutMan_RO(self.ro_lutman.name)
+        self.CCL_qubit.instr_MC(self.MC.name)
 
         # Setting some "random" initial parameters
         self.CCL_qubit.ro_freq(5.43e9)
@@ -85,9 +86,6 @@ class Test_Qubit_Object(unittest.TestCase):
         QT = QWG_driven_transmon('QT')
         QT.close()
 
-    def test_prep_for_timedomain(self):
-        self.CCL_qubit.prepare_for_timedomain()
-
     def test_prep_for_continuous_wave(self):
         self.CCL_qubit.spec_pow(-20)
         self.CCL_qubit.prepare_for_continuous_wave()
@@ -102,6 +100,9 @@ class Test_Qubit_Object(unittest.TestCase):
         self.CCL_qubit.prepare_readout()
 
     def test_prep_ro_instantiate_detectors(self):
+        self.MC.soft_avg(1)
+
+        self.CCL_qubit.ro_soft_avg(4)
         detector_attributes = [
             'int_avg_det', 'int_log_det', 'int_avg_det_single',
             'input_average_detector']
@@ -115,6 +116,8 @@ class Test_Qubit_Object(unittest.TestCase):
         # Test that the detectors have been instantiated
         for det_attr in detector_attributes:
             self.assertTrue(hasattr(self.CCL_qubit, det_attr))
+
+        self.assertEqual(self.MC.soft_avg(), 4)
 
     def test_prep_ro_MW_sources(self):
         LO = self.CCL_qubit.instr_LO.get_instr()
@@ -203,6 +206,48 @@ class Test_Qubit_Object(unittest.TestCase):
         # These should not have been touched by optimal weights
         self.assertEqual(self.UHFQC.quex_rot_4_real(), .21)
         self.assertEqual(self.UHFQC.quex_rot_4_imag(), .108)
+
+    ########################################################
+    #          Test prepare for timedomain                 #
+    ########################################################
+    def test_prep_for_timedomain(self):
+        self.CCL_qubit.freq_qubit(4.56e9)
+        self.CCL_qubit.Q_freq_mod(-100e6)
+        self.CCL_qubit.Q_awg_ch(1)
+        self.CCL_qubit.prepare_for_timedomain()
+
+    def test_prep_td_sources(self):
+
+        self.MW1.off()
+        self.MW2.on()
+        self.MW3.off()
+        self.CCL_qubit.freq_qubit(4.56e9)
+        self.CCL_qubit.Q_freq_mod(-100e6)
+        self.CCL_qubit.Q_pow_td_source(13)
+
+        self.CCL_qubit.prepare_for_timedomain()
+        self.assertEqual(self.MW1.status(), 'on')
+        self.assertEqual(self.MW2.status(), 'off')
+        self.assertEqual(self.MW3.status(), 'on')
+        self.assertEqual(self.MW3.frequency(), 4.56e9 + 100e6)
+        self.assertEqual(self.MW3.power(), 13)
+
+    def test_prep_td_pulses(self):
+        self.CCL_qubit.Q_awg_ch(5)
+        self.CCL_qubit.Q_G_mixer_alpha(1.02)
+        self.CCL_qubit.Q_D_mixer_phi(8)
+
+        self.CCL_qubit.prepare_for_timedomain()
+        self.assertEqual(self.AWG8_VSM_MW_LutMan.channel_GI(), 5)
+        self.assertEqual(self.AWG8_VSM_MW_LutMan.channel_GQ(), 6)
+        self.assertEqual(self.AWG8_VSM_MW_LutMan.channel_DI(), 7)
+        self.assertEqual(self.AWG8_VSM_MW_LutMan.channel_DQ(), 8)
+
+        self.assertEqual(self.AWG8_VSM_MW_LutMan.G_mixer_alpha(), 1.02)
+        self.assertEqual(self.AWG8_VSM_MW_LutMan.D_mixer_phi(), 8)
+
+
+
 
     @classmethod
     def tearDownClass(self):

@@ -37,6 +37,9 @@ class Base_MW_LutMan(Base_LutMan):
                        ' that when using an AWG with build in modulation this'
                        ' should be set to 0.'),
             parameter_class=ManualParameter, initial_value=50.0e6)
+        self._add_mixer_corr_pars()
+
+    def _add_mixer_corr_pars(self):
         self.add_parameter('mixer_alpha', vals=vals.Numbers(),
                            parameter_class=ManualParameter,
                            initial_value=1.0)
@@ -47,7 +50,7 @@ class Base_MW_LutMan(Base_LutMan):
             'mixer_apply_predistortion_matrix', vals=vals.Bool(), docstring=(
                 'If True applies a mixer correction using mixer_phi and '
                 'mixer_alpha to all microwave pulses using.'),
-            parameter_class=ManualParameter, initial_value=False)
+            parameter_class=ManualParameter, initial_value=True)
 
     def _add_channel_params(self):
         self.add_parameter('channel_I',
@@ -120,21 +123,25 @@ class Base_MW_LutMan(Base_LutMan):
             motzoi=self.Q_motzoi())
 
         if self.mixer_apply_predistortion_matrix():
-            M = wf.mixer_predistortion_matrix(self.mixer_alpha(),
-                                              self.mixer_phi())
-            for key, val in self._wave_dict.items():
-                self._wave_dict[key] = np.dot(M, val)
-
+            self._wave_dict = self.apply_mixer_predistortion_corrections(
+                self._wave_dict)
         return self._wave_dict
+
+    def apply_mixer_predistortion_corrections(self, wave_dict):
+        M = wf.mixer_predistortion_matrix(self.mixer_alpha(),
+                                          self.mixer_phi())
+        for key, val in wave_dict.items():
+            wave_dict[key] = np.dot(M, val)
+        return wave_dict
 
     def load_waveform_onto_AWG_lookuptable(self, waveform_name: str,
                                            regenerate_waveforms: bool=False):
-            if regenerate_waveforms:
-                self.generate_standard_waveforms()
-            waveforms = self._wave_dict[waveform_name]
-            codewords = self.LutMap()[waveform_name]
-            for waveform, cw in zip(waveforms, codewords):
-                self.AWG.get_instr().set(cw, waveform)
+        if regenerate_waveforms:
+            self.generate_standard_waveforms()
+        waveforms = self._wave_dict[waveform_name]
+        codewords = self.LutMap()[waveform_name]
+        for waveform, cw in zip(waveforms, codewords):
+            self.AWG.get_instr().set(cw, waveform)
 
 
 class CBox_MW_LutMan(Base_MW_LutMan):
@@ -253,4 +260,35 @@ class AWG8_VSM_MW_LutMan(Base_MW_LutMan):
                            parameter_class=ManualParameter,
                            vals=vals.Numbers(1, self._num_channels))
 
+    def _add_mixer_corr_pars(self):
+        self.add_parameter('G_mixer_alpha', vals=vals.Numbers(),
+                           parameter_class=ManualParameter,
+                           initial_value=1.0)
+        self.add_parameter('G_mixer_phi', vals=vals.Numbers(), unit='deg',
+                           parameter_class=ManualParameter,
+                           initial_value=0.0)
+        self.add_parameter('D_mixer_alpha', vals=vals.Numbers(),
+                           parameter_class=ManualParameter,
+                           initial_value=1.0)
+        self.add_parameter('D_mixer_phi', vals=vals.Numbers(), unit='deg',
+                           parameter_class=ManualParameter,
+                           initial_value=0.0)
 
+        self.add_parameter(
+            'mixer_apply_predistortion_matrix', vals=vals.Bool(), docstring=(
+                'If True applies a mixer correction using mixer_phi and '
+                'mixer_alpha to all microwave pulses using.'),
+            parameter_class=ManualParameter, initial_value=True)
+
+    def apply_mixer_predistortion_corrections(self, wave_dict):
+
+        M_G = wf.mixer_predistortion_matrix(self.G_mixer_alpha(),
+                                            self.G_mixer_phi())
+        M_D = wf.mixer_predistortion_matrix(self.G_mixer_alpha(),
+                                            self.G_mixer_phi())
+
+        for key, val in wave_dict.items():
+            GI, GQ = np.dot(M_G, val[0:2])  # Mixer correction Gaussian comp.
+            DI, DQ = np.dot(M_D, val[2:4])  # Mixer correction Derivative comp.
+            wave_dict[key] = GI, GQ, DI, DQ
+        return wave_dict

@@ -31,6 +31,8 @@ class QuTech_Duplexer(VisaInstrument):
         logging.info(__name__ + ' : Initializing instrument')
         address += '::5025::SOCKET'
         super().__init__(name, address)
+        self._nr_input_channels = nr_input_channels
+        self._nr_output_channels = nr_output_channels
         self.SCPI_command_pause = 0.1
         self.add_parameters(nr_input_channels=nr_input_channels,
                             nr_output_channels=nr_output_channels)
@@ -61,18 +63,16 @@ class QuTech_Duplexer(VisaInstrument):
                                    inp+1, outp+1) + '{} \n',
                                    set_parser=self._mode_set_parser,
                                    vals=vals.Numbers(0, 65536))
-                self.add_parameter('in{}_out{}_attenuation'.format(inp+1,
-                                                                   outp+1),
+                self.add_parameter('in{}_out{}_att'.format(inp+1, outp+1),
                                    set_cmd='ch:in{}:out{}:att:'.format(
                     inp+1, outp+1) + ' {} \n',
                     vals=vals.Numbers(0, 65536),
                     set_parser=self._mode_set_parser)
 
-    def set_all_switches_to(self, mode):
-        raise NotImplementedError()
-        for i in range(4):
-            for j in range(2):
-                self.set_switch(i+1, j+1, mode)
+    def set_all_switches_to(self, mode: str):
+        for inp in range(4):
+            for outp in range(2):
+                self.set('in{}_out{}_switch'.format(inp+1, outp+1), mode)
 
     def set_all_phases_to(self, val):
         raise NotImplementedError()
