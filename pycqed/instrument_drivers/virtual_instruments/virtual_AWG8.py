@@ -50,6 +50,9 @@ class VirtualAWG8(Instrument):
                     initial_value=np.zeros(32),
                     docstring=docst)
 
+    def upload_codeword_program(self):
+        pass
+
     def stop(self):
         pass
 

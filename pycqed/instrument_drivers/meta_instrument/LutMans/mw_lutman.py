@@ -223,8 +223,25 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                 'wave_ch{}_cw{:03}'.format(self.channel_Q(), cw_idx))
         self.LutMap(LutMap)
 
+    def load_waveforms_onto_AWG_lookuptable(
+            self, regenerate_waveforms: bool=True, stop_start: bool = True):
+        """
+        Loads all waveforms specified in the LutMap to an AWG.
 
-class AWG8_VSM_MW_LutMan(Base_MW_LutMan):
+        Args:
+            regenerate_waveforms (bool): if True calls
+                generate_standard_waveforms before uploading.
+            stop_start           (bool): if True stops and starts the AWG.
+        """
+        super().load_waveforms_onto_AWG_lookuptable(
+            regenerate_waveforms=regenerate_waveforms,
+            stop_start=stop_start)
+        # Uploading the codeword program (again) is needed to link the new
+        # waveforms.
+        self.AWG.get_instr().upload_codeword_program()
+
+
+class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
 
     def __init__(self, name, **kw):
         self._num_channels = 8

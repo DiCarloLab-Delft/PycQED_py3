@@ -246,7 +246,18 @@ class Test_Qubit_Object(unittest.TestCase):
         self.assertEqual(self.AWG8_VSM_MW_LutMan.G_mixer_alpha(), 1.02)
         self.assertEqual(self.AWG8_VSM_MW_LutMan.D_mixer_phi(), 8)
 
+    def test_prep_td_config_vsm(self):
+        self.CCL_qubit.mw_vsm_switch('ON')
+        self.CCL_qubit.mw_vsm_G_att(10234)
+        self.CCL_qubit.mw_vsm_D_phase(10206)
+        self.CCL_qubit.mw_vsm_ch_Gin(3)
+        self.CCL_qubit.mw_vsm_ch_Din(4)
+        self.CCL_qubit.mw_vsm_ch_out(2)
+        self.CCL_qubit.prepare_for_timedomain()
 
+        self.assertEqual(self.Dux.in3_out2_switch(), 'ON')
+        self.assertEqual(self.Dux.in3_out2_att(), 10234)
+        self.assertEqual(self.Dux.in4_out2_phase(), 10206)
 
 
     @classmethod

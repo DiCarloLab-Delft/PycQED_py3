@@ -294,15 +294,16 @@ class CCLight_Transmon(Qubit):
 
         self.add_parameter('mw_vsm_switch',
                            label='VSM switch state',
+                           initial_value='EXT',
                            vals=vals.Enum('ON', 'OFF', 'EXT'),
                            parameter_class=ManualParameter)
 
-        self.add_parameter('mw_vsm_ch_in_G',
+        self.add_parameter('mw_vsm_ch_Gin',
                            label='VSM input channel Gaussian component',
                            vals=vals.Ints(1, 4),
                            initial_value=1,
                            parameter_class=ManualParameter)
-        self.add_parameter('mw_vsm_ch_in_D',
+        self.add_parameter('mw_vsm_ch_Din',
                            label='VSM input channel Derivative component',
                            vals=vals.Ints(1, 4),
                            initial_value=2,
@@ -635,7 +636,7 @@ class CCLight_Transmon(Qubit):
     def prepare_for_timedomain(self):
         self.prepare_readout()
         self._prep_td_sources()
-        self._prep_td_pulses()
+        self._prep_mw_pulses()
 
     def _prep_td_sources(self):
         self.instr_cw_source.get_instr().off()
@@ -646,7 +647,7 @@ class CCLight_Transmon(Qubit):
 
         self.instr_td_source.get_instr().power.set(self.mw_pow_td_source.get())
 
-    def _prep_td_pulses(self):
+    def _prep_mw_pulses(self):
         MW_LutMan = self.instr_LutMan_MW.get_instr()
 
         # 4-channels are used for VSM based AWG's.
@@ -671,16 +672,27 @@ class CCLight_Transmon(Qubit):
         MW_LutMan.D_mixer_alpha(self.mw_D_mixer_alpha())
         MW_LutMan.load_waveforms_onto_AWG_lookuptable()
 
+
+        self._prep_td_configure_VSM()
+
+    def _prep_td_configure_VSM(self):
         # Configure VSM
+        # N.B. This configure VSM block is geared specifically to the
+        # Duplexer/BlueBox VSM
         VSM = self.instr_VSM.get_instr()
-        Gin = self.mw_vsm_ch_in_G()
-        Din = self.mw_vsm_ch_in_D()
+        Gin = self.mw_vsm_ch_Gin()
+        Din = self.mw_vsm_ch_Din()
         out = self.mw_vsm_ch_out()
+
+        VSM.set('in{}_out{}_switch'.format(Gin, out), self.mw_vsm_switch())
+        VSM.set('in{}_out{}_switch'.format(Din, out), self.mw_vsm_switch())
 
         VSM.set('in{}_out{}_att'.format(Gin, out), self.mw_vsm_G_att())
         VSM.set('in{}_out{}_att'.format(Din, out), self.mw_vsm_D_att())
+        VSM.set('in{}_out{}_phase'.format(Gin, out), self.mw_vsm_G_phase())
+        VSM.set('in{}_out{}_phase'.format(Din, out), self.mw_vsm_D_phase())
 
-        # Configure the AWG8 in the right way
+
 
 
 
