@@ -12,27 +12,27 @@ class Base_MW_LutMan(Base_LutMan):
         self.wf_func = wf.mod_gauss
 
         self._add_channel_params()
-        self.add_parameter('Q_amp180', unit='V', vals=vals.Numbers(-1, 1),
+        self.add_parameter('mw_amp180', unit='V', vals=vals.Numbers(-1, 1),
                            parameter_class=ManualParameter,
                            initial_value=0.1)
-        self.add_parameter('Q_amp90_scale',
+        self.add_parameter('mw_amp90_scale',
                            vals=vals.Numbers(-1, 1),
                            parameter_class=ManualParameter,
                            initial_value=0.5)
-        self.add_parameter('Q_motzoi', vals=vals.Numbers(-2, 2),
+        self.add_parameter('mw_motzoi', vals=vals.Numbers(-2, 2),
                            parameter_class=ManualParameter,
                            initial_value=0.0)
-        self.add_parameter('Q_gauss_width',
+        self.add_parameter('mw_gauss_width',
                            vals=vals.Numbers(min_value=1e-9), unit='s',
                            parameter_class=ManualParameter,
                            initial_value=4e-9)
-        self.add_parameter('Q_phi', label='Phase of Rphi pulse',
+        self.add_parameter('mw_phi', label='Phase of Rphi pulse',
                            vals=vals.Numbers(), unit='deg',
                            parameter_class=ManualParameter,
                            initial_value=0)
 
         self.add_parameter(
-            'Q_modulation', vals=vals.Numbers(), unit='Hz',
+            'mw_modulation', vals=vals.Numbers(), unit='Hz',
             docstring=('Modulation frequency for qubit driving pulses. Note'
                        ' that when using an AWG with build in modulation this'
                        ' should be set to 0.'),
@@ -65,62 +65,62 @@ class Base_MW_LutMan(Base_LutMan):
         self._wave_dict = {}
 
         self._wave_dict['I'] = self.wf_func(
-            amp=0, sigma_length=self.Q_gauss_width(),
-            f_modulation=self.Q_modulation(),
+            amp=0, sigma_length=self.mw_gauss_width(),
+            f_modulation=self.mw_modulation(),
             sampling_rate=self.sampling_rate(), phase=0,
             motzoi=0)
         self._wave_dict['rX180'] = self.wf_func(
-            amp=self.Q_amp180(), sigma_length=self.Q_gauss_width(),
-            f_modulation=self.Q_modulation(),
+            amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
+            f_modulation=self.mw_modulation(),
             sampling_rate=self.sampling_rate(), phase=0,
-            motzoi=self.Q_motzoi())
+            motzoi=self.mw_motzoi())
         self._wave_dict['rY180'] = self.wf_func(
-            amp=self.Q_amp180(), sigma_length=self.Q_gauss_width(),
-            f_modulation=self.Q_modulation(),
+            amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
+            f_modulation=self.mw_modulation(),
             sampling_rate=self.sampling_rate(), phase=90,
-            motzoi=self.Q_motzoi())
+            motzoi=self.mw_motzoi())
         self._wave_dict['rX90'] = self.wf_func(
-            amp=self.Q_amp180()*self.Q_amp90_scale(),
-            sigma_length=self.Q_gauss_width(),
-            f_modulation=self.Q_modulation(),
+            amp=self.mw_amp180()*self.mw_amp90_scale(),
+            sigma_length=self.mw_gauss_width(),
+            f_modulation=self.mw_modulation(),
             sampling_rate=self.sampling_rate(), phase=0,
-            motzoi=self.Q_motzoi())
+            motzoi=self.mw_motzoi())
         self._wave_dict['rY90'] = self.wf_func(
-            amp=self.Q_amp180()*self.Q_amp90_scale(),
-            sigma_length=self.Q_gauss_width(),
-            f_modulation=self.Q_modulation(),
+            amp=self.mw_amp180()*self.mw_amp90_scale(),
+            sigma_length=self.mw_gauss_width(),
+            f_modulation=self.mw_modulation(),
             sampling_rate=self.sampling_rate(), phase=90,
-            motzoi=self.Q_motzoi())
+            motzoi=self.mw_motzoi())
         self._wave_dict['rXm90'] = self.wf_func(
-            amp=-1*self.Q_amp180()*self.Q_amp90_scale(),
-            sigma_length=self.Q_gauss_width(),
-            f_modulation=self.Q_modulation(),
+            amp=-1*self.mw_amp180()*self.mw_amp90_scale(),
+            sigma_length=self.mw_gauss_width(),
+            f_modulation=self.mw_modulation(),
             sampling_rate=self.sampling_rate(), phase=0,
-            motzoi=self.Q_motzoi())
+            motzoi=self.mw_motzoi())
         self._wave_dict['rYm90'] = self.wf_func(
-            amp=-1*self.Q_amp180()*self.Q_amp90_scale(),
-            sigma_length=self.Q_gauss_width(),
-            f_modulation=self.Q_modulation(),
+            amp=-1*self.mw_amp180()*self.mw_amp90_scale(),
+            sigma_length=self.mw_gauss_width(),
+            f_modulation=self.mw_modulation(),
             sampling_rate=self.sampling_rate(), phase=90,
-            motzoi=self.Q_motzoi())
+            motzoi=self.mw_motzoi())
 
         self._wave_dict['rPhi180'] = self.wf_func(
-            amp=self.Q_amp180(), sigma_length=self.Q_gauss_width(),
-            f_modulation=self.Q_modulation(),
-            sampling_rate=self.sampling_rate(), phase=self.Q_phi(),
-            motzoi=self.Q_motzoi())
+            amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
+            f_modulation=self.mw_modulation(),
+            sampling_rate=self.sampling_rate(), phase=self.mw_phi(),
+            motzoi=self.mw_motzoi())
         self._wave_dict['rPhi90'] = self.wf_func(
-            amp=self.Q_amp180()*self.Q_amp90_scale(),
-            sigma_length=self.Q_gauss_width(),
-            f_modulation=self.Q_modulation(),
-            sampling_rate=self.sampling_rate(), phase=self.Q_phi(),
-            motzoi=self.Q_motzoi())
+            amp=self.mw_amp180()*self.mw_amp90_scale(),
+            sigma_length=self.mw_gauss_width(),
+            f_modulation=self.mw_modulation(),
+            sampling_rate=self.sampling_rate(), phase=self.mw_phi(),
+            motzoi=self.mw_motzoi())
         self._wave_dict['rPhim90'] = self.wf_func(
-            amp=-1*self.Q_amp180()*self.Q_amp90_scale(),
-            sigma_length=self.Q_gauss_width(),
-            f_modulation=self.Q_modulation(),
-            sampling_rate=self.sampling_rate(), phase=self.Q_phi(),
-            motzoi=self.Q_motzoi())
+            amp=-1*self.mw_amp180()*self.mw_amp90_scale(),
+            sigma_length=self.mw_gauss_width(),
+            f_modulation=self.mw_modulation(),
+            sampling_rate=self.sampling_rate(), phase=self.mw_phi(),
+            motzoi=self.mw_motzoi())
 
         if self.mixer_apply_predistortion_matrix():
             self._wave_dict = self.apply_mixer_predistortion_corrections(

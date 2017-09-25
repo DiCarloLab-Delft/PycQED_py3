@@ -15,7 +15,7 @@ class Test_MW_LutMan(unittest.TestCase):
         self.AWG8_MW_LutMan.AWG(self.AWG.name)
         self.AWG8_MW_LutMan.channel_I(1)
         self.AWG8_MW_LutMan.channel_Q(2)
-        self.AWG8_MW_LutMan.Q_modulation(100e6)
+        self.AWG8_MW_LutMan.mw_modulation(100e6)
         self.AWG8_MW_LutMan.sampling_rate(2.4e9)
 
         self.AWG8_VSM_MW_LutMan = mwl.AWG8_VSM_MW_LutMan('MW_LutMan_VSM')
@@ -24,7 +24,7 @@ class Test_MW_LutMan(unittest.TestCase):
         self.AWG8_VSM_MW_LutMan.channel_GQ(2)
         self.AWG8_VSM_MW_LutMan.channel_DI(3)
         self.AWG8_VSM_MW_LutMan.channel_DQ(4)
-        self.AWG8_VSM_MW_LutMan.Q_modulation(100e6)
+        self.AWG8_VSM_MW_LutMan.mw_modulation(100e6)
         self.AWG8_VSM_MW_LutMan.sampling_rate(2.4e9)
 
         self.CBox_MW_LutMan = mwl.CBox_MW_LutMan('CBox_MW_LutMan')
@@ -41,11 +41,11 @@ class Test_MW_LutMan(unittest.TestCase):
         # Tests that all waveforms are present and no error is raised.
         self.AWG8_MW_LutMan.load_waveforms_onto_AWG_lookuptable()
         expected_wf = wf.mod_gauss(
-            amp=self.AWG8_MW_LutMan.Q_amp180(),
-            sigma_length=self.AWG8_MW_LutMan.Q_gauss_width(),
-            f_modulation=self.AWG8_MW_LutMan.Q_modulation(),
+            amp=self.AWG8_MW_LutMan.mw_amp180(),
+            sigma_length=self.AWG8_MW_LutMan.mw_gauss_width(),
+            f_modulation=self.AWG8_MW_LutMan.mw_modulation(),
             sampling_rate=self.AWG8_MW_LutMan.sampling_rate(), phase=0,
-            motzoi=self.AWG8_MW_LutMan.Q_motzoi())[0]
+            motzoi=self.AWG8_MW_LutMan.mw_motzoi())[0]
 
         uploaded_wf = self.AWG.get('wave_ch1_cw001')
         np.testing.assert_array_almost_equal(expected_wf, uploaded_wf)
@@ -137,11 +137,11 @@ class Test_MW_LutMan(unittest.TestCase):
         # Tests that all waveforms are present and no error is raised.
         self.AWG8_VSM_MW_LutMan.load_waveforms_onto_AWG_lookuptable()
         expected_wfs = wf.mod_gauss_VSM(
-            amp=self.AWG8_VSM_MW_LutMan.Q_amp180(),
-            sigma_length=self.AWG8_VSM_MW_LutMan.Q_gauss_width(),
-            f_modulation=self.AWG8_VSM_MW_LutMan.Q_modulation(),
+            amp=self.AWG8_VSM_MW_LutMan.mw_amp180(),
+            sigma_length=self.AWG8_VSM_MW_LutMan.mw_gauss_width(),
+            f_modulation=self.AWG8_VSM_MW_LutMan.mw_modulation(),
             sampling_rate=self.AWG8_VSM_MW_LutMan.sampling_rate(), phase=0,
-            motzoi=self.AWG8_VSM_MW_LutMan.Q_motzoi())
+            motzoi=self.AWG8_VSM_MW_LutMan.mw_motzoi())
 
         for i in range(4):
             uploaded_wf = self.AWG.get('wave_ch{}_cw001'.format(i+1))

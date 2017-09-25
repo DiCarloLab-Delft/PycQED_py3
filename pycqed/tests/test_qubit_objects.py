@@ -48,7 +48,7 @@ class Test_Qubit_Object(unittest.TestCase):
         self.AWG8_VSM_MW_LutMan.channel_GQ(2)
         self.AWG8_VSM_MW_LutMan.channel_DI(3)
         self.AWG8_VSM_MW_LutMan.channel_DQ(4)
-        self.AWG8_VSM_MW_LutMan.Q_modulation(100e6)
+        self.AWG8_VSM_MW_LutMan.mw_modulation(100e6)
         self.AWG8_VSM_MW_LutMan.sampling_rate(2.4e9)
 
         self.ro_lutman = UHFQC_RO_LutMan('RO_lutman', num_res=5)
@@ -212,8 +212,8 @@ class Test_Qubit_Object(unittest.TestCase):
     ########################################################
     def test_prep_for_timedomain(self):
         self.CCL_qubit.freq_qubit(4.56e9)
-        self.CCL_qubit.Q_freq_mod(-100e6)
-        self.CCL_qubit.Q_awg_ch(1)
+        self.CCL_qubit.mw_freq_mod(-100e6)
+        self.CCL_qubit.mw_awg_ch(1)
         self.CCL_qubit.prepare_for_timedomain()
 
     def test_prep_td_sources(self):
@@ -222,8 +222,8 @@ class Test_Qubit_Object(unittest.TestCase):
         self.MW2.on()
         self.MW3.off()
         self.CCL_qubit.freq_qubit(4.56e9)
-        self.CCL_qubit.Q_freq_mod(-100e6)
-        self.CCL_qubit.Q_pow_td_source(13)
+        self.CCL_qubit.mw_freq_mod(-100e6)
+        self.CCL_qubit.mw_pow_td_source(13)
 
         self.CCL_qubit.prepare_for_timedomain()
         self.assertEqual(self.MW1.status(), 'on')
@@ -233,9 +233,9 @@ class Test_Qubit_Object(unittest.TestCase):
         self.assertEqual(self.MW3.power(), 13)
 
     def test_prep_td_pulses(self):
-        self.CCL_qubit.Q_awg_ch(5)
-        self.CCL_qubit.Q_G_mixer_alpha(1.02)
-        self.CCL_qubit.Q_D_mixer_phi(8)
+        self.CCL_qubit.mw_awg_ch(5)
+        self.CCL_qubit.mw_G_mixer_alpha(1.02)
+        self.CCL_qubit.mw_D_mixer_phi(8)
 
         self.CCL_qubit.prepare_for_timedomain()
         self.assertEqual(self.AWG8_VSM_MW_LutMan.channel_GI(), 5)
