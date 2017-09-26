@@ -98,14 +98,27 @@ class Test_Qubit_Object(unittest.TestCase):
         QT.close()
 
     def test_prep_for_continuous_wave(self):
-        self.CCL_qubit.spec_pow(-20)
         self.CCL_qubit.ro_acq_weight_type('optimal')
         with self.assertRaises(ValueError):
             self.CCL_qubit.prepare_for_continuous_wave()
-
         self.CCL_qubit.ro_acq_weight_type('SSB')
         self.CCL_qubit.prepare_for_continuous_wave()
-        self.assertEqual(self.MW2.status(), 'off')
+        self.assertEqual(self.MW2.status(), 'on')
+
+    def test_prep_cw_config_vsm(self):
+
+        self.CCL_qubit.spec_vsm_ch_in(2)
+        self.CCL_qubit.spec_vsm_ch_out(1)
+        self.CCL_qubit.spec_vsm_att(112)
+
+        self.CCL_qubit.prepare_for_continuous_wave()
+
+        self.assertEqual(self.Dux.in1_out1_switch(), 'OFF')
+        self.assertEqual(self.Dux.in1_out2_switch(), 'OFF')
+        self.assertEqual(self.Dux.in2_out1_switch(), 'EXT')
+        self.assertEqual(self.Dux.in2_out2_switch(), 'OFF')
+        self.assertEqual(self.Dux.in2_out1_att(), 112)
+
 
     def test_prep_for_fluxing(self):
         self.CCL_qubit.prepare_for_fluxing()

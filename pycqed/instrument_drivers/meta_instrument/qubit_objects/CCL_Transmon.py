@@ -337,17 +337,26 @@ class CCLight_Transmon(Qubit):
                            parameter_class=ManualParameter)
 
     def add_spec_parameters(self):
-
-        self.add_parameter('spec_pow', label='spectroscopy power',
-                           unit='dBm',
+        self.add_parameter('spec_vsm_att',
+                           label='VSM attenuation for spec pulses',
+                           vals=vals.Numbers(0, 65536),
+                           initial_value=65536/2,
                            parameter_class=ManualParameter)
-        self.add_parameter('spec_pow_pulsed',
-                           label='pulsed spectroscopy power',
-                           unit='dBm',
+        self.add_parameter('spec_vsm_ch_out',
+                           label='VSM output channel for spectroscopy pulses',
+                           docstring=('Selects the VSM output channel for spec'
+                                      ' pulses. N.B. for mw pulses the '
+                                      'spec_mw_ch_out parameter is used.'),
+                           vals=vals.Ints(1, 2),
+                           initial_value=1,
                            parameter_class=ManualParameter)
-
-        self.add_parameter('mod_amp_cw', label='RO modulation ampl cw',
-                           unit='V', initial_value=0.5,
+        self.add_parameter('spec_vsm_ch_in',
+                           label='VSM input channel for spec pulses',
+                           docstring=('VSM input channel for spec pulses'
+                                      ' generally this should be the same as '
+                                      ' the mw_vsm_ch_Gin parameter.'),
+                           vals=vals.Ints(1, 4),
+                           initial_value=1,
                            parameter_class=ManualParameter)
 
         self.add_parameter('spec_pulse_length',
@@ -356,11 +365,14 @@ class CCLight_Transmon(Qubit):
                            # FIXME validator: should be multiple of 20e-9
                            initial_value=500e-9,
                            parameter_class=ManualParameter)
-        self.add_parameter('spec_amp',
-                           unit='V',
-                           vals=vals.Numbers(0, 1),
-                           parameter_class=ManualParameter,
-                           initial_value=0.4)
+
+        self.add_parameter(
+            'spec_amp', unit='V', docstring=(
+                'Amplitude of the spectroscopy pulse in the mw LutMan. '
+                'The power of the spec pulse should be controlled through '
+                'the vsm attenuation "spec_vsm_att"'),
+            vals=vals.Numbers(0, 1), parameter_class=ManualParameter,
+            initial_value=0.8)
 
     def add_flux_parameters(self):
         pass
@@ -435,8 +447,18 @@ class CCLight_Transmon(Qubit):
             raise ValueError('Readout "{}" '.format(self.ro_acq_weight_type())
                              + 'weight type must be "SSB" or "DSB"')
         self.prepare_readout()
+        self._prep_cw_spec()
         # LO for readout is turned on in prepare_readout
-        self.instr_td_source.get_instr().off()
+        self.instr_td_source.get_instr().on()
+
+    def _prep_cw_spec(self):
+        VSM = self.instr_VSM.get_instr()
+        VSM.set_all_switches_to('OFF')
+        VSM.set('in{}_out{}_switch'.format(self.spec_vsm_ch_in(),
+                                           self.spec_vsm_ch_out()), 'EXT')
+        VSM.set('in{}_out{}_att'.format(
+                self.spec_vsm_ch_in(), self.spec_vsm_ch_out()),
+                self.spec_vsm_att())
 
     def prepare_readout(self):
         """
