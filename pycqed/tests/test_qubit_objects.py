@@ -1,5 +1,10 @@
 import unittest
 import numpy as np
+import os
+import pycqed as pq
+
+import pycqed.analysis.analysis_toolbox as a_tools
+
 import pycqed.instrument_drivers.virtual_instruments.virtual_AWG8 as v8
 import pycqed.instrument_drivers.virtual_instruments.virtual_MW_source as vmw
 from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman as mwl
@@ -39,6 +44,11 @@ class Test_Qubit_Object(unittest.TestCase):
             'MC', live_plot_enabled=False, verbose=False)
         self.MC.station = self.station
         self.station.add_component(self.MC)
+
+        # Required to set it to the testing datadir
+        test_datadir = os.path.join(pq.__path__[0], 'tests', 'test_output')
+        self.MC.datadir(test_datadir)
+        a_tools.datadir = self.MC.datadir()
 
         self.AWG = v8.VirtualAWG8('DummyAWG8')
         self.AWG8_VSM_MW_LutMan = mwl.AWG8_VSM_MW_LutMan('MW_LutMan_VSM')
