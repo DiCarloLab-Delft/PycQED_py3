@@ -73,6 +73,9 @@ class Test_Qubit_Object(unittest.TestCase):
         self.CCL_qubit.instr_LutMan_RO(self.ro_lutman.name)
         self.CCL_qubit.instr_MC(self.MC.name)
 
+        config_fn = os.path.join(pq.__path__[0], 'tests', 'test_cfg_CCL.json')
+        self.CCL_qubit.cfg_openql_platform_fn(config_fn)
+
         # Setting some "random" initial parameters
         self.CCL_qubit.ro_freq(5.43e9)
         self.CCL_qubit.ro_freq_mod(200e6)

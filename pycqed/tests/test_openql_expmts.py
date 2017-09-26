@@ -14,6 +14,9 @@ try:
     ql.set_output_dir(output_dir)
 
     class Test_single_qubit_seqs_CCL(unittest.TestCase):
+        def test_CW_RO_seq(self):
+            sqo.CW_RO_sequence(qubit_idx=0, platf_cfg=config_fn)
+
         def test_allxy(self):
             # Only test if it compiles
             sqo.AllXY(qubit_idx=0, platf_cfg=config_fn)
@@ -29,6 +32,8 @@ try:
         def test_butterfly(self):
             sqo.butterfly(qubit_idx=0, initialize=True,
                           platf_cfg=config_fn)
+
+
 
 
 except ImportError as e:

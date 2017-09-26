@@ -18,8 +18,24 @@ def CW_tone():
     pass
 
 
-def CW_RO_sequence(qubit_name, trigger_separation, clock_cycle=1e-9):
-    pass
+def CW_RO_sequence(qubit_idx: int, platf_cfg: str):
+    """
+    A sequence that performs readout back to back without initialization.
+    The separation of the readout triggers is done by specifying the duration
+    of the readout parameter in the configuration file for compilation.
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="CW_RO_sequence", nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    k = Kernel("main", p=platf)
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+    p.compile()
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
 
 
 def pulsed_spec_sequence(qubit_name, clock_cycle=1e-9):

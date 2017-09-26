@@ -4,6 +4,8 @@ import numpy as np
 import copy
 
 import os
+
+from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
 from pycqed.measurement.waveform_control_CC import qasm_compiler as qcx
 from scipy.optimize import brent
 from pycqed.measurement.optimization import nelder_mead
@@ -382,6 +384,17 @@ class CCLight_Transmon(Qubit):
             unit='s', initial_value=200e-6,
             parameter_class=ManualParameter,
             vals=vals.Numbers(min_value=1e-6, max_value=327668e-9))
+        self.add_parameter('cfg_openql_platform_fn',
+                           label='OpenQL platform configuration filename',
+                           parameter_class=ManualParameter,
+                           vals=vals.Strings())
+        self.add_parameter(
+            'cfg_qubit_nr', label='Qubit number', vals=vals.Ints(0, 7),
+            parameter_class=ManualParameter, initial_value=0,
+            docstring='The qubit number is used in the OpenQL compiler. '
+            'Beware that a similar parameter (ro_pulse_res_nr) exists that is'
+            ' used for uploading to the right Lookuptable. These params are '
+            'oten but not always identical (e.g., multiple feedlines). ')
 
     def add_generic_qubit_parameters(self):
         self.add_parameter('E_c', unit='Hz',
@@ -509,13 +522,6 @@ class CCLight_Transmon(Qubit):
         LO.frequency.set(self.ro_freq() - self.ro_freq_mod())
         LO.on()
         LO.power(self.ro_pow_LO())
-
-        if "gated" in self.ro_pulse_type().lower():
-            raise NotImplementedError()
-            # RF = self.ro_freq_source.get_instr()
-            # RF.power(self.ro_power_cw())
-            # RF.frequency(self.ro_freq.get())
-            # RF.on()
 
     def _prep_ro_pulse(self):
         """
@@ -703,8 +709,13 @@ class CCLight_Transmon(Qubit):
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
-        #####
         # Snippet here to create and upload the CCL instructions
+        CCL = self.instr_CC.get_instr()
+        CCL.stop()
+        p = sqo.CW_RO_sequence(qubit_idx=self.cfg_qubit_nr(),
+                               platf_cfg=self.cfg_openql_platform_fn())
+        CCL.upload_instructions(p.filename)
+        # CCL gets started in the detector
 
         MC.set_sweep_function(swf.Heterodyne_Frequency_Sweep_simple(
             MW_LO_source=self.instr_LO.get_instr(),
