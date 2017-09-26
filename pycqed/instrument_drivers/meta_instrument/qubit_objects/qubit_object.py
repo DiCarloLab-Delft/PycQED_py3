@@ -85,6 +85,7 @@ class Qubit(Instrument):
         - Should the pulse-parameters be grouped here in some convenient way?
             (e.g. parameter prefixes)
     '''
+
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
         self.msmt_suffix = '_' + name  # used to append to measurement labels
@@ -187,8 +188,7 @@ class Qubit(Instrument):
     def measure_ssro(self):
         raise NotImplementedError()
 
-    def measure_spectroscopy(self, freqs, pulsed=False, MC=None,
-                             analyze=True, close_fig=True):
+    def measure_spectroscopy(self):
         raise NotImplementedError()
 
     def measure_transients(self):
@@ -197,44 +197,6 @@ class Qubit(Instrument):
     def measure_motzoi(self, motzois=np.linspace(-.3, .3, 31),
                        MC=None, analyze=True, close_fig=True):
         raise NotImplementedError()
-
-    def find_resonator_frequency(self, use_min=False,
-                                 update=True,
-                                 freqs=None,
-                                 MC=None, close_fig=True):
-        '''
-        Finds the resonator frequency by performing a heterodyne experiment
-        if freqs == None it will determine a default range dependent on the
-        last known frequency of the resonator.
-        '''
-        # This snippet exists to be backwards compatible 9/2017.
-        try:
-            freq_res_par = self.freq_res
-            freq_RO_par = self.ro_freq
-        except AttributeError():
-            logging.warning('Rename the f_res parameter to freq_res')
-            freq_res_par = self.f_res
-            freq_RO_par = self.f_RO
-
-        if freqs is None:
-            f_center = freq_res_par()
-            if f_center is None:
-                raise ValueError('Specify "freq_res" to generate a freq span')
-            f_span = 10e6
-            f_step = 100e3
-            freqs = np.arange(f_center-f_span/2, f_center+f_span/2, f_step)
-        self.measure_heterodyne_spectroscopy(freqs, MC, analyze=False)
-        a = ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
-        if use_min:
-            f_res = a.min_frequency
-        else:
-            f_res = a.fit_results.params['f0'].value*1e9  # fit converts to Hz
-        if f_res > max(freqs) or f_res < min(freqs):
-            logging.warning('exracted frequency outside of range of scan')
-        elif update:  # don't update if the value is out of the scan range
-            freq_res_par(f_res)
-            freq_RO_par(f_res)
-        return f_res
 
     def calibrate_motzoi(self, MC=None, verbose=True, update=True):
         motzois = gen_sweep_pts(center=0, span=1, num=31)
@@ -313,57 +275,7 @@ class Qubit(Instrument):
         raise NotImplementedError
         return True
 
-
-    def calibrate_MW_RO_latency(self, MC=None, update: bool=True)-> bool:
-        """
-        Calibrates parameters:
-            "latency_MW"
-            "RO_acq_delay"
-
-
-        Used to calibrate the delay of the MW pulse with respect to the
-        RO pulse and the RO acquisition delay.
-
-
-        The MW_pulse_latency is calibrated by setting the frequency of
-        the LO to the qubit frequency such that both the MW and the RO pulse
-        will show up in the RO.
-        Measuring the transients will  show what the optimal latency is.
-
-        Note that a lot of averages may be required when using dedicated drive
-        lines.
-
-        This function does NOT overwrite the values that were set in the qubit
-        object and as such can be used to verify the succes of the calibration.
-
-        Currently (28/6/2017) the experiment has to be analysed by hand.
-
-        """
-        raise NotImplementedError()
-        return True
-
-    def calibrate_Flux_pulse_latency(self, MC=None, update=True)-> bool:
-        """
-        Calibrates parameter: "latency_Flux"
-
-        Used to calibrate the timing between the MW and Flux pulses.
-
-        Flux pulse latency is calibrated using a Ram-Z experiment.
-        The experiment works as follows:
-        - x90 | square_flux  # defines t = 0
-        - wait (should be slightly longer than the pulse duration)
-        - x90
-        - wait
-        - RO
-
-        The position of the square flux pulse is varied to find the
-        optimal latency.
-        """
-        raise NotImplementedError
-        return True
-
-    def measure_heterodyne_spectroscopy(self, freqs, MC=None,
-                                        analyze=True, close_fig=True):
+    def measure_heterodyne_spectroscopy(self):
         raise NotImplementedError()
 
     def add_operation(self, operation_name):
@@ -695,14 +607,38 @@ class Transmon(Qubit):
                 close_fig=close_fig)
         return self.f_qubit()
 
-
     def find_frequency_pulsed(self):
         raise NotImplementedError()
 
     def find_frequency_cw_spec(self):
         raise NotImplementedError()
 
-
+    def find_resonator_frequency(self, use_min=False,
+                                 update=True,
+                                 freqs=None,
+                                 MC=None, close_fig=True):
+        '''
+        Finds the resonator frequency by performing a heterodyne experiment
+        if freqs == None it will determine a default range dependent on the
+        last known frequency of the resonator.
+        '''
+        if freqs is None:
+            f_center = self.f_res.get()
+            f_span = 10e6
+            f_step = 100e3
+            freqs = np.arange(f_center-f_span/2, f_center+f_span/2, f_step)
+        self.measure_heterodyne_spectroscopy(freqs, MC, analyze=False)
+        a = ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
+        if use_min:
+            f_res = a.min_frequency
+        else:
+            f_res = a.fit_results.params['f0'].value*1e9  # fit converts to Hz
+        if f_res > max(freqs) or f_res < min(freqs):
+            logging.warning('exracted frequency outside of range of scan')
+        elif update:  # don't update if the value is out of the scan range
+            self.f_res.set(f_res)
+        self.f_RO(self.f_res())
+        return f_res
 
     def calibrate_pulse_amplitude_coarse(self,
                                          amps=np.linspace(-.5, .5, 31),

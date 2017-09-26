@@ -4,6 +4,8 @@ import numpy as np
 
 try:
     from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
+    from pycqed.measurement.openql_experiments.generate_CCL_cfg import  \
+        generate_config
     from openql import openql as ql
 
     rootDir = os.path.dirname(os.path.realpath(__file__))
@@ -12,6 +14,15 @@ try:
 
     output_dir = os.path.join(curdir, 'test_output')
     ql.set_output_dir(output_dir)
+
+    class Test_configuration_files(unittest.TestCase):
+        def test_openQL_config_valid(self):
+            test_config_fn = os.path.join(curdir, 'test_gen_cfg_CCL.json')
+            generate_config(filename=test_config_fn,
+                            mw_pulse_duration=20, RO_duration=300,
+                            init_duration=200000)
+            # If this compiles we conclude that the generated config is valid
+            sqo.AllXY(qubit_idx=0, platf_cfg=test_config_fn)
 
     class Test_single_qubit_seqs_CCL(unittest.TestCase):
         def test_CW_RO_seq(self):
@@ -34,13 +45,10 @@ try:
                           platf_cfg=config_fn)
 
 
-
-
 except ImportError as e:
     class TestMissingDependency(unittest.TestCase):
-
         @unittest.skip('Missing dependency - ' + str(e))
-        def test_fail():
+        def test_fail(self):
             pass
 
 if __name__ == '__main__':
