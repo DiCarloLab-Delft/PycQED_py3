@@ -452,13 +452,12 @@ class MeasurementAnalysis(object):
                     plot_title = kw.pop('plot_title', self.measurementstring +
                                         '\n' + self.timestamp_string)
                 ax.ticklabel_format(useOffset=False)
+                # plots rescaled sweep points (ex: GHz instead of Hz)
                 self.plot_results_vs_sweepparam(x=self.scaled_sweep_points,
                                                 y=self.measured_values[i],
                                                 fig=fig, ax=ax, log=log,
-                                                xlabel=self.parameter_names[0],
-                                                x_unit=self.parameter_units[0],
-                                                ylabel=self.value_names[i],
-                                                y_unit=self.value_units[i],
+                                                xlabel=self.scaled_xlabel,
+                                                ylabel=self.ylabels[i],
                                                 save=False)
                 # fig.suptitle(self.plot_title)
             fig.subplots_adjust(hspace=0.5)
@@ -503,14 +502,15 @@ class MeasurementAnalysis(object):
                     ax = axs[i//2, i % 2]
                 else:
                     ax = axs[i]  # If not 2 or 4 just gives a list of plots
+                # plots rescaled sweep points (ex: GHz instead of Hz)
                 [fig, ax, colormap, cbar]=a_tools.color_plot(
                     x=self.scaled_sweep_points,
                     y=self.scaled_sweep_points_2D,
                     z=self.measured_values[i].transpose(),
                     plot_title=self.zlabels[i],
                     fig=fig, ax=ax,
-                    xlabel=self.xlabel,
-                    ylabel=self.ylabel,
+                    xlabel=self.scaled_xlabel,
+                    ylabel=self.scaled_ylabel,
                     zlabel=self.zlabels[i],
                     save=False,
                     transpose=transpose,
@@ -570,9 +570,9 @@ class MeasurementAnalysis(object):
             self.sweep_unit = self.get_key('sweep_parameter_unit')
             #Add unit prefix to self.sweep_unit
             if unit_prefix == 'u':
-                self.sweep_unit = r'$\mu$' + self.sweep_unit
+                self.scaled_sweep_unit = r'$\mu$' + self.sweep_unit
             else:
-                self.sweep_unit = unit_prefix + self.sweep_unit
+                self.scaled_sweep_unit = unit_prefix + self.sweep_unit
 
             self.value_names = self.get_key('value_names')
             value_units = self.get_key('value_units')
@@ -587,17 +587,19 @@ class MeasurementAnalysis(object):
                 self.ylabels.append(str(
                     self.value_names[i] + '('+value_units[i]+')'))
             self.xlabel = str(self.sweep_name + '('+self.sweep_unit+')')
-            if self.xlabel[0] is not 't':
-                self.xlabel = self.xlabel[0].upper() + self.xlabel[1::]
+            self.scaled_xlabel = str(self.sweep_name + '('+self.scaled_sweep_unit+')')
+            if self.scaled_xlabel[0] is not 't':
+                self.scaled_xlabel = self.scaled_xlabel[0].upper() + \
+                                     self.scaled_xlabel[1::]
         elif datasaving_format == 'Version 2':
 
             self.parameter_names = self.get_key('sweep_parameter_names')
             self.sweep_name = self.parameter_names[0]
             self.parameter_units = self.get_key('sweep_parameter_units')
             if unit_prefix == 'u':
-                self.parameter_units[0] = r'$\mu$' + self.parameter_units[0]
+                self.scaled_sweep_unit = r'$\mu$' + self.parameter_units[0]
             else:
-                self.parameter_units[0] = unit_prefix + self.parameter_units[0]
+                self.scaled_sweep_unit = unit_prefix + self.parameter_units[0]
             self.sweep_unit = self.parameter_units  # for legacy reasons
             self.value_names = self.get_key('value_names')
             self.value_units = self.get_key('value_units')
@@ -615,8 +617,11 @@ class MeasurementAnalysis(object):
 
             self.xlabel = self.parameter_names[0] + ' (' +  \
                 self.parameter_units[0] + ')'
-            if self.xlabel[0] is not 't':
-                self.xlabel = self.xlabel[0].upper() + self.xlabel[1::]
+            self.scaled_xlabel = self.parameter_names[0] + ' (' + \
+                          self.scaled_sweep_unit + ')'
+            if self.scaled_xlabel[0] is not 't':
+                self.scaled_xlabel = self.scaled_xlabel[0].upper() + \
+                                     self.scaled_xlabel[1::]
             self.parameter_labels = [a+' (' + b + ')' for a, b in zip(
                                      self.parameter_names,
                                      self.parameter_units)]
@@ -977,11 +982,11 @@ class MeasurementAnalysis(object):
             self.sweep_unit_2D = self.get_key('sweep_parameter_2D_unit')
             #Add unit prefix to self.sweep_unit and self.sweep_unit_2D
             if unit_prefix == 'u':
-                self.sweep_unit = r'$\mu$' + self.sweep_unit
-                self.sweep_unit_2D = r'$\mu$' + self.sweep_unit_2D
+                self.scaled_sweep_unit = r'$\mu$' + self.sweep_unit
+                self.scaled_sweep_unit_2D = r'$\mu$' + self.sweep_unit_2D
             else:
-                self.sweep_unit = unit_prefix + self.sweep_unit
-                self.sweep_unit_2D = unit_prefix + self.sweep_unit_2D
+                self.scaled_sweep_unit = unit_prefix + self.sweep_unit
+                self.scaled_sweep_unit_2D = unit_prefix + self.sweep_unit_2D
 
             self.value_names = self.get_key('value_names')
             value_units = self.get_key('value_units')
@@ -997,33 +1002,39 @@ class MeasurementAnalysis(object):
                 self.zlabels.append(str(
                     self.value_names[i] + '('+value_units[i]+')'))
             self.xlabel = str(self.sweep_name + '('+self.sweep_unit+')')
-            if self.xlabel[0] is not 't':
-                self.xlabel = self.xlabel[0].upper() + self.xlabel[1::]
+            self.scaled_xlabel = str(self.sweep_name +
+                                     '('+self.scaled_sweep_unit+')')
+            if self.scaled_xlabel[0] is not 't':
+                self.scaled_xlabel = self.scaled_xlabel[0].upper() + \
+                                     self.scaled_xlabel[1::]
             self.ylabel = str(self.sweep_name_2D + '('+self.sweep_unit_2D+')')
-            if self.ylabel[0] is not 't':
-                self.ylabel = self.ylabel[0].upper() + self.ylabel[1::]
+            self.scaled_ylabel = str(self.sweep_name_2D +
+                                     '('+self.scaled_sweep_unit_2D+')')
+            if self.scaled_ylabel[0] is not 't':
+                self.scaled_ylabel = self.scaled_ylabel[0].upper() + \
+                                     self.scaled_ylabel[1::]
 
         elif datasaving_format == 'Version 2':
             self.parameter_names = self.get_key('sweep_parameter_names')
             self.parameter_units = self.get_key('sweep_parameter_units')
             #Add unit prefix to self.sweep_unit and self.sweep_unit_2D
-            for i in range(len(self.parameter_units)):
-                if unit_prefix == 'u':
-                    self.parameter_units[i] = r'$\mu$' + self.parameter_units[i]
-                else:
-                    self.parameter_units[i] = unit_prefix + \
-                                              self.parameter_units[i]
+            # for i in range(len(self.parameter_units)):
+            #     if unit_prefix == 'u':
+            #         self.parameter_units[i] = r'$\mu$' + self.parameter_units[i]
+            #     else:
+            #         self.parameter_units[i] = unit_prefix + \
+            #                                   self.parameter_units[i]
             self.sweep_name = self.parameter_names[0]
             self.sweep_name_2D = self.parameter_names[1]
             self.sweep_unit = self.parameter_units[0]
             self.sweep_unit_2D = self.parameter_units[1]
 
-            # if unit_prefix == 'u':
-            #     self.sweep_unit = r'$\mu$' + self.sweep_unit
-            #     self.sweep_unit_2D = r'$\mu$' + self.sweep_unit_2D
-            # else:
-            #     self.sweep_unit = unit_prefix + self.sweep_unit
-            #     self.sweep_unit_2D = unit_prefix + self.sweep_unit_2D
+            if unit_prefix == 'u':
+                self.scaled_sweep_unit = r'$\mu$' + self.sweep_unit
+                self.scaled_sweep_unit_2D = r'$\mu$' + self.sweep_unit_2D
+            else:
+                self.scaled_sweep_unit = unit_prefix + self.sweep_unit
+                self.scaled_sweep_unit_2D = unit_prefix + self.sweep_unit_2D
 
             self.value_names = self.get_key('value_names')
             self.value_units = self.get_key('value_units')
@@ -1053,12 +1064,18 @@ class MeasurementAnalysis(object):
 
             self.xlabel = self.parameter_names[0] + ' (' +  \
                 self.parameter_units[0] + ')'
+            self.scaled_xlabel = self.parameter_names[0] + ' (' + \
+                          self.scaled_sweep_unit + ')'
+            if self.scaled_xlabel[0] is not 't':
+                self.scaled_xlabel = self.scaled_xlabel[0].upper() + \
+                                     self.scaled_xlabel[1::]
             self.ylabel = self.parameter_names[1] + ' (' +  \
                 self.parameter_units[1] + ')'
-            if self.xlabel[0] is not 't':
-                self.xlabel = self.xlabel[0].upper() + self.xlabel[1::]
-            if self.ylabel[0] is not 't':
-                self.ylabel = self.ylabel[0].upper() + self.ylabel[1::]
+            self.scaled_ylabel = self.parameter_names[1] + ' (' + \
+                          self.scaled_sweep_unit_2D + ')'
+            if self.scaled_ylabel[0] is not 't':
+                self.scaled_ylabel = self.scaled_ylabel[0].upper() + \
+                                     self.scaled_ylabel[1::]
 
             self.parameter_labels = [a+' (' + b + ')' for a, b in zip(
                                      self.parameter_names,
@@ -1429,7 +1446,7 @@ class TD_Analysis(MeasurementAnalysis):
             self.plot_results_vs_sweepparam(x=self.scaled_sweep_points,
                                             y=self.normalized_values,
                                             fig=self.fig, ax=self.ax,
-                                            xlabel=self.xlabel,
+                                            xlabel=self.scaled_xlabel,
                                             ylabel=ylabel,
                                             marker='o-',
                                             save=False)
@@ -4556,7 +4573,7 @@ class Ramsey_Analysis(TD_Analysis):
                 self.plot_results_vs_sweepparam(x=self.sweep_pts*self.scale,
                                                 y=ramsey_data_dict[str(i)],
                                                 fig=self.fig, ax=ax,
-                                                xlabel=self.xlabel,
+                                                xlabel=self.scaled_xlabel,
                                                 ylabel=ylabel,
                                                 marker='o-',
                                                 save=False)
@@ -5962,7 +5979,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
             self.plot_results_vs_sweepparam(x=self.scaled_sweep_points,
                                             y=self.measured_values[0],
                                             fig=fig, ax=ax,
-                                            xlabel=self.xlabel,
+                                            xlabel=self.scaled_xlabel,
                                             ylabel=str('S21_mag (arb. units)'),
                                             save=False)
 
@@ -5988,13 +6005,13 @@ class Homodyne_Analysis(MeasurementAnalysis):
             self.plot_results_vs_sweepparam(x=self.scaled_sweep_points,
                                             y=self.measured_powers,
                                             fig=fig, ax=ax,
-                                            xlabel=self.xlabel,
+                                            xlabel=self.scaled_xlabel,
                                             ylabel=str('Power (arb. units)'),
                                             save=False)
             if interactive_plot:
                 self.plotly_plot(self.scaled_sweep_points,
                                  self.measured_powers,fit_res,
-                                 xlabel=self.xlabel,
+                                 xlabel=self.scaled_xlabel,
                                  ylabel=str('Power (arb. units)'),
                                  show_exponent=False)
 
@@ -6597,7 +6614,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         self.plot_results_vs_sweepparam(x=self.scaled_sweep_points,
                                         y=self.data_dist,
                                         fig=fig_dist, ax=ax_dist,
-                                        xlabel=self.xlabel,
+                                        xlabel=self.scaled_xlabel,
                                         ylabel='S21 distance (arb.units)',
                                         label=False,
                                         save=False)
