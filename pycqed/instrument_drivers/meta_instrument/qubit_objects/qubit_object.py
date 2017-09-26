@@ -187,7 +187,8 @@ class Qubit(Instrument):
     def measure_ssro(self):
         raise NotImplementedError()
 
-    def measure_spectroscopy(self):
+    def measure_spectroscopy(self, freqs, pulsed=False, MC=None,
+                             analyze=True, close_fig=True):
         raise NotImplementedError()
 
     def measure_transients(self):

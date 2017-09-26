@@ -38,8 +38,29 @@ def CW_RO_sequence(qubit_idx: int, platf_cfg: str):
     return p
 
 
-def pulsed_spec_sequence(qubit_name, clock_cycle=1e-9):
-    pass
+def pulsed_spec_sequence(qubit_idx: int, spec_pulse_duration: float,
+                         platf_cfg: str):
+    """
+    Sequence for a pulsed spectroscopy.
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="CW_RO_sequence", nqubits=platf.get_qubit_number(),
+                p=platf)
+    k = Kernel("main", p=platf)
+
+    nr_clocks = int(spec_pulse_duration/20e-9)
+
+    for i in range(nr_clocks):
+        # The spec pulse is a pulse that lasts 20ns, because of the way the VSM
+        # control works. By repeating it the duration can be controlled.
+        k.gate('spec', qubit_idx)
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+    p.compile()
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
 
 
 def T1(qubit_name, times, clock_cycle=1e-9,

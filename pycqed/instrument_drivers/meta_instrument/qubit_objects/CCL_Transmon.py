@@ -727,3 +727,7 @@ class CCLight_Transmon(Qubit):
         MC.run(name='Resonator_scan'+self.msmt_suffix)
         if analyze:
             ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
+
+    def measure_spectroscopy(self, freqs, pulsed=False, MC=None,
+                             analyze=True, close_fig=True):
+        pass
