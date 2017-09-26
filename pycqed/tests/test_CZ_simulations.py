@@ -55,7 +55,7 @@ except ImportError as e:
         class Test_CZ_single_trajectory_analysis_skipped(unittest.TestCase):
 
             @unittest.skip('Missing dependency - ' + str(e))
-            def test_fail():
+            def test_fail(self):
                 pass
     else:
         raise
