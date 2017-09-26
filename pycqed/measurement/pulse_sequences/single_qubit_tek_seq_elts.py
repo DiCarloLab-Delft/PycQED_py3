@@ -860,6 +860,13 @@ def get_pulse_dict_from_pars(pulse_pars):
     pi_amp = pulse_pars['amplitude']
     pi2_amp = pulse_pars['amplitude']*pulse_pars['amp90_scale']
 
+    # Software Z-gate: apply phase offset to all subsequent X and Y pulses
+    Z180 = deepcopy(pulse_pars)
+    Z180['pulse_type'] = 'Z_pulse'
+    for i in pulse_pars.keys():
+        if i not in ['phase', 'pulse_type', 'pulse_delay','operation_type']:
+            del Z180[i]
+
     pulses = {'I': deepcopy(pulse_pars),
               'X180': deepcopy(pulse_pars),
               'mX180': deepcopy(pulse_pars),
@@ -868,8 +875,11 @@ def get_pulse_dict_from_pars(pulse_pars):
               'Y180': deepcopy(pulse_pars),
               'mY180': deepcopy(pulse_pars),
               'Y90': deepcopy(pulse_pars),
-              'mY90': deepcopy(pulse_pars)}
-
+              'mY90': deepcopy(pulse_pars),
+              'Z180': Z180,
+              'mZ180': deepcopy(Z180),
+              'Z90': deepcopy(Z180),
+              'mZ90': deepcopy(Z180)}
 
     pulses['I']['amplitude'] = 0
     pulses['mX180']['amplitude'] = -pi_amp
@@ -884,4 +894,29 @@ def get_pulse_dict_from_pars(pulse_pars):
     pulses['mY90']['amplitude'] = -pi2_amp
     pulses['mY90']['phase'] += 90
 
+    pulses['Z180']['phase'] += 180
+    pulses['mZ180']['phase'] += -180
+    pulses['Z90']['phase'] += 90
+    pulses['mZ90']['phase'] += -90
+
     return pulses
+
+def Z(theta=0, pulse_pars=None):
+
+    """
+    Software Z-gate of arbitrary rotation.
+
+    :param theta:           rotation angle
+    :param pulse_pars:      pulse parameters (dict)
+
+    :return: Pulse dict of the Z-gate
+    """
+    if pulse_pars is None:
+        raise ValueError('Pulse_pars is None.')
+    else:
+        pulses = get_pulse_dict_from_pars(pulse_pars)
+
+    Z_gate = deepcopy(pulses['Z180'])
+    Z_gate['phase'] = theta
+
+    return Z_gate
