@@ -1,43 +1,23 @@
 import time
 import logging
 import numpy as np
-import copy
-import logging
-import os
 try:
     from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
 except ImportError:
     logging.warning('Could not import OpenQL')
     sqo = None
-from pycqed.measurement.waveform_control_CC import qasm_compiler as qcx
-from scipy.optimize import brent
-from pycqed.measurement.optimization import nelder_mead
-import pygsti
 
 from .qubit_object import Qubit
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter
-from pycqed.measurement.waveform_control_CC import waveform as wf
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import measurement_analysis as ma2
-import pycqed.analysis.analysis_toolbox as a_tools
 
-from pycqed.analysis.tools.data_manipulation import rotation_matrix
 from pycqed.measurement.calibration_toolbox import (
     mixer_carrier_cancellation, mixer_skewness_calibration_CBoxV3)
 
 from pycqed.measurement import sweep_functions as swf
-from pycqed.measurement.waveform_control_CC import single_qubit_qasm_seqs as sqqs
-import pycqed.measurement.CBox_sweep_functions as cbs
-from pycqed.measurement.waveform_control_CC import qasm_helpers as qh
-from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
-from pycqed.measurement.waveform_control_CC import instruction_lib as ins_lib
-
-from pycqed.measurement.waveform_control_CC import QWG_fluxing_seqs as qwfs
-from pycqed.measurement.waveform_control_CC.instruction_lib import convert_to_clocks
-
 from pycqed.measurement import detector_functions as det
-import pycqed.measurement.gate_set_tomography.gate_set_tomography_CC as gstCC
 
 
 class CCLight_Transmon(Qubit):
