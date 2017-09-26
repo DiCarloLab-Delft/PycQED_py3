@@ -881,7 +881,7 @@ def smooth(x, window_len=11, window='hanning'):
     return y[edge:-edge]
 
 
-def find_second_peak(sweep_pts_cut_edges=None, data_dist_smooth=None,
+def find_second_peak(sweep_pts=None, data_dist_smooth=None,
                      key=None, peaks=None, percentile=20, optimize=False,
                      verbose=False):
 
@@ -903,34 +903,35 @@ def find_second_peak(sweep_pts_cut_edges=None, data_dist_smooth=None,
 
     # Calculate how many data points away from the tallest peak
     # to look left and right. Should be 50MHz away.
-    freq_range = sweep_pts_cut_edges[-1]-sweep_pts_cut_edges[0]
-    num_points = sweep_pts_cut_edges.size
+    freq_range = sweep_pts[-1]-sweep_pts[0]
+    num_points = sweep_pts.size
     n = int(50e6*num_points/freq_range)
     m = int(50e6*num_points/freq_range)
 
     # Search for 2nd peak (f_ge) to the right of the first (tallest)
-    while(int(len(sweep_pts_cut_edges)-1) <= int(tallest_peak_idx+n) and
+    while(int(len(sweep_pts)-1) <= int(tallest_peak_idx+n) and
                   n>0):
         # Reduce n if outside of range
         n -= 1
-    if (int(tallest_peak_idx+n)) == sweep_pts_cut_edges.size:
+    if (int(tallest_peak_idx+n)) == sweep_pts.size:
         # If n points to the right of tallest peak is the range edge:
         n = 0
-    if not ((int(tallest_peak_idx+n)) >= sweep_pts_cut_edges.size):
+    if not ((int(tallest_peak_idx+n)) >= sweep_pts.size):
         if verbose:
             print('Searching for the gf/2 {:} {:} points to the right of the largest'
                   ' in the range {:.5}-{:.5}'.format(
                   key,
                   n,
-                  sweep_pts_cut_edges[int(tallest_peak_idx+n)],
-                  sweep_pts_cut_edges[-1]) )
+                  sweep_pts[int(tallest_peak_idx+n)],
+                  sweep_pts[-1]) )
 
         peaks_right = peak_finder(
-            sweep_pts_cut_edges[int(tallest_peak_idx+n)::],
+            sweep_pts[int(tallest_peak_idx+n)::],
             data_dist_smooth[int(tallest_peak_idx+n)::],
             percentile=percentile,
             num_sigma_threshold=1,
             optimize=optimize,
+            window_len=0,
             key=key)
 
         # The peak/dip found to the right of the tallest is assumed to be
@@ -965,15 +966,16 @@ def find_second_peak(sweep_pts_cut_edges=None, data_dist_smooth=None,
                   'largest, in the range {:.5}-{:.5}'.format(
                   key,
                   m,
-                  sweep_pts_cut_edges[0],
-                  sweep_pts_cut_edges[int(tallest_peak_idx-m-1)]) )
+                  sweep_pts[0],
+                  sweep_pts[int(tallest_peak_idx-m-1)]) )
 
         peaks_left = peak_finder(
-            sweep_pts_cut_edges[0:int(tallest_peak_idx-m)],
+            sweep_pts[0:int(tallest_peak_idx-m)],
             data_dist_smooth[0:int(tallest_peak_idx-m)],
             percentile=percentile,
             num_sigma_threshold=1,
             optimize=optimize,
+            window_len=0,
             key=key)
 
         # The peak/dip found to the left of the tallest is assumed to be
@@ -1062,29 +1064,33 @@ def cut_edges(array, window_len=11):
     array = array[(window_len//2):-(window_len//2)]
     return array
 
-def peak_finder(x, y, percentile=20, num_sigma_threshold=5,
-                key=None, optimize=True):
+def peak_finder(x, y, percentile=20, num_sigma_threshold=5, window_len=11,
+                key=None, optimize=False):
     """
     Uses look_for_peak_dips (the old peak_finder routine renamed) to find peaks/
-    dips. If optimize==True, reruns look_for_peak_dips until tallest (for peaks)
-    data point/lowest (for dip) data point has been found.
+    dips. If optimize==False, results from look_for_peak_dips is returned,
+    and this routine is the same as the old peak_finder routine.
+    If optimize==True, reruns look_for_peak_dips until tallest (for peaks)
+    data point/lowest (for dips) data point has been found.
 
     :param x:                       x data
     :param y:                       y data
     :param percentile:              percentile of data defining background noise
     :param num_sigma_threshold:     number of std deviations above background
                                     where to look for data
-    :param key:                     'peak' or 'dip'
+    :param key:                     'peak' or 'dip'; tell look_for_peals_dips
+                                    to return only the peaks or the dips
     :param optimize:                re-run look_for_peak_dips until tallest
                                     (for peaks) data point/lowest (for dip) data
                                     point has been found
-    :return:                        dict from look_for_peaks_dips
+    :return:                        dict of peaks, dips, or both from
+                                    look_for_peaks_dips
     """
 
     # First search for peaks/dips
     search_result = look_for_peaks_dips(x=x, y_smoothed=y, percentile=percentile,
                                         num_sigma_threshold=num_sigma_threshold,
-                                        key=key)
+                                        key=key, window_len=window_len)
 
     if optimize:
     # Rerun if the found peak/dip is smaller/larger than the largest/
@@ -1123,7 +1129,7 @@ def peak_finder(x, y, percentile=20, num_sigma_threshold=5,
                 search_result = look_for_peaks_dips(x=x,y_smoothed=y,
                                     percentile=percentile,
                                     num_sigma_threshold=(num_sigma_threshold),
-                                    key=key_1)
+                                    key=key_1, window_len=window_len)
 
                 if search_result[key_1+'_idx'] is None:
                     search_result = search_result_1
@@ -1134,22 +1140,20 @@ def peak_finder(x, y, percentile=20, num_sigma_threshold=5,
 
     return search_result
 
-def look_for_peaks_dips(x, y_smoothed, percentile=20,
+def look_for_peaks_dips(x, y_smoothed, percentile=20, window_len=11,
                         num_sigma_threshold=5, key=None):
-
-# Originally:
-# def peak_finder(x, y, percentile=20, num_sigma_threshold=5,
-#                         window_len=3, analyze_ef=False):
 
     '''
     Peak finding algorithm designed by Serwan
     1 smooth data
     2 Define the threshold based on background data
     3
+
+    key:    'peak' or 'dip'; return only the peaks or the dips
     '''
 
     # Smooth the data
-    #y_smoothed = smooth(y, window_len=window_len)
+    y_smoothed = smooth(y_smoothed, window_len=window_len)
 
     # Finding peaks
     # Defining the threshold
@@ -1204,9 +1208,8 @@ def look_for_peaks_dips(x, y_smoothed, percentile=20,
 
         #Take an approximate peak width for each peak index
         for i,idx in enumerate(peak_indices):
-            if (idx+i+1)<x.size and (idx-i-1)>=0:          #ensure data points
-                                                           #idx+i+1 and idx-i-1
-                                                           #are inside sweep pts
+            if (idx+i+1)<x.size and (idx-i-1)>=0:
+                #ensure data points idx+i+1 and idx-i-1 are inside sweep pts
                 peak_widths += [ (x[idx+i+1] - x[idx-i-1])/5 ]
             elif (idx+i+1)>x.size and (idx-i-1)>=0:
                 peak_widths += [ (x[idx] - x[idx-i])/5 ]
