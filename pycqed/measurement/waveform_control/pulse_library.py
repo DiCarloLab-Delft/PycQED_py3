@@ -393,8 +393,6 @@ class GaussFluxPulse(Pulse):
             gauss_kernel = gauss_kernel/np.sum(gauss_kernel)
             i_max = int(nr_samples/2)
             pulse = np.convolve(pulse, gauss_kernel, mode='full')[i_max:(len(pulse)+i_max)]
-            plt.plot(tvals,pulse)
-            plt.show()
         return pulse
 
 
