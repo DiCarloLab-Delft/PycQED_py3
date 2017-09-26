@@ -2,10 +2,13 @@ import time
 import logging
 import numpy as np
 import copy
-
+import logging
 import os
-
-from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
+try:
+    from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
+except ImportError:
+    logging.warning('Could not import OpenQL')
+    sqo = None
 from pycqed.measurement.waveform_control_CC import qasm_compiler as qcx
 from scipy.optimize import brent
 from pycqed.measurement.optimization import nelder_mead

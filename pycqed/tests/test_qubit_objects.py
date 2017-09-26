@@ -25,6 +25,13 @@ from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import dummy_CCL
 from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
 
 
+try:
+    import openql
+    openql_import_fail = True
+except:
+    openql_import_fail = False
+
+
 class Test_Qubit_Object(unittest.TestCase):
 
     @classmethod
@@ -291,6 +298,7 @@ class Test_Qubit_Object(unittest.TestCase):
     ###################################################
     #          Test basic experiments                 #
     ###################################################
+    @unittest.skipIf(openql_import_fail, 'OpenQL not present')
     def test_resonator_spec(self):
         self.CCL_qubit.ro_acq_weight_type('SSB')
 
@@ -304,11 +312,13 @@ class Test_Qubit_Object(unittest.TestCase):
 
         self.CCL_qubit.measure_heterodyne_spectroscopy(freqs=freqs)
 
+    @unittest.skipIf(openql_import_fail, 'OpenQL not present')
     def test_qubit_spec(self):
         freqs = np.linspace(6e9, 6.5e9, 31)
         self.CCL_qubit.measure_spectroscopy(freqs=freqs)
 
     @unittest.skip('NotImplementedError')
+    @unittest.skipIf(openql_import_fail, 'OpenQL not present')
     def test_find_qubit_freq(self):
         self.CCL_qubit.find_frequency()
 
