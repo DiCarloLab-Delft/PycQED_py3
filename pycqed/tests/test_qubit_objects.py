@@ -223,6 +223,8 @@ class Test_Qubit_Object(unittest.TestCase):
         self.assertEqual(self.UHFQC.quex_rot_4_real(), .21)
         self.assertEqual(self.UHFQC.quex_rot_4_imag(), .108)
 
+        self.CCL_qubit.ro_acq_weight_type('SSB')
+
     ########################################################
     #          Test prepare for timedomain                 #
     ########################################################
@@ -289,14 +291,13 @@ class Test_Qubit_Object(unittest.TestCase):
 
         self.CCL_qubit.measure_heterodyne_spectroscopy(freqs=freqs)
 
-
-    @unittest.skip('NotImplementedError')
     def test_qubit_spec(self):
-        raise NotImplementedError()
+        freqs = np.linspace(6e9, 6.5e9, 31)
+        self.CCL_qubit.measure_spectroscopy(freqs=freqs)
 
     @unittest.skip('NotImplementedError')
-    def test_qubit_pulsed_spec(self):
-        raise NotImplementedError()
+    def test_find_qubit_freq(self):
+        self.CCL_qubit.find_frequency()
 
     @unittest.skip('NotImplementedError')
     def test_AllXY(self):

@@ -38,7 +38,7 @@ def CW_RO_sequence(qubit_idx: int, platf_cfg: str):
     return p
 
 
-def pulsed_spec_sequence(qubit_idx: int, spec_pulse_duration: float,
+def pulsed_spec_sequence(qubit_idx: int, spec_pulse_length: float,
                          platf_cfg: str):
     """
     Sequence for a pulsed spectroscopy.
@@ -48,7 +48,7 @@ def pulsed_spec_sequence(qubit_idx: int, spec_pulse_duration: float,
                 p=platf)
     k = Kernel("main", p=platf)
 
-    nr_clocks = int(spec_pulse_duration/20e-9)
+    nr_clocks = int(spec_pulse_length/20e-9)
 
     for i in range(nr_clocks):
         # The spec pulse is a pulse that lasts 20ns, because of the way the VSM

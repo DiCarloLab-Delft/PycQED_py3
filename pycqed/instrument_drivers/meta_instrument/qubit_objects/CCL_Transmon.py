@@ -350,21 +350,10 @@ class CCLight_Transmon(Qubit):
                            unit='V', initial_value=0.5,
                            parameter_class=ManualParameter)
 
-        self.add_parameter('spec_pulse_marker_channel',
-                           vals=vals.Ints(1, 7),
-                           initial_value=5,
-                           parameter_class=ManualParameter)
-        self.add_parameter('spec_pulse_type',
-                           vals=vals.Enum('gated', 'square'),
-                           initial_value='gated',
-                           docstring=('Use either a marker gated spec pulse or' +
-                                      ' use an AWG pulse to modulate a pulse'),
-                           parameter_class=ManualParameter)
-
         self.add_parameter('spec_pulse_length',
                            label='Pulsed spec pulse duration',
-                           unit='s',
-                           vals=vals.Numbers(5e-9, 20e-6),
+                           unit='s', vals=vals.Numbers(20e-9, 20e-6),
+                           # FIXME validator: should be multiple of 20e-9
                            initial_value=500e-9,
                            parameter_class=ManualParameter)
         self.add_parameter('spec_amp',
@@ -715,7 +704,7 @@ class CCLight_Transmon(Qubit):
         p = sqo.CW_RO_sequence(qubit_idx=self.cfg_qubit_nr(),
                                platf_cfg=self.cfg_openql_platform_fn())
         CCL.upload_instructions(p.filename)
-        # CCL gets started in the detector
+        # CCL gets started in the int_avg detector
 
         MC.set_sweep_function(swf.Heterodyne_Frequency_Sweep_simple(
             MW_LO_source=self.instr_LO.get_instr(),
@@ -728,6 +717,30 @@ class CCLight_Transmon(Qubit):
         if analyze:
             ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
 
-    def measure_spectroscopy(self, freqs, pulsed=False, MC=None,
+    def measure_spectroscopy(self, freqs, pulsed=True, MC=None,
                              analyze=True, close_fig=True):
-        pass
+        if pulsed == False:
+            raise NotImplementedError()
+        self.prepare_for_continuous_wave()
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        # Snippet here to create and upload the CCL instructions
+        CCL = self.instr_CC.get_instr()
+        CCL.stop()
+        p = sqo.pulsed_spec_sequence(
+            qubit_idx=self.cfg_qubit_nr(),
+            spec_pulse_length=self.spec_pulse_length(),
+            platf_cfg=self.cfg_openql_platform_fn())
+        CCL.upload_instructions(p.filename)
+        # CCL gets started in the int_avg detector
+
+        MC.set_sweep_function(swf.Heterodyne_Frequency_Sweep_simple(
+            MW_LO_source=self.instr_LO.get_instr(),
+            IF=self.ro_freq_mod()))
+        MC.set_sweep_points(freqs)
+
+        self.int_avg_det_single._set_real_imag(False)
+        MC.set_detector_function(self.int_avg_det_single)
+        MC.run(name='Resonator_scan'+self.msmt_suffix)
+        if analyze:
+            ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
