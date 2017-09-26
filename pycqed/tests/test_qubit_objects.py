@@ -29,7 +29,6 @@ class Test_Qubit_Object(unittest.TestCase):
 
         self.MW1 = vmw.VirtualMWsource('MW1')
         self.MW2 = vmw.VirtualMWsource('MW2')
-        self.MW3 = vmw.VirtualMWsource('MW3')
 
         self.UHFQC = dummy_UHFQC('UHFQC')
 
@@ -57,8 +56,7 @@ class Test_Qubit_Object(unittest.TestCase):
         # Assign instruments
         self.CCL_qubit.instr_LutMan_MW(self.AWG8_VSM_MW_LutMan.name)
         self.CCL_qubit.instr_LO(self.MW1.name)
-        self.CCL_qubit.instr_cw_source(self.MW2.name)
-        self.CCL_qubit.instr_td_source(self.MW3.name)
+        self.CCL_qubit.instr_td_source(self.MW2.name)
         self.CCL_qubit.instr_acquisition(self.UHFQC.name)
         self.CCL_qubit.instr_VSM(self.Dux.name)
         self.CCL_qubit.instr_CC(self.CCL.name)
@@ -88,11 +86,13 @@ class Test_Qubit_Object(unittest.TestCase):
 
     def test_prep_for_continuous_wave(self):
         self.CCL_qubit.spec_pow(-20)
-        self.CCL_qubit.prepare_for_continuous_wave()
+        self.CCL_qubit.ro_acq_weight_type('optimal')
+        with self.assertRaises(ValueError):
+            self.CCL_qubit.prepare_for_continuous_wave()
 
-        self.assertEqual(self.MW2.power(), -20)
+        self.CCL_qubit.ro_acq_weight_type('SSB')
+        self.CCL_qubit.prepare_for_continuous_wave()
         self.assertEqual(self.MW2.status(), 'off')
-        self.assertEqual(self.MW3.status(), 'off')
 
     def test_prep_for_fluxing(self):
         self.CCL_qubit.prepare_for_fluxing()
@@ -161,7 +161,6 @@ class Test_Qubit_Object(unittest.TestCase):
         self.assertEqual(self.UHFQC.sigouts_0_offset(), .01)
         self.assertEqual(self.UHFQC.sigouts_1_offset(), .02)
 
-
     def test_prep_ro_integration_weigths(self):
         IF = 50e6
         self.CCL_qubit.ro_freq_mod(IF)
@@ -223,18 +222,16 @@ class Test_Qubit_Object(unittest.TestCase):
     def test_prep_td_sources(self):
 
         self.MW1.off()
-        self.MW2.on()
-        self.MW3.off()
+        self.MW2.off()
         self.CCL_qubit.freq_qubit(4.56e9)
         self.CCL_qubit.mw_freq_mod(-100e6)
         self.CCL_qubit.mw_pow_td_source(13)
 
         self.CCL_qubit.prepare_for_timedomain()
         self.assertEqual(self.MW1.status(), 'on')
-        self.assertEqual(self.MW2.status(), 'off')
-        self.assertEqual(self.MW3.status(), 'on')
-        self.assertEqual(self.MW3.frequency(), 4.56e9 + 100e6)
-        self.assertEqual(self.MW3.power(), 13)
+        self.assertEqual(self.MW2.status(), 'on')
+        self.assertEqual(self.MW2.frequency(), 4.56e9 + 100e6)
+        self.assertEqual(self.MW2.power(), 13)
 
     def test_prep_td_pulses(self):
         self.CCL_qubit.mw_awg_ch(5)
@@ -263,6 +260,34 @@ class Test_Qubit_Object(unittest.TestCase):
         self.assertEqual(self.Dux.in3_out2_att(), 10234)
         self.assertEqual(self.Dux.in4_out2_phase(), 10206)
 
+    ###################################################
+    #          Test basic experiments                 #
+    ###################################################
+    def test_resonator_spec(self):
+        self.CCL_qubit.ro_acq_weight_type('SSB')
+
+        # set to not set to bypass validator
+        self.CCL_qubit.freq_res._save_val(None)
+        with self.assertRaises(ValueError):
+            self.CCL_qubit.find_resonator_frequency()
+        self.CCL_qubit.freq_res(5.4e9)
+        self.CCL_qubit.find_resonator_frequency()
+        freqs = np.linspace(6e9, 6.5e9, 31)
+
+        self.CCL_qubit.measure_heterodyne_spectroscopy(freqs=freqs)
+
+
+    @unittest.skip('NotImplementedError')
+    def test_qubit_spec(self):
+        raise NotImplementedError()
+
+    @unittest.skip('NotImplementedError')
+    def test_qubit_pulsed_spec(self):
+        raise NotImplementedError()
+
+    @unittest.skip('NotImplementedError')
+    def test_AllXY(self):
+        raise NotImplementedError()
 
     @classmethod
     def tearDownClass(self):

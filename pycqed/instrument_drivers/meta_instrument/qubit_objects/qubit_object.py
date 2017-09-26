@@ -197,6 +197,44 @@ class Qubit(Instrument):
                        MC=None, analyze=True, close_fig=True):
         raise NotImplementedError()
 
+    def find_resonator_frequency(self, use_min=False,
+                                 update=True,
+                                 freqs=None,
+                                 MC=None, close_fig=True):
+        '''
+        Finds the resonator frequency by performing a heterodyne experiment
+        if freqs == None it will determine a default range dependent on the
+        last known frequency of the resonator.
+        '''
+        # This snippet exists to be backwards compatible 9/2017.
+        try:
+            freq_res_par = self.freq_res
+            freq_RO_par = self.ro_freq
+        except AttributeError():
+            logging.warning('Rename the f_res parameter to freq_res')
+            freq_res_par = self.f_res
+            freq_RO_par = self.f_RO
+
+        if freqs is None:
+            f_center = freq_res_par()
+            if f_center is None:
+                raise ValueError('Specify "freq_res" to generate a freq span')
+            f_span = 10e6
+            f_step = 100e3
+            freqs = np.arange(f_center-f_span/2, f_center+f_span/2, f_step)
+        self.measure_heterodyne_spectroscopy(freqs, MC, analyze=False)
+        a = ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
+        if use_min:
+            f_res = a.min_frequency
+        else:
+            f_res = a.fit_results.params['f0'].value*1e9  # fit converts to Hz
+        if f_res > max(freqs) or f_res < min(freqs):
+            logging.warning('exracted frequency outside of range of scan')
+        elif update:  # don't update if the value is out of the scan range
+            freq_res_par(f_res)
+            freq_RO_par(f_res)
+        return f_res
+
     def calibrate_motzoi(self, MC=None, verbose=True, update=True):
         motzois = gen_sweep_pts(center=0, span=1, num=31)
 
@@ -323,8 +361,8 @@ class Qubit(Instrument):
         raise NotImplementedError
         return True
 
-
-    def measure_heterodyne_spectroscopy(self):
+    def measure_heterodyne_spectroscopy(self, freqs, MC=None,
+                                        analyze=True, close_fig=True):
         raise NotImplementedError()
 
     def add_operation(self, operation_name):
@@ -663,32 +701,7 @@ class Transmon(Qubit):
     def find_frequency_cw_spec(self):
         raise NotImplementedError()
 
-    def find_resonator_frequency(self, use_min=False,
-                                 update=True,
-                                 freqs=None,
-                                 MC=None, close_fig=True):
-        '''
-        Finds the resonator frequency by performing a heterodyne experiment
-        if freqs == None it will determine a default range dependent on the
-        last known frequency of the resonator.
-        '''
-        if freqs is None:
-            f_center = self.f_res.get()
-            f_span = 10e6
-            f_step = 100e3
-            freqs = np.arange(f_center-f_span/2, f_center+f_span/2, f_step)
-        self.measure_heterodyne_spectroscopy(freqs, MC, analyze=False)
-        a = ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
-        if use_min:
-            f_res = a.min_frequency
-        else:
-            f_res = a.fit_results.params['f0'].value*1e9  # fit converts to Hz
-        if f_res > max(freqs) or f_res < min(freqs):
-            logging.warning('exracted frequency outside of range of scan')
-        elif update:  # don't update if the value is out of the scan range
-            self.f_res.set(f_res)
-        self.f_RO(self.f_res())
-        return f_res
+
 
     def calibrate_pulse_amplitude_coarse(self,
                                          amps=np.linspace(-.5, .5, 31),

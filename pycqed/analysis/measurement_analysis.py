@@ -3895,9 +3895,10 @@ class Homodyne_Analysis(MeasurementAnalysis):
         else:                                 # Otherwise take center of range
             f0 = np.median(self.sweep_points)
             amplitude_factor = -1.
-            logging.error('No peaks or dips in range')
+            logging.warning('No peaks or dips in range')
             # If this error is raised, it should continue the analysis but
             # not use it to update the qubit object
+            # N.B. This not updating is not implemented as of 9/2017
 
         # Fit data according to the model required
         if 'hanger' in fitting_model:

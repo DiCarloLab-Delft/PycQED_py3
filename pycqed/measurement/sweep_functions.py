@@ -80,6 +80,24 @@ class Heterodyne_Frequency_Sweep(Soft_Sweep):
             self.RF_source.frequency(val)
 
 
+class Heterodyne_Frequency_Sweep_simple(Soft_Sweep):
+    # Same as above but less input arguments
+    def __init__(self, MW_LO_source, IF,
+                 sweep_points=None,
+                 **kw):
+        super().__init__()
+        self.name = 'Heterodyne frequency'
+        self.parameter_name = 'Frequency'
+        self.unit = 'Hz'
+        self.sweep_points = sweep_points
+        self.MW_LO_source = MW_LO_source
+        self.IF = IF
+
+    def set_parameter(self, val):
+        # RF = LO + IF
+        self.MW_LO_source.frequency(val-self.IF)
+
+
 class None_Sweep(Soft_Sweep):
 
     def __init__(self, sweep_control='soft', sweep_points=None,

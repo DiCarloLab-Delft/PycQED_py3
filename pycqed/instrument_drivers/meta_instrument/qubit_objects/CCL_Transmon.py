@@ -53,8 +53,7 @@ class CCLight_Transmon(Qubit):
 
     def add_instrument_ref_parameters(self):
         # MW sources
-        self.add_parameter('instr_LO', parameter_class=InstrumentRefParameter)
-        self.add_parameter('instr_cw_source',
+        self.add_parameter('instr_LO',
                            parameter_class=InstrumentRefParameter)
         self.add_parameter('instr_td_source',
                            parameter_class=InstrumentRefParameter)
@@ -309,7 +308,10 @@ class CCLight_Transmon(Qubit):
                            initial_value=2,
                            parameter_class=ManualParameter)
         self.add_parameter('mw_vsm_ch_out',
-                           label='VSM output channel',
+                           label='VSM output channel for microwave pulses',
+                           docstring=('Selects the VSM output channel for MW'
+                                      ' pulses. N.B. for spec the '
+                                      'spec_vsm_ch_out parameter is used.'),
                            vals=vals.Ints(1, 2),
                            initial_value=1,
                            parameter_class=ManualParameter)
@@ -331,8 +333,6 @@ class CCLight_Transmon(Qubit):
                            vals=vals.Numbers(0, 65536),
                            initial_value=65536/2,
                            parameter_class=ManualParameter)
-
-
 
     def add_spec_parameters(self):
 
@@ -427,13 +427,14 @@ class CCLight_Transmon(Qubit):
                            parameter_class=ManualParameter)
 
     def prepare_for_continuous_wave(self):
+        if self.ro_acq_weight_type() not in {'DSB', 'SSB'}:
+            # this is because the CW acquisition detects using angle and phase
+            # and this requires two channels to rotate the signal properly.
+            raise ValueError('Readout "{}" '.format(self.ro_acq_weight_type())
+                             + 'weight type must be "SSB" or "DSB"')
         self.prepare_readout()
-
-        # LO and RF for readout are turned on in prepare_readout
+        # LO for readout is turned on in prepare_readout
         self.instr_td_source.get_instr().off()
-        self.instr_cw_source.get_instr().off()
-        self.instr_cw_source.get_instr().pulsemod_state.set('off')
-        self.instr_cw_source.get_instr().power.set(self.spec_pow.get())
 
     def prepare_readout(self):
         """
@@ -639,7 +640,6 @@ class CCLight_Transmon(Qubit):
         self._prep_mw_pulses()
 
     def _prep_td_sources(self):
-        self.instr_cw_source.get_instr().off()
         self.instr_td_source.get_instr().on()
         # Set source to fs =f-f_mod such that pulses appear at f = fs+f_mod
         self.instr_td_source.get_instr().frequency.set(
@@ -672,7 +672,6 @@ class CCLight_Transmon(Qubit):
         MW_LutMan.D_mixer_alpha(self.mw_D_mixer_alpha())
         MW_LutMan.load_waveforms_onto_AWG_lookuptable()
 
-
         self._prep_td_configure_VSM()
 
     def _prep_td_configure_VSM(self):
@@ -692,16 +691,28 @@ class CCLight_Transmon(Qubit):
         VSM.set('in{}_out{}_phase'.format(Gin, out), self.mw_vsm_G_phase())
         VSM.set('in{}_out{}_phase'.format(Din, out), self.mw_vsm_D_phase())
 
-
-
-
-
-
     def prepare_for_fluxing(self, reset=True):
         pass
 
-    def _get_acquisition_instr(self):
-        pass
+    #####################################################
+    # "measure_" methods below
+    #####################################################
 
-    def _set_acquisition_instr(self, acq_instr_name):
-        pass
+    def measure_heterodyne_spectroscopy(self, freqs, MC=None,
+                                        analyze=True, close_fig=True):
+        self.prepare_for_continuous_wave()
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        #####
+        # Snippet here to create and upload the CCL instructions
+
+        MC.set_sweep_function(swf.Heterodyne_Frequency_Sweep_simple(
+            MW_LO_source=self.instr_LO.get_instr(),
+            IF=self.ro_freq_mod()))
+        MC.set_sweep_points(freqs)
+
+        self.int_avg_det_single._set_real_imag(False)
+        MC.set_detector_function(self.int_avg_det_single)
+        MC.run(name='Resonator_scan'+self.msmt_suffix)
+        if analyze:
+            ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)

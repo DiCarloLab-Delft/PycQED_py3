@@ -325,48 +325,14 @@ class dummy_UHFQC(Instrument):
     def acquisition_poll(self, samples, arm=True,
                          acquisition_time=0.010):
         """
-        Polls the UHFQC for data.
-
-        Args:
-            samples (int): the expected number of samples
-            arm    (bool): if true arms the acquisition, disable when you
-                           need synchronous acquisition with some external dev
-            acquisition_time (float): time in sec between polls? # TODO check with Niels H
-            timeout (float): time in seconds before timeout Error is raised.
-
+        Dummy version of UHFQC acquisiton poll
         """
         data = dict()
-
-        # Start acquisition
-        if arm:
-            self.acquisition_arm()
-
-        # Acquire data
-        gotem = [False]*len(self.acquisition_paths)
-        accumulated_time = 0
-
-        while accumulated_time < self.timeout() and not all(gotem):
-            dataset = self._daq.poll(acquisition_time, 1, 4, True)
-
-            for n, p in enumerate(self.acquisition_paths):
-                if p in dataset:
-                    for v in dataset[p]:
-                        if n in data:
-                            data[n] = np.concatenate((data[n], v['vector']))
-                        else:
-                            data[n] = v['vector']
-                        if len(data[n]) >= samples:
-                            gotem[n] = True
-            accumulated_time += acquisition_time
-
-        if not all(gotem):
-            self.acquisition_finalize()
-            for n, c in enumerate(self.acquisition_paths):
-                if n in data:
-                    print("\t: Channel {}: Got {} of {} samples".format(
-                          n, len(data[n]), samples))
-            raise TimeoutError("Error: Didn't get all results!")
-
+        # puts dummy data in all channels of the expected length
+        # channels are labeled as integers
+        channels = np.arange(9)
+        for ch in channels:
+            data[ch] = np.random.rand(samples)
         return data
 
     def acquisition(self, samples, acquisition_time=0.010, timeout=0,
@@ -378,28 +344,7 @@ class dummy_UHFQC(Instrument):
         return data
 
     def acquisition_initialize(self, channels=set([0, 1]), mode='rl'):
-        # Define the channels to use and subscribe to them
-        self.acquisition_paths = []
-
-        if mode == 'rl':
-            for c in channels:
-                self.acquisition_paths.append(
-                    '/' + self._device + '/quex/rl/data/{}'.format(c))
-            self._daq.subscribe('/' + self._device + '/quex/rl/data/*')
-            # Enable automatic readout
-            self._daq.setInt('/' + self._device + '/quex/rl/readout', 1)
-        else:
-            for c in channels:
-                self.acquisition_paths.append(
-                    '/' + self._device + '/quex/iavg/data/{}'.format(c))
-            self._daq.subscribe('/' + self._device + '/quex/iavg/data/*')
-            # Enable automatic readout
-            self._daq.setInt('/' + self._device + '/quex/iavg/readout', 1)
-
-        self._daq.subscribe('/' + self._device + '/auxins/0/sample')
-
-        # Generate more dummy data
-        self._daq.setInt('/' + self._device + '/auxins/0/averaging', 8)
+        pass
 
     def acquisition_finalize(self):
         pass
