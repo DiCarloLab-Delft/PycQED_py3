@@ -139,8 +139,9 @@ def latest_data(contains='', older_than=None, newer_than=None, or_equal=False,
     i = len(daydirs)-1
     while len(measdirs) == 0 and i >= 0:
         daydir = daydirs[i]
-        # this makes sure hidden folders (OS related) are not searched
-        if not daydir.startswith('.'):
+        # this makes sure that (most) non day dirs do not get searched
+        # as they should start with a digit (e.g. YYYYMMDD)
+        if daydir[0].isdigit():
             all_measdirs = [d for d in os.listdir(
                 os.path.join(search_dir, daydir))]
             all_measdirs.sort()
