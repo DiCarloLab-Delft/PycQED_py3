@@ -50,15 +50,12 @@ def Lorentzian(f, A, offset, f0, kappa):
     val = offset + A/np.pi * (kappa / ((f-f0)**2 + kappa**2))
     return val
 
-
-def TwinLorentzFunc(f, amplitude_a, amplitude_b, center_a, center_b,
-                    sigma_a, sigma_b, background=0):
+def TwinLorentzFunc(f, A_gf_over_2, A, f0_gf_over_2, f0,
+                    kappa_gf_over_2, kappa, background=0):
     'twin lorentz with background'
-    val = (amplitude_a/np.pi * (sigma_a / ((f-center_a)**2 + sigma_a**2)) +
-           amplitude_b/np.pi * (sigma_b / ((f-center_b)**2 + sigma_b**2)) +
-           background)
+    val = (A_gf_over_2/np.pi * (kappa_gf_over_2 / ((f-f0_gf_over_2)**2 + kappa_gf_over_2**2)) +
+           A/np.pi * (kappa / ((f-f0)**2 + kappa**2)) + background)
     return val
-
 
 def Qubit_dac_to_freq(dac_voltage, f_max, E_c,
                       dac_sweet_spot, V_per_phi0=None, dac_flux_coefficient=None,

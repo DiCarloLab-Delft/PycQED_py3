@@ -1,11 +1,13 @@
 # some convenience tools
 #
+import inspect
 import logging
 import numpy as np
 import os
 import time
 import datetime
 import warnings
+from copy import deepcopy
 from collections import OrderedDict as od
 from matplotlib import pyplot as plt
 from matplotlib import colors
@@ -878,6 +880,172 @@ def smooth(x, window_len=11, window='hanning'):
     return y[edge:-edge]
 
 
+def find_second_peak(sweep_pts=None, data_dist_smooth=None,
+                     key=None, peaks=None, percentile=20, optimize=False,
+                     verbose=False):
+
+    """
+    Used for qubit spectroscopy analysis. Find the second gf/2 peak/dip based on
+    the location of the tallest peak found, given in peaks, which is the result
+    of peak_finder. The algorithm takes the index of this tallest peak and looks
+    to the right and to the left of it for the tallest peaks in these new
+    ranges. The resulting two new peaks are compared and the tallest/deepest
+    one is chosen.
+    """
+
+    tallest_peak = peaks[key] #the ge freq
+    tallest_peak_idx = peaks[key+'_idx']
+    tallest_peak_width = peaks[key+'_width']
+    tallest_peak_val = data_dist_smooth[tallest_peak_idx]
+    if verbose:
+        print('Largest peak is at ',tallest_peak)
+
+    # Calculate how many data points away from the tallest peak
+    # to look left and right. Should be 50MHz away.
+    freq_range = sweep_pts[-1]-sweep_pts[0]
+    num_points = sweep_pts.size
+    n = int(50e6*num_points/freq_range)
+    m = int(50e6*num_points/freq_range)
+
+    # Search for 2nd peak (f_ge) to the right of the first (tallest)
+    while(int(len(sweep_pts)-1) <= int(tallest_peak_idx+n) and
+                  n>0):
+        # Reduce n if outside of range
+        n -= 1
+    if (int(tallest_peak_idx+n)) == sweep_pts.size:
+        # If n points to the right of tallest peak is the range edge:
+        n = 0
+    if not ((int(tallest_peak_idx+n)) >= sweep_pts.size):
+        if verbose:
+            print('Searching for the gf/2 {:} {:} points to the right of the largest'
+                  ' in the range {:.5}-{:.5}'.format(
+                  key,
+                  n,
+                  sweep_pts[int(tallest_peak_idx+n)],
+                  sweep_pts[-1]) )
+
+        peaks_right = peak_finder(
+            sweep_pts[int(tallest_peak_idx+n)::],
+            data_dist_smooth[int(tallest_peak_idx+n)::],
+            percentile=percentile,
+            num_sigma_threshold=1,
+            optimize=optimize,
+            window_len=0,
+            key=key)
+
+        # The peak/dip found to the right of the tallest is assumed to be
+        # the ge peak, which means that the tallest was in fact the gf/2 peak
+        if verbose:
+            print('Right peak is at ', peaks_right[key])
+        subset_right = data_dist_smooth[int(tallest_peak_idx+n)::]
+        val_right = subset_right[peaks_right[key+'_idx']]
+        f0_right = peaks_right[key]
+        kappa_guess_right = peaks_right[key+'_width']
+        f0_gf_over_2_right = tallest_peak
+        kappa_guess_ef_right = tallest_peak_width
+    else:
+        if verbose:
+            print('Right peak is None')
+        val_right = 0
+        f0_right = 0
+        kappa_guess_right = 0
+        f0_gf_over_2_right = tallest_peak
+        kappa_guess_ef_right = tallest_peak_width
+
+    # Search for 2nd peak (f_gf/2) to the left of the first (tallest)
+    while(int(tallest_peak_idx-m)<0 and m>0):
+        # Reduce m if outside of range
+        m -= 1
+    if int(tallest_peak_idx-m) == 0:
+        # If m points to the left of tallest peak is the range edge:
+        m = 0
+    if not (int(tallest_peak_idx-m) <= 0):
+        if verbose:
+            print('Searching for the gf/2 {:} {:} points to the left of the '
+                  'largest, in the range {:.5}-{:.5}'.format(
+                  key,
+                  m,
+                  sweep_pts[0],
+                  sweep_pts[int(tallest_peak_idx-m-1)]) )
+
+        peaks_left = peak_finder(
+            sweep_pts[0:int(tallest_peak_idx-m)],
+            data_dist_smooth[0:int(tallest_peak_idx-m)],
+            percentile=percentile,
+            num_sigma_threshold=1,
+            optimize=optimize,
+            window_len=0,
+            key=key)
+
+        # The peak/dip found to the left of the tallest is assumed to be
+        # the gf/2 peak, which means that the tallest was indeed the ge peak
+        if verbose:
+            print('Left peak is at ', peaks_left[key])
+        subset_left = data_dist_smooth[0:int(tallest_peak_idx-m)]
+        val_left = subset_left[peaks_left[key+'_idx']]
+        f0_left = tallest_peak
+        kappa_guess_left = tallest_peak_width
+        f0_gf_over_2_left = peaks_left[key]
+        kappa_guess_ef_left = peaks_left[key+'_width']
+    else:
+        if verbose:
+            print('Left peak is None')
+        val_left = 0
+        f0_left = tallest_peak
+        kappa_guess_left = tallest_peak_width
+        f0_gf_over_2_left = 0
+        kappa_guess_ef_left = 0
+
+    if np.abs(val_left) > np.abs(val_right):
+        # If peak on the left taller than peak on the right, then
+        # the second peak is to the left of the tallest and it is indeed
+        # the gf/2 peak, while the tallest is the ge peak.
+        if np.abs(f0_gf_over_2_left - tallest_peak) > 50e6:
+            # If the two peaks found are separated by at least 50MHz,
+            # then both the ge and gf/2 have been found.
+            if verbose:
+                print('Both f_ge and f_gf/2 have been found. '
+                      'f_ge was assumed to the LEFT of f_gf/2.')
+        else:
+            # If not, then it is just some other signal.
+            logging.warning('The f_gf/2 '+key+' was not found. Fitting to '
+                                    'the next largest '+key+' found.')
+
+        f0 = f0_left
+        kappa_guess = kappa_guess_left
+        f0_gf_over_2 = f0_gf_over_2_left
+        kappa_guess_ef = kappa_guess_ef_left
+
+    elif np.abs(val_left) < np.abs(val_right):
+        # If peak on the right taller than peak on the left, then
+        # the second peak is to the right of the tallest and it is in fact
+        # the ge peak, while the tallest is the gf/2 peak.
+        if np.abs(f0_right - tallest_peak) > 50e6:
+            # If the two peaks found are separated by at least 50MHz,
+            # then both the ge and gf/2 have been found.
+            if verbose:
+                print('Both f_ge and f_gf/2 have been found. '
+                      'f_ge was assumed to the RIGHT of f_gf/2.')
+        else:
+            # If not, then it is just some other signal.
+            logging.warning('The f_gf/2 '+key+' was not found. Fitting to '
+                                    'the next largest '+key+' found.')
+        f0 = f0_right
+        kappa_guess = kappa_guess_right
+        f0_gf_over_2 = f0_gf_over_2_right
+        kappa_guess_ef = kappa_guess_ef_right
+
+    else:
+        # If the peaks on the right and left are equal, or cannot be compared,
+        # then there was probably no second peak, and only noise was found.
+        logging.warning('Only f_ge has been found.')
+        f0 = tallest_peak
+        kappa_guess = tallest_peak_width
+        f0_gf_over_2 = tallest_peak
+        kappa_guess_ef = tallest_peak_width
+
+    return f0, f0_gf_over_2, kappa_guess, kappa_guess_ef
+
 def peak_finder_v2(x, y, perc=90, window_len=11):
     '''
     Peak finder based on argrelextrema function from scipy
@@ -891,21 +1059,100 @@ def peak_finder_v2(x, y, perc=90, window_len=11):
     sort_mask = np.argsort(y[array_peaks])[::-1]
     return peaks_x[sort_mask]
 
+def cut_edges(array, window_len=11):
+    array = array[(window_len//2):-(window_len//2)]
+    return array
 
-def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
+def peak_finder(x, y, percentile=20, num_sigma_threshold=5, window_len=11,
+                key=None, optimize=False):
+    """
+    Uses look_for_peak_dips (the old peak_finder routine renamed) to find peaks/
+    dips. If optimize==False, results from look_for_peak_dips is returned,
+    and this routine is the same as the old peak_finder routine.
+    If optimize==True, reruns look_for_peak_dips until tallest (for peaks)
+    data point/lowest (for dips) data point has been found.
 
-    def cut_edges(array, window_len=11):
-        array = array[(window_len/2):-(window_len/2)]
-        return array
+    :param x:                       x data
+    :param y:                       y data
+    :param percentile:              percentile of data defining background noise
+    :param num_sigma_threshold:     number of std deviations above background
+                                    where to look for data
+    :param key:                     'peak' or 'dip'; tell look_for_peals_dips
+                                    to return only the peaks or the dips
+    :param optimize:                re-run look_for_peak_dips until tallest
+                                    (for peaks) data point/lowest (for dip) data
+                                    point has been found
+    :return:                        dict of peaks, dips, or both from
+                                    look_for_peaks_dips
+    """
+
+    # First search for peaks/dips
+    search_result = look_for_peaks_dips(x=x, y_smoothed=y, percentile=percentile,
+                                        num_sigma_threshold=num_sigma_threshold,
+                                        key=key, window_len=window_len)
+
+    if optimize:
+    # Rerun if the found peak/dip is smaller/larger than the largest/
+    # smallest data point
+
+        y_for_test = deepcopy(y)
+        # Figure out if the data set has peaks or dips
+        if key is not None:
+            key_1 = key
+        else:
+            if search_result['dip'] is None:
+                key_1 = 'peak'
+            elif search_result['peak'] is None:
+                key_1 = 'dip'
+                y_for_test = -y_for_test
+            elif np.abs(y[search_result['dip_idx']]) < \
+                    np.abs(y[search_result['peak_idx']]):
+                key_1 = 'peak'
+            elif np.abs(y[search_result['dip_idx']]) > \
+                 np.abs(y[search_result['peak_idx']]):
+                key_1 = 'dip'
+                y_for_test = -y_for_test
+            else:
+                logging.error('Cannot determine for sure if data set has peaks '
+                              'or dips. Assume peaks.')
+                key_1 = 'peak'
+
+        if (y_for_test[search_result[key_1+'_idx']] < max(y_for_test)):
+            while ((y_for_test[search_result[key_1+'_idx']] < max(y_for_test)) and
+                    (num_sigma_threshold<100) and
+                        (len(search_result[key_1+'s_idx'])>1)):
+
+                search_result_1 = deepcopy(search_result)
+                num_sigma_threshold += 1
+
+                search_result = look_for_peaks_dips(x=x,y_smoothed=y,
+                                    percentile=percentile,
+                                    num_sigma_threshold=(num_sigma_threshold),
+                                    key=key_1, window_len=window_len)
+
+                if search_result[key_1+'_idx'] is None:
+                    search_result = search_result_1
+                    break
+
+            print('Peak Finder: Optimal num_sigma_threshold after optimization '
+                  'is ', num_sigma_threshold)
+
+    return search_result
+
+def look_for_peaks_dips(x, y_smoothed, percentile=20, window_len=11,
+                        num_sigma_threshold=5, key=None):
+
     '''
     Peak finding algorithm designed by Serwan
     1 smooth data
     2 Define the threshold based on background data
     3
+
+    key:    'peak' or 'dip'; return only the peaks or the dips
     '''
 
     # Smooth the data
-    y_smoothed = smooth(y, window_len=window_len)
+    y_smoothed = smooth(y_smoothed, window_len=window_len)
 
     # Finding peaks
     # Defining the threshold
@@ -920,7 +1167,10 @@ def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
     thresholdlst = np.arange(y_smoothed.size)[y_smoothed > threshold]
     datthreshold = y_smoothed[thresholdlst]
 
-    kk = 0
+    if thresholdlst.size is 0:
+        kk = 0
+    else:
+        kk = thresholdlst[0]
     inpeak = False
     peakranges = []
     peak_indices = []
@@ -940,7 +1190,7 @@ def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
                     inpeak = False
                     peakranges.append([peakfmin, peakfmax])
 
-        peakranges.append([peakfmin, peakfmax])
+            peakranges.append([peakfmin, peakfmax])
         for elem in peakranges:
             try:
                 if elem[0] != elem[1]:
@@ -948,17 +1198,34 @@ def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
                                      np.argmax(y_smoothed[elem[0]:elem[1]])]
                 else:
                     peak_indices += [elem[0]]
-                peak_widths += [x[elem[1]] - x[elem[0]]]
+                #peak_widths += [x[elem[1]] - x[elem[0]]]
             except:
                 pass
-        peaks = np.take(x, peak_indices)  # Frequencies of peaks
-        peak_vals = np.take(y_smoothed, peak_indices)  # values of peaks
-        peak_index = peak_indices[np.argmax(peak_vals)]  # idx of highest peak
-        peak = x[peak_index]
+
+        #eliminate duplicates
+        peak_indices = np.unique(peak_indices)
+
+        #Take an approximate peak width for each peak index
+        for i,idx in enumerate(peak_indices):
+            if (idx+i+1)<x.size and (idx-i-1)>=0:
+                #ensure data points idx+i+1 and idx-i-1 are inside sweep pts
+                peak_widths += [ (x[idx+i+1] - x[idx-i-1])/5 ]
+            elif (idx+i+1)>x.size and (idx-i-1)>=0:
+                peak_widths += [ (x[idx] - x[idx-i])/5 ]
+            elif (idx+i+1)<x.size and (idx-i-1)<0:
+                peak_widths += [ (x[idx+i] - x[idx])/5 ]
+            else:
+                peak_widths += [ 5e6 ]
+
+        peaks = np.take(x, peak_indices)                   #Frequencies of peaks
+        peak_vals = np.take(y_smoothed, peak_indices)           #values of peaks
+        peak_index = peak_indices[np.argmax(peak_vals)]
         peak_width = peak_widths[np.argmax(peak_vals)]
+        peak = x[peak_index]                          #Frequency of highest peak
 
     else:
         peak = None
+        peak_vals = None
         peak_index = None
         peaks = []
         peak_width = None
@@ -974,7 +1241,11 @@ def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
 
     thresholdlst = np.arange(y_smoothed.size)[y_smoothed < threshold]
     datthreshold = y_smoothed[thresholdlst]
-    kk = 0
+
+    if thresholdlst.size is 0:
+        kk = 0
+    else:
+        kk = thresholdlst[0]
     indip = False
     dipranges = []
     dip_indices = []
@@ -994,7 +1265,7 @@ def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
                     indip = False
                     dipranges.append([dipfmin, dipfmax])
 
-        dipranges.append([dipfmin, dipfmax])
+            dipranges.append([dipfmin, dipfmax])
         for elem in dipranges:
             try:
                 if elem[0] != elem[1]:
@@ -1002,26 +1273,60 @@ def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
                                     np.argmin(y_smoothed[elem[0]:elem[1]])]
                 else:
                     dip_indices += [elem[0]]
-                dip_widths += [x[elem[1]] - x[elem[0]]]
+                #dip_widths += [x[elem[1]] - x[elem[0]]]
             except:
                 pass
+
+        #eliminate duplicates
+        dip_indices = np.unique(dip_indices)
+
+        #Take an approximate dip width for each dip index
+        for i,idx in enumerate(dip_indices):
+            if (idx+i+1)<x.size and (idx-i-1)>=0:         #ensure data points
+                                                          #idx+i+1 and idx-i-1
+                                                          #are inside sweep pts
+                dip_widths += [ (x[idx+i+1] - x[idx-i-1])/5 ]
+            elif (idx+i+1)>x.size and (idx-i-1)>=0:
+                dip_widths += [ (x[idx] - x[idx-i])/5 ]
+            elif (idx+i+1)<x.size and (idx-i-1)<0:
+                dip_widths += [ (x[idx+i] - x[idx])/5 ]
+            else:
+                dip_widths += [ 5e6 ]
+
         dips = np.take(x, dip_indices)
         dip_vals = np.take(y_smoothed, dip_indices)
         dip_index = dip_indices[np.argmin(dip_vals)]
+        dip_width = dip_widths[np.argmax(dip_vals)]
         dip = x[dip_index]
-        dip_width = dip_widths[np.argmin(dip_vals)]
+
     else:
         dip = None
+        dip_vals = None
         dip_index = None
         dips = []
         dip_width = None
 
-    return {'peak': peak, 'peak_idx': peak_index,
-            'peak_width': peak_width, 'peak_widths': peak_widths,
-            'peaks': peaks, 'peaks_idx': peak_indices,
-            'dip': dip, 'dip_idx': dip_index,
-            'dip_width': dip_width, 'dip_widths': dip_widths,
-            'dips': dips, 'dips_idx': dip_indices}
+    if key == 'peak':
+        return {'peak': peak, 'peak_idx': peak_index, 'peak_values':peak_vals,
+                'peak_width': peak_width, 'peak_widths': peak_widths,
+                'peaks': peaks, 'peaks_idx': peak_indices,
+                'dip': None, 'dip_idx': None, 'dip_values':[],
+                'dip_width': None, 'dip_widths': [],
+                'dips': [], 'dips_idx': []}
+    elif key == 'dip':
+        return {'peak': None, 'peak_idx': None, 'peak_values':[],
+                'peak_width': None, 'peak_widths': [],
+                'peaks': [], 'peaks_idx': [],
+                'dip': dip, 'dip_idx': dip_index, 'dip_values':dip_vals,
+                'dip_width': dip_width, 'dip_widths': dip_widths,
+                'dips': dips, 'dips_idx': dip_indices}
+    else:
+        return {'peak': peak, 'peak_idx': peak_index, 'peak_values':peak_vals,
+                'peak_width': peak_width, 'peak_widths': peak_widths,
+                'peaks': peaks, 'peaks_idx': peak_indices,
+                'dip': dip, 'dip_idx': dip_index, 'dip_values':dip_vals,
+                'dip_width': dip_width, 'dip_widths': dip_widths,
+                'dips': dips, 'dips_idx': dip_indices}
 
 
 def calculate_distance_ground_state(data_real, data_imag, percentile=70,
@@ -1114,39 +1419,156 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
     Inputs:
         data (numpy array) : 2D dataset that has to be rotated and normalized
         zero_coord (tuple) : coordinates of reference zero
-                one_coord (tuple) : coordinates of reference one
+        one_coord (tuple) : coordinates of reference one
         cal_zero_points (range) : range specifying what indices in 'data'
                                   correspond to zero
         cal_one_points (range) : range specifying what indices in 'data'
                                  correspond to one
     '''
     # Extract zero and one coordinates
-    if zero_coord is not None:
-        I_zero = zero_coord[0]
-        Q_zero = zero_coord[1]
-    else:
+    start_at_zero = kw.get('start_at_zero', False)
+
+    if np.all([cal_zero_points==None, cal_one_points==None,
+               zero_coord==None, one_coord==None]):
+        # no cal points were used
+        normalized_data = rotate_and_normalize_data_no_cal_points(data=data,
+                                                                  **kw)
+    elif np.all([cal_one_points==None, one_coord==None]) and \
+        (not np.all([cal_zero_points==None, zero_coord==None])):
+        # only 2 cal points used; both are I pulses
         I_zero = np.mean(data[0][cal_zero_points])
         Q_zero = np.mean(data[1][cal_zero_points])
-        zero_coord = (I_zero, Q_zero)
-    if one_coord is not None:
-        I_one = one_coord[0]
-        Q_one = one_coord[1]
+
+        # Translate the data
+        trans_data = [data[0] - I_zero, data[1] - Q_zero]
+
+        # Least squares fitting to the line through the data, that also
+        # intercepts the calibration point
+
+        from lmfit.models import LinearModel
+
+        x = trans_data[0]
+        y = trans_data[1]
+
+        linear_model = LinearModel()
+        linear_model.set_param_hint('intercept',
+                                    value=0,
+                                    vary=False)
+        linear_model.set_param_hint('slope')
+        params = linear_model.make_params()
+        fit_res = linear_model.fit(data=y,
+                                   x=x,
+                                   params=params)
+
+        line_slope = fit_res.params['slope'].value
+        line_intercept = fit_res.params['intercept'].value
+        #finx the x, y coordinates of the projected points
+        x_proj=(x+line_slope*y-line_slope*line_intercept)/(line_slope**2+1)
+        y_proj= line_slope*(x_proj)+line_intercept
+
+        #find the minimum (on th ey axis) point on the line
+        y_min_line = min(fit_res.best_fit)
+        x_min_line = x[np.argmin(fit_res.best_fit)]
+
+        #find x,y coordinates with respect to end of line
+        x_data = np.abs(x_min_line - x_proj)
+        y_data = y_proj-y_min_line
+
+        #find distance from points on line to end of line
+        rotated_data = np.sqrt(x_data**2+y_data**2)
+        if start_at_zero and (rotated_data[0] > np.mean(rotated_data)):
+            rotated_data = -rotated_data
+            rotated_data -= min(rotated_data)
+
+        normalized_data = rotated_data
+
+        # #normalize data
+        # max_min_distance = max(rotated_data) - min(rotated_data)
+        # normalized_data = (rotated_data - min(rotated_data))/max_min_distance
+
     else:
-        I_one = np.mean(data[0][cal_one_points])
-        Q_one = np.mean(data[1][cal_one_points])
-        one_coord = (I_one, Q_one)
-    # Translate the date
-    trans_data = [data[0] - I_zero, data[1] - Q_zero]
-    # Rotate the data
-    M = calculate_rotation_matrix(I_one-I_zero, Q_one-Q_zero)
-    outp = [np.asarray(elem)[0] for elem in M * trans_data]
-    [rotated_data_ch1, rotated_data_ch2] = outp
-    # Normalize the data
-    one_zero_dist = np.sqrt((I_one-I_zero)**2 + (Q_one-Q_zero)**2)
-    normalized_data = rotated_data_ch1/one_zero_dist
+        # for 4 anf 6 cal points
+        if zero_coord is not None:
+            I_zero = zero_coord[0]
+            Q_zero = zero_coord[1]
+        else:
+            I_zero = np.mean(data[0][cal_zero_points])
+            Q_zero = np.mean(data[1][cal_zero_points])
+            zero_coord = (I_zero, Q_zero)
+
+        if one_coord is not None:
+            I_one = one_coord[0]
+            Q_one = one_coord[1]
+        else:
+            I_one = np.mean(data[0][cal_one_points])
+            Q_one = np.mean(data[1][cal_one_points])
+            one_coord = (I_one, Q_one)
+
+        # Translate the data
+        trans_data = [data[0] - I_zero, data[1] - Q_zero]
+
+        # Rotate the data
+        M = calculate_rotation_matrix(I_one-I_zero, Q_one-Q_zero)
+        outp = [np.asarray(elem)[0] for elem in M * trans_data]
+        [rotated_data_ch1, rotated_data_ch2] = outp
+
+        # Normalize the data
+        one_zero_dist = np.sqrt((I_one-I_zero)**2 + (Q_one-Q_zero)**2)
+        normalized_data = rotated_data_ch1/one_zero_dist
+
+        if start_at_zero and (normalized_data[0] > np.mean(normalized_data)):
+            normalized_data = -normalized_data
+            normalized_data -= min(normalized_data)
 
     return [normalized_data, zero_coord, one_coord]
 
+def rotate_and_normalize_data_no_cal_points(data, **kw):
+
+    """
+    Rotates and projects data based on principal component analysis.
+    (Source: http://www.cs.otago.ac.nz/cosc453/student_tutorials/
+    principal_components.pdf)
+    """
+    start_at_zero = kw.pop('start_at_zero', False)
+
+    #translate each column in the data by its mean
+    mean_x = np.mean(data[0])
+    mean_y = np.mean(data[1])
+    trans_x = data[0] - mean_x
+    trans_y = data[1] - mean_y
+
+    #compute the covariance 2x2 matrix
+    cov_matrix = np.cov(np.array([trans_x,trans_y]))
+
+    #find eigenvalues and eigenvectors of the covariance matrix
+    [eigvals, eigvecs] = np.linalg.eig(cov_matrix)
+
+    #compute the transposed feature vector
+    row_feature_vector = np.array([(eigvecs[0,np.argmin(eigvals)],
+                                    eigvecs[1,np.argmin(eigvals)]),
+                                   (eigvecs[0,np.argmax(eigvals)],
+                                    eigvecs[1,np.argmax(eigvals)])])
+    #compute the row_data_trans matrix with (x,y) pairs in each column. Each
+    #row is a dimension (row1 = x_data, row2 = y_data)
+    row_data_trans = np.array([trans_x,trans_y])
+    #compute final, projected data; only the first row is of interest (it is the
+    #principal axis
+    final_data = np.dot(row_feature_vector, row_data_trans)
+    normalized_data = final_data[1,:]
+
+    #normalize data
+    # max_min_distance = np.sqrt(max(final_data[1,:])**2 +
+    #                            min(final_data[1,:])**2)
+    # normalized_data = final_data[1,:]/max_min_distance
+    # max_min_difference = max(normalized_data -  min(normalized_data))
+    # normalized_data = (normalized_data-min(normalized_data))/max_min_difference
+
+    # Ensure trace starts at closest to zero
+    if start_at_zero and (normalized_data[0] > np.mean(normalized_data)):
+        normalized_data = -normalized_data
+        normalized_data -= min(normalized_data)
+
+    return normalized_data
 
 def normalize_data_v3(data, cal_zero_points=np.arange(-4, -2, 1),
                       cal_one_points=np.arange(-2, 0, 1), **kw):
@@ -1435,6 +1857,52 @@ def color_plot_interpolated(x, y, z, ax=None,
             cbar.set_label(zlabel)
         return ax, CS, cbar
     return ax, CS
+
+def plot_errorbars(x, y, fit_results=None, fit_function=None, ax=None,
+                   linewidth=2 ,markersize=2, marker='none', only_bars=True):
+
+    if ax is None:
+        new_plot_created = True
+        f, ax = plt.subplots()
+    else:
+        new_plot_created = False
+
+    standard_error = np.std(y)/np.sqrt(y.size)
+
+    # if only_bars:
+    #     ax.errorbar( x, y, yerr=standard_error, ecolor='k',
+    #                  fmt='',linewidth=linewidth)
+    # else:
+    ax.errorbar( x, y, yerr=standard_error, ecolor='k', fmt=marker,
+                     linewidth=linewidth, markersize=markersize)
+
+    # best_vals = fit_results.best_values
+    # func_args=inspect.getargspec(fit_function)[0]                   #returns list of function parameters
+    #
+    # plus_list = []
+    # minus_list = []
+    # for i in func_args[1:]:
+    #     plus_list += [best_vals[i] + fit_results.params[i].stderr]
+    #     minus_list += [best_vals[i] - fit_results.params[i].stderr]
+    #
+    # yplus = fit_function(x,*plus_list)
+    # yminus = fit_function(x,*minus_list)
+    #
+    # asymmetric_error=[]
+    # for idx,val in enumerate(y):
+    #     asymmetric_error += [[ val-yminus[idx],yplus[idx]-val ]]
+    # asymmetric_error = np.asarray(asymmetric_error)
+    # asymmetric_error=np.transpose(asymmetric_error)
+    #
+    # if only_bars:
+    #     ax.errorbar( x, y, yerr=asymmetric_error, fmt='' )
+    # else:
+    #     ax.errorbar( x, y, yerr=asymmetric_error, fmt='-o' )
+
+    if new_plot_created:
+        return f,ax
+    else:
+        return
 
 
 ######################################################################
