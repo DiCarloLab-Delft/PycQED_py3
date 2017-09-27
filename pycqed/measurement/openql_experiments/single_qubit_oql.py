@@ -22,7 +22,7 @@ def CW_RO_sequence(qubit_idx: int, platf_cfg: str):
     """
     A sequence that performs readout back to back without initialization.
     The separation of the readout triggers is done by specifying the duration
-    of the readout parameter in the configuration file for compilation.
+    of the readout parameter in the configuration file used for compilation.
     """
     platf = Platform('OpenQL_Platform', platf_cfg)
     p = Program(pname="CW_RO_sequence", nqubits=platf.get_qubit_number(),

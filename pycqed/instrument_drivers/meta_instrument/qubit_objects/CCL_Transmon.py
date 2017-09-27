@@ -510,6 +510,8 @@ class CCLight_Transmon(Qubit):
                 channels=ro_channels,
                 result_logging_mode=result_logging_mode,
                 integration_length=self.ro_acq_integration_length())
+        else:
+            raise NotImplementedError()
 
     def _prep_ro_sources(self):
         LO = self.instr_LO_ro.get_instr()

@@ -27,9 +27,9 @@ from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO
 
 try:
     import openql
-    openql_import_fail = True
-except:
     openql_import_fail = False
+except:
+    openql_import_fail = True
 
 
 class Test_Qubit_Object(unittest.TestCase):

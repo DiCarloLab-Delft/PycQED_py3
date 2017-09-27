@@ -19,7 +19,7 @@ try:
         def test_openQL_config_valid(self):
             test_config_fn = os.path.join(curdir, 'test_gen_cfg_CCL.json')
             generate_config(filename=test_config_fn,
-                            mw_pulse_duration=20, RO_duration=300,
+                            mw_pulse_duration=20, ro_duration=300,
                             init_duration=200000)
             # If this compiles we conclude that the generated config is valid
             sqo.AllXY(qubit_idx=0, platf_cfg=test_config_fn)
