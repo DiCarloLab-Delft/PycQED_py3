@@ -172,6 +172,14 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
             determine which lookuptable to load to.
         '''
         resonator_combinations = self.resonator_combinations()
+
+        # TODO: automatically assign right codeword for resonator combinations
+        # 1. convert each combination to binary to extract the expected CW
+        # 2. create a list of these binary numbers or put the combinations in
+        #   a dict with these numbers as keys.
+        # 3. When uploading, ensure that the waveforms are loaded to the right
+        # number as specified in 2.
+
         pulse_type = self.pulse_type()
         if regenerate_pulses:
             wave_dict = self.generate_standard_waveforms()
@@ -198,6 +206,7 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
                         # (have to be same length for now)
                         I_waves[i] += wave_dict[wavename][0]
                         Q_waves[i] += wave_dict[wavename][1]
+
             # clipping the waveform
             I_waves[i] = np.clip(I_waves[i],
                                  self._voltage_min, self._voltage_max)
@@ -206,9 +215,9 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
         self.AWG.get_instr().awg_sequence_acquisition_and_DIO_triggered_pulse(
             I_waves, Q_waves, self.acquisition_delay())
 
-        def load_waveforms_onto_AWG_lookuptable(
-                self, regenerate_waveforms: bool=True,
-                stop_start: bool = True):
-            raise NotImplementedError(
-                'UHFQC needs a full sequence, use '
-                '"load_DIO_triggered_sequence_onto_UHFQC"')
+    def load_waveforms_onto_AWG_lookuptable(
+            self, regenerate_waveforms: bool=True,
+            stop_start: bool = True):
+        raise NotImplementedError(
+            'UHFQC needs a full sequence, use '
+            '"load_DIO_triggered_sequence_onto_UHFQC"')
