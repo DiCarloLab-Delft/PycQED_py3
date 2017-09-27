@@ -38,9 +38,9 @@ class CCLight_Transmon(Qubit):
 
     def add_instrument_ref_parameters(self):
         # MW sources
-        self.add_parameter('instr_LO',
+        self.add_parameter('instr_LO_ro',
                            parameter_class=InstrumentRefParameter)
-        self.add_parameter('instr_td_source',
+        self.add_parameter('instr_LO_mw',
                            parameter_class=InstrumentRefParameter)
 
         # Control electronics
@@ -432,7 +432,7 @@ class CCLight_Transmon(Qubit):
         self.prepare_readout()
         self._prep_cw_spec()
         # LO for readout is turned on in prepare_readout
-        self.instr_td_source.get_instr().on()
+        self.instr_LO_mw.get_instr().on()
 
     def _prep_cw_spec(self):
         VSM = self.instr_VSM.get_instr()
@@ -512,7 +512,7 @@ class CCLight_Transmon(Qubit):
                 integration_length=self.ro_acq_integration_length())
 
     def _prep_ro_sources(self):
-        LO = self.instr_LO.get_instr()
+        LO = self.instr_LO_ro.get_instr()
         LO.frequency.set(self.ro_freq() - self.ro_freq_mod())
         LO.on()
         LO.power(self.ro_pow_LO())
@@ -640,12 +640,12 @@ class CCLight_Transmon(Qubit):
         self._prep_mw_pulses()
 
     def _prep_td_sources(self):
-        self.instr_td_source.get_instr().on()
+        self.instr_LO_mw.get_instr().on()
         # Set source to fs =f-f_mod such that pulses appear at f = fs+f_mod
-        self.instr_td_source.get_instr().frequency.set(
+        self.instr_LO_mw.get_instr().frequency.set(
             self.freq_qubit.get() - self.mw_freq_mod.get())
 
-        self.instr_td_source.get_instr().power.set(self.mw_pow_td_source.get())
+        self.instr_LO_mw.get_instr().power.set(self.mw_pow_td_source.get())
 
     def _prep_mw_pulses(self):
         MW_LutMan = self.instr_LutMan_MW.get_instr()
@@ -712,7 +712,7 @@ class CCLight_Transmon(Qubit):
         # CCL gets started in the int_avg detector
 
         MC.set_sweep_function(swf.Heterodyne_Frequency_Sweep_simple(
-            MW_LO_source=self.instr_LO.get_instr(),
+            MW_LO_source=self.instr_LO_ro.get_instr(),
             IF=self.ro_freq_mod()))
         MC.set_sweep_points(freqs)
 
@@ -740,7 +740,7 @@ class CCLight_Transmon(Qubit):
         # CCL gets started in the int_avg detector
 
         MC.set_sweep_function(swf.Heterodyne_Frequency_Sweep_simple(
-            MW_LO_source=self.instr_LO.get_instr(),
+            MW_LO_source=self.instr_LO_ro.get_instr(),
             IF=self.ro_freq_mod()))
         MC.set_sweep_points(freqs)
 

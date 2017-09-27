@@ -3,8 +3,26 @@ import json
 
 def generate_config(filename: str,
                     mw_pulse_duration: int = 20,
-                    RO_duration: int = 800,
+                    ro_duration: int = 800,
                     init_duration: int = 200000):
+    """
+    Generates a configuration file for OpenQL for use with the CCLight.
+    Args:
+        filename (str)          : location where to write the config json file
+        mw_pulse_duration (int) : duration of the mw_pulses in ns.
+            N.B. this should be 20 as the VSM marker is hardcoded to be of that
+            length.
+        ro_duration       (int) : duration of the readout, including depletion
+         in ns.
+        init_duration     (int) : duration of the initialization/reset
+            operation in ns. This corresponds to the wait time before every
+            experiment.
+
+    The format for the configuration is a completely flattened file, this means
+    that for every operation (including it's target) there is a separate entry
+    in the JSON. The details of what can be specified are given in the OpenQL
+    documentation under "configuration_specification".
+    """
 
     qubits = ['q0', 'q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7']
     lut_map = ['i {}', 'rX180 {}', 'rY180 {}', 'rX90 {}', 'rY90 {}',
@@ -115,7 +133,7 @@ def generate_config(filename: str,
 
     for q in qubits:
         cfg["instructions"]["measure {}".format(q)] = {
-            "duration": RO_duration,
+            "duration": ro_duration,
             "latency": 0,
             "qubits": [q],
             "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],

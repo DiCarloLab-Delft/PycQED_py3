@@ -72,8 +72,8 @@ class Test_Qubit_Object(unittest.TestCase):
 
         # Assign instruments
         self.CCL_qubit.instr_LutMan_MW(self.AWG8_VSM_MW_LutMan.name)
-        self.CCL_qubit.instr_LO(self.MW1.name)
-        self.CCL_qubit.instr_td_source(self.MW2.name)
+        self.CCL_qubit.instr_LO_ro(self.MW1.name)
+        self.CCL_qubit.instr_LO_mw(self.MW2.name)
         self.CCL_qubit.instr_acquisition(self.UHFQC.name)
         self.CCL_qubit.instr_VSM(self.Dux.name)
         self.CCL_qubit.instr_CC(self.CCL.name)
@@ -157,7 +157,7 @@ class Test_Qubit_Object(unittest.TestCase):
         self.assertEqual(self.MC.soft_avg(), 4)
 
     def test_prep_ro_MW_sources(self):
-        LO = self.CCL_qubit.instr_LO.get_instr()
+        LO = self.CCL_qubit.instr_LO_ro.get_instr()
         LO.off()
         LO.frequency(4e9)
         LO.power(10)
