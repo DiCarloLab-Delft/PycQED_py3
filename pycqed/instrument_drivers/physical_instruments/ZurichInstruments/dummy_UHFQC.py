@@ -467,7 +467,7 @@ class dummy_UHFQC(Instrument):
             self._daq.vectorWrite('/' + self._device + '/' + path, value)
 
     # sequencer functions
-    def awg_sequence_acquisition_and_DIO_triggered_pulse(self, Iwaves, Qwaves, acquisition_delay):
+    def awg_sequence_acquisition_and_DIO_triggered_pulse(self, Iwaves, Qwaves, cases, acquisition_delay):
         # setting the acquisition delay samples
         delay_samples = int(acquisition_delay*1.8e9/8)
         # setting the delay in the instrument
@@ -523,7 +523,7 @@ class dummy_UHFQC(Instrument):
         # adding the case statements
         for i in range(len(Iwaves)):
             # generating the case statement string
-            case = '  case {}:\n'.format(i)
+            case = '  case {}:\n'.format(cases[i])
             case_play = '   playWave(Iwave{}, Qwave{});\n'.format(i, i)
             # adding the individual case statements to the sequence
             sequence = sequence + case+case_play

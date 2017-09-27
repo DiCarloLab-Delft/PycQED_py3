@@ -187,6 +187,8 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
             wave_dict = self._wave_dict
         I_waves = []
         Q_waves = []
+        cases=np.zeros([len(resonator_combinations)])
+        
         for i, resonator_combination in enumerate(resonator_combinations):
             if not resonator_combination:
                 # empty combination, generating empty 20 ns pulse
@@ -206,6 +208,7 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
                         # (have to be same length for now)
                         I_waves[i] += wave_dict[wavename][0]
                         Q_waves[i] += wave_dict[wavename][1]
+                    cases[i]+=2**resonator
 
             # clipping the waveform
             I_waves[i] = np.clip(I_waves[i],
@@ -213,7 +216,7 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
             Q_waves[i] = np.clip(Q_waves[i], self._voltage_min,
                                  self._voltage_max)
         self.AWG.get_instr().awg_sequence_acquisition_and_DIO_triggered_pulse(
-            I_waves, Q_waves, self.acquisition_delay())
+            I_waves, Q_waves, cases, self.acquisition_delay())
 
     def load_waveforms_onto_AWG_lookuptable(
             self, regenerate_waveforms: bool=True,
