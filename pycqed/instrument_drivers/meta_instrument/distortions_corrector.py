@@ -940,7 +940,7 @@ class RT_distortion_corrector(Distortion_corrector):
         # Normalize waveform and find rising edge
         edge_idx = -1
         for i in range(len(self.raw_waveform) - 1):
-            if self.raw_waveform[i+1] - self.raw_waveform[i] > 0.01:
+            if self.raw_waveform[i+1] - self.raw_waveform[i] > 0.005:
                 edge_idx = i
                 break
         if edge_idx < 0:
