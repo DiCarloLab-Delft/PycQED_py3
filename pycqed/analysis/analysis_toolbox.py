@@ -1,6 +1,5 @@
 # some convenience tools
 #
-import inspect
 import logging
 import numpy as np
 import os
@@ -897,7 +896,7 @@ def find_second_peak(sweep_pts=None, data_dist_smooth=None,
     tallest_peak = peaks[key] #the ge freq
     tallest_peak_idx = peaks[key+'_idx']
     tallest_peak_width = peaks[key+'_width']
-    tallest_peak_val = data_dist_smooth[tallest_peak_idx]
+    #tallest_peak_val = data_dist_smooth[tallest_peak_idx]
     if verbose:
         print('Largest peak is at ',tallest_peak)
 

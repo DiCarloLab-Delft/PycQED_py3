@@ -1967,61 +1967,76 @@ class QuDev_transmon(Qubit):
 
         return
 
-    def find_frequency_T2_ramsey(self, times, for_ef=False, artificial_detuning=0,
-                                 update=False, MC=None,
-                                 cal_points=True, close_fig=True, upload=True,
-                                 last_ge_pulse=True, label=None,
-                                 no_cal_points=None, analyze=True, **kw):
-
+    def find_frequency_T2_ramsey(self, times, artificial_detuning=0,
+                                 upload=False, MC=None, label=None,
+                                 cal_points=True, no_cal_points=None,
+                                 analyze=True, close_fig=True, update=False,
+                                 for_ef=False, last_ge_pulse=False, **kw):
         """
-        Finds the real qubit frequency and the dephasing rate T2* from the fit
-        to a Ramsey experiment.
-        Uses the Ramsey_Analysis class from measurement_analysis.py
-        The ef analysis assumes the the e population is zero (because of the ge
-        X180 pulse at the end).
+        Finds the real qubit GE or EF transition frequencies and the dephasing
+        rates T2* or T2*_ef from the fit to a Ramsey experiment.
+
+        Uses the Ramsey_Analysis class for Ramsey with one artificial detuning,
+        and the Ramsey_Analysis_multiple_detunings class for Ramsey with 2
+        artificial detunings.
+
+        Has support only for 1 or 2 artifical detunings.
 
         WARNING: Does not automatically update the qubit freq and T2_star
         parameters. Set update=True if you want this!
 
-        :param times                    array of times over which to sweep in
+        Arguments:
+            times                    array of times over which to sweep in
                                         the Ramsey measurement
-        :param artificial_detuning:     difference between drive frequency and
+            artificial_detuning:     difference between drive frequency and
                                         qubit frequency estimated from
-                                        qubit spectroscopy
-        :param update:                  update the qubit amp180 and amp90
+                                        qubit spectroscopy. Must be a list with
+                                        one or two entries.
+            upload:                  upload sequence to AWG
+            update:                  update the qubit frequency and T2*
                                         parameters
-        :param MC:                      the measurement control object
-        :param close_fig:               close the resulting figure?
-        :param kw:                      other keyword arguments. The Rabi sweep
-                                        time delays array 'times',
-                                        or the parameter 'times_mean' should be
-                                        passed here (in seconds)
-        :return:                        the real qubit frequency
-                                        (=self.f_qubit()+artificial_detuning-
-                                        fitted_freq)
-                                        + stddev, the dephasing rate T2* +
-                                        stddev
+            MC:                      the measurement control object
+            label:                   measurement label
+            cal_points:              use calibration points or not
+            no_cal_points:           number of cal_points (4 for ge;
+                                        2,4,6 for ef)
+            analyze:                 perform analysis
+            close_fig:               close the resulting figure
+            update:                  update relevant parameters
+            for_ef:                  perform msmt and analysis on ef transition
+            last_ge_pulse:           ge pi pulse at the end of each sequence
+
+        Keyword arguments:
+            For one artificial detuning, the Ramsey sweep time delays array
+            'times', or the parameter 'times_mean' should be passed
+            here (in seconds).
+
+        Returns:
+            The real qubit frequency + stddev, the dephasing rate T2* + stddev.
+
+        For 1 artificial_detuning:
+            ! Specify either the times array or the times_mean value (defaults
+            to 2.5 micro-s) and the span around it (times_mean; defaults to 5
+            micro-s) as kw. Then the script will construct the sweep points as
+            times = np.linspace(times_mean - times_span/2, times_mean +
+            times_span/2, nr_points).
         """
         if not update:
             logging.warning("Does not automatically update the qubit frequency "
                             "and T2_star parameters. "
                             "Set update=True if you want this!")
-
-        if artificial_detuning == 0:
-            logging.warning('Artificial_detuning=0; qubit driven at "%s" '
+        if artificial_detuning == None:
+            logging.warning('Artificial_detuning is None; qubit driven at "%s" '
                             'estimated with '
                             'spectroscopy' %self.f_qubit())
-        if np.abs(artificial_detuning)<1e3:
-            logging.warning('The artificial detuning is too small. The units '
-                            'should be Hz.')
-
+        if np.any(np.asarray(np.abs(artificial_detuning))<1e3):
+            logging.warning('The artificial detuning is too small.')
         if np.any(times>1e-3):
-            logging.warning('Some of the values in the times array might be too '
-                            'large.The units should be seconds.')
+            logging.warning('The values in the times array might be too large.')
 
         if (cal_points is True) and (no_cal_points is None):
-            logging.warning('no_cal_points is None. Defaults to 4 if for_ef==False,'
-                            'or to 6 if for_ef==True.')
+            logging.warning('no_cal_points is None. Defaults to 4 if '
+                            'for_ef==False, or to 6 if for_ef==True.')
             if for_ef:
                 no_cal_points = 6
             else:
@@ -2039,175 +2054,92 @@ class QuDev_transmon(Qubit):
             else:
                 label = 'Ramsey' + self.msmt_suffix
 
-        if times is None:
-            times_span = kw.get('times_span', 5e-6)
-            times_mean = kw.get('times_mean', 2.5e-6)
-            nr_points = kw.get('nr_points', 50)
-            if times_mean == 0:
+        # Check if one or more artificial detunings
+        if (type(artificial_detuning) is list) and (len(artificial_detuning)>1):
+            # 2 ARTIFICIAL_DETUNING VALUES
+
+            if times is None:
                 logging.warning("find_frequency_T2_ramsey does not know over "
                                 "which times to do Ramsey. Please specify the "
                                 "times_mean or the times function parameter.")
-                return 0
+
+            # Each time value must be repeated len(artificial_detunings) times
+            # to correspond to the logic in Ramsey_seq_multiple_detunings
+            # sequence
+            len_art_det = len(artificial_detuning)
+            temp_array = np.zeros((times.size-no_cal_points)*len_art_det)
+            for i in range(len(artificial_detuning)):
+                np.put(temp_array,list(range(i,temp_array.size,len_art_det)),
+                       times)
+            times = np.append(temp_array,times[-no_cal_points::])
+
+            #Perform Ramsey multiple detunings
+            if for_ef is False:
+                self.measure_ramsey_multiple_detunings(
+                    times=times,
+                    artificial_detunings=artificial_detuning,
+                    MC=MC,
+                    label=label,
+                    cal_points=cal_points,
+                    close_fig=close_fig, upload=upload)
+
             else:
-                times = np.linspace(times_mean - times_span/2,
-                                    times_mean + times_span/2,
-                                    nr_points)
-        #Perform Ramsey
-        if for_ef is False:
-            self.measure_ramsey(times=times,
-                                artificial_detuning=artificial_detuning,
-                                MC=MC,
-                                cal_points=cal_points,
-                                close_fig=close_fig, upload=upload, label=label)
-            #Needed for analysis
-            qubit_frequency_spec = self.f_qubit()
+                self.measure_ramsey_2nd_exc_multiple_detunings(
+                    times=times,
+                    artificial_detunings=artificial_detuning,
+                    cal_points=cal_points, no_cal_points=no_cal_points,
+                    close_fig=close_fig, upload=upload,
+                    last_ge_pulse=last_ge_pulse, MC=MC, label=label)
 
         else:
-            self.measure_ramsey_2nd_exc(times=times,
-                                        artificial_detuning=artificial_detuning,
-                                        MC=MC, cal_points=cal_points,
-                                        close_fig=close_fig, upload=upload,
-                                        last_ge_pulse=last_ge_pulse,
-                                        no_cal_points=no_cal_points, label=label)
-            #Needed for analysis
-            qubit_frequency_spec = self.f_ef_qubit()
+            # 1 ARTIFICIAL_DETUNING VALUE
+
+            if type(artificial_detuning) is list:
+                artificial_detuning = artificial_detuning[0]
+
+            if times is None:
+                times_span = kw.get('times_span', 5e-6)
+                times_mean = kw.get('times_mean', 2.5e-6)
+                nr_points = kw.get('nr_points', 50)
+                if times_mean == 0:
+                    logging.warning("find_frequency_T2_ramsey does not know "
+                                    "over which times to do Ramsey. Please "
+                                    "specify the times_mean or the times "
+                                    "function parameter.")
+                    return 0
+                else:
+                    times = np.linspace(times_mean - times_span/2,
+                                        times_mean + times_span/2,
+                                        nr_points)
+
+            #Perform Ramsey one detuning
+            if for_ef is False:
+                self.measure_ramsey(times=times,
+                                    artificial_detuning=artificial_detuning,
+                                    MC=MC,
+                                    cal_points=cal_points,
+                                    close_fig=close_fig,
+                                    upload=upload, label=label)
+
+            else:
+                self.measure_ramsey_2nd_exc(
+                    times=times,
+                    artificial_detuning=artificial_detuning,
+                    MC=MC, cal_points=cal_points,
+                    close_fig=close_fig, upload=upload,
+                    last_ge_pulse=last_ge_pulse,
+                    no_cal_points=no_cal_points, label=label)
 
         if analyze:
 
-            RamseyA = ma.Ramsey_Analysis(auto=True, qb_name=self.name,
-                                         NoCalPoints=no_cal_points, label=label,
-                                         for_ef=for_ef, last_ge_pulse=last_ge_pulse,
-                                         artificial_detuning=artificial_detuning,
-                                         **kw)
-
-            #get new freq and T2* from analysis results
-            new_qubit_freq = RamseyA.qubit_frequency    #value
-            fitted_freq = RamseyA.ramsey_freq           #dict
-            T2_star = RamseyA.T2_star                   #dict
-
-            print('New qubit frequency = {:.10f} \t stderr = {:.10f}'.format(
-                new_qubit_freq,RamseyA.ramsey_freq['freq_stderr']))
-            print('T2_Star = {:.5f} \t stderr = {:.5f}'.format(
-                T2_star['T2_star'],T2_star['T2_star_stderr']))
-
-            if update:
-                if for_ef:
-                    self.f_ef_qubit(new_qubit_freq)
-                    self.T2_star_ef(T2_star['T2_star'])
-                else:
-                    self.f_qubit(new_qubit_freq)
-                    self.T2_star(T2_star['T2_star'])
-
-            return new_qubit_freq, fitted_freq, T2_star
-
-        else:
-            return
-
-
-    def calibrate_ramsey(self, times, for_ef=False,
-                         artificial_detunings=None, update=False, label=None,
-                         MC=None, cal_points=True, no_cal_points=None,
-                         close_fig=True, upload=True, last_ge_pulse=True, **kw):
-
-        """
-        Finds the real qubit frequency and the dephasing rate T2* from the fit
-        to a Ramsey experiment.
-        Uses the Ramsey_Analysis class from measurement_analysis.py
-        The ef analysis assumes the the e population is zero (because of the ge
-        X180 pulse at the end).
-
-        WARNING: Does not automatically update the qubit freq and T2_star
-        parameters. Set update=True if you want this!
-
-        :param times                    array of times over which to sweep in
-                                        the Ramsey measurement
-        :param artificial_detuning:     difference between drive frequency and
-                                        qubit frequency estimated from
-                                        qubit spectroscopy
-        :param update:                  update the qubit amp180 and amp90
-                                        parameters
-        :param MC:                      the measurement control object
-        :param close_fig:               close the resulting figure?
-        :param kw:                      other keyword arguments. The Rabi sweep
-                                        time delays array 'times',
-                                        or the parameter 'times_mean' should be
-                                        passed here (in seconds)
-        :return:                        the real qubit frequency
-                                        + stddev, the dephasing rate T2* +
-                                        stddev
-        """
-        if not update:
-            logging.warning("Does not automatically update the qubit frequency "
-                            "and T2_star parameters. "
-                            "Set update=True if you want this!")
-
-        if artificial_detunings is None:
-            logging.warning('Artificial_detuning=0; qubit driven at "%s" '
-                            'estimated with '
-                            'spectroscopy' %self.f_qubit())
-        if np.any(np.asarray(np.abs(artificial_detunings))<1e3):
-            logging.warning('The artificial detuning is too small.')
-        if np.any(times>1e-3):
-            logging.warning('The values in the times array might be too large.')
-
-        if (cal_points is True) and (no_cal_points is None):
-            logging.warning('no_cal_points is None. Defaults to 4 if for_ef==False,'
-                            'or to 6 if for_ef==True.')
-            if for_ef:
-                no_cal_points = 6
-            else:
-                no_cal_points = 4
-
-        if cal_points is False:
-            no_cal_points = 0
-
-        if MC is None:
-            MC = self.MC
-
-        if times is None:
-            logging.warning("find_frequency_T2_ramsey does not know over "
-                            "which times to do Ramsey. Please specify the "
-                            "times_mean or the times function parameter.")
-
-        if label is None:
-            if for_ef:
-                label = 'Ramsey_mult_det_2nd' +self.msmt_suffix
-            else:
-                label = 'Ramsey_mult_det' + self.msmt_suffix
-
-        # Each time value must be repeated len(artificial_detunings) times to
-        # correspond to the logic in Ramsey_seq_multiple_detunings sequence
-        len_art_det = len(artificial_detunings)
-        temp_array = np.zeros((times.size-no_cal_points)*len_art_det)
-        for i in range(len(artificial_detunings)):
-            np.put(temp_array,list(range(i,temp_array.size,len_art_det)),times)
-        times =  np.append(temp_array,times[-no_cal_points::])
-
-        #Perform Ramsey
-        if for_ef is False:
-            self.measure_ramsey_multiple_detunings(times=times,
-                                artificial_detunings=artificial_detunings,
-                                MC=MC,
-                                label=label,
-                                cal_points=cal_points,
-                                close_fig=close_fig, upload=upload)
-
-        else:
-            self.measure_ramsey_2nd_exc_multiple_detunings(times=times,
-                                artificial_detunings=artificial_detunings,
-                                cal_points=cal_points, no_cal_points=no_cal_points,
-                                close_fig=close_fig, upload=upload,
-                                last_ge_pulse=last_ge_pulse, MC=MC, label=label)
-
-        # Analyze data if analyze==True
-        if kw.pop('analyze',True):
-            RamseyA = ma.Ramsey_Analysis_multiple_detunings(auto=True,
-                                label=label,
-                                qb_name=self.name,
-                                NoCalPoints=no_cal_points,
-                                for_ef=for_ef,
-                                last_ge_pulse=last_ge_pulse,
-                                artificial_detunings=artificial_detunings, **kw)
+            RamseyA = ma.Ramsey_Analysis_multiple_detunings(
+                auto=True,
+                label=label,
+                qb_name=self.name,
+                NoCalPoints=no_cal_points,
+                for_ef=for_ef,
+                last_ge_pulse=last_ge_pulse,
+                artificial_detuning=artificial_detuning, **kw)
 
             #get new freq and T2* from analysis results
             new_qubit_freq = RamseyA.qubit_frequency    #value
@@ -2221,13 +2153,30 @@ class QuDev_transmon(Qubit):
 
             if update:
                 if for_ef:
-                    self.f_ef_qubit(new_qubit_freq)
-                    self.T2_star_ef(T2_star['T2_star'])
+                    try:
+                        self.f_ef_qubit(new_qubit_freq)
+                    except AttributeError as e:
+                        logging.warning('%s. This parameter will not be '
+                                        'updated.'%e)
+                    try:
+                        self.T2_star_ef(T2_star['T2_star'])
+                    except AttributeError as e:
+                        logging.warning('%s. This parameter will not be '
+                                        'updated.'%e)
                 else:
-                    self.f_qubit(new_qubit_freq)
-                    self.T2_star(T2_star['T2_star'])
+                    try:
+                        self.f_qubit(new_qubit_freq)
+                    except AttributeError as e:
+                        logging.warning('%s. This parameter will not be '
+                                        'updated.'%e)
+                    try:
+                        self.T2_star(T2_star['T2_star'])
+                    except AttributeError as e:
+                        logging.warning('%s. This parameter will not be '
+                                        'updated.'%e)
 
             return new_qubit_freq, fitted_freq, T2_star
+
         else:
             return
 
