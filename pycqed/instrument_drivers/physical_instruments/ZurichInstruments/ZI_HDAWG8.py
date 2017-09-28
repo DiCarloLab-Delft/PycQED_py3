@@ -97,6 +97,13 @@ class ZI_HDAWG8(ZI_base_instrument):
         self._add_codeword_parameters()
         self.connect_message(begin_time=t0)
 
+    def snapshot_base(self, update=False, params_to_skip_update=None):
+        if params_to_skip_update is None:
+            params_to_skip_update = self._params_to_skip_update
+        snap = super().snapshot_base(
+            update=update, params_to_skip_update=params_to_skip_update)
+        return snap
+
     def add_ZIshell_device_methods_to_instrument(self):
         """
         Some methods defined in the zishell are convenient as public
@@ -147,6 +154,7 @@ class ZI_HDAWG8(ZI_base_instrument):
                  'The waveforms must be uploaded using ' +
                  '"upload_codeword_program". The channel number corresponds' +
                  ' to the channel as indicated on the device (1 is lowest).')
+        self._params_to_skip_update = []
         for ch in range(self._num_channels):
             for cw in range(self._num_codewords):
                 parname = 'wave_ch{}_cw{:03}'.format(ch+1, cw)
@@ -158,9 +166,13 @@ class ZI_HDAWG8(ZI_base_instrument):
                     set_cmd=self._gen_write_csv(parname),
                     get_cmd=self._gen_read_csv(parname),
                     docstring=docst)
+                self._params_to_skip_update.append(parname)
 
     def _gen_write_csv(self, wf_name):
         def write_func(waveform):
+            # The lenght of AWG8 waveforms should be a multiple of 8 samples.
+            extra_zeros = 8-(len(waveform) % 8)
+            waveform = np.concatenate([waveform, np.zeros(extra_zeros)])
             return self._write_csv_waveform(
                 wf_name=wf_name, waveform=waveform)
         return write_func

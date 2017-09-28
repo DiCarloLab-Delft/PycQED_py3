@@ -10,7 +10,6 @@ from pycqed.measurement.waveform_control_CC import qasm_compiler as qcx
 import pycqed.measurement.waveform_control_CC.qasm_compiler_helpers as qch
 
 
-
 class Sweep_function(object):
 
     '''
@@ -82,6 +81,7 @@ class Heterodyne_Frequency_Sweep(Soft_Sweep):
 
 class Heterodyne_Frequency_Sweep_simple(Soft_Sweep):
     # Same as above but less input arguments
+
     def __init__(self, MW_LO_source, IF,
                  sweep_points=None,
                  **kw):
@@ -101,12 +101,14 @@ class Heterodyne_Frequency_Sweep_simple(Soft_Sweep):
 class None_Sweep(Soft_Sweep):
 
     def __init__(self, sweep_control='soft', sweep_points=None,
+                 name: str='None_Sweep', parameter_name: str='pts',
+                 unit: str='arb. unit',
                  **kw):
         super(None_Sweep, self).__init__()
         self.sweep_control = sweep_control
-        self.name = 'None_Sweep'
-        self.parameter_name = 'pts'
-        self.unit = 'arb. unit'
+        self.name = name
+        self.parameter_name = parameter_name
+        self.unit = unit
         self.sweep_points = sweep_points
 
     def set_parameter(self, val):
@@ -426,6 +428,7 @@ class Multi_QASM_Sweep(QASM_Sweep_v2):
     '''
     Sweep function that combines multiple QASM sweeps into one sweep.
     '''
+
     def __init__(self, exp_per_file: int, hard_repetitions: int,
                  soft_repetitions: int, qasm_list, config: dict, detector,
                  CBox, parameter_name: str='Points', unit: str='a.u.',

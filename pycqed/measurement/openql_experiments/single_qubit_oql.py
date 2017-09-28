@@ -317,9 +317,9 @@ def two_elt_MotzoiXY(qubit_name):
 
 def off_on(qubit_idx: int, pulse_comb: str, platf_cfg: str):
     """
-    Performs an 'Off_On' sequence on the qubit specified.
-        Off: prepz -      - RO
-        On:  prepz - x180 - RO
+    Performs an 'off_on' sequence on the qubit specified.
+        off: prepz -      - RO
+        on:  prepz - x180 - RO
     Args:
         qubit_idx (int) :
         pulse_comb (str): What pulses to play valid options are
@@ -345,6 +345,9 @@ def off_on(qubit_idx: int, pulse_comb: str, platf_cfg: str):
         k.gate('rx180', qubit_idx)
         k.measure(qubit_idx)
         p.add_kernel(k)
+
+    if ('on' not in pulse_comb.lower()) and ('off' not in pulse_comb.lower()):
+        raise ValueError()
 
     p.compile(verbose=False)
     # attribute get's added to program to help finding the output files

@@ -87,6 +87,11 @@ class Test_Qubit_Object(unittest.TestCase):
         self.CCL_qubit.ro_freq(5.43e9)
         self.CCL_qubit.ro_freq_mod(200e6)
 
+        self.CCL_qubit.freq_qubit(4.56e9)
+        self.CCL_qubit.mw_freq_mod(-100e6)
+        self.CCL_qubit.mw_awg_ch(1)
+
+
     def test_instantiate_QuDevTransmon(self):
         QDT = QuDev_transmon('QuDev_transmon',
                              MC=None, heterodyne_instr=None, cw_source=None)
@@ -249,9 +254,6 @@ class Test_Qubit_Object(unittest.TestCase):
     #          Test prepare for timedomain                 #
     ########################################################
     def test_prep_for_timedomain(self):
-        self.CCL_qubit.freq_qubit(4.56e9)
-        self.CCL_qubit.mw_freq_mod(-100e6)
-        self.CCL_qubit.mw_awg_ch(1)
         self.CCL_qubit.prepare_for_timedomain()
 
     def test_prep_td_sources(self):

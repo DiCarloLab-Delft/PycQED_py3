@@ -330,7 +330,7 @@ class dummy_UHFQC(Instrument):
         data = dict()
         # puts dummy data in all channels of the expected length
         # channels are labeled as integers
-        channels = np.arange(9)
+        channels = self._acquisition_channels
         for ch in channels:
             data[ch] = np.random.rand(samples)
         return data
@@ -344,7 +344,7 @@ class dummy_UHFQC(Instrument):
         return data
 
     def acquisition_initialize(self, channels=set([0, 1]), mode='rl'):
-        pass
+        self._acquisition_channels = channels
 
     def acquisition_finalize(self):
         pass

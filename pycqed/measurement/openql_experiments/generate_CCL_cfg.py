@@ -1,6 +1,5 @@
 import json
 
-
 def generate_config(filename: str,
                     mw_pulse_duration: int = 20,
                     ro_duration: int = 800,
@@ -148,7 +147,7 @@ def generate_config(filename: str,
     for CW in range(len(lut_map)):
         for q in qubits:
             cfg["instructions"][lut_map[CW].format(q)] = {
-                "duration": 20,
+                "duration": mw_pulse_duration,
                 "latency": 0,
                 "qubits": [q],
                 "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
@@ -162,7 +161,7 @@ def generate_config(filename: str,
     for CW in range(32):
         for q in qubits:
             cfg["instructions"]["CW_{:02} {}".format(CW, q)] = {
-                "duration": 20,
+                "duration": mw_pulse_duration,
                 "latency": 0,
                 "qubits": [q],
                 "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],

@@ -726,7 +726,7 @@ class CCLight_Transmon(Qubit):
 
     def measure_spectroscopy(self, freqs, pulsed=True, MC=None,
                              analyze=True, close_fig=True):
-        if pulsed == False:
+        if not pulsed:
             raise NotImplementedError()
         self.prepare_for_continuous_wave()
         if MC is None:
@@ -755,4 +755,43 @@ class CCLight_Transmon(Qubit):
     def measure_transients(self, MC=None, analyze: bool=True,
                            cases=('off', 'on'),
                            prepare: bool=True):
-        print('Hello!')
+        # docstring from parent class
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        if prepare:
+            self.prepare_for_timedomain()
+            # off/on switching is achieved by turning the MW source on and
+            # off as this is much faster than recompiling/uploading
+            p = sqo.off_on(
+                qubit_idx=self.cfg_qubit_nr(), pulse_comb='on',
+                platf_cfg=self.cfg_openql_platform_fn())
+            self.instr_CC.get_instr().upload_instructions(p.filename)
+
+        transients = []
+        for i, pulse_comb in enumerate(cases):
+            if 'off' in pulse_comb.lower():
+                self.instr_LO_mw.get_instr().off()
+            elif 'on' in pulse_comb.lower():
+                self.instr_LO_mw.get_instr().on()
+
+            s = swf.None_Sweep(sweep_control='hard',
+                               parameter_name='Transient time', unit='s')
+            MC.set_sweep_function(s)
+
+            if 'UHFQC' in self.instr_acquisition():
+                sampling_rate = 1.8e9
+            else:
+                raise NotImplementedError()
+            MC.set_sweep_points(
+                np.arange(self.input_average_detector.nr_samples) /
+                sampling_rate)
+            MC.set_detector_function(self.input_average_detector)
+            data = MC.run(
+                'Measure_transients{}_{}'.format(self.msmt_suffix, i))
+            dset = data['dset']
+            transients.append(dset.T[1:])
+            if analyze:
+                ma.MeasurementAnalysis()
+
+        return [np.array(t, dtype=np.float64) for t in transients]
