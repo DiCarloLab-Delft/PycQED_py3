@@ -1,6 +1,5 @@
 # some convenience tools
 #
-import inspect
 import logging
 import numpy as np
 import os
@@ -437,8 +436,7 @@ def get_data_from_ma_v2(ma, param_names, numeric_params=None):
 
 def get_data_from_ma(ma, param_names, data_version=2, numeric_params=None):
     if data_version == 1:
-        data = get_data_from_ma_v1(ma, param_names,
-                                   numeric_params=numeric_params)
+        data = get_data_from_ma_v1(ma, param_names)
     elif data_version == 2:
         data = get_data_from_ma_v2(ma, param_names,
                                    numeric_params=numeric_params)
@@ -896,7 +894,6 @@ def find_second_peak(sweep_pts=None, data_dist_smooth=None,
     tallest_peak = peaks[key] #the ge freq
     tallest_peak_idx = peaks[key+'_idx']
     tallest_peak_width = peaks[key+'_width']
-    tallest_peak_val = data_dist_smooth[tallest_peak_idx]
     if verbose:
         print('Largest peak is at ',tallest_peak)
 
@@ -1165,7 +1162,7 @@ def look_for_peaks_dips(x, y_smoothed, percentile=20, window_len=11,
     threshold = background_mean + num_sigma_threshold * background_std
 
     thresholdlst = np.arange(y_smoothed.size)[y_smoothed > threshold]
-    datthreshold = y_smoothed[thresholdlst]
+    #datthreshold = y_smoothed[thresholdlst]
 
     if thresholdlst.size is 0:
         kk = 0
@@ -1240,7 +1237,7 @@ def look_for_peaks_dips(x, y_smoothed, percentile=20, window_len=11,
     threshold = background_mean - num_sigma_threshold * background_std
 
     thresholdlst = np.arange(y_smoothed.size)[y_smoothed < threshold]
-    datthreshold = y_smoothed[thresholdlst]
+    #datthreshold = y_smoothed[thresholdlst]
 
     if thresholdlst.size is 0:
         kk = 0
@@ -1510,7 +1507,7 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
         # Rotate the data
         M = calculate_rotation_matrix(I_one-I_zero, Q_one-Q_zero)
         outp = [np.asarray(elem)[0] for elem in M * trans_data]
-        [rotated_data_ch1, rotated_data_ch2] = outp
+        rotated_data_ch1 = outp[0]
 
         # Normalize the data
         one_zero_dist = np.sqrt((I_one-I_zero)**2 + (Q_one-Q_zero)**2)
@@ -1768,7 +1765,7 @@ def color_plot_slices(xvals, yvals, zvals, ax=None,
     # various plot options
     # define colormap
     cmap = kw.pop('cmap', 'viridis')
-    clim = kw.pop('clim', [None, None])
+    #clim = kw.pop('clim', [None, None])
     # normalized plot
     if normalize:
         for xx in range(len(xvals)):
@@ -1779,13 +1776,13 @@ def color_plot_slices(xvals, yvals, zvals, ax=None,
             zvals[xx] = np.log(zvals[xx])/np.log(10)
 
     # add blocks to plot
-    hold = kw.pop('hold', False)
+    #hold = kw.pop('hold', False)
     for xx in range(len(xvals)):
         tempzvals = np.array([np.append(zvals[xx], np.array(0)),
                               np.append(zvals[xx], np.array(0))]).transpose()
-        im = ax.pcolor(xvertices[xx:xx+2],
-                       yvertices[xx],
-                       tempzvals, cmap=cmap)
+        # im = ax.pcolor(xvertices[xx:xx+2],
+        #                yvertices[xx],
+        #                tempzvals, cmap=cmap)
     return ax
 
 

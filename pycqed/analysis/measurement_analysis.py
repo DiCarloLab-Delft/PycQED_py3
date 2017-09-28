@@ -1,13 +1,10 @@
 import os
 import logging
 import numpy as np
-from scipy import stats
 import h5py
 import matplotlib
-from matplotlib.ticker import FormatStrFormatter
 import matplotlib.lines as mlines
 from matplotlib import pyplot as plt
-from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis import fitting_models as fit_mods
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -1851,72 +1848,76 @@ class Rabi_Analysis(TD_Analysis):
         freq_std = self.fit_res.params['frequency'].stderr
         phase_std = self.fit_res.params['phase'].stderr
 
-        assert freq_fit != 0 ,"Fitted frequency is zero."
+        if freq_fit != 0:
 
-        # THESE CHECKS ARE NOT USED BECAUSE PHASE WAS FIXED AT 0.
-        #If fitted_phase<0, shift fitted_phase by 4. This corresponds to a
-        # shift of 2pi in the argument of cos.
-        # if phase_fit < 0.1:
-        #     phase_fit = 0
+            # THESE CHECKS ARE NOT USED BECAUSE PHASE WAS FIXED AT 0.
+            #If fitted_phase<0, shift fitted_phase by 4. This corresponds to a
+            # shift of 2pi in the argument of cos.
+            # if phase_fit < 0.1:
+            #     phase_fit = 0
 
-        #If phase_fit<1, the piHalf amplitude<0.
-        # if phase_fit < 1:
-        #     logging.info('The data could not be fitted correctly. '
-        #                     'The fitted phase "%s" <1, which gives '
-        #                     'negative piHalf '
-        #                     'amplitude.' %phase_fit)
+            #If phase_fit<1, the piHalf amplitude<0.
+            # if phase_fit < 1:
+            #     logging.info('The data could not be fitted correctly. '
+            #                     'The fitted phase "%s" <1, which gives '
+            #                     'negative piHalf '
+            #                     'amplitude.' %phase_fit)
 
-        stepsize = self.sweep_points[1] - self.sweep_points[0]
-        #Nyquist: wavelength>2*stepsize
-        if (freq_fit) > 2*stepsize:
-            logging.info('The data could not be fitted correctly. The '
-                            'frequency "%s" is too high.' %freq_fit)
+            stepsize = self.sweep_points[1] - self.sweep_points[0]
+            #Nyquist: wavelength>2*stepsize
+            if (freq_fit) > 2*stepsize:
+                logging.info('The data could not be fitted correctly. The '
+                                'frequency "%s" is too high.' %freq_fit)
 
-        #Extract pi and pi/2 amplitudes from best fit values
-        if phase_fit == 0:
-            piPulse = 1/(2*freq_fit)
-            piHalfPulse = 1/(4*freq_fit)
-            piPulse_std = freq_std/freq_fit
-            piHalfPulse_std = freq_std/freq_fit
-        else:
-            piPulse = phase_fit/(2*np.pi*freq_fit)
-            piHalfPulse = piPulse - 1/(4*freq_fit)
-
-            #Calculate std. deviation for pi and pi/2 amplitudes based on error
-            # propagation theory
-            #(http://ugastro.berkeley.edu/infrared09/PDF-2009/statistics1.pdf)
-            #Errors were assumed to be uncorrelated.
-
-            #extract cov(phase,freq)
-            freq_idx = self.fit_res.var_names.index('frequency')
-            phase_idx = self.fit_res.var_names.index('phase')
-            if self.fit_res.covar is not None:
-                cov_freq_phase = self.fit_res.covar[freq_idx,phase_idx]
+            #Extract pi and pi/2 amplitudes from best fit values
+            if phase_fit == 0:
+                piPulse = 1/(2*freq_fit)
+                piHalfPulse = 1/(4*freq_fit)
+                piPulse_std = freq_std/freq_fit
+                piHalfPulse_std = freq_std/freq_fit
             else:
-                cov_freq_phase=0
+                piPulse = phase_fit/(2*np.pi*freq_fit)
+                piHalfPulse = piPulse - 1/(4*freq_fit)
 
-            piPulse_std = piPulse*np.sqrt( (2*np.pi*freq_std/freq_fit)**2 +
-                                           (phase_std/phase_fit)**2
-                                           -cov_freq_phase/
-                                           (np.pi*freq_fit*phase_fit) )
-            piHalfPulse_std = np.sqrt( (piPulse_std)**2 +
-                                       (freq_std/freq_fit)**2 )
+                #Calculate std. deviation for pi and pi/2 amplitudes based on error
+                # propagation theory
+                #(http://ugastro.berkeley.edu/infrared09/PDF-2009/statistics1.pdf)
+                #Errors were assumed to be uncorrelated.
 
-        if kw.get('show_amplitudes',True):
-            print(pretty(pi)+'-Pulse Amplitude = {:.6} '.format(piPulse)+
-                  '('+self.parameter_units[-1]+')'+'\t'+
-                  pretty(pi)+'-Pulse Stddev = {:.6} '.format(piPulse_std)+
-                  '('+self.parameter_units[-1]+')'+'\n'+
-                  pretty(pi)+'/2-Pulse Amlitude = {:.6} '.format(piHalfPulse)+
-                  '('+self.parameter_units[-1]+')'+'\t'+
-                  pretty(pi)+'/2-Pulse Stddev = {:.6} '.format(piHalfPulse_std)+
-                  '('+self.parameter_units[-1]+')')
+                #extract cov(phase,freq)
+                freq_idx = self.fit_res.var_names.index('frequency')
+                phase_idx = self.fit_res.var_names.index('phase')
+                if self.fit_res.covar is not None:
+                    cov_freq_phase = self.fit_res.covar[freq_idx,phase_idx]
+                else:
+                    cov_freq_phase=0
 
-        #return as dict for ease of use with "save_computed_parameters"
-        self.rabi_amplitudes = {'piPulse':piPulse,
-                                'piPulse_std':piPulse_std,
-                                'piHalfPulse':piHalfPulse,
-                                'piHalfPulse_std':piHalfPulse_std}
+                piPulse_std = piPulse*np.sqrt( (2*np.pi*freq_std/freq_fit)**2 +
+                                               (phase_std/phase_fit)**2
+                                               -cov_freq_phase/
+                                               (np.pi*freq_fit*phase_fit) )
+                piHalfPulse_std = np.sqrt( (piPulse_std)**2 +
+                                           (freq_std/freq_fit)**2 )
+
+            if kw.get('show_amplitudes',True):
+                print(pretty(pi)+'-Pulse Amplitude = {:.6} '.format(piPulse)+
+                      '('+self.parameter_units[-1]+')'+'\t'+
+                      pretty(pi)+'-Pulse Stddev = {:.6} '.format(piPulse_std)+
+                      '('+self.parameter_units[-1]+')'+'\n'+
+                      pretty(pi)+'/2-Pulse Amlitude = {:.6} '.format(piHalfPulse)+
+                      '('+self.parameter_units[-1]+')'+'\t'+
+                      pretty(pi)+'/2-Pulse Stddev = {:.6} '.format(piHalfPulse_std)+
+                      '('+self.parameter_units[-1]+')')
+
+            #return as dict for ease of use with "save_computed_parameters"
+            self.rabi_amplitudes = {'piPulse':piPulse,
+                                    'piPulse_std':piPulse_std,
+                                    'piHalfPulse':piHalfPulse,
+                                    'piHalfPulse_std':piHalfPulse_std}
+        else:
+            logging.warning("Fitted frequency is zero. The pi-pulse and "
+                            "pi/2-pulse will not be computed.")
+            return
 
 
 class Rabi_Analysis_original(TD_Analysis):
