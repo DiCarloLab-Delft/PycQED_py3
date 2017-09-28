@@ -70,6 +70,39 @@ gate_decomposition[21] = ['Y90']
 gate_decomposition[22] = ['mX90', 'Y180']
 gate_decomposition[23] = ['X90', 'Y90', 'mX90']
 
+'''
+Gate decomposition decomposition of the clifford group as per
+Eptstein et al. Phys. Rev. A 89, 062321 (2014) and
+McKay et al. Phys. Rev. A 96, 022330 (2017)
+'''
+HZ_gate_decomposition = [[]]*(24)
+# explictly reversing order because order of operators is order in time
+HZ_gate_decomposition[0] = ['I']
+HZ_gate_decomposition[1] = ['Z90']
+HZ_gate_decomposition[2] = ['Z180']
+HZ_gate_decomposition[3] = ['X180']
+HZ_gate_decomposition[4] = ['X180', 'Z90']
+HZ_gate_decomposition[5] = ['X180', 'Z180']
+HZ_gate_decomposition[6] = ['Z90', 'X180', 'mZ90']
+HZ_gate_decomposition[7] = ['Z90', 'X90']
+HZ_gate_decomposition[8] = ['Z90', 'X180', 'Z90']
+HZ_gate_decomposition[9] = ['Z180']
+HZ_gate_decomposition[10] = ['mZ90']
+HZ_gate_decomposition[11] = ['I']
+
+HZ_gate_decomposition[12] = ['Z90', 'X90', 'Z90']
+HZ_gate_decomposition[13] = ['Z90', 'X90', 'Z180']
+HZ_gate_decomposition[14] = ['Z90', 'X90', 'mZ90']
+HZ_gate_decomposition[15] = ['Z90', 'mX90', 'Z90']
+HZ_gate_decomposition[16] = ['Z90', 'mX90', 'Z180']
+HZ_gate_decomposition[17] = ['Z90', 'mX90', 'mZ90']
+HZ_gate_decomposition[18] = ['Z90', 'mX90', 'Z180']
+HZ_gate_decomposition[19] = ['Z90', 'mX90', 'Z180']
+HZ_gate_decomposition[20] = ['Z90', 'mX90', 'mZ90']
+HZ_gate_decomposition[21] = ['mZ90', 'X90', 'Z90']
+HZ_gate_decomposition[22] = ['mZ90', 'X90', 'Z180']
+HZ_gate_decomposition[23] = ['mZ90', 'X90', 'mZ90']
+
 
 
 
