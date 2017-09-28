@@ -65,8 +65,16 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
     ##########################
     # Instantiate an element #
     ##########################
+    
+    # don't count the Z_pulses when specifying number of pulses in element name
+    count_z = 0
+    for pls in pulse_list:
+        if 'Z_pulse' in pls['pulse_type']:
+            count_z += 1
+    no_of_pulses = len(pulse_list) - count_z
+
     el = element.Element(
-        name='{}-pulse-elt_{}'.format(len(pulse_list), i),
+        name='{}-pulse-elt_{}'.format(no_of_pulses, i),
         pulsar=station.pulsar,
         readout_fixed_point=sequencer_config['RO_fixed_point'])
     last_pulse = None
@@ -83,6 +91,7 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
     ##############################
 
     phase_offset = 0 # used for software Z-gates
+    j = 0
     for i, pulse_pars in enumerate(pulse_list):
         # Default values for backwards compatibility
         if 'refpoint' not in pulse_pars.keys():
@@ -146,11 +155,12 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
                             pulse_pars_new['pulse_type']))
 
                 last_pulse = el.add(
-                    pulse_func(name=pulse_pars_new['pulse_type']+'_'+str(i),
+                    pulse_func(name=pulse_pars_new['pulse_type']+'_'+str(j),
                                **pulse_pars_new),
                     start=t0, refpulse=last_pulse,
                     refpoint=pulse_pars_new['refpoint'],
                     operation_type=pulse_pars_new['operation_type'])
+                j += 1
 
         else:
             # Composite "special pulses"
