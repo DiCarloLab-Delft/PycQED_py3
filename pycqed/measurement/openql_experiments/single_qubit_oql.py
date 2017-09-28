@@ -315,30 +315,42 @@ def two_elt_MotzoiXY(qubit_name):
     # return qasm_file
 
 
-def off_on(qubit_name, pulse_comb='off_on'):
+def off_on(qubit_idx: int, pulse_comb: str, platf_cfg: str):
     """
     Performs an 'Off_On' sequence on the qubit specified.
+        Off: prepz -      - RO
+        On:  prepz - x180 - RO
+    Args:
+        qubit_idx (int) :
+        pulse_comb (str): What pulses to play valid options are
+            "off", "on", "off_on"
+        platf_cfg (str) : filepath of OpenQL platform config file
+
     Pulses can be optionally enabled by putting 'off', respectively 'on' in
     the pulse_comb string.
     """
-    pass
-    # filename = join(base_qasm_path, 'off_on.qasm')
-    # qasm_file = mopen(filename, mode='w')
-    # qasm_file.writelines('qubit {} \n'.format(qubit_name))
-
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="CW_RO_sequence", nqubits=platf.get_qubit_number(),
+                p=platf)
     # # Off
-    # if 'off' in pulse_comb.lower():
-    #     qasm_file.writelines('\ninit_all\n')
-    #     qasm_file.writelines('RO {}  \n'.format(qubit_name))
-    # # On
-    # if 'on' in pulse_comb.lower():
-    #     qasm_file.writelines('\ninit_all\n')
-    #     qasm_file.writelines('X180 {}     # On \n'.format(qubit_name))
-    #     qasm_file.writelines('RO {}  \n'.format(qubit_name))
-    # if 'on' not in pulse_comb.lower() and 'off' not in pulse_comb.lower():
-    #     raise ValueError
-    # qasm_file.close()
-    # return qasm_file
+    if 'off' in pulse_comb.lower():
+        k = Kernel("off", p=platf)
+        k.prepz(qubit_idx)
+        k.measure(qubit_idx)
+        p.add_kernel(k)
+
+    if 'on' in pulse_comb.lower():
+        k = Kernel("on", p=platf)
+        k.prepz(qubit_idx)
+        k.gate('rx180', qubit_idx)
+        k.measure(qubit_idx)
+        p.add_kernel(k)
+
+    p.compile(verbose=False)
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
 
 
 def butterfly(qubit_idx: int, initialize: bool, platf_cfg: str):

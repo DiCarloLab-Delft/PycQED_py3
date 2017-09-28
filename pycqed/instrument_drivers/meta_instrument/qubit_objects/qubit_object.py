@@ -1,5 +1,6 @@
 import logging
 import numpy as np
+import time
 
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
@@ -93,6 +94,13 @@ class Qubit(Instrument):
         self.add_parameter('operations',
                            docstring='a list of all operations available on the qubit',
                            get_cmd=self._get_operations)
+
+    def connect_message(self, begin_time=None):
+        t = time.time() - (begin_time or self._t0)
+
+        con_msg = ('Connected to: {repr} '
+                   'in {t:.2f} s'.format(repr=self.__repr__(), t=t))
+        print(con_msg)
 
     def add_parameters(self):
         """
@@ -191,7 +199,25 @@ class Qubit(Instrument):
     def measure_spectroscopy(self):
         raise NotImplementedError()
 
-    def measure_transients(self):
+    def measure_transients(self, MC=None, analyze: bool=True,
+                           cases=('off', 'on'),
+                           prepare: bool=True):
+        '''
+        Measure transients for the cases specified.
+        Args:
+            MC      (instr): measurement control
+            analyze (bool) : run analysis and create figure
+            cases   (list) : list of strings specifying cases to perform
+                transients for, valid cases are "off" and "on" corresponding
+                to preparing the qubit in the 0 or 1 state respectively.
+            prepare (bool) : if True runs prepare for timedomain before
+                measuring the transients
+        Returns:
+            list of numpy arrays containing the transients for the cases
+            specified.
+        '''
+        if prepare:
+            self.prepare_for_timedomain()
         raise NotImplementedError()
 
     def measure_motzoi(self, motzois=np.linspace(-.3, .3, 31),

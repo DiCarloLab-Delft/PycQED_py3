@@ -751,3 +751,8 @@ class CCLight_Transmon(Qubit):
         MC.run(name='Resonator_scan'+self.msmt_suffix)
         if analyze:
             ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
+
+    def measure_transients(self, MC=None, analyze: bool=True,
+                           cases=('off', 'on'),
+                           prepare: bool=True):
+        print('Hello!')

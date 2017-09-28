@@ -44,6 +44,11 @@ try:
             sqo.butterfly(qubit_idx=0, initialize=True,
                           platf_cfg=config_fn)
 
+        def test_off_on(self):
+            sqo.off_on(0, pulse_comb='off', platf_cfg=config_fn)
+            sqo.off_on(0, pulse_comb='on', platf_cfg=config_fn)
+            sqo.off_on(0, pulse_comb='off_on', platf_cfg=config_fn)
+
 
 except ImportError as e:
     class TestMissingDependency(unittest.TestCase):

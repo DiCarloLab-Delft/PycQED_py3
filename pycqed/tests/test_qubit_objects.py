@@ -312,6 +312,9 @@ class Test_Qubit_Object(unittest.TestCase):
 
         self.CCL_qubit.measure_heterodyne_spectroscopy(freqs=freqs)
 
+    def test_measure_transients(self):
+        self.CCL_qubit.measure_transients()
+
     @unittest.skipIf(openql_import_fail, 'OpenQL not present')
     def test_qubit_spec(self):
         freqs = np.linspace(6e9, 6.5e9, 31)
