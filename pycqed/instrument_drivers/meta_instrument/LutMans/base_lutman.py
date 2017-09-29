@@ -7,7 +7,7 @@ from qcodes.instrument.parameter import ManualParameter
 from qcodes.instrument.parameter import InstrumentRefParameter
 from qcodes.utils import validators as vals
 from pycqed.analysis.fit_toolbox.functions import PSD
-
+from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 
 class Base_LutMan(Instrument):
     """
@@ -106,7 +106,7 @@ class Base_LutMan(Instrument):
     def render_wave(self, wave_name, show=True, time_units='lut_index',
                     reload_pulses=True):
         if reload_pulses:
-            self.generate_standard_pulses()
+            self.generate_standard_waveforms()
         fig, ax = plt.subplots(1, 1)
         if time_units == 'lut_index':
             x = np.arange(len(self._wave_dict[wave_name][0]))
@@ -116,7 +116,7 @@ class Base_LutMan(Instrument):
         elif time_units == 's':
             x = (np.arange(len(self._wave_dict[wave_name][0]))
                  / self.sampling_rate.get())
-            ax.set_xlabel('time (s)')
+
             ax.vlines(2048 / self.sampling_rate.get(),
                       self._voltage_min, self._voltage_max, linestyle='--')
         print(wave_name)
@@ -132,6 +132,8 @@ class Base_LutMan(Instrument):
         ax.legend()
         ax.set_ylim(self._voltage_min*1.1, self._voltage_max*1.1)
         ax.set_xlim(0, x[-1])
+        if time_units =='s':
+            set_xlabel(ax, 'time', 's')
         if show:
             plt.show()
         return fig, ax

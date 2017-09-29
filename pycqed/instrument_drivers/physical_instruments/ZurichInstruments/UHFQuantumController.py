@@ -298,27 +298,69 @@ class UHFQC(Instrument):
               ['compiler']['statusstring'][0])
         self._daq.sync()
 
-    def awg_string(self, sourcestring):
-        path = '/' + self._device + '/awgs/0/ready'
-        self._daq.subscribe(path)
-        self._awgModule.set('awgModule/compiler/sourcestring', sourcestring)
-        #self._awgModule.set('awgModule/elf/file', '')
-        while self._awgModule.get('awgModule/progress')['progress'][0] < 1.0:
-            time.sleep(0.1)
-        print(self._awgModule.get('awgModule/compiler/statusstring')
-              ['compiler']['statusstring'][0])
-        while self._awgModule.get('awgModule/progress')['progress'][0] < 1.0:
-            time.sleep(0.01)
+    def awg_string(self, program_string:str, timeout: float=5):
+        t0 = time.time()
+        awg_nr = 0 # hardcoded for UHFQC
+        print('Configuring AWG of {}'.format(self.name))
+        if not self._awgModule:
+            raise(ziShellModuleError())
 
-        ready = False
-        timeout = 0
-        while not ready and timeout < 1.0:
-            data = self._daq.poll(0.1, 1, 4, True)
-            timeout += 0.1
-            if path in data:
-                if data[path]['value'][-1] == 1:
-                    ready = True
-        self._daq.unsubscribe(path)
+        self._awgModule.set('awgModule/index', awg_nr)
+        self._awgModule.set('awgModule/compiler/sourcestring', program_string)
+
+        t0 = time.time()
+
+        succes_msg = 'File successfully uploaded'
+        # Success is set to False when either a timeout or a bad compilation
+        # message is encountered.
+        success = True
+        # while ("compilation not completed"):
+        while len(self._awgModule.get('awgModule/compiler/sourcestring')
+                  ['compiler']['sourcestring'][0]) > 0:
+            time.sleep(0.01)
+            comp_msg = (self._awgModule.get(
+                'awgModule/compiler/statusstring')['compiler']
+                ['statusstring'][0])
+            if (time.time()-t0 >= timeout):
+                success = False
+                print('Timeout encountered during compilation.')
+                break
+
+        if not comp_msg.endswith(succes_msg):
+            success = False
+
+        if not success:
+            # Printing is disabled because we put the waveform in the program
+            # this should be changed when .csv waveforms are supported for UHFQC
+            # print("Compilation failed, printing program:")
+            # for i, line in enumerate(program_string.splitlines()):
+            #     print(i+1, '\t', line)
+            # print('\n')
+            raise ziShellCompilationError(comp_msg)
+        # If succesful the comipilation success message is printed
+        t1 = time.time()
+        print(self._awgModule.get('awgModule/compiler/statusstring')
+              ['compiler']['statusstring'][0] + ' in {:.2f}s'.format(t1-t0))
+
+        # path = '/' + self._device + '/awgs/0/ready'
+        # self._daq.subscribe(path)
+        # self._awgModule.set('awgModule/compiler/sourcestring', program_string)
+        # #self._awgModule.set('awgModule/elf/file', '')
+        # while self._awgModule.get('awgModule/progress')['progress'][0] < 1.0:
+        #     time.sleep(0.1)
+        # print(self._awgModule.get('awgModule/compiler/statusstring')
+        #       ['compiler']['statusstring'][0])
+        # while self._awgModule.get('awgModule/progress')['progress'][0] < 1.0:
+        #     time.sleep(0.01)
+        # ready = False
+        # timeout = 0
+        # while not ready and timeout < 1.0:
+        #     data = self._daq.poll(0.1, 1, 4, True)
+        #     timeout += 0.1
+        #     if path in data:
+        #         if data[path]['value'][-1] == 1:
+        #             ready = True
+        # self._daq.unsubscribe(path)
 
     def close(self):
         self._daq.disconnectDevice(self._device)
@@ -721,7 +763,7 @@ class UHFQC(Instrument):
 
     # sequencer functions
     def awg_sequence_acquisition_and_DIO_triggered_pulse(
-            self, Iwaves, Qwaves, cases, acquisition_delay):
+            self, Iwaves, Qwaves, cases, acquisition_delay, timeout=5):
         # setting the acquisition delay samples
         delay_samples = int(acquisition_delay*1.8e9/8)
         # setting the delay in the instrument
@@ -794,7 +836,7 @@ class UHFQC(Instrument):
                     '}\n' +
                     'wait(300);\n' +
                     'setTrigger(0);\n')
-        self.awg_string(sequence)
+        self.awg_string(sequence, timeout=timeout)
 
     def awg_sequence_acquisition_and_pulse(self, Iwave, Qwave, acquisition_delay):
         if np.max(Iwave) > 1.0 or np.min(Iwave) < -1.0:
@@ -932,3 +974,23 @@ setTrigger(0);"""
                 # print(value)
                 # matrix[i,j]=value
         return matrix
+
+
+class ziShellError(Exception):
+    """Base class for exceptions in this module."""
+    pass
+
+class ziShellDAQError(ziShellError):
+    """Exception raised when no DAQ has been connected."""
+    pass
+
+
+class ziShellModuleError(ziShellError):
+    """Exception raised when a module has not been started."""
+    pass
+
+class ziShellCompilationError(ziShellError):
+    """
+    Exception raised when the zi AWG-8 compiler encounters an error.
+    """
+    pass

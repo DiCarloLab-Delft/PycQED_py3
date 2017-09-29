@@ -148,12 +148,12 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
         self.LutMap({})
 
     def load_single_pulse_sequence_onto_UHFQC(self, pulse_name,
-                                              regenerate_pulses=True):
+                                              regenerate_waveforms=True):
         '''
         Load a single pulse to the lookuptable, it uses the lut_mapping to
             determine which lookuptable to load to.
         '''
-        if regenerate_pulses:
+        if regenerate_waveforms:
             wave_dict = self.generate_standard_waveforms()
         else:
             wave_dict = self._wave_dict
@@ -166,7 +166,7 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
             I_wave, Q_wave, self.acquisition_delay())
 
     def load_DIO_triggered_sequence_onto_UHFQC(self,
-                                               regenerate_pulses=True):
+                                               regenerate_waveforms=True, timeout=5):
         '''
         Load a single pulse to the lookuptable, it uses the lut_mapping to
             determine which lookuptable to load to.
@@ -177,18 +177,18 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
         # 1. convert each combination to binary to extract the expected CW
         # 2. create a list of these binary numbers or put the combinations in
         #   a dict with these numbers as keys.
-        # 3. When uploading, ensure that the waveforms are loaded to the right
+        # 3. When uploading, ensure that the pulses are loaded to the right
         # number as specified in 2.
 
         pulse_type = self.pulse_type()
-        if regenerate_pulses:
+        if regenerate_waveforms:
             wave_dict = self.generate_standard_waveforms()
         else:
             wave_dict = self._wave_dict
         I_waves = []
         Q_waves = []
         cases=np.zeros([len(resonator_combinations)])
-        
+
         for i, resonator_combination in enumerate(resonator_combinations):
             if not resonator_combination:
                 # empty combination, generating empty 20 ns pulse
@@ -216,7 +216,7 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
             Q_waves[i] = np.clip(Q_waves[i], self._voltage_min,
                                  self._voltage_max)
         self.AWG.get_instr().awg_sequence_acquisition_and_DIO_triggered_pulse(
-            I_waves, Q_waves, cases, self.acquisition_delay())
+            I_waves, Q_waves, cases, self.acquisition_delay(),timeout=timeout)
 
     def load_waveforms_onto_AWG_lookuptable(
             self, regenerate_waveforms: bool=True,
