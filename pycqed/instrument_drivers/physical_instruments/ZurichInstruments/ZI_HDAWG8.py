@@ -327,27 +327,18 @@ class ZI_HDAWG8(ZI_base_instrument):
         # Delay configuration
         ####################################################
 
+        # Reset all DIO delays
+        for i in range(32):
+            self._dev.daq.setInt('/' + self._dev.device +
+                                 '/awgs/*/dio/delay/index', i)
+            self._dev.daq.setInt('/' + self._dev.device +
+                                 '/awgs/*/dio/delay/value', 0)
+        # Delay only the toggle/strobe bit by "codeword_delay" samples
         codeword_delay = 2
         self._dev.daq.setInt('/' + self._dev.device +
-                             '/awgs/*/dio/delay/index', 0)
+                             '/awgs/*/dio/delay/index', 30)
         self._dev.daq.setInt('/' + self._dev.device +
                              '/awgs/*/dio/delay/value', codeword_delay)
-        self._dev.daq.setInt('/' + self._dev.device +
-                             '/awgs/*/dio/delay/index', 1)
-        self._dev.daq.setInt('/' + self._dev.device +
-                             '/awgs/*/dio/delay/value', codeword_delay)
-        self._dev.daq.setInt('/' + self._dev.device +
-                             '/awgs/*/dio/delay/index', 2)
-        self._dev.daq.setInt('/' + self._dev.device +
-                             '/awgs/*/dio/delay/value', codeword_delay)
-        self._dev.daq.setInt('/' + self._dev.device +
-                             '/awgs/*/dio/delay/index', 3)
-        self._dev.daq.setInt('/' + self._dev.device +
-                             '/awgs/*/dio/delay/value', codeword_delay)
-        self._dev.daq.setInt('/' + self._dev.device +
-                             '/awgs/*/dio/delay/index', 31)
-        self._dev.daq.setInt('/' + self._dev.device +
-                             '/awgs/*/dio/delay/value', codeword_delay+1)
 
         ####################################################
         # Turn on device

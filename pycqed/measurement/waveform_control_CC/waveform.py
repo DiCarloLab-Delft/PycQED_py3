@@ -134,6 +134,17 @@ def block_pulse(amp, length, sampling_rate=2e8, delay=0, phase=0):
     pulse_Q = list(Zeros)+list(block_Q)
     return pulse_I, pulse_Q
 
+
+def block_pulse_vsm(amp, length, sampling_rate=2e8, delay=0, phase=0):
+    """
+    4-channel compatible version of the vsm block pulse.
+    """
+    I, Q = block_pulse(amp=amp, length=length, sampling_rate=sampling_rate,
+                       delay=delay, phase=phase)
+    zeros = np.zeros(len(I))
+    return I, zeros, zeros, Q
+
+
 ############################################################
 # Pulse modulation  and correction functions               #
 ############################################################

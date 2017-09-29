@@ -6,10 +6,13 @@ from pycqed.measurement.waveform_control_CC import waveform as wf
 
 
 class Base_MW_LutMan(Base_LutMan):
+    _def_lm = ['I', 'rX180',  'rY180', 'rX90',  'rY90',
+               'rXm90',  'rYm90', 'rPhi90', 'spec']
 
     def _add_waveform_parameters(self):
         # defined here so that the VSM based LutMan can overwrite this
         self.wf_func = wf.mod_gauss
+        self.spec_func = wf.block_pulse
 
         self._add_channel_params()
         self.add_parameter('mw_amp180', unit='V', vals=vals.Numbers(-1, 1),
@@ -30,6 +33,15 @@ class Base_MW_LutMan(Base_LutMan):
                            vals=vals.Numbers(), unit='deg',
                            parameter_class=ManualParameter,
                            initial_value=0)
+
+        self.add_parameter('spec_length',
+                           vals=vals.Numbers(), unit='s',
+                           parameter_class=ManualParameter,
+                           initial_value=20e-9)
+        self.add_parameter('spec_amp',
+                           vals=vals.Numbers(), unit='V',
+                           parameter_class=ManualParameter,
+                           initial_value=1)
 
         self.add_parameter(
             'mw_modulation', vals=vals.Numbers(), unit='Hz',
@@ -121,6 +133,12 @@ class Base_MW_LutMan(Base_LutMan):
             f_modulation=self.mw_modulation(),
             sampling_rate=self.sampling_rate(), phase=self.mw_phi(),
             motzoi=self.mw_motzoi())
+        self._wave_dict['spec'] = self.spec_func(
+            amp=self.spec_amp(),
+            length=self.spec_length(),
+            sampling_rate=self.sampling_rate(),
+            delay=0,
+            phase=0)
 
         if self.mixer_apply_predistortion_matrix():
             self._wave_dict = self.apply_mixer_predistortion_corrections(
@@ -170,8 +188,7 @@ class CBox_MW_LutMan(Base_MW_LutMan):
         """
         Set's the default lutmap for standard microwave drive pulses.
         """
-        def_lm = ['I', 'rX180',  'rY180', 'rX90',  'rY90',
-                  'rXm90',  'rYm90', 'rPhi90', 'rPhim90']
+        def_lm = self._def_lm
         LutMap = {}
         for cw_idx, cw_key in enumerate(def_lm):
             LutMap[cw_key] = cw_idx
@@ -188,8 +205,7 @@ class QWG_MW_LutMan(Base_MW_LutMan):
         """
         Set's the default lutmap for standard microwave drive pulses.
         """
-        def_lm = ['I', 'rX180',  'rY180', 'rX90',  'rY90',
-                  'rXm90',  'rYm90', 'rPhi180', 'rPhi90', 'rPhim90']
+        def_lm = self._def_lm
         LutMap = {}
         # N.B. The main difference between the AWG8 and QWG in the lutmap
         # is the naming of the codeword params.
@@ -214,8 +230,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         """
         Set's the default lutmap for standard microwave drive pulses.
         """
-        def_lm = ['I', 'rX180',  'rY180', 'rX90',  'rY90',
-                  'rXm90',  'rYm90', 'rPhi90', 'rPhim90']
+        def_lm = self._def_lm
         LutMap = {}
         for cw_idx, cw_key in enumerate(def_lm):
             LutMap[cw_key] = (
@@ -247,13 +262,13 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
         self._num_channels = 8
         super().__init__(name, **kw)
         self.wf_func = wf.mod_gauss_VSM
+        self.spec_func = wf.block_pulse_vsm
 
     def set_default_lutmap(self):
         """
         Set's the default lutmap for standard microwave drive pulses.
         """
-        def_lm = ['I', 'rX180',  'rY180', 'rX90',  'rY90',
-                  'rXm90',  'rYm90', 'rPhi90', 'rPhim90']
+        def_lm = self._def_lm
         LutMap = {}
         for cw_idx, cw_key in enumerate(def_lm):
             LutMap[cw_key] = (

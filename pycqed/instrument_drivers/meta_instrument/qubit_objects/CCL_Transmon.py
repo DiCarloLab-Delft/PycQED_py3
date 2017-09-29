@@ -287,7 +287,7 @@ class CCLight_Transmon(Qubit):
             docstring=('This value needs to be calibrated to ensure that '
                        'the VSM mask aligns with the microwave pulses. '
                        'Calibration is done using self.calibrate_vsm_delays.'),
-                           )
+            parameter_class=ManualParameter)
 
         self.add_parameter('mw_vsm_ch_Gin',
                            label='VSM input channel Gaussian component',
