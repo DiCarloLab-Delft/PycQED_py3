@@ -314,6 +314,7 @@ class Test_Qubit_Object(unittest.TestCase):
 
         self.CCL_qubit.measure_heterodyne_spectroscopy(freqs=freqs)
 
+    @unittest.skipIf(openql_import_fail, 'OpenQL not present')
     def test_measure_transients(self):
         self.CCL_qubit.measure_transients()
 
@@ -329,7 +330,7 @@ class Test_Qubit_Object(unittest.TestCase):
 
     @unittest.skip('NotImplementedError')
     def test_AllXY(self):
-        raise NotImplementedError()
+        self.CCL_qubit.measure_allxy()
 
     @classmethod
     def tearDownClass(self):

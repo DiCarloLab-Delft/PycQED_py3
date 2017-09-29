@@ -190,7 +190,18 @@ class Qubit(Instrument):
     def measure_echo(self):
         raise NotImplementedError()
 
-    def measure_allxy(self):
+    def measure_allxy(self, MC=None, analyze: bool=True,
+                      close_fig: bool=True):
+        """
+        Performs an AllXY experiment.
+        Args:
+            MC        : instance of the MeasurementControl
+            analyze   : perform analysis
+            close_fig : close the figure in plotting
+
+        returns:
+            T1 (float) the measured value
+        """
         raise NotImplementedError()
 
     def measure_ssro(self):

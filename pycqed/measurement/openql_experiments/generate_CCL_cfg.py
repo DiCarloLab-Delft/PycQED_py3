@@ -1,8 +1,10 @@
 import json
 
+
 def generate_config(filename: str,
                     mw_pulse_duration: int = 20,
                     ro_duration: int = 800,
+                    mw_mw_buffer=20,
                     init_duration: int = 200000):
     """
     Generates a configuration file for OpenQL for use with the CCLight.
@@ -40,7 +42,7 @@ def generate_config(filename: str,
         "hardware_settings": {
             "qubit_number": 7,
             "cycle_time": 20,
-            "mw_mw_buffer": 0,
+            "mw_mw_buffer": mw_mw_buffer,
             "mw_flux_buffer": 0,
             "mw_readout_buffer": 0,
             "flux_mw_buffer": 0,

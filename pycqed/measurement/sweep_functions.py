@@ -288,6 +288,24 @@ class QASM_Sweep(Hard_Sweep):
             self.CBox.load_instructions(qumis_file.name)
 
 
+class OpenQL_Sweep(Hard_Sweep):
+
+    def __init__(self, openql_program, CCL,
+                 parameter_name: str ='Points', unit: str='a.u.',
+                 upload: bool=True):
+        super().__init__()
+        self.name = 'OpenQL_Sweep'
+        self.openql_program = openql_program
+        self.CCL = CCL
+        self.upload = upload
+        self.parameter_name = parameter_name
+        self.unit = unit
+
+    def prepare(self, **kw):
+        if self.upload:
+            self.CCL.upload_instructions(self.openql_program.filename)
+
+
 class QASM_Sweep_v2(Hard_Sweep):
     """
     Sweep function for a QASM file, using the XFu compiler to generate QuMis
