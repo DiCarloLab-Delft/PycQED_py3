@@ -15,7 +15,6 @@ from .SCPI import SCPI
 import numpy as np
 import struct
 from qcodes import validators as vals
-# from qcodes import parser as pars
 
 
 from qcodes.instrument.parameter import StandardParameter
@@ -433,4 +432,3 @@ class QuTech_AWG_Module(SCPI):
         def get_func():
             return fun(ch)
         return get_func
-
