@@ -436,8 +436,7 @@ def get_data_from_ma_v2(ma, param_names, numeric_params=None):
 
 def get_data_from_ma(ma, param_names, data_version=2, numeric_params=None):
     if data_version == 1:
-        data = get_data_from_ma_v1(ma, param_names,
-                                   numeric_params=numeric_params)
+        data = get_data_from_ma_v1(ma, param_names)
     elif data_version == 2:
         data = get_data_from_ma_v2(ma, param_names,
                                    numeric_params=numeric_params)
@@ -862,8 +861,7 @@ def smooth(x, window_len=11, window='hanning'):
 
     if not window in ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']:
         raise ValueError(
-            "Window is on of 'flat', 'hanning', 'hamming', 'bartlett', "
-            "'blackman'")
+            "Window is on of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'")
 
     s = np.r_[x[window_len-1:0:-1], x, x[-1:-window_len:-1]]
 
@@ -896,7 +894,6 @@ def find_second_peak(sweep_pts=None, data_dist_smooth=None,
     tallest_peak = peaks[key] #the ge freq
     tallest_peak_idx = peaks[key+'_idx']
     tallest_peak_width = peaks[key+'_width']
-    #tallest_peak_val = data_dist_smooth[tallest_peak_idx]
     if verbose:
         print('Largest peak is at ',tallest_peak)
 
@@ -1165,7 +1162,7 @@ def look_for_peaks_dips(x, y_smoothed, percentile=20, window_len=11,
     threshold = background_mean + num_sigma_threshold * background_std
 
     thresholdlst = np.arange(y_smoothed.size)[y_smoothed > threshold]
-    datthreshold = y_smoothed[thresholdlst]
+    #datthreshold = y_smoothed[thresholdlst]
 
     if thresholdlst.size is 0:
         kk = 0
@@ -1240,7 +1237,7 @@ def look_for_peaks_dips(x, y_smoothed, percentile=20, window_len=11,
     threshold = background_mean - num_sigma_threshold * background_std
 
     thresholdlst = np.arange(y_smoothed.size)[y_smoothed < threshold]
-    datthreshold = y_smoothed[thresholdlst]
+    #datthreshold = y_smoothed[thresholdlst]
 
     if thresholdlst.size is 0:
         kk = 0
@@ -1329,28 +1326,23 @@ def look_for_peaks_dips(x, y_smoothed, percentile=20, window_len=11,
                 'dips': dips, 'dips_idx': dip_indices}
 
 
-def calculate_distance_ground_state(data_amp, data_phase=None, percentile=70,
+def calculate_distance_ground_state(data_real, data_imag, percentile=70,
                                     normalize=False):
     ''' Calculates the distance from the ground state by assuming that
         for the largest part of the data, the system is in its ground state
     '''
-    if data_phase is not None:
-        data_real = data_amp * np.cos(np.pi * data_phase / 180)
-        data_imag = data_amp * np.sin(np.pi * data_phase / 180)
-        perc_real = np.percentile(data_real, percentile)
-        perc_imag = np.percentile(data_imag, percentile)
-        mean_real = np.mean(np.take(data_real,
-                                    np.where(data_real < perc_real)[0]))
-        mean_imag = np.mean(np.take(data_imag,
-                                    np.where(data_imag < perc_imag)[0]))
-        data_real_dist = data_real - mean_real
-        data_imag_dist = data_imag - mean_imag
-        data_dist = np.abs(data_real_dist + 1.j * data_imag_dist)
-    else:
-        perc = np.percentile(data_amp, percentile)
-        mean = np.mean(np.take(data_amp, np.where(data_amp < perc)[0]))
-        data_dist = data_amp - mean
+    perc_real = np.percentile(data_real, percentile)
+    perc_imag = np.percentile(data_imag, percentile)
 
+    mean_real = np.mean(np.take(data_real,
+                                np.where(data_real < perc_real)[0]))
+    mean_imag = np.mean(np.take(data_imag,
+                                np.where(data_imag < perc_imag)[0]))
+
+    data_real_dist = data_real - mean_real
+    data_imag_dist = data_imag - mean_imag
+
+    data_dist = np.abs(data_real_dist + 1.j * data_imag_dist)
     if normalize:
         data_dist /= np.max(data_dist)
     return data_dist
@@ -1375,7 +1367,8 @@ def calculate_rotation_matrix(delta_I, delta_Q):
     '''
 
     angle = np.arctan2(delta_Q, delta_I)
-    rotation_matrix = np.transpose(np.matrix([[np.cos(angle), -1*np.sin(angle)],
+    rotation_matrix = np.transpose(
+        np.matrix([[np.cos(angle), -1*np.sin(angle)],
                    [np.sin(angle), np.cos(angle)]]))
     return rotation_matrix
 
@@ -1385,8 +1378,8 @@ def normalize_TD_data(data, data_zero, data_one):
 
 
 def normalize_data(data):
-    print('a_tools.normalize_data is deprecated, recommend using '
-        'a_tools.normalize_data_v2()')
+    print(
+        'a_tools.normalize_data is deprecated, recommend using a_tools.normalize_data_v2()')
     return data / np.mean(data)
 
 
@@ -1514,7 +1507,7 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
         # Rotate the data
         M = calculate_rotation_matrix(I_one-I_zero, Q_one-Q_zero)
         outp = [np.asarray(elem)[0] for elem in M * trans_data]
-        [rotated_data_ch1, rotated_data_ch2] = outp
+        rotated_data_ch1 = outp[0]
 
         # Normalize the data
         one_zero_dist = np.sqrt((I_one-I_zero)**2 + (Q_one-Q_zero)**2)
@@ -1529,7 +1522,7 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
 def rotate_and_normalize_data_no_cal_points(data, **kw):
 
     """
-    Rotates and normalizes data based on principal component analysis.
+    Rotates and projects data based on principal component analysis.
     (Source: http://www.cs.otago.ac.nz/cosc453/student_tutorials/
     principal_components.pdf)
     """
@@ -1701,6 +1694,8 @@ def color_plot(x, y, z, fig, ax, cax=None,
 
     xlabel = kw.pop('xlabel', None)
     ylabel = kw.pop('ylabel', None)
+    x_unit = kw.pop('x_unit', None)
+    y_unit = kw.pop('y_unit', None)
     zlabel = kw.pop('zlabel', None)
 
     xlim = kw.pop('xlim', None)
@@ -1709,8 +1704,8 @@ def color_plot(x, y, z, fig, ax, cax=None,
     if plot_title is not None:
         ax.set_title(plot_title, y=1.05)
     if transpose:
-        ax.set_xlabel(ylabel)
-        ax.set_ylabel(xlabel)
+        set_xlabel(ax, ylabel, unit=y_unit)
+        set_ylabel(ax, xlabel, unit=x_unit)
         ax.set_xlim(y_vertices[0], y_vertices[-1])
         ax.set_ylim(x_vertices[0], x_vertices[-1])
         if xlim is not None:
@@ -1718,8 +1713,8 @@ def color_plot(x, y, z, fig, ax, cax=None,
         if ylim is not None:
             ax.set_ylim(xlim)
     else:
-        ax.set_xlabel(xlabel)
-        ax.set_ylabel(ylabel)
+        set_xlabel(ax, xlabel, unit=x_unit)
+        set_ylabel(ax, ylabel, unit=y_unit)
         ax.set_xlim(x_vertices[0], x_vertices[-1])
         ax.set_ylim(y_vertices[0], y_vertices[-1])
         if xlim is not None:
@@ -1772,7 +1767,7 @@ def color_plot_slices(xvals, yvals, zvals, ax=None,
     # various plot options
     # define colormap
     cmap = kw.pop('cmap', 'viridis')
-    clim = kw.pop('clim', [None, None])
+    #clim = kw.pop('clim', [None, None])
     # normalized plot
     if normalize:
         for xx in range(len(xvals)):
@@ -1783,13 +1778,13 @@ def color_plot_slices(xvals, yvals, zvals, ax=None,
             zvals[xx] = np.log(zvals[xx])/np.log(10)
 
     # add blocks to plot
-    hold = kw.pop('hold', False)
+    #hold = kw.pop('hold', False)
     for xx in range(len(xvals)):
         tempzvals = np.array([np.append(zvals[xx], np.array(0)),
                               np.append(zvals[xx], np.array(0))]).transpose()
-        im = ax.pcolor(xvertices[xx:xx+2],
-                       yvertices[xx],
-                       tempzvals, cmap=cmap)
+        # im = ax.pcolor(xvertices[xx:xx+2],
+        #                yvertices[xx],
+        #                tempzvals, cmap=cmap)
     return ax
 
 
@@ -1934,7 +1929,7 @@ def calculate_transmon_transitions(EC, EJ, asym=0, reduced_flux=0,
     return transitions[:no_transitions]
 
 
-def fit_EC_EJ(f01, f12, **kw):
+def fit_EC_EJ(f01, f12):
     '''
     Calculates EC and EJ from f01 and f12 by numerical optimization.
     '''
@@ -1943,12 +1938,7 @@ def fit_EC_EJ(f01, f12, **kw):
     EC0 = f01-f12
     EJ0 = (f01+EC0)**2/(8*EC0)
 
-    asym = kw.pop('asym',0)
-    reduced_flux = kw.pop('reduced_flux',0)
-    dim = kw.pop('dim',None)
-
-    penaltyfn = lambda Es: calculate_transmon_transitions(
-        *Es,asym=asym,reduced_flux=reduced_flux,dim=dim)-[f01, f12]
+    penaltyfn = lambda Es: calculate_transmon_transitions(*Es)-[f01, f12]
     (EC, EJ), success = optimize.leastsq(penaltyfn, (EC0, EJ0))
     return EC, EJ
 
