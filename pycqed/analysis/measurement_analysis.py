@@ -443,8 +443,7 @@ class MeasurementAnalysis(object):
                                                 fig=fig, ax=ax, log=log,
                                                 xlabel=self.sweep_name,
                                                 x_unit=self.sweep_unit,
-                                                ylabel=self.value_names[i],
-                                                y_unit=self.value_units[i],
+                                                ylabel=self.ylabels[i],
                                                 save=False)
                 # fig.suptitle(self.plot_title)
             fig.subplots_adjust(hspace=0.5)
@@ -5770,7 +5769,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         self.data_dist = a_tools.calculate_distance_ground_state(
                                     data_real=data_real,
                                     data_imag=data_imag,
-                                    normalize=True)
+                                    normalize=False)
 
         #Cut edges to remove potential calibration points when looking for peaks
         # window_len_cut_edges = kw.get('analysis_window',10)
