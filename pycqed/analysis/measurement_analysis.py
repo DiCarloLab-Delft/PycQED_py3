@@ -5443,7 +5443,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
                 ax.plot(f0*1e9, Model.func(f=f0*1e9,**fit_res.best_values), 'o',
                         ms=self.marker_size_special)
             else:
-                ax.plot(f0*1e9, Model.func(f=f0,**fit_res.best_values), 'o',
+                ax.plot(f0, Model.func(f=f0,**fit_res.best_values), 'o',
                         ms=self.marker_size_special)
 
             if show:
