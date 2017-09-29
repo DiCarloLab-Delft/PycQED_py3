@@ -80,6 +80,8 @@ def two_qubit_ssro_fidelity(label, fig_format='png',
     frac1_0 = ana.data_file['Analysis']['SSRO_Fidelity'].attrs['frac1_0']
     frac1_1 = ana.data_file['Analysis']['SSRO_Fidelity'].attrs['frac1_1']
     V_opt = ana.data_file['Analysis']['SSRO_Fidelity'].attrs['V_th_a']
+    V_opt_d = ana.data_file['Analysis']['SSRO_Fidelity'].attrs['V_th_d']
+
     SNR_q0 = ana.data_file['Analysis']['SSRO_Fidelity'].attrs['SNR']
 
     n, bins0, patches = plt.hist(namespace['w0_data_00'],
@@ -130,6 +132,7 @@ def two_qubit_ssro_fidelity(label, fig_format='png',
                linewidth=2, color='grey',
                label='SNR={0:.2f}\n $F_a$={1:.5f}\n $F_d$={2:.5f}'.format(
                    SNR_q0, Fa_q0, Fd_q0))
+    ax.axvline(V_opt_d, ls='--', linewidth=2, color='black')
     ax.legend(frameon=False, loc='upper right')
     a = ax.get_xlim()
     ax.set_xlim(a[0], a[0]+(a[1]-a[0])*1.2)
@@ -138,7 +141,11 @@ def two_qubit_ssro_fidelity(label, fig_format='png',
     plt.close()
 
     V_th = np.zeros(len(qubit_labels))
+    V_th_d = np.zeros(len(qubit_labels))
+
     V_th[0] = V_opt
+    V_th_d[0] = V_opt_d
+
 
     ###########################################################################
     # Extracting and plotting the results for q1 (second weight function)
@@ -162,6 +169,7 @@ def two_qubit_ssro_fidelity(label, fig_format='png',
     frac1_0 = ana.data_file['Analysis']['SSRO_Fidelity'].attrs['frac1_0']
     frac1_1 = ana.data_file['Analysis']['SSRO_Fidelity'].attrs['frac1_1']
     V_opt = ana.data_file['Analysis']['SSRO_Fidelity'].attrs['V_th_a']
+    V_opt_d = ana.data_file['Analysis']['SSRO_Fidelity'].attrs['V_th_d']
     SNR_q1 = ana.data_file['Analysis']['SSRO_Fidelity'].attrs['SNR']
 
     n, bins0, patches = plt.hist(namespace['w1_data_00'],
@@ -209,12 +217,16 @@ def two_qubit_ssro_fidelity(label, fig_format='png',
                 linewidth=2, color='grey',
                 label='SNR={0:.2f}\n $F_a$={1:.5f}\n $F_d$={2:.5f}'.format(
                     SNR_q1, Fa_q1, Fd_q1))
+    plt.axvline(V_opt_d, ls='--',
+                linewidth=2, color='black')
     plt.legend(frameon=False, loc='upper right')
     a = plt.xlim()
     plt.xlim(a[0], a[0]+(a[1]-a[0])*1.2)
     plt.savefig(join(ana.folder, 'histogram_w1.' +
                      fig_format), format=fig_format)
+    plt.close()
     V_th[1] = V_opt
+    V_th_d[1] = V_opt_d
 
     # calculating cross-talk matrix and inverting
     ground_state = '00'
@@ -236,6 +248,7 @@ def two_qubit_ssro_fidelity(label, fig_format='png',
     V_th_cor = np.dot(mu_matrix_inv, V_th)
     V_offset_cor = np.dot(mu_matrix_inv, mu_0_vec)
     res_dict = {'mu_matrix': mu_matrix,  'V_th': V_th,
+                'V_th_d': V_th_d,
                 'mu_matrix_inv': mu_matrix_inv,
                 'V_th_cor': V_th_cor,  'V_offset_cor': V_offset_cor,
                 'Fa_q0': Fa_q0, 'Fa_q1': Fa_q1, 'Fd_q0': Fd_q0, 'Fd_q1': Fd_q1,

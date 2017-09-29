@@ -1,7 +1,12 @@
 {
-    "qubit_map": {"q0":0, "q1":1},
+    "qubit_map": {"q0":0, "q1":1, "ql":0, "qr":1},
     "operation dictionary":{
-
+        "i": {
+            "parameters": 1,
+            "duration": 20,
+            "type": "rf",
+            "matrix": []
+        },
         "x180" : {
             "parameters" : 1,
             "duration" : 20,
@@ -140,6 +145,7 @@
 
     "luts" : [
         {
+            "i" : -2,
             "x180"  : 1,
             "y180"  : 2,
             "x90"   : 3,

@@ -25,6 +25,7 @@ from qcodes.instrument.parameter import Command, no_setter
 # Note: the HandshakeParameter is a temporary param that should be replaced
 # once qcodes issue #236 is closed
 class HandshakeParameter(StandardParameter):
+
     """
     If a string is specified as a set command it will append '*OPC?' and use
     instrument.ask instead of instrument.write
@@ -54,6 +55,7 @@ class QuTech_AWG_Module(SCPI):
         self.device_descriptor.numMarkersPerChannel = 2
         self.device_descriptor.numMarkers = 8
         self.device_descriptor.numTriggers = 8
+        # Commented out until bug fixed
         self.device_descriptor.numCodewords = 128
 
         # valid values
@@ -431,3 +433,4 @@ class QuTech_AWG_Module(SCPI):
         def get_func():
             return fun(ch)
         return get_func
+

@@ -1,3 +1,7 @@
+"""
+This is the initial "compiler" that does simple 1 to 1 translation between
+qasm and qumis instructions. This is superceded by the "qasm_compiler" by XFU
+"""
 from pycqed.utilities.general import mopen
 from os.path import join, dirname, basename, splitext
 from copy import deepcopy
@@ -81,9 +85,10 @@ def qasm_to_asm(qasm_filepath, operation_dict):
                         'Multi qubit ops with args: "{}"'.format(line))
                 asm_file.writelines(instruction)
             # Identity is a special instruction that is supported as a wait
-            elif elts[0] == 'I':
+            elif elts[0] == 'I' or elts[0] =='Idx':
                 clock_waits = int(int(elts[1])//5)
                 instruction = 'wait {} \n'.format(clock_waits)
+                asm_file.writelines(instruction)
             else:
                 raise ValueError(
                     'Command "{}" not recognized, must be in {}'.format(
