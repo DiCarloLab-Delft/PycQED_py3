@@ -328,7 +328,7 @@ class Test_Qubit_Object(unittest.TestCase):
     def test_find_qubit_freq(self):
         self.CCL_qubit.find_frequency()
 
-    @unittest.skip('NotImplementedError')
+    @unittest.skipIf(openql_import_fail, 'OpenQL not present')
     def test_AllXY(self):
         self.CCL_qubit.measure_allxy()
 

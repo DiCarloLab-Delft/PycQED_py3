@@ -767,8 +767,8 @@ class CCLight_Transmon(Qubit):
                 qubit_idx=self.cfg_qubit_nr(), pulse_comb='on',
                 platf_cfg=self.cfg_openql_platform_fn())
             self.instr_CC.get_instr().upload_instructions(p.filename)
-        else: 
-            p = None # object needs to exist for the openql_sweep to work
+        else:
+            p = None  # object needs to exist for the openql_sweep to work
 
         transients = []
         for i, pulse_comb in enumerate(cases):
@@ -777,8 +777,8 @@ class CCLight_Transmon(Qubit):
             elif 'on' in pulse_comb.lower():
                 self.instr_LO_mw.get_instr().on()
 
-            s = swf.OpenQL_Sweep(openql_program = p, 
-                                 CCL=self.instr_CC.get_instr(), 
+            s = swf.OpenQL_Sweep(openql_program=p,
+                                 CCL=self.instr_CC.get_instr(),
                                  parameter_name='Transient time', unit='s',
                                  upload=prepare)
             MC.set_sweep_function(s)
@@ -800,19 +800,18 @@ class CCLight_Transmon(Qubit):
 
         return [np.array(t, dtype=np.float64) for t in transients]
 
-
     def measure_allxy(self, MC=None,
                       analyze=True, close_fig=True):
         # docstring from parent class
-        # N.B. this is a good example for a generic timedomain experiment using 
-        # the CCL transmon. 
+        # N.B. this is a good example for a generic timedomain experiment using
+        # the CCL transmon.
         if MC is None:
             MC = self.instr_MC.get_instr()
 
         self.prepare_for_timedomain()
         p = sqo.AllXY(qubit_idx=self.cfg_qubit_nr(), double_points=True,
                       platf_cfg=self.cfg_openql_platform_fn())
-        s = swf.OpenQL_Sweep(openql_program = p, 
+        s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr())
         d = self.int_avg_det
         MC.set_sweep_function(s)
