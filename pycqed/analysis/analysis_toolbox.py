@@ -1270,6 +1270,8 @@ def color_plot(x, y, z, fig, ax, cax=None,
 
     xlabel = kw.pop('xlabel', None)
     ylabel = kw.pop('ylabel', None)
+    x_unit = kw.pop('x_unit', None)
+    y_unit = kw.pop('y_unit', None)
     zlabel = kw.pop('zlabel', None)
 
     xlim = kw.pop('xlim', None)
@@ -1278,8 +1280,8 @@ def color_plot(x, y, z, fig, ax, cax=None,
     if plot_title is not None:
         ax.set_title(plot_title, y=1.05, fontsize=18)
     if transpose:
-        ax.set_xlabel(ylabel)
-        ax.set_ylabel(xlabel)
+        set_xlabel(ax, ylabel, unit=y_unit)
+        set_ylabel(ax, xlabel, unit=x_unit)
         ax.set_xlim(y_vertices[0], y_vertices[-1])
         ax.set_ylim(x_vertices[0], x_vertices[-1])
         if xlim is not None:
@@ -1287,8 +1289,8 @@ def color_plot(x, y, z, fig, ax, cax=None,
         if ylim is not None:
             ax.set_ylim(xlim)
     else:
-        ax.set_xlabel(xlabel)
-        ax.set_ylabel(ylabel)
+        set_xlabel(ax, xlabel, unit=x_unit)
+        set_ylabel(ax, ylabel, unit=y_unit)
         ax.set_xlim(x_vertices[0], x_vertices[-1])
         ax.set_ylim(y_vertices[0], y_vertices[-1])
         if xlim is not None:
@@ -1341,7 +1343,7 @@ def color_plot_slices(xvals, yvals, zvals, ax=None,
     # various plot options
     # define colormap
     cmap = kw.pop('cmap', 'viridis')
-    clim = kw.pop('clim', [None, None])
+    #clim = kw.pop('clim', [None, None])
     # normalized plot
     if normalize:
         for xx in range(len(xvals)):
@@ -1352,13 +1354,13 @@ def color_plot_slices(xvals, yvals, zvals, ax=None,
             zvals[xx] = np.log(zvals[xx])/np.log(10)
 
     # add blocks to plot
-    hold = kw.pop('hold', False)
+    #hold = kw.pop('hold', False)
     for xx in range(len(xvals)):
         tempzvals = np.array([np.append(zvals[xx], np.array(0)),
                               np.append(zvals[xx], np.array(0))]).transpose()
-        im = ax.pcolor(xvertices[xx:xx+2],
-                       yvertices[xx],
-                       tempzvals, cmap=cmap)
+        # im = ax.pcolor(xvertices[xx:xx+2],
+        #                yvertices[xx],
+        #                tempzvals, cmap=cmap)
     return ax
 
 
@@ -1430,6 +1432,52 @@ def color_plot_interpolated(x, y, z, ax=None,
             cbar.set_label(zlabel)
         return ax, CS, cbar
     return ax, CS
+
+def plot_errorbars(x, y, fit_results=None, fit_function=None, ax=None,
+                   linewidth=2 ,markersize=2, marker='none', only_bars=True):
+
+    if ax is None:
+        new_plot_created = True
+        f, ax = plt.subplots()
+    else:
+        new_plot_created = False
+
+    standard_error = np.std(y)/np.sqrt(y.size)
+
+    # if only_bars:
+    #     ax.errorbar( x, y, yerr=standard_error, ecolor='k',
+    #                  fmt='',linewidth=linewidth)
+    # else:
+    ax.errorbar( x, y, yerr=standard_error, ecolor='k', fmt=marker,
+                     linewidth=linewidth, markersize=markersize)
+
+    # best_vals = fit_results.best_values
+    # func_args=inspect.getargspec(fit_function)[0]                   #returns list of function parameters
+    #
+    # plus_list = []
+    # minus_list = []
+    # for i in func_args[1:]:
+    #     plus_list += [best_vals[i] + fit_results.params[i].stderr]
+    #     minus_list += [best_vals[i] - fit_results.params[i].stderr]
+    #
+    # yplus = fit_function(x,*plus_list)
+    # yminus = fit_function(x,*minus_list)
+    #
+    # asymmetric_error=[]
+    # for idx,val in enumerate(y):
+    #     asymmetric_error += [[ val-yminus[idx],yplus[idx]-val ]]
+    # asymmetric_error = np.asarray(asymmetric_error)
+    # asymmetric_error=np.transpose(asymmetric_error)
+    #
+    # if only_bars:
+    #     ax.errorbar( x, y, yerr=asymmetric_error, fmt='' )
+    # else:
+    #     ax.errorbar( x, y, yerr=asymmetric_error, fmt='-o' )
+
+    if new_plot_created:
+        return f,ax
+    else:
+        return
 
 
 ######################################################################
