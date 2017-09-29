@@ -286,7 +286,8 @@ class CCLight_Transmon(Qubit):
             vals=vals.Ints(0, 127), unit='samples',
             docstring=('This value needs to be calibrated to ensure that '
                        'the VSM mask aligns with the microwave pulses. '
-                       'Calibration is done using self.calibrate_vsm_delays.'),
+                       'Calibration is done using'
+                       ' self.calibrate_mw_vsm_delay.'),
             parameter_class=ManualParameter)
 
         self.add_parameter('mw_vsm_ch_Gin',
@@ -700,8 +701,28 @@ class CCLight_Transmon(Qubit):
         VSM.set('in{}_out{}_phase'.format(Gin, out), self.mw_vsm_G_phase())
         VSM.set('in{}_out{}_phase'.format(Din, out), self.mw_vsm_D_phase())
 
+        self.instr_CC.get_instr().set('vsm_channel_delay{}'.format(self.cfg_qubit_nr()),
+                          self.mw_vsm_delay())
+
     def prepare_for_fluxing(self, reset=True):
         pass
+
+    ####################################################
+    # CCL_transmon specifc calibrate_ methods below
+    ####################################################
+
+    def calibrate_mw_vsm_delay(self):
+        """
+        Uploads a sequence for calibrating the vsm
+        """
+        self.prepare_for_timedomain()
+        CCL = self.instr_CC.get_instr()
+        CCL.stop()
+        p = sqo.vsm_timing_cal_sequence(
+            qubit_idx=self.cfg_qubit_nr(), marker_idx=6,
+            platf_cfg=self.cfg_openql_platform_fn())
+        CCL.upload_instructions(p.filename)
+        CCL.start()
 
     #####################################################
     # "measure_" methods below

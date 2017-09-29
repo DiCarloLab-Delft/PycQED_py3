@@ -18,6 +18,31 @@ def CW_tone():
     pass
 
 
+def vsm_timing_cal_sequence(qubit_idx: int, marker_idx: int, platf_cfg: str):
+    """
+    A sequence for calibrating the VSM timing delay.
+
+    The marker idx is a qubit number for which a dummy pulse is played.
+    This can be used as a reference.
+
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="vsm_timing_cal_sequence",
+                nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    k = Kernel("main", p=platf)
+    k.prepz(qubit_idx)  # to ensure enough separation in timing
+    k.gate('CW_00', marker_idx)  # to trigger on
+    k.gate('spec', qubit_idx)
+    p.add_kernel(k)
+    p.compile()
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
+
 def CW_RO_sequence(qubit_idx: int, platf_cfg: str):
     """
     A sequence that performs readout back to back without initialization.

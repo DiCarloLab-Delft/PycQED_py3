@@ -25,6 +25,10 @@ try:
             sqo.AllXY(qubit_idx=0, platf_cfg=test_config_fn)
 
     class Test_single_qubit_seqs_CCL(unittest.TestCase):
+        def test_vsm_timing_cal_sequence(self):
+            sqo.vsm_timing_cal_sequence(qubit_idx=1, marker_idx=5,
+                                        platf_cfg=config_fn)
+
         def test_CW_RO_seq(self):
             sqo.CW_RO_sequence(qubit_idx=0, platf_cfg=config_fn)
 

@@ -45,7 +45,7 @@ class Test_Qubit_Object(unittest.TestCase):
         self.UHFQC = dummy_UHFQC('UHFQC')
 
         self.CCL = dummy_CCL('CCL')
-        self.Dux = Dummy_Duplexer('Dux')
+        self.VSM = Dummy_Duplexer('VSM')
 
         self.MC = measurement_control.MeasurementControl(
             'MC', live_plot_enabled=False, verbose=False)
@@ -75,7 +75,7 @@ class Test_Qubit_Object(unittest.TestCase):
         self.CCL_qubit.instr_LO_ro(self.MW1.name)
         self.CCL_qubit.instr_LO_mw(self.MW2.name)
         self.CCL_qubit.instr_acquisition(self.UHFQC.name)
-        self.CCL_qubit.instr_VSM(self.Dux.name)
+        self.CCL_qubit.instr_VSM(self.VSM.name)
         self.CCL_qubit.instr_CC(self.CCL.name)
         self.CCL_qubit.instr_LutMan_RO(self.ro_lutman.name)
         self.CCL_qubit.instr_MC(self.MC.name)
@@ -90,7 +90,9 @@ class Test_Qubit_Object(unittest.TestCase):
         self.CCL_qubit.freq_qubit(4.56e9)
         self.CCL_qubit.mw_freq_mod(-100e6)
         self.CCL_qubit.mw_awg_ch(1)
+        self.CCL_qubit.cfg_qubit_nr(0)
 
+        self.CCL_qubit.mw_vsm_delay(15)
 
     def test_instantiate_QuDevTransmon(self):
         QDT = QuDev_transmon('QuDev_transmon',
@@ -125,11 +127,11 @@ class Test_Qubit_Object(unittest.TestCase):
 
         self.CCL_qubit.prepare_for_continuous_wave()
 
-        self.assertEqual(self.Dux.in1_out1_switch(), 'OFF')
-        self.assertEqual(self.Dux.in1_out2_switch(), 'OFF')
-        self.assertEqual(self.Dux.in2_out1_switch(), 'EXT')
-        self.assertEqual(self.Dux.in2_out2_switch(), 'OFF')
-        self.assertEqual(self.Dux.in2_out1_att(), 112)
+        self.assertEqual(self.VSM.in1_out1_switch(), 'OFF')
+        self.assertEqual(self.VSM.in1_out2_switch(), 'OFF')
+        self.assertEqual(self.VSM.in2_out1_switch(), 'EXT')
+        self.assertEqual(self.VSM.in2_out2_switch(), 'OFF')
+        self.assertEqual(self.VSM.in2_out1_att(), 112)
 
 
     def test_prep_for_fluxing(self):
@@ -284,6 +286,9 @@ class Test_Qubit_Object(unittest.TestCase):
         self.assertEqual(self.AWG8_VSM_MW_LutMan.G_mixer_alpha(), 1.02)
         self.assertEqual(self.AWG8_VSM_MW_LutMan.D_mixer_phi(), 8)
 
+        self.assertEqual(self.CCL.vsm_channel_delay0(),
+                         self.CCL_qubit.mw_vsm_delay())
+
     def test_prep_td_config_vsm(self):
         self.CCL_qubit.mw_vsm_switch('ON')
         self.CCL_qubit.mw_vsm_G_att(10234)
@@ -293,9 +298,9 @@ class Test_Qubit_Object(unittest.TestCase):
         self.CCL_qubit.mw_vsm_ch_out(2)
         self.CCL_qubit.prepare_for_timedomain()
 
-        self.assertEqual(self.Dux.in3_out2_switch(), 'ON')
-        self.assertEqual(self.Dux.in3_out2_att(), 10234)
-        self.assertEqual(self.Dux.in4_out2_phase(), 10206)
+        self.assertEqual(self.VSM.in3_out2_switch(), 'ON')
+        self.assertEqual(self.VSM.in3_out2_att(), 10234)
+        self.assertEqual(self.VSM.in4_out2_phase(), 10206)
 
     ###################################################
     #          Test basic experiments                 #
