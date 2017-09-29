@@ -281,6 +281,13 @@ class CCLight_Transmon(Qubit):
                            initial_value='EXT',
                            vals=vals.Enum('ON', 'OFF', 'EXT'),
                            parameter_class=ManualParameter)
+        self.add_parameter(
+            'mw_vsm_delay', label='CCL VSM trigger delay',
+            vals=vals.Ints(0, 127), unit='samples',
+            docstring=('This value needs to be calibrated to ensure that '
+                       'the VSM mask aligns with the microwave pulses. '
+                       'Calibration is done using self.calibrate_vsm_delays.'),
+                           )
 
         self.add_parameter('mw_vsm_ch_Gin',
                            label='VSM input channel Gaussian component',
