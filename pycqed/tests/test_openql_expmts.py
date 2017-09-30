@@ -32,6 +32,10 @@ try:
         def test_CW_RO_seq(self):
             sqo.CW_RO_sequence(qubit_idx=0, platf_cfg=config_fn)
 
+        def test_pulsed_spec_seq(self):
+            sqo.pulsed_spec_seq(qubit_idx=0, spec_pulse_length=80e-9,
+                                platf_cfg=config_fn)
+
         def test_allxy(self):
             # Only test if it compiles
             sqo.AllXY(qubit_idx=0, platf_cfg=config_fn)

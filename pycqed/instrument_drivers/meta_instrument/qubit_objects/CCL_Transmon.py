@@ -493,6 +493,7 @@ class CCLight_Transmon(Qubit):
         VSM.set('in{}_out{}_att'.format(
                 self.spec_vsm_ch_in(), self.spec_vsm_ch_out()),
                 self.spec_vsm_att())
+        self.self.instr_LO_mw.get_instr().on()
 
     def prepare_readout(self):
         """
@@ -814,7 +815,6 @@ class CCLight_Transmon(Qubit):
             MC = self.instr_MC.get_instr()
         # Snippet here to create and upload the CCL instructions
         CCL = self.instr_CC.get_instr()
-        CCL.stop()
         p = sqo.pulsed_spec_sequence(
             qubit_idx=self.cfg_qubit_nr(),
             spec_pulse_length=self.spec_pulse_length(),
@@ -822,11 +822,9 @@ class CCLight_Transmon(Qubit):
         CCL.upload_instructions(p.filename)
         # CCL gets started in the int_avg detector
 
-        MC.set_sweep_function(swf.Heterodyne_Frequency_Sweep_simple(
-            MW_LO_source=self.instr_LO_ro.get_instr(),
-            IF=self.ro_freq_mod()))
+        # The spec pulse is a MW pulse that contains not modulation
+        MC.set_sweep_function(self.self.instr_LO_mw.get_instr().frequency)
         MC.set_sweep_points(freqs)
-
         self.int_avg_det_single._set_real_imag(False)
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='spectroscopy_'+self.msmt_suffix)

@@ -63,13 +63,19 @@ def CW_RO_sequence(qubit_idx: int, platf_cfg: str):
     return p
 
 
-def pulsed_spec_sequence(qubit_idx: int, spec_pulse_length: float,
-                         platf_cfg: str):
+def pulsed_spec_seq(qubit_idx: int, spec_pulse_length: float,
+                    platf_cfg: str):
     """
-    Sequence for a pulsed spectroscopy.
+    Sequence for pulsed spectroscopy.
+
+    Important notes: because of the way the CCL functions this sequence is
+    made by repeating multiple "spec" pulses of 20ns back to back.
+    As such the spec_pulse_lenght must be a multiple of 20e-9. If
+    this is not the case the spec_pulse_length will be rounded.
+
     """
     platf = Platform('OpenQL_Platform', platf_cfg)
-    p = Program(pname="CW_RO_sequence", nqubits=platf.get_qubit_number(),
+    p = Program(pname="pulsed_spec_seq", nqubits=platf.get_qubit_number(),
                 p=platf)
     k = Kernel("main", p=platf)
 
