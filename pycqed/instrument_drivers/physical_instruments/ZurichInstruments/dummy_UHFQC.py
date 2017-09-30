@@ -467,7 +467,8 @@ class dummy_UHFQC(Instrument):
             self._daq.vectorWrite('/' + self._device + '/' + path, value)
 
     # sequencer functions
-    def awg_sequence_acquisition_and_DIO_triggered_pulse(self, Iwaves, Qwaves, cases, acquisition_delay):
+    def awg_sequence_acquisition_and_DIO_triggered_pulse(
+            self, Iwaves, Qwaves, cases, acquisition_delay, timeout=5):
         # setting the acquisition delay samples
         delay_samples = int(acquisition_delay*1.8e9/8)
         # setting the delay in the instrument

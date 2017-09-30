@@ -288,7 +288,8 @@ class CCLight_Transmon(Qubit):
                        'the VSM mask aligns with the microwave pulses. '
                        'Calibration is done using'
                        ' self.calibrate_mw_vsm_delay.'),
-            parameter_class=ManualParameter)
+            set_cmd=self._set_mw_vsm_delay,
+            get_cmd=self._get_mw_vsm_delay)
 
         self.add_parameter('mw_vsm_ch_Gin',
                            label='VSM input channel Gaussian component',
@@ -326,6 +327,15 @@ class CCLight_Transmon(Qubit):
                            vals=vals.Numbers(0, 65536),
                            initial_value=65536/2,
                            parameter_class=ManualParameter)
+
+    def _set_mw_vsm_delay(self, val):
+        # sort of a pseudo Manual Parameter
+        self.instr_CC.get_instr().set(
+            'vsm_channel_delay{}'.format(self.cfg_qubit_nr()), val)
+        self._mw_vsm_delay = val
+
+    def _get_mw_vsm_delay(self):
+        return self._mw_vsm_delay
 
     def add_spec_parameters(self):
         self.add_parameter('spec_vsm_att',
@@ -715,6 +725,12 @@ class CCLight_Transmon(Qubit):
     def calibrate_mw_vsm_delay(self):
         """
         Uploads a sequence for calibrating the vsm delay.
+        The experiment consists of a single square pulse of 20 ns that
+        triggers both the VSM channel specified and the AWG8.
+
+        By changing the "mw_vsm_delay" parameter the delay can be calibrated.
+        N.B. Ensure that the signal is visible on a scope or in the UFHQC
+        readout first!
         """
         self.prepare_for_timedomain()
         CCL = self.instr_CC.get_instr()
@@ -724,6 +740,8 @@ class CCLight_Transmon(Qubit):
             platf_cfg=self.cfg_openql_platform_fn())
         CCL.upload_instructions(p.filename)
         CCL.start()
+        print('CCL program is running. Parameter "mw_vsm_delay" can now be '
+              'calibrated by hand.')
 
     #####################################################
     # "measure_" methods below
