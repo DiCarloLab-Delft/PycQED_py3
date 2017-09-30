@@ -75,16 +75,14 @@ class QuTech_Duplexer(VisaInstrument):
                 self.set('in{}_out{}_switch'.format(inp+1, outp+1), mode)
 
     def set_all_phases_to(self, val):
-        raise NotImplementedError()
-        for i in range(4):
-            for j in range(2):
-                self.set_phase(i+1, j+1, val)
+        for inp in range(4):
+            for outp in range(2):
+                self.set('in{}_out{}_phase'.format(inp+1, outp+1), val)
 
     def set_all_attenuations_to(self, val):
-        raise NotImplementedError()
-        for i in range(4):
-            for j in range(2):
-                self.set_attenuation(i+1, j+1, val)
+        for inp in range(4):
+            for outp in range(2):
+                self.set('in{}_out{}_att'.format(inp+1, outp+1), val)
 
     def _mode_set_parser(self, val):
         '''
@@ -128,6 +126,10 @@ class Dummy_Duplexer(QuTech_Duplexer):
         self._dummy_instr = True
         self.add_parameters(nr_input_channels=nr_input_channels,
                             nr_output_channels=nr_output_channels)
+        self.add_parameter('timeout', parameter_class=ManualParameter,
+                           initial_value=1)
+        self._address = 'Dummy'
+        self._terminator = '\n'
 
         self.IDN({'driver': str(self.__class__), 'model': self.name,
                   'serial': 'Dummy', 'vendor': '', 'firmware': ''})
