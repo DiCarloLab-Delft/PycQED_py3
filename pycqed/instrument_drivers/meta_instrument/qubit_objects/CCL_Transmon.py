@@ -59,6 +59,11 @@ class CCLight_Transmon(Qubit):
                            parameter_class=InstrumentRefParameter)
         self.add_parameter('instr_SH', label='SignalHound',
                            parameter_class=InstrumentRefParameter)
+        self.add_parameter(
+            'instr_FluxCtrl', label='Flux control', docstring=(
+                'Instrument used to control flux can either be an IVVI rack '
+                'or a meta instrument such as the Flux control.'),
+            parameter_class=InstrumentRefParameter)
 
         # LutMan's
         self.add_parameter('instr_LutMan_MW',
@@ -376,7 +381,26 @@ class CCLight_Transmon(Qubit):
             initial_value=0.8)
 
     def add_flux_parameters(self):
-        pass
+        # fl_dc_ is the prefix for DC flux bias related params
+        self.add_parameter(
+            'fl_dc_V_per_phi0', label='Flux bias V/Phi0',
+            docstring='Conversion factor for flux bias',
+            vals=vals.Numbers(), unit='V', initial_value=0,
+            parameter_class=ManualParameter)
+        self.add_parameter(
+            'fl_dc_V', label='Flux bias', unit='V',
+            docstring='Current flux bias setting', vals=vals.Numbers(),
+            initial_value=0, parameter_class=ManualParameter)
+        self.add_parameter(
+            'fl_dc_V0', unit='V', docstring=(
+                'Flux bias offset corresponding to the sweetspot'),
+            vals=vals.Numbers(), initial_value=0,
+            parameter_class=ManualParameter)
+        self.add_parameter(
+            'fl_dc_ch',  docstring=(
+                'Flux bias channel'),
+            vals=vals.Ints(), initial_value=1,
+            parameter_class=ManualParameter)
 
     def add_config_parameters(self):
         self.add_parameter(
@@ -397,6 +421,11 @@ class CCLight_Transmon(Qubit):
             'Beware that a similar parameter (ro_pulse_res_nr) exists that is'
             ' used for uploading to the right Lookuptable. These params are '
             'oten but not always identical (e.g., multiple feedlines). ')
+
+        self.add_parameter('cfg_qubit_freq_calc_method',
+                           initial_value='latest',
+                           parameter_class=ManualParameter,
+                           vals=vals.Enum('latest', 'flux'))
 
     def add_generic_qubit_parameters(self):
         self.add_parameter('E_c', unit='Hz',
@@ -423,6 +452,10 @@ class CCLight_Transmon(Qubit):
                            parameter_class=ManualParameter)
         self.add_parameter('freq_res',
                            label='Resonator frequency', unit='Hz',
+                           parameter_class=ManualParameter)
+        self.add_parameter('asymmetry', unit='',
+                           docstring='Asymmetry parameter of the SQUID loop',
+                           initial_value=0,
                            parameter_class=ManualParameter)
 
         self.add_parameter('F_ssro',
@@ -774,7 +807,8 @@ class CCLight_Transmon(Qubit):
     def measure_spectroscopy(self, freqs, pulsed=True, MC=None,
                              analyze=True, close_fig=True):
         if not pulsed:
-            raise NotImplementedError()
+            logging.warning('CCL transmon can only perform '
+                            'pulsed spectrocsopy')
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -795,7 +829,7 @@ class CCLight_Transmon(Qubit):
 
         self.int_avg_det_single._set_real_imag(False)
         MC.set_detector_function(self.int_avg_det_single)
-        MC.run(name='Resonator_scan'+self.msmt_suffix)
+        MC.run(name='spectroscopy_'+self.msmt_suffix)
         if analyze:
             ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
 

@@ -297,24 +297,22 @@ class Qubit(Instrument):
             # args here should be handed down from the top.
             self.measure_spectroscopy(freqs, pulsed=pulsed, MC=None,
                                       analyze=True, close_fig=close_fig)
-            if pulsed:
-                label = 'pulsed-spec'
-            else:
-                label = 'spectroscopy'
+
+            label = 'spec'
             analysis_spec = ma.Qubit_Spectroscopy_Analysis(
                 label=label, close_fig=True)
 
             if update:
                 if use_max:
-                    self.f_qubit(analysis_spec.peaks['peak'])
+                    self.freq_qubit(analysis_spec.peaks['peak'])
                 else:
-                    self.f_qubit(analysis_spec.fitted_freq)
+                    self.freq_qubit(analysis_spec.fitted_freq)
                 # TODO: add updating and fitting
         elif method.lower() == 'ramsey':
             return self.calibrate_frequency_ramsey(
                 steps=steps, verbose=verbose, update=update,
                 close_fig=close_fig)
-        return self.f_qubit()
+        return self.freq_qubit()
 
     def calibrate_motzoi(self, MC=None, verbose=True, update=True):
         motzois = gen_sweep_pts(center=0, span=1, num=31)
@@ -392,6 +390,54 @@ class Qubit(Instrument):
         """
         raise NotImplementedError
         return True
+
+    def calculate_frequency(self,
+                            calc_method=None,
+                            V_per_phi0=None,
+                            V=None):
+        '''
+        Calculates an estimate for the qubit frequency.
+        Arguments are optional and parameters of the object are used if not
+        specified.
+        Args:
+            calc_method : can be "latest" or "flux" uses last known frequency
+                    or calculates using the cosine arc model as specified
+                    in fit_mods.Qubit_dac_to_freq
+                corresponding par. : cfg_qubit_freq_calc_method
+
+            V_per_phi0 : dac flux coefficient, converts volts to Flux.
+                    Set to 1 to reduce the model to pure flux.
+                corresponding par. : fl_dc_V_per_phi
+            V  : dac value used when calculating frequency
+                corresponding par. : fl_dc_V
+
+        Calculates the f01 transition frequency using the cosine arc model.
+        (function available in fit_mods. Qubit_dac_to_freq)
+
+        The parameter cfg_qubit_freq_calc_method determines how it is
+        calculated.
+        Parameters of the qubit object are used unless specified.
+        Flux can be specified both in terms of dac voltage or flux but not
+        both.
+        '''
+        if self.cfg_qubit_freq_calc_method() is 'latest':
+            qubit_freq_est = self.freq_qubit()
+
+        elif self.cfg_qubit_freq_calc_method() == 'flux':
+            if V is None:
+                V = self.fl_dc_V()
+            if V_per_phi0 is None:
+                V_per_phi0 = self.fl_dc_V_per_phi0()
+
+            qubit_freq_est = fit_mods.Qubit_dac_to_freq(
+                dac_voltage=V,
+                f_max=self.freq_max(),
+                E_c=self.E_c(),
+                dac_sweet_spot=self.fl_dc_V0(),
+                V_per_phi0=V_per_phi0,
+                asymmetry=self.asymmetry())
+
+        return qubit_freq_est
 
     def measure_heterodyne_spectroscopy(self):
         raise NotImplementedError()

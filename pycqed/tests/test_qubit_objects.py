@@ -328,7 +328,7 @@ class Test_Qubit_Object(unittest.TestCase):
         freqs = np.linspace(6e9, 6.5e9, 31)
         self.CCL_qubit.measure_spectroscopy(freqs=freqs)
 
-    @unittest.skip('NotImplementedError')
+    # @unittest.skip('NotImplementedError')
     @unittest.skipIf(openql_import_fail, 'OpenQL not present')
     def test_find_qubit_freq(self):
         self.CCL_qubit.find_frequency()
