@@ -88,6 +88,8 @@ class Test_Qubit_Object(unittest.TestCase):
         self.CCL_qubit.ro_freq_mod(200e6)
 
         self.CCL_qubit.freq_qubit(4.56e9)
+        self.CCL_qubit.freq_max(4.62e9)
+
         self.CCL_qubit.mw_freq_mod(-100e6)
         self.CCL_qubit.mw_awg_ch(1)
         self.CCL_qubit.cfg_qubit_nr(0)
@@ -110,6 +112,19 @@ class Test_Qubit_Object(unittest.TestCase):
     def test_instantiate_QWG_transmon(self):
         QT = QWG_driven_transmon('QT')
         QT.close()
+
+    ##############################################
+    # calculate methods
+    ##############################################
+    def test_calc_freq(self):
+        self.CCL_qubit.cfg_qubit_freq_calc_method('latest')
+        self.CCL_qubit.calculate_frequency()
+        self.CCL_qubit.cfg_qubit_freq_calc_method('flux')
+        self.CCL_qubit.calculate_frequency()
+
+    ##############################################
+    # basic prepare methods
+    ##############################################
 
     def test_prep_for_continuous_wave(self):
         self.CCL_qubit.ro_acq_weight_type('optimal')
@@ -136,6 +151,11 @@ class Test_Qubit_Object(unittest.TestCase):
 
     def test_prep_for_fluxing(self):
         self.CCL_qubit.prepare_for_fluxing()
+
+    @unittest.skip('Not Implemented')
+    def test_prep_flux_bias(self):
+        raise NotImplementedError()
+
 
     ##############################################
     # Testing prepare for readout
@@ -331,6 +351,9 @@ class Test_Qubit_Object(unittest.TestCase):
     # @unittest.skip('NotImplementedError')
     @unittest.skipIf(openql_import_fail, 'OpenQL not present')
     def test_find_qubit_freq(self):
+        self.CCL_qubit.cfg_qubit_freq_calc_method('latest')
+        self.CCL_qubit.find_frequency()
+        self.CCL_qubit.cfg_qubit_freq_calc_method('flux')
         self.CCL_qubit.find_frequency()
 
     @unittest.skipIf(openql_import_fail, 'OpenQL not present')

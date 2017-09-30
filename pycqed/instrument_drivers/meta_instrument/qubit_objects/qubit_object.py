@@ -391,10 +391,7 @@ class Qubit(Instrument):
         raise NotImplementedError
         return True
 
-    def calculate_frequency(self,
-                            calc_method=None,
-                            V_per_phi0=None,
-                            V=None):
+    def calculate_frequency(self, calc_method=None, V_per_phi0=None, V=None):
         '''
         Calculates an estimate for the qubit frequency.
         Arguments are optional and parameters of the object are used if not

@@ -385,7 +385,7 @@ class CCLight_Transmon(Qubit):
         self.add_parameter(
             'fl_dc_V_per_phi0', label='Flux bias V/Phi0',
             docstring='Conversion factor for flux bias',
-            vals=vals.Numbers(), unit='V', initial_value=0,
+            vals=vals.Numbers(), unit='V', initial_value=1,
             parameter_class=ManualParameter)
         self.add_parameter(
             'fl_dc_V', label='Flux bias', unit='V',
@@ -429,6 +429,7 @@ class CCLight_Transmon(Qubit):
 
     def add_generic_qubit_parameters(self):
         self.add_parameter('E_c', unit='Hz',
+                           initial_value=300e6,
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
         self.add_parameter('E_j', unit='Hz',
@@ -493,7 +494,7 @@ class CCLight_Transmon(Qubit):
         VSM.set('in{}_out{}_att'.format(
                 self.spec_vsm_ch_in(), self.spec_vsm_ch_out()),
                 self.spec_vsm_att())
-        self.self.instr_LO_mw.get_instr().on()
+        self.instr_LO_mw.get_instr().on()
 
     def prepare_readout(self):
         """
@@ -815,7 +816,7 @@ class CCLight_Transmon(Qubit):
             MC = self.instr_MC.get_instr()
         # Snippet here to create and upload the CCL instructions
         CCL = self.instr_CC.get_instr()
-        p = sqo.pulsed_spec_sequence(
+        p = sqo.pulsed_spec_seq(
             qubit_idx=self.cfg_qubit_nr(),
             spec_pulse_length=self.spec_pulse_length(),
             platf_cfg=self.cfg_openql_platform_fn())
@@ -823,7 +824,7 @@ class CCLight_Transmon(Qubit):
         # CCL gets started in the int_avg detector
 
         # The spec pulse is a MW pulse that contains not modulation
-        MC.set_sweep_function(self.self.instr_LO_mw.get_instr().frequency)
+        MC.set_sweep_function(self.instr_LO_mw.get_instr().frequency)
         MC.set_sweep_points(freqs)
         self.int_avg_det_single._set_real_imag(False)
         MC.set_detector_function(self.int_avg_det_single)
