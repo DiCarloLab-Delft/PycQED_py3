@@ -701,8 +701,9 @@ class CCLight_Transmon(Qubit):
         VSM.set('in{}_out{}_phase'.format(Gin, out), self.mw_vsm_G_phase())
         VSM.set('in{}_out{}_phase'.format(Din, out), self.mw_vsm_D_phase())
 
-        self.instr_CC.get_instr().set('vsm_channel_delay{}'.format(self.cfg_qubit_nr()),
-                          self.mw_vsm_delay())
+        self.instr_CC.get_instr().set(
+            'vsm_channel_delay{}'.format(self.cfg_qubit_nr()),
+            self.mw_vsm_delay())
 
     def prepare_for_fluxing(self, reset=True):
         pass
@@ -713,7 +714,7 @@ class CCLight_Transmon(Qubit):
 
     def calibrate_mw_vsm_delay(self):
         """
-        Uploads a sequence for calibrating the vsm
+        Uploads a sequence for calibrating the vsm delay.
         """
         self.prepare_for_timedomain()
         CCL = self.instr_CC.get_instr()
