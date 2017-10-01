@@ -4038,7 +4038,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
             close_file=False, show=show,**kw)
         self.add_analysis_datagroup_to_file()
 
-        window_len_filter = kw.get('window_len',10)
+        window_len_filter = kw.get('window_len_filter',11)
 
         ########## Fit data ##########
 
@@ -4202,7 +4202,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
             raise ValueError('fitting model "{}" not recognized'.format(
                              fitting_model))
 
-        self.fit_res = fit_res
+        self.fit_results = fit_res
         self.save_fitted_parameters(fit_res, var_name='HM')
 
         if print_fit_results is True:
@@ -4306,7 +4306,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
         else:
             ax.plot(self.sweep_points, fit_res.best_fit, 'r-',
                     linewidth=self.line_width)
-            #f0 = self.fit_results.values['f0']
+
             f0 = fit_res.params['f0'].value
             if 'hanger' in fitting_model:
                 #f is expected in Hz but f0 in GHz!
