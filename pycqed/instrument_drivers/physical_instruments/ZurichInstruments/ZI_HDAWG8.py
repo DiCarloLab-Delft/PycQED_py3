@@ -171,8 +171,9 @@ class ZI_HDAWG8(ZI_base_instrument):
     def _gen_write_csv(self, wf_name):
         def write_func(waveform):
             # The lenght of AWG8 waveforms should be a multiple of 8 samples.
-            extra_zeros = 8-(len(waveform) % 8)
-            waveform = np.concatenate([waveform, np.zeros(extra_zeros)])
+            if (len(waveform) % 8) != 0:
+                extra_zeros = 8-(len(waveform) % 8)
+                waveform = np.concatenate([waveform, np.zeros(extra_zeros)])
             return self._write_csv_waveform(
                 wf_name=wf_name, waveform=waveform)
         return write_func
