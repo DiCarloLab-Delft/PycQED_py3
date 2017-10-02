@@ -133,7 +133,7 @@ class n_qubit_off_on(swf.Hard_Sweep):
         self.upload = upload
         self.parameter_name = 'sample'
         self.unit = '#'
-        samples = len(pulse_pars_list)
+        samples = 2**len(pulse_pars_list)
         if preselection:
             samples *= 2
         self.sweep_points = np.arange(samples)
