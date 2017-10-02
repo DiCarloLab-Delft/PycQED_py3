@@ -202,6 +202,38 @@ class ZI_HDAWG8(ZI_base_instrument):
             print(e)
             return None
 
+    # Note: This was added for debugging by NielsH.
+    # If we do not need it for a few days we should remove it. (2/10/2017)
+    # def stop_awg(self):
+    #     test_program = """
+    #     // 'Counting'  waveform
+    #     const N = 80;
+    #     setWaveDIO(0, ones(N), -ones(N));
+    #     setWaveDIO(1,  ones(N), -ones(N));
+    #     setWaveDIO(2, -ones(N),  ones(N));
+    #     setWaveDIO(3,  ones(N),  ones(N));
+    #     setWaveDIO(4,  -blackman(N, 1.0, 0.2),  -blackman(N, 1.0, 0.2));
+    #     setWaveDIO(5,   blackman(N, 1.0, 0.2),  -blackman(N, 1.0, 0.2));
+    #     setWaveDIO(6,  -blackman(N, 1.0, 0.2),  blackman(N, 1.0, 0.2));
+    #     setWaveDIO(7,  blackman(N, 1.0, 0.2),  blackman(N, 1.0, 0.2));
+    #     """
+
+        for awg_nr in range(4):
+            print('Configuring AWG {} with dummy program'.format(awg_nr))
+
+            # disable all AWG channels
+            self.set('awgs_{}_enable'.format(awg_nr), 0)
+            self.configure_awg_from_string(awg_nr, test_program, self.timeout())
+            self.set('awgs_{}_single'.format(awg_nr), 0)
+            self.set('awgs_{}_enable'.format(awg_nr), 1)
+
+        print('Waiting...')
+        time.sleep(1)
+
+        for awg_nr in range(4):
+            # disable all AWG channels
+            self.set('awgs_{}_enable'.format(awg_nr), 0)
+
     def initialze_all_codewords_to_zeros(self):
         """
         Generates all zeros waveforms for all codewords
