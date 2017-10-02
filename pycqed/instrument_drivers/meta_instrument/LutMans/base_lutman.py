@@ -49,6 +49,11 @@ class Base_LutMan(Instrument):
                            initial_value=1e9,
                            parameter_class=ManualParameter)
 
+        # Used to determine bounds in plotting.
+        # overwrite in child classes if used.
+        self._voltage_min = None
+        self._voltage_max = None
+
         # initialize the _wave_dict to an empty dictionary
         self._wave_dict = {}
         self.set_default_lutmap()
@@ -105,34 +110,42 @@ class Base_LutMan(Instrument):
 
     def render_wave(self, wave_name, show=True, time_units='lut_index',
                     reload_pulses=True):
+        """
+        Renders a waveform
+        """
         if reload_pulses:
             self.generate_standard_waveforms()
         fig, ax = plt.subplots(1, 1)
         if time_units == 'lut_index':
             x = np.arange(len(self._wave_dict[wave_name][0]))
             ax.set_xlabel('Lookuptable index (i)')
-            ax.vlines(
-                2048, self._voltage_min, self._voltage_max, linestyle='--')
+            if self._voltage_min is not None:
+                ax.vlines(
+                    2048, self._voltage_min, self._voltage_max, linestyle='--')
         elif time_units == 's':
             x = (np.arange(len(self._wave_dict[wave_name][0]))
                  / self.sampling_rate.get())
 
-            ax.vlines(2048 / self.sampling_rate.get(),
-                      self._voltage_min, self._voltage_max, linestyle='--')
-        print(wave_name)
+            if self._voltage_min is not None:
+                ax.vlines(2048 / self.sampling_rate.get(),
+                          self._voltage_min, self._voltage_max, linestyle='--')
+
         ax.set_title(wave_name)
         ax.plot(x, self._wave_dict[wave_name][0],
                 marker='o', label='chI')
         ax.plot(x, self._wave_dict[wave_name][1],
                 marker='o', label='chQ')
         ax.set_ylabel('Amplitude (V)')
-        ax.set_axis_bgcolor('gray')
-        ax.axhspan(self._voltage_min, self._voltage_max, facecolor='w',
-                   linewidth=0)
+
         ax.legend()
-        ax.set_ylim(self._voltage_min*1.1, self._voltage_max*1.1)
+        if self._voltage_min is not None:
+            ax.set_axis_bgcolor('gray')
+            ax.axhspan(self._voltage_min, self._voltage_max, facecolor='w',
+                       linewidth=0)
+            ax.set_ylim(self._voltage_min*1.1, self._voltage_max*1.1)
+
         ax.set_xlim(0, x[-1])
-        if time_units =='s':
+        if time_units == 's':
             set_xlabel(ax, 'time', 's')
         if show:
             plt.show()
@@ -158,9 +171,9 @@ class Base_LutMan(Instrument):
         ax.legend()
 
         ax.set_yscale("log", nonposy='clip')
-        if y_bounds != None:
+        if y_bounds is not None:
             ax.set_ylim(y_bounds[0], y_bounds[1])
-        if f_bounds != None:
+        if f_bounds is not None:
             ax.set_xlim(f_bounds[0], f_bounds[1])
         if show:
             plt.show()
