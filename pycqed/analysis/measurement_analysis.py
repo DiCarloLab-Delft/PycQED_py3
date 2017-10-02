@@ -3,6 +3,7 @@ import logging
 import numpy as np
 import pickle
 import h5py
+import matplotlib
 from matplotlib import pyplot as plt
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis import fitting_models as fit_mods
@@ -2494,6 +2495,9 @@ class SSRO_Analysis(MeasurementAnalysis):
         fid_grp.attrs.create(name='frac1_1', data=frac1_1)
         fid_grp.attrs.create(name='F_d', data=F_d)
         fid_grp.attrs.create(name='SNR', data=SNR)
+        fid_grp.attrs.create(name='V_th_a', data=self.V_th_a)
+        fid_grp.attrs.create(name='V_th_d', data=self.V_th_d)
+        fid_grp.attrs.create(name='F_a', data=self.F_a)
 
         self.sigma0_0 = sigma0_0
         self.sigma1_1 = sigma1_1
