@@ -2318,6 +2318,9 @@ class QScale_Analysis(TD_Analysis):
             fig, ax = self.default_ax()
             self.make_figures(fig=fig, ax=ax, **kw)
 
+            if show:
+                plt.show()
+
             if kw.pop('save_fig', True):
                 self.save_fig(fig,
                               figname=self.measurementstring+'_Qscale_fit', **kw)
@@ -2425,9 +2428,6 @@ class QScale_Analysis(TD_Analysis):
                  max(ax.get_xlim())],
                 [0.5, 0.5], 'k--',
                 linewidth=self.axes_line_width)
-
-        if kw.get('show', True):
-            plt.show()
 
     def fit_data(self, **kw):
 
@@ -3757,7 +3757,7 @@ class T1_Analysis(TD_Analysis):
 
             self.ax.locator_params(axis='x', nbins=6)
 
-            if kw.get('show',False):
+            if show:
                 plt.show()
 
             self.save_fig(self.fig, figname=self.measurementstring+'_Fit', **kw)
