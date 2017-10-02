@@ -1850,8 +1850,12 @@ class Rabi_Analysis_original(TD_Analysis):
                 logging.warning(e)
 
     def get_measured_amp180(self):
-        fit_grps = list(self.data_file['Analysis'].keys())
-        fitted_pars_0 = self.data_file['Analysis'][fit_grps[0]]
+        # The "Analysis" group might contain the "Corrected data" dataset
+        #fit_grps = list(self.data_file['Analysis'].keys())
+        #fitted_pars_0 = self.data_file['Analysis'][fit_grps[0]]
+        a = self.data_file['Analysis']
+        fit_grps = [i for i in a.values() if isinstance(i, h5py.Group)]
+        fitted_pars_0 = fit_grps[0]
         amp180 = fitted_pars_0['period'].attrs['value']/2
         # If there are two quadratures, return the amplitude with the smallest
         # errorbar
