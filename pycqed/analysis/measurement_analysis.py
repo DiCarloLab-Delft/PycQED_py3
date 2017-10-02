@@ -2156,7 +2156,6 @@ class SSRO_Analysis(MeasurementAnalysis):
             else:
                 filename = 'raw-cumulative-histograms'
             self.save_fig(fig, figname=filename, close_fig=self.close_fig, **kw)
-            plt.show()
 
         # saving the results
         if 'SSRO_Fidelity' not in self.analysis_group:
@@ -2384,7 +2383,6 @@ class SSRO_Analysis(MeasurementAnalysis):
             else:
                 filename = 'S-curves'
             self.save_fig(fig, figname=filename, **kw)
-            plt.show()
 
             # plotting the histograms
             fig, axes = plt.subplots(figsize=(7, 4))
@@ -2470,7 +2468,6 @@ class SSRO_Analysis(MeasurementAnalysis):
                 filename = 'Histograms'
 
             self.save_fig(fig, figname=filename, **kw)
-            plt.show()
 
         self.save_fitted_parameters(fit_res_double_0,
                                     var_name='fit_res_double_0')
