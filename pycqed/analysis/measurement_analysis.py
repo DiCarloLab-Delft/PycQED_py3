@@ -4411,7 +4411,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
 
         percentile = kw.get('percentile',20)
         num_sigma_threshold = kw.get('num_sigma_threshold',5)
-        window_len_filter = kw.get('window_len',3)
+        window_len_filter = kw.get('window_len_filter',3)
         optimize = kw.pop('optimize',True)
         verbose = kw.get('verbose',False)
 
