@@ -22,8 +22,6 @@ import pygsti
 from math import erfc
 from scipy.signal import argrelmax, argrelmin
 from copy import deepcopy
-from sympy import pretty
-from sympy.abc import pi, mu
 from pprint import pprint
 
 import pycqed.analysis.tools.plotting as pl_tools
@@ -1728,13 +1726,13 @@ class Rabi_Analysis(TD_Analysis):
                                            (freq_std/freq_fit)**2 )
 
             if kw.get('print_parameters', False):
-                print(pretty(pi)+'-Pulse Amplitude = {:.6} '.format(piPulse)+
+                print('\u03C0'+'-Pulse Amplitude = {:.6} '.format(piPulse)+
                       '('+self.parameter_units[-1]+')'+'\t'+
-                      pretty(pi)+'-Pulse Stddev = {:.6} '.format(piPulse_std)+
+                      '\u03C0'+'-Pulse Stddev = {:.6} '.format(piPulse_std)+
                       '('+self.parameter_units[-1]+')'+'\n'+
-                      pretty(pi)+'/2-Pulse Amplitude = {:.6} '.format(piHalfPulse)+
+                      '\u03C0'+'/2-Pulse Amplitude = {:.6} '.format(piHalfPulse)+
                       '('+self.parameter_units[-1]+')'+'\t'+
-                      pretty(pi)+'/2-Pulse Stddev = {:.6} '.format(piHalfPulse_std)+
+                      '\u03C0'+'/2-Pulse Stddev = {:.6} '.format(piHalfPulse_std)+
                       '('+self.parameter_units[-1]+')')
 
             #return as dict for ease of use with "save_computed_parameters"
@@ -2466,11 +2464,11 @@ class QScale_Analysis(TD_Analysis):
                                     var_name='xmY')
 
         if kw.get('print_fit_results',False):
-            print('Fit Report - X'+pretty(pi)+'/2 X'+pretty(pi)+':\n{}\n'.
+            print('Fit Report - X'+'\u03C0'+'/2 X'+'\u03C0'+':\n{}\n'.
                   format(self.fit_res[0].fit_report())+
-                  'Fit Report - X'+pretty(pi)+'/2 Y'+pretty(pi)+':\n{}\n'.
+                  'Fit Report - X'+'\u03C0'+'/2 Y'+'\u03C0'+':\n{}\n'.
                   format(self.fit_res[1].fit_report())+
-                  'Fit Report - X'+pretty(pi)+'/2 Y-'+pretty(pi)+':\n{}\n'.
+                  'Fit Report - X'+'\u03C0'+'/2 Y-'+'\u03C0'+':\n{}\n'.
                   format(self.fit_res[2].fit_report()))
 
     def calculate_optimal_qscale(self, threshold=0.02, **kw):
@@ -3706,9 +3704,9 @@ class T1_Analysis(TD_Analysis):
         T1_err_micro_sec = self.T1['T1_stderr']*1e6
         #Print T1 and error on screen
         if kw.get('print_parameters', False):
-            print('T1 = {:.5f} ('.format(T1_micro_sec)+pretty(mu)+'s) \t '
+            print('T1 = {:.5f} ('.format(T1_micro_sec)+'μs) \t '
                   'T1 StdErr = {:.5f} ('.format(
-                   T1_err_micro_sec)+pretty(mu)+'s)')
+                   T1_err_micro_sec)+'μs)')
 
         #Plot best fit and initial fit + data
         if self.make_fig:
@@ -4007,10 +4005,10 @@ class Ramsey_Analysis(TD_Analysis):
                   '\t\tqubit frequency stderr = {:.7f} (MHz)'.format(
                 self.ramsey_freq['freq_stderr']*1e-6)+
                 '\nT2* = {:.5f} '.format(
-                self.T2_star['T2_star']*self.scale) +'('+pretty(mu)+unit+')'+
+                self.T2_star['T2_star']*self.scale) +'('+'μ'+unit+')'+
                 '\t\tT2* stderr = {:.5f} '.format(
                 self.T2_star['T2_star_stderr']*self.scale) +
-                '('+pretty(mu)+unit+')')
+                '('+'μ'+unit+')')
 
         if close_file:
             self.data_file.close()
