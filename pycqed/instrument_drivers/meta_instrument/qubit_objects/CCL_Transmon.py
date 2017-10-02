@@ -506,7 +506,11 @@ class CCLight_Transmon(Qubit):
         """
         self._prep_ro_instantiate_detectors()
         self._prep_ro_sources()
-        self._prep_ro_pulse()
+        try:
+            self._prep_ro_pulse()
+        except Exception:
+            print("triggered workaround for #348")
+            self._prep_ro_pulse()
         self._prep_ro_integration_weights()
 
     def _prep_ro_instantiate_detectors(self):
@@ -692,7 +696,9 @@ class CCLight_Transmon(Qubit):
     def prepare_for_timedomain(self):
         self.prepare_readout()
         self._prep_td_sources()
-        self._prep_mw_pulses()
+        for i in range(2):
+            print("Uploading twice as a workaround for #348")
+            self._prep_mw_pulses()
 
     def _prep_td_sources(self):
         self.instr_LO_mw.get_instr().on()
