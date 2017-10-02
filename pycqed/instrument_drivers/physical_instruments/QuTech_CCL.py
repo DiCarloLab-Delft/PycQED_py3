@@ -120,6 +120,7 @@ class CCL(SCPI):
                     if (val_type == "Bool"):
                         # Bool can naturally only have 2 values, 0 or 1...
                         parameter["vals"] = vals.Ints(0, 1)
+                        parameter['get_parser'] = int
 
                     elif (val_type == "Non_Neg_Number"):
                         # Non negative integers
@@ -132,9 +133,11 @@ class CCL(SCPI):
                                 val_max = validator["range"][1]
 
                             parameter["vals"] = vals.Ints(val_min, val_max)
+                            parameter['get_parser'] = int
 
                         except Exception as e:
                             parameter["vals"] = vals.Ints(0, INT32_MAX)
+                            parameter['get_parser'] = int
                             log.warning("Range of validator not set correctly")
 
                     else:
