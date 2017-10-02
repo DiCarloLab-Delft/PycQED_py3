@@ -1860,7 +1860,7 @@ class Rabi_Analysis_original(TD_Analysis):
         # If there are two quadratures, return the amplitude with the smallest
         # errorbar
         if len(fit_grps) == 2:
-            fitted_pars_1 = self.data_file['Analysis'][fit_grps[1]]
+            fitted_pars_1 = fit_grps[1]
             if (fitted_pars_1['period'].attrs['stderr'] <
                     fitted_pars_0['period'].attrs['stderr']):
                 amp180 = fitted_pars_1['period'].attrs['value']/2
