@@ -183,6 +183,10 @@ class CCL(SCPI):
             set_cmd=self._upload_microcode,
             vals=vals.Strings()
         )
+        self.add_parameter('last_loaded_instructions',
+                           vals=vals.Strings(),
+                           initial_value='',
+                           parameter_class=ManualParameter)
 
     def _read_parameters(self):
         """
@@ -312,6 +316,8 @@ class CCL(SCPI):
         # write binblock
         hdr = 'QUTech:UploadInstructions '
         self.binBlockWrite(binBlock, hdr)
+        # write to last_loaded_instructions so it can conveniently be read back
+        self.last_loaded_instructions(filename)
 
     def _upload_microcode(self, filename):
         """
