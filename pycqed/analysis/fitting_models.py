@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.special
 import lmfit
 import logging
 #################################
@@ -347,6 +348,21 @@ def avoided_crossing_direct_coupling(flux, f_center1, f_center2,
     return result
 
 
+def ErfWindow(t, t_start, t_end, t_rise, amplitude, offset):
+    '''
+    parameters:
+        t, time in s
+        t_start, start of window in s
+        t_end, end of window in s
+        amplitude a.u.
+        offset a.u.
+        t_rise in s (rise time)
+    '''
+    return offset + amplitude/2*(scipy.special.erf((t - t_start)/(t_rise/2.6))
+                                 - scipy.special.erf((t - t_end)/(t_rise/2.6)))
+
+
+
 ######################
 # Residual functions #
 ######################
@@ -577,6 +593,10 @@ def double_gauss_guess(model, data, x=None, **kwargs):
     else:
         return par_dict
 
+
+
+
+
 #################################
 #     User defined Models       #
 #################################
@@ -606,6 +626,7 @@ RBModel = lmfit.Model(RandomizedBenchmarkingDecay)
 LinOModel = lmfit.Model(linear_with_offset)
 LinBGModel = lmfit.Model(linear_with_background)
 LinBGOModel = lmfit.Model(linear_with_background_and_offset)
+ErfWindowModel = lmfit.Model(ErfWindow)
 
 # 2D models
 Gaus2D_model = lmfit.Model(gaussian_2D, independent_vars=['x', 'y'])

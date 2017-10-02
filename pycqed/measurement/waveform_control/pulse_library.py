@@ -388,11 +388,12 @@ class GaussFluxPulse(Pulse):
         pulse = np.zeros(len(tvals))
         pulse[n_pulse_start:n_pulse_stop] = np.ones(n_pulse_stop - n_pulse_start) * self.amplitude
         if self.sigma != 0:
-            nr_samples = 6*int(self.sigma/dt)
-            gauss_kernel = signal.gaussian(nr_samples, self.sigma/dt, sym=False)
-            gauss_kernel = gauss_kernel/np.sum(gauss_kernel)
-            i_max = int(nr_samples/2)
-            pulse = np.convolve(pulse, gauss_kernel, mode='full')[i_max:(len(pulse)+i_max)]
+            if int(6*self.sigma/dt)>0:
+                nr_samples = 6*int(self.sigma/dt)
+                gauss_kernel = signal.gaussian(nr_samples, self.sigma/dt, sym=False)
+                gauss_kernel = gauss_kernel/np.sum(gauss_kernel)
+                i_max = int(nr_samples/2)
+                pulse = np.convolve(pulse, gauss_kernel, mode='full')[i_max:(len(pulse)+i_max)]
         return pulse
 
 

@@ -18,7 +18,7 @@ import textwrap
 from scipy.interpolate import interp1d
 import pylab
 from pycqed.analysis.tools import data_manipulation as dm_tools
-import imp
+import importlib
 import math
 from math import erfc
 from scipy.signal import argrelextrema, argrelmax, argrelmin
@@ -55,7 +55,8 @@ except ImportError as e:
     else:
         raise
 
-imp.reload(dm_tools)
+importlib.reload(dm_tools)
+importlib.reload(fit_mods)
 
 class MeasurementAnalysis(object):
 
@@ -8644,3 +8645,258 @@ class Ram_Z_Analysis(MeasurementAnalysis):
 
         self.save_fig(fig, 'Ram-Z_dac_arc.png')
 
+class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
+    """
+
+
+
+    """
+    def __init__(self, label='Flux pulse Ramsey 2D', qb_name=None,  **kw):
+        kw['label'] = label
+        kw['h5mode'] = 'r+'
+        super(self.__class__, self).__init__(TwoD=True
+                                             , start_at_zero=True,
+                                             qb_name=qb_name, auto=False, **kw)
+
+        self.get_values('Data')
+        self.get_naming_and_values()
+        self.fitted_phases = None
+        self.fitted_delay = None
+        self.fig,self.ax = plt.subplots()
+        self.fig.canvas.set_window_title(label)
+        self.delay_fit_res = None
+        self.X90_separation = kw.pop('X90_separation', None)
+        self.return_fit = kw.pop('return_fit', False)
+
+
+    def fit_single_cos(self, thetas, ampls, print_fit_results=True,phase_guess=0):
+        cos_mod = fit_mods.CosModel
+        average = np.mean(ampls)
+
+        diff = 0.5*(max(ampls) -
+                    min(ampls))
+        amp_guess = -diff
+        #offset guess
+        offset_guess = average
+
+        #Set up fit parameters and perform fit
+        cos_mod.set_param_hint('amplitude',
+                               value=amp_guess,
+                               vary=True)
+        cos_mod.set_param_hint('phase',
+                               value=phase_guess,
+                               vary=True)
+        cos_mod.set_param_hint('frequency',
+                               value=1./(2*np.pi),
+                               vary=False)
+        cos_mod.set_param_hint('offset',
+                               value=offset_guess,
+                               vary=True)
+        self.params = cos_mod.make_params()
+        fit_res = cos_mod.fit(data=ampls,
+                              t=thetas,
+                              params=self.params)
+
+        if fit_res.chisqr > 0.35:
+            logging.warning('Fit did not converge, chi-square > 0.35')
+
+        if print_fit_results:
+            print(fit_res.fit_report())
+
+        return fit_res
+
+
+    def fit_all(self, plot=False):
+
+        phase_list = [0,0]
+        y_list = []
+        amplitude_list = []
+
+        length_single = len(np.where(self.sweep_points[1] == self.sweep_points[1][0])[0])
+
+        if plot:
+            fig,axs = plt.subplots(2,1)
+        else:
+            fig,axs = (None,None)
+
+        for i in np.arange(0,len(self.sweep_points[0]),length_single):
+
+            data_slice = self.data[:,i:i+length_single-1]
+
+            thetas = data_slice[0]
+            y = data_slice[1,0]
+            ampls = np.abs(data_slice[2] + 1j*data_slice[3])
+
+            phase_guess = phase_list[-1] + (phase_list[-1] - phase_list[-2])
+            fit_res = self.fit_single_cos(thetas,ampls,print_fit_results=False,phase_guess=phase_guess)
+
+            phase_list.append(fit_res.best_values['phase'])
+            y_list.append(y)
+            amplitude_list.append(fit_res.best_values['amplitude'])
+
+            if plot:
+                axs[0].plot(thetas,ampls,'k.')
+                axs[0].plot(thetas,fit_res.best_fit,'r-')
+
+
+        phase_list.pop(0)
+        phase_list.pop(0)
+
+
+        if plot:
+            axs[0].set_title('Cosine fits')
+            axs[0].set_xlabel('theta (rad)')
+            axs[0].set_ylabel('|S21| (arb. units)')
+            axs[0].legend(['data','fits'])
+
+            axs[1].plot(y_list,phase_list)
+            axs[1].set_title('fitted phases')
+            axs[1].set_xlabel(self.parameter_names[1]+' ('+self.parameter_units[1]+')')
+            axs[1].set_ylabel('phase mod 2$\pi$ (rad)')
+
+            fig.subplots_adjust(hspace=0.5)
+
+            fig.show()
+
+        self.fitted_phases = np.array(phase_list)
+        self.sweep_points_2D = np.array(y_list)
+
+        return {'phase_list' : phase_list, 'y_list' : y_list, 'plot' : fig}
+
+
+    def fit_delay(self,X90_separation=None, plot=False, print_fit_results=False,return_fit=None):
+
+        if X90_separation is None:
+            X90_separation = self.X90_separation
+        if X90_separation is None:
+            raise ValueError('Must specify the X90 pulse separation used in the experiment.')
+        if self.fitted_phases is None:
+            self.fit_all(plot=False)
+        if return_fit is None:
+            return_fit = self.return_fit
+
+        erf_window_model = fit_mods.ErfWindowModel
+        offset_guess = self.fitted_phases[0]
+
+        i_amplitude_guess = np.abs(offset_guess - self.fitted_phases).argmax()
+        amplitude_guess = self.fitted_phases[i_amplitude_guess] - offset_guess
+
+        i_list_window = np.where(np.abs(self.fitted_phases - offset_guess) >
+                                 np.abs(amplitude_guess/2.))[0]
+
+        t_start_guess = self.sweep_points_2D[i_list_window[0]]
+        t_end_guess = self.sweep_points_2D[i_list_window[-1]]
+
+
+        #Set up fit parameters and perform fit
+        erf_window_model.set_param_hint('offset',
+                                        value=offset_guess,
+                                        vary=True)
+        erf_window_model.set_param_hint('amplitude',
+                                        value=amplitude_guess,
+                                        vary=True)
+        erf_window_model.set_param_hint('t_start',
+                                        value=t_start_guess,
+                                        vary=True)
+        erf_window_model.set_param_hint('t_end',
+                                        value=t_end_guess,
+                                        vary=True)
+        erf_window_model.set_param_hint('t_rise',
+                                        value=(t_end_guess - t_start_guess)/20.,
+                                        vary=True)
+        self.params_delay_fit = erf_window_model.make_params()
+        self.delay_fit_res = erf_window_model.fit(data=self.fitted_phases,
+                              t=self.sweep_points_2D,
+                              params=self.params_delay_fit)
+
+        if self.delay_fit_res.chisqr > 1.:
+            logging.warning('Fit did not converge, chi-square > 1.')
+
+        self.fitted_delay = (self.delay_fit_res.best_values['t_end'] +
+                             self.delay_fit_res.best_values['t_start'] - X90_separation)/2.
+
+
+
+        if print_fit_results:
+            print(self.delay_fit_res.fit_report())
+            print('fitted delay = ', self.fitted_delay/1e-9, 'ns')
+
+        if plot:
+            self.delay_fit_res.plot()
+
+        if return_fit:
+            return self.fitted_delay, self.delay_fit_res
+        else:
+            return self.fitted_delay
+
+    def run_default_analysis(self, X90_separation=None, show=False,
+                             close_file=False, **kw):
+        if X90_separation is None:
+            X90_separation = self.X90_separation
+        self.fig,self.ax = plt.subplots()
+        self.add_analysis_datagroup_to_file()
+
+        show_guess = kw.get('show_guess', False)
+        print_fit_results = kw.get('print_fit_results', True)
+
+
+        #get the fit results (lmfit.ModelResult) and save them
+        self.fit_all()
+        self.fitted_delay, self.delay_fit_res = self.fit_delay(X90_separation=X90_separation,plot=False, print_fit_results=print_fit_results,return_fit=True)
+        self.save_fitted_parameters(self.delay_fit_res, var_name=self.value_names[0])
+
+
+        #Plot results
+        self.plot_results(show_guess=show_guess)
+
+        #display figure
+        if show:
+            self.fig.show()
+
+        #save figure
+        self.save_fig(self.fig, figname=self.measurementstring+'_delay_fit',
+                      **kw)
+
+        if close_file:
+            self.data_file.close()
+
+        return self.delay_fit_res
+
+    def plot_results(self, show_guess=False):
+
+        self.ax.plot(self.sweep_points_2D,self.delay_fit_res.data,'k.',label='data')
+        textstr = ('fitted delay = {:4.3f}ns'.format(self.fitted_delay/1e-9))
+
+        self.fig.text(0.5,0,textstr,
+                      transform=self.ax.transAxes, fontsize=self.font_size,
+                      verticalalignment='top',
+                      horizontalalignment='center',bbox=self.box_props)
+
+        #Used for plotting the fit
+        best_vals = self.delay_fit_res.best_values
+        erf_window_fit_func = lambda t: fit_mods.ErfWindow(t,
+                                                           t_start=best_vals['t_start'],
+                                                           t_end=best_vals['t_end'],
+                                                           t_rise=best_vals['t_rise'],
+                                                           amplitude=best_vals['amplitude'],
+                                                           offset=best_vals['offset'])
+
+
+        # plot with initial guess
+        if show_guess:
+            self.ax.plot(self.sweep_points_2D,
+                         self.delay_fit_res.init_fit, 'k--',
+                         linewidth=self.line_width,
+                         label='initial guess')
+
+        #plot with best fit results
+        x = np.linspace(self.sweep_points_2D[0],
+                        self.sweep_points_2D[-1],
+                        len(self.sweep_points_2D)*100)
+        y = erf_window_fit_func(x)
+        self.ax.plot(x, y, 'r-', linewidth=self.line_width,label='fit')
+
+        if show_guess:
+            self.ax.legend(['data','guess','fit'])
+        else:
+            self.ax.legend(['data','fit'])
