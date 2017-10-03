@@ -195,8 +195,11 @@ class QuTech_AWG_Module(SCPI):
         self.add_parameter('triggers_logic_input',
                            label='Read triggers input value',
                            get_cmd='QUTEch:TRIGgers:LOGIcinput?',
-                           get_parser=np.uint32,
+                           get_parser=np.uint32, # Did not convert to readable
+                                                 # string because a uint32 is more
+                                                 # usefull when other logic is needed
                            docstring=doc_trgs_log_inp)
+
 
         # This command is added manually
         # self.add_function('deleteWaveform'
