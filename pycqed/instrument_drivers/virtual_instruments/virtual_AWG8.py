@@ -21,11 +21,20 @@ class VirtualAWG8(Instrument):
                            parameter_class=ManualParameter,
                            vals=vals.MultiType(vals.Numbers(min_value=0),
                                                vals.Enum(None)))
-
         self._num_channels = 8
         self._num_codewords = 256
 
         self._add_codeword_parameters()
+        self.add_dummy_parameters()
+
+    def add_dummy_parameters(self):
+        parnames = []
+        for i in range(8):
+            parnames.append('sigouts_{}_offset'.format(i))
+            parnames.append('sigouts_{}_on'.format(i))
+
+        for par in parnames:
+            self.add_parameter(par, parameter_class=ManualParameter)
 
     def snapshot_base(self, update=False, params_to_skip_update=None):
         if params_to_skip_update is None:

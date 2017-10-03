@@ -6,6 +6,7 @@ import pycqed as pq
 import pycqed.analysis.analysis_toolbox as a_tools
 
 import pycqed.instrument_drivers.virtual_instruments.virtual_AWG8 as v8
+import pycqed.instrument_drivers.virtual_instruments.virtual_SignalHound as sh
 import pycqed.instrument_drivers.virtual_instruments.virtual_MW_source as vmw
 from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman as mwl
 from pycqed.measurement.waveform_control_CC import waveform as wf
@@ -32,7 +33,7 @@ except:
     openql_import_fail = True
 
 
-class Test_Qubit_Object(unittest.TestCase):
+class Test_QO(unittest.TestCase):
 
     @classmethod
     def setUpClass(self):
@@ -41,7 +42,7 @@ class Test_Qubit_Object(unittest.TestCase):
 
         self.MW1 = vmw.VirtualMWsource('MW1')
         self.MW2 = vmw.VirtualMWsource('MW2')
-
+        self.SH = sh.virtual_SignalHound_USB_SA124B('SH')
         self.UHFQC = dummy_UHFQC('UHFQC')
 
         self.CCL = dummy_CCL('CCL')
@@ -80,6 +81,8 @@ class Test_Qubit_Object(unittest.TestCase):
         self.CCL_qubit.instr_LutMan_RO(self.ro_lutman.name)
         self.CCL_qubit.instr_MC(self.MC.name)
 
+        self.CCL_qubit.instr_SH(self.SH.name)
+
         config_fn = os.path.join(pq.__path__[0], 'tests', 'test_cfg_CCL.json')
         self.CCL_qubit.cfg_openql_platform_fn(config_fn)
 
@@ -95,6 +98,11 @@ class Test_Qubit_Object(unittest.TestCase):
         self.CCL_qubit.cfg_qubit_nr(0)
 
         self.CCL_qubit.mw_vsm_delay(15)
+
+        self.CCL_qubit.mw_mixer_offs_GI(.1)
+        self.CCL_qubit.mw_mixer_offs_GQ(.2)
+        self.CCL_qubit.mw_mixer_offs_DI(.3)
+        self.CCL_qubit.mw_mixer_offs_DQ(.4)
 
     def test_instantiate_QuDevTransmon(self):
         QDT = QuDev_transmon('QuDev_transmon',
@@ -297,6 +305,13 @@ class Test_Qubit_Object(unittest.TestCase):
         self.CCL_qubit.mw_G_mixer_alpha(1.02)
         self.CCL_qubit.mw_D_mixer_phi(8)
 
+
+        self.CCL_qubit.mw_mixer_offs_GI(.1)
+        self.CCL_qubit.mw_mixer_offs_GQ(.2)
+        self.CCL_qubit.mw_mixer_offs_DI(.3)
+        self.CCL_qubit.mw_mixer_offs_DQ(.4)
+
+
         self.CCL_qubit.prepare_for_timedomain()
         self.assertEqual(self.AWG8_VSM_MW_LutMan.channel_GI(), 5)
         self.assertEqual(self.AWG8_VSM_MW_LutMan.channel_GQ(), 6)
@@ -308,6 +323,12 @@ class Test_Qubit_Object(unittest.TestCase):
 
         self.assertEqual(self.CCL.vsm_channel_delay0(),
                          self.CCL_qubit.mw_vsm_delay())
+
+        self.assertEqual(self.AWG.sigouts_4_offset(), .1)
+        self.assertEqual(self.AWG.sigouts_5_offset(), .2)
+        self.assertEqual(self.AWG.sigouts_6_offset(), .3)
+        self.assertEqual(self.AWG.sigouts_7_offset(), .4)
+
 
     def test_prep_td_config_vsm(self):
         self.CCL_qubit.mw_vsm_switch('ON')
@@ -325,6 +346,9 @@ class Test_Qubit_Object(unittest.TestCase):
     ###################################################
     #          Test basic experiments                 #
     ###################################################
+    def test_cal_mixer_offsets_drive(self):
+        self.CCL_qubit.calibrate_mixer_offsets_drive()
+
     @unittest.skipIf(openql_import_fail, 'OpenQL not present')
     def test_resonator_spec(self):
         self.CCL_qubit.ro_acq_weight_type('SSB')

@@ -436,6 +436,15 @@ class Qubit(Instrument):
 
         return qubit_freq_est
 
+    def calibrate_mixer_offsets_drive(self, update: bool=True)-> bool:
+        '''
+        Calibrates the mixer skewness and updates the I and Q offsets in
+        the qubit object.
+        '''
+        raise NotImplementedError()
+
+        return True
+
     def measure_heterodyne_spectroscopy(self):
         raise NotImplementedError()
 
