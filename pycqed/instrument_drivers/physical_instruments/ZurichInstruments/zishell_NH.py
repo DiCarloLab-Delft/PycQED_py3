@@ -941,7 +941,8 @@ class ziShellDevice:
         self.daq.getAsEvent(path)
         tmp = self.daq.poll(0.5, 500, 4, True)
         if path in tmp:
-            return tmp[path]
+            # The [0]['vector'] is to get strip of the vector stuff around it
+            return tmp[path][0]['vector']
         else:
             return None
 

@@ -1,7 +1,6 @@
 import time
 import logging
 import os
-import sys
 import numpy as np
 from . import zishell_NH as zs
 from qcodes.utils import validators as vals
@@ -69,30 +68,13 @@ class ZI_HDAWG8(ZI_base_instrument):
         base_fn = os.path.join(dir_path, 'zi_parameter_files')
 
         try:
-            self.add_s_node_pars(
-                filename=os.path.join(base_fn, 's_node_pars_HDAWG8.json'))
-        except FileNotFoundError:
-            logging.warning("parameter file for settable parameters"
-                            " {} not found".format(self._s_file_name))
-        try:
-            self.add_d_node_pars(
-                filename=os.path.join(base_fn, 'd_node_pars_HDAWG8.json'))
+            self.add_parameters_from_file(
+                filename=os.path.join(base_fn, 'node_doc_HDAWG8.json'))
+
         except FileNotFoundError:
             logging.warning("parameter file for data parameters"
                             " {} not found".format(self._d_file_name))
         self.add_ZIshell_device_methods_to_instrument()
-
-        # Manually added parameters
-        # amplified mode is not implemented for all channels
-        for i in [0, 1, 6, 7]:
-            self.add_parameter(
-                'raw_sigouts_{}_mode'.format(i),
-                set_cmd=self._gen_set_func(
-                    self._dev.seti, 'raw/sigouts/1/mode'),
-                get_cmd=self._gen_get_func(
-                    self._dev.geti, 'raw/sigouts/1/mode'),
-                vals=vals.Ints(0, 1),  # Ideally this is an Enum
-                docstring='"0" is direct mode\n"1" is amplified mode')
 
         self._add_codeword_parameters()
         self.connect_message(begin_time=t0)
@@ -113,7 +95,6 @@ class ZI_HDAWG8(ZI_base_instrument):
         self.restart_device = self._dev.restart_device
         self.poll = self._dev.poll
         self.sync = self._dev.sync
-        self.configure_awg_from_file = self._dev.configure_awg_from_file
         self.configure_awg_from_string = self._dev.configure_awg_from_string
         self.read_from_scope = self._dev.read_from_scope
         self.restart_scope_module = self._dev.restart_scope_module
@@ -219,21 +200,21 @@ class ZI_HDAWG8(ZI_base_instrument):
     #     setWaveDIO(7,  blackman(N, 1.0, 0.2),  blackman(N, 1.0, 0.2));
     #     """
 
-        for awg_nr in range(4):
-            print('Configuring AWG {} with dummy program'.format(awg_nr))
+    #     for awg_nr in range(4):
+    #         print('Configuring AWG {} with dummy program'.format(awg_nr))
 
-            # disable all AWG channels
-            self.set('awgs_{}_enable'.format(awg_nr), 0)
-            self.configure_awg_from_string(awg_nr, test_program, self.timeout())
-            self.set('awgs_{}_single'.format(awg_nr), 0)
-            self.set('awgs_{}_enable'.format(awg_nr), 1)
+    #         # disable all AWG channels
+    #         self.set('awgs_{}_enable'.format(awg_nr), 0)
+    #         self.configure_awg_from_string(awg_nr, test_program, self.timeout())
+    #         self.set('awgs_{}_single'.format(awg_nr), 0)
+    #         self.set('awgs_{}_enable'.format(awg_nr), 1)
 
-        print('Waiting...')
-        time.sleep(1)
+    #     print('Waiting...')
+    #     time.sleep(1)
 
-        for awg_nr in range(4):
-            # disable all AWG channels
-            self.set('awgs_{}_enable'.format(awg_nr), 0)
+    #     for awg_nr in range(4):
+    #         # disable all AWG channels
+    #         self.set('awgs_{}_enable'.format(awg_nr), 0)
 
     def initialze_all_codewords_to_zeros(self):
         """
