@@ -39,7 +39,7 @@ class ZI_HDAWG8(ZI_base_instrument):
         '''
         t0 = time.time()
         self._num_channels = 8
-        self._num_codewords = 256
+        self._num_codewords = 1024
 
         if os.name == 'nt':
             dll = ctypes.windll.shell32
@@ -60,10 +60,6 @@ class ZI_HDAWG8(ZI_base_instrument):
         print("Trying to connect to device {}".format(self._devname))
         self._dev.connect_device(self._devname, '1GbE')
 
-        self.add_parameter('timeout', unit='s',
-                           initial_value=10,
-                           parameter_class=ManualParameter)
-
         dir_path = os.path.dirname(os.path.abspath(__file__))
         base_fn = os.path.join(dir_path, 'zi_parameter_files')
 
@@ -77,7 +73,27 @@ class ZI_HDAWG8(ZI_base_instrument):
         self.add_ZIshell_device_methods_to_instrument()
 
         self._add_codeword_parameters()
+        self._add_extra_parameters()
         self.connect_message(begin_time=t0)
+
+    def _add_extra_parameters(self):
+        self.add_parameter('timeout', unit='s',
+                           initial_value=10,
+                           parameter_class=ManualParameter)
+        self.add_parameter(
+            'cfg_num_codewords', label='Number of used codewords', docstring=(
+                'This parameter is used to determine how many codewords to '
+                'upload in "self.upload_codeword_program".'),
+            initial_value=self._num_codewords,
+            vals=vals.Ints(1, self._num_codewords),
+            parameter_class=ManualParameter)
+
+        self.add_parameter(
+            'cfg_codeword_mode', initial_value='identical',
+            vals=vals.Enum('identical', 'microwave', 'flux'), docstring=(
+                'Used in the configure codeword method to determine what DIO'
+                ' pins are used in for which AWG numbers.'),
+            parameter_class=ManualParameter)
 
     def snapshot_base(self, update=False, params_to_skip_update=None):
         if params_to_skip_update is None:
@@ -248,7 +264,7 @@ class ZI_HDAWG8(ZI_base_instrument):
 
         for ch in [1, 3, 5, 7]:
             waveform_table = '// Define the waveform table\n'
-            for cw in range(self._num_codewords):
+            for cw in range(self.cfg_num_codewords()):
                 wf0_name = '{}_wave_ch{}_cw{:03}'.format(
                     self._devname, ch, cw)
                 wf1_name = '{}_wave_ch{}_cw{:03}'.format(
