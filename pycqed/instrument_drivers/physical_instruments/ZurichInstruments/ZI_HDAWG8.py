@@ -89,7 +89,7 @@ class ZI_HDAWG8(ZI_base_instrument):
             parameter_class=ManualParameter)
 
         self.add_parameter(
-            'cfg_codeword_mode', initial_value='identical',
+            'cfg_codeword_protocol', initial_value='identical',
             vals=vals.Enum('identical', 'microwave', 'flux'), docstring=(
                 'Used in the configure codeword method to determine what DIO'
                 ' pins are used in for which AWG numbers.'),
@@ -288,6 +288,12 @@ class ZI_HDAWG8(ZI_base_instrument):
 
         The protocol uses several parts to specify the
         These parameters are specific to each AWG-8 channel and depend on the
+        the function the AWG8 has in the setup.
+
+        The parameter "cfg_codeword_protocol" defines what protocol is used.
+        There are three options:
+            identical : all AWGs have the same configuration
+            microwave : AWGs 0 and 1 share bits
 
         Protocol definition:
         protocol
@@ -313,45 +319,53 @@ class ZI_HDAWG8(ZI_base_instrument):
             it to the right mode.
 
         """
-        # TODO: The snippet below uses the direct zi API rather than
-        # parameters (which it should use). This is awaiting fixing
-        # of issue #315.
-
         ####################################################
         # Protocol definition
         ####################################################
 
         # Configure the DIO interface for triggering on
 
-        # This is the bit index of the valid bit,
-        # we use bit 16 of the DIO in this example
-        self._dev.daq.setInt('/' + self._dev.device +
-                             '/awgs/*/dio/valid/index', 31)
-        # Valid polarity is 'high' (hardware value 2),
-        # 'low' (hardware value 1), 'no valid needed' (hardware value 0)
-        self._dev.daq.setInt('/' + self._dev.device +
-                             '/awgs/*/dio/valid/polarity', 2)
-        # This is the bit index of the strobe signal (toggling signal),
-        # we use bit 24
-        self._dev.daq.setInt('/' + self._dev.device +
-                             '/awgs/*/dio/strobe/index', 30)
-        # Configure the DIO interface for triggering on the both edges of
-        # the strobe/toggle bit signal.
-        # 1 for rising edge, 2 for falling edge triggering or 3 for both edges
-        self._dev.daq.setInt('/' + self._dev.device +
-                             '/awgs/*/dio/strobe/slope', 3)
+        for awg_nr in range(4):
+            # This is the bit index of the valid bit,
+            self.set('awgs_{}_dio_valid_index'.format(awg_nr), 31)
+            # Valid polarity is 'high' (hardware value 2),
+            # 'low' (hardware value 1), 'no valid needed' (hardware value 0)
+            self.set('awgs_{}_dio_valid_polarity'.format(awg_nr), 2)
+            # This is the bit index of the strobe signal (toggling signal),
+            self.set('awgs_{}_dio_strobe_index'.format(awg_nr), 30)
 
-        # Define the mask value, we use bit 0 on the DIO to index the table,
-        # The acquired bits on the DIO will be masked by the mask.
-        # as en example mask 3 will mask the bits with 00000011 using only the
-        # 2 Least Significant Bits.
-        self._dev.daq.setInt('/' + self._dev.device +
-                             '/awgs/*/dio/mask/value', 31)
-        # Define the shift to apply to the DIO input before the mask is
-        # applied, as we're using bit 0
-        # we don't need to shift the value, so we set it to 0
-        self._dev.daq.setInt('/' + self._dev.device +
-                             '/awgs/*/dio/mask/shift', 0)
+            # Configure the DIO interface for triggering on the both edges of
+            # the strobe/toggle bit signal.
+            # 1: rising edge, 2: falling edge or 3: both edges
+            self.set('awgs_{}_dio_strobe_slope'.format(awg_nr), 3)
+
+            if self.cfg_codeword_protocol() == 'identical':
+                # In the identical protocol all bits are used to trigger
+                # the same codewords on all AWG's
+
+                # Define the mask value, we use bit 0 on the DIO to index the
+                # table, The acquired bits on the DIO will be masked by the mask.
+                # as en example mask 3 will mask the bits with 00000011 using
+                # only the 2 Least Significant Bits.
+                self.set('awgs_{}_dio_mask_value'.format(awg_nr), 255)
+                # Define the shift to apply to the DIO input before the mask is
+                # applied, as we're using bit 0
+                # we don't need to shift the value, so we set it to 0
+                self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
+
+        # In the mw protocol bits [0:7] -> CW0 and bits [8:15] -> CW1
+        if self.cfg_codeword_protocol() == 'microwave':
+            for awg_nr in [0, 1]:
+                self.set('awgs_{}_dio_mask_value'.format(awg_nr), 255)
+                self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
+            for awg_nr in [2, 3]:
+                # N.B. protocol should be correct but not working
+                # shift/mask settings appear to be working.
+                self.set('awgs_{}_dio_mask_value'.format(awg_nr), 255)
+                self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 8)
+
+        if self.cfg_codeword_protocol() == 'flux':
+            raise NotImplementedError()
 
         ####################################################
         # Delay configuration
