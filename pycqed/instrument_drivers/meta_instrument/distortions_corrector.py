@@ -57,8 +57,9 @@ class Distortion_corrector():
         self.new_step = []
 
         # Fitting
-        self.known_fit_models = ['exponential', 'high-pass', 'damped_osc',
-                                 'spline']
+        self.known_fit_models = ['exponential', 'double_exponential',
+                                 'triple_exponential', 'high-pass',
+                                 'damped_osc', 'spline']
         self.fit_model = None
         self.fit_res = None
 
@@ -250,6 +251,203 @@ class Distortion_corrector():
             'kernel': list(new_ker)
         }
 
+    def fit_double_exp_model(self, start_time_fit, end_time_fit):
+        '''
+        Fit a double exponential decay of the form
+            C + A1 * exp(-t/tau1) + A2 * exp(-t/tau2)
+        to last measured trace (self.waveform). The predistortion is
+        calculated only from the exponential with the longest decay constant.
+        The fit model and result are saved in self.fit_model and self.fit_res,
+        respectively. The new predistortion kernel and information about the
+        fit is stored in self.new_kernel_dict.
+
+        Args:
+            start_time_fit (float): start of the fitted interval
+            end_time_fit (float):   end of the fitted interval
+        '''
+        self._start_idx = np.argmin(np.abs(self.time_pts - start_time_fit))
+        self._stop_idx = np.argmin(np.abs(self.time_pts - end_time_fit))
+
+        # Prepare the fit model
+        self.fit_model = lmfit.Model(fm.DoubleExpDecayFunc)
+        self.fit_model.set_param_hint('offset',
+                                      value=self.waveform[self._stop_idx],
+                                      vary=True)
+        self.fit_model.set_param_hint('amp1',
+                                      value=(self.waveform[self._start_idx] -
+                                             self.waveform[self._stop_idx])/2,
+                                      vary=True)
+        self.fit_model.set_param_hint('tau1',
+                                      value=end_time_fit-start_time_fit,
+                                      vary=True)
+        self.fit_model.set_param_hint('amp2',
+                                      value=(self.waveform[self._start_idx] -
+                                             self.waveform[self._stop_idx])/4,
+                                      vary=True)
+        self.fit_model.set_param_hint('tau2',
+                                      value=(end_time_fit-start_time_fit)/2,
+                                      vary=True)
+
+        self.fit_model.set_param_hint('n', value=1, vary=False)
+        params = self.fit_model.make_params()
+
+        # Do the fit
+        fit_res = self.fit_model.fit(
+            data=self.waveform[self._start_idx:self._stop_idx],
+            t=self.time_pts[self._start_idx:self._stop_idx],
+            params=params)
+        self.fitted_waveform = fit_res.eval(
+            t=self.time_pts[self._start_idx:self._stop_idx])
+
+        # Find exponential with largest decay constant
+        maxInd = np.argmax([fit_res.best_values['tau{}'.format(i+1)]
+                            for i in range(2)]) + 1
+
+        # Analytic form of the predistorted square pulse (input that creates a
+        # square pulse at the output)
+        C = fit_res.best_values['offset']
+        A = fit_res.best_values['amp{}'.format(maxInd)]
+        a = A / C
+        aTilde = a / (a + 1)
+        tau = fit_res.best_values['tau{}'.format(maxInd)]
+        tauTilde = tau * (a + 1)
+
+        tPts = np.arange(0, self.kernel_length*1e-9, 1e-9)  # TODO AWG sampling rate
+        predist_step = (1 - aTilde * np.exp(-tPts/tauTilde)) / C
+
+        # Check if parameters are physical and print warnings if not
+        if tau < 0:
+            print('Warning: unphysical tau = {} (expect tau > 0).'
+                  .format(tau))
+        if C < 0:
+            print('Warning: unphysical C = {} (expect C > 0)'.format(C))
+
+        # Save the results
+        self.fit_res = fit_res
+        self.new_step = predist_step
+        # Take every 5th point because sampling rate of AWG is 1 GHz and
+        # sampling rate of scope is 5 GHz.
+        # TODO: un-hardcode this
+        new_ker = kf.kernel_from_kernel_stepvec(predist_step)
+
+        self.new_kernel_dict = {
+            'name': self.filename + '_' + str(self._iteration),
+            'filter_params': {
+                'b0': 1 / (C + A),
+                'b1': 1 / (tau * (C + A)),
+                'a1': -C / (tau * (C + A))
+            },
+            'fit': {
+                'model': 'double_exponential',
+                'A': A,
+                'tau': tau,
+                'C': C
+            },
+            'kernel': list(new_ker)
+        }
+
+    def fit_triple_exp_model(self, start_time_fit, end_time_fit):
+        '''
+        Fit a triple exponential decay of the form
+            C + A1 * exp(-t/tau1) + A2 * exp(-t/tau2) + A3 * exp(-t/tau3)
+        to last measured trace (self.waveform). The predistortion is
+        calculated only from the exponential with the longest decay constant.
+        The fit model and result are saved in self.fit_model and self.fit_res,
+        respectively. The new predistortion kernel and information about the
+        fit is stored in self.new_kernel_dict.
+
+        Args:
+            start_time_fit (float): start of the fitted interval
+            end_time_fit (float):   end of the fitted interval
+        '''
+        self._start_idx = np.argmin(np.abs(self.time_pts - start_time_fit))
+        self._stop_idx = np.argmin(np.abs(self.time_pts - end_time_fit))
+
+        # Prepare the fit model
+        self.fit_model = lmfit.Model(fm.TripleExpDecayFunc)
+        self.fit_model.set_param_hint('offset',
+                                      value=self.waveform[self._stop_idx],
+                                      vary=True)
+        self.fit_model.set_param_hint('amp1',
+                                      value=(self.waveform[self._start_idx] -
+                                             self.waveform[self._stop_idx])/2,
+                                      vary=True)
+        self.fit_model.set_param_hint('tau1',
+                                      value=end_time_fit-start_time_fit,
+                                      vary=True)
+        self.fit_model.set_param_hint('amp2',
+                                      value=(self.waveform[self._start_idx] -
+                                             self.waveform[self._stop_idx])/4,
+                                      vary=True)
+        self.fit_model.set_param_hint('tau2',
+                                      value=(end_time_fit-start_time_fit)/2,
+                                      vary=True)
+        self.fit_model.set_param_hint('amp3',
+                                      value=(self.waveform[self._start_idx] -
+                                             self.waveform[self._stop_idx])/4,
+                                      vary=True)
+        self.fit_model.set_param_hint('tau3',
+                                      value=(end_time_fit-start_time_fit)/2,
+                                      vary=True)
+
+        self.fit_model.set_param_hint('n', value=1, vary=False)
+        params = self.fit_model.make_params()
+
+        # Do the fit
+        fit_res = self.fit_model.fit(
+            data=self.waveform[self._start_idx:self._stop_idx],
+            t=self.time_pts[self._start_idx:self._stop_idx],
+            params=params)
+        self.fitted_waveform = fit_res.eval(
+            t=self.time_pts[self._start_idx:self._stop_idx])
+
+        # Find exponential with largest decay constant
+        maxInd = np.argmax([fit_res.best_values['tau{}'.format(i+1)]
+                            for i in range(3)]) + 1
+
+        # Analytic form of the predistorted square pulse (input that creates a
+        # square pulse at the output)
+        C = fit_res.best_values['offset']
+        A = fit_res.best_values['amp{}'.format(maxInd)]
+        a = A / C
+        aTilde = a / (a + 1)
+        tau = fit_res.best_values['tau{}'.format(maxInd)]
+        tauTilde = tau * (a + 1)
+
+        tPts = np.arange(0, self.kernel_length*1e-9, 1e-9)  # TODO AWG sampling rate
+        predist_step = (1 - aTilde * np.exp(-tPts/tauTilde)) / C
+
+        # Check if parameters are physical and print warnings if not
+        if tau < 0:
+            print('Warning: unphysical tau = {} (expect tau > 0).'
+                  .format(tau))
+        if C < 0:
+            print('Warning: unphysical C = {} (expect C > 0)'.format(C))
+
+        # Save the results
+        self.fit_res = fit_res
+        self.new_step = predist_step
+        # Take every 5th point because sampling rate of AWG is 1 GHz and
+        # sampling rate of scope is 5 GHz.
+        # TODO: un-hardcode this
+        new_ker = kf.kernel_from_kernel_stepvec(predist_step)
+
+        self.new_kernel_dict = {
+            'name': self.filename + '_' + str(self._iteration),
+            'filter_params': {
+                'b0': 1 / (C + A),
+                'b1': 1 / (tau * (C + A)),
+                'a1': -C / (tau * (C + A))
+            },
+            'fit': {
+                'model': 'triple_exponential',
+                'A': A,
+                'tau': tau,
+                'C': C
+            },
+            'kernel': list(new_ker)
+        }
+
     def fit_high_pass(self, start_time_fit, end_time_fit):
         '''
         Fits a model for a simple RC high-pass
@@ -416,7 +614,8 @@ class Distortion_corrector():
             'kernel': list(new_ker)
         }
 
-    def fit_spline(self, start_time_fit, end_time_fit, s=0.001):
+    def fit_spline(self, start_time_fit, end_time_fit, s=0.001,
+                   weight_tau='inf'):
         '''
         Fit the data using a spline interpolation.
         The fit model and result are saved in self.fit_model and self.fit_res,
@@ -724,6 +923,10 @@ class Distortion_corrector():
 
             if self._fit_model_loop == 'exponential':
                 self.fit_exp_model(fit_start, fit_stop)
+            elif self._fit_model_loop == 'double_exponential':
+                self.fit_double_exp_model(fit_start, fit_stop)
+            elif self._fit_model_loop == 'triple_exponential':
+                self.fit_triple_exp_model(fit_start, fit_stop)
             elif self._fit_model_loop == 'high-pass':
                 self.fit_high_pass(fit_start, fit_stop)
             elif self._fit_model_loop == 'damped_osc':
@@ -982,6 +1185,7 @@ class RT_distortion_corrector_5014(Distortion_corrector):
                     Number of points of the waveform that are plotted. Can be
                     changed in self.nr_plot_points.
         '''
+
 
         self.scope = oscilloscope
         self.AWG = AWG
