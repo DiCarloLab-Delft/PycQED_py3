@@ -21,7 +21,7 @@ from .tools.file_handling import *
 from .tools.data_manipulation import *
 from .tools.plotting import *
 import colorsys as colors
-
+from matplotlib import cm
 
 datadir = get_default_datadir()
 print('Data directory set to:', datadir)
@@ -425,8 +425,7 @@ def get_data_from_ma_v2(ma, param_names, numeric_params=None):
                     if param_end in list(temp.attrs.keys()):
                         data[param] = temp.attrs[param_end]
                     elif param_end in list(temp.keys()):
-                        data[param] = temp[param_end]
-
+                        data[param] = temp[param_end].value
         if numeric_params is not None:
             if param in numeric_params:
                 data[param] = np.double(data[param])
@@ -559,11 +558,7 @@ def get_data_from_timestamp_list(timestamps,
                     out_data[nparam] = np.array(
                         [np.double(val) for val in out_data[nparam]])
                 except ValueError as instance:
-                    if 'could not broadcast' in instance.message:
-                        out_data[nparam] = [
-                            np.double(val) for val in out_data[nparam]]
-                    else:
-                        raise(instance)
+                    raise(instance)
 
     out_data['timestamps'] = get_timestamps
 
@@ -1423,7 +1418,6 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
                                  correspond to one
     '''
     # Extract zero and one coordinates
-    start_at_zero = kw.get('start_at_zero', False)
 
     if np.all([cal_zero_points==None, cal_one_points==None,
                zero_coord==None, one_coord==None]):
@@ -1473,9 +1467,6 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
 
         #find distance from points on line to end of line
         rotated_data = np.sqrt(x_data**2+y_data**2)
-        if start_at_zero and (rotated_data[0] > np.mean(rotated_data)):
-            rotated_data = -rotated_data
-            rotated_data -= min(rotated_data)
 
         normalized_data = rotated_data
 
@@ -1484,7 +1475,7 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
         # normalized_data = (rotated_data - min(rotated_data))/max_min_distance
 
     else:
-        # for 4 anf 6 cal points
+        # for 4
         if zero_coord is not None:
             I_zero = zero_coord[0]
             Q_zero = zero_coord[1]
@@ -1513,10 +1504,6 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
         one_zero_dist = np.sqrt((I_one-I_zero)**2 + (Q_one-Q_zero)**2)
         normalized_data = rotated_data_ch1/one_zero_dist
 
-        if start_at_zero and (normalized_data[0] > np.mean(normalized_data)):
-            normalized_data = -normalized_data
-            normalized_data -= min(normalized_data)
-
     return [normalized_data, zero_coord, one_coord]
 
 def rotate_and_normalize_data_no_cal_points(data, **kw):
@@ -1526,7 +1513,6 @@ def rotate_and_normalize_data_no_cal_points(data, **kw):
     (Source: http://www.cs.otago.ac.nz/cosc453/student_tutorials/
     principal_components.pdf)
     """
-    start_at_zero = kw.pop('start_at_zero', False)
 
     #translate each column in the data by its mean
     mean_x = np.mean(data[0])
@@ -1559,11 +1545,6 @@ def rotate_and_normalize_data_no_cal_points(data, **kw):
     # normalized_data = final_data[1,:]/max_min_distance
     # max_min_difference = max(normalized_data -  min(normalized_data))
     # normalized_data = (normalized_data-min(normalized_data))/max_min_difference
-
-    # Ensure trace starts at closest to zero
-    if start_at_zero and (normalized_data[0] > np.mean(normalized_data)):
-        normalized_data = -normalized_data
-        normalized_data -= min(normalized_data)
 
     return normalized_data
 
@@ -1702,7 +1683,7 @@ def color_plot(x, y, z, fig, ax, cax=None,
     ylim = kw.pop('ylim', None)
 
     if plot_title is not None:
-        ax.set_title(plot_title, y=1.05)
+        ax.set_title(plot_title, y=1.05, fontsize=18)
     if transpose:
         set_xlabel(ax, ylabel, unit=y_unit)
         set_ylabel(ax, xlabel, unit=x_unit)
@@ -2044,7 +2025,9 @@ def find_min(x, y, return_fit=False, perc=30):
         return x_min, y_min
 
 
-def get_color_order(i, max_num):
-    # take a blue to red scale from 0 to max_num
-    # uses HSV system, H_red = 0, H_green = 1/3 H_blue=2/3
-    return colors.hsv_to_rgb(2.*float(i)/(float(max_num)*3.), 1., 1.)
+def get_color_list(max_num, cmap='viridis'):
+    '''Return an array of max_num colors take in even spacing from the
+    color map cmap.'''
+    if isinstance(cmap, str):
+        cmap = cm.get_cmap(cmap)
+    return [cmap(cmap)(i) for i in np.linspace(0.0, 1.0, max_num)]
