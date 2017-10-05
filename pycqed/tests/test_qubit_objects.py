@@ -401,19 +401,19 @@ class Test_QO(unittest.TestCase):
     @unittest.skipIf(openql_import_fail, 'OpenQL not present')
     def test_echo(self):
         self.CCL_qubit.mw_freq_mod(100e6)
-        self.CCL_qubit.measure_echo(times=np.arange(0,2e-6,40e-9))
+        #self.CCL_qubit.measure_echo(times=np.arange(0,2e-6,40e-9))
         time.sleep(1)
         self.CCL_qubit.T2_echo(40e-6)
-        self.CCL_qubit.measure_echo()
+        #self.CCL_qubit.measure_echo()
         time.sleep(1)
         with self.assertRaises(ValueError):
-            invalid_times = [0.1e-9,0.2e-9]
-            #self.CCL_qubit.measure_echo(times=invalid_times)
+            invalid_times = [0.1e-9,0.2e-9,0.3e-9,0.4e-9]
+            self.CCL_qubit.measure_echo(times=invalid_times)
 
         with self.assertRaises(ValueError):
             self.CCL_qubit.mw_freq_mod(.1e6)
             invalid_times = np.arange(0, 2e-6, 60e-9)
-            #self.CCL_qubit.measure_echo(times=invalid_times)
+            self.CCL_qubit.measure_echo(times=invalid_times)
             self.CCL_qubit.mw_freq_mod(100e6)
 
     @classmethod
