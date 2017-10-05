@@ -142,7 +142,10 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
                 phase_offset = -pulse_pars['phase'] + phase_offset
             else:
                 pulse_pars_new = deepcopy(pulse_pars)
-                pulse_pars_new['phase'] = pulse_pars['phase'] + phase_offset
+                total_phase = pulse_pars['phase'] + phase_offset
+                pulse_pars_new['phase'] = (total_phase%360 if total_phase>=0
+                                           else total_phase%-360)
+
                 try:
                     # Look for the function in pl = pulse_lib
                     pulse_func = getattr(pl, pulse_pars_new['pulse_type'])
