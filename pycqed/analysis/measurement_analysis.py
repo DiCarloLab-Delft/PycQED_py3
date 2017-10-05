@@ -6007,7 +6007,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                                         y=self.data_dist,
                                         fig=fig_dist, ax=ax_dist,
                                         xlabel=self.sweep_name,
-                                        x_unit=self.sweep_unit,
+                                        x_unit=self.sweep_unit[0],
                                         ylabel='S21 distance (arb.units)',
                                         label=False,
                                         save=False)
@@ -6037,7 +6037,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                          'k--',linewidth=self.line_width)
 
         scale = SI_prefix_and_scale_factor( val=max(abs(ax_dist.get_xticks())),
-                                                 unit=self.sweep_unit )[0]
+                                                 unit=self.sweep_unit[0] )[0]
 
         instr_set = self.data_file['Instrument settings']
 
