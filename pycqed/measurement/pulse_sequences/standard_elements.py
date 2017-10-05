@@ -65,8 +65,16 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
     ##########################
     # Instantiate an element #
     ##########################
+    
+    # don't count the Z_pulses when specifying number of pulses in element name
+    count_z = 0
+    for pls in pulse_list:
+        if 'Z_pulse' in pls['pulse_type']:
+            count_z += 1
+    no_of_pulses = len(pulse_list) - count_z
+
     el = element.Element(
-        name='{}-pulse-elt_{}'.format(len(pulse_list), i),
+        name='{}-pulse-elt_{}'.format(no_of_pulses, i),
         pulsar=station.pulsar,
         readout_fixed_point=sequencer_config['RO_fixed_point'])
     last_pulse = None
@@ -82,6 +90,8 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
     # Add all pulses one by one  #
     ##############################
 
+    phase_offset = 0 # used for software Z-gates
+    j = 0
     for i, pulse_pars in enumerate(pulse_list):
         # Default values for backwards compatibility
         if 'refpoint' not in pulse_pars.keys():
@@ -125,23 +135,35 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
                                              'MW_IQmod_pulse_UHFQC',
                                              'Gated_MW_RO_pulse',
                                              'Multiplexed_UHFQC_pulse']):
-            try:
-                # Look for the function in pl = pulse_lib
-                pulse_func = getattr(pl, pulse_pars['pulse_type'])
-            except AttributeError:
-                try:
-                    # Look for the function in bpl = pulse
-                    pulse_func = getattr(bpl, pulse_pars['pulse_type'])
-                except AttributeError:
-                    raise KeyError('pulse_type {} not recognized'.format(
-                        pulse_pars['pulse_type']))
 
-            last_pulse = el.add(
-                pulse_func(name=pulse_pars['pulse_type']+'_'+str(i),
-                           **pulse_pars),
-                start=t0, refpulse=last_pulse,
-                refpoint=pulse_pars['refpoint'],
-                operation_type=pulse_pars['operation_type'])
+            if pulse_pars['pulse_type'] == 'Z_pulse':
+                # apply software Z-gate (apply phase offset to all
+                # subsequent X and Y pulses)
+                phase_offset = -pulse_pars['phase'] + phase_offset
+            else:
+                pulse_pars_new = deepcopy(pulse_pars)
+                total_phase = pulse_pars['phase'] + phase_offset
+                pulse_pars_new['phase'] = (total_phase%360 if total_phase>=0
+                                           else total_phase%-360)
+
+                try:
+                    # Look for the function in pl = pulse_lib
+                    pulse_func = getattr(pl, pulse_pars_new['pulse_type'])
+                except AttributeError:
+                    try:
+                        # Look for the function in bpl = pulse
+                        pulse_func = getattr(bpl, pulse_pars_new['pulse_type'])
+                    except AttributeError:
+                        raise KeyError('pulse_type {} not recognized'.format(
+                            pulse_pars_new['pulse_type']))
+
+                last_pulse = el.add(
+                    pulse_func(name=pulse_pars_new['pulse_type']+'_'+str(j),
+                               **pulse_pars_new),
+                    start=t0, refpulse=last_pulse,
+                    refpoint=pulse_pars_new['refpoint'],
+                    operation_type=pulse_pars_new['operation_type'])
+                j += 1
 
         else:
             # Composite "special pulses"

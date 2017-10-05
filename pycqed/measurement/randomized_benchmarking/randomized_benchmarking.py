@@ -3,7 +3,7 @@ from pycqed.measurement.randomized_benchmarking.clifford_group import(
     clifford_lookuptable)
 
 from pycqed.measurement.randomized_benchmarking.clifford_decompositions \
-    import(gate_decomposition)
+    import(HZ_gate_decomposition, gate_decomposition)
 
 
 def calculate_net_clifford(cliffords):
@@ -36,7 +36,15 @@ def calculate_recovery_clifford(cl_in, desired_cl=0):
 
 
 def decompose_clifford_seq(clifford_sequence,
-                           gate_decomposition=gate_decomposition):
+                           gate_decomposition='HZ'):
+
+    if gate_decomposition is 'HZ':
+        gate_decomposition = HZ_gate_decomposition
+    elif gate_decomposition is 'XY':
+        gate_decomposition = gate_decomposition
+    else:
+        raise ValueError('Specify a valid gate decomposition, "HZ" or "XY".')
+
     decomposed_seq = []
     for cl in clifford_sequence:
         decomposed_seq.extend(gate_decomposition[cl])
@@ -44,7 +52,7 @@ def decompose_clifford_seq(clifford_sequence,
 
 
 def convert_clifford_sequence_to_tape(clifford_sequence, lutmapping,
-                                      gate_decomposition=gate_decomposition):
+                                      gate_decomposition=HZ_gate_decomposition):
     '''
     Converts a list of qubit operations to the relevant pulse elements
 
