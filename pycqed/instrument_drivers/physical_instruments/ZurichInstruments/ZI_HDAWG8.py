@@ -16,20 +16,13 @@ class ZI_HDAWG8(ZI_base_instrument):
     This is PycQED/QCoDeS driver driver for the Zurich Instruments HD AWG-8.
 
     Parameter files are generated from the python API of the instrument
-    using the "create_parameter_files" method in the ZI_base_instrument class.
+    using the "create_parameter_file" method in the ZI_base_instrument class.
     These are used to add parameters to the instrument.
-
-    Known issues (last update 25/7/2017)
-        - the parameters "sigouts/*/offset" are detected as int by the
-            create parameter extraction file
-        - the restart device method does not work
-        - the direct/amplified output mode corresponding to node
-            "raw/sigouts/*/mode" is not discoverable through the find method.
-            This parameter is now added by hand as a workaround.
     """
 
     def __init__(self, name, device: str,
-                 server: str='localhost', port=8004, **kw):
+                 server: str='localhost', port=8004,
+                 num_codewords: int = 32, **kw):
         '''
         Input arguments:
             name:           (str) name of the instrument as seen by the user
@@ -39,7 +32,7 @@ class ZI_HDAWG8(ZI_base_instrument):
         '''
         t0 = time.time()
         self._num_channels = 8
-        self._num_codewords = 1024
+        self._num_codewords = num_codewords
 
         if os.name == 'nt':
             dll = ctypes.windll.shell32
@@ -85,7 +78,9 @@ class ZI_HDAWG8(ZI_base_instrument):
                 'This parameter is used to determine how many codewords to '
                 'upload in "self.upload_codeword_program".'),
             initial_value=self._num_codewords,
-            vals=vals.Ints(1, self._num_codewords),
+            # N.B. I have commentd out numbers larger than self._num_codewords
+            # see also issue #358
+            vals=vals.Enum(2, 4, 8, 16, 32), # , 64, 128, 256, 1024),
             parameter_class=ManualParameter)
 
         self.add_parameter(
@@ -339,30 +334,31 @@ class ZI_HDAWG8(ZI_base_instrument):
             # 1: rising edge, 2: falling edge or 3: both edges
             self.set('awgs_{}_dio_strobe_slope'.format(awg_nr), 3)
 
+            # the mask determines how many bits will be used in the protocol
+            # e.g., mask 3 will mask the bits with bin(3) = 00000011 using
+            # only the 2 Least Significant Bits.
+            # N.B. cfg_num_codewords must be a power of 2
+            self.set('awgs_{}_dio_mask_value'.format(awg_nr),
+                     self.cfg_num_codewords()-1)
+
+
             if self.cfg_codeword_protocol() == 'identical':
                 # In the identical protocol all bits are used to trigger
                 # the same codewords on all AWG's
 
-                # Define the mask value, we use bit 0 on the DIO to index the
-                # table, The acquired bits on the DIO will be masked by the mask.
-                # as en example mask 3 will mask the bits with 00000011 using
-                # only the 2 Least Significant Bits.
-                self.set('awgs_{}_dio_mask_value'.format(awg_nr), 255)
-                # Define the shift to apply to the DIO input before the mask is
-                # applied, as we're using bit 0
-                # we don't need to shift the value, so we set it to 0
+                # N.B. The shift is applied before the mask
+                # The relevant bits can be selected by first shifting them
+                # and then masking them.
                 self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
 
-        # In the mw protocol bits [0:7] -> CW0 and bits [8:15] -> CW1
+        # In the mw protocol bits [0:7] -> CW0 and bits [(8+1):15] -> CW1
+        # N.B. DIO bit 8 (first of 2nd byte)  not connected in AWG8!
         if self.cfg_codeword_protocol() == 'microwave':
             for awg_nr in [0, 1]:
-                self.set('awgs_{}_dio_mask_value'.format(awg_nr), 255)
                 self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
+
             for awg_nr in [2, 3]:
-                # N.B. protocol should be correct but not working
-                # shift/mask settings appear to be working.
-                self.set('awgs_{}_dio_mask_value'.format(awg_nr), 255)
-                self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 8)
+                self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 9)
 
         if self.cfg_codeword_protocol() == 'flux':
             raise NotImplementedError()
