@@ -3,6 +3,7 @@ import logging
 import numpy as np
 import pickle
 import h5py
+import matplotlib
 import matplotlib.lines as mlines
 from matplotlib import pyplot as plt
 from pycqed.analysis import analysis_toolbox as a_tools
