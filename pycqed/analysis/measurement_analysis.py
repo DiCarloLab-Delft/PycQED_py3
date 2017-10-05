@@ -5251,7 +5251,7 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
 
         self.pulse_delay = pulse_delay
 
-        super().__init__(**kw)
+        super().__init__(auto=False, **kw)
 
     def run_default_analysis(self, **kw):
         close_main_fig = kw.pop('close_main_fig', True)
@@ -5259,11 +5259,26 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
         if self.cal_points is None:
             self.cal_points = [list(range(-4, -2)), list(range(-2, 0))]
 
-        super().run_default_analysis(close_file=False, make_fig=False,
-                                     **kw)
+        MeasurementAnalysis.run_default_analysis(close_file=False,
+                                                TwoD=True, **kw)
 
-        data = self.corr_data[:-1*(len(self.cal_points[0]*2))]
-        n_cl = self.sweep_points[:-1*(len(self.cal_points[0]*2))]
+        n_cl = np.unique(self.sweep_points_2D)
+        nr_seeds = self.sweep_points.size//n_cl.size #nr_seeds+NoCalPts
+        data = np.zeros(n_cl.size)
+        for i, nr_cliff in enumerate(n_cl):
+            #for i in range(nr_cliff):
+            data_calibrated = np.asarray(
+                self.measured_values[0][i*nr_seeds:(i+1)*nr_seeds],
+                self.measured_values[1][i*nr_seeds:(i+1)*nr_seeds])
+            data_calibrated= a_tools.rotate_and_normalize_data(
+                                                     data_calibrated,
+                                                     self.cal_points[0],
+                                                     self.cal_points[1])
+            data_calibrated = data_calibrated[:-int(self.NoCalPoints)]
+            data[i] = np.mean(data_calibrated)
+
+        #data = self.corr_data[:-1*(len(self.cal_points[0]*2))]
+        #n_cl = self.sweep_points[:-1*(len(self.cal_points[0]*2))]
 
         self.fit_res = self.fit_data(data, n_cl)
         self.fit_results = [self.fit_res]

@@ -663,9 +663,8 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
         return seq, el_list
 
 def Randomized_Benchmarking_seq_one_length(pulse_pars, RO_pars,
-                                            nr_cliffords_list,
                                             nr_cliffords_value, #scalar
-                                            nr_seeds,     #array=arange(old nr_seeds)
+                                            nr_seeds,           #scalar
                                             net_clifford=0,
                                             gate_decomposition='HZ',
                                             post_msmt_delay=3e-6,
@@ -680,14 +679,14 @@ def Randomized_Benchmarking_seq_one_length(pulse_pars, RO_pars,
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
 
-    for i in nr_seeds:
+    for i in range(nr_seeds):
 
-        if cal_points and (nr_cliffords_value == nr_cliffords_list[-4] or
-                                   nr_cliffords_value == nr_cliffords_list[-3]):
+        if cal_points and (i == (len(range(nr_seeds))-4) or
+                                   i == (len(range(nr_seeds))-3)):
             el = multi_pulse_elt(i, station,
                                  [pulses['I'], RO_pars])
-        elif cal_points and (nr_cliffords_value == nr_cliffords_list[-2] or
-                                     nr_cliffords_value == nr_cliffords_list[-1]):
+        elif cal_points and (i == (len(range(nr_seeds))-2) or
+                                     i == (len(range(nr_seeds))-1)):
             el = multi_pulse_elt(i, station,
                                  [pulses['X180'], RO_pars])
         else:
@@ -697,12 +696,11 @@ def Randomized_Benchmarking_seq_one_length(pulse_pars, RO_pars,
                 cl_seq,
                 gate_decomposition=gate_decomposition)
             pulse_list = [pulses[x] for x in pulse_keys]
-            print(pulse_keys)
-            a = [j for j in pulse_keys if 'Z' not in j]
-            print(len(pulse_keys))
-            print(len(a))
-
-            #pulse_list += [RO_pars]
+            # print(pulse_keys)
+            # a = [j for j in pulse_keys if 'Z' not in j]
+            # print(len(pulse_keys))
+            # print(len(a))
+            pulse_list += [RO_pars]
             # copy first element and set extra wait
             pulse_list[0] = deepcopy(pulse_list[0])
             pulse_list[0]['pulse_delay'] += post_msmt_delay
