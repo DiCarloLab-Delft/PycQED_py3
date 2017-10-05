@@ -2,6 +2,7 @@ import unittest
 import numpy as np
 import os
 import pycqed as pq
+import time
 
 import pycqed.analysis.analysis_toolbox as a_tools
 
@@ -383,6 +384,37 @@ class Test_QO(unittest.TestCase):
     @unittest.skipIf(openql_import_fail, 'OpenQL not present')
     def test_AllXY(self):
         self.CCL_qubit.measure_allxy()
+
+    @unittest.skipIf(openql_import_fail, 'OpenQL not present')
+    def test_T1(self):
+        self.CCL_qubit.measure_T1(times=np.arange(0,1e-6,20e-9))
+        self.CCL_qubit.T1(20e-6)
+        self.CCL_qubit.measure_T1()
+
+    @unittest.skipIf(openql_import_fail, 'OpenQL not present')
+    def test_Ramsey(self):
+        self.CCL_qubit.mw_freq_mod(100e6)
+        self.CCL_qubit.measure_Ramsey(times=np.arange(0,1e-6,20e-9))
+        self.CCL_qubit.T2_star(20e-6)
+        self.CCL_qubit.measure_Ramsey()
+
+    @unittest.skipIf(openql_import_fail, 'OpenQL not present')
+    def test_echo(self):
+        self.CCL_qubit.mw_freq_mod(100e6)
+        self.CCL_qubit.measure_echo(times=np.arange(0,2e-6,40e-9))
+        time.sleep(1)
+        self.CCL_qubit.T2_echo(40e-6)
+        self.CCL_qubit.measure_echo()
+        time.sleep(1)
+        with self.assertRaises(ValueError):
+            invalid_times = [0.1e-9,0.2e-9]
+            #self.CCL_qubit.measure_echo(times=invalid_times)
+
+        with self.assertRaises(ValueError):
+            self.CCL_qubit.mw_freq_mod(.1e6)
+            invalid_times = np.arange(0, 2e-6, 60e-9)
+            #self.CCL_qubit.measure_echo(times=invalid_times)
+            self.CCL_qubit.mw_freq_mod(100e6)
 
     @classmethod
     def tearDownClass(self):

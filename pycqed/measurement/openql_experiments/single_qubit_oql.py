@@ -94,11 +94,6 @@ def pulsed_spec_seq(qubit_idx: int, spec_pulse_length: float,
     return p
 
 
-def T1(qubit_name, times, clock_cycle=1e-9,
-       cal_points=True):
-    pass
-
-
 def flipping(qubit_idx: int, number_of_flips, platf_cfg: str,
              equator: bool=False, cal_points: bool=True):
     """
@@ -191,117 +186,126 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool=True):
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
 
+def T1(times, qubit_idx: int, platf_cfg: str):
+    """
+    Single qubit T1 sequence.
+    Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
 
-def Ramsey(qubit_name, times, clock_cycle=1e-9,
-           artificial_detuning=None,
-           cal_points=True):
-    '''
-    Ramsey sequence for a single qubit.
     Input pars:
-        times:               array of times between (start of) pulses (s)
-        pulse_pars:          dict containing the pulse parameters
-        RO_pars:             dict containing the RO parameters
-        artificial_detuning: int,  float or None;
-            if int: number of wiggles
-            if float: artificial_detuning in (Hz)
-            if None: adds no artificial detuning
-                implemented using phase of the second pi/2 pulse (R90_phi),
-                if None it will use X90 as the recovery pulse
-        cal_points:          whether to use calibration points or not
-    '''
-    # if int interpret artificial detuning as desired nr of wiggles
-    pass
-    # if isinstance(artificial_detuning, int):
-    #     phases = (360*np.arange(len(times))/(len(times)-4*cal_points) *
-    #               artificial_detuning % 360)
-    # # if float interpret it as artificial detuning in Hz
-    # elif isinstance(artificial_detuning, float):
-    #     phases = (artificial_detuning*times % 1)*360
-    # elif artificial_detuning is None:
-    #     phases = np.zeros(len(times))
-
-    # clocks = np.round(times/clock_cycle)
-    # filename = join(base_qasm_path, 'Ramsey.qasm')
-    # qasm_file = mopen(filename, mode='w')
-    # qasm_file.writelines('qubit {} \n'.format(qubit_name))
-    # for i, cl in enumerate(clocks):
-    #     qasm_file.writelines('\ninit_all\n')
-    #     if cal_points and (i == (len(clocks)-4) or
-    #                        i == (len(clocks)-3)):
-    #         qasm_file.writelines('RO {}  \n'.format(qubit_name))
-    #     elif cal_points and (i == (len(clocks)-2) or
-    #                          i == (len(clocks)-1)):
-    #         qasm_file.writelines('X180 {} \n'.format(qubit_name))
-    #         qasm_file.writelines('RO {}  \n'.format(qubit_name))
-
-    #     else:
-    #         qasm_file.writelines('X90 {}     \n'.format(
-    #                              qubit_name))
-    #         qasm_file.writelines('I {:d} \n'.format(int(cl)))
-    #         if artificial_detuning is not None:
-    #             qasm_file.writelines('R90_phi {} {}\n'.format(
-    #                 qubit_name, phases[i]))
-    #         else:
-    #             qasm_file.writelines('X90 {}     \n'.format(
-    #                                  qubit_name))
-    #         qasm_file.writelines('RO {}  \n'.format(qubit_name))
-    # qasm_file.close()
-    # return qasm_file
+        times:          the list of waiting times for each T1 element
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+    Returns:
+        p:              OpenQL Program object containing
 
 
-def echo(qubit_name, times, clock_cycle=1e-9,
-         artificial_detuning=None,
-         cal_points=True):
-    '''
-    Echo sequence for a single qubit.
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="T1", nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    for i, time in enumerate(times[:-3]):
+        k = Kernel("T1_"+str(i), p=platf)
+        k.prepz(qubit_idx)
+        nr_clocks = int(time/20e-9)
+        k.gate('rx180', qubit_idx)
+        for i in np.arange(nr_clocks):
+            k.gate('i', qubit_idx)
+        k.measure(qubit_idx)
+        p.add_kernel(k)
+
+    #adding the calibration points
+    add_single_qubit_cal_points(p, platf=platf, qubit_idx=qubit_idx)
+
+
+    p.compile()
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
+
+def Ramsey(times, qubit_idx: int, platf_cfg: str):
+    """
+    Single qubit Ramsey sequence.
+    Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
+
     Input pars:
-        times:               array of times between (start of) pulses (s)
-        pulse_pars:          dict containing the pulse parameters
-        RO_pars:             dict containing the RO parameters
-        artificial_detuning: int,  float or None;
-            if int: number of wiggles
-            if float: artificial_detuning in (Hz)
-            if None: adds no artificial detuning
-                implemented using phase of the second pi/2 pulse
-        cal_points:          whether to use calibration points or not
-    '''
-    # if int interpret artificial detuning as desired nr of wiggles
-    pass
-    # if isinstance(artificial_detuning, int):
-    #     phases = (360*np.arange(len(times))/(len(times)-4*cal_points) *
-    #               artificial_detuning % 360)
-    # # if float interpret it as artificial detuning in Hz
-    # elif isinstance(artificial_detuning, float):
-    #     phases = (artificial_detuning*times % 1)*360
-    # elif artificial_detuning is None:
-    #     phases = np.zeros(len(times))
+        times:          the list of waiting times for each Ramsey element
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+    Returns:
+        p:              OpenQL Program object containing
 
-    # clocks = np.round(times/clock_cycle)
-    # filename = join(base_qasm_path, 'echo.qasm')
-    # qasm_file = mopen(filename, mode='w')
-    # qasm_file.writelines('qubit {} \n'.format(qubit_name))
-    # for i, cl in enumerate(clocks):
-    #     qasm_file.writelines('\ninit_all\n')
-    #     if cal_points and (i == (len(clocks)-4) or
-    #                        i == (len(clocks)-3)):
-    #         qasm_file.writelines('RO {}  \n'.format(qubit_name))
-    #     elif cal_points and (i == (len(clocks)-2) or
-    #                          i == (len(clocks)-1)):
-    #         qasm_file.writelines('X180 {} \n'.format(qubit_name))
-    #         qasm_file.writelines('RO {}  \n'.format(qubit_name))
-    #     else:
-    #         qasm_file.writelines('X90 {}     \n'.format(qubit_name))
-    #         qasm_file.writelines('I {:d} \n'.format(int(cl//2)))
-    #         qasm_file.writelines('X180 {}     \n'.format(qubit_name))
-    #         qasm_file.writelines('I {:d} \n'.format(int(cl//2)))
-    #         if artificial_detuning is not None:
-    #             qasm_file.writelines('R90_phi {} {}\n'.format(
-    #                 qubit_name, phases[i]))
-    #         else:
-    #             qasm_file.writelines('X90 {}     \n'.format(qubit_name))
-    #         qasm_file.writelines('RO {}  \n'.format(qubit_name))
-    # qasm_file.close()
-    # return qasm_file
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="Ramsey", nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    for i, time in enumerate(times[:-3]):
+        k = Kernel("Ramsey_"+str(i), p=platf)
+        k.prepz(qubit_idx)
+        nr_clocks = int(time/20e-9)
+        k.gate('rx90', qubit_idx)
+        for i in np.arange(nr_clocks):
+            k.gate('i', qubit_idx)
+        k.gate('rx90', qubit_idx)
+        k.measure(qubit_idx)
+        p.add_kernel(k)
+
+    #adding the calibration points
+    add_single_qubit_cal_points(p, platf=platf, qubit_idx=qubit_idx)
+
+    p.compile()
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
+
+
+def echo(times, qubit_idx: int, platf_cfg: str):
+    """
+    Single qubit Echo sequence.
+    Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
+
+    Input pars:
+        times:          the list of waiting times for each Echo element
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+    Returns:
+        p:              OpenQL Program object containing
+
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="echo", nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    for i, time in enumerate(times[:-3]):
+        k = Kernel("echo_"+str(i), p=platf)
+        k.prepz(qubit_idx)
+        nr_clocks = int(time/20e-9/2)
+        k.gate('rx90', qubit_idx)
+        for i in np.arange(nr_clocks):
+            k.gate('i', qubit_idx)
+        k.gate('rx180', qubit_idx)
+        for i in np.arange(nr_clocks):
+            k.gate('i', qubit_idx)
+        k.gate('rx90', qubit_idx)
+        k.measure(qubit_idx)
+        p.add_kernel(k)
+
+    #adding the calibration points
+    add_single_qubit_cal_points(p, platf=platf, qubit_idx=qubit_idx)
+
+    p.compile()
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
 
 
 def single_elt_on(qubit_idx: int, platf_cfg: str):
@@ -513,3 +517,17 @@ def Ram_Z(qubit_name,
         clock_cycle     (float): period of the internal AWG clock
     '''
     pass
+
+def  add_single_qubit_cal_points(p, platf, qubit_idx):
+    for i in np.arange(2):
+        k = Kernel("cal_gr_"+str(i), p=platf)
+        k.prepz(qubit_idx)
+        k.measure(qubit_idx)
+        p.add_kernel(k)
+
+    for i in np.arange(2):
+        k = Kernel("cal_ex_"+str(i), p=platf)
+        k.prepz(qubit_idx)
+        k.gate('rx180', qubit_idx)
+        k.measure(qubit_idx)
+        p.add_kernel(k)

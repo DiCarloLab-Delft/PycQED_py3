@@ -40,6 +40,19 @@ try:
             # Only test if it compiles
             sqo.AllXY(qubit_idx=0, platf_cfg=config_fn)
 
+        def test_T1(self):
+            # Only test if it compiles
+            sqo.T1(times=np.arange(0,1e-6,20e-9),qubit_idx=0, platf_cfg=config_fn)
+
+        def test_Ramsey(self):
+            # Only test if it compiles
+            sqo.Ramsey(times=np.arange(0,1e-6,20e-9),qubit_idx=0, platf_cfg=config_fn)
+
+        def test_echo(self):
+            # Only test if it compiles
+            sqo.echo(times=np.arange(0,2e-6,40e-9),qubit_idx=0, platf_cfg=config_fn)
+
+
         def test_single_elt_on(self):
             sqo.single_elt_on(qubit_idx=0, platf_cfg=config_fn)
 
