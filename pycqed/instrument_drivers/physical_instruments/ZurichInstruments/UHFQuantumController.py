@@ -223,6 +223,20 @@ class UHFQC(Instrument):
         # Setting the clock to external
         self.system_extclk(1)
 
+        # Configure the codeword protocol
+        self.awgs_0_dio_strobe_index(31)
+        self.awgs_0_dio_strobe_slope(1) # rising edge
+        self.awgs_0_dio_valid_index(16)
+        self.awgs_0_dio_valid_polarity(2) # high polarity
+
+
+
+
+
+        # We probably need to adjust some delays here...
+        #self.awgs_0_dio_delay_index(31)
+        #self.awgs_0_dio_delay_value(1)
+
         # No rotation on the output of the weighted integration unit, i.e. take
         # real part of result
         for i in range(0, 4):
@@ -814,7 +828,7 @@ class UHFQC(Instrument):
             'repeat(loop_cnt) {\n' +
             ' waitDIOTrigger();\n' +
             ' var dio = getDIOTriggered();\n' +
-            ' cw = (dio >> 17) & 0x1f;\n' +
+            ' cw = (dio >> 17) & 0x1f;\n' +#now hardcoded for 7 bits (cc-light)
             '  switch(cw) {\n')
         # adding the case statements
         for i in range(len(Iwaves)):
