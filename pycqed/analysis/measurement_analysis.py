@@ -5295,7 +5295,8 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
         Formula from Asaad et al.
         pulse separation is time between start of pulses
         '''
-        Np = 1.875  # Number of gates per Clifford for XY_pi/2 decomposition
+        #Np = 1.875  # Avg. number of gates per Clifford for XY decomposition
+        Np = 0.9583  # Avg. number of gates per Clifford for HZ decomposition
         F_cl = (1/6*(3 + 2*np.exp(-1*pulse_delay/(2*T1)) +
                      np.exp(-pulse_delay/T1)))**Np
         p = 2*F_cl - 1
