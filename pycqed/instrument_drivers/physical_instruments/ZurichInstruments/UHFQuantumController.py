@@ -819,7 +819,7 @@ class UHFQC(Instrument):
         # adding the case statements
         for i in range(len(Iwaves)):
             # generating the case statement string
-            case = '  case {}:\n'.format(cases[i])
+            case = '  case {}:\n'.format(int(cases[i]))
             case_play = '   playWave(Iwave{}, Qwave{});\n'.format(i, i)
             # adding the individual case statements to the sequence
             sequence = sequence + case+case_play
