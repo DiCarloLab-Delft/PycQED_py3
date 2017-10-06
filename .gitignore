@@ -126,3 +126,5 @@ $RECYCLE.BIN/
 data/*
 *.hdf5
 
+*.sdpa
+*.sol
