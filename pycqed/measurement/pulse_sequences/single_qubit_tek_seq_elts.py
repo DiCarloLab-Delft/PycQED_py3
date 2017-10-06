@@ -694,7 +694,7 @@ def Randomized_Benchmarking_seq_one_length(pulse_pars, RO_pars,
                 nr_cliffords_value, desired_net_cl=net_clifford)
             pulse_keys = rb.decompose_clifford_seq(
                 cl_seq,
-                gate_decomposition=gate_decomposition)
+                gate_decomp=gate_decomposition)
             pulse_list = [pulses[x] for x in pulse_keys]
             # print(pulse_keys)
             # a = [j for j in pulse_keys if 'Z' not in j]

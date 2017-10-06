@@ -935,12 +935,12 @@ class Butterfly(swf.Hard_Sweep):
 
 class Randomized_Benchmarking_nr_cliffords(swf.Soft_Sweep):
 
-    def __init__(self, sweep_control='soft', nr_cliffords=None, #array
+    def __init__(self, sweep_control='soft',
                  RB_sweepfunction=None):
         super().__init__()
 
         self.sweep_control = sweep_control
-        self.sweep_points = nr_cliffords
+        # self.sweep_points = nr_cliffords
         self.RB_sweepfunction = RB_sweepfunction
         self.name = 'RB_nr_cliffords'
         self.parameter_name = 'Nr of Cliffords'

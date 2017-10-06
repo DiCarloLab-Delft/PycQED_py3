@@ -5232,7 +5232,6 @@ class AllXY_Analysis(TD_Analysis):
             self.save_fig(fig1, ylabel='Amplitude (normalized)', **kw)
         self.save_fig(fig2, ylabel='Amplitude', **kw)
 
-
 class RandomizedBenchmarking_Analysis(TD_Analysis):
 
     '''
@@ -5251,7 +5250,7 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
 
         self.pulse_delay = pulse_delay
 
-        super().__init__(auto=False, **kw)
+        super().__init__(**kw)
 
     def run_default_analysis(self, **kw):
         close_main_fig = kw.pop('close_main_fig', True)
@@ -5259,32 +5258,208 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
         if self.cal_points is None:
             self.cal_points = [list(range(-4, -2)), list(range(-2, 0))]
 
-        MeasurementAnalysis.run_default_analysis(close_file=False,
-                                                TwoD=True, **kw)
+        super().run_default_analysis(close_file=False, make_fig=False,
+                                     **kw)
 
-        n_cl = np.unique(self.sweep_points_2D)
-        nr_seeds = self.sweep_points.size//n_cl.size #nr_seeds+NoCalPts
-        data = np.zeros(n_cl.size)
-        for i, nr_cliff in enumerate(n_cl):
-            #for i in range(nr_cliff):
-            data_calibrated = np.asarray(
-                self.measured_values[0][i*nr_seeds:(i+1)*nr_seeds],
-                self.measured_values[1][i*nr_seeds:(i+1)*nr_seeds])
-            data_calibrated= a_tools.rotate_and_normalize_data(
-                                                     data_calibrated,
-                                                     self.cal_points[0],
-                                                     self.cal_points[1])
-            data_calibrated = data_calibrated[:-int(self.NoCalPoints)]
-            data[i] = np.mean(data_calibrated)
-
-        #data = self.corr_data[:-1*(len(self.cal_points[0]*2))]
-        #n_cl = self.sweep_points[:-1*(len(self.cal_points[0]*2))]
+        data = self.corr_data[:-1*(len(self.cal_points[0]*2))]
+        n_cl = self.sweep_points[:-1*(len(self.cal_points[0]*2))]
 
         self.fit_res = self.fit_data(data, n_cl)
         self.fit_results = [self.fit_res]
         self.save_fitted_parameters(fit_res=self.fit_res, var_name='F|1>')
         if self.make_fig:
             self.make_figures(close_main_fig=close_main_fig, **kw)
+
+        if close_file:
+            self.data_file.close()
+        return
+
+    def calc_T1_limited_fidelity(self, T1, pulse_delay):
+        '''
+        Formula from Asaad et al.
+        pulse separation is time between start of pulses
+        '''
+        Np = 1.875  # Number of gates per Clifford for XY_pi/2 decomposition
+        F_cl = (1/6*(3 + 2*np.exp(-1*pulse_delay/(2*T1)) +
+                     np.exp(-pulse_delay/T1)))**Np
+        p = 2*F_cl - 1
+
+        return F_cl, p
+
+    def add_textbox(self, ax, F_T1=None):
+
+        textstr = ('\t$F_{Cl}$'+' \t= {:.4g} $\pm$ ({:.4g})%'.format(
+            self.fit_res.params['fidelity_per_Clifford'].value*100,
+            self.fit_res.params['fidelity_per_Clifford'].stderr*100) +
+                   '\n  $1-F_{Cl}$'+'  = {:.4g} $\pm$ ({:.4g})%'.format(
+            (1-self.fit_res.params['fidelity_per_Clifford'].value)*100,
+            (self.fit_res.params['fidelity_per_Clifford'].stderr)*100) +
+                   '\n\tOffset\t= {:.4g} $\pm$ ({:.4g})'.format(
+                       (self.fit_res.params['offset'].value),
+                       (self.fit_res.params['offset'].stderr)))
+        if F_T1 is not None:
+            textstr += ('\n\t  $F_{Cl}^{T_1}$  = ' +
+                        '{:.6g}%'.format(F_T1*100))
+
+        self.ax.text(0.1, 0.95, textstr, transform=self.ax.transAxes,
+                     fontsize=11, verticalalignment='top',
+                     bbox=self.box_props)
+
+    def make_figures(self, close_main_fig, **kw):
+
+        ylabel = r'$F$ $\left(|1 \rangle \right)$'
+        self.fig, self.ax = self.default_ax()
+        if self.plot_cal_points:
+            x = self.sweep_points
+            y = self.corr_data
+        else:
+            logging.warning('not tested for all types of calpoints')
+            if type(self.cal_points[0]) is int:
+                x = self.sweep_points[:-2]
+                y = self.corr_data[:-2]
+            else:
+                x = self.sweep_points[:-1*(len(self.cal_points[0])*2)]
+                y = self.corr_data[:-1*(len(self.cal_points[0])*2)]
+
+        self.plot_results_vs_sweepparam(x=x,
+                                        y=y,
+                                        fig=self.fig, ax=self.ax,
+                                        xlabel=self.xlabel,
+                                        ylabel=ylabel,
+                                        save=False)
+
+        x_fine = np.linspace(0, self.sweep_points[-1], 1000)
+        for fit_res in self.fit_results:
+            best_fit = fit_mods.RandomizedBenchmarkingDecay(
+                x_fine, **fit_res.best_values)
+            self.ax.plot(x_fine, best_fit, label='Fit')
+        self.ax.set_ylim(min(min(self.corr_data)-.1, -.1),
+                         max(max(self.corr_data)+.1, 1.1))
+
+        # Here we add the line corresponding to T1 limited fidelity
+        F_T1 = None
+        if self.T1 is not None and self.pulse_delay is not None:
+            F_T1, p_T1 = self.calc_T1_limited_fidelity(
+                self.T1, self.pulse_delay)
+            T1_limited_curve = fit_mods.RandomizedBenchmarkingDecay(
+                x_fine, -0.5, p_T1, 0.5)
+            self.ax.plot(x_fine, T1_limited_curve, label='T1-limit')
+
+            self.ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+
+        # Add a textbox
+        self.add_textbox(self.ax, F_T1)
+
+        if not close_main_fig:
+            # Hacked in here, good idea to only show the main fig but can
+            # be optimized somehow
+            self.save_fig(self.fig, ylabel='Amplitude (normalized)',
+                          close_fig=False, **kw)
+        else:
+            self.save_fig(self.fig, ylabel='Amplitude (normalized)', **kw)
+
+    def fit_data(self, data, numCliff,
+                 print_fit_results=False,
+                 show_guess=False,
+                 plot_results=False):
+
+        RBModel = lmfit.Model(fit_mods.RandomizedBenchmarkingDecay)
+        # RBModel = fit_mods.RBModel
+        RBModel.set_param_hint('Amplitude', value=-0.5)
+        RBModel.set_param_hint('p', value=.99)
+        RBModel.set_param_hint('offset', value=.5)
+        # From Magesan et al., Scalable and Robust Randomized Benchmarking
+        # of Quantum Processes
+        RBModel.set_param_hint('fidelity_per_Clifford',  # vary=False,
+                               expr='(p + (1-p)/2)')
+        RBModel.set_param_hint('error_per_Clifford',  # vary=False,
+                               expr='1-fidelity_per_Clifford')
+        RBModel.set_param_hint('fidelity_per_gate',  # vary=False,
+                               expr='fidelity_per_Clifford**(1./1.875)')
+        RBModel.set_param_hint('error_per_gate',  # vary=False,
+                               expr='1-fidelity_per_gate')
+
+        params = RBModel.make_params()
+        fit_res = RBModel.fit(data, numCliff=numCliff,
+                              params=params)
+        if print_fit_results:
+            print(fit_res.fit_report())
+        if plot_results:
+            plt.plot(fit_res.data, 'o-', label='data')
+            plt.plot(fit_res.best_fit, label='best fit')
+            if show_guess:
+                plt.plot(fit_res.init_fit, '--', label='init fit')
+
+        return fit_res
+
+
+class RandomizedBenchmarking_Analysis_new(TD_Analysis):
+
+    '''
+    Rotates and normalizes the data before doing a fit with a decaying
+    exponential to extract the Clifford fidelity.
+    By optionally specifying T1 and the pulse separation (time between start
+    of pulses) the T1 limited fidelity will be given and plotted in the
+    same figure.
+    '''
+
+    def __init__(self, label='RB', T1=None, pulse_delay=None, TwoD=True, **kw):
+
+        self.T1 = T1
+        if self.T1==0:
+            self.T1=None
+
+        self.pulse_delay = pulse_delay
+
+        super().__init__(TwoD=TwoD, **kw)
+
+    def run_default_analysis(self, **kw):
+
+        close_main_fig = kw.pop('close_main_fig', True)
+        close_file = kw.pop('close_file', True)
+        if self.cal_points is None:
+            self.cal_points = [list(range(-4, -2)), list(range(-2, 0))]
+
+        MeasurementAnalysis.run_default_analysis(self, close_file=False, **kw)
+
+        self.add_analysis_datagroup_to_file()
+
+        self.n_cl = np.unique(self.sweep_points_2D)
+        nr_seeds = self.sweep_points.size #nr_seeds+NoCalPts
+        data = np.zeros(self.n_cl.size)
+
+        data_rearranged = [np.zeros((self.n_cl.size, nr_seeds)),
+                           np.zeros((self.n_cl.size, nr_seeds))]
+        I = self.measured_values[0]
+        Q = self.measured_values[1]
+        for i in range(self.n_cl.size):
+            for j in range(nr_seeds):
+                data_rearranged[0][i, j] = I[j, i]
+                data_rearranged[1][i, j] = Q[j, i]
+        self.data_rearranged = data_rearranged
+        a = np.zeros((2, nr_seeds))  #this is an array with the same shape as
+                                     #as measured_values for TwoD==False
+        for i in range(self.n_cl.size):
+            a[0] = data_rearranged[0][i]
+            a[1] = data_rearranged[1][i]
+            data_calibrated = a_tools.rotate_and_normalize_data(a,
+                                                        self.cal_points[0],
+                                                        self.cal_points[1])[0]
+            data_calibrated = data_calibrated[:-int(self.NoCalPoints)]
+            data[i] = np.mean(data_calibrated)
+
+        self.data = data
+        #data = self.corr_data[:-1*(len(self.cal_points[0]*2))]
+        #n_cl = self.sweep_points[:-1*(len(self.cal_points[0]*2))]
+
+        self.fit_res = self.fit_data(self.data, self.n_cl)
+        self.fit_results = [self.fit_res]
+        self.save_fitted_parameters(fit_res=self.fit_res, var_name='F|1>')
+        if self.make_fig:
+            self.make_figures(close_main_fig=close_main_fig, **kw)
+
+            if kw.pop('show',True):
+                plt.show()
 
         if close_file:
             self.data_file.close()
@@ -5326,32 +5501,32 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
 
         ylabel = r'$F$ $\left(|1 \rangle \right)$'
         self.fig, self.ax = self.default_ax()
-        if self.plot_cal_points:
-            x = self.sweep_points
-            y = self.corr_data
-        else:
-            logging.warning('not tested for all types of calpoints')
-            if type(self.cal_points[0]) is int:
-                x = self.sweep_points[:-2]
-                y = self.corr_data[:-2]
-            else:
-                x = self.sweep_points[:-1*(len(self.cal_points[0])*2)]
-                y = self.corr_data[:-1*(len(self.cal_points[0])*2)]
+        # if self.plot_cal_points:
+        #     x = self.sweep_points
+        #     y = self.corr_data
+        # else:
+        #     logging.warning('not tested for all types of calpoints')
+        #     if type(self.cal_points[0]) is int:
+        #         x = self.sweep_points[:-2]
+        #         y = self.corr_data[:-2]
+        #     else:
+        #         x = self.sweep_points[:-1*(len(self.cal_points[0])*2)]
+        #         y = self.corr_data[:-1*(len(self.cal_points[0])*2)]
 
-        self.plot_results_vs_sweepparam(x=x,
-                                        y=y,
+        self.plot_results_vs_sweepparam(x=self.n_cl,
+                                        y=self.data,
                                         fig=self.fig, ax=self.ax,
-                                        xlabel=self.xlabel,
+                                        xlabel=self.ylabel,
                                         ylabel=ylabel,
                                         save=False)
 
-        x_fine = np.linspace(0, self.sweep_points[-1], 1000)
+        x_fine = np.linspace(0, self.n_cl[-1], 1000)
         for fit_res in self.fit_results:
             best_fit = fit_mods.RandomizedBenchmarkingDecay(
                 x_fine, **fit_res.best_values)
             self.ax.plot(x_fine, best_fit, label='Fit')
-        self.ax.set_ylim(min(min(self.corr_data)-.1, -.1),
-                         max(max(self.corr_data)+.1, 1.1))
+        self.ax.set_ylim(min(min(self.data)-.1, -.1),
+                         max(max(self.data)+.1, 1.1))
 
         # Here we add the line corresponding to T1 limited fidelity
         F_T1 = None

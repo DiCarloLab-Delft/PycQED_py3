@@ -3,7 +3,7 @@ from pycqed.measurement.randomized_benchmarking.clifford_group import(
     clifford_lookuptable)
 
 from pycqed.measurement.randomized_benchmarking.clifford_decompositions \
-    import(HZ_gate_decomposition, gate_decomposition)
+    import (HZ_gate_decomposition, XY_gate_decomposition)
 
 
 def calculate_net_clifford(cliffords):
@@ -36,23 +36,24 @@ def calculate_recovery_clifford(cl_in, desired_cl=0):
 
 
 def decompose_clifford_seq(clifford_sequence,
-                           gate_decomposition='HZ'):
+                           gate_decomp='HZ'):
 
-    if gate_decomposition is 'HZ':
+    if gate_decomp is 'HZ':
         gate_decomposition = HZ_gate_decomposition
-    elif gate_decomposition is 'XY':
-        gate_decomposition = gate_decomposition
+    elif gate_decomp is 'XY':
+        gate_decomposition = XY_gate_decomposition
     else:
         raise ValueError('Specify a valid gate decomposition, "HZ" or "XY".')
 
     decomposed_seq = []
+
     for cl in clifford_sequence:
         decomposed_seq.extend(gate_decomposition[cl])
     return decomposed_seq
 
 
 def convert_clifford_sequence_to_tape(clifford_sequence, lutmapping,
-                                      gate_decomposition=HZ_gate_decomposition):
+                                      gate_decomp='HZ'):
     '''
     Converts a list of qubit operations to the relevant pulse elements
 
@@ -62,6 +63,14 @@ def convert_clifford_sequence_to_tape(clifford_sequence, lutmapping,
     # I cannot test it at this moment (MAR)
     # decomposed_seq = decompose_clifford_seq(clifford_sequence,
     #                                         gate_decomposition)
+
+    if gate_decomp is 'HZ':
+        gate_decomposition = HZ_gate_decomposition
+    elif gate_decomp is 'XY':
+        gate_decomposition = XY_gate_decomposition
+    else:
+        raise ValueError('Specify a valid gate decomposition, "HZ" or "XY".')
+
     decomposed_seq = []
     for cl in clifford_sequence:
         decomposed_seq.extend(gate_decomposition[cl])
@@ -92,6 +101,5 @@ def randomized_benchmarking_sequence(n_cl, desired_net_cl=0,
         net_clifford, desired_net_cl)
 
     rb_cliffords = np.append(rb_cliffords, recovery_clifford)
-
     return rb_cliffords
 
