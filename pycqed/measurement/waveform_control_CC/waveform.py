@@ -10,6 +10,7 @@
 
 import logging
 import numpy as np
+import scipy
 from pycqed.analysis.fitting_models import Qubit_freq_to_dac
 
 
@@ -323,10 +324,10 @@ def martinis_flux_pulse_v2(length, lambda_2, lambda_3, theta_f,
                     eps=f12-f_bus
     """
     # Define number of samples and time points
-    nr_samples = int(np.round((length)*sampling_rate))
-    length = nr_samples/sampling_rate  # gives back the rounded length
-    t_step = 1/sampling_rate
-    t = np.arange(0, length, t_step)
+    nr_samples = int(np.round((length)*sampling_rate * 10))
+    rounded_length = nr_samples/(10 * sampling_rate)  # gives back the rounded length
+    tau_step = 1/(10 * sampling_rate)
+    tau = np.arange(0, rounded_length, tau_step)
 
     # Derived parameters
     if f_interaction is None:
@@ -345,9 +346,11 @@ def martinis_flux_pulse_v2(length, lambda_2, lambda_3, theta_f,
 
     # Calculate the wave
     theta_wave = np.ones(nr_samples) * theta_i
-    theta_wave += lambda_1 * (1 - np.cos(2 * np.pi * t / length))
-    theta_wave += lambda_1 * lambda_2 * (1 - np.cos(4 * np.pi * t / length))
-    theta_wave += lambda_1 * lambda_3 * (1 - np.cos(6 * np.pi * t / length))
+    theta_wave += lambda_1 * (1 - np.cos(2 * np.pi * tau / rounded_length))
+    theta_wave += (lambda_1 * lambda_2 *
+                   (1 - np.cos(4 * np.pi * tau / rounded_length)))
+    theta_wave += (lambda_1 * lambda_3 *
+                   (1 - np.cos(6 * np.pi * tau / rounded_length)))
 
     # Clip wave to [theta_i, pi] to avoid poles in the wave expressed in freq
     theta_wave_clipped = np.clip(theta_wave, theta_i, np.pi-.01)
@@ -356,13 +359,26 @@ def martinis_flux_pulse_v2(length, lambda_2, lambda_3, theta_f,
             'Martinis flux wave form has been clipped to [{}, 180 deg]'
             .format(theta_i))
 
+    # return theta_wave_clipped
+
+    # Transform from proper time to real time
+    t = np.array([np.trapz(np.sin(theta_wave)[:i+1], dx=1/(10*sampling_rate))
+                  for i in range(len(theta_wave))])
+
+    # Interpolate pulse at physical sampling distance
+    t_samples = np.arange(0, length, 1/sampling_rate)
+    # Scaling factor for time-axis to get correct pulse length again
+    scale = t[-1]/t_samples[-1]
+    interp_wave = scipy.interpolate.interp1d(
+        t/scale, theta_wave_clipped, fill_value=0)(t_samples)
+
     # Return in the specified units
     if return_unit == 'theta':
         # Theta is returned in radians here
-        return theta_wave_clipped
+        return interp_wave
 
     # Convert to detuning from f_interaction
-    delta_f_wave = 2 * J2 / np.tan(theta_wave_clipped)
+    delta_f_wave = 2 * J2 / np.tan(interp_wave)
     if return_unit == 'eps':
         return delta_f_wave
 
