@@ -862,6 +862,24 @@ class CCLight_Transmon(Qubit):
             self.mw_mixer_offs_DQ(offset_Q)
         return True
 
+    def calibrate_mixer_offsets_RO(self, update: bool=True) -> bool:
+        '''
+        Calibrates the mixer skewness and updates the I and Q offsets in
+        the qubit object.
+        '''
+        chI_par = self.instr_acquisition.get_instr().sigouts_0_offset
+        chQ_par = self.instr_acquisition.get_instr().sigouts_1_offset
+
+        offset_I, offset_Q = mixer_carrier_cancellation(
+            SH=self.instr_SH.get_instr(), source=self.instr_LO_ro.get_instr(),
+            MC=self.instr_MC.get_instr(),
+            chI_par=chI_par, chQ_par=chQ_par, x0=(0.05, 0.05))
+
+        if update:
+            self.ro_pulse_mixer_offs_I(offset_I)
+            self.ro_pulse_mixer_offs_Q(offset_Q)
+        return True
+
     #####################################################
     # "measure_" methods below
     #####################################################
