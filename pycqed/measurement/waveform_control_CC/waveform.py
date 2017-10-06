@@ -368,7 +368,8 @@ def martinis_flux_pulse_v2(length, lambda_2, lambda_3, theta_f,
     # Scaling factor for time-axis to get correct pulse length again
     scale = t[-1]/t_samples[-1]
     interp_wave = scipy.interpolate.interp1d(
-        t/scale, theta_wave_clipped, fill_value=0)(t_samples)
+        t/scale, theta_wave_clipped, bounds_error=False,
+        fill_value=0)(t_samples)
 
     # Return in the specified units
     if return_unit == 'theta':
