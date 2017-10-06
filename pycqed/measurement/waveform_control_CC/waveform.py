@@ -359,8 +359,6 @@ def martinis_flux_pulse_v2(length, lambda_2, lambda_3, theta_f,
             'Martinis flux wave form has been clipped to [{}, 180 deg]'
             .format(theta_i))
 
-    # return theta_wave_clipped
-
     # Transform from proper time to real time
     t = np.array([np.trapz(np.sin(theta_wave)[:i+1], dx=1/(10*sampling_rate))
                   for i in range(len(theta_wave))])
