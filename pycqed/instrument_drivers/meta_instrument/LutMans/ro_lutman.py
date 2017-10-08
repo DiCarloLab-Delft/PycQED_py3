@@ -138,6 +138,7 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
         # Set to a default because box is not expected to change
         self._voltage_min = -1.0
         self._voltage_max = 1.0-1.0/2**13
+        self.sampling_rate(1.8e9)
 
     def set_default_lutmap(self):
         """

@@ -154,14 +154,13 @@ class Base_LutMan(Instrument):
     def render_wave_PSD(self, wave_name, show=True, reload_pulses=True,
                         f_bounds=None, y_bounds=None):
         if reload_pulses:
-            self.generate_standard_pulses()
+            self.generate_standard_waveforms()
         fig, ax = plt.subplots(1, 1)
         f_axis, PSD_I = PSD(
             self._wave_dict[wave_name][0], 1/self.sampling_rate())
         f_axis, PSD_Q = PSD(
             self._wave_dict[wave_name][1], 1/self.sampling_rate())
 
-        ax.set_xlabel('frequency (Hz)')
         ax.set_title(wave_name)
         ax.plot(f_axis, PSD_I,
                 marker='o', label='chI')
@@ -175,6 +174,7 @@ class Base_LutMan(Instrument):
             ax.set_ylim(y_bounds[0], y_bounds[1])
         if f_bounds is not None:
             ax.set_xlim(f_bounds[0], f_bounds[1])
+        set_xlabel(ax, 'Frequency', 'Hz')
         if show:
             plt.show()
         return fig, ax
