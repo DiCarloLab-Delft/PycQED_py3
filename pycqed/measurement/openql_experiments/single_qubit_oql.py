@@ -365,7 +365,7 @@ def off_on(qubit_idx: int, pulse_comb: str, platf_cfg: str):
     the pulse_comb string.
     """
     platf = Platform('OpenQL_Platform', platf_cfg)
-    p = Program(pname="CW_RO_sequence", nqubits=platf.get_qubit_number(),
+    p = Program(pname="OffOn_RO_sequence", nqubits=platf.get_qubit_number(),
                 p=platf)
     # # Off
     if 'off' in pulse_comb.lower():

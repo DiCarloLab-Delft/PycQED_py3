@@ -430,6 +430,12 @@ class CCLight_Transmon(Qubit):
                            initial_value='latest',
                            parameter_class=ManualParameter,
                            vals=vals.Enum('latest', 'flux'))
+        self.add_parameter('cfg_cycle_time',
+                           initial_value=20e-9,
+                           unit='s',
+                           parameter_class=ManualParameter,
+                           # this is to effictively hardcode the cycle time
+                           vals=vals.Enum(20e-9))
 
     def add_generic_qubit_parameters(self):
         self.add_parameter('E_c', unit='Hz',
@@ -976,15 +982,46 @@ class CCLight_Transmon(Qubit):
 
         return [np.array(t, dtype=np.float64) for t in transients]
 
-    def measure_allxy(self, MC=None,
-                      analyze=True, close_fig=True):
+
+    def measure_rabi_vsm(self, MC=None, atts=np.linspace(0, 65536,31)
+                      analyze=True, close_fig=True, prepare_for_timedomain=True):
         # docstring from parent class
         # N.B. this is a good example for a generic timedomain experiment using
         # the CCL transmon.
         if MC is None:
             MC = self.instr_MC.get_instr()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+        p = sqo.off_on(
+                qubit_idx=self.cfg_qubit_nr(), pulse_comb='on',
+                platf_cfg=self.cfg_openql_platform_fn())
 
-        self.prepare_for_timedomain()
+        VSM = self.instr_VSM.get_instr()
+        Gin = self.mw_vsm_ch_Gin()
+        Din = self.mw_vsm_ch_Din()
+        out = self.mw_vsm_ch_out()
+
+        self.instr_CC.get_instr().upload_instructions(p.filename)
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr())
+        d = self.int_avg_det
+        MC.set_sweep_function(VSM.__getattr__('in{}_out{}_att'.format(Gin, out))
+        MC.set_sweep_points(atts)
+        self.int_avg_det_single._set_real_imag(False)
+        MC.set_detector_function(self.int_avg_det_single)
+        MC.run(name='rabi_'+self.msmt_suffix)
+
+
+
+    def measure_allxy(self, MC=None,
+                      analyze=True, close_fig=True, prepare_for_timedomain=True):
+        # docstring from parent class
+        # N.B. this is a good example for a generic timedomain experiment using
+        # the CCL transmon.
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
         p = sqo.AllXY(qubit_idx=self.cfg_qubit_nr(), double_points=True,
                       platf_cfg=self.cfg_openql_platform_fn())
         s = swf.OpenQL_Sweep(openql_program=p,
@@ -997,3 +1034,136 @@ class CCLight_Transmon(Qubit):
         if analyze:
             a = ma.AllXY_Analysis(close_main_fig=close_fig)
             return a
+
+    def measure_T1(self, times=None, MC=None,
+                      analyze=True, close_fig=True, update=True, prepare_for_timedomain=True):
+        # docstring from parent class
+        # N.B. this is a good example for a generic timedomain experiment using
+        # the CCL transmon.
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        # default timing
+        if times is None:
+            times = np.linspace(0, self.T1()*4, 31)
+
+        # append the calibration points, times are for location in plot
+        times = np.concatenate([times,
+                        (times[-1]+times[0],
+                         times[-1]+times[1],
+                         times[-1]+times[2],
+                         times[-1]+times[3])])
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+        p = sqo.T1(times, qubit_idx=self.cfg_qubit_nr(),
+                      platf_cfg=self.cfg_openql_platform_fn())
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr())
+        d = self.int_avg_det
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(times)
+        MC.set_detector_function(d)
+        MC.run('T1'+self.msmt_suffix)
+        a = ma.T1_Analysis(auto=True, close_fig=True)
+        if update:
+            self.T1(a.T1)
+        return a.T1
+
+    def measure_Ramsey(self, times=None, MC=None, artificial_detuning=None,
+                      analyze=True, close_fig=True, update=True):
+        # docstring from parent class
+        # N.B. this is a good example for a generic timedomain experiment using
+        # the CCL transmon.
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        # default timing
+        if times is None:
+            # funny default is because there is no real time sideband modulation
+            stepsize = (self.T2_star()*4/61)//(abs(self.cfg_cycle_time())) \
+                *abs(self.cfg_cycle_time())
+            times = np.arange(0, self.T2_star()*4, stepsize)
+
+        if artificial_detuning is None:
+            artificial_detuning = 3/times[-1]
+
+        # append the calibration points, times are for location in plot
+        times = np.concatenate([times,
+                        (times[-1]+times[0],
+                         times[-1]+times[1],
+                         times[-1]+times[2],
+                         times[-1]+times[3])])
+
+        self.prepare_for_timedomain()
+
+        # testing if the pulses are locked to the modulation frequency
+        if not all([np.round(t*1e9) % (1/self.mw_freq_mod.get()*1e9)
+                    == 0 for t in times]):
+            raise ValueError('timesteps must be multiples of modulation period')
+
+        # adding 'artificial' detuning by detuning the qubit LO
+        freq_qubit = self.freq_qubit()
+        # # this should have no effect if artificial detuning = 0
+        self.instr_LO_mw.get_instr().set('frequency', freq_qubit -
+                              self.mw_freq_mod.get() + artificial_detuning)
+
+        p = sqo.Ramsey(times, qubit_idx=self.cfg_qubit_nr(),
+                      platf_cfg=self.cfg_openql_platform_fn())
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr())
+        d = self.int_avg_det
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(times)
+        MC.set_detector_function(d)
+        MC.run('Ramsey'+self.msmt_suffix)
+        a = ma.Ramsey_Analysis(auto=True, close_fig=True)
+        if update:
+            self.T2_star(a.T2_star)
+        return a.T2_star
+
+    def measure_echo(self, times=None, MC=None,
+                      analyze=True, close_fig=True, update=True):
+        # docstring from parent class
+        # N.B. this is a good example for a generic timedomain experiment using
+        # the CCL transmon.
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        # default timing
+        if times is None:
+            # funny default is because there is no real time sideband modulation
+            stepsize = (self.T2_echo()*2/61)//(abs(self.cfg_cycle_time())) \
+                *abs(self.cfg_cycle_time())
+            times = np.arange(0, self.T2_echo()*4, stepsize*2)
+
+        # append the calibration points, times are for location in plot
+        times = np.concatenate([times,
+                        (times[-1]+times[0],
+                         times[-1]+times[1],
+                         times[-1]+times[2],
+                         times[-1]+times[3])])
+
+
+        # # Checking if pulses are on 20 ns grid
+        if not all([np.round(t*1e9) % (2*self.cfg_cycle_time()*1e9) == 0 for t in times]):
+          raise ValueError('timesteps must be multiples of 40e-9')
+
+        # # Checking if pulses are locked to the pulse modulation
+        if not all([np.round(t/1*1e9) % (2/self.mw_freq_mod.get()*1e9)
+                    == 0 for t in times]):
+            raise ValueError('timesteps must be multiples of 2 modulation periods')
+
+        self.prepare_for_timedomain()
+        p = sqo.echo(times, qubit_idx=self.cfg_qubit_nr(),
+                      platf_cfg=self.cfg_openql_platform_fn())
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr())
+        d = self.int_avg_det
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(times)
+        MC.set_detector_function(d)
+        MC.run('echo'+self.msmt_suffix)
+        a = ma.Echo_analysis(label='echo',auto=True, close_fig=True)
+        if update:
+            self.T2_echo(a.fit_res.params['tau'].value)
+        return a
