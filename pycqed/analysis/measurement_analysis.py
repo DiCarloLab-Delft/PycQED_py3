@@ -5445,12 +5445,17 @@ class RandomizedBenchmarking_Analysis_new(TD_Analysis):
             data_calibrated = a_tools.rotate_and_normalize_data(a,
                                                         self.cal_points[0],
                                                         self.cal_points[1])[0]
+            self.dcalib = deepcopy(data_calibrated)
             data_calibrated = data_calibrated[:-int(self.NoCalPoints)]
             data[i] = np.mean(data_calibrated)
 
         self.data = data
         #data = self.corr_data[:-1*(len(self.cal_points[0]*2))]
         #n_cl = self.sweep_points[:-1*(len(self.cal_points[0]*2))]
+
+        self.add_dataset_to_analysisgroup('Corrected data', self.data)
+        self.analysis_group.attrs.create('corrected data based on',
+                                         'calibration points'.encode('utf-8'))
 
         self.fit_res = self.fit_data(self.data, self.n_cl)
         self.fit_results = [self.fit_res]
