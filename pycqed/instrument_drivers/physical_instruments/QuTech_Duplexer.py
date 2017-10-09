@@ -59,15 +59,15 @@ class QuTech_Duplexer(VisaInstrument):
                                    vals=vals.Enum('ON', 'OFF', 'EXT'))
 
                 self.add_parameter('in{}_out{}_phase'.format(inp+1, outp+1),
-                                   set_cmd='ch:in{}:out{}:ph: '.format(
+                                   set_cmd='ch:in{}:out{}:ph:raw'.format(
                                    inp+1, outp+1) + '{} \n',
-                                   set_parser=self._mode_set_parser,
+                                   set_parser=int,
                                    vals=vals.Numbers(0, 65536))
                 self.add_parameter('in{}_out{}_att'.format(inp+1, outp+1),
-                                   set_cmd='ch:in{}:out{}:att:'.format(
+                                   set_cmd='ch:in{}:out{}:att:raw'.format(
                     inp+1, outp+1) + ' {} \n',
                     vals=vals.Numbers(0, 65536),
-                    set_parser=self._mode_set_parser)
+                    set_parser=int)
 
     def set_all_switches_to(self, mode: str):
         for inp in range(4):
