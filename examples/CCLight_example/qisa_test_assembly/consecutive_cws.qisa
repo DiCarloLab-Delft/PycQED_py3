@@ -1,0 +1,64 @@
+SMIS s0, { 0 }
+SMIS s1, { 1 }
+SMIS s2, { 2 }
+SMIS s3, { 3 }
+SMIS s4, { 4 }
+SMIS s5, { 5 }
+SMIS s6, { 6 }
+SMIS s7, {0, 1, 2, 3, 4, 5}
+# SMIS s7, {0}            # cw 1 for uhfqc0
+SMIS s8, {2}            # cw 2 for uhfqc0
+SMIS s9, {3}            # cw 4 for uhfqc0
+SMIS s10, {5}           # cw 8 for uhfqc0
+SMIS s11, {0, 2, 3, 5, 6}
+LDI  r4, 150
+LDI r3, 2
+SUB r3, r4, r3
+Loop:
+    qwait 100
+    bs 2 CW_01 s6
+    bs 2 CW_01 s7
+    bs 2 CW_02 s7
+    bs 2 CW_03 s7
+    bs 2 CW_04 s7
+    bs 2 CW_05 s7
+    bs 2 CW_06 s7
+    bs 2 CW_07 s7
+    bs 2 CW_08 s7
+    bs 2 CW_09 s7
+    bs 2 CW_10 s7
+    bs 2 CW_11 s7
+    bs 2 CW_12 s7
+    bs 2 CW_13 s7
+    bs 2 CW_14 s7
+    bs 2 CW_15 s7
+    bs 2 CW_16 s7
+    bs 2 CW_17 s7
+    bs 2 CW_18 s7
+    bs 2 CW_19 s7
+    bs 2 CW_20 s7
+    bs 2 CW_21 s7
+    bs 2 CW_22 s7
+    bs 2 CW_23 s7
+    bs 2 CW_24 s7
+    bs 2 CW_25 s7
+    bs 2 CW_26 s7
+    bs 2 CW_27 s7
+    bs 2 CW_28 s7
+    bs 2 CW_29 s7
+    bs 2 CW_30 s7
+    bs 2 CW_31 s7
+    bs 1 MeasZ s0
+    # qwaitr r4
+    # bs 1 MeasZ s8
+    # qwaitr r4
+    # bs 1 MeasZ s9
+    # qwaitr r4
+    # bs 1 MeasZ s10
+    # qwaitr r4
+    # bs 1 MeasZ s6
+    # qwaitr r4
+    # bs 1 MeasZ s11
+    BR always, loop
+    NOP
+    NOP
