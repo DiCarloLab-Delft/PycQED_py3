@@ -173,18 +173,24 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool=True):
     p.set_sweep_points(np.arange(len(allXY), dtype=float), len(allXY))
 
     for i, xy in enumerate(allXY):
-        k = Kernel("AllXY_"+str(i), p=platf)
-        k.prepz(qubit_idx)
-        k.gate(xy[0], qubit_idx)
-        k.gate(xy[1], qubit_idx)
-        k.measure(qubit_idx)
-        p.add_kernel(k)
+        if double_points:
+            js = 2
+        else:
+            js = 1
+        for j in range(js):
+            k = Kernel("AllXY_"+str(i+j/2), p=platf)
+            k.prepz(qubit_idx)
+            k.gate(xy[0], qubit_idx)
+            k.gate(xy[1], qubit_idx)
+            k.measure(qubit_idx)
+            p.add_kernel(k)
 
     p.compile()
     # attribute get's added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
+
 
 def T1(times, qubit_idx: int, platf_cfg: str):
     """
@@ -215,9 +221,8 @@ def T1(times, qubit_idx: int, platf_cfg: str):
         k.measure(qubit_idx)
         p.add_kernel(k)
 
-    #adding the calibration points
+    # adding the calibration points
     add_single_qubit_cal_points(p, platf=platf, qubit_idx=qubit_idx)
-
 
     p.compile()
     # attribute get's added to program to help finding the output files
@@ -255,7 +260,7 @@ def Ramsey(times, qubit_idx: int, platf_cfg: str):
         k.measure(qubit_idx)
         p.add_kernel(k)
 
-    #adding the calibration points
+    # adding the calibration points
     add_single_qubit_cal_points(p, platf=platf, qubit_idx=qubit_idx)
 
     p.compile()
@@ -263,7 +268,6 @@ def Ramsey(times, qubit_idx: int, platf_cfg: str):
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
-
 
 
 def echo(times, qubit_idx: int, platf_cfg: str):
@@ -298,7 +302,7 @@ def echo(times, qubit_idx: int, platf_cfg: str):
         k.measure(qubit_idx)
         p.add_kernel(k)
 
-    #adding the calibration points
+    # adding the calibration points
     add_single_qubit_cal_points(p, platf=platf, qubit_idx=qubit_idx)
 
     p.compile()
@@ -518,7 +522,8 @@ def Ram_Z(qubit_name,
     '''
     pass
 
-def  add_single_qubit_cal_points(p, platf, qubit_idx):
+
+def add_single_qubit_cal_points(p, platf, qubit_idx):
     for i in np.arange(2):
         k = Kernel("cal_gr_"+str(i), p=platf)
         k.prepz(qubit_idx)
