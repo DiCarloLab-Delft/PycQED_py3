@@ -240,10 +240,8 @@ def rotate_wave(wave_I, wave_Q, phase: float, unit: str = 'deg'):
         angle = angle
     else:
         raise ValueError('unit must be either "deg" or "rad"')
-
     rot_I = np.cos(angle)*wave_I - np.sin(angle)*wave_Q
     rot_Q = np.sin(angle)*wave_I + np.cos(angle)*wave_Q
-
     return rot_I, rot_Q
 
 
@@ -277,16 +275,20 @@ def mod_gauss_VSM(amp, sigma_length, f_modulation, axis='x', phase=0,
     '''
     G, D = gauss_pulse(amp, sigma_length, nr_sigma=nr_sigma,
                        sampling_rate=sampling_rate, axis=axis,
-                       phase=0,
+                       phase=0,#should always be 0
                        motzoi=motzoi, delay=delay)
 
-    G_I, G_Q = mod_pulse(G, np.zeros(len(G)), f_modulation,
+    G_I, G_Q = rotate_wave(G, G, phase=phase, unit='deg')
+    D_I, D_Q = rotate_wave(D, D, phase=phase+90, unit='deg')
+
+
+    G_I_mod, G_Q_mod = mod_pulse(G_I, G_Q, f_modulation,
                          sampling_rate=sampling_rate,
                          Q_phase_delay=Q_phase_delay)
-    D_I, D_Q = mod_pulse(np.zeros(len(G)), D, f_modulation,
+    D_I_mod, D_Q_mod = mod_pulse(D_I, D_Q, f_modulation,
                          sampling_rate=sampling_rate,
                          Q_phase_delay=Q_phase_delay)
-    return G_I, G_Q, D_I, D_Q
+    return G_I_mod, G_Q_mod, D_I_mod, D_Q_mod
 
 
 #####################################################
