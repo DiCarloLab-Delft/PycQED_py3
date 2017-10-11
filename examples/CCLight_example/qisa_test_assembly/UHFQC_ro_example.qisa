@@ -11,20 +11,22 @@ LDI  r4, 150
 LDI r3, 2
 SUB r3, r4, r3
 Loop:
-    qwait 100
+    bs 2 CW_01 s6
+    qwait 70
     bs 1 MeasZ s0
-    qwait 100
+    qwait 70
     bs 1 MeasZ s1
-    qwait 100
+    qwait 70
     bs 1 MeasZ s2
-    qwait 100
+    qwait 70
     bs 1 MeasZ s3
-    qwait 100
+    qwait 70
     bs 1 MeasZ s4
-    qwait 100
+    qwait 70
     bs 1 MeasZ s5
-    qwait 100
+    qwait 70
     bs 1 MeasZ s6
+    qwait 500
     BR always, loop
     NOP
     NOP
