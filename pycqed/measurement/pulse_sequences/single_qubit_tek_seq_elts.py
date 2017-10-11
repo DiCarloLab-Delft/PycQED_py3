@@ -312,6 +312,7 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
         else:
             el = multi_pulse_elt(i, station,
                                  [pulses['X90'], pulse_pars_x2, RO_pars])
+
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:
@@ -369,13 +370,12 @@ def Ramsey_seq_VZ(times, pulse_pars, RO_pars,
             pulse_list = [pulses['X90'], Z_gate, pulse_pars_x2, RO_pars]
             el = multi_pulse_elt(i, station, pulse_list)
 
-            a = [j['phase'] for j in pulse_list]
+            #a = [j['phase'] for j in pulse_list]
 
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:
         station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
-
 
     if return_seq:
         return seq, el_list
@@ -755,14 +755,20 @@ def Randomized_Benchmarking_seq_one_length(pulse_pars, RO_pars,
                 cl_seq,
                 gate_decomp=gate_decomposition)
             pulse_list = [pulses[x] for x in pulse_keys]
-            # print(pulse_keys)
+            # print('\n',pulse_keys)
             # a = [j for j in pulse_keys if 'Z' not in j]
             # print(len(pulse_keys))
             # print(len(a))
             pulse_list += [RO_pars]
-            # copy first element and set extra wait
-            pulse_list[0] = deepcopy(pulse_list[0])
-            pulse_list[0]['pulse_delay'] += post_msmt_delay
+            # find index of first pulse in pulse_list that is not a Z pulse
+            # copy this pulse and set extra wait
+            first_x_pulse = next(j for j in pulse_list if 'Z' not in j['pulse_type'])
+            first_x_pulse_idx = pulse_list.index(first_x_pulse)
+            #print('first_x_pulse_idx = ', first_x_pulse_idx)
+            pulse_list[first_x_pulse_idx] = deepcopy(pulse_list[first_x_pulse_idx])
+            pulse_list[first_x_pulse_idx]['pulse_delay'] += post_msmt_delay
+            # pulse_list[0] = deepcopy(pulse_list[0])
+            # pulse_list[0]['pulse_delay'] += post_msmt_delay
             el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
@@ -775,6 +781,7 @@ def Randomized_Benchmarking_seq_one_length(pulse_pars, RO_pars,
             seq.append_element(el, trigger_wait=True)
     if upload:
         station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+
         return seq, el_list
     else:
         return seq, el_list

@@ -1420,7 +1420,7 @@ class TD_Analysis(MeasurementAnalysis):
         close_file = kw.pop('close_file',True)
 
         super().run_default_analysis(show=show,
-            close_file=close_file, unit_prefix=unit_prefix, **kw)
+            close_file=False, unit_prefix=unit_prefix, **kw)
 
         self.add_analysis_datagroup_to_file()
 
