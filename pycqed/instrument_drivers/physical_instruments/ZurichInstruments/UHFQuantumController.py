@@ -834,9 +834,12 @@ class UHFQC(Instrument):
         for i in range(len(Iwaves)):
             # generating the case statement string
             case = '  case {}:\n'.format(int(cases[i]))
+            case_wait = 'wait(50);\n'
             case_play = '   playWave(Iwave{}, Qwave{});\n'.format(i, i)
             # adding the individual case statements to the sequence
-            sequence = sequence + case+case_play
+            # FIXME: this is a hack to work around missing timing in OpenQL
+            # Oct 2017
+            sequence = sequence + case+case_wait+case_play
 
         # adding the final part of the sequence including a default wave
         sequence = (sequence +
