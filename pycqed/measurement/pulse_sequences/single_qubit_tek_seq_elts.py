@@ -121,18 +121,19 @@ def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6, no_cal_points
     seq_name = 'Rabi_sequence'
     seq = sequence.Sequence(seq_name)
     el_list = []
-    pulses = get_pulse_dict_from_pars(pulse_pars)
+    pulses_unmodified = get_pulse_dict_from_pars(pulse_pars)
+    pulses = deepcopy(pulses_unmodified)
 
     for i, amp in enumerate(amps):  # seq has to have at least 2 elts
         if cal_points and no_cal_points==4 and \
                 (i == (len(amps)-4) or i == (len(amps)-3)):
-            el = multi_pulse_elt(i, station,[pulses['I'], RO_pars])
+            el = multi_pulse_elt(i, station,[pulses_unmodified['I'], RO_pars])
         elif cal_points and no_cal_points==4 and \
                 (i == (len(amps)-2) or i == (len(amps)-1)):
-            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+            el = multi_pulse_elt(i, station, [pulses_unmodified['X180'], RO_pars])
         elif cal_points and no_cal_points==2 and \
                 (i == (len(amps)-2) or i == (len(amps)-1)):
-            el = multi_pulse_elt(i, station,[pulses['I'], RO_pars])
+            el = multi_pulse_elt(i, station,[pulses_unmodified['I'], RO_pars])
         else:
             pulses['X180']['amplitude'] = amp
             pulse_list = n*[pulses['X180']]+[RO_pars]
@@ -429,9 +430,7 @@ def Ramsey_seq_multiple_detunings(times, pulse_pars, RO_pars,
         seq.append_element(el, trigger_wait=True)
 
     if upload:
-        print('uploading')
         station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
-        print('upload finished')
 
     if return_seq:
         return seq, el_list
@@ -723,7 +722,7 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
 
 def Randomized_Benchmarking_seq_one_length(pulse_pars, RO_pars,
                                             nr_cliffords_value, #scalar
-                                            nr_seeds,           #scalar
+                                            nr_seeds,           #array
                                             net_clifford=0,
                                             gate_decomposition='HZ',
                                             post_msmt_delay=3e-6,
@@ -733,19 +732,19 @@ def Randomized_Benchmarking_seq_one_length(pulse_pars, RO_pars,
                                             verbose=False, upload=True):
 
     if seq_name is None:
-        seq_name = 'RandomizedBenchmarking_sequence'
+        seq_name = 'RandomizedBenchmarking_sequence_one_length'
     seq = sequence.Sequence(seq_name)
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
 
-    for i in range(nr_seeds):
+    for i in nr_seeds:
 
-        if cal_points and (i == (len(range(nr_seeds))-4) or
-                                   i == (len(range(nr_seeds))-3)):
+        if cal_points and (i == (len(nr_seeds)-4) or
+                                   i == (len(nr_seeds)-3)):
             el = multi_pulse_elt(i, station,
                                  [pulses['I'], RO_pars])
-        elif cal_points and (i == (len(range(nr_seeds))-2) or
-                                     i == (len(range(nr_seeds))-1)):
+        elif cal_points and (i == (len(nr_seeds)-2) or
+                                     i == (len(nr_seeds)-1)):
             el = multi_pulse_elt(i, station,
                                  [pulses['X180'], RO_pars])
         else:
@@ -781,7 +780,6 @@ def Randomized_Benchmarking_seq_one_length(pulse_pars, RO_pars,
             seq.append_element(el, trigger_wait=True)
     if upload:
         station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
-
         return seq, el_list
     else:
         return seq, el_list

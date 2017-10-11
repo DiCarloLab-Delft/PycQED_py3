@@ -942,7 +942,7 @@ class Randomized_Benchmarking_nr_cliffords(swf.Soft_Sweep):
         self.sweep_control = sweep_control
         # self.sweep_points = nr_cliffords
         self.RB_sweepfunction = RB_sweepfunction
-        self.name = 'RB_nr_cliffords'
+        self.name = 'Randomized_Benchmarking_nr_cliffords'
         self.parameter_name = 'Nr of Cliffords'
         self.unit = '#'
 
@@ -956,11 +956,11 @@ class Randomized_Benchmarking_nr_cliffords(swf.Soft_Sweep):
 
     def set_parameter(self, val):
         self.RB_sweepfunction.nr_cliffords_value=val
+        self.RB_sweepfunction.prepare()
 
 class Randomized_Benchmarking_one_length(swf.Hard_Sweep):
 
     def __init__(self, pulse_pars, RO_pars,
-                 nr_seeds, #int
                  nr_cliffords_value, #int
                  gate_decomposition='HZ',
                  cal_points=True,
@@ -973,21 +973,19 @@ class Randomized_Benchmarking_one_length(swf.Hard_Sweep):
         self.upload = upload
         self.nr_cliffords_value = nr_cliffords_value
         self.cal_points = cal_points
-        self.nr_seeds = nr_seeds
-        self.sweep_points = np.arange(self.nr_seeds)
         self.seq_name = seq_name
         self.gate_decomposition = gate_decomposition
 
         self.parameter_name = 'Nr of Seeds'
         self.unit = '#'
-        self.name = 'Randomized_Benchmarking'
+        self.name = 'Randomized_Benchmarking_one_length'
 
-        if self.cal_points:
-            self.sweep_points = np.concatenate([np.arange(self.nr_seeds),
-                                               [np.arange(self.nr_seeds)[-1]+.2,
-                                                np.arange(self.nr_seeds)[-1]+.3,
-                                                np.arange(self.nr_seeds)[-1]+.7,
-                                                np.arange(self.nr_seeds)[-1]+.8]])
+        # if self.cal_points:
+        #     self.sweep_points = np.concatenate([np.arange(self.nr_seeds),
+        #                                        [np.arange(self.nr_seeds)[-1]+.2,
+        #                                         np.arange(self.nr_seeds)[-1]+.3,
+        #                                         np.arange(self.nr_seeds)[-1]+.7,
+        #                                         np.arange(self.nr_seeds)[-1]+.8]])
 
     def prepare(self, **kw):
         if self.upload:
@@ -995,7 +993,7 @@ class Randomized_Benchmarking_one_length(swf.Hard_Sweep):
                 self.pulse_pars, self.RO_pars,
                 nr_cliffords_value=self.nr_cliffords_value,
                 gate_decomposition=self.gate_decomposition,
-                nr_seeds=self.nr_seeds,
+                nr_seeds=self.sweep_points,
                 cal_points=self.cal_points,
                 seq_name=self.seq_name)
 
