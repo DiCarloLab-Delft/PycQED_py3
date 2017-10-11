@@ -42,6 +42,8 @@ class CCLight_Transmon(Qubit):
                            parameter_class=InstrumentRefParameter)
         self.add_parameter('instr_LO_mw',
                            parameter_class=InstrumentRefParameter)
+        self.add_parameter('instr_spec_source',
+                           parameter_class=InstrumentRefParameter)
 
         # Control electronics
         self.add_parameter(
@@ -337,6 +339,7 @@ class CCLight_Transmon(Qubit):
                            initial_value=65536/2,
                            parameter_class=ManualParameter)
 
+
     def _set_mw_vsm_delay(self, val):
         # sort of a pseudo Manual Parameter
         self.instr_CC.get_instr().set(
@@ -377,12 +380,28 @@ class CCLight_Transmon(Qubit):
                            parameter_class=ManualParameter)
 
         self.add_parameter(
+            'spec_type', parameter_class=ManualParameter, docstring=(
+                'determines what kind of spectroscopy to do, \n'
+                '"CW":  opens the relevant VSM channel to always let the tone '
+                'through. \n'
+                '"vsm_gated":  uses the  VSM in external mode to gate the spec '
+                'source. \n '
+                '"IQ" uses the TD source and AWG8 to generate a spec pulse'),
+            initial_value='vsm_gated',
+            vals=vals.Enum('CW', 'IQ', 'vsm_gated'))
+
+        self.add_parameter(
             'spec_amp', unit='V', docstring=(
                 'Amplitude of the spectroscopy pulse in the mw LutMan. '
                 'The power of the spec pulse should be controlled through '
                 'the vsm attenuation "spec_vsm_att"'),
             vals=vals.Numbers(0, 1), parameter_class=ManualParameter,
             initial_value=0.8)
+        self.add_parameter(
+            'spec_pow', unit='dB',
+            vals=vals.Numbers(-70, 20),
+            parameter_class=ManualParameter,
+            initial_value=-30)
 
     def add_flux_parameters(self):
         # fl_dc_ is the prefix for DC flux bias related params
@@ -436,6 +455,11 @@ class CCLight_Transmon(Qubit):
                            parameter_class=ManualParameter,
                            # this is to effictively hardcode the cycle time
                            vals=vals.Enum(20e-9))
+        # TODO: add docstring (Oct 2017)
+        self.add_parameter('cfg_prepare_mw_awg', vals=vals.Bool(),
+                           initial_value=True,
+                           parameter_class=ManualParameter)
+
 
     def add_generic_qubit_parameters(self):
         self.add_parameter('E_c', unit='Hz',
@@ -493,18 +517,23 @@ class CCLight_Transmon(Qubit):
                              + 'weight type must be "SSB" or "DSB"')
         self.prepare_readout()
         self._prep_cw_spec()
-        # LO for readout is turned on in prepare_readout
-        self.instr_LO_mw.get_instr().on()
+        # source is turned on in measure spec when needed
+        self.instr_LO_mw.get_instr().off()
+        self.instr_spec_source.get_instr().off()
 
     def _prep_cw_spec(self):
         VSM = self.instr_VSM.get_instr()
         VSM.set_all_switches_to('OFF')
+        if self.spec_type() == 'CW':
+            mode = 'ON'
+        else:
+            mode = 'EXT'
         VSM.set('in{}_out{}_switch'.format(self.spec_vsm_ch_in(),
-                                           self.spec_vsm_ch_out()), 'EXT')
+                                           self.spec_vsm_ch_out()), mode)
         VSM.set('in{}_out{}_att'.format(
                 self.spec_vsm_ch_in(), self.spec_vsm_ch_out()),
                 self.spec_vsm_att())
-        self.instr_LO_mw.get_instr().on()
+        self.instr_spec_source.get_instr().power(self.spec_pow())
 
     def prepare_readout(self):
         """
@@ -706,9 +735,10 @@ class CCLight_Transmon(Qubit):
     def prepare_for_timedomain(self):
         self.prepare_readout()
         self._prep_td_sources()
-        for i in range(2):
-            print("Uploading twice as a workaround for #348")
-            self._prep_mw_pulses()
+        if self.cfg_prepare_mw_awg():
+            for i in range(2):
+                print("Uploading twice as a workaround for #348")
+                self._prep_mw_pulses()
 
     def _prep_td_sources(self):
         self.instr_LO_mw.get_instr().on()
@@ -926,13 +956,68 @@ class CCLight_Transmon(Qubit):
         # CCL gets started in the int_avg detector
 
         # The spec pulse is a MW pulse that contains not modulation
-        MC.set_sweep_function(self.instr_LO_mw.get_instr().frequency)
+
+        spec_source = self.instr_spec_source.get_instr()
+        spec_source.on()
+        MC.set_sweep_function(spec_source.frequency)
         MC.set_sweep_points(freqs)
         self.int_avg_det_single._set_real_imag(False)
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='spectroscopy_'+self.msmt_suffix)
         if analyze:
             ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
+
+    def measure_ssro(self, MC=None, analyze: bool=True, nr_shots: int=1024*8,
+                     cases=('off', 'on'), update_threshold: bool=True,
+                     prepare: bool=True, no_fits=False, update=True, verbose=True):
+        old_RO_digit = self.ro_acq_digitized()
+        self.ro_acq_digitized(False)
+        # docstring from parent class
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        # plotting really slows down SSRO (16k shots plotting is slow)
+        old_plot_setting = MC.live_plot_enabled()
+        MC.live_plot_enabled(False)
+        MC.soft_avg(1)  # don't want to average single shots
+        if prepare:
+            self.prepare_for_timedomain()
+            # off/on switching is achieved by turning the MW source on and
+            # off as this is much faster than recompiling/uploading
+            p = sqo.off_on(
+                qubit_idx=self.cfg_qubit_nr(), pulse_comb='offon',
+                platf_cfg=self.cfg_openql_platform_fn())
+            self.instr_CC.get_instr().upload_instructions(p.filename)
+        else:
+            p = None  # object needs to exist for the openql_sweep to work
+
+        self.ro_acq_digitized(old_RO_digit)
+
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr(),
+                             parameter_name='Transient time', unit='s',
+                             upload=prepare)
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(nr_shots))
+        d = self.int_log_det
+        MC.set_detector_function(d)
+        MC.run(
+            'Measure_SSRO_{}'.format(self.msmt_suffix))
+        MC.live_plot_enabled(old_plot_setting)
+        if analyze:
+            a = ma.SSRO_Analysis(label='SSRO',
+                                 channels=d.value_names,
+                                 no_fits=no_fits)
+            if update_threshold:
+                # use the threshold for the best discrimination fidelity
+                self.ro_acq_threshold(a.V_th_d)
+            if update:
+                self.F_ssro(a.F_a)
+                self.F_discr(a.F_d)
+            if verbose:
+                print('Avg. Assignement fidelity: \t{:.4f}\n'.format(a.F_a) +
+                      'Avg. Discrimination fidelity: \t{:.4f}'.format(a.F_d))
+            return a.F_a, a.F_d
 
     def measure_transients(self, MC=None, analyze: bool=True,
                            cases=('off', 'on'),
@@ -982,9 +1067,41 @@ class CCLight_Transmon(Qubit):
 
         return [np.array(t, dtype=np.float64) for t in transients]
 
+    def calibrate_optimal_weights(self, MC=None, verify=True, analyze=False,
+                                  update=True):
+        if MC is None:
+            MC = self.MC.get_instr()
 
-    def measure_rabi_vsm(self, MC=None, atts=np.linspace(0, 65536,31)
-                      analyze=True, close_fig=True, prepare_for_timedomain=True):
+        # Ensure that enough averages are used to get accurate weights
+        old_avg = self.ro_acq_averages()
+        self.ro_acq_averages(2**15)
+        transients = self.measure_transients(MC=MC, analyze=analyze)
+
+        self.ro_acq_averages(old_avg)
+
+        # Calculate optimal weights
+        optimized_weights_I = transients[1][0] - transients[0][0]
+        optimized_weights_Q = transients[1][1] - transients[0][1]
+
+        # joint rescaling to +/-1 Volt
+        maxI = np.max(np.abs(optimized_weights_I))
+        maxQ = np.max(np.abs(optimized_weights_Q))
+        weight_scale_factor = 1./np.max([maxI, maxQ])
+        optimized_weights_I = np.array(
+            weight_scale_factor*optimized_weights_I)
+        optimized_weights_Q = np.array(
+            weight_scale_factor*optimized_weights_Q)
+
+        if update:
+            self.ro_acq_weight_func_I(optimized_weights_I)
+            self.ro_acq_weight_func_Q(optimized_weights_Q)
+            self.ro_acq_weight_type('optimal')
+
+        if verify:
+            self.measure_ssro()
+
+    def measure_rabi_vsm(self, MC=None, atts=np.linspace(0, 65536, 31),
+                         analyze=True, close_fig=True, prepare_for_timedomain=True):
         # docstring from parent class
         # N.B. this is a good example for a generic timedomain experiment using
         # the CCL transmon.
@@ -993,8 +1110,8 @@ class CCLight_Transmon(Qubit):
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
         p = sqo.off_on(
-                qubit_idx=self.cfg_qubit_nr(), pulse_comb='on',
-                platf_cfg=self.cfg_openql_platform_fn())
+            qubit_idx=self.cfg_qubit_nr(), pulse_comb='on',
+            platf_cfg=self.cfg_openql_platform_fn())
 
         VSM = self.instr_VSM.get_instr()
         Gin = self.mw_vsm_ch_Gin()
@@ -1005,13 +1122,12 @@ class CCLight_Transmon(Qubit):
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr())
         d = self.int_avg_det
-        MC.set_sweep_function(VSM.__getattr__('in{}_out{}_att'.format(Gin, out))
+        MC.set_sweep_function(VSM.__getattr__(
+            'in{}_out{}_att'.format(Gin, out)))
         MC.set_sweep_points(atts)
         self.int_avg_det_single._set_real_imag(False)
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='rabi_'+self.msmt_suffix)
-
-
 
     def measure_allxy(self, MC=None,
                       analyze=True, close_fig=True, prepare_for_timedomain=True):
@@ -1036,7 +1152,7 @@ class CCLight_Transmon(Qubit):
             return a
 
     def measure_T1(self, times=None, MC=None,
-                      analyze=True, close_fig=True, update=True, prepare_for_timedomain=True):
+                   analyze=True, close_fig=True, update=True, prepare_for_timedomain=True):
         # docstring from parent class
         # N.B. this is a good example for a generic timedomain experiment using
         # the CCL transmon.
@@ -1049,14 +1165,14 @@ class CCLight_Transmon(Qubit):
 
         # append the calibration points, times are for location in plot
         times = np.concatenate([times,
-                        (times[-1]+times[0],
-                         times[-1]+times[1],
-                         times[-1]+times[2],
-                         times[-1]+times[3])])
+                                (times[-1]+times[0],
+                                 times[-1]+times[1],
+                                    times[-1]+times[2],
+                                    times[-1]+times[3])])
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
         p = sqo.T1(times, qubit_idx=self.cfg_qubit_nr(),
-                      platf_cfg=self.cfg_openql_platform_fn())
+                   platf_cfg=self.cfg_openql_platform_fn())
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr())
         d = self.int_avg_det
@@ -1070,7 +1186,7 @@ class CCLight_Transmon(Qubit):
         return a.T1
 
     def measure_Ramsey(self, times=None, MC=None, artificial_detuning=None,
-                      analyze=True, close_fig=True, update=True):
+                       analyze=True, close_fig=True, update=True):
         # docstring from parent class
         # N.B. this is a good example for a generic timedomain experiment using
         # the CCL transmon.
@@ -1079,9 +1195,10 @@ class CCLight_Transmon(Qubit):
 
         # default timing
         if times is None:
-            # funny default is because there is no real time sideband modulation
+            # funny default is because there is no real time sideband
+            # modulation
             stepsize = (self.T2_star()*4/61)//(abs(self.cfg_cycle_time())) \
-                *abs(self.cfg_cycle_time())
+                * abs(self.cfg_cycle_time())
             times = np.arange(0, self.T2_star()*4, stepsize)
 
         if artificial_detuning is None:
@@ -1089,26 +1206,27 @@ class CCLight_Transmon(Qubit):
 
         # append the calibration points, times are for location in plot
         times = np.concatenate([times,
-                        (times[-1]+times[0],
-                         times[-1]+times[1],
-                         times[-1]+times[2],
-                         times[-1]+times[3])])
+                                (times[-1]+times[0],
+                                 times[-1]+times[1],
+                                    times[-1]+times[2],
+                                    times[-1]+times[3])])
 
         self.prepare_for_timedomain()
 
         # testing if the pulses are locked to the modulation frequency
         if not all([np.round(t*1e9) % (1/self.mw_freq_mod.get()*1e9)
                     == 0 for t in times]):
-            raise ValueError('timesteps must be multiples of modulation period')
+            raise ValueError(
+                'timesteps must be multiples of modulation period')
 
         # adding 'artificial' detuning by detuning the qubit LO
         freq_qubit = self.freq_qubit()
         # # this should have no effect if artificial detuning = 0
         self.instr_LO_mw.get_instr().set('frequency', freq_qubit -
-                              self.mw_freq_mod.get() + artificial_detuning)
+                                         self.mw_freq_mod.get() + artificial_detuning)
 
         p = sqo.Ramsey(times, qubit_idx=self.cfg_qubit_nr(),
-                      platf_cfg=self.cfg_openql_platform_fn())
+                       platf_cfg=self.cfg_openql_platform_fn())
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr())
         d = self.int_avg_det
@@ -1122,7 +1240,7 @@ class CCLight_Transmon(Qubit):
         return a.T2_star
 
     def measure_echo(self, times=None, MC=None,
-                      analyze=True, close_fig=True, update=True):
+                     analyze=True, close_fig=True, update=True):
         # docstring from parent class
         # N.B. this is a good example for a generic timedomain experiment using
         # the CCL transmon.
@@ -1131,31 +1249,32 @@ class CCLight_Transmon(Qubit):
 
         # default timing
         if times is None:
-            # funny default is because there is no real time sideband modulation
+            # funny default is because there is no real time sideband
+            # modulation
             stepsize = (self.T2_echo()*2/61)//(abs(self.cfg_cycle_time())) \
-                *abs(self.cfg_cycle_time())
+                * abs(self.cfg_cycle_time())
             times = np.arange(0, self.T2_echo()*4, stepsize*2)
 
         # append the calibration points, times are for location in plot
         times = np.concatenate([times,
-                        (times[-1]+times[0],
-                         times[-1]+times[1],
-                         times[-1]+times[2],
-                         times[-1]+times[3])])
-
+                                (times[-1]+times[0],
+                                 times[-1]+times[1],
+                                    times[-1]+times[2],
+                                    times[-1]+times[3])])
 
         # # Checking if pulses are on 20 ns grid
         if not all([np.round(t*1e9) % (2*self.cfg_cycle_time()*1e9) == 0 for t in times]):
-          raise ValueError('timesteps must be multiples of 40e-9')
+            raise ValueError('timesteps must be multiples of 40e-9')
 
         # # Checking if pulses are locked to the pulse modulation
         if not all([np.round(t/1*1e9) % (2/self.mw_freq_mod.get()*1e9)
                     == 0 for t in times]):
-            raise ValueError('timesteps must be multiples of 2 modulation periods')
+            raise ValueError(
+                'timesteps must be multiples of 2 modulation periods')
 
         self.prepare_for_timedomain()
         p = sqo.echo(times, qubit_idx=self.cfg_qubit_nr(),
-                      platf_cfg=self.cfg_openql_platform_fn())
+                     platf_cfg=self.cfg_openql_platform_fn())
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr())
         d = self.int_avg_det
@@ -1163,7 +1282,7 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_points(times)
         MC.set_detector_function(d)
         MC.run('echo'+self.msmt_suffix)
-        a = ma.Echo_analysis(label='echo',auto=True, close_fig=True)
+        a = ma.Echo_analysis(label='echo', auto=True, close_fig=True)
         if update:
             self.T2_echo(a.fit_res.params['tau'].value)
         return a

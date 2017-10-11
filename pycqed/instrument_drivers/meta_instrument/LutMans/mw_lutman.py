@@ -253,7 +253,9 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
             stop_start=stop_start)
         # Uploading the codeword program (again) is needed to link the new
         # waveforms.
-        self.AWG.get_instr().upload_codeword_program()
+        # the False prevents reconfiguring the DIO timings. This
+        # needs to be fixed in the AWG8 driver (MAR Oct 2017)
+        self.AWG.get_instr().upload_codeword_program(False)
 
 
 class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
