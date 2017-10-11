@@ -861,6 +861,8 @@ class Function_Detector(Soft_Detector):
             return result
         else:
             results = [result[key] for key in self.result_keys]
+            if len(results) ==1:
+                return results[0] # for a single entry we don't want a list
             return results
 
 
