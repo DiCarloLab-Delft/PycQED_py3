@@ -545,7 +545,7 @@ class Transmon(Qubit):
                            vals=vals.Numbers())
         self.add_parameter('T1', unit='s',
                            parameter_class=ManualParameter,
-                           vals=vals.Numbers())
+                           vals=vals.Numbers(0, 200e-6))
         self.add_parameter('T2_echo', unit='s',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())

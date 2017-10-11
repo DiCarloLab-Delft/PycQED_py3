@@ -339,7 +339,6 @@ class CCLight_Transmon(Qubit):
                            initial_value=65536/2,
                            parameter_class=ManualParameter)
 
-
     def _set_mw_vsm_delay(self, val):
         # sort of a pseudo Manual Parameter
         self.instr_CC.get_instr().set(
@@ -460,7 +459,6 @@ class CCLight_Transmon(Qubit):
                            initial_value=True,
                            parameter_class=ManualParameter)
 
-
     def add_generic_qubit_parameters(self):
         self.add_parameter('E_c', unit='Hz',
                            initial_value=300e6,
@@ -471,13 +469,13 @@ class CCLight_Transmon(Qubit):
                            vals=vals.Numbers())
         self.add_parameter('T1', unit='s',
                            parameter_class=ManualParameter,
-                           vals=vals.Numbers())
+                           vals=vals.Numbers(0, 200e-6))
         self.add_parameter('T2_echo', unit='s',
                            parameter_class=ManualParameter,
-                           vals=vals.Numbers())
+                           vals=vals.Numbers(0, 200e-6))
         self.add_parameter('T2_star', unit='s',
                            parameter_class=ManualParameter,
-                           vals=vals.Numbers())
+                           vals=vals.Numbers(0, 200e-6))
 
         self.add_parameter('freq_qubit',
                            label='mwubit frequency', unit='Hz',
@@ -735,10 +733,9 @@ class CCLight_Transmon(Qubit):
     def prepare_for_timedomain(self):
         self.prepare_readout()
         self._prep_td_sources()
-        if self.cfg_prepare_mw_awg():
-            for i in range(2):
-                print("Uploading twice as a workaround for #348")
-                self._prep_mw_pulses()
+        for i in range(2):
+            print("Uploading twice as a workaround for #348")
+            self._prep_mw_pulses()
 
     def _prep_td_sources(self):
         self.instr_LO_mw.get_instr().on()
@@ -771,7 +768,8 @@ class CCLight_Transmon(Qubit):
         MW_LutMan.G_mixer_alpha(self.mw_G_mixer_alpha())
         MW_LutMan.D_mixer_phi(self.mw_D_mixer_phi())
         MW_LutMan.D_mixer_alpha(self.mw_D_mixer_alpha())
-        MW_LutMan.load_waveforms_onto_AWG_lookuptable()
+        if self.cfg_prepare_mw_awg():
+            MW_LutMan.load_waveforms_onto_AWG_lookuptable()
 
         self._prep_td_configure_VSM()
 
@@ -1164,16 +1162,19 @@ class CCLight_Transmon(Qubit):
             times = np.linspace(0, self.T1()*4, 31)
 
         # append the calibration points, times are for location in plot
+        dt = times[1] - times[0]
         times = np.concatenate([times,
-                                (times[-1]+times[0],
-                                 times[-1]+times[1],
-                                    times[-1]+times[2],
-                                    times[-1]+times[3])])
+                                (times[-1]+1*dt,
+                                 times[-1]+2*dt,
+                                    times[-1]+3*dt,
+                                    times[-1]+4*dt)])
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
         p = sqo.T1(times, qubit_idx=self.cfg_qubit_nr(),
                    platf_cfg=self.cfg_openql_platform_fn())
         s = swf.OpenQL_Sweep(openql_program=p,
+                             parameter_name='Time', 
+                             unit='s',
                              CCL=self.instr_CC.get_instr())
         d = self.int_avg_det
         MC.set_sweep_function(s)
@@ -1205,11 +1206,12 @@ class CCLight_Transmon(Qubit):
             artificial_detuning = 3/times[-1]
 
         # append the calibration points, times are for location in plot
+        dt = times[1] - times[0]
         times = np.concatenate([times,
-                                (times[-1]+times[0],
-                                 times[-1]+times[1],
-                                    times[-1]+times[2],
-                                    times[-1]+times[3])])
+                                (times[-1]+1*dt,
+                                 times[-1]+2*dt,
+                                    times[-1]+3*dt,
+                                    times[-1]+4*dt)])
 
         self.prepare_for_timedomain()
 
@@ -1256,11 +1258,12 @@ class CCLight_Transmon(Qubit):
             times = np.arange(0, self.T2_echo()*4, stepsize*2)
 
         # append the calibration points, times are for location in plot
+        dt = times[1] - times[0]
         times = np.concatenate([times,
-                                (times[-1]+times[0],
-                                 times[-1]+times[1],
-                                    times[-1]+times[2],
-                                    times[-1]+times[3])])
+                                (times[-1]+1*dt,
+                                 times[-1]+2*dt,
+                                    times[-1]+3*dt,
+                                    times[-1]+4*dt)])
 
         # # Checking if pulses are on 20 ns grid
         if not all([np.round(t*1e9) % (2*self.cfg_cycle_time()*1e9) == 0 for t in times]):

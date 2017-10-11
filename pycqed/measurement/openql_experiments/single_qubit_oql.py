@@ -211,7 +211,7 @@ def T1(times, qubit_idx: int, platf_cfg: str):
     p = Program(pname="T1", nqubits=platf.get_qubit_number(),
                 p=platf)
 
-    for i, time in enumerate(times[:-3]):
+    for i, time in enumerate(times[:-4]):
         k = Kernel("T1_"+str(i), p=platf)
         k.prepz(qubit_idx)
         nr_clocks = int(time/20e-9)
@@ -249,7 +249,7 @@ def Ramsey(times, qubit_idx: int, platf_cfg: str):
     p = Program(pname="Ramsey", nqubits=platf.get_qubit_number(),
                 p=platf)
 
-    for i, time in enumerate(times[:-3]):
+    for i, time in enumerate(times[:-4]):
         k = Kernel("Ramsey_"+str(i), p=platf)
         k.prepz(qubit_idx)
         nr_clocks = int(time/20e-9)
@@ -288,7 +288,7 @@ def echo(times, qubit_idx: int, platf_cfg: str):
     p = Program(pname="echo", nqubits=platf.get_qubit_number(),
                 p=platf)
 
-    for i, time in enumerate(times[:-3]):
+    for i, time in enumerate(times[:-4]):
         k = Kernel("echo_"+str(i), p=platf)
         k.prepz(qubit_idx)
         nr_clocks = int(time/20e-9/2)
