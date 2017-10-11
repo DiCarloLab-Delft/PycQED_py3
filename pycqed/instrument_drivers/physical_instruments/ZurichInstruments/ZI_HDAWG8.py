@@ -80,7 +80,7 @@ class ZI_HDAWG8(ZI_base_instrument):
             initial_value=self._num_codewords,
             # N.B. I have commentd out numbers larger than self._num_codewords
             # see also issue #358
-            vals=vals.Enum(2, 4, 8, 16, 32), # , 64, 128, 256, 1024),
+            vals=vals.Enum(2, 4, 8, 16, 32),  # , 64, 128, 256, 1024),
             parameter_class=ManualParameter)
 
         self.add_parameter(
@@ -134,6 +134,131 @@ class ZI_HDAWG8(ZI_base_instrument):
         """
         for i in range(4):
             self.set('awgs_{}_enable'.format(i), 1)
+
+    def _check_protocol(self, awg):
+        # TODO: Add docstrings and make this more clear (Oct 2017)
+        mask = self._dev.geti('awgs/' + str(awg) + '/dio/mask/value') << self._dev.geti(
+            'awgs/' + str(awg) + '/dio/mask/shift')
+        strobe = 1 << self._dev.geti('awgs/' + str(awg) + '/dio/strobe/index')
+        valid = 1 << self._dev.geti('awgs/' + str(awg) + '/dio/valid/index')
+        #print('Codeword mask: {:08x}'.format(mask))
+        #print('Strobe mask  : {:08x}'.format(strobe))
+        #print('Valid mask   : {:08x}'.format(valid))
+
+        got_bits = 0
+        got_strobe_re = False
+        got_strobe_fe = False
+        got_valid_re = False
+        got_valid_fe = False
+        last_strobe = None
+        last_valid = None
+        strobe_low = 0
+        strobe_high = 0
+        count_low = False
+        count_high = False
+        count_ok = True
+        ok = 0
+        data = self._dev.getv('awgs/' + str(awg) + '/dio/data')
+        #print_timing_diagram(data, [30, 31])
+        for n, d in enumerate(data):
+            curr_strobe = (d & strobe) != 0
+            curr_valid = (d & valid) != 0
+
+            if (last_strobe != None) and (curr_strobe and not last_strobe):
+                got_strobe_re = True
+                strobe_high = 0
+                count_high = True
+                index_high = n
+            if (last_strobe != None) and (not curr_strobe and last_strobe):
+                got_strobe_fe = True
+                strobe_low = 0
+                count_low = True
+                index_low = n
+            if (last_valid != None) and (curr_valid and not last_valid):
+                got_valid_re = True
+            if (last_valid != None) and (not curr_valid and last_valid):
+                got_valid_fe = True
+
+            if count_high and curr_strobe:
+                strobe_high += 1
+            elif count_high and not curr_strobe:
+                if (strobe_low > 0) and (strobe_low != strobe_high):
+                    count_ok = False
+                    #print('Checking high to low: {} != {} @ {}'.format(strobe_high, strobe_low, n))
+                count_high = False
+
+            if count_low and curr_valid:
+                strobe_low += 1
+            elif count_low and curr_valid:
+                if (strobe_high > 0) and (strobe_low != strobe_high):
+                    count_ok = False
+                    #print('Checking low to high: {} != {} @ {}'.format(strobe_high, strobe_low, n))
+                count_low = False
+
+            got_bits |= (d & mask)
+            last_strobe = curr_strobe
+            last_valid = curr_valid
+
+        if got_bits != mask:
+            ok |= 1
+        if not got_strobe_re or not got_strobe_fe:
+            ok |= 2
+        if not got_valid_re or not got_valid_fe:
+            ok |= 4
+        if not count_ok:
+            ok |= 8
+
+        return ok
+
+    def _print_check_protocol_error_message(self, ok):
+        if ok & 1:
+            print('Did not see all codeword bits toggling')
+        if ok & 2:
+            print('Did not see toggle bit toggling')
+        if ok & 4:
+            print('Did not see valid bit toggling')
+        if ok & 8:
+            print('Toggle bit is not symmetrical')
+
+    def calibrate_dio(self):
+        # TODO: add docstrings to make it more clear
+        ok = True
+        print("Switching to internal clock")
+        self.set('system_extclk', 0)
+        time.sleep(1)
+        print("Switching to external clock")
+        self.set('system_extclk', 1)
+        time.sleep(1)
+        print("Calibrating internal DIO delays...")
+        for i in [1, 0, 2, 3]:  # strange order is necessary
+            print('  Calibrating AWG {} '.format(i), end='')
+            self._dev.seti('raw/awgs/*/dio/calib/start', 2)
+            time.sleep(1)
+            status = self._dev.geti('raw/awgs/' + str(i) + '/dio/calib/status')
+            if (status != 0):
+                print('[FAILURE]')
+                ok = False
+            else:
+                print('[SUCCESS]')
+        return ok
+
+    def calibrate_dio_protocol(self):
+        # TODO: add docstrings to make it more clear
+        ok = True
+        print("Calibrating DIO protocol delays...")
+        for i in range(4):
+            print('  Calibrating AWG {} '.format(i), end='')
+            self._dev.seti('raw/awgs/' + str(i) + '/dio/calib/start', 1)
+            time.sleep(1)
+            status = self._dev.geti('raw/awgs/' + str(i) + '/dio/calib/status')
+            protocol = self._check_protocol(i)
+            if (status != 0) or (protocol != 0):
+                print('[FAILURE]')
+                self._print_check_protocol_error_message(protocol)
+                ok = False
+            else:
+                print('[SUCCESS]')
+        return ok
 
     def _add_codeword_parameters(self):
         """
@@ -273,9 +398,9 @@ class ZI_HDAWG8(ZI_base_instrument):
             self.configure_awg_from_string(awg_nr=awg_nr,
                                            program_string=program,
                                            timeout=self.timeout())
-            self._configure_codeword_protocol()
+        self.configure_codeword_protocol()
 
-    def _configure_codeword_protocol(self):
+    def configure_codeword_protocol(self, default_dio_timing: bool=False):
         """
         This method configures the AWG-8 codeword protocol.
         It includes specifying what bits are used to specify codewords
@@ -341,7 +466,6 @@ class ZI_HDAWG8(ZI_base_instrument):
             self.set('awgs_{}_dio_mask_value'.format(awg_nr),
                      self.cfg_num_codewords()-1)
 
-
             if self.cfg_codeword_protocol() == 'identical':
                 # In the identical protocol all bits are used to trigger
                 # the same codewords on all AWG's
@@ -367,18 +491,22 @@ class ZI_HDAWG8(ZI_base_instrument):
         # Delay configuration
         ####################################################
 
-        # Reset all DIO delays
-        for i in range(32):
+        if default_dio_timing:
+            # FIXME: This can potentially be deleted as we now have the
+            # _check_protocol method. (Oct 2017)
+
+            # Reset all DIO delays
+            for i in range(32):
+                self._dev.daq.setInt('/' + self._dev.device +
+                                     '/awgs/*/dio/delay/index', i)
+                self._dev.daq.setInt('/' + self._dev.device +
+                                     '/awgs/*/dio/delay/value', 0)
+            # Delay only the toggle/strobe bit by "codeword_delay" samples
+            codeword_delay = 2
             self._dev.daq.setInt('/' + self._dev.device +
-                                 '/awgs/*/dio/delay/index', i)
+                                 '/awgs/*/dio/delay/index', 30)
             self._dev.daq.setInt('/' + self._dev.device +
-                                 '/awgs/*/dio/delay/value', 0)
-        # Delay only the toggle/strobe bit by "codeword_delay" samples
-        codeword_delay = 2
-        self._dev.daq.setInt('/' + self._dev.device +
-                             '/awgs/*/dio/delay/index', 30)
-        self._dev.daq.setInt('/' + self._dev.device +
-                             '/awgs/*/dio/delay/value', codeword_delay)
+                                 '/awgs/*/dio/delay/value', codeword_delay)
 
         ####################################################
         # Turn on device
