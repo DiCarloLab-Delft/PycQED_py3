@@ -5403,12 +5403,14 @@ class RandomizedBenchmarking_Analysis_new(TD_Analysis):
     same figure.
     '''
 
-    def __init__(self, label='RB', T1=None, pulse_delay=None, TwoD=True, **kw):
+    def __init__(self, label='RB', T1=None, pulse_delay=None,
+                 gate_decomp='HZ', TwoD=True, **kw):
 
         self.T1 = T1
         if self.T1==0:
             self.T1=None
 
+        self.gate_decomp = gate_decomp
         self.pulse_delay = pulse_delay
 
         super().__init__(TwoD=TwoD, **kw)
@@ -5476,7 +5478,13 @@ class RandomizedBenchmarking_Analysis_new(TD_Analysis):
         pulse separation is time between start of pulses
         '''
         #Np = 1.875  # Avg. number of gates per Clifford for XY decomposition
-        Np = 0.9583  # Avg. number of gates per Clifford for HZ decomposition
+        #Np = 0.9583  # Avg. number of gates per Clifford for HZ decomposition
+        if self.gate_decomp=='HZ':
+            Np = 0.9583
+        elif self.gate_decomp=='XY':
+            Np = 1.875
+        else:
+            raise ValueError('Gate decomposition not recognized.')
         F_cl = (1/6*(3 + 2*np.exp(-1*pulse_delay/(2*T1)) +
                      np.exp(-pulse_delay/T1)))**Np
         p = 2*F_cl - 1
