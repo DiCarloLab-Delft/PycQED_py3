@@ -12,6 +12,7 @@ roughly split into
 import numpy as np
 import matplotlib.pyplot as plt
 
+
 def count_rounds_to_error(series):
     '''
     returns the index of the first entry that is different
@@ -131,6 +132,19 @@ def count_rounds_since_flip_split(series):
 
 
 def binary_derivative(series):
+    '''
+    Used to extract transitions between flipping and non-flipping
+    part of data traces.
+
+    When there is no change the value is 0.
+    If there is a change the value is 1.
+    '''
+    d_series = np.array([0 if series[i+1] == series[i] else 1
+                         for i in range(len(series)-1)])
+    return d_series
+
+
+def binary_derivative_old(series):
     '''
     Used to extract transitions between flipping and non-flipping
     part of data traces.

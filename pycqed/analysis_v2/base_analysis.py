@@ -524,7 +524,8 @@ class BaseDataAnalysis(object):
             pdict = self.plot_dicts[key]
             # this check is needed as not all plots have xvals e.g., plot_text
             if 'xvals' in pdict.keys():
-                if type(pdict['xvals'][0]) is datetime.datetime:
+                if (type(pdict['xvals'][0]) is datetime.datetime and
+                        key in self.axs.keys()):
                     self.axs[key].figure.autofmt_xdate()
 
     def plot_for_presentation(self, key_list=None, no_label=False):
