@@ -88,6 +88,8 @@ class BaseDataAnalysis(object):
         time stamps are ignored.
         '''
         self.single_timestamp = False
+        # initialize an empty dict to store results of analysis
+        self.proc_data_dict = dict()
         if options_dict is None:
             self.options_dict = dict()
         else:
@@ -231,7 +233,7 @@ class BaseDataAnalysis(object):
         Extracts the data specified in
             self.params_dict
             self.numeric_params
-        and stores it into: self.data_dict
+        and stores it into: self.raw_data_dict
 
         Data extraction is now supported in three different ways
             - using json
@@ -243,7 +245,7 @@ class BaseDataAnalysis(object):
             extension = self.data_file_path.split('.')[-1]
             if extension == 'json':
                 with open(self.data_file_path, 'r') as file:
-                    self.data_dict = json.load(file)
+                    self.raw_data_dict = json.load(file)
             else:
                 raise RuntimeError('Cannot load data from file "{}". '
                                    'Unknown file extension "{}"'
@@ -261,8 +263,8 @@ class BaseDataAnalysis(object):
         self.params_dict['folder'] = 'folder'
 
         if self.do_timestamp_blocks:
-            self.data_dict = {key: [] for key in list(self.params_dict.keys())}
-            self.data_dict['timestamps'] = []
+            self.raw_data_dict = {key: [] for key in list(self.params_dict.keys())}
+            self.raw_data_dict['timestamps'] = []
             for tstamps in self.timestamps:
                 if self.verbose:
                     print(len(tstamps), type(tstamps))
@@ -271,60 +273,60 @@ class BaseDataAnalysis(object):
                     ma_type=self.ma_type,
                     TwoD=TwoD, numeric_params=self.numeric_params,
                     filter_no_analysis=self.filter_no_analysis)
-                for key in self.data_dict:
-                    self.data_dict[key].append(temp_dict[key])
+                for key in self.raw_data_dict:
+                    self.raw_data_dict[key].append(temp_dict[key])
 
             # Use timestamps to calculate datetimes and add to dictionary
-            self.data_dict['datetime'] = []
-            for tstamps in self.data_dict['timestamps']:
-                self.data_dict['datetime'].append(
+            self.raw_data_dict['datetime'] = []
+            for tstamps in self.raw_data_dict['timestamps']:
+                self.raw_data_dict['datetime'].append(
                     [a_tools.datetime_from_timestamp(ts) for ts in tstamps])
 
             # Convert temperature data to dictionary form and extract Tmc
             # N.B. This has the hardcoded temperature names from pycqed_py2
-            if 'temperatures' in self.data_dict:
-                self.data_dict['Tmc'] = []
+            if 'temperatures' in self.raw_data_dict:
+                self.raw_data_dict['Tmc'] = []
                 for ii, temperatures in enumerate(
-                        self.data_dict['temperatures']):
+                        self.raw_data_dict['temperatures']):
                     temp = []
-                    self.data_dict['Tmc'].append([])
+                    self.raw_data_dict['Tmc'].append([])
                     for ii in range(len(temperatures)):
                         exec("temp.append(%s)" % (temperatures[ii]))
-                        self.data_dict['Tmc'][ii].append(
+                        self.raw_data_dict['Tmc'][ii].append(
                             temp[ii].get('T_MClo', None))
-                    self.data_dict['temperatures'][ii] = temp
+                    self.raw_data_dict['temperatures'][ii] = temp
 
         else:
-            self.data_dict = a_tools.get_data_from_timestamp_list(
+            self.raw_data_dict = a_tools.get_data_from_timestamp_list(
                 self.timestamps, param_names=self.params_dict,
                 ma_type=self.ma_type,
                 TwoD=TwoD, numeric_params=self.numeric_params,
                 filter_no_analysis=self.filter_no_analysis)
 
             # Use timestamps to calculate datetimes and add to dictionary
-            self.data_dict['datetime'] = [a_tools.datetime_from_timestamp(
-                timestamp) for timestamp in self.data_dict['timestamps']]
+            self.raw_data_dict['datetime'] = [a_tools.datetime_from_timestamp(
+                timestamp) for timestamp in self.raw_data_dict['timestamps']]
 
             # Convert temperature data to dictionary form and extract Tmc
-            if 'temperatures' in self.data_dict:
+            if 'temperatures' in self.raw_data_dict:
                 temp = []
-                self.data_dict['Tmc'] = []
-                for ii in range(len(self.data_dict['temperatures'])):
+                self.raw_data_dict['Tmc'] = []
+                for ii in range(len(self.raw_data_dict['temperatures'])):
                     exec("temp.append(%s)" %
-                         (self.data_dict['temperatures'][ii]))
-                    self.data_dict['Tmc'].append(temp[ii].get('T_MClo', None))
-                self.data_dict['temperatures'] = temp
+                         (self.raw_data_dict['temperatures'][ii]))
+                    self.raw_data_dict['Tmc'].append(temp[ii].get('T_MClo', None))
+                self.raw_data_dict['temperatures'] = temp
 
         # this is a hacky way to use the same data extraction when there is
         # many files as when there is few files.
         if self.single_timestamp:
             new_dict = {}
-            for key, value in self.data_dict.items():
+            for key, value in self.raw_data_dict.items():
                 if key != 'timestamps':
                     new_dict[key] = value[0]
-            self.data_dict = new_dict
-            self.data_dict['timestamp'] = self.timestamps[0]
-        self.data_dict['timestamps'] = self.timestamps
+            self.raw_data_dict = new_dict
+            self.raw_data_dict['timestamp'] = self.timestamps[0]
+        self.raw_data_dict['timestamps'] = self.timestamps
 
     def process_data(self):
         """
@@ -352,13 +354,13 @@ class BaseDataAnalysis(object):
                      fmt: str ='png', key_list: list='auto',
                      close_figs: bool=True):
         if savedir is None:
-            savedir = self.data_dict.get('folder', '')
+            savedir = self.raw_data_dict.get('folder', '')
             if isinstance(savedir, list):
                 savedir = savedir[0]
         if savebase is None:
             savebase = ''
         if tag_tstamp:
-            tstag = '_'+self.data_dict['timestamps'][0]
+            tstag = '_'+self.raw_data_dict['timestamps'][0]
         else:
             tstag = ''
 
@@ -374,12 +376,12 @@ class BaseDataAnalysis(object):
                   tag_tstamp: bool=True,
                   fmt: str='json', key_list='auto'):
         '''
-        Saves the data from self.data_dict to file.
+        Saves the data from self.raw_data_dict to file.
 
         Args:
             savedir (string):
                     Directory where the file is saved. If this is None, the
-                    file is saved in self.data_dict['folder'] or the working
+                    file is saved in self.raw_data_dict['folder'] or the working
                     directory of the console.
             savebase (string):
                     Base name for the saved file.
@@ -390,27 +392,27 @@ class BaseDataAnalysis(object):
                     File extension for the format in which the file should
                     be saved.
             key_list (list or 'auto'):
-                    Specifies which keys from self.data_dict are saved.
+                    Specifies which keys from self.raw_data_dict are saved.
                     If this is 'auto' or None, all keys-value pairs are
                     saved.
         '''
         if savedir is None:
-            savedir = self.data_dict.get('folder', '')
+            savedir = self.raw_data_dict.get('folder', '')
             if isinstance(savedir, list):
                 savedir = savedir[0]
         if savebase is None:
             savebase = ''
         if tag_tstamp:
-            tstag = '_'+self.data_dict['timestamps'][0]
+            tstag = '_'+self.raw_data_dict['timestamps'][0]
         else:
             tstag = ''
 
         if key_list == 'auto' or key_list is None:
-            key_list = self.data_dict.keys()
+            key_list = self.raw_data_dict.keys()
 
         save_dict = {}
         for k in key_list:
-            save_dict[k] = self.data_dict[k]
+            save_dict[k] = self.raw_data_dict[k]
 
         filepath = os.path.join(savedir, savebase + tstag + '.' + fmt)
         with open(filepath, 'w') as file:
@@ -418,6 +420,8 @@ class BaseDataAnalysis(object):
         print('Data saved to "{}".'.format(filepath))
 
     def prepare_fitting(self):
+        # initialize everything to an empty dict if not overwritten
+        self.fit_dicts = {}
         pass
 
     def run_fitting(self):
