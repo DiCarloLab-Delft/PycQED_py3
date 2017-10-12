@@ -8038,7 +8038,8 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         filter_mask_high = ~dm_tools.get_outliers(peaks_high, filter_threshold)
         filter_mask_high = np.where(
             peaks_high < filter_func(flux), False, filter_mask_high)
-        filter_mask_high[-2] = False  # hand remove 1 datapoint
+        for i in filter_idx_high: filter_mask_high[i] = False
+        # filter_mask_high[-2] = False  # hand remove 1 datapoint
 
         filt_flux_high = flux[filter_mask_high]
         filt_peaks_high = peaks_high[filter_mask_high]
@@ -8047,7 +8048,8 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         filter_mask_low = ~dm_tools.get_outliers(peaks_low, filter_threshold)
         filter_mask_low = np.where(
             peaks_low > filter_func(flux), False, filter_mask_low)
-        filter_mask_low[[0, -1]] = False  # hand remove 2 datapoints
+        for i in filter_idx_low: filter_mask_low[i] = False
+        # filter_mask_low[[0, -1]] = False  # hand remove 2 datapoints
 
         filt_flux_low = flux[filter_mask_low]
         filt_peaks_low = peaks_low[filter_mask_low]
