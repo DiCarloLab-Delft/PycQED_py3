@@ -2120,7 +2120,7 @@ class CBox_v3_driven_transmon(Transmon):
         CBox.trigger_source('internal')
         qasm_file = sqqs.Ram_Z_echo(
             qubit_name=self.name,
-            no_of_points=chunk_size,
+            nr_of_points=chunk_size,
             cal_points=cal_points)
         qasm_folder, qasm_fn = os.path.split(qasm_file.name)
         qumis_fn = os.path.join(qasm_folder,

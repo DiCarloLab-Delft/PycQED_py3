@@ -539,7 +539,7 @@ def get_data_from_timestamp_list(timestamps,
                 ana.finish()
             except Exception as inst:
                 logging.warning('Error "%s" when processing timestamp %s' %
-                      (inst, timestamp))
+                                (inst, timestamp))
                 raise
 
     if len(remove_timestamps) > 0:
