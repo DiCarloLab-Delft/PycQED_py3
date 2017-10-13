@@ -1,7 +1,5 @@
-import lmfit
+import logging
 import numpy as np
-from pycqed.analysis import fitting_models as fit_mods
-from pycqed.analysis import analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
 import pycqed.analysis.tools.data_manipulation as dm_tools
 
@@ -33,15 +31,20 @@ class Single_Qubit_RoundsToEvent_Analysis(ba.BaseDataAnalysis):
     def process_data(self):
         """
         """
-        # FIXME: this should be processed_data_dict instead of data_dict
-        exp_pattern = self.options_dict.get('exp_pattern', 'alternating')
+        # N.B. alternating is the default (net_gate = pi-pulse)
+        net_pulse_pat = 'alternating'
+        if not len(set(self.raw_data_dict['net_gate'])) == 1:
+            logging.warning('Different net pulses in dataset.')
+        if self.raw_data_dict['net_gate'][0] == 'i':
+            net_pulse_pat = 'constant'
+
+        exp_pattern = self.options_dict.get('exp_pattern', net_pulse_pat)
+
         raw_dat = self.raw_data_dict['measured_values']
         nr_expts = np.shape(raw_dat)[0]
         raw_pat = [raw_dat[i][0] for i in range(nr_expts)]
 
         if exp_pattern == 'alternating':
-            # pat = [dm_tools.binary_derivative(raw_pat[i])
-            #        for i in range(nr_expts)]
             s_events = []
             d_events = []
             for i in range(nr_expts):
@@ -49,13 +52,19 @@ class Single_Qubit_RoundsToEvent_Analysis(ba.BaseDataAnalysis):
                 s_events.append(events[0])
                 d_events.append(events[1])
 
-        elif exp_pattern == 'identical':
-            # pat = raw_pat
-            raise NotImplementedError()
+        elif exp_pattern == 'constant':
+            s_events = []
+            d_events = []
+            for i in range(nr_expts):
+                events = dm_tools.mark_errors_constant(raw_pat[i])
+                s_events.append(events[0])
+                d_events.append(events[1])
+
         else:
             raise ValueError('exp_pattern {} should '.format(exp_pattern) +
                              'be either alternating or identical')
         self.proc_data_dict['raw_pattern'] = raw_pat
+        self.proc_data_dict['exp_pattern'] = exp_pattern
 
         self.proc_data_dict['single_events'] = s_events
         self.proc_data_dict['double_events'] = d_events
@@ -97,7 +106,7 @@ class Single_Qubit_RoundsToEvent_Analysis(ba.BaseDataAnalysis):
         s_events = self.proc_data_dict['single_events'][
             dataset_idx][start_idx:stop_idx]
         d_events = self.proc_data_dict['double_events'][
-            dataset_idx][start_idx:stop_idx]
+            dataset_idx][start_idx-1:stop_idx-1]
 
         self.plot_dicts['typical_trace'] = {
             'plotfn': self.plot_line,
@@ -109,25 +118,32 @@ class Single_Qubit_RoundsToEvent_Analysis(ba.BaseDataAnalysis):
             'setlabel': 'Raw trace',
             'title': 'Typical trace',
             'do_legend': True,
-            'legend_pos': 'upper right'}
+            'legend_pos': 'right'}
+
+
+        if self.proc_data_dict['exp_pattern'] == 'constant':
+            event_pat = .5 * np.ones(len(raw_pat))
+        else:
+            event_pat = raw_pat
 
         self.plot_dicts['typical_pat_single'] = {
             'ax_id': 'typical_trace',
             'plotfn': self.plot_line,
             'xvals': np.arange(len(raw_pat))[s_events > .5]+.5,
-            'yvals': raw_pat[s_events > .5],
+            'yvals': event_pat[s_events > .5],
             'marker': 'x',
             'line_kws': {'color': 'r', 'markersize': 7},
             'linestyle': '',
-            'setlabel': 'Single events', 'do_legend': True}
+            'setlabel': 'Single events', 'do_legend': True,
+            'legend_pos': 'right'}
 
         self.plot_dicts['typical_pat_double'] = {
             'ax_id': 'typical_trace',
             'plotfn': self.plot_line,
-            'xvals': np.arange(len(raw_pat))[d_events > .5]+1,
+            'xvals': np.arange(len(raw_pat))[d_events > .5],
             'yvals': raw_pat[d_events > .5],
             'marker': '|',
             'linestyle': '',
             'line_kws': {'markerfacecolor': 'None', 'markeredgecolor': 'red',
                          'markersize': 15},
-            'setlabel': 'Double events', 'do_legend': True}
+            'setlabel': 'Double events', 'do_legend': True, 'legend_pos': 'right'}

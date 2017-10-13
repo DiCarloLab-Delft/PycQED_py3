@@ -307,14 +307,31 @@ def mark_errors_flipping(events):
     single_errors = np.zeros(len(events)-1)
     double_errors = np.zeros(len(events)-2)
 
-    for i in range(len(events)):
-        if i < (len(events)-1):
+    for i in range(len(events)-1):
             # A single error is associated with a qubit error
             if (events[i] == events[i+1]):
                 single_errors[i] = 1
                 if i < (len(events)-2):
                     # two identical outcomes equal to one
                     if (events[i] == events[i+2]):
+                        double_errors[i] = 1
+    return single_errors, double_errors
+
+
+def mark_errors_constant(events):
+    '''
+    Marks error fractions
+    '''
+    single_errors = np.zeros(len(events)-1)
+    double_errors = np.zeros(len(events)-2)
+
+    for i in range(len(events)-1):
+            # A single error is associated with a qubit error
+            if (events[i] != events[i+1]):
+                single_errors[i] = 1
+                if i < (len(events)-2):
+                    # two identical outcomes equal to one
+                    if (events[i+1] != events[i+2]):
                         double_errors[i] = 1
     return single_errors, double_errors
 
