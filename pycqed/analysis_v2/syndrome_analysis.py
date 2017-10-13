@@ -17,8 +17,14 @@ class Single_Qubit_RoundsToEvent_Analysis(ba.BaseDataAnalysis):
                          options_dict=options_dict,
                          extract_only=extract_only, do_fitting=do_fitting)
         self.single_timestamp = False
-        self.params_dict = {'measurementstring': 'measurementstring',
-                            'measured_values': 'measured_values'}
+        exp_meta_str = 'Experimental Data.Experimental Metadata.'
+        self.params_dict = {
+            'measurementstring': 'measurementstring',
+            'measured_values': 'measured_values',
+            'depletion_time': exp_meta_str+'depletion_time',
+            'net_gate': exp_meta_str+'net_gate',
+            'sequence_type': exp_meta_str+'sequence_type',
+            'feedback': exp_meta_str+'feedback'}
 
         self.numeric_params = []
         if auto:
@@ -34,31 +40,33 @@ class Single_Qubit_RoundsToEvent_Analysis(ba.BaseDataAnalysis):
         raw_pat = [raw_dat[i][0] for i in range(nr_expts)]
 
         if exp_pattern == 'alternating':
-            pat = [dm_tools.binary_derivative(raw_pat[i])
-                   for i in range(nr_expts)]
+            # pat = [dm_tools.binary_derivative(raw_pat[i])
+            #        for i in range(nr_expts)]
+            s_events = []
+            d_events = []
+            for i in range(nr_expts):
+                events = dm_tools.mark_errors_flipping(raw_pat[i])
+                s_events.append(events[0])
+                d_events.append(events[1])
+
         elif exp_pattern == 'identical':
-            pat = raw_pat
+            # pat = raw_pat
+            raise NotImplementedError()
         else:
             raise ValueError('exp_pattern {} should '.format(exp_pattern) +
                              'be either alternating or identical')
-
-        events = [dm_tools.binary_derivative(pat[i])
-                  for i in range(nr_expts)]
-        double_events = [dm_tools.binary_derivative(events[i])
-                         for i in range(nr_expts)]
-
-        self.proc_data_dict['pattern'] = pat
         self.proc_data_dict['raw_pattern'] = raw_pat
-        self.proc_data_dict['events'] = events
-        self.proc_data_dict['double_events'] = double_events
+
+        self.proc_data_dict['single_events'] = s_events
+        self.proc_data_dict['double_events'] = d_events
+
         self.proc_data_dict['frac_zero'] = 1 - np.mean(raw_pat, axis=1)
         self.proc_data_dict['frac_one'] = np.mean(raw_pat, axis=1)
-        self.proc_data_dict['frac_no_error'] = 1-np.mean(events, axis=1)
-        self.proc_data_dict['frac_single'] = np.mean(events, axis=1)
-        self.proc_data_dict['frac_double'] = np.mean(double_events, axis=1)
+        self.proc_data_dict['frac_no_error'] = 1-np.mean(s_events, axis=1)
+        self.proc_data_dict['frac_single'] = np.mean(s_events, axis=1)
+        self.proc_data_dict['frac_double'] = np.mean(d_events, axis=1)
 
     def prepare_plots(self):
-        pass
         self.plot_dicts['err_frac'] = {
             'plotfn': self.plot_line,
             'xvals': self.raw_data_dict['datetime'],
@@ -69,7 +77,7 @@ class Single_Qubit_RoundsToEvent_Analysis(ba.BaseDataAnalysis):
             'setlabel': 'Single errors',
             'title': (self.raw_data_dict['timestamps'][0] + ' -  ' +
                       self.raw_data_dict['timestamps'][-1] + '\n' +
-                      self.raw_data_dict['measurementstring'][0]),
+                      'Rounds to event analysis'),
             'do_legend': True,
             'legend_pos': 'upper right'}
         self.plot_dicts['double_err_frac'] = {
@@ -77,8 +85,49 @@ class Single_Qubit_RoundsToEvent_Analysis(ba.BaseDataAnalysis):
             'plotfn': self.plot_line,
             'xvals': self.raw_data_dict['datetime'],
             'yvals': self.proc_data_dict['frac_double'],
-            'ylabel': 'Fraction',
-            'yunit': '',
             'setlabel': 'Double errors',
             'do_legend': True,
             'legend_pos': 'upper right'}
+
+        dataset_idx = self.options_dict.get('typ_data_idx', 0)
+        start_idx = self.options_dict.get('typ_start_idx', 10)
+        stop_idx = self.options_dict.get('typ_stop_idx', 70)
+        raw_pat = self.proc_data_dict['raw_pattern'][
+            dataset_idx][start_idx:stop_idx]
+        s_events = self.proc_data_dict['single_events'][
+            dataset_idx][start_idx:stop_idx]
+        d_events = self.proc_data_dict['double_events'][
+            dataset_idx][start_idx:stop_idx]
+
+        self.plot_dicts['typical_trace'] = {
+            'plotfn': self.plot_line,
+            'xvals': np.arange(len(raw_pat)),
+            'yvals': raw_pat,
+            'xlabel': 'Measurement #',
+            'ylabel': 'Declared state',
+            'yrange': (-0.05, 1.05),  # FIXME change to ylim in base analysis
+            'setlabel': 'Raw trace',
+            'title': 'Typical trace',
+            'do_legend': True,
+            'legend_pos': 'upper right'}
+
+        self.plot_dicts['typical_pat_single'] = {
+            'ax_id': 'typical_trace',
+            'plotfn': self.plot_line,
+            'xvals': np.arange(len(raw_pat))[s_events > .5]+.5,
+            'yvals': raw_pat[s_events > .5],
+            'marker': 'x',
+            'line_kws': {'color': 'r', 'markersize': 7},
+            'linestyle': '',
+            'setlabel': 'Single events', 'do_legend': True}
+
+        self.plot_dicts['typical_pat_double'] = {
+            'ax_id': 'typical_trace',
+            'plotfn': self.plot_line,
+            'xvals': np.arange(len(raw_pat))[d_events > .5]+1,
+            'yvals': raw_pat[d_events > .5],
+            'marker': '|',
+            'linestyle': '',
+            'line_kws': {'markerfacecolor': 'None', 'markeredgecolor': 'red',
+                         'markersize': 15},
+            'setlabel': 'Double events', 'do_legend': True}
