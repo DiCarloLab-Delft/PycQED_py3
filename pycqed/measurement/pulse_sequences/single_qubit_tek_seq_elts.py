@@ -766,8 +766,6 @@ def Randomized_Benchmarking_seq_one_length(pulse_pars, RO_pars,
             #print('first_x_pulse_idx = ', first_x_pulse_idx)
             pulse_list[first_x_pulse_idx] = deepcopy(pulse_list[first_x_pulse_idx])
             pulse_list[first_x_pulse_idx]['pulse_delay'] += post_msmt_delay
-            # pulse_list[0] = deepcopy(pulse_list[0])
-            # pulse_list[0]['pulse_delay'] += post_msmt_delay
             el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
