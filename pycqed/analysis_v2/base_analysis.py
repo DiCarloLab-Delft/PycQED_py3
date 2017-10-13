@@ -645,14 +645,10 @@ class BaseDataAnalysis(object):
                           **plot_linekws)
 
         if plot_xrange is None:
-            # maybe better to do nothing if xrange is None?
-            max_x = np.max(plot_xvals)
-            min_x = np.min(plot_xvals)
-            span = np.abs(max_x - min_x)
-            xmin, xmax = min_x - 0.02*span, max_x+0.02*span
+            pass # Do not set xlim if xrange is None as the axs gets reused
         else:
             xmin, xmax = plot_xrange
-        axs.set_xlim(xmin, xmax)
+            axs.set_xlim(xmin, xmax)
 
         if plot_xlabel is not None:
             set_xlabel(axs, plot_xlabel, plot_xunit)
