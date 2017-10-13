@@ -1277,7 +1277,7 @@ class UHFQC_input_average_detector(Hard_Detector):
         data_raw = self.UHFQC.acquisition_poll(samples=self.nr_sweep_points,
                                                arm=False, acquisition_time=0.01)
         data = np.array([data_raw[key]
-                         for key in data_raw.keys()])  # *self.scaling_factor
+                         for key in sorted(data_raw.keys())])  # *self.scaling_factor
 
         return data
 
@@ -1429,6 +1429,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
         self.UHFQC.acquisition_arm()
         # starting AWG
+
         if self.AWG is not None:
             self.AWG.start()
 
@@ -1437,7 +1438,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         # the self.channels should be the same as data_raw.keys().
         # this is to be tested (MAR 26-9-2017)
         data = np.array([data_raw[key]
-                         for key in self.channels])*self.scaling_factor
+                         for key in sorted(data_raw.keys())])*self.scaling_factor
 
         # Corrects offsets after crosstalk suppression matrix in UFHQC
         if self.result_logging_mode == 'lin_trans':
@@ -1659,10 +1660,10 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
 
         data = []
         if self.thresholding:
-            for key in data_raw.keys():
+            for key in sorted(data_raw.keys()):
                 data.append(np.array(data_raw[key]))
         else:
-            for key in data_raw.keys():
+            for key in sorted(data_raw.keys()):
                 if key in self.correlation_channels:
                     data.append(np.array(data_raw[key]) *
                                 (self.scaling_factor**2 / self.nr_averages))
@@ -1744,7 +1745,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
         data_raw = self.UHFQC.acquisition_poll(
             samples=self.nr_shots, arm=False, acquisition_time=0.01)
         data = np.array([data_raw[key]
-                         for key in data_raw.keys()])*self.scaling_factor
+                         for key in sorted(data_raw.keys())])*self.scaling_factor
 
         # Corrects offsets after crosstalk suppression matrix in UFHQC
         if self.result_logging_mode == 'lin_trans':

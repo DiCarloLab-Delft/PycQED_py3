@@ -391,6 +391,54 @@ class Qubit(Instrument):
         raise NotImplementedError
         return True
 
+    def calibrate_MW_RO_latency(self, MC=None, update: bool=True)-> bool:
+        """
+        Calibrates parameters:
+            "latency_MW"
+            "RO_acq_delay"
+
+
+        Used to calibrate the delay of the MW pulse with respect to the
+        RO pulse and the RO acquisition delay.
+
+
+        The MW_pulse_latency is calibrated by setting the frequency of
+        the LO to the qubit frequency such that both the MW and the RO pulse
+        will show up in the RO.
+        Measuring the transients will  show what the optimal latency is.
+
+        Note that a lot of averages may be required when using dedicated drive
+        lines.
+
+        This function does NOT overwrite the values that were set in the qubit
+        object and as such can be used to verify the succes of the calibration.
+
+        Currently (28/6/2017) the experiment has to be analysed by hand.
+
+        """
+        raise NotImplementedError()
+        return True
+
+    def calibrate_Flux_pulse_latency(self, MC=None, update=True)-> bool:
+        """
+        Calibrates parameter: "latency_Flux"
+
+        Used to calibrate the timing between the MW and Flux pulses.
+
+        Flux pulse latency is calibrated using a Ram-Z experiment.
+        The experiment works as follows:
+        - x90 | square_flux  # defines t = 0
+        - wait (should be slightly longer than the pulse duration)
+        - x90
+        - wait
+        - RO
+
+        The position of the square flux pulse is varied to find the
+        optimal latency.
+        """
+        raise NotImplementedError
+        return True
+
     def calculate_frequency(self, calc_method=None, V_per_phi0=None, V=None):
         '''
         Calculates an estimate for the qubit frequency.
@@ -733,6 +781,49 @@ class Transmon(Qubit):
         if update:
             self.f_qubit.set(cur_freq)
         return cur_freq
+
+    def find_frequency(self, method='spectroscopy', pulsed=False,
+                       steps=[1, 3, 10, 30, 100, 300, 1000],
+                       freqs=None,
+                       f_span=100e6,
+                       use_max=False,
+                       f_step=1e6,
+                       verbose=True,
+                       update=True,
+                       close_fig=True):
+        """
+        Finds the qubit frequency using either the spectroscopy or the Ramsey
+        method.
+        Frequency prediction is done using
+        """
+
+        if method.lower() == 'spectroscopy':
+            if freqs is None:
+                f_qubit_estimate = self.calculate_frequency()
+                freqs = np.arange(f_qubit_estimate - f_span/2,
+                                  f_qubit_estimate + f_span/2,
+                                  f_step)
+            # args here should be handed down from the top.
+            self.measure_spectroscopy(freqs, pulsed=pulsed, MC=None,
+                                      analyze=True, close_fig=close_fig)
+            if pulsed:
+                label = 'pulsed-spec'
+            else:
+                label = 'spectroscopy'
+            analysis_spec = ma.Qubit_Spectroscopy_Analysis(
+                label=label, close_fig=True)
+
+            if update:
+                if use_max:
+                    self.f_qubit(analysis_spec.peaks['peak'])
+                else:
+                    self.f_qubit(analysis_spec.fitted_freq)
+                # TODO: add updating and fitting
+        elif method.lower() == 'ramsey':
+            return self.calibrate_frequency_ramsey(
+                steps=steps, verbose=verbose, update=update,
+                close_fig=close_fig)
+        return self.f_qubit()
 
     def find_frequency_pulsed(self):
         raise NotImplementedError()

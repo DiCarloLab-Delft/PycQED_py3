@@ -485,8 +485,6 @@ def martinis_flux_pulse_v2(length, lambda_2, lambda_3, theta_f,
         asymmetry=asymmetry,
         branch='positive')
     return voltage_wave
-
-
 ############################################################################
 #
 ############################################################################
