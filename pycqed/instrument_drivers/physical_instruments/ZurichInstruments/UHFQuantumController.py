@@ -198,7 +198,7 @@ class UHFQC(Instrument):
 
         # QuExpress thresholds on DIO (mode == 2), AWG control of DIO (mode ==
         # 1)
-        self.dios_0_mode(1)
+        self.dios_0_mode(2)
         # Drive DIO bits 15 to 0
         self.dios_0_drive(0x3)
 
@@ -834,12 +834,11 @@ class UHFQC(Instrument):
         for i in range(len(Iwaves)):
             # generating the case statement string
             case = '  case {}:\n'.format(int(cases[i]))
-            case_wait = 'wait(50);\n'
             case_play = '   playWave(Iwave{}, Qwave{});\n'.format(i, i)
             # adding the individual case statements to the sequence
             # FIXME: this is a hack to work around missing timing in OpenQL
             # Oct 2017
-            sequence = sequence + case+case_wait+case_play
+            sequence = sequence + case+case_play
 
         # adding the final part of the sequence including a default wave
         sequence = (sequence +

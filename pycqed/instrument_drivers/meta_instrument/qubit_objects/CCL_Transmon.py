@@ -191,6 +191,13 @@ class CCLight_Transmon(Qubit):
                        ' readout pulse and the instruction that triggers the '
                        'acquisition. The positive number means that the '
                        'acquisition is started after the pulse is send.'))
+        self.add_parameter(
+            'ro_acq_input_average_length',  unit='s',
+            label='Readout acquisition delay',
+            vals=vals.Numbers(min_value=0, max_value=2.27e-6),
+            initial_value=0,
+            parameter_class=ManualParameter,
+            docstring=('The measurement time in input averaging.'))
 
         self.add_parameter('ro_acq_integration_length', initial_value=500e-9,
                            vals=vals.Numbers(min_value=0, max_value=20e6),
@@ -582,7 +589,8 @@ class CCLight_Transmon(Qubit):
             self.input_average_detector = det.UHFQC_input_average_detector(
                 UHFQC=UHFQC,
                 AWG=self.instr_CC.get_instr(),
-                nr_averages=self.ro_acq_averages())
+                nr_averages=self.ro_acq_averages(),
+                nr_samples=int(self.ro_acq_input_average_length()*1.8e9))
 
             self.int_avg_det = det.UHFQC_integrated_average_detector(
                 UHFQC=UHFQC, AWG=self.instr_CC.get_instr(),
@@ -722,6 +730,7 @@ class CCLight_Transmon(Qubit):
                     UHFQC.set('quex_wint_weights_{}_imag'.format(
                         self.ro_acq_weight_chI()),
                         self.ro_acq_weight_func_Q())
+
                     UHFQC.set('quex_rot_{}_real'.format(
                         self.ro_acq_weight_chI()), 1.0)
                     UHFQC.set('quex_rot_{}_imag'.format(
@@ -818,6 +827,8 @@ class CCLight_Transmon(Qubit):
         The experiment consists of a single square pulse of 20 ns that
         triggers both the VSM channel specified and the AWG8.
 
+        Note: there are two VSM markers, align with the first of two.
+
         By changing the "mw_vsm_delay" parameter the delay can be calibrated.
         N.B. Ensure that the signal is visible on a scope or in the UFHQC
         readout first!
@@ -826,7 +837,7 @@ class CCLight_Transmon(Qubit):
         CCL = self.instr_CC.get_instr()
         CCL.stop()
         p = sqo.vsm_timing_cal_sequence(
-            qubit_idx=self.cfg_qubit_nr(), marker_idx=6,
+            qubit_idx=self.cfg_qubit_nr(),
             platf_cfg=self.cfg_openql_platform_fn())
         CCL.upload_instructions(p.filename)
         CCL.start()
@@ -1008,14 +1019,22 @@ class CCLight_Transmon(Qubit):
                                  no_fits=no_fits)
             if update_threshold:
                 # use the threshold for the best discrimination fidelity
-                self.ro_acq_threshold(a.V_th_d)
-            if update:
-                self.F_ssro(a.F_a)
-                self.F_discr(a.F_d)
-            if verbose:
-                print('Avg. Assignement fidelity: \t{:.4f}\n'.format(a.F_a) +
-                      'Avg. Discrimination fidelity: \t{:.4f}'.format(a.F_d))
-            return a.F_a, a.F_d
+                self.ro_acq_threshold(a.V_th_a/1.5)  # fixme: rather use Fd, but unstable fitting. sqrt2 is a dirty hack. This works. we don't know why
+            if not no_fits:
+                if update:
+                    self.F_ssro(a.F_a)
+                    self.F_discr(a.F_d)
+                if verbose:
+                    print('Avg. Assignement fidelity: \t{:.4f}\n'.format(a.F_a) +
+                          'Avg. Discrimination fidelity: \t{:.4f}'.format(a.F_d))
+                return a.F_a, a.F_d
+            else:
+                if update:
+                    self.F_ssro(a.F_a)
+                if verbose:
+                    print('Avg. Assignement fidelity: \t{:.4f}\n'.format(a.F_a))
+                return a.F_a, None
+
 
     def measure_transients(self, MC=None, analyze: bool=True,
                            cases=('off', 'on'),
@@ -1066,9 +1085,9 @@ class CCLight_Transmon(Qubit):
         return [np.array(t, dtype=np.float64) for t in transients]
 
     def calibrate_optimal_weights(self, MC=None, verify=True, analyze=False,
-                                  update=True):
+                                  update=True, no_fits=False):
         if MC is None:
-            MC = self.MC.get_instr()
+            MC = self.instr_MC.get_instr()
 
         # Ensure that enough averages are used to get accurate weights
         old_avg = self.ro_acq_averages()
@@ -1084,7 +1103,7 @@ class CCLight_Transmon(Qubit):
         # joint rescaling to +/-1 Volt
         maxI = np.max(np.abs(optimized_weights_I))
         maxQ = np.max(np.abs(optimized_weights_Q))
-        weight_scale_factor = 1./np.max([maxI, maxQ])
+        weight_scale_factor = 1./(4*np.max([maxI, maxQ]))#fixme: deviding the weight functions by four to not have overflow in thresholding of the UHFQC
         optimized_weights_I = np.array(
             weight_scale_factor*optimized_weights_I)
         optimized_weights_Q = np.array(
@@ -1096,7 +1115,7 @@ class CCLight_Transmon(Qubit):
             self.ro_acq_weight_type('optimal')
 
         if verify:
-            self.measure_ssro()
+            self.measure_ssro(no_fits=no_fits)
 
     def measure_rabi_vsm(self, MC=None, atts=np.linspace(0, 65536, 31),
                          analyze=True, close_fig=True, prepare_for_timedomain=True):
@@ -1173,7 +1192,7 @@ class CCLight_Transmon(Qubit):
         p = sqo.T1(times, qubit_idx=self.cfg_qubit_nr(),
                    platf_cfg=self.cfg_openql_platform_fn())
         s = swf.OpenQL_Sweep(openql_program=p,
-                             parameter_name='Time', 
+                             parameter_name='Time',
                              unit='s',
                              CCL=self.instr_CC.get_instr())
         d = self.int_avg_det

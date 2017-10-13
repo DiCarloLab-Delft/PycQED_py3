@@ -160,6 +160,19 @@ def generate_config(filename: str,
                 "cc_light_codeword": CW,
                 "cc_light_opcode": 8+CW}
 
+            cfg["instructions"]['C'+lut_map[CW].format(q)] = {
+                "duration": mw_pulse_duration,
+                "latency": 0,
+                "qubits": [q],
+                "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+                "disable_optimization": False,
+                "type": "mw",
+                "cc_light_instr_type": "single_qubit_gate",
+                "cc_light_instr": "C_CW_{:02}".format(CW),
+                "cc_light_codeword": CW,
+                "cc_light_opcode": 32+8+CW,
+                "cc_light_cond": 1}
+
     for CW in range(32):
         for q in qubits:
             cfg["instructions"]["CW_{:02} {}".format(CW, q)] = {

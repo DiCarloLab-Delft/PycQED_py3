@@ -18,7 +18,7 @@ def CW_tone():
     pass
 
 
-def vsm_timing_cal_sequence(qubit_idx: int, marker_idx: int, platf_cfg: str):
+def vsm_timing_cal_sequence(qubit_idx: int, platf_cfg: str):
     """
     A sequence for calibrating the VSM timing delay.
 
@@ -33,7 +33,6 @@ def vsm_timing_cal_sequence(qubit_idx: int, marker_idx: int, platf_cfg: str):
 
     k = Kernel("main", p=platf)
     k.prepz(qubit_idx)  # to ensure enough separation in timing
-    k.gate('CW_00', marker_idx)  # to trigger on
     k.gate('spec', qubit_idx)
     p.add_kernel(k)
     p.compile()
@@ -425,6 +424,49 @@ def butterfly(qubit_idx: int, initialize: bool, platf_cfg: str):
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
+
+def RTE(qubit_idx: int, sequence_type: str, platf_cfg: str, net_gate: str, feedback=False):
+    """
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="RTE", nqubits=platf.get_qubit_number(), p=platf)
+
+    k = Kernel('RTE', p=platf)
+    if sequence_type == 'echo':
+        k.gate('rx90', qubit_idx)
+        k.gate('i', qubit_idx)
+        k.gate('i', qubit_idx)
+        k.gate('rx180', qubit_idx)
+        k.gate('i', qubit_idx)
+        k.gate('i', qubit_idx)
+        if net_gate == 'pi':
+            k.gate('rxm90', qubit_idx)
+        elif net_gate == 'i':
+            k.gate('rx90', qubit_idx)
+        else:
+            raise ValueError('net_gate ({})should be "i" or "pi"'.format(net_gate))
+        if feedback:
+            k.gate('Crx180', qubit_idx)
+    elif sequence_type == 'pi':
+        if net_gate == 'pi':
+            k.gate('rx180', qubit_idx)
+        elif net_gate == 'i':
+            pass
+        else:
+            raise ValueError('net_gate ({})should be "i" or "pi"'.format(net_gate))
+        if feedback:
+            k.gate('Crx180', qubit_idx)
+    else:
+        raise ValueError('sequence_type ({})should be "echo" or "pi"'.format(sequence_type))
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+
+    p.compile()
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
 
 
 def randomized_benchmarking(qubit_name, nr_cliffords, nr_seeds,
