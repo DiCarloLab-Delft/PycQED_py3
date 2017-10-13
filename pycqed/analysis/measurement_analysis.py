@@ -5403,8 +5403,8 @@ class RandomizedBenchmarking_Analysis_new(TD_Analysis):
     same figure.
     '''
 
-    def __init__(self, label='RB', T1=None, pulse_delay=None, TwoD=True,
-                 gate_decomp='HZ', **kw):
+    def __init__(self, label='RB', T1=None, pulse_delay=None,
+                 gate_decomp='HZ', TwoD=True, **kw):
 
         self.T1 = T1
         if self.T1==0:
