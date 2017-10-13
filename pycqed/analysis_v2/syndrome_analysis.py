@@ -31,12 +31,14 @@ class Single_Qubit_RoundsToEvent_Analysis(ba.BaseDataAnalysis):
     def process_data(self):
         """
         """
-        # N.B. alternating is the default (net_gate = pi-pulse)
-        net_pulse_pat = 'alternating'
+        # N.B. flipping is the default (net_gate = pi-pulse)
+        net_pulse_pat = 'flipping'
         if not len(set(self.raw_data_dict['net_gate'])) == 1:
             logging.warning('Different net pulses in dataset.')
         if self.raw_data_dict['net_gate'][0] == 'i':
             net_pulse_pat = 'constant'
+        if self.raw_data_dict['feedback'][0]:
+            net_pulse_pat = 'FB_to_ground'
 
         exp_pattern = self.options_dict.get('exp_pattern', net_pulse_pat)
 
@@ -44,25 +46,15 @@ class Single_Qubit_RoundsToEvent_Analysis(ba.BaseDataAnalysis):
         nr_expts = np.shape(raw_dat)[0]
         raw_pat = [raw_dat[i][0] for i in range(nr_expts)]
 
-        if exp_pattern == 'alternating':
-            s_events = []
-            d_events = []
-            for i in range(nr_expts):
-                events = dm_tools.mark_errors_flipping(raw_pat[i])
-                s_events.append(events[0])
-                d_events.append(events[1])
+        s_events = []
+        d_events = []
+        for i in range(nr_expts):
+            err_marker = getattr(dm_tools,
+                                 'mark_errors_{}'.format(exp_pattern))
+            events = err_marker(raw_pat[i])
+            s_events.append(events[0])
+            d_events.append(events[1])
 
-        elif exp_pattern == 'constant':
-            s_events = []
-            d_events = []
-            for i in range(nr_expts):
-                events = dm_tools.mark_errors_constant(raw_pat[i])
-                s_events.append(events[0])
-                d_events.append(events[1])
-
-        else:
-            raise ValueError('exp_pattern {} should '.format(exp_pattern) +
-                             'be either alternating or identical')
         self.proc_data_dict['raw_pattern'] = raw_pat
         self.proc_data_dict['exp_pattern'] = exp_pattern
 
