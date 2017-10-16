@@ -41,12 +41,19 @@ def simulate_qasm_file(file_url: str,  config_json: str):
         if options['simulator'].lower() == "qx":
             return _simulate_QX(file_path, options)
         elif options['simulator'].lower() == "quantumsim":
-            return _simulate_quantumsim(file_path, options)
+            dat = _simulate_quantumsim(file_path, options)
+            return _MC_result_to_chart_dict(dat)
         else:
             raise Exception("ERROR: simulator "+options['quantumsim'] +
                             " not recognized")
     else:
         raise Exception("ERROR: No simulator selected")
+
+def simulate_qumis_file(file_url: str,  config_json: str):
+    file_path = _retrieve_file_from_url(file_url)
+    options = json.loads(config_json)
+    return _simulate_quantumsim(file_path, options)
+
 
 # Private
 # -------
@@ -94,7 +101,7 @@ def _simulate_quantumsim(file_path, options):
     MC.set_sweep_points(sweep_points)
     dat = MC.run("run QASM")
     print('simulation finished')
-    return _MC_result_to_chart_dict(dat)
+    return dat
 
 
 def _get_qasm_sweep_points(file_path):

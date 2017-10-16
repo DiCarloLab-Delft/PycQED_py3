@@ -9,6 +9,8 @@ import qcodes as qc
 
 from pycqed.measurement import measurement_control
 from qcodes.instrument.base import Instrument
+from pycqed.measurement.demonstrator_helper.detectors import \
+    Quantumsim_Two_QB_Hard_Detector
 from pycqed.measurement import sweep_functions as swf
 from tess.TessConnect import TessConnection
 import logging
@@ -26,17 +28,29 @@ default_simulate_options = {
 # Extract some "hardcoded" instruments from the global namespace"
 station = qc.station
 
-if 'Demonstrator_MC' in station.components.keys():
-    MC = station.components['Demonstrator_MC']
-else:
-    MC = measurement_control.MeasurementControl(
-        'Demonstrator_MC', live_plot_enabled=False, verbose=True)
-    datadir = os.path.abspath(os.path.join(
-                os.path.dirname(pq.__file__), os.pardir,
-                'demonstrator_execute_data'))
-    MC.datadir(datadir)
-    station.add_component(MC)
-    MC.station = station
+#if 'Demonstrator_MC' in station.components.keys():
+#    MC = station.components['Demonstrator_MC']
+#else:
+#    MC = measurement_control.MeasurementControl(
+#        'Demonstrator_MC', live_plot_enabled=False, verbose=True)
+#    datadir = os.path.abspath(os.path.join(
+#                os.path.dirname(pq.__file__), os.pardir,
+#                'demonstrator_execute_data'))
+#    MC.datadir(datadir)
+#    station.add_component(MC)
+#    MC.station = station
+
+st = station.Station()
+# Connect to the qx simulator
+MC = measurement_control.MeasurementControl(
+    'MC', live_plot_enabled=False, verbose=True)
+
+datadir = os.path.abspath(os.path.join(
+    os.path.dirname(pq.__file__), os.pardir, 'execute_data'))
+MC.datadir(datadir)
+MC.station = st
+
+st.add_component(MC)
 
 
 def execute_qasm_file(file_url: str,  config_json: str,
@@ -74,39 +88,9 @@ def execute_qasm_file(file_url: str,  config_json: str,
 
 def execute_qumis_file(file_url: str,  config_json: str,
                       verbosity_level: int=0):
+    file_path = _retrieve_file_from_url(file_url)
     options = json.loads(config_json)
-
-    MC = Instrument.find_instrument('Demonstrator_MC')
-    CBox = Instrument.find_instrument('CBox')
-    device = Instrument.find_instrument('Starmon')
-
-    num_avg = int(options.get('num_avg', 512))
-    nr_soft_averages = int(np.round(num_avg/512))
-    MC.soft_avg(nr_soft_averages)
-    device.RO_acq_averages(512)
-
-    # N.B. hardcoded fixme
-    # qasm_config???? Is there a qumis_config too? TODO -KKL
-    cfg = device.qasm_config()
-
-    qumis_fp = _retrieve_file_from_url(file_url)
-
-    # Do I still need this for qumis???? -KKL
-    sweep_points = _get_qasm_sweep_points(qasm_fp) 
-
-    s = swf.QuMis_Sweep(filename=qumis_fp, Cbox=CBox, parameter_name='Circuit number',
-                        unit='#', upload=True)
-
-    #Still need to change this I reckon! -KKL
-    d = device.get_correlation_detector()
-    d.value_names = ['Q0 ', 'Q1 ', 'Corr. (Q0, Q1) ']
-    d.value_units = ['frac.', 'frac.', 'frac.']
-
-    MC.set_sweep_function(s)
-    MC.set_sweep_points(sweep_points)
-    MC.set_detector_function(d)
-    data = MC.run('demonstrator')  # FIXME <- add the proper name
-
+    data = _simulate_quantumsim(file_path,options)
     return _MC_result_to_chart_dict(data)
 
 
@@ -197,6 +181,28 @@ def _MC_result_to_chart_dict(result):
         "data-type": "chart",
         "data": result
     }]
+
+def _simulate_quantumsim(file_path, options):
+    quantumsim_sweep = swf.None_Sweep()
+    quantumsim_sweep.parameter_name = 'Circuit number '
+    quantumsim_sweep.unit = '#'
+
+    qubit_parameters = {
+        'Q0': {'T1': 30e3, 'T2': 17e3, 'frac1_0': 0.0189, 'frac1_1': 0.918},
+        'Q1': {'T1': 30e3, 'T2': 17e3, 'frac1_0': 0.068, 'frac1_1': 0.949},
+        'q0': {'T1': 30e3, 'T2': 17e3, 'frac1_0': 0.0189, 'frac1_1': 0.918},
+        'q1': {'T1': 30e3, 'T2': 17e3, 'frac1_0': 0.068, 'frac1_1': 0.949}}
+
+    quantumsim_det = Quantumsim_Two_QB_Hard_Detector(
+        file_path, dt=(40, 280), qubit_parameters=qubit_parameters)
+    sweep_points = range(len(quantumsim_det.parser.circuits))
+
+    MC.set_detector_function(quantumsim_det)
+    MC.set_sweep_function(quantumsim_sweep)
+    MC.set_sweep_points(sweep_points)
+    dat = MC.run("run QASM")
+    print('simulation finished')
+    return dat
 
 
 # Send the callibration of the machine every 10 minutes
