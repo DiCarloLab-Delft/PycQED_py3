@@ -72,6 +72,43 @@ def execute_qasm_file(file_url: str,  config_json: str,
 
     return _MC_result_to_chart_dict(data)
 
+def execute_qumis_file(file_url: str,  config_json: str,
+                      verbosity_level: int=0):
+    options = json.loads(config_json)
+
+    MC = Instrument.find_instrument('Demonstrator_MC')
+    CBox = Instrument.find_instrument('CBox')
+    device = Instrument.find_instrument('Starmon')
+
+    num_avg = int(options.get('num_avg', 512))
+    nr_soft_averages = int(np.round(num_avg/512))
+    MC.soft_avg(nr_soft_averages)
+    device.RO_acq_averages(512)
+
+    # N.B. hardcoded fixme
+    # qasm_config???? Is there a qumis_config too? TODO -KKL
+    cfg = device.qasm_config()
+
+    qumis_fp = _retrieve_file_from_url(file_url)
+
+    # Do I still need this for qumis???? -KKL
+    sweep_points = _get_qasm_sweep_points(qasm_fp) 
+
+    s = swf.QuMis_Sweep(filename=qumis_fp, Cbox=CBox, parameter_name='Circuit number',
+                        unit='#', upload=True)
+
+    #Still need to change this I reckon! -KKL
+    d = device.get_correlation_detector()
+    d.value_names = ['Q0 ', 'Q1 ', 'Corr. (Q0, Q1) ']
+    d.value_units = ['frac.', 'frac.', 'frac.']
+
+    MC.set_sweep_function(s)
+    MC.set_sweep_points(sweep_points)
+    MC.set_detector_function(d)
+    data = MC.run('demonstrator')  # FIXME <- add the proper name
+
+    return _MC_result_to_chart_dict(data)
+
 
 def calibrate(config_json: str):
     """

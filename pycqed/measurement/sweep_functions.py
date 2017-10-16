@@ -464,7 +464,7 @@ class QuMis_Sweep(Hard_Sweep):
     def __init__(self, filename, CBox,
                  parameter_name='Points', unit='a.u.', upload=True):
         super().__init__()
-        self.name = 'QASM_Sweep'
+        self.name = 'QuMis_Sweep'
         self.filename = filename
         self.upload = upload
         self.CBox = CBox
