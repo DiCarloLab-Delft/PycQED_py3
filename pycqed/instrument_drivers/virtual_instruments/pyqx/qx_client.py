@@ -12,7 +12,6 @@
 """
 
 import socket
-import re
 
 class qx_client:
 

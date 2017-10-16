@@ -237,7 +237,7 @@ class Pulsar(Instrument):
         #                waveform data)))
         AWG_wfs = {}
 
-        for el in elements:
+        for i, el in enumerate(elements):
             tvals, waveforms = el.normalized_waveforms()
             for cname in waveforms:
                 if cname not in channels:
@@ -250,9 +250,9 @@ class Pulsar(Instrument):
                     continue
                 if cAWG not in AWG_wfs:
                     AWG_wfs[cAWG] = {}
-                if el.name not in AWG_wfs[cAWG]:
-                    AWG_wfs[cAWG][el.name] = {}
-                AWG_wfs[cAWG][el.name][cid] = waveforms[cname]
+                if (i, el.name) not in AWG_wfs[cAWG]:
+                    AWG_wfs[cAWG][i, el.name] = {}
+                AWG_wfs[cAWG][i, el.name][cid] = waveforms[cname]
 
         self.update_AWG5014_settings()
         for AWG in AWG_wfs:
@@ -305,7 +305,7 @@ class Pulsar(Instrument):
         # in the sequence
         packed_waveforms = {}
         elements_with_non_zero_first_points = set()
-        for el, cid_wfs in el_wfs.items():
+        for (i, el), cid_wfs in sorted(el_wfs.items()):
             maxlen = 0
             for wf in cid_wfs.values():
                 if len(wf) > maxlen:
@@ -366,7 +366,7 @@ class Pulsar(Instrument):
         for grp in grps:
             grp_wfnames = []
             # add all wf names of channel
-            for el in el_wfs:
+            for i, el in sorted(el_wfs):
                 wfname = el + '_' + grp
                 grp_wfnames.append(wfname)
             wfname_l.append(grp_wfnames)
@@ -456,12 +456,12 @@ setTrigger(0);
         wfnames = {'ch1': [], 'ch2': []}
         wfdata = {'ch1': [], 'ch2': []}
         i = 1
-        for el in el_wfs:
+        for i, el in el_wfs:
             for cid in ['ch1', 'ch2']:
 
-                if cid in el_wfs[el]:
+                if cid in el_wfs[i, el]:
                     wfname = el + '_' + cid
-                    cid_wf = el_wfs[el][cid]
+                    cid_wf = el_wfs[i, el][cid]
                     wfnames[cid].append(wfname)
                     wfdata[cid].append(cid_wf)
                     if cid_wf[0] != 0.:

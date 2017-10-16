@@ -393,7 +393,6 @@ class UHFQC_LookuptableManager(Instrument):
                          self._voltage_max)
         self.UHFQC.awg_sequence_acquisition_and_pulse(I_wave, Q_wave,
                                                       self.acquisition_delay())
-        print('wave {} should be loaded in UHFQC'.format(pulse_name))
 
     def give_back_wave_forms(self, pulse_name, regenerate_pulses=True):
         '''
