@@ -425,7 +425,9 @@ def butterfly(qubit_idx: int, initialize: bool, platf_cfg: str):
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
 
-def RTE(qubit_idx: int, sequence_type: str, platf_cfg: str, net_gate: str, feedback=False):
+
+def RTE(qubit_idx: int, sequence_type: str, platf_cfg: str,
+        net_gate: str, feedback=False):
     """
     """
     platf = Platform('OpenQL_Platform', platf_cfg)
@@ -444,7 +446,8 @@ def RTE(qubit_idx: int, sequence_type: str, platf_cfg: str, net_gate: str, feedb
         elif net_gate == 'i':
             k.gate('rx90', qubit_idx)
         else:
-            raise ValueError('net_gate ({})should be "i" or "pi"'.format(net_gate))
+            raise ValueError('net_gate ({})should be "i" or "pi"'.format(
+                net_gate))
         if feedback:
             k.gate('Crx180', qubit_idx)
     elif sequence_type == 'pi':
@@ -453,11 +456,13 @@ def RTE(qubit_idx: int, sequence_type: str, platf_cfg: str, net_gate: str, feedb
         elif net_gate == 'i':
             pass
         else:
-            raise ValueError('net_gate ({})should be "i" or "pi"'.format(net_gate))
+            raise ValueError('net_gate ({})should be "i" or "pi"'.format(
+                net_gate))
         if feedback:
             k.gate('Crx180', qubit_idx)
     else:
-        raise ValueError('sequence_type ({})should be "echo" or "pi"'.format(sequence_type))
+        raise ValueError('sequence_type ({})should be "echo" or "pi"'.format(
+            sequence_type))
     k.measure(qubit_idx)
     p.add_kernel(k)
 
@@ -466,7 +471,6 @@ def RTE(qubit_idx: int, sequence_type: str, platf_cfg: str, net_gate: str, feedb
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
-
 
 
 def randomized_benchmarking(qubit_name, nr_cliffords, nr_seeds,

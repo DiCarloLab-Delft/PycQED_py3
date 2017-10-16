@@ -978,7 +978,8 @@ class CCLight_Transmon(Qubit):
 
     def measure_ssro(self, MC=None, analyze: bool=True, nr_shots: int=1024*8,
                      cases=('off', 'on'), update_threshold: bool=True,
-                     prepare: bool=True, no_fits=False, update=True, verbose=True):
+                     prepare: bool=True, no_fits=False, update=True,
+                     verbose=True):
         old_RO_digit = self.ro_acq_digitized()
         self.ro_acq_digitized(False)
         # docstring from parent class
@@ -1014,9 +1015,15 @@ class CCLight_Transmon(Qubit):
             'Measure_SSRO_{}'.format(self.msmt_suffix))
         MC.live_plot_enabled(old_plot_setting)
         if analyze:
-            a = ma.SSRO_Analysis(label='SSRO',
-                                 channels=d.value_names,
-                                 no_fits=no_fits)
+            if len(d.value_names)==1:
+                a = ma.SSRO_Analysis(label='SSRO',
+                                     channels=d.value_names,
+                                     no_fits=no_fits, rotate=False)
+            else:
+                a = ma.SSRO_Analysis(label='SSRO',
+                                     channels=d.value_names,
+                                     no_fits=no_fits, rotate=True)
+
             if update_threshold:
                 # use the threshold for the best discrimination fidelity
                 self.ro_acq_threshold(a.V_th_a/1.5)  # fixme: rather use Fd, but unstable fitting. sqrt2 is a dirty hack. This works. we don't know why
@@ -1108,6 +1115,7 @@ class CCLight_Transmon(Qubit):
             weight_scale_factor*optimized_weights_I)
         optimized_weights_Q = np.array(
             weight_scale_factor*optimized_weights_Q)
+        self.ro_acq_averages(old_avg)
 
         if update:
             self.ro_acq_weight_func_I(optimized_weights_I)
