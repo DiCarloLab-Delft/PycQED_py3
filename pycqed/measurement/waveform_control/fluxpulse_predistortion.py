@@ -95,6 +95,9 @@ def distort_qudev(element, distortion_dict):
         if distortion_dict[ch]['IIR'] is not None:
             aIIRfilterList,bIIRfilterList = distortion_dict[ch]['IIR']
             wf_dist = filter_iir(aIIRfilterList,bIIRfilterList,wf_dist)
+        # set the last point to zero, such that the AWG holds
+        # a zero afer the waveform is finished
+        wf_dist[-1] = 0.
         element.distorted_wfs[ch] = wf_dist
     return element
 

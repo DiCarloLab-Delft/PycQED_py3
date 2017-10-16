@@ -1957,3 +1957,40 @@ class Chevron_ampl_swf(swf.Soft_Sweep):
 
     def finish(self):
         pass
+
+
+class Chevron_ampl_fast_swf(swf.Soft_Sweep):
+    '''
+    Sweep function class (soft sweep) for 2D Chevron experiment where
+    the amplitude of the fluxpulse is swept. Used in combination with
+    the Chevron_length_hard_swf class.
+    '''
+    def __init__(self, qb_control,qb_target,channel,AWG):
+
+        super().__init__()
+        self.channel = channel
+        self.AWG = AWG
+        self.name = 'Chevron flux pulse amplitude sweep'
+        self.parameter_name = 'Fluxpulse amplitude'
+        self.unit = 'V'
+        self.qb_control = qb_control
+        self.qb_target = qb_target
+        self.flux_pulse_ampl_backup = self.qb_control.flux_pulse_amp()
+        self.qb_control.flux_pulse_amp(1.) # used for correct amplitude
+
+    def prepare(self):
+        pass
+
+    def set_parameter(self, val, **kw):
+        self.AWG.stop()
+        if type(self.channel) == int:
+            exec('self.AWG.ch{}_amp({})'.format(self.channel, 4.*val))
+            # factor of 4 for correct amplitude
+        else:
+            exec('self.AWG.{}_amp({})'.format(self.channel, 4.*val))
+            # factor of 4 for correct amplitude
+        self.AWG.start()
+
+    def finish(self):
+        self.qb_control.flux_pulse_amp(self.flux_pulse_ampl_backup)
+
