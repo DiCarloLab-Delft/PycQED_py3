@@ -14,7 +14,7 @@ from tess.TessConnect import TessConnection
 import logging
 
 
-defualt_execute_options = {}
+default_execute_options = {}
 
 tc = TessConnection()
 tc.connect("execute")
