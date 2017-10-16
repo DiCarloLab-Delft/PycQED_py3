@@ -328,6 +328,7 @@ class BaseDataAnalysis(object):
             self.raw_data_dict = new_dict
             self.raw_data_dict['timestamp'] = self.timestamps[0]
         self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['nr_experiments'] = len(self.timestamps)
 
     def process_data(self):
         """
@@ -422,8 +423,7 @@ class BaseDataAnalysis(object):
 
     def prepare_fitting(self):
         # initialize everything to an empty dict if not overwritten
-        self.fit_dicts = {}
-        pass
+        self.fit_dicts = OrderedDict()
 
     def run_fitting(self):
         '''
@@ -543,9 +543,11 @@ class BaseDataAnalysis(object):
         # xvals interpreted as edges for a bar plot
         plot_xedges = pdict['xvals']
         plot_yvals = pdict['yvals']
-        plot_xlabel = pdict['xlabel']
-        plot_ylabel = pdict['ylabel']
-        plot_title = pdict['title']
+        plot_xlabel = pdict.get('xlabel', None)
+        plot_ylabel = pdict.get('ylabel', None)
+        plot_xunit = pdict.get('xunit', None)
+        plot_yunit = pdict.get('yunit', None)
+        plot_title = pdict.get('title', None)
         plot_xrange = pdict.get('xrange', None)
         plot_yrange = pdict.get('yrange', None)
         plot_barkws = pdict.get('bar_kws', {})
@@ -594,6 +596,9 @@ class BaseDataAnalysis(object):
         if self.tight_fig:
             axs.figure.tight_layout()
 
+
+        set_xlabel(axs, plot_xlabel, plot_xunit)
+        set_ylabel(axs, plot_ylabel, plot_yunit)
         pdict['handles'] = p_out
 
     def plot_line(self, pdict, axs):
