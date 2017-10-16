@@ -99,7 +99,7 @@ HZ_gate_decomposition[17] = ['X180', 'Z90']
 HZ_gate_decomposition[18] = ['mZ90', 'mX90', 'Z90', 'X180']
 HZ_gate_decomposition[19] = ['X90', 'mZ90', 'X180', 'Z90']
 HZ_gate_decomposition[20] = ['mX90', 'Z180', 'X90', 'Z90']
-HZ_gate_decomposition[21] = ['mZ90', 'X90', 'Z90'][::-1]
+HZ_gate_decomposition[21] = ['mZ90', 'X90', 'Z90']
 HZ_gate_decomposition[22] = ['mX90', 'mZ90', 'X180', 'Z90']
 HZ_gate_decomposition[23] = ['mZ90']
 
