@@ -100,6 +100,10 @@ class Single_Qubit_RoundsToEvent_Analysis(ba.BaseDataAnalysis):
         d_events = self.proc_data_dict['double_events'][
             dataset_idx][start_idx-1:stop_idx-1]
 
+        title_map = {'constant': 'Typical trace constant',
+                     'FB_to_ground': 'Typical trace feedback',
+                     'flipping': 'Typical trace alternating'}
+
         self.plot_dicts['typical_trace'] = {
             'plotfn': self.plot_line,
             'xvals': np.arange(len(raw_pat)),
@@ -108,10 +112,9 @@ class Single_Qubit_RoundsToEvent_Analysis(ba.BaseDataAnalysis):
             'ylabel': 'Declared state',
             'yrange': (-0.05, 1.05),  # FIXME change to ylim in base analysis
             'setlabel': 'Raw trace',
-            'title': 'Typical trace',
+            'title': title_map[self.proc_data_dict['exp_pattern']],
             'do_legend': True,
             'legend_pos': 'right'}
-
 
         if self.proc_data_dict['exp_pattern'] == 'constant':
             event_pat = .5 * np.ones(len(raw_pat))
@@ -126,7 +129,7 @@ class Single_Qubit_RoundsToEvent_Analysis(ba.BaseDataAnalysis):
             'marker': 'x',
             'line_kws': {'color': 'r', 'markersize': 7},
             'linestyle': '',
-            'setlabel': 'Single events', 'do_legend': True,
+            'setlabel': 'Error', 'do_legend': True,
             'legend_pos': 'right'}
 
         self.plot_dicts['typical_pat_double'] = {

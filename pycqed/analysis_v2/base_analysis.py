@@ -5,6 +5,7 @@ This is based on the REM analysis from PycQED_py2 (as of July 7 2017)
 import os
 import numpy as np
 import copy
+from collections import OrderedDict
 
 from matplotlib import pyplot as plt
 from matplotlib import cm
@@ -89,9 +90,9 @@ class BaseDataAnalysis(object):
         '''
         self.single_timestamp = False
         # initialize an empty dict to store results of analysis
-        self.proc_data_dict = dict()
+        self.proc_data_dict = OrderedDict()
         if options_dict is None:
-            self.options_dict = dict()
+            self.options_dict = OrderedDict()
         else:
             self.options_dict = options_dict
 
@@ -142,9 +143,9 @@ class BaseDataAnalysis(object):
         ########################################
         if self.options_dict.get('apply_default_fig_settings', True):
             def_fig.apply_default_figure_settings()
-        self.plot_dicts = dict()
-        self.axs = dict()
-        self.figs = dict()
+        self.plot_dicts = OrderedDict()
+        self.axs = OrderedDict()
+        self.figs = OrderedDict()
         self.presentation_mode = self.options_dict.get(
             'presentation_mode', False)
         self.tight_fig = self.options_dict.get('tight_fig', True)
