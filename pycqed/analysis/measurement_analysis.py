@@ -5441,13 +5441,14 @@ class RandomizedBenchmarking_Analysis_new(TD_Analysis):
         self.data_rearranged = data_rearranged
         a = np.zeros((2, nr_seeds))  #this is an array with the same shape as
                                      #as measured_values for TwoD==False
+        self.data_calibrated = deepcopy(self.data_rearranged[0])
         for i in range(self.n_cl.size):
             a[0] = data_rearranged[0][i]
             a[1] = data_rearranged[1][i]
             data_calibrated = a_tools.rotate_and_normalize_data(a,
                                                         self.cal_points[0],
                                                         self.cal_points[1])[0]
-            self.dcalib = deepcopy(data_calibrated)
+            self.data_calibrated[i] = data_calibrated
             data_calibrated = data_calibrated[:-int(self.NoCalPoints)]
             data[i] = np.mean(data_calibrated)
 

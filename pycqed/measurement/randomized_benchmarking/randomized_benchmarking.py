@@ -81,7 +81,7 @@ def convert_clifford_sequence_to_tape(clifford_sequence, lutmapping,
 
 
 def randomized_benchmarking_sequence(n_cl, desired_net_cl=0,
-                                     seed=None):
+                                     seed=None, interleaved_gate=None):
     '''
     Generates a sequence of length "n_cl" random cliffords and appends a
     recovery clifford to make the net result correspond to applying the
@@ -89,12 +89,22 @@ def randomized_benchmarking_sequence(n_cl, desired_net_cl=0,
     The default behaviour is that the net clifford corresponds to an
     identity ("0"). If you want e.g. an inverting sequence you should set
     the desired_net_cl to "3" (corresponds to Pauli X).
+
+    If IRB, pass in interleaved_gate as string. Example: 'X180'.
     '''
     if seed is None:
         rb_cliffords = np.random.randint(0, 24, int(n_cl))
     else:
         rng_seed = np.random.RandomState(seed)
         rb_cliffords = rng_seed.randint(0, 24, int(n_cl))
+
+    if interleaved_gate is not None:
+        rb_cliffords = np.repeat(rb_cliffords,2)
+        try:
+            gate_idx = HZ_gate_decomposition.index([interleaved_gate])
+        except ValueError:
+            gate_idx = XY_gate_decomposition.index([interleaved_gate])
+        rb_cliffords[1::2] = [gate_idx]*(len(rb_cliffords)//2)
 
     net_clifford = calculate_net_clifford(rb_cliffords)
     recovery_clifford = calculate_recovery_clifford(

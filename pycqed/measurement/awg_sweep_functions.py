@@ -963,6 +963,7 @@ class Randomized_Benchmarking_one_length(swf.Hard_Sweep):
     def __init__(self, pulse_pars, RO_pars,
                  nr_cliffords_value, #int
                  gate_decomposition='HZ',
+                 interleaved_gate=None,
                  cal_points=True,
                  seq_name=None,
                  upload=True):
@@ -975,6 +976,7 @@ class Randomized_Benchmarking_one_length(swf.Hard_Sweep):
         self.cal_points = cal_points
         self.seq_name = seq_name
         self.gate_decomposition = gate_decomposition
+        self.interleaved_gate = interleaved_gate
 
         self.parameter_name = 'Nr of Seeds'
         self.unit = '#'
@@ -993,6 +995,7 @@ class Randomized_Benchmarking_one_length(swf.Hard_Sweep):
                 self.pulse_pars, self.RO_pars,
                 nr_cliffords_value=self.nr_cliffords_value,
                 gate_decomposition=self.gate_decomposition,
+                interleaved_gate=self.interleaved_gate,
                 nr_seeds=self.sweep_points,
                 cal_points=self.cal_points,
                 seq_name=self.seq_name)

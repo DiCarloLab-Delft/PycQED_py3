@@ -923,33 +923,50 @@ class QuDev_transmon(Qubit):
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
     def measure_randomized_benchmarking(self, nr_cliffords=None, nr_seeds=50,
-                                        T1=None, MC=None, close_fig=True,
+                                        MC=None, close_fig=True,
                                         upload=True, analyze=True,
-                                        double_curves=False, label=None,
-                                        cal_points=True):
+                                        gate_decomp='HZ', label=None,
+                                        cal_points=True,
+                                        interleaved_gate=None):
         '''
         Performs a randomized benchmarking fidelity.
         Optionally specifying T1 also shows the T1 limited fidelity.
+        type(nr_cliffords) == array
+        type(nr_seeds) == int
         '''
 
         if nr_cliffords is None:
             raise ValueError("Unspecified nr_cliffords for measure_echo")
+
         self.prepare_for_timedomain()
+
         if MC is None:
             MC = self.MC
-        if label is None:
-            label = 'RB_{}seeds'.format(nr_seeds)+self.msmt_suffix
 
-        MC.set_sweep_function(awg_swf.Randomized_Benchmarking(
+        if label is None:
+            label = 'RB_{}_{}_seeds_{}_cliffords'.format(
+                gate_decomp, nr_seeds, nr_cliffords[-1]) + self.msmt_suffix
+
+        RB_sweepfunction = awg_swf.Randomized_Benchmarking_one_length(
             pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(),
-            double_curves=double_curves, cal_points=cal_points,
-            nr_cliffords=nr_cliffords, nr_seeds=nr_seeds, upload=upload))
+            cal_points=cal_points, gate_decomposition=gate_decomp,
+            nr_cliffords_value=nr_cliffords[0], upload=upload,
+            interleaved_gate=interleaved_gate)
+
+        RB_sweepfunction_2D = awg_swf.Randomized_Benchmarking_nr_cliffords(
+            RB_sweepfunction=RB_sweepfunction)
+
+        MC.set_sweep_function( RB_sweepfunction )
+        MC.set_sweep_points( np.arange(nr_seeds) )
+        MC.set_sweep_function_2D( RB_sweepfunction_2D )
+        MC.set_sweep_points_2D( nr_cliffords )
         MC.set_detector_function(self.int_avg_det)
-        MC.run(label)
+
+        MC.run(label, mode='2D')
 
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
-                                   qb_name=self.name)
+                                   qb_name=self.name, TwoD=True)
 
     def set_default_readout_weights(self, channels=(0, 1), theta=None):
         """
@@ -1913,13 +1930,20 @@ class QuDev_transmon(Qubit):
         for_ef = kw.pop('for_ef', False)
         last_ge_pulse = kw.pop('last_ge_pulse', False)
         analyze = kw.pop('analyze', True)
-        double_curves = kw.pop('double_curves', False)
+        gate_decomp = kw.pop('gate_decomp', 'HZ')
         show = kw.pop('show', False)
+        interleaved_gate = kw.pop('interleaved_gate', None)
 
         if self.T1() is not None:
             T1 = self.T1()
         else:
             T1 = None
+
+        if type(nr_cliffords) is int:
+            every_other = kw.pop('every_other', 5)
+            nr_cliffords = np.asarray([j for j in
+                                       list(range(0, nr_cliffords[0]+1,
+                                                  every_other))])
 
         if not update:
             logging.warning("Does not automatically update the qubit "
@@ -1943,26 +1967,33 @@ class QuDev_transmon(Qubit):
             raise ValueError("Unspecified nr_cliffords")
 
         if label is None:
-            label = 'RB_{}seeds'.format(nr_seeds)+self.msmt_suffix
+            if for_ef:
+                label = 'RB_2nd_{}_{}_seeds_{}_cliffords'.format(
+                    gate_decomp, nr_seeds, nr_cliffords[-1]) + self.msmt_suffix
+            else:
+                label = 'RB_{}_{}_seeds_{}_cliffords'.format(
+                    gate_decomp, nr_seeds, nr_cliffords[-1]) + self.msmt_suffix
 
         #Perform measurement
         self.measure_randomized_benchmarking(nr_cliffords=nr_cliffords,
-                                             double_curves=double_curves,
                                              nr_seeds=nr_seeds, MC=MC,
                                              close_fig=close_fig,
+                                             gate_decomp=gate_decomp,
+                                             cal_points=cal_points,
                                              label=label,
                                              analyze=analyze,
                                              upload=upload,
-                                             T1=T1)
+                                             interleaved_gate=interleaved_gate)
 
         #Analysis
         if analyze:
             pulse_delay = self.gauss_sigma() * self.nr_sigma()
-            RB_Analysis = ma.RandomizedBenchmarking_Analysis(label=label,
+            RB_Analysis = ma.RandomizedBenchmarking_Analysis_new(label=label,
                                          qb_name=self.name,
                                          T1=T1, pulse_delay=pulse_delay,
                                          NoCalPoints=no_cal_points,
                                          for_ef=for_ef, show=show,
+                                         gate_decomp=gate_decomp,
                                          last_ge_pulse=last_ge_pulse, **kw)
 
         return

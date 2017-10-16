@@ -725,6 +725,7 @@ def Randomized_Benchmarking_seq_one_length(pulse_pars, RO_pars,
                                             nr_seeds,           #array
                                             net_clifford=0,
                                             gate_decomposition='HZ',
+                                            interleaved_gate=None,
                                             post_msmt_delay=3e-6,
                                             cal_points=True,
                                             resetless=False,
@@ -749,7 +750,8 @@ def Randomized_Benchmarking_seq_one_length(pulse_pars, RO_pars,
                                  [pulses['X180'], RO_pars])
         else:
             cl_seq = rb.randomized_benchmarking_sequence(
-                nr_cliffords_value, desired_net_cl=net_clifford)
+                nr_cliffords_value, desired_net_cl=net_clifford,
+                interleaved_gate=interleaved_gate)
             pulse_keys = rb.decompose_clifford_seq(
                 cl_seq,
                 gate_decomp=gate_decomposition)
