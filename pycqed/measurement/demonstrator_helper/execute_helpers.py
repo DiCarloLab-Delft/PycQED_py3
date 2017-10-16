@@ -18,7 +18,7 @@ default_execute_options = {}
 
 tc = TessConnection()
 tc.connect("execute")
-defualt_simulate_options = {
+default_simulate_options = {
     "num_avg": 10000,
     "iterations": 1
 }
