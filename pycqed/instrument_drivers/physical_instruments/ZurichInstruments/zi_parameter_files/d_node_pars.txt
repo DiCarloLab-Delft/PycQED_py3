@@ -40,6 +40,10 @@
     "vector_g"
   ],
   [
+    "awgs/0/dio/data",
+    "vector_g"
+  ],
+  [
     "awgs/0/sequencer/next",
     "float"
   ],

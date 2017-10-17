@@ -50,7 +50,6 @@ class DummyParHolder(Instrument):
         self.add_parameter('status', vals=vals.Anything(),
                            parameter_class=ManualParameter)
 
-
     def get_idn(self):
         return 'dummy'
 

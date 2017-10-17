@@ -861,6 +861,8 @@ class Function_Detector(Soft_Detector):
             return result
         else:
             results = [result[key] for key in self.result_keys]
+            if len(results) ==1:
+                return results[0] # for a single entry we don't want a list
             return results
 
 
@@ -1415,7 +1417,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
         if not self.real_imag:
             if len(self.channels) != 2:
-                raise ValueError()
+                raise ValueError('Length of "{}" is not 2'.format(
+                                 self.channels))
             self.value_names[0] = 'Magn'
             self.value_names[1] = 'Phase'
             self.value_units[1] = 'deg'
@@ -1432,6 +1435,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
         data_raw = self.UHFQC.acquisition_poll(
             samples=self.nr_sweep_points, arm=False, acquisition_time=0.01)
+        # the self.channels should be the same as data_raw.keys().
+        # this is to be tested (MAR 26-9-2017)
         data = np.array([data_raw[key]
                          for key in sorted(data_raw.keys())])*self.scaling_factor
 
@@ -1440,13 +1445,14 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             for i, channel in enumerate(self.channels):
                 data[i] = data[i]-self.UHFQC.get(
                     'quex_trans_offset_weightfunction_{}'.format(channel))
-
         if not self.real_imag:
             data = self.convert_to_polar(data)
-
         return data
 
     def convert_to_polar(self, data):
+        if len(data) != 2:
+            raise ValueError('Expect 2 channels for rotation. Got {}'.format(
+                             len(data)))
         I = data[0]
         Q = data[1]
         S21 = I + 1j*Q

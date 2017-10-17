@@ -1,5 +1,6 @@
 import logging
 import numpy as np
+import time
 
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
@@ -24,14 +25,14 @@ class Qubit(Instrument):
     Possible inheritance tree
     - Qubit (general template class)
         - GateMon
-        - Transmon (contains qubit specific functions)
-            - transmon in setup a (contains setup specific functions)
+        - Transmon (contains qubit specific methods)
+            - transmon in setup a (contains setup specific methods)
 
 
-    Naming conventions for functions
+    Naming conventions for methods
         The qubit object is a combination of a parameter holder and a
         convenient way of performing measurements. As a convention the qubit
-        object contains the following types of functions designated by a prefix
+        object contains the following types of methods designated by a prefix
 
         - measure_xx() -> bool
             A measure_xx method performs a specific experiment such as
@@ -59,6 +60,24 @@ class Qubit(Instrument):
             calculates a quantity based on parameters specified in the qubit
             object e.g. calculate_frequency
 
+    Naming conventions for parameters:
+        (only for qubit objects after Sept 2017)
+        Parameters are grouped based on their functionality. This grouping
+        is achieved through the parameter name.
+
+        Prefixes are listed here:
+            instr_  : references to other instruments
+            ro_     : parameters relating to RO both CW and TD readout.
+            mw_     : parameters of single qubit MW control
+            spec_   : parameters relating to spectroscopy (single qubit CW)
+            fl_     : parameters relating to flux control, this includes both
+                      flux pulsing as well as flux offset (DC).
+            cfg_    : configuration, this can be info relevant for compilers
+                      or configurations that determine how the qubit operates.
+                      examples are cfg_qasm and cfg_f_qubit_calc_method.
+
+            ""      : properties of the qubit do not have a prefix, examples
+                      are T1, T2, etc., F_ssro, F_RB, etc., f_qubit, E_C, etc.
 
     Open for discussion:
         - is a split at the level below qubit really required?
@@ -66,16 +85,70 @@ class Qubit(Instrument):
             or calibrate?
         - Should the pulse-parameters be grouped here in some convenient way?
             (e.g. parameter prefixes)
-
     '''
 
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
-        self.msmt_suffix = '_' + name  # used to append to measuremnet labels
+        self.msmt_suffix = '_' + name  # used to append to measurement labels
         self._operations = {}
         self.add_parameter('operations',
                            docstring='a list of all operations available on the qubit',
                            get_cmd=self._get_operations)
+
+    def connect_message(self, begin_time=None):
+        t = time.time() - (begin_time or self._t0)
+
+        con_msg = ('Connected to: {repr} '
+                   'in {t:.2f} s'.format(repr=self.__repr__(), t=t))
+        print(con_msg)
+
+    def add_parameters(self):
+        """
+        Add parameters to the qubit object grouped according to the
+        naming conventions described above
+
+        Prefixes are listed here:
+            instr_  : references to other instruments
+            ro_     : parameters relating to RO both CW and TD readout.
+            mw_     : parameters of single qubit MW control
+            spec_   : parameters relating to spectroscopy (single qubit CW)
+            fl_     : parameters relating to flux control, this includes both
+                      flux pulsing as well as flux offset (DC).
+            cfg_    : configuration, this can be info relevant for compilers
+                      or configurations that determine how the qubit operates.
+                      examples are cfg_qasm and cfg_f_qubit_calc_method.
+
+            ""      : properties of the qubit do not have a prefix, examples
+                      are T1, T2, etc., F_ssro, F_RB, etc., f_qubit, E_C, etc.
+        """
+        self.add_instrument_ref_parameters()
+        self.add_ro_parameters()
+        self.add_mw_parameters()
+        self.add_spec_parameters()
+        self.add_flux_parameters()
+        self.add_config_parameters()
+        self.add_generic_qubit_parameters()
+
+    def add_instrument_ref_parameters(self):
+        pass
+
+    def add_ro_parameters(self):
+        pass
+
+    def add_mw_parameters(self):
+        pass
+
+    def add_spec_parameters(self):
+        pass
+
+    def add_flux_parameters(self):
+        pass
+
+    def add_config_parameters(self):
+        pass
+
+    def add_generic_qubit_parameters(self):
+        pass
 
     def get_idn(self):
         return {'driver': str(self.__class__), 'name': self.name}
@@ -117,7 +190,18 @@ class Qubit(Instrument):
     def measure_echo(self):
         raise NotImplementedError()
 
-    def measure_allxy(self):
+    def measure_allxy(self, MC=None, analyze: bool=True,
+                      close_fig: bool=True):
+        """
+        Performs an AllXY experiment.
+        Args:
+            MC        : instance of the MeasurementControl
+            analyze   : perform analysis
+            close_fig : close the figure in plotting
+
+        returns:
+            T1 (float) the measured value
+        """
         raise NotImplementedError()
 
     def measure_ssro(self):
@@ -126,12 +210,109 @@ class Qubit(Instrument):
     def measure_spectroscopy(self):
         raise NotImplementedError()
 
-    def measure_transients(self):
+    def measure_transients(self, MC=None, analyze: bool=True,
+                           cases=('off', 'on'),
+                           prepare: bool=True):
+        '''
+        Measure transients for the cases specified.
+        Args:
+            MC      (instr): measurement control
+            analyze (bool) : run analysis and create figure
+            cases   (list) : list of strings specifying cases to perform
+                transients for, valid cases are "off" and "on" corresponding
+                to preparing the qubit in the 0 or 1 state respectively.
+            prepare (bool) : if True runs prepare for timedomain before
+                measuring the transients
+        Returns:
+            list of numpy arrays containing the transients for the cases
+            specified.
+        '''
+        if prepare:
+            self.prepare_for_timedomain()
         raise NotImplementedError()
 
     def measure_motzoi(self, motzois=np.linspace(-.3, .3, 31),
                        MC=None, analyze=True, close_fig=True):
         raise NotImplementedError()
+
+    def find_resonator_frequency(self, use_min=False,
+                                 update=True,
+                                 freqs=None,
+                                 MC=None, close_fig=True):
+        '''
+        Finds the resonator frequency by performing a heterodyne experiment
+        if freqs == None it will determine a default range dependent on the
+        last known frequency of the resonator.
+        '''
+        # This snippet exists to be backwards compatible 9/2017.
+        try:
+            freq_res_par = self.freq_res
+            freq_RO_par = self.ro_freq
+        except AttributeError():
+            logging.warning('Rename the f_res parameter to freq_res')
+            freq_res_par = self.f_res
+            freq_RO_par = self.f_RO
+
+        if freqs is None:
+            f_center = freq_res_par()
+            if f_center is None:
+                raise ValueError('Specify "freq_res" to generate a freq span')
+            f_span = 10e6
+            f_step = 100e3
+            freqs = np.arange(f_center-f_span/2, f_center+f_span/2, f_step)
+        self.measure_heterodyne_spectroscopy(freqs, MC, analyze=False)
+        a = ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
+        if use_min:
+            f_res = a.min_frequency
+        else:
+            f_res = a.fit_results.params['f0'].value*1e9  # fit converts to Hz
+        if f_res > max(freqs) or f_res < min(freqs):
+            logging.warning('exracted frequency outside of range of scan')
+        elif update:  # don't update if the value is out of the scan range
+            freq_res_par(f_res)
+            freq_RO_par(f_res)
+        return f_res
+
+    def find_frequency(self, method='spectroscopy', pulsed=False,
+                       steps=[1, 3, 10, 30, 100, 300, 1000],
+                       freqs=None,
+                       f_span=100e6,
+                       use_max=False,
+                       f_step=1e6,
+                       verbose=True,
+                       update=True,
+                       close_fig=True):
+        """
+        Finds the qubit frequency using either the spectroscopy or the Ramsey
+        method.
+        Frequency prediction is done using
+        """
+
+        if method.lower() == 'spectroscopy':
+            if freqs is None:
+                f_qubit_estimate = self.calculate_frequency()
+                freqs = np.arange(f_qubit_estimate - f_span/2,
+                                  f_qubit_estimate + f_span/2,
+                                  f_step)
+            # args here should be handed down from the top.
+            self.measure_spectroscopy(freqs, pulsed=pulsed, MC=None,
+                                      analyze=True, close_fig=close_fig)
+
+            label = 'spec'
+            analysis_spec = ma.Qubit_Spectroscopy_Analysis(
+                label=label, close_fig=True)
+
+            if update:
+                if use_max:
+                    self.freq_qubit(analysis_spec.peaks['peak'])
+                else:
+                    self.freq_qubit(analysis_spec.fitted_freq)
+                # TODO: add updating and fitting
+        elif method.lower() == 'ramsey':
+            return self.calibrate_frequency_ramsey(
+                steps=steps, verbose=verbose, update=update,
+                close_fig=close_fig)
+        return self.freq_qubit()
 
     def calibrate_motzoi(self, MC=None, verbose=True, update=True):
         motzois = gen_sweep_pts(center=0, span=1, num=31)
@@ -210,7 +391,6 @@ class Qubit(Instrument):
         raise NotImplementedError
         return True
 
-
     def calibrate_MW_RO_latency(self, MC=None, update: bool=True)-> bool:
         """
         Calibrates parameters:
@@ -259,6 +439,59 @@ class Qubit(Instrument):
         raise NotImplementedError
         return True
 
+    def calculate_frequency(self, calc_method=None, V_per_phi0=None, V=None):
+        '''
+        Calculates an estimate for the qubit frequency.
+        Arguments are optional and parameters of the object are used if not
+        specified.
+        Args:
+            calc_method : can be "latest" or "flux" uses last known frequency
+                    or calculates using the cosine arc model as specified
+                    in fit_mods.Qubit_dac_to_freq
+                corresponding par. : cfg_qubit_freq_calc_method
+
+            V_per_phi0 : dac flux coefficient, converts volts to Flux.
+                    Set to 1 to reduce the model to pure flux.
+                corresponding par. : fl_dc_V_per_phi
+            V  : dac value used when calculating frequency
+                corresponding par. : fl_dc_V
+
+        Calculates the f01 transition frequency using the cosine arc model.
+        (function available in fit_mods. Qubit_dac_to_freq)
+
+        The parameter cfg_qubit_freq_calc_method determines how it is
+        calculated.
+        Parameters of the qubit object are used unless specified.
+        Flux can be specified both in terms of dac voltage or flux but not
+        both.
+        '''
+        if self.cfg_qubit_freq_calc_method() == 'latest':
+            qubit_freq_est = self.freq_qubit()
+
+        elif self.cfg_qubit_freq_calc_method() == 'flux':
+            if V is None:
+                V = self.fl_dc_V()
+            if V_per_phi0 is None:
+                V_per_phi0 = self.fl_dc_V_per_phi0()
+
+            qubit_freq_est = fit_mods.Qubit_dac_to_freq(
+                dac_voltage=V,
+                f_max=self.freq_max(),
+                E_c=self.E_c(),
+                dac_sweet_spot=self.fl_dc_V0(),
+                V_per_phi0=V_per_phi0,
+                asymmetry=self.asymmetry())
+
+        return qubit_freq_est
+
+    def calibrate_mixer_offsets_drive(self, update: bool=True)-> bool:
+        '''
+        Calibrates the mixer skewness and updates the I and Q offsets in
+        the qubit object.
+        '''
+        raise NotImplementedError()
+
+        return True
 
     def measure_heterodyne_spectroscopy(self):
         raise NotImplementedError()
@@ -360,7 +593,7 @@ class Transmon(Qubit):
                            vals=vals.Numbers())
         self.add_parameter('T1', unit='s',
                            parameter_class=ManualParameter,
-                           vals=vals.Numbers())
+                           vals=vals.Numbers(0, 200e-6))
         self.add_parameter('T2_echo', unit='s',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
@@ -496,6 +729,16 @@ class Transmon(Qubit):
     def prepare_for_continuous_wave(self):
         raise NotImplementedError()
 
+    def prepare_readout(self):
+        """
+        Configures the readout. Consists of the following steps
+        - instantiate the relevant detector functions
+        - set the microwave frequencies and sources
+        - generate the RO pulse
+        - set the integration weights
+        """
+        raise NotImplementedError()
+
     def calibrate_frequency_ramsey(self, steps=[1, 1, 3, 10, 30, 100, 300, 1000],
                                    stepsize=None, verbose=True, update=True,
                                    close_fig=True):
@@ -582,39 +825,11 @@ class Transmon(Qubit):
                 close_fig=close_fig)
         return self.f_qubit()
 
-
     def find_frequency_pulsed(self):
         raise NotImplementedError()
 
     def find_frequency_cw_spec(self):
         raise NotImplementedError()
-
-    def find_resonator_frequency(self, use_min=False,
-                                 update=True,
-                                 freqs=None,
-                                 MC=None, close_fig=True):
-        '''
-        Finds the resonator frequency by performing a heterodyne experiment
-        if freqs == None it will determine a default range dependent on the
-        last known frequency of the resonator.
-        '''
-        if freqs is None:
-            f_center = self.f_res.get()
-            f_span = 10e6
-            f_step = 100e3
-            freqs = np.arange(f_center-f_span/2, f_center+f_span/2, f_step)
-        self.measure_heterodyne_spectroscopy(freqs, MC, analyze=False)
-        a = ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
-        if use_min:
-            f_res = a.min_frequency
-        else:
-            f_res = a.fit_results.params['f0'].value*1e9  # fit converts to Hz
-        if f_res > max(freqs) or f_res < min(freqs):
-            logging.warning('exracted frequency outside of range of scan')
-        elif update:  # don't update if the value is out of the scan range
-            self.f_res.set(f_res)
-        self.f_RO(self.f_res())
-        return f_res
 
     def calibrate_pulse_amplitude_coarse(self,
                                          amps=np.linspace(-.5, .5, 31),
