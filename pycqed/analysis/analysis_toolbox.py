@@ -884,13 +884,35 @@ def find_second_peak(sweep_pts=None, data_dist_smooth=None,
     to the right and to the left of it for the tallest peaks in these new
     ranges. The resulting two new peaks are compared and the tallest/deepest
     one is chosen.
+
+    Args:
+        sweep_pts (array):      the sweep points array in your measurement
+                                (typically frequency)
+        data_dist_smooth (array):   the smoothed y data of your spectroscopy
+                                    measurement, typically result of
+                                    calculate_distance_ground_state for a qubit
+                                    spectroscopy
+        key (str):  the feature to search for, 'peak' or 'dip'
+        peaks (dict):   the dict returned by peak_finder containing the
+                        peaks/dips values for the tallest peak around which
+                        this routine will search for second peak/dip
+        percentile (int):   percentile of data defining background noise; gets
+                            passed to peak_finder
+        optimize (bool):    the peak_finder optimize parameter
+        verbose (bool):     print detailed logging information
+
+    Returns:
+        f0  (float):                frequency of ge transition
+        f0_gf_over_2 (float):       frequency of gf/2 transition
+        kappa_guess (float):        guess for the kappa of the ge peak/dip
+        kappa_guess_ef (float):     guess for the kappa of the gf/2 peak/dip
     """
 
     tallest_peak = peaks[key] #the ge freq
     tallest_peak_idx = peaks[key+'_idx']
     tallest_peak_width = peaks[key+'_width']
     if verbose:
-        print('Largest peak is at ',tallest_peak)
+        print('Largest '+key+' is at ', tallest_peak)
 
     # Calculate how many data points away from the tallest peak
     # to look left and right. Should be 50MHz away.
@@ -928,7 +950,7 @@ def find_second_peak(sweep_pts=None, data_dist_smooth=None,
         # The peak/dip found to the right of the tallest is assumed to be
         # the ge peak, which means that the tallest was in fact the gf/2 peak
         if verbose:
-            print('Right peak is at ', peaks_right[key])
+            print('Right '+key+' is at ', peaks_right[key])
         subset_right = data_dist_smooth[int(tallest_peak_idx+n)::]
         val_right = subset_right[peaks_right[key+'_idx']]
         f0_right = peaks_right[key]
@@ -937,7 +959,7 @@ def find_second_peak(sweep_pts=None, data_dist_smooth=None,
         kappa_guess_ef_right = tallest_peak_width
     else:
         if verbose:
-            print('Right peak is None')
+            print('Right '+key+' is None')
         val_right = 0
         f0_right = 0
         kappa_guess_right = 0
@@ -972,7 +994,7 @@ def find_second_peak(sweep_pts=None, data_dist_smooth=None,
         # The peak/dip found to the left of the tallest is assumed to be
         # the gf/2 peak, which means that the tallest was indeed the ge peak
         if verbose:
-            print('Left peak is at ', peaks_left[key])
+            print('Left '+key+' is at ', peaks_left[key])
         subset_left = data_dist_smooth[0:int(tallest_peak_idx-m)]
         val_left = subset_left[peaks_left[key+'_idx']]
         f0_left = tallest_peak
@@ -981,7 +1003,7 @@ def find_second_peak(sweep_pts=None, data_dist_smooth=None,
         kappa_guess_ef_left = peaks_left[key+'_width']
     else:
         if verbose:
-            print('Left peak is None')
+            print('Left '+key+' is None')
         val_left = 0
         f0_left = tallest_peak
         kappa_guess_left = tallest_peak_width
@@ -996,7 +1018,7 @@ def find_second_peak(sweep_pts=None, data_dist_smooth=None,
             # If the two peaks found are separated by at least 50MHz,
             # then both the ge and gf/2 have been found.
             if verbose:
-                print('Both f_ge and f_gf/2 have been found. '
+                print('Both f_ge and f_gf/2 '+key+'s have been found. '
                       'f_ge was assumed to the LEFT of f_gf/2.')
         else:
             # If not, then it is just some other signal.
@@ -1069,7 +1091,7 @@ def peak_finder(x, y, percentile=20, num_sigma_threshold=5, window_len=11,
     :param percentile:              percentile of data defining background noise
     :param num_sigma_threshold:     number of std deviations above background
                                     where to look for data
-    :param key:                     'peak' or 'dip'; tell look_for_peals_dips
+    :param key:                     'peak' or 'dip'; tell look_for_peaks_dips
                                     to return only the peaks or the dips
     :param optimize:                re-run look_for_peak_dips until tallest
                                     (for peaks) data point/lowest (for dip) data

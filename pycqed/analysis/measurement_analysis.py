@@ -56,22 +56,8 @@ class MeasurementAnalysis(object):
             self.folder = folder
         self.load_hdf5data(**kw)
         self.fit_results = []
+        self.box_props = dict(boxstyle='Square', facecolor='white', alpha=0.8)
         self.cmap_chosen = cmap_chosen
-        self.no_of_columns = no_of_columns
-        self.dpi = 600                  #dpi for plots
-        self.axes_line_width=0.5        #lw of axes and text boxes
-        self.font_size = 11             #font sizes
-        self.tick_length = 4            #tick lengths
-        self.tick_width = 0.5           #tick line widths
-        self.marker_size=3              #marker size for data points
-        self.line_width=2               #line widths connecting data points
-        self.marker_size_special=8      #marker size for special points like
-                                        #peak freq., Rabi pi and pi/2 amplitudes
-        self.box_props = dict(boxstyle='Square', facecolor='white',
-                              alpha=0.8, lw=self.axes_line_width)
-        self.qb_name = qb_name          #for retrieving values of qubit
-                                        #parameters from data file
-
         if auto is True:
             self.run_default_analysis(TwoD=TwoD, **kw)
 
@@ -4348,8 +4334,8 @@ class Hanger_Analysis_CosBackground(MeasurementAnalysis):
 class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
 
     """
-    Analysis script for a regular (GE peak/dip only) or a high power
-    (GE and GF/2 peaks/dips) Qubit Spectroscopy:
+    Analysis script for a regular (ge peak/dip only) or a high power
+    (ge and gf/2 peaks/dips) Qubit Spectroscopy:
         1. The I and Q data are combined using
             a_tools.calculate_distance_from_ground_state.
         2. The peaks/dips of the data are found using a_tools.peak_finder.
@@ -4357,10 +4343,16 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
             else: to a double Lorentzian.
         3. The data, the best fit, and peak points are then plotted.
 
+    Note:
+    analyze_ef==True tells this routine to look for the gf/2 peak/dip.
+    Even though the parameters for this second peak/dip use the termination
+    "_ef," they refer to the parameters for the gf/2 transition NOT for the ef
+    transition. It was easier to write x_ef than x_gf_over_2 or x_gf_half.
+
     Possible kw parameters:
 
         analyze_ef              (default=False)
-            whether to look for another f_ge/2  peak/dip
+            whether to look for a second peak/dip, which would be the at f_gf/2
 
         percentile              (default=20)
             percentile of the  data that is   considered background noise
@@ -4415,36 +4407,22 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         optimize = kw.pop('optimize',True)
         verbose = kw.get('verbose',False)
 
-        # try:
-        #     self.data_dist = np.sqrt(
-        #         self.measured_values[2]**2 + self.measured_values[3])
-        #     # self.data_dist = a_tools.calculate_distance_ground_state(
-        #     #     data_real=self.measured_values[2],
-        #     #     data_imag=self.measured_values[3])
-        # except:
-        #     # Quick fix to make it work with pulsed spec which does not
-        #     # return both I,Q and, amp and phase
-        #     # only using the amplitude!!
-        #     self.data_dist = self.measured_values[0]
-        #     # self.data_dist = a_tools.calculate_distance_ground_state(
-        #     #     data_real=self.measured_values[0],
-        #     #     data_imag=self.measured_values[1])
+        try:
+            data_amp=self.measured_values[0]
+            data_phase=self.measured_values[1]
+            data_real = data_amp * np.cos(np.pi * data_phase / 180)
+            data_imag = data_amp * np.sin(np.pi * data_phase / 180)
+            self.data_dist = a_tools.calculate_distance_ground_state(
+                data_real=data_real,
+                data_imag=data_imag,
+                normalize=False)
+        except:
+            # Quick fix to make it work with pulsed spec which does not
+            # return both I,Q and, amp and phase
+            # only using the amplitude!!
+            self.data_dist = self.measured_values[0]
 
-        data_amp=self.measured_values[0]
-        data_phase=self.measured_values[1]
-        data_real = data_amp * np.cos(np.pi * data_phase / 180)
-        data_imag = data_amp * np.sin(np.pi * data_phase / 180)
-        self.data_dist = a_tools.calculate_distance_ground_state(
-                                    data_real=data_real,
-                                    data_imag=data_imag,
-                                    normalize=False)
 
-        #Cut edges to remove potential calibration points when looking for peaks
-        # window_len_cut_edges = kw.get('analysis_window',10)
-        # sweep_pts_cut_edges = a_tools.cut_edges(self.sweep_points,
-        #                                         window_len=window_len_cut_edges)
-        # data_dist_cut_edges = a_tools.cut_edges(self.data_dist,
-        #                                         window_len=window_len_cut_edges)
         #Smooth the data by "filtering"
         data_dist_smooth = a_tools.smooth(self.data_dist,
                                           window_len=window_len_filter)
@@ -4605,6 +4583,21 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
 
         super(self.__class__, self).run_default_analysis(
             close_file=False, show=show,**kw)
+
+        # Expects to have self.font_size, self.line_width,
+        # self.marker_size_special, self.qb_name which should be defined in the
+        # MeasurementAnalysis init.
+        if not hasattr(self, 'font_size') and not hasattr(self, 'line_width') \
+            and not hasattr(self, 'marker_size_special') \
+                and not hasattr(self, 'qb_name'):
+            try:
+                q_idx = self.folder[-10::].index('q')
+                self.qb_name = self.folder[-10::][q_idx::]
+            except ValueError:
+                self.qb_name = 'qb'
+            self.font_size = 11
+            self.line_width = 2
+            self.marker_size_special = 8
 
         self.add_analysis_datagroup_to_file()
         self.savename = kw.get('save_name', 'Source Frequency')
