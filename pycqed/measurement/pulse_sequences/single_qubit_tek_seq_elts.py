@@ -121,18 +121,19 @@ def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6, no_cal_points
     seq_name = 'Rabi_sequence'
     seq = sequence.Sequence(seq_name)
     el_list = []
-    pulses = get_pulse_dict_from_pars(pulse_pars)
+    pulses_unmodified = get_pulse_dict_from_pars(pulse_pars)
+    pulses = deepcopy(pulses_unmodified)
 
     for i, amp in enumerate(amps):  # seq has to have at least 2 elts
         if cal_points and no_cal_points==4 and \
                 (i == (len(amps)-4) or i == (len(amps)-3)):
-            el = multi_pulse_elt(i, station,[pulses['I'], RO_pars])
+            el = multi_pulse_elt(i, station,[pulses_unmodified['I'], RO_pars])
         elif cal_points and no_cal_points==4 and \
                 (i == (len(amps)-2) or i == (len(amps)-1)):
-            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+            el = multi_pulse_elt(i, station, [pulses_unmodified['X180'], RO_pars])
         elif cal_points and no_cal_points==2 and \
                 (i == (len(amps)-2) or i == (len(amps)-1)):
-            el = multi_pulse_elt(i, station,[pulses['I'], RO_pars])
+            el = multi_pulse_elt(i, station,[pulses_unmodified['I'], RO_pars])
         else:
             pulses['X180']['amplitude'] = amp
             pulse_list = n*[pulses['X180']]+[RO_pars]
@@ -323,6 +324,64 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
     else:
         return seq_name
 
+
+def Ramsey_seq_VZ(times, pulse_pars, RO_pars,
+                   artificial_detuning=None,
+                   cal_points=True,
+                   verbose=False,
+                   upload=True, return_seq=False):
+    '''
+    Ramsey sequence for a single qubit using the tektronix.
+    SSB_Drag pulse is used for driving, simple modualtion used for RO
+    Input pars:
+        times:               array of times between (start of) pulses (s)
+        pulse_pars:          dict containing the pulse parameters
+        RO_pars:             dict containing the RO parameters
+        artificial_detuning: artificial_detuning (Hz) implemented using phase
+        cal_points:          whether to use calibration points or not
+    '''
+    if np.any(times>1e-3):
+        logging.warning('The values in the times array might be too large.'
+                        'The units should be seconds.')
+
+    seq_name = 'Ramsey_sequence'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+    # First extract values from input, later overwrite when generating
+    # waveforms
+    pulses = get_pulse_dict_from_pars(pulse_pars)
+
+    pulse_pars_x2 = deepcopy(pulses['X90'])
+    pulse_pars_x2['refpoint'] = 'start'
+    for i, tau in enumerate(times):
+        pulse_pars_x2['pulse_delay'] = tau
+
+        if artificial_detuning is not None:
+            Dphase = ((tau-times[0]) * artificial_detuning * 360) % 360
+        else:
+            Dphase = ((tau-times[0]) * 1e6 * 360) % 360
+        Z_gate = Z(Dphase, pulse_pars)
+
+        if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
+            el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+        elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
+            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+        else:
+            pulse_list = [pulses['X90'], Z_gate, pulse_pars_x2, RO_pars]
+            el = multi_pulse_elt(i, station, pulse_list)
+
+            #a = [j['phase'] for j in pulse_list]
+
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
+
 def Ramsey_seq_multiple_detunings(times, pulse_pars, RO_pars,
                artificial_detunings=None,
                cal_points=True,
@@ -370,9 +429,7 @@ def Ramsey_seq_multiple_detunings(times, pulse_pars, RO_pars,
         seq.append_element(el, trigger_wait=True)
 
     if upload:
-        print('uploading')
         station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
-        print('upload finished')
 
     if return_seq:
         return seq, el_list
