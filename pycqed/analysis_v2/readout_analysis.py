@@ -46,6 +46,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         nr_samples = self.options_dict.get('nr_samples', 2)
         sample_0 = self.options_dict.get('sample_0', 0)
         sample_1 = self.options_dict.get('sample_1', 1)
+        nr_bins = self.options_dict.get('nr_bins', 100)
 
         nr_expts = self.raw_data_dict['nr_experiments']
         self.proc_data_dict['shots_0'] = [''] * nr_expts
@@ -71,11 +72,11 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         #  Binning data into histograms  #
         ##################################
         self.proc_data_dict['hist_0'] = np.histogram(
-            self.proc_data_dict['shots_0'][0], bins=100,
+            self.proc_data_dict['shots_0'][0], bins=nr_bins,
             range=(min_sh, max_sh))
         # range given to ensure both use histograms use same bins
         self.proc_data_dict['hist_1'] = np.histogram(
-            self.proc_data_dict['shots_1'][0], bins=100,
+            self.proc_data_dict['shots_1'][0], bins=nr_bins,
             range=(min_sh, max_sh))
 
         self.proc_data_dict['bin_centers'] = (
@@ -116,8 +117,28 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
     def prepare_fitting(self):
         self.fit_dicts = OrderedDict()
 
+        # An initial guess is done on the single guassians to constrain
+        # the fit params and avoid fitting noise if
+        # e.g., mmt. ind. rel. is very low
+        gmod0 = lmfit.models.GaussianModel()
+        guess0 = gmod0.guess(data=self.proc_data_dict['hist_0'][0],
+                             x=self.proc_data_dict['bin_centers'])
+        gmod1 = lmfit.models.GaussianModel()
+        guess1 = gmod1.guess(data=self.proc_data_dict['hist_1'][0],
+                             x=self.proc_data_dict['bin_centers'])
+
         DoubleGaussMod_0 = (lmfit.models.GaussianModel(prefix='A_') +
                             lmfit.models.GaussianModel(prefix='B_'))
+        DoubleGaussMod_0.set_param_hint(
+            'A_center',
+            value=guess0['center'],
+            min=guess0['center']-2*guess0['sigma'],
+            max=guess0['center']+2*guess0['sigma'])
+        DoubleGaussMod_0.set_param_hint(
+            'B_center',
+            value=guess1['center'],
+            min=guess1['center']-2*guess1['sigma'],
+            max=guess1['center']+2*guess1['sigma'])
         # This way of assigning makes the guess function a method of the
         # model (ensures model/self is passed as first argument.
         DoubleGaussMod_0.guess = fit_mods.double_gauss_guess.__get__(
@@ -127,18 +148,28 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         # memory interference between the two fits
         DoubleGaussMod_1 = (lmfit.models.GaussianModel(prefix='A_') +
                             lmfit.models.GaussianModel(prefix='B_'))
+        DoubleGaussMod_1.set_param_hint(
+            'A_center',
+            value=guess0['center'],
+            min=guess0['center']-2*guess0['sigma'],
+            max=guess0['center']+2*guess0['sigma'])
+        DoubleGaussMod_1.set_param_hint(
+            'B_center',
+            value=guess1['center'],
+            min=guess1['center']-2*guess1['sigma'],
+            max=guess1['center']+2*guess1['sigma'])
         DoubleGaussMod_1.guess = fit_mods.double_gauss_guess.__get__(
-            DoubleGaussMod_0, DoubleGaussMod_0.__class__)
+            DoubleGaussMod_1, DoubleGaussMod_1.__class__)
 
         self.fit_dicts['shots_0'] = {
             'model': DoubleGaussMod_0,
-            'fit_guess_fn': DoubleGaussMod_0.guess,
+            # 'fit_guess_fn': DoubleGaussMod_0.guess,
             'fit_xvals': {'x': self.proc_data_dict['bin_centers']},
             'fit_yvals': {'data': self.proc_data_dict['hist_0'][0]}}
 
         self.fit_dicts['shots_1'] = {
             'model': DoubleGaussMod_1,
-            'fit_guess_fn': DoubleGaussMod_1.guess,
+            # 'fit_guess_fn': DoubleGaussMod_1.guess,
             'fit_xvals': {'x': self.proc_data_dict['bin_centers']},
             'fit_yvals': {'data': self.proc_data_dict['hist_1'][0]}}
 
@@ -184,16 +215,29 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         if bv0['A_amplitude'] > bv0['B_amplitude']:
             mu_0 = bv0['A_center']
             sigma_0 = bv0['A_sigma']
+            # under the assumption of perfect gates and no mmt induced exc.
+            self.proc_data_dict['residual_excitation'] = \
+                norm_factor * bv0['B_amplitude']
         else:
             mu_0 = bv0['B_center']
             sigma_0 = bv0['B_sigma']
+            # under the assumption of perfect gates and no mmt induced exc.
+            self.proc_data_dict['residual_excitation'] = \
+                norm_factor * bv0['A_amplitude']
 
         if bv1['A_amplitude'] > bv1['B_amplitude']:
             mu_1 = bv1['A_center']
             sigma_1 = bv1['A_sigma']
+            # under the assumption of perfect gates and no mmt induced exc.
+            self.proc_data_dict['measurement_induced_relaxation'] = \
+                norm_factor * bv1['B_amplitude']
+
         else:
             mu_1 = bv1['B_center']
             sigma_1 = bv1['B_sigma']
+            # under the assumption of perfect gates and no mmt induced exc.
+            self.proc_data_dict['measurement_induced_relaxation'] = \
+                norm_factor * bv1['A_amplitude']
 
         def CDF_0_discr(x):
             return fit_mods.gaussianCDF(x, 1, mu=mu_0, sigma=sigma_0)
@@ -213,12 +257,17 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['threshold_discr'] = opt_fid['x'][0]
 
     def prepare_plots(self):
+        # N.B. If the log option is used we should manually set the
+        # yscale to go from .5 to the current max as otherwise the fits
+        # mess up the log plots.
+        log_hist = self.options_dict.get('log_hist', False)
+
         # The histograms
         self.plot_dicts['1D_histogram'] = {
             'plotfn': self.plot_bar,
             'xvals': self.proc_data_dict['hist_0'][1],
             'yvals': self.proc_data_dict['hist_0'][0],
-            'bar_kws': {'log': False, 'alpha': .4, 'facecolor': 'C0',
+            'bar_kws': {'log': log_hist, 'alpha': .4, 'facecolor': 'C0',
                         'edgecolor': 'C0'},
             'setlabel': 'Shots 0',
             'xlabel': self.proc_data_dict['shots_xlabel'],
@@ -230,7 +279,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             'plotfn': self.plot_bar,
             'xvals': self.proc_data_dict['hist_1'][1],
             'yvals': self.proc_data_dict['hist_1'][0],
-            'bar_kws': {'log': False, 'alpha': .4, 'facecolor': 'C3',
+            'bar_kws': {'log': log_hist, 'alpha': .4, 'facecolor': 'C3',
                         'edgecolor': 'C3'},
             'setlabel': 'Shots 1', 'do_legend': True,
             'xlabel': self.proc_data_dict['shots_xlabel'],
@@ -371,6 +420,20 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 'linestyles': '-.',
                 'line_kws': {'linewidth': .8},
                 'setlabel': fit_th_msg,
+                'do_legend': True}
+
+            # To add text only to the legend I create some "fake" data
+            rel_exc_str = ('Mmt. Ind. Rel.: {:.1f}%\n'.format(
+                self.proc_data_dict['measurement_induced_relaxation']*100) +
+                'Residual Exc.: {:.1f}%'.format(
+                    self.proc_data_dict['residual_excitation']*100))
+            self.plot_dicts['rel_exc_msg'] = {
+                'ax_id': '1D_histogram',
+                'plotfn': self.plot_line,
+                'xvals': [self.proc_data_dict['threshold_discr']],
+                'yvals': [max_cnts/2],
+                'line_kws': {'alpha': 0},
+                'setlabel': rel_exc_str,
                 'do_legend': True}
 
 

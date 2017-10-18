@@ -464,9 +464,12 @@ class BaseDataAnalysis(object):
                 if guess_pars is None:
                     if guess_dict is None:
                         guess_dict = fit_guess_fn(**fit_yvals, **fit_xvals)
-                    # for key, val in list(guess_dict.items()):
-                    #     model.set_param_hint(key, **val)
-                    # guess_pars = model.make_params()
+                        if isinstance(guess_dict, lmfit.Parameters):
+                            guess_pars = guess_dict
+                        else:
+                            for key, val in list(guess_dict.items()):
+                                model.set_param_hint(key, **val)
+                            guess_pars = model.make_params()
 
                 fit_dict['fit_res'] = model.fit(
                     params=guess_pars, **fit_xvals, **fit_yvals)
@@ -487,7 +490,7 @@ class BaseDataAnalysis(object):
         if key_list is 'auto':
             key_list = self.auto_keys
         if key_list is None:
-            key_list = list(self.plot_dicts.keys())
+            key_list = self.plot_dicts.keys()
         if type(key_list) is str:
             key_list = [key_list]
         self.key_list = key_list
