@@ -33,6 +33,8 @@ class Test_SSRO_discrimination_analysis(unittest.TestCase):
         np.testing.assert_almost_equal(a.proc_data_dict['F_discr'],
                                        0.996, decimal=3)
 
+    def test_SSRO_analysis_basic_1D_wrong_peak_selected(self):
+        # This fit failed when I made a typo in the peak selection part
         t_start = '20171016_171715'
         t_stop = t_start
         a = ma.Singleshot_Readout_Analysis(t_start=t_start, t_stop=t_stop,
@@ -49,6 +51,31 @@ class Test_SSRO_discrimination_analysis(unittest.TestCase):
                                        -3.23, decimal=2)
         np.testing.assert_almost_equal(a.proc_data_dict['F_discr'],
                                        0.993, decimal=3)
+
+    def test_SSRO_analysis_basic_1D_misfit(self):
+        # This dataset failed before I added additional constraints to the
+        # guess
+        t_start = '20171016_181021'
+        t_stop = t_start
+        a = ma.Singleshot_Readout_Analysis(t_start=t_start, t_stop=t_stop,
+                                           extract_only=True)
+        np.testing.assert_almost_equal(a.proc_data_dict['threshold_raw'],
+                                       -.95, decimal=2)
+        np.testing.assert_almost_equal(a.proc_data_dict['F_assignment_raw'],
+                                       0.949, decimal=3)
+        np.testing.assert_almost_equal(a.proc_data_dict['threshold_fit'],
+                                       -.96, decimal=2)
+        np.testing.assert_almost_equal(a.proc_data_dict['F_assignment_fit'],
+                                       0.945, decimal=3)
+        np.testing.assert_almost_equal(a.proc_data_dict['threshold_discr'],
+                                       -0.79, decimal=2)
+        np.testing.assert_almost_equal(a.proc_data_dict['F_discr'],
+                                       1.000, decimal=3)
+        np.testing.assert_almost_equal(
+            a.proc_data_dict['residual_excitation'], 0.016, decimal=3)
+        np.testing.assert_almost_equal(
+            a.proc_data_dict['measurement_induced_relaxation'], 0.099,
+            decimal=3)
 
     @unittest.skip('NotImplemented')
     def test_discrimination_fidelity(self):
