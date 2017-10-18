@@ -9,10 +9,12 @@ This includes
 import logging
 import lmfit
 from collections import OrderedDict
+from scipy import integrate
 import numpy as np
 import pycqed.analysis.fitting_models as fit_mods
 import pycqed.analysis.analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
+from scipy.optimize import minimize
 import pycqed.analysis.tools.data_manipulation as dm_tools
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str
 
@@ -82,7 +84,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['bin_centers'] = (
             self.proc_data_dict['hist_0'][1][:-1] +
             self.proc_data_dict['hist_0'][1][1:]) / 2
-
+        self.proc_data_dict['binsize'] = (self.proc_data_dict['hist_0'][1][1] -
+                                          self.proc_data_dict['hist_0'][1][0])
         ##########################
         #  Cumulative histograms #
         ##########################
@@ -107,7 +110,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         # Average assignment fidelity: F_ass = (P01 - P10 )/2
         # where Pxy equals probability to measure x when starting in y
         F_vs_th = (1-(1-abs(self.proc_data_dict['cumhist_1'] -
-                      self.proc_data_dict['cumhist_0']))/2)
+                            self.proc_data_dict['cumhist_0']))/2)
         opt_idx = np.argmax(F_vs_th)
         self.proc_data_dict['F_assigment_raw'] = F_vs_th[opt_idx]
         self.proc_data_dict['threshold_raw'] = \
@@ -143,23 +146,70 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             'fit_yvals': {'data': self.proc_data_dict['hist_1'][0]}}
 
     def analyze_fit_results(self):
-        # uses the fit results to set values like V_th
-
         # Create a CDF based on the fit functions of both fits.
-        fr0 = self.fit_res['shots_0']
-        fr1 = self.fit_res['shots_0']
-        CDF_0 = lambda x: fr0.model.eval(**fr0.best_values, x=x)
-        CDF_1 = lambda x: fr1.model.eval(**fr1.best_values, x=x)
+        fr_0 = self.fit_res['shots_0']
+        fr_1 = self.fit_res['shots_1']
+        bv0 = fr_0.best_values
+        bv1 = fr_1.best_values
+        norm_factor = 1/(self.proc_data_dict['binsize'] *
+                         self.proc_data_dict['nr_shots'][0])
 
-        # Find the minimum difference to find the threshold
+        def CDF_0(x):
+            return fit_mods.double_gaussianCDF(
+                x, A_amplitude=bv0['A_amplitude']*norm_factor,
+                A_sigma=bv0['A_sigma'], A_mu=bv0['A_center'],
+                B_amplitude=bv0['B_amplitude']*norm_factor,
+                B_sigma=bv0['B_sigma'], B_mu=bv0['B_center'])
+
+        def CDF_1(x):
+            return fit_mods.double_gaussianCDF(
+                x, A_amplitude=bv1['A_amplitude']*norm_factor,
+                A_sigma=bv1['A_sigma'], A_mu=bv1['A_center'],
+                B_amplitude=bv1['B_amplitude']*norm_factor,
+                B_sigma=bv1['B_sigma'], B_mu=bv1['B_center'])
+
+        def infid_vs_th(x):
+            return (1-abs(CDF_0(x) - CDF_1(x)))/2
+
+        self._CDF_0 = CDF_0
+        self._CDF_1 = CDF_1
+        self._infid_vs_th = infid_vs_th
+
+        opt_fid = minimize(infid_vs_th, (bv0['A_center']+bv0['B_center'])/2)
+        self.proc_data_dict['F_assigment_fit'] = 1-opt_fid['fun']
+        self.proc_data_dict['threshold_fit'] = opt_fid['x']
 
         # Calculate the fidelity of both
 
-        # Other derived quantities
-        # SNR
-        # residual excitation
+        ###########################################
+        #  Extracting the discrimination fidelity #
+        ###########################################
+        if bv0['A_amplitude'] > bv0['A_amplitude']:
+            mu_0 = bv0['A_center']
+            sigma_0 = bv0['A_sigma']
+        else:
+            mu_0 = bv0['B_center']
+            sigma_0 = bv0['B_sigma']
 
-        pass
+        if bv1['A_amplitude'] > bv1['A_amplitude']:
+            mu_1 = bv1['A_center']
+            sigma_1 = bv1['A_sigma']
+        else:
+            mu_1 = bv1['B_center']
+            sigma_1 = bv1['B_sigma']
+
+        def CDF_0_discr(x):
+            return fit_mods.gaussianCDF(x, 1, mu=mu_0, sigma=sigma_0)
+
+        def CDF_1_discr(x):
+            return fit_mods.gaussianCDF(x, 1, mu=mu_1, sigma=sigma_1)
+
+        def disc_infid_vs_th(x):
+            return (1-abs(CDF_0_discr(x) - CDF_1_discr(x)))/2
+
+        opt_fid = minimize(disc_infid_vs_th, (mu_0 + mu_1)/2)
+        self.proc_data_dict['F_discrimination'] = 1-opt_fid['fun']
+        self.proc_data_dict['threshold_discrimination'] = opt_fid['x']
 
     def prepare_plots(self):
         # The histograms
@@ -231,9 +281,33 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 'line_kws': {'color': 'C3'},
                 'do_legend': True}
 
+            x = np.linspace(self.proc_data_dict['bin_centers'][0],
+                            self.proc_data_dict['bin_centers'][-1], 100)
+            self.plot_dicts['cdf_fit_shots_0'] = {
+                'ax_id': 'cum_histogram',
+                'plotfn': self.plot_line,
+                'xvals': x,
+                'yvals': self._CDF_0(x),
+                'setlabel': 'Fit shots 0',
+                'line_kws': {'color': 'C0'},
+                'marker': '',
+                'do_legend': True}
+            self.plot_dicts['cdf_fit_shots_1'] = {
+                'ax_id': 'cum_histogram',
+                'plotfn': self.plot_line,
+                'xvals': x,
+                'yvals': self._CDF_1(x),
+                'marker': '',
+                'setlabel': 'Fit shots 1',
+                'line_kws': {'color': 'C3'},
+                'do_legend': True}
+
         ###########################################
         # Thresholds and fidelity information     #
         ###########################################
+
+        max_cnts = np.max([np.max(self.proc_data_dict['hist_0'][0]),
+                           np.max(self.proc_data_dict['hist_1'][0])])
 
         thr, th_unit = SI_val_to_msg_str(
             self.proc_data_dict['threshold_raw'],
@@ -241,7 +315,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         raw_th_msg = (
             'Raw threshold: {:.2f} {}\n'.format(
                 thr, th_unit) +
-            r'$F_{A}$: ' +
+            r'$F_{A}$-raw: ' +
             r'{:.3f}'.format(
                 self.proc_data_dict['F_assigment_raw']))
         self.plot_dicts['cumhist_threshold'] = {
@@ -249,11 +323,54 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             'plotfn': self.plot_vlines,
             'x': self.proc_data_dict['threshold_raw'],
             'ymin': 0,
-            'ymax': 100,
-            'colors': 'k',
-            'linestyles': 'dotted',
+            'ymax': max_cnts*1.05,
+            'colors': '.3',
+            'linestyles': 'dashed',
+            'line_kws': {'linewidth': .8},
             'setlabel': raw_th_msg,
             'do_legend': True}
+        if self.do_fitting:
+            thr, th_unit = SI_val_to_msg_str(
+                self.proc_data_dict['threshold_fit'],
+                self.proc_data_dict['shots_xunit'], return_type=float)
+            fit_th_msg = (
+                'Fit threshold: {:.2f} {}\n'.format(
+                    thr, th_unit) +
+                r'$F_{A}$-fit: ' +
+                r'{:.3f}'.format(
+                    self.proc_data_dict['F_assigment_fit']))
+            self.plot_dicts['fit_threshold'] = {
+                'ax_id': '1D_histogram',
+                'plotfn': self.plot_vlines,
+                'x': self.proc_data_dict['threshold_fit'],
+                'ymin': 0,
+                'ymax': max_cnts*1.05,
+                'colors': '.4',
+                'linestyles': 'dotted',
+                'line_kws': {'linewidth': .8},
+                'setlabel': fit_th_msg,
+                'do_legend': True}
+
+            thr, th_unit = SI_val_to_msg_str(
+                self.proc_data_dict['threshold_discrimination'],
+                self.proc_data_dict['shots_xunit'], return_type=float)
+            fit_th_msg = (
+                'Discr. threshold: {:.2f} {}\n'.format(
+                    thr, th_unit) +
+                r'$F_{D}$: ' +
+                r'{:.3f}'.format(
+                    self.proc_data_dict['F_discrimination']))
+            self.plot_dicts['discr_threshold'] = {
+                'ax_id': '1D_histogram',
+                'plotfn': self.plot_vlines,
+                'x': self.proc_data_dict['threshold_discrimination'],
+                'ymin': 0,
+                'ymax': max_cnts*1.05,
+                'colors': '.3',
+                'linestyles': '-.',
+                'line_kws': {'linewidth': .8},
+                'setlabel': fit_th_msg,
+                'do_legend': True}
 
 
 class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
@@ -276,5 +393,3 @@ def get_shots_zero_one(data, preselect: bool=False,
         presel_0 = presel_0*0
         presel_1 = presel_1*0
     return data_0, data_1
-
-

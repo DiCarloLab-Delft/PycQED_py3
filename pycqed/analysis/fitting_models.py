@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.special import erfc
 import lmfit
 import logging
 #################################
@@ -302,6 +303,25 @@ def linear_with_background_and_offset(x, a, b, c):
     A linear signal with a fixed background.
     '''
     return np.sqrt((a*x)**2 + b**2)+c
+
+
+def gaussianCDF(x, amplitude, mu, sigma):
+    """
+    CDF of gaussian is P(X<=x) = .5 erfc((mu-x)/(sqrt(2)sig))
+    """
+    return 0.5 * amplitude * erfc((mu - x) / (np.sqrt(2)*sigma))
+
+
+def double_gaussianCDF(x, A_amplitude, A_mu, A_sigma,
+                       B_amplitude, B_mu, B_sigma):
+    """
+    CDF of two gaussians added on top of each other.
+
+    uses "gaussianCDF"
+    """
+    CDF_A = gaussianCDF(x, amplitude=A_amplitude, mu=A_mu, sigma=A_sigma)
+    CDF_B = gaussianCDF(x, amplitude=B_amplitude, mu=B_mu, sigma=B_sigma)
+    return CDF_A + CDF_B
 
 
 def gaussian_2D(x, y, amplitude=1,

@@ -1021,5 +1021,5 @@ class BaseDataAnalysis(object):
         linestyles = pdict.get('linestyles', '--')
 
         axs.vlines(x, ymin, ymax, colors,
-                   linestyles=linestyles, label=label, )
+                   linestyles=linestyles, label=label, **pdict['line_kws'])
         axs.legend()
