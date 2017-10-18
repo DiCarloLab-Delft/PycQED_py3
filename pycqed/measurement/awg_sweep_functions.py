@@ -946,16 +946,9 @@ class Randomized_Benchmarking_nr_cliffords(swf.Soft_Sweep):
         self.parameter_name = 'Nr of Cliffords'
         self.unit = '#'
 
-        # if self.cal_points:
-        #     self.sweep_points = np.concatenate([nr_cliffords,
-        #                                         [nr_cliffords[-1]+.2,
-        #                                          nr_cliffords[-1]+.3,
-        #                                          nr_cliffords[-1]+.7,
-        #                                          nr_cliffords[-1]+.8]])
-        #     self.RB_sweepfunction.nr_cliffords_list = self.sweep_points
 
     def set_parameter(self, val):
-        self.RB_sweepfunction.nr_cliffords_value=val
+        self.RB_sweepfunction.nr_cliffords_value = val
         self.RB_sweepfunction.prepare()
 
 class Randomized_Benchmarking_one_length(swf.Hard_Sweep):

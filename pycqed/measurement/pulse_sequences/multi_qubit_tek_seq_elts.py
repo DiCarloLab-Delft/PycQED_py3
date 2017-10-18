@@ -979,7 +979,8 @@ def n_qubit_off_on(pulse_pars_list, RO_pars, return_seq=False, verbose=False,
                    'channel': RO_pars['acq_marker_channel'],
                    'amplitude': 0.0,
                    'length': RO_spacing,
-                   'pulse_delay': 0}
+                   'pulse_delay': 0,
+                   'phase': 0}
     pulse_dict.update({'spacer': spacerpulse})
 
     # Create a list of required pulses

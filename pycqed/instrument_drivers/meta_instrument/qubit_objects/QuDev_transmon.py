@@ -219,20 +219,26 @@ class QuDev_transmon(Qubit):
 
         # add flux pulse parameters
         self.add_operation('flux')
-        self.add_pulse_parameter('flux', 'flux_pulse_type', 'flux_pulse_type',
+        self.add_pulse_parameter('flux', 'flux_pulse_type', 'pulse_type',
                                  initial_value=None, vals=vals.Strings())
-        self.add_pulse_parameter('flux', 'flux_pulse_I_channel', 'flux_I_channel',
-                                 initial_value=None, vals=vals.Strings())
-        self.add_pulse_parameter('flux', 'flux_pulse_Q_channel', 'flux_Q_channel',
+        self.add_pulse_parameter('flux', 'flux_pulse_channel', 'channel',
                                  initial_value=None, vals=vals.Strings())
         self.add_pulse_parameter('flux', 'flux_pulse_amp', 'amplitude',
-                                 initial_value=1, vals=vals.Numbers())
+                                 initial_value=None, vals=vals.Numbers())
         self.add_pulse_parameter('flux', 'flux_pulse_length', 'length',
                                  initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('flux', 'flux_pulse_delay', 'flux_pulse_delay',
+        self.add_pulse_parameter('flux', 'flux_pulse_delay', 'pulse_delay',
                                  initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('flux', 'flux_f_pulse_mod', 'flux_mod_frequency',
+        self.add_pulse_parameter('flux', 'flux_pulse_buffer', 'buffer',
                                  initial_value=None, vals=vals.Numbers())
+        self.add_pulse_parameter('flux', 'flux_pulse_sigma', 'sigma',
+                                 initial_value=0, vals=vals.Numbers())
+        # self.add_pulse_parameter('flux', 'flux_f_pulse_mod', 'mod_frequency',
+        #                          initial_value=None, vals=vals.Numbers())
+        # self.add_pulse_parameter('flux','flux_pulse_buffer','pulse_buffer',
+        #                          initial_value=None,vals= vals.Numbers())
+        # self.add_pulse_parameter('flux','kernel_path','kernel_path',
+        #                          initial_value=None,vals=vals.Strings())
 
 
 
@@ -1923,21 +1929,19 @@ class QuDev_transmon(Qubit):
             return
 
     def find_RB_gate_fidelity(self, nr_cliffords, label=None, nr_seeds=10,
-                              update=False, MC=None, cal_points=True,
+                              MC=None, cal_points=True, gate_decomposition='HZ',
                               no_cal_points=None, close_fig=True,
                               upload=True, **kw):
 
         for_ef = kw.pop('for_ef', False)
         last_ge_pulse = kw.pop('last_ge_pulse', False)
         analyze = kw.pop('analyze', True)
-        gate_decomp = kw.pop('gate_decomp', 'HZ')
         show = kw.pop('show', False)
         interleaved_gate = kw.pop('interleaved_gate', None)
+        T1 = kw.pop('T1', None)
 
-        if self.T1() is not None:
+        if T1 is None and self.T1() is not None:
             T1 = self.T1()
-        else:
-            T1 = None
 
         if type(nr_cliffords) is int:
             every_other = kw.pop('every_other', 5)
@@ -1945,9 +1949,9 @@ class QuDev_transmon(Qubit):
                                        list(range(0, nr_cliffords[0]+1,
                                                   every_other))])
 
-        if not update:
-            logging.warning("Does not automatically update the qubit "
-                            "parameter. Set update=True if you want this!")
+        # if not update:
+        #     logging.warning("Does not automatically update the qubit "
+        #                     "parameter. Set update=True if you want this!")
 
         if (cal_points) and (no_cal_points is None):
             logging.warning('no_cal_points is None. Defaults to 4 if for_ef==False,'
@@ -1967,18 +1971,28 @@ class QuDev_transmon(Qubit):
             raise ValueError("Unspecified nr_cliffords")
 
         if label is None:
-            if for_ef:
-                label = 'RB_2nd_{}_{}_seeds_{}_cliffords'.format(
-                    gate_decomp, nr_seeds, nr_cliffords[-1]) + self.msmt_suffix
+            if interleaved_gate is None:
+                if for_ef:
+                    label = 'RB_2nd_{}_{}_seeds_{}_cliffords'.format(
+                        gate_decomposition, nr_seeds, nr_cliffords[-1]) + self.msmt_suffix
+                else:
+                    label = 'RB_{}_{}_seeds_{}_cliffords'.format(
+                        gate_decomposition, nr_seeds, nr_cliffords[-1]) + self.msmt_suffix
             else:
-                label = 'RB_{}_{}_seeds_{}_cliffords'.format(
-                    gate_decomp, nr_seeds, nr_cliffords[-1]) + self.msmt_suffix
+                if for_ef:
+                    label = 'IRB_2nd_{}_{}_{}_seeds_{}_cliffords'.format(
+                        interleaved_gate, gate_decomposition,
+                        nr_seeds, nr_cliffords[-1]) + self.msmt_suffix
+                else:
+                    label = 'IRB_{}_{}_{}_seeds_{}_cliffords'.format(
+                        interleaved_gate, gate_decomposition,
+                        nr_seeds, nr_cliffords[-1]) + self.msmt_suffix
 
         #Perform measurement
         self.measure_randomized_benchmarking(nr_cliffords=nr_cliffords,
                                              nr_seeds=nr_seeds, MC=MC,
                                              close_fig=close_fig,
-                                             gate_decomp=gate_decomp,
+                                             gate_decomp=gate_decomposition,
                                              cal_points=cal_points,
                                              label=label,
                                              analyze=analyze,
@@ -1993,7 +2007,7 @@ class QuDev_transmon(Qubit):
                                          T1=T1, pulse_delay=pulse_delay,
                                          NoCalPoints=no_cal_points,
                                          for_ef=for_ef, show=show,
-                                         gate_decomp=gate_decomp,
+                                         gate_decomp=gate_decomposition,
                                          last_ge_pulse=last_ge_pulse, **kw)
 
         return
