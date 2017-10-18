@@ -181,14 +181,14 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         ###########################################
         #  Extracting the discrimination fidelity #
         ###########################################
-        if bv0['A_amplitude'] > bv0['A_amplitude']:
+        if bv0['A_amplitude'] > bv0['B_amplitude']:
             mu_0 = bv0['A_center']
             sigma_0 = bv0['A_sigma']
         else:
             mu_0 = bv0['B_center']
             sigma_0 = bv0['B_sigma']
 
-        if bv1['A_amplitude'] > bv1['A_amplitude']:
+        if bv1['A_amplitude'] > bv1['B_amplitude']:
             mu_1 = bv1['A_center']
             sigma_1 = bv1['A_sigma']
         else:
@@ -203,6 +203,10 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
         def disc_infid_vs_th(x):
             return (1-abs(CDF_0_discr(x) - CDF_1_discr(x)))/2
+
+        self._CDF_0_discr = CDF_0_discr
+        self._CDF_1_discr = CDF_1_discr
+        self._disc_infid_vs_th = disc_infid_vs_th
 
         opt_fid = minimize(disc_infid_vs_th, (mu_0 + mu_1)/2)
         self.proc_data_dict['F_discr'] = 1-opt_fid['fun']
