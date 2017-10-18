@@ -1209,6 +1209,8 @@ def rotate_and_normalize_data_no_cal_points(data, **kw):
     Rotates and projects data based on principal component analysis.
     (Source: http://www.cs.otago.ac.nz/cosc453/student_tutorials/
     principal_components.pdf)
+    Assumes data has shape (2, nr_sweep_pts), ie the shape of
+    MeasurementAnalysis.measured_values.
     """
 
     #translate each column in the data by its mean
