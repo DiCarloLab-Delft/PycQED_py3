@@ -1035,7 +1035,7 @@ class CCLight_Transmon(Qubit):
                 # use the threshold for the best discrimination fidelity
                 # fixme: rather use Fd, but unstable fitting. sqrt2 is a dirty
                 # hack. This works. we don't know why
-                self.ro_acq_threshold(a.V_th_a*0.9/1.41)
+                self.ro_acq_threshold(a.V_th_a*1)
             if not no_fits:
                 if update:
                     self.F_ssro(a.F_a)
@@ -1055,6 +1055,7 @@ class CCLight_Transmon(Qubit):
     def measure_transients(self, MC=None, analyze: bool=True,
                            cases=('off', 'on'),
                            prepare: bool=True, depletion_analysis=True,
+                           depletion_analysis_plot=True,
                            depletion_optimization_window=None):
         # docstring from parent class
         if MC is None:
@@ -1099,7 +1100,9 @@ class CCLight_Transmon(Qubit):
             if analyze:
                 ma.MeasurementAnalysis()
         if depletion_analysis:
-            a = ma.Input_average_analysis(IF=self.ro_freq_mod(), optimization_window=depletion_optimization_window)
+            a = ma.Input_average_analysis(IF=self.ro_freq_mod(),
+                                          optimization_window=depletion_optimization_window,
+                                          plot=depletion_analysis_plot)
             return a
         else:
             return [np.array(t, dtype=np.float64) for t in transients]
@@ -1195,8 +1198,8 @@ class CCLight_Transmon(Qubit):
             return a
 
     def tuneup_deletion_pulse_transients(self, nested_MC=None, amp0=None,
-                                         amp1=None, phi0=180, phi1=0, two_par=True,
-                                         depletion_optimization_window=None):
+                                         amp1=None, phi0=180, phi1=0, initial_steps=None, two_par=True,
+                                         depletion_optimization_window=None, depletion_analysis_plot=False):
         # this function automatically tunes up a two step, four-parameter depletion pulse.
         # It uses the averaged transients for ground and excited state for its
         # cost function.
@@ -1238,6 +1241,8 @@ class CCLight_Transmon(Qubit):
                                            self.ro_pulse_down_amp1])
         d = det.Function_Detector(self.measure_transients,
                                   msmt_kw={'depletion_analysis': True,
+                                           'depletion_analysis_plot':
+                                           depletion_analysis_plot,
                                            'depletion_optimization_window':
                                            depletion_optimization_window},
                                   value_names=['depletion cost'],
@@ -1246,9 +1251,11 @@ class CCLight_Transmon(Qubit):
         nested_MC.set_detector_function(d)
 
         if two_par:
+            if initial_steps is None:
+                    initial_steps = [-0.1*amp0, -0.1*amp1]
             ad_func_pars = {'adaptive_function': nelder_mead,
                 'x0': [amp0, amp1],
-                'initial_step': [-0.1*amp0, -0.1*amp1],
+                'initial_step': initial_steps,
                 'no_improv_break': 12,
                 'minimize': True,
                 'maxiter': 500}
@@ -1256,9 +1263,11 @@ class CCLight_Transmon(Qubit):
             self.ro_pulse_down_phi1(0)
 
         else:
+            if initial_steps is None:
+                initial_steps =[15, 15, -0.1*amp0, -0.1*amp1]
             ad_func_pars = {'adaptive_function': nelder_mead,
-                            'x0': [phi0, phi1, amp0, amp1],
-                            'initial_step': [15, 15, -0.1*amp0, -0.1*amp1],
+                            'x0': [phi0,phi1, amp0, amp1],
+                            'initial_step': initial_steps,
                             'no_improv_break': 12,
                             'minimize': True,
                             'maxiter': 500}
