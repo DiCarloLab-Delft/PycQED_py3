@@ -328,6 +328,7 @@ class BaseDataAnalysis(object):
             self.raw_data_dict = new_dict
             self.raw_data_dict['timestamp'] = self.timestamps[0]
         self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['nr_experiments'] = len(self.timestamps)
 
     def process_data(self):
         """
@@ -422,8 +423,7 @@ class BaseDataAnalysis(object):
 
     def prepare_fitting(self):
         # initialize everything to an empty dict if not overwritten
-        self.fit_dicts = {}
-        pass
+        self.fit_dicts = OrderedDict()
 
     def run_fitting(self):
         '''
@@ -436,18 +436,23 @@ class BaseDataAnalysis(object):
         for key, fit_dict in self.fit_dicts.items():
             guess_dict = fit_dict.get('guess_dict', None)
             guess_pars = fit_dict.get('guess_pars', None)
-            fit_guess_fn = fit_dict.get('fit_guess_fn', None)
-            fit_fn = fit_dict.get('fit_fn', None)
             fit_yvals = fit_dict['fit_yvals']
             fit_xvals = fit_dict['fit_xvals']
 
-            model = fit_dict.get('model', lmfit.Model(fit_fn))
+            model = fit_dict.get('model', None)
+            if model is None:
+                fit_fn = fit_dict.get('fit_fn', None)
+                model = fit_dict.get('model', lmfit.Model(fit_fn))
+            fit_guess_fn = fit_dict.get('fit_guess_fn', None)
+            if fit_guess_fn is None:
+                fit_guess_fn = model.guess
+
             if self.do_timestamp_blocks:
                 fit_dict['fit_res'] = []
                 for tt in range(len(fit_yvals)):
                     if guess_pars is None:
                         if guess_dict is None:
-                            guess_dict = fit_guess_fn(fit_yvals[tt],
+                            guess_dict = fit_guess_fn(**fit_yvals[tt],
                                                       **fit_xvals[tt])
                         for key, val in list(guess_dict.items()):
                             model.set_param_hint(key, **val)
@@ -458,10 +463,10 @@ class BaseDataAnalysis(object):
             else:
                 if guess_pars is None:
                     if guess_dict is None:
-                        guess_dict = fit_guess_fn(fit_yvals, **fit_xvals)
-                    for key, val in list(guess_dict.items()):
-                        model.set_param_hint(key, **val)
-                    guess_pars = model.make_params()
+                        guess_dict = fit_guess_fn(**fit_yvals, **fit_xvals)
+                    # for key, val in list(guess_dict.items()):
+                    #     model.set_param_hint(key, **val)
+                    # guess_pars = model.make_params()
 
                 fit_dict['fit_res'] = model.fit(
                     params=guess_pars, **fit_xvals, **fit_yvals)
@@ -543,9 +548,11 @@ class BaseDataAnalysis(object):
         # xvals interpreted as edges for a bar plot
         plot_xedges = pdict['xvals']
         plot_yvals = pdict['yvals']
-        plot_xlabel = pdict['xlabel']
-        plot_ylabel = pdict['ylabel']
-        plot_title = pdict['title']
+        plot_xlabel = pdict.get('xlabel', None)
+        plot_ylabel = pdict.get('ylabel', None)
+        plot_xunit = pdict.get('xunit', None)
+        plot_yunit = pdict.get('yunit', None)
+        plot_title = pdict.get('title', None)
         plot_xrange = pdict.get('xrange', None)
         plot_yrange = pdict.get('yrange', None)
         plot_barkws = pdict.get('bar_kws', {})
@@ -594,6 +601,8 @@ class BaseDataAnalysis(object):
         if self.tight_fig:
             axs.figure.tight_layout()
 
+        set_xlabel(axs, plot_xlabel, plot_xunit)
+        set_ylabel(axs, plot_ylabel, plot_yunit)
         pdict['handles'] = p_out
 
     def plot_line(self, pdict, axs):
@@ -998,3 +1007,19 @@ class BaseDataAnalysis(object):
               verticalalignment=verticalalignment,
               horizontalalignment=horizontalalignment,
               bbox=box_props)
+
+    def plot_vlines(self, pdict, axs):
+        """
+        Helper function to add vlines to a plot
+        """
+        pfunc = getattr(axs, pdict.get('func', 'vlines'))
+        x = pdict['x']
+        ymin = pdict['ymin']
+        ymax = pdict['ymax']
+        label = pdict.get('setlabel', None)
+        colors = pdict.get('colors', None)
+        linestyles = pdict.get('linestyles', '--')
+
+        axs.vlines(x, ymin, ymax, colors,
+                   linestyles=linestyles, label=label, **pdict['line_kws'])
+        axs.legend()
