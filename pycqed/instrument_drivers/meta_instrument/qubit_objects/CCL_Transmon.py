@@ -1030,7 +1030,7 @@ class CCLight_Transmon(Qubit):
                 if update_threshold:
                     # UHFQC threshold is wrong, the magic number is a
                     #  dirty hack. This works. we don't know why.
-                    magic_scale_factor = 1
+                    magic_scale_factor = 0.655
                     self.ro_acq_threshold(a.proc_data_dict['threshold_discr'] *
                                           magic_scale_factor)
                 if update:
@@ -1041,7 +1041,8 @@ class CCLight_Transmon(Qubit):
                                 a.proc_data_dict['F_assignment_raw']) +
                           'Avg. Discrimination fidelity: \t{:.4f}'.format(
                                 a.proc_data_dict['F_discr']))
-                return a.F_a, a.F_d
+                return (a.proc_data_dict['F_assignment_raw'],
+                        a.proc_data_dict['F_discr'])
             else:
 
                 a = ma.SSRO_Analysis(label='SSRO',
@@ -1106,7 +1107,7 @@ class CCLight_Transmon(Qubit):
             return [np.array(t, dtype=np.float64) for t in transients]
 
     def calibrate_optimal_weights(self, MC=None, verify=True, analyze=True,
-                                  update=True, no_fits=False):
+                                  update=True, no_figs=False):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -1142,7 +1143,7 @@ class CCLight_Transmon(Qubit):
             self.ro_acq_weight_type('optimal')
 
         if verify:
-            self.measure_ssro(no_fits=no_fits)
+            self.measure_ssro(no_figs=no_figs)
 
     def measure_rabi_vsm(self, MC=None, atts=np.linspace(0, 65536, 31),
                          analyze=True, close_fig=True,
