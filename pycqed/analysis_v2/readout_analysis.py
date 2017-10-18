@@ -371,7 +371,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
 
 class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
-    raise NotImplementedError
+    pass
 
 
 def get_shots_zero_one(data, preselect: bool=False,
