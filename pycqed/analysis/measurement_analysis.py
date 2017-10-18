@@ -125,22 +125,27 @@ class MeasurementAnalysis(object):
         if fig is None:
             fig = self.default_fig(*arg, **kw)
         ax = fig.add_subplot(111)
-        #ax.set_title(self.timestamp_string+'\n'+self.measurementstring)
+
         ax.ticklabel_format(useOffset=False)
         return fig, ax
 
-    def save_fig(self, fig, figname=None, xlabel='x', ylabel='measured_vlaues',
+    def save_fig(self, fig, figname=None, xlabel='x',
+                 ylabel='measured_values',
                  fig_tight=True, **kw):
+
+
         plot_formats = kw.pop('plot_formats', ['png'])
         fail_counter = False
         close_fig = kw.pop('close_fig', True)
+
         if type(plot_formats) == str:
             plot_formats = [plot_formats]
+
         for plot_format in plot_formats:
             if figname is None:
                 if xlabel=='x':
                     xlabel=self.sweep_name
-                # figname = (self.sweep_name+'_'+ylabel +
+
                 figname = (self.measurementstring+'_'+ylabel +
                            '_vs_'+xlabel+'.'+plot_format)
             else:
@@ -156,8 +161,6 @@ class MeasurementAnalysis(object):
                 fig.savefig(
                     self.savename, dpi=self.dpi,format=plot_format,
                     bbox_inches='tight')
-                    # value of 300 is arbitrary but higher than default
-                    # format=plot_format, bbox_inches='tight',pad_inches=0.25)
             except:
                 fail_counter = True
         if fail_counter:
@@ -556,25 +559,6 @@ class MeasurementAnalysis(object):
         else:
             raise ValueError('datasaving_format "%s " not recognized'
                              % datasaving_format)
-
-    def scale_sweep_points(self, unit_prefix = '', TwoD=False):
-
-        self.scales_dict = dict( {'':1, 'u':1e6, 'n':1e9,'p':1e12,
-                             'f':1e15, 'M':1e-6,'G':1e-9})
-
-        self.scaled_sweep_points = deepcopy(self.sweep_points)
-
-        if unit_prefix in self.scales_dict.keys():
-            self.scaled_sweep_points = \
-                self.scaled_sweep_points*self.scales_dict[unit_prefix]
-            if TwoD:
-                self.scaled_sweep_points_2D = deepcopy(self.sweep_points_2D)
-                self.scaled_sweep_points_2D = \
-                    self.scaled_sweep_points_2D*self.scales_dict[unit_prefix]
-        else:
-            raise ValueError('Unit prefix not recognized. The available '
-                             'unit prefixes are "%s".'%list(
-                              self.scales_dict.keys()))
 
     def plot_results_vs_sweepparam(self, x, y, fig, ax, show=False, marker='-o',
                                    log=False, ticks_around=True, label=None,

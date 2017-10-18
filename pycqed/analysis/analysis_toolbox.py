@@ -1278,27 +1278,30 @@ def color_plot(x, y, z, fig, ax, cax=None,
 
     if plot_title is not None:
         ax.set_title(plot_title, y=1.05, fontsize=18)
+
+    ax.get_yaxis().set_tick_params(direction='out')
+    ax.get_xaxis().set_tick_params(direction='out')
+
     if transpose:
-        set_xlabel(ax, ylabel, unit=y_unit)
-        set_ylabel(ax, xlabel, unit=x_unit)
         ax.set_xlim(y_vertices[0], y_vertices[-1])
         ax.set_ylim(x_vertices[0], x_vertices[-1])
         if xlim is not None:
             ax.set_xlim(ylim)
         if ylim is not None:
             ax.set_ylim(xlim)
+        set_xlabel(ax, ylabel, unit=y_unit)
+        set_ylabel(ax, xlabel, unit=x_unit)
+
     else:
-        set_xlabel(ax, xlabel, unit=x_unit)
-        set_ylabel(ax, ylabel, unit=y_unit)
         ax.set_xlim(x_vertices[0], x_vertices[-1])
         ax.set_ylim(y_vertices[0], y_vertices[-1])
         if xlim is not None:
             ax.set_xlim(xlim)
         if ylim is not None:
             ax.set_ylim(ylim)
+        set_xlabel(ax, xlabel, unit=x_unit)
+        set_ylabel(ax, ylabel, unit=y_unit)
 
-    ax.get_yaxis().set_tick_params(direction='out')
-    ax.get_xaxis().set_tick_params(direction='out')
     if add_colorbar:
         if cax is None:
             ax_divider = make_axes_locatable(ax)
