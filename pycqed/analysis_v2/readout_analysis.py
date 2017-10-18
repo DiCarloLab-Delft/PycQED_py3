@@ -174,7 +174,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
         opt_fid = minimize(infid_vs_th, (bv0['A_center']+bv0['B_center'])/2)
         self.proc_data_dict['F_assignment_fit'] = 1-opt_fid['fun']
-        self.proc_data_dict['threshold_fit'] = opt_fid['x']
+        self.proc_data_dict['threshold_fit'] = opt_fid['x'][0]
 
         # Calculate the fidelity of both
 
@@ -206,7 +206,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
         opt_fid = minimize(disc_infid_vs_th, (mu_0 + mu_1)/2)
         self.proc_data_dict['F_discr'] = 1-opt_fid['fun']
-        self.proc_data_dict['threshold_discr'] = opt_fid['x']
+        self.proc_data_dict['threshold_discr'] = opt_fid['x'][0]
 
     def prepare_plots(self):
         # The histograms
