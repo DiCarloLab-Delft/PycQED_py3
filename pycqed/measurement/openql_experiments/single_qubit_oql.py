@@ -438,7 +438,11 @@ def RTE(qubit_idx: int, sequence_type: str, platf_cfg: str,
         k.gate('rx90', qubit_idx)
         k.gate('i', qubit_idx)
         k.gate('i', qubit_idx)
+        k.gate('i', qubit_idx)
+        k.gate('i', qubit_idx)
         k.gate('rx180', qubit_idx)
+        k.gate('i', qubit_idx)
+        k.gate('i', qubit_idx)
         k.gate('i', qubit_idx)
         k.gate('i', qubit_idx)
         if net_gate == 'pi':

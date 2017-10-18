@@ -19,6 +19,9 @@ from pycqed.measurement.calibration_toolbox import (
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import detector_functions as det
 
+from pycqed.analysis.fit_toolbox import functions as func
+from pycqed.measurement.optimization import nelder_mead
+
 
 class CCLight_Transmon(Qubit):
 
@@ -58,6 +61,10 @@ class CCLight_Transmon(Qubit):
                            parameter_class=InstrumentRefParameter)
 
         self.add_parameter('instr_MC', label='MeasurementControl',
+                           parameter_class=InstrumentRefParameter)
+
+        self.add_parameter('instr_nested_MC',
+                           label='Nested MeasurementControl',
                            parameter_class=InstrumentRefParameter)
         self.add_parameter('instr_SH', label='SignalHound',
                            parameter_class=InstrumentRefParameter)
@@ -1015,7 +1022,7 @@ class CCLight_Transmon(Qubit):
             'Measure_SSRO_{}'.format(self.msmt_suffix))
         MC.live_plot_enabled(old_plot_setting)
         if analyze:
-            if len(d.value_names)==1:
+            if len(d.value_names) == 1:
                 a = ma.SSRO_Analysis(label='SSRO',
                                      channels=d.value_names,
                                      no_fits=no_fits, rotate=False)
@@ -1026,7 +1033,9 @@ class CCLight_Transmon(Qubit):
 
             if update_threshold:
                 # use the threshold for the best discrimination fidelity
-                self.ro_acq_threshold(a.V_th_a/1.5)  # fixme: rather use Fd, but unstable fitting. sqrt2 is a dirty hack. This works. we don't know why
+                # fixme: rather use Fd, but unstable fitting. sqrt2 is a dirty
+                # hack. This works. we don't know why
+                self.ro_acq_threshold(a.V_th_a*0.9/1.41)
             if not no_fits:
                 if update:
                     self.F_ssro(a.F_a)
@@ -1039,13 +1048,14 @@ class CCLight_Transmon(Qubit):
                 if update:
                     self.F_ssro(a.F_a)
                 if verbose:
-                    print('Avg. Assignement fidelity: \t{:.4f}\n'.format(a.F_a))
+                    print(
+                        'Avg. Assignement fidelity: \t{:.4f}\n'.format(a.F_a))
                 return a.F_a, None
-
 
     def measure_transients(self, MC=None, analyze: bool=True,
                            cases=('off', 'on'),
-                           prepare: bool=True):
+                           prepare: bool=True, depletion_analysis=True,
+                           depletion_optimization_window=None):
         # docstring from parent class
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -1088,10 +1098,13 @@ class CCLight_Transmon(Qubit):
             transients.append(dset.T[1:])
             if analyze:
                 ma.MeasurementAnalysis()
+        if depletion_analysis:
+            a = ma.Input_average_analysis(IF=self.ro_freq_mod(), optimization_window=depletion_optimization_window)
+            return a
+        else:
+            return [np.array(t, dtype=np.float64) for t in transients]
 
-        return [np.array(t, dtype=np.float64) for t in transients]
-
-    def calibrate_optimal_weights(self, MC=None, verify=True, analyze=False,
+    def calibrate_optimal_weights(self, MC=None, verify=True, analyze=True,
                                   update=True, no_fits=False):
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -1099,7 +1112,10 @@ class CCLight_Transmon(Qubit):
         # Ensure that enough averages are used to get accurate weights
         old_avg = self.ro_acq_averages()
         self.ro_acq_averages(2**15)
-        transients = self.measure_transients(MC=MC, analyze=analyze)
+        transients = self.measure_transients(MC=MC, analyze=analyze,
+                                             depletion_analysis=False)
+        if analyze:
+            ma.Input_average_analysis(IF=self.ro_freq_mod())
 
         self.ro_acq_averages(old_avg)
 
@@ -1110,7 +1126,9 @@ class CCLight_Transmon(Qubit):
         # joint rescaling to +/-1 Volt
         maxI = np.max(np.abs(optimized_weights_I))
         maxQ = np.max(np.abs(optimized_weights_Q))
-        weight_scale_factor = 1./(4*np.max([maxI, maxQ]))#fixme: deviding the weight functions by four to not have overflow in thresholding of the UHFQC
+        # fixme: deviding the weight functions by four to not have overflow in
+        # thresholding of the UHFQC
+        weight_scale_factor = 1./(4*np.max([maxI, maxQ]))
         optimized_weights_I = np.array(
             weight_scale_factor*optimized_weights_I)
         optimized_weights_Q = np.array(
@@ -1175,6 +1193,126 @@ class CCLight_Transmon(Qubit):
         if analyze:
             a = ma.AllXY_Analysis(close_main_fig=close_fig)
             return a
+
+    def tuneup_deletion_pulse_transients(self, nested_MC=None, amp0=None,
+                                         amp1=None, phi0=180, phi1=0, two_par=True,
+                                         depletion_optimization_window=None):
+        # this function automatically tunes up a two step, four-parameter depletion pulse.
+        # It uses the averaged transients for ground and excited state for its
+        # cost function.
+        # two_par:              if readout is performed at the symmetry point and in the linear regime
+        #                       two parameters will suffice. Othen, four paramters do not converge.
+        #                       First optimizaing the amplitudes (two paramters) and then run the full
+        #                       4 paramaters with the correct initial amplitudes works.
+        # optimization_window:  optimization window determins which part of the transients will be
+        #                       nulled in the optimization. By default it uses a window of
+        #                       500 ns post depletiona with a 50 ns buffer.
+
+        # tuneup requires nested MC as the transients detector will use MC
+        self.ro_pulse_type('up_down_down')
+        if nested_MC is None:
+            nested_MC = self.instr_nested_MC.get_instr()
+
+        # setting the initial depletion amplitudes
+        if amp0 is None:
+            amp0 = 2*self.ro_pulse_amp()
+        if amp1 is None:
+            amp1 = 0.5*self.ro_pulse_amp()
+
+
+        if depletion_optimization_window is None:
+            depletion_optimization_window = [
+                self.ro_pulse_length()+self.ro_pulse_down_length0()
+                + self.ro_pulse_down_length1()+50e-9,
+                self.ro_pulse_length()+self.ro_pulse_down_length0()
+                + self.ro_pulse_down_length1()+550e-9]
+
+        if two_par:
+            nested_MC.set_sweep_functions([
+                               self.ro_pulse_down_amp0,
+                               self.ro_pulse_down_amp1])
+        else:
+            nested_MC.set_sweep_functions([self.ro_pulse_down_phi0,
+                                           self.ro_pulse_down_phi1,
+                                           self.ro_pulse_down_amp0,
+                                           self.ro_pulse_down_amp1])
+        d = det.Function_Detector(self.measure_transients,
+                                  msmt_kw={'depletion_analysis': True,
+                                           'depletion_optimization_window':
+                                           depletion_optimization_window},
+                                  value_names=['depletion cost'],
+                                  value_units=['au'],
+                                  result_keys=['depletion_cost'])
+        nested_MC.set_detector_function(d)
+
+        if two_par:
+            ad_func_pars = {'adaptive_function': nelder_mead,
+                'x0': [amp0, amp1],
+                'initial_step': [-0.1*amp0, -0.1*amp1],
+                'no_improv_break': 12,
+                'minimize': True,
+                'maxiter': 500}
+            self.ro_pulse_down_phi0(180)
+            self.ro_pulse_down_phi1(0)
+
+        else:
+            ad_func_pars = {'adaptive_function': nelder_mead,
+                            'x0': [phi0, phi1, amp0, amp1],
+                            'initial_step': [15, 15, -0.1*amp0, -0.1*amp1],
+                            'no_improv_break': 12,
+                            'minimize': True,
+                            'maxiter': 500}
+        nested_MC.set_adaptive_function_parameters(ad_func_pars)
+        nested_MC.set_optimization_method('nelder_mead')
+        nested_MC.run(name='depletion_tuneup', mode='adaptive')
+        ma.OptimizationAnalysis(label='depletion_tuneup')
+
+    def measure_error_fraction(self, MC=None, analyze: bool=True, nr_shots: int=2048*4,
+                               sequence_type='echo', prepare: bool=True, feedback=False,
+                               depletion_time=None, net_gate='pi'):
+        # docstring from parent class
+        # this performs a multiround experiment, the repetition rate is defined
+        # by the ro_duration which can be changed by regenerating the configuration file.
+        # The analysis counts single errors. The definition of an error is adapted
+        # automatically by choosing feedback or the net_gate.
+        # it requires high SNR single shot readout and a calibrated threshold
+        self.ro_acq_digitized(True)
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        # plotting really slows down SSRO (16k shots plotting is slow)
+        old_plot_setting = MC.live_plot_enabled()
+        MC.live_plot_enabled(False)
+        MC.soft_avg(1)  # don't want to average single shots
+        if prepare:
+            self.prepare_for_timedomain()
+            # off/on switching is achieved by turning the MW source on and
+            # off as this is much faster than recompiling/uploading
+            p = sqo.RTE(
+                qubit_idx=self.cfg_qubit_nr(), sequence_type=sequence_type,
+                platf_cfg=self.cfg_openql_platform_fn(), net_gate=net_gate, feedback=feedback)
+            self.instr_CC.get_instr().upload_instructions(p.filename)
+        else:
+            p = None  # object needs to exist for the openql_sweep to work
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr(),
+                             parameter_name='shot nr', unit='#',
+                             upload=prepare)
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(nr_shots))
+        d = self.int_log_det
+        MC.set_detector_function(d)
+
+        exp_metadata = {'feedback': feedback, 'sequence_type': sequence_type,
+                        'depletion_time': depletion_time, 'net_gate': net_gate}
+        MC.run(
+            'Measure_error_fraction_{}'.format(self.msmt_suffix), exp_metadata=exp_metadata)
+        MC.live_plot_enabled(old_plot_setting)
+        if analyze:
+            a = ma2.Single_Qubit_RoundsToEvent_Analysis(
+                t_start=None, t_stop=None,
+                options_dict={'typ_data_idx': 0, 'scan_label': 'error_fraction'}, extract_only=True)
+            return a.proc_data_dict['frac_single']
 
     def measure_T1(self, times=None, MC=None,
                    analyze=True, close_fig=True, update=True, prepare_for_timedomain=True):
