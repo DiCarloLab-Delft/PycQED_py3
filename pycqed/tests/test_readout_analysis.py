@@ -36,7 +36,7 @@ class Test_SSRO_discrimination_analysis(unittest.TestCase):
         t_start = '20171016_171715'
         t_stop = t_start
         a = ma.Singleshot_Readout_Analysis(t_start=t_start, t_stop=t_stop,
-                                           options_dict={'plot_init': True})
+                                           extract_only=True)
         np.testing.assert_almost_equal(a.proc_data_dict['threshold_raw'],
                                        -3.30, decimal=2)
         np.testing.assert_almost_equal(a.proc_data_dict['F_assignment_raw'],
