@@ -6,16 +6,13 @@ This includes
     - multiplexed readout analysis
 """
 
-import logging
 import lmfit
 from collections import OrderedDict
-from scipy import integrate
 import numpy as np
 import pycqed.analysis.fitting_models as fit_mods
 import pycqed.analysis.analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
 from scipy.optimize import minimize
-import pycqed.analysis.tools.data_manipulation as dm_tools
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str
 
 
@@ -112,7 +109,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         F_vs_th = (1-(1-abs(self.proc_data_dict['cumhist_1'] -
                             self.proc_data_dict['cumhist_0']))/2)
         opt_idx = np.argmax(F_vs_th)
-        self.proc_data_dict['F_assigment_raw'] = F_vs_th[opt_idx]
+        self.proc_data_dict['F_assignment_raw'] = F_vs_th[opt_idx]
         self.proc_data_dict['threshold_raw'] = \
             self.proc_data_dict['bin_centers'][opt_idx]
 
@@ -176,7 +173,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         self._infid_vs_th = infid_vs_th
 
         opt_fid = minimize(infid_vs_th, (bv0['A_center']+bv0['B_center'])/2)
-        self.proc_data_dict['F_assigment_fit'] = 1-opt_fid['fun']
+        self.proc_data_dict['F_assignment_fit'] = 1-opt_fid['fun']
         self.proc_data_dict['threshold_fit'] = opt_fid['x']
 
         # Calculate the fidelity of both
@@ -208,8 +205,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             return (1-abs(CDF_0_discr(x) - CDF_1_discr(x)))/2
 
         opt_fid = minimize(disc_infid_vs_th, (mu_0 + mu_1)/2)
-        self.proc_data_dict['F_discrimination'] = 1-opt_fid['fun']
-        self.proc_data_dict['threshold_discrimination'] = opt_fid['x']
+        self.proc_data_dict['F_discr'] = 1-opt_fid['fun']
+        self.proc_data_dict['threshold_discr'] = opt_fid['x']
 
     def prepare_plots(self):
         # The histograms
@@ -317,7 +314,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 thr, th_unit) +
             r'$F_{A}$-raw: ' +
             r'{:.3f}'.format(
-                self.proc_data_dict['F_assigment_raw']))
+                self.proc_data_dict['F_assignment_raw']))
         self.plot_dicts['cumhist_threshold'] = {
             'ax_id': '1D_histogram',
             'plotfn': self.plot_vlines,
@@ -338,7 +335,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                     thr, th_unit) +
                 r'$F_{A}$-fit: ' +
                 r'{:.3f}'.format(
-                    self.proc_data_dict['F_assigment_fit']))
+                    self.proc_data_dict['F_assignment_fit']))
             self.plot_dicts['fit_threshold'] = {
                 'ax_id': '1D_histogram',
                 'plotfn': self.plot_vlines,
@@ -352,18 +349,18 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 'do_legend': True}
 
             thr, th_unit = SI_val_to_msg_str(
-                self.proc_data_dict['threshold_discrimination'],
+                self.proc_data_dict['threshold_discr'],
                 self.proc_data_dict['shots_xunit'], return_type=float)
             fit_th_msg = (
                 'Discr. threshold: {:.2f} {}\n'.format(
                     thr, th_unit) +
                 r'$F_{D}$: ' +
                 r'{:.3f}'.format(
-                    self.proc_data_dict['F_discrimination']))
+                    self.proc_data_dict['F_discr']))
             self.plot_dicts['discr_threshold'] = {
                 'ax_id': '1D_histogram',
                 'plotfn': self.plot_vlines,
-                'x': self.proc_data_dict['threshold_discrimination'],
+                'x': self.proc_data_dict['threshold_discr'],
                 'ymin': 0,
                 'ymax': max_cnts*1.05,
                 'colors': '.3',
@@ -374,7 +371,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
 
 class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
-    pass
+    raise NotImplementedError
 
 
 def get_shots_zero_one(data, preselect: bool=False,
