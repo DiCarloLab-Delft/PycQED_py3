@@ -596,6 +596,10 @@ def double_gauss_guess(model, data, x=None, **kwargs):
     finding the points corresponding to 25% and 75%
     it finds sigma by using the property that ~33% of the data is contained
     in the range mu-sigma to mu+sigma.
+
+    Tip: to use this assign this guess function as a method to a model use:
+        model.guess = double_gauss_guess.__get__(
+            model, model.__class__)
     '''
     if x is None:
         x = np.arange(len(data))

@@ -87,9 +87,9 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
         # interested in extracting the frequency of the oscillation
         cos_mod = lmfit.Model(fit_mods.CosFunc)
 
-        guess_pars = fit_mods.Cos_guess(model=cos_mod,
-                                        t=self.raw_data_dict['sweep_points'][:-4],
-                                        data=self.proc_data_dict['corr_data'][:-4])
+        guess_pars = fit_mods.Cos_guess(
+            model=cos_mod, t=self.raw_data_dict['sweep_points'][:-4],
+            data=self.proc_data_dict['corr_data'][:-4])
 
         # This enforces the oscillation to start at the equator
         # and ensures that any over/under rotation is absorbed in the
