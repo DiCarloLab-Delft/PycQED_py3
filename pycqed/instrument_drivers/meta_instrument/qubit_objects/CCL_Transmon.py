@@ -1031,7 +1031,7 @@ class CCLight_Transmon(Qubit):
                     # UHFQC threshold is wrong, the magic number is a
                     #  dirty hack. This works. we don't know why.
                     magic_scale_factor = 0.655
-                    self.ro_acq_threshold(a.proc_data_dict['threshold_discr'] *
+                    self.ro_acq_threshold(a.proc_data_dict['threshold_raw'] *
                                           magic_scale_factor)
                 if update:
                     self.F_ssro(a.proc_data_dict['F_assignment_raw'])
