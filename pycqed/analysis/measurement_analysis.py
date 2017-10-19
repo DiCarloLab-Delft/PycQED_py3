@@ -92,12 +92,7 @@ class MeasurementAnalysis(object):
         self.box_props = dict(boxstyle='Square', facecolor='white',
                           alpha=0.8, lw=self.axes_line_width)
 
-        if qb_name is None:
-            logging.warning('qb_name is None. Default value qb_name="qb" is '
-                            'used. Old parameter values might not be retrieved.')
-            self.qb_name = 'qb'
-        else:
-            self.qb_name = qb_name
+        self.qb_name = qb_name
 
         if auto is True:
             self.run_default_analysis(TwoD=TwoD, **kw)
@@ -1513,6 +1508,7 @@ class TD_Analysis(MeasurementAnalysis):
             cal_zero_points = list(range(NoPts- int(2*calsteps/3),
                                          NoPts-int(calsteps/3)))
             cal_one_points = list(range(NoPts-int(calsteps/3), NoPts))
+
         else:
             # assume no cal points were used
             print('No calibration points')
@@ -1525,9 +1521,26 @@ class TD_Analysis(MeasurementAnalysis):
             self.corr_data = a_tools.normalize_data_v3(
                 self.measured_values[0], cal_zero_points, cal_one_points)
         else:
-            self.corr_data = a_tools.rotate_and_normalize_data(
-                self.measured_values[0:2], cal_zero_points, cal_one_points,
-                start_at_zero=self.start_at_zero)[0]
+            if (calsteps == 6) and (not self.last_ge_pulse):
+                # For this case we pass in the calibration data, not the indices
+                # of the cal points.
+                # zero_coord takes the cal_one_points and one_coord takes the
+                # cal_zero_points because in a_tools.rotate_and_normalize_data
+                # we must have for this case "calculate_rotation_matrix(
+                # -(I_one-I_zero), -(Q_one-Q_zero))" in order to get
+                # correct rotation
+                zero_coord = [np.mean(self.measured_values[0][cal_one_points]),
+                              np.mean(self.measured_values[1][cal_one_points])]
+                one_coord = [np.mean(self.measured_values[0][cal_zero_points]),
+                             np.mean(self.measured_values[1][cal_zero_points])]
+                self.corr_data = a_tools.rotate_and_normalize_data(
+                    data=self.measured_values[0:2],
+                    zero_coord=zero_coord, one_coord=one_coord,
+                    start_at_zero=self.start_at_zero)[0]
+            else:
+                self.corr_data = a_tools.rotate_and_normalize_data(
+                    self.measured_values[0:2], cal_zero_points, cal_one_points,
+                    start_at_zero=self.start_at_zero)[0]
 
         if save_norm_to_data_file:
             self.add_dataset_to_analysisgroup('Corrected data',
@@ -1742,14 +1755,14 @@ class Rabi_Analysis(TD_Analysis):
     """
     Analysis script for a Rabi measurement:
         1. The I and Q data are rotated and normalized based on the calibration
-            points. In most
-            analysis routines, the latter are typically 4: 2 X180 measurements,
-            and 2 identity measurements, which get averaged resulting in one
-            X180 point and one identity point. However, the default for Rabi
-            is 2 (2 identity measurements) because we typically do Rabi in
-            order to find the correct amplitude for an X180 pulse. However,
-            if a previous such value exists, this routine also accepts
-            4 cal pts.
+            points. In most analysis routines, the latter are typically 4:
+            2 X180 measurements, and 2 identity measurements, which get averaged
+            resulting in one X180 point and one identity point. However, the
+            default for Rabi is 2 (2 identity measurements) because we typically
+            do Rabi in order to find the correct amplitude for an X180 pulse.
+            However, if a previous such value exists, this routine also accepts
+            4 cal pts. If X180_ef pulse was also previously calibrated, this
+            routine also accepts 6 cal pts.
         2. The normalized data is fitted to a cosine function.
         3. The pi-pulse and pi/2-pulse amplitudes are calculated from the fit.
         4. The normalized data, the best fit results, and the pi and pi/2
@@ -1795,7 +1808,9 @@ class Rabi_Analysis(TD_Analysis):
         cos_mod = fit_mods.CosModel
         average = np.mean(self.normalized_data_points)
 
-        fft_of_data = np.fft.fft(self.normalized_data_points,norm='ortho')
+        # Find guess values
+        # Frequency guess
+        fft_of_data = np.fft.fft(self.normalized_data_points, norm='ortho')
         power_spectrum = np.abs(fft_of_data)**2
         index_of_fourier_maximum = np.argmax(
             power_spectrum[1:len(fft_of_data)//2])+1
@@ -1815,16 +1830,18 @@ class Rabi_Analysis(TD_Analysis):
                              self.sweep_points[0])
             freq_guess = fft_scale*index_of_fourier_maximum
 
+        # Amplitude guess
         diff = 0.5*(max(self.normalized_data_points) -
                     min(self.normalized_data_points))
         amp_guess = -diff
 
-        #phase guess
+        # phase guess --> NOT NEEDED because in cal pts calibration we make sure
+        #                 Rabi trace starts at (closest to) zero
         # phase_guess = np.angle(fft_of_data[index_of_fourier_maximum])
         # if phase_guess<0:
         #     phase_guess=-phase_guess
 
-        #offset guess
+        # Offset guess
         if np.abs( np.abs(min(self.normalized_data_points)) -
                            np.abs(max(self.normalized_data_points)) ) < 3:
             offset_guess=(min(self.normalized_data_points)+
@@ -1876,10 +1893,13 @@ class Rabi_Analysis(TD_Analysis):
 
         show_guess = kw.get('show_guess', False)
         plot_amplitudes = kw.get('plot_amplitudes',True)
-        plot_errorbars = kw.get('plot_errorbars',True)
+        plot_errorbars = kw.get('plot_errorbars',False)
         print_fit_results = kw.get('print_fit_results',True)
         scale = self.scales_dict[unit_prefix]
 
+        # Create new sweep points without cal pts variable. Needed here because
+        # we may have 0 cal pts, so writing self.sweep_points[:-self.NoCalPoints]
+        # will give an error if self.NoCalPoints==0.
         self.sweep_pts_wo_cal_pts = deepcopy(self.sweep_points)
         self.scaled_sweep_pts_wo_cal_pts = deepcopy(self.scaled_sweep_points)
         if self.NoCalPoints is not 0:
@@ -1923,18 +1943,26 @@ class Rabi_Analysis(TD_Analysis):
 
         pi_pulse = self.rabi_amplitudes['piPulse']
         pi_half_pulse = self.rabi_amplitudes['piHalfPulse']
-        # Get old values
+
+        # Get previously measured values from the data file
         instr_set = self.data_file['Instrument settings']
         try:
             if self.analyze_ef:
                 pi_pulse_old = float(instr_set[self.qb_name].attrs['amp180_ef'])
-                pi_half_pulse_old = pi_pulse_old*float(instr_set[self.qb_name].attrs['amp90_scale_ef'])
+                pi_half_pulse_old = \
+                    pi_pulse_old*float(instr_set[self.qb_name].attrs['amp90_scale_ef'])
             else:
                 pi_pulse_old = float(instr_set[self.qb_name].attrs['amp180'])
-                pi_half_pulse_old = pi_pulse_old*float(instr_set[self.qb_name].attrs['amp90_scale'])
-        except KeyError:
-            pi_pulse_old = 0
-            pi_half_pulse_old = 0.5
+                pi_half_pulse_old = \
+                    pi_pulse_old*float(instr_set[self.qb_name].attrs['amp90_scale'])
+            old_vals = '\n  $\pi-Amp_{old}$ = %.3g ' % (pi_pulse_old) + \
+                        self.parameter_units[0]+ \
+                        '\n$\pi/2-Amp_{old}$ = %.3g '% (pi_half_pulse_old) + \
+                        self.parameter_units[0]
+        except(TypeError, KeyError, ValueError) as e:
+            logging.warning('qb_name is None. Default value qb_name="qb" is '
+                            'used. Old parameter values will not be retrieved.')
+            old_vals = ''
 
         textstr = ('  $\pi-Amp$ = %.3g ' % (pi_pulse)+self.parameter_units[0]+
                    ' $\pm$ (%.3g) '% (self.rabi_amplitudes['piPulse_std'])+
@@ -1942,18 +1970,14 @@ class Rabi_Analysis(TD_Analysis):
                    '\n$\pi/2-Amp$ = %.3g '% (pi_half_pulse)+
                    self.parameter_units[0]+
                    ' $\pm$ (%.3g) '% (self.rabi_amplitudes['piHalfPulse_std'])+
-                   self.parameter_units[0]+
-                   '\n  $\pi-Amp_{old}$ = %.3g ' % (pi_pulse_old) +
-                   self.parameter_units[0]+
-                   '\n$\pi/2-Amp_{old}$ = %.3g '% (pi_half_pulse_old) +
-                   self.parameter_units[0])
+                   self.parameter_units[0]+ old_vals)
 
         self.fig.text(0.5,0,textstr,
                  transform=self.ax.transAxes, fontsize=self.font_size,
                  verticalalignment='top',
                  horizontalalignment='center',bbox=self.box_props)
 
-        #Used for plotting the fit (line 1776)
+        # Used for plotting the fit (line 1776)
         best_vals = self.fit_res.best_values
         cos_fit_func = lambda a: fit_mods.CosFunc(a,
                                               amplitude=best_vals['amplitude'],
@@ -1961,7 +1985,7 @@ class Rabi_Analysis(TD_Analysis):
                                               phase=best_vals['phase'],
                                               offset=best_vals['offset'])
 
-        #Plot error bars
+        # Plot error bars
         if plot_errorbars:
             a_tools.plot_errorbars(self.scaled_sweep_pts_wo_cal_pts,
                                    self.normalized_data_points,
@@ -1970,18 +1994,18 @@ class Rabi_Analysis(TD_Analysis):
                                    marker='none',
                                    markersize=self.marker_size)
 
-        # plot with initial guess
+        # Plot with initial guess
         if show_guess:
             self.ax.plot(self.scaled_sweep_pts_wo_cal_pts,
                     self.fit_res.init_fit, 'k--', linewidth=self.line_width)
 
-        #Plot the calculated pi and pi/2 amplitudes
+        # Plot the calculated pi and pi/2 amplitudes
         if plot_amplitudes:
 
             piPulse_fit = cos_fit_func(pi_pulse)
             piHalfPulse_fit = cos_fit_func(pi_half_pulse)
 
-            #plot 2 horizontal lines for piAmpl and piHaldAmpl
+            # Plot 2 horizontal lines for piAmpl and piHalfAmpl
             self.ax.plot([min(self.scaled_sweep_points),
                           max(self.scaled_sweep_points)],
                     [piPulse_fit, piPulse_fit], 'k--',
@@ -1990,24 +2014,14 @@ class Rabi_Analysis(TD_Analysis):
                           max(self.scaled_sweep_points)],
                     [piHalfPulse_fit, piHalfPulse_fit], 'k--',
                     linewidth=self.axes_line_width)
-            #show only 2 sig figs
-            # self.ax.xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
-            # self.ax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
-            #Set ticks and labels
-            # self.ax.set_xticks([min(self.scaled_sweep_points),pi_pulse,
-        #                         pi_half_pulse,
-            #                     max(self.scaled_sweep_points)])
-            # self.ax.set_yticks([piPulse_fit,piHalfPulse_fit,1.0])
-            #self.ax.set_yticks(np.arange(0,1.25,0.25))
-            #self.ax.set_yticks(np.arange(0,1.25,0.25))
 
-            #plot two points for the pi and piHalf pulses
+            # Plot two points for the pi and piHalf pulses
             self.ax.plot(pi_pulse, piPulse_fit, 'ro',
                     markersize=self.marker_size_special)
             self.ax.plot(pi_half_pulse, piHalfPulse_fit, 'ro',
                     markersize=self.marker_size_special)
 
-        #plot with best fit results
+        # Plot with best fit results
         x = np.linspace(self.sweep_points[0],
                         self.sweep_pts_wo_cal_pts[-1],
                         len(self.sweep_points)*100)
@@ -2025,10 +2039,11 @@ class Rabi_Analysis(TD_Analysis):
 
         assert freq_fit != 0 ,"Fitted frequency is zero."
 
+        # THESE CHECKS ARE NOT USED BECAUSE PHASE WAS FIXED AT 0.
         #If fitted_phase<0, shift fitted_phase by 4. This corresponds to a
         # shift of 2pi in the argument of cos.
-        if phase_fit < 0.1:
-            phase_fit = 0
+        # if phase_fit < 0.1:
+        #     phase_fit = 0
 
         #If phase_fit<1, the piHalf amplitude<0.
         # if phase_fit < 1:
@@ -2675,12 +2690,6 @@ class QScale_Analysis(TD_Analysis):
         x_fine = np.linspace(min(self.sweep_points[:-self.NoCalPoints]),
                              max(self.sweep_points[:-self.NoCalPoints]),
                              1000)
-        # self.ax.plot(self.sweep_points_xX, self.corr_data_xX, 'o', c='b',
-        # label=r'$X_{\frac{\pi}{2}}X_{\pi}$')
-        # self.ax.plot(self.sweep_points_xY, self.corr_data_xY, 'o', c='g',
-        # label=r'$X_{\frac{\pi}{2}}Y_{\pi}$')
-        # self.ax.plot(self.sweep_points_xmY, self.corr_data_xmY, 'o', c='r',
-        # label=r'$X_{\frac{\pi}{2}}Y_{-\pi}$')
 
         # Get old values
         instr_set = self.data_file['Instrument settings']
@@ -2689,13 +2698,15 @@ class QScale_Analysis(TD_Analysis):
                 qscale_old = float(instr_set[self.qb_name].attrs['motzoi_ef'])
             else:
                 qscale_old = float(instr_set[self.qb_name].attrs['motzoi'])
-        except KeyError:
-            qscale_old = 0
+            old_vals = '\n$qscale_{old} = $%.5g' % (qscale_old)
+        except (TypeError, KeyError, ValueError) as e:
+            logging.warning('qb_name is None. Old parameter values will '
+                            'not be retrieved.')
+            old_vals = ''
 
-        textstr = ('qscale = %.5g $ \pm$ (%.5g)'
-                   % (self.optimal_qscale['qscale'],self.optimal_qscale['qscale_std']) +
-                   '\n$qscale_{old} = %.5g$'
-                   % (qscale_old))
+        textstr = ('qscale = %.5g $\pm$ %.5g'
+                   % (self.optimal_qscale['qscale'],
+                      self.optimal_qscale['qscale_std']) + old_vals)
 
         if self.analyze_ef:
             ylabel = r'$F$ $\left(|f \rangle \right) (arb. units)$'
@@ -2722,9 +2733,9 @@ class QScale_Analysis(TD_Analysis):
                                         marker='or',
                                         label=r'$X_{\frac{\pi}{2}}Y_{-\pi}$',
                                         ticks_around=True,
-                                        xlabel='qscales (arb. units)',
+                                        xlabel=r'$q_{scales}$',
                                         ylabel=ylabel)
-        ax.legend(loc='best')
+        ax.legend(loc='best',  prop={'size': self.font_size})
         #c = ['b', 'g', 'r']
         c = ['g', 'r']
         if hasattr(self, 'fit_res'):
@@ -2756,8 +2767,8 @@ class QScale_Analysis(TD_Analysis):
         red_line = mlines.Line2D([], [], color='red', marker='o',
                                   markersize=self.marker_size,
                                   label=r'$X_{\frac{\pi}{2}}Y_{-\pi}$')
-        ax.legend(handles=[blue_line, green_line, red_line], loc='upper right')
-        # ax.set_ylim(-.1, 1.1)
+        ax.legend(handles=[blue_line, green_line, red_line], loc='upper right',
+                  prop={'size': self.font_size})
 
         qscale = self.optimal_qscale['qscale']
         ax.plot([qscale, qscale],
@@ -2817,17 +2828,29 @@ class QScale_Analysis(TD_Analysis):
                   'Fit Report - X'+pretty(pi)+'/2 Y-'+pretty(pi)+':\n{}\n'.
                   format(self.fit_res[2].fit_report()))
 
-    def calculate_optimal_qscale(self, **kw):
+    def calculate_optimal_qscale(self, threshold=0.02, **kw):
 
         #The best qscale parameter is the point where all 3 curves intersect.
 
         show_qscale = kw.get('show_qscale', True)
 
-        #b_vals0 = self.fit_res[0].best_values
+        b_vals0 = self.fit_res[0].best_values
         b_vals1 = self.fit_res[1].best_values
         b_vals2 = self.fit_res[2].best_values
         optimal_qscale = (b_vals1['intercept']-b_vals2['intercept'])/\
                          (b_vals2['slope']-b_vals1['slope'])
+
+        # Warning if Xpi/2Xpi line is not within +/-threshold of 0.5
+        if (b_vals0['c'] > (0.5+threshold)) or (b_vals0['c']<(0.5-threshold)):
+            logging.warning('The trace from the X90-X180 pulses is NOT within '
+                            '+/-%s of the expected value of 0.5.'%threshold)
+        # Warning if optimal_qscale is not within +/-threshold of 0.5
+        optimal_qscale_pop = optimal_qscale*b_vals2['slope']+b_vals2['intercept']
+        if (optimal_qscale_pop > (0.5+threshold)) or \
+                (optimal_qscale_pop<(0.5-threshold)):
+            logging.warning('The optimal qscale found gives a population that is '
+                            'NOT within +/-%s of the expected value of 0.5.'
+                            %threshold)
 
         #Calculate standard deviation
         #(http://ugastro.berkeley.edu/infrared09/PDF-2009/statistics1.pdf)
@@ -2835,25 +2858,39 @@ class QScale_Analysis(TD_Analysis):
         m1_idx = self.fit_res[1].var_names.index('slope')
         b2_idx = self.fit_res[2].var_names.index('intercept')
         m2_idx = self.fit_res[2].var_names.index('slope')
-        cov_b1_m1 = self.fit_res[1]. covar[b1_idx,m1_idx]
-        cov_b2_m2 = self.fit_res[2]. covar[b2_idx,m2_idx]
-        cov_qscale = - cov_b1_m1 - cov_b2_m2
+
+        if self.fit_res[1].covar is not None:
+            cov_b1_m1 = self.fit_res[1].covar[b1_idx,m1_idx]
+        else:
+            cov_b1_m1 = 0
+        if self.fit_res[2].covar is not None:
+            cov_b2_m2 = self.fit_res[2].covar[b2_idx,m2_idx]
+        else:
+            cov_b2_m2 = 0
+
+        cov_qscale_squared = (- cov_b1_m1 - cov_b2_m2)**2
 
         intercept_diff_mean = self.fit_res[1].params['intercept'].value - \
                               self.fit_res[2].params['intercept'].value
         slope_diff_mean = self.fit_res[2].params['slope'].value - \
                           self.fit_res[1].params['slope'].value
+
         intercept_diff_std_squared = \
-            (self.fit_res[1].params['intercept'].stderr)**2 - \
+            (self.fit_res[1].params['intercept'].stderr)**2 + \
             (self.fit_res[2].params['intercept'].stderr)**2
         slope_diff_std_squared = \
-            (self.fit_res[2].params['slope'].stderr)**2 - \
+            (self.fit_res[2].params['slope'].stderr)**2 + \
             (self.fit_res[1].params['slope'].stderr)**2
 
-        optimal_qscale_stddev = optimal_qscale*np.sqrt(
-            intercept_diff_std_squared/((intercept_diff_mean)**2) +
-            slope_diff_std_squared/((slope_diff_mean)**2) - \
-            2*cov_qscale/(intercept_diff_mean*slope_diff_mean) )
+        sqrt_quantity = intercept_diff_std_squared/((intercept_diff_mean)**2) + \
+                        slope_diff_std_squared/((slope_diff_mean)**2) - \
+                        2*cov_qscale_squared/(intercept_diff_mean*slope_diff_mean)
+        if sqrt_quantity<0:
+            optimal_qscale_stddev = optimal_qscale*np.sqrt(
+                intercept_diff_std_squared/((intercept_diff_mean)**2) + \
+                slope_diff_std_squared/((slope_diff_mean)**2))
+        else:
+            optimal_qscale_stddev = optimal_qscale*np.sqrt(sqrt_quantity)
 
         if show_qscale:
             print('Optimal QScale Parameter = {} \t QScale Stddev = {}'.format(
@@ -4093,7 +4130,7 @@ class T1_Analysis(TD_Analysis):
         self.save_fitted_parameters(fit_res=self.fit_res, var_name='F|1>')
 
         #Create self.T1 and self.T1_stderr and save them
-        self.get_measured_T1() #in seconds!!! Only here.
+        self.get_measured_T1() #in seconds
         self.save_computed_parameters(self.T1, var_name=self.value_names[0])
 
         T1_micro_sec = self.T1['T1']*scale
@@ -4114,15 +4151,16 @@ class T1_Analysis(TD_Analysis):
                     T1_old = float(instr_set[self.qb_name].attrs['T1_ef'])*1e6
                 else:
                     T1_old = float(instr_set[self.qb_name].attrs['T1'])*1e6
-            except KeyError:
-                T1_old = 0
+                old_vals = '\nold $T_1$ = {:.5f} '.format(T1_old)  + self.parameter_units[0]
+            except (TypeError, KeyError, ValueError) as e:
+                logging.warning('qb_name is None. Old parameter values will '
+                                'not be retrieved.')
+                old_vals = ''
 
             textstr = ('$T_1$ = {:.5f} '.format(T1_micro_sec)  +
                        self.parameter_units[0] +
                        ' $\pm$ {:.5f} '.format(T1_err_micro_sec) +
-                       self.parameter_units[0] +
-                       '\nold $T_1$ = {:.5f} '.format(T1_old)  +
-                       self.parameter_units[0])
+                       self.parameter_units[0] + old_vals)
 
             self.fig.text(0.5, 0, textstr, transform=self.ax.transAxes,
                      fontsize=self.font_size,
@@ -4161,11 +4199,11 @@ class T1_Analysis(TD_Analysis):
     def get_measured_T1(self):
         fitted_pars = self.data_file['Analysis']['Fitted Params F|1>']
 
-        T1 = self.fit_res.params['tau'].value           #in micro-seconds
-        T1_stderr = self.fit_res.params['tau'].stderr   #in micro-seconds
+        T1 = self.fit_res.params['tau'].value
+        T1_stderr = self.fit_res.params['tau'].stderr
 
         #return as dict for use with "save_computed_parameters"; units are
-        #seconds here
+        #seconds
         self.T1 = {'T1':T1, 'T1_stderr':T1_stderr}
 
         return self.T1
@@ -4322,16 +4360,21 @@ class Ramsey_Analysis(TD_Analysis):
             close_file=close_file,unit_prefix=unit_prefix,
             close_main_figure=True,save_fig=False,**kw)
 
-        self.artificial_detuning = kw.pop('artificial_detuning',0)
         show_guess = kw.get('show_guess', False)
+
         # Get old values for qubit frequency
         instr_set = self.data_file['Instrument settings']
         try:
             if self.analyze_ef:
-                self.qubit_freq_spec = float(instr_set[self.qb_name].attrs['f_ef_qubit'])
+                self.qubit_freq_spec = \
+                    float(instr_set[self.qb_name].attrs['f_ef_qubit'])
             else:
-                self.qubit_freq_spec = float(instr_set[self.qb_name].attrs['f_qubit'])
-        except KeyError:
+                self.qubit_freq_spec = \
+                    float(instr_set[self.qb_name].attrs['f_qubit'])
+        except (TypeError, KeyError, ValueError) as e:
+            logging.warning('qb_name is None. Setting previously measured value '
+                            'of the qubit frequency to 0. New qubit frequency'
+                            'might be incorrect.')
             self.qubit_freq_spec = 0
 
         self.add_analysis_datagroup_to_file()
@@ -4344,12 +4387,17 @@ class Ramsey_Analysis(TD_Analysis):
         self.save_fitted_parameters(self.fit_res, var_name=self.value_names[0])
 
         # Calculate new qubit frequency
+        self.artificial_detuning = kw.pop('artificial_detuning',0)
+        if self.artificial_detuning == 0:
+            logging.warning('Artificial detuning is unknown. Defaults to %s MHz. '
+                            'New qubit frequency might be incorrect.'
+                            %self.artificial_detuning)
         self.qubit_frequency = self.qubit_freq_spec + self.artificial_detuning \
                                - self.ramsey_freq['freq']
 
         #Extract T2 star and save it
-        self.get_measured_T2_star(fit_res=self.fit_res, **kw)  #defines self.T2_star as a dic; units
-                                         #are seconds
+        self.get_measured_T2_star(fit_res=self.fit_res, **kw)
+        # the call above defines self.T2_star as a dict; units are seconds
         self.save_computed_parameters(self.T2_star,
                                       var_name=self.value_names[0])
 
@@ -4371,12 +4419,9 @@ class Ramsey_Analysis(TD_Analysis):
                 self.T2_star['T2_star_stderr']*scale) +
                 '('+pretty(mu)+unit+')')
 
-        # stepsize = self.sweep_points[1] - self.sweep_points[0]
-        # self.total_detuning = self.fit_res.params['frequency'].value
-        # self.detuning_stderr = self.fit_res.params['frequency'].stderr
-        #
-        # self.artificial_detuning = 4./(60*stepsize)
-        # self.detuning = self.total_detuning - self.artificial_detuning
+        self.total_detuning = self.fit_res.params['frequency'].value
+        self.detuning_stderr = self.fit_res.params['frequency'].stderr
+        self.detuning = self.total_detuning - self.artificial_detuning
 
         #dispaly figure
         if show:
@@ -4561,21 +4606,11 @@ class Ramsey_Analysis_multiple_detunings(TD_Analysis):
                                      close_file=close_file,unit_prefix=unit_prefix,
                                      close_main_figure=True,save_fig=False,**kw)
 
-        # self.get_naming_and_values()
-        # self.add_analysis_datagroup_to_file()
-        #
-        # norm = self.normalize_data_to_calibration_points(
-        #     self.measured_values[0], calsteps=self.NoCalPoints)
-        # self.normalized_values = norm[0]
-        # self.normalized_data_points = norm[1]
-        # self.normalized_cal_vals = norm[2]
-        #
-        # self.add_dataset_to_analysisgroup('Corrected data',
-        #                                   self.corr_data)
-        # self.analysis_group.attrs.create('corrected data based on',
-        #                                  'calibration points'.encode('utf-8'))
-
-        self.artificial_detunings = kw.pop('artificial_detunings',[-4e6,4e6])
+        self.artificial_detunings = kw.pop('artificial_detunings',[0,0])
+        if self.artificial_detunings == [0,0]:
+            logging.warning('Artificial detunings are unknown. Default to '
+                            '%s MHz. New qubit frequency might be incorrect.'
+                            %self.artificial_detunings)
 
         # Get old qubit frequency from data file
         instr_set = self.data_file['Instrument settings']
@@ -4584,7 +4619,10 @@ class Ramsey_Analysis_multiple_detunings(TD_Analysis):
                 self.qubit_freq_spec = float(instr_set[self.qb_name].attrs['f_ef_qubit'])
             else:
                 self.qubit_freq_spec = float(instr_set[self.qb_name].attrs['f_qubit'])
-        except KeyError:
+        except (TypeError, KeyError, ValueError) as e:
+            logging.warning('qb_name is None. Setting previously measured value '
+                            'of the qubit frequency to 0. New qubit frequency'
+                            'might be incorrect.')
             self.qubit_freq_spec = 0
         scale = self.scales_dict[unit_prefix]
 
@@ -4626,18 +4664,6 @@ class Ramsey_Analysis_multiple_detunings(TD_Analysis):
         # Get new qubit frequency
         self.qubit_frequency = self.new_qb_freqs[str(self.correct_key)]
 
-        # vals, inverse, count = np.unique(qb_detunings, return_inverse=True,
-        #                                  return_counts=True)
-        # print(vals, inverse, count)
-        # idx_vals_repeated = np.where(count > 1)[0]
-        # print(idx_vals_repeated)
-        # vals_repeated = vals[idx_vals_repeated]
-        # print(vals_repeated)
-        # self.qb_detuning = vals_repeated
-        # self.qubit_frequency = self.qubit_freq_spec + self.qb_detuning
-
-        #match_idxs = np.where(qb_detunings==vals_repeated)[0]
-        # if match_idxs[0] == 0:
         if self.correct_key < 2:
             # art_det 1 was correct direction
             # print('Artificial detuning {:.1f} MHz gave the best results.'.format(
@@ -4661,15 +4687,17 @@ class Ramsey_Analysis_multiple_detunings(TD_Analysis):
         self.save_fitted_parameters(self.fit_res, var_name=self.value_names[0])
 
         #Extract T2 star and save it
-        self.get_measured_T2_star(fit_res=self.fit_res, **kw)  #defines self.T2_star as a dic; units
-        #are seconds
+        self.get_measured_T2_star(fit_res=self.fit_res, **kw)  #defines self.T2_star as a dict;
+        # units are seconds
         self.save_computed_parameters(self.T2_star,
                                       var_name=self.value_names[0])
         self.save_computed_parameters({'new_qubit_frequency':self.qubit_frequency,
                                        'new_qubit_freq_stderr':qb_stderr},
                                       var_name=self.value_names[0])
 
-        # Plot results
+        ################
+        # Plot results #
+        ################
         show_guess = kw.pop('show_guess', False)
 
         if self.analyze_ef:
@@ -4696,7 +4724,7 @@ class Ramsey_Analysis_multiple_detunings(TD_Analysis):
                                             fig=self.fig, ax=ax,
                                             xlabel=self.xlabel,
                                             ylabel=ylabel,
-                                            marker='o',
+                                            marker='o-',
                                             save=False)
             self.plot_results(fit_res_array[i], show_guess=show_guess,
                               scale=scale, art_det=self.artificial_detunings[i],
@@ -5561,7 +5589,8 @@ class Homodyne_Analysis(MeasurementAnalysis):
         measured_powers_smooth = a_tools.smooth(self.measured_powers,
                                           window_len=window_len_filter)
         self.peaks = a_tools.peak_finder((self.sweep_points),
-                                         measured_powers_smooth)
+                                         measured_powers_smooth,
+                                         optimize=False)
 
         # Search for peak
         if self.peaks['dip'] is not None:    # look for dips first
@@ -5726,8 +5755,11 @@ class Homodyne_Analysis(MeasurementAnalysis):
         instr_set = self.data_file['Instrument settings']
         try:
             old_RO_freq = float(instr_set[self.qb_name].attrs['f_RO'])
-        except KeyError:
-            old_RO_freq = 0
+            old_vals = '\n$f_{\mathrm{old}}$ = %.5f GHz' %(old_RO_freq*scale)
+        except (TypeError, KeyError, ValueError) as e:
+            logging.warning('qb_name is None. Old parameter values will '
+                            'not be retrieved.')
+            old_vals = ''
 
         if ('hanger' in fitting_model) or ('complex' in fitting_model):
             textstr = '$f_{\mathrm{center}}$ = %.5f GHz $\pm$ (%.3g) GHz' % (
@@ -5737,19 +5769,27 @@ class Homodyne_Analysis(MeasurementAnalysis):
                 fit_res.params['Qc'].value,
                 fit_res.params['Qc'].stderr) + '\n' \
                 '$Qi$ = %.1f $\pm$ (%.1f)' % (
-                    fit_res.params['Qi'].value, fit_res.params['Qi'].stderr) + '\n' \
-                '$f_{\mathrm{old}}$ = %.5f GHz' %(old_RO_freq*scale)
+                    fit_res.params['Qi'].value, fit_res.params['Qi'].stderr) + \
+                old_vals
 
         elif fitting_model == 'lorentzian':
-            textstr = '$f_{{\mathrm{{center}}}}$ = {:.5f} GHz ' \
-                      '$\pm$ ({:.3g}) GHz\n' \
-                      '$Q$ = {:.1f} $\pm$ ({:.1f}) ' \
-                      '\n$f_{\mathrm{{old}}$ = {:.5f} GHz '.format(
-                          fit_res.params['f0'].value*scale,
-                          fit_res.params['f0'].stderr*scale,
-                          fit_res.params['Q'].value,
-                          fit_res.params['Q'].stderr,
-                          old_RO_freq*scale)
+            textstr = '$f_{{\mathrm{{center}}}}$ = %.5f GHz ' \
+                      '$\pm$ (%.3g) GHz' % (
+                       fit_res.params['f0'].value*scale,
+                       fit_res.params['f0'].stderr*scale) + '\n' \
+                      '$Q$ = %.1f $\pm$ (%.1f)' %(
+                       fit_res.params['Q'].value,
+                       fit_res.params['Q'].stderr) + old_vals
+
+            # textstr = '$f_{{\mathrm{{center}}}}$ = {:.5f} GHz ' \
+            #           '$\pm$ ({:.3g}) GHz\n' \
+            #           '$Q$ = {:.1f} $\pm$ ({:.1f}) ' \
+            #           '\n$f_{\mathrm{{old}}$ = {:.5f} GHz '.format(
+            #     fit_res.params['f0'].value*scale,
+            #     fit_res.params['f0'].stderr*scale,
+            #     fit_res.params['Q'].value,
+            #     fit_res.params['Q'].stderr,
+            #     old_RO_freq*scale)
 
         fig.text(0.5, 0, textstr, transform=ax.transAxes,
                 fontsize=self.font_size,
@@ -6132,6 +6172,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         num_sigma_threshold = kw.get('num_sigma_threshold',5)
         window_len_filter = kw.get('window_len',3)
         window_len_cut_edges = kw.get('analysis_window',10)
+        verbose = kw.get('verbose',False)
 
         if amp_only:
             self.data_dist = a_tools.calculate_distance_ground_state(
@@ -6156,7 +6197,6 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         #Find peaks
         self.peaks = a_tools.peak_finder(sweep_pts_cut_edges,
                                          data_dist_smooth,
-                                         analyze_ef=analyze_ef,
                                          percentile=percentile,
                                          num_sigma_threshold=num_sigma_threshold)
 
@@ -6190,14 +6230,15 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                             'initial linewidth '
                             'guess was taken as kappa_guess={}'.format(
                              f0,kappa_guess))
+            key = 'peak'
 
         tallest_peak = f0 #the ge freq
-        print('tallest peak at ',tallest_peak)
+        if verbose:
+            print('Largest '+key+' is at ',tallest_peak)
         if f0 == self.peaks[key]:
             tallest_peak_idx = self.peaks[key+'_idx']
-            print('tallest peak idx = ',tallest_peak_idx)
-
-        print('Searching for '+key+'s.')
+            if verbose:
+                print('Largest '+key+' idx is ',tallest_peak_idx)
 
         amplitude_guess = np.pi * kappa_guess * \
                           abs(max(data_dist_smooth) - min(data_dist_smooth))
@@ -6240,7 +6281,8 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                 data_dist_smooth=data_dist_smooth,
                 key=key,
                 peaks=self.peaks,
-                percentile=percentile)
+                percentile=percentile,
+                verbose=verbose)
 
             if f0 == 0:
                 f0 = tallest_peak
@@ -6249,7 +6291,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
             if kappa_guess == 0:
                 kappa_guess = 5e6
             if kappa_guess_ef == 0:
-                kappa_guess_ef == 2.5e6
+                kappa_guess_ef = 2.5e6
 
             amplitude_guess = np.pi * kappa_guess * \
                               abs(max(data_dist_smooth) - min(data_dist_smooth))
@@ -6306,17 +6348,14 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                              unit_prefix='G', **kw):
 
         super(self.__class__, self).run_default_analysis(
-            close_file=False,unit_prefix=unit_prefix,show=show,**kw)
+            close_file=False, unit_prefix=unit_prefix, show=show,**kw)
 
         self.add_analysis_datagroup_to_file()
         self.savename = kw.get('save_name', 'Source Frequency')
         show_guess = kw.get('show_guess', False)
         close_file = kw.get('close_file', True)
         interactive_plot = kw.pop('interactive_plot',False)
-        #self.get_naming_and_values(unit_prefix=unit_prefix)
-        scale = self.scales_dict[unit_prefix] #this line needs to be here
-                                              #because self.scales_dict is
-                                              #created in get_naming_and_values
+        scale = self.scales_dict[unit_prefix]
 
         use_max = kw.get('use_max', False)
 
@@ -6333,41 +6372,61 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         if analyze_ef:
             try:
                 old_freq = float(instr_set[self.qb_name].attrs['f_qubit'])
-            except KeyError:
-                old_freq = 0
-            try:
                 old_freq_ef = float(instr_set[self.qb_name].attrs['f_ef_qubit'])
-            except KeyError:
-                old_freq_ef = 0
-            label = 'f0={:.5f} GHz $\pm$ ({:.2f}) MHz ' \
-                    '\nold f0={:.5f} GHz' \
-                    '\nkappa0={:.4f} MHz $\pm$ ({:.2f}) MHz\n'\
-                    'f0_gf/2={:.5f} GHz $\pm$ ({:.2f}) MHz ' \
-                    '\nold f0_gf/2={:.5f} GH' \
-                    '\nkappa_gf={:.4f} MHz $\pm$ ({:.2f}) MHz'.format(
-                self.fit_res.params['f0'].value*scale,
-                self.fit_res.params['f0'].stderr/1e6,
-                old_freq*scale,
-                self.fit_res.params['kappa'].value/1e6,
-                self.fit_res.params['kappa'].stderr/1e6,
-                self.fit_res.params['f0_gf_over_2'].value*scale,
-                self.fit_res.params['f0_gf_over_2'].stderr/1e6,
-                old_freq_ef*scale,
-                self.fit_res.params['kappa_gf_over_2'].value/1e6,
-                self.fit_res.params['kappa_gf_over_2'].stderr/1e6)
+
+                label = 'f0={:.5f} GHz $\pm$ ({:.2f}) MHz ' \
+                        '\nold f0={:.5f} GHz' \
+                        '\nkappa0={:.4f} MHz $\pm$ ({:.2f}) MHz\n' \
+                        'f0_gf/2={:.5f} GHz $\pm$ ({:.2f}) MHz ' \
+                        '\nold f0_gf/2={:.5f} GHz' \
+                        '\nkappa_gf={:.4f} MHz $\pm$ ({:.2f}) MHz'.format(
+                    self.fit_res.params['f0'].value*scale,
+                    self.fit_res.params['f0'].stderr/1e6,
+                    old_freq*scale,
+                    self.fit_res.params['kappa'].value/1e6,
+                    self.fit_res.params['kappa'].stderr/1e6,
+                    self.fit_res.params['f0_gf_over_2'].value*scale,
+                    self.fit_res.params['f0_gf_over_2'].stderr/1e6,
+                    old_freq_ef*scale,
+                    self.fit_res.params['kappa_gf_over_2'].value/1e6,
+                    self.fit_res.params['kappa_gf_over_2'].stderr/1e6)
+            except (TypeError, KeyError, ValueError) as e:
+                logging.warning('qb_name is None. Old parameter values will '
+                                'not be retrieved.')
+                label = 'f0={:.5f} GHz $\pm$ ({:.2f}) MHz ' \
+                        '\nkappa0={:.4f} MHz $\pm$ ({:.2f}) MHz\n'\
+                        'f0_gf/2={:.5f} GHz $\pm$ ({:.2f}) MHz ' \
+                        '\nkappa_gf={:.4f} MHz $\pm$ ({:.2f}) MHz'.format(
+                    self.fit_res.params['f0'].value*scale,
+                    self.fit_res.params['f0'].stderr/1e6,
+                    self.fit_res.params['kappa'].value/1e6,
+                    self.fit_res.params['kappa'].stderr/1e6,
+                    self.fit_res.params['f0_gf_over_2'].value*scale,
+                    self.fit_res.params['f0_gf_over_2'].stderr/1e6,
+                    self.fit_res.params['kappa_gf_over_2'].value/1e6,
+                    self.fit_res.params['kappa_gf_over_2'].stderr/1e6)
         else:
             try:
                 old_freq = float(instr_set[self.qb_name].attrs['f_qubit'])
-            except KeyError:
-                old_freq = 0
-            label = 'f0={:.5f} GHz $\pm$ ({:.2f}) MHz ' \
-                    '\nold f0={:.5f} GHz' \
-                    '\nkappa0={:.4f} MHz $\pm$ ({:.2f}) MHz'.format(
-                self.fit_res.params['f0'].value*scale,
-                self.fit_res.params['f0'].stderr/1e6,
-                old_freq*scale,
-                self.fit_res.params['kappa'].value/1e6,
-                self.fit_res.params['kappa'].stderr/1e6)
+
+                label = 'f0={:.5f} GHz $\pm$ ({:.2f}) MHz ' \
+                        '\nold f0={:.5f} GHz' \
+                        '\nkappa0={:.4f} MHz $\pm$ ({:.2f}) MHz'.format(
+                    self.fit_res.params['f0'].value*scale,
+                    self.fit_res.params['f0'].stderr/1e6,
+                    old_freq*scale,
+                    self.fit_res.params['kappa'].value/1e6,
+                    self.fit_res.params['kappa'].stderr/1e6)
+            except (TypeError, KeyError, ValueError) as e:
+                logging.warning('qb_name is None. Old parameter values will '
+                                'not be retrieved.')
+                label = 'f0={:.5f} GHz $\pm$ ({:.2f}) MHz ' \
+                        '\nkappa0={:.4f} MHz $\pm$ ({:.2f}) MHz'.format(
+                    self.fit_res.params['f0'].value*scale,
+                    self.fit_res.params['f0'].stderr/1e6,
+                    self.fit_res.params['kappa'].value/1e6,
+                    self.fit_res.params['kappa'].stderr/1e6)
+
 
         fig_dist, ax_dist = self.default_ax()
         self.plot_results_vs_sweepparam(x=self.scaled_sweep_points,
