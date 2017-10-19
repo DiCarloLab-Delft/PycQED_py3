@@ -29,10 +29,9 @@ class Test_SSRO_discrimination_analysis(unittest.TestCase):
                                        -3.66, decimal=2)
         np.testing.assert_almost_equal(a.proc_data_dict['F_assignment_raw'],
                                        0.922, decimal=3)
-        np.testing.assert_almost_equal(a.proc_data_dict['threshold_fit'],
-                                       -3.65, decimal=2)
+        self.assertBetween(a.proc_data_dict['threshold_fit'], -3.69, -3.62)
         np.testing.assert_almost_equal(a.proc_data_dict['F_assignment_fit'],
-                                       0.920, decimal=3)
+                                       0.920, decimal=2)
         np.testing.assert_almost_equal(a.proc_data_dict['threshold_discr'],
                                        -3.64, decimal=1)
         np.testing.assert_almost_equal(a.proc_data_dict['F_discr'],
@@ -68,8 +67,7 @@ class Test_SSRO_discrimination_analysis(unittest.TestCase):
                                        -.95, decimal=2)
         np.testing.assert_almost_equal(a.proc_data_dict['F_assignment_raw'],
                                        0.949, decimal=3)
-        np.testing.assert_almost_equal(a.proc_data_dict['threshold_fit'],
-                                       -.96, decimal=2)
+        self.assertBetween(a.proc_data_dict['threshold_fit'], -1, -.9)
         np.testing.assert_almost_equal(a.proc_data_dict['F_assignment_fit'],
                                        0.945, decimal=2)
         self.assertBetween(a.proc_data_dict['threshold_discr'], -1, -.7)
