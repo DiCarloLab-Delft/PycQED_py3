@@ -19,7 +19,7 @@ import logging
 default_execute_options = {}
 
 tc = TessConnection()
-tc.connect("execute_Starmon")
+tc.connect("execute_CCL")
 default_simulate_options = {
     "num_avg": 10000,
     "iterations": 1
