@@ -16,11 +16,6 @@ from pycqed.measurement import sweep_functions as swf
 MeasurementControl and other legacy imports
 """
 
-#from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import CCL
-"""
-Add the CCL python driver
-"""
-
 from tess.TessConnect import TessConnection
 import logging
 """
@@ -42,71 +37,54 @@ We connect to tess by giving the kernel type as "execute_CCL"
 st = qc.station
 """
 Create the station for which the Instruments can connect to. A virtual representation
-of the physical setup. In our case, the CCL?
+of the physical setup. In our case, the CCL. Since we're calling the station, 
 """
 
-MC = measurement_control.MeasurementControl(
+MC_demo = measurement_control.MeasurementControl(
     'Demonstrator_MC', live_plot_enabled=False, verbose=True)
 
 datadir = os.path.abspath(os.path.join(
     os.path.dirname(pq.__file__), os.pardir, 'demonstrator_execute_data'))
-MC.datadir(datadir)
-MC.station = st
+MC_demo.datadir(datadir)
+MC_demo.station = st
 
-st.add_component(MC)
+st.add_component(MC_demo)
 
-"""
-We also need to add the CCL instrument into the station?
-"""
-#ccl = CCL('CCL', address='192.168.42.11', port=5025)
-#config_fn = os.path.join(pq.__path__[0], 'tests', 'test_cfg_CCL.json')
-
-ccl = 
-
-def execute_qasm_file(file_url: str,  config_json: str,
+def execute_qisa_file(file_url: str,  config_json: str,
                       verbosity_level: int=0):
     options = json.loads(config_json)
 
-    MC = Instrument.find_instrument('Demonstrator_MC')
-    CBox = Instrument.find_instrument('CBox')
-    device = Instrument.find_instrument('Starmon')
+    MC = Instrument.find_instrument('MC')
+    CCL = Instrument.find_instrument('CCL')
+    CCL_qubit = Instrument.find_instrument('CCL_qubit')
 
     num_avg = int(options.get('num_avg', 512))
+    
     nr_soft_averages = int(np.round(num_avg/512))
     MC.soft_avg(nr_soft_averages)
-    device.RO_acq_averages(512)
+
+    CCL_qubit.ro_acq_averages(512)
 
     # N.B. hardcoded fixme
-    cfg = device.qasm_config()
-    qasm_fp = _retrieve_file_from_url(file_url)
-    sweep_points = _get_qasm_sweep_points(qasm_fp)
+    qumis_fp = _retrieve_file_from_url(qumis_file_url)
+    sweep_points_fp = _retrieve_file_from_url(sweep_points_file_url)
 
-    s = swf.QASM_Sweep_v2(parameter_name='Circuit number ', unit='#',
-                          qasm_fn=qasm_fp, config=cfg, CBox=CBox,
-                          verbosity_level=verbosity_level)
+    s = swf.OpenQL_File_Sweep(file_path_sweep = sweep_points_fp, CCL=CCL,
+                 parameter_name ='Points', unit ='a.u.',
+                 upload=True)
 
-    d = device.get_correlation_detector()
+    # To be modified <<<<<
+    d = CCL_qubit.get_correlation_detector()
     d.value_names = ['Q0 ', 'Q1 ', 'Corr. (Q0, Q1) ']
     d.value_units = ['frac.', 'frac.', 'frac.']
+    #>>>>>>
 
     MC.set_sweep_function(s)
     MC.set_sweep_points(sweep_points)
     MC.set_detector_function(d)
-    data = MC.run('demonstrator')  # FIXME <- add the proper name
+    data = MC.run('CCL_demo')  # FIXME <- add the proper name
 
     return _MC_result_to_chart_dict(data)
-
-def execute_qumis_file(file_url: str,  config_json: str,
-                      verbosity_level: int=0):
-    """
-    To be replaced: This is for now a legacy of execute_helpers.py in order
-    to dummy execute
-    """
-    file_path = _retrieve_file_from_url(file_url)
-    options = json.loads(config_json)
-    data = _simulate_quantumsim(file_path,options)
-    return _MC_result_to_chart_dict(data)
-
 
 def calibrate(config_json: str):
     """
