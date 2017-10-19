@@ -5,16 +5,8 @@ from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
 
-from pycqed.analysis.analysis_toolbox import calculate_transmon_transitions
-from pycqed.analysis import analysis_toolbox as a_tools
-from pycqed.measurement import detector_functions as det
-from pycqed.measurement import composite_detector_functions as cdet
-from pycqed.measurement import mc_parameter_wrapper as pw
-
-from pycqed.measurement import sweep_functions as swf
-from pycqed.measurement import awg_sweep_functions as awg_swf
+from pycqed.utilities.general import gen_sweep_pts
 from pycqed.analysis import measurement_analysis as ma
-from pycqed.measurement.pulse_sequences import standard_sequences as st_seqs
 from pycqed.analysis import fitting_models as fit_mods
 
 
@@ -22,11 +14,12 @@ class Qubit(Instrument):
 
     '''
     Abstract base class for the qubit object.
-    Contains a template for all the functions a qubit should have.
+    Contains a template for all methods a qubit (should) has.
     N.B. This is not intended to be initialized.
 
-    Specific types of qubits should inherit from this class, different setups
-    can inherit from those to further specify the functionality.
+    Specific types of qubits should inherit from this class, different
+    hardware configurations can inherit from those to further specify
+    the functionality.
 
     Possible inheritance tree
     - Qubit (general template class)
@@ -39,19 +32,32 @@ class Qubit(Instrument):
         The qubit object is a combination of a parameter holder and a
         convenient way of performing measurements. As a convention the qubit
         object contains the following types of functions designated by a prefix
-        - measure_
-            common measurements such as "spectroscopy" and "ramsey"
-        - find_
-            used to extract a specific quantity such as the qubit frequency
-            these functions should always call "measure_" functions off the
-            qubit objects (merge with calibrate?)
-        - calibrate_
-            used to find the optimal parameters of some quantity (merge with
-            find?).
+
+        - measure_xx() -> bool
+            A measure_xx method performs a specific experiment such as
+                a "spectroscopy" or "ramsey".
+            A measure_xx method typically has a hardware dependent
+            implementation
+
+        - calibrate_xx() -> bool
+            A calibrate_xx method defines a standard protocol to perform a
+                specific calibration.
+            A calibrate_xx method should be blind callable (callable without
+                specifying any arguments).
+            A calibrate_xx method should return a boolean indicating the
+                success of the calibration.
+            A calibrate_xx method should update the internal parameter it is
+                related to.
+            A calibrate_xx method should be defined in the abstract base class
+                whenever possible and rely on implementations of corresponding
+                measure_xx methods in the hardware dependent child classes.
+
+        - find_xx
+            similar to calibrate_xx() naming difference is historical
+
         - calculate_
-            calculates a quantity based on parameters in the qubit object and
-            those specified
-            e.g. calculate_frequency
+            calculates a quantity based on parameters specified in the qubit
+            object e.g. calculate_frequency
 
 
     Open for discussion:
@@ -72,18 +78,38 @@ class Qubit(Instrument):
                            get_cmd=self._get_operations)
 
     def get_idn(self):
-        return {'driver': self.__class__, 'name': self.name}
+        return {'driver': str(self.__class__), 'name': self.name}
 
     def _get_operations(self):
         return self._operations
 
-    def measure_T1(self):
+    def measure_T1(self, times=None, MC=None,
+                   close_fig: bool=True, update: bool=True)->float:
+        """
+        Performs a T1 experiment.
+        Args:
+            times:      array of times to measure at, if None will define a
+                        suitable range based on the last known T1
+            MC:         instance of the MeasurementControl
+            close_fig:  close the figure in plotting
+            update :    update self.T1 with the measured value
+
+        returns:
+            T1 (float) the measured value
+        """
+
         # Note: I made all functions lowercase but for T1 it just looks too
         # ridiculous
         raise NotImplementedError()
 
     def measure_rabi(self):
         raise NotImplementedError()
+
+    def measure_flipping(self,  number_of_flips=2*np.arange(60),
+                         MC=None, label='',
+                         equator=True,
+                         analyze=True, close_fig=True, verbose=True):
+        raise NotImplementedError
 
     def measure_ramsey(self):
         raise NotImplementedError()
@@ -103,9 +129,136 @@ class Qubit(Instrument):
     def measure_transients(self):
         raise NotImplementedError()
 
-    def calibrate_optimal_weights(self, MC=None, verify=True,
-                                  analyze=False, update=True):
+    def measure_motzoi(self, motzois=np.linspace(-.3, .3, 31),
+                       MC=None, analyze=True, close_fig=True):
         raise NotImplementedError()
+
+    def calibrate_motzoi(self, MC=None, verbose=True, update=True):
+        motzois = gen_sweep_pts(center=0, span=1, num=31)
+
+        # large range
+        a = self.measure_motzoi(MC=MC, motzois=motzois, analyze=True)
+        opt_motzoi = a.optimal_motzoi
+        if opt_motzoi > max(motzois) or opt_motzoi < min(motzois):
+            if verbose:
+                print('optimal motzoi {:.3f} '.format(opt_motzoi) +
+                      'outside of measured span, aborting')
+            return False
+
+        # fine range around optimum
+        motzois = gen_sweep_pts(center=a.optimal_motzoi, span=.4, num=31)
+        a = self.measure_motzoi(motzois)
+        opt_motzoi = a.optimal_motzoi
+        if opt_motzoi > max(motzois) or opt_motzoi < min(motzois):
+            if verbose:
+                print('optimal motzoi {:.3f} '.format(opt_motzoi) +
+                      'outside of measured span, aborting')
+        if update:
+            if verbose:
+                print('Setting motzoi to {:.3f}'.format(opt_motzoi))
+            self.motzoi(opt_motzoi)
+        return opt_motzoi
+
+    def calibrate_optimal_weights(self, MC=None, verify=True,
+                                  analyze=False, update=True)->bool:
+        raise NotImplementedError()
+
+    def calibrate_MW_RO_latency(self, MC=None, update: bool=True)-> bool:
+        """
+        Calibrates parameters:
+            "latency_MW"
+            "RO_acq_delay"
+
+
+        Used to calibrate the delay of the MW pulse with respect to the
+        RO pulse and the RO acquisition delay.
+
+
+        The MW_pulse_latency is calibrated by setting the frequency of
+        the LO to the qubit frequency such that both the MW and the RO pulse
+        will show up in the RO.
+        Measuring the transients will  show what the optimal latency is.
+
+        Note that a lot of averages may be required when using dedicated drive
+        lines.
+
+        This function does NOT overwrite the values that were set in the qubit
+        object and as such can be used to verify the succes of the calibration.
+
+        Currently (28/6/2017) the experiment has to be analysed by hand.
+
+        """
+        raise NotImplementedError()
+
+    def calibrate_Flux_pulse_latency(self, MC=None, update=True)-> bool:
+        """
+        Calibrates parameter: "latency_Flux"
+
+        Used to calibrate the timing between the MW and Flux pulses.
+
+        Flux pulse latency is calibrated using a Ram-Z experiment.
+        The experiment works as follows:
+        - x90 | square_flux  # defines t = 0
+        - wait (should be slightly longer than the pulse duration)
+        - x90
+        - wait
+        - RO
+
+        The position of the square flux pulse is varied to find the
+        optimal latency.
+        """
+        raise NotImplementedError
+        return True
+
+
+    def calibrate_MW_RO_latency(self, MC=None, update: bool=True)-> bool:
+        """
+        Calibrates parameters:
+            "latency_MW"
+            "RO_acq_delay"
+
+
+        Used to calibrate the delay of the MW pulse with respect to the
+        RO pulse and the RO acquisition delay.
+
+
+        The MW_pulse_latency is calibrated by setting the frequency of
+        the LO to the qubit frequency such that both the MW and the RO pulse
+        will show up in the RO.
+        Measuring the transients will  show what the optimal latency is.
+
+        Note that a lot of averages may be required when using dedicated drive
+        lines.
+
+        This function does NOT overwrite the values that were set in the qubit
+        object and as such can be used to verify the succes of the calibration.
+
+        Currently (28/6/2017) the experiment has to be analysed by hand.
+
+        """
+        raise NotImplementedError()
+        return True
+
+    def calibrate_Flux_pulse_latency(self, MC=None, update=True)-> bool:
+        """
+        Calibrates parameter: "latency_Flux"
+
+        Used to calibrate the timing between the MW and Flux pulses.
+
+        Flux pulse latency is calibrated using a Ram-Z experiment.
+        The experiment works as follows:
+        - x90 | square_flux  # defines t = 0
+        - wait (should be slightly longer than the pulse duration)
+        - x90
+        - wait
+        - RO
+
+        The position of the square flux pulse is varied to find the
+        optimal latency.
+        """
+        raise NotImplementedError
+        return True
+
 
     def measure_heterodyne_spectroscopy(self):
         raise NotImplementedError()
@@ -202,8 +355,16 @@ class Transmon(Qubit):
         self.add_parameter('E_c', unit='Hz',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
-
         self.add_parameter('E_j', unit='Hz',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers())
+        self.add_parameter('T1', unit='s',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers())
+        self.add_parameter('T2_echo', unit='s',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers())
+        self.add_parameter('T2_star', unit='s',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
 
@@ -251,6 +412,36 @@ class Transmon(Qubit):
                            # in the future add 'tracked_dac', 'tracked_flux',
                            initial_value='latest',
                            parameter_class=ManualParameter)
+        self.add_parameter('F_ssro',
+                           initial_value=0,
+                           label='RO assignment fidelity',
+                           vals=vals.Numbers(0.0, 1.0),
+                           parameter_class=ManualParameter)
+        self.add_parameter('F_discr',
+                           initial_value=0,
+                           label='RO discrimination fidelity',
+                           vals=vals.Numbers(0.0, 1.0),
+                           parameter_class=ManualParameter)
+        self.add_parameter('F_RB',
+                           initial_value=0,
+                           label='RB single qubit Clifford fidelity',
+                           vals=vals.Numbers(0, 1.0),
+                           parameter_class=ManualParameter)
+        self.add_parameter('V_per_phi0',
+                           initial_value=1,
+                           label='V per phi0',
+                           vals=vals.Numbers(),
+                           docstring='Conversion between flux and voltage. '
+                                     'How many volts need to be applied to '
+                                     'have a flux of 1 phi0 (pulsed).',
+                           parameter_class=ManualParameter)
+        self.add_parameter('V_offset',
+                           initial_value=0,
+                           label='V offset',
+                           vals=vals.Numbers(),
+                           docstring='AWG voltage at which the sweet spot is '
+                                     'found (pulsed).',
+                           parameter_class=ManualParameter)
 
     def calculate_frequency(self,
                             dac_voltage=None,
@@ -273,7 +464,7 @@ class Transmon(Qubit):
         elif self.f_qubit_calc_method() == 'dac':
             if dac_voltage is None:
                 dac_voltage = self.IVVI.get_instr().get(
-                        'dac{}'.format(self.dac_channel()))
+                    'dac{}'.format(self.dac_channel()))
 
             f_qubit_estimate = fit_mods.Qubit_dac_to_freq(
                 dac_voltage=dac_voltage,
@@ -304,6 +495,49 @@ class Transmon(Qubit):
 
     def prepare_for_continuous_wave(self):
         raise NotImplementedError()
+
+    def calibrate_frequency_ramsey(self, steps=[1, 1, 3, 10, 30, 100, 300, 1000],
+                                   stepsize=None, verbose=True, update=True,
+                                   close_fig=True):
+        if stepsize is None:
+            stepsize = abs(1/self.f_pulse_mod.get())
+        cur_freq = self.f_qubit.get()
+        # Steps don't double to be more robust against aliasing
+        for n in steps:
+            times = np.arange(self.pulse_delay.get(),
+                              50*n*stepsize, n*stepsize)
+            artificial_detuning = 2.5/times[-1]
+            self.measure_ramsey(times,
+                                artificial_detuning=artificial_detuning,
+                                f_qubit=cur_freq,
+                                label='_{}pulse_sep'.format(n),
+                                analyze=False)
+            a = ma.Ramsey_Analysis(auto=True, close_fig=close_fig,
+                                   close_file=False)
+            fitted_freq = a.fit_res.params['frequency'].value
+            measured_detuning = fitted_freq-artificial_detuning
+            cur_freq -= measured_detuning
+
+            qubit_ana_grp = a.analysis_group.create_group(self.msmt_suffix)
+            qubit_ana_grp.attrs['artificial_detuning'] = \
+                str(artificial_detuning)
+            qubit_ana_grp.attrs['measured_detuning'] = \
+                str(measured_detuning)
+            qubit_ana_grp.attrs['estimated_qubit_freq'] = str(cur_freq)
+            a.finish()  # make sure I close the file
+            if verbose:
+                print('Measured detuning:{:.2e}'.format(measured_detuning))
+                print('Setting freq to: {:.9e}, \n'.format(cur_freq))
+            if times[-1] > 2.*a.T2_star:
+                # If the last step is > T2* then the next will be for sure
+                if verbose:
+                    print('Breaking of measurement because of T2*')
+                break
+        if verbose:
+            print('Converged to: {:.9e}'.format(cur_freq))
+        if update:
+            self.f_qubit.set(cur_freq)
+        return cur_freq
 
     def find_frequency(self, method='spectroscopy', pulsed=False,
                        steps=[1, 3, 10, 30, 100, 300, 1000],
@@ -343,45 +577,17 @@ class Transmon(Qubit):
                     self.f_qubit(analysis_spec.fitted_freq)
                 # TODO: add updating and fitting
         elif method.lower() == 'ramsey':
+            return self.calibrate_frequency_ramsey(
+                steps=steps, verbose=verbose, update=update,
+                close_fig=close_fig)
+        return self.f_qubit()
 
-            stepsize = abs(1/self.f_pulse_mod.get())
-            cur_freq = self.f_qubit.get()
-            # Steps don't double to be more robust against aliasing
-            for n in steps:
-                times = np.arange(self.pulse_delay.get(),
-                                  50*n*stepsize, n*stepsize)
-                artificial_detuning = 4/times[-1]
-                self.measure_ramsey(times,
-                                    artificial_detuning=artificial_detuning,
-                                    f_qubit=cur_freq,
-                                    label='_{}pulse_sep'.format(n),
-                                    analyze=False)
-                a = ma.Ramsey_Analysis(auto=True, close_fig=close_fig,
-                                       close_file=False)
-                fitted_freq = a.fit_res.params['frequency'].value
-                measured_detuning = fitted_freq-artificial_detuning
-                cur_freq -= measured_detuning
 
-                qubit_ana_grp = a.analysis_group.create_group(self.msmt_suffix)
-                qubit_ana_grp.attrs['artificial_detuning'] = \
-                    str(artificial_detuning)
-                qubit_ana_grp.attrs['measured_detuning'] = \
-                    str(measured_detuning)
-                qubit_ana_grp.attrs['estimated_qubit_freq'] = str(cur_freq)
-                a.finish()  # make sure I close the file
-                if verbose:
-                    print('Measured detuning:{:.2e}'.format(measured_detuning))
-                    print('Setting freq to: {:.9e}, \n'.format(cur_freq))
-                if times[-1] > 1.5*a.T2_star:
-                    # If the last step is > T2* then the next will be for sure
-                    if verbose:
-                        print('Breaking of measurement because of T2*')
-                    break
-            if verbose:
-                print('Converged to: {:.9e}'.format(cur_freq))
-            if update:
-                self.f_qubit.set(cur_freq)
-            return cur_freq
+    def find_frequency_pulsed(self):
+        raise NotImplementedError()
+
+    def find_frequency_cw_spec(self):
+        raise NotImplementedError()
 
     def find_resonator_frequency(self, use_min=False,
                                  update=True,
@@ -410,6 +616,105 @@ class Transmon(Qubit):
         self.f_RO(self.f_res())
         return f_res
 
+    def calibrate_pulse_amplitude_coarse(self,
+                                         amps=np.linspace(-.5, .5, 31),
+                                         close_fig=True, verbose=False,
+                                         MC=None, update=True,
+                                         take_fit_I=False):
+        """
+        Calibrates the pulse amplitude using a single rabi oscillation
+        """
+
+        self.measure_rabi(amps, n=1, MC=MC, analyze=False)
+        a = ma.Rabi_Analysis(close_fig=close_fig)
+        # Decide which quadrature to take by comparing the contrast
+        if take_fit_I or len(a.measured_values) == 1:
+            ampl = abs(a.fit_res[0].params['period'].value)/2.
+        elif (np.abs(max(a.measured_values[0]) -
+                     min(a.measured_values[0]))) > (
+                np.abs(max(a.measured_values[1]) -
+                       min(a.measured_values[1]))):
+            ampl = a.fit_res[0].params['period'].value/2.
+        else:
+            ampl = a.fit_res[1].params['period'].value/2.
+
+        if update:
+            self.Q_amp180.set(ampl)
+        return ampl
+
+    def calibrate_pulse_amplitude_flipping(self,
+                                           MC=None, update: bool=True,
+                                           fine_accuracy: float=0.005,
+                                           desired_accuracy: float=0.00005,
+                                           max_iterations: int=10,
+                                           verbose: bool=True):
+        """
+        Calibrates the pulse amplitude using a flipping sequence.
+        The flipping sequence itself should be implemented using the
+        "measure_flipping" method.
+        It converges to the optimal amplitude using first a coarse and then
+        a finer scan with more pulses.
+
+        Args:
+            MC                    : The measurement control used, if None
+                                   uses the one specified in the qubit object.
+            updates       (bool)  : if True updates the Q_amp180 parameter
+            fine_accuracy (float) : the accuracy to switch to the fine scan
+            desired_accuracy (float): the accuracy after which to terminate
+                                      the optimization
+            max_iterations  (int) : always terminate after this number of
+                                     optimizations.
+            verbose         (bool): if true adds additional print statements.
+        returns:
+            success         (bool): True if optimization converged.
+        """
+        success = False
+        fine = False
+        for k in range(max_iterations):
+            old_Q_amp180 = self.Q_amp180()
+            if not fine:
+                number_of_flips = 2*np.arange(60)
+            if fine:
+                number_of_flips = 8*np.arange(60)
+            a = self.measure_flipping(MC=MC, number_of_flips=number_of_flips)
+            Q_amp180_scale_factor = a.get_scale_factor()
+
+            # Check if Q_amp180_scale_factor is within boundaries
+            if Q_amp180_scale_factor > 1.1:
+                Q_amp180_scale_factor = 1.1
+                if verbose:
+                    print('Qubit drive scaling %.3f ' % Q_amp180_scale_factor
+                          + 'is too high, capping at 1.1')
+            elif Q_amp180_scale_factor < 0.9:
+                Q_amp180_scale_factor = 0.9
+                if verbose:
+                    print('Qubit drive scaling %.3f ' % Q_amp180_scale_factor
+                          + 'is too low, capping at 0.9')
+
+            self.Q_amp180(np.round(Q_amp180_scale_factor * self.Q_amp180(), 7))
+
+            if verbose:
+                print('Q_amp180_scale_factor: {:.4f}, new Q_amp180: {}'.format(
+                      Q_amp180_scale_factor, self.Q_amp180()))
+
+            if (abs(Q_amp180_scale_factor-1) < fine_accuracy) and (not fine):
+                if verbose:
+                    print('Getting close to optimum, increasing sensitivity')
+                fine = True
+
+            if abs(Q_amp180_scale_factor-1) < desired_accuracy:
+                if verbose:
+                    print('within threshold')
+                success = True
+                break
+
+        # If converged?
+        if success and verbose:
+            print('Drive calibration set to {}'.format(self.Q_amp180()))
+        if not update or not success:
+            self.Q_amp180(old_Q_amp180)
+        return success
+
     def find_pulse_amplitude(self, amps=np.linspace(-.5, .5, 31),
                              N_steps=[3, 7, 13, 17], max_n=18,
                              close_fig=True, verbose=False,
@@ -429,18 +734,10 @@ class Transmon(Qubit):
         if MC is None:
             MC = self.MC.get_instr()
         if np.size(amps) != 1:
-            self.measure_rabi(amps, n=1, MC=MC, analyze=False)
-            a = ma.Rabi_Analysis(close_fig=close_fig)
-            # Decide which quadrature to take by comparing the contrast
-            if take_fit_I:
-                ampl = abs(a.fit_res[0].params['period'].value)/2.
-            elif (np.abs(max(a.measured_values[0]) -
-                         min(a.measured_values[0]))) > (
-                    np.abs(max(a.measured_values[1]) -
-                           min(a.measured_values[1]))):
-                ampl = a.fit_res[0].params['period'].value/2.
-            else:
-                ampl = a.fit_res[1].params['period'].value/2.
+            ampl = self.calibrate_pulse_amplitude_coarse(
+                amps=amps, close_fig=close_fig, verbose=verbose,
+                MC=MC, update=update,
+                take_fit_I=take_fit_I)
         else:
             ampl = amps
         if verbose:
@@ -451,7 +748,7 @@ class Transmon(Qubit):
                 break
             else:
                 old_amp = ampl
-                ampl_span = 0.3*ampl/n
+                ampl_span = 0.5*ampl/n
                 amps = np.linspace(ampl-ampl_span, ampl+ampl_span, 15)
                 self.measure_rabi(amps, n=n, MC=MC, analyze=False)
                 a = ma.Rabi_parabola_analysis(close_fig=close_fig)
@@ -460,8 +757,8 @@ class Transmon(Qubit):
                     ampl = a.fit_res[0].params['x0'].value
                 elif (np.abs(max(a.measured_values[0]) -
                              min(a.measured_values[0]))) > (
-                      np.abs(max(a.measured_values[1]) -
-                             min(a.measured_values[1]))):
+                    np.abs(max(a.measured_values[1]) -
+                           min(a.measured_values[1]))):
                     ampl = a.fit_res[0].params['x0'].value
                 else:
                     ampl = a.fit_res[1].params['x0'].value
@@ -476,15 +773,16 @@ class Transmon(Qubit):
                         ampl = a.fit_res[0].params['x0'].value
                     elif (np.abs(max(a.measured_values[0]) -
                                  min(a.measured_values[0]))) > (
-                          np.abs(max(a.measured_values[1]) -
-                                 min(a.measured_values[1]))):
+                        np.abs(max(a.measured_values[1]) -
+                               min(a.measured_values[1]))):
                         ampl = a.fit_res[0].params['x0'].value
                     else:
                         ampl = a.fit_res[1].params['x0'].value
                 if verbose:
                     print('Found amplitude', ampl, '\n')
         if update:
-            self.amp180.set(ampl)
+            self.Q_amp180.set(ampl)
+        return ampl
 
     def find_amp90_scaling(self, scales=0.5,
                            N_steps=[5, 9], max_n=100,

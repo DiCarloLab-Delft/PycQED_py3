@@ -3,6 +3,7 @@ Currently empty should contain the plotting tools portion of the
 analysis toolbox
 '''
 import matplotlib.pyplot as plt
+from matplotlib import cm
 import colorsys as colors
 import numpy as np
 
@@ -108,7 +109,8 @@ def SI_val_to_msg_str(val: float, unit: str=None):
 
     value_str = str(val)
     return value_str, unit
-  
+
+
 def data_to_table_png(data: list, filename: str, title: str='',
                       close_fig: bool=True):
     """
@@ -134,7 +136,7 @@ def data_to_table_png(data: list, filename: str, title: str='',
     if close_fig:
         plt.close(fig)
 
-        
+
 def annotate_point_pair(ax, text, xy_start, xy_end, xycoords='data',
                         text_offset=(-10, -5), arrowprops=None, **kw):
     '''
@@ -173,10 +175,14 @@ def annotate_point_pair(ax, text, xy_start, xy_end, xycoords='data',
     return label
 
 
-def get_color_order(i, max_num):
+def get_color_order(i, max_num, cmap='viridis'):
     # take a blue to red scale from 0 to max_num
     # uses HSV system, H_red = 0, H_green = 1/3 H_blue=2/3
-    return colors.hsv_to_rgb(2.*float(i)/(float(max_num)*3.), 1., 1.)
+    # return colors.hsv_to_rgb(2.*float(i)/(float(max_num)*3.), 1., 1.)
+    print('It is recommended to use the updated function "get_color_cycle".')
+    if isinstance(cmap, str):
+        cmap = cm.get_cmap(cmap)
+    return cmap((i/max_num) % 1)
 
 
 def get_color_from_cmap(i, max_num):

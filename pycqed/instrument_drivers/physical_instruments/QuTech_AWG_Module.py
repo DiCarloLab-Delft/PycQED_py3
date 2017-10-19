@@ -24,6 +24,7 @@ from qcodes.instrument.parameter import Command, no_setter
 # Note: the HandshakeParameter is a temporary param that should be replaced
 # once qcodes issue #236 is closed
 class HandshakeParameter(StandardParameter):
+
     """
     If a string is specified as a set command it will append '*OPC?' and use
     instrument.ask instead of instrument.write
@@ -53,6 +54,7 @@ class QuTech_AWG_Module(SCPI):
         self.device_descriptor.numMarkersPerChannel = 2
         self.device_descriptor.numMarkers = 8
         self.device_descriptor.numTriggers = 8
+        # Commented out until bug fixed
         self.device_descriptor.numCodewords = 128
 
         # valid values
@@ -179,6 +181,25 @@ class QuTech_AWG_Module(SCPI):
         self.add_parameter('Wlist',
                            label='Waveform list',
                            get_cmd=self._getWlist)
+
+        # Trigger parameters
+        doc_trgs_log_inp = 'Reads the current input values on the all the trigger ' \
+                    +'inputs.\nReturn:\n    uint32 where trigger 1 (T1) ' \
+                    +'is on the Least significant bit (LSB), T2 on the second  ' \
+                    +'bit after LSB, etc.\n\n For example, if only T3 is ' \
+                    +'connected to a high signal, the return value is: ' \
+                    +'4 (0b0000100)\n\n Note: To convert the return value ' \
+                    +'to a readable ' \
+                    +'binary output use: `print(\"{0:#010b}\".format(qwg.' \
+                    +'triggers_logic_input()))`'
+        self.add_parameter('triggers_logic_input',
+                           label='Read triggers input value',
+                           get_cmd='QUTEch:TRIGgers:LOGIcinput?',
+                           get_parser=np.uint32, # Did not convert to readable
+                                                 # string because a uint32 is more
+                                                 # usefull when other logic is needed
+                           docstring=doc_trgs_log_inp)
+
 
         # This command is added manually
         # self.add_function('deleteWaveform'

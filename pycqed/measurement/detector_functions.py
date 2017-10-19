@@ -504,7 +504,8 @@ class CBox_single_int_avg_with_LutReload(CBox_single_integration_average_det):
 
 class CBox_integration_logging_det(Hard_Detector):
 
-    def __init__(self, CBox, AWG, integration_length=1e-6, LutMan=None, reload_pulses=False,
+    def __init__(self, CBox, AWG, integration_length=1e-6, LutMan=None,
+                 reload_pulses=False,
                  awg_nrs=None, **kw):
         '''
         If you want AWG reloading you should give a LutMan and specify
@@ -856,7 +857,6 @@ class Function_Detector(Soft_Detector):
 
         # Call the function
         result = self.get_function(**measurement_kwargs)
-        print(result)
         if self.result_keys is None:
             return result
         else:
@@ -1275,7 +1275,7 @@ class UHFQC_input_average_detector(Hard_Detector):
         data_raw = self.UHFQC.acquisition_poll(samples=self.nr_sweep_points,
                                                arm=False, acquisition_time=0.01)
         data = np.array([data_raw[key]
-                         for key in data_raw.keys()])  # *self.scaling_factor
+                         for key in sorted(data_raw.keys())])  # *self.scaling_factor
 
         return data
 
@@ -1426,13 +1426,14 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
         self.UHFQC.acquisition_arm()
         # starting AWG
+
         if self.AWG is not None:
             self.AWG.start()
 
         data_raw = self.UHFQC.acquisition_poll(
             samples=self.nr_sweep_points, arm=False, acquisition_time=0.01)
         data = np.array([data_raw[key]
-                         for key in data_raw.keys()])*self.scaling_factor
+                         for key in sorted(data_raw.keys())])*self.scaling_factor
 
         # Corrects offsets after crosstalk suppression matrix in UFHQC
         if self.result_logging_mode == 'lin_trans':
@@ -1469,6 +1470,11 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         else:
             self.nr_sweep_points = len(sweep_points)*self.seg_per_point
         # this sets the result to integration and rotation outcome
+            if (self.chunk_size is not None and
+                    self.chunk_size < self.nr_sweep_points):
+                # Chunk size is defined and smaller than total number of sweep
+                # points -> only acquire one chunk
+                self.nr_sweep_points = self.chunk_size * self.seg_per_point
 
             if (self.chunk_size is not None and
                     self.chunk_size < self.nr_sweep_points):
@@ -1620,6 +1626,7 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             self.UHFQC.set('quex_corr_{}_mode'.format(correlation_channel), 1)
             self.UHFQC.set('quex_corr_{}_source'.format(correlation_channel),
                            corr[1])
+
             # If thresholding is enabled, set the threshold for the correlation
             # channel.
             if self.thresholding:
@@ -1647,10 +1654,10 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
 
         data = []
         if self.thresholding:
-            for key in data_raw.keys():
+            for key in sorted(data_raw.keys()):
                 data.append(np.array(data_raw[key]))
         else:
-            for key in data_raw.keys():
+            for key in sorted(data_raw.keys()):
                 if key in self.correlation_channels:
                     data.append(np.array(data_raw[key]) *
                                 (self.scaling_factor**2 / self.nr_averages))
@@ -1732,7 +1739,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
         data_raw = self.UHFQC.acquisition_poll(
             samples=self.nr_shots, arm=False, acquisition_time=0.01)
         data = np.array([data_raw[key]
-                         for key in data_raw.keys()])*self.scaling_factor
+                         for key in sorted(data_raw.keys())])*self.scaling_factor
 
         # Corrects offsets after crosstalk suppression matrix in UFHQC
         if self.result_logging_mode == 'lin_trans':
@@ -1912,6 +1919,72 @@ class UHFQC_statistics_logging_det(Soft_Detector):
             return data_concat/(self.nr_chunks*self.shots_per_chunk)
         return data_concat
 
+
+class UHFQC_single_qubit_statistics_logging_det(UHFQC_statistics_logging_det):
+
+    def __init__(self, UHFQC, AWG, nr_shots: int,
+                 integration_length: float,
+                 channel: int,
+                 statemap: dict,
+                 channel_name: str=None,
+                 normalize_counts: bool=True):
+        """
+        Detector for the statistics logger mode in the UHFQC.
+
+            UHFQC (instrument) : data acquisition device
+            AWG   (instrument) : device responsible for starting and stopping
+                the experiment, can also be a central controller.
+            integration_length (float): integration length in seconds
+            nr_shots (int)     : nr of shots (max is 4095)
+            channel  (int)    : index (channel) of UHFQC weight function
+            statemap (dict) : dictionary specifying the expected output state
+                for each 1 bit input state.
+                e.g.:
+                    statemap ={'0': '0', '1':'1'}
+            channel_name (str) : optional name of the channel
+
+
+        """
+        super(UHFQC_statistics_logging_det, self).__init__()
+        self.UHFQC = UHFQC
+        self.AWG = AWG
+        self.nr_shots = nr_shots
+        self.integration_length = integration_length
+        self.normalize_counts = normalize_counts
+
+        self.channels = [channel, int((channel+1) % 5)]
+
+        if channel_name is None:
+            channel_name = ['ch{}'.format(channel)]
+
+        self.value_names = ['{} counts'.format(channel),
+                            '{} flips'.format(channel),
+                            '{} state errors'.format(channel)]
+        if not self.normalize_counts:
+            self.value_units = '#'*len(self.value_names)
+        else:
+            self.value_units = ['frac']*len(self.value_names)
+        self.statemap = statemap
+
+        self.max_shots = 4095  # hardware limit of UHFQC
+
+        self.statemap = self.statemap_one2two_bit(statemap)
+
+    @staticmethod
+    def statemap_one2two_bit(one_bit_sm: dict):
+        """
+        Converts a one bit statemap to an appropriate dummy 2-bit statemap
+        """
+        sm = one_bit_sm
+        two_bit_sm = {'00': '{}{}'.format(sm['0'], sm['0']),
+                      '10': '{}{}'.format(sm['0'], sm['0']),
+                      '01': '{}{}'.format(sm['1'], sm['1']),
+                      '11': '{}{}'.format(sm['1'], sm['1'])}
+        return two_bit_sm
+
+    def acquire_data_point(self, **kw):
+        # Returns only the data for the relevant channel
+        return super().acquire_data_point()[0:3]
 
 class UHFQC_single_qubit_statistics_logging_det(UHFQC_statistics_logging_det):
 
