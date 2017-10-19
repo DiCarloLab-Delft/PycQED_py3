@@ -538,7 +538,7 @@ def get_data_from_timestamp_list(timestamps,
                 ana.finish()
             except Exception as inst:
                 logging.warning('Error "%s" when processing timestamp %s' %
-                      (inst, timestamp))
+                                (inst, timestamp))
                 raise
 
     if len(remove_timestamps) > 0:
@@ -1167,10 +1167,14 @@ def normalize_data_v3(data, cal_zero_points=np.arange(-4, -2, 1),
 
 
 def datetime_from_timestamp(timestamp):
-    if len(timestamp) == 14:
-        return datetime.datetime.strptime(timestamp, "%Y%m%d%H%M%S")
-    else:
-        return datetime.datetime.strptime(timestamp, "%Y%m%d_%H%M%S")
+    try:
+        if len(timestamp) == 14:
+            return datetime.datetime.strptime(timestamp, "%Y%m%d%H%M%S")
+        elif len(timestamp) == 15:
+            return datetime.datetime.strptime(timestamp, "%Y%m%d_%H%M%S")
+    except Exception as e:
+        print('Invalid timestamp :"{}"'.format(timestamp))
+        raise e
 
 
 def timestamp_from_datetime(date):
