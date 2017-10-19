@@ -3,7 +3,6 @@ import os
 import json
 import re
 import urllib.request
-# import time
 import pycqed as pq
 import qcodes as qc
 
@@ -12,9 +11,21 @@ from qcodes.instrument.base import Instrument
 from pycqed.measurement.demonstrator_helper.detectors import \
     Quantumsim_Two_QB_Hard_Detector
 from pycqed.measurement import sweep_functions as swf
+
+"""
+MeasurementControl and other legacy imports
+"""
+
+#from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import CCL
+"""
+Add the CCL python driver
+"""
+
 from tess.TessConnect import TessConnection
 import logging
-
+"""
+TessConnection is used to tell Tess that we are a kernel open for use
+"""
 
 default_execute_options = {}
 
@@ -24,34 +35,33 @@ default_simulate_options = {
     "num_avg": 10000,
     "iterations": 1
 }
+"""
+We connect to tess by giving the kernel type as "execute_CCL"
+"""
 
-# Extract some "hardcoded" instruments from the global namespace"
-station = qc.station
+st = qc.station
+"""
+Create the station for which the Instruments can connect to. A virtual representation
+of the physical setup. In our case, the CCL?
+"""
 
-#if 'Demonstrator_MC' in station.components.keys():
-#    MC = station.components['Demonstrator_MC']
-#else:
-#    MC = measurement_control.MeasurementControl(
-#        'Demonstrator_MC', live_plot_enabled=False, verbose=True)
-#    datadir = os.path.abspath(os.path.join(
-#                os.path.dirname(pq.__file__), os.pardir,
-#                'demonstrator_execute_data'))
-#    MC.datadir(datadir)
-#    station.add_component(MC)
-#    MC.station = station
-
-st = station.Station()
-# Connect to the qx simulator
 MC = measurement_control.MeasurementControl(
-    'MC', live_plot_enabled=False, verbose=True)
+    'Demonstrator_MC', live_plot_enabled=False, verbose=True)
 
 datadir = os.path.abspath(os.path.join(
-    os.path.dirname(pq.__file__), os.pardir, 'execute_data'))
+    os.path.dirname(pq.__file__), os.pardir, 'demonstrator_execute_data'))
 MC.datadir(datadir)
 MC.station = st
 
 st.add_component(MC)
 
+"""
+We also need to add the CCL instrument into the station?
+"""
+#ccl = CCL('CCL', address='192.168.42.11', port=5025)
+#config_fn = os.path.join(pq.__path__[0], 'tests', 'test_cfg_CCL.json')
+
+ccl = 
 
 def execute_qasm_file(file_url: str,  config_json: str,
                       verbosity_level: int=0):
@@ -88,6 +98,10 @@ def execute_qasm_file(file_url: str,  config_json: str,
 
 def execute_qumis_file(file_url: str,  config_json: str,
                       verbosity_level: int=0):
+    """
+    To be replaced: This is for now a legacy of execute_helpers.py in order
+    to dummy execute
+    """
     file_path = _retrieve_file_from_url(file_url)
     options = json.loads(config_json)
     data = _simulate_quantumsim(file_path,options)
@@ -150,6 +164,9 @@ def calibrate(config_json: str):
 
 
 def _retrieve_file_from_url(file_url: str):
+    """
+    Self explanatory: we retrieve the file from the url given
+    """
 
     file_name = file_url.split("/")[-1]
     base_path = os.path.join(
@@ -162,6 +179,10 @@ def _retrieve_file_from_url(file_url: str):
 
 
 def _get_qasm_sweep_points(file_path):
+    """
+    I am unsure what this does. Will need to grep RO_acq_averages.
+    Am guessing this is related to qubit_object, CCL_transmon.py.
+    """
     counter = 0
     with open(file_path) as f:
         line = f.readline()
@@ -183,6 +204,9 @@ def _MC_result_to_chart_dict(result):
     }]
 
 def _simulate_quantumsim(file_path, options):
+    """
+    We can remove this function as I am using this to dummy execute
+    """
     quantumsim_sweep = swf.None_Sweep()
     quantumsim_sweep.parameter_name = 'Circuit number '
     quantumsim_sweep.unit = '#'
