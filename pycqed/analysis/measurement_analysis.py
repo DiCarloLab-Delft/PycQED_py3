@@ -3,6 +3,7 @@ import logging
 import numpy as np
 import pickle
 import h5py
+import matplotlib
 from matplotlib import pyplot as plt
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis import fitting_models as fit_mods
@@ -2000,7 +2001,6 @@ class Rabi_Analysis_old(TD_Analysis):
 
 
 class SSRO_Analysis(MeasurementAnalysis):
-
     '''
     Analysis class for Single Shot Readout.
     Scripts finds optimum rotation of IQ plane leaving all information in the
@@ -2041,6 +2041,7 @@ class SSRO_Analysis(MeasurementAnalysis):
                              channels=['I', 'Q'],
                              no_fits=False,
                              print_fit_results=False,
+                             preselection=False,
                              n_bins: int=120, **kw):
 
         self.add_analysis_datagroup_to_file()
@@ -2050,10 +2051,19 @@ class SSRO_Analysis(MeasurementAnalysis):
 
         if len(self.channels) == 1:
             shots_I_data = self.get_values(key=self.channels[0])
-            shots_I_data_0, shots_I_data_1 = a_tools.zigzag(shots_I_data,
-                                                            sample_0, sample_1, nr_samples)
+            if not preselection:
+                shots_I_data_0, shots_I_data_1 = a_tools.zigzag(
+                    shots_I_data, sample_0, sample_1, nr_samples)
+            else:
+                shots_I_presel_0, shots_I_presel_1 = a_tools.zigzag(
+                    shots_I_data, sample_0, sample_1, nr_samples)
+                shots_I_data_0, shots_I_data_1 = a_tools.zigzag(
+                    shots_I_data, sample_0+1, sample_1+1, nr_samples)
             shots_Q_data_0 = shots_I_data_0*0
             shots_Q_data_1 = shots_I_data_1*0
+            if preselection:
+                shots_Q_presel_0 = shots_I_presel_0*0
+                shots_Q_presel_1 = shots_I_presel_1*0
 
         else:
             # Try getting data by name first and by index otherwise
@@ -2064,10 +2074,20 @@ class SSRO_Analysis(MeasurementAnalysis):
                 shots_I_data = self.measured_values[0]
                 shots_Q_data = self.measured_values[1]
 
-            shots_I_data_0, shots_I_data_1 = a_tools.zigzag(
-                shots_I_data, sample_0, sample_1, nr_samples)
-            shots_Q_data_0, shots_Q_data_1 = a_tools.zigzag(
-                shots_Q_data, sample_0, sample_1, nr_samples)
+            if not preselection:
+                shots_I_data_0, shots_I_data_1 = a_tools.zigzag(
+                    shots_I_data, sample_0, sample_1, nr_samples)
+                shots_Q_data_0, shots_Q_data_1 = a_tools.zigzag(
+                    shots_Q_data, sample_0, sample_1, nr_samples)
+            else:
+                shots_I_presel_0, shots_I_presel_1 = a_tools.zigzag(
+                    shots_I_data, sample_0, sample_1, nr_samples)
+                shots_Q_presel_0, shots_Q_presel_1 = a_tools.zigzag(
+                    shots_Q_data, sample_0, sample_1, nr_samples)
+                shots_I_data_0, shots_I_data_1 = a_tools.zigzag(
+                    shots_I_data, sample_0+1, sample_1+1, nr_samples)
+                shots_Q_data_0, shots_Q_data_1 = a_tools.zigzag(
+                    shots_Q_data, sample_0+1, sample_1+1, nr_samples)
 
         # cutting off half data points (odd number of data points)
         min_len = np.min([np.size(shots_I_data_0), np.size(shots_I_data_1),
@@ -2076,6 +2096,11 @@ class SSRO_Analysis(MeasurementAnalysis):
         shots_I_data_1 = shots_I_data_1[0:min_len]
         shots_Q_data_0 = shots_Q_data_0[0:min_len]
         shots_Q_data_1 = shots_Q_data_1[0:min_len]
+        if preselection:
+            shots_I_presel_0 = shots_I_presel_0[0:min_len]
+            shots_I_presel_1 = shots_I_presel_1[0:min_len]
+            shots_Q_presel_0 = shots_Q_presel_0[0:min_len]
+            shots_Q_presel_1 = shots_Q_presel_1[0:min_len]
 
         # rotating IQ-plane to transfer all information to the I-axis
         if self.rotate:
@@ -2084,87 +2109,68 @@ class SSRO_Analysis(MeasurementAnalysis):
                                        shots_I_data_0, shots_Q_data_0, min_len,
                                        **kw)
             self.theta = theta
+            if preselection:
+                shots_presel_1_rot = np.cos(theta)*shots_I_presel_1 - \
+                                     np.sin(theta)*shots_Q_presel_1
+                shots_presel_0_rot = np.cos(theta)*shots_I_presel_0 - \
+                                     np.sin(theta)*shots_Q_presel_0
+
         else:
             self.theta = 0
             shots_I_data_1_rot = shots_I_data_1
             shots_I_data_0_rot = shots_I_data_0
+            if preselection:
+                shots_presel_1_rot = shots_I_presel_1
+                shots_presel_0_rot = shots_I_presel_0
 
-            cmap = kw.pop('cmap', 'viridis')
-            # plotting 2D histograms of mmts with pulse
-
-            I_min = min(min(shots_I_data_0), min(shots_I_data_1))
-            I_max = max(max(shots_I_data_0), max(shots_I_data_1))
-            Q_min = min(min(shots_Q_data_0), min(shots_Q_data_1))
-            Q_max = max(max(shots_Q_data_0), max(shots_Q_data_1))
-            edge = max(abs(I_min), abs(I_max), abs(Q_min), abs(Q_max))
-
-            H0, xedges0, yedges0 = np.histogram2d(shots_I_data_0, shots_Q_data_0,
-                                                  bins=n_bins,
-                                                  range=[[I_min, I_max],
-                                                         [Q_min, Q_max]],
-                                                  normed=True)
-            H1, xedges1, yedges1 = np.histogram2d(shots_I_data_1, shots_Q_data_1,
-                                                  bins=n_bins,
-                                                  range=[[I_min, I_max, ],
-                                                         [Q_min, Q_max, ]],
-                                                  normed=True)
-            fig, axarray = plt.subplots(nrows=1, ncols=2)
-            axarray[0].tick_params(axis='both', which='major',
-                                   labelsize=5, direction='out')
-            axarray[1].tick_params(axis='both', which='major',
-                                   labelsize=5, direction='out')
-
-            plt.subplots_adjust(hspace=20)
-
-            axarray[0].set_title('2D histogram, pi pulse')
-            im1 = axarray[0].imshow(np.transpose(H1), interpolation='nearest',
-                                    origin='low',
-                                    extent=[xedges1[0], xedges1[-1],
-                                            yedges1[0], yedges1[-1]], cmap=cmap)
-            set_xlabel(axarray[0], self.value_names[0], self.value_units[0])
-            if len(self.channels) == 2:
-                set_ylabel(axarray[0], self.value_names[
-                           1], self.value_units[1])
-            else:
-                set_ylabel(axarray[0], 'Dummy axis')
-            axarray[0].set_xlim(-edge, edge)
-            axarray[0].set_ylim(-edge, edge)
-
-            # plotting 2D histograms of mmts with no pulse
-            axarray[1].set_title('2D histogram, no pi pulse')
-            im0 = axarray[1].imshow(np.transpose(H0), interpolation='nearest', origin='low',
-                                    extent=[xedges0[0], xedges0[-1], yedges0[0],
-                                            yedges0[-1]], cmap=cmap)
-            set_xlabel(axarray[1], self.value_names[0], self.value_units[0])
-            if len(self.channels) == 2:
-                set_ylabel(axarray[1], self.value_names[
-                           1], self.value_units[1])
-            else:
-                set_ylabel(axarray[1], 'Dummy axis')
-            axarray[1].set_xlim(-edge, edge)
-            axarray[1].set_ylim(-edge, edge)
-
-            self.save_fig(fig, figname='SSRO_Density_Plots',
-                          close_fig=self.close_fig, **kw)
-
-            self.avg_0_I = np.mean(shots_I_data_0)
-            self.avg_1_I = np.mean(shots_I_data_1)
-            self.avg_0_Q = np.mean(shots_Q_data_0)
-            self.avg_1_Q = np.mean(shots_Q_data_1)
-        # making gaussfits of s-curves
+        if kw.get('plot', True):
+            self.plot_2D_histograms(shots_I_data_0, shots_Q_data_0,
+                                    shots_I_data_1, shots_Q_data_1)
 
         self.no_fits_analysis(shots_I_data_1_rot, shots_I_data_0_rot, min_len,
                               **kw)
         if self.no_fits is False:
+            # making gaussfits of s-curves
             self.s_curve_fits(shots_I_data_1_rot, shots_I_data_0_rot, min_len,
                               **kw)
+
+        if preselection:
+            try:
+                V_th = self.V_th_d
+            except:
+                V_th = self.V_th_a
+            s = np.sign(np.mean(shots_I_data_1_rot - shots_I_data_0_rot))
+            shots_gmask_0 = s*(V_th - shots_presel_0_rot) > 0
+            shots_gmask_1 = s*(V_th - shots_presel_1_rot) > 0
+
+            shots_masked_0 = shots_I_data_0_rot[shots_gmask_0]
+            shots_masked_1 = shots_I_data_1_rot[shots_gmask_1]
+
+            self.total_points = np.size(shots_I_data_0_rot) + \
+                                np.size(shots_I_data_1_rot)
+            self.removed_points = self.total_points - \
+                                  np.size(shots_masked_0) - \
+                                  np.size(shots_masked_1)
+
+            min_len_masked = np.min([np.size(shots_masked_0),
+                                     np.size(shots_masked_1)])
+            shots_masked_0 = shots_masked_0[:min_len_masked]
+            shots_masked_1 = shots_masked_1[:min_len_masked]
+
+
+
+            self.no_fits_analysis(shots_masked_1, shots_masked_0,
+                                  min_len_masked, masked=True, **kw)
+            if self.no_fits is False:
+                # making gaussfits of s-curves
+                self.s_curve_fits(shots_masked_1, shots_masked_0,
+                                  min_len_masked, masked=True, **kw)
+
         self.finish(**kw)
 
     def optimize_IQ_angle(self, shots_I_1, shots_Q_1, shots_I_0,
                           shots_Q_0, min_len, plot_2D_histograms=True,
                           **kw):
-        cmap = kw.pop('cmap', 'viridis')
-        # plotting 2D histograms of mmts with pulse
 
         n_bins = 120  # the bins we want to have around our data
         I_min = min(min(shots_I_0), min(shots_I_1))
@@ -2182,46 +2188,6 @@ class SSRO_Analysis(MeasurementAnalysis):
                                               range=[[I_min, I_max, ],
                                                      [Q_min, Q_max, ]],
                                               normed=True)
-
-        if plot_2D_histograms:
-            fig, axarray = plt.subplots(nrows=1, ncols=2)
-            axarray[0].tick_params(axis='both', which='major',
-                                   labelsize=5, direction='out')
-            axarray[1].tick_params(axis='both', which='major',
-                                   labelsize=5, direction='out')
-
-            plt.subplots_adjust(hspace=20)
-
-            axarray[0].set_title('2D histogram, pi pulse')
-            im1 = axarray[0].imshow(np.transpose(H1), interpolation='nearest', origin='low',
-                                    extent=[xedges1[0], xedges1[-1],
-                                            yedges1[0], yedges1[-1]], cmap=cmap)
-
-            set_xlabel(axarray[0], self.value_names[0], self.value_units[0])
-            if len(self.channels) == 2:
-                set_ylabel(axarray[0], self.value_names[
-                           1], self.value_units[1])
-            else:
-                set_ylabel(axarray[0], 'Dummy axis')
-            axarray[0].set_xlim(-edge, edge)
-            axarray[0].set_ylim(-edge, edge)
-
-            # plotting 2D histograms of mmts with no pulse
-            axarray[1].set_title('2D histogram, no pi pulse')
-            im0 = axarray[1].imshow(np.transpose(H0), interpolation='nearest', origin='low',
-                                    extent=[xedges0[0], xedges0[-1], yedges0[0],
-                                            yedges0[-1]], cmap=cmap)
-
-            set_xlabel(axarray[1], self.value_names[0], self.value_units[0])
-            if len(self.channels) == 2:
-                set_ylabel(axarray[1], self.value_names[
-                           1], self.value_units[1])
-            else:
-                set_ylabel(axarray[1], 'Dummy axis')
-            axarray[1].set_xlim(-edge, edge)
-            axarray[1].set_ylim(-edge, edge)
-            self.save_fig(fig, figname='SSRO_Density_Plots',
-                          close_fig=self.close_fig, **kw)
 
         # this part performs 2D gaussian fits and calculates coordinates of the
         # maxima
@@ -2262,14 +2228,14 @@ class SSRO_Analysis(MeasurementAnalysis):
         # interpolating to find the gauss top x and y coordinates
         x_lin = np.linspace(0, n_bins, n_bins+1)
         y_lin = np.linspace(0, n_bins, n_bins+1)
-        f_x_1 = interp1d(x_lin, xedges1)
+        f_x_1 = interp1d(x_lin, xedges1, fill_value='extrapolate')
         x_1_max = f_x_1(params1[1])
-        f_y_1 = interp1d(y_lin, yedges1)
+        f_y_1 = interp1d(y_lin, yedges1, fill_value='extrapolate')
         y_1_max = f_y_1(params1[2])
 
-        f_x_0 = interp1d(x_lin, xedges0)
+        f_x_0 = interp1d(x_lin, xedges0, fill_value='extrapolate')
         x_0_max = f_x_0(params0[1])
-        f_y_0 = interp1d(y_lin, yedges0)
+        f_y_0 = interp1d(y_lin, yedges0, fill_value='extrapolate')
         y_0_max = f_y_0(params0[2])
 
         # following part will calculate the angle to rotate the IQ plane
@@ -2284,10 +2250,13 @@ class SSRO_Analysis(MeasurementAnalysis):
         shots_I_0_rot = np.cos(theta)*shots_I_0 - np.sin(theta)*shots_Q_0
         shots_Q_0_rot = np.sin(theta)*shots_I_0 + np.cos(theta)*shots_Q_0
 
-        return(theta, shots_I_1_rot, shots_I_0_rot)
+        return (theta, shots_I_1_rot, shots_I_0_rot)
 
     def no_fits_analysis(self, shots_I_1_rot, shots_I_0_rot, min_len,
-                         **kw):
+                         masked=False, **kw):
+
+        plot = kw.get('plot', True)
+
         min_voltage_1 = np.min(shots_I_1_rot)
         min_voltage_0 = np.min(shots_I_0_rot)
         min_voltage = np.min([min_voltage_1, min_voltage_0])
@@ -2316,26 +2285,42 @@ class SSRO_Analysis(MeasurementAnalysis):
         # adding half a bin size
         F_a = 1-(1-cumsum_diff_list[self.index_V_th_a])/2
 
-        fig, ax = plt.subplots()
-        ax.plot(bins[0:-1], self.cumsum_1, label='cumsum_1', color='red')
-        ax.plot(bins[0:-1], self.cumsum_0, label='cumsum_0', color='blue')
-        ax.axvline(V_th_a, ls='--', label="V_th_a = %.3f" % V_th_a,
-                   linewidth=2, color='grey')
-        ax.text(.7, .6, '$Fa$ = %.4f' % F_a, transform=ax.transAxes,
-                fontsize='large')
-        ax.set_title('raw cumulative histograms')
-        plt.xlabel('DAQ voltage integrated (AU)', fontsize=14)
-        plt.ylabel('Fraction', fontsize=14)
+        if plot:
+            fig, ax = plt.subplots()
+            ax.plot(bins[0:-1], self.cumsum_1, label='cumsum_1', color='blue')
+            ax.plot(bins[0:-1], self.cumsum_0, label='cumsum_0', color='red')
+            ax.axvline(V_th_a, ls='--', label="V_th_a = %.3f" % V_th_a,
+                       linewidth=2, color='grey')
+            ax.text(.7, .6, '$Fa$ = %.4f' % F_a, transform=ax.transAxes,
+                    fontsize='large')
+            ax.set_title('raw cumulative histograms')
+            plt.xlabel('DAQ voltage integrated (AU)', fontsize=14)
+            plt.ylabel('Fraction', fontsize=14)
 
-        #plt.hist(SS_Q_data, bins=40,label = '0 Q')
-        plt.legend(loc=2)
-        self.save_fig(fig, figname='raw-cumulative-histograms', **kw, close_fig=self.close_fig)
+            #plt.hist(SS_Q_data, bins=40,label = '0 Q')
+            plt.legend(loc=2)
+            if masked:
+                filename = 'raw-cumulative-histograms-masked'
+            else:
+                filename = 'raw-cumulative-histograms'
+            self.save_fig(fig, figname=filename, close_fig=self.close_fig, **kw)
+
+        # saving the results
+        if 'SSRO_Fidelity' not in self.analysis_group:
+            fid_grp = self.analysis_group.create_group('SSRO_Fidelity')
+        else:
+            fid_grp = self.analysis_group['SSRO_Fidelity']
+        fid_grp.attrs.create(name='V_th_a', data=V_th_a)
+        fid_grp.attrs.create(name='F_a', data=F_a)
 
         self.F_a = F_a
         self.V_th_a = V_th_a
 
-    def s_curve_fits(self, shots_I_1_rot, shots_I_0_rot, min_len,
+    def s_curve_fits(self, shots_I_1_rot, shots_I_0_rot, min_len, masked=False,
                      **kw):
+
+        plot = kw.get('plot', True)
+
         # Sorting data for analytical fitting
         S_sorted_I_1 = np.sort(shots_I_1_rot)
         S_sorted_I_0 = np.sort(shots_I_0_rot)
@@ -2353,9 +2338,9 @@ class SSRO_Analysis(MeasurementAnalysis):
             out = np.zeros(np.size(x))
             t = 1. / (1. + 0.5*z)
             r = t * np.exp(-z*z-1.26551223+t*(1.00002368+t*(.37409196 +
-                                                            t*(.09678418+t*(-.18628806+t*(.27886807 +
-                                                                                          t*(-1.13520398+t*(1.48851587+t*(-.82215223 +
-                                                                                                                          t*.17087277)))))))))
+                    t*(.09678418+t*(-.18628806+t*(.27886807 +
+                        t*(-1.13520398+t*(1.48851587+t*(-.82215223 +
+                            t*.17087277)))))))))
             if np.size(x) > 1:
                 for k in range(np.size(x)):
                     if (x[k] >= 0.):
@@ -2391,10 +2376,11 @@ class SSRO_Analysis(MeasurementAnalysis):
             return y
 
         NormCdf2Model = lmfit.Model(NormCdf2)
-        NormCdfModel.set_param_hint('mu', value=(np.average(shots_I_0_rot)
-                                                 + np.average(shots_I_0_rot))/2)
-        NormCdfModel.set_param_hint('sigma', value=(np.std(shots_I_0_rot)
-                                                    + np.std(shots_I_0_rot))/2, min=0)
+        NormCdfModel.set_param_hint('mu', value=(np.average(shots_I_0_rot) +
+                                                 np.average(shots_I_1_rot))/2)
+        NormCdfModel.set_param_hint('sigma', value=(np.std(shots_I_0_rot) +
+                                                    np.std(shots_I_1_rot))/2,
+                                             min=0)
 
         params = NormCdfModel.make_params()
 
@@ -2474,13 +2460,13 @@ class SSRO_Analysis(MeasurementAnalysis):
 
         # redefining the function with different variables to avoid problems
         # with arguments in brent optimization
-        def NormCdfdiff(x, mu0=mu0_0, mu1=mu1_1, sigma0=sigma0_0, sigma1=sigma1_1):
+        def NormCdfdiff(x, mu0=mu0_0, mu1=mu1_1, sigma0=sigma0_0,
+                        sigma1=sigma1_1):
             y0 = -abs(NormCdf(x, mu0, sigma0)-NormCdf(x, mu1, sigma1))
             return y0
 
         self.V_th_d = optimize.brent(NormCdfdiff)
         F_d = 1-(1+NormCdfdiff(x=self.V_th_d))/2
-
         # print 'F_corrected',F_corrected
 
         def NormCdfdiffDouble(x, mu0_0=mu0_0,
@@ -2505,96 +2491,131 @@ class SSRO_Analysis(MeasurementAnalysis):
         noise = (sigma0_0 + sigma1_1)/2
         SNR = signal/noise
 
-        # plotting s-curves
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.set_title(
-            'S-curves (not binned) and fits, determining fidelity and threshold optimum, %s shots' % min_len)
-        # ax.set_xlabel('DAQ voltage integrated (V)')  # , fontsize=14)
-        set_xlabel(ax, 'Weight',  self.value_units[0])
-        ax.set_ylabel('Fraction of counts')  # , fontsize=14)
-        ax.set_ylim((-.01, 1.01))
-        ax.plot(S_sorted_I_0, p_norm_I_0, label='0 I', linewidth=2,
-                color='blue')
-        ax.plot(S_sorted_I_1, p_norm_I_1, label='1 I', linewidth=2,
-                color='red')
+        if plot:
+            # plotting s-curves
+            fig, ax = plt.subplots(figsize=(7, 4))
+            ax.set_title('S-curves (not binned) and fits, determining fidelity '
+                         'and threshold optimum, %s shots' % min_len)
+            ax.set_xlabel('DAQ voltage integrated (V)')  # , fontsize=14)
+            ax.set_ylabel('Fraction of counts')  # , fontsize=14)
+            ax.set_ylim((-.01, 1.01))
+            ax.plot(S_sorted_I_0, p_norm_I_0, label='0 I', linewidth=2,
+                    color='red')
+            ax.plot(S_sorted_I_1, p_norm_I_1, label='1 I', linewidth=2,
+                    color='blue')
 
-        # ax.plot(S_sorted_I_0, fit_res_0.best_fit,
-        #         label='0 I single gaussian fit', ls='--', linewidth=3,
-        #         color='lightblue')
-        # ax.plot(S_sorted_I_1, fit_res_1.best_fit, label='1 I',
-        #         linewidth=2, color='red')
+            # ax.plot(S_sorted_I_0, fit_res_0.best_fit,
+            #         label='0 I single gaussian fit', ls='--', linewidth=3,
+            #         color='lightblue')
+            # ax.plot(S_sorted_I_1, fit_res_1.best_fit, label='1 I',
+            #         linewidth=2, color='red')
 
-        ax.plot(S_sorted_I_0, fit_res_double_0.best_fit,
-                label='0 I double gaussfit', ls='--', linewidth=3,
-                color='lightblue')
-        ax.plot(S_sorted_I_1, fit_res_double_1.best_fit,
-                label='1 I double gaussfit', ls='--', linewidth=3,
-                color='darkred')
-        labelstring = 'V_th_a= %.3f V' % (self.V_th_a)
-        labelstring_corrected = 'V_th_d= %.3f V' % (self.V_th_d)
+            ax.plot(S_sorted_I_0, fit_res_double_0.best_fit,
+                    label='0 I double gaussfit', ls='--', linewidth=3,
+                    color='darkred')
+            ax.plot(S_sorted_I_1, fit_res_double_1.best_fit,
+                    label='1 I double gaussfit', ls='--', linewidth=3,
+                    color='lightblue')
+            labelstring = 'V_th_a= %.3f V' % (self.V_th_a)
+            labelstring_corrected = 'V_th_d= %.3f V' % (self.V_th_d)
 
-        ax.axvline(self.V_th_a, ls='--', label=labelstring,
-                   linewidth=2, color='grey')
-        ax.axvline(self.V_th_d, ls='--', label=labelstring_corrected,
-                   linewidth=2, color='black')
+            ax.axvline(self.V_th_a, ls='--', label=labelstring,
+                       linewidth=2, color='grey')
+            ax.axvline(self.V_th_d, ls='--', label=labelstring_corrected,
+                       linewidth=2, color='black')
 
-        leg = ax.legend(loc='best')
-        leg.get_frame().set_alpha(0.5)
-        self.save_fig(fig, figname='S-curves', close_fig=self.close_fig, **kw)
+            leg = ax.legend(loc='best')
+            leg.get_frame().set_alpha(0.5)
+            if masked:
+                filename = 'S-curves-masked'
+            else:
+                filename = 'S-curves'
+            self.save_fig(fig, figname=filename, **kw)
 
-        #################################################
-        #         plotting the 1D histograms            #
-        #################################################
-        fig, ax = plt.subplots(figsize=(8, 4))
+            # plotting the histograms
+            fig, axes = plt.subplots(figsize=(7, 4))
+            n1, bins1, patches = pylab.hist(shots_I_1_rot, bins=40,
+                                            label='1 I', histtype='step',
+                                            color='red', normed=False)
+            n0, bins0, patches = pylab.hist(shots_I_0_rot, bins=40,
+                                            label='0 I', histtype='step',
+                                            color='blue', normed=False)
+            pylab.clf()
+            # n0, bins0 = np.histogram(shots_I_0_rot, bins=int(min_len/50),
+            #                          normed=1)
+            # n1, bins1 = np.histogram(shots_I_1_rot, bins=int(min_len/50),
+            #                          normed=1)
 
-        n0, bins0 = np.histogram(shots_I_0_rot, bins=int(min_len/50),
-                                 normed=True)
-        n1, bins1 = np.histogram(shots_I_1_rot, bins=int(min_len/50),
-                                 normed=True)
+            edat, = pylab.plot(bins1[:-1]+0.5*(bins1[1]-bins1[0]), n1, 'bo')
+            gdat, = pylab.plot(bins0[:-1]+0.5*(bins0[1]-bins0[0]), n0, 'ro')
 
-        pylab.plot(bins1[:-1]+0.5*(bins1[1]-bins1[0]), n1, 'ro')
-        pylab.plot(bins0[:-1]+0.5*(bins0[1]-bins0[0]), n0, 'bo')
+            # n, bins1, patches = np.hist(shots_I_1_rot, bins=int(min_len/50),
+            #                               label = '1 I',histtype='step',
+            #                               color='red',normed=1)
+            # n, bins0, patches = pylab.hist(shots_I_0_rot, bins=int(min_len/50),
+            #                               label = '0 I',histtype='step',
+            #                               color='blue',normed=1)
 
-        # add lines showing the fitted distribution
-        # building up the histogram fits for off measurements
-        y0 = (1-frac1_0)*pylab.normpdf(bins0, mu0_0, sigma0_0) + \
-            frac1_0*pylab.normpdf(bins0, mu1_0, sigma1_0)
-        y1_0 = frac1_0*pylab.normpdf(bins0, mu1_0, sigma1_0)
-        y0_0 = (1-frac1_0)*pylab.normpdf(bins0, mu0_0, sigma0_0)
+            # add lines showing the fitted distribution
+            # building up the histogram fits for off measurements
 
-        # building up the histogram fits for on measurements
-        y1 = (1-frac1_1)*pylab.normpdf(bins1, mu0_1, sigma0_1) + \
-            frac1_1*pylab.normpdf(bins1, mu1_1, sigma1_1)
-        y1_1 = frac1_1*pylab.normpdf(bins1, mu1_1, sigma1_1)
-        y0_1 = (1-frac1_1)*pylab.normpdf(bins1, mu0_1, sigma0_1)
+            norm0 = (bins0[1]-bins0[0])*min_len
+            norm1 = (bins1[1]-bins1[0])*min_len
 
-        plt.plot(bins0, y0, 'b', linewidth=1.5)
-        plt.plot(bins0, y1_0, 'b--', linewidth=3.5)
-        plt.plot(bins0, y0_0, 'b--', linewidth=3.5)
+            y0 = norm0*(1-frac1_0)*pylab.normpdf(bins0, mu0_0, sigma0_0) + \
+                 norm0*frac1_0*pylab.normpdf(bins0, mu1_0, sigma1_0)
+            y1_0 = norm0*frac1_0*pylab.normpdf(bins0, mu1_0, sigma1_0)
+            y0_0 = norm0*(1-frac1_0)*pylab.normpdf(bins0, mu0_0, sigma0_0)
 
-        plt.plot(bins1, y1, 'r', linewidth=1.5)
-        plt.plot(bins1, y0_1, 'r--', linewidth=3.5)
-        plt.plot(bins1, y1_1, 'r--', linewidth=3.5)
+            # building up the histogram fits for on measurements
+            y1 = norm1*(1-frac1_1)*pylab.normpdf(bins1, mu0_1, sigma0_1) + \
+                 norm1*frac1_1*pylab.normpdf(bins1, mu1_1, sigma1_1)
+            y1_1 = norm1*frac1_1*pylab.normpdf(bins1, mu1_1, sigma1_1)
+            y0_1 = norm1*(1-frac1_1)*pylab.normpdf(bins1, mu0_1, sigma0_1)
 
-        pdf_max = (max(max(y0), max(y1)))
-        ax.set_ylim(pdf_max/1000, 2*pdf_max)
-        if self.hist_log_scale:
-            ax.set_yscale('log')
-        ax.set_title('Histograms of {} shots, {}'.format(
-            min_len, self.timestamp_string))
-        set_xlabel(ax, 'Rotated weight', self.value_units[0])
-        set_ylabel(ax, 'Fraction of counts')
+            pylab.semilogy(bins0, y0, 'r', linewidth=1.5)
+            pylab.semilogy(bins0, y1_0, 'r--', linewidth=3.5)
+            pylab.semilogy(bins0, y0_0, 'r--', linewidth=3.5)
 
-        plt.axvline(self.V_th_a, ls='--',
-                    linewidth=2, color='grey',
-                    label='SNR={0:.2f}\n $F_a$={1:.4f}\n $F_d$={2:.4f}\n $p_e$={3:.4f}'.format(SNR, self.F_a, F_d, frac1_0))
-        plt.axvline(self.V_th_d, ls='--',
-                    linewidth=2, color='black')
-        plt.legend()
-        leg2 = ax.legend(loc='best')
-        leg2.get_frame().set_alpha(0.5)
-        self.save_fig(fig, figname='Histograms',
-                      close_fig=self.close_fig, **kw)
+            pylab.semilogy(bins1, y1, 'b', linewidth=1.5)
+            pylab.semilogy(bins1, y0_1, 'b--', linewidth=3.5)
+            pylab.semilogy(bins1, y1_1, 'b--', linewidth=3.5)
+            pdf_max = (max(max(y0), max(y1)))
+            (pylab.gca()).set_ylim(pdf_max/1000, 2*pdf_max)
+
+            plt.title('Histograms of {} shots, {}'.format(
+                min_len, self.timestamp_string))
+            plt.xlabel('DAQ voltage integrated (V)')
+            plt.ylabel('Number of counts')
+
+            thaline = plt.axvline(self.V_th_a, ls='--', linewidth=1,
+                                  color='grey')
+            thdline = plt.axvline(self.V_th_d, ls='--', linewidth=1,
+                                  color='black')
+            nomarker = matplotlib.patches.Rectangle((0, 0), 0, 0, alpha=0.0)
+
+            markers = [gdat, edat, thaline, thdline, nomarker, nomarker,
+                       nomarker]
+            labels = [r'$\left| g \right\rangle$ prepared',
+                      r'$\left| e \right\rangle$ prepared',
+                       '$F_a$ = {:.4f}'.format(self.F_a),
+                       '$F_d$ = {:.4f}'.format(F_d),
+                       'SNR = {:.2f}'.format(SNR),
+                       '$p(e|0)$ = {:.4f}'.format(frac1_0),
+                       '$p(g|\pi)$ = {:.4f}'.format(1-frac1_1)]
+            if masked:
+                p_rem = self.removed_points/self.total_points
+                markers += [nomarker]
+                labels += ['$p_{{rem}}$ = {:.4f}'.format(p_rem)]
+            lgd = plt.legend(markers, labels, bbox_to_anchor=(1.05, 1),
+                             loc=2, borderaxespad=0., framealpha=0.5)
+
+            if masked:
+                filename = 'Histograms-masked'
+            else:
+                filename = 'Histograms'
+
+            self.save_fig(fig, figname=filename, **kw)
 
         self.save_fitted_parameters(fit_res_double_0,
                                     var_name='fit_res_double_0')
@@ -2632,6 +2653,67 @@ class SSRO_Analysis(MeasurementAnalysis):
         self.F_d = F_d
         self.SNR = SNR
 
+    def plot_2D_histograms(self, shots_I_0, shots_Q_0, shots_I_1, shots_Q_1,
+                           **kw):
+        cmap = kw.pop('cmap', 'viridis')
+
+        n_bins = 120  # the bins we want to have around our data
+        I_min = min(min(shots_I_0), min(shots_I_1))
+        I_max = max(max(shots_I_0), max(shots_I_1))
+        Q_min = min(min(shots_Q_0), min(shots_Q_1))
+        Q_max = max(max(shots_Q_0), max(shots_Q_1))
+        edge = max(abs(I_min), abs(I_max), abs(Q_min), abs(Q_max))
+        H0, xedges0, yedges0 = np.histogram2d(shots_I_0, shots_Q_0,
+                                              bins=n_bins,
+                                              range=[[I_min, I_max],
+                                                     [Q_min, Q_max]],
+                                              normed=True)
+        H1, xedges1, yedges1 = np.histogram2d(shots_I_1, shots_Q_1,
+                                              bins=n_bins,
+                                              range=[[I_min, I_max, ],
+                                                     [Q_min, Q_max, ]],
+                                              normed=True)
+
+        fig, axarray = plt.subplots(nrows=1, ncols=2)
+        axarray[0].tick_params(axis='both', which='major',
+                               labelsize=5, direction='out')
+        axarray[1].tick_params(axis='both', which='major',
+                               labelsize=5, direction='out')
+
+        plt.subplots_adjust(hspace=20)
+
+        axarray[0].set_title('2D histogram, pi pulse')
+        im1 = axarray[0].imshow(np.transpose(H1), interpolation='nearest',
+                                origin='low',
+                                extent=[xedges1[0], xedges1[-1],
+                                        yedges1[0], yedges1[-1]], cmap=cmap)
+
+        set_xlabel(axarray[0], self.value_names[0], self.value_units[0])
+        if len(self.channels) == 2:
+            set_ylabel(axarray[0], self.value_names[
+                1], self.value_units[1])
+        else:
+            set_ylabel(axarray[0], 'Dummy axis')
+        #axarray[0].set_xlim(-edge, edge)
+        #axarray[0].set_ylim(-edge, edge)
+
+        # plotting 2D histograms of mmts with no pulse
+        axarray[1].set_title('2D histogram, no pi pulse')
+        im0 = axarray[1].imshow(np.transpose(H0), interpolation='nearest',
+                                origin='low',
+                                extent=[xedges0[0], xedges0[-1], yedges0[0],
+                                        yedges0[-1]], cmap=cmap)
+
+        set_xlabel(axarray[1], self.value_names[0], self.value_units[0])
+        if len(self.channels) == 2:
+            set_ylabel(axarray[1], self.value_names[
+                1], self.value_units[1])
+        else:
+            set_ylabel(axarray[1], 'Dummy axis')
+        #axarray[1].set_xlim(-edge, edge)
+        #axarray[1].set_ylim(-edge, edge)
+        self.save_fig(fig, figname='SSRO_Density_Plots',
+                      close_fig=self.close_fig, **kw)
 
 class SSRO_discrimination_analysis(MeasurementAnalysis):
 
@@ -5363,7 +5445,7 @@ class time_trace_analysis(MeasurementAnalysis):
         for i in range(np.shape(self.Z)[0]):
             series = self.Z[i, :]
             if flipping_sequence:
-                series = dm_tools.binary_derivative(series)
+                series = dm_tools.binary_derivative_old(series)
 
             rsf = dm_tools.count_rounds_since_flip_split(series)
             rsf_lst_mp.extend(rsf[0])

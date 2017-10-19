@@ -23,7 +23,7 @@ class Test_base_analysis(unittest.TestCase):
 
         # Test if it loaded correctly
         np.testing.assert_equal(
-            a.data_dict, {
+            a.raw_data_dict, {
                 'datetime': ['2017-07-31 01:00:40', '2017-07-31 01:37:24',
                              '2017-07-31 02:14:20', '2017-07-31 02:51:24',
                              '2017-07-31 03:28:44', '2017-07-31 04:05:34',
@@ -68,8 +68,8 @@ class Test_base_analysis(unittest.TestCase):
             key_list='auto')
 
         # This time use default argument for savedir
-        oldFolder = a.data_dict['folder']
-        a.data_dict['folder'] = [os.path.join(self.datadir, '20170808',
+        oldFolder = a.raw_data_dict['folder']
+        a.raw_data_dict['folder'] = [os.path.join(self.datadir, '20170808',
                                               '010101_analysis_v2_json')]
         a.save_data(
             savebase='saved_by_test_select_keys',
@@ -77,7 +77,7 @@ class Test_base_analysis(unittest.TestCase):
             tag_tstamp=False,
             key_list=['detuning', 'phase'])
         # Need to set old folder again to pass assertions below
-        a.data_dict['folder'] = oldFolder
+        a.raw_data_dict['folder'] = oldFolder
 
         # Reload the data
         with open(os.path.join(self.datadir, '20170808',
@@ -91,7 +91,7 @@ class Test_base_analysis(unittest.TestCase):
                   'r') as file:
             loaded_dict_select_keys = json.load(file)
 
-        np.testing.assert_equal(loaded_dict_all, a.data_dict)
+        np.testing.assert_equal(loaded_dict_all, a.raw_data_dict)
         np.testing.assert_equal(loaded_dict_select_keys, {
                 'detuning': [0.0, -49320761.24079269, -22225390.9111607,
                              -13568964.579852352, 21392223.595482837,
