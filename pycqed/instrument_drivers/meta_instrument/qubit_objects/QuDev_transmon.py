@@ -2532,27 +2532,30 @@ class QuDev_transmon(Qubit):
         return operation_dict
 
     def calibrate_flux_pulse_timing(self,MC=None, thetas=None, delays=None,
-                                    analyze=False,update=False,**kw):
+                                    analyze=False, update=False,**kw):
         """
         flux pulse timing calibration
 
         does a 2D measuement of the type:
 
-                   X90_separation
-                < -- ---- --- --->
-                |X90|  ------     |X90|  ---  |RO|
-                <----->
-                       |   fluxpulse     |
+                      X90_separation
+                < -- ---- ----------- --->
+                |X90|  --------------     |X90|  ---  |RO|
+                   <----->
+                          | fluxpulse |
 
-        where the flux pulse delay and the angle of the second X90 pulse are swept.
+        where the flux pulse delay and the angle of the second X90 pulse
+         are swept.
 
         Args:
             MC: measurement control object
-            thetas: numpy array with angles (in rad) for the Ramsey type measurement
-            delays: numpy array with delays (in s) swept through as flux pulse delay
-            analyze: bool, if True, then the measurede data gets analyzed (for detailed
-                documentation of the analysis see in the Fluxpulse_Ramsey_2D_Analysis class
-            update: bool, if True, the AWG channel delay gets corrected, such that single qubit
+            thetas: numpy array with angles (in rad) for the Ramsey type
+            measurement delays: numpy array with delays (in s) swept through
+                as flux pulse delay
+            analyze: bool, if True, then the measured data
+                gets analyzed (for detailed documentation of the analysis see in
+                the Fluxpulse_Ramsey_2D_Analysis class update: bool, if True, the
+                AWG channel delay gets corrected, such that single qubit
                 gates and flux pulses have no relative delay
 
         Returns:
@@ -2565,23 +2568,34 @@ class QuDev_transmon(Qubit):
         clock_rate = MC.station.pulsar.clock(channel)
         T_sample = 1./clock_rate
 
-        X90_separation = kw.pop('X90_separation', 40e-9)
+        X90_separation = kw.pop('X90_separation', 200e-9)
         distorted = kw.pop('distorted', False)
-        distortion_dict = kw.pop('distortion_dict',None)
-        pulse_length = kw.pop('pulse_length', 80e-9)
+        distortion_dict = kw.pop('distortion_dict', None)
+        pulse_length = kw.pop('pulse_length', 20e-9)
+        self.flux_pulse_length(pulse_length)
+        amplitude = kw.pop('amplitude', 0.1)
+        self.flux_pulse_amp(amplitude)
+
+
+        measurement_string = 'Flux_pulse_delay_calibration_{}'.format(self.name)
 
         if thetas is None:
             thetas = np.linspace(0, 2*np.pi, 8, endpoint=False)
         if delays is None:
-            delays = np.arange(-1.5*pulse_length, X90_separation + 0.5*pulse_length, 1*T_sample)
+            delays = np.arange(-6*self.flux_pulse_length(),
+                               X90_separation + 6*self.flux_pulse_length(),
+                               20*T_sample)
 
         self.set_default_readout_weights()
+        self.prepare_for_timedomain()
         self.update_detector_functions()
         detector_fun = self.int_avg_det
 
-        s1 = awg_swf.Ramsey_interleaved_fluxpulse_sweep(self, X90_separation=X90_separation,
-                                                        distorted=distorted,
-                                                        distortion_dict=distortion_dict)
+        s1 = awg_swf.Ramsey_interleaved_fluxpulse_sweep(
+                        self,
+                        X90_separation=X90_separation,
+                        distorted=distorted,
+                        distortion_dict=distortion_dict)
         s2 = awg_swf.Ramsey_fluxpulse_delay_sweep(self, s1)
 
         MC.set_sweep_function(s1)
@@ -2589,17 +2603,25 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_function_2D(s2)
         MC.set_sweep_points_2D(delays)
         MC.set_detector_function(detector_fun)
-        MC.run_2D('Flux pulse delay calibration measurement')
+        MC.run_2D(measurement_string)
 
         if analyze:
-            MA = ma.Fluxpulse_Ramsey_2D_Analysis(X90_separation=X90_separation)
-            MA.run_default_analysis()
+            flux_pulse_ma = ma.Fluxpulse_Ramsey_2D_Analysis(
+                        label=measurement_string,
+                        X90_separation=X90_separation,
+                        flux_pulse_length=pulse_length,
+                        gauss_sigma=self.gauss_sigma,
+                        nr_gauss_sigma=self.nr_sigma,
+                        qb_name=self.name,
+                        auto=False)
+            flux_pulse_ma.run_delay_analysis(show=True)
 
             if update:
-                MC.station.pulsar.channels[channel]['delay'] += MA.fitted_delay
+                MC.station.pulsar.channels[channel]['delay'] -= flux_pulse_ma.fitted_delay
+                print('updated delay of channel {}.'.format(channel))
             else:
-                logging.warning('Not updated, since analysis was disabled.')
-            return MA.fitted_delay
+                logging.warning('Not updated, since update was disabled.')
+            return flux_pulse_ma.fitted_delay
         else:
             return
 

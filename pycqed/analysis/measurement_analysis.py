@@ -8653,35 +8653,46 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
 
 
     """
-    def __init__(self, label='Flux pulse Ramsey 2D', qb_name=None,  **kw):
+    def __init__(self, X90_separation=None,flux_pulse_length=None, gauss_sigma=None, nr_gauss_sigma=None,
+                 qb_name=None, label='Ramsey_interleaved_flux_pulse',
+
+                 **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
-        super(self.__class__, self).__init__(TwoD=True
-                                             , start_at_zero=True,
-                                             qb_name=qb_name, auto=False, **kw)
-
+        super(self.__class__, self).__init__(TwoD=True,
+                                             start_at_zero=True,
+                                             qb_name=qb_name, **kw)
+        self.label = label
         self.get_values('Data')
         self.get_naming_and_values()
         self.fitted_phases = None
-        self.fitted_delay = None
-        self.fig,self.ax = plt.subplots()
-        self.fig.canvas.set_window_title(label)
+        self.fitted_delay = 0
+        # self.fig, self.ax = plt.subplots()
+        # self.fig.canvas.set_window_title(label)
         self.delay_fit_res = None
-        self.X90_separation = kw.pop('X90_separation', None)
+        self.X90_separation = X90_separation
+        self.flux_pulse_length = flux_pulse_length
+        self.gauss_sigma = gauss_sigma
+        self.nr_gauss_sigma = nr_gauss_sigma
         self.return_fit = kw.pop('return_fit', False)
 
+        super(self.__class__, self).run_default_analysis(TwoD=True,
+                                                         close_file=False)
 
-    def fit_single_cos(self, thetas, ampls, print_fit_results=True,phase_guess=0):
+
+
+    def fit_single_cos(self, thetas, ampls,
+                       print_fit_results=True,phase_guess=0):
         cos_mod = fit_mods.CosModel
         average = np.mean(ampls)
 
         diff = 0.5*(max(ampls) -
                     min(ampls))
         amp_guess = -diff
-        #offset guess
+        # offset guess
         offset_guess = average
 
-        #Set up fit parameters and perform fit
+        # Set up fit parameters and perform fit
         cos_mod.set_param_hint('amplitude',
                                value=amp_guess,
                                vary=True)
@@ -8707,73 +8718,77 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
 
         return fit_res
 
-
-    def fit_all(self, plot=False):
+    def fit_all(self, plot=False, extrapolate_phase=False):
 
         phase_list = [0,0]
-        y_list = []
         amplitude_list = []
 
-        length_single = len(np.where(self.sweep_points[1] == self.sweep_points[1][0])[0])
+        length_single = len(self.sweep_points)
 
         if plot:
-            fig,axs = plt.subplots(2,1)
+            self.fig, self.ax = plt.subplots(2,1)
         else:
-            fig,axs = (None,None)
+            self.fig,self.ax = (None,None)
 
-        for i in np.arange(0,len(self.sweep_points[0]),length_single):
+        for i in np.arange(0,len(self.sweep_points_2D)*length_single,length_single):
 
             data_slice = self.data[:,i:i+length_single-1]
 
             thetas = data_slice[0]
-            y = data_slice[1,0]
             ampls = np.abs(data_slice[2] + 1j*data_slice[3])
 
-            phase_guess = phase_list[-1] + (phase_list[-1] - phase_list[-2])
-            fit_res = self.fit_single_cos(thetas,ampls,print_fit_results=False,phase_guess=phase_guess)
+            if extrapolate_phase:
+                phase_guess = phase_list[-1] + (phase_list[-1] - phase_list[-2])
+            else:
+                phase_guess = phase_list[-1]
+            fit_res = self.fit_single_cos(thetas, ampls,
+                                          print_fit_results=False,
+                                          phase_guess=phase_guess)
 
             phase_list.append(fit_res.best_values['phase'])
-            y_list.append(y)
             amplitude_list.append(fit_res.best_values['amplitude'])
 
             if plot:
-                axs[0].plot(thetas,ampls,'k.')
-                axs[0].plot(thetas,fit_res.best_fit,'r-')
-
+                self.ax[0].plot(thetas, ampls, 'k.')
+                self.ax[0].plot(thetas, fit_res.best_fit, 'r-')
 
         phase_list.pop(0)
         phase_list.pop(0)
 
 
         if plot:
-            axs[0].set_title('Cosine fits')
-            axs[0].set_xlabel('theta (rad)')
-            axs[0].set_ylabel('|S21| (arb. units)')
-            axs[0].legend(['data','fits'])
+            self.ax[0].set_title('Cosine fits')
+            self.ax[0].set_xlabel('theta (rad)')
+            self.ax[0].set_ylabel('|S21| (arb. units)')
+            self.ax[0].legend(['data','fits'])
 
-            axs[1].plot(y_list,phase_list)
-            axs[1].set_title('fitted phases')
-            axs[1].set_xlabel(self.parameter_names[1]+' ('+self.parameter_units[1]+')')
-            axs[1].set_ylabel('phase mod 2$\pi$ (rad)')
+            self.ax[1].plot(self.sweep_points_2D,phase_list)
+            self.ax[1].set_title('fitted phases')
+            self.ax[1].set_xlabel(self.parameter_names[1]+' ('+self.parameter_units[1]+')')
+            self.ax[1].set_ylabel('phase (rad)')
 
-            fig.subplots_adjust(hspace=0.5)
+            self.fig.subplots_adjust(hspace=0.5)
 
-            fig.show()
+            self.fig.show()
 
         self.fitted_phases = np.array(phase_list)
-        self.sweep_points_2D = np.array(y_list)
 
-        return {'phase_list' : phase_list, 'y_list' : y_list, 'plot' : fig}
+        return phase_list
 
 
-    def fit_delay(self,X90_separation=None, plot=False, print_fit_results=False,return_fit=None):
+    def fit_delay(self,X90_separation=None,flux_pulse_length=None, plot=False,
+                  print_fit_results=False,return_fit=None):
 
         if X90_separation is None:
             X90_separation = self.X90_separation
         if X90_separation is None:
             raise ValueError('Must specify the X90 pulse separation used in the experiment.')
+        if flux_pulse_length is None:
+            flux_pulse_length = self.flux_pulse_length
+        if flux_pulse_length is None:
+            raise ValueError('Must specify the flux pulse length used in the experiment.')
         if self.fitted_phases is None:
-            self.fit_all(plot=False)
+            self.fit_all(plot=False,extrapolate_phase=True)
         if return_fit is None:
             return_fit = self.return_fit
 
@@ -8804,7 +8819,7 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
                                         value=t_end_guess,
                                         vary=True)
         erf_window_model.set_param_hint('t_rise',
-                                        value=(t_end_guess - t_start_guess)/20.,
+                                        value=(t_end_guess - t_start_guess)/10.,
                                         vary=True)
         self.params_delay_fit = erf_window_model.make_params()
         self.delay_fit_res = erf_window_model.fit(data=self.fitted_phases,
@@ -8814,14 +8829,17 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
         if self.delay_fit_res.chisqr > 1.:
             logging.warning('Fit did not converge, chi-square > 1.')
 
+
+
         self.fitted_delay = (self.delay_fit_res.best_values['t_end'] +
-                             self.delay_fit_res.best_values['t_start'] - X90_separation)/2.
-
-
+                             self.delay_fit_res.best_values['t_start']
+                             - X90_separation)/2. - flux_pulse_length/2.
 
         if print_fit_results:
             print(self.delay_fit_res.fit_report())
-            print('fitted delay = ', self.fitted_delay/1e-9, 'ns')
+            print('fitted delay  = {}ns'.format(self.fitted_delay/1e-9))
+
+
 
         if plot:
             self.delay_fit_res.plot()
@@ -8831,8 +8849,9 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
         else:
             return self.fitted_delay
 
-    def run_default_analysis(self, X90_separation=None, show=False,
-                             close_file=False, **kw):
+    def run_delay_analysis(self, X90_separation=None, show=False,
+                             close_file=True, **kw):
+
         if X90_separation is None:
             X90_separation = self.X90_separation
         self.fig,self.ax = plt.subplots()
@@ -8843,9 +8862,16 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
 
 
         #get the fit results (lmfit.ModelResult) and save them
-        self.fit_all()
-        self.fitted_delay, self.delay_fit_res = self.fit_delay(X90_separation=X90_separation,plot=False, print_fit_results=print_fit_results,return_fit=True)
+        self.fit_all(plot=False,extrapolate_phase=True)
+
+        self.fitted_delay, self.delay_fit_res = self.fit_delay(
+            X90_separation=X90_separation,
+            plot=False,
+            print_fit_results=print_fit_results,
+            return_fit=True)
+
         self.save_fitted_parameters(self.delay_fit_res, var_name=self.value_names[0])
+
 
 
         #Plot results
@@ -8866,8 +8892,11 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
 
     def plot_results(self, show_guess=False):
 
-        self.ax.plot(self.sweep_points_2D,self.delay_fit_res.data,'k.',label='data')
+        self.fig, self.ax = plt.subplots()
+
+        self.ax.plot(self.sweep_points_2D/1e-9,self.delay_fit_res.data,'k.',label='data')
         textstr = ('fitted delay = {:4.3f}ns'.format(self.fitted_delay/1e-9))
+
 
         self.fig.text(0.5,0,textstr,
                       transform=self.ax.transAxes, fontsize=self.font_size,
@@ -8876,17 +8905,18 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
 
         #Used for plotting the fit
         best_vals = self.delay_fit_res.best_values
-        erf_window_fit_func = lambda t: fit_mods.ErfWindow(t,
-                                                           t_start=best_vals['t_start'],
-                                                           t_end=best_vals['t_end'],
-                                                           t_rise=best_vals['t_rise'],
-                                                           amplitude=best_vals['amplitude'],
-                                                           offset=best_vals['offset'])
+        erf_window_fit_func = lambda t: fit_mods.ErfWindow(
+                            t,
+                           t_start=best_vals['t_start'],
+                           t_end=best_vals['t_end'],
+                           t_rise=best_vals['t_rise'],
+                           amplitude=best_vals['amplitude'],
+                           offset=best_vals['offset'])
 
 
         # plot with initial guess
         if show_guess:
-            self.ax.plot(self.sweep_points_2D,
+            self.ax.plot(self.sweep_points_2D/1e-9,
                          self.delay_fit_res.init_fit, 'k--',
                          linewidth=self.line_width,
                          label='initial guess')
@@ -8896,7 +8926,10 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
                         self.sweep_points_2D[-1],
                         len(self.sweep_points_2D)*100)
         y = erf_window_fit_func(x)
-        self.ax.plot(x, y, 'r-', linewidth=self.line_width,label='fit')
+        self.ax.plot(x/1e-9, y, 'r-', linewidth=self.line_width,label='fit')
+        self.ax.set_title(self.label)
+        self.ax.set_xlabel('pulse delay (ns')
+        self.ax.set_ylabel('phase (rad)')
 
         if show_guess:
             self.ax.legend(['data','guess','fit'])

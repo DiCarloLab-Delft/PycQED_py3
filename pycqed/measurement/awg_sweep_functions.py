@@ -1994,3 +1994,55 @@ class Chevron_ampl_fast_swf(swf.Soft_Sweep):
     def finish(self):
         self.qb_control.flux_pulse_amp(self.flux_pulse_ampl_backup)
 
+
+class Fluxpulse_scope_swf(swf.Hard_Sweep):
+    def __init__(self, qb,cal_points=False, upload=True,distorted=False,
+                 distortion_dict=None,
+                 spacing=30e-9,
+                 compensation_pulses=False
+                 ):
+        super().__init__()
+        self.qb = qb
+        self.upload = upload
+        self.cal_points = cal_points
+        self.spacing=spacing
+        self.compensation_pulses = compensation_pulses
+
+        self.name = 'Fluxpulse_scope_{}'.format(self.qb.name)
+        self.parameter_name = 'delay'
+        self.unit = 's'
+        self.distorted = distorted
+        self.distortion_dict = distortion_dict
+
+    def prepare(self, **kw):
+        if self.upload:
+            fsqs.fluxpulse_scope_sequence(delays=self.sweep_points, qb=self.qb,
+                                          cal_points=self.cal_points,
+                                          distorted=self.distorted,
+                                          distortion_dict=self.distortion_dict,
+                                          spacing=self.spacing,
+                                          compensation_pulses=
+                                          self.compensation_pulses)
+
+class Fluxpulse_scope_drive_freq_sweep(swf.Soft_Sweep):
+
+    # sweeps the qubit frequency such that the X180 pulses have different frequencies.
+
+    def __init__(self, qb):
+        super().__init__()
+        self.name = 'Fluxpulse scope drive freq sweep'
+        self.parameter_name = 'qubit drive freq.'
+        self.unit = 'Hz'
+        self.qb = qb
+        self.stored_f_qubit = self.qb.f_qubit()
+        self.f_mod = self.qb.f_pulse_mod()
+
+    def prepare(self):
+        pass
+
+    def set_parameter(self, val, **kw):
+        self.qb.cw_source.frequency(val - self.f_mod)
+
+    def finish(self):
+        self.qb.f_qubit(self.stored_f_qubit)
+        pass
