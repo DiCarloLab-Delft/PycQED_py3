@@ -6400,7 +6400,7 @@ class time_trace_analysis(MeasurementAnalysis):
         for i in range(np.shape(self.Z)[0]):
             series = self.Z[i, :]
             if flipping_sequence:
-                series = dm_tools.binary_derivative(series)
+                series = dm_tools.binary_derivative_old(series)
 
             rsf = dm_tools.count_rounds_since_flip_split(series)
             rsf_lst_mp.extend(rsf[0])
