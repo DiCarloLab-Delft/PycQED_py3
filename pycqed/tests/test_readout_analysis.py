@@ -75,5 +75,5 @@ class Test_SSRO_discrimination_analysis(unittest.TestCase):
                                        1.000, decimal=2)
         self.assertLess(a.proc_data_dict['residual_excitation'], 0.02)
         np.testing.assert_almost_equal(
-            a.proc_data_dict['measurement_induced_relaxation'], 0.099,
-            decimal=2)
+            a.proc_data_dict['measurement_induced_relaxation'], 0.1,
+            decimal=1)
