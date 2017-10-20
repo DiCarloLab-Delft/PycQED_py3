@@ -73,8 +73,7 @@ class Test_SSRO_discrimination_analysis(unittest.TestCase):
         self.assertBetween(a.proc_data_dict['threshold_discr'], -1, -.7)
         np.testing.assert_almost_equal(a.proc_data_dict['F_discr'],
                                        1.000, decimal=2)
-        np.testing.assert_almost_equal(
-            a.proc_data_dict['residual_excitation'], 0.016, decimal=3)
+        self.assertLess(a.proc_data_dict['residual_excitation'], 0.02)
         np.testing.assert_almost_equal(
             a.proc_data_dict['measurement_induced_relaxation'], 0.099,
-            decimal=3)
+            decimal=2)
