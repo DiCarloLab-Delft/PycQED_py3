@@ -557,11 +557,7 @@ class CCLight_Transmon(Qubit):
         """
         self._prep_ro_instantiate_detectors()
         self._prep_ro_sources()
-        try:
-            self._prep_ro_pulse()
-        except Exception:
-            print("triggered workaround for #348")
-            self._prep_ro_pulse()
+        self._prep_ro_pulse()
         self._prep_ro_integration_weights()
 
     def _prep_ro_instantiate_detectors(self):
@@ -749,9 +745,7 @@ class CCLight_Transmon(Qubit):
     def prepare_for_timedomain(self):
         self.prepare_readout()
         self._prep_td_sources()
-        for i in range(2):
-            print("Uploading twice as a workaround for #348")
-            self._prep_mw_pulses()
+        self._prep_mw_pulses()
 
     def _prep_td_sources(self):
         self.instr_LO_mw.get_instr().on()
@@ -1196,7 +1190,46 @@ class CCLight_Transmon(Qubit):
         MC.run('AllXY'+self.msmt_suffix)
         if analyze:
             a = ma.AllXY_Analysis(close_main_fig=close_fig)
-            return a
+            return a.deviation_total
+
+    def tuneup_single_qubit_gates_allxy(self, nested_MC=None, f_start=None,
+                                        G_start=None, D_start=None,
+                                        initial_steps=None):
+        if f_start is None:
+            f_start = self.freq_qubit()
+
+        if G_start is None:
+            G_start = self.mw_vsm_G_att()
+
+        if D_start is None:
+            D_start = self.mw_vsm_D_att()
+
+        if initial_steps is None:
+                initial_steps = [1e6, 4e2, 2e3]
+
+        if nested_MC is None:
+            nested_MC = self.instr_nested_MC.get_instr()
+
+        nested_MC.set_sweep_functions([
+                        self.freq_qubit,
+                        self.mw_vsm_G_att,
+                        self.mw_vsm_D_att])
+
+        d = det.Function_Detector(self.measure_allxy, value_names=['AllXY cost'],
+                                          value_units=['au'],)
+        nested_MC.set_detector_function(d)
+
+        ad_func_pars = {'adaptive_function': nelder_mead,
+                                    'x0': [f_start, G_start, D_start],
+                                    'initial_step': initial_steps,
+                                    'no_improv_break': 10,
+                                    'minimize': True,
+                                    'maxiter': 500}
+
+        nested_MC.set_adaptive_function_parameters(ad_func_pars)
+        nested_MC.set_optimization_method('nelder_mead')
+        nested_MC.run(name='gate_tuneup_allxy', mode='adaptive')
+        ma.OptimizationAnalysis(label='gate_tuneup_allxy')
 
     def tuneup_deletion_pulse_transients(
             self, nested_MC=None, amp0=None,
@@ -1216,6 +1249,8 @@ class CCLight_Transmon(Qubit):
         #             the transients will be
         #             nulled in the optimization. By default it uses a
         #             window of 500 ns post depletiona with a 50 ns buffer.
+        # initial_steps:  These have to be given in the order [phi0,phi1,amp0,amp1]
+        #             for 4-par tuning and [amp0,amp1] for 2-par tunining
 
         # tuneup requires nested MC as the transients detector will use MC
         self.ro_pulse_type('up_down_down')
@@ -1323,8 +1358,9 @@ class CCLight_Transmon(Qubit):
 
         exp_metadata = {'feedback': feedback, 'sequence_type': sequence_type,
                         'depletion_time': depletion_time, 'net_gate': net_gate}
+        suffix = 'depletion_time_{}_ro_pulse_type_{}_feedback_{}_net_gate_{}'.format(depletion_time, self.ro_pulse_type(), feedback, net_gate)
         MC.run(
-            'Measure_error_fraction_{}'.format(self.msmt_suffix),
+            'Measure_error_fraction_{}_{}'.format(self.msmt_suffix, suffix),
             exp_metadata=exp_metadata)
         MC.live_plot_enabled(old_plot_setting)
         if analyze:
@@ -1478,3 +1514,4 @@ class CCLight_Transmon(Qubit):
         if update:
             self.T2_echo(a.fit_res.params['tau'].value)
         return a
+
