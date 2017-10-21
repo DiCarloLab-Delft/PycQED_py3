@@ -364,6 +364,7 @@ class Test_QO(unittest.TestCase):
 
     @unittest.skipIf(openql_import_fail, 'OpenQL not present')
     def test_measure_transients(self):
+        self.CCL_qubit.ro_acq_input_average_length(2e-6)
         self.CCL_qubit.measure_transients()
 
     @unittest.skipIf(openql_import_fail, 'OpenQL not present')
