@@ -12,14 +12,12 @@ from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import measurement_analysis as ma2
-
 from pycqed.measurement.calibration_toolbox import (
-    mixer_carrier_cancellation, mixer_skewness_calibration_CBoxV3)
+    mixer_carrier_cancellation)
 
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import detector_functions as det
 
-from pycqed.analysis.fit_toolbox import functions as func
 from pycqed.measurement.optimization import nelder_mead
 
 
@@ -1032,9 +1030,9 @@ class CCLight_Transmon(Qubit):
                     self.F_discr(a.proc_data_dict['F_discr'])
                 if verbose:
                     print('Avg. Assignement fidelity: \t{:.4f}\n'.format(
-                                a.proc_data_dict['F_assignment_raw']) +
-                          'Avg. Discrimination fidelity: \t{:.4f}'.format(
-                                a.proc_data_dict['F_discr']))
+                        a.proc_data_dict['F_assignment_raw']) +
+                        'Avg. Discrimination fidelity: \t{:.4f}'.format(
+                        a.proc_data_dict['F_discr']))
                 return (a.proc_data_dict['F_assignment_raw'],
                         a.proc_data_dict['F_discr'])
             else:
@@ -1142,9 +1140,6 @@ class CCLight_Transmon(Qubit):
     def measure_rabi_vsm(self, MC=None, atts=np.linspace(0, 65536, 31),
                          analyze=True, close_fig=True,
                          prepare_for_timedomain=True):
-        # docstring from parent class
-        # N.B. this is a good example for a generic timedomain experiment using
-        # the CCL transmon.
         if MC is None:
             MC = self.instr_MC.get_instr()
         if prepare_for_timedomain:
@@ -1155,13 +1150,13 @@ class CCLight_Transmon(Qubit):
 
         VSM = self.instr_VSM.get_instr()
         Gin = self.mw_vsm_ch_Gin()
+        # FIXME: This variable is not used, both main and derivative should
+        # be swept
         Din = self.mw_vsm_ch_Din()
         out = self.mw_vsm_ch_out()
 
         self.instr_CC.get_instr().upload_instructions(p.filename)
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             CCL=self.instr_CC.get_instr())
-        d = self.int_avg_det
+
         MC.set_sweep_function(VSM.__getattr__(
             'in{}_out{}_att'.format(Gin, out)))
         MC.set_sweep_points(atts)
@@ -1192,9 +1187,11 @@ class CCLight_Transmon(Qubit):
             a = ma.AllXY_Analysis(close_main_fig=close_fig)
             return a.deviation_total
 
-    def tuneup_single_qubit_gates_allxy(self, nested_MC=None, f_start=None,
-                                        G_start=None, D_start=None,
-                                        initial_steps=None):
+    def calibrate_single_qubit_gates_allxy(self, nested_MC=None, f_start=None,
+                                           G_start=None, D_start=None,
+                                           initial_steps=None):
+        # FIXME: this tuneup does not update the qubit object parameters
+        # FIXME2: this tuneup does not return True upon success
         if f_start is None:
             f_start = self.freq_qubit()
 
@@ -1205,52 +1202,58 @@ class CCLight_Transmon(Qubit):
             D_start = self.mw_vsm_D_att()
 
         if initial_steps is None:
-                initial_steps = [1e6, 4e2, 2e3]
+            initial_steps = [1e6, 4e2, 2e3]
 
         if nested_MC is None:
             nested_MC = self.instr_nested_MC.get_instr()
 
         nested_MC.set_sweep_functions([
-                        self.freq_qubit,
-                        self.mw_vsm_G_att,
-                        self.mw_vsm_D_att])
+            self.freq_qubit,
+            self.mw_vsm_G_att,
+            self.mw_vsm_D_att])
 
-        d = det.Function_Detector(self.measure_allxy, value_names=['AllXY cost'],
-                                          value_units=['au'],)
+        d = det.Function_Detector(self.measure_allxy,
+                                  value_names=['AllXY cost'],
+                                  value_units=['a.u.'],)
         nested_MC.set_detector_function(d)
 
         ad_func_pars = {'adaptive_function': nelder_mead,
-                                    'x0': [f_start, G_start, D_start],
-                                    'initial_step': initial_steps,
-                                    'no_improv_break': 10,
-                                    'minimize': True,
-                                    'maxiter': 500}
+                        'x0': [f_start, G_start, D_start],
+                        'initial_step': initial_steps,
+                        'no_improv_break': 10,
+                        'minimize': True,
+                        'maxiter': 500}
 
         nested_MC.set_adaptive_function_parameters(ad_func_pars)
         nested_MC.set_optimization_method('nelder_mead')
         nested_MC.run(name='gate_tuneup_allxy', mode='adaptive')
         ma.OptimizationAnalysis(label='gate_tuneup_allxy')
 
-    def tuneup_deletion_pulse_transients(
+    def calibrate_deletion_pulse_transients(
             self, nested_MC=None, amp0=None,
             amp1=None, phi0=180, phi1=0, initial_steps=None, two_par=True,
             depletion_optimization_window=None, depletion_analysis_plot=False):
-        # this function automatically tunes up a two step, four-parameter
-        # depletion pulse.
-        # It uses the averaged transients for ground and excited state for its
-        # cost function.
-        # two_par:    if readout is performed at the symmetry point and in the
-        #             linear regime two parameters will suffice. Othen, four
-        #             paramters do not converge.
-        #             First optimizaing the amplitudes (two paramters) and
-        #             then run the full 4 paramaters with the correct initial
-        #             amplitudes works.
-        # optimization_window:  optimization window determins which part of
-        #             the transients will be
-        #             nulled in the optimization. By default it uses a
-        #             window of 500 ns post depletiona with a 50 ns buffer.
-        # initial_steps:  These have to be given in the order [phi0,phi1,amp0,amp1]
-        #             for 4-par tuning and [amp0,amp1] for 2-par tunining
+        """
+        this function automatically tunes up a two step, four-parameter
+        depletion pulse.
+        It uses the averaged transients for ground and excited state for its
+        cost function.
+        two_par:    if readout is performed at the symmetry point and in the
+                    linear regime two parameters will suffice. Othen, four
+                    paramters do not converge.
+                    First optimizaing the amplitudes (two paramters) and
+                    then run the full 4 paramaters with the correct initial
+                    amplitudes works.
+        optimization_window:  optimization window determins which part of
+                    the transients will be
+                    nulled in the optimization. By default it uses a
+                    window of 500 ns post depletiona with a 50 ns buffer.
+        initial_steps:  These have to be given in the order
+                       [phi0,phi1,amp0,amp1] for 4-par tuning and
+                       [amp0,amp1] for 2-par tunining
+        """
+        # FIXME: this calibration does not update the qubit object params
+        # FIXME2: this calibration does not return a boolean upon success
 
         # tuneup requires nested MC as the transients detector will use MC
         self.ro_pulse_type('up_down_down')
@@ -1358,7 +1361,8 @@ class CCLight_Transmon(Qubit):
 
         exp_metadata = {'feedback': feedback, 'sequence_type': sequence_type,
                         'depletion_time': depletion_time, 'net_gate': net_gate}
-        suffix = 'depletion_time_{}_ro_pulse_type_{}_feedback_{}_net_gate_{}'.format(depletion_time, self.ro_pulse_type(), feedback, net_gate)
+        suffix = 'depletion_time_{}_ro_pulse_type_{}_feedback_{}_net_gate_{}'.format(
+            depletion_time, self.ro_pulse_type(), feedback, net_gate)
         MC.run(
             'Measure_error_fraction_{}_{}'.format(self.msmt_suffix, suffix),
             exp_metadata=exp_metadata)
@@ -1514,4 +1518,3 @@ class CCLight_Transmon(Qubit):
         if update:
             self.T2_echo(a.fit_res.params['tau'].value)
         return a
-
