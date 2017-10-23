@@ -56,14 +56,14 @@ def execute_qisa_file(file_url: str,  config_json: str,
 
     MC = Instrument.find_instrument('MC')
     CCL = Instrument.find_instrument('CCL')
-    CCL_qubit = Instrument.find_instrument('CCL_qubit')
+    CCL_transmon = Instrument.find_instrument('CCL_transmon')
 
     num_avg = int(options.get('num_avg', 512))
     
     nr_soft_averages = int(np.round(num_avg/512))
     MC.soft_avg(nr_soft_averages)
 
-    CCL_qubit.ro_acq_averages(512)
+    CCL_transmon.ro_acq_averages(512)
 
     # N.B. hardcoded fixme
     qumis_fp = _retrieve_file_from_url(qumis_file_url)
@@ -74,15 +74,17 @@ def execute_qisa_file(file_url: str,  config_json: str,
                  upload=True)
 
     # To be modified <<<<<
-    d = CCL_qubit.get_correlation_detector()
-    d.value_names = ['Q0 ', 'Q1 ', 'Corr. (Q0, Q1) ']
-    d.value_units = ['frac.', 'frac.', 'frac.']
+    #d = CCL_transmon.get_correlation_detector()
+    #d.value_names = ['Q0 ', 'Q1 ', 'Corr. (Q0, Q1) ']
+    #d.value_units = ['frac.', 'frac.', 'frac.']
     #>>>>>>
+
+    d = CCL_transmon.int_avg_det
 
     MC.set_sweep_function(s)
     MC.set_sweep_points(sweep_points)
     MC.set_detector_function(d)
-    data = MC.run('CCL_demo')  # FIXME <- add the proper name
+    data = MC.run('CCL_execute')  # FIXME <- add the proper name
 
     return _MC_result_to_chart_dict(data)
 
