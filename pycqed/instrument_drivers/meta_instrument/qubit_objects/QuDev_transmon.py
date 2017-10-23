@@ -1892,7 +1892,7 @@ class QuDev_transmon(Qubit):
                                          NoCalPoints=no_cal_points,
                                          for_ef=for_ef,
                                          last_ge_pulse=last_ge_pulse, **kw)
-            T1_dict = T1_Analysis.T1
+            T1_dict = T1_Analysis.T1_dict
             T1_value = T1_dict['T1']
 
             if update:

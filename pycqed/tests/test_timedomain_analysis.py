@@ -12,43 +12,9 @@ class Test_Rabi_analysis(unittest.TestCase):
         ma.a_tools.datadir = self.datadir
 
     def test_Rabi_analysis(self):
-        rabis = [ma.Rabi_Analysis(timestamp='20170412_185618', NoCalPoints=0),
-                 ma.Rabi_Analysis(timestamp='20170412_183928', NoCalPoints=0),
-                 ma.Rabi_Analysis(timestamp='20170413_134244', NoCalPoints=0)]
-        for rabi_an in rabis:
-            rabi_amp = 1/(2*rabi_an.fit_res.values['frequency'])
-            amp_low = 0.63
-            amp_high = 0.8
-
-            self.assertGreaterEqual(rabi_amp, amp_low)
-            self.assertGreaterEqual(amp_high, rabi_amp)
-
-        a = ma.Rabi_Analysis(timestamp='20170607_160504', NoCalPoints=0)
-        self.assertAlmostEqual(1/a.fit_res.values['frequency'], 0.3839, places=2)
-        self.assertAlmostEqual(1/a.fit_res.values['frequency'], 0.3839, places=2)
-
-        a = ma.Rabi_Analysis(timestamp='20170607_160504',NoCalPoints=0)
-        self.assertAlmostEqual(a.rabi_amplitudes['piPulse'], 0.3839/2, places=2)
-
-    def test_Rabi_single_weight(self):
-        a = ma.Rabi_Analysis(timestamp='20170607_211203')
-        self.assertAlmostEqual(1/a.fit_res.values['frequency'], 0.3839, places=2)
-
-        a = ma.Rabi_Analysis(timestamp='20170607_211203')
-        self.assertAlmostEqual(a.rabi_amplitudes['piPulse'], 0.3839/2, places=2)
-
-
-class Test_Rabi_analysis_original(unittest.TestCase):
-
-    @classmethod
-    def setUpClass(self):
-        self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
-        ma.a_tools.datadir = self.datadir
-
-    def test_Rabi_analysis_original(self):
-        rabis = [ma.Rabi_Analysis_original(timestamp='20170412_185618'),
-                 ma.Rabi_Analysis_original(timestamp='20170412_183928'),
-                 ma.Rabi_Analysis_original(timestamp='20170413_134244')]
+        rabis = [ma.Rabi_Analysis(timestamp='20170412_185618'),
+                 ma.Rabi_Analysis(timestamp='20170412_183928'),
+                 ma.Rabi_Analysis(timestamp='20170413_134244')]
         for rabi_an in rabis:
             for tt in range(2):
                 rabi_amp = rabi_an.fit_res[tt].values['period']/2.
@@ -58,19 +24,27 @@ class Test_Rabi_analysis_original(unittest.TestCase):
                 self.assertGreaterEqual(rabi_amp, amp_low)
                 self.assertGreaterEqual(amp_high, rabi_amp)
 
-        a = ma.Rabi_Analysis_original(timestamp='20170607_160504')
+        a = ma.Rabi_Analysis(timestamp='20170607_160504')
         self.assertAlmostEqual(a.fit_res[0].values['period'], 0.3839, places=2)
         self.assertAlmostEqual(a.fit_res[1].values['period'], 0.3839, places=2)
 
-        a = ma.Rabi_Analysis_original(timestamp='20170607_160504', auto=False)
+        a = ma.Rabi_Analysis(timestamp='20170607_160504', auto=False)
         self.assertAlmostEqual(a.get_measured_amp180(), 0.3839/2, places=2)
 
-    def test_Rabi_single_weight_original(self):
-        a = ma.Rabi_Analysis_original(timestamp='20170607_211203')
+    def test_Rabi_single_weight(self):
+        a = ma.Rabi_Analysis(timestamp='20170607_211203')
         self.assertAlmostEqual(a.fit_res[0].values['period'], 0.3839, places=2)
 
-        a = ma.Rabi_Analysis_original(timestamp='20170607_211203', auto=False)
+        a = ma.Rabi_Analysis(timestamp='20170607_211203', auto=False)
         self.assertAlmostEqual(a.get_measured_amp180(), 0.3839/2, places=2)
+
+    def test_Rabi_other_params(self):
+
+        a = ma.Rabi_Analysis(timestamp='20170607_160504')
+        self.assertAlmostEqual(1/a.fit_result.values['frequency'], 0.3839, places=2)
+
+        a = ma.Rabi_Analysis(timestamp='20170607_160504')
+        self.assertAlmostEqual(a.rabi_amplitudes['piPulse'], 0.3839/2, places=2)
 
 
 class Test_DoubleFreq_analysis(unittest.TestCase):
@@ -159,15 +133,15 @@ class test_t1_analysis(unittest.TestCase):
 
     def test_T1_IQ_data(self):
         a = ma.T1_Analysis(timestamp='20170607_152324')
-        self.assertAlmostEqual(a.fit_res.values['tau']*1e6, 35.0788, places=3)
+        self.assertAlmostEqual(a.T1*1e6, 35.0788, places=3)
 
     def test_T1_single_weight(self):
         a = ma.T1_Analysis(timestamp='20170607_152324')
-        self.assertAlmostEqual(a.fit_res.values['tau']*1e6, 35.0788, places=3)
+        self.assertAlmostEqual(a.T1*1e6, 35.0788, places=3)
 
     def test_loading_T1_fit_res_from_file(self):
         a = ma.T1_Analysis(timestamp='20170607_210448', auto=False)
-        T1 = a.get_measured_T1()['T1']
+        T1 = a.get_measured_T1()[0]
         self.assertAlmostEqual(T1*1e6, 18.0505, places=3)
 
 
