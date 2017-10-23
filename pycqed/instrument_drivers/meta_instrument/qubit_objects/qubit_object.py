@@ -157,7 +157,8 @@ class Qubit(Instrument):
         return self._operations
 
     def measure_T1(self, times=None, MC=None,
-                   close_fig: bool=True, update: bool=True)->float:
+                   close_fig: bool=True, update: bool=True,
+                   prepare_for_timedomain: bool=True)->float:
         """
         Performs a T1 experiment.
         Args:
@@ -187,11 +188,13 @@ class Qubit(Instrument):
     def measure_ramsey(self):
         raise NotImplementedError()
 
-    def measure_echo(self):
+    def measure_echo(self, times=None, MC=None,
+                     analyze=True, close_fig=True, update=True):
         raise NotImplementedError()
 
     def measure_allxy(self, MC=None, analyze: bool=True,
-                      close_fig: bool=True):
+                      close_fig: bool=True,
+                      prepare_for_timedomain: bool=True):
         """
         Performs an AllXY experiment.
         Args:
@@ -204,15 +207,22 @@ class Qubit(Instrument):
         """
         raise NotImplementedError()
 
-    def measure_ssro(self):
+    def measure_ssro(self, MC=None, analyze: bool=True, nr_shots: int=1024*8,
+                     cases=('off', 'on'), update_threshold: bool=True,
+                     prepare: bool=True, no_figs: bool=False,
+                     update: bool=True,
+                     verbose: bool=True):
         raise NotImplementedError()
 
-    def measure_spectroscopy(self):
+    def measure_spectroscopy(self, freqs, pulsed=True, MC=None,
+                             analyze=True, close_fig=True):
         raise NotImplementedError()
 
     def measure_transients(self, MC=None, analyze: bool=True,
                            cases=('off', 'on'),
-                           prepare: bool=True):
+                           prepare: bool=True, depletion_analysis: bool=True,
+                           depletion_analysis_plot: bool=True,
+                           depletion_optimization_window=None):
         '''
         Measure transients for the cases specified.
         Args:
@@ -340,56 +350,10 @@ class Qubit(Instrument):
             self.motzoi(opt_motzoi)
         return opt_motzoi
 
-    def calibrate_optimal_weights(self, MC=None, verify=True,
-                                  analyze=False, update=True)->bool:
+    def calibrate_optimal_weights(self, MC=None, verify: bool=True,
+                                  analyze: bool=True, update: bool=True,
+                                  no_figs: bool=False)->bool:
         raise NotImplementedError()
-
-    def calibrate_MW_RO_latency(self, MC=None, update: bool=True)-> bool:
-        """
-        Calibrates parameters:
-            "latency_MW"
-            "RO_acq_delay"
-
-
-        Used to calibrate the delay of the MW pulse with respect to the
-        RO pulse and the RO acquisition delay.
-
-
-        The MW_pulse_latency is calibrated by setting the frequency of
-        the LO to the qubit frequency such that both the MW and the RO pulse
-        will show up in the RO.
-        Measuring the transients will  show what the optimal latency is.
-
-        Note that a lot of averages may be required when using dedicated drive
-        lines.
-
-        This function does NOT overwrite the values that were set in the qubit
-        object and as such can be used to verify the succes of the calibration.
-
-        Currently (28/6/2017) the experiment has to be analysed by hand.
-
-        """
-        raise NotImplementedError()
-
-    def calibrate_Flux_pulse_latency(self, MC=None, update=True)-> bool:
-        """
-        Calibrates parameter: "latency_Flux"
-
-        Used to calibrate the timing between the MW and Flux pulses.
-
-        Flux pulse latency is calibrated using a Ram-Z experiment.
-        The experiment works as follows:
-        - x90 | square_flux  # defines t = 0
-        - wait (should be slightly longer than the pulse duration)
-        - x90
-        - wait
-        - RO
-
-        The position of the square flux pulse is varied to find the
-        optimal latency.
-        """
-        raise NotImplementedError
-        return True
 
     def calibrate_MW_RO_latency(self, MC=None, update: bool=True)-> bool:
         """
@@ -493,7 +457,8 @@ class Qubit(Instrument):
 
         return True
 
-    def measure_heterodyne_spectroscopy(self):
+    def measure_heterodyne_spectroscopy(self, freqs, MC=None,
+                                        analyze=True, close_fig=True):
         raise NotImplementedError()
 
     def add_operation(self, operation_name):

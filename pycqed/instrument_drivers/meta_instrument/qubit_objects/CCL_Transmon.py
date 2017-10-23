@@ -662,9 +662,9 @@ class CCLight_Transmon(Qubit):
             idx = self.ro_pulse_res_nr()
             # These parameters affect all resonators
             ro_lm.set('pulse_type', 'M_' + self.ro_pulse_type())
-            ro_lm.set('mixer_alpha'.format(idx),
+            ro_lm.set('mixer_alpha',
                       self.ro_pulse_mixer_alpha())
-            ro_lm.set('mixer_phi'.format(idx),
+            ro_lm.set('mixer_phi',
                       self.ro_pulse_mixer_phi())
 
             ro_lm.set('M_modulation_R{}'.format(idx), self.ro_freq_mod())
@@ -977,8 +977,9 @@ class CCLight_Transmon(Qubit):
 
     def measure_ssro(self, MC=None, analyze: bool=True, nr_shots: int=1024*8,
                      cases=('off', 'on'), update_threshold: bool=True,
-                     prepare: bool=True, no_figs=False, update=True,
-                     verbose=True):
+                     prepare: bool=True, no_figs: bool=False,
+                     update: bool=True,
+                     verbose: bool=True):
         old_RO_digit = self.ro_acq_digitized()
         self.ro_acq_digitized(False)
         # docstring from parent class
@@ -1044,8 +1045,8 @@ class CCLight_Transmon(Qubit):
 
     def measure_transients(self, MC=None, analyze: bool=True,
                            cases=('off', 'on'),
-                           prepare: bool=True, depletion_analysis=True,
-                           depletion_analysis_plot=True,
+                           prepare: bool=True, depletion_analysis: bool=True,
+                           depletion_analysis_plot: bool=True,
                            depletion_optimization_window=None):
         # docstring from parent class
         if MC is None:
@@ -1098,8 +1099,9 @@ class CCLight_Transmon(Qubit):
         else:
             return [np.array(t, dtype=np.float64) for t in transients]
 
-    def calibrate_optimal_weights(self, MC=None, verify=True, analyze=True,
-                                  update=True, no_figs=False):
+    def calibrate_optimal_weights(self, MC=None, verify: bool=True,
+                                  analyze: bool=True, update: bool=True,
+                                  no_figs: bool=False)->bool:
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -1136,6 +1138,7 @@ class CCLight_Transmon(Qubit):
 
         if verify:
             self.measure_ssro(no_figs=no_figs)
+        return True
 
     def measure_rabi_vsm(self, MC=None, atts=np.linspace(0, 65536, 31),
                          analyze=True, close_fig=True,
