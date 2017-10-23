@@ -8653,12 +8653,12 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
 
 
     """
-    def __init__(self, X90_separation=None,flux_pulse_length=None, gauss_sigma=None, nr_gauss_sigma=None,
-                 qb_name=None, label='Ramsey_interleaved_flux_pulse',
-
-                 **kw):
+    def __init__(self, X90_separation=None,flux_pulse_length=None,
+                 gauss_sigma=None, nr_gauss_sigma=None,
+                 qb_name=None, label='Ramsey_interleaved_flux_pulse', **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
+        kw['close_file'] = False
         super(self.__class__, self).__init__(TwoD=True,
                                              start_at_zero=True,
                                              qb_name=qb_name, **kw)
@@ -8833,7 +8833,7 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
 
         self.fitted_delay = (self.delay_fit_res.best_values['t_end'] +
                              self.delay_fit_res.best_values['t_start']
-                             - X90_separation)/2. - flux_pulse_length/2.
+                             - X90_separation)/2. + flux_pulse_length/2.
 
         if print_fit_results:
             print(self.delay_fit_res.fit_report())
@@ -8862,7 +8862,7 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
 
 
         #get the fit results (lmfit.ModelResult) and save them
-        self.fit_all(plot=False,extrapolate_phase=True)
+        self.fit_all(plot=False,extrapolate_phase=False)
 
         self.fitted_delay, self.delay_fit_res = self.fit_delay(
             X90_separation=X90_separation,

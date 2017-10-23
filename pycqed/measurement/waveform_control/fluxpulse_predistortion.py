@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.signal as signal
+import logging
 
 def import_iir(filename):
     '''
@@ -77,7 +78,7 @@ def distort_qudev(element, distortion_dict):
               'chy': filter_dict,
               ...
               }
-    with filter_dict = {'FIR' : filter_fernel, 'IIR':  [aIIRfilterLis,bIIRfilterList]}
+    with filter_dict = {'FIR' : [filter_kernel1,filter_kernel2,..], 'IIR':  [aIIRfilterLis,bIIRfilterList]}
 
     args:
         element : element instance of the Element class in element.py module
@@ -88,10 +89,15 @@ def distort_qudev(element, distortion_dict):
     t_vals, wfs_dict = element.waveforms()
     for ch in distortion_dict['ch_list']:
         element.chan_distorted[ch] = True
-        kernelvec = distortion_dict[ch]['FIR']
+        kernelvecs = distortion_dict[ch]['FIR']
         wf_dist = wfs_dict[ch]
-        if kernelvec is not None:
-            wf_dist = filter_fir(kernelvec,wfs_dict[ch])
+        if kernelvecs is not None:
+            if np.array(kernelvecs).shape[0] == 1 and \
+                    len(np.array(kernelvecs).shape) == 1:
+                wf_dist = filter_fir(kernelvecs,wfs_dict[ch])
+            else:
+                for kernelvec in kernelvecs:
+                    wf_dist = filter_fir(kernelvec,wfs_dict[ch])
         if distortion_dict[ch]['IIR'] is not None:
             aIIRfilterList,bIIRfilterList = distortion_dict[ch]['IIR']
             wf_dist = filter_iir(aIIRfilterList,bIIRfilterList,wf_dist)
@@ -101,6 +107,14 @@ def distort_qudev(element, distortion_dict):
         element.distorted_wfs[ch] = wf_dist
     return element
 
+def gaussian_filter_kernel(sigma,nr_sigma,dt):
+    nr_samples = int(nr_sigma*sigma/dt)
+    if nr_samples == 0:
+        logging.warning('sigma too small (much smaller than sampling rate).')
+        return np.array([1])
+    gauss_kernel = signal.gaussian(nr_samples, sigma/dt, sym=False)
+    gauss_kernel = gauss_kernel/np.sum(gauss_kernel)
+    return np.array(gauss_kernel)
 
 
 
