@@ -483,7 +483,7 @@ class MeasurementAnalysis(object):
                 plt.show()
 
         elif TwoD is True:
-            self.get_naming_and_values_2D(unit_prefix=unit_prefix)
+            self.get_naming_and_values_2D()
             self.sweep_points = kw.pop('sweep_points', self.sweep_points)
             self.sweep_points_2D = kw.pop(
                 'sweep_points_2D', self.sweep_points_2D)
@@ -521,13 +521,15 @@ class MeasurementAnalysis(object):
                 else:
                     ax = axs[i]  # If not 2 or 4 just gives a list of plots
                 [fig, ax, colormap, cbar]=a_tools.color_plot(
-                    x=self.scaled_sweep_points,
-                    y=self.scaled_sweep_points_2D,
+                    x=self.sweep_points,
+                    y=self.sweep_points_2D,
                     z=self.measured_values[i].transpose(),
                     plot_title=self.zlabels[i],
                     fig=fig, ax=ax,
-                    xlabel=self.xlabel,
-                    ylabel=self.ylabel,
+                    xlabel=self.sweep_name,
+                    x_unit=self.sweep_unit,
+                    ylabel=self.sweep_name_2D,
+                    y_unit=self.sweep_unit_2D,
                     zlabel=self.zlabels[i],
                     save=False,
                     transpose=transpose,
