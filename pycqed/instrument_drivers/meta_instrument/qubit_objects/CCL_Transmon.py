@@ -1160,7 +1160,8 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_function(VSM.__getattr__(
             'in{}_out{}_att'.format(Gin, out)))
         MC.set_sweep_points(atts)
-        self.int_avg_det_single._set_real_imag(False)
+        # real_imag is acutally not polar and as such works for opt weights
+        self.int_avg_det_single._set_real_imag(True)
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='rabi_'+self.msmt_suffix)
 
