@@ -8718,7 +8718,7 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
 
         return fit_res
 
-    def fit_all(self, plot=False, extrapolate_phase=False):
+    def fit_all(self, plot=False, extrapolate_phase=False,return_ampl=False):
 
         phase_list = [0,0]
         amplitude_list = []
@@ -8773,7 +8773,10 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
 
         self.fitted_phases = np.array(phase_list)
 
-        return phase_list
+        if return_ampl:
+            return phase_list, amplitude_list
+        else:
+            return phase_list
 
 
     def fit_delay(self,X90_separation=None,flux_pulse_length=None, plot=False,
