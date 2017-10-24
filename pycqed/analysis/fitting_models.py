@@ -52,12 +52,38 @@ def Lorentzian(f, A, offset, f0, kappa):
     return val
 
 
-def TwinLorentzFunc(f, amplitude_a, amplitude_b, center_a, center_b,
-                    sigma_a, sigma_b, background=0):
-    'twin lorentz with background'
-    val = (amplitude_a/np.pi * (sigma_a / ((f-center_a)**2 + sigma_a**2)) +
-           amplitude_b/np.pi * (sigma_b / ((f-center_b)**2 + sigma_b**2)) +
-           background)
+def TwinLorentzFunc(f, A_gf_over_2, A, f0_gf_over_2, f0,
+                    kappa_gf_over_2, kappa, background=0):
+    """
+    Twin lorentz with background.
+
+    Args:
+    f (float):          frequency sweep points in Hz
+    A (float):          amplitude of the tallest/deepest Lorentzian structure
+                        in the data
+    A_gf_over_2 (float):    amplitude of the other Lorentzian structure in the
+                            data; since this function is used for high power
+                            qubit spectroscopy, this parameter refers to the
+                            Lorentzian structure corresponding to the gf/2
+                            transition
+    f0 (float):         frequency of the tallest/deepest Lorentzian structure
+                        in the data
+    f0_gf_over_2 (float):   frequency of the other Lorentzian structure in the
+                            data; since this function is used for high power
+                            qubit spectroscopy, this parameter refers to the
+                            Lorentzian structure corresponding to the gf/2
+                            transition
+    kappa (float):      kappa (FWHM) of the tallest/deepest Lorentzian structure
+                        in the data
+    kappa_gf_over_2 (float): kappa (FWHM) of the other Lorentzian structure in
+                             the data; since this function is used for high
+                             power qubit spectroscopy, this parameter refers to
+                             the Lorentzian structure corresponding to the gf/2
+                             transition
+    background (float):     background offset
+    """
+    val = (A_gf_over_2/np.pi * (kappa_gf_over_2 / ((f-f0_gf_over_2)**2 + kappa_gf_over_2**2)) +
+           A/np.pi * (kappa / ((f-f0)**2 + kappa**2)) + background)
     return val
 
 
