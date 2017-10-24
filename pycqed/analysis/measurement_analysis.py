@@ -22,6 +22,7 @@ import pygsti
 from math import erfc
 from scipy.signal import argrelmax, argrelmin
 from copy import deepcopy
+
 import pycqed.analysis.tools.plotting as pl_tools
 from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel,
                                             data_to_table_png,
@@ -57,8 +58,22 @@ class MeasurementAnalysis(object):
             self.folder = folder
         self.load_hdf5data(**kw)
         self.fit_results = []
-        self.box_props = dict(boxstyle='Square', facecolor='white', alpha=0.8)
         self.cmap_chosen = cmap_chosen
+        self.no_of_columns = no_of_columns
+        self.dpi = 600                  #dpi for plots
+        self.axes_line_width=0.5        #lw of axes and text boxes
+        self.font_size = 11             #font sizes
+        self.tick_length = 4            #tick lengths
+        self.tick_width = 0.5           #tick line widths
+        self.marker_size=3              #marker size for data points
+        self.line_width=2               #line widths connecting data points
+        self.marker_size_special=8      #marker size for special points like
+                                        #peak freq., Rabi pi and pi/2 amplitudes
+        self.box_props = dict(boxstyle='Square', facecolor='white',
+                              alpha=0.8, lw=self.axes_line_width)
+        self.qb_name = qb_name          #for retrieving values of qubit
+                                        #parameters from data file
+
         if auto is True:
             self.run_default_analysis(TwoD=TwoD, **kw)
 
@@ -95,27 +110,45 @@ class MeasurementAnalysis(object):
 
     def default_fig(self, **kw):
         figsize = kw.pop('figsize', None)
-        return plt.figure(figsize=figsize, **kw)
+
+        if figsize is None:
+            #these are the standard figure sizes for PRL
+            if self.no_of_columns==1:
+                figsize = (7, 4)
+            elif self.no_of_columns==2:
+                figsize = (3.375, 2.25)
+        else:
+            pass
+
+        return plt.figure(figsize=figsize,dpi=self.dpi,**kw)
 
     def default_ax(self, fig=None, *arg, **kw):
         if fig is None:
             fig = self.default_fig(*arg, **kw)
         ax = fig.add_subplot(111)
-        ax.set_title(self.timestamp_string+'\n'+self.measurementstring)
+
         ax.ticklabel_format(useOffset=False)
         return fig, ax
 
-    def save_fig(self, fig, figname=None, xlabel='x', ylabel='y',
+    def save_fig(self, fig, figname=None, xlabel='x',
+                 ylabel='measured_values',
                  fig_tight=True, **kw):
+
+
         plot_formats = kw.pop('plot_formats', ['png'])
         fail_counter = False
         close_fig = kw.pop('close_fig', True)
+
         if type(plot_formats) == str:
             plot_formats = [plot_formats]
+
         for plot_format in plot_formats:
             if figname is None:
-                figname = (self.sweep_name+'_'+xlabel +
-                           '_vs_'+ylabel+'.'+plot_format)
+                if xlabel=='x':
+                    xlabel=self.sweep_name
+
+                figname = (self.measurementstring+'_'+ylabel +
+                           '_vs_'+xlabel+'.'+plot_format)
             else:
                 figname = (figname+'.' + plot_format)
             self.savename = os.path.abspath(os.path.join(
@@ -127,9 +160,8 @@ class MeasurementAnalysis(object):
                     print('WARNING: Could not set tight layout')
             try:
                 fig.savefig(
-                    self.savename, dpi=300,
-                    # value of 300 is arbitrary but higher than default
-                    format=plot_format)
+                    self.savename, dpi=self.dpi,format=plot_format,
+                    bbox_inches='tight')
             except:
                 fail_counter = True
         if fail_counter:
@@ -162,13 +194,30 @@ class MeasurementAnalysis(object):
             self.ax = [self.f[k].add_subplot(111) for k in range(main_figs)]
         val_len = len(self.value_names)
         if val_len == 4:
-            self.figarray, self.axarray = plt.subplots(
-                val_len, 1, figsize=(min(6*len(self.value_names), 11),
-                                     1.5*len(self.value_names)+3))
+            if self.no_of_columns==2:
+                self.figarray, self.axarray = plt.subplots(
+                    val_len, 1, figsize=(3.375,2.25**len(self.value_names)),
+                    dpi=self.dpi)
+            else:
+                self.figarray, self.axarray = plt.subplots(
+                    val_len, 1, figsize=(7,4*len(self.value_names)),
+                    dpi=self.dpi)
+                    # val_len, 1, figsize=(min(8*len(self.value_names), 11),
+                    #                      4*len(self.value_names)))
         else:
-            self.figarray, self.axarray = plt.subplots(
-                max(len(self.value_names), 1), 1,
-                figsize=(6, 1.5*len(self.value_names)+4))
+            if self.no_of_columns==2:
+                self.figarray, self.axarray = plt.subplots(
+                    max(len(self.value_names), 1), 1,
+                    figsize=(3.375,2.25*len(self.value_names)),dpi=self.dpi)
+                # max(len(self.value_names), 1), 1,
+                # figsize=(8, 4*len(self.value_names)))
+            else:
+                self.figarray, self.axarray = plt.subplots(
+                    max(len(self.value_names), 1), 1,
+                    figsize=(7,4*len(self.value_names)),dpi=self.dpi)
+                    # max(len(self.value_names), 1), 1,
+                    # figsize=(8, 4*len(self.value_names)))
+
         return tuple(self.f + [self.figarray] + self.ax + [self.axarray])
 
     def get_values(self, key):
@@ -305,19 +354,34 @@ class MeasurementAnalysis(object):
 
     def run_default_analysis(self, TwoD=False, close_file=True,
                              show=False, log=False, transpose=False, **kw):
+
         if TwoD is False:
             self.get_naming_and_values()
             self.sweep_points = kw.pop('sweep_points', self.sweep_points)
             # Preallocate the array of axes in the figure
             # Creates either a 2x2 grid or a vertical list
+
             if len(self.value_names) == 4:
-                fig, axs = plt.subplots(
-                    nrows=int(len(self.value_names)/2), ncols=2,
-                    figsize=(min(6*len(self.value_names), 11),
-                             1.5*len(self.value_names)))
+                if self.no_of_columns==2:
+                    fig, axs = plt.subplots(
+                        nrows=int(len(self.value_names)/2), ncols=2,
+                        figsize=(3.375,2.25*len(self.value_names)),dpi=self.dpi)
+                else:
+                    fig, axs = plt.subplots(
+                        nrows=max(len(self.value_names)), ncols=1,
+                        figsize=(7,4*len(self.value_names)),dpi=self.dpi)
+                    # figsize=(min(6*len(self.value_names), 11),
+                    #          1.5*len(self.value_names)))
             else:
-                fig, axs = plt.subplots(max(len(self.value_names), 1), 1,
-                                        figsize=(5, 3*len(self.value_names)+2))
+                if self.no_of_columns==2:
+                    fig, axs = plt.subplots(max(len(self.value_names), 1), 1,
+                                        figsize=(3.375,
+                                                 2.25*len(self.value_names)),
+                                        dpi=self.dpi)
+                else:
+                    fig, axs = plt.subplots(max(len(self.value_names), 1), 1,
+                                        figsize=(7, 4*len(self.value_names)),
+                                        dpi=self.dpi)
                 # Add all the sweeps to the plot 1 by 1
                 # indices are determined by it's shape/number of sweeps
             for i in range(len(self.value_names)):
@@ -332,20 +396,21 @@ class MeasurementAnalysis(object):
                 if i != 0:
                     plot_title = ' '
                 else:
-                    plot_title = kw.pop('plot_title', textwrap.fill(
-                                        self.timestamp_string + '_' +
-                                        self.measurementstring, 40))
+                    plot_title = kw.pop('plot_title', self.measurementstring +
+                                        '\n' + self.timestamp_string)
                 ax.ticklabel_format(useOffset=False)
 
                 self.plot_results_vs_sweepparam(x=self.sweep_points,
                                                 y=self.measured_values[i],
                                                 fig=fig, ax=ax, log=log,
-                                                xlabel=self.parameter_names[0],
-                                                x_unit=self.parameter_units[0],
-                                                ylabel=self.value_names[i],
-                                                y_unit=self.value_units[i],
-                                                save=False, show=show,
-                                                plot_title=plot_title)
+                                                xlabel=self.sweep_name,
+                                                x_unit=self.sweep_unit[0],
+                                                ylabel=self.ylabels[i],
+                                                save=False)
+                # fig.suptitle(self.plot_title)
+            fig.subplots_adjust(hspace=0.5)
+            if show:
+                plt.show()
 
         elif TwoD is True:
             self.get_naming_and_values_2D()
@@ -354,13 +419,27 @@ class MeasurementAnalysis(object):
                 'sweep_points_2D', self.sweep_points_2D)
 
             if len(self.value_names) == 4:
-                fig, axs = plt.subplots(int(len(self.value_names)/2), 2,
-                                        figsize=(min(6*len(self.value_names),
-                                                     11),
-                                                 1.5*len(self.value_names)))
+                if self.no_of_columns==2:
+                    fig, axs = plt.subplots(int(len(self.value_names)/2), 2,
+                                        figsize=(3.375,
+                                                 2.25*len(self.value_names)),
+                                        dpi=self.dpi)
+                else:
+                    fig, axs = plt.subplots(max(len(self.value_names)), 1,
+                                        figsize=(7,
+                                                 4*len(self.value_names)),
+                                        dpi=self.dpi)
             else:
-                fig, axs = plt.subplots(max(len(self.value_names), 1), 1,
-                                        figsize=(5, 3*len(self.value_names)))
+                if self.no_of_columns==2:
+                    fig, axs = plt.subplots(max(len(self.value_names), 1), 1,
+                                        figsize=(3.375,
+                                                 2.25*len(self.value_names)),
+                                        dpi=self.dpi)
+                else:
+                    fig, axs = plt.subplots(max(len(self.value_names), 1), 1,
+                                        figsize=(7,
+                                                 4*len(self.value_names)),
+                                        dpi=self.dpi)
 
             for i in range(len(self.value_names)):
                 if len(self.value_names) == 1:
@@ -371,27 +450,48 @@ class MeasurementAnalysis(object):
                     ax = axs[i//2, i % 2]
                 else:
                     ax = axs[i]  # If not 2 or 4 just gives a list of plots
-                a_tools.color_plot(
+
+                [fig, ax, colormap, cbar]=a_tools.color_plot(
                     x=self.sweep_points,
                     y=self.sweep_points_2D,
                     z=self.measured_values[i].transpose(),
                     plot_title=self.zlabels[i],
                     fig=fig, ax=ax,
-                    xlabel=self.xlabel,
-                    ylabel=self.ylabel,
+                    xlabel=self.sweep_name,
+                    x_unit=self.sweep_unit,
+                    ylabel=self.sweep_name_2D,
+                    y_unit=self.sweep_unit_2D,
                     zlabel=self.zlabels[i],
                     save=False,
                     transpose=transpose,
                     cmap_chosen=self.cmap_chosen,
                     **kw)
 
-            fig.tight_layout(h_pad=1.5)
-            fig.subplots_adjust(top=3.0)
-            plot_title = '{timestamp}_{measurement}'.format(
+                ax.set_title(self.zlabels[i], y=1.05,size=self.font_size)
+                ax.xaxis.label.set_size(self.font_size)
+                ax.yaxis.label.set_size(self.font_size)
+                ax.tick_params(labelsize=self.font_size,
+                               length=self.tick_length, width=self.tick_width)
+                cbar.set_label(self.zlabels[i], size=self.font_size)
+                cbar.ax.tick_params(labelsize=self.font_size,
+                                    length=self.tick_length,
+                                    width=self.tick_width)
+
+            fig.subplots_adjust(hspace=0.5)
+
+            # Make space for title
+            #fig.tight_layout(h_pad=1.5)
+            #fig.subplots_adjust(top=3.0)
+            plot_title = '{measurement}\n{timestamp}'.format(
                 timestamp=self.timestamp_string,
                 measurement=self.measurementstring)
-            fig.suptitle(plot_title, fontsize=18)
-            # Make space for title
+            #fig.suptitle(plot_title)
+            fig.text(0.5, 1, plot_title, fontsize=self.font_size,
+                      horizontalalignment='center',
+                      verticalalignment = 'bottom',
+                      transform = ax.transAxes)
+            if show:
+                plt.show()
 
         self.save_fig(fig, fig_tight=True, **kw)
 
@@ -416,8 +516,10 @@ class MeasurementAnalysis(object):
             # Get naming
             self.sweep_name = self.get_key('sweep_parameter_name')
             self.sweep_unit = self.get_key('sweep_parameter_unit')
+
             self.value_names = self.get_key('value_names')
             value_units = self.get_key('value_units')
+
             # get values
             self.sweep_points = self.get_values(self.sweep_name)
             self.measured_values = []
@@ -428,6 +530,7 @@ class MeasurementAnalysis(object):
                 self.ylabels.append(str(
                     self.value_names[i] + '('+value_units[i]+')'))
             self.xlabel = str(self.sweep_name + '('+self.sweep_unit+')')
+
         elif datasaving_format == 'Version 2':
 
             self.parameter_names = self.get_key('sweep_parameter_names')
@@ -459,24 +562,67 @@ class MeasurementAnalysis(object):
             raise ValueError('datasaving_format "%s " not recognized'
                              % datasaving_format)
 
-    def plot_results_vs_sweepparam(self, x, y, fig, ax, show=False,
-                                   marker='-o',
-                                   xlabel=None, x_unit=None,
-                                   ylabel=None, y_unit=None,
-                                   log=False, label=None, **kw):
-        save = kw.pop('save', False)
-        self.plot_title = kw.pop('plot_title',
-                                 textwrap.fill(self.timestamp_string + '_' +
-                                               self.measurementstring, 40))
+    def plot_results_vs_sweepparam(self, x, y, fig, ax, show=False, marker='-o',
+                                   log=False, ticks_around=True, label=None,
+                                   **kw):
 
-        ax.set_title(self.plot_title)
-        ax.plot(x, y, marker, label=label)
+        save = kw.get('save', False)
+        font_size = kw.pop('font_size', None)
+        if font_size is not None:
+            self.font_size = font_size
+
+        self.plot_title = kw.get('plot_title',
+                                 self.measurementstring + '\n' +
+                                 self.timestamp_string)
+
+        #ax.set_title(self.plot_title)
+        fig.text(0.5, 1, self.plot_title, fontsize=self.font_size,
+                 horizontalalignment='center',
+                 verticalalignment = 'bottom',
+                 transform = ax.transAxes)
+
+        # Plot:
+        ax.plot(x, y, marker, markersize=self.marker_size,
+                linewidth=self.line_width, label=label)
+
         if log:
             ax.set_yscale('log')
+
+        #Adjust ticks
+        # set axes labels format to scientific when outside interval [0.01,99]
+        from matplotlib.ticker import ScalarFormatter
+        fmt = ScalarFormatter()
+        fmt.set_powerlimits((-2,2))
+        ax.xaxis.set_major_formatter(fmt)
+        ax.yaxis.set_major_formatter(fmt)
+
+        #Set the line width of the scientific notation exponent
+        ax.xaxis.offsetText.set_fontsize(self.font_size)
+        ax.yaxis.offsetText.set_fontsize(self.font_size)
+        if ticks_around:
+            ax.xaxis.set_tick_params(labeltop='off',top='on',direction='in')
+            ax.yaxis.set_tick_params(labeltop='off',top='on',direction='in')
+        ax.tick_params(axis='both',labelsize=self.font_size,
+                       length=self.tick_length, width=self.tick_width)
+
+        for axis in ['top','bottom','left','right']:
+            ax.spines[axis].set_linewidth(self.axes_line_width)
+
+        #Set axis labels
+        xlabel = kw.get('xlabel', None)
+        ylabel = kw.get('ylabel', None)
+        x_unit = kw.get('x_unit', None)
+        y_unit = kw.get('y_unit', None)
+
         if xlabel is not None:
-            set_xlabel(ax, xlabel, x_unit)
+            set_xlabel(ax, xlabel, unit=x_unit)
+            ax.xaxis.label.set_fontsize(self.font_size)
         if ylabel is not None:
-            set_ylabel(ax, ylabel, y_unit)
+            set_ylabel(ax, ylabel, unit=y_unit)
+            ax.yaxis.label.set_fontsize(self.font_size)
+
+        fig.tight_layout()
+
         if show:
             plt.show()
         if save:
@@ -3950,13 +4096,18 @@ class Homodyne_Analysis(MeasurementAnalysis):
         Available fitting_models:
             - 'hanger' = amplitude fit with slope
             - 'complex' = complex transmission fit WITHOUT slope
+            - 'lorentzian' = fit to a Lorentzian lineshape
 
         'fit_window': allows to select the windows of data to fit.
                       Example: fit_window=[100,-100]
         '''
         super(self.__class__, self).run_default_analysis(
-            close_file=False, **kw)
+            close_file=False, show=show,**kw)
         self.add_analysis_datagroup_to_file()
+
+        window_len_filter = kw.get('window_len_filter',11)
+
+        ########## Fit data ##########
 
         # Fit Power to a Lorentzian
         self.measured_powers = self.measured_values[0]**2
@@ -3967,8 +4118,11 @@ class Homodyne_Analysis(MeasurementAnalysis):
         self.min_frequency = self.sweep_points[min_index]
         self.max_frequency = self.sweep_points[max_index]
 
+        measured_powers_smooth = a_tools.smooth(self.measured_powers,
+                                          window_len=window_len_filter)
         self.peaks = a_tools.peak_finder((self.sweep_points),
-                                         self.measured_powers)
+                                         measured_powers_smooth,
+                                         window_len=0)
 
         # Search for peak
         if self.peaks['dip'] is not None:    # look for dips first
@@ -3987,10 +4141,13 @@ class Homodyne_Analysis(MeasurementAnalysis):
         # Fit data according to the model required
         if 'hanger' in fitting_model:
             if fitting_model == 'hanger':
-                HangerModel = fit_mods.SlopedHangerAmplitudeModel
+                #f is expected in Hz but f0 in GHz!
+                Model = fit_mods.SlopedHangerAmplitudeModel
             # this in not working at the moment (need to be fixed)
             elif fitting_model == 'simple_hanger':
-                HangerModel = fit_mods.HangerAmplitudeModel
+                Model = fit_mods.HangerAmplitudeModel
+            else:
+                raise ValueError('The fitting model specified is not available')
             # added reject outliers to be robust agains CBox data acq bug.
             # this should have no effect on regular data acquisition and is
             # only used in the guess.
@@ -4005,36 +4162,36 @@ class Homodyne_Analysis(MeasurementAnalysis):
             Qe = abs(Q / abs(1 - S21min))
 
             # Note: input to the fit function is in GHz for convenience
-            HangerModel.set_param_hint('f0', value=f0*1e-9,
+            Model.set_param_hint('f0', value=f0*1e-9,
                                        min=min(self.sweep_points)*1e-9,
                                        max=max(self.sweep_points)*1e-9)
-            HangerModel.set_param_hint('A', value=amplitude_guess)
-            HangerModel.set_param_hint('Q', value=Q, min=1, max=50e6)
-            HangerModel.set_param_hint('Qe', value=Qe, min=1, max=50e6)
+            Model.set_param_hint('A', value=amplitude_guess)
+            Model.set_param_hint('Q', value=Q, min=1, max=50e6)
+            Model.set_param_hint('Qe', value=Qe, min=1, max=50e6)
             # NB! Expressions are broken in lmfit for python 3.5 this has
             # been fixed in the lmfit repository but is not yet released
             # the newest upgrade to lmfit should fix this (MAR 18-2-2016)
-            HangerModel.set_param_hint('Qi', expr='abs(1./(1./Q-1./Qe*cos(theta)))',
+            Model.set_param_hint('Qi', expr='abs(1./(1./Q-1./Qe*cos(theta)))',
                                        vary=False)
-            HangerModel.set_param_hint('Qc', expr='Qe/cos(theta)', vary=False)
-            HangerModel.set_param_hint('theta', value=0, min=-np.pi/2,
+            Model.set_param_hint('Qc', expr='Qe/cos(theta)', vary=False)
+            Model.set_param_hint('theta', value=0, min=-np.pi/2,
                                        max=np.pi/2)
-            HangerModel.set_param_hint('slope', value=0, vary=True)
-            self.params = HangerModel.make_params()
+            Model.set_param_hint('slope', value=0, vary=True)
+            self.params = Model.make_params()
 
             if fit_window == None:
                 data_x = self.sweep_points
-                data_y = self.measured_values[0]
+                self.data_y = self.measured_values[0]
             else:
                 data_x = self.sweep_points[fit_window[0]:fit_window[1]]
                 data_y_temp = self.measured_values[0]
-                data_y = data_y_temp[fit_window[0]:fit_window[1]]
+                self.data_y = data_y_temp[fit_window[0]:fit_window[1]]
 
-            # make sure that frequencies are in Hz
-            if np.floor(data_x[0]/1e8) == 0:  # frequency is defined in GHz
-                data_x = data_x*1e9
+            # # make sure that frequencies are in Hz
+            # if np.floor(data_x[0]/1e8) == 0:  # frequency is defined in GHz
+            #     data_x = data_x*1e9
 
-            fit_res = HangerModel.fit(data=data_y,
+            fit_res = Model.fit(data=self.data_y,
                                       f=data_x, verbose=False)
 
         elif fitting_model == 'complex':
@@ -4079,34 +4236,35 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                      args=(fit_mods.HangerFuncComplex, self.sweep_points, data_complex))
 
         elif fitting_model == 'lorentzian':
-            LorentzianModel = fit_mods.LorentzianModel
+            Model = fit_mods.LorentzianModel
 
             kappa_guess = 2.5e6
 
             amplitude_guess = amplitude_factor * np.pi*kappa_guess * abs(
                 max(self.measured_powers)-min(self.measured_powers))
 
-            LorentzianModel.set_param_hint('f0', value=f0,
+            Model.set_param_hint('f0', value=f0,
                                            min=min(self.sweep_points),
                                            max=max(self.sweep_points))
-            LorentzianModel.set_param_hint('A', value=amplitude_guess)
+            Model.set_param_hint('A', value=amplitude_guess)
 
             # Fitting
-            LorentzianModel.set_param_hint('offset',
+            Model.set_param_hint('offset',
                                            value=np.mean(self.measured_powers),
                                            vary=True)
-            LorentzianModel.set_param_hint('kappa',
+            Model.set_param_hint('kappa',
                                            value=kappa_guess,
                                            min=0,
                                            vary=True)
-            LorentzianModel.set_param_hint('Q',
+            Model.set_param_hint('Q',
                                            expr='0.5*f0/kappa',
                                            vary=False)
-            self.params = LorentzianModel.make_params()
+            self.params = Model.make_params()
 
-            fit_res = LorentzianModel.fit(data=self.measured_powers,
+            fit_res = Model.fit(data=self.measured_powers,
                                           f=self.sweep_points,
                                           params=self.params)
+
         else:
             raise ValueError('fitting model "{}" not recognized'.format(
                              fitting_model))
@@ -4118,31 +4276,16 @@ class Homodyne_Analysis(MeasurementAnalysis):
             # print(fit_res.fit_report())
             print(lmfit.fit_report(fit_res))
 
+        ########## Plot results ##########
+
         fig, ax = self.default_ax()
-
-        if ('hanger' in fitting_model) or ('complex' in fitting_model):
-            textstr = '$f_{\mathrm{center}}$ = %.4f $\pm$ (%.3g) GHz' % (
-                fit_res.params['f0'].value, fit_res.params['f0'].stderr) + '\n' \
-                '$Qc$ = %.1f $\pm$ (%.1f)' % (fit_res.params['Qc'].value, fit_res.params['Qc'].stderr) + '\n' \
-                '$Qi$ = %.1f $\pm$ (%.1f)' % (
-                    fit_res.params['Qi'].value, fit_res.params['Qi'].stderr)
-
-        elif fitting_model == 'lorentzian':
-            textstr = '$f_{{\mathrm{{center}}}}$ = {:.4f} $\pm$ ({:.3g}) GHz\n' \
-                      '$Q$ = {:.1f} $\pm$ ({:.1f})'.format(
-                          fit_res.params['f0'].value*1e-9,
-                          fit_res.params['f0'].stderr*1e-9,
-                          fit_res.params['Q'].value,
-                          fit_res.params['Q'].stderr)
-
-        ax.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=11,
-                verticalalignment='top', bbox=self.box_props)
 
         if 'hanger' in fitting_model:
             self.plot_results_vs_sweepparam(x=self.sweep_points,
                                             y=self.measured_values[0],
                                             fig=fig, ax=ax,
-                                            xlabel=self.xlabel,
+                                            xlabel=self.sweep_name,
+                                            x_unit=self.sweep_unit[0],
                                             ylabel=str('S21_mag (arb. units)'),
                                             save=False)
 
@@ -4151,18 +4294,61 @@ class Homodyne_Analysis(MeasurementAnalysis):
                 data_complex, fig=fig, ax=ax, show=False, save=False)
             # second figure with amplitude
             fig2, ax2 = self.default_ax()
-            ax2.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=11,
-                     verticalalignment='top', bbox=self.box_props)
             self.plot_results_vs_sweepparam(x=self.sweep_points, y=data_amp,
-                                            fig=fig2, ax=ax2, show=False, save=False)
+                                            fig=fig2, ax=ax2,
+                                            show=False, save=False)
 
         elif fitting_model == 'lorentzian':
             self.plot_results_vs_sweepparam(x=self.sweep_points,
                                             y=self.measured_powers,
                                             fig=fig, ax=ax,
-                                            xlabel=self.xlabel,
+                                            xlabel=self.sweep_name,
+                                            x_unit=self.sweep_unit[0],
                                             ylabel=str('Power (arb. units)'),
                                             save=False)
+
+        scale = SI_prefix_and_scale_factor( val=max(abs(ax.get_xticks())),
+                                            unit=self.sweep_unit[0] )[0]
+
+        instr_set = self.data_file['Instrument settings']
+        try:
+            old_RO_freq = float(instr_set[self.qb_name].attrs['f_RO'])
+            old_vals = '\n$f_{\mathrm{old}}$ = %.5f GHz' %(old_RO_freq*scale)
+        except (TypeError, KeyError, ValueError):
+            logging.warning('qb_name is None. Old parameter values will '
+                            'not be retrieved.')
+            old_vals = ''
+
+        if ('hanger' in fitting_model) or ('complex' in fitting_model):
+            textstr = '$f_{\mathrm{center}}$ = %.5f GHz $\pm$ (%.3g) GHz' % (
+                fit_res.params['f0'].value,
+                fit_res.params['f0'].stderr) + '\n' \
+                '$Qc$ = %.1f $\pm$ (%.1f)' % (
+                   fit_res.params['Qc'].value,
+                   fit_res.params['Qc'].stderr) + '\n' \
+                '$Qi$ = %.1f $\pm$ (%.1f)' % (
+                fit_res.params['Qi'].value, fit_res.params['Qi'].stderr) + \
+                      old_vals
+
+        elif fitting_model == 'lorentzian':
+            textstr = '$f_{{\mathrm{{center}}}}$ = %.5f GHz ' \
+                      '$\pm$ (%.3g) GHz' % (
+                          fit_res.params['f0'].value*scale,
+                          fit_res.params['f0'].stderr*scale) + '\n' \
+                      '$Q$ = %.1f $\pm$ (%.1f)' %(
+                         fit_res.params['Q'].value,
+                         fit_res.params['Q'].stderr) + old_vals
+
+        fig.text(0.5, 0, textstr, transform=ax.transAxes,
+                 fontsize=self.font_size,
+                 verticalalignment='top',
+                 horizontalalignment='center', bbox=self.box_props)
+
+        if 'complex' in fitting_model:
+            fig2.text(0.5, 0, textstr, transform=ax.transAxes,
+                      fontsize=self.font_size,
+                      verticalalignment='top', horizontalalignment = 'center',
+                      bbox=self.box_props)
 
         if fit_window == None:
             data_x = self.sweep_points
@@ -4170,7 +4356,8 @@ class Homodyne_Analysis(MeasurementAnalysis):
             data_x = self.sweep_points[fit_window[0]:fit_window[1]]
 
         if show_guess:
-            ax.plot(self.sweep_points, fit_res.init_fit, 'k--')
+            ax.plot(self.sweep_points, fit_res.init_fit, 'k--',
+                    linewidth=self.line_width)
 
         # this part is necessary to separate fit perfomed with lmfit.minimize
         if 'complex' in fitting_model:
@@ -4184,15 +4371,25 @@ class Homodyne_Analysis(MeasurementAnalysis):
             self.save_fig(fig, figname='complex', **kw)
             self.save_fig(fig2, xlabel='Mag', **kw)
         else:
-            ax.plot(data_x, fit_res.best_fit, 'r-')
-            f0 = self.fit_results.values['f0']
-            plt.plot(f0*1e9, fit_res.eval(f=f0*1e9), 'o', ms=8)
+            ax.plot(self.sweep_points, fit_res.best_fit, 'r-',
+                    linewidth=self.line_width)
+
+            f0 = fit_res.params['f0'].value
+            if 'hanger' in fitting_model:
+                #f is expected in Hz but f0 in GHz!
+                ax.plot(f0*1e9, Model.func(f=f0*1e9,**fit_res.best_values), 'o',
+                        ms=self.marker_size_special)
+            else:
+                ax.plot(f0, Model.func(f=f0,**fit_res.best_values), 'o',
+                        ms=self.marker_size_special)
+
+            if show:
+                plt.show()
 
             # save figure
             self.save_fig(fig, xlabel=self.xlabel, ylabel='Mag', **kw)
 
-        if show:
-            plt.show()
+
         # self.save_fig(fig, xlabel=self.xlabel, ylabel='Mag', **kw)
         if close_file:
             self.data_file.close()

@@ -1598,6 +1598,8 @@ def color_plot(x, y, z, fig, ax, cax=None,
 
     xlabel = kw.pop('xlabel', None)
     ylabel = kw.pop('ylabel', None)
+    x_unit = kw.pop('x_unit', None)
+    y_unit = kw.pop('y_unit', None)
     zlabel = kw.pop('zlabel', None)
 
     xlim = kw.pop('xlim', None)
@@ -1605,27 +1607,30 @@ def color_plot(x, y, z, fig, ax, cax=None,
 
     if plot_title is not None:
         ax.set_title(plot_title, y=1.05, fontsize=18)
+
+    ax.get_yaxis().set_tick_params(direction='out')
+    ax.get_xaxis().set_tick_params(direction='out')
+
     if transpose:
-        ax.set_xlabel(ylabel)
-        ax.set_ylabel(xlabel)
         ax.set_xlim(y_vertices[0], y_vertices[-1])
         ax.set_ylim(x_vertices[0], x_vertices[-1])
         if xlim is not None:
             ax.set_xlim(ylim)
         if ylim is not None:
             ax.set_ylim(xlim)
+        set_xlabel(ax, ylabel, unit=y_unit)
+        set_ylabel(ax, xlabel, unit=x_unit)
+
     else:
-        ax.set_xlabel(xlabel)
-        ax.set_ylabel(ylabel)
         ax.set_xlim(x_vertices[0], x_vertices[-1])
         ax.set_ylim(y_vertices[0], y_vertices[-1])
         if xlim is not None:
             ax.set_xlim(xlim)
         if ylim is not None:
             ax.set_ylim(ylim)
+        set_xlabel(ax, xlabel, unit=x_unit)
+        set_ylabel(ax, ylabel, unit=y_unit)
 
-    ax.get_yaxis().set_tick_params(direction='out')
-    ax.get_xaxis().set_tick_params(direction='out')
     if add_colorbar:
         if cax is None:
             ax_divider = make_axes_locatable(ax)
@@ -1669,7 +1674,7 @@ def color_plot_slices(xvals, yvals, zvals, ax=None,
     # various plot options
     # define colormap
     cmap = kw.pop('cmap', 'viridis')
-    clim = kw.pop('clim', [None, None])
+    #clim = kw.pop('clim', [None, None])
     # normalized plot
     if normalize:
         for xx in range(len(xvals)):
@@ -1680,13 +1685,13 @@ def color_plot_slices(xvals, yvals, zvals, ax=None,
             zvals[xx] = np.log(zvals[xx])/np.log(10)
 
     # add blocks to plot
-    hold = kw.pop('hold', False)
+    #hold = kw.pop('hold', False)
     for xx in range(len(xvals)):
         tempzvals = np.array([np.append(zvals[xx], np.array(0)),
                               np.append(zvals[xx], np.array(0))]).transpose()
-        im = ax.pcolor(xvertices[xx:xx+2],
-                       yvertices[xx],
-                       tempzvals, cmap=cmap)
+        # im = ax.pcolor(xvertices[xx:xx+2],
+        #                yvertices[xx],
+        #                tempzvals, cmap=cmap)
     return ax
 
 
@@ -1758,6 +1763,24 @@ def color_plot_interpolated(x, y, z, ax=None,
             cbar.set_label(zlabel)
         return ax, CS, cbar
     return ax, CS
+
+def plot_errorbars(x, y, ax=None, linewidth=2 ,markersize=2, marker='none'):
+
+    if ax is None:
+        new_plot_created = True
+        f, ax = plt.subplots()
+    else:
+        new_plot_created = False
+
+    standard_error = np.std(y)/np.sqrt(y.size)
+
+    ax.errorbar( x, y, yerr=standard_error, ecolor='k', fmt=marker,
+                     linewidth=linewidth, markersize=markersize)
+
+    if new_plot_created:
+        return f,ax
+    else:
+        return
 
 
 ######################################################################
