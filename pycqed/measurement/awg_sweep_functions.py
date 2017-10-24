@@ -1793,13 +1793,15 @@ class Ramsey_interleaved_fluxpulse_sweep(swf.Hard_Sweep):
         X90_separation: float (separation of the pi/2 pulses)
     '''
     def __init__(self, qb, X90_separation, upload=True,
-                 distorted=False,distortion_dict=None):
+                 distorted=False,distortion_dict=None,
+                 compensation_pulses=False):
         super().__init__()
         self.qb = qb
         self.X90_separation = X90_separation
         self.upload = upload
         self.distorted = distorted
         self.distortion_dict = distortion_dict
+        self.compensation_pulses = compensation_pulses
 
         self.name = 'Ramsey with interleaved flux pulse'
         self.parameter_name = 'theta'
@@ -1807,9 +1809,13 @@ class Ramsey_interleaved_fluxpulse_sweep(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         if self.upload:
-            fsqs.Ramsey_with_flux_pulse_meas_seq(thetas=self.sweep_points, qb=self.qb,
-                                                  X90_separation=self.X90_separation,
-                                                  distorted=self.distorted,distortion_dict=self.distortion_dict)
+            fsqs.Ramsey_with_flux_pulse_meas_seq(
+                thetas=self.sweep_points, qb=self.qb,
+                X90_separation=self.X90_separation,
+                distorted=self.distorted,
+                distortion_dict=self.distortion_dict,
+                compensation_pulses=self.compensation_pulses
+            )
 
 
 class Ramsey_fluxpulse_ampl_sweep(swf.Soft_Sweep):
@@ -1877,8 +1883,10 @@ class Chevron_length_hard_swf(swf.Hard_Sweep):
     For details on the experiment see documentation of
     'fsqs.Chevron_flux_pulse_length_seq(...)'
     '''
-    def __init__(self, qb_control, qb_target, spacing=50e-9,cal_points=False, upload=True,
-                 distorted=False,distortion_dict=None):
+    def __init__(self, qb_control, qb_target, spacing=50e-9,
+                 cal_points=False, upload=True,
+                 distorted=False,distortion_dict=None,
+                 compensation_pulses=False):
         super().__init__()
         self.qb_control = qb_control
         self.qb_target = qb_target
@@ -1887,6 +1895,7 @@ class Chevron_length_hard_swf(swf.Hard_Sweep):
         self.cal_points = cal_points
         self.distorted = distorted
         self.distortion_dict = distortion_dict
+        self.compensation_pulses = compensation_pulses
 
         self.name = 'Chevron flux pulse length sweep'
         self.parameter_name = 'length'
@@ -1898,7 +1907,8 @@ class Chevron_length_hard_swf(swf.Hard_Sweep):
                 lengths=self.sweep_points, qb_control=self.qb_control,
                 qb_target=self.qb_target, spacing=self.spacing,
                 cal_points=self.cal_points, distorted=self.distorted,
-                distortion_dict=self.distortion_dict
+                distortion_dict=self.distortion_dict,
+                compensation_pulses=self.compensation_pulses
                 )
 
 class Chevron_ampl_hard_swf(swf.Hard_Sweep):
@@ -1909,7 +1919,8 @@ class Chevron_ampl_hard_swf(swf.Hard_Sweep):
     'fsqs.Chevron_flux_pulse_ampl_seq(...)'
     '''
     def __init__(self, qb_control, qb_target, spacing=50e-9,cal_points=False,upload=True,
-                 distorted=False,distortion_dict=None):
+                 distorted=False,distortion_dict=None,
+                 compensation_pulses=False):
         super().__init__()
         self.qb_control = qb_control
         self.qb_target = qb_target
@@ -1918,6 +1929,7 @@ class Chevron_ampl_hard_swf(swf.Hard_Sweep):
         self.cal_points = cal_points
         self.distorted = distorted
         self.distortion_dict = distortion_dict
+        self.compensation_pulses = compensation_pulses
 
 
         self.name = 'Chevron flux pulse amplitude sweep'
@@ -1929,7 +1941,8 @@ class Chevron_ampl_hard_swf(swf.Hard_Sweep):
             fsqs.Chevron_flux_pulse_ampl_seq(
                 ampls=self.sweep_points, qb_control=self.qb_control,
                 qb_target=self.qb_target, spacing=self.spacing, cal_points=self.cal_points,
-                distorted=self.distorted,distortion_dict=self.distortion_dict
+                distorted=self.distorted,distortion_dict=self.distortion_dict,
+                compensation_pulses=self.compensation_pulses
             )
 
 

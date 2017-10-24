@@ -2601,9 +2601,12 @@ class QuDev_transmon(Qubit):
         if thetas is None:
             thetas = np.linspace(0, 2*np.pi, 8, endpoint=False)
         if delays is None:
-            delays = np.arange(-6*self.flux_pulse_length(),
-                               X90_separation + 6*self.flux_pulse_length(),
-                               20*T_sample)
+            buffer_factor = int(X90_separation/self.flux_pulse_length())
+            total_time = X90_separation + 3*buffer_factor*self.flux_pulse_length()
+            res = int(total_time/T_sample/30)
+            delays = np.arange(-1.5*buffer_factor*self.flux_pulse_length(),
+                               X90_separation + 1.5*buffer_factor*self.flux_pulse_length(),
+                               res*T_sample)
 
         self.set_default_readout_weights()
         self.prepare_for_timedomain()
