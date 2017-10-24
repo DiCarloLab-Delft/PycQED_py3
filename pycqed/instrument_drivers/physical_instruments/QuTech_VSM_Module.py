@@ -17,7 +17,7 @@ import time
 
 from qcodes import IPInstrument
 from qcodes import validators as vals
-from qcodes_driver.vsm_validators import CaseInsensitiveEnum
+from .vsm_validators import CaseInsensitiveEnum
 
 
 class QuTechVSMModule(IPInstrument):
