@@ -1133,13 +1133,68 @@ class Dummy_distortion_corrector(Distortion_corrector):
         noise = np.random.rand(len(self.raw_waveform)) * 0.02
         self.raw_waveform += noise
 
+        self.raw_waveform = np.convolve(
+            self.raw_waveform,  self.kernel_object.get_decay_kernel_1())
+
         self.raw_time_pts = np.arange(len(self.raw_waveform))/sampling_rate
         # Normalize waveform and find rising edge
         self.waveform = self.detect_edge_and_normalize_wf(self.raw_waveform)
         self.time_pts = np.arange(len(self.waveform))/sampling_rate
 
 
-class RT_distortion_corrector(Distortion_corrector):
+class RT_distortion_corrector_AWG8(Distortion_corrector): 
+    def __init__(self, flux_lutman, oscilloscope, square_amp: float,
+                 nr_plot_points: int=1000, ):
+        '''
+        Instantiates an object.
+        Note: Sampling rate of the scope is assumed to be 5 GHz. Sampling rate
+        of the AWG is assumed to be 1 GHz.
+
+        Args:
+            flux_lutman (Instrument):
+                    Lookup table manager for the AWG.
+            oscilloscope (Instrument):
+                    Oscilloscope instrument.
+
+            nr_plot_points (int):
+                    Number of points of the waveform that are plotted. Can be
+                    changed in self.nr_plot_points.
+        '''
+        self.flux_lutman = flux_lutman
+        self.scope = oscilloscope
+        super().__init__(kernel_object=flux_lutman.F_kernel_instr.get_instr(),
+                         square_amp=square_amp,
+                         nr_plot_points=nr_plot_points)
+
+        self.raw_waveform = []
+        self.raw_time_pts = []
+
+    def measure_trace(self, verbose=True):
+        '''
+        Measure a trace with the oscilloscope.
+        Raw data is saved to self.raw_time_pts and self.raw_waveform.
+        Data clipped to start at the rising edge is saved to self.time_pts
+        and self.waveform.
+
+        N.B. This measure trace method makes two assumptions 
+            1. The scope is properly configured. 
+            2. The CCLight is running the correct program that triggers the 
+               AWG8. 
+        '''
+        # Upload waveform
+        self.flux_lutman.load_waveform_onto_AWG_lookuptable(
+            'square', regenerate_waveforms=True)
+        if verbose:
+            print('Measuring trace...')
+        self.raw_time_pts, self.raw_waveform = \
+            self.scope.measure_trace()
+
+        # Normalize waveform and find rising edge
+        self.waveform = self.detect_edge_and_normalize_wf(self.raw_waveform)
+        
+        self.time_pts = np.arange(len(self.waveform)) / self.sampling_rate
+
+class RT_distortion_corrector_QWG(Distortion_corrector):
     '''
     Class for applying corrections for room-temperature distortions to flux
     pulses.

@@ -26,6 +26,12 @@ class Test_distorter(unittest.TestCase):
         self.dist_corr.plot_trace()
 
     def test_static_loop(self):
+        # Setting some mock kernel that is used to generate the fake pulse
+        self.kernel_object.corrections_length(50e-6)
+        self.kernel_object.decay_length_1(30e-6)
+        self.kernel_object.decay_tau_1(20e-6)
+        self.kernel_object.decay_amp_1(.1)
+
         # This mocks calling all the methods from the interactive loop
         self.dist_corr.open_new_correction(8e-6, AWG_sampling_rate=1e9,
                                            name='Test_kernel_corr')
