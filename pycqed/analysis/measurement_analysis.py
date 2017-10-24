@@ -144,7 +144,7 @@ class MeasurementAnalysis(object):
         if fig is None:
             fig = self.default_fig(*arg, **kw)
         ax = fig.add_subplot(111)
-        #ax.set_title(self.timestamp_string+'\n'+self.measurementstring)
+
         ax.ticklabel_format(useOffset=False)
         return fig, ax
 
@@ -159,7 +159,7 @@ class MeasurementAnalysis(object):
             if figname is None:
                 if xlabel=='x':
                     xlabel=self.sweep_name
-                # figname = (self.sweep_name+'_'+ylabel +
+
                 figname = (self.measurementstring+'_'+ylabel +
                            '_vs_'+xlabel+'.'+plot_format)
             else:
@@ -451,7 +451,6 @@ class MeasurementAnalysis(object):
                     plot_title = kw.pop('plot_title', self.measurementstring +
                                         '\n' + self.timestamp_string)
                 ax.ticklabel_format(useOffset=False)
-                # plots rescaled sweep points (ex: GHz instead of Hz)
                 self.plot_results_vs_sweepparam(x=self.sweep_points,
                                                 y=self.measured_values[i],
                                                 fig=fig, ax=ax, log=log,
@@ -502,7 +501,7 @@ class MeasurementAnalysis(object):
                     ax = axs[i//2, i % 2]
                 else:
                     ax = axs[i]  # If not 2 or 4 just gives a list of plots
-                # plots rescaled sweep points (ex: GHz instead of Hz)
+
                 [fig, ax, colormap, cbar]=a_tools.color_plot(
                     x=self.sweep_points,
                     y=self.sweep_points_2D,
