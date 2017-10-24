@@ -14,8 +14,9 @@ from qcodes.plots.pyqtgraph import QtPlot
 
 class Distortion_corrector():
 
-    def __init__(self, kernel_object, nr_plot_points=1000,
-                 auto_save_plots=True):
+    def __init__(self, kernel_object, square_amp: float=1,
+                 nr_plot_points: int=1000,
+                 auto_save_plots: bool=True):
         '''
         Instantiates an object.
 
@@ -23,6 +24,9 @@ class Distortion_corrector():
             kernel_object (Instrument):
                     kernel object instrument that handles applying kernels to
                     flux pulses.
+            square_amp (float):
+                    Amplitude of the square pulse that is applied. This is
+                    needed for correct normalization of the step response.
             nr_plot_points (int):
                     Number of points of the waveform that are plotted. Can be
                     changed in self.nr_plot_points.
@@ -37,6 +41,8 @@ class Distortion_corrector():
         self._t_stop_loop = 30e-6
         self.nr_plot_points = nr_plot_points
 
+        self.square_amp = square_amp
+
         # Kernels
         self.kernel_length = 0
         self.kernel_combined_dict = {}
@@ -46,8 +52,7 @@ class Distortion_corrector():
 
         # Files
         self.filename = ''
-        self.kernel_dir = self.kernel_object.kernel_dir()
-        self.data_dir = self.kernel_dir  # where traces and plots are saved
+        self.data_dir = self.kernel_object.kernel_dir()  # where traces and plots are saved
         self._iteration = 0
         self.auto_save_plots = auto_save_plots
 
@@ -88,31 +93,39 @@ class Distortion_corrector():
     def load_kernel_file(self, filename):
         '''
         Loads kernel dictionary (containing kernel and metadata) from a JSON
-        file. This function looks only in the directory self.kernel_dir for
-        the file.
+        file. This function looks only in the directory
+        self.kernel_object.kernel_dir() for the file.
         Returns a dictionary of the kernel and metadata.
         '''
-        with open(os.path.join(self.kernel_dir, filename)) as infile:
+        with open(os.path.join(self.kernel_object.kernel_dir(),
+                               filename)) as infile:
             data = json.load(infile)
         return data
 
     def save_kernel_file(self, kernel_dict, filename):
         '''
         Saves kernel dictionary (containing kernel and metadata) to a JSON
-        file in the directory self.kernel_dir.
+        file in the directory self.kernel_object.kernel_dir().
         '''
-        with open(os.path.join(self.kernel_dir, filename), 'w') as outfile:
-            json.dump(kernel_dict, outfile)
+        directory = self.kernel_object.kernel_dir()
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        with open(os.path.join(directory, filename),
+                  'w') as outfile:
+            json.dump(kernel_dict, outfile, indent=True, sort_keys=True)
 
     def save_plot(self, filename):
         try:
-            self.vw.save(os.path.join(self.data_dir, filename))
+            directory = self.kernel_object.kernel_dir()
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+            # FIXME: saving disabled as it is currently broken.
+            # self.vw.save(os.path.join(self.kernel_object.kernel_dir(),
+            #                           filename))
         except Exception as e:
             logging.warning('Could not save plot.')
 
-    def open_new_correction(self, kernel_length, AWG_sampling_rate,
-                            name='{}_corr'.format(
-                                datetime.date.today().strftime('%y%m%d'))):
+    def open_new_correction(self, kernel_length, AWG_sampling_rate, name):
         '''
         Opens a new correction with name 'filename', i.e. initializes the
         combined kernel to a Dirac delta and empties kernel_list of the
@@ -1084,6 +1097,47 @@ class Distortion_corrector():
         print('End of summary.')
         print('********')
 
+    def detect_edge_and_normalize_wf(self, waveform, edge_level=0.1):
+        """
+        Detects the edge of a waveform and cuts of the leading zeros as well
+        as normalizes the waveform to "self.square_amp".
+
+        args:
+            waveform      (array) : the raw_waveform
+            edge_level    (float) : fractional change to declare an edge
+        Returns:
+            norm_waveform (array) : shifted and normalized waveform
+        """
+        # Normalize waveform and find rising edge
+        edge_idx = -1
+        abs_edge_change = (np.max(waveform) - np.min(waveform))*edge_level
+
+        for i in range(len(waveform) - 1):
+            if waveform[i+1] - waveform[i] > abs_edge_change:
+                edge_idx = i
+                break
+        if edge_idx < 0:
+            raise ValueError('Failed to find rising edge.')
+        norm_waveform = (waveform -
+                         np.mean(waveform[:edge_idx-1])) / self.square_amp
+        return norm_waveform
+
+
+class Dummy_distortion_corrector(Distortion_corrector):
+
+    def measure_trace(self, verbose=True):
+        sampling_rate = 5e9
+        # Generate some dummy square wave
+        self.raw_waveform = np.concatenate([np.zeros(100), np.ones(50000),
+                                            np.zeros(1000)])
+        noise = np.random.rand(len(self.raw_waveform)) * 0.02
+        self.raw_waveform += noise
+
+        self.raw_time_pts = np.arange(len(self.raw_waveform))/sampling_rate
+        # Normalize waveform and find rising edge
+        self.waveform = self.detect_edge_and_normalize_wf(self.raw_waveform)
+        self.time_pts = np.arange(len(self.waveform))/sampling_rate
+
 
 class RT_distortion_corrector(Distortion_corrector):
     '''
@@ -1107,17 +1161,15 @@ class RT_distortion_corrector(Distortion_corrector):
                     Lookup table manager for the AWG.
             oscilloscope (Instrument):
                     Oscilloscope instrument.
-            square_amp (float):
-                    Amplitude of the square pulse that is applied. This is
-                    needed for correct normalization of the step response.
+
             nr_plot_points (int):
                     Number of points of the waveform that are plotted. Can be
                     changed in self.nr_plot_points.
         '''
         self.AWG_lutman = AWG_lutman
         self.scope = oscilloscope
-        self.square_amp = square_amp  # Normalization for step
         super().__init__(kernel_object=AWG_lutman.F_kernel_instr.get_instr(),
+                         square_amp=square_amp,
                          nr_plot_points=nr_plot_points)
 
         self.raw_waveform = []
@@ -1146,17 +1198,7 @@ class RT_distortion_corrector(Distortion_corrector):
         # self.data_dir = a.folder
 
         # Normalize waveform and find rising edge
-        edge_idx = -1
-        for i in range(len(self.raw_waveform) - 1):
-            if self.raw_waveform[i+1] - self.raw_waveform[i] > 0.005:
-                edge_idx = i
-                break
-        if edge_idx < 0:
-            raise ValueError('Failed to find rising edge.')
-        waveform = (self.raw_waveform -
-                    np.mean(self.raw_waveform[:edge_idx-1])) / self.square_amp
-
-        self.waveform = waveform[edge_idx:]
+        self.waveform = self.detect_edge_and_normalize_wf(self.raw_waveform)
         # Sampling rate hardcoded to 5 GHz
         self.time_pts = np.arange(len(self.waveform)) / 5e9
 
@@ -1193,8 +1235,7 @@ class RT_distortion_corrector_5014(Distortion_corrector):
 
         self.scope = oscilloscope
         self.AWG = AWG
-        self.square_amp = square_amp  # Normalization for step
-        super().__init__(kernel_object=kernel,
+        super().__init__(kernel_object=kernel, square_amp=square_amp,
                          nr_plot_points=nr_plot_points)
 
         self.raw_waveform = []
@@ -1238,17 +1279,7 @@ class RT_distortion_corrector_5014(Distortion_corrector):
         # self.data_dir = a.folder
 
         # Normalize waveform and find rising edge
-        edge_idx = -1
-        for i in range(len(self.raw_waveform) - 1):
-            if self.raw_waveform[i+1] - self.raw_waveform[i] > 0.01:
-                edge_idx = i
-                break
-        if edge_idx < 0:
-            raise ValueError('Failed to find rising edge.')
-        waveform = (self.raw_waveform -
-                    np.mean(self.raw_waveform[:edge_idx-1])) / self.square_amp
-
-        self.waveform = waveform[edge_idx:]
+        self.waveform = self.detect_edge_and_normalize_wf(self.raw_waveform)
         # Sampling rate hardcoded to 5 GHz
         self.time_pts = np.arange(len(self.waveform)) / 5e9
 
@@ -1287,6 +1318,7 @@ class Cryo_distortion_corrector(Distortion_corrector):
         self.qubit = qubit
         super().__init__(
             kernel_object=self.AWG_lutman.F_kernel_instr.get_instr(),
+            square_amp=square_amp,
             nr_plot_points=nr_plot_points)
         self.time_pts = time_pts
         self.phases = []
@@ -1295,7 +1327,6 @@ class Cryo_distortion_corrector(Distortion_corrector):
         self.V_per_phi0 = self.qubit.V_per_phi0()
         self.V_0 = self.qubit.V_offset()
         self.f_demod = f_demod
-        self.square_amp = square_amp
         self.demodulate = demodulate
 
     def measure_trace(self, verbose=True):
@@ -1313,8 +1344,6 @@ class Cryo_distortion_corrector(Distortion_corrector):
             demodulate=self.demodulate,
             f_demod=self.f_demod,
             flux_amp_analysis=self.square_amp)
-
-        self.data_dir = a.folder
 
         self.waveform = a.step_response
         self.phases = a.phases
