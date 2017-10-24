@@ -56,7 +56,7 @@ def _simulate_QX(file_path, options):
     qxc = qx_client()
     try:
         qxc.connect()
-        qxc.create_qubits(2)
+        qxc.create_qubits(5)
         qx_sweep = swf.QX_Hard_Sweep(qxc, file_path)
         num_avg = options.get('num_avg', 10000)  # 10000 is the default
 

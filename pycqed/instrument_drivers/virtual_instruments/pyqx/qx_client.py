@@ -12,6 +12,7 @@
 """
 
 import socket
+import re
 
 class qx_client:
 
@@ -20,9 +21,23 @@ class qx_client:
     """
     encoding = "utf-8"
     ack = "OK"
-    timeout = 10.0
+    timeout = 5.0
     buffer_size = 8192
     IllegalOperationException = Exception("Illegal Operation !")
+    errorMessages = {
+        "E1":  "Invalid qubit id",
+        "E2":  "Invalid bit id",
+        "E3":  "Unknown command",
+        "E4":  "Invalid syntax at",
+        "E5":  "Number of qubits already defined",
+        "E6":  "To many qubits",
+        "E7":  "Invalid error model",
+        "E9":  "Qubits not defined yet",
+        "E10": "Qubit out of range",
+        "E11": "Toffoli requires 3 qubits",
+        "E12": "Circuit not found",
+        "E13": "Unknown error"
+    }
 
     def __init__(self):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -57,6 +72,12 @@ class qx_client:
             self.sock.settimeout(self.timeout)
             while reply.find(self.ack) == -1:
                 reply += self.__receive()
+                # Check for errors
+                print(repr(reply.strip()))
+                errMatch = re.search(r'E[0-9]+', reply)
+                if errMatch:
+                    return errMatch.group(0)
+
         except socket.timeout:
             print("[x] error : timeout while waiting for server reply")
             return ""
@@ -67,8 +88,15 @@ class qx_client:
         """
           send command and receive acknowlegement : command can be single or multiple gates
         """
+        print(cmd)
         self.__send(cmd)
-        return self.__receive_ack()
+        recv = self.__receive_ack()
+        if(recv[0] == "E"):
+            if(recv in self.errorMessages):
+                raise Exception(self.errorMessages[recv]+" at: '"+cmd+"'")
+            else:
+                raise Exception("An unknown error occurred at: "+ cmd)
+        return recv
 
     def create_qubits(self, n):
         """

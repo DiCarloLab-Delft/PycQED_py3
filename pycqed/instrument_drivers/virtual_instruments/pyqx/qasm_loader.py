@@ -102,6 +102,7 @@ class qasm_loader:
                     i = i + 1
             p[1] = cr
             # print("[-] number of gates : ",ng)
+            print(p)
             self.circuits.append(p)
 
     def get_circuits(self):
