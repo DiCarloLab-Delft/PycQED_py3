@@ -1860,8 +1860,9 @@ def color_plot_interpolated(x, y, z, ax=None,
         return ax, CS, cbar
     return ax, CS
 
-def plot_errorbars(x, y, fit_results=None, fit_function=None, ax=None,
-                   linewidth=2 ,markersize=2, marker='none', only_bars=True):
+def plot_errorbars(x, y, ax=None,
+                   linewidth=2 ,markersize=2, marker='none',
+                   err_bars=None, label=None):
 
     if ax is None:
         new_plot_created = True
@@ -1869,37 +1870,19 @@ def plot_errorbars(x, y, fit_results=None, fit_function=None, ax=None,
     else:
         new_plot_created = False
 
-    standard_error = np.std(y)/np.sqrt(y.size)
+    if err_bars is None:
+        if (len(y.shape))==1:
+            err_bars = np.std(y)/np.sqrt(y.size)
+        else:
+            err_bars = []
+            for data in y:
+                err_bars.append(np.std(data)/np.sqrt(data.size))
+            err_bars = np.asarray(err_bars)
+        if label is None:
+            label = 'stderr'
 
-    # if only_bars:
-    #     ax.errorbar( x, y, yerr=standard_error, ecolor='k',
-    #                  fmt='',linewidth=linewidth)
-    # else:
-    ax.errorbar( x, y, yerr=standard_error, ecolor='k', fmt=marker,
-                     linewidth=linewidth, markersize=markersize)
-
-    # best_vals = fit_results.best_values
-    # func_args=inspect.getargspec(fit_function)[0]                   #returns list of function parameters
-    #
-    # plus_list = []
-    # minus_list = []
-    # for i in func_args[1:]:
-    #     plus_list += [best_vals[i] + fit_results.params[i].stderr]
-    #     minus_list += [best_vals[i] - fit_results.params[i].stderr]
-    #
-    # yplus = fit_function(x,*plus_list)
-    # yminus = fit_function(x,*minus_list)
-    #
-    # asymmetric_error=[]
-    # for idx,val in enumerate(y):
-    #     asymmetric_error += [[ val-yminus[idx],yplus[idx]-val ]]
-    # asymmetric_error = np.asarray(asymmetric_error)
-    # asymmetric_error=np.transpose(asymmetric_error)
-    #
-    # if only_bars:
-    #     ax.errorbar( x, y, yerr=asymmetric_error, fmt='' )
-    # else:
-    #     ax.errorbar( x, y, yerr=asymmetric_error, fmt='-o' )
+    ax.errorbar( x, y, yerr=err_bars, ecolor='k', fmt=marker,
+                     linewidth=linewidth, markersize=markersize, label=label)
 
     if new_plot_created:
         return f,ax

@@ -5427,19 +5427,20 @@ class RandomizedBenchmarking_Analysis_new(TD_Analysis):
         self.add_analysis_datagroup_to_file()
 
         self.n_cl = np.unique(self.sweep_points_2D)
-        nr_seeds = self.sweep_points.size #nr_seeds+NoCalPts
+        nr_sweep_pts = self.sweep_points.size #nr_seeds+NoCalPts
+        self.nr_seeds = nr_sweep_pts - 2*len(self.cal_points[0])
         data = np.zeros(self.n_cl.size)
 
-        data_rearranged = [np.zeros((self.n_cl.size, nr_seeds)),
-                           np.zeros((self.n_cl.size, nr_seeds))]
+        data_rearranged = [np.zeros((self.n_cl.size, nr_sweep_pts)),
+                           np.zeros((self.n_cl.size, nr_sweep_pts))]
         I = self.measured_values[0]
         Q = self.measured_values[1]
         for i in range(self.n_cl.size):
-            for j in range(nr_seeds):
+            for j in range(nr_sweep_pts):
                 data_rearranged[0][i, j] = I[j, i]
                 data_rearranged[1][i, j] = Q[j, i]
         self.data_rearranged = data_rearranged
-        a = np.zeros((2, nr_seeds))  #this is an array with the same shape as
+        a = np.zeros((2, nr_sweep_pts))  #this is an array with the same shape as
                                      #as measured_values for TwoD==False
         self.data_calibrated = deepcopy(self.data_rearranged[0])
         for i in range(self.n_cl.size):
@@ -5451,6 +5452,11 @@ class RandomizedBenchmarking_Analysis_new(TD_Analysis):
             self.data_calibrated[i] = data_calibrated
             data_calibrated = data_calibrated[:-int(self.NoCalPoints)]
             data[i] = np.mean(data_calibrated)
+
+        self.calibrated_data_points = np.zeros(shape=(self.data_calibrated.shape[0],
+                                               self.nr_seeds))
+        for i,d in enumerate(self.data_calibrated):
+            self.calibrated_data_points[i] = d[:-int(2*len(self.cal_points[0]))]
 
         self.data = data
         #data = self.corr_data[:-1*(len(self.cal_points[0]*2))]
@@ -5465,9 +5471,6 @@ class RandomizedBenchmarking_Analysis_new(TD_Analysis):
         self.save_fitted_parameters(fit_res=self.fit_res, var_name='F|1>')
         if self.make_fig:
             self.make_figures(close_main_fig=close_main_fig, **kw)
-
-            if kw.pop('show',True):
-                plt.show()
 
         if close_file:
             self.data_file.close()
@@ -5534,6 +5537,35 @@ class RandomizedBenchmarking_Analysis_new(TD_Analysis):
                                         ylabel=ylabel,
                                         save=False)
 
+        if kw.pop('plot_errorbars', True):
+            if kw.pop('std_err', False):
+                err_bars = []
+                for data in self.calibrated_data_points:
+                    err_bars.append(np.std(data)/np.sqrt(data.size))
+                err_bars = np.asarray(err_bars)
+                err_label = 'stderr'
+
+            else:
+                conf_level = kw.pop('conf_level', 0.95)
+                epsilon_guess = kw.pop('epsilon_guess', 0.1)
+                eta = kw.pop('eta', 0)
+                err_bars, err_label = self.calculate_confidence_intervals(
+                    nr_seeds=self.nr_seeds,
+                    nr_cliffords=self.n_cl,
+                    infidelity=self.fit_res.params['error_per_Clifford'].value,
+                    conf_level=conf_level,
+                    epsilon_guess=epsilon_guess,
+                    eta=eta)
+
+            a_tools.plot_errorbars(self.n_cl,
+                                   self.data,
+                                   ax=self.ax,
+                                   err_bars=err_bars,
+                                   label=err_label,
+                                   linewidth=self.axes_line_width,
+                                   marker='none',
+                                   markersize=self.marker_size)
+
         x_fine = np.linspace(0, self.n_cl[-1], 1000)
         for fit_res in self.fit_results:
             best_fit = fit_mods.RandomizedBenchmarkingDecay(
@@ -5551,10 +5583,13 @@ class RandomizedBenchmarking_Analysis_new(TD_Analysis):
                 x_fine, -0.5, p_T1, 0.5)
             self.ax.plot(x_fine, T1_limited_curve, label='T1-limit')
 
-            self.ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        self.ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 
         # Add a textbox
         self.add_textbox(self.ax, F_T1)
+
+        if kw.pop('show',True):
+            plt.show()
 
         if not close_main_fig:
             # Hacked in here, good idea to only show the main fig but can
@@ -5563,6 +5598,35 @@ class RandomizedBenchmarking_Analysis_new(TD_Analysis):
                           close_fig=False, **kw)
         else:
             self.save_fig(self.fig, ylabel='Amplitude (normalized)', **kw)
+
+    def calculate_confidence_intervals(self, nr_seeds, nr_cliffords,
+                                       conf_level=0.95, infidelity=0,
+                                       epsilon_guess=0.1, eta=0):
+        # For each number of cliffords in nr_cliffords (array), finds epsilon
+        # such that with probability greater than conf_level, the true value of
+        # the survival probability, p_N_m, for a given N=nr_seeds and
+        # m=nr_cliffords, is in the interval
+        # [p_N_m_measured-epsilon, p_N_m_measured+epsilon]
+        # See Helsen et al. (2017) for more details.
+
+        # eta is the SPAM-dependent prefactor defined in Helsen et al. (2017)
+
+        label = str(int(conf_level*100)) + '% confidence interval'
+
+        epsilon = []
+        delta = 1-conf_level
+        for n_cl in nr_cliffords:
+            if n_cl == 0:
+                epsilon.append(0)
+            else:
+                V = min((13*n_cl*infidelity**2)/2, 7*infidelity/2)
+
+                H = lambda eps: (1/(1-eps))**((1-eps)/(V+1)) * \
+                                (V/(V+eps))**((V+eps)/(V+1)) - \
+                                (delta/2)**(1/nr_seeds)
+                epsilon.append(optimize.fsolve(H, epsilon_guess)[0])
+
+        return np.asarray(epsilon), label
 
     def fit_data(self, data, numCliff,
                  print_fit_results=False,
@@ -5580,8 +5644,14 @@ class RandomizedBenchmarking_Analysis_new(TD_Analysis):
                                expr='(p + (1-p)/2)')
         RBModel.set_param_hint('error_per_Clifford',  # vary=False,
                                expr='1-fidelity_per_Clifford')
-        RBModel.set_param_hint('fidelity_per_gate',  # vary=False,
-                               expr='fidelity_per_Clifford**(1./1.875)')
+        if self.gate_decomp is 'XY':
+            RBModel.set_param_hint('fidelity_per_gate',  # vary=False,
+                                   expr='fidelity_per_Clifford**(1./1.875)')
+        elif self.gate_decomp is 'HZ':
+            RBModel.set_param_hint('fidelity_per_gate',  # vary=False,
+                                   expr='fidelity_per_Clifford**(1./1.125)')
+        else:
+            raise ValueError('Gate decomposition not recognized.')
         RBModel.set_param_hint('error_per_gate',  # vary=False,
                                expr='1-fidelity_per_gate')
 
