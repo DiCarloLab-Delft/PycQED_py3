@@ -31,6 +31,16 @@ class Test_Heterodyne_analysis(unittest.TestCase):
         self.assertAlmostEqual(f0/1e9, 8.110836918005137, places=3)
         self.assertAlmostEqual(Q/1000, 2.506147979874048, places=1)
 
+    def test_spectroscopy_analysis_hanger_model(self):
+
+        a = ma.Homodyne_Analysis(timestamp='20170929_174145', label='resonator_spec')
+        self.assertAlmostEqual(a.fit_results.values['f0'], 7.1875, places=2)
+        self.assertAlmostEqual(a.fit_results.values['Q'], 1523.119, places=1)
+
+        a = ma.Homodyne_Analysis(timestamp='20170929_120456', label='resonator_spec')
+        self.assertAlmostEqual(a.fit_results.values['f0'], 7.4942, places=2)
+        self.assertAlmostEqual(a.fit_results.values['Q'], 7430.27187, places=1)
+
     def test_acquisition_delay_analysis(self):
         # Test the correct file is loaded
         self.assertEqual(self.a_acq_delay.folder,
