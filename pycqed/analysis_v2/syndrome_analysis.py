@@ -43,7 +43,7 @@ class Single_Qubit_RoundsToEvent_Analysis(ba.BaseDataAnalysis):
         exp_pattern = self.options_dict.get('exp_pattern', net_pulse_pat)
 
         raw_dat = self.raw_data_dict['measured_values']
-        nr_expts = np.shape(raw_dat)[0]
+        nr_expts = self.raw_data_dict['nr_experiments']
         raw_pat = [raw_dat[i][0] for i in range(nr_expts)]
 
         s_events = []

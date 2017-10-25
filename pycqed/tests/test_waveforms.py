@@ -162,21 +162,21 @@ class Test_Waveforms(unittest.TestCase):
         #     self.assertEqual(np.argmax(V_pulse), 20)
 
     def test_martinis_flux_pulse_v2(self):
-        length=200e-9
-        lambda_2=0.015
-        lambda_3=0
-        theta_f=8
-        f_01_max=6.089e9
-        J2=4.2e6
-        E_c=0
-        V_per_phi0=np.pi/1.7178
-        f_interaction=4.940e9
-        f_bus=None
-        asymmetry=0
-        sampling_rate=1e9
-        return_unit='V'
+        length = 200e-9
+        lambda_2 = 0.015
+        lambda_3 = 0
+        theta_f = 8
+        f_01_max = 6.089e9
+        J2 = 4.2e6
+        E_c = 0
+        V_per_phi0 = np.pi/1.7178
+        f_interaction = 4.940e9
+        f_bus = None
+        asymmetry = 0
+        sampling_rate = 1e9
+        return_unit = 'V'
 
-        theta_wave=wf.martinis_flux_pulse_v2(
+        theta_wave = wf.martinis_flux_pulse_v2(
             length=length,
             lambda_2=lambda_2,
             lambda_3=lambda_3,
@@ -191,7 +191,7 @@ class Test_Waveforms(unittest.TestCase):
             sampling_rate=sampling_rate,
             return_unit=return_unit)
 
-        test_wave=np.array(
+        test_wave = np.array(
             [0.,  0.03471175,  0.06891321,  0.10213049,  0.13395662,
              0.16407213,  0.19225372,  0.21837228,  0.24238259,  0.26430828,
              0.28422502,  0.30224448,  0.31850026,  0.33313676,  0.34630067,
@@ -236,10 +236,10 @@ class Test_Waveforms(unittest.TestCase):
         self.assertEqual(np.shape(theta_wave), np.shape(test_wave))
         np.testing.assert_almost_equal(theta_wave, test_wave)
 
-        lambda_2=-0.02
+        lambda_2 = -0.02
         # FIXME: we should test if the right warning is raised.
         # with warnings.catch_warnings(record=True) as w:
-        theta_wave=wf.martinis_flux_pulse_v2(
+        theta_wave = wf.martinis_flux_pulse_v2(
             length=length,
             lambda_2=lambda_2,
             lambda_3=lambda_3,
@@ -254,7 +254,7 @@ class Test_Waveforms(unittest.TestCase):
             sampling_rate=sampling_rate,
             return_unit=return_unit)
 
-        test_wave_2=np.array(
+        test_wave_2 = np.array(
             [0.,  0.03234928,  0.06428708,  0.09542742,  0.12543163,
              0.1540241,  0.18100034,  0.20622772,  0.22964031,  0.25122954,
              0.2710329,  0.28912228,  0.30559317,  0.32055543,  0.33412579,

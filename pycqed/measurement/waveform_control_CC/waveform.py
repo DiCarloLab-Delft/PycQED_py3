@@ -275,19 +275,20 @@ def mod_gauss_VSM(amp, sigma_length, f_modulation, axis='x', phase=0,
     '''
     G, D = gauss_pulse(amp, sigma_length, nr_sigma=nr_sigma,
                        sampling_rate=sampling_rate, axis=axis,
-                       phase=0,#should always be 0
+                       phase=0,  # should always be 0
                        motzoi=motzoi, delay=delay)
-
-    G_I, G_Q = rotate_wave(G, G, phase=phase, unit='deg')
-    D_I, D_Q = rotate_wave(D, D, phase=phase+90, unit='deg')
-
-
+    # The identity wave is used because the wave needs to be split up
+    # to the VSM
+    I = np.zeros(len(G))
+    G_I, G_Q = rotate_wave(G, I, phase=phase, unit='deg')
+    # D is in the Q quadrature because it should be 90 deg out of phase
+    D_I, D_Q = rotate_wave(I, D, phase=phase, unit='deg')
     G_I_mod, G_Q_mod = mod_pulse(G_I, G_Q, f_modulation,
-                         sampling_rate=sampling_rate,
-                         Q_phase_delay=Q_phase_delay)
+                                 sampling_rate=sampling_rate,
+                                 Q_phase_delay=Q_phase_delay)
     D_I_mod, D_Q_mod = mod_pulse(D_I, D_Q, f_modulation,
-                         sampling_rate=sampling_rate,
-                         Q_phase_delay=Q_phase_delay)
+                                 sampling_rate=sampling_rate,
+                                 Q_phase_delay=Q_phase_delay)
     return G_I_mod, G_Q_mod, D_I_mod, D_Q_mod
 
 

@@ -43,6 +43,7 @@ class Test_QO(unittest.TestCase):
 
         self.MW1 = vmw.VirtualMWsource('MW1')
         self.MW2 = vmw.VirtualMWsource('MW2')
+        self.MW3 = vmw.VirtualMWsource('MW3')
         self.SH = sh.virtual_SignalHound_USB_SA124B('SH')
         self.UHFQC = dummy_UHFQC('UHFQC')
 
@@ -76,6 +77,8 @@ class Test_QO(unittest.TestCase):
         self.CCL_qubit.instr_LutMan_MW(self.AWG8_VSM_MW_LutMan.name)
         self.CCL_qubit.instr_LO_ro(self.MW1.name)
         self.CCL_qubit.instr_LO_mw(self.MW2.name)
+        self.CCL_qubit.instr_spec_source(self.MW3.name)
+
         self.CCL_qubit.instr_acquisition(self.UHFQC.name)
         self.CCL_qubit.instr_VSM(self.VSM.name)
         self.CCL_qubit.instr_CC(self.CCL.name)
@@ -141,7 +144,6 @@ class Test_QO(unittest.TestCase):
             self.CCL_qubit.prepare_for_continuous_wave()
         self.CCL_qubit.ro_acq_weight_type('SSB')
         self.CCL_qubit.prepare_for_continuous_wave()
-        self.assertEqual(self.MW2.status(), 'on')
 
     def test_prep_cw_config_vsm(self):
 
@@ -157,14 +159,12 @@ class Test_QO(unittest.TestCase):
         self.assertEqual(self.VSM.in2_out2_switch(), 'OFF')
         self.assertEqual(self.VSM.in2_out1_att(), 112)
 
-
     def test_prep_for_fluxing(self):
         self.CCL_qubit.prepare_for_fluxing()
 
     @unittest.skip('Not Implemented')
     def test_prep_flux_bias(self):
         raise NotImplementedError()
-
 
     ##############################################
     # Testing prepare for readout
@@ -199,6 +199,7 @@ class Test_QO(unittest.TestCase):
         LO.power(10)
         self.assertEqual(LO.status(), 'off')
         self.assertEqual(LO.frequency(), 4e9)
+        self.CCL_qubit.mw_pow_td_source(20)
 
         self.CCL_qubit.ro_freq(5.43e9)
         self.CCL_qubit.ro_freq_mod(200e6)
@@ -206,7 +207,7 @@ class Test_QO(unittest.TestCase):
 
         self.assertEqual(LO.status(), 'on')
         self.assertEqual(LO.frequency(), 5.43e9-200e6)
-        self.assertEqual(LO.power(), 14)
+        self.assertEqual(LO.power(), 20)
 
     def test_prep_ro_pulses(self):
         self.CCL_qubit.ro_pulse_res_nr(3)
@@ -306,12 +307,10 @@ class Test_QO(unittest.TestCase):
         self.CCL_qubit.mw_G_mixer_alpha(1.02)
         self.CCL_qubit.mw_D_mixer_phi(8)
 
-
         self.CCL_qubit.mw_mixer_offs_GI(.1)
         self.CCL_qubit.mw_mixer_offs_GQ(.2)
         self.CCL_qubit.mw_mixer_offs_DI(.3)
         self.CCL_qubit.mw_mixer_offs_DQ(.4)
-
 
         self.CCL_qubit.prepare_for_timedomain()
         self.assertEqual(self.AWG8_VSM_MW_LutMan.channel_GI(), 5)
@@ -329,7 +328,6 @@ class Test_QO(unittest.TestCase):
         self.assertEqual(self.AWG.sigouts_5_offset(), .2)
         self.assertEqual(self.AWG.sigouts_6_offset(), .3)
         self.assertEqual(self.AWG.sigouts_7_offset(), .4)
-
 
     def test_prep_td_config_vsm(self):
         self.CCL_qubit.mw_vsm_switch('ON')
@@ -366,6 +364,7 @@ class Test_QO(unittest.TestCase):
 
     @unittest.skipIf(openql_import_fail, 'OpenQL not present')
     def test_measure_transients(self):
+        self.CCL_qubit.ro_acq_input_average_length(2e-6)
         self.CCL_qubit.measure_transients()
 
     @unittest.skipIf(openql_import_fail, 'OpenQL not present')
@@ -387,27 +386,29 @@ class Test_QO(unittest.TestCase):
 
     @unittest.skipIf(openql_import_fail, 'OpenQL not present')
     def test_T1(self):
-        self.CCL_qubit.measure_T1(times=np.arange(0,1e-6,20e-9))
+        self.CCL_qubit.measure_T1(
+            times=np.arange(0, 1e-6, 20e-9), update=False)
         self.CCL_qubit.T1(20e-6)
-        self.CCL_qubit.measure_T1()
+        self.CCL_qubit.measure_T1(update=False)
 
     @unittest.skipIf(openql_import_fail, 'OpenQL not present')
     def test_Ramsey(self):
         self.CCL_qubit.mw_freq_mod(100e6)
-        self.CCL_qubit.measure_Ramsey(times=np.arange(0,1e-6,20e-9))
+        self.CCL_qubit.measure_Ramsey(times=np.arange(0, 1e-6, 20e-9),
+                                      update=False)
         self.CCL_qubit.T2_star(20e-6)
-        self.CCL_qubit.measure_Ramsey()
+        self.CCL_qubit.measure_Ramsey(update=False)
 
     @unittest.skipIf(openql_import_fail, 'OpenQL not present')
     def test_echo(self):
         self.CCL_qubit.mw_freq_mod(100e6)
-        #self.CCL_qubit.measure_echo(times=np.arange(0,2e-6,40e-9))
+        # self.CCL_qubit.measure_echo(times=np.arange(0,2e-6,40e-9))
         time.sleep(1)
         self.CCL_qubit.T2_echo(40e-6)
-        #self.CCL_qubit.measure_echo()
+        # self.CCL_qubit.measure_echo()
         time.sleep(1)
         with self.assertRaises(ValueError):
-            invalid_times = [0.1e-9,0.2e-9,0.3e-9,0.4e-9]
+            invalid_times = [0.1e-9, 0.2e-9, 0.3e-9, 0.4e-9]
             self.CCL_qubit.measure_echo(times=invalid_times)
 
         with self.assertRaises(ValueError):
