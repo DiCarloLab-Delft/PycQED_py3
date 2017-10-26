@@ -79,7 +79,7 @@ def execute_qisa_file(qisa_file_url: str,  config_json: str,
                  parameter_name ='Points', unit ='a.u.',
                  upload=True)
 
-    # To be modified <<<<<
+    # To be modified depending on what we're gonna name the S-7 qubits? <<<<<
     d = device.get_correlation_detector()
     #d.value_names = ['Q0 ', 'Q1 ', 'Corr. (Q0, Q1) ']
     #d.value_units = ['frac.', 'frac.', 'frac.']
