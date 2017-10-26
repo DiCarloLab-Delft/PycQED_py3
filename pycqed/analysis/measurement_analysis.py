@@ -60,19 +60,34 @@ class MeasurementAnalysis(object):
         self.fit_results = []
         self.cmap_chosen = cmap_chosen
         self.no_of_columns = no_of_columns
-        self.dpi = 600  # dpi for plots
-        self.axes_line_width = 0.5  # lw of axes and text boxes
-        self.font_size = 11  # font sizes
-        self.tick_length = 4  # tick lengths
-        self.tick_width = 0.5  # tick line widths
-        self.marker_size = 3  # marker size for data points
-        self.line_width = 2  # line widths connecting data points
-        self.marker_size_special = 8  # marker size for special points like
-        # peak freq., Rabi pi and pi/2 amplitudes
+        self.dpi = kw.get('dpi', 300)  # dpi for plots
+        # 300 dpi is a good balance between resolution and speed of analysis
+        self.axes_line_width = kw.get('axes_line_width', 0.5)
+        # lw of axes and text boxes
+        self.font_size = kw.get('font_size', 11)  # font sizes
+        self.tick_length = kw.get('tick_length', 4)  # tick lengths
+        self.tick_width = kw.get('tick_width', 0.5)  # tick line widths
+        self.marker_size = kw.get('marker_size', None)
+        # marker size for data points
+        self.line_width = kw.get('line_width', 2)
+        # line widths connecting data points
+        self.marker_size_special = kw.get('marker_size_special', 8)
+        # marker size for special points like peak freq.,
+        # Rabi pi and pi/2 amplitudes etc.
         self.box_props = dict(boxstyle='Square', facecolor='white',
                               alpha=0.8, lw=self.axes_line_width)
         self.qb_name = qb_name  # for retrieving values of qubit
         # parameters from data file
+
+        self.tick_color = kw.get('tick_color', 'k')
+        # tick label color get's updated in savefig
+        self.tick_labelcolor = kw.get('tick_labelcolor', 'k')
+        self.axes_labelcolor = kw.get('axes_labelcolor', 'k')
+
+        params = {"ytick.color": self.tick_color,
+                  "xtick.color": self.tick_color,
+                  "axes.labelcolor": self.axes_labelcolor, }
+        plt.rcParams.update(params)
 
         if auto is True:
             self.run_default_analysis(TwoD=TwoD, **kw)
@@ -133,7 +148,8 @@ class MeasurementAnalysis(object):
     def save_fig(self, fig, figname=None, xlabel='x',
                  ylabel='measured_values',
                  fig_tight=True, **kw):
-
+        # N.B. this save_fig method is the one from the base
+        # MeasurementAnalysis class
         plot_formats = kw.pop('plot_formats', ['png'])
         fail_counter = False
         close_fig = kw.pop('close_fig', True)
@@ -158,6 +174,16 @@ class MeasurementAnalysis(object):
                 except ValueError:
                     print('WARNING: Could not set tight layout')
             try:
+                # Before saving some plotting properties are updated
+                for ax in fig.axes:
+                    plt.setp(ax.get_xticklabels(), color=self.tick_labelcolor)
+                    plt.setp(ax.get_yticklabels(), color=self.tick_labelcolor)
+
+                # This makes the background around the axes transparent
+                fig.patch.set_alpha(0)
+                # FIXME: the axes labels and unit rescaling could also be
+                # repeated here as the last step before saving
+
                 fig.savefig(
                     self.savename, dpi=self.dpi, format=plot_format,
                     bbox_inches='tight')
