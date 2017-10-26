@@ -618,7 +618,7 @@ class MeasurementAnalysis(object):
         # set axes labels format to scientific when outside interval [0.01,99]
         from matplotlib.ticker import ScalarFormatter
         fmt = ScalarFormatter()
-        fmt.set_powerlimits((-2, 2))
+        fmt.set_powerlimits((-4, 4))
         ax.xaxis.set_major_formatter(fmt)
         ax.yaxis.set_major_formatter(fmt)
 
