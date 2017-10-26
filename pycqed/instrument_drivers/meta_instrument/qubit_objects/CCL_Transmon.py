@@ -12,12 +12,13 @@ from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import measurement_analysis as ma2
-
 from pycqed.measurement.calibration_toolbox import (
-    mixer_carrier_cancellation, mixer_skewness_calibration_CBoxV3)
+    mixer_carrier_cancellation)
 
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import detector_functions as det
+
+from pycqed.measurement.optimization import nelder_mead
 
 
 class CCLight_Transmon(Qubit):
@@ -58,6 +59,10 @@ class CCLight_Transmon(Qubit):
                            parameter_class=InstrumentRefParameter)
 
         self.add_parameter('instr_MC', label='MeasurementControl',
+                           parameter_class=InstrumentRefParameter)
+
+        self.add_parameter('instr_nested_MC',
+                           label='Nested MeasurementControl',
                            parameter_class=InstrumentRefParameter)
         self.add_parameter('instr_SH', label='SignalHound',
                            parameter_class=InstrumentRefParameter)
@@ -550,11 +555,7 @@ class CCLight_Transmon(Qubit):
         """
         self._prep_ro_instantiate_detectors()
         self._prep_ro_sources()
-        try:
-            self._prep_ro_pulse()
-        except Exception:
-            print("triggered workaround for #348")
-            self._prep_ro_pulse()
+        self._prep_ro_pulse()
         self._prep_ro_integration_weights()
 
     def _prep_ro_instantiate_detectors(self):
@@ -661,9 +662,9 @@ class CCLight_Transmon(Qubit):
             idx = self.ro_pulse_res_nr()
             # These parameters affect all resonators
             ro_lm.set('pulse_type', 'M_' + self.ro_pulse_type())
-            ro_lm.set('mixer_alpha'.format(idx),
+            ro_lm.set('mixer_alpha',
                       self.ro_pulse_mixer_alpha())
-            ro_lm.set('mixer_phi'.format(idx),
+            ro_lm.set('mixer_phi',
                       self.ro_pulse_mixer_phi())
 
             ro_lm.set('M_modulation_R{}'.format(idx), self.ro_freq_mod())
@@ -742,9 +743,7 @@ class CCLight_Transmon(Qubit):
     def prepare_for_timedomain(self):
         self.prepare_readout()
         self._prep_td_sources()
-        for i in range(2):
-            print("Uploading twice as a workaround for #348")
-            self._prep_mw_pulses()
+        self._prep_mw_pulses()
 
     def _prep_td_sources(self):
         self.instr_LO_mw.get_instr().on()
@@ -978,8 +977,9 @@ class CCLight_Transmon(Qubit):
 
     def measure_ssro(self, MC=None, analyze: bool=True, nr_shots: int=1024*8,
                      cases=('off', 'on'), update_threshold: bool=True,
-                     prepare: bool=True, no_fits=False, update=True,
-                     verbose=True):
+                     prepare: bool=True, no_figs: bool=False,
+                     update: bool=True,
+                     verbose: bool=True):
         old_RO_digit = self.ro_acq_digitized()
         self.ro_acq_digitized(False)
         # docstring from parent class
@@ -992,20 +992,20 @@ class CCLight_Transmon(Qubit):
         MC.soft_avg(1)  # don't want to average single shots
         if prepare:
             self.prepare_for_timedomain()
-            # off/on switching is achieved by turning the MW source on and
-            # off as this is much faster than recompiling/uploading
             p = sqo.off_on(
-                qubit_idx=self.cfg_qubit_nr(), pulse_comb='offon',
+                qubit_idx=self.cfg_qubit_nr(), pulse_comb='off_on',
                 platf_cfg=self.cfg_openql_platform_fn())
             self.instr_CC.get_instr().upload_instructions(p.filename)
         else:
             p = None  # object needs to exist for the openql_sweep to work
 
+        # digitization setting is reset here but the detector still uses
+        # the disabled setting that was set above
         self.ro_acq_digitized(old_RO_digit)
 
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr(),
-                             parameter_name='Transient time', unit='s',
+                             parameter_name='Shot', unit='#',
                              upload=prepare)
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
@@ -1015,37 +1015,39 @@ class CCLight_Transmon(Qubit):
             'Measure_SSRO_{}'.format(self.msmt_suffix))
         MC.live_plot_enabled(old_plot_setting)
         if analyze:
-            if len(d.value_names)==1:
+            if len(d.value_names) == 1:
+                a = ma2.Singleshot_Readout_Analysis(
+                    t_start=None, t_stop=None,
+                    options_dict={'scan_label': 'SSRO'},
+                    extract_only=no_figs)
+                if update_threshold:
+                    # UHFQC threshold is wrong, the magic number is a
+                    #  dirty hack. This works. we don't know why.
+                    magic_scale_factor = 0.655
+                    self.ro_acq_threshold(a.proc_data_dict['threshold_raw'] *
+                                          magic_scale_factor)
+                if update:
+                    self.F_ssro(a.proc_data_dict['F_assignment_raw'])
+                    self.F_discr(a.proc_data_dict['F_discr'])
+                if verbose:
+                    print('Avg. Assignement fidelity: \t{:.4f}\n'.format(
+                        a.proc_data_dict['F_assignment_raw']) +
+                        'Avg. Discrimination fidelity: \t{:.4f}'.format(
+                        a.proc_data_dict['F_discr']))
+                return (a.proc_data_dict['F_assignment_raw'],
+                        a.proc_data_dict['F_discr'])
+            else:
+
                 a = ma.SSRO_Analysis(label='SSRO',
                                      channels=d.value_names,
-                                     no_fits=no_fits, rotate=False)
-            else:
-                a = ma.SSRO_Analysis(label='SSRO',
-                                     channels=d.value_names,
-                                     no_fits=no_fits, rotate=True)
-
-            if update_threshold:
-                # use the threshold for the best discrimination fidelity
-                self.ro_acq_threshold(a.V_th_a/1.5)  # fixme: rather use Fd, but unstable fitting. sqrt2 is a dirty hack. This works. we don't know why
-            if not no_fits:
-                if update:
-                    self.F_ssro(a.F_a)
-                    self.F_discr(a.F_d)
-                if verbose:
-                    print('Avg. Assignement fidelity: \t{:.4f}\n'.format(a.F_a) +
-                          'Avg. Discrimination fidelity: \t{:.4f}'.format(a.F_d))
-                return a.F_a, a.F_d
-            else:
-                if update:
-                    self.F_ssro(a.F_a)
-                if verbose:
-                    print('Avg. Assignement fidelity: \t{:.4f}\n'.format(a.F_a))
-                return a.F_a, None
-
+                                     no_fits=no_figs, rotate=False)
+                return None, None
 
     def measure_transients(self, MC=None, analyze: bool=True,
                            cases=('off', 'on'),
-                           prepare: bool=True):
+                           prepare: bool=True, depletion_analysis: bool=True,
+                           depletion_analysis_plot: bool=True,
+                           depletion_optimization_window=None):
         # docstring from parent class
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -1088,18 +1090,28 @@ class CCLight_Transmon(Qubit):
             transients.append(dset.T[1:])
             if analyze:
                 ma.MeasurementAnalysis()
+        if depletion_analysis:
+            a = ma.Input_average_analysis(
+                IF=self.ro_freq_mod(),
+                optimization_window=depletion_optimization_window,
+                plot=depletion_analysis_plot)
+            return a
+        else:
+            return [np.array(t, dtype=np.float64) for t in transients]
 
-        return [np.array(t, dtype=np.float64) for t in transients]
-
-    def calibrate_optimal_weights(self, MC=None, verify=True, analyze=False,
-                                  update=True, no_fits=False):
+    def calibrate_optimal_weights(self, MC=None, verify: bool=True,
+                                  analyze: bool=True, update: bool=True,
+                                  no_figs: bool=False)->bool:
         if MC is None:
             MC = self.instr_MC.get_instr()
 
         # Ensure that enough averages are used to get accurate weights
         old_avg = self.ro_acq_averages()
         self.ro_acq_averages(2**15)
-        transients = self.measure_transients(MC=MC, analyze=analyze)
+        transients = self.measure_transients(MC=MC, analyze=analyze,
+                                             depletion_analysis=False)
+        if analyze:
+            ma.Input_average_analysis(IF=self.ro_freq_mod())
 
         self.ro_acq_averages(old_avg)
 
@@ -1110,7 +1122,9 @@ class CCLight_Transmon(Qubit):
         # joint rescaling to +/-1 Volt
         maxI = np.max(np.abs(optimized_weights_I))
         maxQ = np.max(np.abs(optimized_weights_Q))
-        weight_scale_factor = 1./(4*np.max([maxI, maxQ]))#fixme: deviding the weight functions by four to not have overflow in thresholding of the UHFQC
+        # fixme: deviding the weight functions by four to not have overflow in
+        # thresholding of the UHFQC
+        weight_scale_factor = 1./(4*np.max([maxI, maxQ]))
         optimized_weights_I = np.array(
             weight_scale_factor*optimized_weights_I)
         optimized_weights_Q = np.array(
@@ -1123,13 +1137,12 @@ class CCLight_Transmon(Qubit):
             self.ro_acq_weight_type('optimal')
 
         if verify:
-            self.measure_ssro(no_fits=no_fits)
+            self.measure_ssro(no_figs=no_figs)
+        return True
 
     def measure_rabi_vsm(self, MC=None, atts=np.linspace(0, 65536, 31),
-                         analyze=True, close_fig=True, prepare_for_timedomain=True):
-        # docstring from parent class
-        # N.B. this is a good example for a generic timedomain experiment using
-        # the CCL transmon.
+                         analyze=True, close_fig=True,
+                         prepare_for_timedomain=True):
         if MC is None:
             MC = self.instr_MC.get_instr()
         if prepare_for_timedomain:
@@ -1140,22 +1153,24 @@ class CCLight_Transmon(Qubit):
 
         VSM = self.instr_VSM.get_instr()
         Gin = self.mw_vsm_ch_Gin()
+        # FIXME: This variable is not used, both main and derivative should
+        # be swept
         Din = self.mw_vsm_ch_Din()
         out = self.mw_vsm_ch_out()
 
         self.instr_CC.get_instr().upload_instructions(p.filename)
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             CCL=self.instr_CC.get_instr())
-        d = self.int_avg_det
+
         MC.set_sweep_function(VSM.__getattr__(
             'in{}_out{}_att'.format(Gin, out)))
         MC.set_sweep_points(atts)
-        self.int_avg_det_single._set_real_imag(False)
+        # real_imag is acutally not polar and as such works for opt weights
+        self.int_avg_det_single._set_real_imag(True)
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='rabi_'+self.msmt_suffix)
 
     def measure_allxy(self, MC=None,
-                      analyze=True, close_fig=True, prepare_for_timedomain=True):
+                      analyze=True, close_fig=True,
+                      prepare_for_timedomain=True):
         # docstring from parent class
         # N.B. this is a good example for a generic timedomain experiment using
         # the CCL transmon.
@@ -1174,10 +1189,199 @@ class CCLight_Transmon(Qubit):
         MC.run('AllXY'+self.msmt_suffix)
         if analyze:
             a = ma.AllXY_Analysis(close_main_fig=close_fig)
-            return a
+            return a.deviation_total
+
+    def calibrate_single_qubit_gates_allxy(self, nested_MC=None, f_start=None,
+                                           G_start=None, D_start=None,
+                                           initial_steps=None):
+        # FIXME: this tuneup does not update the qubit object parameters
+        # FIXME2: this tuneup does not return True upon success
+        if f_start is None:
+            f_start = self.freq_qubit()
+
+        if G_start is None:
+            G_start = self.mw_vsm_G_att()
+
+        if D_start is None:
+            D_start = self.mw_vsm_D_att()
+
+        if initial_steps is None:
+            initial_steps = [1e6, 4e2, 2e3]
+
+        if nested_MC is None:
+            nested_MC = self.instr_nested_MC.get_instr()
+
+        nested_MC.set_sweep_functions([
+            self.freq_qubit,
+            self.mw_vsm_G_att,
+            self.mw_vsm_D_att])
+
+        d = det.Function_Detector(self.measure_allxy,
+                                  value_names=['AllXY cost'],
+                                  value_units=['a.u.'],)
+        nested_MC.set_detector_function(d)
+
+        ad_func_pars = {'adaptive_function': nelder_mead,
+                        'x0': [f_start, G_start, D_start],
+                        'initial_step': initial_steps,
+                        'no_improv_break': 10,
+                        'minimize': True,
+                        'maxiter': 500}
+
+        nested_MC.set_adaptive_function_parameters(ad_func_pars)
+        nested_MC.set_optimization_method('nelder_mead')
+        nested_MC.run(name='gate_tuneup_allxy', mode='adaptive')
+        ma.OptimizationAnalysis(label='gate_tuneup_allxy')
+
+    def calibrate_deletion_pulse_transients(
+            self, nested_MC=None, amp0=None,
+            amp1=None, phi0=180, phi1=0, initial_steps=None, two_par=True,
+            depletion_optimization_window=None, depletion_analysis_plot=False):
+        """
+        this function automatically tunes up a two step, four-parameter
+        depletion pulse.
+        It uses the averaged transients for ground and excited state for its
+        cost function.
+        two_par:    if readout is performed at the symmetry point and in the
+                    linear regime two parameters will suffice. Othen, four
+                    paramters do not converge.
+                    First optimizaing the amplitudes (two paramters) and
+                    then run the full 4 paramaters with the correct initial
+                    amplitudes works.
+        optimization_window:  optimization window determins which part of
+                    the transients will be
+                    nulled in the optimization. By default it uses a
+                    window of 500 ns post depletiona with a 50 ns buffer.
+        initial_steps:  These have to be given in the order
+                       [phi0,phi1,amp0,amp1] for 4-par tuning and
+                       [amp0,amp1] for 2-par tunining
+        """
+        # FIXME: this calibration does not update the qubit object params
+        # FIXME2: this calibration does not return a boolean upon success
+
+        # tuneup requires nested MC as the transients detector will use MC
+        self.ro_pulse_type('up_down_down')
+        if nested_MC is None:
+            nested_MC = self.instr_nested_MC.get_instr()
+
+        # setting the initial depletion amplitudes
+        if amp0 is None:
+            amp0 = 2*self.ro_pulse_amp()
+        if amp1 is None:
+            amp1 = 0.5*self.ro_pulse_amp()
+
+        if depletion_optimization_window is None:
+            depletion_optimization_window = [
+                self.ro_pulse_length()+self.ro_pulse_down_length0()
+                + self.ro_pulse_down_length1()+50e-9,
+                self.ro_pulse_length()+self.ro_pulse_down_length0()
+                + self.ro_pulse_down_length1()+550e-9]
+
+        if two_par:
+            nested_MC.set_sweep_functions([
+                self.ro_pulse_down_amp0,
+                self.ro_pulse_down_amp1])
+        else:
+            nested_MC.set_sweep_functions([self.ro_pulse_down_phi0,
+                                           self.ro_pulse_down_phi1,
+                                           self.ro_pulse_down_amp0,
+                                           self.ro_pulse_down_amp1])
+        d = det.Function_Detector(self.measure_transients,
+                                  msmt_kw={'depletion_analysis': True,
+                                           'depletion_analysis_plot':
+                                           depletion_analysis_plot,
+                                           'depletion_optimization_window':
+                                           depletion_optimization_window},
+                                  value_names=['depletion cost'],
+                                  value_units=['au'],
+                                  result_keys=['depletion_cost'])
+        nested_MC.set_detector_function(d)
+
+        if two_par:
+            if initial_steps is None:
+                initial_steps = [-0.1*amp0, -0.1*amp1]
+            ad_func_pars = {'adaptive_function': nelder_mead,
+                            'x0': [amp0, amp1],
+                            'initial_step': initial_steps,
+                            'no_improv_break': 12,
+                            'minimize': True,
+                            'maxiter': 500}
+            self.ro_pulse_down_phi0(180)
+            self.ro_pulse_down_phi1(0)
+
+        else:
+            if initial_steps is None:
+                initial_steps = [15, 15, -0.1*amp0, -0.1*amp1]
+            ad_func_pars = {'adaptive_function': nelder_mead,
+                            'x0': [phi0, phi1, amp0, amp1],
+                            'initial_step': initial_steps,
+                            'no_improv_break': 12,
+                            'minimize': True,
+                            'maxiter': 500}
+        nested_MC.set_adaptive_function_parameters(ad_func_pars)
+        nested_MC.set_optimization_method('nelder_mead')
+        nested_MC.run(name='depletion_tuneup', mode='adaptive')
+        ma.OptimizationAnalysis(label='depletion_tuneup')
+
+    def measure_error_fraction(self, MC=None, analyze: bool=True,
+                               nr_shots: int=2048*4,
+                               sequence_type='echo', prepare: bool=True,
+                               feedback=False,
+                               depletion_time=None, net_gate='pi'):
+        # docstring from parent class
+        # this performs a multiround experiment, the repetition rate is defined
+        # by the ro_duration which can be changed by regenerating the
+        # configuration file.
+        # The analysis counts single errors. The definition of an error is
+        # adapted automatically by choosing feedback or the net_gate.
+        # it requires high SNR single shot readout and a calibrated threshold
+        self.ro_acq_digitized(True)
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        # plotting really slows down SSRO (16k shots plotting is slow)
+        old_plot_setting = MC.live_plot_enabled()
+        MC.live_plot_enabled(False)
+        MC.soft_avg(1)  # don't want to average single shots
+        if prepare:
+            self.prepare_for_timedomain()
+            # off/on switching is achieved by turning the MW source on and
+            # off as this is much faster than recompiling/uploading
+            p = sqo.RTE(
+                qubit_idx=self.cfg_qubit_nr(), sequence_type=sequence_type,
+                platf_cfg=self.cfg_openql_platform_fn(), net_gate=net_gate,
+                feedback=feedback)
+            self.instr_CC.get_instr().upload_instructions(p.filename)
+        else:
+            p = None  # object needs to exist for the openql_sweep to work
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr(),
+                             parameter_name='shot nr', unit='#',
+                             upload=prepare)
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(nr_shots))
+        d = self.int_log_det
+        MC.set_detector_function(d)
+
+        exp_metadata = {'feedback': feedback, 'sequence_type': sequence_type,
+                        'depletion_time': depletion_time, 'net_gate': net_gate}
+        suffix = 'depletion_time_{}_ro_pulse_type_{}_feedback_{}_net_gate_{}'.format(
+            depletion_time, self.ro_pulse_type(), feedback, net_gate)
+        MC.run(
+            'Measure_error_fraction_{}_{}'.format(self.msmt_suffix, suffix),
+            exp_metadata=exp_metadata)
+        MC.live_plot_enabled(old_plot_setting)
+        if analyze:
+            a = ma2.Single_Qubit_RoundsToEvent_Analysis(
+                t_start=None, t_stop=None,
+                options_dict={'typ_data_idx': 0,
+                              'scan_label': 'error_fraction'},
+                extract_only=True)
+            return a.proc_data_dict['frac_single']
 
     def measure_T1(self, times=None, MC=None,
-                   analyze=True, close_fig=True, update=True, prepare_for_timedomain=True):
+                   analyze=True, close_fig=True, update=True,
+                   prepare_for_timedomain=True):
         # docstring from parent class
         # N.B. this is a good example for a generic timedomain experiment using
         # the CCL transmon.
@@ -1251,8 +1455,9 @@ class CCLight_Transmon(Qubit):
         # adding 'artificial' detuning by detuning the qubit LO
         freq_qubit = self.freq_qubit()
         # # this should have no effect if artificial detuning = 0
-        self.instr_LO_mw.get_instr().set('frequency', freq_qubit -
-                                         self.mw_freq_mod.get() + artificial_detuning)
+        self.instr_LO_mw.get_instr().set(
+            'frequency', freq_qubit -
+            self.mw_freq_mod.get() + artificial_detuning)
 
         p = sqo.Ramsey(times, qubit_idx=self.cfg_qubit_nr(),
                        platf_cfg=self.cfg_openql_platform_fn())
@@ -1293,7 +1498,8 @@ class CCLight_Transmon(Qubit):
                                     times[-1]+4*dt)])
 
         # # Checking if pulses are on 20 ns grid
-        if not all([np.round(t*1e9) % (2*self.cfg_cycle_time()*1e9) == 0 for t in times]):
+        if not all([np.round(t*1e9) % (2*self.cfg_cycle_time()*1e9) == 0 for
+                    t in times]):
             raise ValueError('timesteps must be multiples of 40e-9')
 
         # # Checking if pulses are locked to the pulse modulation

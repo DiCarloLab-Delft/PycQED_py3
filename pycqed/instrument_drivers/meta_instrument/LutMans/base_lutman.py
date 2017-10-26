@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from qcodes.plots.pyqtgraph import QtPlot
+# FIXME: add support for QtPlot render wave
+# from qcodes.plots.pyqtgraph import QtPlot
 import logging
 from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ManualParameter
@@ -8,6 +9,7 @@ from qcodes.instrument.parameter import InstrumentRefParameter
 from qcodes.utils import validators as vals
 from pycqed.analysis.fit_toolbox.functions import PSD
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
+
 
 class Base_LutMan(Instrument):
     """
@@ -135,8 +137,6 @@ class Base_LutMan(Instrument):
                 marker='o', label='chI')
         ax.plot(x, self._wave_dict[wave_name][1],
                 marker='o', label='chQ')
-        ax.set_ylabel('Amplitude (V)')
-
         ax.legend()
         if self._voltage_min is not None:
             ax.set_axis_bgcolor('gray')
@@ -147,6 +147,7 @@ class Base_LutMan(Instrument):
         ax.set_xlim(0, x[-1])
         if time_units == 's':
             set_xlabel(ax, 'time', 's')
+        set_ylabel(ax, 'Amplitude', 'V')
         if show:
             plt.show()
         return fig, ax
@@ -166,7 +167,6 @@ class Base_LutMan(Instrument):
                 marker='o', label='chI')
         ax.plot(f_axis, PSD_Q,
                 marker='o', label='chQ')
-        ax.set_ylabel('Spectral density (V^2/Hz)')
         ax.legend()
 
         ax.set_yscale("log", nonposy='clip')
@@ -175,6 +175,7 @@ class Base_LutMan(Instrument):
         if f_bounds is not None:
             ax.set_xlim(f_bounds[0], f_bounds[1])
         set_xlabel(ax, 'Frequency', 'Hz')
+        set_ylabel(ax, 'Spectral density',  'V^2/Hz')
         if show:
             plt.show()
         return fig, ax

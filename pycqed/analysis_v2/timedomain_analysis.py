@@ -1,5 +1,6 @@
 import lmfit
 import numpy as np
+from collections import OrderedDict
 from pycqed.analysis import fitting_models as fit_mods
 from pycqed.analysis import analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
@@ -80,15 +81,15 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
             self.run_analysis()
 
     def prepare_fitting(self):
-        self.fit_dicts = {}
+        self.fit_dicts = OrderedDict()
         # Even though we expect an exponentially damped oscillation we use
         # a simple cosine as this gives more reliable fitting and we are only
         # interested in extracting the frequency of the oscillation
         cos_mod = lmfit.Model(fit_mods.CosFunc)
 
-        guess_pars = fit_mods.Cos_guess(model=cos_mod,
-                                        t=self.raw_data_dict['sweep_points'][:-4],
-                                        data=self.proc_data_dict['corr_data'][:-4])
+        guess_pars = fit_mods.Cos_guess(
+            model=cos_mod, t=self.raw_data_dict['sweep_points'][:-4],
+            data=self.proc_data_dict['corr_data'][:-4])
 
         # This enforces the oscillation to start at the equator
         # and ensures that any over/under rotation is absorbed in the

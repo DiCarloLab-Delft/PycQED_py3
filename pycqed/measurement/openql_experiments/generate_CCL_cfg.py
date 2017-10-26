@@ -26,8 +26,8 @@ def generate_config(filename: str,
     """
 
     qubits = ['q0', 'q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7']
-    lut_map = ['i {}', 'rX180 {}', 'rY180 {}', 'rX90 {}', 'rY90 {}',
-               'rXm90 {}', 'rYm90 {}', 'rPhi90 {}', 'spec {}']
+    lut_map = ['i {}', 'rx180 {}', 'ry180 {}', 'rx90 {}', 'ry90 {}',
+               'rxm90 {}', 'rym90 {}', 'rphi90 {}', 'spec {}']
     flux_tuples = [("q2", "q0"), ("q0", "q2"),
                    ("q0", "q3"), ("q3", "q0"),
                    ("q3", "q1"), ("q1", "q3"),
@@ -104,7 +104,14 @@ def generate_config(filename: str,
                 {"id": 6,  "src": 3, "dst": 6},
                 {"id": 7,  "src": 6, "dst": 4}
             ]
-        }, }
+        },
+
+       "gate_decomposition": {
+          "x %0" : ["rx180 %0"],
+          "roty90 %0" : ["ry90 %0"],
+          "cnot %0,%1" : ["ry90 %1","cz %0,%1","ry90 %1"]
+       },
+   }
 
     # cfg["gate_decomposition"]: {
     #     "x q0": ["x q0"],
