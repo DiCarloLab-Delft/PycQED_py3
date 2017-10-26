@@ -535,7 +535,7 @@ def randomized_benchmarking(qubit_idx: int,  platf_cfg: str,
                     k.gate('cl_{}'.format(cl), qubit_idx)
                 k.measure(qubit_idx)
             p.add_kernel(k)
-    p.compile()
+    p.compile(verbose=False)
     # attribute get's added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
