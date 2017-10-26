@@ -18,7 +18,7 @@ from pycqed.instrument_drivers.pq_parameters import ConfigParameter
 
 class Distortion(Instrument):
 
-    '''fkeren
+    '''
     Implements a distortion kernel for a flux channel.
     It contains the parameters and functions needed to produce a kernel file
     according to the models shown in the functions.

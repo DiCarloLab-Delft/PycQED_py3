@@ -5,7 +5,7 @@ For those parts that it pulseshape comes from the waveform module.
 import numpy as np
 import qutip as qtp
 from pycqed.measurement.waveform_control_CC.waveform import \
-    martinis_flux_pulse_v2 as martinis_flux_pulse
+    martinis_flux_pulse
 import logging
 
 
@@ -62,7 +62,7 @@ def simulate_CZ_trajectory(length, lambda_2, lambda_3, theta_f,
     """
     if dac_flux_coefficient is not None:
         logging.warning('dac_flux_coefficient deprecated. Please use the '
-                       'physically meaningful V_per_phi0 instead.')
+                        'physically meaningful V_per_phi0 instead.')
         V_per_phi0 = np.pi/dac_flux_coefficient
 
     Hx = qtp.sigmax()*2*np.pi  # so that freqs are real and not radial
