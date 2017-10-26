@@ -239,6 +239,26 @@ class QuDev_transmon(Qubit):
         # self.add_pulse_parameter('flux','kernel_path','kernel_path',
         #                          initial_value=None,vals=vals.Strings())
 
+        # add flux pulse parameters
+        self.add_operation('CZ')
+        self.add_pulse_parameter('CZ', 'CZ_qb_target', 'qb_target',
+                                 initial_value=None, vals=vals.Strings())
+        self.add_pulse_parameter('CZ', 'CZ_pulse_type', 'pulse_type',
+                                 initial_value=None, vals=vals.Strings())
+        self.add_pulse_parameter('CZ', 'CZ_pulse_channel', 'channel',
+                                 initial_value=None, vals=vals.Strings())
+        self.add_pulse_parameter('CZ', 'CZ_pulse_amp', 'amplitude',
+                                 initial_value=None, vals=vals.Numbers())
+        self.add_pulse_parameter('CZ', 'CZ_pulse_length', 'length',
+                                 initial_value=None, vals=vals.Numbers())
+        self.add_pulse_parameter('CZ', 'CZ_pulse_delay', 'pulse_delay',
+                                 initial_value=None, vals=vals.Numbers())
+        self.add_pulse_parameter('CZ', 'CZ_dynamic_phase', 'dynamic_phase',
+                                 initial_value=None, vals=vals.Numbers())
+        self.add_pulse_parameter('CZ', 'CZ_dynamic_phase_target',
+                                 'dynamic_phase_target',
+                                 initial_value=None, vals=vals.Numbers())
+
 
 
         self.update_detector_functions()
