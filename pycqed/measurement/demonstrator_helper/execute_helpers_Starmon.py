@@ -41,7 +41,7 @@ else:
     MC.station = station
 
 
-def execute_qasm_file(file_url: str,  config_json: str,
+def execute_qumis_file(file_url: str,  config_json: str,
                       verbosity_level: int=0):
     options = json.loads(config_json)
 
@@ -54,15 +54,12 @@ def execute_qasm_file(file_url: str,  config_json: str,
     MC.soft_avg(nr_soft_averages)
     device.RO_acq_averages(512)
 
-    # N.B. hardcoded fixme
-    cfg = device.qasm_config()
-    qasm_fp = _retrieve_file_from_url(file_url)
+    qumis_fp = _retrieve_file_from_url(file_url)
+
     sweep_points = _get_qasm_sweep_points(qasm_fp)
 
-    s = swf.QASM_Sweep_v2(parameter_name='Circuit number ', unit='#',
-                          qasm_fn=qasm_fp, config=cfg, CBox=CBox,
-                          verbosity_level=verbosity_level)
 
+    s = swf.QuMis_Sweep(filename=qumis_fp, CBox=CBox,parameter_name='Circuit number', unit='#')
     d = device.get_correlation_detector()
     d.value_names = ['Q0 ', 'Q1 ', 'Corr. (Q0, Q1) ']
     d.value_units = ['frac.', 'frac.', 'frac.']
@@ -70,11 +67,11 @@ def execute_qasm_file(file_url: str,  config_json: str,
     MC.set_sweep_function(s)
     MC.set_sweep_points(sweep_points)
     MC.set_detector_function(d)
-    data = MC.run('demonstrator')  # FIXME <- add the proper name
+    data = MC.run('Starmon_execute')  # FIXME <- add the proper name
 
     return _MC_result_to_chart_dict(data)
 
-def execute_qumis_file(file_url: str,  config_json: str,
+def execute_qumis_file_sim(file_url: str,  config_json: str,
                       verbosity_level: int=0):
     file_path = _retrieve_file_from_url(file_url)
     options = json.loads(config_json)

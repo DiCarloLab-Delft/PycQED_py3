@@ -527,8 +527,8 @@ class QuMis_Sweep(Hard_Sweep):
         self.unit = unit
 
     def prepare(self, **kw):
-        self.CBox.trigger_source('internal')
         if self.upload:
+            self.CBox.trigger_source('internal')
             self.CBox.load_instructions(self.filename)
 
 
