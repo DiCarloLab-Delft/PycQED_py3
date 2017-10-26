@@ -76,7 +76,7 @@ class Test_RTE_Analysis(unittest.TestCase):
         a = ma.Single_Qubit_RoundsToEvent_Analysis(
             t_start=self.start_timestamps[1],
             t_stop=self.stop_timestamps[1],
-            options_dict={'typ_data_idx': 2})
+            options_dict={'typ_data_idx': 12, 'typ_start_idx': 528, 'typ_stop_idx': 588 })
         self.assertEqual(a.raw_data_dict['net_gate'][0], 'i')
         self.assertEqual(a.raw_data_dict['feedback'][0], True)
         self.assertEqual(a.raw_data_dict['sequence_type'][0], 'echo')

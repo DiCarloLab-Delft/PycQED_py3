@@ -1,6 +1,5 @@
 """
 File containing the BaseDataAnalyis class.
-This is based on the REM analysis from PycQED_py2 (as of July 7 2017)
 """
 import os
 import numpy as np
@@ -383,8 +382,8 @@ class BaseDataAnalysis(object):
         Args:
             savedir (string):
                     Directory where the file is saved. If this is None, the
-                    file is saved in self.raw_data_dict['folder'] or the working
-                    directory of the console.
+                    file is saved in self.raw_data_dict['folder'] or the
+                    working directory of the console.
             savebase (string):
                     Base name for the saved file.
             tag_tstamp (bool):
@@ -511,6 +510,9 @@ class BaseDataAnalysis(object):
                     sharex=pdict.get('sharex', False),
                     sharey=pdict.get('sharey', False),
                     figsize=pdict.get('plotsize', None))  # (8, 6)))
+
+                # transparent background around axes for presenting data
+                self.figs[key].patch.set_alpha(0)
 
         if presentation_mode:
             self.plot_for_presentation(key_list=key_list, no_label=no_label)
