@@ -106,24 +106,40 @@ def generate_config(filename: str,
             ]
         },
 
-       "gate_decomposition": {
-          "x %0" : ["rx180 %0"],
-          "roty90 %0" : ["ry90 %0"],
-          "cnot %0,%1" : ["ry90 %1","cz %0,%1","ry90 %1"]
-       },
-   }
+        "gate_decomposition": {
+            "x %0": ["rx180 %0"],
+            "y %0": ["ry180 %0"],
+            "roty90 %0": ["ry90 %0"],
+            "cnot %0,%1": ["ry90 %1", "cz %0,%1", "ry90 %1"],
+            # Clifford decomposition per Eptstein et al. Phys. Rev. A 89, 062321
+            # (2014)
+            "cl_0 %0": ['i %0'],
+            "cl_1 %0": ['ry90 %0', 'rx90 %0'],
+            "cl_2 %0": ['rxm90 %0', 'rym90 %0'],
+            "cl_3 %0": ['rx180 %0'],
+            "cl_4 %0": ['rym90 %0', 'rxm90 %0'],
+            "cl_5 %0": ['rx90 %0', 'rym90 %0'],
+            "cl_6 %0": ['ry180 %0'],
+            "cl_7 %0": ['rym90 %0', 'rx90 %0'],
+            "cl_8 %0": ['rx90 %0', 'ry90 %0'],
+            "cl_9 %0": ['rx180 %0', 'ry180 %0'],
+            "cl_10 %0": ['ry90 %0', 'rxm90 %0'],
+            "cl_11 %0": ['rxm90 %0', 'ry90 %0'],
 
-    # cfg["gate_decomposition"]: {
-    #     "x q0": ["x q0"],
-    #     "ry180 q0": ["ry180 q0"],
-    #     "z q0": ["z q0"],
-    #     "h q0": ["h q0"],
-    #     "t q0": ["t q0"],
-    #     "tdag q0": ["tdag q0"],
-    #     "s q0": ["s q0"],
-    #     "sdag q0": ["sdag q0"],
-    #     "cnot q0,q1": ["cnot q0,q1"]
-    # }
+            "cl_12 %0": ['ry90 %0', 'rx180 %0'],
+            "cl_13 %0": ['rxm90 %0'],
+            "cl_14 %0": ['rx90 %0', 'rym90 %0', 'rxm90 %0'],
+            "cl_15 %0": ['rym90 %0'],
+            "cl_16 %0": ['rx90 %0'],
+            "cl_17 %0": ['rx90 %0', 'ry90 %0', 'rx90 %0'],
+            "cl_18 %0": ['rym90 %0', 'rx180 %0'],
+            "cl_19 %0": ['rx90 %0', 'ry180 %0'],
+            "cl_20 %0": ['rx90 %0', 'rym90 %0', 'rx90 %0'],
+            "cl_21 %0": ['ry90 %0'],
+            "cl_22 %0": ['rxm90 %0', 'ry180 %0'],
+            "cl_23 %0": ['rx90 %0', 'ry90 %0', 'rxm90 %0']
+        },
+    }
 
     for q in qubits:
         cfg["instructions"]["prepz {}".format(q)] = {

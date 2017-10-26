@@ -74,6 +74,11 @@ try:
             sqo.off_on(0, pulse_comb='on', platf_cfg=config_fn)
             sqo.off_on(0, pulse_comb='off_on', platf_cfg=config_fn)
 
+        def test_randomized_benchmarking(self):
+            nr_cliffords = 2**np.arange(10)
+            sqo.randomized_benchmarking(0, platf_cfg=config_fn,
+                                        nr_cliffords=nr_cliffords, nr_seeds=3)
+
 
 except ImportError as e:
     class TestMissingDependency(unittest.TestCase):

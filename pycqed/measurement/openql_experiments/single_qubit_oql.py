@@ -477,62 +477,69 @@ def RTE(qubit_idx: int, sequence_type: str, platf_cfg: str,
     return p
 
 
-def randomized_benchmarking(qubit_name, nr_cliffords, nr_seeds,
-                            net_clifford=0, restless=False,
-                            label='randomized_benchmarking',
-                            cal_points=True,
-                            double_curves=False):
+def randomized_benchmarking(qubit_idx: int,  platf_cfg: str,
+                            nr_cliffords, nr_seeds: int,
+                            net_clifford: int=0, restless: bool=False,
+                            program_name: str='randomized_benchmarking',
+                            cal_points: bool=True,
+                            double_curves: bool=False):
     '''
     Input pars:
-        nr_cliffords:  list nr_cliffords for which to generate RB seqs
-        nr_seeds:      int  nr_seeds for which to generate RB seqs
-        net_clifford:  int index of net clifford the sequence should perform
-                       0 corresponds to Identity and 3 corresponds to X180
-        restless:      bool, does not initialize if restless is True
-        label:           some string that can be used as a label.
-        cal_points:    bool whether to replace the last two elements with
-                       calibration points, set to False if you want
-                       to measure a single element (for e.g. optimization)
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+        nr_cliffords:   list nr_cliffords for which to generate RB seqs
+        nr_seeds:       int  nr_seeds for which to generate RB seqs
+        net_clifford:   int index of net clifford the sequence should perform
+                        0 corresponds to Identity and 3 corresponds to X180
+        restless:       bool, does not initialize if restless is True
+        program_name:           some string that can be used as a label.
+        cal_points:     bool whether to replace the last two elements with
+                        calibration points, set to False if you want
+                        to measure a single element (for e.g. optimization)
 
         double_curves: Alternates between net clifford 0 and 3
 
-    returns:
-        qasm_file
+    Returns:
+        p:              OpenQL Program object
 
-    generates a qasm file for single qubit Clifford based randomized
+    generates a program for single qubit Clifford based randomized
     benchmarking.
     '''
-    pass
-    # net_cliffords = [0, 3]  # Exists purely for the double curves mode
-    # filename = join(base_qasm_path, label+'.qasm')
-    # qasm_file = mopen(filename, mode='w')
-    # qasm_file.writelines('qubit {} \n'.format(qubit_name))
-    # i = 0
-    # for seed in range(nr_seeds):
-    #     for j, n_cl in enumerate(nr_cliffords):
-    #         if not restless:
-    #             qasm_file.writelines('init_all  \n')
-    #         if cal_points and (j == (len(nr_cliffords)-4) or
-    #                            j == (len(nr_cliffords)-3)):
-    #             qasm_file.writelines('RO {}  \n'.format(qubit_name))
-    #         elif cal_points and (j == (len(nr_cliffords)-2) or
-    #                              j == (len(nr_cliffords)-1)):
-    #             qasm_file.writelines('X180 {} \n'.format(qubit_name))
-    #             qasm_file.writelines('RO {}  \n'.format(qubit_name))
-    #         else:
-    #             if double_curves:
-    #                 net_clifford = net_cliffords[i % 2]
-    #                 i += 1
-    #             cl_seq = rb.randomized_benchmarking_sequence(
-    #                 n_cl, desired_net_cl=net_clifford)
-    #             pulse_keys = rb.decompose_clifford_seq(cl_seq)
-    #             for pulse in pulse_keys:
-    #                 if pulse != 'I':
-    #                     qasm_file.writelines('{} {}\n'.format(
-    #                         pulse, qubit_name))
-    #             qasm_file.writelines('RO {}  \n'.format(qubit_name))
-    # qasm_file.close()
-    # return qasm_file
+    net_cliffords = [0, 3]  # Exists purely for the double curves mode
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname=program_name, nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    i = 0
+    for seed in range(nr_seeds):
+        for j, n_cl in enumerate(nr_cliffords):
+            k = Kernel('RB_{}Cl_s{}'.format(n_cl, seed), p=platf)
+            if not restless:
+                k.prepz(qubit_idx)
+            if cal_points and (j == (len(nr_cliffords)-4) or
+                               j == (len(nr_cliffords)-3)):
+                k.measure(qubit_idx)
+
+            elif cal_points and (j == (len(nr_cliffords)-2) or
+                                 j == (len(nr_cliffords)-1)):
+                k.x(qubit_idx)
+                k.measure(qubit_idx)
+            else:
+                if double_curves:
+                    net_clifford = net_cliffords[i % 2]
+                    i += 1
+                cl_seq = rb.randomized_benchmarking_sequence(
+                    n_cl, desired_net_cl=net_clifford)
+                # pulse_keys = rb.decompose_clifford_seq(cl_seq)
+                for cl in cl_seq:
+                    k.gate('cl_{}'.format(cl), qubit_idx)
+                k.measure(qubit_idx)
+            p.add_kernel(k)
+    p.compile()
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
 
 
 def MotzoiXY(qubit_name, motzois, cal_points=True):
