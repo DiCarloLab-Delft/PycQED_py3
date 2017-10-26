@@ -50,39 +50,44 @@ MC_demo.station = st
 
 st.add_component(MC_demo)
 
-def execute_qisa_file(file_url: str,  config_json: str,
+def execute_qisa_file(qisa_file_url: str,  config_json: str,
                       verbosity_level: int=0):
     options = json.loads(config_json)
 
     MC = Instrument.find_instrument('MC')
     CCL = Instrument.find_instrument('CCL')
-    CCL_transmon = Instrument.find_instrument('CCL_transmon')
+    device = Instrument.find_instrument('CCL_transmon')
 
     num_avg = int(options.get('num_avg', 512))
     
     nr_soft_averages = int(np.round(num_avg/512))
     MC.soft_avg(nr_soft_averages)
 
-    CCL_transmon.ro_acq_averages(512)
+    device.RO_acq_averages(512)
 
-    # N.B. hardcoded fixme
-    qumis_fp = _retrieve_file_from_url(qumis_file_url)
+    # Get the qisa file
+    qisa_fp = _retrieve_file_from_url(qisa_file_url)
+
+    # Two ways to generate the sweep_points. Either I get from the file_url
+    # or I get the appended options file which has the kw "measurement_points"
     sweep_points_fp = _retrieve_file_from_url(sweep_points_file_url)
+    sweep_points = json.loads(sweep_points_fp)
+    sweep_points = sweep_points["measurement_points"]
+    sweep_points = options["measurement_points"]
 
-    s = swf.OpenQL_File_Sweep(file_path_sweep = sweep_points_fp, CCL=CCL,
+    s = swf.OpenQL_File_Sweep(file_path_sweep = qisa_fp, CCL=CCL,
                  parameter_name ='Points', unit ='a.u.',
                  upload=True)
 
     # To be modified <<<<<
-    #d = CCL_transmon.get_correlation_detector()
+    d = device.get_correlation_detector()
     #d.value_names = ['Q0 ', 'Q1 ', 'Corr. (Q0, Q1) ']
     #d.value_units = ['frac.', 'frac.', 'frac.']
     #>>>>>>
 
-    d = CCL_transmon.int_avg_det
-
     MC.set_sweep_function(s)
     MC.set_sweep_points(sweep_points)
+
     MC.set_detector_function(d)
     data = MC.run('CCL_execute')  # FIXME <- add the proper name
 
