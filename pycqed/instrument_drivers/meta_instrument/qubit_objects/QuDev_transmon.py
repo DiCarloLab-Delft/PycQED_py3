@@ -228,10 +228,10 @@ class QuDev_transmon(Qubit):
                                  initial_value=None, vals=vals.Numbers())
         self.add_pulse_parameter('flux', 'flux_pulse_delay', 'pulse_delay',
                                  initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('flux', 'flux_pulse_buffer', 'buffer',
-                                 initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('flux', 'flux_pulse_sigma', 'sigma',
-                                 initial_value=0, vals=vals.Numbers())
+        # self.add_pulse_parameter('flux', 'flux_pulse_buffer', 'buffer',
+        #                          initial_value=None, vals=vals.Numbers())
+        # self.add_pulse_parameter('flux', 'flux_pulse_sigma', 'sigma',
+        #                          initial_value=0, vals=vals.Numbers())
         # self.add_pulse_parameter('flux', 'flux_f_pulse_mod', 'mod_frequency',
         #                          initial_value=None, vals=vals.Numbers())
         # self.add_pulse_parameter('flux','flux_pulse_buffer','pulse_buffer',
