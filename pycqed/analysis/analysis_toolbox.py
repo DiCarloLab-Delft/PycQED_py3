@@ -1699,34 +1699,39 @@ def color_plot(x, y, z, fig, ax, cax=None,
 
     xlabel = kw.pop('xlabel', None)
     ylabel = kw.pop('ylabel', None)
+    x_unit = kw.pop('x_unit', None)
+    y_unit = kw.pop('y_unit', None)
     zlabel = kw.pop('zlabel', None)
 
     xlim = kw.pop('xlim', None)
     ylim = kw.pop('ylim', None)
 
     if plot_title is not None:
-        ax.set_title(plot_title, y=1.05)
+        ax.set_title(plot_title, y=1.05, fontsize=18)
+
+    ax.get_yaxis().set_tick_params(direction='out')
+    ax.get_xaxis().set_tick_params(direction='out')
+
     if transpose:
-        ax.set_xlabel(ylabel)
-        ax.set_ylabel(xlabel)
         ax.set_xlim(y_vertices[0], y_vertices[-1])
         ax.set_ylim(x_vertices[0], x_vertices[-1])
         if xlim is not None:
             ax.set_xlim(ylim)
         if ylim is not None:
             ax.set_ylim(xlim)
+        set_xlabel(ax, ylabel, unit=y_unit)
+        set_ylabel(ax, xlabel, unit=x_unit)
+
     else:
-        ax.set_xlabel(xlabel)
-        ax.set_ylabel(ylabel)
         ax.set_xlim(x_vertices[0], x_vertices[-1])
         ax.set_ylim(y_vertices[0], y_vertices[-1])
         if xlim is not None:
             ax.set_xlim(xlim)
         if ylim is not None:
             ax.set_ylim(ylim)
+        set_xlabel(ax, xlabel, unit=x_unit)
+        set_ylabel(ax, ylabel, unit=y_unit)
 
-    ax.get_yaxis().set_tick_params(direction='out')
-    ax.get_xaxis().set_tick_params(direction='out')
     if add_colorbar:
         if cax is None:
             ax_divider = make_axes_locatable(ax)

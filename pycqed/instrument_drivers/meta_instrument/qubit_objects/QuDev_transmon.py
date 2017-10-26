@@ -2258,7 +2258,7 @@ class QuDev_transmon(Qubit):
             return
 
     def find_qscale(self, qscales, label=None, for_ef=False, update=False,
-                    MC=None, close_fig=True, last_ge_pulse=True, upload=False,
+                    MC=None, close_fig=True, last_ge_pulse=True, upload=True,
                     cal_points=True, no_cal_points=None, **kw):
 
         '''
