@@ -2547,6 +2547,8 @@ class QuDev_transmon(Qubit):
         operation_dict['RO ' + self.name]['operation_type'] = 'RO'
         operation_dict['X180 ' + self.name]['operation_type'] = 'MW'
         operation_dict['X180_ef ' + self.name]['operation_type'] = 'MW'
+        operation_dict['flux ' + self.name]['operation_type'] = 'Flux'
+        operation_dict['CZ ' + self.name]['operation_type'] = 'Flux'
         operation_dict['X180_ef ' + self.name]['I_channel'] = \
             operation_dict['X180 ' + self.name]['I_channel']
         operation_dict['X180_ef ' + self.name]['Q_channel'] = \

@@ -224,8 +224,17 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
     ####################################################################
     for j, pulse_pars in enumerate(flux_compensation_pulse_list):
         pulse_pars['amplitude'] *= -1
+        pulse_pars['pulse_delay'] = 0
+        pulse_pars['refpoint'] = 'end'
+
         if j == 0:
             t0 = sequencer_config['Flux_comp_dead_time']
+            if last_pulse.find('RO') == -1:
+                # last_pulse is not a RO pulse
+                last_pulse = None
+                t0 += sequencer_config['RO_fixed_point']
+                logging.warning('make sure, your Flux_comp_dead_time is longer'
+                                'than the RO_pulse_length!')
         else:
             t0 = sequencer_config['Buffer_Flux_Flux']
         try:
