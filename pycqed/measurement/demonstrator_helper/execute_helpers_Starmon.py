@@ -56,6 +56,7 @@ def execute_qumis_file(file_url: str,  config_json: str,
 
     qumis_fp = _retrieve_file_from_url(file_url)
 
+    
     sweep_points = _get_qasm_sweep_points(qasm_fp)
 
 

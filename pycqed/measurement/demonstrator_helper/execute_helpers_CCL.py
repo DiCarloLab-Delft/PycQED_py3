@@ -70,9 +70,11 @@ def execute_qisa_file(qisa_file_url: str,  config_json: str,
 
     # Two ways to generate the sweep_points. Either I get from the file_url
     # or I get the appended options file which has the kw "measurement_points"
-    sweep_points_fp = _retrieve_file_from_url(sweep_points_file_url)
-    sweep_points = json.loads(sweep_points_fp)
-    sweep_points = sweep_points["measurement_points"]
+    #sweep_points_fp = _retrieve_file_from_url(sweep_points_file_url)
+    #sweep_points = json.loads(sweep_points_fp)
+    #sweep_points = sweep_points["measurement_points"]
+
+    # Ok, I am assured by stanvn that he will provide me a options with kw
     sweep_points = options["measurement_points"]
 
     s = swf.OpenQL_File_Sweep(file_path_sweep = qisa_fp, CCL=CCL,
