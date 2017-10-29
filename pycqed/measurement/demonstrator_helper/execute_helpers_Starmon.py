@@ -26,7 +26,12 @@ default_simulate_options = {
 }
 
 # Extract some "hardcoded" instruments from the global namespace"
-station = qc.station
+if hasattr(qc.station,'component'):
+    station = qc.station
+    new_station = False
+else:
+    station = qc.station.Station()
+    new_station = True
 
 if 'Demonstrator_MC' in station.components.keys():
     MC = station.components['Demonstrator_MC']
@@ -56,8 +61,8 @@ def execute_qumis_file(file_url: str,  config_json: str,
 
     qumis_fp = _retrieve_file_from_url(file_url)
 
-    
-    sweep_points = _get_qasm_sweep_points(qasm_fp)
+    # Ok, I am assured by stanvn that he will provide me a options with kw
+    sweep_points = options["measurement_points"]
 
 
     s = swf.QuMis_Sweep(filename=qumis_fp, CBox=CBox,parameter_name='Circuit number', unit='#')

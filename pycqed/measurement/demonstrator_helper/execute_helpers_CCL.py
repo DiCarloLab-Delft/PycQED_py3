@@ -34,7 +34,13 @@ default_simulate_options = {
 We connect to tess by giving the kernel type as "execute_CCL"
 """
 
-st = qc.station
+if hasattr(qc.station,'component'):
+    st = qc.station
+    new_station = False
+else:
+    st = qc.station.Station()
+    new_station = True
+
 """
 Create the station for which the Instruments can connect to. A virtual representation
 of the physical setup. In our case, the CCL. Since we're calling the station, 
