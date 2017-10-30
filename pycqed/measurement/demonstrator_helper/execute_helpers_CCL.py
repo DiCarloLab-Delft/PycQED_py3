@@ -3,7 +3,6 @@ import os
 import json
 import re
 import urllib.request
-# import time
 import pycqed as pq
 import qcodes as qc
 
@@ -12,75 +11,95 @@ from qcodes.instrument.base import Instrument
 from pycqed.measurement.demonstrator_helper.detectors import \
     Quantumsim_Two_QB_Hard_Detector
 from pycqed.measurement import sweep_functions as swf
+
+"""
+MeasurementControl and other legacy imports
+"""
+
 from tess.TessConnect import TessConnection
 import logging
-
+"""
+TessConnection is used to tell Tess that we are a kernel open for use
+"""
 
 default_execute_options = {}
 
 tc = TessConnection()
-tc.connect("execute_Starmon")
+tc.connect("execute_CCL")
 default_simulate_options = {
     "num_avg": 10000,
     "iterations": 1
 }
+"""
+We connect to tess by giving the kernel type as "execute_CCL"
+"""
 
-# Extract some "hardcoded" instruments from the global namespace"
-station = qc.station
-
-if 'Demonstrator_MC' in station.components.keys():
-    MC = station.components['Demonstrator_MC']
+if hasattr(qc.station,'component'):
+    st = qc.station
+    new_station = False
 else:
-    MC = measurement_control.MeasurementControl(
-        'Demonstrator_MC', live_plot_enabled=False, verbose=True)
-    datadir = os.path.abspath(os.path.join(
-                os.path.dirname(pq.__file__), os.pardir,
-                'demonstrator_execute_data'))
-    MC.datadir(datadir)
-    station.add_component(MC)
-    MC.station = station
+    st = qc.station.Station()
+    new_station = True
 
+"""
+Create the station for which the Instruments can connect to. A virtual representation
+of the physical setup. In our case, the CCL. Since we're calling the station, 
+"""
 
-def execute_qasm_file(file_url: str,  config_json: str,
+MC_demo = measurement_control.MeasurementControl(
+    'Demonstrator_MC', live_plot_enabled=False, verbose=True)
+
+datadir = os.path.abspath(os.path.join(
+    os.path.dirname(pq.__file__), os.pardir, 'demonstrator_execute_data'))
+MC_demo.datadir(datadir)
+MC_demo.station = st
+
+st.add_component(MC_demo)
+
+def execute_qisa_file(qisa_file_url: str,  config_json: str,
                       verbosity_level: int=0):
     options = json.loads(config_json)
 
-    MC = Instrument.find_instrument('Demonstrator_MC')
-    CBox = Instrument.find_instrument('CBox')
-    device = Instrument.find_instrument('Starmon')
+    MC = Instrument.find_instrument('MC')
+    CCL = Instrument.find_instrument('CCL')
+    device = Instrument.find_instrument('CCL_transmon')
 
     num_avg = int(options.get('num_avg', 512))
+    
     nr_soft_averages = int(np.round(num_avg/512))
     MC.soft_avg(nr_soft_averages)
+
     device.RO_acq_averages(512)
 
-    # N.B. hardcoded fixme
-    cfg = device.qasm_config()
-    qasm_fp = _retrieve_file_from_url(file_url)
-    sweep_points = _get_qasm_sweep_points(qasm_fp)
+    # Get the qisa file
+    qisa_fp = _retrieve_file_from_url(qisa_file_url)
 
-    s = swf.QASM_Sweep_v2(parameter_name='Circuit number ', unit='#',
-                          qasm_fn=qasm_fp, config=cfg, CBox=CBox,
-                          verbosity_level=verbosity_level)
+    # Two ways to generate the sweep_points. Either I get from the file_url
+    # or I get the appended options file which has the kw "measurement_points"
+    #sweep_points_fp = _retrieve_file_from_url(sweep_points_file_url)
+    #sweep_points = json.loads(sweep_points_fp)
+    #sweep_points = sweep_points["measurement_points"]
 
-    d = device.get_correlation_detector()
-    d.value_names = ['Q0 ', 'Q1 ', 'Corr. (Q0, Q1) ']
-    d.value_units = ['frac.', 'frac.', 'frac.']
+    # Ok, I am assured by stanvn that he will provide me a options with kw
+    sweep_points = options["measurement_points"]
+
+    s = swf.OpenQL_File_Sweep(file_path_sweep = qisa_fp, CCL=CCL,
+                 parameter_name ='Points', unit ='a.u.',
+                 upload=True)
+
+    # To be modified depending on what we're gonna name the S-7 qubits? <<<<<
+    d = device.get_integrated_average_detector()
+    #d.value_names = ['Q0 ', 'Q1 ', 'Corr. (Q0, Q1) ']
+    #d.value_units = ['frac.', 'frac.', 'frac.']
+    #>>>>>>
 
     MC.set_sweep_function(s)
     MC.set_sweep_points(sweep_points)
+
     MC.set_detector_function(d)
-    data = MC.run('demonstrator')  # FIXME <- add the proper name
+    data = MC.run('CCL_execute')  # FIXME <- add the proper name
 
     return _MC_result_to_chart_dict(data)
-
-def execute_qumis_file(file_url: str,  config_json: str,
-                      verbosity_level: int=0):
-    file_path = _retrieve_file_from_url(file_url)
-    options = json.loads(config_json)
-    data = _simulate_quantumsim(file_path,options)
-    return _MC_result_to_chart_dict(data)
-
 
 def calibrate(config_json: str):
     """
@@ -138,6 +157,9 @@ def calibrate(config_json: str):
 
 
 def _retrieve_file_from_url(file_url: str):
+    """
+    Self explanatory: we retrieve the file from the url given
+    """
 
     file_name = file_url.split("/")[-1]
     base_path = os.path.join(
@@ -150,6 +172,10 @@ def _retrieve_file_from_url(file_url: str):
 
 
 def _get_qasm_sweep_points(file_path):
+    """
+    I am unsure what this does. Will need to grep RO_acq_averages.
+    Am guessing this is related to qubit_object, CCL_transmon.py.
+    """
     counter = 0
     with open(file_path) as f:
         line = f.readline()
@@ -171,17 +197,9 @@ def _MC_result_to_chart_dict(result):
     }]
 
 def _simulate_quantumsim(file_path, options):
-    st = station.Station()
-    # Connect to the qx simulator
-    MC_sim = measurement_control.MeasurementControl(
-        'MC_sim', live_plot_enabled=False, verbose=True)
-
-    datadir = os.path.abspath(os.path.join(
-        os.path.dirname(pq.__file__), os.pardir, 'execute_data'))
-    MC_sim.datadir(datadir)
-    MC_sim.station = st
-
-    st.add_component(MC_sim)
+    """
+    We can remove this function as I am using this to dummy execute
+    """
     quantumsim_sweep = swf.None_Sweep()
     quantumsim_sweep.parameter_name = 'Circuit number '
     quantumsim_sweep.unit = '#'
@@ -196,10 +214,10 @@ def _simulate_quantumsim(file_path, options):
         file_path, dt=(40, 280), qubit_parameters=qubit_parameters)
     sweep_points = range(len(quantumsim_det.parser.circuits))
 
-    MC_sim.set_detector_function(quantumsim_det)
-    MC_sim.set_sweep_function(quantumsim_sweep)
-    MC_sim.set_sweep_points(sweep_points)
-    dat = MC_sim.run("run QASM")
+    MC.set_detector_function(quantumsim_det)
+    MC.set_sweep_function(quantumsim_sweep)
+    MC.set_sweep_points(sweep_points)
+    dat = MC.run("run QASM")
     print('simulation finished')
     return dat
 
