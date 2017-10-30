@@ -825,7 +825,3 @@ class lutman_par_dB_attenuation(Soft_Sweep):
     def set_parameter(self, val):
         self.LutMan_parameter.set(10**(val/20))
         self.LutMan.load_DIO_triggered_sequence_onto_UHFQC()
-        self.LutMan_parameter.set(val)
-        self.LutMan.load_pulses_onto_AWG_lookuptable(regenerate_pulses=True)
-        self.LutMan.QWG.get_instr().start()
-        self.LutMan.QWG.get_instr().getOperationComplete()

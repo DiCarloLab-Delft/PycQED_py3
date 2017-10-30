@@ -218,6 +218,12 @@ class Qubit(Instrument):
                              analyze=True, close_fig=True):
         raise NotImplementedError()
 
+
+    def measure_resonator_power(self, freqs, powers,
+                                MC=None, analyze: bool=True,
+                                close_fig: bool=True):
+        raise NotImplementedError()
+
     def measure_transients(self, MC=None, analyze: bool=True,
                            cases=('off', 'on'),
                            prepare: bool=True, depletion_analysis: bool=True,

@@ -946,6 +946,36 @@ class CCLight_Transmon(Qubit):
         if analyze:
             ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
 
+
+    def measure_resonator_power(self, freqs, powers,
+                                MC=None, analyze=True, close_fig=True):
+        self.prepare_for_continuous_wave()
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        # Snippet here to create and upload the CCL instructions
+        CCL = self.instr_CC.get_instr()
+        CCL.stop()
+        p = sqo.CW_RO_sequence(qubit_idx=self.cfg_qubit_nr(),
+                               platf_cfg=self.cfg_openql_platform_fn())
+        CCL.upload_instructions(p.filename)
+        # CCL gets started in the int_avg detector
+
+        MC.set_sweep_function(swf.Heterodyne_Frequency_Sweep_simple(
+            MW_LO_source=self.instr_LO_ro.get_instr(),
+            IF=self.ro_freq_mod()))
+        MC.set_sweep_points(freqs)
+
+        ro_lm = self.instr_LutMan_RO.get_instr()
+        m_amp_par = ro_lm.parameters['M_amp_R{}'.format(self.ro_pulse_res_nr())]
+        s2 = swf.lutman_par_dB_attenuation(LutMan=ro_lm, LutMan_parameter=m_amp_par)
+        MC.set_sweep_function_2D(s2)
+        MC.set_sweep_points_2D(powers)
+        self.int_avg_det_single._set_real_imag(False)
+        MC.set_detector_function(self.int_avg_det_single)
+        MC.run(name='Resonator_power_scan'+self.msmt_suffix, mode='2D')
+        if analyze:
+            ma.TwoD_Analysis(label='Resonator_power_scan', close_fig=close_fig)
+
     def measure_spectroscopy(self, freqs, pulsed=True, MC=None,
                              analyze=True, close_fig=True):
         if not pulsed:

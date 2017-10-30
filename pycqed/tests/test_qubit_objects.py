@@ -363,6 +363,16 @@ class Test_QO(unittest.TestCase):
         self.CCL_qubit.measure_heterodyne_spectroscopy(freqs=freqs)
 
     @unittest.skipIf(openql_import_fail, 'OpenQL not present')
+    def test_resonator_power(self):
+        self.CCL_qubit.ro_acq_weight_type('SSB')
+        freqs = np.linspace(6e9, 6.5e9, 31)
+        powers = np.arange(-30, -10, 5)
+
+        # set to not set to bypass validator
+        self.CCL_qubit.freq_res._save_val(None)
+        self.CCL_qubit.measure_resonator_power(freqs=freqs, powers=powers)
+
+    @unittest.skipIf(openql_import_fail, 'OpenQL not present')
     def test_measure_transients(self):
         self.CCL_qubit.ro_acq_input_average_length(2e-6)
         self.CCL_qubit.measure_transients()
