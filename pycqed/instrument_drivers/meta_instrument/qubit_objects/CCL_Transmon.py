@@ -1522,3 +1522,69 @@ class CCLight_Transmon(Qubit):
         if update:
             self.T2_echo(a.fit_res.params['tau'].value)
         return a
+
+    def measure_randomized_benchmarking(self, nr_cliffords=2**np.arange(12),
+                                        nr_seeds=100,
+                                        double_curves=False,
+                                        MC=None, analyze=True, close_fig=True,
+                                        verbose=False, upload=True,
+                                        update=True):
+        # Adding calibration points
+        if double_curves:
+            nr_cliffords = np.repeat(nr_cliffords, 2)
+        nr_cliffords = np.append(
+            nr_cliffords, [nr_cliffords[-1]+.5]*2 + [nr_cliffords[-1]+1.5]*2)
+        self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        MC.soft_avg(nr_seeds)
+        counter_param = ManualParameter('name_ctr', initial_value=0)
+        programs = []
+        for i in range(nr_seeds):
+            p = sqo.randomized_benchmarking(
+                qubit_idx=self.cfg_qubit_nr(),
+                nr_cliffords=nr_cliffords,
+                platf_cfg=self.cfg_openql_platform_fn(),
+                nr_seeds=1, program_name='RB_{}'.format(i),
+                double_curves=double_curves)
+            programs.append(p)
+
+        prepare_function_kwargs = {
+            'counter_param': counter_param,
+            'programs': programs,
+            'CC': self.instr_CC.get_instr()}
+
+        d = self.int_avg_det
+        d.prepare_function = load_range_of_oql_programs
+        d.prepare_function_kwargs = prepare_function_kwargs
+        d.nr_averages = 128
+
+        s = swf.None_Sweep()
+        s.parameter_name = 'Number of Cliffords'
+        s.unit = '#'
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(nr_cliffords)
+
+        MC.set_detector_function(d)
+        MC.run('RB_{}seeds'.format(nr_seeds)+self.msmt_suffix)
+        if double_curves:
+            a = ma.ma.RB_double_curve_Analysis(
+                T1=self.T1(),
+                pulse_delay=self.mw_gauss_width.get()*4)
+        else:
+            a = ma.RandomizedBenchmarking_Analysis(
+                close_main_fig=close_fig, T1=self.T1(),
+                pulse_delay=self.mw_gauss_width.get()*4)
+        if update:
+            self.F_RB(a.fit_res.params['fidelity_per_Clifford'].value)
+        return a.fit_res.params['fidelity_per_Clifford'].value
+
+
+def load_range_of_oql_programs(programs, counter_param, CC):
+    """
+    This is a helper function for running an experiment that is spread over
+    multiple OpenQL programs such as RB.
+    """
+    program = programs[counter_param()]
+    counter_param((counter_param()+1) % len(programs))
+    CC.upload_instructions(program.filename)

@@ -861,8 +861,8 @@ class Function_Detector(Soft_Detector):
             return result
         else:
             results = [result[key] for key in self.result_keys]
-            if len(results) ==1:
-                return results[0] # for a single entry we don't want a list
+            if len(results) == 1:
+                return results[0]  # for a single entry we don't want a list
             return results
 
 
@@ -1337,11 +1337,12 @@ class UHFQC_integrated_average_detector(Hard_Detector):
     '''
 
     def __init__(self, UHFQC, AWG=None,
-                 integration_length=1e-6, nr_averages=1024,
-                 channels=(0, 1, 2, 3), result_logging_mode='raw',
-                 real_imag=True,
-                 seg_per_point=1, single_int_avg=False,
-                 chunk_size=None,
+                 integration_length: float=1e-6, nr_averages: int=1024,
+                 channels: list=(0, 1, 2, 3), result_logging_mode: str='raw',
+                 real_imag: bool=True,
+                 seg_per_point: int =1, single_int_avg: bool =False,
+                 chunk_size: int=None,
+                 prepare_function=None, prepare_function_kwargs: dict=None,
                  **kw):
         """
         Args:
@@ -1402,6 +1403,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.result_logging_mode = result_logging_mode
         self.chunk_size = chunk_size
 
+        self.prepare_function = prepare_function
+        self.prepare_function_kwargs = prepare_function_kwargs
         self._set_real_imag(real_imag)
 
     def _set_real_imag(self, real_imag=False):
@@ -1500,6 +1503,14 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
         self.UHFQC.quex_rl_source(self.result_logging_mode_idx)
         self.UHFQC.acquisition_initialize(channels=self.channels, mode='rl')
+
+        # Optionally perform extra actions on prepare
+        if self.prepare_function_kwargs is not None:
+            if self.prepare_function is not None:
+                self.prepare_function(**self.prepare_function_kwargs)
+        else:
+            if self.prepare_function is not None:
+                self.prepare_function()
 
     def finish(self):
         if self.AWG is not None:
@@ -1991,6 +2002,7 @@ class UHFQC_single_qubit_statistics_logging_det(UHFQC_statistics_logging_det):
     def acquire_data_point(self, **kw):
         # Returns only the data for the relevant channel
         return super().acquire_data_point()[0:3]
+
 
 class UHFQC_single_qubit_statistics_logging_det(UHFQC_statistics_logging_det):
 
