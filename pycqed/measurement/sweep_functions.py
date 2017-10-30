@@ -6,6 +6,7 @@ from pycqed.utilities.general import setInDict
 from pycqed.measurement.waveform_control_CC import qasm_compiler as qcx
 from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
 from pycqed.measurement.waveform_control_CC import qasm_to_asm as qta
+from pycqed.measurement.waveform_control_CC import qasm_compiler as qcx
 import pycqed.measurement.waveform_control_CC.qasm_compiler_helpers as qch
 
 
