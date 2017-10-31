@@ -58,9 +58,10 @@ st.add_component(MC_demo)
 
 def execute_qisa_file(qisa_file_url: str,  config_json: str,
                       verbosity_level: int=0):
-    if (not new_station):
-        options = json.loads(config_json)
+    options = json.loads(config_json)
 
+    if (not new_station):
+        
         MC = Instrument.find_instrument('MC')
         CCL = Instrument.find_instrument('CCL')
         device = Instrument.find_instrument('CCL_transmon')
@@ -99,8 +100,10 @@ def execute_qisa_file(qisa_file_url: str,  config_json: str,
 
         MC.set_detector_function(d)
         data = MC.run('CCL_execute')  # FIXME <- add the proper name
+    
     else:
-        data = _simulate_quantumsim(qasm_file_path, options)
+        qisa_fp = _retrieve_file_from_url(qisa_file_url)
+        data = _simulate_quantumsim(qisa_fp, options)
 
 
     return _MC_result_to_chart_dict(data)

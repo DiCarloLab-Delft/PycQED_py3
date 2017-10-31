@@ -48,9 +48,10 @@ else:
 
 def execute_qumis_file(file_url: str,  config_json: str,
                       verbosity_level: int=0):
-    if (not new_station):
-        options = json.loads(config_json)
+    options = json.loads(config_json)
 
+    if (not new_station):
+        
         MC = Instrument.find_instrument('Demonstrator_MC')
         CBox = Instrument.find_instrument('CBox')
         device = Instrument.find_instrument('Starmon')
@@ -75,8 +76,10 @@ def execute_qumis_file(file_url: str,  config_json: str,
         MC.set_sweep_points(sweep_points)
         MC.set_detector_function(d)
         data = MC.run('Starmon_execute')  # FIXME <- add the proper name
+    
     else:
-        data = _simulate_quantumsim(qasm_file_path, options)
+        qumis_fp = _retrieve_file_from_url(file_url)
+        data = _simulate_quantumsim(qumis_fp, options)
 
     return _MC_result_to_chart_dict(data)
 
@@ -191,10 +194,10 @@ def _simulate_quantumsim(file_path, options):
         file_path, dt=(40, 280), qubit_parameters=qubit_parameters)
     sweep_points = range(len(quantumsim_det.parser.circuits))
 
-    MC_sim.set_detector_function(quantumsim_det)
-    MC_sim.set_sweep_function(quantumsim_sweep)
-    MC_sim.set_sweep_points(sweep_points)
-    dat = MC_sim.run("run QASM")
+    MC_demo.set_detector_function(quantumsim_det)
+    MC_demo.set_sweep_function(quantumsim_sweep)
+    MC_demo.set_sweep_points(sweep_points)
+    dat = MC_demo.run("run QASM")
     print('simulation execute_Starmon finished')
     return dat
 
