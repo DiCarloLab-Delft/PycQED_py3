@@ -21,11 +21,6 @@ except ImportError as e:
     logging.warning('Could not import qutip, tomo code will not work')
 import itertools
 
-#Based on py2 code by Chris and Jaap  
-#adapted by Malay Singh 
-
-
-
 comp_projectors = [qt.ket2dm(qt.tensor(qt.basis(2,0), qt.basis(2,0))),
                   qt.ket2dm(qt.tensor(qt.basis(2,0), qt.basis(2,1))),
                   qt.ket2dm(qt.tensor(qt.basis(2,1), qt.basis(2,0))),
