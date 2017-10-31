@@ -470,6 +470,11 @@ class CCLight_Transmon(Qubit):
         self.add_parameter('cfg_prepare_mw_awg', vals=vals.Bool(),
                            initial_value=True,
                            parameter_class=ManualParameter)
+        self.add_parameter(
+            'cfg_dac_ch', label='Flux DAC channel',
+            docstring=('Used to determine the DAC channel used for DC '
+                       'flux biasing.'), initial_value=1,
+            parameter_class=ManualParameter)
 
     def add_generic_qubit_parameters(self):
         self.add_parameter('E_c', unit='Hz',
@@ -746,6 +751,7 @@ class CCLight_Transmon(Qubit):
         self._prep_mw_pulses()
 
     def _prep_td_sources(self):
+        self.instr_spec_source.get_instr().off()
         self.instr_LO_mw.get_instr().on()
         # Set source to fs =f-f_mod such that pulses appear at f = fs+f_mod
         self.instr_LO_mw.get_instr().frequency.set(
@@ -946,9 +952,8 @@ class CCLight_Transmon(Qubit):
         if analyze:
             ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
 
-
-    def measure_resonator_power(self, freqs, powers,
-                                MC=None, analyze=True, close_fig=True):
+    def measure_resonator_power(self, freqs, powers, MC=None,
+                                analyze: bool=True, close_fig: bool=True):
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -966,8 +971,10 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_points(freqs)
 
         ro_lm = self.instr_LutMan_RO.get_instr()
-        m_amp_par = ro_lm.parameters['M_amp_R{}'.format(self.ro_pulse_res_nr())]
-        s2 = swf.lutman_par_dB_attenuation(LutMan=ro_lm, LutMan_parameter=m_amp_par)
+        m_amp_par = ro_lm.parameters[
+            'M_amp_R{}'.format(self.ro_pulse_res_nr())]
+        s2 = swf.lutman_par_dB_attenuation(
+            LutMan=ro_lm, LutMan_parameter=m_amp_par)
         MC.set_sweep_function_2D(s2)
         MC.set_sweep_points_2D(powers)
         self.int_avg_det_single._set_real_imag(False)
@@ -975,6 +982,39 @@ class CCLight_Transmon(Qubit):
         MC.run(name='Resonator_power_scan'+self.msmt_suffix, mode='2D')
         if analyze:
             ma.TwoD_Analysis(label='Resonator_power_scan', close_fig=close_fig)
+
+    def measure_resonator_dac(self, freqs, dac_voltages, MC=None,
+                              analyze: bool =True, close_fig: bool=True):
+        self.prepare_for_continuous_wave()
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        # Snippet here to create and upload the CCL instructions
+        CCL = self.instr_CC.get_instr()
+        CCL.stop()
+        p = sqo.CW_RO_sequence(qubit_idx=self.cfg_qubit_nr(),
+                               platf_cfg=self.cfg_openql_platform_fn())
+        CCL.upload_instructions(p.filename)
+        # CCL gets started in the int_avg detector
+
+        MC.set_sweep_function(swf.Heterodyne_Frequency_Sweep_simple(
+            MW_LO_source=self.instr_LO_ro.get_instr(),
+            IF=self.ro_freq_mod()))
+        MC.set_sweep_points(freqs)
+
+        if 'ivvi' in self.instr_FluxCtrl().lower():
+            IVVI = self.instr_FluxCtrl.get_instr()
+            dac_par = IVVI.parameters['dac{}'.format(self.cfg_dac_ch())]
+        else:
+            # TODO: extract proper param from flux control using the right idx
+            raise NotImplementedError('for Flux control instrument')
+
+        MC.set_sweep_function_2D(dac_par)
+        MC.set_sweep_points_2D(dac_voltages)
+        self.int_avg_det_single._set_real_imag(False)
+        MC.set_detector_function(self.int_avg_det_single)
+        MC.run(name='Resonator_dac_scan'+self.msmt_suffix, mode='2D')
+        if analyze:
+            ma.TwoD_Analysis(label='Resonator_dac_scan', close_fig=close_fig)
 
     def measure_spectroscopy(self, freqs, pulsed=True, MC=None,
                              analyze=True, close_fig=True):
