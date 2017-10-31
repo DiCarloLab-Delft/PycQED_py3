@@ -34,46 +34,49 @@ else:
     new_station = True
 
 if 'Demonstrator_MC' in station.components.keys():
-    MC = station.components['Demonstrator_MC']
+    MC_demo = station.components['Demonstrator_MC']
 else:
-    MC = measurement_control.MeasurementControl(
+    MC_demo = measurement_control.MeasurementControl(
         'Demonstrator_MC', live_plot_enabled=False, verbose=True)
     datadir = os.path.abspath(os.path.join(
                 os.path.dirname(pq.__file__), os.pardir,
                 'demonstrator_execute_data'))
-    MC.datadir(datadir)
-    station.add_component(MC)
-    MC.station = station
+    MC_demo.datadir(datadir)
+    station.add_component(MC_demo)
+    MC_demo.station = station
 
 
 def execute_qumis_file(file_url: str,  config_json: str,
                       verbosity_level: int=0):
-    options = json.loads(config_json)
+    if (not new_station):
+        options = json.loads(config_json)
 
-    MC = Instrument.find_instrument('Demonstrator_MC')
-    CBox = Instrument.find_instrument('CBox')
-    device = Instrument.find_instrument('Starmon')
+        MC = Instrument.find_instrument('Demonstrator_MC')
+        CBox = Instrument.find_instrument('CBox')
+        device = Instrument.find_instrument('Starmon')
 
-    num_avg = int(options.get('num_avg', 512))
-    nr_soft_averages = int(np.round(num_avg/512))
-    MC.soft_avg(nr_soft_averages)
-    device.RO_acq_averages(512)
+        num_avg = int(options.get('num_avg', 512))
+        nr_soft_averages = int(np.round(num_avg/512))
+        MC.soft_avg(nr_soft_averages)
+        device.RO_acq_averages(512)
 
-    qumis_fp = _retrieve_file_from_url(file_url)
+        qumis_fp = _retrieve_file_from_url(file_url)
 
-    # Ok, I am assured by stanvn that he will provide me a options with kw
-    sweep_points = options["measurement_points"]
+        # Ok, I am assured by stanvn that he will provide me a options with kw
+        sweep_points = options["measurement_points"]
 
 
-    s = swf.QuMis_Sweep(filename=qumis_fp, CBox=CBox,parameter_name='Circuit number', unit='#')
-    d = device.get_correlation_detector()
-    d.value_names = ['Q0 ', 'Q1 ', 'Corr. (Q0, Q1) ']
-    d.value_units = ['frac.', 'frac.', 'frac.']
+        s = swf.QuMis_Sweep(filename=qumis_fp, CBox=CBox,parameter_name='Circuit number', unit='#')
+        d = device.get_correlation_detector()
+        d.value_names = ['Q0 ', 'Q1 ', 'Corr. (Q0, Q1) ']
+        d.value_units = ['frac.', 'frac.', 'frac.']
 
-    MC.set_sweep_function(s)
-    MC.set_sweep_points(sweep_points)
-    MC.set_detector_function(d)
-    data = MC.run('Starmon_execute')  # FIXME <- add the proper name
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(sweep_points)
+        MC.set_detector_function(d)
+        data = MC.run('Starmon_execute')  # FIXME <- add the proper name
+    else:
+        data = _simulate_quantumsim(qasm_file_path, options)
 
     return _MC_result_to_chart_dict(data)
 
@@ -174,19 +177,8 @@ def _MC_result_to_chart_dict(result):
     }]
 
 def _simulate_quantumsim(file_path, options):
-    st = station.Station()
-    # Connect to the qx simulator
-    MC_sim = measurement_control.MeasurementControl(
-        'MC_sim', live_plot_enabled=False, verbose=True)
-
-    datadir = os.path.abspath(os.path.join(
-        os.path.dirname(pq.__file__), os.pardir, 'execute_data'))
-    MC_sim.datadir(datadir)
-    MC_sim.station = st
-
-    st.add_component(MC_sim)
     quantumsim_sweep = swf.None_Sweep()
-    quantumsim_sweep.parameter_name = 'Circuit number '
+    quantumsim_sweep.parameter_name = 'Starmon number '
     quantumsim_sweep.unit = '#'
 
     qubit_parameters = {
@@ -203,7 +195,7 @@ def _simulate_quantumsim(file_path, options):
     MC_sim.set_sweep_function(quantumsim_sweep)
     MC_sim.set_sweep_points(sweep_points)
     dat = MC_sim.run("run QASM")
-    print('simulation finished')
+    print('simulation execute_Starmon finished')
     return dat
 
 

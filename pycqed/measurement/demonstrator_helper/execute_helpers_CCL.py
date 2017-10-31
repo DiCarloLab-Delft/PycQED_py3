@@ -58,46 +58,50 @@ st.add_component(MC_demo)
 
 def execute_qisa_file(qisa_file_url: str,  config_json: str,
                       verbosity_level: int=0):
-    options = json.loads(config_json)
+    if (not new_station):
+        options = json.loads(config_json)
 
-    MC = Instrument.find_instrument('MC')
-    CCL = Instrument.find_instrument('CCL')
-    device = Instrument.find_instrument('CCL_transmon')
+        MC = Instrument.find_instrument('MC')
+        CCL = Instrument.find_instrument('CCL')
+        device = Instrument.find_instrument('CCL_transmon')
 
-    num_avg = int(options.get('num_avg', 512))
-    
-    nr_soft_averages = int(np.round(num_avg/512))
-    MC.soft_avg(nr_soft_averages)
+        num_avg = int(options.get('num_avg', 512))
+        
+        nr_soft_averages = int(np.round(num_avg/512))
+        MC.soft_avg(nr_soft_averages)
 
-    device.RO_acq_averages(512)
+        device.RO_acq_averages(512)
 
-    # Get the qisa file
-    qisa_fp = _retrieve_file_from_url(qisa_file_url)
+        # Get the qisa file
+        qisa_fp = _retrieve_file_from_url(qisa_file_url)
 
-    # Two ways to generate the sweep_points. Either I get from the file_url
-    # or I get the appended options file which has the kw "measurement_points"
-    #sweep_points_fp = _retrieve_file_from_url(sweep_points_file_url)
-    #sweep_points = json.loads(sweep_points_fp)
-    #sweep_points = sweep_points["measurement_points"]
+        # Two ways to generate the sweep_points. Either I get from the file_url
+        # or I get the appended options file which has the kw "measurement_points"
+        #sweep_points_fp = _retrieve_file_from_url(sweep_points_file_url)
+        #sweep_points = json.loads(sweep_points_fp)
+        #sweep_points = sweep_points["measurement_points"]
 
-    # Ok, I am assured by stanvn that he will provide me a options with kw
-    sweep_points = options["measurement_points"]
+        # Ok, I am assured by stanvn that he will provide me a options with kw
+        sweep_points = options["measurement_points"]
 
-    s = swf.OpenQL_File_Sweep(file_path_sweep = qisa_fp, CCL=CCL,
-                 parameter_name ='Points', unit ='a.u.',
-                 upload=True)
+        s = swf.OpenQL_File_Sweep(file_path_sweep = qisa_fp, CCL=CCL,
+                     parameter_name ='Points', unit ='a.u.',
+                     upload=True)
 
-    # To be modified depending on what we're gonna name the S-7 qubits? <<<<<
-    d = device.get_integrated_average_detector()
-    #d.value_names = ['Q0 ', 'Q1 ', 'Corr. (Q0, Q1) ']
-    #d.value_units = ['frac.', 'frac.', 'frac.']
-    #>>>>>>
+        # To be modified depending on what we're gonna name the S-7 qubits? <<<<<
+        d = device.get_integrated_average_detector()
+        #d.value_names = ['Q0 ', 'Q1 ', 'Corr. (Q0, Q1) ']
+        #d.value_units = ['frac.', 'frac.', 'frac.']
+        #>>>>>>
 
-    MC.set_sweep_function(s)
-    MC.set_sweep_points(sweep_points)
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(sweep_points)
 
-    MC.set_detector_function(d)
-    data = MC.run('CCL_execute')  # FIXME <- add the proper name
+        MC.set_detector_function(d)
+        data = MC.run('CCL_execute')  # FIXME <- add the proper name
+    else:
+        data = _simulate_quantumsim(qasm_file_path, options)
+
 
     return _MC_result_to_chart_dict(data)
 
@@ -201,7 +205,7 @@ def _simulate_quantumsim(file_path, options):
     We can remove this function as I am using this to dummy execute
     """
     quantumsim_sweep = swf.None_Sweep()
-    quantumsim_sweep.parameter_name = 'Circuit number '
+    quantumsim_sweep.parameter_name = 'CCL number '
     quantumsim_sweep.unit = '#'
 
     qubit_parameters = {
@@ -214,11 +218,11 @@ def _simulate_quantumsim(file_path, options):
         file_path, dt=(40, 280), qubit_parameters=qubit_parameters)
     sweep_points = range(len(quantumsim_det.parser.circuits))
 
-    MC.set_detector_function(quantumsim_det)
-    MC.set_sweep_function(quantumsim_sweep)
-    MC.set_sweep_points(sweep_points)
-    dat = MC.run("run QASM")
-    print('simulation finished')
+    MC_demo.set_detector_function(quantumsim_det)
+    MC_demo.set_sweep_function(quantumsim_sweep)
+    MC_demo.set_sweep_points(sweep_points)
+    dat = MC_demo.run("run QASM")
+    print('simulation execute_CCL finished')
     return dat
 
 
