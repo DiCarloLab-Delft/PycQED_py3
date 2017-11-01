@@ -34,44 +34,52 @@ default_simulate_options = {
 We connect to tess by giving the kernel type as "execute_CCL"
 """
 
-if hasattr(qc.station,'component'):
-    st = qc.station
+try:
+    MC = Instrument.find_instrument('MC')
+    st = MC.station
     new_station = False
-else:
+except KeyError:
     st = qc.station.Station()
     new_station = True
 
 """
 Create the station for which the Instruments can connect to. A virtual representation
-of the physical setup. In our case, the CCL. Since we're calling the station, 
+of the physical setup. In our case, the CCL. Since we're calling the station,
 """
+try:
+    MC_demo = measurement_control.MeasurementControl(
+        'Demonstrator_MC', live_plot_enabled=True, verbose=True)
 
-MC_demo = measurement_control.MeasurementControl(
-    'Demonstrator_MC', live_plot_enabled=False, verbose=True)
+    datadir = os.path.abspath(os.path.join(
+        os.path.dirname(pq.__file__), os.pardir, 'demonstrator_execute_data'))
+    MC_demo.datadir(datadir)
+    MC_demo.station = st
 
-datadir = os.path.abspath(os.path.join(
-    os.path.dirname(pq.__file__), os.pardir, 'demonstrator_execute_data'))
-MC_demo.datadir(datadir)
-MC_demo.station = st
+    st.add_component(MC_demo)
+except KeyError:
+    MC_demo = Instrument.find_instrument('Demonstrator_MC')
 
-st.add_component(MC_demo)
 
 def execute_qisa_file(qisa_file_url: str,  config_json: str,
                       verbosity_level: int=0):
     options = json.loads(config_json)
 
     if (not new_station):
-        
+        write_to_log('options:')
+        write_to_log(options)
+        write_to_log(qisa_file_url)
         MC = Instrument.find_instrument('MC')
         CCL = Instrument.find_instrument('CCL')
-        device = Instrument.find_instrument('CCL_transmon')
+        # Device for CCL is not implemented yet 11/1/2017 MAR
+        # device = Instrument.find_instrument('CCL_transmon')
+        qubit = Instrument.find_instrument('QL')
 
         num_avg = int(options.get('num_avg', 512))
-        
-        nr_soft_averages = int(np.round(num_avg/512))
-        MC.soft_avg(nr_soft_averages)
 
-        device.RO_acq_averages(512)
+        nr_soft_averages = int(np.round(num_avg/512))
+        MC_demo.soft_avg(nr_soft_averages)
+
+        qubit.ro_acq_averages(512)
 
         # Get the qisa file
         qisa_fp = _retrieve_file_from_url(qisa_file_url)
@@ -79,34 +87,37 @@ def execute_qisa_file(qisa_file_url: str,  config_json: str,
         # Two ways to generate the sweep_points. Either I get from the file_url
         # or I get the appended options file which has the kw "measurement_points"
         #sweep_points_fp = _retrieve_file_from_url(sweep_points_file_url)
-        #sweep_points = json.loads(sweep_points_fp)
+        # sweep_points = json.loads(sweep_points_fp)
         #sweep_points = sweep_points["measurement_points"]
 
         # Ok, I am assured by stanvn that he will provide me a options with kw
-        sweep_points = options["measurement_points"]
+        # sweep_points = options["measurement_points"]
+        # HACK HACK HACK
+        sweep_points = np.arange(21)
 
-        s = swf.OpenQL_File_Sweep(file_path_sweep = qisa_fp, CCL=CCL,
-                     parameter_name ='Points', unit ='a.u.',
-                     upload=True)
+        s = swf.OpenQL_File_Sweep(filename=qisa_fp, CCL=CCL,
+                                  parameter_name='Points', unit='a.u.',
+                                  upload=True)
 
-        # To be modified depending on what we're gonna name the S-7 qubits? <<<<<
-        d = device.get_integrated_average_detector()
+        d = qubit.int_avg_det
+        # To be modified depending on what we're gonna name the S-7 qubits? <<<
+        # d = device.get_integrated_average_detector()
         #d.value_names = ['Q0 ', 'Q1 ', 'Corr. (Q0, Q1) ']
         #d.value_units = ['frac.', 'frac.', 'frac.']
         #>>>>>>
 
-        MC.set_sweep_function(s)
-        MC.set_sweep_points(sweep_points)
+        MC_demo.set_sweep_function(s)
+        MC_demo.set_sweep_points(sweep_points)
 
-        MC.set_detector_function(d)
-        data = MC.run('CCL_execute')  # FIXME <- add the proper name
-    
+        MC_demo.set_detector_function(d)
+        data = MC_demo.run('CCL_execute')  # FIXME <- add the proper name
+
     else:
         qisa_fp = _retrieve_file_from_url(qisa_file_url)
         data = _simulate_quantumsim(qisa_fp, options)
 
-
     return _MC_result_to_chart_dict(data)
+
 
 def calibrate(config_json: str):
     """
@@ -121,7 +132,6 @@ def calibrate(config_json: str):
 
     print('*'*80)
     options = json.loads(config_json)
-
 
     # relies on this being added explicitly
     cal_graph = station.calibration_graph
@@ -203,6 +213,7 @@ def _MC_result_to_chart_dict(result):
         "data": result
     }]
 
+
 def _simulate_quantumsim(file_path, options):
     """
     We can remove this function as I am using this to dummy execute
@@ -253,3 +264,8 @@ def send_calibration_data():
         "calibration": calibration
     })
     print('Calibration data send')
+
+
+def write_to_log(string):
+    with open(r'D:\Experiments\1709_M18\demo_log.txt', 'r+') as f:
+        f.write(str(string))
