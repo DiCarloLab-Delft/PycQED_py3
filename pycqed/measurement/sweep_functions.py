@@ -305,6 +305,23 @@ class OpenQL_Sweep(Hard_Sweep):
         if self.upload:
             self.CCL.upload_instructions(self.openql_program.filename)
 
+class OpenQL_File_Sweep(Hard_Sweep):
+
+    def __init__(self, filename: str, CCL,
+                 parameter_name: str ='Points', unit: str='a.u.',
+                 upload: bool=True):
+        super().__init__()
+        self.name = 'OpenQL_Sweep'
+        self.filename = filename
+        self.CCL = CCL
+        self.upload = upload
+        self.parameter_name = parameter_name
+        self.unit = unit
+
+    def prepare(self, **kw):
+        if self.upload:
+            self.CCL.upload_instructions(self.filename)
+
 
 class QASM_Sweep_v2(Hard_Sweep):
     """
@@ -503,7 +520,7 @@ class QuMis_Sweep(Hard_Sweep):
     def __init__(self, filename, CBox,
                  parameter_name='Points', unit='a.u.', upload=True):
         super().__init__()
-        self.name = 'QASM_Sweep'
+        self.name = 'QuMis_Sweep'
         self.filename = filename
         self.upload = upload
         self.CBox = CBox
@@ -511,8 +528,8 @@ class QuMis_Sweep(Hard_Sweep):
         self.unit = unit
 
     def prepare(self, **kw):
-        self.CBox.trigger_source('internal')
         if self.upload:
+            self.CBox.trigger_source('internal')
             self.CBox.load_instructions(self.filename)
 
 
