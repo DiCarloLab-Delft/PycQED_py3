@@ -825,3 +825,27 @@ class lutman_par_dB_attenuation(Soft_Sweep):
     def set_parameter(self, val):
         self.LutMan_parameter.set(10**(val/20))
         self.LutMan.load_DIO_triggered_sequence_onto_UHFQC()
+
+
+class two_par_joint_sweep(Soft_Sweep):
+    """
+    Allows jointly sweeping two parameters while preserving their
+    respective ratios.
+    """
+    def __init__(self, par_A, par_B, **kw):
+        self.set_kw()
+        self.name = par_A.name
+        self.parameter_name = par_A.name
+        self.unit = par_A.unit
+        self.sweep_control = 'soft'
+
+        self.par_A = par_A
+        self.par_B = par_B
+        try:
+            self.par_ratio = self.par_B.get()/self.par_A.get()
+        except NotImplementedError:
+            self.par_ratio = self.par_B.get_latest()/self.par_A.get_latest()
+
+    def set_parameter(self, val):
+        self.par_A.set(val)
+        self.par_B.set(val*self.par_ratio)

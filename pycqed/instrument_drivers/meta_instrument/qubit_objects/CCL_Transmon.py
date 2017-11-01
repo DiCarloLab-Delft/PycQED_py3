@@ -806,6 +806,9 @@ class CCLight_Transmon(Qubit):
         Gin = self.mw_vsm_ch_Gin()
         Din = self.mw_vsm_ch_Din()
         out = self.mw_vsm_ch_out()
+        spec_in = self.spec_vsm_ch_in()
+
+        VSM.set('in{}_out{}_switch'.format(spec_in, out), 'OFF')
 
         VSM.set('in{}_out{}_switch'.format(Gin, out), self.mw_vsm_switch())
         VSM.set('in{}_out{}_switch'.format(Din, out), self.mw_vsm_switch())
@@ -1211,7 +1214,7 @@ class CCLight_Transmon(Qubit):
         return True
 
     def measure_rabi_vsm(self, MC=None, atts=np.linspace(0, 65536, 31),
-                         analyze=True, close_fig=True,
+                         analyze=True, close_fig=True, real_imag=True,
                          prepare_for_timedomain=True):
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -1222,19 +1225,19 @@ class CCLight_Transmon(Qubit):
             platf_cfg=self.cfg_openql_platform_fn())
 
         VSM = self.instr_VSM.get_instr()
+        out = self.mw_vsm_ch_out()
         Gin = self.mw_vsm_ch_Gin()
+        G_par = VSM.parameters['in{}_out{}_att'.format(Gin, out)]
         # FIXME: This variable is not used, both main and derivative should
         # be swept
         Din = self.mw_vsm_ch_Din()
-        out = self.mw_vsm_ch_out()
-
+        D_par = VSM.parameters['in{}_out{}_att'.format(Din, out)]
+        s = swf.two_par_joint_sweep(G_par, D_par)
         self.instr_CC.get_instr().upload_instructions(p.filename)
-
-        MC.set_sweep_function(VSM.__getattr__(
-            'in{}_out{}_att'.format(Gin, out)))
+        MC.set_sweep_function(s)
         MC.set_sweep_points(atts)
         # real_imag is acutally not polar and as such works for opt weights
-        self.int_avg_det_single._set_real_imag(True)
+        self.int_avg_det_single._set_real_imag(real_imag)
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='rabi_'+self.msmt_suffix)
 
