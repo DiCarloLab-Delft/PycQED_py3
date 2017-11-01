@@ -1114,7 +1114,7 @@ class CCLight_Transmon(Qubit):
                 a = ma.SSRO_Analysis(label='SSRO',
                                      channels=d.value_names,
                                      no_fits=no_figs, rotate=False)
-                return None, None
+                return a.F_a, a.F_d
 
     def measure_transients(self, MC=None, analyze: bool=True,
                            cases=('off', 'on'),
