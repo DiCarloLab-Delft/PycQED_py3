@@ -181,6 +181,7 @@ def Qubit_dac_sensitivity(dac_voltage, f_max: float, E_c: float,
                           asymmetry: float=0):
     '''
     Derivative of the qubit detuning vs dac at dac_voltage.
+    The returned quantity is "dfreq/dPhi (dac_voltage)"
     '''
     cos_term = np.cos(np.pi / V_per_phi0 * (dac_voltage - dac_sweet_spot))
     sin_term = np.sin(np.pi / V_per_phi0 * (dac_voltage - dac_sweet_spot))
