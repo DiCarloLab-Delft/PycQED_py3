@@ -5,7 +5,7 @@ from os.path import join, dirname
 import openql.openql as ql
 from openql.openql import Program, Kernel, Platform
 
-from pycqed.utilities.general import mopen
+# from pycqed.utilities.general import mopen
 from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
 
 
@@ -213,10 +213,9 @@ def T1(times, qubit_idx: int, platf_cfg: str):
     for i, time in enumerate(times[:-4]):
         k = Kernel("T1_"+str(i), p=platf)
         k.prepz(qubit_idx)
-        nr_clocks = int(time/20e-9)
+        wait_nanoseconds = int(round(time/1e-9))
         k.gate('rx180', qubit_idx)
-        for i in np.arange(nr_clocks):
-            k.gate('i', qubit_idx)
+        k.gate("wait", [qubit_idx], wait_nanoseconds)
         k.measure(qubit_idx)
         p.add_kernel(k)
 
@@ -251,10 +250,9 @@ def Ramsey(times, qubit_idx: int, platf_cfg: str):
     for i, time in enumerate(times[:-4]):
         k = Kernel("Ramsey_"+str(i), p=platf)
         k.prepz(qubit_idx)
-        nr_clocks = int(time/20e-9)
+        wait_nanoseconds = int(round(time/1e-9))
         k.gate('rx90', qubit_idx)
-        for i in np.arange(nr_clocks):
-            k.gate('i', qubit_idx)
+        k.gate("wait", [qubit_idx], wait_nanoseconds)
         k.gate('rx90', qubit_idx)
         k.measure(qubit_idx)
         p.add_kernel(k)
@@ -290,13 +288,12 @@ def echo(times, qubit_idx: int, platf_cfg: str):
     for i, time in enumerate(times[:-4]):
         k = Kernel("echo_"+str(i), p=platf)
         k.prepz(qubit_idx)
-        nr_clocks = int(time/20e-9/2)
+        # nr_clocks = int(time/20e-9/2)
+        wait_nanoseconds = int(round(time/1e-9/2))
         k.gate('rx90', qubit_idx)
-        for i in np.arange(nr_clocks):
-            k.gate('i', qubit_idx)
+        k.gate("wait", [qubit_idx], wait_nanoseconds)
         k.gate('rx180', qubit_idx)
-        for i in np.arange(nr_clocks):
-            k.gate('i', qubit_idx)
+        k.gate("wait", [qubit_idx], wait_nanoseconds)
         k.gate('rx90', qubit_idx)
         k.measure(qubit_idx)
         p.add_kernel(k)
@@ -477,7 +474,7 @@ def RTE(qubit_idx: int, sequence_type: str, platf_cfg: str,
     return p
 
 
-def randomized_benchmarking(qubit_idx: int,  platf_cfg: str,
+def randomized_benchmarking(qubit_idx: int, platf_cfg: str,
                             nr_cliffords, nr_seeds: int,
                             net_clifford: int=0, restless: bool=False,
                             program_name: str='randomized_benchmarking',
