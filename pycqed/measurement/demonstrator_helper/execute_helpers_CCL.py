@@ -91,9 +91,7 @@ def execute_qisa_file(qisa_file_url: str,  config_json: str,
         #sweep_points = sweep_points["measurement_points"]
 
         # Ok, I am assured by stanvn that he will provide me a options with kw
-        # sweep_points = options["measurement_points"]
-        # HACK HACK HACK
-        sweep_points = np.arange(21)
+        sweep_points = options["measurement_points"]
 
         s = swf.OpenQL_File_Sweep(filename=qisa_fp, CCL=CCL,
                                   parameter_name='Points', unit='a.u.',
