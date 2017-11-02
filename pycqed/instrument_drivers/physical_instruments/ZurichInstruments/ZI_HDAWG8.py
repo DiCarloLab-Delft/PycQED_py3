@@ -381,23 +381,67 @@ class ZI_HDAWG8(ZI_base_instrument):
             '\t// Play a waveform from the table based on the DIO code-word\n'
             '\tplayWaveDIO(); \n'
             '}')
+        if self.cfg_codeword_protocol() != 'flux':
+            for ch in [1, 3, 5, 7]:
+                waveform_table = '// Define the waveform table\n'
+                for cw in range(self.cfg_num_codewords()):
+                    wf0_name = '{}_wave_ch{}_cw{:03}'.format(
+                        self._devname, ch, cw)
+                    wf1_name = '{}_wave_ch{}_cw{:03}'.format(
+                        self._devname, ch+1, cw)
+                    waveform_table += 'setWaveDIO({}, "{}", "{}");\n'.format(
+                        cw, wf0_name, wf1_name)
+                program = waveform_table + codeword_mode_snippet
+                # N.B. awg_nr in goes from 0 to 3 in API while in LabOne
+                # it is 1 to 4
+                awg_nr = ch//2  # channels are coupled in pairs of 2
+                self.configure_awg_from_string(awg_nr=awg_nr,
+                                               program_string=program,
+                                               timeout=self.timeout())
+        else:  # if protocol is flux
+            for ch in [1, 3, 5, 7]:
+                waveform_table = '// Define the waveform table\n'
+                mask_0 = 0b000111  # AWGx_ch0 uses lower bits for CW
+                mask_1 = 0b111000  # AWGx_ch1 uses higher bits for CW
+                for cw in range(2**6):
+                    cw0 = cw & mask_0
+                    cw1 = (cw & mask_1) >> 3
+                    # if both wfs are triggered play both
+                    if (cw0 != 0) and (cw1 != 0):
+                        # if both waveforms exist, upload
+                        wf0_cmd = '"{}_wave_ch{}_cw{:03}"'.format(
+                            self._devname, ch, cw0)
+                        wf1_cmd = '"{}_wave_ch{}_cw{:03}"'.format(
+                            self._devname, ch+1, cw1)
 
-        for ch in [1, 3, 5, 7]:
-            waveform_table = '// Define the waveform table\n'
-            for cw in range(self.cfg_num_codewords()):
-                wf0_name = '{}_wave_ch{}_cw{:03}'.format(
-                    self._devname, ch, cw)
-                wf1_name = '{}_wave_ch{}_cw{:03}'.format(
-                    self._devname, ch+1, cw)
-                waveform_table += 'setWaveDIO({}, "{}", "{}");\n'.format(
-                    cw, wf0_name, wf1_name)
-            program = waveform_table + codeword_mode_snippet
-            # N.B. awg_nr in goes from 0 to 3 in API while in LabOne it is 1 to
-            # 4
-            awg_nr = ch//2  # channels are coupled in pairs of 2
-            self.configure_awg_from_string(awg_nr=awg_nr,
-                                           program_string=program,
-                                           timeout=self.timeout())
+                    # if single wf is triggered fill the other with zeros
+                    elif (cw0 == 0) and (cw1 != 0):
+                        wf0_cmd = 'zeros({})'.format(len(self.get(
+                            'wave_ch{}_cw{:03}'.format(
+                                self._devname, ch, cw1))))
+                        wf1_cmd = '"{}_wave_ch{}_cw{:03}"'.format(
+                            self._devname, ch+1, cw1)
+
+                    elif (cw0 != 0) and (cw1 == 0):
+                        wf0_cmd = '"{}_wave_ch{}_cw{:03}"'.format(
+                            self._devname, ch+1, cw0)
+                        wf0_cmd = 'zeros({})'.format(len(self.get(
+                            'wave_ch{}_cw{:03}'.format(
+                                self._devname, ch, cw0))))
+                    # if no wfs are triggered play only zeros
+                    else:
+                        wf0_cmd = 'zeros({})'.format(42)
+                        wf1_cmd = 'zeros({})'.format(42)
+                    waveform_table += 'setWaveDIO({}, {}, {});\n'.format(
+                        cw, wf0_cmd, wf1_cmd)
+                program = waveform_table + codeword_mode_snippet
+
+                # N.B. awg_nr in goes from 0 to 3 in API while in LabOne it
+                # is 1 to 4
+                awg_nr = ch//2  # channels are coupled in pairs of 2
+                self.configure_awg_from_string(awg_nr=awg_nr,
+                                               program_string=program,
+                                               timeout=self.timeout())
         self.configure_codeword_protocol()
 
     def configure_codeword_protocol(self, default_dio_timing: bool=False):
@@ -414,6 +458,9 @@ class ZI_HDAWG8(ZI_base_instrument):
         There are three options:
             identical : all AWGs have the same configuration
             microwave : AWGs 0 and 1 share bits
+            flux      : Each AWG pair is responsible for 2 flux channels.
+                        this also affects the "codeword_program" and
+                        setting "wave_chX_cwXXX" parameters.
 
         Protocol definition:
         protocol
@@ -480,12 +527,13 @@ class ZI_HDAWG8(ZI_base_instrument):
         if self.cfg_codeword_protocol() == 'microwave':
             for awg_nr in [0, 1]:
                 self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
-
             for awg_nr in [2, 3]:
                 self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 9)
 
-        if self.cfg_codeword_protocol() == 'flux':
-            raise NotImplementedError()
+        elif self.cfg_codeword_protocol() == 'flux':
+            # bits[0:3] for awg0_ch0, bits[4:6] for awg0_ch1 etc.
+            for awg_nr in range(4):
+                self.set('awgs_{}_dio_mask_shift'.format(awg_nr), awg_nr*6)
 
         ####################################################
         # Delay configuration
