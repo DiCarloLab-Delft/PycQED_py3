@@ -2062,6 +2062,9 @@ class SSRO_Analysis(MeasurementAnalysis):
         self.channels = channels
         self.hist_log_scale = hist_log_scale
         self.close_fig = close_fig
+        self.F_a = 0
+        self.F_d = 0 # Placeholder values until analysis completes
+        # this is added to prevent bugs if fits are not run
         super(self.__class__, self).__init__(**kw)
 
     def run_default_analysis(self, rotate=True,
