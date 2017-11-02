@@ -126,10 +126,12 @@ class CCLight_Transmon(Qubit):
                            parameter_class=ManualParameter)
 
         self.add_parameter('ro_pulse_length',
+                           label='Readout pulse length',
                            initial_value=100e-9,
                            unit='s',
                            parameter_class=ManualParameter)
         self.add_parameter('ro_pulse_amp', unit='V',
+                           label='Readout pulse amplitude',
                            initial_value=1,
                            parameter_class=ManualParameter)
         self.add_parameter('ro_pulse_phi', unit='deg', initial_value=0,
@@ -495,7 +497,7 @@ class CCLight_Transmon(Qubit):
                            vals=vals.Numbers(0, 200e-6))
 
         self.add_parameter('freq_qubit',
-                           label='mwubit frequency', unit='Hz',
+                           label='Qubit frequency', unit='Hz',
                            parameter_class=ManualParameter)
         self.add_parameter('freq_max',
                            label='mwubit sweet spot frequency', unit='Hz',
