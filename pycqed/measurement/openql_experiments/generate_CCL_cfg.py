@@ -213,7 +213,8 @@ def generate_config(filename: str,
     # N.B. The codewords for CZ pulses need to be further specified.
     # I do not expect this to be correct for now.
     for ft in flux_tuples:
-        cfg["instructions"]["CZ {}, {}".format(ft[0], ft[1])] = {
+        # FIXME add space back in
+        cfg["instructions"]["cz {},{}".format(ft[0], ft[1])] = {
             "duration": 80,
             "latency": 0,
             "qubits": [ft[0], ft[1]],

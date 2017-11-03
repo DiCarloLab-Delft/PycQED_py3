@@ -4,6 +4,7 @@ import numpy as np
 
 try:
     from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
+    from pycqed.measurement.openql_experiments import multi_qubit_oql as mqo
     from pycqed.measurement.openql_experiments.generate_CCL_cfg import  \
         generate_config
     from openql import openql as ql
@@ -24,6 +25,8 @@ try:
                             init_duration=200000)
             # If this compiles we conclude that the generated config is valid
             sqo.AllXY(qubit_idx=0, platf_cfg=test_config_fn)
+            mqo.single_flux_pulse_seq(qubit_indices=(2, 0),
+                                      platf_cfg=test_config_fn)
 
     class Test_single_qubit_seqs_CCL(unittest.TestCase):
 
@@ -79,6 +82,11 @@ try:
             sqo.randomized_benchmarking(0, platf_cfg=config_fn,
                                         nr_cliffords=nr_cliffords, nr_seeds=3)
 
+    class Test_multi_qubit_seqs_CCL(unittest.TestCase):
+
+        def test_single_flux_pulse_seq(self):
+            mqo.single_flux_pulse_seq(qubit_indices=(2, 0),
+                                      platf_cfg=config_fn)
 
 except ImportError as e:
     class TestMissingDependency(unittest.TestCase):

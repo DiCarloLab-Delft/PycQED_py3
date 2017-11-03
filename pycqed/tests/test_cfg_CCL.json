@@ -2083,7 +2083,7 @@
             ],
             "cc_light_instr": "CW_06"
         },
-        "CZ q2, q0": {
+        "cz q2,q0": {
             "qubits": [
                 "q2",
                 "q0"
