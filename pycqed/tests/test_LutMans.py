@@ -2,6 +2,7 @@ import unittest
 import numpy as np
 import pycqed.instrument_drivers.virtual_instruments.virtual_AWG8 as v8
 from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman as mwl
+from pycqed.instrument_drivers.meta_instrument.LutMans import flux_lutman as flm
 from pycqed.measurement.waveform_control_CC import waveform as wf
 
 
@@ -158,3 +159,28 @@ class Test_MW_LutMan(unittest.TestCase):
         for i in range(4):
             uploaded_wf = self.AWG.get('wave_ch{}_cw001'.format(i+1))
             np.testing.assert_array_almost_equal(expected_wfs[i], uploaded_wf)
+
+
+class Test_Flux_LutMan(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(self):
+        self.AWG = v8.VirtualAWG8('DummyAWG8')
+
+        self.AWG8_Flux_LutMan = flm.AWG8_Flux_LutMan('MW_LutMan')
+        self.AWG8_Flux_LutMan.AWG(self.AWG.name)
+        self.AWG8_Flux_LutMan.channel_I(1)
+        self.AWG8_Flux_LutMan.channel_Q(2)
+        self.AWG8_Flux_LutMan.mw_modulation(100e6)
+        self.AWG8_Flux_LutMan.sampling_rate(2.4e9)
+
+
+    @classmethod
+    def tearDownClass(self):
+        self.AWG.close()
+        self.AWG8_VSM_MW_LutMan.close()
+        self.CBox_MW_LutMan.close()
+        self.QWG_MW_LutMan.close()
+
+
+
