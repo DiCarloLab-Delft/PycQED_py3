@@ -3,6 +3,7 @@ import json
 
 def generate_config(filename: str,
                     mw_pulse_duration: int = 20,
+                    flux_pulse_duration: int=40,
                     ro_duration: int = 800,
                     mw_mw_buffer=0,
                     init_duration: int = 200000):
@@ -13,8 +14,9 @@ def generate_config(filename: str,
         mw_pulse_duration (int) : duration of the mw_pulses in ns.
             N.B. this should be 20 as the VSM marker is hardcoded to be of that
             length.
+        flux_pulse_duration (int) : duration of flux pulses in ns.
         ro_duration       (int) : duration of the readout, including depletion
-         in ns.
+                                    in ns.
         init_duration     (int) : duration of the initialization/reset
             operation in ns. This corresponds to the wait time before every
             experiment.
@@ -215,18 +217,35 @@ def generate_config(filename: str,
     for ft in flux_tuples:
         # FIXME add space back in
         cfg["instructions"]["cz {},{}".format(ft[0], ft[1])] = {
-            "duration": 80,
+            "duration": flux_pulse_duration,
             "latency": 0,
             "qubits": [ft[0], ft[1]],
             "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
             "disable_optimization": True,
             "type": "flux",
             "cc_light_instr_type": "two_qubits_gate",
-            "cc_light_instr": "cz",
+            "cc_light_instr": "FL_CW_{:02}".format(1),
             "cc_light_right_codeword": 1,
-            "cc_light_left_codeword": 2,
-            "cc_light_opcode": 128
+            "cc_light_left_codeword": 1,
+            "cc_light_opcode": 128+1
         }
+
+    for CW_flux in range(8):
+        for ft in flux_tuples:
+            cfg["instructions"]["FL_CW_{:02} {},{}".format(CW_flux,
+                                                           ft[0], ft[1])] = {
+                "duration": flux_pulse_duration,
+                "latency": 0,
+                "qubits": [ft[0], ft[1]],
+                "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+                "disable_optimization": True,
+                "type": "flux",
+                "cc_light_instr_type": "two_qubits_gate",
+                "cc_light_instr": "FL_CW_{:02}".format(CW_flux),
+                "cc_light_right_codeword": CW_flux,
+                "cc_light_left_codeword": CW_flux,
+                "cc_light_opcode": 128+CW_flux
+            }
 
     with open(filename, 'w') as f:
         json.dump(cfg, f, indent=4)

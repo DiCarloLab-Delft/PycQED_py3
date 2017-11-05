@@ -417,21 +417,20 @@ class ZI_HDAWG8(ZI_base_instrument):
                     # if single wf is triggered fill the other with zeros
                     elif (cw0 == 0) and (cw1 != 0):
                         wf0_cmd = 'zeros({})'.format(len(self.get(
-                            'wave_ch{}_cw{:03}'.format(
-                                self._devname, ch, cw1))))
+                            'wave_ch{}_cw{:03}'.format(ch, cw1))))
                         wf1_cmd = '"{}_wave_ch{}_cw{:03}"'.format(
                             self._devname, ch+1, cw1)
 
                     elif (cw0 != 0) and (cw1 == 0):
                         wf0_cmd = '"{}_wave_ch{}_cw{:03}"'.format(
                             self._devname, ch+1, cw0)
-                        wf0_cmd = 'zeros({})'.format(len(self.get(
-                            'wave_ch{}_cw{:03}'.format(
-                                self._devname, ch, cw0))))
+                        wf1_cmd = 'zeros({})'.format(len(self.get(
+                            'wave_ch{}_cw{:03}'.format(ch, cw0))))
                     # if no wfs are triggered play only zeros
                     else:
                         wf0_cmd = 'zeros({})'.format(42)
                         wf1_cmd = 'zeros({})'.format(42)
+
                     waveform_table += 'setWaveDIO({}, {}, {});\n'.format(
                         cw, wf0_cmd, wf1_cmd)
                 program = waveform_table + codeword_mode_snippet
