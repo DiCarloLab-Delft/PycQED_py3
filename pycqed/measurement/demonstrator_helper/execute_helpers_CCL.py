@@ -60,7 +60,7 @@ except KeyError:
     MC_demo = Instrument.find_instrument('Demonstrator_MC')
 
 
-def execute_qisa_file(qisa_file_url: str,  config_json: str,
+def execute(file_url: str,  config_json: str,
                       verbosity_level: int=0):
     options = json.loads(config_json)
 
@@ -82,15 +82,9 @@ def execute_qisa_file(qisa_file_url: str,  config_json: str,
         qubit.ro_acq_averages(512)
 
         # Get the qisa file
-        qisa_fp = _retrieve_file_from_url(qisa_file_url)
+        qisa_fp = _retrieve_file_from_url(file_url)
 
-        # Two ways to generate the sweep_points. Either I get from the file_url
-        # or I get the appended options file which has the kw "measurement_points"
-        #sweep_points_fp = _retrieve_file_from_url(sweep_points_file_url)
-        # sweep_points = json.loads(sweep_points_fp)
-        #sweep_points = sweep_points["measurement_points"]
-
-        # Ok, I am assured by stanvn that he will provide me a options with kw
+        # Retrieve the sweep points
         sweep_points = options["measurement_points"]
 
         s = swf.OpenQL_File_Sweep(filename=qisa_fp, CCL=CCL,
@@ -111,8 +105,9 @@ def execute_qisa_file(qisa_file_url: str,  config_json: str,
         data = MC_demo.run('CCL_execute')  # FIXME <- add the proper name
 
     else:
-        qisa_fp = _retrieve_file_from_url(qisa_file_url)
-        data = _simulate_quantumsim(qisa_fp, options)
+        # We need to take in a qasm file because we're invoking quantumsim when we're in fake execute mode...
+        qasm_fp = _retrieve_file_from_url(file_url)
+        data = _simulate_quantumsim(qasm_fp, options)
 
     return _MC_result_to_chart_dict(data)
 

@@ -46,7 +46,7 @@ else:
     MC_demo.station = station
 
 
-def execute_qumis_file(file_url: str,  config_json: str,
+def execute(file_url: str,  config_json: str,
                       verbosity_level: int=0):
     options = json.loads(config_json)
 
@@ -63,7 +63,7 @@ def execute_qumis_file(file_url: str,  config_json: str,
 
         qumis_fp = _retrieve_file_from_url(file_url)
 
-        # Ok, I am assured by stanvn that he will provide me a options with kw
+        # Retrieve the sweep points
         sweep_points = options["measurement_points"]
 
 
@@ -78,8 +78,9 @@ def execute_qumis_file(file_url: str,  config_json: str,
         data = MC.run('Starmon_execute')  # FIXME <- add the proper name
     
     else:
-        qumis_fp = _retrieve_file_from_url(file_url)
-        data = _simulate_quantumsim(qumis_fp, options)
+        # We need to take in a qasm file because we're invoking quantumsim when we're in fake execute mode...
+        qasm_fp = _retrieve_file_from_url(file_url)
+        data = _simulate_quantumsim(qasm_fp, options)
 
     return _MC_result_to_chart_dict(data)
 
