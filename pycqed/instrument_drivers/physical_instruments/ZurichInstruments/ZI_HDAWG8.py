@@ -402,7 +402,10 @@ class ZI_HDAWG8(ZI_base_instrument):
             for ch in [1, 3, 5, 7]:
                 waveform_table = '// Define the waveform table\n'
                 mask_0 = 0b000111  # AWGx_ch0 uses lower bits for CW
-                mask_1 = 0b111000  # AWGx_ch1 uses higher bits for CW
+                # FIXME: this is a hack because not all AWG8 channels support
+                # amp mode. It forces all AWG8's of a pair to behave identical.
+                mask_1 = mask_0
+                # mask_1 = 0b111000  # AWGx_ch1 uses higher bits for CW
                 for cw in range(2**6):
                     cw0 = cw & mask_0
                     cw1 = (cw & mask_1) >> 3
@@ -568,7 +571,7 @@ class ZI_HDAWG8(ZI_base_instrument):
         # Disable all function generators
         self._dev.daq.setInt('/' + self._dev.device +
                              '/sigouts/*/enables/*', 0)
-        # Switch all outputs in to direct mode
+        # Switch all outputs into direct mode
         if self.cfg_codeword_protocol() != 'flux':
             self._dev.daq.setInt(
                 '/' + self._dev.device + '/raw/sigouts/*/mode', 0)
