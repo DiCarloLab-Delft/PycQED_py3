@@ -81,10 +81,10 @@ class ConfigParameter(ManualParameter):
             value (any): value to validate and save
         """
         self.validate(value)
-        if value != self._latest()['value']:
+        if value != self.get_latest():
             self._instrument._config_changed = True
         self._save_val(value)
 
     def get(self):
         """ Return latest value"""
-        return self._latest()['value']
+        return self.get_latest()
