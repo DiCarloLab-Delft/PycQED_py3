@@ -17,7 +17,6 @@ import time
 
 from qcodes import IPInstrument
 from qcodes import validators as vals
-from .vsm_validators import CaseInsensitiveEnum
 
 
 class QuTechVSMModule(IPInstrument):
@@ -189,8 +188,7 @@ class QuTechVSMModule(IPInstrument):
 
         self.add_power_supply_parameters()
         self.add_parameter('mbbc_state', get_cmd='MBBC?',
-                           vals=CaseInsensitiveEnum('connected',
-                                                    'disconnected'))
+                           vals=vals.Enum('connected', 'disconnected'))
         self.add_temperature_parameters()
         self.add_marker_parameters()
         self.add_qubit_parameters()
