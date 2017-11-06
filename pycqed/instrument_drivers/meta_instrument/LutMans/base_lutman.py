@@ -38,7 +38,7 @@ class Base_LutMan(Instrument):
                 "Name of the AWG instrument used, note that this can also be "
                 "a UHFQC or a CBox as these also contain AWG's"),
             vals=vals.Strings())
-
+        self._add_cfg_parameters()
         self._add_waveform_parameters()
         self.add_parameter(
             'LutMap', docstring=(
@@ -72,6 +72,9 @@ class Base_LutMan(Instrument):
         Adds the parameters required to generate the standard waveforms
         """
         raise NotImplementedError()
+
+    def _add_cfg_parameters(self):
+        pass
 
     def generate_standard_waveforms(self):
         """

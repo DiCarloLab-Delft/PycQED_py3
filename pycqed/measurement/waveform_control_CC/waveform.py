@@ -99,8 +99,8 @@ def gauss_pulse(amp: float, sigma_length: float, nr_sigma: int=4,
 def single_channel_block(amp, length, sampling_rate=2e8, delay=0):
     '''
     Generates a block pulse.
-        length in s
         amp in V
+        length in s
         sampling_rate in Hz
         empty delay in s
     '''

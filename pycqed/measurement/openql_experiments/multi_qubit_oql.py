@@ -18,11 +18,9 @@ def single_flux_pulse_seq(qubit_indices: tuple,
     k = Kernel("main", p=platf)
     for idx in qubit_indices:
         k.prepz(idx)  # to ensure enough separation in timing
-    # k.gate('cz', qubit_indices)
-    k.gate('cz', qubit_indices[0], qubit_indices[1])
-    # k.gate('cz', 0, 2)
-    # k.gate('cz', 2, 0)
-    # k.cphase(2, 0)
+    for i in range(7):
+        k.gate('CW_00', i)
+    k.gate('fl_cw_02', qubit_indices[0], qubit_indices[1])
     p.add_kernel(k)
     p.compile()
     # attribute get's added to program to help finding the output files

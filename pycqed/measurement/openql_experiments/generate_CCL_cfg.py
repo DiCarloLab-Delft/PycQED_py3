@@ -181,7 +181,7 @@ def generate_config(filename: str,
                 "disable_optimization": False,
                 "type": "mw",
                 "cc_light_instr_type": "single_qubit_gate",
-                "cc_light_instr": "CW_{:02}".format(CW),
+                "cc_light_instr": "cw_{:02}".format(CW),
                 "cc_light_codeword": CW,
                 "cc_light_opcode": 8+CW}
 
@@ -193,14 +193,14 @@ def generate_config(filename: str,
                 "disable_optimization": False,
                 "type": "mw",
                 "cc_light_instr_type": "single_qubit_gate",
-                "cc_light_instr": "C_CW_{:02}".format(CW),
+                "cc_light_instr": "C_cw_{:02}".format(CW),
                 "cc_light_codeword": CW,
                 "cc_light_opcode": 32+8+CW,
                 "cc_light_cond": 1}
 
     for CW in range(32):
         for q in qubits:
-            cfg["instructions"]["CW_{:02} {}".format(CW, q)] = {
+            cfg["instructions"]["cw_{:02} {}".format(CW, q)] = {
                 "duration": mw_pulse_duration,
                 "latency": 0,
                 "qubits": [q],
@@ -208,7 +208,7 @@ def generate_config(filename: str,
                 "disable_optimization": False,
                 "type": "mw",
                 "cc_light_instr_type": "single_qubit_gate",
-                "cc_light_instr": "CW_{:02}".format(CW),
+                "cc_light_instr": "cw_{:02}".format(CW),
                 "cc_light_codeword": CW,
                 "cc_light_opcode": 8+CW}
 
@@ -224,15 +224,15 @@ def generate_config(filename: str,
             "disable_optimization": True,
             "type": "flux",
             "cc_light_instr_type": "two_qubits_gate",
-            "cc_light_instr": "FL_CW_{:02}".format(1),
+            "cc_light_instr": "fl_cw_{:02}".format(1),
             "cc_light_right_codeword": 1,
             "cc_light_left_codeword": 1,
             "cc_light_opcode": 128+1
         }
 
-    for CW_flux in range(8):
+    for cw_flux in range(8):
         for ft in flux_tuples:
-            cfg["instructions"]["FL_CW_{:02} {},{}".format(CW_flux,
+            cfg["instructions"]["fl_cw_{:02} {},{}".format(cw_flux,
                                                            ft[0], ft[1])] = {
                 "duration": flux_pulse_duration,
                 "latency": 0,
@@ -241,10 +241,10 @@ def generate_config(filename: str,
                 "disable_optimization": True,
                 "type": "flux",
                 "cc_light_instr_type": "two_qubits_gate",
-                "cc_light_instr": "FL_CW_{:02}".format(CW_flux),
-                "cc_light_right_codeword": CW_flux,
-                "cc_light_left_codeword": CW_flux,
-                "cc_light_opcode": 128+CW_flux
+                "cc_light_instr": "fl_cw_{:02}".format(cw_flux),
+                "cc_light_right_codeword": cw_flux,
+                "cc_light_left_codeword": cw_flux,
+                "cc_light_opcode": 128+cw_flux
             }
 
     with open(filename, 'w') as f:

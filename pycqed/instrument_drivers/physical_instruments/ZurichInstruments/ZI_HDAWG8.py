@@ -568,5 +568,7 @@ class ZI_HDAWG8(ZI_base_instrument):
         # Disable all function generators
         self._dev.daq.setInt('/' + self._dev.device +
                              '/sigouts/*/enables/*', 0)
-        # Switch all outputs in to DAC mode
-        self._dev.daq.setInt('/' + self._dev.device + '/raw/sigouts/*/mode', 0)
+        # Switch all outputs in to direct mode
+        if self.cfg_codeword_protocol() != 'flux':
+            self._dev.daq.setInt(
+                '/' + self._dev.device + '/raw/sigouts/*/mode', 0)

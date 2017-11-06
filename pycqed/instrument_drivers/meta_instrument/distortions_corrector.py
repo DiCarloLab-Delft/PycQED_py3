@@ -1142,8 +1142,8 @@ class Dummy_distortion_corrector(Distortion_corrector):
         self.time_pts = np.arange(len(self.waveform))/sampling_rate
 
 
-class RT_distortion_corrector_AWG8(Distortion_corrector): 
-    def __init__(self, flux_lutman, oscilloscope, square_amp: float,
+class RT_distortion_corrector_AWG8(Distortion_corrector):
+    def __init__(self, flux_lutman, measure_scope_trace, square_amp: float,
                  nr_plot_points: int=1000, ):
         '''
         Instantiates an object.
@@ -1161,10 +1161,11 @@ class RT_distortion_corrector_AWG8(Distortion_corrector):
                     changed in self.nr_plot_points.
         '''
         self.flux_lutman = flux_lutman
-        self.scope = oscilloscope
-        super().__init__(kernel_object=flux_lutman.F_kernel_instr.get_instr(),
-                         square_amp=square_amp,
-                         nr_plot_points=nr_plot_points)
+        self.sampling_rate = flux_lutman.sampling_rate()
+        self.measure_scope_trace = measure_scope_trace
+        super().__init__(
+            kernel_object=flux_lutman.instr_distortion_kernel.get_instr(),
+            square_amp=square_amp, nr_plot_points=nr_plot_points)
 
         self.raw_waveform = []
         self.raw_time_pts = []
@@ -1176,23 +1177,23 @@ class RT_distortion_corrector_AWG8(Distortion_corrector):
         Data clipped to start at the rising edge is saved to self.time_pts
         and self.waveform.
 
-        N.B. This measure trace method makes two assumptions 
-            1. The scope is properly configured. 
-            2. The CCLight is running the correct program that triggers the 
-               AWG8. 
+        N.B. This measure trace method makes two assumptions
+            1. The scope is properly configured.
+            2. The CCLight is running the correct program that triggers the
+               AWG8.
         '''
         # Upload waveform
         self.flux_lutman.load_waveform_onto_AWG_lookuptable(
             'square', regenerate_waveforms=True)
         if verbose:
             print('Measuring trace...')
-        self.raw_time_pts, self.raw_waveform = \
-            self.scope.measure_trace()
+        self.raw_time_pts, self.raw_waveform = self.measure_scope_trace()
 
         # Normalize waveform and find rising edge
         self.waveform = self.detect_edge_and_normalize_wf(self.raw_waveform)
-        
+
         self.time_pts = np.arange(len(self.waveform)) / self.sampling_rate
+
 
 class RT_distortion_corrector_QWG(Distortion_corrector):
     '''
@@ -1204,7 +1205,7 @@ class RT_distortion_corrector_QWG(Distortion_corrector):
     #   - check TODOs in this file
     #   - waveform length will become parameter in QWG_flux_lutman
     #       -> adapt this class to handle that
-    def __init__(self, AWG_lutman, oscilloscope, square_amp: float,
+    def __init__(self, AWG_lutman, measure_scope_trace, square_amp: float,
                  nr_plot_points: int=1000):
         '''
         Instantiates an object.
@@ -1222,7 +1223,7 @@ class RT_distortion_corrector_QWG(Distortion_corrector):
                     changed in self.nr_plot_points.
         '''
         self.AWG_lutman = AWG_lutman
-        self.scope = oscilloscope
+        self.measure_scope_trace = measure_scope_trace
         super().__init__(kernel_object=AWG_lutman.F_kernel_instr.get_instr(),
                          square_amp=square_amp,
                          nr_plot_points=nr_plot_points)
@@ -1245,7 +1246,7 @@ class RT_distortion_corrector_QWG(Distortion_corrector):
         if verbose:
             print('Measuring trace...')
         self.raw_time_pts, self.raw_waveform = \
-            self.scope.measure_trace()
+            self.measure_scope_trace()
 
         # Measurement should be implemented using measurement_control
         # self.data_dir should be set to data dir of last measurement
