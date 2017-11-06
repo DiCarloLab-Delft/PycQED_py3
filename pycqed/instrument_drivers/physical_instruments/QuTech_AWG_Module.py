@@ -14,7 +14,9 @@ from .SCPI import SCPI
 
 import numpy as np
 import struct
+import json
 from qcodes import validators as vals
+import warnings
 
 
 from qcodes.instrument.parameter import StandardParameter
@@ -211,13 +213,23 @@ class QuTech_AWG_Module(SCPI):
         self.add_function('syncSidebandGenerators',
                           call_cmd='QUTEch:OUTPut:SYNCsideband',
                           docstring=doc_sSG)
+
+        # self.add_parameter('system_status'),
+        #                    label='System status',
+        #                    get_cmd=systemState_cmd + 'SYSTem:STAtus? {}',
+        #                    val_mapping={True: '1', False: '0'},
+        #                    vals=vals.Bool())
         # command is run but using start and stop because
         # FIXME: replace custom start function when proper error message has
         # been implemented.
         # self.add_function('start',
         #                   call_cmd='awgcontrol:run:immediate')
-        self.add_function('stop',
-                          call_cmd='awgcontrol:stop:immediate')
+    def stop(self):
+        self.write('awgcontrol:stop:immediate')
+
+        self.detectOverflow()
+        self.getErrors()
+
 
     def start(self):
         run_mode = self.run_mode()
@@ -225,9 +237,14 @@ class QuTech_AWG_Module(SCPI):
             raise RuntimeError('No run mode is specified')
         self.write('awgcontrol:run:immediate')
 
-        err_msg = self.getError()
-        if not err_msg.startswith('0'):
-            raise RuntimeError(err_msg)
+        self.getErrors()
+
+        status = self.getSystemStatus()
+        # warn_msg = self.detectPosibleOverflow(status)
+        warn_msg = self.detectPosibleUnderFlow(status)
+
+        if(len(warn_msg) > 0):
+            warnings.warn(', '.join(warn_msg))
 
     def _setMatrix(self, chPair, mat):
         '''
@@ -248,6 +265,49 @@ class QuTech_AWG_Module(SCPI):
             M[i] = x
         M = M.reshape(2, 2, order='F')
         return(M)
+
+    def getSystemStatus(self):
+        # vals.Bool().validate(resetStatus)
+        status = str(self.ask('SYSTem:STAtus?'))[1:-1]
+        status = status.replace('\"\"', '\"') # SCPI/visa adds additional quotes
+        return json.loads(status)
+
+    def detectOverflow(self):
+        status = self.getSystemStatus()
+        errors = False;
+        err_msg = [];
+        for channel in status["channels"]:
+            if(channel["overflow"] == True):
+                errors = True;
+                err_msg.append("Wave overflow detected on channel: {}".format(channel["id"]))
+        if(errors == True):
+            raise RuntimeError(err_msg)
+
+    # def detectPosibleOverflow(self, status):
+    #     msg = [];
+    #     for channel in status["channels"]:
+    #         if((channel["on"] == True) and (channel["possibleOverflow"] == True)):
+    #             msg.append("Possible wave overflow detected on channel: {}".format(channel["id"]))
+    #     return msg;
+
+    def detectPosibleUnderFlow(self, status):
+        msg = [];
+        for channel in status["channels"]:
+            if((channel["on"] == True) and (channel["underflow"] == True)):
+                msg.append("Possible wave underflow detected on channel: {}".format(channel["id"]))
+        return msg;
+
+    def getErrors(self):
+        errNr = self.getSystemErrorCount()
+
+        if errNr > 0:
+            errMgs = [];
+            for i in range(errNr):
+                errMgs.append(self.getError())
+            raise RuntimeError(', '.join(errMgs))
+
+
+
 
     ##########################################################################
     # AWG5014 functions: SEQUENCE
@@ -400,8 +460,8 @@ class QuTech_AWG_Module(SCPI):
 
         Compatibility:  QWG
         """
-        wv_val = vals.Arrays(min_value=-1, max_value=1)
-        wv_val.validate(waveform)
+        # wv_val = vals.Arrays(min_value=-1, max_value=1)
+        # wv_val.validate(waveform)
 
         maxWaveLen = 2**17-4  # FIXME: this is the hardware max
 
