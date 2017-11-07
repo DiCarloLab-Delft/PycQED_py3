@@ -35,9 +35,9 @@ class InstrumentParameter(ManualParameter):
             vals (Validator):  validator to set
         """
         if vals is None:
-            self._vals = Strings()
+            self.vals = Strings()
         elif isinstance(vals, Validator):
-            self._vals = vals
+            self.vals = vals
         else:
             raise TypeError('vals must be a Validator')
 
