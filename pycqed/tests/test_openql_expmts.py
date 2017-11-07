@@ -88,6 +88,28 @@ try:
             mqo.single_flux_pulse_seq(qubit_indices=(2, 0),
                                       platf_cfg=config_fn)
 
+        def test_flux_staircase_seq(self):
+            mqo.flux_staircase_seq(platf_cfg=config_fn)
+
+        def test_two_qubit_off_on(self):
+            mqo.two_qubit_off_on(q0=0, q1=1, platf_cfg=config_fn)
+
+        def test_two_qubit_tomo_cardinal(self):
+            mqo.two_qubit_tomo_cardinal(cardinal=3,
+                                        q0=0, q1=1, platf_cfg=config_fn)
+
+        def test_two_qubit_AllXY(self):
+            mqo.two_qubit_AllXY(q0=0, q1=1, platf_cfg=config_fn,
+                                sequence_type='sequential',
+                                replace_q1_pulses_X180=False,
+                                double_points=True)
+
+            mqo.two_qubit_AllXY(q0=0, q1=1, platf_cfg=config_fn,
+                                sequence_type='simultaneous',
+                                replace_q1_pulses_X180=False,
+                                double_points=True)
+
+
 except ImportError as e:
     class TestMissingDependency(unittest.TestCase):
 
