@@ -109,8 +109,9 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         """
         Adds the parameters required to generate the standard waveforms
         """
-        self.add_parameter('sq_amp', initial_value=1,
-                           unit='V', vals=vals.Numbers(),
+        self.add_parameter('sq_amp', initial_value=.5,
+                           # units is part of the total range of AWG8
+                           unit='a.u.', vals=vals.Numbers(),
                            parameter_class=ManualParameter)
         self.add_parameter('sq_length', unit='s',
                            initial_value=40e-9,
@@ -144,7 +145,6 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         if self.cfg_append_compensation():
             waveform = self.add_compensation_pulses(waveform)
-            print(waveform)
 
         if self.cfg_distort():
             waveform = self.distort_waveform(waveform)

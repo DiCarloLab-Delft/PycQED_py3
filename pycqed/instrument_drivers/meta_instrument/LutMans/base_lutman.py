@@ -33,6 +33,7 @@ class Base_LutMan(Instrument):
     def __init__(self, name, **kw):
         logging.info(__name__ + ' : Initializing instrument')
         super().__init__(name, **kw)
+        # FIXME: rename to instr_AWG to be consistent with other instr refs
         self.add_parameter(
             'AWG', parameter_class=InstrumentRefParameter, docstring=(
                 "Name of the AWG instrument used, note that this can also be "

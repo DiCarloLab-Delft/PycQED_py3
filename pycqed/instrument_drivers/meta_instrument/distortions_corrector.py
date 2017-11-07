@@ -1191,8 +1191,7 @@ class RT_distortion_corrector_AWG8(Distortion_corrector):
 
         # Normalize waveform and find rising edge
         self.waveform = self.detect_edge_and_normalize_wf(self.raw_waveform)
-
-        self.time_pts = np.arange(len(self.waveform)) / self.sampling_rate
+        self.time_pts = self.raw_time_pts
 
 
 class RT_distortion_corrector_QWG(Distortion_corrector):
