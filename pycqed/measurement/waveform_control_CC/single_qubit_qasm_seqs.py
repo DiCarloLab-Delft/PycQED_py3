@@ -626,8 +626,7 @@ def distortion_scope_fine_seq(qubit_name: str, nr_of_points: int,
     return qasm_file
 
 
-def flux_timing_seq(qubit_name, taus,
-                    wait_between=220e-9, clock_cycle=1e-9, cal_points=True):
+def flux_timing_seq(qubit_name, cal_points=True, chunk_size=32):
     '''
     Creates the QASM sequence to calibrate the timing of the flux pulse
     relative to microwave pulses.
@@ -647,22 +646,19 @@ def flux_timing_seq(qubit_name, taus,
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \n'.format(qubit_name))
 
-    for i, tau in enumerate(taus):
+
+    for i in range(chunk_size):
         qasm_file.writelines('\ninit_all\n')
 
-        if cal_points and (i == len(taus) - 4 or i == len(taus) - 3):
+        if cal_points and 3 <= chunk_size - i <= 4:
             # Calibration point for |0>
             pass
-        elif cal_points and (i == len(taus) - 2 or i == len(taus) - 1):
+        elif cal_points and 1 <= chunk_size - i <= 2:
             # Calibration point for |1>
             qasm_file.writelines('X180 {} \n'.format(qubit_name))
         else:
-            qasm_file.writelines('flux square {}\n'.format(qubit_name))
-            qasm_file.writelines(
-                'I {}\n'.format(int(round(tau/clock_cycle))))
             qasm_file.writelines('X90 {}\n'.format(qubit_name))
-            qasm_file.writelines(
-                'I {}\n'.format(int(round(wait_between/clock_cycle))))
+            qasm_file.writelines('square_{} {}\n'.format(i, qubit_name))
             qasm_file.writelines('X90 {}\n'.format(qubit_name))
 
         qasm_file.writelines('RO {}  \n'.format(qubit_name))
