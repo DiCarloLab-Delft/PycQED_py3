@@ -1117,9 +1117,15 @@ class Distortion_corrector():
                 edge_idx = i
                 break
         if edge_idx < 0:
-            raise ValueError('Failed to find rising edge.')
+            # This is an important error but should not crash the
+            # process
+            logging.warning('Failed to find rising edge.')
+            self.edge_idx = 0
+            return waveform
         norm_waveform = (waveform -
                          np.mean(waveform[:edge_idx-1])) / self.square_amp
+        # FIXME: this should be returned and other methods should use this
+        self.edge_idx = edge_idx
         return norm_waveform
 
 
@@ -1190,8 +1196,9 @@ class RT_distortion_corrector_AWG8(Distortion_corrector):
         self.raw_time_pts, self.raw_waveform = self.measure_scope_trace()
 
         # Normalize waveform and find rising edge
-        self.waveform = self.detect_edge_and_normalize_wf(self.raw_waveform)
-        self.time_pts = self.raw_time_pts
+        self.waveform = self.detect_edge_and_normalize_wf(self.raw_waveform,
+                                                          edge_level=0.05)
+        self.time_pts = self.raw_time_pts - self.raw_time_pts[self.edge_idx]
 
 
 class RT_distortion_corrector_QWG(Distortion_corrector):
