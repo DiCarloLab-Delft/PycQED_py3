@@ -133,8 +133,8 @@ class Qubit(Instrument):
                        MC=None, analyze=True, close_fig=True):
         raise NotImplementedError()
 
-    def calibrate_motzoi(self, MC=None, verbose=True, update=True):
-        motzois = gen_sweep_pts(center=0, span=1, num=31)
+    def calibrate_motzoi(self, MC=None, verbose=True, update=True, num=31):
+        motzois = gen_sweep_pts(center=0, span=1, num=num)
 
         # large range
         a = self.measure_motzoi(MC=MC, motzois=motzois, analyze=True)
@@ -146,7 +146,7 @@ class Qubit(Instrument):
             return False
 
         # fine range around optimum
-        motzois = gen_sweep_pts(center=a.optimal_motzoi, span=.4, num=31)
+        motzois = gen_sweep_pts(center=a.optimal_motzoi, span=.4, num=num)
         a = self.measure_motzoi(motzois)
         opt_motzoi = a.optimal_motzoi
         if opt_motzoi > max(motzois) or opt_motzoi < min(motzois):
@@ -668,7 +668,7 @@ class Transmon(Qubit):
         return success
 
     def find_pulse_amplitude(self, amps=np.linspace(-.5, .5, 31),
-                             N_steps=[3, 7, 13, 17], max_n=18,
+                             N_steps=[3, 7], max_n=18,
                              close_fig=True, verbose=False,
                              MC=None, update=True, take_fit_I=False):
         '''
