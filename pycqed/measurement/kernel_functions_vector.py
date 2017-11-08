@@ -133,9 +133,9 @@ htilde_onchip = lambda t, pairs: htilde(step_onchip, t, pairs)
 #kill the open line, take the data as an array in the function input
 def step_scope(t=None, params=None):
     # open file
-    
+
     step = params['vector']
-    
+
     max_len_output = len(step)-2*params['points_per_ns']
     print('max trace time = %.3f ns' %
           (max_len_output/params['points_per_ns']))
@@ -166,7 +166,7 @@ def step_raw(vector, process_step=True, step_params=None, norm_type='max'):
 
     #killed file reading here
     step = vector
-    
+
 
     if process_step:
         if step_params is None:

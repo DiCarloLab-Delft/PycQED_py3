@@ -1,5 +1,6 @@
 import logging
 import numpy as np
+from scipy.linalg import toeplitz
 from scipy import special
 from os.path import join
 kernel_dir = None
@@ -14,24 +15,30 @@ def heaviside(t):
 def square(t, width=1, t0=0):
     return heaviside(t-t0)-heaviside(t-t0-width)
 
+
+def bounce(t, amp, time, sampling_rate=1):
+    main_comp = (1-amp) * heaviside(t)
+    bounce_comp = amp*np.double((t+(1/sampling_rate)/2) > time)*heaviside(t)
+    return main_comp + bounce_comp
+
 # generic function calculating the htilde (discrete impulse response) from
 # a known step function
 htilde = lambda fun, t, params, width=1: fun(t, params)-fun(t-width, params)
 
 
-filter_matrix_generic = lambda fun, t, *params: np.sum(
-    np.array(map(lambda ii: np.diag(fun(t[ii], *params)*np.ones(len(t)-ii), k=-ii), range(len(t)))), 0)
-
-
-def kernel_generic(fun, t, *params):
-    return np.linalg.inv(filter_matrix_generic(fun, t, *params))[:, 0]
-
-
-def kernel_generic2(fun, t, *params):
-    return np.linalg.inv(filter_matrix_generic2(fun, t, *params))[:, 0]
+def kernel_generic(fun, t, *args, **kw):
+    """
+    Constructs a toeplitz matrix for a given function and performs
+    the required inversion.
+    """
+    c = fun(t, *args, **kw)
+    r = np.zeros(len(c))
+    M = toeplitz(c=c, r=r)
+    return np.linalg.inv(M)[:, 0]
 
 
 def filter_matrix_generic2(fun, t, *params):
+    logging.warning('use scipy.linalg.toeplitz instead')
     A = np.zeros((len(t), len(t)))
     for i in range(len(t)):
         for j in range(len(t)):
@@ -341,8 +348,9 @@ def get_all_sampled(file_name, step_width_ns, points_per_ns, max_points=600,
     step_direct = np.double(f.readlines())
     f.close()
 
+
 def get_all_sampled_vector(vector, step_width_ns, points_per_ns, max_points=600,
-                    step_params=None, norm_type='max'):
+                           step_params=None, norm_type='max'):
     """
     step_width_ns (ints):  not all points are selected for inversion,
                     this selects the stepsize for the inversion
@@ -407,25 +415,46 @@ kernel_name = 'my_current_kernel'
 matrix_kernel_time = 400.
 
 
-def bounce_kernel(amp=0.02, time=4, length=601):
+def bounce_kernel(amp: float=0.02, time: float=4,
+                  length: float=601, sampling_rate: float=1):
     """
     Generates a bounce kernel, with the specified parameters.
     amp is the fraction of the signal that is reflected.
 
     kernel_step_function:
         (1-amp) heaviside(t) + amp*heaviside(t-time)
+
+    Args:
+        amp             (float) : amplitude of the decay
+        time            (float) : time constant of the bounce
+        length          (float) : total length of the kernel
+        sampling_rate   (float) : sampling rate for which to generate the
+            kernel. Default value is 1 to support deprecated behaviour
+            in which everything is expressed in units of ns.
+    returns:
+        bounce_kernel (np.array) : the predistortion kernel to correct for
+            an exponential decay.
+
     """
-    bounce = lambda t, amp, time: (1-amp) * heaviside(
-        t) + amp*np.double((t+1) > time)*heaviside(t)
-    htilde_bounce = lambda t, time: bounce(
-        t, amp, time) - bounce(t-1, amp, time)
-    t_kernel = np.arange(int(length))
+    nr_samples = int(length*sampling_rate)
+    t_kernel = np.arange(nr_samples)/sampling_rate
+
+    def htilde_bounce(t, amp, time, sampling_rate):
+        first_comp = bounce(t, amp, time, sampling_rate=sampling_rate)
+        sec_comp = bounce(t-1/sampling_rate, amp, time,
+                          sampling_rate=sampling_rate)
+        return first_comp - sec_comp
+
     if abs(amp) > 0.:
-        kernel_bounce = kernel_generic2(htilde_bounce, t_kernel, time)
+        kernel_bounce = kernel_generic(
+            fun=htilde_bounce, t=t_kernel,
+            amp=amp, time=time,
+            sampling_rate=sampling_rate)
     else:
-        kernel_bounce = np.zeros(int(length))
+        kernel_bounce = np.zeros(int(nr_samples))
         kernel_bounce[0] = 1.
     kernel_bounce = kernel_bounce / np.sum(kernel_bounce)
+
     return kernel_bounce
 
 
@@ -464,7 +493,7 @@ def decay_kernel(amp: float=1., tau: float =11000,
         kernel_decay[0] = kernel_decay_step[0]
         kernel_decay[1:] = kernel_decay_step[1:]-kernel_decay_step[:-1]
     else:
-        kernel_decay = np.zeros(int(length))
+        kernel_decay = np.zeros(int(nr_samples))
         kernel_decay[0] = 1.
     return kernel_decay
 
@@ -477,7 +506,7 @@ def skin_kernel(alpha=0., length=601):
     """
     t_kernel = np.arange(int(length))
     if abs(alpha) > 0.:
-        kernel_skineffect = kernel_generic2(htilde_skineffect,
+        kernel_skineffect = kernel_generic(htilde_skineffect,
                                             t_kernel, alpha)
     else:
         kernel_skineffect = np.zeros(int(length))

@@ -10,7 +10,7 @@ from qcodes.instrument.parameter import ManualParameter
 from pycqed.measurement.kernel_functions import (
     kernel_generic, htilde_bounce,
     htilde_skineffect, save_kernel, step_bounce, step_skineffect,
-    heaviside, kernel_generic2)
+    heaviside)
 
 import pycqed.measurement.kernel_functions as kf
 from pycqed.instrument_drivers.pq_parameters import ConfigParameter
@@ -181,12 +181,14 @@ class DistortionKernel(Instrument):
                               length=self.skineffect_length()*self.sampling_rate())
 
     def get_decay_kernel_1(self):
-        return kf.decay_kernel(amp=self.decay_amp_1(), tau=self.decay_tau_1()*self.sampling_rate(),
-                               length=self.decay_length_1()*self.sampling_rate())
+        return kf.decay_kernel(amp=self.decay_amp_1(), tau=self.decay_tau_1(),
+                               length=self.decay_length_1(),
+                               sampling_rate=self.sampling_rate())
 
     def get_decay_kernel_2(self):
-        return kf.decay_kernel(amp=self.decay_amp_2(), tau=self.decay_tau_2()*self.sampling_rate(),
-                               length=self.decay_length_2()*self.sampling_rate())
+        return kf.decay_kernel(amp=self.decay_amp_2(), tau=self.decay_tau_2(),
+                               length=self.decay_length_2(),
+                               sampling_rate=self.sampling_rate())
 
     def get_poly_kernel(self):
         """
