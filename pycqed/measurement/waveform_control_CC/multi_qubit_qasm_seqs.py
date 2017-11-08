@@ -73,8 +73,8 @@ def two_qubit_tomo_cardinal(cardinal,
     tomo_list_q0 = []
     tomo_list_q1 = []
     for tp in tomo_pulses:
-        tomo_list_q0 += [tp + q0 + '\n']
-        tomo_list_q1 += [tp + q1 + '\n']
+        tomo_list_q0 += [tp + q0]
+        tomo_list_q1 += [tp + q1]
 
     prep_index_q0 = int(cardinal % len(tomo_list_q0))
     prep_index_q1 = int(((cardinal - prep_index_q0) / len(tomo_list_q0) %
@@ -91,10 +91,8 @@ def two_qubit_tomo_cardinal(cardinal,
     for p_q1 in tomo_list_q1:
         for p_q0 in tomo_list_q0:
             qasm_file.writelines('\ninit_all\n')
-            qasm_file.writelines(prep_pulse_q0)
-            qasm_file.writelines(prep_pulse_q1)
-            qasm_file.writelines(p_q0)
-            qasm_file.writelines(p_q1)
+            qasm_file.writelines(prep_pulse_q0 + " | " + prep_pulse_q1 + "\n")
+            qasm_file.writelines(p_q0 + " | " + p_q1 + "\n")
             qasm_file.writelines('RO ' + RO_target + '  \n')
     cal_pulses = []
     # every calibration point is repeated 7 times. This is copied from the
@@ -103,7 +101,7 @@ def two_qubit_tomo_cardinal(cardinal,
     for seq in cal_points_2Q:
         cal_pulses += [[seq[0].format(q0) +
                         seq[1].format(q1) +
-                        'RO {} \n'.format(RO_target)]]
+                        'RO {} \n'.format(RO_target)]]*7
 
     for seq in cal_pulses:
         qasm_file.writelines('\ninit_all\n')
@@ -116,7 +114,7 @@ def two_qubit_tomo_cardinal(cardinal,
 
 def two_qubit_AllXY(q0, q1, RO_target='all',
                     sequence_type='sequential',
-                    replace_q1_pulses_X180=False,
+                    do_X180=None,
                     double_points=False):
     """
     AllXY sequence on two qubits.
@@ -145,17 +143,24 @@ def two_qubit_AllXY(q0, q1, RO_target='all',
                           ['Y90', 'Y90']]
 
     pulse_combinations_tiled = pulse_combinations + pulse_combinations
-    if double_points:
-        pulse_combinations = [val for val in pulse_combinations
+
+    pulse_combinations_twice = [val for val in pulse_combinations
                               for _ in (0, 1)]
 
-    if replace_q1_pulses_X180:
-        pulse_combinations_q1 = ['X180' for val in pulse_combinations]
+    
 
-    pulse_combinations_q0 = pulse_combinations
-    pulse_combinations_q1 = pulse_combinations_tiled
-
-
+    if do_X180 == 'q1':
+        n = len(pulse_combinations)
+        pulse_combinations_q1 = n*[2*['I']]+n*[2*['X180']]
+        pulse_combinations_q0 = pulse_combinations_tiled
+    elif do_X180 == 'q0':
+        n = len(pulse_combinations)
+        pulse_combinations_q0 = n*[2*['I']]+n*[2*['X180']]
+        pulse_combinations_q1 = pulse_combinations_tiled
+    else:
+        pulse_combinations_q1 = pulse_combinations_tiled
+        pulse_combinations_q0 = pulse_combinations_twice
+    
     filename = join(base_qasm_path, 'two_qubit_AllXY.qasm')
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \nqubit {} \n'.format(q0, q1))
@@ -194,7 +199,9 @@ def two_qubit_AllXY(q0, q1, RO_target='all',
 
 
 def chevron_seq(fluxing_qubit: str, spectator_qubit: str,
-                excite_q1: bool=False, RO_target='all'):
+                excite_spectator: bool=False, 
+                second_pi_on_fluxing_qubit: bool=False,
+                RO_target='all'):
     '''
     Single chevron sequence that does a swap on |01> <-> |10> or |11> <-> |20>.
 
@@ -203,9 +210,11 @@ def chevron_seq(fluxing_qubit: str, spectator_qubit: str,
         spectator qubit (str): name of the qubit with which the fluxing
                             qubit interacts.
         RO_target   (str): can be q0, q1, or 'all'
-        excite_q1   (bool): choose whether to excite q1, thus choosing
+        excite_spectator   (bool): choose whether to excite q1, thus choosing
                             between the |01> <-> |10> and the |11> <-> |20>
                             swap.
+        second_pi_on_fluxing_qubit (bool): choose whether to perform a second pi 
+                            (after the flux pulse) on the fluxing qubit
     '''
     filename = join(base_qasm_path, 'chevron_seq.qasm')
     qasm_file = mopen(filename, mode='w')
@@ -213,13 +222,16 @@ def chevron_seq(fluxing_qubit: str, spectator_qubit: str,
                                                          spectator_qubit))
 
     qasm_file.writelines('\ninit_all\n')
-    if excite_q1:
+    if excite_spectator is True:
         qasm_file.writelines('X180 {} | X180 {}\n'.format(fluxing_qubit,
+                                                          spectator_qubit))
+    elif excite_spectator is 'X90':
+        qasm_file.writelines('X180 {} | X90 {}\n'.format(fluxing_qubit,
                                                           spectator_qubit))
     else:
         qasm_file.writelines('X180 {}\n'.format(fluxing_qubit))
     qasm_file.writelines('square {}\n'.format(fluxing_qubit))
-    if excite_q1:
+    if second_pi_on_fluxing_qubit:
         # fluxing_qubit is rotated to ground-state to have better contrast
         # (|0> and |2> instead of |1> and |2>)
         qasm_file.writelines('X180 {}\n'.format(fluxing_qubit))
