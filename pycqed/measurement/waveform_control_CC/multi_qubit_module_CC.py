@@ -55,7 +55,7 @@ def measure_two_qubit_ssro(device, q0_name, q1_name, nr_shots=4092*4,
                            result_logging_mode='lin_trans'):
     # N.B. this function can be replaced with a more general multi-qubit ssro
     if MC is None:
-        MC = qc.station.components['MC']
+        MC = device.find_instrument(q0_name).MC.get_instr()
     q0 = device.find_instrument(q0_name)
     q1 = device.find_instrument(q1_name)
 
