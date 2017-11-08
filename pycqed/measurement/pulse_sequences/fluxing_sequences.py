@@ -1583,16 +1583,16 @@ def Ramsey_with_flux_pulse_meas_seq(thetas, qb, X90_separation, verbose=False,
         flux_pulse_comp['amplitude'] = -  flux_pulse['amplitude']
     else:
         flux_pulse_comp['amplitude'] = 0
-    flux_pulse_comp['refpoint'] = 'end'
-    flux_pulse_comp['delay'] = 100e-9
-
+    flux_pulse_comp['refpoint'] = 'start'
+    flux_pulse_comp['pulse_delay'] = 500e-9 - flux_pulse_delay_hack \
+                                        - flux_pulse['pulse_delay']
 
     for i, theta in enumerate(thetas):
 
         X90_2['phase'] = theta*180/np.pi
         el = multi_pulse_elt(i, station,
-                             [pulses['X90'], X90_2, RO_pars, flux_pulse,
-                              flux_pulse_comp])
+                             [pulses['X90'], X90_2, RO_pars,
+                              flux_pulse, flux_pulse_comp])
         if distorted is True:
             if distortion_dict is not None:
                 el = fluxpulse_predistortion.distort_qudev(el,distortion_dict)

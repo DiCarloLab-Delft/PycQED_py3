@@ -404,8 +404,13 @@ class Pulsar(Instrument):
             awg_file = obj.generate_awg_file(packed_waveforms,
                                              np.array(wfname_l), nrep_l, wait_l,
                                              goto_l, logic_jump_l,
-                                             self._AWG5014_chan_cfg(obj.name),
-                                             preservechannelsettings=True)
+                                             self._AWG5014_chan_cfg(obj.name))
+            #
+            # awg_file = obj.generate_awg_file(packed_waveforms,
+            #                                  np.array(wfname_l), nrep_l, wait_l,
+            #                                  goto_l, logic_jump_l,
+            #                                  self._AWG5014_chan_cfg(obj.name),
+            #                                  preservechannelsettings=True)
             #preservechannelsettings=True since the "Add Input" was overwritten
             #by Jonas Butscher, 2017/09/07
             obj.send_awg_file(filename, awg_file)
