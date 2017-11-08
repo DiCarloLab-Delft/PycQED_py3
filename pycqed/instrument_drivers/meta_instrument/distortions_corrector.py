@@ -16,6 +16,7 @@ class Distortion_corrector():
 
     def __init__(self, kernel_object, square_amp: float=1,
                  nr_plot_points: int=1000,
+                 sampling_rate: float=1e9,
                  auto_save_plots: bool=True):
         '''
         Instantiates an object.
@@ -40,6 +41,7 @@ class Distortion_corrector():
         self._t_start_loop = 0  # sets x range for plotting during loop
         self._t_stop_loop = 30e-6
         self.nr_plot_points = nr_plot_points
+        self.sampling_rate = sampling_rate
 
         self.square_amp = square_amp
 
@@ -230,8 +232,8 @@ class Distortion_corrector():
         tau = fit_res.best_values['tau']
         tauTilde = tau * (a + 1)
 
-        tPts = np.arange(0, self.kernel_length*1e-9,
-                         1e-9)  # TODO AWG sampling rate
+        tPts = np.arange(0, self.kernel_length/self.sampling_rate,
+                         1/self.sampling_rate)
         predist_step = (1 - aTilde * np.exp(-tPts/tauTilde)) / C
 
         # Check if parameters are physical and print warnings if not
@@ -326,8 +328,8 @@ class Distortion_corrector():
         tau = fit_res.best_values['tau{}'.format(maxInd)]
         tauTilde = tau * (a + 1)
 
-        tPts = np.arange(0, self.kernel_length*1e-9,
-                         1e-9)  # TODO AWG sampling rate
+        tPts = np.arange(0, self.kernel_length/self.sampling_rate,
+                         1/self.sampling_rate)
         predist_step = (1 - aTilde * np.exp(-tPts/tauTilde)) / C
 
         # Check if parameters are physical and print warnings if not
@@ -429,8 +431,8 @@ class Distortion_corrector():
         tau = fit_res.best_values['tau{}'.format(maxInd)]
         tauTilde = tau * (a + 1)
 
-        tPts = np.arange(0, self.kernel_length*1e-9,
-                         1e-9)  # TODO AWG sampling rate
+        tPts = np.arange(0, self.kernel_length/self.sampling_rate,
+                         1/self.sampling_rate)
         predist_step = (1 - aTilde * np.exp(-tPts/tauTilde)) / C
 
         # Check if parameters are physical and print warnings if not
@@ -506,8 +508,8 @@ class Distortion_corrector():
         # square pulse at the output)
         tau = fit_res.best_values['tau']
 
-        tPts = np.arange(0, self.kernel_length*1e-9,
-                         1e-9)  # TODO AWG sampling rate
+        tPts = np.arange(0, self.kernel_length/self.sampling_rate,
+                         1/self.sampling_rate)
         predist_step = tPts/tau + 1
 
         # Check if parameters are physical and print warnings if not
@@ -900,8 +902,7 @@ class Distortion_corrector():
                     datetime.date.today().strftime('%y%m%d'))
             self.open_new_correction(
                 kernel_length=self.kernel_object.corrections_length(),
-                # AWG_sampling_rate=self.AWG_lutman.sampling_rate(),
-                AWG_sampling_rate=1e9,
+                AWG_sampling_rate=self.sampling_rate,
                 name=filename)
         else:
             # Continue working with current kernel; nothing to do
@@ -1167,11 +1168,11 @@ class RT_distortion_corrector_AWG8(Distortion_corrector):
                     changed in self.nr_plot_points.
         '''
         self.flux_lutman = flux_lutman
-        self.sampling_rate = flux_lutman.sampling_rate()
         self.measure_scope_trace = measure_scope_trace
         super().__init__(
             kernel_object=flux_lutman.instr_distortion_kernel.get_instr(),
-            square_amp=square_amp, nr_plot_points=nr_plot_points)
+            square_amp=square_amp, sampling_rate=2.4e9,
+            nr_plot_points=nr_plot_points)
 
         self.raw_waveform = []
         self.raw_time_pts = []

@@ -122,7 +122,7 @@ class Test_Kernel_functions(unittest.TestCase):
     def test_bounce_kernel(self):
         amp = 0.1
         tau = 10e-9
-        length = 60e-9
+        length = 100e-9
         sampling_rate = 1e9
 
         ker_real = kf.bounce_kernel(amp=amp, time=tau, length=length,
@@ -133,6 +133,28 @@ class Test_Kernel_functions(unittest.TestCase):
                                        sampling_rate=1)
 
         np.testing.assert_almost_equal(ker_real, ker_sampled)
+        nr_samples = int(length*sampling_rate)
+        t_kernel = np.arange(nr_samples)/sampling_rate
+        bounce = kf.bounce(t_kernel, amp=amp, time=tau,
+                           sampling_rate=sampling_rate)
+        y_corr0 = np.convolve(ker_real, bounce)
+        np.testing.assert_almost_equal(y_corr0[10:80], np.ones(70), decimal=2)
+
+    def test_bounce_kernel_2p4GS(self):
+        amp = 0.1
+        tau = 10e-9
+        length = 100e-9
+        sampling_rate = 2.4e9
+
+        ker_real = kf.bounce_kernel(amp=amp, time=tau, length=length,
+                                    sampling_rate=sampling_rate)
+
+        nr_samples = int(length*sampling_rate)
+        t_kernel = np.arange(nr_samples)/sampling_rate
+        bounce = kf.bounce(t_kernel, amp=amp, time=tau,
+                           sampling_rate=sampling_rate)
+        y_corr0 = np.convolve(ker_real, bounce)
+        np.testing.assert_almost_equal(y_corr0[10:80], np.ones(70), decimal=2)
 
     def test_decay_kernel(self):
         A = .4
@@ -203,7 +225,11 @@ class Test_Kernel_functions(unittest.TestCase):
         np.testing.assert_array_almost_equal(
             test_kernel, known_vals, decimal=7)
 
-        test_kernel = kf.poly_kernel([1, 0, 1], length=10)
+        coeffs = [1, 0, 1]
+        length = 10e-9
+        sampling_rate = 1e9
+        test_kernel = kf.poly_kernel(coeffs, length=length*sampling_rate,
+                                     sampling_rate=1)
         known_vals = np.arange(10)*2-1
         known_vals[0] = 1
 

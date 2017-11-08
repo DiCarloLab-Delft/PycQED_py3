@@ -514,7 +514,7 @@ def skin_kernel(alpha=0., length=601):
     return kernel_skineffect
 
 
-def poly_kernel(coeffs, length=601):
+def poly_kernel(coeffs: list, length: float=601, sampling_rate: float=1):
     """
     Generates the kernel that corresponds to a step response that is described
     by a polynomial.
@@ -522,8 +522,10 @@ def poly_kernel(coeffs, length=601):
     Note that the kernel corresponds to the impulse response and not to the
     step response.
     """
-    samples = np.arange(length)
-    polyvec = np.polyval(coeffs, samples)
+
+    nr_samples = int(length*sampling_rate)
+    t_kernel = np.arange(nr_samples)/sampling_rate
+    polyvec = np.polyval(coeffs, t_kernel)
     poly_kernel = kernel_from_kernel_stepvec(polyvec)
 
     return poly_kernel
