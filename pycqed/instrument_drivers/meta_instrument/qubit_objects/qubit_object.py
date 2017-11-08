@@ -189,6 +189,54 @@ class Qubit(Instrument):
 
         """
         raise NotImplementedError()
+
+    def calibrate_Flux_pulse_latency(self, MC=None, update=True)-> bool:
+        """
+        Calibrates parameter: "latency_Flux"
+
+        Used to calibrate the timing between the MW and Flux pulses.
+
+        Flux pulse latency is calibrated using a Ram-Z experiment.
+        The experiment works as follows:
+        - x90 | square_flux  # defines t = 0
+        - wait (should be slightly longer than the pulse duration)
+        - x90
+        - wait
+        - RO
+
+        The position of the square flux pulse is varied to find the
+        optimal latency.
+        """
+        raise NotImplementedError
+        return True
+
+
+    def calibrate_MW_RO_latency(self, MC=None, update: bool=True)-> bool:
+        """
+        Calibrates parameters:
+            "latency_MW"
+            "RO_acq_delay"
+
+
+        Used to calibrate the delay of the MW pulse with respect to the
+        RO pulse and the RO acquisition delay.
+
+
+        The MW_pulse_latency is calibrated by setting the frequency of
+        the LO to the qubit frequency such that both the MW and the RO pulse
+        will show up in the RO.
+        Measuring the transients will  show what the optimal latency is.
+
+        Note that a lot of averages may be required when using dedicated drive
+        lines.
+
+        This function does NOT overwrite the values that were set in the qubit
+        object and as such can be used to verify the succes of the calibration.
+
+        Currently (28/6/2017) the experiment has to be analysed by hand.
+
+        """
+        raise NotImplementedError()
         return True
 
     def calibrate_Flux_pulse_latency(self, MC=None, update=True)-> bool:
@@ -533,6 +581,7 @@ class Transmon(Qubit):
                 steps=steps, verbose=verbose, update=update,
                 close_fig=close_fig)
         return self.f_qubit()
+
 
     def find_frequency_pulsed(self):
         raise NotImplementedError()

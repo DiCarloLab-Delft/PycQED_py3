@@ -103,6 +103,7 @@ def two_qubit_tomo_cardinal(cardinal,
                         seq[1].format(q1) +
                         'RO {} \n'.format(RO_target)]]*7
 
+
     for seq in cal_pulses:
         qasm_file.writelines('\ninit_all\n')
         for p in seq:
@@ -143,7 +144,6 @@ def two_qubit_AllXY(q0, q1, RO_target='all',
                           ['Y90', 'Y90']]
 
     pulse_combinations_tiled = pulse_combinations + pulse_combinations
-
     pulse_combinations_twice = [val for val in pulse_combinations
                               for _ in (0, 1)]
 
@@ -161,6 +161,7 @@ def two_qubit_AllXY(q0, q1, RO_target='all',
         pulse_combinations_q1 = pulse_combinations_tiled
         pulse_combinations_q0 = pulse_combinations_twice
     
+
     filename = join(base_qasm_path, 'two_qubit_AllXY.qasm')
     qasm_file = mopen(filename, mode='w')
     qasm_file.writelines('qubit {} \nqubit {} \n'.format(q0, q1))
@@ -202,6 +203,7 @@ def chevron_seq(fluxing_qubit: str, spectator_qubit: str,
                 excite_spectator: bool=False, 
                 second_pi_on_fluxing_qubit: bool=False,
                 RO_target='all'):
+
     '''
     Single chevron sequence that does a swap on |01> <-> |10> or |11> <-> |20>.
 
@@ -215,6 +217,7 @@ def chevron_seq(fluxing_qubit: str, spectator_qubit: str,
                             swap.
         second_pi_on_fluxing_qubit (bool): choose whether to perform a second pi 
                             (after the flux pulse) on the fluxing qubit
+
     '''
     filename = join(base_qasm_path, 'chevron_seq.qasm')
     qasm_file = mopen(filename, mode='w')
@@ -232,6 +235,7 @@ def chevron_seq(fluxing_qubit: str, spectator_qubit: str,
         qasm_file.writelines('X180 {}\n'.format(fluxing_qubit))
     qasm_file.writelines('square {}\n'.format(fluxing_qubit))
     if second_pi_on_fluxing_qubit:
+
         # fluxing_qubit is rotated to ground-state to have better contrast
         # (|0> and |2> instead of |1> and |2>)
         qasm_file.writelines('X180 {}\n'.format(fluxing_qubit))
@@ -271,8 +275,9 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
         tomo_list_q0 += [tp + q0 + '\n']
         tomo_list_q1 += [tp + q1 + '\n']
 
-    tomo_list_q0[0] = 'I 20\n'.format(q0)
-    tomo_list_q1[0] = 'I 20\n'.format(q1)
+
+    tomo_list_q0[0] = 'I 20\n'
+    tomo_list_q1[0] = 'I 20\n'
 
     # Choose a bell state and set the corresponding preparation pulses
     if bell_state % 10 == 0:  # |Phi_m>=|00>-|11>

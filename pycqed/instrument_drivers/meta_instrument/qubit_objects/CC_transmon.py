@@ -1134,7 +1134,6 @@ class CBox_v3_driven_transmon(Transmon):
             pulse_delay=self.gauss_width.get()*4)
         if update:
             self.F_RB(a.fit_res.params['fidelity_per_Clifford'].value)
-
         return a.fit_res.params['fidelity_per_Clifford'].value
 
     def measure_randomized_benchmarking_vs_pars(self, amps=None,
@@ -1900,6 +1899,7 @@ class CBox_v3_driven_transmon(Transmon):
                 print('No analysis specified for the given cases "{}".'
                       .format(cases))
 
+
     def measure_cryo_scope(self, waveform, lengths='full', chunk_size: int=32,
                            MC=None, wait_during_flux: str='auto',
                            cal_points: bool=False, filter_raw: bool=False,
@@ -2167,7 +2167,7 @@ class CBox_v3_driven_transmon(Transmon):
         CBox.trigger_source('internal')
         qasm_file = sqqs.Ram_Z_echo(
             qubit_name=self.name,
-            no_of_points=chunk_size,
+            nr_of_points=chunk_size,
             cal_points=cal_points)
         qasm_folder, qasm_fn = os.path.split(qasm_file.name)
         qumis_fn = os.path.join(qasm_folder,

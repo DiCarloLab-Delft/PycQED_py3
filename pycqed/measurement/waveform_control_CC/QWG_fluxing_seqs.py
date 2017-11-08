@@ -23,7 +23,8 @@ def ramZ_flux_latency(q0_name, wait_after_flux=20):
     qasm_file.writelines('\ninit_all\n')
     qasm_file.writelines('X90 {} \n'.format(q0_name))
     qasm_file.writelines('square {}\n'.format(q0_name))
-    #qasm_file.writelines('I {}\n'.format(wait_after_flux))
+
+    qasm_file.writelines('I {}\n'.format(wait_after_flux))
     qasm_file.writelines('X90 {}\n'.format(q0_name))
     qasm_file.writelines('RO {} \n'.format(q0_name))
 
@@ -142,6 +143,7 @@ def CZ_calibration_seq(q0, q1, RO_target='all',
                        cases=('no_excitation', 'excitation'),
                        do_echo=False,
                        sequential_experimental=False):
+
     '''
     Sequence used to calibrate flux pulses for CZ gates.
 
@@ -160,6 +162,7 @@ def CZ_calibration_seq(q0, q1, RO_target='all',
         do_echo: Apply echo after CZ gate.
         sequential_experimental: only applied if do_echo is true:
             apply single qubit gates sequentially.
+
     '''
 
     filename = join(base_qasm_path, 'CZ_calibration_seq.qasm')
@@ -291,6 +294,7 @@ def two_qubit_tomo_bell(bell_state, q0, q1, RO_target='all'):
     return qasm_file
 
 
+<<<<<<< HEAD
 def two_qubit_tomo_bell_with_echo_q0(bell_state, q0, q1, RO_target='all'):
     '''
     Two qubit bell state tomography.
@@ -854,6 +858,7 @@ def grover_test_tomo_seq(q0_name, q1_name, omega, RO_target='all',
             qasm_file.writelines('{} | {}\n'.format(p_q1, p_q0))
             qasm_file.writelines(RO_line)   
 
+
     # Add calibration pulses
     cal_pulses = []
     # every calibration point is repeated 7 times. This is copied from the
@@ -873,6 +878,7 @@ def grover_test_tomo_seq(q0_name, q1_name, omega, RO_target='all',
 
 
 def purity_CZ_seq(q0, q1, RO_target='all', do_echo=False):
+
     """
     Creates the |00> + |11> Bell state and does a partial tomography in
     order to determine the purity of both qubits.
@@ -892,6 +898,7 @@ def purity_CZ_seq(q0, q1, RO_target='all', do_echo=False):
         if do_echo:
             qasm_file.writelines('X180 {} | X180 {} \n'.format(q0, q1))
             qasm_file.writelines('dummy_CZ {} {} \n'.format(q0, q1))
+
         qasm_file.writelines('mY90 {}\n'.format(q1))
 
         # Perform pulses to measure the purity of both qubits

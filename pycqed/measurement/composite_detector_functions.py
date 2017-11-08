@@ -1460,6 +1460,7 @@ class FluxTrack(det.Soft_Detector):
 class purity_CZ_detector(det.Soft_Detector):
 
     def __init__(self, measurement_name: str, MC, device, q0, q1, do_echo=False,
+
                  return_purity_only: bool=True):
         self.measurement_name = measurement_name
         self.MC = MC
@@ -1470,6 +1471,7 @@ class purity_CZ_detector(det.Soft_Detector):
         self.q1 = q1
         self.return_purity_only = return_purity_only
         self.do_echo = do_echo
+
 
         if self.return_purity_only:
             self.value_names = ['Purity sum', 'Purity {}'.format(q0.name),
@@ -1485,6 +1487,8 @@ class purity_CZ_detector(det.Soft_Detector):
         self.i = 0
         purity_CZ_seq = qwfs.purity_CZ_seq(self.q0.name, self.q1.name, 
             do_echo=self.do_echo)
+
+        purity_CZ_seq = qwfs.purity_CZ_seq(self.q0.name, self.q1.name)
         self.s = swf.QASM_Sweep_v2(qasm_fn=purity_CZ_seq.name,
                                    config=self.device.qasm_config(),
                                    CBox=self.device.central_controller.get_instr(),

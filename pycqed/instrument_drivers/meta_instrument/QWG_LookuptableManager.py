@@ -263,6 +263,7 @@ class QWG_FluxLookuptableManager(Instrument):
                            initial_value=0e-9,
                            vals=vals.Numbers(),
                            parameter_class=ManualParameter)
+
         self.add_parameter('Z_amp',
                            docstring=('Amplitude of the single qubit phase '
                                       'correction in CZ pulses.'),
@@ -390,7 +391,6 @@ class QWG_FluxLookuptableManager(Instrument):
           np.zeros(z_delay_nr_samples), np.ones(z_nr_samples)]) * self.Z_amp()
         single_qubit_phase_correction_grover = np.concatenate([
           np.zeros(z_delay_nr_samples), np.ones(z_nr_samples)])* self.Z_amp_grover()
-           
 
 
         if self.disable_CZ():

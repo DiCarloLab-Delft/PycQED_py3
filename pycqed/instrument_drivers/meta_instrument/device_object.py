@@ -50,6 +50,7 @@ class DeviceObject(Instrument):
         self.add_parameter("cfg_readout_type", parameter_class=ManualParameter, 
                            vals=vals.Strings())
 
+
         self._sequencer_config = {}
         self.delegate_attr_dicts += ['_sequencer_config']
 
@@ -120,7 +121,6 @@ class DeviceObject(Instrument):
         """
         Calls the prepare for timedomain on each of the constituent qubits.
         """
-
         if self.cfg_readout_type() == "multiplex":
 
             RO_LMM = self.RO_LutManMan.get_instr()
@@ -279,7 +279,6 @@ class TwoQubitDevice(DeviceObject):
             correlations=[(w0, w1)],
             nr_averages=self.RO_acq_averages(),
             integration_length=q0.RO_acq_integration_length())
-
 
         return d
 
@@ -505,6 +504,7 @@ class TwoQubitDevice(DeviceObject):
                         fluxing_qubit=None, spectator_qubit=None,
                         wait_during_flux='auto', excite_spectator: bool=True,
                         second_pi_on_fluxing_qubit: bool=True,
+
                         MC=None):
         '''
         Measures chevron for the two qubits of the device.
@@ -529,11 +529,13 @@ class TwoQubitDevice(DeviceObject):
                     the time is automatically picked based on the maximum
                     of the sweep points.
             excite_spectator (bool):
+
                     False: measure |01> - |10> chevron.
                     True: measure |11> - |02> chevron.
             MC (Instr):
                     Measurement control instrument to use for the experiment.
         '''
+
 
         CBox = self.central_controller.get_instr()
 
@@ -550,6 +552,7 @@ class TwoQubitDevice(DeviceObject):
             q1 = self.find_instrument(spectator_qubit)
         else:
             q1 = spectator_qubit
+
 
         self.prepare_for_timedomain()
         # only prepare q0 for fluxing, because this is the only qubit that
@@ -580,6 +583,7 @@ class TwoQubitDevice(DeviceObject):
                                      spectator_qubit=q1.name,
                                      excite_spectator=excite_spectator,
                                      second_pi_on_fluxing_qubit=second_pi_on_fluxing_qubit,
+
                                      RO_target='all')
 
         CBox.trigger_source('internal')
@@ -622,6 +626,7 @@ class TwoQubitDevice(DeviceObject):
                                    min_fit_pts: int=15, MC=None,
                                    msmt_suffix: str=None,
                                    do_echo=False) -> bool:
+
         '''
         Measures a the Z-amp cost function in a small range around the value
         from the last calibration, fits a parabola, extracts a new minimum,
@@ -648,12 +653,14 @@ class TwoQubitDevice(DeviceObject):
             do_echo (bool):
                     Use a calibration sequence that includes an echo pulse
 
+
         Returns:
             success (bool):
                     True if calibration succeeded, False otherwise.
         '''
         if MC is None:
             MC = correction_qubit.MC.get_instr()
+
 
         if correction_qubit is None:
             correction_qubit = self.qubits()[0]
@@ -670,6 +677,7 @@ class TwoQubitDevice(DeviceObject):
             amp_pts = gen_sweep_pts(center=old_z_amp, span=span, num=num)
             CZ_cost_Z_amp(correction_qubit, spectator_qubit, MC,
                           Z_amps_q0=amp_pts, do_echo=do_echo)
+
             try:
                 a = ma.CZ_1Q_phase_analysis()
             except RuntimeError as e:
