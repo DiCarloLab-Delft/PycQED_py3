@@ -429,20 +429,35 @@ def bounce_kernel(amp=0.02, time=4, length=601):
     return kernel_bounce
 
 
-def decay_kernel(amp=1., tau=11000, length=2000):
+def decay_kernel(amp: float=1., tau: float =11000,
+                 length: float=2000,
+                 sampling_rate: float=1):
     """
     Generates a decay kernel, with the specified parameters
 
     step_function
         1 - amp*np.exp(-t_kernel/tau)
 
-    amp and tau are the parameters etimated from the step function
+    amp and tau are the parameters estimated from the step function
 
+    Args:
+        amp             (float) : amplitude of the decay
+        tau             (float) : time constant of the decay
+        length          (float) : total length of the kernel
+        sampling_rate   (float) : sampling rate for which to generate the
+            kernel. Default value is 1 to support deprecated behaviour
+            in which everything is expressed in units of ns.
+    returns:
+        decay_kernel (np.array) : the predistortion kernel to correct for
+            an exponential decay.
     """
 
     tau_k = (1.-amp)*tau
     amp_k = amp/(amp-1)
-    t_kernel = np.arange(int(length))
+
+    nr_samples = int(length*sampling_rate)
+    t_kernel = np.arange(nr_samples)/sampling_rate
+
     if abs(amp) > 0.:
         kernel_decay_step = 1 - amp_k*np.exp(-t_kernel/tau_k)
         kernel_decay = np.zeros(kernel_decay_step.shape)

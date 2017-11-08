@@ -115,8 +115,37 @@ class Test_Kernel_functions(unittest.TestCase):
         pass
 
     def test_decay_kernel(self):
-        kf_dec = kf.decay_kernel(amp=dA, tau=dtau*1e9, length=dl*1e9)
+        A = .4
+        tau = 10e-9
+        x = np.arange(200)/1e9
+        y_signal = 1 - A*np.exp(-x/tau)
 
+        sampling_rate = 1e9
+        kf_dec = kf.decay_kernel(
+            amp=A, tau=tau, length=100e-6, sampling_rate=sampling_rate)
+        kf_dec_2 = kf.decay_kernel(amp=A, tau=tau*sampling_rate,
+                                   length=100e-6*sampling_rate,
+                                   sampling_rate=1)
+
+        y_corr0 = np.convolve(y_signal, kf_dec)
+        y_corr1 = np.convolve(y_signal, kf_dec_2)
+        np.testing.assert_almost_equal(y_corr0, y_corr1)
+
+        # Test that the correction produces a square wave
+        # not the entire wave is tested as the beginning shows a small
+        # imperfection
+        np.testing.assert_almost_equal(y_corr0[10:80], np.ones(70), decimal=2)
+        # Testing on a different sampling rate
+
+        sampling_rate = 2.4e9
+        x24GS = np.arange(200)/sampling_rate
+        y24Gs_signal = 1 - A*np.exp(-x24GS/tau)
+
+        kf_dec = kf.decay_kernel(
+            amp=A, tau=tau, length=100e-6, sampling_rate=sampling_rate)
+        y24Gs_corr0 = np.convolve(y24Gs_signal, kf_dec)
+        np.testing.assert_almost_equal(y24Gs_corr0[10:80], np.ones(70),
+                                       decimal=2)
 
     def test_heaviside(self):
         hs = kf.heaviside(np.array([-1, -.5, 0, 1, 2]))
