@@ -45,6 +45,11 @@ class DeviceObject(Instrument):
                            vals=vals.Ints(),
                            parameter_class=ManualParameter)
 
+        # either "multiplex" or name of which qubit object is used to do single 
+        # qubit readout
+        self.add_parameter("cfg_readout_type", parameter_class=ManualParameter, 
+                           vals=vals.Strings())
+
         self._sequencer_config = {}
         self.delegate_attr_dicts += ['_sequencer_config']
 
@@ -115,33 +120,44 @@ class DeviceObject(Instrument):
         """
         Calls the prepare for timedomain on each of the constituent qubits.
         """
-        RO_LMM = self.RO_LutManMan.get_instr()
 
-        q0 = self.find_instrument(self.qubits()[0])
-        q1 = self.find_instrument(self.qubits()[1])
+        if self.cfg_readout_type() == "multiplex":
 
-        # this is to ensure that the cross talk correction matrix coefficients
-        # can rey on the weight function indices being consistent
-        q0.RO_acq_weight_function_I(0)
-        q1.RO_acq_weight_function_I(1)
+            RO_LMM = self.RO_LutManMan.get_instr()
 
-        # Set the modulation frequencies so that the LO's match
-        q0.f_RO_mod(q0.f_RO() - self.RO_LO_freq())
-        q1.f_RO_mod(q1.f_RO() - self.RO_LO_freq())
+            q0 = self.find_instrument(self.qubits()[0])
+            q1 = self.find_instrument(self.qubits()[1])
 
-        # Update parameters
-        q0.RO_pulse_type('IQmod_multiplexed_UHFQC')
-        q1.RO_pulse_type('IQmod_multiplexed_UHFQC')
+            # this is to ensure that the cross talk correction matrix coefficients
+            # can rey on the weight function indices being consistent
+            q0.RO_acq_weight_function_I(0)
+            q1.RO_acq_weight_function_I(1)
 
-        q1.prepare_for_timedomain()
-        q0.prepare_for_timedomain()
-        RO_LMM.acquisition_delay(q0.RO_acq_marker_delay())
+            # Set the modulation frequencies so that the LO's match
+            q0.f_RO_mod(q0.f_RO() - self.RO_LO_freq())
+            q1.f_RO_mod(q1.f_RO() - self.RO_LO_freq())
 
-        # Generate multiplexed pulse
-        multiplexed_wave = [[q0.RO_LutMan(), 'M_square'],
-                            [q1.RO_LutMan(), 'M_square']]
-        RO_LMM.generate_multiplexed_pulse(multiplexed_wave)
-        RO_LMM.load_pulse_onto_AWG_lookuptable('Multiplexed_pulse')
+            # Update parameters
+            q0.RO_pulse_type('IQmod_multiplexed_UHFQC')
+            q1.RO_pulse_type('IQmod_multiplexed_UHFQC')
+
+            q1.prepare_for_timedomain()
+            q0.prepare_for_timedomain()
+            RO_LMM.acquisition_delay(q0.RO_acq_marker_delay())
+
+            # Generate multiplexed pulse
+            multiplexed_wave = [[q0.RO_LutMan(), 'M_square'],
+                                [q1.RO_LutMan(), 'M_square']]
+            RO_LMM.generate_multiplexed_pulse(multiplexed_wave)
+            RO_LMM.load_pulse_onto_AWG_lookuptable('Multiplexed_pulse')
+
+        else:
+            ro_qubit = self.find_instrument(self.cfg_readout_type())
+            q0 = self.find_instrument(self.qubits()[0])
+            q1 = self.find_instrument(self.qubits()[1])
+            q1.prepare_for_timedomain()
+            q0.prepare_for_timedomain()
+            ro_qubit.prepare_for_timedomain()
 
     def prepare_for_fluxing(self, reset: bool=True):
         '''
@@ -259,9 +275,12 @@ class TwoQubitDevice(DeviceObject):
             thresholding=True,
             AWG=self.central_controller.get_instr(),
             channels=[w0, w1],
+            value_names=[q0.name, q1.name],
             correlations=[(w0, w1)],
             nr_averages=self.RO_acq_averages(),
             integration_length=q0.RO_acq_integration_length())
+
+
         return d
 
     def get_integration_logging_detector(self):
@@ -299,20 +318,26 @@ class TwoQubitDevice(DeviceObject):
             seg_per_point=seg_per_point)
         return d
 
-    def measure_two_qubit_AllXY(self, sequence_type='simultaneous', MC=None):
-        if MC is None:
-            MC = qc.station.components['MC']
+    def measure_two_qubit_AllXY(self, sequence_type='simultaneous', order=(0, 1), 
+                                do_X180=False, MC=None):
 
         qnames = self.qubits()
-        q0 = self.find_instrument(qnames[0])
-        q1 = self.find_instrument(qnames[1])
+        q0 = self.find_instrument(qnames[order[0]])
+        q1 = self.find_instrument(qnames[order[1]])
+
+
+
         self.prepare_for_timedomain()
+
+        if MC is None:
+            MC = q0.MC.get_instr()
+
 
         double_points = True
         AllXY = mqqs.two_qubit_AllXY(q0.name, q1.name,
                                      RO_target=q0.name,  # shold be 'all'
                                      sequence_type=sequence_type,
-                                     replace_q1_pulses_X180=False,
+                                     do_X180=do_X180,
                                      double_points=double_points)
 
         s = swf.QASM_Sweep_v2(qasm_fn=AllXY.name,
@@ -478,7 +503,8 @@ class TwoQubitDevice(DeviceObject):
 
     def measure_chevron(self, amps, lengths,
                         fluxing_qubit=None, spectator_qubit=None,
-                        wait_during_flux='auto', excite_q1: bool=True,
+                        wait_during_flux='auto', excite_spectator: bool=True,
+                        second_pi_on_fluxing_qubit: bool=True,
                         MC=None):
         '''
         Measures chevron for the two qubits of the device.
@@ -502,15 +528,13 @@ class TwoQubitDevice(DeviceObject):
                     Delay during the flux pulse. If this is 'auto',
                     the time is automatically picked based on the maximum
                     of the sweep points.
-            excite_q1 (bool):
+            excite_spectator (bool):
                     False: measure |01> - |10> chevron.
                     True: measure |11> - |02> chevron.
             MC (Instr):
                     Measurement control instrument to use for the experiment.
         '''
 
-        if MC is None:
-            MC = qc.station.components['MC']
         CBox = self.central_controller.get_instr()
 
         if fluxing_qubit is None:
@@ -518,12 +542,22 @@ class TwoQubitDevice(DeviceObject):
         if spectator_qubit is None:
             spectator_qubit = self.qubits()[1]
 
-        q0 = self.find_instrument(fluxing_qubit)
-        q1 = self.find_instrument(spectator_qubit)
+        if isinstance(fluxing_qubit, str):
+            q0 = self.find_instrument(fluxing_qubit)
+        else:
+            q0 = fluxing_qubit
+        if isinstance(spectator_qubit, str):
+            q1 = self.find_instrument(spectator_qubit)
+        else:
+            q1 = spectator_qubit
+
         self.prepare_for_timedomain()
         # only prepare q0 for fluxing, because this is the only qubit that
         # gets a flux pulse.
         q0.prepare_for_fluxing()
+
+        if MC is None:
+            MC = q0.MC.get_instr()
 
         # Use flux lutman from q0, since this is the qubit being fluxed.
         QWG_flux_lutman = q0.flux_LutMan.get_instr()
@@ -544,7 +578,8 @@ class TwoQubitDevice(DeviceObject):
 
         qasm_file = mqqs.chevron_seq(fluxing_qubit=q0.name,
                                      spectator_qubit=q1.name,
-                                     excite_q1=excite_q1,
+                                     excite_spectator=excite_spectator,
+                                     second_pi_on_fluxing_qubit=second_pi_on_fluxing_qubit,
                                      RO_target='all')
 
         CBox.trigger_source('internal')
@@ -578,12 +613,15 @@ class TwoQubitDevice(DeviceObject):
         # Restore the old wave dict unit.
         QWG_flux_lutman.wave_dict_unit(oldWaveDictUnit)
 
+        ma.TwoD_Analysis()
+
     def calibrate_CZ_1Q_phase_fine(self,
                                    correction_qubit=None,
                                    spectator_qubit=None,
                                    span: float=0.04, num: int=31,
                                    min_fit_pts: int=15, MC=None,
-                                   msmt_suffix: str=None) -> bool:
+                                   msmt_suffix: str=None,
+                                   do_echo=False) -> bool:
         '''
         Measures a the Z-amp cost function in a small range around the value
         from the last calibration, fits a parabola, extracts a new minimum,
@@ -607,13 +645,15 @@ class TwoQubitDevice(DeviceObject):
                     The measurement is repeated with an adapted range if
                     there are less points than left after discarding points
                     that are too far away from the minimum.
+            do_echo (bool):
+                    Use a calibration sequence that includes an echo pulse
 
         Returns:
             success (bool):
                     True if calibration succeeded, False otherwise.
         '''
         if MC is None:
-            MC = qc.station.components['MC']
+            MC = correction_qubit.MC.get_instr()
 
         if correction_qubit is None:
             correction_qubit = self.qubits()[0]
@@ -629,7 +669,7 @@ class TwoQubitDevice(DeviceObject):
         while repeat_calibration:
             amp_pts = gen_sweep_pts(center=old_z_amp, span=span, num=num)
             CZ_cost_Z_amp(correction_qubit, spectator_qubit, MC,
-                          Z_amps_q0=amp_pts)
+                          Z_amps_q0=amp_pts, do_echo=do_echo)
             try:
                 a = ma.CZ_1Q_phase_analysis()
             except RuntimeError as e:
