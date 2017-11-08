@@ -255,6 +255,14 @@ class QWG_FluxLookuptableManager(Instrument):
                            initial_value=10e-9,
                            vals=vals.Numbers(),
                            parameter_class=ManualParameter)
+        self.add_parameter('Z_delay',
+                           docstring=('Delay of the single qubit phase correction'
+                            'pulse with respect to end of flux pulse'),
+                           label='Z delay',
+                           unit='s',
+                           initial_value=0e-9,
+                           vals=vals.Numbers(),
+                           parameter_class=ManualParameter)
         self.add_parameter('Z_amp',
                            docstring=('Amplitude of the single qubit phase '
                                       'correction in CZ pulses.'),
@@ -376,10 +384,14 @@ class QWG_FluxLookuptableManager(Instrument):
             return_unit='V')
 
         # Flux pulse for single qubit phase correction
+        z_delay_nr_samples = int(round(self.Z_delay() * self.sampling_rate()))
         z_nr_samples = int(np.round(self.Z_length() * self.sampling_rate()))
-        single_qubit_phase_correction = np.ones(z_nr_samples) * self.Z_amp()
-        single_qubit_phase_correction_grover = \
-            np.ones(z_nr_samples) * self.Z_amp_grover()
+        single_qubit_phase_correction = np.concatenate([
+          np.zeros(z_delay_nr_samples), np.ones(z_nr_samples)]) * self.Z_amp()
+        single_qubit_phase_correction_grover = np.concatenate([
+          np.zeros(z_delay_nr_samples), np.ones(z_nr_samples)])* self.Z_amp_grover()
+           
+
 
         if self.disable_CZ():
             martinis_pulse_v2 *= 0
