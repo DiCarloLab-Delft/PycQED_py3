@@ -49,15 +49,16 @@ class Flux_Control(Instrument):
                            vals=vals.Arrays())
 
         self.add_parameter('dac_mapping',
-                           label='Linear transformation coefficients',
+                           label='Which dac channels are corresponding to the'
+                           'rows of self.transfer_matrix',
                            parameter_class=ManualParameter,
                            vals=vals.Arrays())
 
         self._flux_vector = np.zeros(num_channels)
         for i in range(0, num_channels):
             self.add_parameter(
-                'flux{}'.format(i),
-                label='Flux {}'.format(i),
+                'flux{}'.format(i+1),
+                label='Flux {}'.format(i+1),
                 unit=r'$\Phi_0$',
                 get_cmd=self._gen_ch_get_func(self._get_flux, i),
                 set_cmd=self._gen_ch_set_func(self._set_flux, i),
@@ -87,7 +88,8 @@ class Flux_Control(Instrument):
         currents = np.dot(self.inv_transfer_matrix(),
                           vector) + self.dac_offsets()
         for i in range(len(self.dac_mapping())):
-            IVVI._set_dac(self.dac_mapping()[i], currents[i])
+          IVVI.set('dac{}'.format(i+1), currents[i])
+            # IVVI._set_dac(self.dac_mapping()[i], currents[i])
         return currents
 
     def _do_get_flux_vector(self):

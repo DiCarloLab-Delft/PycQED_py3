@@ -143,6 +143,7 @@ class BaseDataAnalysis(object):
         ########################################
         if self.options_dict.get('apply_default_fig_settings', True):
             def_fig.apply_default_figure_settings()
+
         self.plot_dicts = OrderedDict()
         self.axs = OrderedDict()
         self.figs = OrderedDict()

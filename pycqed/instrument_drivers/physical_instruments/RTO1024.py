@@ -51,15 +51,25 @@ class RTO1024_scope(visa.VisaInstrument):
         #                        .format(self.trigger_ch()))
         # self.visa_handle.write('ACQuire:SRATe {}'.format(acq_rate))
         # self.visa_handle.write('EXPort:WAVeform:FASTexport ON')
+        # self.visa_handle.write('EXPort:WAVeform:INCXvalues ON')
         # self.visa_handle.write('CHANnel1:WAVeform1:STATe 1')
+<<<<<<< HEAD
+
+=======
         # self.visa_handle.write('EXPort:WAVeform:STARt {}'.format(t_start))
         # self.visa_handle.write('EXPort:WAVeform:STOP {}'.format(t_stop))
+>>>>>>> Proj/starmon
         # self.sampling_rate = float(self.visa_handle.ask('ACQuire:POINts:ARATe?'))*1e-9
 
         # Load settings from file
         self.visa_handle.write("MMEM RCL " +
             "'C:\\Users\\Instrument.RTO-XXXXXX\\Documents\\Data\\1703_Starmon\\Settings_2017-06-06.dfl'")
         # Include x-values in output
+<<<<<<< HEAD
+        self.visa_handle.write('EXPort:WAVeform:STARt {}'.format(t_start))
+        self.visa_handle.write('EXPort:WAVeform:STOP {}'.format(t_stop))
+=======
+>>>>>>> Proj/starmon
         self.visa_handle.write('EXPort:WAVeform:INCXvalues ON')
 
     def measure_trace(self):
@@ -68,13 +78,11 @@ class RTO1024_scope(visa.VisaInstrument):
         Returns x_values, y_values as numpy arrays.
         '''
         # defines the acquisition no. for run single mode
-        self.visa_handle.write('EXPort:WAVeform:INCXvalues ON')
         self.visa_handle.write('ACQuire:COUNt %s'%str(self.num_averages()))
         self.visa_handle.write('RUNSingle')
         # Wait until measurement finishes before extracting data.
         # TODO: ask device if operation is complete
         sleep(self.num_averages() * self.trigger_interval() + 1)
-        self.visa_handle.write('STOP')
         self.visa_handle.write('EXPort:WAVeform:SOURce C1W1')
         self.visa_handle.write('CHANnel1:ARIThmetics AVERage')
         ret_str = self.visa_handle.ask('CHANNEL1:WAVEFORM1:DATA?')

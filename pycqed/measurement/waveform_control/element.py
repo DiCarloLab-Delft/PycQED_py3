@@ -343,9 +343,10 @@ class Element:
                 if np.min(wfs[wf]) < lo:
                     logging.warning('Clipping waveform {} < {}'.format(
                                     min(wfs[wf]), lo))
-                wfs[wf][wfs[wf] > hi] = hi
-                wfs[wf][wfs[wf] < lo] = lo
+                wfs[wf][wfs[wf] > hi] = hi-1e-6
+                wfs[wf][wfs[wf] < lo] = lo+1e-6
             elif self.pulsar.channels[wf]['type'] == 'marker':
+
                 wfs[wf][wfs[wf] > lo] = hi
                 wfs[wf][wfs[wf] < lo] = lo
         return tvals, wfs

@@ -604,6 +604,10 @@ class ZNB_VNA_sweep(Hard_Sweep):
         # get the list of frequency used in the span from the VNA
         self.sweep_points = self.VNA.get_stimulus()
 
+    def set_parameter(self,val):
+        logging.warning(
+            'VNA: Sweeping is not implemented in software(rather in hardware).')
+
 
 class QWG_lutman_par(Soft_Sweep):
 

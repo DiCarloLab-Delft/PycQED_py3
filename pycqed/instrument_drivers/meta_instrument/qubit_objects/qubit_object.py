@@ -133,8 +133,8 @@ class Qubit(Instrument):
                        MC=None, analyze=True, close_fig=True):
         raise NotImplementedError()
 
-    def calibrate_motzoi(self, MC=None, verbose=True, update=True):
-        motzois = gen_sweep_pts(center=0, span=1, num=31)
+    def calibrate_motzoi(self, MC=None, verbose=True, update=True, num=31):
+        motzois = gen_sweep_pts(center=0, span=1, num=num)
 
         # large range
         a = self.measure_motzoi(MC=MC, motzois=motzois, analyze=True)
@@ -146,7 +146,7 @@ class Qubit(Instrument):
             return False
 
         # fine range around optimum
-        motzois = gen_sweep_pts(center=a.optimal_motzoi, span=.4, num=31)
+        motzois = gen_sweep_pts(center=a.optimal_motzoi, span=.4, num=num)
         a = self.measure_motzoi(motzois)
         opt_motzoi = a.optimal_motzoi
         if opt_motzoi > max(motzois) or opt_motzoi < min(motzois):
@@ -458,7 +458,7 @@ class Transmon(Qubit):
         if dac_voltage is not None and flux is not None:
             raise ValueError('Specify either dac voltage or flux but not both')
 
-        if self.f_qubit_calc_method() is 'latest':
+        if self.f_qubit_calc_method() == 'latest':
             f_qubit_estimate = self.f_qubit()
 
         elif self.f_qubit_calc_method() == 'dac':
@@ -589,6 +589,7 @@ class Transmon(Qubit):
     def find_frequency_cw_spec(self):
         raise NotImplementedError()
 
+
     def find_resonator_frequency(self, use_min=False,
                                  update=True,
                                  freqs=None,
@@ -716,7 +717,7 @@ class Transmon(Qubit):
         return success
 
     def find_pulse_amplitude(self, amps=np.linspace(-.5, .5, 31),
-                             N_steps=[3, 7, 13, 17], max_n=18,
+                             N_steps=[3, 7], max_n=18,
                              close_fig=True, verbose=False,
                              MC=None, update=True, take_fit_I=False):
         '''
@@ -753,7 +754,7 @@ class Transmon(Qubit):
                 self.measure_rabi(amps, n=n, MC=MC, analyze=False)
                 a = ma.Rabi_parabola_analysis(close_fig=close_fig)
                 # Decide which quadrature to take by comparing the contrast
-                if take_fit_I:
+                if take_fit_I or a.nr_quadratures < 2:
                     ampl = a.fit_res[0].params['x0'].value
                 elif (np.abs(max(a.measured_values[0]) -
                              min(a.measured_values[0]))) > (
@@ -769,7 +770,7 @@ class Transmon(Qubit):
                     self.measure_rabi(amps, n=n, MC=MC, analyze=False)
                     a = ma.Rabi_parabola_analysis(close_fig=close_fig)
                     # Decide which quadrature to take by comparing the contrast
-                    if take_fit_I:
+                    if take_fit_I or a.nr_quadratures < 2:
                         ampl = a.fit_res[0].params['x0'].value
                     elif (np.abs(max(a.measured_values[0]) -
                                  min(a.measured_values[0]))) > (
@@ -799,7 +800,7 @@ class Transmon(Qubit):
         using flipping sequences.
         '''
         if MC is None:
-            MC = self.MC
+            MC = self.MC.get_instr()
         if np.size(scales) != 1:
             self.measure_rabi_amp90(scales=scales, n=1, MC=MC, analyze=False)
             a = ma.Rabi_Analysis(close_fig=close_fig)

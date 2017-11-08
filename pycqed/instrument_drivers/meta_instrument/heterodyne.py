@@ -84,6 +84,10 @@ class HeterodyneInstrument(Instrument):
                            label='Automatic AWG sequence loading',
                            parameter_class=ManualParameter,
                            initial_value=True)
+        self.add_parameter('auto_UHFQC_seq_loading', vals=vals.Bool(),
+                           label='Automatic UHFQC sequence loading',
+                           parameter_class=ManualParameter,
+                           initial_value=True)
         self.add_parameter('acq_marker_channels', vals=vals.Strings(),
                            label='Acquisition trigger channels',
                            docstring='comma (,) separated string of marker channels',
@@ -158,7 +162,7 @@ class HeterodyneInstrument(Instrument):
             self._acquisition_instr.prepare_DSB_weight_and_rotation(
                 IF=self.f_RO_mod(), weight_function_I=0, weight_function_Q=1)
 
-        if self._UHFQC_awg_parameters_changed and self.auto_seq_loading():
+        if self._UHFQC_awg_parameters_changed and self.auto_UHFQC_seq_loading():
             self._acquisition_instr.awg_sequence_acquisition()
             self._UHFQC_awg_parameters_changed = False
 
@@ -254,7 +258,7 @@ class HeterodyneInstrument(Instrument):
             self.prepare()
 
         dataset = self._acquisition_instr.acquisition_poll(
-            samples=1, acquisition_time=0.001, timeout=10)
+            samples=1, acquisition_time=0.001)
         dat = (self.scale_factor_UHFQC*dataset[0][0] +
                self.scale_factor_UHFQC*1j*dataset[1][0])
         return dat
@@ -544,7 +548,7 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
             self._awg_seq_parameters_changed = False
 
         # reupload the UHFQC pulse generation only if something changed
-        if self._UHFQC_awg_parameters_changed and self.auto_seq_loading():
+        if self._UHFQC_awg_parameters_changed and self.auto_UHFQC_seq_loading():
             self._acquisition_instr.awg_sequence_acquisition_and_pulse_SSB(
                 self.f_RO_mod.get(), self.mod_amp(), RO_pulse_length=800e-9,
                 acquisition_delay=self.acquisition_delay())

@@ -343,7 +343,7 @@ class Pulsar(Instrument):
                                           (0, maxlen - len(grp_wfs[cid])),
                                           'constant',
                                           constant_values=cval)
-                    if grp_wfs[cid][0] != 0.:
+                    if abs(grp_wfs[cid][0]) > 1e-10:
                         elements_with_non_zero_first_points.add(el)
                 wfname = el + '_' + grp
 
@@ -416,6 +416,7 @@ class Pulsar(Instrument):
 
         if len(wfname_l) > 0:
             filename = sequence.name + '_FILE.AWG'
+            self.update_AWG5014_settings()
             awg_file = obj.generate_awg_file(packed_waveforms,
                                              np.array(wfname_l), nrep_l, wait_l,
                                              goto_l, logic_jump_l,

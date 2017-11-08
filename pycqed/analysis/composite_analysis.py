@@ -49,6 +49,7 @@ class Standard_MA(object):
 
     def extract_data(self):
         self.TD_timestamps = a_tools.get_timestamps_in_range(
+
             self.t_start, self.t_stop, label=self.labels,
             exact_label_match=self.exact_label_match)
 
@@ -229,7 +230,7 @@ class Standard_MA(object):
         plot_cmap = pdict.get('cmap', 'YlGn')
 
         plot_xvals_step = plot_xvals[1]-plot_xvals[0]
-        plot_yvals_step = plot_yvals[1, 0]-plot_yvals[0, 0]
+        plot_yvals_step = plot_yvals[1][0]-plot_yvals[0][0]
 
         fig_clim = pdict['zrange']
         out = flex_color_plot_vs_x(ax=axs, cmap=plot_cmap, normalize=False,
@@ -237,15 +238,15 @@ class Standard_MA(object):
                                    yvals=plot_yvals,
                                    zvals=plot_zvals.transpose())
 
-        xmin, xmax = plot_xvals.min()-plot_xvals_step / \
-            2., plot_xvals.max()+plot_xvals_step/2.
+        # xmin, xmax = plot_xvals.min()-plot_xvals_step / \
+        #     2., plot_xvals.max()+plot_xvals_step/2.
         axs.set_xlabel(plot_xlabel)
-        axs.set_xlim(xmin, xmax)
+        # axs.set_xlim(xmin, xmax)
 
-        ymin, ymax = plot_yvals.min()-plot_yvals_step / \
-            2., plot_yvals.max()+plot_yvals_step/2.
+        # ymin, ymax = plot_yvals.min()-plot_yvals_step / \
+        #     2., plot_yvals.max()+plot_yvals_step/2.
         axs.set_ylabel(plot_ylabel)
-        axs.set_ylim(ymin, ymax)
+        # axs.set_ylim(ymin, ymax)
 
         axs.set_title(plot_title)
 

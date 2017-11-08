@@ -209,7 +209,8 @@ def load_settings_onto_instrument_v2(instrument, load_from_instr: str=None,
             logging.warning(e)
             older_than = os.path.split(folder)[0][-8:] \
                 + '_' + os.path.split(folder)[1][:6]
-            folder = None
+            # folder = None
+            filepath = None
             success = False
         count += 1
 

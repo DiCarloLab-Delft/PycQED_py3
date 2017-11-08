@@ -22,7 +22,6 @@ import pygsti
 from math import erfc
 from scipy.signal import argrelmax, argrelmin
 from copy import deepcopy
-
 import pycqed.analysis.tools.plotting as pl_tools
 from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel,
                                             data_to_table_png,
@@ -219,6 +218,7 @@ class MeasurementAnalysis(object):
             self.ax = [self.f[k].add_subplot(111) for k in range(main_figs)]
         val_len = len(self.value_names)
         if val_len == 4:
+
             if self.no_of_columns == 2:
                 self.figarray, self.axarray = plt.subplots(
                     val_len, 1, figsize=(3.375, 2.25**len(self.value_names)),
@@ -398,6 +398,7 @@ class MeasurementAnalysis(object):
                     # figsize=(min(6*len(self.value_names), 11),
                     #          1.5*len(self.value_names)))
             else:
+
                 if self.no_of_columns == 2:
                     fig, axs = plt.subplots(max(len(self.value_names), 1), 1,
                                             figsize=(3.375,
@@ -408,6 +409,7 @@ class MeasurementAnalysis(object):
                                             figsize=(
                                                 7, 4*len(self.value_names)),
                                             dpi=self.dpi)
+
                 # Add all the sweeps to the plot 1 by 1
                 # indices are determined by it's shape/number of sweeps
             for i in range(len(self.value_names)):
@@ -587,6 +589,7 @@ class MeasurementAnalysis(object):
         else:
             raise ValueError('datasaving_format "%s " not recognized'
                              % datasaving_format)
+
 
     def plot_results_vs_sweepparam(self, x, y, fig, ax, show=False, marker='-o',
                                    log=False, ticks_around=True, label=None,
@@ -855,6 +858,7 @@ class OptimizationAnalysis_v2(MeasurementAnalysis):
                     zlabel=self.value_names[i])
                 ax.set_xlabel(self.parameter_labels[0])
                 ax.set_ylabel(self.parameter_labels[1])
+
                 ax.plot(self.sweep_points[0],
                         self.sweep_points[1], '-o', c='grey')
                 ax.plot(self.sweep_points[0][-1], self.sweep_points[1][-1],
@@ -1449,11 +1453,92 @@ class Rabi_Analysis(TD_Analysis):
             self.axs[i].set_ylim(ymin-0.23*yspan, 0.05*yspan+ymax)
             self.axs[i].legend(frameon=False, loc='lower left')
 
-            if show_guess:
+        if fitting_model == 'simple':
+            x_fine = np.linspace(min(self.sweep_points), max(self.sweep_points),
+                                 1000)
+            for i in range(self.nr_quadratures):
+                if i == 0:
+                    plot_title = kw.pop('plot_title', textwrap.fill(
+                                        self.timestamp_string + '_' +
+                                        self.measurementstring, 40))
+                else:
+                    plot_title = ''
+                self.axs[i].ticklabel_format(useOffset=False)
+                self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                                y=self.measured_values[i],
+                                                fig=self.fig, ax=self.axs[i],
+                                                xlabel=self.xlabel,
+                                                ylabel=self.ylabels[i],
+                                                save=False,
+                                                plot_title=plot_title)
+
                 fine_fit = self.fit_res[i].model.func(
-                    x_fine, **self.fit_res[i].init_values)
-                self.axs[i].plot(x_fine, fine_fit, label='guess')
-                self.axs[i].legend(loc='best')
+                    x_fine, **self.fit_res[i].best_values)
+                # adding the fitted amp180
+                if 'period' in self.fit_res[i].params.keys():
+                    label = 'amp180 = {:.3e}'.format(
+                        abs(self.fit_res[i].params['period'].value)/2)
+                else:
+                    label = 'amp180 = {:.3e}'.format(
+                        abs(self.fit_res[i].params['x0'].value))
+                self.axs[i].plot(x_fine, fine_fit, label=label)
+                ymin = min(self.measured_values[i])
+                ymax = max(self.measured_values[i])
+                yspan = ymax-ymin
+                self.axs[i].set_ylim(ymin-0.23*yspan, 0.05*yspan+ymax)
+                self.axs[i].legend(frameon=False, loc='lower left')
+
+                if show_guess:
+                    fine_fit = self.fit_res[i].model.func(
+                        x_fine, **self.fit_res[i].init_values)
+                    self.axs[i].plot(x_fine, fine_fit, label='guess')
+                    self.axs[i].legend(loc='best')
+
+        elif fitting_model == 'complex':
+            if self.nr_parameters != 2:
+                raise ValueError("Cannot fit a complex cosine\
+                 to only one quadrature")
+            fit_values = fit_mods.CosComplex(
+                self.sweep_points, self.fit_res.params)
+
+            for idx_quadrature in range(self.nr_parameters):
+                if idx_quadrature == 0:
+                    plot_title = kw.pop('plot_title', textwrap.fill(
+                                        self.timestamp_string + '_' +
+                                        self.measurementstring, 40))
+                else:
+                    plot_title = ''
+
+                self.axs[idx_quadrature].ticklabel_format(useOffset=False)
+                self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                                y=self.measured_values[
+                                                    idx_quadrature],
+                                                fig=self.fig, ax=self.axs[
+                                                    idx_quadrature],
+                                                xlabel=self.xlabel,
+                                                ylabel=self.ylabels[
+                                                    idx_quadrature],
+                                                save=False,
+                                                plot_title=plot_title)
+
+                # adding amplitude for pi-pulse
+                label = 'amp180 = {:.3e}'.format(
+                    0.5*abs(self.fit_res.params['frequency'].value))
+
+                if idx_quadrature == 0:
+                    self.axs[idx_quadrature].plot(
+                        self.sweep_points, fit_values.real, label=label)
+                elif idx_quadrature == 1:
+                    self.axs[idx_quadrature].plot(
+                        self.sweep_points, fit_values.imag, label=label)
+
+                ymin = min(self.measured_values[idx_quadrature])
+                ymax = max(self.measured_values[idx_quadrature])
+                yspan = ymax-ymin
+                self.axs[idx_quadrature].set_ylim(
+                    ymin-0.23*yspan, 0.05*yspan+ymax)
+                self.axs[idx_quadrature].legend(
+                    frameon=False, loc='lower left')
         self.save_fig(self.fig, fig_tight=False, **kw)
 
     def fit_data(self, print_fit_results=False, **kw):
@@ -1602,7 +1687,7 @@ class Rabi_parabola_analysis(Rabi_Analysis):
         self.fit_res = ['', '']
         # It would be best to do 1 fit to both datasets but since it is
         # easier to do just one fit we stick to that.
-        for i in [0, 1]:
+        for i in range(self.nr_quadratures):
             model.set_param_hint('x0', expr='-b/(2*a)')
             params = model.guess(data=self.measured_values[i],
                                  x=self.sweep_points)
@@ -1787,9 +1872,10 @@ class Motzoi_XY_analysis(TD_Analysis):
         self.corr_data_Yx = self.corr_data[1:-4:2]
 
         self.fit_data(**kw)
+        opt_motzoi = self.calculate_optimal_motzoi()
+
         self.make_figures(**kw)
 
-        opt_motzoi = self.calculate_optimal_motzoi()
 
         if close_file:
             self.data_file.close()
@@ -1823,6 +1909,14 @@ class Motzoi_XY_analysis(TD_Analysis):
                     fine_fit = self.fit_res[i].model.func(
                         x_fine, **self.fit_res[i].init_values)
                     self.ax.plot(x_fine, fine_fit, c=c[i], label='guess')
+
+
+        self.ax.axvline(self.optimal_motzoi, c="k", ls='--')
+        self.ax.annotate(s = "optimal:\n{:g}".format(self.optimal_motzoi),
+                         fontsize=8,
+                         xy=(self.optimal_motzoi, 0.75), xytext=(10, 0),
+                         xycoords=("data", "figure fraction"),
+                         textcoords="offset points")
 
         self.ax.legend(loc='best')
         if self.cal_points is not None:
@@ -2332,14 +2426,6 @@ class SSRO_Analysis(MeasurementAnalysis):
             self.save_fig(fig, figname=filename,
                           close_fig=self.close_fig, **kw)
 
-        # saving the results
-        if 'SSRO_Fidelity' not in self.analysis_group:
-            fid_grp = self.analysis_group.create_group('SSRO_Fidelity')
-        else:
-            fid_grp = self.analysis_group['SSRO_Fidelity']
-        fid_grp.attrs.create(name='V_th_a', data=V_th_a)
-        fid_grp.attrs.create(name='F_a', data=F_a)
-
         self.F_a = F_a
         self.V_th_a = V_th_a
 
@@ -2494,6 +2580,7 @@ class SSRO_Analysis(MeasurementAnalysis):
 
         self.V_th_d = optimize.brent(NormCdfdiff)
         F_d = 1-(1+NormCdfdiff(x=self.V_th_d))/2
+
         # print 'F_corrected',F_corrected
 
         def NormCdfdiffDouble(x, mu0_0=mu0_0,
@@ -7474,7 +7561,6 @@ class GST_Analysis(TD_Analysis):
 
 
 class CZ_1Q_phase_analysis(TD_Analysis):
-
     def __init__(self, use_diff: bool=True, meas_vals_idx: int=0, **kw):
         self.use_diff = use_diff
         self.meas_vals_idx = meas_vals_idx

@@ -49,7 +49,9 @@ class Fridge_Monitor(Instrument):
 
         self.add_parameter(
             'fridge_name', initial_value=fridge_name,
+
             vals=vals.Enum('LaMaserati', 'LaDucati', 'LaFerrari', 'LaAprilia'),
+
             parameter_class=ManualParameter)
 
         self.add_parameter('last_mon_update',
@@ -59,6 +61,7 @@ class Fridge_Monitor(Instrument):
         self.url = address_dict[self.fridge_name()]
         # These parameters could also be extracted by reading the website.
         # might be nicer :)
+
         self.monitored_temps = monitored_pars_dict[self.fridge_name()]['temp']
         self.monitored_press = monitored_pars_dict[self.fridge_name()]['press']
 

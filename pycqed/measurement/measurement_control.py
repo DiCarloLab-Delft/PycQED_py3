@@ -88,13 +88,7 @@ class MeasurementControl(Instrument):
                            vals=vals.Strings())
 
         # pyqtgraph plotting process is reused for different measurements.
-        if self.live_plot_enabled():
-            self.main_QtPlot = QtPlot(
-                window_title='Main plotmon of {}'.format(self.name),
-                figsize=(600, 400))
-            self.secondary_QtPlot = QtPlot(
-                window_title='Secondary plotmon of {}'.format(self.name),
-                figsize=(600, 400))
+        self.open_plotting_windows()
 
         self.plotting_interval(plotting_interval)
 
@@ -106,6 +100,32 @@ class MeasurementControl(Instrument):
     ##############################################
     # Functions used to control the measurements #
     ##############################################
+
+    def open_plotting_windows(self):
+        """
+        Opens the two plotting windows of the MC. Closes and recreates the
+        windows if they already exist.
+
+        (Call this to recreate the windows if you closed them accidentally)
+        """
+        try:
+            self.main_QtPlot.win.close()
+        except AttributeError:
+            pass
+
+        try:
+            self.secondary_QtPlot.win.close()
+        except AttributeError:
+            pass
+
+        if self.live_plot_enabled():
+            self.main_QtPlot = QtPlot(
+                window_title='Main plotmon of {}'.format(self.name),
+                figsize=(600, 400))
+            self.secondary_QtPlot = QtPlot(
+                window_title='Secondary plotmon of {}'.format(self.name),
+                figsize=(600, 400))
+
 
     def run(self, name: str=None, exp_metadata: dict=None,
             mode: str='1D', **kw):

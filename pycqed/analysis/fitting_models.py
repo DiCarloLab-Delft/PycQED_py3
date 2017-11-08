@@ -287,6 +287,33 @@ def HangerFuncComplex(f, pars):
     return S21
 
 
+def CosComplex(t, pars):
+    '''
+    Cos function in a 2D plan.
+    This is used (for example) in Rabi measurements when I and Q quadratures are available.
+    Input:
+        t = time variable for the cos oscillation (this is the amplitude in Rabi measurements)
+        pars = parameters dictionary
+               amplitude_real, amplitude_imag,
+               phase,
+               offset_real, offset_imag,
+               frequency
+    
+    author: Stefano Poletto
+    '''
+    A_r = pars['amplitude_real']
+    A_i = pars['amplitude_imag']
+    phase = pars['phase']
+    off_r = pars['offset_real']
+    off_i = pars['offset_imag']
+    f = pars['frequency']
+
+    cos_comp = (A_r*np.cos(2*np.pi*f*t + phase) + off_r) + \
+            1.j*(A_i*np.cos(2*np.pi*f*t + phase) + off_i)
+
+    return cos_comp
+
+
 def PolyBgHangerFuncAmplitude(f, f0, Q, Qe, A, theta, poly_coeffs):
     # This is the function for a hanger (lambda/4 resonator) which takes into
     # account a possible polynomial background
@@ -468,7 +495,7 @@ def fft_freq_phase_guess(data, t):
     # Freq guess ! only valid with uniform sampling
     # Only first half of array is used, because the second half contains the
     # negative frequecy components, and we want a positive frequency.
-    w = np.fft.fft(data)[:len(data)//2]
+    w = np.fft.fft(data)[:len(data)//2] # STEFANO: this can be raplaced with np.fft.rfft (no need to cut in half the array)
     f = np.fft.fftfreq(len(data), t[1]-t[0])[:len(w)]
     w[0] = 0  # Removes DC component from fourier transform
 
@@ -671,6 +698,7 @@ PolyBgHangerAmplitudeModel = lmfit.Model(PolyBgHangerFuncAmplitude)
 HangerComplexModel = lmfit.Model(HangerFuncComplex)
 SlopedHangerComplexModel = lmfit.Model(SlopedHangerFuncComplex)
 QubitFreqDacModel = lmfit.Model(QubitFreqDac)
+QubitFreqDacModel2 = lmfit.Model(Qubit_dac_to_freq)
 QubitFreqFluxModel = lmfit.Model(QubitFreqFlux)
 TwinLorentzModel = lmfit.Model(TwinLorentzFunc)
 LorentzianModel = lmfit.Model(Lorentzian)

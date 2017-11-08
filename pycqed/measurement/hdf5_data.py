@@ -143,7 +143,7 @@ def write_dict_to_hdf5(data_dict: dict, entry_point):
     for key, item in data_dict.items():
         # Basic types
         if isinstance(item, (str, float, int, bool,
-                             np.float_, np.int_, np.bool_)):
+                             np.number, np.bool_)):
             try:
                 entry_point.attrs[key] = item
             except Exception as e:

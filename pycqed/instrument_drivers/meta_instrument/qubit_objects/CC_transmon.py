@@ -392,15 +392,17 @@ class CBox_v3_driven_transmon(Transmon):
                 UHFQC = self._acquisition_instrument
                 UHFQC.awg_sequence_acquisition()
             elif 'iqmod' in self.RO_pulse_type().lower():
+                
                 RO_lm = self.RO_LutMan.get_instr()
+                
                 RO_lm.M_length(self.RO_pulse_length())
                 RO_lm.M_amp(self.RO_amp())
-                RO_lm.M_length(self.RO_pulse_length())
                 RO_lm.M_modulation(self.f_RO_mod())
                 RO_lm.acquisition_delay(self.RO_acq_marker_delay())
-
+                RO_lm.generate_standard_pulses()
                 if 'multiplexed' not in self.RO_pulse_type().lower():
-                    RO_lm.load_pulse_onto_AWG_lookuptable('M_square')
+                    RO_lm.load_pulse_onto_AWG_lookuptable('M_square', regenerate_pulses=False)
+
 
         #####################################
         # Setting The integration weights
@@ -893,6 +895,15 @@ class CBox_v3_driven_transmon(Transmon):
             # Redirect to the pulsed spec function
             return self.measure_pulsed_spectroscopy(freqs,
                                                     MC, analyze, close_fig)
+        else:
+          # Loading the right qumis instructions
+            CW_RO_sequence = sqqs.CW_RO_sequence(self.name,
+                                             self.RO_acq_period_cw())
+            CW_RO_sequence_asm = qta.qasm_to_asm(CW_RO_sequence.name,
+                                             self.get_operation_dict())
+            qumis_file = CW_RO_sequence_asm
+            self.CBox.get_instr().load_instructions(qumis_file.name)
+            self.CBox.get_instr().run_mode('run')
         MC.set_sweep_function(self.cw_source.get_instr().frequency)
         MC.set_sweep_points(freqs)
         self.int_avg_det_single._set_real_imag(False)
@@ -1260,14 +1271,16 @@ class CBox_v3_driven_transmon(Transmon):
             return a
 
     def measure_echo(self, times=None, artificial_detuning=0,
-                     label='', MC=None, analyze=True, close_fig=True,
+                     label='', f_qubit=None, MC=None, analyze=True, close_fig=True,
                      update=True, verbose=True):
-        if times == None:
+        if times is None:
             # funny default is because CBox has no real time sideband
             # modulation
             stepsize = (self.T2_echo()*4/61)//(1/abs(self.f_pulse_mod())) \
                 / abs(self.f_pulse_mod())
             times = np.arange(0, self.T2_echo()*4, stepsize)
+        if artificial_detuning is None:
+            artificial_detuning = 3/times[-1]
 
         self.prepare_for_timedomain()
         if MC is None:
@@ -1283,6 +1296,7 @@ class CBox_v3_driven_transmon(Transmon):
         if not all([np.round(t*1e9) % (1/self.f_pulse_mod.get()*1e9)
                     == 0 for t in times]):
             raise ValueError('timesteps must be multiples of modulation freq')
+
 
         echo = sqqs.echo(self.name, times=times, artificial_detuning=None)
         s = swf.QASM_Sweep(echo.name, self.CBox.get_instr(), self.get_operation_dict(),
@@ -1350,7 +1364,7 @@ class CBox_v3_driven_transmon(Transmon):
 
     def measure_ssro(self, no_fits=False,
                      return_detector=False,
-                     MC=None, nr_shots=1024*24,
+                     MC=None, nr_shots=1024*6,
                      analyze=True, verbose=True, update_threshold=True,
                      update=True):
 
@@ -1596,10 +1610,14 @@ class CBox_v3_driven_transmon(Transmon):
         if MC is None:
             MC = self.MC.get_instr()
 
-        cfg = self.qasm_config()
+        cfg = copy.deepcopy(self.qasm_config())
         cfg_channel = cfg['qubit_map'][self.name.lower()]
         config_par_map = ['hardware specification', 'qubit_cfgs', cfg_channel,
                           'flux', 'latency']
+
+        # waiting time must be a multiple of pulse modulation (usually 20 ns)
+        assert np.allclose(wait_after_flux % (1/self.f_pulse_mod()), 0)
+        cfg['operation dictionary']['square']['duration'] = round(wait_after_flux*1e9)
 
         # N.B. docstring in parent class
         qasm_file = qwfs.ramZ_flux_latency(self.name, int(wait_after_flux*1e9))
@@ -1614,7 +1632,7 @@ class CBox_v3_driven_transmon(Transmon):
         MC.run('Ram_Z_latency_calibration'+self.msmt_suffix)
         ma.MeasurementAnalysis()
 
-    def measure_flux_timing(self, taus, MC=None, wait_between=220e-9):
+    def measure_flux_timing(self, taus, chunk_size=16, MC=None, wait_between=None):
         '''
         Measure timing of the flux pulse relative to microwave pulses.
         The sequence of the experiment is
@@ -1647,18 +1665,55 @@ class CBox_v3_driven_transmon(Transmon):
 
         if MC is None:
             MC = self.MC.get_instr()
+        f_lutman = self.flux_LutMan.get_instr()
+        CBox = self.CBox.get_instr()
 
-        qasm_file = sqqs.flux_timing_seq(self.name, taus,
-                                         wait_between=wait_between)
+        if wait_between is None:
+            # Round to the next integer multiple of qubit pulse modulation
+            # period and add two periods as buffer
+            T_pulsemod = np.abs(1/self.f_pulse_mod())
+            wait_between = (np.ceil(max(taus) / T_pulsemod) + 2) \
+                * T_pulsemod
 
-        MC.set_sweep_function(swf.QASM_Sweep(
-            filename=qasm_file.name, CBox=self.CBox.get_instr(),
-            op_dict=self.get_operation_dict(),
-            parameter_name='tau', unit='s'))
+        cfg = copy.deepcopy(self.qasm_config())
+        for i in range(chunk_size):
+            cfg['luts'][1]['square_{}'.format(i)] = i  # assign codeword
+            cfg["operation dictionary"]["square_{}".format(i)] = {
+                "parameters": 1,
+                "duration": int(np.round(wait_between*1e9)),  # in ns
+                "type": "flux",
+                "matrix": []
+            }
+
+        qubit_id = cfg["qubit_map"][self.name.lower()]
+        
+        cfg["hardware specification"]["qubit_cfgs"][qubit_id]["flux"]["latency"] = 0
+    
+        qasm_file = sqqs.flux_timing_seq(self.name, chunk_size=chunk_size,
+                                         cal_points=False)
+
+        qasm_folder, qasm_fn = os.path.split(qasm_file.name)
+        qumis_fn = os.path.join(qasm_folder,
+                                qasm_fn.split('.')[0] + '.qumis')
+        compiler = qcx.QASM_QuMIS_Compiler(verbosity_level=0)
+        compiler.compile(qasm_file.name, qumis_fn=qumis_fn, config=cfg)
+        CBox.load_instructions(qumis_fn)
+
+        CBox.trigger_source('internal')
+        MC.set_sweep_function(swf.QWG_lutman_par_chunks(
+                LutMan=f_lutman,
+                LutMan_parameter=f_lutman.F_delay,
+                sweep_points=taus,
+                chunk_size=chunk_size,
+                codewords=range(chunk_size),
+                flux_pulse_type='square'))
         MC.set_sweep_points(taus)
 
-        MC.set_detector_function(self.int_avg_det)
-        MC.run('flux_timing')
+        d = self.int_avg_det
+        d.chunk_size = chunk_size
+
+        MC.set_detector_function(d)
+        MC.run('flux_timing{}'.format(self.msmt_suffix))
 
         ma.MeasurementAnalysis(label='flux_timing')
 
@@ -1702,7 +1757,6 @@ class CBox_v3_driven_transmon(Transmon):
                     pi-half pulse. For 'interleaved', the 'cos' and 'sin'
                     cases are measured interleaved. Measurement is repeated
                     for all cases given.
-
             analyze (bool):
                     Do the Ram-Z analysis, extracting the step response.
             filter_raw (bool):
@@ -1763,13 +1817,6 @@ class CBox_v3_driven_transmon(Transmon):
             }
 
         for case in cases:
-            if case == 'cos':
-                rec_Y90 = False
-            elif case == 'sin':
-                rec_Y90 = True
-            else:
-                raise ValueError('Unknown case "{}".'.format(case))
-
             CBox.trigger_source('internal')
             qasm_file = sqqs.Ram_Z(
                 qubit_name=self.name,
@@ -1956,7 +2003,7 @@ class CBox_v3_driven_transmon(Transmon):
 
         # Set the flux pulses in the operation dictionary
         # pulse 'square_i' has codeword codewords[i]
-        cfg = copy.copy(self.qasm_config())
+        cfg = copy.deepcopy(self.qasm_config())
         for i in range(chunk_size):
             cfg['luts'][1]['square_{}'.format(i)] = i  # assign codeword
             cfg["operation dictionary"]["square_{}".format(i)] = {
