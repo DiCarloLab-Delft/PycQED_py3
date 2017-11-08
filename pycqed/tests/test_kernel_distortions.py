@@ -27,10 +27,13 @@ class Test_KernelObject(unittest.TestCase):
     def setUpClass(self):
         print('setting up')
         self.station = station.Station()
-        self.k0 = ko.Distortion('k0')
-        self.k1 = ko.Distortion('k1')
+        self.k0 = ko.DistortionKernel('k0')
+        self.k1 = ko.DistortionKernel('k1')
         self.station.add_component(self.k0)
         self.station.add_component(self.k1)
+
+        self.k0.sampling_rate(1e9)
+        self.k1.sampling_rate(1e9)
 
     def test_skin_kernel(self):
         print('skin_kernel')
@@ -110,6 +113,10 @@ class Test_Kernel_functions(unittest.TestCase):
 
     def test_bounce_kernel(self):
         pass
+
+    def test_decay_kernel(self):
+        kf_dec = kf.decay_kernel(amp=dA, tau=dtau*1e9, length=dl*1e9)
+
 
     def test_heaviside(self):
         hs = kf.heaviside(np.array([-1, -.5, 0, 1, 2]))

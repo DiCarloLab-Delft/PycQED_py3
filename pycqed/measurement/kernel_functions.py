@@ -248,7 +248,8 @@ def step_raw(file_name, process_step=True, step_params=None, norm_type='max'):
         return step
 
 
-def step_zeros(file_name, process_step=True, step_params=None, norm_type='max'):
+def step_zeros(file_name, process_step=True,
+               step_params=None, norm_type='max'):
 
     my_step_raw, my_step_params = step_raw(
         file_name, step_params=step_params, norm_type='max')
@@ -259,7 +260,8 @@ def step_zeros(file_name, process_step=True, step_params=None, norm_type='max'):
     return my_step_zeros, my_step_params
 
 
-def step_sampled(file_name, step_width_ns, points_per_ns, step_params=None, norm_type='max'):
+def step_sampled(file_name, step_width_ns, points_per_ns,
+                 step_params=None, norm_type='max'):
 
     my_step_width_points = step_width_ns * points_per_ns
     my_step, my_step_params = step_raw(
@@ -282,7 +284,8 @@ def htilde_raw(step_vec, t=None, width=1):
     return step_vec[t+width]-step_vec[t]
 
 
-def htilde_sampled(file_name, step_width_ns, points_per_ns, step_params=None, norm_type='max'):
+def htilde_sampled(file_name, step_width_ns, points_per_ns,
+                   step_params=None, norm_type='max'):
 
     my_step_width_points = step_width_ns * points_per_ns
     my_step, my_step_params = step_zeros(

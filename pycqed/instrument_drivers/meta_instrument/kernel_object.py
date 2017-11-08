@@ -16,7 +16,7 @@ import pycqed.measurement.kernel_functions as kf
 from pycqed.instrument_drivers.pq_parameters import ConfigParameter
 
 
-class Distortion(Instrument):
+class DistortionKernel(Instrument):
 
     '''
     Implements a distortion kernel for a flux channel.
@@ -137,6 +137,11 @@ class Distortion(Instrument):
                            initial_value=10e-6,
                            vals=vals.Numbers())
 
+        self.add_parameter('sampling_rate',
+                           parameter_class=ManualParameter,
+                           initial_value=1e9,
+                           vals=vals.Numbers())
+
     def add_kernel_to_kernel_list(self, kernel_name):
         v = vals.Strings()
         v.validate(kernel_name)
@@ -163,25 +168,25 @@ class Distortion(Instrument):
 
     def get_bounce_kernel_1(self):
         return kf.bounce_kernel(amp=self.bounce_amp_1(),
-                                time=self.bounce_tau_1()*1e9,
-                                length=self.bounce_length_1()*1e9)
+                                time=self.bounce_tau_1()*self.sampling_rate(),
+                                length=self.bounce_length_1()*self.sampling_rate())
 
     def get_bounce_kernel_2(self):
         return kf.bounce_kernel(amp=self.bounce_amp_2(),
-                                time=self.bounce_tau_2()*1e9,
-                                length=self.bounce_length_2()*1e9)
+                                time=self.bounce_tau_2()*self.sampling_rate(),
+                                length=self.bounce_length_2()*self.sampling_rate())
 
     def get_skin_kernel(self):
         return kf.skin_kernel(alpha=self.skineffect_alpha(),
-                              length=self.skineffect_length()*1e9)
+                              length=self.skineffect_length()*self.sampling_rate())
 
     def get_decay_kernel_1(self):
-        return kf.decay_kernel(amp=self.decay_amp_1(), tau=self.decay_tau_1()*1e9,
-                               length=self.decay_length_1()*1e9)
+        return kf.decay_kernel(amp=self.decay_amp_1(), tau=self.decay_tau_1()*self.sampling_rate(),
+                               length=self.decay_length_1()*self.sampling_rate())
 
     def get_decay_kernel_2(self):
-        return kf.decay_kernel(amp=self.decay_amp_2(), tau=self.decay_tau_2()*1e9,
-                               length=self.decay_length_2()*1e9)
+        return kf.decay_kernel(amp=self.decay_amp_2(), tau=self.decay_tau_2()*self.sampling_rate(),
+                               length=self.decay_length_2()*self.sampling_rate())
 
     def get_poly_kernel(self):
         """
@@ -189,7 +194,7 @@ class Distortion(Instrument):
         """
         return kf.poly_kernel(
             coeffs=[self.poly_a(), self.poly_b(), self.poly_c()],
-            length=self.poly_length()*1e9)
+            length=self.poly_length()*self.sampling_rate())
 
     def convolve_kernel(self, kernel_list, length_samples=None):
         """
@@ -252,7 +257,7 @@ class Distortion(Instrument):
 
         kernel_list = external_kernels + kernel_object_kernels
         return self.convolve_kernel(
-            kernel_list, length_samples=int(self.corrections_length()*1e9))
+            kernel_list, length_samples=int(self.corrections_length()*self.sampling_rate()))
 
     def save_corrections_kernel(self, filename):
 
