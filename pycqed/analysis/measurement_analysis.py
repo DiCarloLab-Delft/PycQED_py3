@@ -8779,7 +8779,7 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
 
         return fit_res
 
-    def fit_all(self, plot=False, extrapolate_phase=False):
+    def fit_all(self, plot=False, extrapolate_phase=False,return_ampl=False):
 
         phase_list = [0,0]
         amplitude_list = []
@@ -8823,18 +8823,21 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
             self.ax[0].set_ylabel('|S21| (arb. units)')
             self.ax[0].legend(['data','fits'])
 
-            self.ax[1].plot(self.sweep_points_2D,phase_list)
+            self.ax[1].plot(self.sweep_points_2D/1e-9,phase_list)
             self.ax[1].set_title('fitted phases')
-            self.ax[1].set_xlabel(self.parameter_names[1]+' ('+self.parameter_units[1]+')')
+            self.ax[1].set_xlabel(self.parameter_names[1]+' (ns)')
             self.ax[1].set_ylabel('phase (rad)')
 
-            self.fig.subplots_adjust(hspace=0.5)
+            self.fig.subplots_adjust(hspace=0.7)
 
             self.fig.show()
 
         self.fitted_phases = np.array(phase_list)
 
-        return phase_list
+        if return_ampl:
+            return phase_list, amplitude_list
+        else:
+            return phase_list
 
 
     def fit_delay(self,X90_separation=None,flux_pulse_length=None, plot=False,

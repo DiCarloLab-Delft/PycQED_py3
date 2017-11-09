@@ -301,6 +301,7 @@ class QuDev_transmon(Qubit):
             self.readout_UC_LO.pulsemod_state('Off')
 
     def prepare_for_pulsed_spec(self):
+        self.heterodyne.auto_seq_loading(False)
         # Not working
         if self.cw_source is not None:
             self.cw_source.pulsemod_state('On')
@@ -334,7 +335,6 @@ class QuDev_transmon(Qubit):
             self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
             self.readout_UC_LO.on()
         self.heterodyne.prepare()
-        self.heterodyne.auto_seq_loading(False)
 
 
 
@@ -464,7 +464,7 @@ class QuDev_transmon(Qubit):
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
     def measure_spectroscopy(self, freqs=None, pulsed=False, MC=None,
-                             analyze=True, close_fig=True):
+                             analyze=True, close_fig=True,upload=True):
         """ Varies qubit drive frequency and measures the resonator
         transmittance """
         if freqs is None:
@@ -502,7 +502,7 @@ class QuDev_transmon(Qubit):
 
             self.cw_source.on()
 
-            sq.Pulsed_spec_seq(spec_pars, RO_pars)
+            sq.Pulsed_spec_seq(spec_pars, RO_pars, upload=upload)
 
             self.AWG.start()
 
@@ -1522,6 +1522,7 @@ class QuDev_transmon(Qubit):
 
     def find_frequency(self, freqs, method='cw_spectroscopy', update=False,
                        MC=None, close_fig=True, analyze_ef=False, analyze=True,
+                       upload=True,
                        **kw):
         """
         WARNING: Does not automatically update the qubit frequency parameter.
@@ -1611,7 +1612,7 @@ class QuDev_transmon(Qubit):
             label = 'spectroscopy'
         else:
             self.measure_spectroscopy(freqs, pulsed=True, MC=MC,
-                                      close_fig=close_fig)
+                                      close_fig=close_fig,upload=upload)
             label = 'pulsed-spec'
 
         if analyze_ef:
@@ -1625,7 +1626,7 @@ class QuDev_transmon(Qubit):
                 label=label,
                 amp_only=amp_only,
                 close_fig=close_fig,**kw)
-            self.f_qubit(SpecA.fitted_freq)
+            # self.f_qubit(SpecA.fitted_freq)
             f0 = SpecA.fitted_freq
             if update:
                 self.f_qubit(f0)

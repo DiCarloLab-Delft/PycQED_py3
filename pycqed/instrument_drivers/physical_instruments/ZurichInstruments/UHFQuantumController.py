@@ -509,7 +509,8 @@ class UHFQC(Instrument):
         d_node_pars = []
         # ["quex/iavg", "quex/wint"]
         patterns = [
-            "awgs", "sigins", "sigouts", "quex", "dios", "system/extclk"]
+            "awgs", "sigins", "sigouts", "quex", "dios", "system/extclk",
+            'triggers/in']
         # json.dump([, s_file, default=int)
         # json.dump([, d_file, default=int)
         for pattern in patterns:
