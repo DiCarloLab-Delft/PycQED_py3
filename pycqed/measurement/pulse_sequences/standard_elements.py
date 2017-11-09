@@ -233,7 +233,7 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
                 # last_pulse is not a RO pulse
                 last_pulse = None
                 t0 += sequencer_config['RO_fixed_point']
-                logging.warning('make sure, your Flux_comp_dead_time is longer'
+                logging.warning('make sure, your Flux_comp_dead_time is longer '
                                 'than the RO_pulse_length!')
         else:
             t0 = sequencer_config['Buffer_Flux_Flux']
