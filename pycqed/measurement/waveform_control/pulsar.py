@@ -187,8 +187,20 @@ class Pulsar(Instrument):
             for AWG in self.used_AWGs():
                 if AWG != self.master_AWG():
                     self._start_AWG(AWG)
-            time.sleep(0.3)  # wait 0.2 second for all other awg-s to start
-            self._start_AWG(self.master_AWG())
+            tstart = time.time()
+            for AWG in self.used_AWGs():
+                if AWG != self.master_AWG():
+                    good = False
+                    while time.time() - tstart < 10:
+                        if self._is_AWG_running(AWG):
+                            good = True
+                            break
+                        else:
+                            time.sleep(0.1)
+                    if not good:
+                        raise Exception('Could not start {}'.format(AWG))
+
+        self._start_AWG(self.master_AWG())
 
     def stop(self):
         """
@@ -411,8 +423,6 @@ class Pulsar(Instrument):
             #                                  goto_l, logic_jump_l,
             #                                  self._AWG5014_chan_cfg(obj.name),
             #                                  preservechannelsettings=True)
-            #preservechannelsettings=True since the "Add Input" was overwritten
-            #by Jonas Butscher, 2017/09/07
             obj.send_awg_file(filename, awg_file)
             obj.load_awg_file(filename)
         else:
@@ -537,6 +547,15 @@ setTrigger(0);
             obj.stop()
         elif isinstance(obj, UHFQC):
             obj._daq.syncSetInt('/' + obj._device + '/awgs/0/enable', 0)
+        else:
+            raise ValueError('Unsupported AWG type: {}'.format(type(obj)))
+
+    def _is_AWG_running(self, AWG):
+        obj = self.AWG_obj(AWG=AWG)
+        if isinstance(obj, Tektronix_AWG5014):
+            return obj.get_state() != 'Idle'
+        elif isinstance(obj, UHFQC):
+            raise NotImplementedError()
         else:
             raise ValueError('Unsupported AWG type: {}'.format(type(obj)))
 

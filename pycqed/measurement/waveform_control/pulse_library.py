@@ -344,61 +344,6 @@ class SquareFluxPulse(Pulse):
         return np.concatenate([sq_pulse, buff_pulse])
 
 
-
-class GaussFluxPulse(Pulse):
-    '''
-    square pulse smoothed out by convolution with a Gaussian pulse of with sigma
-    (sigma specified as flux pulse parameter)
-    '''
-
-    def __init__(self, channel=None, channels=None, name='gauss flux pulse', **kw):
-        Pulse.__init__(self, name)
-        if channel is None and channels is None:
-            raise ValueError('Must specify either channel or channels')
-        elif channels is None:
-            self.channel = channel  # this is just for convenience, internally
-            # this is the part the sequencer element wants to communicate with
-            self.channels.append(channel)
-        else:
-            self.channels = channels
-        self.amplitude = kw.pop('amplitude', 0)
-        self.length = kw.pop('length', 0)
-        self.buffer = kw.pop('buffer', 0)
-        self.length_square_pulse = self.length
-        self.length += 2*self.buffer
-        self.sigma = kw.pop('sigma',0)
-
-
-    def __call__(self, **kw):
-        self.amplitude = kw.pop('amplitude', self.amplitude)
-        self.length = kw.pop('length', self.length)
-        self.buffer = kw.pop('buffer', 0)
-        self.length_square_pulse = self.length
-        self.length += 2*self.buffer
-        self.channel = kw.pop('channel', self.channel)
-        self.channels = kw.pop('channels', self.channels)
-        self.channels.append(self.channel)
-        self.sigma = kw.pop('sigma',0)
-        return self
-
-    def chan_wf(self, chan, tvals):
-        dt = tvals[1] - tvals[0]
-        n_pulse_start = int(self.buffer/dt)
-        n_pulse_stop = int(self.length_square_pulse/dt + self.buffer/dt)
-        pulse = np.zeros(len(tvals))
-        pulse[n_pulse_start:n_pulse_stop] = np.ones(n_pulse_stop - n_pulse_start) * self.amplitude
-        if self.sigma != 0:
-            if int(6*self.sigma/dt)>0:
-                nr_samples = 6*int(self.sigma/dt)
-                gauss_kernel = signal.gaussian(nr_samples, self.sigma/dt, sym=False)
-                gauss_kernel = gauss_kernel/np.sum(gauss_kernel)
-                i_max = int(nr_samples/2)
-                pulse = np.convolve(pulse, gauss_kernel, mode='full')[i_max:(len(pulse)+i_max)]
-        return pulse
-
-
-
-
 class MartinisFluxPulse(Pulse):
 
     def __init__(self, channel=None, channels=None, name='Martinis flux pulse',

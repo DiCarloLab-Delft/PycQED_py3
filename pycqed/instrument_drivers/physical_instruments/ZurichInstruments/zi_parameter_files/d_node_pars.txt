@@ -4,8 +4,6 @@
     "float"
   ],
   [
-    "awgs/0/sweep/awgtrigs/3",
-    "float"
   ],
   [
     "awgs/0/triggers/1/state",
@@ -120,11 +118,9 @@
     "float"
   ],
   [
-    "sigins/0/max",
     "float"
   ],
   [
-    "sigins/0/min",
     "float"
   ],
   [
@@ -136,11 +132,9 @@
     "float"
   ],
   [
-    "sigins/1/autorange",
     "float"
   ],
   [
-    "sigouts/0/over",
     "float"
   ],
   [
@@ -164,7 +158,6 @@
     "vector_g"
   ],
   [
-    "quex/wint/weights/1/real",
     "vector_gs"
   ],
   [
@@ -184,8 +177,6 @@
     "vector_gs"
   ],
   [
-    "quex/wint/weights/2/imag",
-    "vector_gs"
   ],
   [
     "quex/wint/weights/3/real",
