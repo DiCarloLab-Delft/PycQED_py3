@@ -10,7 +10,6 @@ from pycqed.measurement.waveform_control_CC import qasm_compiler as qcx
 import pycqed.measurement.waveform_control_CC.qasm_compiler_helpers as qch
 
 
-
 class Sweep_function(object):
 
     '''
@@ -80,15 +79,36 @@ class Heterodyne_Frequency_Sweep(Soft_Sweep):
             self.RF_source.frequency(val)
 
 
+class Heterodyne_Frequency_Sweep_simple(Soft_Sweep):
+    # Same as above but less input arguments
+
+    def __init__(self, MW_LO_source, IF,
+                 sweep_points=None,
+                 **kw):
+        super().__init__()
+        self.name = 'Heterodyne frequency'
+        self.parameter_name = 'Frequency'
+        self.unit = 'Hz'
+        self.sweep_points = sweep_points
+        self.MW_LO_source = MW_LO_source
+        self.IF = IF
+
+    def set_parameter(self, val):
+        # RF = LO + IF
+        self.MW_LO_source.frequency(val-self.IF)
+
+
 class None_Sweep(Soft_Sweep):
 
     def __init__(self, sweep_control='soft', sweep_points=None,
+                 name: str='None_Sweep', parameter_name: str='pts',
+                 unit: str='arb. unit',
                  **kw):
         super(None_Sweep, self).__init__()
         self.sweep_control = sweep_control
-        self.name = 'None_Sweep'
-        self.parameter_name = 'pts'
-        self.unit = 'arb. unit'
+        self.name = name
+        self.parameter_name = parameter_name
+        self.unit = unit
         self.sweep_points = sweep_points
 
     def set_parameter(self, val):
@@ -268,6 +288,41 @@ class QASM_Sweep(Hard_Sweep):
             self.CBox.load_instructions(qumis_file.name)
 
 
+class OpenQL_Sweep(Hard_Sweep):
+
+    def __init__(self, openql_program, CCL,
+                 parameter_name: str ='Points', unit: str='a.u.',
+                 upload: bool=True):
+        super().__init__()
+        self.name = 'OpenQL_Sweep'
+        self.openql_program = openql_program
+        self.CCL = CCL
+        self.upload = upload
+        self.parameter_name = parameter_name
+        self.unit = unit
+
+    def prepare(self, **kw):
+        if self.upload:
+            self.CCL.upload_instructions(self.openql_program.filename)
+
+class OpenQL_File_Sweep(Hard_Sweep):
+
+    def __init__(self, filename: str, CCL,
+                 parameter_name: str ='Points', unit: str='a.u.',
+                 upload: bool=True):
+        super().__init__()
+        self.name = 'OpenQL_Sweep'
+        self.filename = filename
+        self.CCL = CCL
+        self.upload = upload
+        self.parameter_name = parameter_name
+        self.unit = unit
+
+    def prepare(self, **kw):
+        if self.upload:
+            self.CCL.upload_instructions(self.filename)
+
+
 class QASM_Sweep_v2(Hard_Sweep):
     """
     Sweep function for a QASM file, using the XFu compiler to generate QuMis
@@ -408,6 +463,7 @@ class Multi_QASM_Sweep(QASM_Sweep_v2):
     '''
     Sweep function that combines multiple QASM sweeps into one sweep.
     '''
+
     def __init__(self, exp_per_file: int, hard_repetitions: int,
                  soft_repetitions: int, qasm_list, config: dict, detector,
                  CBox, parameter_name: str='Points', unit: str='a.u.',
@@ -464,7 +520,7 @@ class QuMis_Sweep(Hard_Sweep):
     def __init__(self, filename, CBox,
                  parameter_name='Points', unit='a.u.', upload=True):
         super().__init__()
-        self.name = 'QASM_Sweep'
+        self.name = 'QuMis_Sweep'
         self.filename = filename
         self.upload = upload
         self.CBox = CBox
@@ -472,8 +528,8 @@ class QuMis_Sweep(Hard_Sweep):
         self.unit = unit
 
     def prepare(self, **kw):
-        self.CBox.trigger_source('internal')
         if self.upload:
+            self.CBox.trigger_source('internal')
             self.CBox.load_instructions(self.filename)
 
 
@@ -752,3 +808,61 @@ class QWG_lutman_custom_wave_chunks(Soft_Sweep):
             self.LutMan.load_custom_pulse_onto_AWG_lookuptable(
                 self.wave_func(paramVal), append_compensation=True,
                 pulse_name=pulseName, codeword=self.codewords[i])
+
+# lookuptable sweepfunctions for UHFQC
+
+
+class lutman_par(Soft_Sweep):
+
+    def __init__(self, LutMan, LutMan_parameter, **kw):
+        self.set_kw()
+        self.name = LutMan_parameter.name
+        self.parameter_name = LutMan_parameter.label
+        self.unit = LutMan_parameter.unit
+        self.sweep_control = 'soft'
+        self.LutMan = LutMan
+        self.LutMan_parameter = LutMan_parameter
+
+    def set_parameter(self, val):
+        self.LutMan_parameter.set(val)
+        self.LutMan.load_DIO_triggered_sequence_onto_UHFQC()
+
+
+class lutman_par_dB_attenuation(Soft_Sweep):
+
+    def __init__(self, LutMan, LutMan_parameter, **kw):
+        self.set_kw()
+        self.name = LutMan_parameter.name
+        self.parameter_name = LutMan_parameter.label
+        self.unit = 'dB'
+        self.sweep_control = 'soft'
+        self.LutMan = LutMan
+        self.LutMan_parameter = LutMan_parameter
+
+    def set_parameter(self, val):
+        self.LutMan_parameter.set(10**(val/20))
+        self.LutMan.load_DIO_triggered_sequence_onto_UHFQC()
+
+
+class two_par_joint_sweep(Soft_Sweep):
+    """
+    Allows jointly sweeping two parameters while preserving their
+    respective ratios.
+    """
+    def __init__(self, par_A, par_B, **kw):
+        self.set_kw()
+        self.name = par_A.name
+        self.parameter_name = par_A.name
+        self.unit = par_A.unit
+        self.sweep_control = 'soft'
+
+        self.par_A = par_A
+        self.par_B = par_B
+        try:
+            self.par_ratio = self.par_B.get()/self.par_A.get()
+        except NotImplementedError:
+            self.par_ratio = self.par_B.get_latest()/self.par_A.get_latest()
+
+    def set_parameter(self, val):
+        self.par_A.set(val)
+        self.par_B.set(val*self.par_ratio)

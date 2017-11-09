@@ -941,7 +941,8 @@ class ziShellDevice:
         self.daq.getAsEvent(path)
         tmp = self.daq.poll(0.5, 500, 4, True)
         if path in tmp:
-            return tmp[path]
+            # The [0]['vector'] is to get strip of the vector stuff around it
+            return tmp[path][0]['vector']
         else:
             return None
 
@@ -1025,6 +1026,10 @@ class ziShellDevice:
         This function is tested to work and give the correct error messages
         when compilation fails.
         """
+        print('Disabling codeword triggering')
+        self.seti('awgs/' + str(awg_nr) + '/dio/valid/polarity', 0)
+        self.seti('awgs/' + str(awg_nr) + '/dio/strobe/slope', 0)
+
         print('Configuring AWG_nr {}.'.format(awg_nr))
         if not self.daq:
             raise(ziShellDAQError())
@@ -1055,6 +1060,10 @@ class ziShellDevice:
 
         if not comp_msg.endswith(succes_msg):
             success = False
+
+        print('Reenabling codeword triggering')
+        self.seti('awgs/' + str(awg_nr) + '/dio/valid/polarity', 2)
+        self.seti('awgs/' + str(awg_nr) + '/dio/strobe/slope', 2)
 
         if not success:
             print("Compilation failed, printing program:")

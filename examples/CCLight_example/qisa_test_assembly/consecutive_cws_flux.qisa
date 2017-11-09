@@ -1,0 +1,37 @@
+smis s0, {0}
+smis s1, {1}
+smis s2, {2}
+smis s3, {3}
+smis s4, {4}
+smis s5, {5}
+smis s6, {6}
+smis s7, {0, 1, 2, 3, 4, 5, 6}
+smis s8, {0, 1, 5, 6}
+smis s9, {2, 3, 4}
+smit t0, {(2, 0)}
+smit t0, {(3, 1)}
+
+start:
+    bs 1    prepz s0 | prepz s2
+    qwait 9999
+    bs 2 CW_01 s6
+    bs 4 FL_CW_00 t0  | FL_CW_00 t1
+    qwait 4
+    bs 4 FL_CW_01 t0  | FL_CW_01 t1
+    qwait 4
+    bs 4 FL_CW_02 t0  | FL_CW_02 t1
+    qwait 4
+    bs 4 FL_CW_03 t0  | FL_CW_03 t1
+    qwait 4
+    bs 4 FL_CW_04 t0  | FL_CW_04 t1
+    qwait 4
+    bs 4 FL_CW_05 t0  | FL_CW_05 t1
+    qwait 4
+    bs 4 FL_CW_06 t0  | FL_CW_06 t1
+    qwait 4
+    bs 4 FL_CW_07 t0  | FL_CW_07 t1
+    qwait 4
+    br always, start
+    nop
+    nop
+

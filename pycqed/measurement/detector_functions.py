@@ -861,6 +861,8 @@ class Function_Detector(Soft_Detector):
             return result
         else:
             results = [result[key] for key in self.result_keys]
+            if len(results) == 1:
+                return results[0]  # for a single entry we don't want a list
             return results
 
 
@@ -1275,7 +1277,7 @@ class UHFQC_input_average_detector(Hard_Detector):
         data_raw = self.UHFQC.acquisition_poll(samples=self.nr_sweep_points,
                                                arm=False, acquisition_time=0.01)
         data = np.array([data_raw[key]
-                         for key in data_raw.keys()])  # *self.scaling_factor
+                         for key in sorted(data_raw.keys())])  # *self.scaling_factor
 
         return data
 
@@ -1335,11 +1337,12 @@ class UHFQC_integrated_average_detector(Hard_Detector):
     '''
 
     def __init__(self, UHFQC, AWG=None,
-                 integration_length=1e-6, nr_averages=1024,
-                 channels=(0, 1, 2, 3), result_logging_mode='raw',
-                 real_imag=True,
-                 seg_per_point=1, single_int_avg=False,
-                 chunk_size=None,
+                 integration_length: float=1e-6, nr_averages: int=1024,
+                 channels: list=(0, 1, 2, 3), result_logging_mode: str='raw',
+                 real_imag: bool=True,
+                 seg_per_point: int =1, single_int_avg: bool =False,
+                 chunk_size: int=None,
+                 prepare_function=None, prepare_function_kwargs: dict=None,
                  **kw):
         """
         Args:
@@ -1400,6 +1403,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.result_logging_mode = result_logging_mode
         self.chunk_size = chunk_size
 
+        self.prepare_function = prepare_function
+        self.prepare_function_kwargs = prepare_function_kwargs
         self._set_real_imag(real_imag)
 
     def _set_real_imag(self, real_imag=False):
@@ -1415,7 +1420,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
         if not self.real_imag:
             if len(self.channels) != 2:
-                raise ValueError()
+                raise ValueError('Length of "{}" is not 2'.format(
+                                 self.channels))
             self.value_names[0] = 'Magn'
             self.value_names[1] = 'Phase'
             self.value_units[1] = 'deg'
@@ -1426,26 +1432,30 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
         self.UHFQC.acquisition_arm()
         # starting AWG
+
         if self.AWG is not None:
             self.AWG.start()
 
         data_raw = self.UHFQC.acquisition_poll(
             samples=self.nr_sweep_points, arm=False, acquisition_time=0.01)
+        # the self.channels should be the same as data_raw.keys().
+        # this is to be tested (MAR 26-9-2017)
         data = np.array([data_raw[key]
-                         for key in data_raw.keys()])*self.scaling_factor
+                         for key in sorted(data_raw.keys())])*self.scaling_factor
 
         # Corrects offsets after crosstalk suppression matrix in UFHQC
         if self.result_logging_mode == 'lin_trans':
             for i, channel in enumerate(self.channels):
                 data[i] = data[i]-self.UHFQC.get(
                     'quex_trans_offset_weightfunction_{}'.format(channel))
-
         if not self.real_imag:
             data = self.convert_to_polar(data)
-
         return data
 
     def convert_to_polar(self, data):
+        if len(data) != 2:
+            raise ValueError('Expect 2 channels for rotation. Got {}'.format(
+                             len(data)))
         I = data[0]
         Q = data[1]
         S21 = I + 1j*Q
@@ -1493,6 +1503,14 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
         self.UHFQC.quex_rl_source(self.result_logging_mode_idx)
         self.UHFQC.acquisition_initialize(channels=self.channels, mode='rl')
+
+        # Optionally perform extra actions on prepare
+        if self.prepare_function_kwargs is not None:
+            if self.prepare_function is not None:
+                self.prepare_function(**self.prepare_function_kwargs)
+        else:
+            if self.prepare_function is not None:
+                self.prepare_function()
 
     def finish(self):
         if self.AWG is not None:
@@ -1653,10 +1671,10 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
 
         data = []
         if self.thresholding:
-            for key in data_raw.keys():
+            for key in sorted(data_raw.keys()):
                 data.append(np.array(data_raw[key]))
         else:
-            for key in data_raw.keys():
+            for key in sorted(data_raw.keys()):
                 if key in self.correlation_channels:
                     data.append(np.array(data_raw[key]) *
                                 (self.scaling_factor**2 / self.nr_averages))
@@ -1738,7 +1756,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
         data_raw = self.UHFQC.acquisition_poll(
             samples=self.nr_shots, arm=False, acquisition_time=0.01)
         data = np.array([data_raw[key]
-                         for key in data_raw.keys()])*self.scaling_factor
+                         for key in sorted(data_raw.keys())])*self.scaling_factor
 
         # Corrects offsets after crosstalk suppression matrix in UFHQC
         if self.result_logging_mode == 'lin_trans':
@@ -1984,6 +2002,7 @@ class UHFQC_single_qubit_statistics_logging_det(UHFQC_statistics_logging_det):
     def acquire_data_point(self, **kw):
         # Returns only the data for the relevant channel
         return super().acquire_data_point()[0:3]
+
 
 class UHFQC_single_qubit_statistics_logging_det(UHFQC_statistics_logging_det):
 

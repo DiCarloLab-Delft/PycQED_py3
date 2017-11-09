@@ -102,10 +102,16 @@
     3.0
   ],
   [
-    "awgs/0/dio/delay",
+    "awgs/0/dio/delay/index",
     "int",
     0,
-    4294967295
+    31
+  ],
+  [
+    "awgs/0/dio/delay/value",
+    "int",
+    0,
+    3
   ],
   [
     "awgs/0/dio/snapshot",

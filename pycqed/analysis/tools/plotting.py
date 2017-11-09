@@ -3,6 +3,7 @@ Currently empty should contain the plotting tools portion of the
 analysis toolbox
 '''
 import matplotlib.pyplot as plt
+from matplotlib import cm
 import colorsys as colors
 import numpy as np
 
@@ -21,7 +22,7 @@ def set_xlabel(axis, label, unit=None, **kw):
         **kw : keyword argument to be passed to matplotlib.set_xlabel
 
     """
-    if unit is not None:
+    if unit is not None and unit != '':
         xticks = axis.get_xticks()
         scale_factor, unit = SI_prefix_and_scale_factor(
             val=max(abs(xticks)), unit=unit)
@@ -43,7 +44,7 @@ def set_ylabel(axis, label, unit=None, **kw):
         **kw : keyword argument to be passed to matplotlib.set_ylabel
 
     """
-    if unit is not None:
+    if unit is not None and unit != '':
         yticks = axis.get_yticks()
         scale_factor, unit = SI_prefix_and_scale_factor(
             val=max(abs(yticks)), unit=unit)
@@ -82,14 +83,17 @@ def SI_prefix_and_scale_factor(val, unit=None):
     else:
         scale_factor = 1
 
+    if unit == None:
+        unit = ''  # to ensure proper return value
     return scale_factor, unit
 
 
-def SI_val_to_msg_str(val: float, unit: str=None):
+def SI_val_to_msg_str(val: float, unit: str=None, return_type=str):
     """
     Takes in a value  with optional unit and returns a string tuple consisting
     of (value_str, unit) where the value and unit are rescaled according to
     SI prefixes.
+    the value_str is of the type specified in return_type (str) by default.
     """
     validtypes = (float, int, np.integer, np.floating)
     if unit in SI_UNITS and isinstance(val, validtypes):
@@ -106,7 +110,10 @@ def SI_val_to_msg_str(val: float, unit: str=None):
         val = val*10**-prefix_power
         unit = prefix+unit
 
-    value_str = str(val)
+    value_str = return_type(val)
+    # To ensure right type of return value
+    if unit == None:
+        unit = ''
     return value_str, unit
 
 
@@ -174,10 +181,14 @@ def annotate_point_pair(ax, text, xy_start, xy_end, xycoords='data',
     return label
 
 
-def get_color_order(i, max_num):
+def get_color_order(i, max_num, cmap='viridis'):
     # take a blue to red scale from 0 to max_num
     # uses HSV system, H_red = 0, H_green = 1/3 H_blue=2/3
-    return colors.hsv_to_rgb(2.*float(i)/(float(max_num)*3.), 1., 1.)
+    # return colors.hsv_to_rgb(2.*float(i)/(float(max_num)*3.), 1., 1.)
+    print('It is recommended to use the updated function "get_color_cycle".')
+    if isinstance(cmap, str):
+        cmap = cm.get_cmap(cmap)
+    return cmap((i/max_num) % 1)
 
 
 def get_color_from_cmap(i, max_num):

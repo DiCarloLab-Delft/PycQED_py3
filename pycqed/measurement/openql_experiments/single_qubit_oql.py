@@ -5,7 +5,7 @@ from os.path import join, dirname
 import openql.openql as ql
 from openql.openql import Program, Kernel, Platform
 
-from pycqed.utilities.general import mopen
+# from pycqed.utilities.general import mopen
 from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
 
 
@@ -18,17 +18,79 @@ def CW_tone():
     pass
 
 
-def CW_RO_sequence(qubit_name, trigger_separation, clock_cycle=1e-9):
-    pass
+def vsm_timing_cal_sequence(qubit_idx: int, platf_cfg: str):
+    """
+    A sequence for calibrating the VSM timing delay.
+
+    The marker idx is a qubit number for which a dummy pulse is played.
+    This can be used as a reference.
+
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="vsm_timing_cal_sequence",
+                nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    k = Kernel("main", p=platf)
+    k.prepz(qubit_idx)  # to ensure enough separation in timing
+    k.gate('spec', qubit_idx)
+    p.add_kernel(k)
+    p.compile()
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
 
 
-def pulsed_spec_sequence(qubit_name, clock_cycle=1e-9):
-    pass
+def CW_RO_sequence(qubit_idx: int, platf_cfg: str):
+    """
+    A sequence that performs readout back to back without initialization.
+    The separation of the readout triggers is done by specifying the duration
+    of the readout parameter in the configuration file used for compilation.
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="CW_RO_sequence", nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    k = Kernel("main", p=platf)
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+    p.compile()
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
 
 
-def T1(qubit_name, times, clock_cycle=1e-9,
-       cal_points=True):
-    pass
+def pulsed_spec_seq(qubit_idx: int, spec_pulse_length: float,
+                    platf_cfg: str):
+    """
+    Sequence for pulsed spectroscopy.
+
+    Important notes: because of the way the CCL functions this sequence is
+    made by repeating multiple "spec" pulses of 20ns back to back.
+    As such the spec_pulse_lenght must be a multiple of 20e-9. If
+    this is not the case the spec_pulse_length will be rounded.
+
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="pulsed_spec_seq", nqubits=platf.get_qubit_number(),
+                p=platf)
+    k = Kernel("main", p=platf)
+
+    nr_clocks = int(spec_pulse_length/20e-9)
+
+    for i in range(nr_clocks):
+        # The spec pulse is a pulse that lasts 20ns, because of the way the VSM
+        # control works. By repeating it the duration can be controlled.
+        k.gate('spec', qubit_idx)
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+    p.compile()
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
 
 
 def flipping(qubit_idx: int, number_of_flips, platf_cfg: str,
@@ -110,12 +172,17 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool=True):
     p.set_sweep_points(np.arange(len(allXY), dtype=float), len(allXY))
 
     for i, xy in enumerate(allXY):
-        k = Kernel("AllXY_"+str(i), p=platf)
-        k.prepz(qubit_idx)
-        k.gate(xy[0], qubit_idx)
-        k.gate(xy[1], qubit_idx)
-        k.measure(qubit_idx)
-        p.add_kernel(k)
+        if double_points:
+            js = 2
+        else:
+            js = 1
+        for j in range(js):
+            k = Kernel("AllXY_"+str(i+j/2), p=platf)
+            k.prepz(qubit_idx)
+            k.gate(xy[0], qubit_idx)
+            k.gate(xy[1], qubit_idx)
+            k.measure(qubit_idx)
+            p.add_kernel(k)
 
     p.compile()
     # attribute get's added to program to help finding the output files
@@ -124,116 +191,121 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool=True):
     return p
 
 
-def Ramsey(qubit_name, times, clock_cycle=1e-9,
-           artificial_detuning=None,
-           cal_points=True):
-    '''
-    Ramsey sequence for a single qubit.
+def T1(times, qubit_idx: int, platf_cfg: str):
+    """
+    Single qubit T1 sequence.
+    Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
+
     Input pars:
-        times:               array of times between (start of) pulses (s)
-        pulse_pars:          dict containing the pulse parameters
-        RO_pars:             dict containing the RO parameters
-        artificial_detuning: int,  float or None;
-            if int: number of wiggles
-            if float: artificial_detuning in (Hz)
-            if None: adds no artificial detuning
-                implemented using phase of the second pi/2 pulse (R90_phi),
-                if None it will use X90 as the recovery pulse
-        cal_points:          whether to use calibration points or not
-    '''
-    # if int interpret artificial detuning as desired nr of wiggles
-    pass
-    # if isinstance(artificial_detuning, int):
-    #     phases = (360*np.arange(len(times))/(len(times)-4*cal_points) *
-    #               artificial_detuning % 360)
-    # # if float interpret it as artificial detuning in Hz
-    # elif isinstance(artificial_detuning, float):
-    #     phases = (artificial_detuning*times % 1)*360
-    # elif artificial_detuning is None:
-    #     phases = np.zeros(len(times))
-
-    # clocks = np.round(times/clock_cycle)
-    # filename = join(base_qasm_path, 'Ramsey.qasm')
-    # qasm_file = mopen(filename, mode='w')
-    # qasm_file.writelines('qubit {} \n'.format(qubit_name))
-    # for i, cl in enumerate(clocks):
-    #     qasm_file.writelines('\ninit_all\n')
-    #     if cal_points and (i == (len(clocks)-4) or
-    #                        i == (len(clocks)-3)):
-    #         qasm_file.writelines('RO {}  \n'.format(qubit_name))
-    #     elif cal_points and (i == (len(clocks)-2) or
-    #                          i == (len(clocks)-1)):
-    #         qasm_file.writelines('X180 {} \n'.format(qubit_name))
-    #         qasm_file.writelines('RO {}  \n'.format(qubit_name))
-
-    #     else:
-    #         qasm_file.writelines('X90 {}     \n'.format(
-    #                              qubit_name))
-    #         qasm_file.writelines('I {:d} \n'.format(int(cl)))
-    #         if artificial_detuning is not None:
-    #             qasm_file.writelines('R90_phi {} {}\n'.format(
-    #                 qubit_name, phases[i]))
-    #         else:
-    #             qasm_file.writelines('X90 {}     \n'.format(
-    #                                  qubit_name))
-    #         qasm_file.writelines('RO {}  \n'.format(qubit_name))
-    # qasm_file.close()
-    # return qasm_file
+        times:          the list of waiting times for each T1 element
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+    Returns:
+        p:              OpenQL Program object containing
 
 
-def echo(qubit_name, times, clock_cycle=1e-9,
-         artificial_detuning=None,
-         cal_points=True):
-    '''
-    Echo sequence for a single qubit.
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="T1", nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    for i, time in enumerate(times[:-4]):
+        k = Kernel("T1_"+str(i), p=platf)
+        k.prepz(qubit_idx)
+        wait_nanoseconds = int(round(time/1e-9))
+        k.gate('rx180', qubit_idx)
+        k.gate("wait", [qubit_idx], wait_nanoseconds)
+        k.measure(qubit_idx)
+        p.add_kernel(k)
+
+    # adding the calibration points
+    add_single_qubit_cal_points(p, platf=platf, qubit_idx=qubit_idx)
+
+    p.compile()
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
+
+def Ramsey(times, qubit_idx: int, platf_cfg: str):
+    """
+    Single qubit Ramsey sequence.
+    Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
+
     Input pars:
-        times:               array of times between (start of) pulses (s)
-        pulse_pars:          dict containing the pulse parameters
-        RO_pars:             dict containing the RO parameters
-        artificial_detuning: int,  float or None;
-            if int: number of wiggles
-            if float: artificial_detuning in (Hz)
-            if None: adds no artificial detuning
-                implemented using phase of the second pi/2 pulse
-        cal_points:          whether to use calibration points or not
-    '''
-    # if int interpret artificial detuning as desired nr of wiggles
-    pass
-    # if isinstance(artificial_detuning, int):
-    #     phases = (360*np.arange(len(times))/(len(times)-4*cal_points) *
-    #               artificial_detuning % 360)
-    # # if float interpret it as artificial detuning in Hz
-    # elif isinstance(artificial_detuning, float):
-    #     phases = (artificial_detuning*times % 1)*360
-    # elif artificial_detuning is None:
-    #     phases = np.zeros(len(times))
+        times:          the list of waiting times for each Ramsey element
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+    Returns:
+        p:              OpenQL Program object containing
 
-    # clocks = np.round(times/clock_cycle)
-    # filename = join(base_qasm_path, 'echo.qasm')
-    # qasm_file = mopen(filename, mode='w')
-    # qasm_file.writelines('qubit {} \n'.format(qubit_name))
-    # for i, cl in enumerate(clocks):
-    #     qasm_file.writelines('\ninit_all\n')
-    #     if cal_points and (i == (len(clocks)-4) or
-    #                        i == (len(clocks)-3)):
-    #         qasm_file.writelines('RO {}  \n'.format(qubit_name))
-    #     elif cal_points and (i == (len(clocks)-2) or
-    #                          i == (len(clocks)-1)):
-    #         qasm_file.writelines('X180 {} \n'.format(qubit_name))
-    #         qasm_file.writelines('RO {}  \n'.format(qubit_name))
-    #     else:
-    #         qasm_file.writelines('X90 {}     \n'.format(qubit_name))
-    #         qasm_file.writelines('I {:d} \n'.format(int(cl//2)))
-    #         qasm_file.writelines('X180 {}     \n'.format(qubit_name))
-    #         qasm_file.writelines('I {:d} \n'.format(int(cl//2)))
-    #         if artificial_detuning is not None:
-    #             qasm_file.writelines('R90_phi {} {}\n'.format(
-    #                 qubit_name, phases[i]))
-    #         else:
-    #             qasm_file.writelines('X90 {}     \n'.format(qubit_name))
-    #         qasm_file.writelines('RO {}  \n'.format(qubit_name))
-    # qasm_file.close()
-    # return qasm_file
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="Ramsey", nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    for i, time in enumerate(times[:-4]):
+        k = Kernel("Ramsey_"+str(i), p=platf)
+        k.prepz(qubit_idx)
+        wait_nanoseconds = int(round(time/1e-9))
+        k.gate('rx90', qubit_idx)
+        k.gate("wait", [qubit_idx], wait_nanoseconds)
+        k.gate('rx90', qubit_idx)
+        k.measure(qubit_idx)
+        p.add_kernel(k)
+
+    # adding the calibration points
+    add_single_qubit_cal_points(p, platf=platf, qubit_idx=qubit_idx)
+
+    p.compile()
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
+
+def echo(times, qubit_idx: int, platf_cfg: str):
+    """
+    Single qubit Echo sequence.
+    Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
+
+    Input pars:
+        times:          the list of waiting times for each Echo element
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+    Returns:
+        p:              OpenQL Program object containing
+
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="echo", nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    for i, time in enumerate(times[:-4]):
+        k = Kernel("echo_"+str(i), p=platf)
+        k.prepz(qubit_idx)
+        # nr_clocks = int(time/20e-9/2)
+        wait_nanoseconds = int(round(time/1e-9/2))
+        k.gate('rx90', qubit_idx)
+        k.gate("wait", [qubit_idx], wait_nanoseconds)
+        k.gate('rx180', qubit_idx)
+        k.gate("wait", [qubit_idx], wait_nanoseconds)
+        k.gate('rx90', qubit_idx)
+        k.measure(qubit_idx)
+        p.add_kernel(k)
+
+    # adding the calibration points
+    add_single_qubit_cal_points(p, platf=platf, qubit_idx=qubit_idx)
+
+    p.compile()
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
 
 
 def single_elt_on(qubit_idx: int, platf_cfg: str):
@@ -278,30 +350,45 @@ def two_elt_MotzoiXY(qubit_name):
     # return qasm_file
 
 
-def off_on(qubit_name, pulse_comb='off_on'):
+def off_on(qubit_idx: int, pulse_comb: str, platf_cfg: str):
     """
-    Performs an 'Off_On' sequence on the qubit specified.
+    Performs an 'off_on' sequence on the qubit specified.
+        off: prepz -      - RO
+        on:  prepz - x180 - RO
+    Args:
+        qubit_idx (int) :
+        pulse_comb (str): What pulses to play valid options are
+            "off", "on", "off_on"
+        platf_cfg (str) : filepath of OpenQL platform config file
+
     Pulses can be optionally enabled by putting 'off', respectively 'on' in
     the pulse_comb string.
     """
-    pass
-    # filename = join(base_qasm_path, 'off_on.qasm')
-    # qasm_file = mopen(filename, mode='w')
-    # qasm_file.writelines('qubit {} \n'.format(qubit_name))
-
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="OffOn_RO_sequence", nqubits=platf.get_qubit_number(),
+                p=platf)
     # # Off
-    # if 'off' in pulse_comb.lower():
-    #     qasm_file.writelines('\ninit_all\n')
-    #     qasm_file.writelines('RO {}  \n'.format(qubit_name))
-    # # On
-    # if 'on' in pulse_comb.lower():
-    #     qasm_file.writelines('\ninit_all\n')
-    #     qasm_file.writelines('X180 {}     # On \n'.format(qubit_name))
-    #     qasm_file.writelines('RO {}  \n'.format(qubit_name))
-    # if 'on' not in pulse_comb.lower() and 'off' not in pulse_comb.lower():
-    #     raise ValueError
-    # qasm_file.close()
-    # return qasm_file
+    if 'off' in pulse_comb.lower():
+        k = Kernel("off", p=platf)
+        k.prepz(qubit_idx)
+        k.measure(qubit_idx)
+        p.add_kernel(k)
+
+    if 'on' in pulse_comb.lower():
+        k = Kernel("on", p=platf)
+        k.prepz(qubit_idx)
+        k.gate('rx180', qubit_idx)
+        k.measure(qubit_idx)
+        p.add_kernel(k)
+
+    if ('on' not in pulse_comb.lower()) and ('off' not in pulse_comb.lower()):
+        raise ValueError()
+
+    p.compile(verbose=False)
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
 
 
 def butterfly(qubit_idx: int, initialize: bool, platf_cfg: str):
@@ -336,62 +423,120 @@ def butterfly(qubit_idx: int, initialize: bool, platf_cfg: str):
     return p
 
 
-def randomized_benchmarking(qubit_name, nr_cliffords, nr_seeds,
-                            net_clifford=0, restless=False,
-                            label='randomized_benchmarking',
-                            cal_points=True,
-                            double_curves=False):
+def RTE(qubit_idx: int, sequence_type: str, platf_cfg: str,
+        net_gate: str, feedback=False):
+    """
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="RTE", nqubits=platf.get_qubit_number(), p=platf)
+
+    k = Kernel('RTE', p=platf)
+    if sequence_type == 'echo':
+        k.gate('rx90', qubit_idx)
+        k.gate('i', qubit_idx)
+        k.gate('i', qubit_idx)
+        k.gate('i', qubit_idx)
+        k.gate('i', qubit_idx)
+        k.gate('rx180', qubit_idx)
+        k.gate('i', qubit_idx)
+        k.gate('i', qubit_idx)
+        k.gate('i', qubit_idx)
+        k.gate('i', qubit_idx)
+        if net_gate == 'pi':
+            k.gate('rxm90', qubit_idx)
+        elif net_gate == 'i':
+            k.gate('rx90', qubit_idx)
+        else:
+            raise ValueError('net_gate ({})should be "i" or "pi"'.format(
+                net_gate))
+        if feedback:
+            k.gate('Crx180', qubit_idx)
+    elif sequence_type == 'pi':
+        if net_gate == 'pi':
+            k.gate('rx180', qubit_idx)
+        elif net_gate == 'i':
+            pass
+        else:
+            raise ValueError('net_gate ({})should be "i" or "pi"'.format(
+                net_gate))
+        if feedback:
+            k.gate('Crx180', qubit_idx)
+    else:
+        raise ValueError('sequence_type ({})should be "echo" or "pi"'.format(
+            sequence_type))
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+
+    p.compile()
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
+
+def randomized_benchmarking(qubit_idx: int, platf_cfg: str,
+                            nr_cliffords, nr_seeds: int,
+                            net_clifford: int=0, restless: bool=False,
+                            program_name: str='randomized_benchmarking',
+                            cal_points: bool=True,
+                            double_curves: bool=False):
     '''
     Input pars:
-        nr_cliffords:  list nr_cliffords for which to generate RB seqs
-        nr_seeds:      int  nr_seeds for which to generate RB seqs
-        net_clifford:  int index of net clifford the sequence should perform
-                       0 corresponds to Identity and 3 corresponds to X180
-        restless:      bool, does not initialize if restless is True
-        label:           some string that can be used as a label.
-        cal_points:    bool whether to replace the last two elements with
-                       calibration points, set to False if you want
-                       to measure a single element (for e.g. optimization)
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+        nr_cliffords:   list nr_cliffords for which to generate RB seqs
+        nr_seeds:       int  nr_seeds for which to generate RB seqs
+        net_clifford:   int index of net clifford the sequence should perform
+                        0 corresponds to Identity and 3 corresponds to X180
+        restless:       bool, does not initialize if restless is True
+        program_name:           some string that can be used as a label.
+        cal_points:     bool whether to replace the last two elements with
+                        calibration points, set to False if you want
+                        to measure a single element (for e.g. optimization)
 
         double_curves: Alternates between net clifford 0 and 3
 
-    returns:
-        qasm_file
+    Returns:
+        p:              OpenQL Program object
 
-    generates a qasm file for single qubit Clifford based randomized
+    generates a program for single qubit Clifford based randomized
     benchmarking.
     '''
-    pass
-    # net_cliffords = [0, 3]  # Exists purely for the double curves mode
-    # filename = join(base_qasm_path, label+'.qasm')
-    # qasm_file = mopen(filename, mode='w')
-    # qasm_file.writelines('qubit {} \n'.format(qubit_name))
-    # i = 0
-    # for seed in range(nr_seeds):
-    #     for j, n_cl in enumerate(nr_cliffords):
-    #         if not restless:
-    #             qasm_file.writelines('init_all  \n')
-    #         if cal_points and (j == (len(nr_cliffords)-4) or
-    #                            j == (len(nr_cliffords)-3)):
-    #             qasm_file.writelines('RO {}  \n'.format(qubit_name))
-    #         elif cal_points and (j == (len(nr_cliffords)-2) or
-    #                              j == (len(nr_cliffords)-1)):
-    #             qasm_file.writelines('X180 {} \n'.format(qubit_name))
-    #             qasm_file.writelines('RO {}  \n'.format(qubit_name))
-    #         else:
-    #             if double_curves:
-    #                 net_clifford = net_cliffords[i % 2]
-    #                 i += 1
-    #             cl_seq = rb.randomized_benchmarking_sequence(
-    #                 n_cl, desired_net_cl=net_clifford)
-    #             pulse_keys = rb.decompose_clifford_seq(cl_seq)
-    #             for pulse in pulse_keys:
-    #                 if pulse != 'I':
-    #                     qasm_file.writelines('{} {}\n'.format(
-    #                         pulse, qubit_name))
-    #             qasm_file.writelines('RO {}  \n'.format(qubit_name))
-    # qasm_file.close()
-    # return qasm_file
+    net_cliffords = [0, 3]  # Exists purely for the double curves mode
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname=program_name, nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    i = 0
+    for seed in range(nr_seeds):
+        for j, n_cl in enumerate(nr_cliffords):
+            k = Kernel('RB_{}Cl_s{}'.format(n_cl, seed), p=platf)
+            if not restless:
+                k.prepz(qubit_idx)
+            if cal_points and (j == (len(nr_cliffords)-4) or
+                               j == (len(nr_cliffords)-3)):
+                k.measure(qubit_idx)
+
+            elif cal_points and (j == (len(nr_cliffords)-2) or
+                                 j == (len(nr_cliffords)-1)):
+                k.x(qubit_idx)
+                k.measure(qubit_idx)
+            else:
+                if double_curves:
+                    net_clifford = net_cliffords[i % 2]
+                    i += 1
+                cl_seq = rb.randomized_benchmarking_sequence(
+                    n_cl, desired_net_cl=net_clifford)
+                # pulse_keys = rb.decompose_clifford_seq(cl_seq)
+                for cl in cl_seq:
+                    k.gate('cl_{}'.format(cl), qubit_idx)
+                k.measure(qubit_idx)
+            p.add_kernel(k)
+    p.compile(verbose=False)
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
 
 
 def MotzoiXY(qubit_name, motzois, cal_points=True):
@@ -430,3 +575,18 @@ def Ram_Z(qubit_name,
         clock_cycle     (float): period of the internal AWG clock
     '''
     pass
+
+
+def add_single_qubit_cal_points(p, platf, qubit_idx):
+    for i in np.arange(2):
+        k = Kernel("cal_gr_"+str(i), p=platf)
+        k.prepz(qubit_idx)
+        k.measure(qubit_idx)
+        p.add_kernel(k)
+
+    for i in np.arange(2):
+        k = Kernel("cal_ex_"+str(i), p=platf)
+        k.prepz(qubit_idx)
+        k.gate('rx180', qubit_idx)
+        k.measure(qubit_idx)
+        p.add_kernel(k)
