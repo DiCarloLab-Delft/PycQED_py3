@@ -2,7 +2,7 @@
 `test_python_interface.py` is used to showcase the python interface of the
 QISA assembler.
 
-The file `../qisa_test_assembly/test_assembly.qumis` is assembled.
+The file `../qisa_test_assembly/test_assembly.qisa` is assembled.
 The verbose flag is set, so that the instructions are shown as they are
 processed.
 

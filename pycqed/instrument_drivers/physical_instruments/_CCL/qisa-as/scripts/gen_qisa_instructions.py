@@ -133,6 +133,12 @@ try:
 
         if not encountered_error:
             print('', file=fd)
+            print('  // Contains the opcodes for the quantum instructions that do not have an argument.', file=fd)
+
+            for opc in sorted(def_q_arg_none.values()):
+                print('  _q_inst_arg_none.insert({0:#04x});'.format(opc), file=fd)
+
+            print('', file=fd)
             print('  // Contains the opcodes for the quantum instructions specifying an st argument.', file=fd)
 
             for opc in sorted(def_q_arg_st.values()):
