@@ -126,3 +126,4 @@ $RECYCLE.BIN/
 data/*
 *.hdf5
 
+.idea
