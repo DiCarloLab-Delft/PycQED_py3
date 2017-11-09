@@ -316,6 +316,7 @@ class QuDev_transmon(Qubit):
             self.readout_UC_LO.pulsemod_state('Off')
             self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
             self.readout_UC_LO.on()
+        self.heterodyne.prepare()
 
 
 
@@ -444,7 +445,7 @@ class QuDev_transmon(Qubit):
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
     def measure_spectroscopy(self, freqs=None, pulsed=False, MC=None,
-                             analyze=True, close_fig=True):
+                             analyze=True, close_fig=True,upload=True):
         """ Varies qubit drive frequency and measures the resonator
         transmittance """
         if freqs is None:
@@ -482,7 +483,7 @@ class QuDev_transmon(Qubit):
 
             self.cw_source.on()
 
-            sq.Pulsed_spec_seq(spec_pars, RO_pars)
+            sq.Pulsed_spec_seq(spec_pars, RO_pars, upload=upload)
 
             self.AWG.start()
 
@@ -1519,6 +1520,7 @@ class QuDev_transmon(Qubit):
 
     def find_frequency(self, freqs, method='cw_spectroscopy', update=False,
                        MC=None, close_fig=True, analyze_ef=False, analyze=True,
+                       upload=True,
                        **kw):
         """
         WARNING: Does not automatically update the qubit frequency parameter.
@@ -1608,7 +1610,7 @@ class QuDev_transmon(Qubit):
             label = 'spectroscopy'
         else:
             self.measure_spectroscopy(freqs, pulsed=True, MC=MC,
-                                      close_fig=close_fig)
+                                      close_fig=close_fig,upload=upload)
             label = 'pulsed-spec'
 
         if analyze_ef:
@@ -1622,7 +1624,7 @@ class QuDev_transmon(Qubit):
                 label=label,
                 amp_only=amp_only,
                 close_fig=close_fig,**kw)
-            self.f_qubit(SpecA.fitted_freq)
+            # self.f_qubit(SpecA.fitted_freq)
             f0 = SpecA.fitted_freq
             if update:
                 self.f_qubit(f0)
@@ -1974,19 +1976,23 @@ class QuDev_transmon(Qubit):
             if interleaved_gate is None:
                 if for_ef:
                     label = 'RB_2nd_{}_{}_seeds_{}_cliffords'.format(
-                        gate_decomposition, nr_seeds, nr_cliffords[-1]) + self.msmt_suffix
+                        gate_decomposition, nr_seeds-no_cal_points,
+                        nr_cliffords[-1]) + self.msmt_suffix
                 else:
                     label = 'RB_{}_{}_seeds_{}_cliffords'.format(
-                        gate_decomposition, nr_seeds, nr_cliffords[-1]) + self.msmt_suffix
+                        gate_decomposition, nr_seeds-no_cal_points,
+                        nr_cliffords[-1]) + self.msmt_suffix
             else:
                 if for_ef:
                     label = 'IRB_2nd_{}_{}_{}_seeds_{}_cliffords'.format(
                         interleaved_gate, gate_decomposition,
-                        nr_seeds, nr_cliffords[-1]) + self.msmt_suffix
+                        nr_seeds-no_cal_points, nr_cliffords[-1]) \
+                            + self.msmt_suffix
                 else:
                     label = 'IRB_{}_{}_{}_seeds_{}_cliffords'.format(
                         interleaved_gate, gate_decomposition,
-                        nr_seeds, nr_cliffords[-1]) + self.msmt_suffix
+                        nr_seeds-no_cal_points, nr_cliffords[-1]) \
+                            + self.msmt_suffix
 
         #Perform measurement
         self.measure_randomized_benchmarking(nr_cliffords=nr_cliffords,

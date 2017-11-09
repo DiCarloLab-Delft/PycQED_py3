@@ -73,10 +73,10 @@ class MeasurementAnalysis(object):
         self.dpi = 600                  #dpi for plots
 
         self.axes_line_width=0.5        #lw of axes and text boxes
-        self.font_size = 11             #font sizes
+        self.font_size = 14             #font sizes
         self.tick_length = 4            #tick lengths
         self.tick_width = 0.5           #tick line widths
-        self.marker_size=3              #marker size for data points
+        self.marker_size=4              #marker size for data points
         self.line_width=2               #line widths connecting data points
         self.marker_size_special=8      #marker size for special points like
                                         #peak freq., Rabi pi and pi/2 amplitudes
@@ -1449,7 +1449,8 @@ class TD_Analysis(MeasurementAnalysis):
                                             xlabel=self.xlabel,
                                             ylabel=ylabel,
                                             marker='o-',
-                                            save=False)
+                                            save=False,
+                                            plot_title=kw.pop('plot_title',None))
             # self.ax.set_ylim(min(min(self.normalized_values)-.1, -.1),
             #                   max(max(self.normalized_values)+.1, 1.1))
 
@@ -5403,12 +5404,15 @@ class RandomizedBenchmarking_Analysis_new(TD_Analysis):
     same figure.
     '''
 
-    def __init__(self, label='RB', T1=None, pulse_delay=None,
+    def __init__(self, label='RB', T1=None, T2=None, pulse_delay=None,
                  gate_decomp='HZ', TwoD=True, **kw):
 
         self.T1 = T1
+        self.T2 = T2
         if self.T1==0:
             self.T1=None
+        if self.T2==0:
+            self.T2=None
 
         self.gate_decomp = gate_decomp
         self.pulse_delay = pulse_delay
@@ -5476,7 +5480,7 @@ class RandomizedBenchmarking_Analysis_new(TD_Analysis):
             self.data_file.close()
         return
 
-    def calc_T1_limited_fidelity(self, T1, pulse_delay):
+    def calc_T1_limited_fidelity(self, T1, T2, pulse_delay):
         '''
         Formula from Asaad et al.
         pulse separation is time between start of pulses
@@ -5489,50 +5493,40 @@ class RandomizedBenchmarking_Analysis_new(TD_Analysis):
             Np = 1.875
         else:
             raise ValueError('Gate decomposition not recognized.')
-        F_cl = (1/6*(3 + 2*np.exp(-1*pulse_delay/(2*T1)) +
+        F_cl = (1/6*(3 + 2*np.exp(-1*pulse_delay/(T2)) +
                      np.exp(-pulse_delay/T1)))**Np
         p = 2*F_cl - 1
 
         return F_cl, p
 
-    def add_textbox(self, ax, F_T1=None):
+    def add_textbox(self, ax, F_T1=None, plot_T1_lim=True):
 
-        textstr = ('\t$F_{Cl}$'+' \t= {:.4g} $\pm$ ({:.4g})%'.format(
+        textstr = ('$F_{Cl}$'+' = {:.6g} $\pm$ ({:.4g})%'.format(
             self.fit_res.params['fidelity_per_Clifford'].value*100,
             self.fit_res.params['fidelity_per_Clifford'].stderr*100) +
-            '\n  $1-F_{Cl}$'+'  = {:.4g} $\pm$ ({:.4g})%'.format(
+            '\n$1-F_{Cl}$'+'  = {:.4g} $\pm$ ({:.4g})%'.format(
                 (1-self.fit_res.params['fidelity_per_Clifford'].value)*100,
                 (self.fit_res.params['fidelity_per_Clifford'].stderr)*100) +
-            '\n\tOffset\t= {:.4g} $\pm$ ({:.4g})'.format(
+            '\nOffset = {:.4g} $\pm$ ({:.3g})'.format(
                 (self.fit_res.params['offset'].value),
                 (self.fit_res.params['offset'].stderr)))
-        if F_T1 is not None:
-            textstr += ('\n\t  $F_{Cl}^{T_1}$  = ' +
+        if F_T1 is not None and plot_T1_lim:
+            textstr += ('\n$F_{Cl}^{T_1}$  = ' +
                         '{:.6g}%'.format(F_T1*100))
 
-        self.ax.text(0.1, 0.95, textstr, transform=self.ax.transAxes,
-                     fontsize=11, verticalalignment='top',
+        self.ax.text(0.025, 0.95, textstr, transform=self.ax.transAxes,
+                     fontsize=self.font_size, verticalalignment='top',
                      bbox=self.box_props)
 
     def make_figures(self, close_main_fig, **kw):
 
         ylabel = r'$F$ $\left(|1 \rangle \right)$'
         self.fig, self.ax = self.default_ax()
-        # if self.plot_cal_points:
-        #     x = self.sweep_points
-        #     y = self.corr_data
-        # else:
-        #     logging.warning('not tested for all types of calpoints')
-        #     if type(self.cal_points[0]) is int:
-        #         x = self.sweep_points[:-2]
-        #         y = self.corr_data[:-2]
-        #     else:
-        #         x = self.sweep_points[:-1*(len(self.cal_points[0])*2)]
-        #         y = self.corr_data[:-1*(len(self.cal_points[0])*2)]
 
         self.plot_results_vs_sweepparam(x=self.n_cl,
                                         y=self.data,
                                         fig=self.fig, ax=self.ax,
+                                        marker='o',
                                         xlabel=self.ylabel,
                                         ylabel=ylabel,
                                         save=False)
@@ -5546,47 +5540,46 @@ class RandomizedBenchmarking_Analysis_new(TD_Analysis):
                 err_label = 'stderr'
 
             else:
-                conf_level = kw.pop('conf_level', 0.95)
-                epsilon_guess = kw.pop('epsilon_guess', 0.1)
-                eta = kw.pop('eta', 0)
-                err_bars, err_label = self.calculate_confidence_intervals(
-                    nr_seeds=self.nr_seeds,
-                    nr_cliffords=self.n_cl,
-                    infidelity=self.fit_res.params['error_per_Clifford'].value,
-                    conf_level=conf_level,
-                    epsilon_guess=epsilon_guess,
-                    eta=eta)
+                err_bars = self.epsilon
+                err_label = str(int(self.conf_level*100)) + '% CI'
 
             a_tools.plot_errorbars(self.n_cl,
                                    self.data,
                                    ax=self.ax,
                                    err_bars=err_bars,
                                    label=err_label,
-                                   linewidth=self.axes_line_width,
+                                   linewidth=self.line_width//2,
                                    marker='none',
-                                   markersize=self.marker_size)
+                                   markersize=self.marker_size,
+                                   capsize=self.line_width,
+                                   capthick=self.line_width)
 
         x_fine = np.linspace(0, self.n_cl[-1], 1000)
         for fit_res in self.fit_results:
             best_fit = fit_mods.RandomizedBenchmarkingDecay(
                 x_fine, **fit_res.best_values)
-            self.ax.plot(x_fine, best_fit, label='Fit')
+            self.ax.plot(x_fine, best_fit, 'C0', label='Fit')
         self.ax.set_ylim(min(min(self.data)-.1, -.1),
                          max(max(self.data)+.1, 1.1))
 
         # Here we add the line corresponding to T1 limited fidelity
+        plot_T1_lim = kw.pop('plot_T1_lim', True)
         F_T1 = None
-        if self.T1 is not None and self.pulse_delay is not None:
-            F_T1, p_T1 = self.calc_T1_limited_fidelity(
-                self.T1, self.pulse_delay)
-            T1_limited_curve = fit_mods.RandomizedBenchmarkingDecay(
-                x_fine, -0.5, p_T1, 0.5)
-            self.ax.plot(x_fine, T1_limited_curve, label='T1-limit')
+        if self.pulse_delay is not None:
+            if self.T1 is not None and self.T2 is not None and plot_T1_lim:
+                F_T1, p_T1 = self.calc_T1_limited_fidelity(
+                    self.T1, self.T2, self.pulse_delay)
+                T1_limited_curve = fit_mods.RandomizedBenchmarkingDecay(
+                    x_fine, -0.5, p_T1, 0.5)
+                self.ax.plot(x_fine, T1_limited_curve, '-.', color='C1',
+                             linewidth=self.line_width,
+                             label=r'$T_{1}$-limit')
 
-        self.ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        self.ax.legend(loc='center left', bbox_to_anchor=(1, 0.5),
+                       fontsize=self.font_size)
 
         # Add a textbox
-        self.add_textbox(self.ax, F_T1)
+        self.add_textbox(self.ax, F_T1, plot_T1_lim=plot_T1_lim)
 
         if kw.pop('show',True):
             plt.show()
@@ -5600,8 +5593,10 @@ class RandomizedBenchmarking_Analysis_new(TD_Analysis):
             self.save_fig(self.fig, ylabel='Amplitude (normalized)', **kw)
 
     def calculate_confidence_intervals(self, nr_seeds, nr_cliffords,
-                                       conf_level=0.95, infidelity=0,
+                                       conf_level=0.68, infidelity=0,
                                        epsilon_guess=0.1, eta=0):
+
+        # From Helsen et al. (2017)
         # For each number of cliffords in nr_cliffords (array), finds epsilon
         # such that with probability greater than conf_level, the true value of
         # the survival probability, p_N_m, for a given N=nr_seeds and
@@ -5610,8 +5605,6 @@ class RandomizedBenchmarking_Analysis_new(TD_Analysis):
         # See Helsen et al. (2017) for more details.
 
         # eta is the SPAM-dependent prefactor defined in Helsen et al. (2017)
-
-        label = str(int(conf_level*100)) + '% confidence interval'
 
         epsilon = []
         delta = 1-conf_level
@@ -5626,12 +5619,12 @@ class RandomizedBenchmarking_Analysis_new(TD_Analysis):
                                 (delta/2)**(1/nr_seeds)
                 epsilon.append(optimize.fsolve(H, epsilon_guess)[0])
 
-        return np.asarray(epsilon), label
+        return np.asarray(epsilon)
 
     def fit_data(self, data, numCliff,
                  print_fit_results=False,
                  show_guess=False,
-                 plot_results=False):
+                 plot_results=False, **kw):
 
         RBModel = lmfit.Model(fit_mods.RandomizedBenchmarkingDecay)
         # RBModel = fit_mods.RBModel
@@ -5656,8 +5649,34 @@ class RandomizedBenchmarking_Analysis_new(TD_Analysis):
                                expr='1-fidelity_per_gate')
 
         params = RBModel.make_params()
-        fit_res = RBModel.fit(data, numCliff=numCliff,
-                              params=params)
+
+        # Run once to get an estimate for the error per Clifford
+        fit_res = RBModel.fit(data, numCliff=numCliff, params=params)
+
+        # Use the found error per Clifford to standard errors for the data
+        # points fro Helsen et al. (2017)
+        self.conf_level = kw.pop('conf_level', 0.68)
+        epsilon_guess = kw.pop('epsilon_guess', 0.1)
+        eta = kw.pop('eta', 0)
+        epsilon = self.calculate_confidence_intervals(
+            nr_seeds=self.nr_seeds,
+            nr_cliffords=self.n_cl,
+            infidelity=fit_res.params['error_per_Clifford'].value,
+            conf_level=self.conf_level,
+            epsilon_guess=epsilon_guess,
+            eta=eta)
+
+        self.epsilon = epsilon
+        # Run fit again with scale_covar=False, and weights = 1/epsilon
+
+        # if an entry in epsilon_sqrd is 0, replace it with half the minimum
+        # value in the epsilon_sqrd array
+        idxs = np.where(epsilon==0)[0]
+        epsilon[idxs] = min([eps for eps in epsilon if eps!=0])/2
+
+        fit_res = RBModel.fit(data, numCliff=numCliff, params=params,
+                              scale_covar=False, weights=1/epsilon)
+
         if print_fit_results:
             print(fit_res.fit_report())
         if plot_results:

@@ -1860,9 +1860,16 @@ def color_plot_interpolated(x, y, z, ax=None,
         return ax, CS, cbar
     return ax, CS
 
-def plot_errorbars(x, y, ax=None,
-                   linewidth=2 ,markersize=2, marker='none',
-                   err_bars=None, label=None):
+def plot_errorbars(x, y, ax=None, err_bars=None, label=None, **kw):
+
+    color = kw.pop('color', 'C0')
+    # see https://matplotlib.org/users/dflt_style_changes.html for details about
+    # the 'C#" color notation
+    marker = kw.pop('marker', 'none')
+    linewidth = kw.pop('linewidth', 2)
+    markersize = kw.pop('markersize', 2)
+    capsize = kw.pop('capsize', 2)
+    capthick = kw.pop('capthick', 2)
 
     if ax is None:
         new_plot_created = True
@@ -1881,13 +1888,15 @@ def plot_errorbars(x, y, ax=None,
         if label is None:
             label = 'stderr'
 
-    ax.errorbar( x, y, yerr=err_bars, ecolor='k', fmt=marker,
-                     linewidth=linewidth, markersize=markersize, label=label)
+    ax.errorbar( x, y, yerr=err_bars, label=label,
+                 ecolor=color, fmt=marker,
+                 elinewidth=linewidth, markersize=markersize,
+                 capsize=capsize, capthick=capthick, )
 
     if new_plot_created:
         return f,ax
     else:
-        return
+        return ax
 
 
 ######################################################################
