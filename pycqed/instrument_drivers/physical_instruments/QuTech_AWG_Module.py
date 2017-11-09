@@ -184,6 +184,17 @@ class QuTech_AWG_Module(SCPI):
                            label='Waveform list',
                            get_cmd=self._getWlist)
 
+
+        self.add_parameter('get_system_status',
+                           unit='JSON',
+                           label=('System status'),
+                           get_cmd='SYSTem:STAtus?',
+                           vals=vals.Strings(),
+                           get_parser=self.JSON_parser,
+                           docstring='Reads the current system status. E.q. channel ' \
+                               +'status: on or off, overflow, underdrive.\n' \
+                               +'Return:\n     JSON object with system status')
+
         # Trigger parameters
         doc_trgs_log_inp = 'Reads the current input values on the all the trigger ' \
                     +'inputs.\nReturn:\n    uint32 where trigger 1 (T1) ' \
@@ -214,24 +225,24 @@ class QuTech_AWG_Module(SCPI):
                           call_cmd='QUTEch:OUTPut:SYNCsideband',
                           docstring=doc_sSG)
 
-        # self.add_parameter('system_status'),
-        #                    label='System status',
-        #                    get_cmd=systemState_cmd + 'SYSTem:STAtus? {}',
-        #                    val_mapping={True: '1', False: '0'},
-        #                    vals=vals.Bool())
-        # command is run but using start and stop because
-        # FIXME: replace custom start function when proper error message has
-        # been implemented.
-        # self.add_function('start',
-        #                   call_cmd='awgcontrol:run:immediate')
-    def stop(self):
-        self.write('awgcontrol:stop:immediate')
 
-        self.detectOverflow()
+    def stop(self):
+        '''
+        Shutsdown output on channels. When stoped will check for errors or overflow
+        '''
+        self.write('awgcontrol:stop:immediate')
+        self.detect_overflow()
         self.getErrors()
 
-
+    # command is run but using start and stop because
+    # FIXME: replace custom start function when proper error message has
+    # been implemented.
+    # self.add_function('start',
+    #                   call_cmd='awgcontrol:run:immediate')
     def start(self):
+        '''
+        Activates output on channels with the current settings. When started this function will check for possible warnings
+        '''
         run_mode = self.run_mode()
         if run_mode == 'NONE':
             raise RuntimeError('No run mode is specified')
@@ -239,9 +250,8 @@ class QuTech_AWG_Module(SCPI):
 
         self.getErrors()
 
-        status = self.getSystemStatus()
-        # warn_msg = self.detectPosibleOverflow(status)
-        warn_msg = self.detectPosibleUnderFlow(status)
+        status = self.get_system_status()
+        warn_msg = self.detect_underdrive(status)
 
         if(len(warn_msg) > 0):
             warnings.warn(', '.join(warn_msg))
@@ -266,38 +276,33 @@ class QuTech_AWG_Module(SCPI):
         M = M.reshape(2, 2, order='F')
         return(M)
 
-    def getSystemStatus(self):
-        # vals.Bool().validate(resetStatus)
-        status = str(self.ask('SYSTem:STAtus?'))[1:-1]
-        status = status.replace('\"\"', '\"') # SCPI/visa adds additional quotes
-        return json.loads(status)
-
-    def detectOverflow(self):
-        status = self.getSystemStatus()
-        errors = False;
+    def detect_overflow(self):
+        '''
+        Will raise an error if on a channel overflow happened
+        '''
+        status = self.get_system_status()
         err_msg = [];
         for channel in status["channels"]:
             if(channel["overflow"] == True):
-                errors = True;
                 err_msg.append("Wave overflow detected on channel: {}".format(channel["id"]))
-        if(errors == True):
+        if(len(err_msg) > 0):
             raise RuntimeError(err_msg)
 
-    # def detectPosibleOverflow(self, status):
-    #     msg = [];
-    #     for channel in status["channels"]:
-    #         if((channel["on"] == True) and (channel["possibleOverflow"] == True)):
-    #             msg.append("Possible wave overflow detected on channel: {}".format(channel["id"]))
-    #     return msg;
-
-    def detectPosibleUnderFlow(self, status):
+    def detect_underdrive(self, status):
+        '''
+        Will raise an warning if on a channel underflow is detected
+        '''
         msg = [];
         for channel in status["channels"]:
-            if((channel["on"] == True) and (channel["underflow"] == True)):
-                msg.append("Possible wave underflow detected on channel: {}".format(channel["id"]))
+            if((channel["on"] == True) and (channel["underdrive"] == True)):
+                msg.append("Possible wave underdrive detected on channel: {}".format(channel["id"]))
         return msg;
 
     def getErrors(self):
+        '''
+        The SCPI protocol by default does not return errors. Therefore the user needs
+        to ask for errors. This function retrieves all errors and will raise them.
+        '''
         errNr = self.getSystemErrorCount()
 
         if errNr > 0:
@@ -306,8 +311,16 @@ class QuTech_AWG_Module(SCPI):
                 errMgs.append(self.getError())
             raise RuntimeError(', '.join(errMgs))
 
+    def JSON_parser(self, msg):
+        '''
+        Converts the result of a SCPI message to a JSON.
 
-
+        msg: SCPI message where the body is a JSON
+        return: JSON object with the data of the SCPI message
+        '''
+        result = str(msg)[1:-1]
+        result = result.replace('\"\"', '\"') # SCPI/visa adds additional quotes
+        return json.loads(result)
 
     ##########################################################################
     # AWG5014 functions: SEQUENCE
