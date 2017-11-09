@@ -473,6 +473,8 @@ def decay_kernel(amp: float=-1., tau: float =11000,
         amp             (float) : amplitude of the decay (should be negative)
         tau             (float) : time constant of the decay
         length          (float) : total length of the kernel
+        offset          (float) : the offset, N.B. if the offset is close to 0
+                one get's weird behaviour due to floating point errors.
         sampling_rate   (float) : sampling rate for which to generate the
             kernel. Default value is 1 to support deprecated behaviour
             in which everything is expressed in units of ns.

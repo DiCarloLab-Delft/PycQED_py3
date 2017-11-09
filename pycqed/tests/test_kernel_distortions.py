@@ -180,12 +180,28 @@ class Test_Kernel_functions(unittest.TestCase):
         # Testing on a different sampling rate
 
         sampling_rate = 2.4e9
-        offset=.95
+        offset = .95
         x24GS = np.arange(200)/sampling_rate
-        y24Gs_signal =  A * np.exp(-x24GS/tau) + offset
+        y24Gs_signal = A * np.exp(-x24GS/tau) + offset
 
         kf_dec = kf.decay_kernel(
-            amp=A, tau=tau, length=100e-6, offset=offset, sampling_rate=sampling_rate)
+            amp=A, tau=tau, length=100e-6, offset=offset,
+            sampling_rate=sampling_rate)
+        y24Gs_corr0 = np.convolve(y24Gs_signal, kf_dec)
+        np.testing.assert_almost_equal(y24Gs_corr0[10:80], np.ones(70),
+                                       decimal=2)
+
+    def test_decay_small_offset(self):
+        A = 1
+        tau = 4e-6
+        sampling_rate = 2.4e9
+        offset = 0.2
+        x24GS = np.arange(200)/sampling_rate
+        y24Gs_signal = A * np.exp(-x24GS/tau) + offset
+
+        kf_dec = kf.decay_kernel(
+            amp=A, tau=tau, length=100e-6, offset=offset,
+            sampling_rate=sampling_rate)
         y24Gs_corr0 = np.convolve(y24Gs_signal, kf_dec)
         np.testing.assert_almost_equal(y24Gs_corr0[10:80], np.ones(70),
                                        decimal=2)
