@@ -458,19 +458,19 @@ def bounce_kernel(amp: float=0.02, time: float=4,
     return kernel_bounce
 
 
-def decay_kernel(amp: float=1., tau: float =11000,
-                 length: float=2000,
+def decay_kernel(amp: float=-1., tau: float =11000,
+                 length: float=2000, offset: float=1,
                  sampling_rate: float=1):
     """
     Generates a decay kernel, with the specified parameters
 
-    step_function
-        1 - amp*np.exp(-t_kernel/tau)
+    This kernel corrects for the following step function
+        amp * exp(-t_kernel/tau) + offset
 
     amp and tau are the parameters estimated from the step function
 
     Args:
-        amp             (float) : amplitude of the decay
+        amp             (float) : amplitude of the decay (should be negative)
         tau             (float) : time constant of the decay
         length          (float) : total length of the kernel
         sampling_rate   (float) : sampling rate for which to generate the
@@ -480,21 +480,22 @@ def decay_kernel(amp: float=1., tau: float =11000,
         decay_kernel (np.array) : the predistortion kernel to correct for
             an exponential decay.
     """
-
-    tau_k = (1.-amp)*tau
-    amp_k = amp/(amp-1)
+    a = amp/offset
+    amp_k = a / (a + 1)
+    tau_k = (amp+1)*tau
 
     nr_samples = int(length*sampling_rate)
     t_kernel = np.arange(nr_samples)/sampling_rate
 
-    if abs(amp) > 0.:
-        kernel_decay_step = 1 - amp_k*np.exp(-t_kernel/tau_k)
-        kernel_decay = np.zeros(kernel_decay_step.shape)
-        kernel_decay[0] = kernel_decay_step[0]
-        kernel_decay[1:] = kernel_decay_step[1:]-kernel_decay_step[:-1]
-    else:
-        kernel_decay = np.zeros(int(nr_samples))
-        kernel_decay[0] = 1.
+    # if abs(amp) > 0.:
+    kernel_decay_step = (1 - amp_k*np.exp(-t_kernel/tau_k))/offset
+    kernel_decay = kernel_from_kernel_stepvec(kernel_decay_step)
+    # kernel_decay = np.zeros(kernel_decay_step.shape)
+    # kernel_decay[0] = kernel_decay_step[0]
+    # kernel_decay[1:] = kernel_decay_step[1:]-kernel_decay_step[:-1]
+    # else:
+    #     kernel_decay = np.zeros(int(nr_samples))
+    #     kernel_decay[0] = 1.
     return kernel_decay
 
 
@@ -507,7 +508,7 @@ def skin_kernel(alpha=0., length=601):
     t_kernel = np.arange(int(length))
     if abs(alpha) > 0.:
         kernel_skineffect = kernel_generic(htilde_skineffect,
-                                            t_kernel, alpha)
+                                           t_kernel, alpha)
     else:
         kernel_skineffect = np.zeros(int(length))
         kernel_skineffect[0] = 1.
