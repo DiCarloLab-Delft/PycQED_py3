@@ -183,8 +183,7 @@ class QuTech_AWG_Module(SCPI):
         self.add_parameter('Wlist',
                            label='Waveform list',
                            get_cmd=self._getWlist)
-
-
+        
         self.add_parameter('get_system_status',
                            unit='JSON',
                            label=('System status'),
@@ -192,8 +191,8 @@ class QuTech_AWG_Module(SCPI):
                            vals=vals.Strings(),
                            get_parser=self.JSON_parser,
                            docstring='Reads the current system status. E.q. channel ' \
-                               +'status: on or off, overflow, underdrive.\n' \
-                               +'Return:\n     JSON object with system status')
+                             +'status: on or off, overflow, underdrive.\n' \
+                             +'Return:\n     JSON object with system status')
 
         # Trigger parameters
         doc_trgs_log_inp = 'Reads the current input values on the all the trigger ' \
