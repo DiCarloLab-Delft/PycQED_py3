@@ -1712,8 +1712,7 @@ def Chevron_flux_pulse_ampl_seq(ampls, qb_control,
                                 qb_target, spacing=50e-9,
                                 cal_points=False, verbose=False,
                                 upload=True, return_seq=False,
-                                distorted=False,distortion_dict=None,
-                                compensation_pulses=False
+                                distorted=False,distortion_dict=None
                                 ):
     '''
     chevron sequence (sweep of the flux pulse amplitude)
@@ -1756,40 +1755,26 @@ def Chevron_flux_pulse_ampl_seq(ampls, qb_control,
     flux_pulse_control['refpoint'] = 'end'
     flux_pulse_control['pulse_delay'] = spacing
 
-    flux_pulse_comp = deepcopy(flux_pulse_control)
-    if compensation_pulses:
-        flux_pulse_comp['amplitude'] = -  flux_pulse_control['amplitude']
-    else:
-        flux_pulse_comp['amplitude'] = 0
-    flux_pulse_comp['refpoint'] = 'end'
-    flux_pulse_comp['delay'] = spacing
 
     flux_pulse_length = flux_pulse_control['length']
 
     RO_pars_target['refpoint'] = 'start'
     RO_pars_target['pulse_delay'] = flux_pulse_length + spacing
 
-    if flux_pulse_control['pulse_type'] == 'GaussFluxPulse':
-        flux_pulse_control['pulse_delay'] -= flux_pulse_control['buffer']
-        RO_pars_target['pulse_delay'] -= 2* flux_pulse_control['buffer']
-
     for i, ampl in enumerate(ampls):
         flux_pulse_control['amplitude'] = ampl
-        flux_pulse_comp['amplitude'] = -ampl
 
         if cal_points and (i == (len(ampls)-4) or i == (len(ampls)-3)):
             el = multi_pulse_elt(i, station, [RO_pars_target])
         elif cal_points and (i == (len(ampls)-2) or i == (len(ampls)-1)):
             flux_pulse_control['amplitude'] = 0
-            flux_pulse_comp['amplitude'] = 0
             el = multi_pulse_elt(i, station, [X180_control, X180_target,
                                               flux_pulse_control,
-                                              RO_pars_target,flux_pulse_comp])
+                                              RO_pars_target])
         else:
             el = multi_pulse_elt(i, station, [X180_control,X180_target,
                                               flux_pulse_control,
-                                              RO_pars_target,
-                                              flux_pulse_comp])
+                                              RO_pars_target])
 
 
         if distorted is True:
