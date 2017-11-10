@@ -11,7 +11,7 @@
 
 from .SCPI import SCPI
 from ._CCL.CCLightMicrocode import CCLightMicrocode
-from qcodes import StandardParameter
+from qcodes import Parameter
 from qcodes import validators as vals
 import os
 import logging
@@ -79,7 +79,7 @@ class CCL(SCPI):
         self.QISA.setVerbose(False)
 
     def add_parameter(self, name,
-                      parameter_class=StandardParameter, **kwargs):
+                      parameter_class=Parameter, **kwargs):
         """
         Function to manually add a qcodes parameter. Useful for nonstandard
         forms of the scpiCmds.
