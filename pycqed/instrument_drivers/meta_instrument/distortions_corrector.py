@@ -54,7 +54,8 @@ class Distortion_corrector():
 
         # Files
         self.filename = ''
-        self.data_dir = self.kernel_object.kernel_dir()  # where traces and plots are saved
+        # where traces and plots are saved
+        self.data_dir = self.kernel_object.kernel_dir()
         self._iteration = 0
         self.auto_save_plots = auto_save_plots
 
@@ -87,7 +88,10 @@ class Distortion_corrector():
             '        Set the x-range of the plot to (min, max). The points\n'
             '        outside this range are not plotted. The number of\n'
             '        points plotted in the given interval is fixed to\n'
-            '        self.nr_plot_points (default=1000).')
+            '        self.nr_plot_points (default=1000).\n'
+            'square_amp <amp> \n'
+            '        Set the square_amp used to normalize measured waveforms.\n'
+            '        If amp = "?" the current square_amp is printed.')
 
         # Make window for plots
         self.vw = QtPlot(window_title='Distortions', figsize=(600, 400))
@@ -187,7 +191,7 @@ class Distortion_corrector():
     def fit_exp_model(self, start_time_fit, end_time_fit):
         '''
         Fits an exponential of the form
-            A * exp(-t/tau) + C
+            A * exp(-t/tau) + offset
         to the last trace that was measured (self.waveform).
         The fit model and result are saved in self.fit_model and self.fit_res,
         respectively. The new predistortion kernel and information about the
@@ -206,8 +210,8 @@ class Distortion_corrector():
                                       value=self.waveform[self._stop_idx],
                                       vary=True)
         self.fit_model.set_param_hint('amplitude',
-                                      value=self.waveform[self._start_idx] -
-                                      self.waveform[self._stop_idx],
+                                      value=(self.waveform[self._start_idx] -
+                                             self.waveform[self._stop_idx]),
                                       vary=True)
         self.fit_model.set_param_hint('tau',
                                       value=end_time_fit-start_time_fit,
@@ -220,49 +224,43 @@ class Distortion_corrector():
             data=self.waveform[self._start_idx:self._stop_idx],
             t=self.time_pts[self._start_idx:self._stop_idx],
             params=params)
+
         self.fitted_waveform = fit_res.eval(
             t=self.time_pts[self._start_idx:self._stop_idx])
 
         # Analytic form of the predistorted square pulse (input that creates a
         # square pulse at the output)
-        C = fit_res.best_values['offset']
+        offset = fit_res.best_values['offset']
         A = fit_res.best_values['amplitude']
-        a = A / C
-        aTilde = a / (a + 1)
         tau = fit_res.best_values['tau']
-        tauTilde = tau * (a + 1)
-
-        tPts = np.arange(0, self.kernel_length/self.sampling_rate,
-                         1/self.sampling_rate)
-        predist_step = (1 - aTilde * np.exp(-tPts/tauTilde)) / C
 
         # Check if parameters are physical and print warnings if not
         if tau < 0:
             print('Warning: unphysical tau = {} (expect tau > 0).'
                   .format(tau))
-        if C < 0:
-            print('Warning: unphysical C = {} (expect C > 0)'.format(C))
+        if offset < 0:
+            print('Warning: unphysical offset = {} (expect offset > 0)'.format(
+                offset))
 
         # Save the results
         self.fit_res = fit_res
-        self.new_step = predist_step
-        # Take every 5th point because sampling rate of AWG is 1 GHz and
-        # sampling rate of scope is 5 GHz.
-        # TODO: un-hardcode this
-        new_ker = kf.kernel_from_kernel_stepvec(predist_step)
+        new_ker = kf.decay_kernel(
+            amp=A, tau=tau, offset=offset,
+            length=self.kernel_object.corrections_length(),
+            sampling_rate=self.sampling_rate)
 
         self.new_kernel_dict = {
             'name': self.filename + '_' + str(self._iteration),
             'filter_params': {
-                'b0': 1 / (C + A),
-                'b1': 1 / (tau * (C + A)),
-                'a1': -C / (tau * (C + A))
+                'b0': 1 / (offset + A),
+                'b1': 1 / (tau * (offset + A)),
+                'a1': -offset / (tau * (offset + A))
             },
             'fit': {
                 'model': 'exponential',
                 'A': A,
                 'tau': tau,
-                'C': C
+                'offset': offset
             },
             'kernel': list(new_ker)
         }
@@ -492,7 +490,7 @@ class Distortion_corrector():
                                       vary=False)
         self.fit_model.set_param_hint('amplitude',
                                       value=1,
-                                      vary=False)
+                                      vary=True)
         self.fit_model.set_param_hint('n', value=1, vary=False)
         params = self.fit_model.make_params()
 
@@ -807,11 +805,10 @@ class Distortion_corrector():
             self.new_kernel_dict['kernel'])[:self.kernel_length]
         self.kernel_combined_dict['kernel'] = list(ker_combined)
 
-        self.kernel_combined_dict['metadata'][self.new_kernel_dict['name']] =\
-            {
-                'fit': self.new_kernel_dict['fit'],
-                'filter_params': self.new_kernel_dict['filter_params'],
-                'name': self.new_kernel_dict['name']
+        self.kernel_combined_dict['metadata'][self.new_kernel_dict['name']] = {
+            'fit': self.new_kernel_dict['fit'],
+            'filter_params': self.new_kernel_dict['filter_params'],
+            'name': self.new_kernel_dict['name']
         }
 
         # Remove the last correction from the kernel list in the kernel
@@ -1067,6 +1064,17 @@ class Distortion_corrector():
                 print('Model "{}" unknown. Please choose from {}.'
                       .format(inp_elements[1], self.known_fit_models))
 
+        elif (inp_elements[0] == 'square_amp' and len(inp_elements) == 2):
+            if inp_elements[1] == '?':
+                print('square_amp is {}'.format(self.square_amp))
+            else:
+                try:
+                    square_amp = float(inp_elements[1])
+                    self._set_square_amp(square_amp)
+                except ValueError:
+                    print('Square_amp can only be set to a float')
+
+
         elif valid_inputs != 'any':
             if inp not in valid_inputs:
                 print('Valid inputs: {}'.format(valid_inputs))
@@ -1129,6 +1137,18 @@ class Distortion_corrector():
         self.edge_idx = edge_idx
         return norm_waveform
 
+    def _set_square_amp(self, square_amp: float):
+        old_square_amp = self.square_amp
+        self.square_amp = square_amp
+        if len(self.waveform) > 0:
+            self.waveform = self.waveform*old_square_amp/self.square_amp
+        self.plot_trace(self._t_start_loop, self._t_stop_loop,
+                        nr_plot_pts=self.nr_plot_points)
+        print('Updated square amp from {} to {}'.format(old_square_amp,
+                                                        square_amp))
+
+
+
 
 class Dummy_distortion_corrector(Distortion_corrector):
 
@@ -1150,6 +1170,7 @@ class Dummy_distortion_corrector(Distortion_corrector):
 
 
 class RT_distortion_corrector_AWG8(Distortion_corrector):
+
     def __init__(self, flux_lutman, measure_scope_trace, square_amp: float,
                  nr_plot_points: int=1000, ):
         '''
@@ -1252,8 +1273,7 @@ class RT_distortion_corrector_QWG(Distortion_corrector):
 
         if verbose:
             print('Measuring trace...')
-        self.raw_time_pts, self.raw_waveform = \
-            self.measure_scope_trace()
+        self.raw_time_pts, self.raw_waveform = self.measure_scope_trace()
 
         # Measurement should be implemented using measurement_control
         # self.data_dir should be set to data dir of last measurement
@@ -1333,8 +1353,7 @@ class RT_distortion_corrector_5014(Distortion_corrector):
 
         if verbose:
             print('Measuring trace...')
-        self.raw_time_pts, self.raw_waveform = \
-            self.scope.measure_trace()
+        self.raw_time_pts, self.raw_waveform = self.scope.measure_trace()
 
         # Measurement should be implemented using measurement_control
         # self.data_dir should be set to data dir of last measurement

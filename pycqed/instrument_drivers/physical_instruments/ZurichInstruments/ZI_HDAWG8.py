@@ -412,12 +412,13 @@ class ZI_HDAWG8(ZI_base_instrument):
                 mask_0 = 0b000111  # AWGx_ch0 uses lower bits for CW
                 mask_1 = 0b111000  # AWGx_ch1 uses higher bits for CW
 
-                for cw in range(2**6):
+                # for cw in range(2**6):
+                for cw in range(8):
                     cw0 = cw & mask_0
                     cw1 = (cw & mask_1) >> 3
                 # FIXME: this is a hack because not all AWG8 channels support
                 # amp mode. It forces all AWG8's of a pair to behave identical.
-                    cw0 = cw1
+                    cw1 = cw0
                     # if both wfs are triggered play both
                     if (cw0 != 0) and (cw1 != 0):
                         # if both waveforms exist, upload
@@ -543,9 +544,10 @@ class ZI_HDAWG8(ZI_base_instrument):
 
             elif self.cfg_codeword_protocol() == 'flux':
                 # bits[0:3] for awg0_ch0, bits[4:6] for awg0_ch1 etc.
-                self.set('awgs_{}_dio_mask_value'.format(awg_nr), 2**6-1)
+                # self.set('awgs_{}_dio_mask_value'.format(awg_nr), 2**6-1)
+                self.set('awgs_{}_dio_mask_value'.format(awg_nr), 2**3-1)
                 # self.set('awgs_{}_dio_mask_shift'.format(awg_nr), awg_nr*6)
-                self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
+                self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 3)
 
         ####################################################
         # Turn on device
@@ -561,7 +563,17 @@ class ZI_HDAWG8(ZI_base_instrument):
                              '/sigouts/*/enables/*', 0)
         # Switch all outputs into direct mode
         if self.cfg_codeword_protocol() != 'flux':
-            self._dev.seti('raw/sigouts/*/mode', 0)
+            for ch in range(8):
+                try:
+                    self.set('sigouts_{}_direct'.format(ch), 0)
+                except:
+                    # Exception is here because not all AWG8 units have
+                    # been upgraded
+                    pass
         # when doing flux pulses, set everything to amp mode
         else:
-            self._dev.seti('raw/sigouts/*/mode', 1)
+            for ch in range(8):
+                try:
+                    self.set('sigouts_{}_direct'.format(ch), 1)
+                except:
+                    pass

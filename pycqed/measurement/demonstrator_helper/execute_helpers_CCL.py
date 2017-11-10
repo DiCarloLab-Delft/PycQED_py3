@@ -60,8 +60,8 @@ except KeyError:
     MC_demo = Instrument.find_instrument('Demonstrator_MC')
 
 
-def execute_qisa_file(qisa_file_url: str,  config_json: str,
-                      verbosity_level: int=0):
+def execute(qisa_file_url: str,  config_json: str,
+            verbosity_level: int=0):
     options = json.loads(config_json)
 
     if (not new_station):
