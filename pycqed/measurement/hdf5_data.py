@@ -149,7 +149,7 @@ def write_dict_to_hdf5(data_dict: dict, entry_point):
             except Exception as e:
                 print('Exception occurred while writing'
                       ' {}:{} of type {}'.format(key, item, type(item)))
-                raise e
+                logging.warning(e)
         elif isinstance(item, np.ndarray):
             entry_point.create_dataset(key, data=item)
         elif item is None:
