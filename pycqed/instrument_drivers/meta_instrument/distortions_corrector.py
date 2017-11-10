@@ -77,7 +77,11 @@ class Distortion_corrector():
         self._loop_helpstring = str(
             'h:      Print this help.\n'
             'q:      Quit the loop.\n'
-            'p:      Print the parameters of the last fit.\n'
+            'p <pars>:\n'
+            '        Print the parameters of the last fit if pars not given.\n'
+            '        If pars are given in the form of JSON string, \n'
+            '        e.g., {"parA": a, "parB": b} the parameters of the last\n'
+            '        fit are updated with those provided.'
             's <filename>:\n'
             '        Save the current plot to "filename.png".\n'
             'model <name>:\n'
@@ -231,7 +235,7 @@ class Distortion_corrector():
         # Analytic form of the predistorted square pulse (input that creates a
         # square pulse at the output)
         offset = fit_res.best_values['offset']
-        A = fit_res.best_values['amplitude']
+        amp = fit_res.best_values['amplitude']
         tau = fit_res.best_values['tau']
 
         # Check if parameters are physical and print warnings if not
@@ -245,20 +249,20 @@ class Distortion_corrector():
         # Save the results
         self.fit_res = fit_res
         new_ker = kf.decay_kernel(
-            amp=A, tau=tau, offset=offset,
+            amp=amp, tau=tau, offset=offset,
             length=self.kernel_object.corrections_length(),
             sampling_rate=self.sampling_rate)
 
         self.new_kernel_dict = {
             'name': self.filename + '_' + str(self._iteration),
             'filter_params': {
-                'b0': 1 / (offset + A),
-                'b1': 1 / (tau * (offset + A)),
-                'a1': -offset / (tau * (offset + A))
+                'b0': 1 / (offset + amp),
+                'b1': 1 / (tau * (offset + amp)),
+                'a1': -offset / (tau * (offset + amp))
             },
             'fit': {
                 'model': 'exponential',
-                'A': A,
+                'amp': amp,
                 'tau': tau,
                 'offset': offset
             },
@@ -1046,11 +1050,14 @@ class Distortion_corrector():
             repeat = False
 
         elif inp_elements[0] == 'p':
-            try:
-                for param, val in self.new_kernel_dict['fit'].items():
-                    print('{} = {}'.format(param, val))
-            except KeyError:
-                print('No fit has been done yet!')
+            if len(inp_elements) == 1:
+                try:
+                    for param, val in self.new_kernel_dict['fit'].items():
+                        print('{} = {}'.format(param, val))
+                except KeyError:
+                    print('No fit has been done yet!')
+            else:
+                self._update_latest_params(json_string=inp[1:])
 
         elif (inp_elements[0] == 's' and len(inp_elements == 2)):
             self.save_plot('{}.png'.format(inp_elements[1]))
@@ -1074,7 +1081,6 @@ class Distortion_corrector():
                 except ValueError:
                     print('Square_amp can only be set to a float')
 
-
         elif valid_inputs != 'any':
             if inp not in valid_inputs:
                 print('Valid inputs: {}'.format(valid_inputs))
@@ -1086,6 +1092,79 @@ class Distortion_corrector():
             repeat = False
 
         return repeat, quit
+
+    def _update_latest_params(self, json_string):
+        """
+        Uses a JSON formatted string to update the parameters of the
+        latest fit.
+
+        For each model does the following
+            1. update the 'fit' dict
+            2. update the 'filter_params' dict
+            3. recalculate the kernel
+            4. calculate the new "fit"
+            5. Plot the new "fit"
+
+        Currently only supported for the high-pass and exponential model.
+        """
+        try:
+            par_dict = json.loads(json_string)
+        except Exception as e:
+            print(e)
+            return
+
+        # 1. update the 'fit' dict
+        self.new_kernel_dict['fit'].update(par_dict)
+
+        if self._fit_model_loop == 'high-pass':
+            tau = self.new_kernel_dict['fit']['tau']
+            # 2. update the filter_params' dict
+            self.new_kernel_dict['filter_params'] = {
+                'b0': 1,
+                'b1': 1/tau,
+                'a1': 0}
+            # 3. recalculate the kernel
+            tPts = np.arange(0, self.kernel_length/self.sampling_rate,
+                             1/self.sampling_rate)
+            predist_step = tPts/tau + 1
+            self.new_kernel_dict['kernel'] = \
+                list(kf.kernel_from_kernel_stepvec(predist_step))
+            # 4. calculate the fit
+            self.fitted_waveform = self.fit_res.eval(
+                t=self.time_pts[self._start_idx:self._stop_idx], tau=tau)
+
+        elif self._fit_model_loop == 'exponential':
+            amp = self.new_kernel_dict['fit']['amp']
+            tau = self.new_kernel_dict['fit']['tau']
+            offset = self.new_kernel_dict['fit']['offset']
+
+            # 2. update the 'filter_params' dict
+            self.new_kernel_dict['filter_params'] = {
+                'b0': 1 / (offset + amp),
+                'b1': 1 / (tau * (offset + amp)),
+                'a1': -offset / (tau * (offset + amp))}
+            # 3. recalculate the new kernel
+            self.new_kernel_dict['kernel'] = list(kf.decay_kernel(
+                amp=amp, tau=tau, offset=offset,
+                length=self.kernel_object.corrections_length(),
+                sampling_rate=self.sampling_rate))
+            # 4. calculate the fit
+            self.fitted_waveform = self.fit_res.eval(
+                t=self.time_pts[self._start_idx:self._stop_idx],
+                offset=offset, amplitude=amp, tau=tau)
+
+        elif self._fit_model_loop == 'double_exponential':
+            print('Updating params not implemented for double_exponential')
+        elif self._fit_model_loop == 'triple_exponential':
+            print('Updating params not implemented for triple_exponential')
+        elif self._fit_model_loop == 'damped_osc':
+            print('Updating params not implemented for damped_osc')
+        elif self._fit_model_loop == 'spline':
+            print('Updating params not implemented for spline')
+
+        # The fit results still have to be updated
+        self.plot_fit(self._t_start_loop, self._t_stop_loop,
+                      nr_plot_pts=self.nr_plot_points)
 
     def print_summary(self):
         '''
