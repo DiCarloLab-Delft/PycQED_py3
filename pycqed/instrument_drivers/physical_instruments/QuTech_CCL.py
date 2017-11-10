@@ -13,6 +13,7 @@ from .SCPI import SCPI
 from qcodes.instrument.base import Instrument
 from ._CCL.CCLightMicrocode import CCLightMicrocode
 from qcodes import Parameter
+from qcodes.instrument.parameter import ManualParameter
 from qcodes import validators as vals
 import os
 import logging
