@@ -19,13 +19,13 @@ from qcodes import validators as vals
 import warnings
 
 
-from qcodes.instrument.parameter import StandardParameter
+from qcodes.instrument.parameter import Parameter
 from qcodes.instrument.parameter import Command, no_setter
 
 
 # Note: the HandshakeParameter is a temporary param that should be replaced
 # once qcodes issue #236 is closed
-class HandshakeParameter(StandardParameter):
+class HandshakeParameter(Parameter):
 
     """
     If a string is specified as a set command it will append '*OPC?' and use
