@@ -15,7 +15,7 @@ class Test_distorter(unittest.TestCase):
 
     @classmethod
     def setUpClass(self):
-        self.kernel_object = ko.Distortion('kernel_object')
+        self.kernel_object = ko.DistortionKernel('kernel_object')
         self.dist_corr = dc.Dummy_distortion_corrector(self.kernel_object)
         test_datadir = os.path.join(pq.__path__[0], 'tests', 'test_output')
         self.kernel_object.kernel_dir(test_datadir)

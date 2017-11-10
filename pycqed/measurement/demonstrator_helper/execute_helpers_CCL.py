@@ -61,7 +61,7 @@ except KeyError:
 
 
 def execute(qisa_file_url: str,  config_json: str,
-                      verbosity_level: int=0):
+            verbosity_level: int=0):
     options = json.loads(config_json)
 
     if (not new_station):

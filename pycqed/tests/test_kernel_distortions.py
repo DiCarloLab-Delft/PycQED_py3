@@ -25,7 +25,6 @@ class Test_KernelObject(unittest.TestCase):
 
     @classmethod
     def setUpClass(self):
-        print('setting up')
         self.station = station.Station()
         self.k0 = ko.DistortionKernel('k0')
         self.k1 = ko.DistortionKernel('k1')
@@ -36,15 +35,13 @@ class Test_KernelObject(unittest.TestCase):
         self.k1.sampling_rate(1e9)
 
     def test_skin_kernel(self):
-        print('skin_kernel')
         self.k0.skineffect_alpha(0.1)
         self.k0.skineffect_length(40e-9)
         kObj_skin = self.k0.get_skin_kernel()
         kf_skin = kf.skin_kernel(alpha=.1, length=40)
-        np.testing.assert_array_equal(kObj_skin, kf_skin)
+        np.testing.assert_almost_equal(kObj_skin, kf_skin)
 
     def test_bounce_kernel(self):
-        print('bounce_kernel')
         bl = 40e-9
         ba = .2
         bt = 12e-9
@@ -53,7 +50,7 @@ class Test_KernelObject(unittest.TestCase):
         self.k0.bounce_length_1(bl)
         kObj_bounce = self.k0.get_bounce_kernel_1()
         kf_bounce = kf.bounce_kernel(amp=ba, time=bt*1e9, length=bl*1e9)
-        np.testing.assert_array_equal(kObj_bounce, kf_bounce)
+        np.testing.assert_almost_equal(kObj_bounce, kf_bounce)
 
     def test_decay_kernel(self):
         dA = 3
@@ -68,8 +65,8 @@ class Test_KernelObject(unittest.TestCase):
         kObj_dec2 = self.k0.get_decay_kernel_1()
         kf_dec = kf.decay_kernel(amp=dA, tau=dtau*1e9, length=dl*1e9)
 
-        np.testing.assert_array_equal(kf_dec, kObj_dec1)
-        np.testing.assert_array_equal(kf_dec, kObj_dec2)
+        np.testing.assert_almost_equal(kf_dec, kObj_dec1)
+        np.testing.assert_almost_equal(kf_dec, kObj_dec2)
 
     def test_config_changed_flag(self):
         print('config_changed_flag')
@@ -111,14 +108,59 @@ class Test_KernelObject(unittest.TestCase):
 
 class Test_Kernel_functions(unittest.TestCase):
 
+    def test_bounce(self):
+        t0 = np.arange(100)
+        y0 = kf.bounce(t0, .2, 20, sampling_rate=1)
+
+        t1 = np.arange(100)/1e9
+        y1 = kf.bounce(t1, .2, 20/1e9, sampling_rate=1e9)
+
+        np.testing.assert_almost_equal(y0, y1)
+        expected_bounce = np.concatenate([np.ones(20)*.8, np.ones(80)])
+        np.testing.assert_almost_equal(expected_bounce, y1)
+
     def test_bounce_kernel(self):
-        pass
+        amp = 0.1
+        tau = 10e-9
+        length = 100e-9
+        sampling_rate = 1e9
+
+        ker_real = kf.bounce_kernel(amp=amp, time=tau, length=length,
+                                    sampling_rate=sampling_rate)
+
+        ker_sampled = kf.bounce_kernel(amp=amp, time=tau*sampling_rate,
+                                       length=length*sampling_rate,
+                                       sampling_rate=1)
+
+        np.testing.assert_almost_equal(ker_real, ker_sampled)
+        nr_samples = int(length*sampling_rate)
+        t_kernel = np.arange(nr_samples)/sampling_rate
+        bounce = kf.bounce(t_kernel, amp=amp, time=tau,
+                           sampling_rate=sampling_rate)
+        y_corr0 = np.convolve(ker_real, bounce)
+        np.testing.assert_almost_equal(y_corr0[10:80], np.ones(70), decimal=2)
+
+    def test_bounce_kernel_2p4GS(self):
+        amp = 0.1
+        tau = 10e-9
+        length = 100e-9
+        sampling_rate = 2.4e9
+
+        ker_real = kf.bounce_kernel(amp=amp, time=tau, length=length,
+                                    sampling_rate=sampling_rate)
+
+        nr_samples = int(length*sampling_rate)
+        t_kernel = np.arange(nr_samples)/sampling_rate
+        bounce = kf.bounce(t_kernel, amp=amp, time=tau,
+                           sampling_rate=sampling_rate)
+        y_corr0 = np.convolve(ker_real, bounce)
+        np.testing.assert_almost_equal(y_corr0[10:80], np.ones(70), decimal=2)
 
     def test_decay_kernel(self):
-        A = .4
+        A = -.4
         tau = 10e-9
         x = np.arange(200)/1e9
-        y_signal = 1 - A*np.exp(-x/tau)
+        y_signal = 1 + A * np.exp(-x/tau)
 
         sampling_rate = 1e9
         kf_dec = kf.decay_kernel(
@@ -138,22 +180,39 @@ class Test_Kernel_functions(unittest.TestCase):
         # Testing on a different sampling rate
 
         sampling_rate = 2.4e9
+        offset = .95
         x24GS = np.arange(200)/sampling_rate
-        y24Gs_signal = 1 - A*np.exp(-x24GS/tau)
+        y24Gs_signal = A * np.exp(-x24GS/tau) + offset
 
         kf_dec = kf.decay_kernel(
-            amp=A, tau=tau, length=100e-6, sampling_rate=sampling_rate)
+            amp=A, tau=tau, length=100e-6, offset=offset,
+            sampling_rate=sampling_rate)
+        y24Gs_corr0 = np.convolve(y24Gs_signal, kf_dec)
+        np.testing.assert_almost_equal(y24Gs_corr0[10:80], np.ones(70),
+                                       decimal=2)
+
+    def test_decay_small_offset(self):
+        A = 1
+        tau = 4e-6
+        sampling_rate = 2.4e9
+        offset = 0.2
+        x24GS = np.arange(200)/sampling_rate
+        y24Gs_signal = A * np.exp(-x24GS/tau) + offset
+
+        kf_dec = kf.decay_kernel(
+            amp=A, tau=tau, length=100e-6, offset=offset,
+            sampling_rate=sampling_rate)
         y24Gs_corr0 = np.convolve(y24Gs_signal, kf_dec)
         np.testing.assert_almost_equal(y24Gs_corr0[10:80], np.ones(70),
                                        decimal=2)
 
     def test_heaviside(self):
         hs = kf.heaviside(np.array([-1, -.5, 0, 1, 2]))
-        np.testing.assert_array_equal(hs, [0, 0, 1, 1, 1])
+        np.testing.assert_almost_equal(hs, [0, 0, 1, 1, 1])
 
     def test_square(self):
         sq = kf.square(np.arange(-2, 5), 3)
-        np.testing.assert_array_equal(sq, [0, 0, 1, 1, 1, 0, 0])
+        np.testing.assert_almost_equal(sq, [0, 0, 1, 1, 1, 0, 0])
 
     def test_skin_kernel(self):
         skin_kernel_test = kf.skin_kernel(alpha=.1, length=40)
@@ -183,7 +242,11 @@ class Test_Kernel_functions(unittest.TestCase):
         np.testing.assert_array_almost_equal(
             test_kernel, known_vals, decimal=7)
 
-        test_kernel = kf.poly_kernel([1, 0, 1], length=10)
+        coeffs = [1, 0, 1]
+        length = 10e-9
+        sampling_rate = 1e9
+        test_kernel = kf.poly_kernel(coeffs, length=length*sampling_rate,
+                                     sampling_rate=1)
         known_vals = np.arange(10)*2-1
         known_vals[0] = 1
 
