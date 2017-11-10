@@ -35,9 +35,9 @@ class InstrumentParameter(ManualParameter):
             vals (Validator):  validator to set
         """
         if vals is None:
-            self._vals = Strings()
+            self.vals = Strings()
         elif isinstance(vals, Validator):
-            self._vals = vals
+            self.vals = vals
         else:
             raise TypeError('vals must be a Validator')
 
@@ -81,10 +81,10 @@ class ConfigParameter(ManualParameter):
             value (any): value to validate and save
         """
         self.validate(value)
-        if value != self._latest()['value']:
+        if value != self.get_latest():
             self._instrument._config_changed = True
         self._save_val(value)
 
     def get(self):
         """ Return latest value"""
-        return self._latest()['value']
+        return self.get_latest()

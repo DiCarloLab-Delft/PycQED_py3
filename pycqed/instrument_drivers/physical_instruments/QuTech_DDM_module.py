@@ -15,7 +15,7 @@ import math
 from qcodes import validators as vals
 import logging
 import time
-from qcodes import StandardParameter
+from qcodes import Parameter
 import os
 import json
 import sys
@@ -67,7 +67,7 @@ class DDMq(SCPI):
                 return result
         return result
 
-    def add_parameter(self, name, parameter_class=StandardParameter,
+    def add_parameter(self, name, parameter_class=Parameter,
                       **kwargs):
         self._setValidatorLimits(name, kwargs)
         super(DDMq, self).add_parameter(name, parameter_class, **kwargs)
