@@ -41,11 +41,26 @@ class DeviceCCL(Instrument):
         self.add_parameter('instr_MC', label='MeasurementControl',
                            parameter_class=InstrumentRefParameter)
 
+
+        ro_acq_docstr = (
+            'Determines what type of integration weights to use: '
+            '\n\t SSB: Single sideband demodulation\n\t'
+            'DSB: Double sideband demodulation\n\t'
+            'optimal: waveforms specified in "RO_acq_weight_func_I" '
+            '\n\tand "RO_acq_weight_func_Q"')
+
         self.add_parameter('ro_acq_weight_type',
                            initial_value='DSB',
                            vals=vals.Enum('SSB', 'DSB', 'optimal'),
                            docstring=ro_acq_docstr,
                            parameter_class=ManualParameter)
+
+        self.add_parameter('ro_qubits_list',
+                           vals=vals.List(),
+                           parameter_class=ManualParameter,
+                           docstring="Select which qubits to readout \
+                                by default detector",
+                           initial_value=[])
 
 
     def prepare_for_timedomain(self):
@@ -58,14 +73,42 @@ class DeviceCCL(Instrument):
         else:
             nr_of_acquisition_channels_per_qubit = 2
 
+        used_acq_channels = defaultdict(int)
 
         for qb_name in self.qubits():
+            qb = self.find_instrument(qb_name)
 
-            qb = self.find_instrument(qubit_name)
+            ### all qubits use the same acquisition type
+            qb.ro_acq_weight_type(self.ro_acq_weight_type())
+
+            acq_device = qb.instr_acquisition()
+
+            ### allocate different acquisition channels
+            # use next available channel as I
+            index = used_acq_channels[acq_device]
+            used_acq_channels[acq_device] += 1
+            qb.ro_acq_weight_chI(index)
+
+            # use next available channel as Q if needed
+            if nr_of_acquisition_channels_per_qubit > 1:
+                index = used_acq_channels[acq_device]
+                used_acq_channels[acq_device] += 1
+                qb.ro_acq_weight_chQ(index)
+
+            ### set RO modulation to use common LO frequency
+            qb.ro_freq_mod(qb.ro_freq() - self.ro_lo_freq())
+
+    def _prep_ro_instantiate_detectors(self):
+        pass
+
+    def _prep_ro_sources(self):
+        pass
+
+    def _prep_ro_pulses(self):
+        pass
 
 
-        # setup RO pulse
-        # allocate different resonators in lutman for different qubits
 
-        # setup RO acq channels
-        # allocate different channels in uhfli for different qubits (1 or 2)
+
+    def prepare_for_timedomain(self):
+        pass
