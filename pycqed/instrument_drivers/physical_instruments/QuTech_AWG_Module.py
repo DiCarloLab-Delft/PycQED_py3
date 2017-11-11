@@ -507,3 +507,4 @@ class QuTech_AWG_Module(SCPI):
         def get_func():
             return fun(ch)
         return get_func
+

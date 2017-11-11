@@ -78,6 +78,48 @@
     13.0
   ],
   [
+      "awgs/0/dio/strobe/index",
+    "int",
+    0,
+    31.0
+  ],
+  [
+    "awgs/0/dio/strobe/slope",
+    "int",
+    0,
+    3.0
+  ],
+  [
+    "awgs/0/dio/valid/index",
+    "int",
+    0,
+    31.0
+  ],
+  [
+    "awgs/0/dio/valid/polarity",
+    "int",
+    0,
+    3.0
+  ],
+  [
+    "awgs/0/dio/delay/index",
+    "int",
+    0,
+    31
+  ],
+  [
+    "awgs/0/dio/delay/value",
+    "int",
+    0,
+    3
+  ],
+  [
+    "awgs/0/dio/snapshot",
+    "int",
+    0,
+    1
+  ],
+  [
     "awgs/0/triggers/0/channel",
     "int_64",
     0,

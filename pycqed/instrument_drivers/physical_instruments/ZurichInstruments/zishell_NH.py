@@ -75,6 +75,13 @@ class ziShellModuleError(ziShellError):
     pass
 
 
+class ziShellCompilationError(ziShellError):
+    """
+    Exception raised when the zi AWG-8 compiler encounters an error.
+    """
+    pass
+
+
 class ziShellEnvironment:
     """Holds all the global variables."""
 
@@ -934,7 +941,8 @@ class ziShellDevice:
         self.daq.getAsEvent(path)
         tmp = self.daq.poll(0.5, 500, 4, True)
         if path in tmp:
-            return tmp[path]
+            # The [0]['vector'] is to get strip of the vector stuff around it
+            return tmp[path][0]['vector']
         else:
             return None
 
@@ -999,6 +1007,7 @@ class ziShellDevice:
         self.daq.sync()
 
     def configure_awg_from_file(self, filename):
+        raise NotImplementedError('Use "configure_awg_from_string" instead')
         if not self.daq:
             raise(ziShellDAQError())
 
@@ -1009,18 +1018,63 @@ class ziShellDevice:
         self.awgModule.set('awgModule/compiler/start', 1)
         self.awgModule.set('awgModule/elf/file', '')
 
-    def configure_awg_from_string(self, string):
+    def configure_awg_from_string(self, awg_nr: int, program_string: str,
+                                  timeout: float=5):
+        """
+        Uploads a program string to one of the AWGs in the AWG8.
+
+        This function is tested to work and give the correct error messages
+        when compilation fails.
+        """
+        print('Disabling codeword triggering')
+        self.seti('awgs/' + str(awg_nr) + '/dio/valid/polarity', 0)
+        self.seti('awgs/' + str(awg_nr) + '/dio/strobe/slope', 0)
+
+        print('Configuring AWG_nr {}.'.format(awg_nr))
         if not self.daq:
             raise(ziShellDAQError())
 
         if not self.awgModule:
             raise(ziShellModuleError())
 
-        self.awgModule.set('awgModule/compiler/sourcestring', string)
-        self.awgModule.set('awgModule/compiler/start', 1)
-        self.awgModule.set('awgModule/elf/file', '')
-        # while self.awgModule.get('awgModule/progress')['progress'][0] < 1.0:
-        #    time.sleep(0.1)
+        self.awgModule.set('awgModule/index', awg_nr)
+        self.awgModule.set('awgModule/compiler/sourcestring', program_string)
+
+        t0 = time.time()
+
+        succes_msg = 'File successfully uploaded'
+        # Success is set to False when either a timeout or a bad compilation
+        # message is encountered.
+        success = True
+        # while ("compilation not completed"):
+        while len(self.awgModule.get('awgModule/compiler/sourcestring')
+                  ['compiler']['sourcestring'][0]) > 0:
+            time.sleep(0.01)
+            comp_msg = (self.awgModule.get(
+                'awgModule/compiler/statusstring')['compiler']
+                ['statusstring'][0])
+            if (time.time()-t0 >= timeout):
+                success = False
+                print('Timeout encountered during compilation.')
+                break
+
+        if not comp_msg.endswith(succes_msg):
+            success = False
+
+        print('Reenabling codeword triggering')
+        self.seti('awgs/' + str(awg_nr) + '/dio/valid/polarity', 2)
+        self.seti('awgs/' + str(awg_nr) + '/dio/strobe/slope', 2)
+
+        if not success:
+            print("Compilation failed, printing program:")
+            for i, line in enumerate(program_string.splitlines()):
+                print(i+1, '\t', line)
+            print('\n')
+            raise ziShellCompilationError(comp_msg)
+        # If succesful the comipilation success message is printed
+        t1 = time.time()
+        print(self.awgModule.get('awgModule/compiler/statusstring')
+              ['compiler']['statusstring'][0] + ' in {:.2f}s'.format(t1-t0))
 
     def read_from_scope(self, timeout=1.0, enable=True):
         if not self.daq:

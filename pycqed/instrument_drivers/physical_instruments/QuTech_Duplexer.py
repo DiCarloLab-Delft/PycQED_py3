@@ -3,6 +3,7 @@ import numpy as np
 import time
 import h5py
 from os import path
+from qcodes.instrument.base import Instrument
 from qcodes.instrument.visa import VisaInstrument
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter
@@ -29,13 +30,19 @@ class QuTech_Duplexer(VisaInstrument):
         t0 = time.time()
         logging.info(__name__ + ' : Initializing instrument')
         address += '::5025::SOCKET'
-        print(address)
         super().__init__(name, address)
+        self._nr_input_channels = nr_input_channels
+        self._nr_output_channels = nr_output_channels
         self.SCPI_command_pause = 0.1
+        self.add_parameters(nr_input_channels=nr_input_channels,
+                            nr_output_channels=nr_output_channels)
+        t1 = time.time()
+        print('Initialized Duplexer in {}'.format(t1-t0))
 
+    def add_parameters(self, nr_input_channels, nr_output_channels):
         dirname, filename = path.split(path.abspath(__file__))
         cal_file_path = path.join(dirname,
-                                  '_duplexer/Duplexer_normalized_gain.hdf5')
+                                  '_duplexer/duplexer_normalized_gain.hdf5')
         cal_file = h5py.File(cal_file_path, 'r')
         self._calibration_array = list(cal_file.values())[0][1]
         self.add_parameter('mode', label='Operating mode',
@@ -52,39 +59,30 @@ class QuTech_Duplexer(VisaInstrument):
                                    vals=vals.Enum('ON', 'OFF', 'EXT'))
 
                 self.add_parameter('in{}_out{}_phase'.format(inp+1, outp+1),
-                                   set_cmd='ch:in{}:out{}:ph: '.format(
+                                   set_cmd='ch:in{}:out{}:ph:raw'.format(
                                    inp+1, outp+1) + '{} \n',
-                                   set_parser=self._mode_set_parser,
+                                   set_parser=int,
                                    vals=vals.Numbers(0, 65536))
-                self.add_parameter('in{}_out{}_attenuation'.format(inp+1,
-                                                                   outp+1),
-                                   set_cmd='ch:in{}:out{}:att:'.format(
-                                        inp+1, outp+1) + ' {} \n',
-                                   vals=vals.Numbers(0, 65536),
-                                   set_parser=self._mode_set_parser)
+                self.add_parameter('in{}_out{}_att'.format(inp+1, outp+1),
+                                   set_cmd='ch:in{}:out{}:att:raw'.format(
+                    inp+1, outp+1) + ' {} \n',
+                    vals=vals.Numbers(0, 65536),
+                    set_parser=int)
 
-        # Get commands are not Implemented!!!
-        # self.add_parameter('IDN', get_cmd='IDN?')
-        t1 = time.time()
-        print('Initialized Duplexer in {}'.format(t1-t0))
-
-    def set_all_switches_to(self, mode):
-        raise NotImplementedError()
-        for i in range(4):
-            for j in range(2):
-                self.set_switch(i+1, j+1, mode)
+    def set_all_switches_to(self, mode: str):
+        for inp in range(4):
+            for outp in range(2):
+                self.set('in{}_out{}_switch'.format(inp+1, outp+1), mode)
 
     def set_all_phases_to(self, val):
-        raise NotImplementedError()
-        for i in range(4):
-            for j in range(2):
-                self.set_phase(i+1, j+1, val)
+        for inp in range(4):
+            for outp in range(2):
+                self.set('in{}_out{}_phase'.format(inp+1, outp+1), val)
 
     def set_all_attenuations_to(self, val):
-        raise NotImplementedError()
-        for i in range(4):
-            for j in range(2):
-                self.set_attenuation(i+1, j+1, val)
+        for inp in range(4):
+            for outp in range(2):
+                self.set('in{}_out{}_att'.format(inp+1, outp+1), val)
 
     def _mode_set_parser(self, val):
         '''
@@ -118,3 +116,31 @@ class QuTech_Duplexer(VisaInstrument):
         final_val = self._calibration_array - current_val * scaling_factor
         new_dac_val = np.argmin(np.abs(final_val))
         return new_dac_val
+
+
+class Dummy_Duplexer(QuTech_Duplexer):
+
+    def __init__(self, name, nr_input_channels=4, nr_output_channels=2,
+                 **kw):
+        Instrument.__init__(self, name=name, **kw)
+        self._dummy_instr = True
+        self.add_parameters(nr_input_channels=nr_input_channels,
+                            nr_output_channels=nr_output_channels)
+        self.add_parameter('timeout', parameter_class=ManualParameter,
+                           initial_value=1)
+        self._address = 'Dummy'
+        self._terminator = '\n'
+
+        self.IDN({'driver': str(self.__class__), 'model': self.name,
+                  'serial': 'Dummy', 'vendor': '', 'firmware': ''})
+        self.connect_message()
+
+    def add_parameter(self, name, parameter_class=ManualParameter,
+                      **kwargs):
+        kwargs.pop('get_cmd', 0)
+        kwargs.pop('set_cmd', 0)
+        kwargs.pop('get_parser', 0)
+        kwargs.pop('set_parser', 0)
+
+        super().add_parameter(name, parameter_class=parameter_class,
+                              **kwargs)
