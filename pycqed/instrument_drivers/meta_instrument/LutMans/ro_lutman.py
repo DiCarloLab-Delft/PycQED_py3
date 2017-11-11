@@ -26,8 +26,16 @@ class Base_RO_LutMan(Base_LutMan):
         self.add_parameter('mixer_phi', vals=vals.Numbers(), unit='deg',
                            parameter_class=ManualParameter,
                            initial_value=0.0)
+        self.add_parameter('mixer_offs_I', unit='V',
+                           parameter_class=ManualParameter, initial_value=0)
+        self.add_parameter('mixer_offs_Q', unit='V',
+                           parameter_class=ManualParameter, initial_value=0)
         comb_msg = (
-            'Resonator combinations specifies blablab needs to be format like bla example ablabj ')
+            'Resonator combinations specifies which pulses are uploaded to'
+            'the device. Given as a list of lists:'
+            'e.g. [[0], [1], [0, 1]] specifies that pulses for readout'
+            'of resonator 0, 1, and a pulse for mux readout on both should be'
+            'uploaded.')
         self.add_parameter('resonator_combinations', vals=vals.Lists(),
                            parameter_class=ManualParameter,
                            docstring=comb_msg,
@@ -236,6 +244,11 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
 
         self.AWG.get_instr().awg_sequence_acquisition_and_DIO_triggered_pulse(
             I_waves, Q_waves, cases, self.acquisition_delay(), timeout=timeout)
+
+    def set_mixer_offsets(self):
+        UHFQC = self.AWG.get_instr()
+        UHFQC.sigouts_0_offset(self.mixer_offs_I())
+        UHFQC.sigouts_1_offset(self.mixer_offs_Q())
 
     def load_waveforms_onto_AWG_lookuptable(
             self, regenerate_waveforms: bool=True,
