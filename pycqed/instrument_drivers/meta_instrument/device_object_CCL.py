@@ -38,8 +38,20 @@ class DeviceCCL(Instrument):
             docstring=('Frequency of the common LO for all RO pulses.'),
             parameter_class=ManualParameter)
 
+        self.add_parameter('ro_pow_LO', label='RO power LO',
+                           unit='dBm', initial_value=20,
+                           parameter_class=ManualParameter)
+
         self.add_parameter('instr_MC', label='MeasurementControl',
                            parameter_class=InstrumentRefParameter)
+        self.add_parameter('instr_VSM', label='Vector Switch Matrix',
+                           parameter_class=InstrumentRefParameter)
+        self.add_parameter(
+            'instr_CC', label='Central Controller',
+            docstring=('Device responsible for controlling the experiment'
+                       ' using eQASM generated using OpenQL, in the near'
+                       ' future will be the CC_Light.'),
+            parameter_class=InstrumentRefParameter)
 
 
         ro_acq_docstr = (
@@ -59,7 +71,7 @@ class DeviceCCL(Instrument):
                            vals=vals.List(),
                            parameter_class=ManualParameter,
                            docstring="Select which qubits to readout \
-                                by default detector",
+                                by default detector. Empty list means all.",
                            initial_value=[])
 
 
@@ -99,16 +111,82 @@ class DeviceCCL(Instrument):
             qb.ro_freq_mod(qb.ro_freq() - self.ro_lo_freq())
 
     def _prep_ro_instantiate_detectors(self):
-        pass
+        # collect which channels belong to which qubit and make a fancy detector
+
+        channels_list = [] # tuples (instrumentname, channel, description)
+
+
+        for qb_name in self.qubits():
+            if self.ro_qubits_list() and qb_rame not in self.ro_qubits_list():
+                continue
+
+            qb = self.find_instrument(qb_name)
+            acq_instr_name = qb.instr_acquisition()
+
+            # one channel per qb
+            if self.ro_acq_weight_type() == 'optimal':
+                ch_idx = qb.ro_acq_weight_chI()
+                channels_list.append((acq_instr_name, ch_idx, qb_name))
+            else:
+                ch_idx = qb.ro_acq_weight_chI()
+                channels_list.append((acq_instr_name, ch_idx, qb_name + " I"))
+                ch_idx = qb.ro_acq_weight_chQ()
+                channels_list.append((acq_instr_name, ch_idx, qb_name + " Q"))
+
+        # for now, implement only working with one UHFLI
+        acq_instruments = list(set([inst for inst,_ ,_ in channels_list]))
+        if len(acq_instruments) != 1:
+            raise NotImplementedError("Only one acquisition instrument supported")
+
+        ro_ch_idx = [ch for _, ch ,_ in channels_list]
+        value_names = [n for _, _, n in channels_list]
+
+        if 'UHFQC' in self.instr_acquisition():
+            UHFQC = self.find_instrument(acq_instruments[0])
+
+            self.input_average_detector = det.UHFQC_input_average_detector(
+                UHFQC=UHFQC,
+                AWG=self.instr_CC.get_instr(),
+                nr_averages=self.ro_acq_averages(),
+                nr_samples=int(self.ro_acq_input_average_length()*1.8e9))
+
+            self.int_avg_det = det.UHFQC_integrated_average_detector(
+                UHFQC=UHFQC, AWG=self.instr_CC.get_instr(),
+                channels=ro_ch_idx,
+                result_logging_mode=result_logging_mode,
+                nr_averages=self.ro_acq_averages(),
+                integration_length=self.ro_acq_integration_length())
+
+            self.int_avg_det.value_names = value_names
+
+            self.int_avg_det_single = det.UHFQC_integrated_average_detector(
+                UHFQC=UHFQC, AWG=self.instr_CC.get_instr(),
+                channels=ro_ch_idx,
+                result_logging_mode=result_logging_mode,
+                nr_averages=self.ro_acq_averages(),
+                real_imag=True, single_int_avg=True,
+                integration_length=self.ro_acq_integration_length())
+
+            self.int_avg_det_single.value_names = value_names
+
+            self.int_log_det = det.UHFQC_integration_logging_det(
+                UHFQC=UHFQC, AWG=self.instr_CC.get_instr(),
+                channels=ro_ch_idx,
+                result_logging_mode=result_logging_mode,
+                integration_length=self.ro_acq_integration_length())
+
+            self.int_log_det.value_names = value_names
+
+
 
     def _prep_ro_sources(self):
-        pass
+        LO = self.instr_LO_ro.get_instr()
+        LO.frequency.set(self.ro_lo_freq())
+        LO.on()
+        LO.power(self.ro_pow_LO())
 
     def _prep_ro_pulses(self):
         pass
-
-
-
 
     def prepare_for_timedomain(self):
         pass
