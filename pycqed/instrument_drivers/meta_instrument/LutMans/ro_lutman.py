@@ -140,6 +140,11 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
         self._voltage_max = 1.0-1.0/2**13
         self.sampling_rate(1.8e9)
 
+        self.add_parameter('hardcode_cases', vals=vals.Lists(),
+                           parameter_class=ManualParameter,
+                           initial_value=[])
+
+
     def set_default_lutmap(self):
         """
         The LutMap parameter is not used for the UHFQC. Instead this is
@@ -167,10 +172,17 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
             I_wave, Q_wave, self.acquisition_delay())
 
     def load_DIO_triggered_sequence_onto_UHFQC(self,
-                                               regenerate_waveforms=True, timeout=5):
+                                               regenerate_waveforms=True,
+                                               hardcode_cases=None,
+                                               timeout=5):
         '''
         Load a single pulse to the lookuptable, it uses the lut_mapping to
             determine which lookuptable to load to.
+
+        hardcode_case_0 is a workaround as long as it's not clear how
+        to make the qisa assembler output the codeword mask on DIO.
+        The first element of self.resonator_combinations is linked
+        to codeword 0, the others are not uploaded.
         '''
         resonator_combinations = self.resonator_combinations()
 
@@ -218,6 +230,10 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
                                  self._voltage_min, self._voltage_max)
             Q_waves[i] = np.clip(Q_waves[i], self._voltage_min,
                                  self._voltage_max)
+
+        if self.hardcode_cases() != []:
+            cases = self.hardcode_cases()
+
         self.AWG.get_instr().awg_sequence_acquisition_and_DIO_triggered_pulse(
             I_waves, Q_waves, cases, self.acquisition_delay(), timeout=timeout)
 
