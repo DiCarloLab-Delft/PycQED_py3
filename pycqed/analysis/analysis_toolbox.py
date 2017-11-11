@@ -140,8 +140,9 @@ def latest_data(contains='', older_than=None, newer_than=None, or_equal=False,
     i = len(daydirs)-1
     while len(measdirs) == 0 and i >= 0:
         daydir = daydirs[i]
-        # this makes sure hidden folders (OS related) are not searched
-        if not daydir.startswith('.'):
+        # this makes sure that (most) non day dirs do not get searched
+        # as they should start with a digit (e.g. YYYYMMDD)
+        if daydir[0].isdigit():
             all_measdirs = [d for d in os.listdir(
                 os.path.join(search_dir, daydir))]
             all_measdirs.sort()
@@ -1921,6 +1922,16 @@ def find_min(x, y, return_fit=False, perc=30):
         return x_min, y_min, my_fit_res
     else:
         return x_min, y_min
+
+
+def get_color_order(i, max_num, cmap='viridis'):
+    # take a blue to red scale from 0 to max_num
+    # uses HSV system, H_red = 0, H_green = 1/3 H_blue=2/3
+    # return colors.hsv_to_rgb(2.*float(i)/(float(max_num)*3.), 1., 1.)
+    print('It is recommended to use the updated function "get_color_cycle".')
+    if isinstance(cmap, str):
+        cmap = cm.get_cmap(cmap)
+    return cmap((i/max_num) % 1)
 
 
 def get_color_list(max_num, cmap='viridis'):

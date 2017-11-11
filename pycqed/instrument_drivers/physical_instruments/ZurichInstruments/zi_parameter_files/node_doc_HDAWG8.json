@@ -1,0 +1,3322 @@
+{
+    "/DEV8008/AWGS/0/AUXTRIGGERS/0/CHANNEL": {
+        "Description": "Selects the digital trigger source signal.",
+        "Node": "/DEV8008/AWGS/0/AUXTRIGGERS/0/CHANNEL",
+        "Options": {},
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/AUXTRIGGERS/0/SLOPE": {
+        "Description": "Select the signal edge that should activate the trigger. The trigger will be level sensitive when the Level option is selected.",
+        "Node": "/DEV8008/AWGS/0/AUXTRIGGERS/0/SLOPE",
+        "Options": {},
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/AUXTRIGGERS/0/STATE": {
+        "Description": "State of the Auxiliary Trigger: No trigger detected/trigger detected.",
+        "Node": "/DEV8008/AWGS/0/AUXTRIGGERS/0/STATE",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/AUXTRIGGERS/1/CHANNEL": {
+        "Description": "Selects the digital trigger source signal.",
+        "Node": "/DEV8008/AWGS/0/AUXTRIGGERS/1/CHANNEL",
+        "Options": {},
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/AUXTRIGGERS/1/SLOPE": {
+        "Description": "Select the signal edge that should activate the trigger. The trigger will be level sensitive when the Level option is selected.",
+        "Node": "/DEV8008/AWGS/0/AUXTRIGGERS/1/SLOPE",
+        "Options": {},
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/AUXTRIGGERS/1/STATE": {
+        "Description": "State of the Auxiliary Trigger: No trigger detected/trigger detected.",
+        "Node": "/DEV8008/AWGS/0/AUXTRIGGERS/1/STATE",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/DIO/DATA": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/0/DIO/DATA",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/DIO/DELAY/INDEX": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/0/DIO/DELAY/INDEX",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/DIO/DELAY/VALUE": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/0/DIO/DELAY/VALUE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/DIO/MASK/SHIFT": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/0/DIO/MASK/SHIFT",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/DIO/MASK/VALUE": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/0/DIO/MASK/VALUE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/DIO/SNAPSHOT": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/0/DIO/SNAPSHOT",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/DIO/STROBE/INDEX": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/0/DIO/STROBE/INDEX",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/DIO/STROBE/SLOPE": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/0/DIO/STROBE/SLOPE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/DIO/VALID/INDEX": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/0/DIO/VALID/INDEX",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/DIO/VALID/POLARITY": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/0/DIO/VALID/POLARITY",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/DIO/VALUE": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/0/DIO/VALUE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/ELF/CHECKSUM": {
+        "Description": "Checksum of the uploaded ELF file.",
+        "Node": "/DEV8008/AWGS/0/ELF/CHECKSUM",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/ELF/DATA": {
+        "Description": "Contains the data of the uploaded ELF file.",
+        "Node": "/DEV8008/AWGS/0/ELF/DATA",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/ELF/MEMORYUSAGE": {
+        "Description": "Size the uploaded ELF file relative to the size of the main memory.",
+        "Node": "/DEV8008/AWGS/0/ELF/MEMORYUSAGE",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/ELF/NAME": {
+        "Description": "The name of the uploaded ELF file.",
+        "Node": "/DEV8008/AWGS/0/ELF/NAME",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/ENABLE": {
+        "Description": "Activates the AWG.",
+        "Node": "/DEV8008/AWGS/0/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/OUTPUTS/0/AMPLITUDE": {
+        "Description": "Amplitude in units of full scale of the given AWG Output. The full scale corresponds to the Range voltage setting of the Signal Outputs.",
+        "Node": "/DEV8008/AWGS/0/OUTPUTS/0/AMPLITUDE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/AWGS/0/OUTPUTS/0/ENABLES/0": {
+        "Description": "Enables the driving of the given AWG output channel.",
+        "Node": "/DEV8008/AWGS/0/OUTPUTS/0/ENABLES/0",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/OUTPUTS/0/ENABLES/1": {
+        "Description": "Enables the driving of the given AWG output channel.",
+        "Node": "/DEV8008/AWGS/0/OUTPUTS/0/ENABLES/1",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/OUTPUTS/0/MODE": {
+        "Description": "Select between direct mode and amplitude modulation mode.",
+        "Node": "/DEV8008/AWGS/0/OUTPUTS/0/MODE",
+        "Options": {
+            "0": "Direct: AWG Output goes directly to Signal Output.",
+            "1": "Modulation: AWG Output 1 (2) is multiplied with oscillator signal of demodulator 4 (8)."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/OUTPUTS/1/AMPLITUDE": {
+        "Description": "Amplitude in units of full scale of the given AWG Output. The full scale corresponds to the Range voltage setting of the Signal Outputs.",
+        "Node": "/DEV8008/AWGS/0/OUTPUTS/1/AMPLITUDE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/AWGS/0/OUTPUTS/1/ENABLES/0": {
+        "Description": "Enables the driving of the given AWG output channel.",
+        "Node": "/DEV8008/AWGS/0/OUTPUTS/1/ENABLES/0",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/OUTPUTS/1/ENABLES/1": {
+        "Description": "Enables the driving of the given AWG output channel.",
+        "Node": "/DEV8008/AWGS/0/OUTPUTS/1/ENABLES/1",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/OUTPUTS/1/MODE": {
+        "Description": "Select between direct mode and amplitude modulation mode.",
+        "Node": "/DEV8008/AWGS/0/OUTPUTS/1/MODE",
+        "Options": {
+            "0": "Direct: AWG Output goes directly to Signal Output.",
+            "1": "Modulation: AWG Output 1 (2) is multiplied with oscillator signal of demodulator 4 (8)."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/READY": {
+        "Description": "AWG has a compiled wave form and is ready to be enabled.",
+        "Node": "/DEV8008/AWGS/0/READY",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/SEQUENCER/ASSEMBLY": {
+        "Description": "Displays the current sequence program in compiled form. Every line corresponds to one hardware instruction and requires one clock cycle (4.44 ns) for execution.",
+        "Node": "/DEV8008/AWGS/0/SEQUENCER/ASSEMBLY",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/SEQUENCER/CONTINUE": {
+        "Description": "Reserved for future use.",
+        "Node": "/DEV8008/AWGS/0/SEQUENCER/CONTINUE",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/SEQUENCER/MEMORYUSAGE": {
+        "Description": "Size of the current sequence program relative to the device cache memory. The cache memory provides space for 1024 instructions. Memory Usage over 100% means that instructions must be loaded from the main memory during playback, which can lead to delays.",
+        "Node": "/DEV8008/AWGS/0/SEQUENCER/MEMORYUSAGE",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/SEQUENCER/NEXT": {
+        "Description": "Reserved for future use.",
+        "Node": "/DEV8008/AWGS/0/SEQUENCER/NEXT",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/SEQUENCER/PC": {
+        "Description": "Current position in the list of sequence instructions during execution.",
+        "Node": "/DEV8008/AWGS/0/SEQUENCER/PC",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/SEQUENCER/PROGRAM": {
+        "Description": "Displays the source code of the current sequence program.",
+        "Node": "/DEV8008/AWGS/0/SEQUENCER/PROGRAM",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/SEQUENCER/STATUS": {
+        "Description": "Status of the sequencer on the instrument.",
+        "Node": "/DEV8008/AWGS/0/SEQUENCER/STATUS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/SINGLE": {
+        "Description": "Puts the AWG into single shot mode.",
+        "Node": "/DEV8008/AWGS/0/SINGLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/SWEEP/AWGTRIGS/0": {
+        "Description": "Node used by the sweeper module for fast index sweeps. When selected as sweep grid the sweeper module will switch into a fast index based scan mode. This mode can be up to 1000 times faster than conventional node sweeps. The sequencer program must support this functionality. See section 'AWG Index Sweep' of the UHF user manual for more information.",
+        "Node": "/DEV8008/AWGS/0/SWEEP/AWGTRIGS/0",
+        "Properties": "Read, Write",
+        "Type": "Double",
+        "Unit": "Dependent"
+    },
+    "/DEV8008/AWGS/0/SWEEP/AWGTRIGS/1": {
+        "Description": "Node used by the sweeper module for fast index sweeps. When selected as sweep grid the sweeper module will switch into a fast index based scan mode. This mode can be up to 1000 times faster than conventional node sweeps. The sequencer program must support this functionality. See section 'AWG Index Sweep' of the UHF user manual for more information.",
+        "Node": "/DEV8008/AWGS/0/SWEEP/AWGTRIGS/1",
+        "Properties": "Read, Write",
+        "Type": "Double",
+        "Unit": "Dependent"
+    },
+    "/DEV8008/AWGS/0/SWEEP/AWGTRIGS/2": {
+        "Description": "Node used by the sweeper module for fast index sweeps. When selected as sweep grid the sweeper module will switch into a fast index based scan mode. This mode can be up to 1000 times faster than conventional node sweeps. The sequencer program must support this functionality. See section 'AWG Index Sweep' of the UHF user manual for more information.",
+        "Node": "/DEV8008/AWGS/0/SWEEP/AWGTRIGS/2",
+        "Properties": "Read, Write",
+        "Type": "Double",
+        "Unit": "Dependent"
+    },
+    "/DEV8008/AWGS/0/SWEEP/AWGTRIGS/3": {
+        "Description": "Node used by the sweeper module for fast index sweeps. When selected as sweep grid the sweeper module will switch into a fast index based scan mode. This mode can be up to 1000 times faster than conventional node sweeps. The sequencer program must support this functionality. See section 'AWG Index Sweep' of the UHF user manual for more information.",
+        "Node": "/DEV8008/AWGS/0/SWEEP/AWGTRIGS/3",
+        "Properties": "Read, Write",
+        "Type": "Double",
+        "Unit": "Dependent"
+    },
+    "/DEV8008/AWGS/0/TIME": {
+        "Description": "AWG sampling rate. This value is used by default and can be overridden in the Sequence program.",
+        "Node": "/DEV8008/AWGS/0/TIME",
+        "Options": {
+            "0": "1.80 GHz",
+            "1": "900 MHz",
+            "10": "1.75 MHz",
+            "11": "880 kHz",
+            "12": "440 kHz",
+            "13": "220 kHz",
+            "2": "450 MHz",
+            "3": "225 MHz",
+            "4": "113 MHz",
+            "5": "56.2 MHz",
+            "6": "28.1 MHz",
+            "7": "14.0 MHz",
+            "8": "7.03 MHz",
+            "9": "3.50 MHz"
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/USERREGS/0": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/0/USERREGS/0",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/USERREGS/1": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/0/USERREGS/1",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/USERREGS/10": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/0/USERREGS/10",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/USERREGS/11": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/0/USERREGS/11",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/USERREGS/12": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/0/USERREGS/12",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/USERREGS/13": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/0/USERREGS/13",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/USERREGS/14": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/0/USERREGS/14",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/USERREGS/15": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/0/USERREGS/15",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/USERREGS/2": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/0/USERREGS/2",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/USERREGS/3": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/0/USERREGS/3",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/USERREGS/4": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/0/USERREGS/4",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/USERREGS/5": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/0/USERREGS/5",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/USERREGS/6": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/0/USERREGS/6",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/USERREGS/7": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/0/USERREGS/7",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/USERREGS/8": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/0/USERREGS/8",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/USERREGS/9": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/0/USERREGS/9",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/WAVEFORM/DATA": {
+        "Description": "Allows to write (using vectorWrite) or read (using getAsEvent) the selected waveform data at the selected index.",
+        "Node": "/DEV8008/AWGS/0/WAVEFORM/DATA",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/WAVEFORM/DESCRIPTORS": {
+        "Description": "Displays various properties of the current waveform: name, filename, function, channels, length, segment, hash.",
+        "Node": "/DEV8008/AWGS/0/WAVEFORM/DESCRIPTORS",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/WAVEFORM/INDEX": {
+        "Description": "Allows to select the index of the waveform in the waveform list for subsequent writing and reading.",
+        "Node": "/DEV8008/AWGS/0/WAVEFORM/INDEX",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/0/WAVEFORM/MEMORYUSAGE": {
+        "Description": "Amount of the used waveform data relative to the device cache memory. The cache memory provides space for 32 kSa of waveform data. Memory Usage over 100% means that waveforms must be loaded from the main memory (128 MSa per channel) during playback, which can lead to delays.",
+        "Node": "/DEV8008/AWGS/0/WAVEFORM/MEMORYUSAGE",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "%"
+    },
+    "/DEV8008/AWGS/1/AUXTRIGGERS/0/CHANNEL": {
+        "Description": "Selects the digital trigger source signal.",
+        "Node": "/DEV8008/AWGS/1/AUXTRIGGERS/0/CHANNEL",
+        "Options": {},
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/AUXTRIGGERS/0/SLOPE": {
+        "Description": "Select the signal edge that should activate the trigger. The trigger will be level sensitive when the Level option is selected.",
+        "Node": "/DEV8008/AWGS/1/AUXTRIGGERS/0/SLOPE",
+        "Options": {},
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/AUXTRIGGERS/0/STATE": {
+        "Description": "State of the Auxiliary Trigger: No trigger detected/trigger detected.",
+        "Node": "/DEV8008/AWGS/1/AUXTRIGGERS/0/STATE",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/AUXTRIGGERS/1/CHANNEL": {
+        "Description": "Selects the digital trigger source signal.",
+        "Node": "/DEV8008/AWGS/1/AUXTRIGGERS/1/CHANNEL",
+        "Options": {},
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/AUXTRIGGERS/1/SLOPE": {
+        "Description": "Select the signal edge that should activate the trigger. The trigger will be level sensitive when the Level option is selected.",
+        "Node": "/DEV8008/AWGS/1/AUXTRIGGERS/1/SLOPE",
+        "Options": {},
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/AUXTRIGGERS/1/STATE": {
+        "Description": "State of the Auxiliary Trigger: No trigger detected/trigger detected.",
+        "Node": "/DEV8008/AWGS/1/AUXTRIGGERS/1/STATE",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/DIO/DATA": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/1/DIO/DATA",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/DIO/DELAY/INDEX": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/1/DIO/DELAY/INDEX",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/DIO/DELAY/VALUE": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/1/DIO/DELAY/VALUE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/DIO/MASK/SHIFT": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/1/DIO/MASK/SHIFT",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/DIO/MASK/VALUE": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/1/DIO/MASK/VALUE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/DIO/SNAPSHOT": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/1/DIO/SNAPSHOT",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/DIO/STROBE/INDEX": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/1/DIO/STROBE/INDEX",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/DIO/STROBE/SLOPE": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/1/DIO/STROBE/SLOPE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/DIO/VALID/INDEX": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/1/DIO/VALID/INDEX",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/DIO/VALID/POLARITY": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/1/DIO/VALID/POLARITY",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/DIO/VALUE": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/1/DIO/VALUE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/ELF/CHECKSUM": {
+        "Description": "Checksum of the uploaded ELF file.",
+        "Node": "/DEV8008/AWGS/1/ELF/CHECKSUM",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/ELF/DATA": {
+        "Description": "Contains the data of the uploaded ELF file.",
+        "Node": "/DEV8008/AWGS/1/ELF/DATA",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/ELF/MEMORYUSAGE": {
+        "Description": "Size the uploaded ELF file relative to the size of the main memory.",
+        "Node": "/DEV8008/AWGS/1/ELF/MEMORYUSAGE",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/ELF/NAME": {
+        "Description": "The name of the uploaded ELF file.",
+        "Node": "/DEV8008/AWGS/1/ELF/NAME",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/ENABLE": {
+        "Description": "Activates the AWG.",
+        "Node": "/DEV8008/AWGS/1/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/OUTPUTS/0/AMPLITUDE": {
+        "Description": "Amplitude in units of full scale of the given AWG Output. The full scale corresponds to the Range voltage setting of the Signal Outputs.",
+        "Node": "/DEV8008/AWGS/1/OUTPUTS/0/AMPLITUDE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/AWGS/1/OUTPUTS/0/ENABLES/0": {
+        "Description": "Enables the driving of the given AWG output channel.",
+        "Node": "/DEV8008/AWGS/1/OUTPUTS/0/ENABLES/0",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/OUTPUTS/0/ENABLES/1": {
+        "Description": "Enables the driving of the given AWG output channel.",
+        "Node": "/DEV8008/AWGS/1/OUTPUTS/0/ENABLES/1",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/OUTPUTS/0/MODE": {
+        "Description": "Select between direct mode and amplitude modulation mode.",
+        "Node": "/DEV8008/AWGS/1/OUTPUTS/0/MODE",
+        "Options": {
+            "0": "Direct: AWG Output goes directly to Signal Output.",
+            "1": "Modulation: AWG Output 1 (2) is multiplied with oscillator signal of demodulator 4 (8)."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/OUTPUTS/1/AMPLITUDE": {
+        "Description": "Amplitude in units of full scale of the given AWG Output. The full scale corresponds to the Range voltage setting of the Signal Outputs.",
+        "Node": "/DEV8008/AWGS/1/OUTPUTS/1/AMPLITUDE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/AWGS/1/OUTPUTS/1/ENABLES/0": {
+        "Description": "Enables the driving of the given AWG output channel.",
+        "Node": "/DEV8008/AWGS/1/OUTPUTS/1/ENABLES/0",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/OUTPUTS/1/ENABLES/1": {
+        "Description": "Enables the driving of the given AWG output channel.",
+        "Node": "/DEV8008/AWGS/1/OUTPUTS/1/ENABLES/1",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/OUTPUTS/1/MODE": {
+        "Description": "Select between direct mode and amplitude modulation mode.",
+        "Node": "/DEV8008/AWGS/1/OUTPUTS/1/MODE",
+        "Options": {
+            "0": "Direct: AWG Output goes directly to Signal Output.",
+            "1": "Modulation: AWG Output 1 (2) is multiplied with oscillator signal of demodulator 4 (8)."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/READY": {
+        "Description": "AWG has a compiled wave form and is ready to be enabled.",
+        "Node": "/DEV8008/AWGS/1/READY",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/SEQUENCER/ASSEMBLY": {
+        "Description": "Displays the current sequence program in compiled form. Every line corresponds to one hardware instruction and requires one clock cycle (4.44 ns) for execution.",
+        "Node": "/DEV8008/AWGS/1/SEQUENCER/ASSEMBLY",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/SEQUENCER/CONTINUE": {
+        "Description": "Reserved for future use.",
+        "Node": "/DEV8008/AWGS/1/SEQUENCER/CONTINUE",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/SEQUENCER/MEMORYUSAGE": {
+        "Description": "Size of the current sequence program relative to the device cache memory. The cache memory provides space for 1024 instructions. Memory Usage over 100% means that instructions must be loaded from the main memory during playback, which can lead to delays.",
+        "Node": "/DEV8008/AWGS/1/SEQUENCER/MEMORYUSAGE",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/SEQUENCER/NEXT": {
+        "Description": "Reserved for future use.",
+        "Node": "/DEV8008/AWGS/1/SEQUENCER/NEXT",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/SEQUENCER/PC": {
+        "Description": "Current position in the list of sequence instructions during execution.",
+        "Node": "/DEV8008/AWGS/1/SEQUENCER/PC",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/SEQUENCER/PROGRAM": {
+        "Description": "Displays the source code of the current sequence program.",
+        "Node": "/DEV8008/AWGS/1/SEQUENCER/PROGRAM",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/SEQUENCER/STATUS": {
+        "Description": "Status of the sequencer on the instrument.",
+        "Node": "/DEV8008/AWGS/1/SEQUENCER/STATUS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/SINGLE": {
+        "Description": "Puts the AWG into single shot mode.",
+        "Node": "/DEV8008/AWGS/1/SINGLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/SWEEP/AWGTRIGS/0": {
+        "Description": "Node used by the sweeper module for fast index sweeps. When selected as sweep grid the sweeper module will switch into a fast index based scan mode. This mode can be up to 1000 times faster than conventional node sweeps. The sequencer program must support this functionality. See section 'AWG Index Sweep' of the UHF user manual for more information.",
+        "Node": "/DEV8008/AWGS/1/SWEEP/AWGTRIGS/0",
+        "Properties": "Read, Write",
+        "Type": "Double",
+        "Unit": "Dependent"
+    },
+    "/DEV8008/AWGS/1/SWEEP/AWGTRIGS/1": {
+        "Description": "Node used by the sweeper module for fast index sweeps. When selected as sweep grid the sweeper module will switch into a fast index based scan mode. This mode can be up to 1000 times faster than conventional node sweeps. The sequencer program must support this functionality. See section 'AWG Index Sweep' of the UHF user manual for more information.",
+        "Node": "/DEV8008/AWGS/1/SWEEP/AWGTRIGS/1",
+        "Properties": "Read, Write",
+        "Type": "Double",
+        "Unit": "Dependent"
+    },
+    "/DEV8008/AWGS/1/SWEEP/AWGTRIGS/2": {
+        "Description": "Node used by the sweeper module for fast index sweeps. When selected as sweep grid the sweeper module will switch into a fast index based scan mode. This mode can be up to 1000 times faster than conventional node sweeps. The sequencer program must support this functionality. See section 'AWG Index Sweep' of the UHF user manual for more information.",
+        "Node": "/DEV8008/AWGS/1/SWEEP/AWGTRIGS/2",
+        "Properties": "Read, Write",
+        "Type": "Double",
+        "Unit": "Dependent"
+    },
+    "/DEV8008/AWGS/1/SWEEP/AWGTRIGS/3": {
+        "Description": "Node used by the sweeper module for fast index sweeps. When selected as sweep grid the sweeper module will switch into a fast index based scan mode. This mode can be up to 1000 times faster than conventional node sweeps. The sequencer program must support this functionality. See section 'AWG Index Sweep' of the UHF user manual for more information.",
+        "Node": "/DEV8008/AWGS/1/SWEEP/AWGTRIGS/3",
+        "Properties": "Read, Write",
+        "Type": "Double",
+        "Unit": "Dependent"
+    },
+    "/DEV8008/AWGS/1/TIME": {
+        "Description": "AWG sampling rate. This value is used by default and can be overridden in the Sequence program.",
+        "Node": "/DEV8008/AWGS/1/TIME",
+        "Options": {
+            "0": "1.80 GHz",
+            "1": "900 MHz",
+            "10": "1.75 MHz",
+            "11": "880 kHz",
+            "12": "440 kHz",
+            "13": "220 kHz",
+            "2": "450 MHz",
+            "3": "225 MHz",
+            "4": "113 MHz",
+            "5": "56.2 MHz",
+            "6": "28.1 MHz",
+            "7": "14.0 MHz",
+            "8": "7.03 MHz",
+            "9": "3.50 MHz"
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/USERREGS/0": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/1/USERREGS/0",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/USERREGS/1": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/1/USERREGS/1",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/USERREGS/10": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/1/USERREGS/10",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/USERREGS/11": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/1/USERREGS/11",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/USERREGS/12": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/1/USERREGS/12",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/USERREGS/13": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/1/USERREGS/13",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/USERREGS/14": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/1/USERREGS/14",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/USERREGS/15": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/1/USERREGS/15",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/USERREGS/2": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/1/USERREGS/2",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/USERREGS/3": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/1/USERREGS/3",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/USERREGS/4": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/1/USERREGS/4",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/USERREGS/5": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/1/USERREGS/5",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/USERREGS/6": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/1/USERREGS/6",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/USERREGS/7": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/1/USERREGS/7",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/USERREGS/8": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/1/USERREGS/8",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/USERREGS/9": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/1/USERREGS/9",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/WAVEFORM/DATA": {
+        "Description": "Allows to write (using vectorWrite) or read (using getAsEvent) the selected waveform data at the selected index.",
+        "Node": "/DEV8008/AWGS/1/WAVEFORM/DATA",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/WAVEFORM/DESCRIPTORS": {
+        "Description": "Displays various properties of the current waveform: name, filename, function, channels, length, segment, hash.",
+        "Node": "/DEV8008/AWGS/1/WAVEFORM/DESCRIPTORS",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/WAVEFORM/INDEX": {
+        "Description": "Allows to select the index of the waveform in the waveform list for subsequent writing and reading.",
+        "Node": "/DEV8008/AWGS/1/WAVEFORM/INDEX",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/1/WAVEFORM/MEMORYUSAGE": {
+        "Description": "Amount of the used waveform data relative to the device cache memory. The cache memory provides space for 32 kSa of waveform data. Memory Usage over 100% means that waveforms must be loaded from the main memory (128 MSa per channel) during playback, which can lead to delays.",
+        "Node": "/DEV8008/AWGS/1/WAVEFORM/MEMORYUSAGE",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "%"
+    },
+    "/DEV8008/AWGS/2/AUXTRIGGERS/0/CHANNEL": {
+        "Description": "Selects the digital trigger source signal.",
+        "Node": "/DEV8008/AWGS/2/AUXTRIGGERS/0/CHANNEL",
+        "Options": {},
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/AUXTRIGGERS/0/SLOPE": {
+        "Description": "Select the signal edge that should activate the trigger. The trigger will be level sensitive when the Level option is selected.",
+        "Node": "/DEV8008/AWGS/2/AUXTRIGGERS/0/SLOPE",
+        "Options": {},
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/AUXTRIGGERS/0/STATE": {
+        "Description": "State of the Auxiliary Trigger: No trigger detected/trigger detected.",
+        "Node": "/DEV8008/AWGS/2/AUXTRIGGERS/0/STATE",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/AUXTRIGGERS/1/CHANNEL": {
+        "Description": "Selects the digital trigger source signal.",
+        "Node": "/DEV8008/AWGS/2/AUXTRIGGERS/1/CHANNEL",
+        "Options": {},
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/AUXTRIGGERS/1/SLOPE": {
+        "Description": "Select the signal edge that should activate the trigger. The trigger will be level sensitive when the Level option is selected.",
+        "Node": "/DEV8008/AWGS/2/AUXTRIGGERS/1/SLOPE",
+        "Options": {},
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/AUXTRIGGERS/1/STATE": {
+        "Description": "State of the Auxiliary Trigger: No trigger detected/trigger detected.",
+        "Node": "/DEV8008/AWGS/2/AUXTRIGGERS/1/STATE",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/DIO/DATA": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/2/DIO/DATA",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/DIO/DELAY/INDEX": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/2/DIO/DELAY/INDEX",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/DIO/DELAY/VALUE": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/2/DIO/DELAY/VALUE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/DIO/MASK/SHIFT": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/2/DIO/MASK/SHIFT",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/DIO/MASK/VALUE": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/2/DIO/MASK/VALUE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/DIO/SNAPSHOT": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/2/DIO/SNAPSHOT",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/DIO/STROBE/INDEX": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/2/DIO/STROBE/INDEX",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/DIO/STROBE/SLOPE": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/2/DIO/STROBE/SLOPE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/DIO/VALID/INDEX": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/2/DIO/VALID/INDEX",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/DIO/VALID/POLARITY": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/2/DIO/VALID/POLARITY",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/DIO/VALUE": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/2/DIO/VALUE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/ELF/CHECKSUM": {
+        "Description": "Checksum of the uploaded ELF file.",
+        "Node": "/DEV8008/AWGS/2/ELF/CHECKSUM",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/ELF/DATA": {
+        "Description": "Contains the data of the uploaded ELF file.",
+        "Node": "/DEV8008/AWGS/2/ELF/DATA",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/ELF/MEMORYUSAGE": {
+        "Description": "Size the uploaded ELF file relative to the size of the main memory.",
+        "Node": "/DEV8008/AWGS/2/ELF/MEMORYUSAGE",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/ELF/NAME": {
+        "Description": "The name of the uploaded ELF file.",
+        "Node": "/DEV8008/AWGS/2/ELF/NAME",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/ENABLE": {
+        "Description": "Activates the AWG.",
+        "Node": "/DEV8008/AWGS/2/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/OUTPUTS/0/AMPLITUDE": {
+        "Description": "Amplitude in units of full scale of the given AWG Output. The full scale corresponds to the Range voltage setting of the Signal Outputs.",
+        "Node": "/DEV8008/AWGS/2/OUTPUTS/0/AMPLITUDE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/AWGS/2/OUTPUTS/0/ENABLES/0": {
+        "Description": "Enables the driving of the given AWG output channel.",
+        "Node": "/DEV8008/AWGS/2/OUTPUTS/0/ENABLES/0",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/OUTPUTS/0/ENABLES/1": {
+        "Description": "Enables the driving of the given AWG output channel.",
+        "Node": "/DEV8008/AWGS/2/OUTPUTS/0/ENABLES/1",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/OUTPUTS/0/MODE": {
+        "Description": "Select between direct mode and amplitude modulation mode.",
+        "Node": "/DEV8008/AWGS/2/OUTPUTS/0/MODE",
+        "Options": {
+            "0": "Direct: AWG Output goes directly to Signal Output.",
+            "1": "Modulation: AWG Output 1 (2) is multiplied with oscillator signal of demodulator 4 (8)."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/OUTPUTS/1/AMPLITUDE": {
+        "Description": "Amplitude in units of full scale of the given AWG Output. The full scale corresponds to the Range voltage setting of the Signal Outputs.",
+        "Node": "/DEV8008/AWGS/2/OUTPUTS/1/AMPLITUDE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/AWGS/2/OUTPUTS/1/ENABLES/0": {
+        "Description": "Enables the driving of the given AWG output channel.",
+        "Node": "/DEV8008/AWGS/2/OUTPUTS/1/ENABLES/0",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/OUTPUTS/1/ENABLES/1": {
+        "Description": "Enables the driving of the given AWG output channel.",
+        "Node": "/DEV8008/AWGS/2/OUTPUTS/1/ENABLES/1",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/OUTPUTS/1/MODE": {
+        "Description": "Select between direct mode and amplitude modulation mode.",
+        "Node": "/DEV8008/AWGS/2/OUTPUTS/1/MODE",
+        "Options": {
+            "0": "Direct: AWG Output goes directly to Signal Output.",
+            "1": "Modulation: AWG Output 1 (2) is multiplied with oscillator signal of demodulator 4 (8)."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/READY": {
+        "Description": "AWG has a compiled wave form and is ready to be enabled.",
+        "Node": "/DEV8008/AWGS/2/READY",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/SEQUENCER/ASSEMBLY": {
+        "Description": "Displays the current sequence program in compiled form. Every line corresponds to one hardware instruction and requires one clock cycle (4.44 ns) for execution.",
+        "Node": "/DEV8008/AWGS/2/SEQUENCER/ASSEMBLY",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/SEQUENCER/CONTINUE": {
+        "Description": "Reserved for future use.",
+        "Node": "/DEV8008/AWGS/2/SEQUENCER/CONTINUE",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/SEQUENCER/MEMORYUSAGE": {
+        "Description": "Size of the current sequence program relative to the device cache memory. The cache memory provides space for 1024 instructions. Memory Usage over 100% means that instructions must be loaded from the main memory during playback, which can lead to delays.",
+        "Node": "/DEV8008/AWGS/2/SEQUENCER/MEMORYUSAGE",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/SEQUENCER/NEXT": {
+        "Description": "Reserved for future use.",
+        "Node": "/DEV8008/AWGS/2/SEQUENCER/NEXT",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/SEQUENCER/PC": {
+        "Description": "Current position in the list of sequence instructions during execution.",
+        "Node": "/DEV8008/AWGS/2/SEQUENCER/PC",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/SEQUENCER/PROGRAM": {
+        "Description": "Displays the source code of the current sequence program.",
+        "Node": "/DEV8008/AWGS/2/SEQUENCER/PROGRAM",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/SEQUENCER/STATUS": {
+        "Description": "Status of the sequencer on the instrument.",
+        "Node": "/DEV8008/AWGS/2/SEQUENCER/STATUS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/SINGLE": {
+        "Description": "Puts the AWG into single shot mode.",
+        "Node": "/DEV8008/AWGS/2/SINGLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/SWEEP/AWGTRIGS/0": {
+        "Description": "Node used by the sweeper module for fast index sweeps. When selected as sweep grid the sweeper module will switch into a fast index based scan mode. This mode can be up to 1000 times faster than conventional node sweeps. The sequencer program must support this functionality. See section 'AWG Index Sweep' of the UHF user manual for more information.",
+        "Node": "/DEV8008/AWGS/2/SWEEP/AWGTRIGS/0",
+        "Properties": "Read, Write",
+        "Type": "Double",
+        "Unit": "Dependent"
+    },
+    "/DEV8008/AWGS/2/SWEEP/AWGTRIGS/1": {
+        "Description": "Node used by the sweeper module for fast index sweeps. When selected as sweep grid the sweeper module will switch into a fast index based scan mode. This mode can be up to 1000 times faster than conventional node sweeps. The sequencer program must support this functionality. See section 'AWG Index Sweep' of the UHF user manual for more information.",
+        "Node": "/DEV8008/AWGS/2/SWEEP/AWGTRIGS/1",
+        "Properties": "Read, Write",
+        "Type": "Double",
+        "Unit": "Dependent"
+    },
+    "/DEV8008/AWGS/2/SWEEP/AWGTRIGS/2": {
+        "Description": "Node used by the sweeper module for fast index sweeps. When selected as sweep grid the sweeper module will switch into a fast index based scan mode. This mode can be up to 1000 times faster than conventional node sweeps. The sequencer program must support this functionality. See section 'AWG Index Sweep' of the UHF user manual for more information.",
+        "Node": "/DEV8008/AWGS/2/SWEEP/AWGTRIGS/2",
+        "Properties": "Read, Write",
+        "Type": "Double",
+        "Unit": "Dependent"
+    },
+    "/DEV8008/AWGS/2/SWEEP/AWGTRIGS/3": {
+        "Description": "Node used by the sweeper module for fast index sweeps. When selected as sweep grid the sweeper module will switch into a fast index based scan mode. This mode can be up to 1000 times faster than conventional node sweeps. The sequencer program must support this functionality. See section 'AWG Index Sweep' of the UHF user manual for more information.",
+        "Node": "/DEV8008/AWGS/2/SWEEP/AWGTRIGS/3",
+        "Properties": "Read, Write",
+        "Type": "Double",
+        "Unit": "Dependent"
+    },
+    "/DEV8008/AWGS/2/TIME": {
+        "Description": "AWG sampling rate. This value is used by default and can be overridden in the Sequence program.",
+        "Node": "/DEV8008/AWGS/2/TIME",
+        "Options": {
+            "0": "1.80 GHz",
+            "1": "900 MHz",
+            "10": "1.75 MHz",
+            "11": "880 kHz",
+            "12": "440 kHz",
+            "13": "220 kHz",
+            "2": "450 MHz",
+            "3": "225 MHz",
+            "4": "113 MHz",
+            "5": "56.2 MHz",
+            "6": "28.1 MHz",
+            "7": "14.0 MHz",
+            "8": "7.03 MHz",
+            "9": "3.50 MHz"
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/USERREGS/0": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/2/USERREGS/0",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/USERREGS/1": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/2/USERREGS/1",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/USERREGS/10": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/2/USERREGS/10",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/USERREGS/11": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/2/USERREGS/11",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/USERREGS/12": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/2/USERREGS/12",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/USERREGS/13": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/2/USERREGS/13",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/USERREGS/14": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/2/USERREGS/14",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/USERREGS/15": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/2/USERREGS/15",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/USERREGS/2": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/2/USERREGS/2",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/USERREGS/3": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/2/USERREGS/3",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/USERREGS/4": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/2/USERREGS/4",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/USERREGS/5": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/2/USERREGS/5",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/USERREGS/6": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/2/USERREGS/6",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/USERREGS/7": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/2/USERREGS/7",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/USERREGS/8": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/2/USERREGS/8",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/USERREGS/9": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/2/USERREGS/9",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/WAVEFORM/DATA": {
+        "Description": "Allows to write (using vectorWrite) or read (using getAsEvent) the selected waveform data at the selected index.",
+        "Node": "/DEV8008/AWGS/2/WAVEFORM/DATA",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/WAVEFORM/DESCRIPTORS": {
+        "Description": "Displays various properties of the current waveform: name, filename, function, channels, length, segment, hash.",
+        "Node": "/DEV8008/AWGS/2/WAVEFORM/DESCRIPTORS",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/WAVEFORM/INDEX": {
+        "Description": "Allows to select the index of the waveform in the waveform list for subsequent writing and reading.",
+        "Node": "/DEV8008/AWGS/2/WAVEFORM/INDEX",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/2/WAVEFORM/MEMORYUSAGE": {
+        "Description": "Amount of the used waveform data relative to the device cache memory. The cache memory provides space for 32 kSa of waveform data. Memory Usage over 100% means that waveforms must be loaded from the main memory (128 MSa per channel) during playback, which can lead to delays.",
+        "Node": "/DEV8008/AWGS/2/WAVEFORM/MEMORYUSAGE",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "%"
+    },
+    "/DEV8008/AWGS/3/AUXTRIGGERS/0/CHANNEL": {
+        "Description": "Selects the digital trigger source signal.",
+        "Node": "/DEV8008/AWGS/3/AUXTRIGGERS/0/CHANNEL",
+        "Options": {},
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/AUXTRIGGERS/0/SLOPE": {
+        "Description": "Select the signal edge that should activate the trigger. The trigger will be level sensitive when the Level option is selected.",
+        "Node": "/DEV8008/AWGS/3/AUXTRIGGERS/0/SLOPE",
+        "Options": {},
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/AUXTRIGGERS/0/STATE": {
+        "Description": "State of the Auxiliary Trigger: No trigger detected/trigger detected.",
+        "Node": "/DEV8008/AWGS/3/AUXTRIGGERS/0/STATE",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/AUXTRIGGERS/1/CHANNEL": {
+        "Description": "Selects the digital trigger source signal.",
+        "Node": "/DEV8008/AWGS/3/AUXTRIGGERS/1/CHANNEL",
+        "Options": {},
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/AUXTRIGGERS/1/SLOPE": {
+        "Description": "Select the signal edge that should activate the trigger. The trigger will be level sensitive when the Level option is selected.",
+        "Node": "/DEV8008/AWGS/3/AUXTRIGGERS/1/SLOPE",
+        "Options": {},
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/AUXTRIGGERS/1/STATE": {
+        "Description": "State of the Auxiliary Trigger: No trigger detected/trigger detected.",
+        "Node": "/DEV8008/AWGS/3/AUXTRIGGERS/1/STATE",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/DIO/DATA": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/3/DIO/DATA",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/DIO/DELAY/INDEX": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/3/DIO/DELAY/INDEX",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/DIO/DELAY/VALUE": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/3/DIO/DELAY/VALUE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/DIO/MASK/SHIFT": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/3/DIO/MASK/SHIFT",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/DIO/MASK/VALUE": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/3/DIO/MASK/VALUE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/DIO/SNAPSHOT": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/3/DIO/SNAPSHOT",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/DIO/STROBE/INDEX": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/3/DIO/STROBE/INDEX",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/DIO/STROBE/SLOPE": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/3/DIO/STROBE/SLOPE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/DIO/VALID/INDEX": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/3/DIO/VALID/INDEX",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/DIO/VALID/POLARITY": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/3/DIO/VALID/POLARITY",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/DIO/VALUE": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/AWGS/3/DIO/VALUE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/ELF/CHECKSUM": {
+        "Description": "Checksum of the uploaded ELF file.",
+        "Node": "/DEV8008/AWGS/3/ELF/CHECKSUM",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/ELF/DATA": {
+        "Description": "Contains the data of the uploaded ELF file.",
+        "Node": "/DEV8008/AWGS/3/ELF/DATA",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/ELF/MEMORYUSAGE": {
+        "Description": "Size the uploaded ELF file relative to the size of the main memory.",
+        "Node": "/DEV8008/AWGS/3/ELF/MEMORYUSAGE",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/ELF/NAME": {
+        "Description": "The name of the uploaded ELF file.",
+        "Node": "/DEV8008/AWGS/3/ELF/NAME",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/ENABLE": {
+        "Description": "Activates the AWG.",
+        "Node": "/DEV8008/AWGS/3/ENABLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/OUTPUTS/0/AMPLITUDE": {
+        "Description": "Amplitude in units of full scale of the given AWG Output. The full scale corresponds to the Range voltage setting of the Signal Outputs.",
+        "Node": "/DEV8008/AWGS/3/OUTPUTS/0/AMPLITUDE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/AWGS/3/OUTPUTS/0/ENABLES/0": {
+        "Description": "Enables the driving of the given AWG output channel.",
+        "Node": "/DEV8008/AWGS/3/OUTPUTS/0/ENABLES/0",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/OUTPUTS/0/ENABLES/1": {
+        "Description": "Enables the driving of the given AWG output channel.",
+        "Node": "/DEV8008/AWGS/3/OUTPUTS/0/ENABLES/1",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/OUTPUTS/0/MODE": {
+        "Description": "Select between direct mode and amplitude modulation mode.",
+        "Node": "/DEV8008/AWGS/3/OUTPUTS/0/MODE",
+        "Options": {
+            "0": "Direct: AWG Output goes directly to Signal Output.",
+            "1": "Modulation: AWG Output 1 (2) is multiplied with oscillator signal of demodulator 4 (8)."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/OUTPUTS/1/AMPLITUDE": {
+        "Description": "Amplitude in units of full scale of the given AWG Output. The full scale corresponds to the Range voltage setting of the Signal Outputs.",
+        "Node": "/DEV8008/AWGS/3/OUTPUTS/1/AMPLITUDE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/AWGS/3/OUTPUTS/1/ENABLES/0": {
+        "Description": "Enables the driving of the given AWG output channel.",
+        "Node": "/DEV8008/AWGS/3/OUTPUTS/1/ENABLES/0",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/OUTPUTS/1/ENABLES/1": {
+        "Description": "Enables the driving of the given AWG output channel.",
+        "Node": "/DEV8008/AWGS/3/OUTPUTS/1/ENABLES/1",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/OUTPUTS/1/MODE": {
+        "Description": "Select between direct mode and amplitude modulation mode.",
+        "Node": "/DEV8008/AWGS/3/OUTPUTS/1/MODE",
+        "Options": {
+            "0": "Direct: AWG Output goes directly to Signal Output.",
+            "1": "Modulation: AWG Output 1 (2) is multiplied with oscillator signal of demodulator 4 (8)."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/READY": {
+        "Description": "AWG has a compiled wave form and is ready to be enabled.",
+        "Node": "/DEV8008/AWGS/3/READY",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/SEQUENCER/ASSEMBLY": {
+        "Description": "Displays the current sequence program in compiled form. Every line corresponds to one hardware instruction and requires one clock cycle (4.44 ns) for execution.",
+        "Node": "/DEV8008/AWGS/3/SEQUENCER/ASSEMBLY",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/SEQUENCER/CONTINUE": {
+        "Description": "Reserved for future use.",
+        "Node": "/DEV8008/AWGS/3/SEQUENCER/CONTINUE",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/SEQUENCER/MEMORYUSAGE": {
+        "Description": "Size of the current sequence program relative to the device cache memory. The cache memory provides space for 1024 instructions. Memory Usage over 100% means that instructions must be loaded from the main memory during playback, which can lead to delays.",
+        "Node": "/DEV8008/AWGS/3/SEQUENCER/MEMORYUSAGE",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/SEQUENCER/NEXT": {
+        "Description": "Reserved for future use.",
+        "Node": "/DEV8008/AWGS/3/SEQUENCER/NEXT",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/SEQUENCER/PC": {
+        "Description": "Current position in the list of sequence instructions during execution.",
+        "Node": "/DEV8008/AWGS/3/SEQUENCER/PC",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/SEQUENCER/PROGRAM": {
+        "Description": "Displays the source code of the current sequence program.",
+        "Node": "/DEV8008/AWGS/3/SEQUENCER/PROGRAM",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/SEQUENCER/STATUS": {
+        "Description": "Status of the sequencer on the instrument.",
+        "Node": "/DEV8008/AWGS/3/SEQUENCER/STATUS",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/SINGLE": {
+        "Description": "Puts the AWG into single shot mode.",
+        "Node": "/DEV8008/AWGS/3/SINGLE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/SWEEP/AWGTRIGS/0": {
+        "Description": "Node used by the sweeper module for fast index sweeps. When selected as sweep grid the sweeper module will switch into a fast index based scan mode. This mode can be up to 1000 times faster than conventional node sweeps. The sequencer program must support this functionality. See section 'AWG Index Sweep' of the UHF user manual for more information.",
+        "Node": "/DEV8008/AWGS/3/SWEEP/AWGTRIGS/0",
+        "Properties": "Read, Write",
+        "Type": "Double",
+        "Unit": "Dependent"
+    },
+    "/DEV8008/AWGS/3/SWEEP/AWGTRIGS/1": {
+        "Description": "Node used by the sweeper module for fast index sweeps. When selected as sweep grid the sweeper module will switch into a fast index based scan mode. This mode can be up to 1000 times faster than conventional node sweeps. The sequencer program must support this functionality. See section 'AWG Index Sweep' of the UHF user manual for more information.",
+        "Node": "/DEV8008/AWGS/3/SWEEP/AWGTRIGS/1",
+        "Properties": "Read, Write",
+        "Type": "Double",
+        "Unit": "Dependent"
+    },
+    "/DEV8008/AWGS/3/SWEEP/AWGTRIGS/2": {
+        "Description": "Node used by the sweeper module for fast index sweeps. When selected as sweep grid the sweeper module will switch into a fast index based scan mode. This mode can be up to 1000 times faster than conventional node sweeps. The sequencer program must support this functionality. See section 'AWG Index Sweep' of the UHF user manual for more information.",
+        "Node": "/DEV8008/AWGS/3/SWEEP/AWGTRIGS/2",
+        "Properties": "Read, Write",
+        "Type": "Double",
+        "Unit": "Dependent"
+    },
+    "/DEV8008/AWGS/3/SWEEP/AWGTRIGS/3": {
+        "Description": "Node used by the sweeper module for fast index sweeps. When selected as sweep grid the sweeper module will switch into a fast index based scan mode. This mode can be up to 1000 times faster than conventional node sweeps. The sequencer program must support this functionality. See section 'AWG Index Sweep' of the UHF user manual for more information.",
+        "Node": "/DEV8008/AWGS/3/SWEEP/AWGTRIGS/3",
+        "Properties": "Read, Write",
+        "Type": "Double",
+        "Unit": "Dependent"
+    },
+    "/DEV8008/AWGS/3/TIME": {
+        "Description": "AWG sampling rate. This value is used by default and can be overridden in the Sequence program.",
+        "Node": "/DEV8008/AWGS/3/TIME",
+        "Options": {
+            "0": "1.80 GHz",
+            "1": "900 MHz",
+            "10": "1.75 MHz",
+            "11": "880 kHz",
+            "12": "440 kHz",
+            "13": "220 kHz",
+            "2": "450 MHz",
+            "3": "225 MHz",
+            "4": "113 MHz",
+            "5": "56.2 MHz",
+            "6": "28.1 MHz",
+            "7": "14.0 MHz",
+            "8": "7.03 MHz",
+            "9": "3.50 MHz"
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/USERREGS/0": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/3/USERREGS/0",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/USERREGS/1": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/3/USERREGS/1",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/USERREGS/10": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/3/USERREGS/10",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/USERREGS/11": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/3/USERREGS/11",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/USERREGS/12": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/3/USERREGS/12",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/USERREGS/13": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/3/USERREGS/13",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/USERREGS/14": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/3/USERREGS/14",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/USERREGS/15": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/3/USERREGS/15",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/USERREGS/2": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/3/USERREGS/2",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/USERREGS/3": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/3/USERREGS/3",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/USERREGS/4": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/3/USERREGS/4",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/USERREGS/5": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/3/USERREGS/5",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/USERREGS/6": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/3/USERREGS/6",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/USERREGS/7": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/3/USERREGS/7",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/USERREGS/8": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/3/USERREGS/8",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/USERREGS/9": {
+        "Description": "Integer user register value. The sequencer has reading and writing access to the user register values during run time.",
+        "Node": "/DEV8008/AWGS/3/USERREGS/9",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/WAVEFORM/DATA": {
+        "Description": "Allows to write (using vectorWrite) or read (using getAsEvent) the selected waveform data at the selected index.",
+        "Node": "/DEV8008/AWGS/3/WAVEFORM/DATA",
+        "Properties": "Read, Write",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/WAVEFORM/DESCRIPTORS": {
+        "Description": "Displays various properties of the current waveform: name, filename, function, channels, length, segment, hash.",
+        "Node": "/DEV8008/AWGS/3/WAVEFORM/DESCRIPTORS",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/WAVEFORM/INDEX": {
+        "Description": "Allows to select the index of the waveform in the waveform list for subsequent writing and reading.",
+        "Node": "/DEV8008/AWGS/3/WAVEFORM/INDEX",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/AWGS/3/WAVEFORM/MEMORYUSAGE": {
+        "Description": "Amount of the used waveform data relative to the device cache memory. The cache memory provides space for 32 kSa of waveform data. Memory Usage over 100% means that waveforms must be loaded from the main memory (128 MSa per channel) during playback, which can lead to delays.",
+        "Node": "/DEV8008/AWGS/3/WAVEFORM/MEMORYUSAGE",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "%"
+    },
+    "/DEV8008/CLOCKBASE": {
+        "Description": "Returns the internal clock frequency of the device.",
+        "Node": "/DEV8008/CLOCKBASE",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "Hz"
+    },
+    "/DEV8008/DIOS/0/DATA": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/DIOS/0/DATA",
+        "Properties": "Read",
+        "Type": "ZIVectorData",
+        "Unit": "None"
+    },
+    "/DEV8008/DIOS/0/DRIVE": {
+        "Description": "When on (1), the corresponding 8-bit bus is in output mode. When off (0), it is in input mode. Bit 0 corresponds to the least significant byte. For example, the value 1 drives the least significant byte, the value 8 drives the most significant byte.",
+        "Node": "/DEV8008/DIOS/0/DRIVE",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/DIOS/0/VALUE": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/DIOS/0/VALUE",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/FEATURES/CODE": {
+        "Description": "Node providing a mechanism to write feature codes.",
+        "Node": "/DEV8008/FEATURES/CODE",
+        "Properties": "Read, Write",
+        "Type": "CoreString",
+        "Unit": "None"
+    },
+    "/DEV8008/FEATURES/DEVTYPE": {
+        "Description": "Returns the device type.",
+        "Node": "/DEV8008/FEATURES/DEVTYPE",
+        "Properties": "Read",
+        "Type": "CoreString",
+        "Unit": "None"
+    },
+    "/DEV8008/FEATURES/OPTIONS": {
+        "Description": "Returns enabled options.",
+        "Node": "/DEV8008/FEATURES/OPTIONS",
+        "Properties": "Read",
+        "Type": "CoreString",
+        "Unit": "None"
+    },
+    "/DEV8008/FEATURES/SERIAL": {
+        "Description": "Device serial number.",
+        "Node": "/DEV8008/FEATURES/SERIAL",
+        "Properties": "Read",
+        "Type": "CoreString",
+        "Unit": "None"
+    },
+    "/DEV8008/OSCS/0/FREQ": {
+        "Description": "Frequency control for each oscillator.",
+        "Node": "/DEV8008/OSCS/0/FREQ",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "Hz"
+    },
+    "/DEV8008/OSCS/1/FREQ": {
+        "Description": "Frequency control for each oscillator.",
+        "Node": "/DEV8008/OSCS/1/FREQ",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "Hz"
+    },
+    "/DEV8008/OSCS/2/FREQ": {
+        "Description": "Frequency control for each oscillator.",
+        "Node": "/DEV8008/OSCS/2/FREQ",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "Hz"
+    },
+    "/DEV8008/OSCS/3/FREQ": {
+        "Description": "Frequency control for each oscillator.",
+        "Node": "/DEV8008/OSCS/3/FREQ",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "Hz"
+    },
+    "/DEV8008/OSCS/4/FREQ": {
+        "Description": "Frequency control for each oscillator.",
+        "Node": "/DEV8008/OSCS/4/FREQ",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "Hz"
+    },
+    "/DEV8008/OSCS/5/FREQ": {
+        "Description": "Frequency control for each oscillator.",
+        "Node": "/DEV8008/OSCS/5/FREQ",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "Hz"
+    },
+    "/DEV8008/OSCS/6/FREQ": {
+        "Description": "Frequency control for each oscillator.",
+        "Node": "/DEV8008/OSCS/6/FREQ",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "Hz"
+    },
+    "/DEV8008/OSCS/7/FREQ": {
+        "Description": "Frequency control for each oscillator.",
+        "Node": "/DEV8008/OSCS/7/FREQ",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "Hz"
+    },
+    "/DEV8008/SIGOUTS/0/AMPLITUDES/0": {
+        "Description": "Sets the peak amplitude that the oscillator assigned to the given demodulation channel contributes to the signal output.",
+        "Node": "/DEV8008/SIGOUTS/0/AMPLITUDES/0",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/0/AMPLITUDES/1": {
+        "Description": "Sets the peak amplitude that the oscillator assigned to the given demodulation channel contributes to the signal output.",
+        "Node": "/DEV8008/SIGOUTS/0/AMPLITUDES/1",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/0/DELAY": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/SIGOUTS/0/DELAY",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "/DEV8008/SIGOUTS/0/ENABLES/0": {
+        "Description": "Enables individual output signal amplitude. When the MD option is used, it is possible to generate signals being the linear combination of the available demodulator frequencies.",
+        "Node": "/DEV8008/SIGOUTS/0/ENABLES/0",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/0/ENABLES/1": {
+        "Description": "Enables individual output signal amplitude. When the MD option is used, it is possible to generate signals being the linear combination of the available demodulator frequencies.",
+        "Node": "/DEV8008/SIGOUTS/0/ENABLES/1",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/0/OFFSET": {
+        "Description": "Defines the DC voltage that is added to the dynamic part of the output signal.",
+        "Node": "/DEV8008/SIGOUTS/0/OFFSET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/0/ON": {
+        "Description": "Enabling/Disabling the Signal Output. Corresponds to the blue LED indicator on the instrument front panel.",
+        "Node": "/DEV8008/SIGOUTS/0/ON",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/SIGOUTS/1/AMPLITUDES/0": {
+        "Description": "Sets the peak amplitude that the oscillator assigned to the given demodulation channel contributes to the signal output.",
+        "Node": "/DEV8008/SIGOUTS/1/AMPLITUDES/0",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/1/AMPLITUDES/1": {
+        "Description": "Sets the peak amplitude that the oscillator assigned to the given demodulation channel contributes to the signal output.",
+        "Node": "/DEV8008/SIGOUTS/1/AMPLITUDES/1",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/1/DELAY": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/SIGOUTS/1/DELAY",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "/DEV8008/SIGOUTS/1/ENABLES/0": {
+        "Description": "Enables individual output signal amplitude. When the MD option is used, it is possible to generate signals being the linear combination of the available demodulator frequencies.",
+        "Node": "/DEV8008/SIGOUTS/1/ENABLES/0",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/1/ENABLES/1": {
+        "Description": "Enables individual output signal amplitude. When the MD option is used, it is possible to generate signals being the linear combination of the available demodulator frequencies.",
+        "Node": "/DEV8008/SIGOUTS/1/ENABLES/1",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/1/OFFSET": {
+        "Description": "Defines the DC voltage that is added to the dynamic part of the output signal.",
+        "Node": "/DEV8008/SIGOUTS/1/OFFSET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/1/ON": {
+        "Description": "Enabling/Disabling the Signal Output. Corresponds to the blue LED indicator on the instrument front panel.",
+        "Node": "/DEV8008/SIGOUTS/1/ON",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/SIGOUTS/2/AMPLITUDES/0": {
+        "Description": "Sets the peak amplitude that the oscillator assigned to the given demodulation channel contributes to the signal output.",
+        "Node": "/DEV8008/SIGOUTS/2/AMPLITUDES/0",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/2/AMPLITUDES/1": {
+        "Description": "Sets the peak amplitude that the oscillator assigned to the given demodulation channel contributes to the signal output.",
+        "Node": "/DEV8008/SIGOUTS/2/AMPLITUDES/1",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/2/DELAY": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/SIGOUTS/2/DELAY",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "/DEV8008/SIGOUTS/2/ENABLES/0": {
+        "Description": "Enables individual output signal amplitude. When the MD option is used, it is possible to generate signals being the linear combination of the available demodulator frequencies.",
+        "Node": "/DEV8008/SIGOUTS/2/ENABLES/0",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/2/ENABLES/1": {
+        "Description": "Enables individual output signal amplitude. When the MD option is used, it is possible to generate signals being the linear combination of the available demodulator frequencies.",
+        "Node": "/DEV8008/SIGOUTS/2/ENABLES/1",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/2/OFFSET": {
+        "Description": "Defines the DC voltage that is added to the dynamic part of the output signal.",
+        "Node": "/DEV8008/SIGOUTS/2/OFFSET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/2/ON": {
+        "Description": "Enabling/Disabling the Signal Output. Corresponds to the blue LED indicator on the instrument front panel.",
+        "Node": "/DEV8008/SIGOUTS/2/ON",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/SIGOUTS/3/AMPLITUDES/0": {
+        "Description": "Sets the peak amplitude that the oscillator assigned to the given demodulation channel contributes to the signal output.",
+        "Node": "/DEV8008/SIGOUTS/3/AMPLITUDES/0",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/3/AMPLITUDES/1": {
+        "Description": "Sets the peak amplitude that the oscillator assigned to the given demodulation channel contributes to the signal output.",
+        "Node": "/DEV8008/SIGOUTS/3/AMPLITUDES/1",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/3/DELAY": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/SIGOUTS/3/DELAY",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "/DEV8008/SIGOUTS/3/ENABLES/0": {
+        "Description": "Enables individual output signal amplitude. When the MD option is used, it is possible to generate signals being the linear combination of the available demodulator frequencies.",
+        "Node": "/DEV8008/SIGOUTS/3/ENABLES/0",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/3/ENABLES/1": {
+        "Description": "Enables individual output signal amplitude. When the MD option is used, it is possible to generate signals being the linear combination of the available demodulator frequencies.",
+        "Node": "/DEV8008/SIGOUTS/3/ENABLES/1",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/3/OFFSET": {
+        "Description": "Defines the DC voltage that is added to the dynamic part of the output signal.",
+        "Node": "/DEV8008/SIGOUTS/3/OFFSET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/3/ON": {
+        "Description": "Enabling/Disabling the Signal Output. Corresponds to the blue LED indicator on the instrument front panel.",
+        "Node": "/DEV8008/SIGOUTS/3/ON",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/SIGOUTS/4/AMPLITUDES/0": {
+        "Description": "Sets the peak amplitude that the oscillator assigned to the given demodulation channel contributes to the signal output.",
+        "Node": "/DEV8008/SIGOUTS/4/AMPLITUDES/0",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/4/AMPLITUDES/1": {
+        "Description": "Sets the peak amplitude that the oscillator assigned to the given demodulation channel contributes to the signal output.",
+        "Node": "/DEV8008/SIGOUTS/4/AMPLITUDES/1",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/4/DELAY": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/SIGOUTS/4/DELAY",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "/DEV8008/SIGOUTS/4/ENABLES/0": {
+        "Description": "Enables individual output signal amplitude. When the MD option is used, it is possible to generate signals being the linear combination of the available demodulator frequencies.",
+        "Node": "/DEV8008/SIGOUTS/4/ENABLES/0",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/4/ENABLES/1": {
+        "Description": "Enables individual output signal amplitude. When the MD option is used, it is possible to generate signals being the linear combination of the available demodulator frequencies.",
+        "Node": "/DEV8008/SIGOUTS/4/ENABLES/1",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/4/OFFSET": {
+        "Description": "Defines the DC voltage that is added to the dynamic part of the output signal.",
+        "Node": "/DEV8008/SIGOUTS/4/OFFSET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/4/ON": {
+        "Description": "Enabling/Disabling the Signal Output. Corresponds to the blue LED indicator on the instrument front panel.",
+        "Node": "/DEV8008/SIGOUTS/4/ON",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/SIGOUTS/5/AMPLITUDES/0": {
+        "Description": "Sets the peak amplitude that the oscillator assigned to the given demodulation channel contributes to the signal output.",
+        "Node": "/DEV8008/SIGOUTS/5/AMPLITUDES/0",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/5/AMPLITUDES/1": {
+        "Description": "Sets the peak amplitude that the oscillator assigned to the given demodulation channel contributes to the signal output.",
+        "Node": "/DEV8008/SIGOUTS/5/AMPLITUDES/1",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/5/DELAY": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/SIGOUTS/5/DELAY",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "/DEV8008/SIGOUTS/5/ENABLES/0": {
+        "Description": "Enables individual output signal amplitude. When the MD option is used, it is possible to generate signals being the linear combination of the available demodulator frequencies.",
+        "Node": "/DEV8008/SIGOUTS/5/ENABLES/0",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/5/ENABLES/1": {
+        "Description": "Enables individual output signal amplitude. When the MD option is used, it is possible to generate signals being the linear combination of the available demodulator frequencies.",
+        "Node": "/DEV8008/SIGOUTS/5/ENABLES/1",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/5/OFFSET": {
+        "Description": "Defines the DC voltage that is added to the dynamic part of the output signal.",
+        "Node": "/DEV8008/SIGOUTS/5/OFFSET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/5/ON": {
+        "Description": "Enabling/Disabling the Signal Output. Corresponds to the blue LED indicator on the instrument front panel.",
+        "Node": "/DEV8008/SIGOUTS/5/ON",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/SIGOUTS/6/AMPLITUDES/0": {
+        "Description": "Sets the peak amplitude that the oscillator assigned to the given demodulation channel contributes to the signal output.",
+        "Node": "/DEV8008/SIGOUTS/6/AMPLITUDES/0",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/6/AMPLITUDES/1": {
+        "Description": "Sets the peak amplitude that the oscillator assigned to the given demodulation channel contributes to the signal output.",
+        "Node": "/DEV8008/SIGOUTS/6/AMPLITUDES/1",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/6/DELAY": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/SIGOUTS/6/DELAY",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "/DEV8008/SIGOUTS/6/ENABLES/0": {
+        "Description": "Enables individual output signal amplitude. When the MD option is used, it is possible to generate signals being the linear combination of the available demodulator frequencies.",
+        "Node": "/DEV8008/SIGOUTS/6/ENABLES/0",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/6/ENABLES/1": {
+        "Description": "Enables individual output signal amplitude. When the MD option is used, it is possible to generate signals being the linear combination of the available demodulator frequencies.",
+        "Node": "/DEV8008/SIGOUTS/6/ENABLES/1",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/6/OFFSET": {
+        "Description": "Defines the DC voltage that is added to the dynamic part of the output signal.",
+        "Node": "/DEV8008/SIGOUTS/6/OFFSET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/6/ON": {
+        "Description": "Enabling/Disabling the Signal Output. Corresponds to the blue LED indicator on the instrument front panel.",
+        "Node": "/DEV8008/SIGOUTS/6/ON",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/SIGOUTS/7/AMPLITUDES/0": {
+        "Description": "Sets the peak amplitude that the oscillator assigned to the given demodulation channel contributes to the signal output.",
+        "Node": "/DEV8008/SIGOUTS/7/AMPLITUDES/0",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/7/AMPLITUDES/1": {
+        "Description": "Sets the peak amplitude that the oscillator assigned to the given demodulation channel contributes to the signal output.",
+        "Node": "/DEV8008/SIGOUTS/7/AMPLITUDES/1",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/7/DELAY": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/SIGOUTS/7/DELAY",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "/DEV8008/SIGOUTS/7/ENABLES/0": {
+        "Description": "Enables individual output signal amplitude. When the MD option is used, it is possible to generate signals being the linear combination of the available demodulator frequencies.",
+        "Node": "/DEV8008/SIGOUTS/7/ENABLES/0",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/7/ENABLES/1": {
+        "Description": "Enables individual output signal amplitude. When the MD option is used, it is possible to generate signals being the linear combination of the available demodulator frequencies.",
+        "Node": "/DEV8008/SIGOUTS/7/ENABLES/1",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/7/OFFSET": {
+        "Description": "Defines the DC voltage that is added to the dynamic part of the output signal.",
+        "Node": "/DEV8008/SIGOUTS/7/OFFSET",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/SIGOUTS/7/ON": {
+        "Description": "Enabling/Disabling the Signal Output. Corresponds to the blue LED indicator on the instrument front panel.",
+        "Node": "/DEV8008/SIGOUTS/7/ON",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/STATS/CMDSTREAM/BANDWIDTH": {
+        "Description": "Command streaming bandwidth usage on the physical network connection between device and data server.",
+        "Node": "/DEV8008/STATS/CMDSTREAM/BANDWIDTH",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "Mbit/s"
+    },
+    "/DEV8008/STATS/CMDSTREAM/BYTESRECEIVED": {
+        "Description": "Number of bytes received on the command stream from the device since session start.",
+        "Node": "/DEV8008/STATS/CMDSTREAM/BYTESRECEIVED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "B"
+    },
+    "/DEV8008/STATS/CMDSTREAM/BYTESSENT": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/STATS/CMDSTREAM/BYTESSENT",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/STATS/CMDSTREAM/PACKETSLOST": {
+        "Description": "Number of command packets lost since device start. Command packets contain device settings that are sent to and received from the device.",
+        "Node": "/DEV8008/STATS/CMDSTREAM/PACKETSLOST",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/STATS/CMDSTREAM/PACKETSRECEIVED": {
+        "Description": "Number of packets received on the command stream from the device since session start.",
+        "Node": "/DEV8008/STATS/CMDSTREAM/PACKETSRECEIVED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/STATS/CMDSTREAM/PACKETSSENT": {
+        "Description": "Number of packets sent on the command stream to the device since session start.",
+        "Node": "/DEV8008/STATS/CMDSTREAM/PACKETSSENT",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/STATS/CMDSTREAM/PENDING": {
+        "Description": "Number of buffers ready for receiving command packets from the device.",
+        "Node": "/DEV8008/STATS/CMDSTREAM/PENDING",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/STATS/CMDSTREAM/PROCESSING": {
+        "Description": "Number of buffers being processed for command packets. Small values indicate proper performance. For a TCP/IP interface, command packets are sent using the TCP protocol.",
+        "Node": "/DEV8008/STATS/CMDSTREAM/PROCESSING",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/STATS/DATASTREAM/BANDWIDTH": {
+        "Description": "Data streaming bandwidth usage on the physical network connection between device and data server.",
+        "Node": "/DEV8008/STATS/DATASTREAM/BANDWIDTH",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "Mbit/s"
+    },
+    "/DEV8008/STATS/DATASTREAM/BYTESRECEIVED": {
+        "Description": "Number of bytes received on the data stream from the device since session start.",
+        "Node": "/DEV8008/STATS/DATASTREAM/BYTESRECEIVED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "B"
+    },
+    "/DEV8008/STATS/DATASTREAM/PACKETSLOST": {
+        "Description": "Number of data packets lost since device start. Data packets contain measurement data.",
+        "Node": "/DEV8008/STATS/DATASTREAM/PACKETSLOST",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/STATS/DATASTREAM/PACKETSRECEIVED": {
+        "Description": "Number of packets received on the data stream from the device since session start.",
+        "Node": "/DEV8008/STATS/DATASTREAM/PACKETSRECEIVED",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/STATS/DATASTREAM/PENDING": {
+        "Description": "Number of buffers ready for receiving data packets from the device.",
+        "Node": "/DEV8008/STATS/DATASTREAM/PENDING",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/STATS/DATASTREAM/PROCESSING": {
+        "Description": "Number of buffers being processed for data packets. Small values indicate proper performance. For a TCP/IP interface, data packets are sent using the UDP protocol.",
+        "Node": "/DEV8008/STATS/DATASTREAM/PROCESSING",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/STATS/PHYSICAL/FPGA/AUX": {
+        "Description": "Supply voltage of the FPGA.",
+        "Node": "/DEV8008/STATS/PHYSICAL/FPGA/AUX",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/FPGA/CORE": {
+        "Description": "Core voltage of the FPGA.",
+        "Node": "/DEV8008/STATS/PHYSICAL/FPGA/CORE",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/FPGA/TEMP": {
+        "Description": "Internal temperature of the FPGA.",
+        "Node": "/DEV8008/STATS/PHYSICAL/FPGA/TEMP",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "/DEV8008/STATS/PHYSICAL/TEMPERATURES/0": {
+        "Description": "Internal temperature measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/TEMPERATURES/0",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "/DEV8008/STATS/PHYSICAL/TEMPERATURES/1": {
+        "Description": "Internal temperature measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/TEMPERATURES/1",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "/DEV8008/STATS/PHYSICAL/TEMPERATURES/10": {
+        "Description": "Internal temperature measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/TEMPERATURES/10",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "/DEV8008/STATS/PHYSICAL/TEMPERATURES/11": {
+        "Description": "Internal temperature measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/TEMPERATURES/11",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "/DEV8008/STATS/PHYSICAL/TEMPERATURES/12": {
+        "Description": "Internal temperature measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/TEMPERATURES/12",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "/DEV8008/STATS/PHYSICAL/TEMPERATURES/13": {
+        "Description": "Internal temperature measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/TEMPERATURES/13",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "/DEV8008/STATS/PHYSICAL/TEMPERATURES/14": {
+        "Description": "Internal temperature measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/TEMPERATURES/14",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "/DEV8008/STATS/PHYSICAL/TEMPERATURES/15": {
+        "Description": "Internal temperature measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/TEMPERATURES/15",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "/DEV8008/STATS/PHYSICAL/TEMPERATURES/16": {
+        "Description": "Internal temperature measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/TEMPERATURES/16",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "/DEV8008/STATS/PHYSICAL/TEMPERATURES/17": {
+        "Description": "Internal temperature measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/TEMPERATURES/17",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "/DEV8008/STATS/PHYSICAL/TEMPERATURES/18": {
+        "Description": "Internal temperature measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/TEMPERATURES/18",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "/DEV8008/STATS/PHYSICAL/TEMPERATURES/19": {
+        "Description": "Internal temperature measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/TEMPERATURES/19",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "/DEV8008/STATS/PHYSICAL/TEMPERATURES/2": {
+        "Description": "Internal temperature measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/TEMPERATURES/2",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "/DEV8008/STATS/PHYSICAL/TEMPERATURES/20": {
+        "Description": "Internal temperature measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/TEMPERATURES/20",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "/DEV8008/STATS/PHYSICAL/TEMPERATURES/21": {
+        "Description": "Internal temperature measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/TEMPERATURES/21",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "/DEV8008/STATS/PHYSICAL/TEMPERATURES/22": {
+        "Description": "Internal temperature measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/TEMPERATURES/22",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "/DEV8008/STATS/PHYSICAL/TEMPERATURES/23": {
+        "Description": "Internal temperature measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/TEMPERATURES/23",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "/DEV8008/STATS/PHYSICAL/TEMPERATURES/24": {
+        "Description": "Internal temperature measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/TEMPERATURES/24",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "/DEV8008/STATS/PHYSICAL/TEMPERATURES/3": {
+        "Description": "Internal temperature measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/TEMPERATURES/3",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "/DEV8008/STATS/PHYSICAL/TEMPERATURES/4": {
+        "Description": "Internal temperature measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/TEMPERATURES/4",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "/DEV8008/STATS/PHYSICAL/TEMPERATURES/5": {
+        "Description": "Internal temperature measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/TEMPERATURES/5",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "/DEV8008/STATS/PHYSICAL/TEMPERATURES/6": {
+        "Description": "Internal temperature measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/TEMPERATURES/6",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "/DEV8008/STATS/PHYSICAL/TEMPERATURES/7": {
+        "Description": "Internal temperature measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/TEMPERATURES/7",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "/DEV8008/STATS/PHYSICAL/TEMPERATURES/8": {
+        "Description": "Internal temperature measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/TEMPERATURES/8",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "/DEV8008/STATS/PHYSICAL/TEMPERATURES/9": {
+        "Description": "Internal temperature measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/TEMPERATURES/9",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "/DEV8008/STATS/PHYSICAL/VOLTAGES/0": {
+        "Description": "Internal voltage measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/VOLTAGES/0",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/VOLTAGES/1": {
+        "Description": "Internal voltage measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/VOLTAGES/1",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/VOLTAGES/10": {
+        "Description": "Internal voltage measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/VOLTAGES/10",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/VOLTAGES/11": {
+        "Description": "Internal voltage measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/VOLTAGES/11",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/VOLTAGES/12": {
+        "Description": "Internal voltage measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/VOLTAGES/12",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/VOLTAGES/13": {
+        "Description": "Internal voltage measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/VOLTAGES/13",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/VOLTAGES/14": {
+        "Description": "Internal voltage measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/VOLTAGES/14",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/VOLTAGES/15": {
+        "Description": "Internal voltage measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/VOLTAGES/15",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/VOLTAGES/16": {
+        "Description": "Internal voltage measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/VOLTAGES/16",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/VOLTAGES/17": {
+        "Description": "Internal voltage measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/VOLTAGES/17",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/VOLTAGES/18": {
+        "Description": "Internal voltage measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/VOLTAGES/18",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/VOLTAGES/19": {
+        "Description": "Internal voltage measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/VOLTAGES/19",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/VOLTAGES/2": {
+        "Description": "Internal voltage measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/VOLTAGES/2",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/VOLTAGES/20": {
+        "Description": "Internal voltage measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/VOLTAGES/20",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/VOLTAGES/21": {
+        "Description": "Internal voltage measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/VOLTAGES/21",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/VOLTAGES/22": {
+        "Description": "Internal voltage measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/VOLTAGES/22",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/VOLTAGES/23": {
+        "Description": "Internal voltage measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/VOLTAGES/23",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/VOLTAGES/24": {
+        "Description": "Internal voltage measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/VOLTAGES/24",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/VOLTAGES/25": {
+        "Description": "Internal voltage measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/VOLTAGES/25",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/VOLTAGES/26": {
+        "Description": "Internal voltage measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/VOLTAGES/26",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/VOLTAGES/27": {
+        "Description": "Internal voltage measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/VOLTAGES/27",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/VOLTAGES/28": {
+        "Description": "Internal voltage measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/VOLTAGES/28",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/VOLTAGES/29": {
+        "Description": "Internal voltage measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/VOLTAGES/29",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/VOLTAGES/3": {
+        "Description": "Internal voltage measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/VOLTAGES/3",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/VOLTAGES/30": {
+        "Description": "Internal voltage measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/VOLTAGES/30",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/VOLTAGES/31": {
+        "Description": "Internal voltage measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/VOLTAGES/31",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/VOLTAGES/4": {
+        "Description": "Internal voltage measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/VOLTAGES/4",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/VOLTAGES/5": {
+        "Description": "Internal voltage measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/VOLTAGES/5",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/VOLTAGES/6": {
+        "Description": "Internal voltage measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/VOLTAGES/6",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/VOLTAGES/7": {
+        "Description": "Internal voltage measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/VOLTAGES/7",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/VOLTAGES/8": {
+        "Description": "Internal voltage measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/VOLTAGES/8",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATS/PHYSICAL/VOLTAGES/9": {
+        "Description": "Internal voltage measurements.",
+        "Node": "/DEV8008/STATS/PHYSICAL/VOLTAGES/9",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/STATUS/ADC0MAX": {
+        "Description": "The maximum value on Signal Input 1 (ADC0) during 100 ms.",
+        "Node": "/DEV8008/STATUS/ADC0MAX",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/STATUS/ADC0MIN": {
+        "Description": "The minimum value on Signal Input 1 (ADC0) during 100 ms",
+        "Node": "/DEV8008/STATUS/ADC0MIN",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/STATUS/ADC1MAX": {
+        "Description": "The maximum value on Signal Input 2 (ADC1) during 100 ms.",
+        "Node": "/DEV8008/STATUS/ADC1MAX",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/STATUS/ADC1MIN": {
+        "Description": "The minimum value on Signal Input 2 (ADC1) during 100 ms",
+        "Node": "/DEV8008/STATUS/ADC1MIN",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/STATUS/FIFOLEVEL": {
+        "Description": "USB FIFO level: Indicates the USB FIFO fill level inside the device. When 100%, data is lost",
+        "Node": "/DEV8008/STATUS/FIFOLEVEL",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "/DEV8008/STATUS/FLAGS/BINARY": {
+        "Description": "A set of binary flags giving an indication of the state of various parts of the device. Bit 0: Signal Input 1 overflow, Bit 1: Signal Input 2 overflow (MFLI Current Input 1), Bit 2: Analog PLL fail, Bit 3: Output 1 DAC OK, Bit 4: Output 2 DAC OK, Bit 5: Signal Output 1 clipping, Bit 6: Signal Output 2 clipping, Bit 7: Ext Ref 1 Locked, Bit 8: Ext Ref 2 Locked, Bit 9:Ext Ref 3 Locked, Bit 10:Ext Ref 4 Locked, Bit 11: Sample Loss, Bits 12 - 13: Trigger In 1, Bits 14 - 15: Trigger In 2, Bits 16 - 17: Trigger In 3, Bits 18 - 19: Trigger In 4, Bit 20: PLL 1 locked, Bit 21: PLL 2 locked, Bit 22: PLL 3 locked, Bit 23: PLL 4 locked, Bit 24: Rubidium clock locked, Bit 25: AU Cartesian 1 Overflow, Bit 26: AU Cartesian 2 Overflow, Bit 27: AU Polar 1 Overflow, Bit 28: AU Polar 2 Overflow.",
+        "Node": "/DEV8008/STATUS/FLAGS/BINARY",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/STATUS/FLAGS/PACKETLOSSTCP": {
+        "Description": "Flag indicating if tcp packages have been lost.",
+        "Node": "/DEV8008/STATUS/FLAGS/PACKETLOSSTCP",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/STATUS/FLAGS/PACKETLOSSUDP": {
+        "Description": "Flag indicating if udp packages have been lost.",
+        "Node": "/DEV8008/STATUS/FLAGS/PACKETLOSSUDP",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/STATUS/TIME": {
+        "Description": "The current timestamp.",
+        "Node": "/DEV8008/STATUS/TIME",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/SYSTEM/ACTIVEINTERFACE": {
+        "Description": "Currently active interface of the device.",
+        "Node": "/DEV8008/SYSTEM/ACTIVEINTERFACE",
+        "Properties": "Read",
+        "Type": "CoreString",
+        "Unit": "None"
+    },
+    "/DEV8008/SYSTEM/BOARDREVISIONS/0": {
+        "Description": "Hardware revision of the FPGA base board",
+        "Node": "/DEV8008/SYSTEM/BOARDREVISIONS/0",
+        "Properties": "Read",
+        "Type": "CoreString",
+        "Unit": "None"
+    },
+    "/DEV8008/SYSTEM/BOARDREVISIONS/1": {
+        "Description": "Hardware revision of the analog board",
+        "Node": "/DEV8008/SYSTEM/BOARDREVISIONS/1",
+        "Properties": "Read",
+        "Type": "CoreString",
+        "Unit": "None"
+    },
+    "/DEV8008/SYSTEM/CALIB/AUTO": {
+        "Description": "Enables an automatic instrument self calibration about 16 min after start up. In order to guarantee the full specification, it is recommended to perform a self calibration after warm-up of the device.",
+        "Node": "/DEV8008/SYSTEM/CALIB/AUTO",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/SYSTEM/CALIB/CALIBRATE": {
+        "Description": "Initiates self calibration to improve input digitizer linearity.",
+        "Node": "/DEV8008/SYSTEM/CALIB/CALIBRATE",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/SYSTEM/CALIB/NEXT": {
+        "Description": "Remaining seconds until the first calibration is executed or a recalibration is requested.",
+        "Node": "/DEV8008/SYSTEM/CALIB/NEXT",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "s"
+    },
+    "/DEV8008/SYSTEM/CALIB/REQUIRED": {
+        "Description": "State of device self calibration.",
+        "Node": "/DEV8008/SYSTEM/CALIB/REQUIRED",
+        "Options": {
+            "0": "Device is warmed-up and self calibrated.",
+            "1": "It is recommended to manually execute a self calibration to assure operation according to specifications.",
+            "2": "Device is warming up and will automatically execute a self calibration after 16 minutes."
+        },
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/SYSTEM/CALIB/TEMPTHRESHOLD": {
+        "Description": "When the temperature changes by the specified amount, it is recommended to rerun the self calibration.",
+        "Node": "/DEV8008/SYSTEM/CALIB/TEMPTHRESHOLD",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "\u00b0C"
+    },
+    "/DEV8008/SYSTEM/CALIB/TIMEINTERVAL": {
+        "Description": "Time interval for which the self calibration is valid. After this time it is recommended to rerun the auto calibration.",
+        "Node": "/DEV8008/SYSTEM/CALIB/TIMEINTERVAL",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "s"
+    },
+    "/DEV8008/SYSTEM/EXTCLK": {
+        "Description": "10 MHz reference clock source.",
+        "Node": "/DEV8008/SYSTEM/EXTCLK",
+        "Options": {
+            "0": "Internal 10 MHz clock is used as the frequency and time base reference.",
+            "1": "An external 10-MHz clock is used as the frequency and time base reference. Provide a clean and stable 10 MHz reference to the appropriate back panel connector."
+        },
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/SYSTEM/FPGAREVISION": {
+        "Description": "HDL firmware revision",
+        "Node": "/DEV8008/SYSTEM/FPGAREVISION",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/SYSTEM/FWLOGENABLE": {
+        "Description": "Enables logging to the fwlog node.",
+        "Node": "/DEV8008/SYSTEM/FWLOGENABLE",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/SYSTEM/FWREVISION": {
+        "Description": "Revision of the device internal controller software",
+        "Node": "/DEV8008/SYSTEM/FWREVISION",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/SYSTEM/FX3REVISION": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/SYSTEM/FX3REVISION",
+        "Properties": "Read",
+        "Type": "CoreString",
+        "Unit": "None"
+    },
+    "/DEV8008/SYSTEM/JUMBO": {
+        "Description": "Enables jumbo frames (4k) on the TCP/IP interface. This will reduce the load on the PC and is required to achieve maximal throughput. Make sure that jumbo frames (4k) are enabled on the network card as well. If one of the devices on the network is not able to work with jumbo frames, the connection will fail.",
+        "Node": "/DEV8008/SYSTEM/JUMBO",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/SYSTEM/OWNER": {
+        "Description": "Returns the current owner of the device (IP).",
+        "Node": "/DEV8008/SYSTEM/OWNER",
+        "Properties": "Read",
+        "Type": "CoreString",
+        "Unit": "None"
+    },
+    "/DEV8008/SYSTEM/PORTTCP": {
+        "Description": "Returns the current TCP port used for communication to the dataserver.",
+        "Node": "/DEV8008/SYSTEM/PORTTCP",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/SYSTEM/PORTUDP": {
+        "Description": "Returns the current UDP port used for communication to the dataserver.",
+        "Node": "/DEV8008/SYSTEM/PORTUDP",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/SYSTEM/POWERCONFIGDATE": {
+        "Description": "Contains the date of power configuration (format is: (year << 16) | (month << 8) | day)",
+        "Node": "/DEV8008/SYSTEM/POWERCONFIGDATE",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/SYSTEM/PROPERTIES/FREQRESOLUTION": {
+        "Description": "The number of bits used to represent a frequency.",
+        "Node": "/DEV8008/SYSTEM/PROPERTIES/FREQRESOLUTION",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/SYSTEM/PROPERTIES/FREQSCALING": {
+        "Description": "The scale factor to use to convert a frequency represented as a freqresolution-bit integer to a floating point value.",
+        "Node": "/DEV8008/SYSTEM/PROPERTIES/FREQSCALING",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "/DEV8008/SYSTEM/PROPERTIES/MAXFREQ": {
+        "Description": "The maximum oscillator frequency that can be set.",
+        "Node": "/DEV8008/SYSTEM/PROPERTIES/MAXFREQ",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "/DEV8008/SYSTEM/PROPERTIES/MAXTIMECONSTANT": {
+        "Description": "The maximum demodulator time constant that can be set.",
+        "Node": "/DEV8008/SYSTEM/PROPERTIES/MAXTIMECONSTANT",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "/DEV8008/SYSTEM/PROPERTIES/MINFREQ": {
+        "Description": "The minimum oscillator frequency that can be set.",
+        "Node": "/DEV8008/SYSTEM/PROPERTIES/MINFREQ",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "/DEV8008/SYSTEM/PROPERTIES/MINTIMECONSTANT": {
+        "Description": "The minimum demodulator time constant that can be set.",
+        "Node": "/DEV8008/SYSTEM/PROPERTIES/MINTIMECONSTANT",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "/DEV8008/SYSTEM/PROPERTIES/NEGATIVEFREQ": {
+        "Description": "Indicates whether negative frequencies are supported.",
+        "Node": "/DEV8008/SYSTEM/PROPERTIES/NEGATIVEFREQ",
+        "Properties": "Read",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/SYSTEM/PROPERTIES/TIMEBASE": {
+        "Description": "Minimal time difference between two timestamps. Is equal to 1/(maximum sampling rate).",
+        "Node": "/DEV8008/SYSTEM/PROPERTIES/TIMEBASE",
+        "Properties": "Read",
+        "Type": "Double",
+        "Unit": "s"
+    },
+    "/DEV8008/SYSTEM/SAMPLECLK": {
+        "Description": "[empty]",
+        "Node": "/DEV8008/SYSTEM/SAMPLECLK",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "None"
+    },
+    "/DEV8008/SYSTEM/SAVEPORTS": {
+        "Description": "Flag indicating that the TCP and UDP ports should be saved.",
+        "Node": "/DEV8008/SYSTEM/SAVEPORTS",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/SYSTEM/STALL": {
+        "Description": "Indicates if the network connection is stalled.",
+        "Node": "/DEV8008/SYSTEM/STALL",
+        "Properties": "Read, Write",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/TRIGGERS/IN/0/IMP50": {
+        "Description": "Trigger input impedance: When on, the trigger input impedance is 50 Ohm, when off 1 k Ohm.",
+        "Node": "/DEV8008/TRIGGERS/IN/0/IMP50",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/TRIGGERS/IN/0/LEVEL": {
+        "Description": "Trigger voltage level at which the trigger input toggles between low and high. Use 50% amplitude for digital input and consider the trigger hysteresis.",
+        "Node": "/DEV8008/TRIGGERS/IN/0/LEVEL",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/TRIGGERS/IN/1/IMP50": {
+        "Description": "Trigger input impedance: When on, the trigger input impedance is 50 Ohm, when off 1 k Ohm.",
+        "Node": "/DEV8008/TRIGGERS/IN/1/IMP50",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/TRIGGERS/IN/1/LEVEL": {
+        "Description": "Trigger voltage level at which the trigger input toggles between low and high. Use 50% amplitude for digital input and consider the trigger hysteresis.",
+        "Node": "/DEV8008/TRIGGERS/IN/1/LEVEL",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/TRIGGERS/IN/2/IMP50": {
+        "Description": "Trigger input impedance: When on, the trigger input impedance is 50 Ohm, when off 1 k Ohm.",
+        "Node": "/DEV8008/TRIGGERS/IN/2/IMP50",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/TRIGGERS/IN/2/LEVEL": {
+        "Description": "Trigger voltage level at which the trigger input toggles between low and high. Use 50% amplitude for digital input and consider the trigger hysteresis.",
+        "Node": "/DEV8008/TRIGGERS/IN/2/LEVEL",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/TRIGGERS/IN/3/IMP50": {
+        "Description": "Trigger input impedance: When on, the trigger input impedance is 50 Ohm, when off 1 k Ohm.",
+        "Node": "/DEV8008/TRIGGERS/IN/3/IMP50",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/TRIGGERS/IN/3/LEVEL": {
+        "Description": "Trigger voltage level at which the trigger input toggles between low and high. Use 50% amplitude for digital input and consider the trigger hysteresis.",
+        "Node": "/DEV8008/TRIGGERS/IN/3/LEVEL",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/TRIGGERS/IN/4/IMP50": {
+        "Description": "Trigger input impedance: When on, the trigger input impedance is 50 Ohm, when off 1 k Ohm.",
+        "Node": "/DEV8008/TRIGGERS/IN/4/IMP50",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/TRIGGERS/IN/4/LEVEL": {
+        "Description": "Trigger voltage level at which the trigger input toggles between low and high. Use 50% amplitude for digital input and consider the trigger hysteresis.",
+        "Node": "/DEV8008/TRIGGERS/IN/4/LEVEL",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/TRIGGERS/IN/5/IMP50": {
+        "Description": "Trigger input impedance: When on, the trigger input impedance is 50 Ohm, when off 1 k Ohm.",
+        "Node": "/DEV8008/TRIGGERS/IN/5/IMP50",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/TRIGGERS/IN/5/LEVEL": {
+        "Description": "Trigger voltage level at which the trigger input toggles between low and high. Use 50% amplitude for digital input and consider the trigger hysteresis.",
+        "Node": "/DEV8008/TRIGGERS/IN/5/LEVEL",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/TRIGGERS/IN/6/IMP50": {
+        "Description": "Trigger input impedance: When on, the trigger input impedance is 50 Ohm, when off 1 k Ohm.",
+        "Node": "/DEV8008/TRIGGERS/IN/6/IMP50",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/TRIGGERS/IN/6/LEVEL": {
+        "Description": "Trigger voltage level at which the trigger input toggles between low and high. Use 50% amplitude for digital input and consider the trigger hysteresis.",
+        "Node": "/DEV8008/TRIGGERS/IN/6/LEVEL",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    },
+    "/DEV8008/TRIGGERS/IN/7/IMP50": {
+        "Description": "Trigger input impedance: When on, the trigger input impedance is 50 Ohm, when off 1 k Ohm.",
+        "Node": "/DEV8008/TRIGGERS/IN/7/IMP50",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None"
+    },
+    "/DEV8008/TRIGGERS/IN/7/LEVEL": {
+        "Description": "Trigger voltage level at which the trigger input toggles between low and high. Use 50% amplitude for digital input and consider the trigger hysteresis.",
+        "Node": "/DEV8008/TRIGGERS/IN/7/LEVEL",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "V"
+    }
+}

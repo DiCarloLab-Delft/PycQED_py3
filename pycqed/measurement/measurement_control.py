@@ -628,7 +628,7 @@ class MeasurementControl(Instrument):
                                           y=self.sweep_pts_y,
                                           z=self.TwoD_array[:, :, j],
                                           xlabel=slabels[0], xunit=sunits[0],
-                                          ylabel=sunits[1], yunit=sunits[1],
+                                          ylabel=slabels[1], yunit=sunits[1],
                                           zlabel=zlabels[j], zunit=zunits[j],
                                           subplot=j+1,
                                           cmap='viridis')

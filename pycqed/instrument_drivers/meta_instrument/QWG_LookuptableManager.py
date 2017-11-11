@@ -11,6 +11,7 @@ from qcodes.plots.pyqtgraph import QtPlot
 class QWG_LookuptableManager(Instrument):
 
     def __init__(self, name, QWG, **kw):
+        logging.warning('The QWG_LookuptableManager is deprecated.')
         logging.info(__name__ + ' : Initializing instrument')
         super().__init__(name, **kw)
         self.add_parameter('QWG', parameter_class=InstrumentParameter)

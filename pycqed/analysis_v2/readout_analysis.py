@@ -435,6 +435,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 'Residual Exc.: {:.1f}%\n'.format(
                     self.proc_data_dict['residual_excitation']*100)+
                 'SNR: {:.2f}'.format(self.proc_data_dict['SNR']))
+
             self.plot_dicts['rel_exc_msg'] = {
                 'ax_id': '1D_histogram',
                 'plotfn': self.plot_line,
