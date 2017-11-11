@@ -5,8 +5,7 @@ import logging
 from copy import deepcopy
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
-from qcodes.instrument.parameter import ManualParameter
-from pycqed.instrument_drivers.pq_parameters import InstrumentParameter
+from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter
 from pycqed.analysis import multiplexed_RO_analysis as mra
 from pycqed.measurement import detector_functions as det
 from pycqed.measurement import sweep_functions as swf
@@ -16,12 +15,12 @@ import pygsti
 
 from collections import defaultdict
 
-class DeviceCCL(Instrument):
 
+class DeviceCCL(Instrument):
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
 
-        self.msmt_suffix  = '_' + name
+        self.msmt_suffix = '_' + name
 
         self.add_parameter('qubits',
                            parameter_class=ManualParameter,
@@ -53,7 +52,6 @@ class DeviceCCL(Instrument):
                        ' future will be the CC_Light.'),
             parameter_class=InstrumentRefParameter)
 
-
         ro_acq_docstr = (
             'Determines what type of integration weights to use: '
             '\n\t SSB: Single sideband demodulation\n\t'
@@ -68,17 +66,20 @@ class DeviceCCL(Instrument):
                            parameter_class=ManualParameter)
 
         self.add_parameter('ro_qubits_list',
-                           vals=vals.List(),
+                           vals=vals.Lists(elt_validator=vals.Strings()),
                            parameter_class=ManualParameter,
                            docstring="Select which qubits to readout \
                                 by default detector. Empty list means all.",
                            initial_value=[])
 
-
     def prepare_for_timedomain(self):
         pass
 
     def _setup_qubits(self):
+        """
+        set the parameters of the individual qubits to be compatible
+        with multiplexed readout
+        """
 
         if self.ro_acq_weight_type() == 'optimal':
             nr_of_acquisition_channels_per_qubit = 1
@@ -90,12 +91,12 @@ class DeviceCCL(Instrument):
         for qb_name in self.qubits():
             qb = self.find_instrument(qb_name)
 
-            ### all qubits use the same acquisition type
+            # all qubits use the same acquisition type
             qb.ro_acq_weight_type(self.ro_acq_weight_type())
 
             acq_device = qb.instr_acquisition()
 
-            ### allocate different acquisition channels
+            # allocate different acquisition channels
             # use next available channel as I
             index = used_acq_channels[acq_device]
             used_acq_channels[acq_device] += 1
@@ -107,17 +108,37 @@ class DeviceCCL(Instrument):
                 used_acq_channels[acq_device] += 1
                 qb.ro_acq_weight_chQ(index)
 
-            ### set RO modulation to use common LO frequency
+            # set RO modulation to use common LO frequency
             qb.ro_freq_mod(qb.ro_freq() - self.ro_lo_freq())
 
-    def _prep_ro_instantiate_detectors(self):
-        # collect which channels belong to which qubit and make a fancy detector
+    def _setup_ro_lutmans(self):
+        """
+        set the combinations for all involved lutmans
+        to involve the qubits that are supposed to be read out.
+        """
 
-        channels_list = [] # tuples (instrumentname, channel, description)
-
+        combs = defaultdict(lambda: [[]])
 
         for qb_name in self.qubits():
-            if self.ro_qubits_list() and qb_rame not in self.ro_qubits_list():
+            qb = self.find_instrument(qb_name)
+            lutman_name = qb.instr_ro_lutman()
+            if self.ro_qubits_list() and qb_name not in self.ro_qubits_list():
+                continue
+            combs[lutman_name] = (combs[lutman_name] +
+                                  [c + [qb.ro_pulse_res_nr()]
+                                   for c in combs[lutman_name]])
+
+        for lutman_name in combs:
+            lutman = self.find_instrument(lutman_name)
+            lutman.resonator_combinations(combs[lutman_name])
+
+    def _prep_ro_instantiate_detectors(self):
+        # collect which channels belong to which qubit and make a detector
+
+        channels_list = []  # tuples (instrumentname, channel, description)
+
+        for qb_name in self.qubits():
+            if self.ro_qubits_list() and qb_name not in self.ro_qubits_list():
                 continue
 
             qb = self.find_instrument(qb_name)
@@ -134,11 +155,18 @@ class DeviceCCL(Instrument):
                 channels_list.append((acq_instr_name, ch_idx, qb_name + " Q"))
 
         # for now, implement only working with one UHFLI
-        acq_instruments = list(set([inst for inst,_ ,_ in channels_list]))
+        acq_instruments = list(set([inst for inst, _, _ in channels_list]))
         if len(acq_instruments) != 1:
-            raise NotImplementedError("Only one acquisition instrument supported")
+            raise NotImplementedError("Only one acquisition"
+                                      "instrument supported so far")
 
-        ro_ch_idx = [ch for _, ch ,_ in channels_list]
+        if self.ro_acq_weight_type() == 'optimal':
+            # todo: digitized mode
+            result_logging_mode = 'lin_trans'
+        else:
+            result_logging_mode = 'raw'
+
+        ro_ch_idx = [ch for _, ch, _ in channels_list]
         value_names = [n for _, _, n in channels_list]
 
         if 'UHFQC' in self.instr_acquisition():
@@ -176,8 +204,6 @@ class DeviceCCL(Instrument):
                 integration_length=self.ro_acq_integration_length())
 
             self.int_log_det.value_names = value_names
-
-
 
     def _prep_ro_sources(self):
         LO = self.instr_LO_ro.get_instr()
