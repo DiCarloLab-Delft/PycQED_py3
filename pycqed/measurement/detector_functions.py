@@ -43,11 +43,69 @@ class Detector_Function(object):
         pass
 
 
+class Multi_Detector(Detector_Function):
+    """
+    Combines several detectors of the same type (hard/soft) into a single
+    detector.
+    """
+
+    def __init__(self, detectors: list,
+                 det_idx_suffix: bool=True, **kw):
+        """
+        detectors     (list): a list of detectors to combine.
+        det_idx_suffix(bool): if True suffixes the value names with
+                "_det{idx}" where idx refers to the relevant detector.
+        """
+        self.detectors = detectors
+        self.name = 'Multi_detector'
+        self.value_names = []
+        self.value_units = []
+        for i, detector in enumerate(detectors):
+            for detector_value_name in detector.value_names:
+                if det_idx_suffix:
+                    detector_value_name += '_det{}'.format(i)
+                self.value_names.append(detector_value_name)
+            for detector_value_unit in detector.value_units:
+                self.value_units.append(detector_value_unit)
+
+        self.detector_control = self.detectors[0].detector_control
+        for d in self.detectors:
+            if d.detector_control != self.detector_control:
+                raise ValueError('All detectors should be of the same type')
+
+    def prepare(self, **kw):
+        for detector in self.detectors:
+            detector.prepare(**kw)
+
+    def get_values(self):
+        values_list = []
+        for detector in self.detectors:
+            new_values = detector.get_values()
+            values_list.append(new_values)
+        values = np.concatenate(values_list)
+        return values
+
+    def acquire_data_point(self):
+        # N.B. get_values and acquire_data point are virtually identical.
+        # the only reason for their existence is a historical distinction
+        # between hard and soft detectors that leads to some confusing data
+        # shape related problems, hence the append vs concatenate
+        values = []
+        for detector in self.detectors:
+            new_values = detector.acquire_data_point()
+            values = np.append(values, new_values)
+        return values
+
+    def finish(self):
+        for detector in self.detectors:
+            detector.finish()
+
 ###############################################################################
 ###############################################################################
 ####################             None Detector             ####################
 ###############################################################################
 ###############################################################################
+
 
 class None_Detector(Detector_Function):
 
