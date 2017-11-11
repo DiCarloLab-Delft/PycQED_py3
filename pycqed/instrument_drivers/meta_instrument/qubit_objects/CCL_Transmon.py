@@ -695,7 +695,7 @@ class CCLight_Transmon(Qubit):
                       self.ro_pulse_down_phi1())
 
             ro_lm.acquisition_delay(self.ro_acq_delay())
-            ro_lm.load_DIO_triggered_sequence_onto_UHFQC()
+            ro_lm.load_DIO_triggered_sequence_onto_UHFQC(hardcode_cases=[])
 
             UHFQC.sigouts_0_offset(self.ro_pulse_mixer_offs_I())
             UHFQC.sigouts_1_offset(self.ro_pulse_mixer_offs_Q())
@@ -1234,7 +1234,7 @@ class CCLight_Transmon(Qubit):
         # be swept
         Din = self.mw_vsm_ch_Din()
         D_par = VSM.parameters['in{}_out{}_att'.format(Din, out)]
-        s = swf.two_par_joint_sweep(G_par, D_par)
+        s = swf.two_par_joint_sweep(G_par, D_par, preserve_ratio=True)
         self.instr_CC.get_instr().upload_instructions(p.filename)
         MC.set_sweep_function(s)
         MC.set_sweep_points(atts)

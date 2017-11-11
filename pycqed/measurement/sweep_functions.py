@@ -849,7 +849,7 @@ class two_par_joint_sweep(Soft_Sweep):
     Allows jointly sweeping two parameters while preserving their
     respective ratios.
     """
-    def __init__(self, par_A, par_B, **kw):
+    def __init__(self, par_A, par_B, preserve_ratio: bool=True, **kw):
         self.set_kw()
         self.name = par_A.name
         self.parameter_name = par_A.name
@@ -858,10 +858,14 @@ class two_par_joint_sweep(Soft_Sweep):
 
         self.par_A = par_A
         self.par_B = par_B
-        try:
-            self.par_ratio = self.par_B.get()/self.par_A.get()
-        except NotImplementedError:
-            self.par_ratio = self.par_B.get_latest()/self.par_A.get_latest()
+        if preserve_ratio:
+            try:
+                self.par_ratio = self.par_B.get()/self.par_A.get()
+            except NotImplementedError:
+                self.par_ratio = (self.par_B.get_latest()/
+                                  self.par_A.get_latest())
+        else:
+            self.par_ratio = 1
 
     def set_parameter(self, val):
         self.par_A.set(val)
