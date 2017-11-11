@@ -23,7 +23,7 @@ def single_flux_pulse_seq(qubit_indices: tuple,
     k.gate('fl_cw_02', qubit_indices[0], qubit_indices[1])
     p.add_kernel(k)
     p.compile()
-    # attribute get's added to program to help finding the output files
+    # attribute is added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
@@ -48,7 +48,7 @@ def flux_staircase_seq(platf_cfg: str):
 
     p.add_kernel(k)
     p.compile()
-    # attribute get's added to program to help finding the output files
+    # attribute is added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
@@ -68,7 +68,7 @@ def two_qubit_off_on(q0: int, q1: int, platf_cfg: str):
                 p=platf)
     p = add_two_q_cal_points(p, platf=platf, q0=0, q1=1)
     p.compile()
-    # attribute get's added to program to help finding the output files
+    # attribute is added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
@@ -117,7 +117,7 @@ def two_qubit_tomo_cardinal(cardinal: int, q0: int, q1: int, platf_cfg: str):
     # is important or even necessary here.
     p = add_two_q_cal_points(p, platf=platf, q0=0, q1=1, reps_per_cal_pt=7)
     p.compile()
-    # attribute get's added to program to help finding the output files
+    # attribute is added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
@@ -227,7 +227,7 @@ def two_qubit_AllXY(q0: int, q1: int, platf_cfg: str,
         p.add_kernel(k)
 
     p.compile()
-    # attribute get's added to program to help finding the output files
+    # attribute is added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
