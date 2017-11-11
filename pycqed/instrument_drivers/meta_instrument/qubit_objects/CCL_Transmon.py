@@ -695,7 +695,7 @@ class CCLight_Transmon(Qubit):
                       self.ro_pulse_down_phi1())
 
             ro_lm.acquisition_delay(self.ro_acq_delay())
-            ro_lm.load_DIO_triggered_sequence_onto_UHFQC(hardcode_cases=[])
+            ro_lm.load_DIO_triggered_sequence_onto_UHFQC()
 
             UHFQC.sigouts_0_offset(self.ro_pulse_mixer_offs_I())
             UHFQC.sigouts_1_offset(self.ro_pulse_mixer_offs_Q())
@@ -751,6 +751,7 @@ class CCLight_Transmon(Qubit):
         self.prepare_readout()
         self._prep_td_sources()
         self._prep_mw_pulses()
+        self._prep_td_configure_VSM()
 
     def _prep_td_sources(self):
         self.instr_spec_source.get_instr().off()
@@ -787,7 +788,6 @@ class CCLight_Transmon(Qubit):
         if self.cfg_prepare_mw_awg():
             MW_LutMan.load_waveforms_onto_AWG_lookuptable()
 
-        self._prep_td_configure_VSM()
 
         # N.B. This part is AWG8 specific
         AWG = MW_LutMan.AWG.get_instr()
@@ -1308,7 +1308,7 @@ class CCLight_Transmon(Qubit):
         nested_MC.run(name='gate_tuneup_allxy', mode='adaptive')
         ma.OptimizationAnalysis(label='gate_tuneup_allxy')
 
-    def calibrate_deletion_pulse_transients(
+    def calibrate_depletion_pulse_transients(
             self, nested_MC=None, amp0=None,
             amp1=None, phi0=180, phi1=0, initial_steps=None, two_par=True,
             depletion_optimization_window=None, depletion_analysis_plot=False):
@@ -1596,6 +1596,36 @@ class CCLight_Transmon(Qubit):
         a = ma.Echo_analysis(label='echo', auto=True, close_fig=True)
         if update:
             self.T2_echo(a.fit_res.params['tau'].value)
+        return a
+
+    def measure_flipping(self, number_of_flips=np.arange(20), equator=False,
+                          MC=None, analyze=True, close_fig=True, update=True):
+
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        # append the calibration points, times are for location in plot
+
+        nf = np.array(number_of_flips)
+        dn = nf[1] - nf[0]
+        nf = np.concatenate([nf,
+                                (nf[-1]+1*dn,
+                                 nf[-1]+2*dn,
+                                    nf[-1]+3*dn,
+                                    nf[-1]+4*dn)])
+
+        self.prepare_for_timedomain()
+        p = sqo.flipping(number_of_flips=nf, equator=equator,
+                         qubit_idx=self.cfg_qubit_nr(),
+                         platf_cfg=self.cfg_openql_platform_fn())
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr())
+        d = self.int_avg_det
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(nf)
+        MC.set_detector_function(d)
+        MC.run('flipping'+self.msmt_suffix)
+        a = ma.MeasurementAnalysis(auto=True, close_fig=True)
         return a
 
     def measure_randomized_benchmarking(self, nr_cliffords=2**np.arange(12),
