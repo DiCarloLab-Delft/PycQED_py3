@@ -111,9 +111,11 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         """
         self.add_parameter('sq_amp', initial_value=.5,
                            # units is part of the total range of AWG8
+                           label='Square pulse amplitude',
                            unit='a.u.', vals=vals.Numbers(),
                            parameter_class=ManualParameter)
         self.add_parameter('sq_length', unit='s',
+                           label='Square pulse length',
                            initial_value=40e-9,
                            vals=vals.Numbers(0, 12e-6),
                            # 12us is current max of AWG8
