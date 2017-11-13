@@ -1,3 +1,5 @@
+import lmfit
+from collections import OrderedDict
 import pycqed.analysis_v2.base_analysis as ba
 import pycqed.measurement.waveform_control_CC.waveform as wf
 import pycqed.analysis.fitting_models as fit_mods
@@ -63,9 +65,26 @@ class RamZFluxArc(ba.BaseDataAnalysis):
         self.proc_data_dict['FFT_yvals'] = freqs
         self.proc_data_dict['FFT_ylabel'] = 'Frequency'
         self.proc_data_dict['FFT_yunit'] = 'Hz'
-
         self.proc_data_dict['FFT_zlabel'] = 'Magnitude'
         self.proc_data_dict['FFT_zunit'] = 'a.u.'
+
+        FFT_peak_idx = []
+        for i in range(np.shape(self.proc_data_dict['FFT'])[0]):
+            FFT_peak_idx.append(np.argmax(
+                self.proc_data_dict['FFT'][i, :len(freqs)//2]))
+        self.proc_data_dict['FFT_peak_idx'] = FFT_peak_idx
+        self.proc_data_dict['FFT_peak_freqs'] = freqs[FFT_peak_idx]
+
+    def prepare_fitting(self):
+        self.fit_dicts = OrderedDict()
+        start_fit_idx = self.options_dict.get('start_fit_idx', 0)
+        stop_fit_idx = self.options_dict.get('stop_fit_idx', -1)
+
+        self.fit_dicts['parabola_fit'] = {
+            'model': lmfit.models.PolynomialModel(degree=2),
+            'fit_xvals': {'x': self.raw_data_dict['xvals'][start_fit_idx:stop_fit_idx]},
+            'fit_yvals': {'data':
+                self.proc_data_dict['FFT_peak_freqs'][start_fit_idx:stop_fit_idx]}}
 
     def prepare_plots(self):
         self.plot_dicts['raw_data'] = {
@@ -96,6 +115,31 @@ class RamZFluxArc(ba.BaseDataAnalysis):
             'zlabel': self.proc_data_dict['FFT_zlabel'],
             'zunit': self.proc_data_dict['FFT_zunit'],
             'do_legend': True, }
+
+        self.plot_dicts['fourier_peaks'] = {
+            'plotfn': self.plot_line,
+            'xvals': self.raw_data_dict['xvals'],
+            'yvals': self.proc_data_dict['FFT_peak_freqs'],
+            'ax_id': 'fourier_data',
+            'marker': 'o',
+            'line_kws': {'color': 'C1', 'markersize': 5,
+                         'markeredgewidth': .2,
+                         'markerfacecolor': 'None'},
+            'linestyle': '',
+            'setlabel': 'Fourier maxima', 'do_legend': True,
+            'legend_pos': 'right'}
+
+        if self.do_fitting:
+            self.plot_dicts['parabola_fit'] = {
+                'ax_id': 'fourier_data',
+                'plotfn': self.plot_fit,
+                'fit_res': self.fit_dicts['parabola_fit']['fit_res'],
+                'plot_init': self.options_dict['plot_init'],
+                'setlabel': 'parabola fit',
+                'do_legend': True,
+                'line_kws': {'color': 'C3'},
+
+                'legend_pos': 'upper right'}
 
 
 class RamZAnalysisInterleaved(ba.BaseDataAnalysis):
