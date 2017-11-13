@@ -20,6 +20,7 @@ try:
 except ImportError as e:
     logging.warning('Could not import qutip, tomo code will not work')
 import itertools
+from pycqed.analysis_v2 import pytomo as csdp_tomo
 
 comp_projectors = [qt.ket2dm(qt.tensor(qt.basis(2,0), qt.basis(2,0))),
                   qt.ket2dm(qt.tensor(qt.basis(2,0), qt.basis(2,1))),

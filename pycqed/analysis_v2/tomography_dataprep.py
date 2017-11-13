@@ -1,9 +1,6 @@
 import sys  
 #custom made toolboxes
 sys.path.append('D:\\Repository\\PycQED_py3\\pycqed')
-
-
-from analysis import tomography_toolbox as tomography
 import os
 import time
 from imp import reload
@@ -11,7 +8,6 @@ from matplotlib import pyplot as plt
 import numpy as np
 from analysis import measurement_analysis as MA 
 from analysis import ramiro_analysis as RA
-from analysis import thresholding_toolbox as thresholding
 from analysis import fitting_models as fit_mods
 import lmfit
 import scipy as scipy
@@ -43,13 +39,15 @@ class TomoPrep():
 				 shots_q1,
 				 start_calliration_index =36,
 				 no_of_tomographic_rotations=36, 
-				 no_of_repetitions_callibration =7):
+				 no_of_repetitions_callibration =7,
+				 make_figures_flag = False):
 
 		self.start_calliration_index = start_calliration_index
 		self.no_of_tomographic_rotations = no_of_tomographic_rotations
 		self.no_of_repetitions_callibration = no_of_repetitions_callibration
 		self.shots_q0 = shots_q0
 		self.shots_q1 = shots_q1
+		self.make_figures_flag = make_figures_flag
 
 	def histogram_shots(self, shots):
 		hist, bins = np.histogram(shots, bins=100, normed=True)
@@ -66,7 +64,7 @@ class TomoPrep():
 	def make_figures(self, hist, centers, show_guess = False, make_figures_flag = False):
 		fit_res = self.fit_data(hist,centers)
 			
-		if make_figures_flag==False:
+		if self.make_figures_flag==True:
 			fig, ax = plt.subplots(figsize=(5, 3))
 			width = .7 * (centers[1]-centers[0])
 		  
@@ -119,16 +117,17 @@ class TomoPrep():
 		x1 = np.linspace(np.min(self.shots_q0.flatten()),np.amax(self.shots_q0.flatten()),100)
 		#extract_threshold
 		th0 = x1[np.argmax(np.subtract(erf1_q0,erf2_q0))]
-		# plt.figure(1)
-		# plt.subplot(211)
-		# plt.plot(x1,erf1_q0)
-		# plt.xlim([np.min(shots_q0),np.amax(shots_q0)])
-		# plt.plot(x1,erf2_q0)
-		# plt.xlim([np.min(shots_q0),np.amax(shots_q0)])
-		
+		if self.make_figures_flag == True:
+			plt.figure(1)
+			plt.subplot(211)
+			plt.plot(x1,erf1_q0)
+			plt.xlim([np.min(shots_q0),np.amax(shots_q0)])
+			plt.plot(x1,erf2_q0)
+			plt.xlim([np.min(shots_q0),np.amax(shots_q0)])
+			
 
-		# plt.axvline(th0, color='r')
-		# plt.show()               
+			plt.axvline(th0, color='r')
+			plt.show()               
 						
 		#For q1 Fit Two gaussians 
 		hist2, bins2, centers2 = self.histogram_shots(self.shots_q1.flatten())
@@ -149,16 +148,17 @@ class TomoPrep():
 		#Plot the s-curve
 		x2 = np.linspace(np.min(self.shots_q1.flatten()),np.amax(self.shots_q1.flatten()),100)
 		th1 = x2[np.argmax(np.subtract(erf1_q1,erf2_q1))]
-		# plt.subplot(212)
-		# plt.plot(x2,erf1_q1)
-		# plt.xlim([np.min(shots_q1),np.amax(shots_q1)])
-		# plt.plot(x2,erf2_q1)
-		# plt.xlim([np.min(shots_q1),np.amax(shots_q1)])
-		# #extract_threshold
-		
+		if self.make_figures_flag == True:
+			plt.subplot(212)
+			plt.plot(x2,erf1_q1)
+			plt.xlim([np.min(shots_q1),np.amax(shots_q1)])
+			plt.plot(x2,erf2_q1)
+			plt.xlim([np.min(shots_q1),np.amax(shots_q1)])
+			#extract_threshold
+			
 
-		# plt.axvline(th1, color='r')
-		# plt.show()               
+			plt.axvline(th1, color='r')
+			plt.show()               
 
 		return th0, th1
 
@@ -249,4 +249,3 @@ class TomoPrep():
 		
 		return comp_projectors,counts_tomo
 	
-
