@@ -395,7 +395,7 @@ class MeasurementAnalysis(object):
                         figsize=(3.375, 2.25*len(self.value_names)), dpi=self.dpi)
                 else:
                     fig, axs = plt.subplots(
-                        nrows=max(len(self.value_names)), ncols=1,
+                        nrows=len(self.value_names), ncols=1,
                         figsize=(7, 4*len(self.value_names)), dpi=self.dpi)
                     # figsize=(min(6*len(self.value_names), 11),
                     #          1.5*len(self.value_names)))

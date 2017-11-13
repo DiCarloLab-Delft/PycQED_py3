@@ -408,7 +408,7 @@ class ZI_HDAWG8(ZI_base_instrument):
                                                timeout=self.timeout())
         else:  # if protocol is flux
             for ch in awg_channels:
-                waveform_table = '// Define the waveform table\n'
+                waveform_table = '//Flux mode\n// Define the waveform table\n'
                 mask_0 = 0b000111  # AWGx_ch0 uses lower bits for CW
                 mask_1 = 0b111000  # AWGx_ch1 uses higher bits for CW
 

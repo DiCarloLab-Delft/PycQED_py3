@@ -327,7 +327,7 @@ class DeviceCCL(Instrument):
         for qb_name in self.qubits():
             qb = self.find_instrument(qb_name)
             VSM = qb.instr_VSM.get_instr()
-            VSM.set_all_switches('OFF')
+            VSM.set_all_switches_to('OFF')
 
         # turn the desired channels on
         for qb_name in self.qubits():
@@ -351,7 +351,7 @@ class DeviceCCL(Instrument):
 
             self.instr_CC.get_instr().set(
                 'vsm_channel_delay{}'.format(qb.cfg_qubit_nr()),
-                self.mw_vsm_delay())
+                qb.mw_vsm_delay())
 
     def prepare_for_timedomain(self):
         self.prepare_readout()
@@ -363,7 +363,7 @@ class DeviceCCL(Instrument):
 
         self._prep_td_configure_VSM()
 
-    def measure_two_qubit_AllXY(self, q0, q1,
+    def measure_two_qubit_AllXY(self, q0: str, q1: str,
                                 sequence_type='sequential',
                                 replace_q1_pulses_X180: bool=False,
                                 analyze=True, close_fig=True,
@@ -389,7 +389,7 @@ class DeviceCCL(Instrument):
                              CCL=self.instr_CC.get_instr())
         d = self.int_avg_det
         MC.set_sweep_function(s)
-        MC.set_sweep_points(np.arange(42*2))
+        MC.set_sweep_points(np.arange(42))
         MC.set_detector_function(d)
         MC.run('TwoQubitAllXY_{}_{}_{}'.format(q0, q1, self.msmt_suffix))
         if analyze:

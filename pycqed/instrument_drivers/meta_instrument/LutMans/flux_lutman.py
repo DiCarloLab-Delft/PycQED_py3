@@ -115,7 +115,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                            parameter_class=ManualParameter)
         self.add_parameter('sq_length', unit='s',
                            initial_value=40e-9,
-                           vals=vals.Numbers(20e-9, 12e-6),
+                           vals=vals.Numbers(0, 12e-6),
                            # 12us is current max of AWG8
                            parameter_class=ManualParameter)
 
