@@ -201,9 +201,9 @@ class TomoAnalysis():
 
         # If the tomography bins have zero counts, they not satisfy gaussian noise. If N>>1 then turning them into 1 fixes 
         # convergence problems without screwing the total statistics/estimate.
-        if(np.sum(np.where(np.array(counts_tomo) == 0)) > 0):
-                print("WARNING: Some bins contain zero counts, this violates gaussian assumptions. \n \
-                        If correct_zero_count_bins=True these will be set to 1 to minimize errors")
+        # if(np.sum(np.where(np.array(counts_tomo) == 0)) > 0):
+                # print("WARNING: Some bins contain zero counts, this violates gaussian assumptions. \n \
+                        # If correct_zero_count_bins=True these will be set to 1 to minimize errors")
         if correct_zero_count_bins:
             counts_tomo = np.array([[int(b) if b > 0 else  1 for b in bin_counts] for bin_counts in counts_tomo])
 
@@ -228,14 +228,14 @@ class TomoAnalysis():
         a = time.time()
         rho_nathan = csdp_tomo.tomo_state(data, measurement_vector, weights)
         b=time.time()-a
-        print("time solving csdp: ", b)
-        print(rho_nathan)
+        # print("time solving csdp: ", b)
+        # print(rho_nathan)
         n_estimate = rho_nathan.trace()
-        print(n_estimate)
+        # print(n_estimate)
         rho = qt.Qobj(rho_nathan / n_estimate,dims=self.qt_dims)
         
-        if((np.abs(N_total - n_estimate) / N_total > 0.03)):
-            print('WARNING estimated N(%d) is not close to provided N(%d) '% (n_estimate,N_total))
+        # if((np.abs(N_total - n_estimate) / N_total > 0.03)):
+            # print('WARNING estimated N(%d) is not close to provided N(%d) '% (n_estimate,N_total))
 
         if calc_chi_squared:
             chi_squared = self._state_tomo_goodness_of_fit(rho, data, N, measurement_vector)
