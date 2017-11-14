@@ -66,7 +66,7 @@ def two_qubit_off_on(q0: int, q1: int, platf_cfg: str):
     platf = Platform('OpenQL_Platform', platf_cfg)
     p = Program(pname="two_qubit_off_on", nqubits=platf.get_qubit_number(),
                 p=platf)
-    p = add_two_q_cal_points(p, platf=platf, q0=0, q1=1)
+    p = add_two_q_cal_points(p, platf=platf, q0=q0, q1=q1)
     p.compile()
     # attribute is added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
@@ -676,8 +676,12 @@ def add_two_q_cal_points(p, platf, q0: int, q1: int,
         k.prepz(q1)
         if comb[0] == '1':
             k.gate('rx180', q0)
+        else:
+            k.gate('i', q0)
         if comb[1] == '1':
             k.gate('rx180', q1)
+        else:
+            k.gate('i', q1)
         k.measure(q0)
         k.measure(q1)
         kernel_list.append(k)
