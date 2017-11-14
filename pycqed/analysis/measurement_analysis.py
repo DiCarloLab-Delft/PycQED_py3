@@ -392,13 +392,13 @@ class MeasurementAnalysis(object):
                 if self.no_of_columns == 2:
                     fig, axs = plt.subplots(
                         nrows=int(len(self.value_names)/2), ncols=2,
-                        figsize=(3.375, 2.25*len(self.value_names)), dpi=self.dpi)
+                        figsize=(3.375, 2.25*len(self.value_names)),
+                        dpi=self.dpi)
                 else:
                     fig, axs = plt.subplots(
                         nrows=len(self.value_names), ncols=1,
                         figsize=(7, 4*len(self.value_names)), dpi=self.dpi)
-                    # figsize=(min(6*len(self.value_names), 11),
-                    #          1.5*len(self.value_names)))
+
             else:
                 if self.no_of_columns == 2:
                     fig, axs = plt.subplots(max(len(self.value_names), 1), 1,
@@ -415,9 +415,9 @@ class MeasurementAnalysis(object):
             for i in range(len(self.value_names)):
                 if len(self.value_names) == 1:
                     ax = axs
-                elif len(self.value_names) == 2:
-                    ax = axs[i % 2]
-                elif len(self.value_names) == 4:
+                elif self.no_of_columns == 1:
+                    ax = axs[i]
+                elif self.no_of_columns == 2:
                     ax = axs[i//2, i % 2]
                 else:
                     ax = axs[i]  # If not 2 or 4 just gives a list of plots
@@ -426,7 +426,11 @@ class MeasurementAnalysis(object):
                 else:
                     plot_title = kw.pop('plot_title', self.measurementstring +
                                         '\n' + self.timestamp_string)
-                ax.ticklabel_format(useOffset=False)
+                try:
+                    ax.ticklabel_format(useOffset=False)
+                except AttributeError:
+                    # only mpl scalar formatters support this feature
+                    pass
 
                 self.plot_results_vs_sweepparam(x=self.sweep_points,
                                                 y=self.measured_values[i],
