@@ -1,6 +1,4 @@
-import sys  
-#custom made toolboxes
-sys.path.append('D:\\Repository\\PycQED_py3\\pycqed')
+
 import os
 import time
 from imp import reload
