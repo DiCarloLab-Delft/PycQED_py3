@@ -18,6 +18,7 @@ from collections import defaultdict
 
 
 class DeviceCCL(Instrument):
+
     def __init__(self, name, **kw):
         super().__init__(name, **kw)
 
@@ -27,11 +28,6 @@ class DeviceCCL(Instrument):
                            parameter_class=ManualParameter,
                            initial_value=[],
                            vals=vals.Lists(elt_validator=vals.Strings()))
-
-        self.add_parameter('RO_acq_averages',
-                           initial_value=1024,
-                           vals=vals.Ints(),
-                           parameter_class=ManualParameter)
 
         self.add_parameter(
             'ro_lo_freq', unit='Hz',
@@ -52,6 +48,17 @@ class DeviceCCL(Instrument):
         self.add_parameter('ro_acq_averages', initial_value=1024,
                            vals=vals.Numbers(min_value=0, max_value=1e6),
                            parameter_class=ManualParameter)
+
+        self.add_parameter(
+            'ro_acq_delay',  unit='s',
+            label='Readout acquisition delay',
+            vals=vals.Numbers(min_value=0),
+            initial_value=0,
+            parameter_class=ManualParameter,
+            docstring=('The time between the instruction that trigger the'
+                       ' readout pulse and the instruction that triggers the '
+                       'acquisition. The positive number means that the '
+                       'acquisition is started after the pulse is send.'))
 
 
         self.add_parameter('instr_MC', label='MeasurementControl',
@@ -78,6 +85,10 @@ class DeviceCCL(Instrument):
                            docstring=ro_acq_docstr,
                            parameter_class=ManualParameter)
 
+        self.add_parameter('ro_acq_digitized', vals=vals.Bool(),
+                           initial_value=False,
+                           parameter_class=ManualParameter)
+
         self.add_parameter('ro_qubits_list',
                            vals=vals.Lists(elt_validator=vals.Strings()),
                            parameter_class=ManualParameter,
@@ -89,6 +100,12 @@ class DeviceCCL(Instrument):
                            label='OpenQL platform configuration filename',
                            parameter_class=ManualParameter,
                            vals=vals.Strings())
+
+        self.add_parameter('ro_always_all',
+                           label='If true, configures the UHFQC to RO all qubits '
+                           'independent of codeword received.',
+                           parameter_class=ManualParameter,
+                           vals=vals.Bool())
 
     def _grab_instruments_from_qb(self):
         """
@@ -105,10 +122,10 @@ class DeviceCCL(Instrument):
 
     def prepare_readout(self):
         self._prep_ro_setup_qubits()
-        self._prep_ro_instantiate_detectors()
         self._prep_ro_sources()
         self._prep_ro_pulses()
         self._prep_ro_integration_weights()
+        self._prep_ro_instantiate_detectors()
 
     def _prep_ro_setup_qubits(self):
         """
@@ -132,6 +149,10 @@ class DeviceCCL(Instrument):
 
             # all qubits use the same acquisition type
             qb.ro_acq_weight_type(self.ro_acq_weight_type())
+            qb.ro_acq_integration_length(self.ro_acq_integration_length())
+            qb.ro_acq_digitized(self.ro_acq_digitized())
+            qb.ro_acq_delay(self.ro_acq_delay())
+
 
             acq_device = qb.instr_acquisition()
 
@@ -158,12 +179,63 @@ class DeviceCCL(Instrument):
             qb = self.find_instrument(qb_name)
             qb._prep_ro_integration_weights()
 
-    def _prep_ro_instantiate_detectors(self):
-        """
-        collect which channels are being used for which qubit and make
-        detectors.
-        """
+            if self.ro_acq_digitized():
+                # Update the RO theshold
+                acq_ch = qb.ro_acq_weight_chI()
 
+                # The threshold that is set in the hardware  needs to be
+                # corrected for the offset as this is only applied in
+                # software.
+                threshold = qb.ro_acq_threshold()
+                offs = qb.instr_acquisition.get_instr().get(
+                    'quex_trans_offset_weightfunction_{}'.format(acq_ch))
+                hw_threshold = threshold + offs
+                qb.instr_acquisition.get_instr().set(
+                    'quex_thres_{}_level'.format(acq_ch), hw_threshold)
+
+    def get_correlation_detector(self):
+        qnames = self.qubits()
+        q0 = self.find_instrument(qnames[0])
+        q1 = self.find_instrument(qnames[1])
+
+        w0 = q0.ro_acq_weight_chI()
+        w1 = q1.ro_acq_weight_chI()
+
+        d = det.UHFQC_correlation_detector(
+            UHFQC=q0.instr_acquisition.get_instr(),  # <- hack line
+            thresholding=True,
+            AWG=self.instr_CC.get_instr(),
+            channels=[w0, w1],
+            correlations=[(w0, w1)],
+            nr_averages=self.ro_acq_averages(),
+            integration_length=q0.ro_acq_integration_length())
+        return d
+
+    def get_int_logging_detector(self, qubits: list=None,
+                                 result_logging_mode='lin_trans'):
+        acq_instrs, ro_ch_idx, value_names = \
+            self._get_ro_channels_and_labels(qubits)
+
+        UHFQC = self.find_instrument(acq_instrs[0])
+        int_log_det = det.UHFQC_integration_logging_det(
+            UHFQC=UHFQC, AWG=self.instr_CC.get_instr(),
+            channels=ro_ch_idx,
+            result_logging_mode=result_logging_mode,
+            integration_length=self.ro_acq_integration_length())
+
+        int_log_det.value_names = value_names
+
+        return int_log_det
+
+    def _get_ro_channels_and_labels(self, qubits: list=None):
+        """
+        Returns
+            acq_instruments     : list of acquisition instruments
+            ro_ch_idx           : channel indices for acquisition
+            value_names         : convenient labels
+        """
+        if qubits is None:
+            qubits = self.ro_qubits_list()
 
         channels_list = []  # tuples (instrumentname, channel, description)
 
@@ -190,14 +262,26 @@ class DeviceCCL(Instrument):
             raise NotImplementedError("Only one acquisition"
                                       "instrument supported so far")
 
+        ro_ch_idx = [ch for _, ch, _ in channels_list]
+        value_names = [n for _, _, n in channels_list]
+
+        return acq_instruments, ro_ch_idx, value_names
+
+    def _prep_ro_instantiate_detectors(self):
+        """
+        collect which channels are being used for which qubit and make
+        detectors.
+        """
+        acq_instruments, ro_ch_idx, value_names = \
+            self._get_ro_channels_and_labels(self.ro_qubits_list())
+
         if self.ro_acq_weight_type() == 'optimal':
             # todo: digitized mode
             result_logging_mode = 'lin_trans'
+            if self.ro_acq_digitized():
+                result_logging_mode = 'digitized'
         else:
             result_logging_mode = 'raw'
-
-        ro_ch_idx = [ch for _, ch, _ in channels_list]
-        value_names = [n for _, _, n in channels_list]
 
         if 'UHFQC' in acq_instruments[0]:
             UHFQC = self.find_instrument(acq_instruments[0])
@@ -227,13 +311,6 @@ class DeviceCCL(Instrument):
 
             self.int_avg_det_single.value_names = value_names
 
-            self.int_log_det = det.UHFQC_integration_logging_det(
-                UHFQC=UHFQC, AWG=self.instr_CC.get_instr(),
-                channels=ro_ch_idx,
-                result_logging_mode=result_logging_mode,
-                integration_length=self.ro_acq_integration_length())
-
-            self.int_log_det.value_names = value_names
 
     def _prep_ro_sources(self):
         """
@@ -313,6 +390,13 @@ class DeviceCCL(Instrument):
                       qb.ro_pulse_down_phi1())
 
         for ro_lm_name, ro_lm in lutmans_to_configure.items():
+            if self.ro_always_all():
+                all_qubit_idx_list = combs[ro_lm_name][-1]
+                no_of_pulses = len(combs[ro_lm_name])
+                combs[ro_lm_name] = [all_qubit_idx_list]*no_of_pulses
+                ro_lm.hardcode_cases(
+                    list(range(1, no_of_pulses)))
+
             ro_lm.resonator_combinations(combs[ro_lm_name][1:])
             ro_lm.load_DIO_triggered_sequence_onto_UHFQC()
             ro_lm.set_mixer_offsets()
@@ -323,7 +407,7 @@ class DeviceCCL(Instrument):
         turn on the required channels again.
         """
 
-        # turn all channels on all VSMS off
+        # turn all channels on all VSMnS off
         for qb_name in self.qubits():
             qb = self.find_instrument(qb_name)
             VSM = qb.instr_VSM.get_instr()
@@ -388,9 +472,107 @@ class DeviceCCL(Instrument):
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr())
         d = self.int_avg_det
+
+        d = self.get_correlation_detector()
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(42))
         MC.set_detector_function(d)
         MC.run('TwoQubitAllXY_{}_{}_{}'.format(q0, q1, self.msmt_suffix))
         if analyze:
             a = ma.MeasurementAnalysis(close_main_fig=close_fig)
+        return a
+
+    def measure_two_qubit_SSRO(self, q0: str, q1: str,
+                               detector = None,
+                               nr_shots: int=4092*4,
+                               prepare_for_timedomain: bool =True,
+                               result_logging_mode='lin_trans',
+                               analyze=True,
+                               MC=None):
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        assert q0 in self.qubits()
+        assert q1 in self.qubits()
+
+        q0idx = self.find_instrument(q0).cfg_qubit_nr()
+        q1idx = self.find_instrument(q1).cfg_qubit_nr()
+
+        p = mqo.two_qubit_off_on(q0idx, q1idx,
+                                 platf_cfg=self.cfg_openql_platform_fn())
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr())
+        if detector is None:
+            d = self.get_int_logging_detector([q0, q1],
+                                              result_logging_mode='lin_trans')
+        else:
+            d = detector
+
+        old_soft_avg = MC.soft_avg()
+        old_live_plot_enabled = MC.live_plot_enabled()
+        MC.soft_avg(1)
+        MC.live_plot_enabled(False)
+
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.arange(nr_shots))
+        MC.set_detector_function(d)
+        MC.run('SSRO_{}_{}_{}'.format(q0, q1, self.msmt_suffix))
+
+        MC.soft_avg(old_soft_avg)
+        MC.live_plot_enabled(old_live_plot_enabled)
+        if analyze:
+            a = mra.two_qubit_ssro_fidelity('SSRO_{}_{}'.format(q0, q1))
+        return a
+
+    def calibrate_mux_RO(self,
+                         calibrate_optimal_weights=True,
+                         verify_optimal_weights=False,
+                         update: bool=True,
+                         update_threshold: bool=True)-> bool:
+        """
+        Calibrates multiplexed Readout.
+        N.B. Currently only works for 2 qubits
+        """
+
+        q0 = self.find_instrument(self.qubits()[0])
+        q1 = self.find_instrument(self.qubits()[1])
+
+        q0idx = q0.cfg_qubit_nr()
+        q1idx = q1.cfg_qubit_nr()
+
+        UHFQC = q0.instr_acquisition.get_instr()
+        self.prepare_for_timedomain()
+
+        # Important that this happens before calibrating the weights
+        UHFQC.quex_trans_offset_weightfunction_0(0)
+        UHFQC.quex_trans_offset_weightfunction_1(0)
+        UHFQC.upload_transformation_matrix([[1, 0], [0, 1]])
+
+        if calibrate_optimal_weights:
+            q0.calibrate_optimal_weights(
+                analyze=True, verify=verify_optimal_weights)
+            q1.calibrate_optimal_weights(
+                analyze=True, verify=verify_optimal_weights)
+
+
+
+        self.measure_two_qubit_SSRO(q0.name, q1.name,
+                                    result_logging_mode='lin_trans')
+
+        res_dict = mra.two_qubit_ssro_fidelity(
+            label='{}_{}'.format(q0.name, q1.name),
+            qubit_labels=[q0.name, q1.name])
+        V_offset_cor = res_dict['V_offset_cor']
+
+        # weights 0 and 1 are the correct indices because I set the numbering
+        # at the start of this calibration script.
+        UHFQC.quex_trans_offset_weightfunction_0(V_offset_cor[0])
+        UHFQC.quex_trans_offset_weightfunction_1(V_offset_cor[1])
+
+        # Does not work because axes are not normalized
+        UHFQC.upload_transformation_matrix(res_dict['mu_matrix_inv'])
+
+        # a = self.check_mux_RO(update=update, update_threshold=update_threshold)
+        return True
