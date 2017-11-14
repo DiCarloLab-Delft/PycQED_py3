@@ -193,7 +193,8 @@ class DeviceCCL(Instrument):
                 qb.instr_acquisition.get_instr().set(
                     'quex_thres_{}_level'.format(acq_ch), hw_threshold)
 
-    def get_correlation_detector(self):
+    def get_correlation_detector(self, single_int_avg: bool =False,
+                                 seg_per_point: int=1):
         qnames = self.qubits()
         q0 = self.find_instrument(qnames[0])
         q1 = self.find_instrument(qnames[1])
@@ -205,10 +206,11 @@ class DeviceCCL(Instrument):
             UHFQC=q0.instr_acquisition.get_instr(),  # <- hack line
             thresholding=True,
             AWG=self.instr_CC.get_instr(),
-            channels=[w0, w1],
-            correlations=[(w0, w1)],
+            channels=[w0, w1], correlations=[(w0, w1)],
             nr_averages=self.ro_acq_averages(),
-            integration_length=q0.ro_acq_integration_length())
+            integration_length=q0.ro_acq_integration_length(),
+            single_int_avg=single_int_avg,
+            seg_per_point=seg_per_point)
         return d
 
     def get_int_logging_detector(self, qubits: list=None,
