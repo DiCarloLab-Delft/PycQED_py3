@@ -1,6 +1,7 @@
 import unittest
 import numpy as np
 import pycqed.instrument_drivers.virtual_instruments.virtual_AWG8 as v8
+from pycqed.instrument_drivers.meta_instrument import kernel_object as ko
 from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman as mwl
 from pycqed.instrument_drivers.meta_instrument.LutMans import flux_lutman as flm
 from pycqed.measurement.waveform_control_CC import waveform as wf
@@ -30,13 +31,6 @@ class Test_MW_LutMan(unittest.TestCase):
 
         self.CBox_MW_LutMan = mwl.CBox_MW_LutMan('CBox_MW_LutMan')
         self.QWG_MW_LutMan = mwl.QWG_MW_LutMan('QWG_MW_LutMan')
-
-    @classmethod
-    def tearDownClass(self):
-        self.AWG.close()
-        self.AWG8_VSM_MW_LutMan.close()
-        self.CBox_MW_LutMan.close()
-        self.QWG_MW_LutMan.close()
 
     def test_uploading_standard_pulses(self):
         # Tests that all waveforms are present and no error is raised.
@@ -160,6 +154,15 @@ class Test_MW_LutMan(unittest.TestCase):
             uploaded_wf = self.AWG.get('wave_ch{}_cw001'.format(i+1))
             np.testing.assert_array_almost_equal(expected_wfs[i], uploaded_wf)
 
+    @classmethod
+    def tearDownClass(self):
+        for inststr in list(self.AWG._all_instruments):
+            try:
+                inst = self.AWG.find_instrument(inststr)
+                inst.close()
+            except KeyError:
+                pass
+
 
 class Test_Flux_LutMan(unittest.TestCase):
 
@@ -167,20 +170,31 @@ class Test_Flux_LutMan(unittest.TestCase):
     def setUpClass(self):
         self.AWG = v8.VirtualAWG8('DummyAWG8')
 
-        self.AWG8_Flux_LutMan = flm.AWG8_Flux_LutMan('MW_LutMan')
+        self.AWG8_Flux_LutMan = flm.AWG8_Flux_LutMan('Flux_LutMan')
+        self.k0 = ko.DistortionKernel('k0')
+        self.AWG8_Flux_LutMan.instr_distortion_kernel(self.k0.name)
         self.AWG8_Flux_LutMan.AWG(self.AWG.name)
-        self.AWG8_Flux_LutMan.channel_I(1)
-        self.AWG8_Flux_LutMan.channel_Q(2)
-        self.AWG8_Flux_LutMan.mw_modulation(100e6)
         self.AWG8_Flux_LutMan.sampling_rate(2.4e9)
+        self.AWG8_Flux_LutMan.cz_theta_f(80)
+        self.AWG8_Flux_LutMan.cz_freq_01_max(6.8e9)
+        self.AWG8_Flux_LutMan.cz_J2(4.1e6)
+        self.AWG8_Flux_LutMan.cz_freq_interaction(5.1e9)
 
+    def test_generate_standard_flux_waveforms(self):
+        self.AWG8_Flux_LutMan.generate_standard_waveforms()
+
+    def test_generate_standard_flux_waveforms(self):
+        self.AWG8_Flux_LutMan.generate_standard_waveforms()
+        self.AWG8_Flux_LutMan.render_wave('cz')
+
+    def test_upload_and_distort(self):
+        self.AWG8_Flux_LutMan.load_waveforms_onto_AWG_lookuptable()
 
     @classmethod
     def tearDownClass(self):
-        self.AWG.close()
-        self.AWG8_VSM_MW_LutMan.close()
-        self.CBox_MW_LutMan.close()
-        self.QWG_MW_LutMan.close()
-
-
-
+        for inststr in list(self.AWG._all_instruments):
+            try:
+                inst = self.AWG.find_instrument(inststr)
+                inst.close()
+            except KeyError:
+                pass

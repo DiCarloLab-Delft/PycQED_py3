@@ -330,8 +330,6 @@ def martinis_flux_pulse(length, lambda_2, lambda_3, theta_f,
     E_c             (float) Charging energy of the transmon (Hz).
     f_bus           (float) frequency of the bus (Hz).
     f_interaction   (float) interaction frequency (Hz).
-    dac_flux_coefficient  (float) conversion factor for AWG voltage to
-                    flux (1/V)
     asymmetry       (float) qubit asymmetry
 
     sampling_rate   (float)
@@ -341,11 +339,13 @@ def martinis_flux_pulse(length, lambda_2, lambda_3, theta_f,
                     eps=f12-f_bus
     """
     # Define number of samples and time points
-    # FIXME: why tau and factor 10?
+    # Pulse is generated at a denser grid to allow for good interpolation
     nr_samples = int(np.round((length)*sampling_rate * 10))
     rounded_length = nr_samples/(10 * sampling_rate)
-    tau_step = 1/(10 * sampling_rate)
-    tau = np.arange(0, rounded_length, tau_step)
+    tau_step = 1/(10 * sampling_rate)  # denser points
+    # tau is a virtual time/proper time
+    taus = np.arange(0, rounded_length-tau_step/2, tau_step)
+    # -tau_step/2 is to make sure final pt is excluded
 
     # Derived parameters
     if f_interaction is None:
@@ -364,11 +364,11 @@ def martinis_flux_pulse(length, lambda_2, lambda_3, theta_f,
 
     # Calculate the wave
     theta_wave = np.ones(nr_samples) * theta_i
-    theta_wave += lambda_1 * (1 - np.cos(2 * np.pi * tau / rounded_length))
+    theta_wave += lambda_1 * (1 - np.cos(2 * np.pi * taus / rounded_length))
     theta_wave += (lambda_1 * lambda_2 *
-                   (1 - np.cos(4 * np.pi * tau / rounded_length)))
+                   (1 - np.cos(4 * np.pi * taus / rounded_length)))
     theta_wave += (lambda_1 * lambda_3 *
-                   (1 - np.cos(6 * np.pi * tau / rounded_length)))
+                   (1 - np.cos(6 * np.pi * taus / rounded_length)))
 
     # Clip wave to [theta_i, pi] to avoid poles in the wave expressed in freq
     theta_wave_clipped = np.clip(theta_wave, theta_i, np.pi-.01)
