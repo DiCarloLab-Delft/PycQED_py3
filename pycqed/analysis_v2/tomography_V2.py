@@ -9,10 +9,10 @@ import time
 from imp import reload
 from matplotlib import pyplot as plt
 import numpy as np
-from analysis import measurement_analysis as MA 
-from analysis import ramiro_analysis as RA
-from analysis import thresholding_toolbox as thresholding
-from analysis import fitting_models as fit_mods
+from pycqed.analysis import measurement_analysis as MA 
+from pycqed.analysis import ramiro_analysis as RA
+from pycqed.analysis import thresholding_toolbox as thresholding
+from pycqed.analysis import fitting_models as fit_mods
 import lmfit
 import scipy as scipy
 try:
