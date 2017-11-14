@@ -3,7 +3,7 @@ import sys
 sys.path.append('D:\\Repository\\PycQED_py3\\pycqed')
 
 
-from analysis import tomography_toolbox as tomography
+from pycqed.analysis import tomography_toolbox as tomography
 import os
 import time
 from imp import reload
