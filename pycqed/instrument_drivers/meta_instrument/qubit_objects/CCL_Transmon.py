@@ -1537,7 +1537,8 @@ class CCLight_Transmon(Qubit):
         p = sqo.Ramsey(times, qubit_idx=self.cfg_qubit_nr(),
                        platf_cfg=self.cfg_openql_platform_fn())
         s = swf.OpenQL_Sweep(openql_program=p,
-                             CCL=self.instr_CC.get_instr())
+                             CCL=self.instr_CC.get_instr(),
+                             parameter_name='Time', unit='s')
         d = self.int_avg_det
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
@@ -1587,7 +1588,8 @@ class CCLight_Transmon(Qubit):
         p = sqo.echo(times, qubit_idx=self.cfg_qubit_nr(),
                      platf_cfg=self.cfg_openql_platform_fn())
         s = swf.OpenQL_Sweep(openql_program=p,
-                             CCL=self.instr_CC.get_instr())
+                             CCL=self.instr_CC.get_instr(),
+                             parameter_name="Time", unit="s")
         d = self.int_avg_det
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
