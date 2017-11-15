@@ -13,6 +13,7 @@ from pycqed.analysis import measurement_analysis as ma
 import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
 import pycqed.measurement.gate_set_tomography.gate_set_tomography_CC as gstCC
 import pygsti
+from pycqed.analysis import tomography as tomo
 
 from collections import defaultdict
 
@@ -448,6 +449,39 @@ class DeviceCCL(Instrument):
             qb._prep_mw_pulses()
 
         self._prep_td_configure_VSM()
+
+    def measure_two_qubit_tomo_bell(self, q0: str, q1: str,
+                                bell_state=0,
+                                analyze=True, close_fig=True,
+                                prepare_for_timedomain=True, MC=None):
+
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        assert q0 in self.qubits()
+        assert q1 in self.qubits()
+
+        q0idx = self.find_instrument(q0).cfg_qubit_nr()
+        q1idx = self.find_instrument(q1).cfg_qubit_nr()
+
+        p = mqo.two_qubit_tomo_bell(bell_state, q0idx, q1idx,
+                            platf_cfg=self.cfg_openql_platform_fn())
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr())
+        d = self.get_correlation_detector()
+        MC.set_sweep_function(s)
+        # 36 tomo rotations + 4 calibration points
+        MC.set_sweep_points(np.arange(36+4))
+        MC.set_detector_function(d)
+        MC.run('TwoQubitBellTomo_{}_{}_{}'.format(q0, q1, self.msmt_suffix))
+        if analyze:
+            tomo.Tomo_Multiplexed(
+                label='Tomo',
+                MLE=True, target_bell=target_bell, single_shots=single_shots,
+                q0_label=q0.name, q1_label=q1.name)
+            return a
 
     def measure_two_qubit_AllXY(self, q0: str, q1: str,
                                 sequence_type='sequential',

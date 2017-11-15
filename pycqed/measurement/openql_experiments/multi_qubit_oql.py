@@ -274,12 +274,7 @@ def chevron_seq(fluxing_qubit: str, spectator_qubit: str,
 
 
 def two_qubit_tomo_bell(bell_state, q0, q1,
-                        platf_cfg,
-                        wait_after_trigger=10e-9,
-                        wait_during_flux=260e-9,
-                        clock_cycle=1e-9,
-                        single_qubit_compiled_phase=False,
-                        RO_target='all'):
+                        platf_cfg):
     '''
     Two qubit bell state tomography.
 
