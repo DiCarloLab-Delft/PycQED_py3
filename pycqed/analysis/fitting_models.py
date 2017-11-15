@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.special import erfc
 import lmfit
 import logging
 #################################
@@ -51,17 +52,44 @@ def Lorentzian(f, A, offset, f0, kappa):
     return val
 
 
-def TwinLorentzFunc(f, amplitude_a, amplitude_b, center_a, center_b,
-                    sigma_a, sigma_b, background=0):
-    'twin lorentz with background'
-    val = (amplitude_a/np.pi * (sigma_a / ((f-center_a)**2 + sigma_a**2)) +
-           amplitude_b/np.pi * (sigma_b / ((f-center_b)**2 + sigma_b**2)) +
-           background)
+def TwinLorentzFunc(f, A_gf_over_2, A, f0_gf_over_2, f0,
+                    kappa_gf_over_2, kappa, background=0):
+    """
+    Twin lorentz with background.
+
+    Args:
+    f (float):          frequency sweep points in Hz
+    A (float):          amplitude of the tallest/deepest Lorentzian structure
+                        in the data
+    A_gf_over_2 (float):    amplitude of the other Lorentzian structure in the
+                            data; since this function is used for high power
+                            qubit spectroscopy, this parameter refers to the
+                            Lorentzian structure corresponding to the gf/2
+                            transition
+    f0 (float):         frequency of the tallest/deepest Lorentzian structure
+                        in the data
+    f0_gf_over_2 (float):   frequency of the other Lorentzian structure in the
+                            data; since this function is used for high power
+                            qubit spectroscopy, this parameter refers to the
+                            Lorentzian structure corresponding to the gf/2
+                            transition
+    kappa (float):      kappa (FWHM) of the tallest/deepest Lorentzian structure
+                        in the data
+    kappa_gf_over_2 (float): kappa (FWHM) of the other Lorentzian structure in
+                             the data; since this function is used for high
+                             power qubit spectroscopy, this parameter refers to
+                             the Lorentzian structure corresponding to the gf/2
+                             transition
+    background (float):     background offset
+    """
+    val = (A_gf_over_2/np.pi * (kappa_gf_over_2 / ((f-f0_gf_over_2)**2 + kappa_gf_over_2**2)) +
+           A/np.pi * (kappa / ((f-f0)**2 + kappa**2)) + background)
     return val
 
 
 def Qubit_dac_to_freq(dac_voltage, f_max, E_c,
-                      dac_sweet_spot, V_per_phi0=None, dac_flux_coefficient=None,
+                      dac_sweet_spot, V_per_phi0=None,
+                      dac_flux_coefficient=None,
                       asymmetry=0):
     '''
     The cosine Arc model for uncalibrated flux for asymmetric qubit.
@@ -81,11 +109,30 @@ def Qubit_dac_to_freq(dac_voltage, f_max, E_c,
                         'physically meaningful "V_per_phi0" instead.')
         V_per_phi0 = np.pi/dac_flux_coefficient
 
-    qubit_freq = (f_max + E_c)*(
+    qubit_freq = (f_max + E_c) * (
         asymmetry**2 + (1 - asymmetry**2) *
-        np.sqrt(abs(np.cos(np.pi / V_per_phi0 *
-                           (dac_voltage - dac_sweet_spot))))) - E_c
+        np.cos(np.pi / V_per_phi0 *
+               (dac_voltage - dac_sweet_spot))**2)**0.25 - E_c
     return qubit_freq
+
+
+def Qubit_dac_to_detun(dac_voltage, f_max, E_c, dac_sweet_spot, V_per_phi0,
+                       asymmetry=0):
+    '''
+    The cosine Arc model for uncalibrated flux for asymmetric qubit.
+
+    dac_voltage (V)
+    f_max (Hz): sweet-spot frequency of the qubit
+    E_c (Hz): charging energy of the qubit
+    V_per_phi0 (V): volt per phi0 (convert voltage to flux)
+    dac_sweet_spot (V): voltage at which the sweet-spot is found
+    asymmetry (dimensionless asymmetry param) = abs((EJ1-EJ2)/(EJ1+EJ2))
+    '''
+    return f_max - Qubit_dac_to_freq(dac_voltage,
+                                     f_max=f_max, E_c=E_c,
+                                     dac_sweet_spot=dac_sweet_spot,
+                                     V_per_phi0=V_per_phi0,
+                                     asymmetry=asymmetry)
 
 
 def Qubit_freq_to_dac(frequency, f_max, E_c,
@@ -107,8 +154,12 @@ def Qubit_freq_to_dac(frequency, f_max, E_c,
     if V_per_phi0 is None and dac_flux_coefficient is None:
         raise ValueError('Please specify "V_per_phi0".')
 
-    asymm_term = (asymmetry**2 + (1-asymmetry**2))
-    dac_term = np.arccos(((frequency+E_c)/((f_max+E_c) * asymm_term))**2)
+    # asymm_term = (asymmetry**2 + (1-asymmetry**2))
+    # dac_term = np.arccos(((frequency+E_c)/((f_max+E_c) * asymm_term))**2)
+
+    dac_term = np.arccos(np.sqrt(
+        (((frequency + E_c) / (f_max + E_c))**4 - asymmetry**2) /
+        (1 - asymmetry**2)))
 
     if dac_flux_coefficient is not None:
         logging.warning('"dac_flux_coefficient" deprecated. Please use the '
@@ -116,13 +167,26 @@ def Qubit_freq_to_dac(frequency, f_max, E_c,
         V_per_phi0 = np.pi/dac_flux_coefficient
 
     if branch == 'positive':
-        dac_voltage = (dac_term) * V_per_phi0 / np.pi + dac_sweet_spot
+        dac_voltage = dac_term * V_per_phi0 / np.pi + dac_sweet_spot
     elif branch == 'negative':
-        dac_voltage = -(dac_term) * V_per_phi0 / np.pi + dac_sweet_spot
+        dac_voltage = -dac_term * V_per_phi0 / np.pi + dac_sweet_spot
     else:
         raise ValueError('branch {} not recognized'.format(branch))
 
     return dac_voltage
+
+
+def Qubit_dac_sensitivity(dac_voltage, f_max: float, E_c: float,
+                          dac_sweet_spot: float, V_per_phi0: float,
+                          asymmetry: float=0):
+    '''
+    Derivative of the qubit detuning vs dac at dac_voltage.
+    '''
+    cos_term = np.cos(np.pi / V_per_phi0 * (dac_voltage - dac_sweet_spot))
+    sin_term = np.sin(np.pi / V_per_phi0 * (dac_voltage - dac_sweet_spot))
+    return ((f_max + E_c)*(1 - asymmetry**2) * np.pi / (2 * V_per_phi0) *
+            cos_term * sin_term * (asymmetry**2 + (1 - asymmetry**2) *
+                                   cos_term**2)**(-0.75))
 
 
 def QubitFreqDac(dac_voltage, f_max, E_c,
@@ -168,7 +232,8 @@ def GaussExpDampOscFunc(t, tau, tau_2, frequency, phase, amplitude,
         2*np.pi*frequency*t+phase)+oscillation_offset) + exponential_offset
 
 
-def ExpDampDblOscFunc(t, tau, n, freq_1, freq_2, phase_1, phase_2, amp_1, amp_2,
+def ExpDampDblOscFunc(t, tau, n, freq_1, freq_2, phase_1, phase_2,
+                      amp_1, amp_2,
                       osc_offset_1, osc_offset_2, exponential_offset):
     '''
     Exponential decay with double cosine modulation
@@ -266,6 +331,25 @@ def linear_with_background_and_offset(x, a, b, c):
     return np.sqrt((a*x)**2 + b**2)+c
 
 
+def gaussianCDF(x, amplitude, mu, sigma):
+    """
+    CDF of gaussian is P(X<=x) = .5 erfc((mu-x)/(sqrt(2)sig))
+    """
+    return 0.5 * amplitude * erfc((mu - x) / (np.sqrt(2)*sigma))
+
+
+def double_gaussianCDF(x, A_amplitude, A_mu, A_sigma,
+                       B_amplitude, B_mu, B_sigma):
+    """
+    CDF of two gaussians added on top of each other.
+
+    uses "gaussianCDF"
+    """
+    CDF_A = gaussianCDF(x, amplitude=A_amplitude, mu=A_mu, sigma=A_sigma)
+    CDF_B = gaussianCDF(x, amplitude=B_amplitude, mu=B_mu, sigma=B_sigma)
+    return CDF_A + CDF_B
+
+
 def gaussian_2D(x, y, amplitude=1,
                 center_x=0, center_y=0,
                 sigma_x=1, sigma_y=1):
@@ -277,6 +361,12 @@ def gaussian_2D(x, y, amplitude=1,
     val = (gaus(x, amplitude, center_x, sigma_x) *
            gaus(y, amplitude, center_y, sigma_y))
     return val
+
+
+def DoubleExpDecayFunc(t, tau1, tau2, amp1, amp2, offset, n):
+    return (offset +
+            amp1 * np.exp(-(t / tau1)**n) +
+            amp2 * np.exp(-(t / tau2)**n))
 
 
 def TripleExpDecayFunc(t, tau1, tau2, tau3, amp1, amp2, amp3, offset, n):
@@ -552,6 +642,10 @@ def double_gauss_guess(model, data, x=None, **kwargs):
     finding the points corresponding to 25% and 75%
     it finds sigma by using the property that ~33% of the data is contained
     in the range mu-sigma to mu+sigma.
+
+    Tip: to use this assign this guess function as a method to a model use:
+        model.guess = double_gauss_guess.__get__(
+            model, model.__class__)
     '''
     if x is None:
         x = np.arange(len(data))

@@ -31,7 +31,8 @@ class Pulsar(Instrument):
     A meta-instrument responsible for all communication with the AWGs.
     Contains information about all the available awg-channels in the setup.
     Starting, stopping and programming and changing the parameters of the AWGs
-    should be done through Pulsar. Supports Tektronix AWG5014 and ZI UHFLI.
+    should be done through Pulsar. Supports Tektronix AWG5014 and partially
+    ZI UHFLI.
 
     Args:
         default_AWG: Name of the AWG that new channels get defined on if no
@@ -180,7 +181,10 @@ class Pulsar(Instrument):
 
     def start(self):
         """
-        Start the active AWGs.
+        Start the active AWGs. If multiple AWGs are used in a setup where the
+        slave AWGs are triggered by the master AWG, then the slave AWGs must be
+        running and waiting for trigger when the master AWG is started to
+        ensure synchronous playback.
         """
         if self.master_AWG() is None:
             for AWG in self.used_AWGs():
@@ -189,7 +193,18 @@ class Pulsar(Instrument):
             for AWG in self.used_AWGs():
                 if AWG != self.master_AWG():
                     self._start_AWG(AWG)
-            time.sleep(0.2)  # wait 0.2 second for all other awg-s to start
+            tstart = time.time()
+            for AWG in self.used_AWGs():
+                if AWG != self.master_AWG():
+                    good = False
+                    while time.time() - tstart < 10:
+                        if self._is_AWG_running(AWG):
+                            good = True
+                            break
+                        else:
+                            time.sleep(0.1)
+                    if not good:
+                        raise Exception('AWG {} did not start in 10s'.format(AWG))
             self._start_AWG(self.master_AWG())
 
     def stop(self):
@@ -237,7 +252,7 @@ class Pulsar(Instrument):
         #                waveform data)))
         AWG_wfs = {}
 
-        for el in elements:
+        for i, el in enumerate(elements):
             tvals, waveforms = el.normalized_waveforms()
             for cname in waveforms:
                 if cname not in channels:
@@ -250,9 +265,9 @@ class Pulsar(Instrument):
                     continue
                 if cAWG not in AWG_wfs:
                     AWG_wfs[cAWG] = {}
-                if el.name not in AWG_wfs[cAWG]:
-                    AWG_wfs[cAWG][el.name] = {}
-                AWG_wfs[cAWG][el.name][cid] = waveforms[cname]
+                if (i, el.name) not in AWG_wfs[cAWG]:
+                    AWG_wfs[cAWG][i, el.name] = {}
+                AWG_wfs[cAWG][i, el.name][cid] = waveforms[cname]
 
         self.update_AWG5014_settings()
         for AWG in AWG_wfs:
@@ -305,7 +320,7 @@ class Pulsar(Instrument):
         # in the sequence
         packed_waveforms = {}
         elements_with_non_zero_first_points = set()
-        for el, cid_wfs in el_wfs.items():
+        for (i, el), cid_wfs in sorted(el_wfs.items()):
             maxlen = 0
             for wf in cid_wfs.values():
                 if len(wf) > maxlen:
@@ -366,7 +381,7 @@ class Pulsar(Instrument):
         for grp in grps:
             grp_wfnames = []
             # add all wf names of channel
-            for el in el_wfs:
+            for i, el in sorted(el_wfs):
                 wfname = el + '_' + grp
                 grp_wfnames.append(wfname)
             wfname_l.append(grp_wfnames)
@@ -456,12 +471,12 @@ setTrigger(0);
         wfnames = {'ch1': [], 'ch2': []}
         wfdata = {'ch1': [], 'ch2': []}
         i = 1
-        for el in el_wfs:
+        for i, el in el_wfs:
             for cid in ['ch1', 'ch2']:
 
-                if cid in el_wfs[el]:
+                if cid in el_wfs[i, el]:
                     wfname = el + '_' + cid
-                    cid_wf = el_wfs[el][cid]
+                    cid_wf = el_wfs[i, el][cid]
                     wfnames[cid].append(wfname)
                     wfdata[cid].append(cid_wf)
                     if cid_wf[0] != 0.:
@@ -529,6 +544,15 @@ setTrigger(0);
             obj.stop()
         elif isinstance(obj, UHFQC):
             obj._daq.syncSetInt('/' + obj._device + '/awgs/0/enable', 0)
+        else:
+            raise ValueError('Unsupported AWG type: {}'.format(type(obj)))
+
+    def _is_AWG_running(self, AWG):
+        obj = self.AWG_obj(AWG=AWG)
+        if isinstance(obj, Tektronix_AWG5014):
+            return obj.get_state() != 'Idle'
+        elif isinstance(obj, UHFQC):
+            raise NotImplementedError()
         else:
             raise ValueError('Unsupported AWG type: {}'.format(type(obj)))
 

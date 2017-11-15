@@ -1,7 +1,3 @@
-# N.B. 
-
-This is a copy of the qisa-as from the ProjElec_CCL repository at commit 50872968fef6d91792e563ab31e39c7ffab54c6e. Having a copy of the assembler that needs to be built repeatedly is a temporary workaround.
-
 ### Assembler for the Quantum Instruction Set Architecture
 ---
 ```
@@ -216,19 +212,19 @@ This is because the opcodes of the classic instructions are not yet final.
 Also, the quantum instructions themselves are not fully specified and are subject to revisal.
 
 The solution found is to have the specification of the opcodes of the classic instructions and that of the
-quantum instructions (instruction and opcode) into a text file (`qisa_instructions.dbpd`).
+quantum instructions (instruction and opcode) into a text file (`qisa_opcodes.qmap`).
 This file is processed during build time, and generates the appropriate cpp, bison and flex input files.
 The generated files are put in the build directory. They are: `qisa_parser.yy`, `qisa_lexer.l` and
 `qisa_opcode_defs.inc`.
 The input files needed to generate those files are:
 
-* `qisa_instructions.dbpd` Contains the opcode definitions for the classic instructions and the quantum
+* `qisa_opcodes.qmap` Contains the opcode definitions for the classic instructions and the quantum
 instructions (declared using several formats). Refer to this file for more information.
 * `qisa_parser.tmpl` Contains the grammars for the qisa-as assembler.
 * `qisa_lexer.tmpl` Contains the syntax definition for the qisa-as assembler.
 
 
-`qisa_instructions.dbpd` is processed by a Python script, which uses string templates.
+`qisa_opcodes.qmap` is processed by a Python script, which uses string templates.
 One peculiarity of using Python's string template substitution is that `$$` stands for an escaped dollar sign.
 The net result of this is that every occurrence of `$$` in the template file is converted to a single `$`.
 Normally this is not a problem, but in the Bison parser language, this `$$` construct has to be used.
