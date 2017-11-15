@@ -74,9 +74,8 @@ class Test_MW_LutMan(unittest.TestCase):
                       'wave_ch2_cw005'),
             'spec': ('wave_ch1_cw008',
                      'wave_ch2_cw008')}
-
-        self.assertDictEqual.__self__.maxDiff = None
-        self.assertDictEqual(expected_dict, self.AWG8_MW_LutMan.LutMap())
+        # Does not check the full lutmap
+        dict_contained_in(expected_dict, self.AWG8_MW_LutMan.LutMap())
 
     def test_lut_mapping_CBox(self):
         self.CBox_MW_LutMan.set_default_lutmap()
@@ -87,8 +86,7 @@ class Test_MW_LutMan(unittest.TestCase):
                          'rY90': 4,
                          'rXm90': 5,
                          'rYm90': 6,
-                         'rPhi90': 7,
-                         'spec': 8}
+                         'rPhi90': 7}
 
         self.assertDictEqual.__self__.maxDiff = None
         self.assertDictEqual(expected_dict, self.CBox_MW_LutMan.LutMap())
@@ -116,10 +114,6 @@ class Test_MW_LutMan(unittest.TestCase):
                        'wave_ch2_cw007',
                        'wave_ch3_cw007',
                        'wave_ch4_cw007'),
-            # 'rPhim90': ('wave_ch1_cw008',
-            #             'wave_ch2_cw008',
-            #             'wave_ch3_cw008',
-            #             'wave_ch4_cw008'),
             'rX90': ('wave_ch1_cw003',
                      'wave_ch2_cw003',
                      'wave_ch3_cw003',
@@ -136,9 +130,8 @@ class Test_MW_LutMan(unittest.TestCase):
                      'wave_ch2_cw008',
                      'wave_ch3_cw008',
                      'wave_ch4_cw008')}
-
-        self.assertDictEqual.__self__.maxDiff = None
-        self.assertDictEqual(expected_dict, self.AWG8_VSM_MW_LutMan.LutMap())
+        # Does not check the full lutmap
+        dict_contained_in(expected_dict, self.AWG8_VSM_MW_LutMan.LutMap())
 
     def test_uploading_standard_pulses_AWG8_VSM(self):
         # Tests that all waveforms are present and no error is raised.
@@ -198,3 +191,10 @@ class Test_Flux_LutMan(unittest.TestCase):
                 inst.close()
             except KeyError:
                 pass
+
+
+def dict_contained_in(subset, superset):
+    if subset.items() <= superset.items():
+        return True
+    else:
+        raise ValueError

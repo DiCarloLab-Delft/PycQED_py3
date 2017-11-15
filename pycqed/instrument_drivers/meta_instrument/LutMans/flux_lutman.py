@@ -139,6 +139,9 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                            unit='deg',
                            initial_value=80,
                            parameter_class=ManualParameter)
+        self.add_parameter('cz_V_per_phi0', vals=vals.Numbers(),
+                           unit='V', initial_value=1,
+                           parameter_class=ManualParameter)
         self.add_parameter('cz_freq_01_max', vals=vals.Numbers(),
                            unit='Hz', parameter_class=ManualParameter)
         self.add_parameter('cz_J2', vals=vals.Numbers(),
@@ -177,6 +180,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             lambda_3=self.cz_lambda_3(),
             theta_f=self.cz_theta_f(),
             f_01_max=self.cz_freq_01_max(),
+            V_per_phi0=self.cz_V_per_phi0(),
             J2=self.cz_J2(),
             f_interaction=self.cz_freq_interaction(),
             sampling_rate=self.sampling_rate(),

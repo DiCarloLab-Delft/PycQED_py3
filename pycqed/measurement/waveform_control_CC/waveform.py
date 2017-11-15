@@ -389,6 +389,8 @@ def martinis_flux_pulse(length, lambda_2, lambda_3, theta_f,
         t/scale, theta_wave_clipped, bounds_error=False,
         fill_value=0)(t_samples)
 
+
+
     # Return in the specified units
     if return_unit == 'theta':
         # Theta is returned in radians here
@@ -413,6 +415,12 @@ def martinis_flux_pulse(length, lambda_2, lambda_3, theta_f,
         V_per_phi0=V_per_phi0,
         asymmetry=asymmetry,
         branch='positive')
+
+    # why sometimes the last sample is nan is not known,
+    # but we will surely figure it out someday.
+    # (Brian and Adriaan, 14.11.2017)
+    voltage_wave = np.nan_to_num(voltage_wave)
+
     return voltage_wave
 ############################################################################
 #
