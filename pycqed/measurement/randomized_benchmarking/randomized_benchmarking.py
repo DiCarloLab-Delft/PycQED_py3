@@ -51,6 +51,54 @@ def decompose_clifford_seq(clifford_sequence,
         decomposed_seq.extend(gate_decomposition[cl])
     return decomposed_seq
 
+def decompose_clifford_seq_n_qubits(clifford_sequence_list, gate_decomp='HZ'):
+
+    """
+    Returns list of physical pulses for each Clifford element for each qubit in
+    the following format: [ [C_pl0_qb0], [C_pl0_qb1],.., [C_pl0_qbN],...,
+     [C_plN_qb0], ..., [C_plN_qbN] ], where C_pli_qbj is the pulse decomposition
+     of the ith Clifford element for qubit j.
+    :param clifford_sequence_list: list of lists of random Cliffords for each qubit
+    :param gate_decomp: the physical decomposition for the Cliffords
+    :return: decomposed_seq
+    """
+    if gate_decomp is 'HZ':
+        gate_decomposition = HZ_gate_decomposition
+    elif gate_decomp is 'XY':
+        gate_decomposition = XY_gate_decomposition
+    else:
+        raise ValueError('Specify a valid gate decomposition, "HZ" or "XY".')
+
+    # convert clifford_sequence_list to an array
+    clifford_sequence_array = np.zeros(
+        shape=(len(clifford_sequence_list), len(clifford_sequence_list[0])),
+        dtype=type(clifford_sequence_list[0][0]))
+
+    for i, cl_lst in enumerate(clifford_sequence_list):
+        clifford_sequence_array[i] = cl_lst
+
+    decomposed_seq = []
+
+    # iterate over columns; decompose each element in the column into physical
+    # pulses and ensure that the same number of pulses occur for each Clifford
+    # element, i.e. pad with 'I' pulses
+    # example: decomposed_seq_temp = [['I','X180'], ['X180'],
+    # ['X90', 'Z90', 'Z180']], after padding we have [['I', 'X180', 'I'],
+    # ['X180', 'I', 'I'], ['X90', 'Z90', 'Z180']]. We do this because each of
+    # these sublists of pulses are applied in parallel to different qubits.
+    for idx1 in range(clifford_sequence_array.shape[1]):
+        decomposed_seq_temp = []
+        decomposed_seq_temp.extend(
+            [gate_decomposition[clifford_sequence_array[idx0][idx1]] for
+             idx0 in range(clifford_sequence_array.shape[0])])
+        # find longest pulse sequence
+        length = len(sorted(decomposed_seq_temp, key=len, reverse=True)[0])
+        # pad shorter pulse sequences with 'I' pulses
+        decomposed_seq.extend([pulse_list+['I']*(length-len(pulse_list)) for
+                               pulse_list in decomposed_seq_temp])
+
+    return decomposed_seq
+
 
 def convert_clifford_sequence_to_tape(clifford_sequence, lutmapping,
                                       gate_decomp='HZ'):

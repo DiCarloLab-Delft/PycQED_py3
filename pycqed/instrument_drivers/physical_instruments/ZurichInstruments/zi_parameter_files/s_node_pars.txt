@@ -24,10 +24,34 @@
     3.0
   ],
   [
-    "awgs/0/enable",
-    "bool",
+    "awgs/0/dio/strobe/index",
+    "int",
     0,
-    1.0
+    31.0
+  ],
+  [
+    "awgs/0/dio/strobe/slope",
+    "int",
+    0,
+    3.0
+  ],
+  [
+    "awgs/0/dio/valid/index",
+    "int",
+    0,
+    31.0
+  ],
+  [
+    "awgs/0/dio/valid/polarity",
+    "int",
+    0,
+    3.0
+  ],
+  [
+    "awgs/0/enable",
+    "int_8bit",
+    0,
+    255
   ],
   [
     "awgs/0/outputs/0/amplitude",
@@ -105,7 +129,7 @@
     "awgs/0/triggers/0/hysteresis/absolute",
     "float",
     0,
-    0.03750000149011612
+    1500000026624.0
   ],
   [
     "awgs/0/triggers/0/hysteresis/mode",
@@ -117,7 +141,7 @@
     "awgs/0/triggers/0/hysteresis/relative",
     "float",
     0,
-    0.02500000037252903
+    999999995904.0
   ],
   [
     "awgs/0/triggers/0/level",
@@ -171,7 +195,7 @@
     "awgs/0/triggers/1/hysteresis/absolute",
     "float",
     0,
-    0.02500000223517418
+    1500000026624.0
   ],
   [
     "awgs/0/triggers/1/hysteresis/mode",
@@ -183,7 +207,7 @@
     "awgs/0/triggers/1/hysteresis/relative",
     "float",
     0,
-    0.01666666753590107
+    999999995904.0
   ],
   [
     "awgs/0/triggers/1/level",
@@ -1912,5 +1936,53 @@
     "bool",
     0,
     1.0
+  ],
+  [
+    "triggers/in/0/imp50",
+    "bool",
+    0,
+    1.0
+  ],
+  [
+    "triggers/in/0/level",
+    "float",
+    -4.99981689453125,
+    5.000091552734375
+  ],
+  [
+    "triggers/in/1/imp50",
+    "bool",
+    0,
+    1.0
+  ],
+  [
+    "triggers/in/1/level",
+    "float",
+    -4.99981689453125,
+    5.000091552734375
+  ],
+  [
+    "triggers/in/2/imp50",
+    "bool",
+    0,
+    1.0
+  ],
+  [
+    "triggers/in/2/level",
+    "float",
+    -5.000114440917969,
+    4.999885559082031
+  ],
+  [
+    "triggers/in/3/imp50",
+    "bool",
+    0,
+    1.0
+  ],
+  [
+    "triggers/in/3/level",
+    "float",
+    -5.000114440917969,
+    4.999885559082031
   ]
 ]

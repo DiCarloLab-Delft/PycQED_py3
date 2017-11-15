@@ -1443,6 +1443,8 @@ class TD_Analysis(MeasurementAnalysis):
                 ylabel = r'$F$ $\left(|f \rangle \right) (arb. units)$'
             else:
                 ylabel = r'$F$ $\left(|e \rangle \right) (arb. units)$'
+            plot_title = kw.pop('plot_title', self.measurementstring + '\n' +
+                               self.timestamp_string)
             self.plot_results_vs_sweepparam(x=self.scaled_sweep_points,
                                             y=self.normalized_values,
                                             fig=self.fig, ax=self.ax,
@@ -1450,7 +1452,7 @@ class TD_Analysis(MeasurementAnalysis):
                                             ylabel=ylabel,
                                             marker='o-',
                                             save=False,
-                                            plot_title=kw.pop('plot_title',None))
+                                            plot_title=plot_title)
             # self.ax.set_ylim(min(min(self.normalized_values)-.1, -.1),
             #                   max(max(self.normalized_values)+.1, 1.1))
 

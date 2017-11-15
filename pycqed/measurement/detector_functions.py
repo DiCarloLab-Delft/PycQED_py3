@@ -1715,7 +1715,7 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
 
             correlation_channel = -1
             # 4 is the (current) max number of weights in the UHFQC (v5)
-            for ch in range(4):
+            for ch in range(9):
                 if ch in self.channels:
                     # Disable correlation mode as this is used for normal
                     # acquisition
@@ -1734,6 +1734,50 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
                 raise ValueError('No free channel available for correlation.')
 
             self.correlation_channels += [correlation_channel]
+
+    # def set_threshold(self, threshold_levle=0, ch_to_copy=None):
+    #
+    #     if ch_to_copy is not None:
+    #         if ch_to_copy not in self.channels:
+    #             raise ValueError('Channel to copy should be in channels')
+    #
+    #         for ch in range(9):
+    #             if ch not in self.channels:
+    #                 # selects the lowest available free channel
+    #                 self.channels += [ch]
+    #
+    #                 # copy ch_to_copy into ch
+    #                 copy_int_weights_real = \
+    #                     self.UHFQC.get('quex_wint_weights_{}_real'.format(ch_to_copy))[
+    #                         0]['vector']
+    #                 copy_int_weights_imag = \
+    #                     self.UHFQC.get('quex_wint_weights_{}_imag'.format(ch_to_copy))[
+    #                         0]['vector']
+    #
+    #                 copy_rot_matrix_real = \
+    #                     self.UHFQC.get('quex_rot_{}_real'.format(ch_to_copy))
+    #                 copy_rot_matrix_imag = \
+    #                     self.UHFQC.get('quex_rot_{}_imag'.format(ch_to_copy))
+    #
+    #                 self.UHFQC.set(
+    #                     'quex_wint_weights_{}_real'.format(ch),
+    #                     copy_int_weights_real)
+    #                 self.UHFQC.set(
+    #                     'quex_wint_weights_{}_imag'.format(ch),
+    #                     copy_int_weights_imag)
+    #
+    #                 self.UHFQC.set(
+    #                     'quex_rot_{}_real'.format(ch),
+    #                     copy_rot_matrix_real)
+    #                 self.UHFQC.set(
+    #                     'quex_rot_{}_imag'.format(ch),
+    #                     copy_rot_matrix_imag)
+    #
+    #                 print('Using channel {} for correlation ({}, {}).'
+    #                       .format(ch, corr[0], corr[1]))
+    #                 # correlation mode is turned on in the
+    #                 # set_up_correlation_weights method
+    #                 break
 
     def set_up_correlation_weights(self):
         if self.thresholding:
@@ -1754,12 +1798,25 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             copy_int_weights_imag = \
                 self.UHFQC.get('quex_wint_weights_{}_imag'.format(corr[0]))[
                     0]['vector']
+
+            copy_rot_matrix_real = \
+                self.UHFQC.get('quex_rot_{}_real'.format(corr[0]))
+            copy_rot_matrix_imag = \
+                self.UHFQC.get('quex_rot_{}_imag'.format(corr[0]))
+
             self.UHFQC.set(
                 'quex_wint_weights_{}_real'.format(correlation_channel),
                 copy_int_weights_real)
             self.UHFQC.set(
                 'quex_wint_weights_{}_imag'.format(correlation_channel),
                 copy_int_weights_imag)
+
+            self.UHFQC.set(
+                'quex_rot_{}_real'.format(correlation_channel),
+                copy_rot_matrix_real)
+            self.UHFQC.set(
+                'quex_rot_{}_imag'.format(correlation_channel),
+                copy_rot_matrix_imag)
             # Enable correlation mode one the correlation output channel and
             # set the source to the second source channel
             self.UHFQC.set('quex_corr_{}_mode'.format(correlation_channel), 1)

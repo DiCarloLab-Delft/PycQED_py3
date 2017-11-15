@@ -8,6 +8,7 @@ from pycqed.measurement.waveform_control import sequence
 from pycqed.utilities.general import add_suffix_to_dict_keys
 from pycqed.measurement.pulse_sequences.standard_elements import multi_pulse_elt
 from pycqed.measurement.pulse_sequences.standard_elements import distort_and_compensate
+from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
 
 from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import get_pulse_dict_from_pars
 from importlib import reload
@@ -1005,3 +1006,137 @@ def n_qubit_off_on(pulse_pars_list, RO_pars, return_seq=False, verbose=False,
         return seq, el_list
     else:
         return seq_name
+
+
+def n_qubit_simultaneous_randomized_benchmarking_seq(pulse_pars_list, RO_pars,
+                                         nr_cliffords_value, #scalar
+                                         nr_seeds,           #array
+                                         idx_for_RB=0,
+                                         return_seq=False,
+                                         parallel_pulses=False,
+                                         CxC_RB=True,
+                                         net_clifford=0,
+                                         gate_decomposition='HZ',
+                                         interleaved_gate=None,
+                                         post_msmt_delay=3e-6,
+                                         seq_name=None,
+                                         verbose=False):
+
+    # Here RO_pars must contain the RO pulse for multiplexed RO on the
+    # relevant qubits.
+    # idx_for_RB refers to the index of the pulse_pars in pulse_pars_list
+    # which will undergo the RB protocol in the case CxC_RB==False (i.e. the
+    # position of the Z operator when we measure ZIII..I, IZII..I, IIZI..I etc.
+
+    # !!! ONLY FOR 2 QUBITS SO FAR
+    n = len(pulse_pars_list)
+
+    # Create a dict with the parameters for all the pulses
+    pulse_dict = {'RO': RO_pars}
+    for i, pulse_pars in enumerate(pulse_pars_list):
+        pars = pulse_pars.copy()
+        # RO_pars = RO_pars_list[i].copy()
+        if i != 0 and parallel_pulses:
+            pars['refpoint'] = 'start'
+        # pulse_dict.update({'RO '+str(i): RO_pars})
+        pulses = add_suffix_to_dict_keys(
+            get_pulse_dict_from_pars(pars), ' {}'.format(i))
+        pulse_dict.update(pulses)
+
+    if CxC_RB:
+
+        if seq_name is None:
+            seq_name = 'CxC_RB_sequence'
+        seq = sequence.Sequence(seq_name)
+        el_list = []
+
+        for i in nr_seeds:
+
+            clifford_sequence_list = []
+            for index in range(n):
+                clifford_sequence_list.append(rb.randomized_benchmarking_sequence(
+                    nr_cliffords_value, desired_net_cl=net_clifford,
+                    interleaved_gate=interleaved_gate))
+
+            pulse_keys = rb.decompose_clifford_seq_n_qubits(
+                clifford_sequence_list,
+                gate_decomp=gate_decomposition)
+
+            # interleave pulses for each qubit to obtain [pulse0_qb0,
+            # pulse0_qb1,...pulse0_qbN,...,pulseN_qb0, pulseN_qb1,...,pulseN_qbN]
+            pulse_keys_w_suffix = []
+            for k, lst in enumerate(pulse_keys):
+                pulse_keys_w_suffix.append([x+' '+str(k % n) for x in lst])
+            pulse_keys_by_qubit = []
+            for k in range(n):
+                pulse_keys_by_qubit.append([x for l in pulse_keys_w_suffix[k::n] for x in l])
+            pulse_list = []
+            for j in range(len(pulse_keys_by_qubit[0])):
+                for k in range(n):
+                    pulse_list.append(pulse_dict[pulse_keys_by_qubit[k][j]])
+
+            # find index of first pulse in pulse_list that is not a Z pulse
+            # copy this pulse and set extra wait
+            first_x_pulse = next(j for j in pulse_list if 'Z' not in j['pulse_type'])
+            first_x_pulse_idx = pulse_list.index(first_x_pulse)
+            pulse_list[first_x_pulse_idx] = deepcopy(pulse_list[first_x_pulse_idx])
+            pulse_list[first_x_pulse_idx]['pulse_delay'] += post_msmt_delay
+
+            # add RO pulse pars at the end
+            pulse_list += [RO_pars]
+
+            el = multi_pulse_elt(i, station, pulse_list)
+            el_list.append(el)
+            seq.append_element(el, trigger_wait=True)
+
+    else:
+
+        if seq_name is None:
+            seq_name = 'CxI_IxC_RB_sequence'
+        seq = sequence.Sequence(seq_name)
+        el_list = []
+
+        # create pulse list
+        pulse_list = (nr_cliffords_value+1)*n*[''] # +1 for recovery pulse
+
+        for i in nr_seeds:
+
+            cl_seq = rb.randomized_benchmarking_sequence(
+                nr_cliffords_value, desired_net_cl=net_clifford,
+                interleaved_gate=interleaved_gate)
+            pulse_keys = rb.decompose_clifford_seq(
+                cl_seq,
+                gate_decomp=gate_decomposition)
+
+            C_pulse_list = [pulse_dict[x+' '+str(idx_for_RB)] for x in pulse_keys]
+            # find index of first pulse in pulse_list that is not a Z pulse
+            # copy this pulse and set extra wait
+            first_x_pulse = next(j for j in C_pulse_list if 'Z' not in j['pulse_type'])
+            first_x_pulse_idx = C_pulse_list.index(first_x_pulse)
+            C_pulse_list[first_x_pulse_idx] = deepcopy(C_pulse_list[first_x_pulse_idx])
+            C_pulse_list[first_x_pulse_idx]['pulse_delay'] += post_msmt_delay
+            pulse_list[idx_for_RB::n] = C_pulse_list
+
+            for index in range(n):
+                if index != idx_for_RB:
+                    I_pulse_list = (nr_cliffords_value+1)*[pulse_dict['I '+str(index)]]
+                    # pulse_list = [val for pair in zip(C_pulse_list, I_pulse_list) for val in pair]
+                    pulse_list[index::n] = I_pulse_list
+
+            pulse_list += [RO_pars]
+
+            el = multi_pulse_elt(i, station, pulse_list)
+            el_list.append(el)
+            seq.append_element(el, trigger_wait=True)
+
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
+
+
+
+
+
+

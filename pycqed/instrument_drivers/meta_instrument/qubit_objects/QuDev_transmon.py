@@ -61,6 +61,10 @@ class QuDev_transmon(Qubit):
                            initial_value=0, parameter_class=ManualParameter)
         self.add_parameter('T1_ef', label='Qubit relaxation', unit='s',
                            initial_value=0, parameter_class=ManualParameter)
+        self.add_parameter('T2', label='Qubit dephasing Echo', unit='s',
+                           initial_value=0, parameter_class=ManualParameter)
+        self.add_parameter('T2_ef', label='Qubit dephasing Echo', unit='s',
+                           initial_value=0, parameter_class=ManualParameter)
         self.add_parameter('T2_star', label='Qubit dephasing', unit='s',
                            initial_value=0, parameter_class=ManualParameter)
         self.add_parameter('T2_star_ef', label='Qubit dephasing', unit='s',
@@ -934,10 +938,10 @@ class QuDev_transmon(Qubit):
                                         upload=True, analyze=True,
                                         gate_decomp='HZ', label=None,
                                         cal_points=True,
-                                        interleaved_gate=None):
+                                        interleaved_gate=None,
+                                        det_func=None):
         '''
-        Performs a randomized benchmarking fidelity.
-        Optionally specifying T1 also shows the T1 limited fidelity.
+        Performs a randomized benchmarking experiment on 1 qubit.
         type(nr_cliffords) == array
         type(nr_seeds) == int
         '''
@@ -967,13 +971,17 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_points( np.arange(nr_seeds) )
         MC.set_sweep_function_2D( RB_sweepfunction_2D )
         MC.set_sweep_points_2D( nr_cliffords )
-        MC.set_detector_function(self.int_avg_det)
+        if det_func is None:
+            MC.set_detector_function(self.int_avg_det)
+        else:
+            MC.set_detector_function(det_func)
 
         MC.run(label, mode='2D')
 
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
                                    qb_name=self.name, TwoD=True)
+
 
     def set_default_readout_weights(self, channels=(0, 1), theta=None):
         """
@@ -1933,7 +1941,7 @@ class QuDev_transmon(Qubit):
     def find_RB_gate_fidelity(self, nr_cliffords, label=None, nr_seeds=10,
                               MC=None, cal_points=True, gate_decomposition='HZ',
                               no_cal_points=None, close_fig=True,
-                              upload=True, **kw):
+                              upload=True, det_func=None, **kw):
 
         for_ef = kw.pop('for_ef', False)
         last_ge_pulse = kw.pop('last_ge_pulse', False)
@@ -1941,9 +1949,16 @@ class QuDev_transmon(Qubit):
         show = kw.pop('show', False)
         interleaved_gate = kw.pop('interleaved_gate', None)
         T1 = kw.pop('T1', None)
+        T2 = kw.pop('T1', None)
 
         if T1 is None and self.T1() is not None:
             T1 = self.T1()
+        if T2 is None:
+            if self.T2() is not None:
+                T2 = self.T2()
+            elif self.T2_star() is not None:
+                print('T2 is None. Using T2_star.')
+                T2 = self.T2_star()
 
         if type(nr_cliffords) is int:
             every_other = kw.pop('every_other', 5)
@@ -2003,14 +2018,15 @@ class QuDev_transmon(Qubit):
                                              label=label,
                                              analyze=analyze,
                                              upload=upload,
-                                             interleaved_gate=interleaved_gate)
+                                             interleaved_gate=interleaved_gate,
+                                             det_func=det_func)
 
         #Analysis
         if analyze:
             pulse_delay = self.gauss_sigma() * self.nr_sigma()
             RB_Analysis = ma.RandomizedBenchmarking_Analysis_new(label=label,
                                          qb_name=self.name,
-                                         T1=T1, pulse_delay=pulse_delay,
+                                         T1=T1, T2=T2, pulse_delay=pulse_delay,
                                          NoCalPoints=no_cal_points,
                                          for_ef=for_ef, show=show,
                                          gate_decomp=gate_decomposition,
