@@ -20,7 +20,7 @@ class Test_tomography_execute(unittest.TestCase):
     def test_tomo_analysis_cardinal_state(self):
       
       #The dataset corresponds to the 00 cardinal state.
-      tomo_object = tomography_execute.TomographyExecute(timestamp='20161124_162604')
+      tomo_object = tomography_execute.TomographyExecute(timestamp='20161124_162604',tomography_type = "MLE")
       # Get the dm for 00 cardinal state  
       # returned rho is a quantum object
       rho_tomo = (tomo_object.get_density_matrix()).full()
@@ -30,7 +30,7 @@ class Test_tomography_execute(unittest.TestCase):
       #This is not the correct fidelity 
       #The correct method shhould be pauli labels
       benchmark_fidelity = np.real_if_close(np.dot(rho_tomo.flatten(),rho_target.flatten()))
-      self.assertAlmostEqual(benchmark_fidelity, 0.9077158, places=7)
+      self.assertAlmostEqual(benchmark_fidelity, 0.9679030, places=6)
 
     
 
