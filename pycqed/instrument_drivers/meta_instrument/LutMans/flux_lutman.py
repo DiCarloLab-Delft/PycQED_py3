@@ -1,5 +1,6 @@
 from .base_lutman import Base_LutMan
 import numpy as np
+import logging
 from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter
 from qcodes.utils import validators as vals
 from pycqed.measurement.waveform_control_CC import waveform as wf
@@ -10,7 +11,7 @@ class Base_Flux_LutMan(Base_LutMan):
     # this default lutman is if a flux pulse can be done with only one
     # other qubit. this needs to be expanded if there are more qubits
     # to interact with.
-    _def_lm = ['i', 'cz',  'square', 'park']
+    _def_lm = ['i', 'cz_z', 'square', 'park']
 
     def render_wave(self, wave_name, show=True, time_units='s',
                     reload_pulses: bool=True, render_distorted_wave: bool=True,
@@ -35,15 +36,19 @@ class Base_Flux_LutMan(Base_LutMan):
                                 figsize=(600, 400))
 
         if render_distorted_wave:
-            x2 = np.arange(len(self._wave_dict_dist[wave_name]))
-            if time_units == 's':
-                x2 = x2/self.sampling_rate()
+            if wave_name in self._wave_dict_dist.keys():
+                x2 = np.arange(len(self._wave_dict_dist[wave_name]))
+                if time_units == 's':
+                    x2 = x2/self.sampling_rate()
 
-            y2 = self._wave_dict_dist[wave_name]
-            QtPlot_win.add(
-                x=x2, y=y2, name=wave_name+' distorted',
-                symbol='o', symbolSize=5,
-                xlabel=xlab[0], xunit=xlab[1], ylabel='Amplitude', yunit='V')
+                y2 = self._wave_dict_dist[wave_name]
+                QtPlot_win.add(
+                    x=x2, y=y2, name=wave_name+' distorted',
+                    symbol='o', symbolSize=5,
+                    xlabel=xlab[0], xunit=xlab[1], ylabel='Amplitude',
+                    yunit='V')
+            else:
+                logging.warning('Wave not in distorted wave dict')
         # Plotting the normal one second ensures it is on top.
         QtPlot_win.add(
             x=x, y=y, name=wave_name,
@@ -121,6 +126,38 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                            # 12us is current max of AWG8
                            parameter_class=ManualParameter)
 
+        self.add_parameter('cz_length', vals=vals.Numbers(),
+                           unit='s', initial_value=35e-9,
+                           parameter_class=ManualParameter)
+        self.add_parameter('cz_lambda_2', vals=vals.Numbers(),
+                           initial_value=0,
+                           parameter_class=ManualParameter)
+        self.add_parameter('cz_lambda_3', vals=vals.Numbers(),
+                           initial_value=0,
+                           parameter_class=ManualParameter)
+        self.add_parameter('cz_theta_f', vals=vals.Numbers(),
+                           unit='deg',
+                           initial_value=80,
+                           parameter_class=ManualParameter)
+        self.add_parameter('cz_freq_01_max', vals=vals.Numbers(),
+                           unit='Hz', parameter_class=ManualParameter)
+        self.add_parameter('cz_J2', vals=vals.Numbers(),
+                           unit='Hz',
+                           initial_value=50e6,
+                           parameter_class=ManualParameter)
+        self.add_parameter('cz_freq_interaction', vals=vals.Numbers(),
+                           unit='Hz',
+                           parameter_class=ManualParameter)
+        self.add_parameter('cz_phase_corr_length',
+                           unit='s',
+                           initial_value=5e-9, vals=vals.Numbers(),
+                           parameter_class=ManualParameter)
+
+        self.add_parameter('cz_phase_corr_amp',
+                           unit='V',
+                           initial_value=0, vals=vals.Numbers(),
+                           parameter_class=ManualParameter)
+
     def generate_standard_waveforms(self):
         """
         Generates all the standard waveforms and populates self._wave_dict
@@ -129,11 +166,33 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         self._wave_dict = {}
         # FIXME: only implemented square wave for now (MAR)
         self._wave_dict['i'] = np.zeros(42)
-        self._wave_dict['cz'] = np.zeros(42)
         self._wave_dict['square'] = wf.single_channel_block(
             amp=self.sq_amp(), length=self.sq_length(),
             sampling_rate=self.sampling_rate(), delay=0)
         self._wave_dict['park'] = np.zeros(42)
+
+        self._wave_dict['cz'] = wf.martinis_flux_pulse(
+            length=self.cz_length(),
+            lambda_2=self.cz_lambda_2(),
+            lambda_3=self.cz_lambda_3(),
+            theta_f=self.cz_theta_f(),
+            f_01_max=self.cz_freq_01_max(),
+            J2=self.cz_J2(),
+            f_interaction=self.cz_freq_interaction(),
+            sampling_rate=self.sampling_rate(),
+            return_unit='V')
+
+        phase_corr = wf.single_channel_block(
+            amp=self.cz_phase_corr_amp(), length=self.cz_phase_corr_length(),
+            sampling_rate=self.sampling_rate(), delay=0)
+
+        # CZ with phase correction
+        self._wave_dict['cz_z'] = np.concatenate(
+            [self._wave_dict['cz'], phase_corr])
+
+        # Only apply phase correction component after idle for duration of CZ
+        self._wave_dict['idle_z'] = np.concatenate(
+            [np.zeros(len(self._wave_dict['cz'])), phase_corr])
 
     def load_waveform_onto_AWG_lookuptable(self, waveform_name: str,
                                            regenerate_waveforms: bool=False):
