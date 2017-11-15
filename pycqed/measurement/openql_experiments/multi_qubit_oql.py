@@ -1,4 +1,3 @@
-import numpy as np
 from os.path import join, dirname
 import openql.openql as ql
 from openql.openql import Program, Kernel, Platform
@@ -275,7 +274,9 @@ def chevron_seq(fluxing_qubit: str, spectator_qubit: str,
 
 
 def two_qubit_tomo_bell(bell_state, q0, q1,
-                        wait_after_trigger=10e-9, wait_during_flux=260e-9,
+                        platf_cfg,
+                        wait_after_trigger=10e-9,
+                        wait_during_flux=260e-9,
                         clock_cycle=1e-9,
                         single_qubit_compiled_phase=False,
                         RO_target='all'):
@@ -293,87 +294,61 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
             correction in the recovery pulse
         RO_target   (str): can be q0, q1, or 'all'
     '''
-    raise NotImplementedError()
-    # tomo_pulses = ['I ', 'X180 ', 'Y90 ', 'mY90 ', 'X90 ', 'mX90 ']
-    # tomo_list_q0 = []
-    # tomo_list_q1 = []
-    # for tp in tomo_pulses:
-    #     tomo_list_q0 += [tp + q0 + '\n']
-    #     tomo_list_q1 += [tp + q1 + '\n']
+    tomo_gates = ['i', 'rx180', 'ry90', 'rym90', 'rx90', 'rxm90']
 
-    # tomo_list_q0[0] = 'I 20\n'
-    # tomo_list_q1[0] = 'I 20\n'
+    # Choose a bell state and set the corresponding preparation pulses
+    if bell_state == 0:  # |Phi_m>=|00>-|11>
+        prep_pulse_q0, prep_pulse_q1 = 'ry90', 'ry90'
+    elif bell_state % 10 == 1:  # |Phi_p>=|00>+|11>
+        prep_pulse_q0, prep_pulse_q1 = 'rym90', 'ry90'
+    elif bell_state % 10 == 2:  # |Psi_m>=|01>-|10>
+        prep_pulse_q0, prep_pulse_q1 = 'ry90', 'rym90'
+    elif bell_state % 10 == 3:  # |Psi_p>=|01>+|10>
+        prep_pulse_q0, prep_pulse_q1 = 'rym90', 'rym90'
+    else:
+        raise ValueError('Bell state {} is not defined.'.format(bell_state))
 
-    # # Choose a bell state and set the corresponding preparation pulses
-    # if bell_state % 10 == 0:  # |Phi_m>=|00>-|11>
-    #     prep_pulse_q0 = 'Y90 {}\n'.format(q0)
-    #     prep_pulse_q1 = 'Y90 {}\n'.format(q1)
-    # elif bell_state % 10 == 1:  # |Phi_p>=|00>+|11>
-    #     prep_pulse_q0 = 'mY90 {}\n'.format(q0)
-    #     prep_pulse_q1 = 'Y90 {}\n'.format(q1)
-    # elif bell_state % 10 == 2:  # |Psi_m>=|01>-|10>
-    #     prep_pulse_q0 = 'Y90 {}\n'.format(q0)
-    #     prep_pulse_q1 = 'mY90 {}\n'.format(q1)
-    # elif bell_state % 10 == 3:  # |Psi_p>=|01>+|10>
-    #     prep_pulse_q0 = 'mY90 {}\n'.format(q0)
-    #     prep_pulse_q1 = 'mY90 {}\n'.format(q1)
-    # else:
-    #     raise ValueError('Bell state {} is not defined.'.format(bell_state))
-
-    # # Recovery pulse is the same for all Bell states
-    # if single_qubit_compiled_phase == False:
-    #     after_pulse = 'mY90 {}\n'.format(q1)
-    # else:
-    #     after_pulse = 'recmY90 {}\n'.format(q1)
-
-    # # Disable preparation pulse on one or the other qubit for debugging
-    # if bell_state//10 == 1:
-    #     prep_pulse_q1 = 'I 20'
-    # elif bell_state//10 == 2:
-    #     prep_pulse_q0 = 'I 20'
+    # Recovery pulse is the same for all Bell states
+    after_pulse_q1 = 'rym90'
 
     # # Define compensation pulses
     # # FIXME: needs to be added
     # print('Warning: not using compensation pulses.')
 
-    # # Write tomo sequence
-
-    # filename = join(base_qasm_path, 'two_qubit_tomo_bell.qasm')
-    # qasm_file = mopen(filename, mode='w')
-    # qasm_file.writelines('qubit {} \nqubit {} \n'.format(q0, q1))
-
-    # for p_q1 in tomo_list_q1:
-    #     for p_q0 in tomo_list_q0:
-    #         qasm_file.writelines('\ninit_all\n')
-    #         qasm_file.writelines('QWG trigger\n')
-    #         qasm_file.writelines(
-    #             'I {}\n'.format(int(wait_after_trigger//clock_cycle)))
-    #         qasm_file.writelines(prep_pulse_q0)
-    #         qasm_file.writelines(prep_pulse_q1)
-    #         qasm_file.writelines(
-    #             'I {}\n'.format(int(wait_during_flux//clock_cycle)))
-    #         qasm_file.writelines(after_pulse)
-    #         qasm_file.writelines(p_q1)
-    #         qasm_file.writelines(p_q0)
-    #         qasm_file.writelines('RO ' + RO_target + '  \n')
-
-    # # Add calibration pulses
-    # cal_pulses = []
-    # # every calibration point is repeated 7 times. This is copied from the
-    # # script for Tektronix driven qubits. I do not know if this repetition
-    # # is important or even necessary here.
-    # for seq in cal_points_2Q:
-    #     cal_pulses += [[seq[0].format(q0), seq[1].format(q1),
-    #                     'RO ' + RO_target + '\n']] * 7
-
-    # for seq in cal_pulses:
-    #     qasm_file.writelines('\ninit_all\n')
-    #     for p in seq:
-    #         qasm_file.writelines(p)
-
-    # qasm_file.close()
-    # return qasm_file
-
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="two_qubit_tomo_bell",
+                nqubits=platf.get_qubit_number(),
+                p=platf)
+    for p_q1 in tomo_gates:
+        for p_q0 in tomo_gates:
+            k = Kernel("BellTomo_{}{}_{}{}".format(
+                       q1, p_q1, q0, p_q0
+                       ), p=platf)
+            # next experiment
+            k.prepz(q0)  # to ensure enough separation in timing
+            k.prepz(q1)  # to ensure enough separation in timing
+            # pre-rotations
+            k.gate(prep_pulse_q0, q0)
+            k.gate(prep_pulse_q1, q1)
+            # FIXME hardcoded edge because of
+            # brainless "directed edge recources" in compiler
+            k.gate('fl_cw_01', 2, 0)
+            # after-rotations
+            k.gate(after_pulse_q1, q1)
+            # sync barrier before tomo
+            k.gate("wait", [q0, q1], 0)
+            # tomo pulses
+            k.gate(p_q1, q0)
+            k.gate(p_q0, q1)
+            # measure
+            k.measure(q0)
+            k.measure(q1)
+            p.add_kernel(k)
+    p = add_two_q_cal_points(p, platf=platf, q0=q0, q1=q1)
+    p.compile()
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
 
 def CZ_calibration_seq(q0, q1, RO_target='all',
                        CZ_disabled=False,
