@@ -85,7 +85,7 @@ def generate_config(filename: str,
         },
     }
 
-    for q in qubits:
+    for qnum, q in enumerate(qubits):
         cfg["instructions"]["prepz {}".format(q)] = {
             "duration": init_duration,
             "latency": 0,
@@ -100,7 +100,7 @@ def generate_config(filename: str,
             }
         }
 
-    for q in qubits:
+    for qnum, q in enumerate(qubits):
         cfg["instructions"]["measure {}".format(q)] = {
             "duration": ro_duration,
             "latency": 0,
@@ -116,34 +116,34 @@ def generate_config(filename: str,
         }
 
     for CW in range(len(lut_map)):
-        for q in qubits:
+        for qnum, q in enumerate(qubits):
             cfg["instructions"][lut_map[CW].format(q)] = {
                 "duration": mw_pulse_duration,
                 "latency": 0,
                 "qubits": [q],
                 "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
-                "disable_optimization": False,
+                "disable_optimization": True,
                 "type": "mw",
                 "qumis_instr": "pulse",
                 "qumis_instr_kw": {
                     "codeword": CW,
-                    "awg_nr": q
+                    "awg_nr": qnum
                 }
             }
 
-    for CW in range(8):
-        for q in qubits:
+    for CW in range(len(lut_map)):
+        for qnum, q in enumerate(qubits):
             cfg["instructions"]["cw_{:02} {}".format(CW, q)] = {
                 "duration": mw_pulse_duration,
                 "latency": 0,
                 "qubits": [q],
                 "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
-                "disable_optimization": False,
+                "disable_optimization": True,
                 "type": "mw",
                 "qumis_instr": "pulse",
                 "qumis_instr_kw": {
                     "codeword": CW,
-                    "awg_nr": q
+                    "awg_nr": qnum
                 }
             }
 
