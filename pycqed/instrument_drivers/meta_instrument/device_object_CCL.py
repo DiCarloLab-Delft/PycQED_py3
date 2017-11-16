@@ -61,7 +61,6 @@ class DeviceCCL(Instrument):
                        'acquisition. The positive number means that the '
                        'acquisition is started after the pulse is send.'))
 
-
         self.add_parameter('instr_MC', label='MeasurementControl',
                            parameter_class=InstrumentRefParameter)
         self.add_parameter('instr_VSM', label='Vector Switch Matrix',
@@ -154,7 +153,6 @@ class DeviceCCL(Instrument):
             qb.ro_acq_digitized(self.ro_acq_digitized())
             qb.ro_acq_delay(self.ro_acq_delay())
 
-
             acq_device = qb.instr_acquisition()
 
             # allocate different acquisition channels
@@ -212,6 +210,8 @@ class DeviceCCL(Instrument):
             integration_length=q0.ro_acq_integration_length(),
             single_int_avg=single_int_avg,
             seg_per_point=seg_per_point)
+        d.value_names = [qnames[0], qnames[1],
+                 'Corr ({}, {})'.format(qnames[0], qnames[1])]
         return d
 
     def get_int_logging_detector(self, qubits: list=None,
@@ -313,7 +313,6 @@ class DeviceCCL(Instrument):
                 integration_length=self.ro_acq_integration_length())
 
             self.int_avg_det_single.value_names = value_names
-
 
     def _prep_ro_sources(self):
         """
@@ -451,9 +450,9 @@ class DeviceCCL(Instrument):
         self._prep_td_configure_VSM()
 
     def measure_two_qubit_tomo_bell(self, q0: str, q1: str,
-                                bell_state=0,
-                                analyze=True, close_fig=True,
-                                prepare_for_timedomain=True, MC=None):
+                                    bell_state=0,
+                                    analyze=True, close_fig=True,
+                                    prepare_for_timedomain=True, MC=None):
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
@@ -467,20 +466,20 @@ class DeviceCCL(Instrument):
         q1idx = self.find_instrument(q1).cfg_qubit_nr()
 
         p = mqo.two_qubit_tomo_bell(bell_state, q0idx, q1idx,
-                            platf_cfg=self.cfg_openql_platform_fn())
+                                    platf_cfg=self.cfg_openql_platform_fn())
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr())
         d = self.get_correlation_detector()
         MC.set_sweep_function(s)
-        # 36 tomo rotations + 4 calibration points
-        MC.set_sweep_points(np.arange(36+4))
+        # 36 tomo rotations + 7*4 calibration points
+        MC.set_sweep_points(np.arange(36+7*4))
         MC.set_detector_function(d)
         MC.run('TwoQubitBellTomo_{}_{}_{}'.format(q0, q1, self.msmt_suffix))
         if analyze:
-            tomo.Tomo_Multiplexed(
+            a = tomo.Tomo_Multiplexed(
                 label='Tomo',
-                MLE=True, target_bell=target_bell, single_shots=single_shots,
-                q0_label=q0.name, q1_label=q1.name)
+                MLE=True, target_bell=bell_state, single_shots=False,
+                q0_label=q0, q1_label=q1)
             return a
 
     def measure_two_qubit_AllXY(self, q0: str, q1: str,
@@ -519,7 +518,7 @@ class DeviceCCL(Instrument):
         return a
 
     def measure_two_qubit_SSRO(self, q0: str, q1: str,
-                               detector = None,
+                               detector=None,
                                nr_shots: int=4092*4,
                                prepare_for_timedomain: bool =True,
                                result_logging_mode='lin_trans',
@@ -591,8 +590,6 @@ class DeviceCCL(Instrument):
                 analyze=True, verify=verify_optimal_weights)
             q1.calibrate_optimal_weights(
                 analyze=True, verify=verify_optimal_weights)
-
-
 
         self.measure_two_qubit_SSRO(q0.name, q1.name,
                                     result_logging_mode='lin_trans')

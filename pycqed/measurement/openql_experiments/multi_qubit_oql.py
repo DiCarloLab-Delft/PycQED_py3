@@ -1,4 +1,5 @@
 from os.path import join, dirname
+import numpy as np
 import openql.openql as ql
 from openql.openql import Program, Kernel, Platform
 
@@ -372,26 +373,33 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
             k.gate(prep_pulse_q1, q1)
             # FIXME hardcoded edge because of
             # brainless "directed edge recources" in compiler
+            # Hardcoded flux pulse, FIXME use actual CZ
+            k.gate('wait', [2, 0], 100)
             k.gate('fl_cw_01', 2, 0)
             # after-rotations
             k.gate(after_pulse_q1, q1)
-            # sync barrier before tomo
-            k.gate("wait", [q0, q1], 0)
             # tomo pulses
             k.gate(p_q1, q0)
             k.gate(p_q0, q1)
             # measure
             k.measure(q0)
             k.measure(q1)
+            # sync barrier before tomo
+            # k.gate("wait", [q0, q1], 0)
+            k.gate("wait", [2, 0], 0)
             p.add_kernel(k)
-    p = add_two_q_cal_points(p, platf=platf, q0=q0, q1=q1)
+    # 7 repetitions is because of assumptions in tomo analysis
+    p = add_two_q_cal_points(p, platf=platf, q0=q0, q1=q1, reps_per_cal_pt=7)
     p.compile()
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
 
+
 def CZ_calibration_seq(q0: int, q1: int, platf_cfg: str,
                        CZ_disabled=False,
+                       angles=np.arange(0, 360, 20),
+                       add_cal_points=True,
                        cases=('no_excitation', 'excitation')):
     '''
     Sequence used to calibrate flux pulses for CZ gates.
@@ -412,7 +420,6 @@ def CZ_calibration_seq(q0: int, q1: int, platf_cfg: str,
     p = Program(pname="CZ_calibration_seq", nqubits=platf.get_qubit_number(),
                 p=platf)
     # These angles correspond to special pi/2 pulses in the lutman
-    angles = np.arange(0, 360, 20)
     for i, angle in enumerate(angles):
         for case in cases:
             k = Kernel("{}_{}".format(case, angle), p=platf)
@@ -426,7 +433,7 @@ def CZ_calibration_seq(q0: int, q1: int, platf_cfg: str,
             if not CZ_disabled:
                 k.gate('fl_cw_01', 2, 0)
             # hardcoded angles, must be uploaded to AWG
-            k.gate('cw_{:02}'.format(i+8), q0)
+            k.gate('cw_{:02}'.format(i+9), q0)
             if case == 'excitation':
                 k.gate('rx180', q1)
 
@@ -438,14 +445,18 @@ def CZ_calibration_seq(q0: int, q1: int, platf_cfg: str,
             k.gate('wait', [2, 0], 0)
 
             p.add_kernel(k)
-
-    p = add_two_q_cal_points(p, platf=platf, q0=q0, q1=q1)
+    if add_cal_points:
+        p = add_two_q_cal_points(p, platf=platf, q0=q0, q1=q1)
     p.compile()
     # attribute get's added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
-    p.sweep_points = np.concatenate([np.repeat(angles, 2),
-                                    [361, 362, 363, 364]])
+
+    if add_cal_points:
+        cal_pts_idx = [361, 362, 363, 364]
+    else:
+        cal_pts_idx = []
+    p.sweep_points = np.concatenate([np.repeat(angles, 2), cal_pts_idx])
     p.set_sweep_points(p.sweep_points, len(p.sweep_points))
     return p
 
@@ -456,8 +467,8 @@ def CZ_poisoned_purity_seq(q0, q1, platf_cfg: str):
     order to determine the purity of both qubits.
     """
     platf = Platform('OpenQL_Platform', platf_cfg)
-    p = Program(pname="CZ_poisoned_purity_seq", nqubits=platf.get_qubit_number(),
-                p=platf)
+    p = Program(pname="CZ_poisoned_purity_seq",
+                nqubits=platf.get_qubit_number(), p=platf)
     tomo_list = ['rxm90', 'rym90', 'i']
 
     for p_pulse in tomo_list:
