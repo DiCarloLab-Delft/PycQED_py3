@@ -29,20 +29,20 @@ class TomoAnalysis():
     Uses binary counting as general guideline in ordering states. Calculates
      rotations by using the qutip library
     BEFORE YOU USE THIS SET THE CORRECT ORDER BY CHANGING
-        'rotation_matrixes'
+        'rotation_matrices'
         'measurement_basis' + 'measurement_basis_labels'
         to values corresponding to your experiment
         and maybe 'readout_basis'
     """
 
-    # The set of single qubit rotation matrixes used in the tomography
+    # The set of single qubit rotation matrices used in the tomography
     # measurement (will be assumed to be used on all qubits)
-    rotation_matrixes = [qt.identity(2), qt.sigmax(),
+    rotation_matrices = [qt.identity(2), qt.sigmax(),
                          qt.rotation(
                              qt.sigmay(), np.pi / 2), qt.rotation(qt.sigmay(), -1*np.pi / 2),
                          qt.rotation(qt.sigmax(), np.pi / 2), qt.rotation(qt.sigmax(), -np.pi / 2)]
     measurement_operator_labels = ['I', 'X', 'y', '-y', 'x','-x']
-    #MAKE SURE THE LABELS CORRESPOND TO THE ROTATION MATRIXES DEFINED ABOVE
+    #MAKE SURE THE LABELS CORRESPOND TO THE ROTATION MATRICES DEFINED ABOVE
 
     # The set of single qubit basis operators and labels (normalized)
     measurement_basis = [
@@ -55,7 +55,7 @@ class TomoAnalysis():
         """
         keyword arguments:
         measurements_cal --- Should be an array of length 2 ** n_qubits
-        measurements_tomo --- Should be an array of length length(rotation_matrixes) ** n_qubits
+        measurements_tomo --- Should be an array of length length(rotation_matrices) ** n_qubits
         n_qubits --- default(2) the amount of qubits present in the expirement
         n_quadratures --- default(1(either I or Q)) The amount of complete measurement data sets. For example a combined IQ measurement has 2 measurement sets.
         tomo_vars  : since this tomo does not have access to the original data, the vars should be given by
@@ -65,7 +65,7 @@ class TomoAnalysis():
         self.n_qubits = n_qubits
         self.n_states = 2 ** n_qubits
 
-        # Generate the vectors of matrixes that correspond to all measurements,
+        # Generate the vectors of matrices that correspond to all measurements,
         # readout bases and rotations
         self.basis_vector = self._calculate_matrix_set(
             self.measurement_basis, n_qubits)
@@ -73,7 +73,7 @@ class TomoAnalysis():
             self.readout_basis, n_qubits)
 
         self.rotation_vector = self._calculate_matrix_set(
-            self.rotation_matrixes, n_qubits)
+            self.rotation_matrices, n_qubits)
 
         # generate the basis change matrix from pauli to comp and back
         A = np.zeros((self.n_states**2, self.n_states**2), dtype=complex)
@@ -87,6 +87,8 @@ class TomoAnalysis():
         self.qt_dims = [[2 for i in range(self.n_qubits)], [2 for i in range(self.n_qubits)]]
 
         if check_labels is True:
+            # prints the order of basis set corresponding to the 
+            # tomographic rotations
             print(self.get_meas_operator_labels(n_qubits))
             print(self.get_basis_labels(n_qubits))
 
@@ -104,10 +106,10 @@ class TomoAnalysis():
         
 
         #for each independent set of measurements(with their own measurement operator, calculate the coeff matrix)
-        coeff_matrixes = []
+        coeff_matrices = []
         for measurement_operator in meas_operators:
-            coeff_matrixes.append(self.calculate_LI_coefficient_matrix(measurement_operator, do_in_pauli=use_pauli_basis))
-        coefficient_matrix = np.vstack(coeff_matrixes)
+            coeff_matrices.append(self.calculate_LI_coefficient_matrix(measurement_operator, do_in_pauli=use_pauli_basis))
+        coefficient_matrix = np.vstack(coeff_matrices)
 
         basis_decomposition = np.zeros(4 ** self.n_qubits, dtype=complex)
         
@@ -139,7 +141,7 @@ class TomoAnalysis():
                         tomo_var_i = 1 / N_i * np.var(M_i) where i stands for the data corresponding to rotation i. 
         --- arguments for scipy fmin_powel method below, see the powell documentation
         """
-        # first we calculate the measurement matrixes
+        # first we calculate the measurement matrices
         tstart = time.time()
 
         measurement_operators = [measurement_operators] if type(measurement_operators) == qt.Qobj else measurement_operators
@@ -171,7 +173,7 @@ class TomoAnalysis():
         t_optimal = scipy.optimize.fmin_powell(
             self._max_likelihood_optimization_function, t0, maxiter=max_iter, full_output=full_output, ftol=ftol, xtol=xtol)
         if show_time is True:
-            print(" Time to calc rotation matrixes %.2f " % (tlinear-tstart))
+            print(" Time to calc rotation matrices %.2f " % (tlinear-tstart))
             print(" Time to do linear tomo %.2f " % (tcholesky-tlinear))
             print(" Time to build T %.2f " % (topt-tcholesky))
             print(" Time to optimize %.2f" % (time.time()-topt))
@@ -276,7 +278,7 @@ class TomoAnalysis():
         Requires a calibrated measurement operator
         if do_in_pauli is true this will presume measurement operator is given in the  basis.
         """
-        coefficient_matrix = np.zeros((len(self.rotation_matrixes) ** self.n_qubits, 4 ** self.n_qubits), dtype=complex)
+        coefficient_matrix = np.zeros((len(self.rotation_matrices) ** self.n_qubits, 4 ** self.n_qubits), dtype=complex)
         Ms = self.get_measurement_vector(measurement_operator, do_in_pauli=do_in_pauli)
         for i in range(len(Ms)):
             coefficient_matrix[i,:] =  np.ravel(Ms[i].full())
@@ -286,7 +288,7 @@ class TomoAnalysis():
         """
         Returns a list of rotated measurement operator based on an initial measurement operator which should be obtained from the calibration
         """
-        n_rotations = len(self.rotation_matrixes) ** self.n_qubits
+        n_rotations = len(self.rotation_matrices) ** self.n_qubits
         measurement_vector = []
         for i in range(n_rotations):
             R = self.rotation_vector[i]
@@ -323,12 +325,8 @@ class TomoAnalysis():
 
     
 
-
-
-#########################################################################
-#
 # HELPERS
-#
+
 
 
     def trans_pauli_to_comp(self, rho_pauli):
@@ -372,7 +370,7 @@ class TomoAnalysis():
     def get_basis_labels(self, n_qubits):
         """
         Returns the basis labels in the same order as the basis vector is parsed.
-        Requires self.measurement_basis_labels to be set with the correct order corresponding to the matrixes in self.measurement_basis
+        Requires self.measurement_basis_labels to be set with the correct order corresponding to the matrices in self.measurement_basis
         """
         if(n_qubits > 1):
             return [x + y for x in self.get_basis_labels(n_qubits - 1)
@@ -529,25 +527,3 @@ def get_TE_calibration_points(e_01, e_10, get_coefficient_matrix=False):
 
 
 
-##############################################################33
-#
-# THRESHOLDED TOMO
-#
-
-class TomoAnalysisThresholded(TomoAnalysis):
-
-    def do_thresholded_tomo():
-        pass
-
-
-################################################################
-#
-# Averaged TOMO
-#
-
-class TomoAnalysisAveraged(TomoAnalysis):
-
-    def do_averaged_tomo():
-             # calculate measurement operator from calibration points, can be seen as the betas!
-        measurement_operator = self.calibrate_measurement_operator(meas_cal, calibration_points, transform_to_pauli=False)
-        pass

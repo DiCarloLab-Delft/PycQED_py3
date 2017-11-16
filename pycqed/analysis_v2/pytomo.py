@@ -1,9 +1,16 @@
+
 from cmath import *
 import re, os, math, sys, time, subprocess, string, getopt
 from numpy import zeros, eye
 import uuid
 
 i=j=1j
+"""
+File that prepares the input and reads the output from the .exe executable file.
+The executable contains a Convex semidefinite programming code, that is a faster version of MLE.
+This code was originally developed by NATHAN LANGFORD.
+
+"""
 
 #--------------------------------------------------------------------------------
 def bases(dim,triangular=False):
