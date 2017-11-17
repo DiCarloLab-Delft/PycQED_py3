@@ -763,9 +763,12 @@ def Randomized_Benchmarking_seq_one_length(pulse_pars, RO_pars,
             pulse_list += [RO_pars]
             # find index of first pulse in pulse_list that is not a Z pulse
             # copy this pulse and set extra wait
-            first_x_pulse = next(j for j in pulse_list if 'Z' not in j['pulse_type'])
-            first_x_pulse_idx = pulse_list.index(first_x_pulse)
-            #print('first_x_pulse_idx = ', first_x_pulse_idx)
+            try:
+                first_x_pulse = next(j for j in pulse_list if 'Z' not in j['pulse_type'])
+                first_x_pulse_idx = pulse_list.index(first_x_pulse)
+                #print('first_x_pulse_idx = ', first_x_pulse_idx)
+            except:
+                first_x_pulse_idx = 0
             pulse_list[first_x_pulse_idx] = deepcopy(pulse_list[first_x_pulse_idx])
             pulse_list[first_x_pulse_idx]['pulse_delay'] += post_msmt_delay
             el = multi_pulse_elt(i, station, pulse_list)
@@ -986,7 +989,8 @@ def get_pulse_dict_from_pars(pulse_pars):
     Z180 = deepcopy(pulse_pars)
     Z180['pulse_type'] = 'Z_pulse'
     for i in pulse_pars.keys():
-        if i not in ['phase', 'pulse_type', 'pulse_delay','operation_type']:
+        if i not in ['phase', 'pulse_type', 'pulse_delay','operation_type',
+                     'target_qubit', 'refpoint']:
             del Z180[i]
 
     pulses = {'I': deepcopy(pulse_pars),

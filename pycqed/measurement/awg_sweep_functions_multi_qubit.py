@@ -154,7 +154,7 @@ class n_qubit_off_on(swf.Hard_Sweep):
                                 return_seq=self.return_seq,
                                 verbose=self.verbose)
 
-class n_qubit_andomized_Benchmarking_nr_cliffords(swf.Soft_Sweep):
+class n_qubit_Simultaneous_Randomized_Benchmarking_nr_cliffords(swf.Soft_Sweep):
 
     def __init__(self, sweep_control='soft',
                  n_qubit_RB_sweepfunction=None):
@@ -163,7 +163,7 @@ class n_qubit_andomized_Benchmarking_nr_cliffords(swf.Soft_Sweep):
         self.sweep_control = sweep_control
         # self.sweep_points = nr_cliffords
         self.n_qubit_RB_sweepfunction = n_qubit_RB_sweepfunction
-        self.name = 'n qubit Randomized_Benchmarking_nr_cliffords'
+        self.name = 'n_qubit_Simultaneous_Randomized_Benchmarking_nr_cliffords'
         self.parameter_name = 'Nr of Cliffords'
         self.unit = '#'
 
@@ -173,7 +173,7 @@ class n_qubit_andomized_Benchmarking_nr_cliffords(swf.Soft_Sweep):
         self.n_qubit_RB_sweepfunction.prepare()
 
 
-class n_qubit_simultaneous_randomized_benchmarking(swf.Hard_Sweep):
+class n_qubit_Simultaneous_Randomized_Benchmarking_one_length(swf.Hard_Sweep):
 
     def __init__(self, pulse_pars_list, RO_pars, nr_cliffords_value, #int
                  gate_decomposition='HZ', interleaved_gate=None,
@@ -196,7 +196,7 @@ class n_qubit_simultaneous_randomized_benchmarking(swf.Hard_Sweep):
 
         self.parameter_name = 'Nr of Seeds'
         self.unit = '#'
-        self.name = 'n_qubit_randomized_Benchmarking_one_length'
+        self.name = 'n_qubit_Simultaneous_Randomized_Benchmarking_one_length'
 
     def prepare(self, **kw):
         if self.upload:

@@ -89,8 +89,16 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
     ##############################
     # Add all pulses one by one  #
     ##############################
-
-    phase_offset = 0 # used for software Z-gates
+    temp_qubit_names = []
+    for x in pulse_list:
+        if x['operation_type']=='MW':
+            try:
+                temp_qubit_names.append(x['target_qubit'])
+            except KeyError: #for example for spacer pulse
+                pass
+    target_qubit_names = list(set(temp_qubit_names))
+    phase_offset = {} # used for software Z-gates
+    [phase_offset.update({qb_name:0}) for qb_name in target_qubit_names]
     j = 0
     for i, pulse_pars in enumerate(pulse_list):
         # Default values for backwards compatibility
@@ -136,19 +144,24 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
                                              'Gated_MW_RO_pulse',
                                              'Multiplexed_UHFQC_pulse']):
 
+
             if pulse_pars['pulse_type'] == 'Z_pulse':
                 # apply software Z-gate (apply phase offset to all
                 # subsequent X and Y pulses)
-                phase_offset = -pulse_pars['phase'] + phase_offset
+                phase_offset[pulse_pars['target_qubit']] = \
+                    -pulse_pars['phase'] + phase_offset[pulse_pars['target_qubit']]
             else:
                 pulse_pars_new = deepcopy(pulse_pars)
-                if phase_offset != 0:
-                    try:
-                        total_phase = pulse_pars['phase'] + phase_offset
+                if pulse_pars['operation_type']=='MW' and \
+                    ('target_qubit' in pulse_pars.keys()):
+                    # only add phase_offset if the pulse is a qubit drive pulse
+
+                    if ('phase' in pulse_pars.keys()) and \
+                                    phase_offset[pulse_pars['target_qubit']] != 0:
+                        total_phase = pulse_pars['phase'] + \
+                                      phase_offset[pulse_pars['target_qubit']]
                         pulse_pars_new['phase'] = (total_phase%360 if total_phase>=0
                                                    else total_phase%-360)
-                    except KeyError:
-                        pass
 
                 try:
                     # Look for the function in pl = pulse_lib
