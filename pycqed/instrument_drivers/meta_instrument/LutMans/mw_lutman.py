@@ -8,6 +8,10 @@ from pycqed.measurement.waveform_control_CC import waveform as wf
 class Base_MW_LutMan(Base_LutMan):
     _def_lm = ['I', 'rX180',  'rY180', 'rX90',  'rY90',
                'rXm90',  'rYm90', 'rPhi90', 'spec']
+    # use remaining codewords to set pi/2 gates for various angles
+    for i in range(18):
+        angle = i * 20
+        _def_lm.append('r{}_90'.format(angle))
 
     def _add_waveform_parameters(self):
         # defined here so that the VSM based LutMan can overwrite this
@@ -140,6 +144,15 @@ class Base_MW_LutMan(Base_LutMan):
             delay=0,
             phase=0)
 
+        for i in range(18):
+            angle = i * 20
+            self._wave_dict['r{}_90'.format(angle)] = self.wf_func(
+                amp=self.mw_amp180()*self.mw_amp90_scale(),
+                sigma_length=self.mw_gauss_width(),
+                f_modulation=self.mw_modulation(),
+                sampling_rate=self.sampling_rate(), phase=angle,
+                motzoi=self.mw_motzoi())
+
         if self.mixer_apply_predistortion_matrix():
             self._wave_dict = self.apply_mixer_predistortion_corrections(
                 self._wave_dict)
@@ -191,7 +204,9 @@ class CBox_MW_LutMan(Base_MW_LutMan):
         def_lm = self._def_lm
         LutMap = {}
         for cw_idx, cw_key in enumerate(def_lm):
-            LutMap[cw_key] = cw_idx
+            max_cw_cbox = 8
+            if cw_idx < max_cw_cbox:
+                LutMap[cw_key] = cw_idx
         self.LutMap(LutMap)
 
 

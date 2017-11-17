@@ -305,6 +305,7 @@ class OpenQL_Sweep(Hard_Sweep):
         if self.upload:
             self.CCL.upload_instructions(self.openql_program.filename)
 
+
 class OpenQL_File_Sweep(Hard_Sweep):
 
     def __init__(self, filename: str, CCL,
@@ -842,6 +843,10 @@ class lutman_par_dB_attenuation(Soft_Sweep):
     def set_parameter(self, val):
         self.LutMan_parameter.set(10**(val/20))
         self.LutMan.load_DIO_triggered_sequence_onto_UHFQC()
+        self.LutMan_parameter.set(val)
+        self.LutMan.load_pulses_onto_AWG_lookuptable(regenerate_pulses=True)
+        self.LutMan.QWG.get_instr().start()
+        self.LutMan.QWG.get_instr().getOperationComplete()
 
 
 class two_par_joint_sweep(Soft_Sweep):
@@ -849,7 +854,7 @@ class two_par_joint_sweep(Soft_Sweep):
     Allows jointly sweeping two parameters while preserving their
     respective ratios.
     """
-    def __init__(self, par_A, par_B, **kw):
+    def __init__(self, par_A, par_B, preserve_ratio: bool=True, **kw):
         self.set_kw()
         self.name = par_A.name
         self.parameter_name = par_A.name
@@ -858,10 +863,14 @@ class two_par_joint_sweep(Soft_Sweep):
 
         self.par_A = par_A
         self.par_B = par_B
-        try:
-            self.par_ratio = self.par_B.get()/self.par_A.get()
-        except NotImplementedError:
-            self.par_ratio = self.par_B.get_latest()/self.par_A.get_latest()
+        if preserve_ratio:
+            try:
+                self.par_ratio = self.par_B.get()/self.par_A.get()
+            except NotImplementedError:
+                self.par_ratio = (self.par_B.get_latest()/
+                                  self.par_A.get_latest())
+        else:
+            self.par_ratio = 1
 
     def set_parameter(self, val):
         self.par_A.set(val)

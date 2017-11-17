@@ -13,6 +13,8 @@ from pycqed.utilities.general import NumpyJsonEncoder
 from pycqed.analysis.analysis_toolbox import get_color_order as gco
 from pycqed.analysis.analysis_toolbox import get_color_list
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
+from pycqed.analysis.tools.plotting import (
+    flex_colormesh_plot_vs_xy, flex_color_plot_vs_x, )#flex_image_plot_vs_xy)
 # import pycqed.analysis_v2.default_figure_settings_analysis as def_fig
 from . import default_figure_settings_analysis as def_fig
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -257,7 +259,7 @@ class BaseDataAnalysis(object):
         # one file being used to load data from
         if self.single_timestamp:
             self.timestamps = [self.timestamps[0]]
-        TwoD = self.params_dict.pop('TwoD', False)
+        TwoD = self.options_dict.get('TwoD', False)
         # this should always be extracted as it is used to determine where
         # the file is as required for datasaving
         self.params_dict['folder'] = 'folder'
@@ -762,13 +764,10 @@ class BaseDataAnalysis(object):
             axs.figure.tight_layout()
 
     def plot_colorxy(self, pdict, axs):
-        self.plot_color2D(a_tools.flex_colormesh_plot_vs_xy, pdict, axs)
-
-    def plot_imagexy(self, pdict, axs):
-        self.plot_color2D(a_tools.flex_image_plot_vs_xy, pdict, axs)
+        self.plot_color2D(flex_colormesh_plot_vs_xy, pdict, axs)
 
     def plot_colorx(self, pdict, axs):
-        self.plot_color2D(a_tools.flex_color_plot_vs_x, pdict, axs)
+        self.plot_color2D(flex_color_plot_vs_x, pdict, axs)
 
     def plot_color2D_grid_idx(self, pfunc, pdict, axs, idx):
         pfunc(pdict, np.ravel(axs)[idx])
@@ -819,7 +818,7 @@ class BaseDataAnalysis(object):
         plot_xvals = pdict['xvals']
         plot_yvals = pdict['yvals']
         plot_cbar = pdict.get('plotcbar', True)
-        plot_cmap = pdict.get('cmap', 'YlGn')
+        plot_cmap = pdict.get('cmap', 'viridis')
         plot_zrange = pdict.get('zrange', None)
         plot_yrange = pdict.get('yrange', None)
         plot_xrange = pdict.get('xrange', None)
@@ -914,14 +913,17 @@ class BaseDataAnalysis(object):
     def label_color2D(self, pdict, axs):
         plot_transpose = pdict.get('transpose', False)
         plot_xlabel = pdict['xlabel']
+        plot_xunit = pdict['xunit']
         plot_ylabel = pdict['ylabel']
+        plot_yunit = pdict['yunit']
         plot_title = pdict['title']
         if plot_transpose:
-            axs.set_xlabel(plot_ylabel)
-            axs.set_ylabel(plot_xlabel)
+            # transpose switches X and Y
+            set_xlabel(axs, plot_ylabel, plot_yunit)
+            set_ylabel(axs, plot_xlabel, plot_xunit)
         else:
-            axs.set_xlabel(plot_xlabel)
-            axs.set_ylabel(plot_ylabel)
+            set_xlabel(axs, plot_xlabel, plot_xunit)
+            set_ylabel(axs, plot_ylabel, plot_yunit)
         if plot_title is not None:
             axs.set_title(plot_title)
 

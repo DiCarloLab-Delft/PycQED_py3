@@ -20,7 +20,6 @@ class Test_distorter(unittest.TestCase):
         test_datadir = os.path.join(pq.__path__[0], 'tests', 'test_output')
         self.kernel_object.kernel_dir(test_datadir)
 
-
     def test_measure_trace(self):
         self.dist_corr.measure_trace()
         self.dist_corr.plot_trace()

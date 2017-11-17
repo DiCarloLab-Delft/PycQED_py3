@@ -86,7 +86,7 @@ class UHFQC(Instrument):
             init = False
 
         self.add_parameter('timeout', unit='s',
-                           initial_value=10,
+                           initial_value=30,
                            parameter_class=ManualParameter)
         for parameter in s_node_pars:
             parname = parameter[0].replace("/", "_")

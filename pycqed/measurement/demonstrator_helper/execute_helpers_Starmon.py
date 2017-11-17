@@ -25,52 +25,78 @@ default_simulate_options = {
     "iterations": 1
 }
 
-# Extract some "hardcoded" instruments from the global namespace"
-if hasattr(qc.station,'component'):
-    station = qc.station
+try:
+    MC = Instrument.find_instrument('MC')
+    st = MC.station
     new_station = False
-else:
-    station = qc.station.Station()
+except KeyError:
+    st = qc.station.Station()
     new_station = True
 
-if 'Demonstrator_MC' in station.components.keys():
-    MC_demo = station.components['Demonstrator_MC']
-else:
+"""
+Create the station for which the Instruments can connect to. A virtual representation
+of the physical setup. In our case, the CCL. Since we're calling the station,
+"""
+try:
     MC_demo = measurement_control.MeasurementControl(
-        'Demonstrator_MC', live_plot_enabled=False, verbose=True)
+        'Demonstrator_MC', live_plot_enabled=True, verbose=True)
+
     datadir = os.path.abspath(os.path.join(
-                os.path.dirname(pq.__file__), os.pardir,
-                'demonstrator_execute_data'))
+        os.path.dirname(pq.__file__), os.pardir, 'demonstrator_execute_data'))
     MC_demo.datadir(datadir)
-    station.add_component(MC_demo)
-    MC_demo.station = station
+    MC_demo.station = st
+
+    st.add_component(MC_demo)
+except KeyError:
+    MC_demo = Instrument.find_instrument('Demonstrator_MC')
 
 
 def execute_qumis_file(file_url: str,  config_json: str,
                       verbosity_level: int=0):
+    write_to_log('QUMIS!')
+    return 
+
+def execute(file_url: str,  config_json: str,
+                      verbosity_level: int=0):
+    write_to_log('Hello!')
     options = json.loads(config_json)
+    write_to_log('options:')
+    write_to_log(options)
+    write_to_log(file_url)
 
     if (not new_station):
         
         MC = Instrument.find_instrument('Demonstrator_MC')
         CBox = Instrument.find_instrument('CBox')
-        device = Instrument.find_instrument('Starmon')
+        device = Instrument.find_instrument('Device')
+        qubit = Instrument.find_instrument('QL')
 
         num_avg = int(options.get('num_avg', 512))
         nr_soft_averages = int(np.round(num_avg/512))
         MC.soft_avg(nr_soft_averages)
-        device.RO_acq_averages(512)
+        #device.RO_acq_averages(512)
+        qubit.RO_acq_averages(512)
+        qubit.prepare_for_timedomain()
 
         qumis_fp = _retrieve_file_from_url(file_url)
 
         # Ok, I am assured by stanvn that he will provide me a options with kw
         sweep_points = options["measurement_points"]
 
-
         s = swf.QuMis_Sweep(filename=qumis_fp, CBox=CBox,parameter_name='Circuit number', unit='#')
-        d = device.get_correlation_detector()
-        d.value_names = ['Q0 ', 'Q1 ', 'Corr. (Q0, Q1) ']
-        d.value_units = ['frac.', 'frac.', 'frac.']
+        #d = device.get_correlation_detector()
+        d = qubit.int_avg_det
+        #d.value_names = ['Q0 ', 'Q1 ', 'Corr. (Q0, Q1) ']
+        #d.value_units = ['frac.', 'frac.', 'frac.']
+
+        # N.B. hardcoded fixme
+        #cfg = qubit.qasm_config()
+        #qasm_fp = _retrieve_file_from_url(file_url)
+        #sweep_points = _get_qasm_sweep_points(qasm_fp)
+
+        #s = swf.QASM_Sweep(parameter_name='Circuit number ', unit='#',
+        #                      qasm_fn=qasm_fp, config=cfg, CBox=CBox,
+        #                      verbosity_level=verbosity_level)
 
         MC.set_sweep_function(s)
         MC.set_sweep_points(sweep_points)
@@ -226,3 +252,8 @@ def send_calibration_data():
         "calibration": calibration
     })
     print('Calibration data send')
+
+
+def write_to_log(string):
+    with open(r'D:\Experiments\1709_Pokemon\demo_log.txt', 'a+') as f:
+        f.write(str(string) + str('\n'))

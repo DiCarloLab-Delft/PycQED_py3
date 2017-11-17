@@ -1,5 +1,5 @@
-import numpy as np
 from os.path import join, dirname
+import numpy as np
 import openql.openql as ql
 from openql.openql import Program, Kernel, Platform
 
@@ -23,7 +23,7 @@ def single_flux_pulse_seq(qubit_indices: tuple,
     k.gate('fl_cw_02', qubit_indices[0], qubit_indices[1])
     p.add_kernel(k)
     p.compile()
-    # attribute get's added to program to help finding the output files
+    # attribute is added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
@@ -48,7 +48,7 @@ def flux_staircase_seq(platf_cfg: str):
 
     p.add_kernel(k)
     p.compile()
-    # attribute get's added to program to help finding the output files
+    # attribute is added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
@@ -66,9 +66,9 @@ def two_qubit_off_on(q0: int, q1: int, platf_cfg: str):
     platf = Platform('OpenQL_Platform', platf_cfg)
     p = Program(pname="two_qubit_off_on", nqubits=platf.get_qubit_number(),
                 p=platf)
-    p = add_two_q_cal_points(p, platf=platf, q0=0, q1=1)
+    p = add_two_q_cal_points(p, platf=platf, q0=q0, q1=q1)
     p.compile()
-    # attribute get's added to program to help finding the output files
+    # attribute is added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
@@ -117,7 +117,7 @@ def two_qubit_tomo_cardinal(cardinal: int, q0: int, q1: int, platf_cfg: str):
     # is important or even necessary here.
     p = add_two_q_cal_points(p, platf=platf, q0=0, q1=1, reps_per_cal_pt=7)
     p.compile()
-    # attribute get's added to program to help finding the output files
+    # attribute is added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
@@ -227,6 +227,51 @@ def two_qubit_AllXY(q0: int, q1: int, platf_cfg: str,
         p.add_kernel(k)
 
     p.compile()
+    # attribute is added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
+
+# FIMXE: merge into the real chevron seq
+def Chevron_hack(qubit_idx: int, qubit_idx_spec,
+                 buffer_time, buffer_time2, platf_cfg: str):
+    """
+    Single qubit Ramsey sequence.
+    Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
+
+    Input pars:
+        times:          the list of waiting times for each Ramsey element
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+    Returns:
+        p:              OpenQL Program object containing
+
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="Chevron", nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    buffer_nanoseconds = int(round(buffer_time/1e-9))
+    buffer_nanoseconds2 = int(round(buffer_time/1e-9))
+
+    k = Kernel("Chevron", p=platf)
+    k.prepz(qubit_idx)
+    k.gate('rx90', qubit_idx_spec)
+    k.gate('rx180', qubit_idx)
+    k.gate("wait", [qubit_idx], buffer_nanoseconds)
+    k.gate('fl_cw_02', 2, 0)
+    k.gate('wait', [qubit_idx], buffer_nanoseconds2)
+    k.gate('rx180', qubit_idx)
+    k.measure(qubit_idx)
+    # k.measure(qubit_idx_spec)
+    p.add_kernel(k)
+
+    # adding the calibration points
+    # add_single_qubit_cal_points(p, platf=platf, qubit_idx=qubit_idx)
+
+    p.compile()
     # attribute get's added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
@@ -275,10 +320,7 @@ def chevron_seq(fluxing_qubit: str, spectator_qubit: str,
 
 
 def two_qubit_tomo_bell(bell_state, q0, q1,
-                        wait_after_trigger=10e-9, wait_during_flux=260e-9,
-                        clock_cycle=1e-9,
-                        single_qubit_compiled_phase=False,
-                        RO_target='all'):
+                        platf_cfg):
     '''
     Two qubit bell state tomography.
 
@@ -293,100 +335,77 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
             correction in the recovery pulse
         RO_target   (str): can be q0, q1, or 'all'
     '''
-    raise NotImplementedError()
-    # tomo_pulses = ['I ', 'X180 ', 'Y90 ', 'mY90 ', 'X90 ', 'mX90 ']
-    # tomo_list_q0 = []
-    # tomo_list_q1 = []
-    # for tp in tomo_pulses:
-    #     tomo_list_q0 += [tp + q0 + '\n']
-    #     tomo_list_q1 += [tp + q1 + '\n']
+    tomo_gates = ['i', 'rx180', 'ry90', 'rym90', 'rx90', 'rxm90']
 
-    # tomo_list_q0[0] = 'I 20\n'
-    # tomo_list_q1[0] = 'I 20\n'
+    # Choose a bell state and set the corresponding preparation pulses
+    if bell_state == 0:  # |Phi_m>=|00>-|11>
+        prep_pulse_q0, prep_pulse_q1 = 'ry90', 'ry90'
+    elif bell_state % 10 == 1:  # |Phi_p>=|00>+|11>
+        prep_pulse_q0, prep_pulse_q1 = 'rym90', 'ry90'
+    elif bell_state % 10 == 2:  # |Psi_m>=|01>-|10>
+        prep_pulse_q0, prep_pulse_q1 = 'ry90', 'rym90'
+    elif bell_state % 10 == 3:  # |Psi_p>=|01>+|10>
+        prep_pulse_q0, prep_pulse_q1 = 'rym90', 'rym90'
+    else:
+        raise ValueError('Bell state {} is not defined.'.format(bell_state))
 
-    # # Choose a bell state and set the corresponding preparation pulses
-    # if bell_state % 10 == 0:  # |Phi_m>=|00>-|11>
-    #     prep_pulse_q0 = 'Y90 {}\n'.format(q0)
-    #     prep_pulse_q1 = 'Y90 {}\n'.format(q1)
-    # elif bell_state % 10 == 1:  # |Phi_p>=|00>+|11>
-    #     prep_pulse_q0 = 'mY90 {}\n'.format(q0)
-    #     prep_pulse_q1 = 'Y90 {}\n'.format(q1)
-    # elif bell_state % 10 == 2:  # |Psi_m>=|01>-|10>
-    #     prep_pulse_q0 = 'Y90 {}\n'.format(q0)
-    #     prep_pulse_q1 = 'mY90 {}\n'.format(q1)
-    # elif bell_state % 10 == 3:  # |Psi_p>=|01>+|10>
-    #     prep_pulse_q0 = 'mY90 {}\n'.format(q0)
-    #     prep_pulse_q1 = 'mY90 {}\n'.format(q1)
-    # else:
-    #     raise ValueError('Bell state {} is not defined.'.format(bell_state))
-
-    # # Recovery pulse is the same for all Bell states
-    # if single_qubit_compiled_phase == False:
-    #     after_pulse = 'mY90 {}\n'.format(q1)
-    # else:
-    #     after_pulse = 'recmY90 {}\n'.format(q1)
-
-    # # Disable preparation pulse on one or the other qubit for debugging
-    # if bell_state//10 == 1:
-    #     prep_pulse_q1 = 'I 20'
-    # elif bell_state//10 == 2:
-    #     prep_pulse_q0 = 'I 20'
+    # Recovery pulse is the same for all Bell states
+    after_pulse_q1 = 'rym90'
 
     # # Define compensation pulses
     # # FIXME: needs to be added
     # print('Warning: not using compensation pulses.')
 
-    # # Write tomo sequence
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="two_qubit_tomo_bell",
+                nqubits=platf.get_qubit_number(),
+                p=platf)
+    for p_q1 in tomo_gates:
+        for p_q0 in tomo_gates:
+            k = Kernel("BellTomo_{}{}_{}{}".format(
+                       q1, p_q1, q0, p_q0
+                       ), p=platf)
+            # next experiment
+            k.prepz(q0)  # to ensure enough separation in timing
+            k.prepz(q1)  # to ensure enough separation in timing
+            # pre-rotations
+            k.gate(prep_pulse_q0, q0)
+            k.gate(prep_pulse_q1, q1)
+            # FIXME hardcoded edge because of
+            # brainless "directed edge recources" in compiler
+            # Hardcoded flux pulse, FIXME use actual CZ
+            k.gate('wait', [2, 0], 100)
+            k.gate('fl_cw_01', 2, 0)
+            # after-rotations
+            k.gate(after_pulse_q1, q1)
+            # tomo pulses
+            k.gate(p_q1, q0)
+            k.gate(p_q0, q1)
+            # measure
+            k.measure(q0)
+            k.measure(q1)
+            # sync barrier before tomo
+            # k.gate("wait", [q0, q1], 0)
+            k.gate("wait", [2, 0], 0)
+            p.add_kernel(k)
+    # 7 repetitions is because of assumptions in tomo analysis
+    p = add_two_q_cal_points(p, platf=platf, q0=q0, q1=q1, reps_per_cal_pt=7)
+    p.compile()
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
 
-    # filename = join(base_qasm_path, 'two_qubit_tomo_bell.qasm')
-    # qasm_file = mopen(filename, mode='w')
-    # qasm_file.writelines('qubit {} \nqubit {} \n'.format(q0, q1))
 
-    # for p_q1 in tomo_list_q1:
-    #     for p_q0 in tomo_list_q0:
-    #         qasm_file.writelines('\ninit_all\n')
-    #         qasm_file.writelines('QWG trigger\n')
-    #         qasm_file.writelines(
-    #             'I {}\n'.format(int(wait_after_trigger//clock_cycle)))
-    #         qasm_file.writelines(prep_pulse_q0)
-    #         qasm_file.writelines(prep_pulse_q1)
-    #         qasm_file.writelines(
-    #             'I {}\n'.format(int(wait_during_flux//clock_cycle)))
-    #         qasm_file.writelines(after_pulse)
-    #         qasm_file.writelines(p_q1)
-    #         qasm_file.writelines(p_q0)
-    #         qasm_file.writelines('RO ' + RO_target + '  \n')
-
-    # # Add calibration pulses
-    # cal_pulses = []
-    # # every calibration point is repeated 7 times. This is copied from the
-    # # script for Tektronix driven qubits. I do not know if this repetition
-    # # is important or even necessary here.
-    # for seq in cal_points_2Q:
-    #     cal_pulses += [[seq[0].format(q0), seq[1].format(q1),
-    #                     'RO ' + RO_target + '\n']] * 7
-
-    # for seq in cal_pulses:
-    #     qasm_file.writelines('\ninit_all\n')
-    #     for p in seq:
-    #         qasm_file.writelines(p)
-
-    # qasm_file.close()
-    # return qasm_file
-
-
-def CZ_calibration_seq(q0, q1, RO_target='all',
+def CZ_calibration_seq(q0: int, q1: int, platf_cfg: str,
                        CZ_disabled=False,
-                       cases=('no_excitation', 'excitation'),
-                       wait_after_trigger=40e-9,
-                       wait_during_flux=280e-9,
-                       clock_cycle=1e-9,
-                       mw_pulse_duration=40e-9):
+                       angles=np.arange(0, 360, 20),
+                       add_cal_points=True,
+                       cases=('no_excitation', 'excitation')):
     '''
     Sequence used to calibrate flux pulses for CZ gates.
 
     Timing of the sequence:
-    q0:   --   X90  C-Phase  Rphi90   --      RO
+    q0:   --   X90  C-Phase  Rphi90   --       RO
     q1: (X180)  --     --       --   (X180)    RO
 
     Args:
@@ -397,106 +416,92 @@ def CZ_calibration_seq(q0, q1, RO_target='all',
         clock_cycle (float): period of the internal AWG clock
         wait_time   (int): wait time in seconds after triggering the flux
     '''
-    raise NotImplementedError()
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="CZ_calibration_seq", nqubits=platf.get_qubit_number(),
+                p=platf)
+    # These angles correspond to special pi/2 pulses in the lutman
+    for i, angle in enumerate(angles):
+        for case in cases:
+            k = Kernel("{}_{}".format(case, angle), p=platf)
+            k.prepz(q0)
+            k.prepz(q1)
+            if case == 'excitation':
+                k.gate('rx180', q1)
+            k.gate('rx90', q0)
+            # Hardcoded flux pulse, FIXME use actual CZ
+            k.gate('wait', [2, 0], 100)
+            if not CZ_disabled:
+                k.gate('fl_cw_01', 2, 0)
+            # hardcoded angles, must be uploaded to AWG
+            k.gate('cw_{:02}'.format(i+9), q0)
+            if case == 'excitation':
+                k.gate('rx180', q1)
 
-    # filename = join(base_qasm_path, 'CZ_calibration_seq.qasm')
-    # qasm_file = mopen(filename, mode='w')
-    # qasm_file.writelines('qubit {} \nqubit {} \n'.format(q0, q1))
+            k.measure(q0)
+            k.measure(q1)
+            # Implements a barrier to align timings
+            # k.gate('wait', [q0, q1], 0)
+            # hardcoded because of openQL #104
+            k.gate('wait', [2, 0], 0)
 
-    # for case in cases:
-    #     qasm_file.writelines('\ninit_all\n')
-    #     qasm_file.writelines('QWG trigger\n')
-    #     waitTime = wait_after_trigger
-    #     if case == 'excitation':
-    #         # Decrease wait time because there is an additional pulse
-    #         waitTime -= mw_pulse_duration
-    #     qasm_file.writelines(
-    #         'I {}\n'.format(int(waitTime//clock_cycle)))
-    #     if case == 'excitation':
-    #         qasm_file.writelines('X180 {}\n'.format(q1))
-    #     qasm_file.writelines('X90 {}\n'.format(q0))
-    #     qasm_file.writelines(
-    #         'I {}\n'.format(int(wait_during_flux//clock_cycle)))
-    #     qasm_file.writelines('Rphi90 {}\n'.format(q0))
-    #     if case == 'excitation':
-    #         qasm_file.writelines('X180 {}\n'.format(q1))
+            p.add_kernel(k)
+    if add_cal_points:
+        p = add_two_q_cal_points(p, platf=platf, q0=q0, q1=q1)
+    p.compile()
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
 
-    #     qasm_file.writelines('RO {}  \n'.format(RO_target))
-
-    # qasm_file.close()
-    # return qasm_file
+    if add_cal_points:
+        cal_pts_idx = [361, 362, 363, 364]
+    else:
+        cal_pts_idx = []
+    p.sweep_points = np.concatenate([np.repeat(angles, 2), cal_pts_idx])
+    p.set_sweep_points(p.sweep_points, len(p.sweep_points))
+    return p
 
 
-def CZ_fast_calibration_seq(q0_name: str, q1_name: str, no_of_points: int,
-                            cal_points: bool=True,
-                            RO_target: str='all',
-                            CZ_disabled: bool=False,
-                            cases=('no_excitation', 'excitation'),
-                            wait_after_trigger=40e-9,
-                            wait_during_flux=280e-9,
-                            clock_cycle=1e-9,
-                            mw_pulse_duration=40e-9):
-    '''
-    Sequence used to (numerically) calibrate CZ gate, including single qubit
-    phase corrections.
-    Repeats the sequence below 'no_of_points' times, giving a new trigger
-    instruction
-        QWG trigger 'i'
-    every time, where 'i' is the number of iteration (starting at 0).
+def CZ_poisoned_purity_seq(q0, q1, platf_cfg: str):
+    """
+    Creates the |00> + |11> Bell state and does a partial tomography in
+    order to determine the purity of both qubits.
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="CZ_poisoned_purity_seq",
+                nqubits=platf.get_qubit_number(), p=platf)
+    tomo_list = ['rxm90', 'rym90', 'i']
 
-    Timing of the sequence:
-    q0:   --   mX90  C-Phase  X90   --      RO
-    q1: (X180)  --     --       --   (X180)    RO
+    for p_pulse in tomo_list:
+        k = Kernel("{}".format(p_pulse), p=platf)
+        k.prepz(q0)
+        k.prepz(q1)
 
-    Args:
-        q0, q1      (str): names of the addressed qubits
-        RO_target   (str): can be q0, q1, or 'all'
-        CZ_disabled (bool): disable CZ gate
-        excitations (bool/str): can be True, False, or 'both_cases'
-        clock_cycle (float): period of the internal AWG clock
-        wait_time   (int): wait time in seconds after triggering the flux
-    '''
-    raise NotImplementedError()
-    # filename = join(base_qasm_path, 'CZ_fast_calibration_seq.qasm')
-    # qasm_file = mopen(filename, mode='w')
-    # qasm_file.writelines('qubit {} \nqubit {} \n'.format(q0_name, q1_name))
+        # Create a Bell state:  |00> + |11>
+        k.gate('rym90', q0)
+        k.gate('ry90', q1)
+        # Hardcoded flux pulse, FIXME use actual CZ
+        k.gate('wait', [2, 0], 100)
+        k.gate('fl_cw_01', 2, 0)
+        k.gate('rym90', q1)
 
-    # for i in range(no_of_points):
+        # Perform pulses to measure the purity of both qubits
+        k.gate(p_pulse, q0)
+        k.gate(p_pulse, q1)
 
-    #     if cal_points and (i == no_of_points - 4 or i == no_of_points - 3):
-    #         # Calibration point for |0>
-    #         qasm_file.writelines('\ninit_all\n')
-    #         qasm_file.writelines('RO {}  \n'.format(RO_target))
-    #         pass
-    #     elif cal_points and (i == no_of_points - 2 or i == no_of_points - 1):
-    #         # Calibration point for |1>
-    #         qasm_file.writelines('\ninit_all\n')
-    #         qasm_file.writelines('X180 {} \n'.format(q0_name))
-    #         qasm_file.writelines('X180 {} \n'.format(q1_name))
-    #         qasm_file.writelines('RO {}  \n'.format(RO_target))
-    #     else:
-    #         for case in cases:
-    #             qasm_file.writelines('\ninit_all\n')
-    #             qasm_file.writelines('QWG_trigger_{}\n'.format(i))
-    #             waitTime = wait_after_trigger
-    #             if case == 'excitation':
-    #                 # Decrease wait time because there is an additional pulse
-    #                 waitTime -= mw_pulse_duration
-    #             qasm_file.writelines(
-    #                 'I {}\n'.format(int(waitTime//clock_cycle)))
-    #             if case == 'excitation':
-    #                 qasm_file.writelines('X180 {}\n'.format(q1_name))
-    #             qasm_file.writelines('mX90 {}\n'.format(q0_name))
-    #             qasm_file.writelines(
-    #                 'I {}\n'.format(int(wait_during_flux//clock_cycle)))
-    #             qasm_file.writelines('X90 {}\n'.format(q0_name))
-    #             if case == 'excitation':
-    #                 qasm_file.writelines('X180 {}\n'.format(q1_name))
+        k.measure(q0)
+        k.measure(q1)
+        # Implements a barrier to align timings
+        # k.gate('wait', [q0, q1], 0)
+        # hardcoded because of openQL #104
+        k.gate('wait', [2, 0], 0)
 
-    #             qasm_file.writelines('RO {}  \n'.format(RO_target))
+        p.add_kernel(k)
 
-    # qasm_file.close()
-    # return qasm_file
+    p.compile()
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
 
 
 def chevron_block_seq(q0_name, q1_name, no_of_points,
@@ -676,8 +681,12 @@ def add_two_q_cal_points(p, platf, q0: int, q1: int,
         k.prepz(q1)
         if comb[0] == '1':
             k.gate('rx180', q0)
+        else:
+            k.gate('i', q0)
         if comb[1] == '1':
             k.gate('rx180', q1)
+        else:
+            k.gate('i', q1)
         k.measure(q0)
         k.measure(q1)
         kernel_list.append(k)

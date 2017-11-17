@@ -43,8 +43,9 @@ except KeyError:
     new_station = True
 
 """
-Create the station for which the Instruments can connect to. A virtual representation
-of the physical setup. In our case, the CCL. Since we're calling the station,
+Create the station for which the Instruments can connect to.
+A virtual representation of the physical setup. In our case, the CCL.
+Since we're calling the station,
 """
 try:
     MC_demo = measurement_control.MeasurementControl(
@@ -68,27 +69,25 @@ def execute(qisa_file_url: str,  config_json: str,
         write_to_log('options:')
         write_to_log(options)
         write_to_log(qisa_file_url)
-        MC = Instrument.find_instrument('MC')
+
         CCL = Instrument.find_instrument('CCL')
-        # Device for CCL is not implemented yet 11/1/2017 MAR
-        # device = Instrument.find_instrument('CCL_transmon')
-        qubit = Instrument.find_instrument('QL')
+        device = Instrument.find_instrument('device')
 
         num_avg = int(options.get('num_avg', 512))
 
         nr_soft_averages = int(np.round(num_avg/512))
         MC_demo.soft_avg(nr_soft_averages)
 
-        qubit.ro_acq_averages(512)
+        device.ro_acq_averages(512)
 
         # Get the qisa file
         qisa_fp = _retrieve_file_from_url(qisa_file_url)
 
         # Two ways to generate the sweep_points. Either I get from the file_url
         # or I get the appended options file which has the kw "measurement_points"
-        #sweep_points_fp = _retrieve_file_from_url(sweep_points_file_url)
+        # sweep_points_fp = _retrieve_file_from_url(sweep_points_file_url)
         # sweep_points = json.loads(sweep_points_fp)
-        #sweep_points = sweep_points["measurement_points"]
+        # sweep_points = sweep_points["measurement_points"]
 
         # Ok, I am assured by stanvn that he will provide me a options with kw
         sweep_points = options["measurement_points"]
@@ -97,16 +96,10 @@ def execute(qisa_file_url: str,  config_json: str,
                                   parameter_name='Points', unit='a.u.',
                                   upload=True)
 
-        d = qubit.int_avg_det
-        # To be modified depending on what we're gonna name the S-7 qubits? <<<
-        # d = device.get_integrated_average_detector()
-        #d.value_names = ['Q0 ', 'Q1 ', 'Corr. (Q0, Q1) ']
-        #d.value_units = ['frac.', 'frac.', 'frac.']
-        #>>>>>>
+        d = device.get_correlation_detector()
 
         MC_demo.set_sweep_function(s)
         MC_demo.set_sweep_points(sweep_points)
-
         MC_demo.set_detector_function(d)
         data = MC_demo.run('CCL_execute')  # FIXME <- add the proper name
 
