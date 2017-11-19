@@ -18,6 +18,7 @@ std::string usage(const std::string& progName)
   ss << "  -t                Enable scanner and parser tracing while assembling" << std::endl;
   ss << "  -V, --version     Show the program version and exit" << std::endl;
   ss << "  -v, --verbose     Show informational messages while assembling" << std::endl;
+  ss << "  --dumpspecs       Output the opcode specifications that have been compiled into the assembler" << std::endl;
   ss << "  -h, --help        Show this help message and exit" << std::endl;
 
   return ss.str();
@@ -89,7 +90,11 @@ main(const int argc, const char **argv)
       {
         outputFilename = argv[++i];
       }
-
+      else if (!std::strcmp(arg, "--dumpspecs"))
+      {
+        std::cout << QISA::QISA_Driver::dumpOpcodeSpecification() << std::endl;
+        return EXIT_SUCCESS;
+      }
       else
       {
         std::cerr << progName << ": Unrecognized option: '" << arg << "'" << std::endl
@@ -159,8 +164,13 @@ main(const int argc, const char **argv)
       }
       else
       {
-        std::cout << "Generated assembly:" << std::endl;
-        std::cout << driver.getInstructionsAsHexStrings();
+        std::cout << "Generated assembly (hex):" << std::endl;
+
+        std::vector<std::string> hexStrings = driver.getInstructionsAsHexStrings(true);
+        for (auto it = hexStrings.begin(); it != hexStrings.end(); ++it)
+        {
+          std::cout << *it << std::endl;
+        }
       }
     }
     else

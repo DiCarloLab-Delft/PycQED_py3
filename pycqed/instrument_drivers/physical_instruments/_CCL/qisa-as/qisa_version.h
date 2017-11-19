@@ -1,8 +1,8 @@
-#define QISA_MAJOR_VERSION 0
+#define QISA_MAJOR_VERSION 1
 
-#define QISA_MINOR_VERSION 2
+#define QISA_MINOR_VERSION 1
 
-#define QISA_PATCH_VERSION 0
+#define QISA_PATCH_VERSION 1
 
 // Make it easier to check for QISA version dependencies.
 // This assumes the PATCH and MINOR version will not exceed 99
