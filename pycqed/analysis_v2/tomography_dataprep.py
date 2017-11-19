@@ -14,24 +14,28 @@ try:
 except ImportError as e:
 	logging.warning('Could not import qutip, tomo code will not work')
 import itertools
-
-
-#Written By MALAY SINGH 
+#Written By MALAY SINGH and RAMA SAGASTIZABAL
 #To prepare relevant inputs for tomography_V2
-
-
-
 class TomoPrep():
 	"""
-	class to prepare the necessary inputs for tomography_V2.
+	Class to prepare the necessary inputs for tomography_V2.
 	Does thresholding and coincidence counting on measured voltages
 	to convert them into counts.
 	Constructs measurement operators based on callibration counts.
 	Counts and callibrated measurement operators 
+	Following is how it relates to tomograpy
+	1. The user calls tomography_execute with the data stamps and type_tomography 
+	   (options:MLE, SDPA, Linear Pseudo inverse).
+	   "shots" Data from time_stamps is extracted by tomography_execute using mav1.
+	2. Shots are thresholded and coincidence counting is done 
 
+	3. (This class) tomography_dataprep is then called, it thresholds counts and 
+	bins them into 00,01,10,11 bins using coincidence counting. The counts in bin 00,01,10,11
+	for callibration points which are shots of 00,01,10,11 states are used to 
+	callibrate measurement operators. These measurement operators along with   
 
 	""" 
-	#TODO: Improve init
+	#TODO: Improve init, give user more options to print out plots.
 
 	def __init__(self, 
 				 shots_q0,

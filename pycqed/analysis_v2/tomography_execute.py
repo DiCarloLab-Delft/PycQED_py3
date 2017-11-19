@@ -1,5 +1,4 @@
 import numpy as np
-from pycqed.analysis import fitting_models as fit_mods
 from pycqed.analysis import analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
 # import dataprep for tomography module

@@ -1,6 +1,5 @@
 
 from cmath import *
-import re
 import os
 import math
 import sys
@@ -32,13 +31,11 @@ def bases(dim, triangular=False):
 
     invsqrtdim = 1/float(math.sqrt(dim))
     invsqrt2 = 1.0/math.sqrt(2)
-
     gellmann = []
     for m in range(dim):
         for n in range(m+1):
             B = []
             if m == 0 and n == 0:
-                # I/sqrt(d)
                 for ii in range(dim):
                     B.append((ii, ii, invsqrtdim))
                 gellmann.append(B)
@@ -53,7 +50,6 @@ def bases(dim, triangular=False):
                     B.append((m, n, invsqrt2))
                 B.append((n, m, invsqrt2))
                 gellmann.append(B)
-
                 B = []
                 if not triangular:
                     B.append((m, n, 1j*invsqrt2))
@@ -102,19 +98,14 @@ def readsol(filename, OPT):
             else:
                 # sdplr gives -x
                 x.append(-float(line[0]))
-
     elif OPT['solver'] == "csdp" or OPT['solver'] == "dsdp5":
         # solution on first line
         line = fp.readline()
         x = list(map(float, line.strip().split()))
     else:
         raise 'Unknown solver "%s"' % OPT['solver']
-
     fp.close()
-
     return x
-
-
 def writesol(rho, filename):
     '''
     Write out reconstructed matrix. Real and imaginary parts are separate files for 

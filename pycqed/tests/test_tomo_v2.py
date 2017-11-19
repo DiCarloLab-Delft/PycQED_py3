@@ -27,7 +27,9 @@ class Test_tomography_execute(unittest.TestCase):
       # get a rho target corresponding to the 00 state
       rho_target = (qt.ket2dm(qt.basis(4, 0))).full()
       #get it's fidelity to a 00 state
-      #This is not the correct fidelity 
+      #This is not the correct fidelity, it's only to benchmark whether 
+      #this run of code reproduced this fidelity or not, if it does not,
+      #the code is broken. 
       #The correct method shhould be pauli labels
       benchmark_fidelity = np.real_if_close(np.dot(rho_tomo.flatten(),rho_target.flatten()))
       self.assertAlmostEqual(benchmark_fidelity, 0.9679030, places=6)

@@ -1,12 +1,8 @@
-import os
 import time
-from imp import reload
-from matplotlib import pyplot as plt
 import numpy as np
 from pycqed.analysis import measurement_analysis as MA 
 from pycqed.analysis import ramiro_analysis as RA
 from pycqed.analysis import fitting_models as fit_mods
-import lmfit
 import scipy as scipy
 try:
     import qutip as qt
@@ -82,11 +78,9 @@ class TomoAnalysis():
             A[:,i] = np.ravel(self.basis_vector[i].full()) 
         self.basis_pauli_to_comp_trafo_matrix= A / self.n_states
         self.basis_comp_to_pauli_trafo_matrix= np.linalg.inv(A) 
-
         #get dims of qutip objects
         self.qt_dims = [[2 for i in range(self.n_qubits)], [2 for i in range(self.n_qubits)]]
-
-        if check_labels is True:
+    if check_labels is True:
             # prints the order of basis set corresponding to the 
             # tomographic rotations
             print(self.get_meas_operator_labels(n_qubits))
@@ -110,9 +104,7 @@ class TomoAnalysis():
         for measurement_operator in meas_operators:
             coeff_matrices.append(self.calculate_LI_coefficient_matrix(measurement_operator, do_in_pauli=use_pauli_basis))
         coefficient_matrix = np.vstack(coeff_matrices)
-
         basis_decomposition = np.zeros(4 ** self.n_qubits, dtype=complex)
-        
         if use_pauli_basis:
             # first skip beta0
             #basis_decomposition[1:] = np.dot(np.linalg.pinv(coefficient_matrix[:, 1:]), meas_tomo)
@@ -125,6 +117,8 @@ class TomoAnalysis():
             rho = qt.Qobj(np.reshape(basis_decomposition, [self.n_states, self.n_states]),
                      dims=self.qt_dims)
         return (basis_decomposition, rho)
+
+        
 
     def execute_mle_T_matrix_tomo(self, measurement_operators, meas_tomo, weights_tomo =False,
                                 show_time=True, ftol=0.01, xtol=0.001, full_output=0, max_iter=100,
