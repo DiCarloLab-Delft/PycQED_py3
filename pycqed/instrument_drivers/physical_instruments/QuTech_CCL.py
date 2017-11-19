@@ -81,7 +81,7 @@ class CCL(SCPI):
         self.QISA.setVerbose(False)
 
     def add_parameter(self, name,
-                      parameter_class=StandardParameter, **kwargs):
+                      parameter_class=Parameter, **kwargs):
         """
         Function to manually add a qcodes parameter. Useful for nonstandard
         forms of the scpiCmds.
