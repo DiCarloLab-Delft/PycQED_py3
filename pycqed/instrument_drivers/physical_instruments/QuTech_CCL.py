@@ -313,6 +313,7 @@ class CCL(SCPI):
         hdr = 'QUTech:UploadInstructions '
         self.binBlockWrite(binBlock, hdr)
 
+        # write to last_loaded_instructions so it can conveniently be read back
         self.last_loaded_instructions(filename)
 
     def _upload_microcode(self, filename):
