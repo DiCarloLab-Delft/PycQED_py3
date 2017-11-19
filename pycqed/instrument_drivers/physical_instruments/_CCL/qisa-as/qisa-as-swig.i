@@ -12,6 +12,12 @@
 %include std_string.i
 using std::string;
 
+%include std_vector.i
+namespace std {
+   %template(StringVector) vector<string>;
+};
+
+
 namespace QISA
 {
 
@@ -95,13 +101,18 @@ verbose: bool  -- Specifies the verbosity of the assembler.
   void setVerbose(bool verbose);
 
   %feature("autodoc", "
-Retrieve the generated code as a multi-line string that contains the hex values of the encoded instructions.
+Retrieve the generated code as a list of strings that contain the hex values of the encoded instructions.
+
+Parameters
+----------
+withBinaryOutput: bool  -- If True, the binary representation of the instruction will be appended to the hex codes.
 
 Returns
 -------
---> str: The generated instructions, one encoded instruction per line..
+--> tuple of str: The generated instructions, one encoded instruction per element.
 ");
-  std::string getInstructionsAsHexStrings();
+  std::vector<std::string>
+  getInstructionsAsHexStrings(bool withBinaryOutput);
 
 %feature("autodoc", "
 Retrieve the disassembly output as a multi-line string.
@@ -121,6 +132,23 @@ Parameters
 outputFileName: str  -- Name of the file in which to store the generated output.
 ");
   bool save(const std::string& outputFileName);
+
+
+%feature("autodoc", "
+Retrieve the compiled-in QISA opcode specification as a multi-line string.
+
+Returns
+-------
+--> str: The compiled-in QISA opcode specification.
+");
+  static std::string dumpOpcodeSpecification();
+
+  %feature("autodoc", "
+Reset the assembler driver such that it can be used for assembly/disassembly again.
+NOTE: A reset() is done implicitly at each call to parse()/disassemble().
+");
+  void reset();
+
 };
 
 }

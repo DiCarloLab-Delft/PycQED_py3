@@ -107,6 +107,7 @@
 %token <std::string> IDENTIFIER
 %token <int64_t>     INTEGER
 %token <std::string> STRING
+%token <std::string> JUNK      /* Unrecognized characters from FLEX. */
 
 /* Assembler directives */
 %token DIR_DEF_SYMBOL
@@ -163,6 +164,7 @@
 %token NOR
 %token XNOR
 %token BRA
+%token GOTO
 %token BRN
 %token BEQ
 %token BNE
@@ -231,6 +233,11 @@ instruction
   | label_decl    NEWLINE
   | statement     NEWLINE
   | label_decl statement NEWLINE
+  | JUNK
+    {
+      driver.error(@1, "Illegal output detected.");
+      YYABORT;
+    }
   ;
 
 REGISTER
@@ -478,7 +485,7 @@ cond
     { $$$$ = $1; }
   | error
     {
-      driver.addExpectationErrorMessage("a CONDITION");
+      driver.addExpectedConditionErrorMessage();
       YYABORT;
     }
   ;
@@ -691,6 +698,12 @@ q_bs
         YYERROR;
       }
     }
+ // This is to cope when a bundle starts with BS, but does not specify the wait time.
+ // In this case, we use a default wait time of 1.
+  | BS
+    {
+      $$$$ = 1;
+    }
   ;
 
 
@@ -780,6 +793,9 @@ classic_statement
 
   /* BRA   addr          */
   | BRA offset_to_label { if (!driver.generate_BRA(@1, $2, @2)) { YYERROR;} }
+
+  /* GOTO addr          */
+  | GOTO offset_to_label { if (!driver.generate_GOTO(@1, $2, @2)) { YYERROR;} }
 
   /* BRN   addr          */
   | BRN offset_to_label { if (!driver.generate_BRN(@1, $2, @2)) { YYERROR;} }

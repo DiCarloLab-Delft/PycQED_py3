@@ -2,7 +2,6 @@
 #include <sstream>
 #include <iomanip>
 #include <iostream>
-#include <bitset>
 #include <cstring>
 
 #include "qisa_driver.h"
@@ -20,6 +19,7 @@ const char* QISA_Driver::DISASSEMBLY_LABEL_PREFIX = "label_";
 std::map<std::string, int> QISA_Driver::_opcodes;
 std::map<int, std::string> QISA_Driver::_classicOpcode2instName;
 std::map<int, std::string> QISA_Driver::_quantumOpcode2instName;
+std::set<int> QISA_Driver::_q_inst_arg_none;
 std::set<int> QISA_Driver::_q_inst_arg_st;
 std::set<int> QISA_Driver::_q_inst_arg_tt;
 
@@ -27,6 +27,7 @@ QISA_Driver::QISA_Driver()
     : _traceScanning(false)
     , _traceParsing(false)
     , _verbose(false)
+    , _hadEOF(false)
     , _totalNrOfQubits(0)
     , _max_bs_val(0)
     , _disassemblyStartedQuantumBundle(false)
@@ -68,6 +69,13 @@ QISA_Driver::QISA_Driver()
   _branchConditionNames[COND_LE    ] = "LE";
   _branchConditionNames[COND_GT    ] = "GT";
 
+  // Branch condition aliases.
+  // Maps the alias name to the 'real' condition.
+  _branchConditionAliases["NOTCARRY"] = 0x8;
+  _branchConditionAliases["CARRY"]    = 0x9;
+  _branchConditionAliases["EQZ"]      = 0xa;
+  _branchConditionAliases["NEZ"]      = 0xb;
+
   // Valid target-control pairs: 'left-to-right' direction
   _valid_target_control_pairs[std::make_pair(2,0)] =  0;
   _valid_target_control_pairs[std::make_pair(0,3)] =  1;
@@ -108,9 +116,49 @@ QISA_Driver::QISA_Driver()
 
 }
 
+void
+QISA_Driver::reset()
+{
+  _hadEOF = false;
+  _filename.clear();
+
+  _instructions.clear();
+
+  _disassemblyOutput.str(""); // Clear the accumulated error messages.
+  _disassemblyOutput.clear(); // Clear state flags.
+
+  _disassembledInstructions.clear();
+
+  _disassemblyStartedQuantumBundle = false;
+
+  _disassemblyLabels.clear();
+  _labels.clear();
+
+  _registerAliases[0].clear();
+  _registerAliases[1].clear();
+  _registerAliases[2].clear();
+  _registerAliases[3].clear();
+
+  _intSymbols.clear();
+
+  _strSymbols.clear();
+
+  _deferredInstructions.clear();
+
+  _errorStream.str(""); // Clear the accumulated error messages.
+  _errorStream.clear(); // Clear state flags.
+
+  _lastDriverAction = DRIVER_ACTION_NONE;
+
+  _errorLoc = location();
+}
+
 bool
 QISA_Driver::parse(const std::string &filename)
 {
+  // First, reset the driver to get a clean start.
+  reset();
+
   _filename = filename;
   bool success = scanBegin ();
 
@@ -142,6 +190,9 @@ QISA_Driver::parse(const std::string &filename)
 bool
 QISA_Driver::disassemble(const std::string& filename)
 {
+  // First reset the driver to get a clean start.
+  reset();
+
   std::ifstream inputFile (filename, std::ios::in | std::ios::binary);
 
   // Assume no errors while disassembling.
@@ -505,7 +556,7 @@ QISA_Driver::disassembleClassicInstruction(qisa_instruction_type inst, Disassemb
     const int qs = inst & QS_MASK;
     if (!checkRegisterNumber(qs, errLoc, Q_REGISTER)) return false;
 
-    ssInst << inst_name << " R" << rd << ", Q" << qs << std::endl;
+    ssInst << inst_name << " R" << rd << ", Q" << qs;
   }
   else if (inst_name == "SMIS")
   {
@@ -657,11 +708,6 @@ QISA_Driver::getLastErrorMessage()
   ss << _errorStream.str();
   ss << std::endl;
 
-  _errorStream.str(""); // Clear the accumulated error messages.
-  _errorStream.clear(); // Clear state flags.
-
-  _errorLoc = location(); // Reset the location of the last error.
-
   return ss.str();
 }
 
@@ -699,8 +745,8 @@ QISA_Driver::getErrorSourceLine()
   }
 
   // Add context lines
-  unsigned int start_context_line = start_error_line - NUM_CONTEXT_LINES_IN_ERROR_MSG;
-  unsigned int end_context_line = end_error_line + NUM_CONTEXT_LINES_IN_ERROR_MSG;
+  int start_context_line = start_error_line - NUM_CONTEXT_LINES_IN_ERROR_MSG;
+  int end_context_line = end_error_line + NUM_CONTEXT_LINES_IN_ERROR_MSG;
 
   // Adjust start_context_line if it is too small.
   if (start_context_line < 1)
@@ -726,8 +772,8 @@ QISA_Driver::getErrorSourceLine()
     {
       line_counter++;
 
-      if ((line_counter >= start_context_line) &&
-          (line_counter <= end_context_line))
+      if ((line_counter >= (size_t)start_context_line) &&
+          (line_counter <= (size_t)end_context_line))
       {
         if (line_counter < start_error_line)
         {
@@ -748,7 +794,7 @@ QISA_Driver::getErrorSourceLine()
             ss_post_context << line << std::endl;
           }
       }
-      if (line_counter > end_context_line)
+      if (line_counter > (size_t)end_context_line)
       {
         break;
       }
@@ -819,6 +865,67 @@ QISA_Driver::getVersion()
   return QISA_VERSION_STRING;
 }
 
+std::string
+QISA_Driver::dumpOpcodeSpecification()
+{
+  if (_opcodes.empty())
+  {
+    setOpcodes();
+  }
+
+  std::ostringstream ss;
+  ss << "##################################################" << std::endl;
+  ss << "#                                                #" << std::endl;
+  ss << "#      Compiled-in QISA Opcode Specification     #" << std::endl;
+  ss << "#                                                #" << std::endl;
+  ss << "# Compilation-date: " << __DATE__ << "                  #" << std::endl;
+  ss << "# Compilation-time: " << __TIME__ << "                     #" << std::endl;
+  ss << "#                                                #" << std::endl;
+  ss << "##################################################" << std::endl;
+  ss << std::endl;
+  ss << "# Classic instructions (Single Instruction Format)" << std::endl;
+
+  std::string opc_str;
+  for (auto it = _classicOpcode2instName.begin(); it != _classicOpcode2instName.end(); ++it)
+  {
+    opc_str = "def_opcode['" + it->second + "']";
+    ss << std::setw(30) << std::left << opc_str << "= " << getHex(it->first, 2) << std::endl;
+  }
+
+  ss << std::endl;
+  ss << "# Quantum Instructions (Double Instruction Format)" << std::endl;
+  ss << std::endl;
+  ss << "# No arguments" << std::endl;
+
+  for (auto it = _q_inst_arg_none.begin(); it != _q_inst_arg_none.end(); ++it)
+  {
+    opc_str = "def_q_arg_none['" + _quantumOpcode2instName[*it] + "']";
+    ss << std::setw(30) << std::left << opc_str << "= " << getHex(*it, 2) << std::endl;
+  }
+
+  ss << std::endl;
+  ss << "# Uses 'S' register as parameter" << std::endl;
+
+  for (auto it = _q_inst_arg_st.begin(); it != _q_inst_arg_st.end(); ++it)
+  {
+    opc_str = "def_q_arg_st['" + _quantumOpcode2instName[*it] + "']";
+    ss << std::setw(30) << std::left << opc_str << "= " << getHex(*it, 2) << std::endl;
+  }
+
+  ss << std::endl;
+  ss << "# Uses 'T' register as parameter" << std::endl;
+
+  for (auto it = _q_inst_arg_tt.begin(); it != _q_inst_arg_tt.end(); ++it)
+  {
+    opc_str = "def_q_arg_tt['" + _quantumOpcode2instName[*it] + "']";
+    ss << std::setw(30) << std::left << opc_str << "= " << getHex(*it, 2) << std::endl;
+  }
+
+  return ss.str();
+}
+
+
+
 void
 QISA_Driver::enableScannerTracing(bool enabled)
 {
@@ -857,13 +964,39 @@ QISA_Driver::addSpecificErrorMessage(const std::string& msg)
   _errorStream << msg << std::endl;
 }
 
-void QISA_Driver::addExpectationErrorMessage(const std::string& expected_item)
+void
+QISA_Driver::addExpectationErrorMessage(const std::string& expected_item)
 {
   if (_errorStream.str().find(", expecting") == std::string::npos)
   {
     addSpecificErrorMessage("ERROR DETECTED: Expected " + expected_item + " here");
   }
 }
+
+void
+QISA_Driver::addExpectedConditionErrorMessage()
+{
+  if (_errorStream.str().find(", expecting") == std::string::npos)
+  {
+    std::ostringstream ss;
+    ss << std::endl;
+    ss << "ERROR DETECTED: Expected a CONDITION here." << std::endl;
+    ss << "Valid conditions are:" << std::endl;
+    for (auto it = _branchConditionNames.begin(); it != _branchConditionNames.end(); ++it)
+    {
+      ss << "  " << it->second << std::endl;
+    }
+    ss << std::endl;
+    ss << "Valid condition ALIASES are:" << std::endl;
+    for (auto it = _branchConditionAliases.begin(); it != _branchConditionAliases.end(); ++it)
+    {
+      ss << "  " << std::setw(9) << std::left << it->first << ": aliased to: " << _branchConditionNames[it->second] << std::endl;
+    }
+
+    addSpecificErrorMessage(ss.str());
+  }
+}
+
 
 void
 QISA_Driver::add_symbol(const std::string& symbol_name,
@@ -1924,6 +2057,27 @@ QISA_Driver::generate_BRA(const location& inst_loc,
   return result;
 }
 
+/* ALIAS: [GOTO addr] --> [BR always, addr] */
+bool
+QISA_Driver::generate_GOTO(const location& inst_loc,
+                           int64_t addr,
+                           const location& addr_loc)
+{
+  if (_verbose)
+      std::cout << std::setw(8) << std::setfill('0') << _instructions.size() << ": " << std::setw(0)
+                << "-- ALIAS: GOTO(addr=" << addr << ");" << std::endl;
+
+  // We leave checking the parameters up to the generation functions we call.
+
+  bool result = generate_BR(inst_loc, COND_ALWAYS, inst_loc, addr, addr_loc);
+
+  if (result && _verbose)
+      std::cout << std::setw(8) << std::setfill('0') << _instructions.size() << ": " << std::setw(0)
+                << "-- END ALIAS" << std::endl;
+  return result;
+}
+
+
 /* ALIAS: [BRN addr] --> [BR never, addr] */
 bool
 QISA_Driver::generate_BRN(const location& inst_loc,
@@ -2589,8 +2743,13 @@ QISA_Driver::processDeferredInstructions()
       // Set return value to false to indicate an error condition.
       result = false;
 
+// We used to return multiple errors, but this breaks things with error reporting.
+#if 0
       // Continue with the next deferred instruction.
       continue;
+#endif
+      // Now, we return at the first missing label.
+      return result;
     }
 
     const uint64_t label_address = findIt->second;
@@ -2660,18 +2819,28 @@ QISA_Driver::processDeferredInstructions()
   return result;
 }
 
-std::string
-QISA_Driver::getInstructionsAsHexStrings()
-{
-  std::ostringstream ss;
-  for (auto& it : _instructions)
-  {
-    std::bitset<sizeof(qisa_instruction_type)*8> binary(it);
 
-    ss << "0x" << std::hex << std::setfill('0') << std::setw(8) << it << " (" << binary << ")" << std::endl;
+std::vector<std::string>
+QISA_Driver::getInstructionsAsHexStrings(bool withBinaryOutput)
+{
+  std::vector<std::string> result;
+
+  if (withBinaryOutput)
+  {
+    for (auto& it : _instructions)
+    {
+      result.push_back(getHex(it, 8) + " (" + getSpacedBinary(it) + ")");
+    }
+  }
+  else
+  {
+    for (auto& it : _instructions)
+    {
+      result.push_back(getHex(it, 8));
+    }
   }
 
-  return ss.str();
+  return result;
 }
 
 std::string QISA_Driver::getDisassemblyOutput()
@@ -2700,10 +2869,6 @@ QISA_Driver::saveAssembly(std::ofstream& outputStream)
       return false;
     }
   }
-
-  // Do not allow saving twice.
-  _instructions.clear();
-  _lastDriverAction = DRIVER_ACTION_NONE;
 
   // Return true to indicate success;
   return true;
@@ -2761,11 +2926,6 @@ QISA_Driver::saveDisassembly(std::ofstream& outputStream)
     // Return false to indicate failure;
     return false;
   }
-
-  // Do not allow saving twice.
-  _disassemblyOutput.str(std::string());
-  _disassemblyOutput.clear();
-  _lastDriverAction = DRIVER_ACTION_NONE;
 
   // Return true to indicate success;
   return true;

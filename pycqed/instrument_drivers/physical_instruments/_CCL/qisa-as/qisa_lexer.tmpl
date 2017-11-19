@@ -123,6 +123,7 @@ identifier    {alpha}[a-zA-Z0-9_]*
 "NOR"          { return QISA::QISA_Parser::make_NOR(loc); }
 "XNOR"         { return QISA::QISA_Parser::make_XNOR(loc); }
 "BRA"          { return QISA::QISA_Parser::make_BRA(loc); }
+"GOTO"         { return QISA::QISA_Parser::make_GOTO(loc); }
 "BRN"          { return QISA::QISA_Parser::make_BRN(loc); }
 "BEQ"          { return QISA::QISA_Parser::make_BEQ(loc); }
 "BNE"          { return QISA::QISA_Parser::make_BNE(loc); }
@@ -161,9 +162,22 @@ $template_input_quantum_instructions
 {identifier}   { return QISA::QISA_Parser::make_IDENTIFIER(yytext, loc); }
 
 \r             { /* ignore carriage returns. */ }
-.              { printf("flex: Unknown character = '%s'", yytext); driver.error(loc, "flex Unknown character"); }
-<<EOF>>        { return QISA::QISA_Parser::make_END(loc); }
+.              { return QISA::QISA_Parser::make_JUNK(yytext, loc); }
 
+ /* This is a trick to always generate an extra new line at the end of file.
+  * It prevents the parser to give an error message in case the last line of a file is not properly terminated.
+  * The idea comes from: https://stackoverflow.com/a/1779949
+  */
+<<EOF>> { if (driver.hadEOF())
+           {
+             return QISA::QISA_Parser::make_END(loc);
+           }
+           else
+           {
+             driver.haveEOF();
+             return QISA::QISA_Parser::make_NEWLINE(loc);
+           }
+        }
 
 %%
 

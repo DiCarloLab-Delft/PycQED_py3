@@ -19,6 +19,8 @@ import os
 import logging
 import json
 import sys
+import traceback
+import array
 
 # The assembler needs to be build first before it can be imported.
 # The default location is a copy of the build in the _CCL hidden folder next
@@ -90,7 +92,7 @@ class CCL(SCPI):
 
     def start(self):
         self.enable(1)
-        self.run(1),
+        self.run(1)
 
     def add_parameter(self, name,
                       parameter_class=Parameter, **kwargs):
@@ -133,7 +135,6 @@ class CCL(SCPI):
                                 val_max = validator["range"][1]
 
                             parameter["vals"] = vals.Ints(val_min, val_max)
-                            parameter['get_parser'] = int
 
                         except Exception as e:
                             parameter["vals"] = vals.Ints(0, INT32_MAX)
@@ -289,30 +290,29 @@ class CCL(SCPI):
         self.stop()
         if not isinstance(filename, str):
             raise ValueError(
-                "The parameter filename type({}) is incorrect. It should be str.".format(type(filename)))
+                "The parameter filename type({}) is incorrect. "
+                "It should be str.".format(type(filename)))
 
-        outputFilename = self._change_file_ext(filename, '.bin')
         success_parser = self.QISA.parse(filename)
 
         if success_parser is not True:
-            raise RuntimeError(self.QISA.getLastErrorMessage())
+            print("Error detected while assembling the file {}:".format(
+                filename))
+            print(self.QISA.getLastErrorMessage())
+            raise RuntimeError("Assembling failed.")
 
-        success_save = self.QISA.save(outputFilename)
+        instHex = self.QISA.getInstructionsAsHexStrings(False)
 
-        if success_save is not True:
-            raise Exception("Instruction save to binary failed")
+        intarray = []
+        for instr in instHex:
+            intarray.append(int(instr[2:], 16))
 
-        binBlock = None
-
-        with open(outputFilename, 'rb') as insn_file:
-            binBlock = insn_file.read()
-
-        binBlock = bytearray(binBlock)
-
+        binBlock = bytearray(array.array('L', intarray))
+        print(binBlock)
         # write binblock
         hdr = 'QUTech:UploadInstructions '
         self.binBlockWrite(binBlock, hdr)
-        # write to last_loaded_instructions so it can conveniently be read back
+
         self.last_loaded_instructions(filename)
 
     def _upload_microcode(self, filename):
@@ -324,13 +324,15 @@ class CCL(SCPI):
 
         if not isinstance(filename, str):
             raise ValueError(
-                "The parameter filename type({}) is incorrect. It should be str.".format(type(filename)))
+                "The parameter filename type({}) is incorrect. "
+                "It should be str.".format(type(filename)))
 
         self.microcode.load_microcode(filename)
         binBlock = self.microcode.write_to_bin()
         if not isinstance(binBlock, bytearray):
             raise ValueError(
-                "The parameter binBlock type({}) is incorrect. It should be bytearray.".format(type(binBlock)))
+                "The parameter binBlock type({}) is incorrect. "
+                "It should be bytearray.".format(type(binBlock)))
 
         # write binblock
         hdr = 'QUTech:UploadMicrocode '
@@ -357,7 +359,6 @@ class CCL(SCPI):
         base_name = os.path.splitext(os.path.basename(qumis_name))[0]
         fn = os.path.join(pathname, base_name + ext)
         return fn
-
 
 class dummy_CCL(CCL):
     """

@@ -48,6 +48,7 @@ addr:
                   XNOR       y,r2,r3
 
                   BRA        addr
+                  GOTO       addr
                   BRN        addr
                   BEQ        r4, r5, addr
                   BNE        r4, r5, addr
