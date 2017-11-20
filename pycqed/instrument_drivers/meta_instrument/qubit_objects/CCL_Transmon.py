@@ -788,7 +788,6 @@ class CCLight_Transmon(Qubit):
         if self.cfg_prepare_mw_awg():
             MW_LutMan.load_waveforms_onto_AWG_lookuptable()
 
-
         # N.B. This part is AWG8 specific
         AWG = MW_LutMan.AWG.get_instr()
         AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()-1),
@@ -1242,8 +1241,10 @@ class CCLight_Transmon(Qubit):
         self.int_avg_det_single._set_real_imag(real_imag)
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='rabi_'+self.msmt_suffix)
+        ma.MeasurementAnalysis()
 
     def measure_allxy(self, MC=None,
+                      label: str ='',
                       analyze=True, close_fig=True,
                       prepare_for_timedomain=True):
         # docstring from parent class
@@ -1261,7 +1262,7 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(42))
         MC.set_detector_function(d)
-        MC.run('AllXY'+self.msmt_suffix)
+        MC.run('AllXY'+label+self.msmt_suffix)
         if analyze:
             a = ma.AllXY_Analysis(close_main_fig=close_fig)
             return a.deviation_total
@@ -1492,7 +1493,10 @@ class CCLight_Transmon(Qubit):
             self.T1(a.T1)
         return a.T1
 
-    def measure_Ramsey(self, times=None, MC=None, artificial_detuning=None,
+    def measure_ramsey(self, times=None, MC=None,
+                       artificial_detuning: float=None,
+                       freq_qubit: float=None,
+                       label: str='',
                        analyze=True, close_fig=True, update=True):
         # docstring from parent class
         # N.B. this is a good example for a generic timedomain experiment using
@@ -1528,7 +1532,8 @@ class CCLight_Transmon(Qubit):
                 'timesteps must be multiples of modulation period')
 
         # adding 'artificial' detuning by detuning the qubit LO
-        freq_qubit = self.freq_qubit()
+        if freq_qubit is None:
+            freq_qubit = self.freq_qubit()
         # # this should have no effect if artificial detuning = 0
         self.instr_LO_mw.get_instr().set(
             'frequency', freq_qubit -
@@ -1543,7 +1548,7 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
         MC.set_detector_function(d)
-        MC.run('Ramsey'+self.msmt_suffix)
+        MC.run('Ramsey'+label+self.msmt_suffix)
         a = ma.Ramsey_Analysis(auto=True, close_fig=True)
         if update:
             self.T2_star(a.T2_star)
@@ -1601,7 +1606,7 @@ class CCLight_Transmon(Qubit):
         return a
 
     def measure_flipping(self, number_of_flips=np.arange(20), equator=False,
-                          MC=None, analyze=True, close_fig=True, update=True):
+                         MC=None, analyze=True, close_fig=True, update=True):
 
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -1611,10 +1616,10 @@ class CCLight_Transmon(Qubit):
         nf = np.array(number_of_flips)
         dn = nf[1] - nf[0]
         nf = np.concatenate([nf,
-                                (nf[-1]+1*dn,
+                             (nf[-1]+1*dn,
                                  nf[-1]+2*dn,
-                                    nf[-1]+3*dn,
-                                    nf[-1]+4*dn)])
+                              nf[-1]+3*dn,
+                              nf[-1]+4*dn)])
 
         self.prepare_for_timedomain()
         p = sqo.flipping(number_of_flips=nf, equator=equator,
@@ -1627,7 +1632,9 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_points(nf)
         MC.set_detector_function(d)
         MC.run('flipping'+self.msmt_suffix)
-        a = ma.MeasurementAnalysis(auto=True, close_fig=True)
+        if analyze:
+            a = ma2.FlippingAnalysis(
+                options_dict={'scan_label': 'flipping'})
         return a
 
     def measure_randomized_benchmarking(self, nr_cliffords=2**np.arange(12),
