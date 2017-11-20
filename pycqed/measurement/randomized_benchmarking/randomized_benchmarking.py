@@ -80,22 +80,41 @@ def decompose_clifford_seq_n_qubits(clifford_sequence_list, gate_decomp='HZ'):
     decomposed_seq = []
 
     # iterate over columns; decompose each element in the column into physical
-    # pulses and ensure that the same number of pulses occur for each Clifford
-    # element, i.e. pad with 'I' pulses
-    # example: decomposed_seq_temp = [['I','X180'], ['X180'],
-    # ['X90', 'Z90', 'Z180']], after padding we have [['I', 'X180', 'I'],
-    # ['X180', 'I', 'I'], ['X90', 'Z90', 'Z180']]. We do this because each of
+    # pulses and ensure that the same number of finite duration pulses, and the
+    # same total number of pulses occur for each Clifford element, i.e. pad with
+    # 'I' and 'Z0' pulses
+    # example: decomposed_seq_temp = [Cl0, Cl1, Cl2] = [['X90'], ['mZ90'],
+    # ['Z180', 'X90', 'Z90']] after padding we have [['X90', 'Z0', 'Z0'],
+    # ['mZ90', 'I', 'Z0'], ['Z180', 'X90', 'Z90']]. We do this because each of
     # these sublists of pulses are applied in parallel to different qubits.
     for idx1 in range(clifford_sequence_array.shape[1]):
         decomposed_seq_temp = []
         decomposed_seq_temp.extend(
             [gate_decomposition[clifford_sequence_array[idx0][idx1]] for
              idx0 in range(clifford_sequence_array.shape[0])])
-        # find longest pulse sequence
-        length = len(sorted(decomposed_seq_temp, key=len, reverse=True)[0])
-        # pad shorter pulse sequences with 'I' pulses
-        decomposed_seq.extend([pulse_list+['I']*(length-len(pulse_list)) for
-                               pulse_list in decomposed_seq_temp])
+
+        # add extra I pulses to make each Clifford decomposition
+        # have the same total duration
+        nr_finite_duration_pulses = [len([y for y in x if 'Z' not in y]) for
+                                     x in decomposed_seq_temp]
+        for i, pulse_list in enumerate(decomposed_seq_temp):
+            if nr_finite_duration_pulses[i]<max(nr_finite_duration_pulses):
+                diff_finite_duration_pulses = max(nr_finite_duration_pulses)-\
+                                              nr_finite_duration_pulses[i]
+                pulse_list = pulse_list + ['I']*diff_finite_duration_pulses
+            decomposed_seq_temp[i] = pulse_list
+
+        # if all qubits receive same number of finite duration pulses in their
+        # respective Cl_i, patch with Z0 pulses until all qubits receive the
+        # same total nr of pulses
+        pulse_list_lengths = [len(j) for j in decomposed_seq_temp]
+        for i, pulse_list in enumerate(decomposed_seq_temp):
+            if pulse_list_lengths[i]<max(pulse_list_lengths):
+                nr_Z0_to_add = max(pulse_list_lengths)-pulse_list_lengths[i]
+                pulse_list = pulse_list + ['Z0']*nr_Z0_to_add
+            decomposed_seq_temp[i] = pulse_list
+
+        decomposed_seq.extend(decomposed_seq_temp)
 
     return decomposed_seq
 
