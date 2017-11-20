@@ -895,7 +895,7 @@ class Heterodyne_probe(Soft_Detector):
         super().__init__(**kw)
         self.HS = HS
         self.name = 'Heterodyne probe'
-        self.value_names = ['|S21|', 'S21 angle']  # , 'Re{S21}', 'Im{S21}']
+        self.value_names = ['S21', 'S21 angle']  # , 'Re{S21}', 'Im{S21}']
         self.value_units = ['V', 'deg']
         self.first = True
         self.last_frequency = 0.
@@ -949,7 +949,7 @@ class Heterodyne_probe_soft_avg(Soft_Detector):
         super().__init__(**kw)
         self.HS = HS
         self.name = 'Heterodyne probe'
-        self.value_names = ['|S21|', 'S21 angle']  # , 'Re{S21}', 'Im{S21}']
+        self.value_names = ['S21', 'S21 angle']  # , 'Re{S21}', 'Im{S21}']
         self.value_units = ['mV', 'deg']  # , 'a.u.', 'a.u.']
         self.first = True
         self.last_frequency = 0.
