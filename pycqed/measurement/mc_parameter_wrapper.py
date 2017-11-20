@@ -36,9 +36,15 @@ def wrap_pars_to_swf(parameters, retrieve_value=False):
     '''
     sweep_function = swf.Sweep_function()
     sweep_function.sweep_control = 'soft'
-    sweep_function.name = parameters[0].name
-    sweep_function.parameter_name = parameters[0].label
-    sweep_function.unit = parameters[0].unit
+    sweep_function.name = parameter.name
+    sweep_function.parameter_name = parameter.label
+    sweep_function.unit = parameter.unit
+
+    def wrapped_set(val):
+        old_val = parameter.get()
+        vector_value = old_val
+        vector_value[index] = val
+        parameter.set(vector_value)
 
     sweep_function.prepare = pass_function
     sweep_function.finish = pass_function

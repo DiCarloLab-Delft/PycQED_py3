@@ -1,6 +1,8 @@
 import os
 import numpy as np
 import h5py
+import json
+import datetime
 from pycqed.measurement import hdf5_data as h5d
 from pycqed.analysis import analysis_toolbox as a_tools
 import errno
@@ -218,7 +220,7 @@ def load_settings_onto_instrument_v2(instrument, load_from_instr: str=None,
 
     for parname, par in ins_group['parameters'].items():
         try:
-            if instrument.parameters[parname].has_set:
+            if hasattr(instrument.parameters[parname], 'set'):
                 instrument.set(parname, par['value'])
         except Exception as e:
             print('Could not set parameter: "{}" to "{}" '
@@ -419,3 +421,22 @@ def setInDict(dataDict: dict, mapList: list, value):
                         'b': 4}
     """
     getFromDict(dataDict, mapList[:-1])[mapList[-1]] = value
+
+
+class NumpyJsonEncoder(json.JSONEncoder):
+    '''
+    JSON encoder subclass that converts Numpy types to native python types
+    for saving in JSON files.
+    Also converts datetime objects to strings.
+    '''
+    def default(self, o):
+        if isinstance(o, np.integer):
+            return int(o)
+        elif isinstance(o, np.floating):
+            return float(o)
+        elif isinstance(o, np.ndarray):
+            return o.tolist()
+        elif isinstance(o, datetime.datetime):
+            return str(o)
+        else:
+            return super().default(o)
