@@ -56,13 +56,15 @@ def execute_qumis_file(file_url: str,  config_json: str,
     write_to_log('QUMIS!')
     return 
 
-def execute(file_url: str,  config_json: str,
+def execute(file_url: str, tasm_file_url:str, qasm_file_url:str, config_json: str,
                       verbosity_level: int=0):
     write_to_log('Hello!')
     options = json.loads(config_json)
     write_to_log('options:')
     write_to_log(options)
     write_to_log(file_url)
+    write_to_log(tasm_file_url)
+    write_to_log(qasm_file_url)
 
     if (not new_station):
         
