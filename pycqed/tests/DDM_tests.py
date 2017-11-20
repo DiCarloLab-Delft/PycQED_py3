@@ -46,11 +46,11 @@ class DDM_tests(unittest.TestCase):
 
     def array_get_set(self, par):
         old_val = par.get()
-        shape = par._vals._shape
-        mn = par._vals._min_value
+        shape = par.vals._shape
+        mn = par.vals._min_value
         if mn == -float("inf"):
             mn = -100
-        mx = par._vals._max_value
+        mx = par.vals._max_value
         if mx == float("inf"):
             mx = 100
         v = (np.zeros(shape)+mn)+(mx-mn)/2
@@ -64,10 +64,10 @@ class DDM_tests(unittest.TestCase):
 
     def floating_get_set(self, par):
         old_val = par.get()
-        mn = par._vals._min_value
+        mn = par.vals._min_value
         if mn == -float("inf"):
             mn = -100.5
-        mx = par._vals._max_value
+        mx = par.vals._max_value
         if mx == float("inf"):
             mx = 100.5
         v = (mn)+(mx-mn)/2
@@ -81,10 +81,10 @@ class DDM_tests(unittest.TestCase):
 
     def integer_get_set(self, par):
         old_val = par.get()
-        mn = par._vals._min_value
+        mn = par.vals._min_value
         if mn == -float("inf"):
             mn = -100
-        mx = par._vals._max_value
+        mx = par.vals._max_value
         if mx == float("inf"):
             mx = 100
         v = (mn)+(mx-mn)//2
@@ -98,8 +98,8 @@ class DDM_tests(unittest.TestCase):
 
     def string_get_set(self, par):
         old_val = par.get()
-        min_len = par._vals._min_length
-        max_len = par._vals._max_length
+        min_len = par.vals._min_length
+        max_len = par.vals._max_length
 
         v = 'test_string'
         if len(v) > max_len:
@@ -112,7 +112,7 @@ class DDM_tests(unittest.TestCase):
 
     def enum_get_set(self, par):
         old_val = par.get()
-        for v in par._vals._values:
+        for v in par.vals._values:
             par.set(v)
             self.assertEqual(v, par.get(), msg=par.name)
         par.set(old_val)
@@ -127,7 +127,7 @@ class DDM_tests(unittest.TestCase):
                 np.testing.assert_equal(old_value2, old_value,
                                         err_msg=par.name)
                 if hasattr(par, '_vals') and par.has_set:
-                    validator = par._vals
+                    validator = par.vals
                     if isinstance(validator, vals.Ints):
                         self.integer_get_set(par)
                     elif isinstance(validator, vals.Numbers):
@@ -143,7 +143,7 @@ class DDM_tests(unittest.TestCase):
 
                     else:
                         print('{} validator "{}" not recognized'.format(
-                            par.name, par._vals))
+                            par.name, par.vals))
                 else:
                     print(par.name, 'does not have validator, not testing')
             else:

@@ -43,11 +43,69 @@ class Detector_Function(object):
         pass
 
 
+class Multi_Detector(Detector_Function):
+    """
+    Combines several detectors of the same type (hard/soft) into a single
+    detector.
+    """
+
+    def __init__(self, detectors: list,
+                 det_idx_suffix: bool=True, **kw):
+        """
+        detectors     (list): a list of detectors to combine.
+        det_idx_suffix(bool): if True suffixes the value names with
+                "_det{idx}" where idx refers to the relevant detector.
+        """
+        self.detectors = detectors
+        self.name = 'Multi_detector'
+        self.value_names = []
+        self.value_units = []
+        for i, detector in enumerate(detectors):
+            for detector_value_name in detector.value_names:
+                if det_idx_suffix:
+                    detector_value_name += '_det{}'.format(i)
+                self.value_names.append(detector_value_name)
+            for detector_value_unit in detector.value_units:
+                self.value_units.append(detector_value_unit)
+
+        self.detector_control = self.detectors[0].detector_control
+        for d in self.detectors:
+            if d.detector_control != self.detector_control:
+                raise ValueError('All detectors should be of the same type')
+
+    def prepare(self, **kw):
+        for detector in self.detectors:
+            detector.prepare(**kw)
+
+    def get_values(self):
+        values_list = []
+        for detector in self.detectors:
+            new_values = detector.get_values()
+            values_list.append(new_values)
+        values = np.concatenate(values_list)
+        return values
+
+    def acquire_data_point(self):
+        # N.B. get_values and acquire_data point are virtually identical.
+        # the only reason for their existence is a historical distinction
+        # between hard and soft detectors that leads to some confusing data
+        # shape related problems, hence the append vs concatenate
+        values = []
+        for detector in self.detectors:
+            new_values = detector.acquire_data_point()
+            values = np.append(values, new_values)
+        return values
+
+    def finish(self):
+        for detector in self.detectors:
+            detector.finish()
+
 ###############################################################################
 ###############################################################################
 ####################             None Detector             ####################
 ###############################################################################
 ###############################################################################
+
 
 class None_Detector(Detector_Function):
 
@@ -861,6 +919,8 @@ class Function_Detector(Soft_Detector):
             return result
         else:
             results = [result[key] for key in self.result_keys]
+            if len(results) == 1:
+                return results[0]  # for a single entry we don't want a list
             return results
 
 
@@ -1415,7 +1475,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
         if not self.real_imag:
             if len(self.channels) != 2:
-                raise ValueError()
+                raise ValueError('Length of "{}" is not 2'.format(
+                                 self.channels))
             self.value_names[0] = 'Magn'
             self.value_names[1] = 'Phase'
             self.value_units[1] = 'deg'
@@ -1432,6 +1493,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
         data_raw = self.UHFQC.acquisition_poll(
             samples=self.nr_sweep_points, arm=False, acquisition_time=0.01)
+        # the self.channels should be the same as data_raw.keys().
+        # this is to be tested (MAR 26-9-2017)
         data = np.array([data_raw[key]
                          for key in sorted(data_raw.keys())])*self.scaling_factor
 
@@ -1440,13 +1503,14 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             for i, channel in enumerate(self.channels):
                 data[i] = data[i]-self.UHFQC.get(
                     'quex_trans_offset_weightfunction_{}'.format(channel))
-
         if not self.real_imag:
             data = self.convert_to_polar(data)
-
         return data
 
     def convert_to_polar(self, data):
+        if len(data) != 2:
+            raise ValueError('Expect 2 channels for rotation. Got {}'.format(
+                             len(data)))
         I = data[0]
         Q = data[1]
         S21 = I + 1j*Q
@@ -1985,6 +2049,7 @@ class UHFQC_single_qubit_statistics_logging_det(UHFQC_statistics_logging_det):
     def acquire_data_point(self, **kw):
         # Returns only the data for the relevant channel
         return super().acquire_data_point()[0:3]
+
 
 class UHFQC_single_qubit_statistics_logging_det(UHFQC_statistics_logging_det):
 

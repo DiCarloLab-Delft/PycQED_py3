@@ -22,7 +22,7 @@ def set_xlabel(axis, label, unit=None, **kw):
         **kw : keyword argument to be passed to matplotlib.set_xlabel
 
     """
-    if unit is not None:
+    if unit is not None and unit != '':
         xticks = axis.get_xticks()
         scale_factor, unit = SI_prefix_and_scale_factor(
             val=max(abs(xticks)), unit=unit)
@@ -44,7 +44,7 @@ def set_ylabel(axis, label, unit=None, **kw):
         **kw : keyword argument to be passed to matplotlib.set_ylabel
 
     """
-    if unit is not None:
+    if unit is not None and unit != '':
         yticks = axis.get_yticks()
         scale_factor, unit = SI_prefix_and_scale_factor(
             val=max(abs(yticks)), unit=unit)
@@ -83,14 +83,17 @@ def SI_prefix_and_scale_factor(val, unit=None):
     else:
         scale_factor = 1
 
+    if unit == None:
+        unit = ''  # to ensure proper return value
     return scale_factor, unit
 
 
-def SI_val_to_msg_str(val: float, unit: str=None):
+def SI_val_to_msg_str(val: float, unit: str=None, return_type=str):
     """
     Takes in a value  with optional unit and returns a string tuple consisting
     of (value_str, unit) where the value and unit are rescaled according to
     SI prefixes.
+    the value_str is of the type specified in return_type (str) by default.
     """
     validtypes = (float, int, np.integer, np.floating)
     if unit in SI_UNITS and isinstance(val, validtypes):
@@ -107,7 +110,10 @@ def SI_val_to_msg_str(val: float, unit: str=None):
         val = val*10**-prefix_power
         unit = prefix+unit
 
-    value_str = str(val)
+    value_str = return_type(val)
+    # To ensure right type of return value
+    if unit == None:
+        unit = ''
     return value_str, unit
 
 
