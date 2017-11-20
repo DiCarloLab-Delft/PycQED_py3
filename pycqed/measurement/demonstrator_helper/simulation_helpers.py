@@ -58,6 +58,8 @@ def _simulate_QX(file_path, options):
         qxc.connect()
         qxc.create_qubits(2)
         qx_sweep = swf.QX_Hard_Sweep(qxc, file_path)
+        qx_sweep.parameter_name = 'Circuit number '
+        qx_sweep.unit = '#'
         num_avg = options.get('num_avg', 10000)  # 10000 is the default
 
         qx_detector = QX_Hard_Detector(qxc, [file_path], num_avg=num_avg)
