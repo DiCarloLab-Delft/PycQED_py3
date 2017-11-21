@@ -109,18 +109,21 @@ class QuTechVSMModule(SCPI):
                            vals=validators.OnOff())
 
         # Each (module, channel) separately
-        for channel in self.channels:
-            for mod in self.modules:
+        for mod in self.modules:
+            mod_name = 'mod{m}'.format(m=mod)
+            mod_scpi = 'MODULE{m}'.format(m=mod)
+
+            doc_source = 'Marker source of module {m}.'.format(m=mod)
+            self.add_parameter(mod_name + '_marker_source',
+                               docstring=doc_source,
+                               get_cmd='MARKER:'+mod_scpi+':SOURCE?',
+                               set_cmd='MARKER:'+mod_scpi+':SOURCE {}',
+                               vals=validators.Enum('int', 'ext'))
+
+            for channel in self.channels:
                 mod_ch_name = 'mod{m}_ch{c}'.format(m=mod, c=channel)
-                mod_ch_scpi = 'MODULE{m}:CHANNEL{c}'.format(m=mod, c=channel)
-
-                doc_source = 'Marker source of module {m}, ' \
-                             'channel {c}.'.format(m=mod, c=channel)
-                self.add_parameter(mod_ch_name + '_marker_source',
-                                   docstring=doc_source,
-                                   get_cmd='MARKER:'+mod_ch_scpi+':SOURCE?',
-                                   vals=validators.Enum('int', 'ext'))
-
+                mod_ch_scpi = 'MODULE{m}:CHANNEL{c}'.format(m=mod,
+                                                            c=channel)
                 doc_state = 'Marker state of module {m}, ' \
                             'channel {c}.'.format(m=mod, c=channel)
                 self.add_parameter(mod_ch_name + '_marker_state',
