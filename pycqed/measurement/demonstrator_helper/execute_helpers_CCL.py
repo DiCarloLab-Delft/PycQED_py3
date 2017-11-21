@@ -61,7 +61,7 @@ except KeyError:
     MC_demo = Instrument.find_instrument('Demonstrator_MC')
 
 
-def execute(qisa_file_url: str,  config_json: str,
+def execute(qisa_file_url: str, tqisa_file_url:str, qasm_file_url:str,  config_json: str,
             verbosity_level: int=0):
     options = json.loads(config_json)
 
@@ -69,6 +69,8 @@ def execute(qisa_file_url: str,  config_json: str,
         write_to_log('options:')
         write_to_log(options)
         write_to_log(qisa_file_url)
+        write_to_log(tqisa_file_url)
+        write_to_log(qasm_file_url)
 
         CCL = Instrument.find_instrument('CCL')
         device = Instrument.find_instrument('device')
@@ -258,5 +260,5 @@ def send_calibration_data():
 
 
 def write_to_log(string):
-    with open(r'D:\Experiments\1709_M18\demo_log.txt', 'r+') as f:
-        f.write(str(string))
+    with open(r'D:\Experiments\1709_M18\demo_log.txt', 'a+') as f:
+        f.write(str(string) + '\n')
