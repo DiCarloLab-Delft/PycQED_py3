@@ -178,7 +178,7 @@ class n_qubit_Simultaneous_Randomized_Benchmarking_one_length(swf.Hard_Sweep):
     def __init__(self, pulse_pars_list, RO_pars, nr_cliffords_value, #int
                  gate_decomposition='HZ', interleaved_gate=None,
                  upload=True, return_seq=False, seq_name=None,
-                 parallel_pulses=False, CxC_RB=True, idx_for_RB=0,
+                 CxC_RB=True, idx_for_RB=0,
                  verbose=False):
 
         super().__init__()
@@ -188,6 +188,7 @@ class n_qubit_Simultaneous_Randomized_Benchmarking_one_length(swf.Hard_Sweep):
         self.nr_cliffords_value = nr_cliffords_value
         self.CxC_RB = CxC_RB
         self.seq_name = seq_name
+        self.return_seq = return_seq
         self.gate_decomposition = gate_decomposition
         self.interleaved_gate = interleaved_gate
         self.parallel_pulses = parallel_pulses
@@ -208,8 +209,8 @@ class n_qubit_Simultaneous_Randomized_Benchmarking_one_length(swf.Hard_Sweep):
                 nr_seeds=self.sweep_points,
                 CxC_RB=self.CxC_RB,
                 idx_for_RB=self.idx_for_RB,
-                parallel_pulses=self.parallel_pulses,
-                seq_name=self.seq_name)
+                seq_name=self.seq_name,
+                return_seq=self.return_seq)
 
 
 class two_qubit_AllXY(swf.Hard_Sweep):

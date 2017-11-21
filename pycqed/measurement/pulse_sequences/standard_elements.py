@@ -91,14 +91,14 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
     ##############################
     temp_qubit_names = []
     for x in pulse_list:
-        if x['operation_type']=='MW':
+        if 'operation_type' in x.keys() and x['operation_type'] == 'MW':
             try:
                 temp_qubit_names.append(x['target_qubit'])
             except KeyError: #for example for spacer pulse
                 pass
     target_qubit_names = list(set(temp_qubit_names))
     phase_offset = {} # used for software Z-gates
-    [phase_offset.update({qb_name:0}) for qb_name in target_qubit_names]
+    [phase_offset.update({qb_name: 0}) for qb_name in target_qubit_names]
     j = 0
     for i, pulse_pars in enumerate(pulse_list):
         # Default values for backwards compatibility
@@ -152,16 +152,17 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
                     -pulse_pars['phase'] + phase_offset[pulse_pars['target_qubit']]
             else:
                 pulse_pars_new = deepcopy(pulse_pars)
-                if pulse_pars['operation_type']=='MW' and \
-                    ('target_qubit' in pulse_pars.keys()):
-                    # only add phase_offset if the pulse is a qubit drive pulse
-
-                    if ('phase' in pulse_pars.keys()) and \
-                                    phase_offset[pulse_pars['target_qubit']] != 0:
-                        total_phase = pulse_pars['phase'] + \
+                # only add phase_offset if the pulse is a qubit drive pulse
+                if 'operation_type' in pulse_pars.keys():
+                    if pulse_pars['operation_type'] == 'MW' and \
+                            ('target_qubit' in pulse_pars.keys()):
+                        if ('phase' in pulse_pars.keys()) and \
+                                phase_offset[pulse_pars['target_qubit']] != 0:
+                            total_phase = pulse_pars['phase'] + \
                                       phase_offset[pulse_pars['target_qubit']]
-                        pulse_pars_new['phase'] = (total_phase%360 if total_phase>=0
-                                                   else total_phase%-360)
+                            pulse_pars_new['phase'] = (total_phase % 360
+                                                       if total_phase >= 0
+                                                       else total_phase % (-360))
 
                 try:
                     # Look for the function in pl = pulse_lib
