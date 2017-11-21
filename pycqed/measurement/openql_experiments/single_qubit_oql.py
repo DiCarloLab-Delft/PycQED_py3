@@ -487,7 +487,8 @@ def randomized_benchmarking(qubit_idx: int, platf_cfg: str,
         nr_cliffords:   list nr_cliffords for which to generate RB seqs
         nr_seeds:       int  nr_seeds for which to generate RB seqs
         net_clifford:   int index of net clifford the sequence should perform
-                        0 corresponds to Identity and 3 corresponds to X180
+                            0 -> Idx
+                            3 -> rx180
         restless:       bool, does not initialize if restless is True
         program_name:           some string that can be used as a label.
         cal_points:     bool whether to replace the last two elements with

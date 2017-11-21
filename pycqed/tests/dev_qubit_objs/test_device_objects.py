@@ -113,10 +113,10 @@ class Test_Device_obj(unittest.TestCase):
         self.CCL_qubit.mw_mixer_offs_DQ(.4)
 
     @classmethod
-        def tearDownClass(self):
-            for inststr in list(self.CCL_qubit._all_instruments):
-                try:
-                    inst = self.CCL_qubit.find_instrument(inststr)
-                    inst.close()
-                except KeyError:
-                    pass
+    def tearDownClass(self):
+        for inststr in list(self.CCL_qubit._all_instruments):
+            try:
+                inst = self.CCL_qubit.find_instrument(inststr)
+                inst.close()
+            except KeyError:
+                pass
