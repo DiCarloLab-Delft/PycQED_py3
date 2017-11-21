@@ -1267,30 +1267,32 @@ class CCLight_Transmon(Qubit):
             a = ma.AllXY_Analysis(close_main_fig=close_fig)
             return a.deviation_total
 
-    def calibrate_single_qubit_gates_allxy(self, nested_MC=None, f_start=None,
-                                           G_start=None, D_start=None,
-                                           initial_steps=None):
+    def calibrate_single_qubit_gates_allxy(self, nested_MC=None,
+                                           start_values=None,
+                                           initial_steps=None,
+                                           parameter_list=None):
         # FIXME: this tuneup does not update the qubit object parameters
         # FIXME2: this tuneup does not return True upon success
-        if f_start is None:
-            f_start = self.freq_qubit()
-
-        if G_start is None:
-            G_start = self.mw_vsm_G_att()
-
-        if D_start is None:
-            D_start = self.mw_vsm_D_att()
-
         if initial_steps is None:
-            initial_steps = [1e6, 4e2, 2e3]
+            if parameter_list is None:
+                initial_steps = [1e6, 4e2, 2e3]
+            else:
+                raise ValueError("must pass initial steps if setting parameter_list")
 
         if nested_MC is None:
             nested_MC = self.instr_nested_MC.get_instr()
 
+        if parameter_list is None:
+            parameter_list = ["freq_qubit",
+                "mw_vsm_G_att",
+                "mw_vsm_D_att"]
+
         nested_MC.set_sweep_functions([
-            self.freq_qubit,
-            self.mw_vsm_G_att,
-            self.mw_vsm_D_att])
+            self.__getattr__(p) for p in parameter_list])
+
+        if start_values is None:
+            # use current values
+            start_values = [self.get(p) for p in parameter_list]
 
         d = det.Function_Detector(self.measure_allxy,
                                   value_names=['AllXY cost'],
@@ -1298,7 +1300,7 @@ class CCLight_Transmon(Qubit):
         nested_MC.set_detector_function(d)
 
         ad_func_pars = {'adaptive_function': nelder_mead,
-                        'x0': [f_start, G_start, D_start],
+                        'x0': start_values,
                         'initial_step': initial_steps,
                         'no_improv_break': 10,
                         'minimize': True,
