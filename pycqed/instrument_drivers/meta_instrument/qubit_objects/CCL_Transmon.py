@@ -469,7 +469,9 @@ class CCLight_Transmon(Qubit):
                            # this is to effictively hardcode the cycle time
                            vals=vals.Enum(20e-9))
         # TODO: add docstring (Oct 2017)
-        self.add_parameter('cfg_prepare_mw_awg', vals=vals.Bool(),
+        self.add_parameter('cfg_prepare_awg', vals=vals.Bool(),
+                           docstring=('If False disables uploading pusles '
+                                      'to AWG8 and UHFQC'),
                            initial_value=True,
                            parameter_class=ManualParameter)
         self.add_parameter(
@@ -562,7 +564,8 @@ class CCLight_Transmon(Qubit):
         """
         self._prep_ro_instantiate_detectors()
         self._prep_ro_sources()
-        self._prep_ro_pulse()
+        if self.cfg_prepare_awg():
+            self._prep_ro_pulse()
         self._prep_ro_integration_weights()
 
     def _prep_ro_instantiate_detectors(self):
@@ -785,7 +788,7 @@ class CCLight_Transmon(Qubit):
         MW_LutMan.G_mixer_alpha(self.mw_G_mixer_alpha())
         MW_LutMan.D_mixer_phi(self.mw_D_mixer_phi())
         MW_LutMan.D_mixer_alpha(self.mw_D_mixer_alpha())
-        if self.cfg_prepare_mw_awg():
+        if self.cfg_prepare_awg():
             MW_LutMan.load_waveforms_onto_AWG_lookuptable()
 
         # N.B. This part is AWG8 specific
@@ -1267,25 +1270,105 @@ class CCLight_Transmon(Qubit):
             a = ma.AllXY_Analysis(close_main_fig=close_fig)
             return a.deviation_total
 
-    def calibrate_single_qubit_gates_allxy(self, nested_MC=None,
-                                           start_values=None,
-                                           initial_steps=None,
-                                           parameter_list=None):
+    def calibrate_mw_gates_restless(
+            self, MC=None,
+            parameter_list: list = ['G_att', 'D_att', 'freq'],
+            initial_values: list =None,
+            initial_steps: list= [5e3, 10e3, 3e6],
+            nr_cliffords: int=80, nr_seeds:int=40, update: bool=True):
+
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        if parameter_list is None:
+            parameter_list = ["freq_qubit", "mw_vsm_G_att", "mw_vsm_D_att"]
+
+        VSM = self.instr_VSM.get_instr()
+        G_att_par = VSM.parameters['in{}_out{}_att'.format(self.mw_vsm_ch_Gin(),
+                                                           self.mw_vsm_ch_out())]
+
+        D_att_par = VSM.parameters['in{}_out{}_att'.format(self.mw_vsm_ch_Din(),
+                                                           self.mw_vsm_ch_out())]
+        freq_par = self.instr_LO_mw.get_instr().frequency
+
+        sweep_pars = []
+        if 'G_att' in parameter_list:
+            sweep_pars.append(G_att_par)
+        if 'D_att' in parameter_list:
+            sweep_pars.append(D_att_par)
+        if 'freq' in parameter_list:
+            sweep_pars.append(freq_par)
+
+        if initial_values is None:
+            # use the current values of the parameters being varied.
+            initial_values = [p.get() for p in sweep_pars]
+
+        # Preparing the sequence
+        p = sqo.randomized_benchmarking(
+            self.cfg_qubit_nr(), self.cfg_openql_platform_fn(),
+            nr_cliffords=[nr_cliffords],
+            net_clifford=3, nr_seeds=nr_seeds, restless=True, cal_points=False)
+        self.instr_CC.get_instr().upload_instructions(p.filename)
+        self.instr_CC.get_instr().start()
+
+
+        MC.set_sweep_functions(sweep_pars)
+
+        d = det.UHFQC_single_qubit_statistics_logging_det(
+            self.instr_acquisition.get_instr(),
+            self.instr_CC.get_instr(), nr_shots=4*4095,
+            integration_length=self.ro_acq_integration_length(),
+            channel=self.ro_acq_weight_chI(),
+            statemap={'0':'1', '1':'0'})
+
+        MC.set_detector_function(d)
+
+        ad_func_pars = {'adaptive_function': nelder_mead,
+                        'x0': initial_values,
+                        'initial_step': initial_steps,
+                        'par_idx': 1,
+                        'minimize': False}
+
+        MC.set_adaptive_function_parameters(ad_func_pars)
+        MC.set_optimization_method('nelder_mead')
+        MC.run(name='Restless_tuneup'+self.msmt_suffix, mode='adaptive')
+        a=ma.OptimizationAnalysis(label='Restless_tuneup')
+
+        if update:
+            opt_par_values = a.optimization_result[0]
+            if 'G_att' in parameter_list:
+                G_idx = parameter_list.index('G_att')
+                self.mw_vsm_G_att(opt_par_values[G_idx])
+            if 'D_att' in parameter_list:
+                D_idx = parameter_list.index('D_att')
+                self.mw_vsm_D_att(opt_par_values[D_idx])
+            if 'freq' in parameter_list:
+                freq_idx = parameter_list.index('freq')
+                # We are varying the LO frequency in the opt, not the q freq.
+                self.freq_qubit(opt_par_values[freq_idx] +
+                                self.mw_freq_mod.get())
+
+
+    def calibrate_mw_gates_allxy(self, nested_MC=None,
+                                 start_values=None,
+                                 initial_steps=None,
+                                 parameter_list=None):
         # FIXME: this tuneup does not update the qubit object parameters
         # FIXME2: this tuneup does not return True upon success
         if initial_steps is None:
             if parameter_list is None:
                 initial_steps = [1e6, 4e2, 2e3]
             else:
-                raise ValueError("must pass initial steps if setting parameter_list")
+                raise ValueError(
+                    "must pass initial steps if setting parameter_list")
 
         if nested_MC is None:
             nested_MC = self.instr_nested_MC.get_instr()
 
         if parameter_list is None:
             parameter_list = ["freq_qubit",
-                "mw_vsm_G_att",
-                "mw_vsm_D_att"]
+                              "mw_vsm_G_att",
+                              "mw_vsm_D_att"]
 
         nested_MC.set_sweep_functions([
             self.__getattr__(p) for p in parameter_list])
