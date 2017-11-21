@@ -593,7 +593,7 @@ class ZI_HDAWG8(ZI_base_instrument):
         self._dev.daq.setInt('/' + self._dev.device +
                              '/sigouts/*/enables/*', 0)
         # Switch all outputs into direct mode
-        if self.cfg_codeword_protocol() != 'flux':
+        if self.cfg_codeword_protocol() == 'flux':
             for ch in range(8):
                 try:
                     self.set('sigouts_{}_direct'.format(ch), 0)
