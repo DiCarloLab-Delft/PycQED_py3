@@ -232,6 +232,106 @@ def two_qubit_AllXY(q0: int, q1: int, platf_cfg: str,
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
 
+def Cryoscope(qubit_idx: int, buffer_time1, buffer_time2, platf_cfg: str):
+    """
+    Single qubit Ramsey sequence.
+    Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
+
+    Input pars:
+        times:          the list of waiting times for each Ramsey element
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+    Returns:
+        p:              OpenQL Program object containing
+
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="Cryoscope", nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    buffer_nanoseconds1 = int(round(buffer_time1/1e-9))
+    buffer_nanoseconds2 = int(round(buffer_time2/1e-9))
+
+    k = Kernel("RamZ_X", p=platf)
+    k.prepz(qubit_idx)
+    k.gate('rx90', qubit_idx)
+    k.gate("wait", [qubit_idx], buffer_nanoseconds1)
+    k.gate('fl_cw_02', 2, 0)
+    k.gate("wait", [qubit_idx], buffer_nanoseconds2)
+    k.gate("rx180", qubit_idx)
+    k.gate('wait', [qubit_idx], buffer_nanoseconds2)
+    k.gate('i', qubit_idx)
+    k.gate('i', qubit_idx)
+    k.gate("wait", [qubit_idx], buffer_nanoseconds1)
+    k.gate('rx90', qubit_idx)
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+
+    k = Kernel("RamZ_Y", p=platf)
+    k.prepz(qubit_idx)
+    k.gate('rx90', qubit_idx)
+    k.gate("wait", [qubit_idx], buffer_nanoseconds1)
+    k.gate('fl_cw_02', 2, 0)
+    k.gate("wait", [qubit_idx], buffer_nanoseconds2)
+    k.gate("rx180", qubit_idx)
+    k.gate('wait', [qubit_idx], buffer_nanoseconds2)
+    k.gate('i', qubit_idx)
+    k.gate('i', qubit_idx)
+    k.gate("wait", [qubit_idx], buffer_nanoseconds1)
+    k.gate('ry90', qubit_idx)
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+
+    # adding the calibration points
+    # add_single_qubit_cal_points(p, platf=platf, qubit_idx=qubit_idx)
+
+    p.compile()
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
+def CryoscopeGoogle(qubit_idx: int, buffer_time1, times, platf_cfg: str):
+    """
+    A Ramsey sequence with varying waiting times `times` around a flux pulse.
+    Generates 2xlen(times) measurements (t1-x, t1-y, t2-x, t2-y. etc)
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="CryoscopeGoogle", nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    buffer_nanoseconds1 = int(round(buffer_time1/1e-9))
+
+    for t in times:
+
+        t_nanoseconds = int(round(t/1e-9))
+
+        k = Kernel("RamZ_X", p=platf)
+        k.prepz(qubit_idx)
+        k.gate('rx90', qubit_idx)
+        k.gate("wait", [qubit_idx], buffer_nanoseconds1)
+        k.gate('fl_cw_02', 2, 0)
+        k.gate("wait", [qubit_idx], t_nanoseconds)
+        k.gate('rx90', qubit_idx)
+        k.measure(qubit_idx)
+        p.add_kernel(k)
+        k = Kernel("RamZ_Y", p=platf)
+        k.prepz(qubit_idx)
+        k.gate('rx90', qubit_idx)
+        k.gate("wait", [qubit_idx], buffer_nanoseconds1)
+        k.gate('fl_cw_02', 2, 0)
+        k.gate("wait", [qubit_idx], t_nanoseconds)
+        k.gate('ry90', qubit_idx)
+        k.measure(qubit_idx)
+        p.add_kernel(k)
+
+    p.compile()
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+    pass
 
 # FIMXE: merge into the real chevron seq
 def Chevron_hack(qubit_idx: int, qubit_idx_spec,
