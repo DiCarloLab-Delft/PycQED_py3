@@ -86,14 +86,16 @@ class QuTechVSMModule(SCPI):
                 self.add_parameter(ch_name + '_temperature',
                                    docstring=doc,
                                    unit='℃',
-                                   get_cmd='TEMPERATURE:'+ch_scpi+'?')
+                                   get_cmd='TEMPERATURE:'+ch_scpi+'?',
+                                   get_parser=float)
             # Digital sensor
             self.add_parameter(mod_name + '_temperature_digital',
                                docstring='Temperature (in ℃) of the separate '
                                          'digital temperature sensor on each '
                                          'module.',
                                unit='℃',
-                               get_cmd='TEMPERATURE:' + mod_scpi + ':DIGITAL?')
+                               get_cmd='TEMPERATURE:' + mod_scpi + ':DIGITAL?',
+                               get_parser=float)
 
     def add_marker_parameters(self):
         # Set all markers in one go
@@ -160,7 +162,8 @@ class QuTechVSMModule(SCPI):
                                unit='Hz',
                                get_cmd='QUBIT'+ch_scpi+':FREQUENCY?',
                                set_cmd='QUBIT'+ch_scpi+':FREQUENCY {}',
-                               vals=validators.Numbers())
+                               vals=validators.Numbers(),
+                               get_parser=int)
 
             colors = ', '.join(['black', 'blue', 'green', 'grey', 'orange',
                                 'red', 'white', 'yellow', 'dcl_blue',
@@ -223,5 +226,6 @@ class QuTechVSMModule(SCPI):
                             docstring=doc_dac,
                             get_cmd=scpi_name + '?',
                             set_cmd=scpi_name + ' {}',
+                            get_parser=int,
                             vals=validators.Ints(min_value=0, max_value=2**16-1)
                         )
