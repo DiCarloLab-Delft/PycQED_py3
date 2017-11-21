@@ -18,7 +18,7 @@ from qcodes import validators as vals
 
 
 from qcodes.instrument.parameter import Parameter
-from qcodes.instrument.parameter import Command, no_setter
+from qcodes.instrument.parameter import Command #, no_setter
 
 
 # Note: the HandshakeParameter is a temporary param that should be replaced
@@ -36,7 +36,7 @@ class HandshakeParameter(Parameter):
         if isinstance(set_cmd, str):
             set_cmd += '\n *OPC?'
         self._set = Command(arg_count=1, cmd=set_cmd, exec_str=exec_str,
-                            input_parser=set_parser, no_cmd_function=no_setter)
+                            input_parser=set_parser, no_cmd_function=None) # no_setter)
 
         self.has_set = set_cmd is not None
 

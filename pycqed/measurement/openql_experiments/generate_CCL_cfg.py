@@ -64,10 +64,21 @@ def generate_config(filename: str,
                           "2": [5, 6]
                       }
                       },
-             "meas_units": {"count": 2,
-                            "connection_map": {"0": [0, 2, 3, 5, 6],
-                                               "1": [1, 4]}
+             "meas_units": {"count": 7,
+                            "connection_map": {"0": [0],
+                                               "1": [1],
+                                               "2": [2],
+                                               "3": [3],
+                                               "4": [4],
+                                               "5": [5],
+                                               "6": [6]
+                                               }
                             },
+             # FIXME OpenQL #103
+             # "meas_units": {"count": 2,
+             #                "connection_map": {"0": [0, 2, 3, 5, 6],
+             #                                   "1": [1, 4]}
+             #                },
              "edges": {"count": 8,
                        "connection_map": {
                            "0": [2],
@@ -150,7 +161,7 @@ def generate_config(filename: str,
             "qubits": [q],
             "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
             "disable_optimization": True,
-            "type": "mw",
+            "type": "none",
             "cc_light_instr_type": "single_qubit_gate",
             "cc_light_instr": "prepz",
             "cc_light_codeword": 0,

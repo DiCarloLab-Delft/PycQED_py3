@@ -409,6 +409,50 @@ class Qubit(Instrument):
         raise NotImplementedError
         return True
 
+    def calibrate_frequency_ramsey(self,
+                                   steps=[1, 1, 3, 10, 30, 100, 300, 1000],
+                                   stepsize=None, verbose=True, update=True,
+                                   close_fig=True):
+        if stepsize is None:
+            stepsize = abs(1/self.mw_freq_mod())
+        cur_freq = self.freq_qubit.get()
+        # Steps don't double to be more robust against aliasing
+        for n in steps:
+            times = np.arange(self.mw_gauss_width()*4,
+                              50*n*stepsize, n*stepsize)
+            artificial_detuning = 2.5/times[-1]
+            self.measure_ramsey(times,
+                                artificial_detuning=artificial_detuning,
+                                freq_qubit=cur_freq,
+                                label='_{}pulse_sep'.format(n),
+                                analyze=False)
+            a = ma.Ramsey_Analysis(auto=True, close_fig=close_fig,
+                                   close_file=False)
+            fitted_freq = a.fit_res.params['frequency'].value
+            measured_detuning = fitted_freq-artificial_detuning
+            cur_freq -= measured_detuning
+
+            qubit_ana_grp = a.analysis_group.create_group(self.msmt_suffix)
+            qubit_ana_grp.attrs['artificial_detuning'] = \
+                str(artificial_detuning)
+            qubit_ana_grp.attrs['measured_detuning'] = \
+                str(measured_detuning)
+            qubit_ana_grp.attrs['estimated_qubit_freq'] = str(cur_freq)
+            a.finish()  # make sure I close the file
+            if verbose:
+                print('Measured detuning:{:.2e}'.format(measured_detuning))
+                print('Setting freq to: {:.9e}, \n'.format(cur_freq))
+            if times[-1] > 2.*a.T2_star:
+                # If the last step is > T2* then the next will be for sure
+                if verbose:
+                    print('Breaking of measurement because of T2*')
+                break
+        if verbose:
+            print('Converged to: {:.9e}'.format(cur_freq))
+        if update:
+            self.freq_qubit(cur_freq)
+        return cur_freq
+
     def calculate_frequency(self, calc_method=None, V_per_phi0=None, V=None):
         '''
         Calculates an estimate for the qubit frequency.

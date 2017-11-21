@@ -392,13 +392,13 @@ class MeasurementAnalysis(object):
                 if self.no_of_columns == 2:
                     fig, axs = plt.subplots(
                         nrows=int(len(self.value_names)/2), ncols=2,
-                        figsize=(3.375, 2.25*len(self.value_names)), dpi=self.dpi)
+                        figsize=(3.375, 2.25*len(self.value_names)),
+                        dpi=self.dpi)
                 else:
                     fig, axs = plt.subplots(
-                        nrows=max(len(self.value_names)), ncols=1,
+                        nrows=len(self.value_names), ncols=1,
                         figsize=(7, 4*len(self.value_names)), dpi=self.dpi)
-                    # figsize=(min(6*len(self.value_names), 11),
-                    #          1.5*len(self.value_names)))
+
             else:
                 if self.no_of_columns == 2:
                     fig, axs = plt.subplots(max(len(self.value_names), 1), 1,
@@ -415,9 +415,9 @@ class MeasurementAnalysis(object):
             for i in range(len(self.value_names)):
                 if len(self.value_names) == 1:
                     ax = axs
-                elif len(self.value_names) == 2:
-                    ax = axs[i % 2]
-                elif len(self.value_names) == 4:
+                elif self.no_of_columns == 1:
+                    ax = axs[i]
+                elif self.no_of_columns == 2:
                     ax = axs[i//2, i % 2]
                 else:
                     ax = axs[i]  # If not 2 or 4 just gives a list of plots
@@ -426,7 +426,11 @@ class MeasurementAnalysis(object):
                 else:
                     plot_title = kw.pop('plot_title', self.measurementstring +
                                         '\n' + self.timestamp_string)
-                ax.ticklabel_format(useOffset=False)
+                try:
+                    ax.ticklabel_format(useOffset=False)
+                except AttributeError:
+                    # only mpl scalar formatters support this feature
+                    pass
 
                 self.plot_results_vs_sweepparam(x=self.sweep_points,
                                                 y=self.measured_values[i],
@@ -1622,19 +1626,35 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
         super().__init__(label=label, **kw)
 
     def run_default_analysis(self, close_file=True, **kw):
-        normalize_to_cal_points = kw.pop('normalize_to_cal_points', True)
+        normalize_to_cal_points = kw.get('normalize_to_cal_points', True)
+        self.normalize_to_cal_points = normalize_to_cal_points
         self.get_naming_and_values()
-        print('normalize_to_cal_points', normalize_to_cal_points)
+        self.oscillating_qubit = kw.get('oscillating_qubit', 0)
         if normalize_to_cal_points:
-            cal_0I = np.mean([self.measured_values[0][-4],
-                              self.measured_values[0][-3]])
-            cal_1I = np.mean([self.measured_values[0][-2],
-                              self.measured_values[0][-1]])
+            if self.oscillating_qubit == 0:
+                cal_0I = np.mean([self.measured_values[0][-4],
+                                  self.measured_values[0][-3]])
 
-            cal_0Q = np.mean([self.measured_values[1][-4],
-                              self.measured_values[1][-2]])
-            cal_1Q = np.mean([self.measured_values[1][-3],
-                              self.measured_values[1][-1]])
+                cal_1I = np.mean([self.measured_values[0][-2],
+                                  self.measured_values[0][-1]])
+
+                cal_0Q = np.mean([self.measured_values[1][-4],
+                                  self.measured_values[1][-2]])
+
+                cal_1Q = np.mean([self.measured_values[1][-3],
+                                  self.measured_values[1][-1]])
+            else:
+                cal_0I = np.mean([self.measured_values[0][-4],
+                                  self.measured_values[0][-2]])
+
+                cal_1I = np.mean([self.measured_values[0][-3],
+                                  self.measured_values[0][-1]])
+
+                cal_0Q = np.mean([self.measured_values[1][-4],
+                                  self.measured_values[1][-3]])
+
+                cal_1Q = np.mean([self.measured_values[1][-2],
+                                  self.measured_values[1][-1]])
 
             self.measured_values[0][:] = (
                 self.measured_values[0] - cal_0I)/(cal_1I-cal_0I)
@@ -1659,7 +1679,13 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
         for i in range(2):
             self.y_exc[i] = self.measured_values[i][1::2]
             self.y_idx[i] = self.measured_values[i][::2]
+            if self.normalize_to_cal_points:
+                self.y_exc[i] = self.y_exc[i][:-2]
+                self.y_idx[i] = self.y_idx[i][:-2]
 
+        if self.normalize_to_cal_points:
+            self.x_idx = self.x_idx[:-2]
+            self.x_exc = self.x_exc[:-2]
     # def calculate_cost_func(self, **kw):
     #     num_points = len(self.sweep_points)-4
 
@@ -1699,7 +1725,7 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
             # self.axs[i].set_xlabel(self.xlabel)
             # self.axs[i].set_ylabel(self.ylabels[i])
 
-            if i == 0:
+            if i == self.oscillating_qubit:
                 plot_title = kw.pop('plot_title', textwrap.fill(
                                     self.timestamp_string + '_' +
                                     self.measurementstring, 40))
@@ -1727,22 +1753,28 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
         self.fit_result = {}
 
         # Fit case with no excitation first
-        guess_params = fit_mods.Cos_amp_phase_guess(model, data=self.y_idx[0],
-                                                    f=1.0/360.0, t=self.x_idx)
-        fit_res = model.fit(data=self.y_idx[0],
-                            t=self.x_idx,
-                            params=guess_params)
+        guess_params = fit_mods.Cos_amp_phase_guess(
+            model,
+            data=self.y_idx[self.oscillating_qubit],
+            f=1.0/360.0, t=self.x_idx)
+        fit_res = model.fit(
+            data=self.y_idx[self.oscillating_qubit],
+            t=self.x_idx,
+            params=guess_params)
         self.fit_result['idx_amp'] = fit_res.values['amplitude']
         self.fit_result['idx_freq'] = 1.0 / 360.0
         self.fit_result['idx_phase'] = fit_res.values['phase']
         self.fit_result['idx_offset'] = fit_res.values['offset']
 
         # Fit case with excitation
-        guess_params = fit_mods.Cos_amp_phase_guess(model, data=self.y_exc[0],
-                                                    f=1.0/360.0, t=self.x_exc)
-        fit_res = model.fit(data=self.y_exc[0],
-                            t=self.x_exc,
-                            params=guess_params)
+        guess_params = fit_mods.Cos_amp_phase_guess(
+            model,
+            data=self.y_exc[self.oscillating_qubit],
+            f=1.0/360.0, t=self.x_exc)
+        fit_res = model.fit(
+            data=self.y_exc[self.oscillating_qubit],
+            t=self.x_exc,
+            params=guess_params)
         self.fit_result['exc_amp'] = fit_res.values['amplitude']
         self.fit_result['exc_freq'] = 1.0/360.0
         self.fit_result['exc_phase'] = fit_res.values['phase']
@@ -2063,7 +2095,7 @@ class SSRO_Analysis(MeasurementAnalysis):
         self.hist_log_scale = hist_log_scale
         self.close_fig = close_fig
         self.F_a = 0
-        self.F_d = 0 # Placeholder values until analysis completes
+        self.F_d = 0  # Placeholder values until analysis completes
         # this is added to prevent bugs if fits are not run
         super(self.__class__, self).__init__(**kw)
 
@@ -7558,131 +7590,146 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
                            predistort=True, plot=True, timestamp_ground=None,
                            timestamp_excited=None, close_fig=True,
                            optimization_window=None, post_rotation_angle=None):
-    data_file = MeasurementAnalysis(label='_0', auto=True, TwoD=False, close_fig=True, timestamp=timestamp_ground)
+    data_file = MeasurementAnalysis(
+        label='_0', auto=True, TwoD=False, close_fig=True, timestamp=timestamp_ground)
     temp = data_file.load_hdf5data()
     data_file.get_naming_and_values()
 
-    offset_calibration_samples=720 #using the last x samples for offset subtraction 720 is multiples of 2.5 MHz modulation
+    # using the last x samples for offset subtraction 720 is multiples of 2.5
+    # MHz modulation
+    offset_calibration_samples = 720
 
     x = data_file.sweep_points/1.8
-    offset_I = np.mean(data_file.measured_values[0][-offset_calibration_samples:])
-    offset_Q = np.mean(data_file.measured_values[1][-offset_calibration_samples:])
+    offset_I = np.mean(data_file.measured_values[
+                       0][-offset_calibration_samples:])
+    offset_Q = np.mean(data_file.measured_values[
+                       1][-offset_calibration_samples:])
     print('offset I {}, offset Q {}'.format(offset_I, offset_Q))
     y1 = data_file.measured_values[0]-offset_I
     y2 = data_file.measured_values[1]-offset_Q
-    I0,Q0=SSB_demod(y1,y2, alpha=alpha, phi=phi, I_o=I_o, Q_o=Q_o, IF=IF, predistort=predistort)
-    power0=(I0**2+Q0**2)/50
+    I0, Q0 = SSB_demod(y1, y2, alpha=alpha, phi=phi, I_o=I_o,
+                       Q_o=Q_o, IF=IF, predistort=predistort)
+    power0 = (I0**2+Q0**2)/50
 
-    data_file = MeasurementAnalysis(label='_1', auto=True, TwoD=False, close_fig=True, plot=True, timestamp=timestamp_excited)
+    data_file = MeasurementAnalysis(
+        label='_1', auto=True, TwoD=False, close_fig=True, plot=True, timestamp=timestamp_excited)
     temp = data_file.load_hdf5data()
     data_file.get_naming_and_values()
 
     x = data_file.sweep_points/1.8
-    offset_I = np.mean(data_file.measured_values[0][-offset_calibration_samples:])
-    offset_Q = np.mean(data_file.measured_values[1][-offset_calibration_samples:])
+    offset_I = np.mean(data_file.measured_values[
+                       0][-offset_calibration_samples:])
+    offset_Q = np.mean(data_file.measured_values[
+                       1][-offset_calibration_samples:])
     y1 = data_file.measured_values[0]-offset_I
     y2 = data_file.measured_values[1]-offset_Q
-    I1,Q1=SSB_demod(y1,y2,  alpha=alpha, phi=phi, I_o=I_o, Q_o=Q_o,  IF=IF, predistort=predistort)
-    power1=(I1**2+Q1**2)/50
+    I1, Q1 = SSB_demod(y1, y2,  alpha=alpha, phi=phi, I_o=I_o,
+                       Q_o=Q_o,  IF=IF, predistort=predistort)
+    power1 = (I1**2+Q1**2)/50
 
-    amps=np.sqrt((I1-I0)**2+(Q1-Q0)**2)
-    amp_max=np.max(amps)
-    #defining weight functions for postrotation
-    weight_I=(I1-I0)/amp_max
-    weight_Q=(Q1-Q0)/amp_max
+    amps = np.sqrt((I1-I0)**2+(Q1-Q0)**2)
+    amp_max = np.max(amps)
+    # defining weight functions for postrotation
+    weight_I = (I1-I0)/amp_max
+    weight_Q = (Q1-Q0)/amp_max
 
-    if post_rotation_angle==None:
-        arg_max=np.argmax(amps)
-        post_rotation_angle=np.arctan2(weight_I[arg_max],weight_Q[arg_max])-np.pi/2
+    if post_rotation_angle == None:
+        arg_max = np.argmax(amps)
+        post_rotation_angle = np.arctan2(
+            weight_I[arg_max], weight_Q[arg_max])-np.pi/2
         #print('found post_rotation angle {}'.format(post_rotation_angle))
     else:
-        post_rotation_angle=2*np.pi*post_rotation_angle/360
+        post_rotation_angle = 2*np.pi*post_rotation_angle/360
     I0rot = np.cos(post_rotation_angle)*I0 - np.sin(post_rotation_angle)*Q0
     Q0rot = np.sin(post_rotation_angle)*I0 + np.cos(post_rotation_angle)*Q0
     I1rot = np.cos(post_rotation_angle)*I1 - np.sin(post_rotation_angle)*Q1
     Q1rot = np.sin(post_rotation_angle)*I1 + np.cos(post_rotation_angle)*Q1
-    I0=I0rot
-    Q0=Q0rot
-    I1=I1rot
-    Q1=Q1rot
+    I0 = I0rot
+    Q0 = Q0rot
+    I1 = I1rot
+    Q1 = Q1rot
 
-    #redefining weight functions after rotation
-    weight_I=(I1-I0)/amp_max
-    weight_Q=(Q1-Q0)/amp_max
-
+    # redefining weight functions after rotation
+    weight_I = (I1-I0)/amp_max
+    weight_Q = (Q1-Q0)/amp_max
 
     edge = 1.05*max(max(np.sqrt(I0**2+Q0**2)), max(np.sqrt(I1**2+Q1**2)))
 
     def rms(x):
         return np.sqrt(x.dot(x)/x.size)
 
-    if optimization_window!=None:
-        optimization_start=optimization_window[0]
-        optimization_stop=optimization_window[-1]
-        start_sample=int(optimization_start*1.8e9)
-        stop_sample=int(optimization_stop*1.8e9)
-        shift_w=80e-9
-        start_sample_w=int((optimization_start-shift_w)*1.8e9)
-        stop_sample_w=int((optimization_stop-shift_w)*1.8e9)
-        depletion_cost_d=np.mean(rms(I0[start_sample:stop_sample])+
-                                 rms(Q0[start_sample:stop_sample])+
-                                 rms(I1[start_sample:stop_sample])+
-                                 rms(Q1[start_sample:stop_sample]))
-        depletion_cost_w=10*np.mean(rms(I0[start_sample_w:stop_sample_w]-I1[start_sample_w:stop_sample_w])+
-                                    rms(Q0[start_sample_w:stop_sample_w]-Q1[start_sample_w:stop_sample_w]))#+abs(np.mean(Q0[start_sample:stop_sample]))+abs(np.mean(I1[start_sample:stop_sample]))+abs(np.mean(Q1[start_sample:stop_sample]))
-        depletion_cost=depletion_cost_d+depletion_cost_w
+    if optimization_window != None:
+        optimization_start = optimization_window[0]
+        optimization_stop = optimization_window[-1]
+        start_sample = int(optimization_start*1.8e9)
+        stop_sample = int(optimization_stop*1.8e9)
+        shift_w = 80e-9
+        start_sample_w = int((optimization_start-shift_w)*1.8e9)
+        stop_sample_w = int((optimization_stop-shift_w)*1.8e9)
+        depletion_cost_d = np.mean(rms(I0[start_sample:stop_sample]) +
+                                   rms(Q0[start_sample:stop_sample]) +
+                                   rms(I1[start_sample:stop_sample]) +
+                                   rms(Q1[start_sample:stop_sample]))
+        depletion_cost_w = 10*np.mean(rms(I0[start_sample_w:stop_sample_w]-I1[start_sample_w:stop_sample_w]) +
+                                      rms(Q0[start_sample_w:stop_sample_w]-Q1[start_sample_w:stop_sample_w]))  # +abs(np.mean(Q0[start_sample:stop_sample]))+abs(np.mean(I1[start_sample:stop_sample]))+abs(np.mean(Q1[start_sample:stop_sample]))
+        depletion_cost = depletion_cost_d+depletion_cost_w
         #print('total {} direct {} weights {}'.format(1000*depletion_cost, 1000*depletion_cost_d, 1000*depletion_cost_w))
     else:
-        depletion_cost=0
+        depletion_cost = 0
 
     if plot:
         fig, ax = plt.subplots()
-        plt.plot(x,I0, label='I ground')
-        plt.plot(x,I1, label='I excited')
+        plt.plot(x, I0, label='I ground')
+        plt.plot(x, I1, label='I excited')
         ax.set_ylim(-edge, edge)
 
         plt.title('Demodulated I')
         plt.xlabel('time (ns)')
         plt.ylabel('Demodulated voltage (V)')
 
-        if optimization_window!=None:
-            plt.axvline(optimization_start*1e9, linestyle='--', color='k', label='depletion optimization window')
+        if optimization_window != None:
+            plt.axvline(optimization_start*1e9, linestyle='--',
+                        color='k', label='depletion optimization window')
             plt.axvline(optimization_stop*1e9, linestyle='--', color='k')
-        ax.set_xlim(0,1500)
+        ax.set_xlim(0, 1500)
         plt.legend()
 
-        plt.savefig(data_file.folder+'\\'+'transients_I_demodulated.'+fig_format,format=fig_format)
+        plt.savefig(data_file.folder+'\\' +
+                    'transients_I_demodulated.'+fig_format, format=fig_format)
         plt.close()
 
         fig, ax = plt.subplots()
-        plt.plot(x,Q0, label='Q ground')
-        plt.plot(x,Q1, label='Q excited')
+        plt.plot(x, Q0, label='Q ground')
+        plt.plot(x, Q1, label='Q excited')
         ax.set_ylim(-edge, edge)
         plt.title('Demodulated Q')
         plt.xlabel('time (ns)')
         plt.ylabel('Demodulated Q')
-        if optimization_window!=None:
-            plt.axvline(optimization_start*1e9, linestyle='--', color='k', label='depletion optimization window')
+        if optimization_window != None:
+            plt.axvline(optimization_start*1e9, linestyle='--',
+                        color='k', label='depletion optimization window')
             plt.axvline(optimization_stop*1e9, linestyle='--', color='k')
-        ax.set_xlim(0,1500)
+        ax.set_xlim(0, 1500)
         plt.legend()
 
-        plt.savefig(data_file.folder+'\\'+'transients_Q_demodulated.'+fig_format,format=fig_format)
+        plt.savefig(data_file.folder+'\\' +
+                    'transients_Q_demodulated.'+fig_format, format=fig_format)
         plt.close()
 
         fig, ax = plt.subplots()
-        plt.plot(x,power0*1e6, label='ground' , lw=4)
-        plt.plot(x,power1*1e6, label='excited', lw=4)
-        if optimization_window!=None:
-            plt.axvline(optimization_start*1e9, linestyle='--', color='k', label='depletion optimization window')
+        plt.plot(x, power0*1e6, label='ground', lw=4)
+        plt.plot(x, power1*1e6, label='excited', lw=4)
+        if optimization_window != None:
+            plt.axvline(optimization_start*1e9, linestyle='--',
+                        color='k', label='depletion optimization window')
             plt.axvline(optimization_stop*1e9, linestyle='--', color='k')
-        ax.set_xlim(0,1500)
+        ax.set_xlim(0, 1500)
         plt.title('Signal power (uW)')
         plt.ylabel('Signal power (uW)')
 
-        plt.savefig(data_file.folder+'\\'+'transients_power.'+fig_format,format=fig_format)
+        plt.savefig(data_file.folder+'\\'+'transients_power.' +
+                    fig_format, format=fig_format)
         plt.close()
-
 
     # sampling rate GHz
     A0I = I0
@@ -7710,27 +7757,35 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     #print('f_offset', f_offset)
     #print(len(A0I), len(A0I[-1024:]))
 
-    samples=7
-    cost_skew=0
+    samples = 7
+    cost_skew = 0
     cost_offset = 0
 
     for i in range(samples):
-        n_s=int(n_spurious-samples/2+i)
-        n_o=int(n_offset-samples/2+i)
+        n_s = int(n_spurious-samples/2+i)
+        n_o = int(n_offset-samples/2+i)
 
-        cost_skew=cost_skew+np.abs(PSD0I[n_s])+np.abs(PSD1I[n_s])+np.abs(PSD0Q[n_s])+np.abs(PSD1Q[n_s])
-        cost_offset=cost_offset+np.abs(PSD0I_o[n_o])+np.abs(PSD1I_o[n_o])+np.abs(PSD0Q_o[n_o])+np.abs(PSD1Q_o[n_o])
+        cost_skew = cost_skew + \
+            np.abs(PSD0I[n_s])+np.abs(PSD1I[n_s]) + \
+            np.abs(PSD0Q[n_s])+np.abs(PSD1Q[n_s])
+        cost_offset = cost_offset + \
+            np.abs(PSD0I_o[n_o])+np.abs(PSD1I_o[n_o]) + \
+            np.abs(PSD0Q_o[n_o])+np.abs(PSD1Q_o[n_o])
 
 #         print('freq',f_axis[n])
 #         print('cost_skew', cost_skew)
     if plot:
         fig, ax = plt.subplots(2)
-        ax[0].set_xlim(0,0.4)
-        ax[0].plot(f_axis*1e-9, abs(PSD0I), label='ground I') # plotting the spectrum
-        ax[0].plot(f_axis*1e-9, abs(PSD1I), label='excited I') # plotting the spectrum
-        ax[1].set_xlim(0,0.4)
-        ax[1].plot(f_axis*1e-9, abs(PSD0Q), label='ground Q') # plotting the spectrum
-        ax[1].plot(f_axis*1e-9, abs(PSD1Q), label='excited Q') # plotting the spectrum
+        ax[0].set_xlim(0, 0.4)
+        # plotting the spectrum
+        ax[0].plot(f_axis*1e-9, abs(PSD0I), label='ground I')
+        # plotting the spectrum
+        ax[0].plot(f_axis*1e-9, abs(PSD1I), label='excited I')
+        ax[1].set_xlim(0, 0.4)
+        # plotting the spectrum
+        ax[1].plot(f_axis*1e-9, abs(PSD0Q), label='ground Q')
+        # plotting the spectrum
+        ax[1].plot(f_axis*1e-9, abs(PSD1Q), label='excited Q')
         ax[1].set_xlabel('Freq (GHz)')
         ax[0].set_ylabel('|PSD|')
         ax[0].set_yscale('log')
@@ -7740,16 +7795,20 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
         ax[1].legend()
         ax[0].set_title('PSD')
 
-        plt.savefig(data_file.folder+'\\'+'PSD.'+fig_format,format=fig_format)
+        plt.savefig(data_file.folder+'\\'+'PSD.'+fig_format, format=fig_format)
         plt.close()
 
         fig, ax = plt.subplots(2)
-        ax[0].set_xlim(0,0.4)
-        ax[0].plot(f_axis_o*1e-9, abs(PSD0I_o), label='ground I') # plotting the spectrum
-        ax[0].plot(f_axis_o*1e-9, abs(PSD1I_o), label='excited I') # plotting the spectrum
-        ax[1].set_xlim(0,0.4)
-        ax[1].plot(f_axis_o*1e-9, abs(PSD0Q_o), label='ground Q') # plotting the spectrum
-        ax[1].plot(f_axis_o*1e-9, abs(PSD1Q_o), label='excited Q') # plotting the spectrum
+        ax[0].set_xlim(0, 0.4)
+        # plotting the spectrum
+        ax[0].plot(f_axis_o*1e-9, abs(PSD0I_o), label='ground I')
+        # plotting the spectrum
+        ax[0].plot(f_axis_o*1e-9, abs(PSD1I_o), label='excited I')
+        ax[1].set_xlim(0, 0.4)
+        # plotting the spectrum
+        ax[1].plot(f_axis_o*1e-9, abs(PSD0Q_o), label='ground Q')
+        # plotting the spectrum
+        ax[1].plot(f_axis_o*1e-9, abs(PSD1Q_o), label='excited Q')
         ax[1].set_xlabel('Freq (GHz)')
         ax[0].set_ylabel('|PSD|')
         ax[0].set_yscale('log')
@@ -7759,24 +7818,26 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
         ax[1].legend()
         ax[0].set_title('PSD last quarter')
 
-        plt.savefig(data_file.folder+'\\'+'PSD_last_quarter.'+fig_format,format=fig_format)
+        plt.savefig(data_file.folder+'\\'+'PSD_last_quarter.' +
+                    fig_format, format=fig_format)
         plt.close()
 
-        fig, ax = plt.subplots(figsize=[8,7])
-        plt.plot(I0,Q0, label='ground', lw=1)
-        plt.plot(I1,Q1, label='excited', lw=1)
+        fig, ax = plt.subplots(figsize=[8, 7])
+        plt.plot(I0, Q0, label='ground', lw=1)
+        plt.plot(I1, Q1, label='excited', lw=1)
         ax.set_ylim(-edge, edge)
         ax.set_xlim(-edge, edge)
         plt.legend(frameon=False)
-        plt.title('IQ trajectory alpha{} phi{}_'.format(alpha, phi)+data_file.timestamp_string)
+        plt.title('IQ trajectory alpha{} phi{}_'.format(
+            alpha, phi)+data_file.timestamp_string)
         plt.xlabel('I (V)')
         plt.ylabel('Q (V)')
-        plt.savefig(data_file.folder+'\\'+'IQ_trajectory.'+fig_format,format=fig_format)
+        plt.savefig(data_file.folder+'\\'+'IQ_trajectory.' +
+                    fig_format, format=fig_format)
         plt.close()
 
-
-    fig, ax = plt.subplots(figsize=[8,7])
-    plt.plot(weight_I,weight_Q, label='weights', lw=1)
+    fig, ax = plt.subplots(figsize=[8, 7])
+    plt.plot(weight_I, weight_Q, label='weights', lw=1)
     ax.set_ylim(-1.1, 1.1)
     ax.set_xlim(-1.1, 1.1)
     plt.legend(frameon=False)
@@ -7786,12 +7847,13 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     plt.savefig(data_file.folder+'\\'+'IQ_trajectory_weights')
     plt.close()
 
-    time=np.linspace(0,len(weight_I)/1.8, len(weight_I))
+    time = np.linspace(0, len(weight_I)/1.8, len(weight_I))
     fig, ax = plt.subplots()
     plt.plot(time, weight_I, label='weight I')
     plt.plot(time, weight_Q, label='weight Q')
-    if optimization_window!=None:
-        plt.axvline((optimization_start-shift_w)*1e9, linestyle='--', color='k', label='depletion optimization window')
+    if optimization_window != None:
+        plt.axvline((optimization_start-shift_w)*1e9, linestyle='--',
+                    color='k', label='depletion optimization window')
         plt.axvline((optimization_stop-shift_w)*1e9, linestyle='--', color='k')
     plt.legend()
     plt.xlabel('time (ns)')
@@ -7800,16 +7862,19 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     plt.axhline(0, linestyle='--')
     edge = 1.05*max(max(abs(weight_I)), max(abs(weight_Q)))
 
-    plt.savefig(data_file.folder+'\\'+'weight_functions.'+fig_format,format=fig_format)
+    plt.savefig(data_file.folder+'\\'+'weight_functions.' +
+                fig_format, format=fig_format)
     plt.close()
 
     # should return a dict for the function detector
     # return cost_skew, cost_offset, depletion_cost, x, y1, y2, I0, Q0, I1, Q1
-    return {'cost_skew':cost_skew, 'cost_offset':cost_offset,
-            'depletion_cost':depletion_cost, 'x':x, 'y1':y1, 'y2':y2,
-            'I0':I0, 'Q0':Q0, 'I1':I1, 'Q1':Q1}
+    return {'cost_skew': cost_skew, 'cost_offset': cost_offset,
+            'depletion_cost': depletion_cost, 'x': x, 'y1': y1, 'y2': y2,
+            'I0': I0, 'Q0': Q0, 'I1': I1, 'Q1': Q1}
 
-#analysis functions
+# analysis functions
+
+
 def SSB_demod(Ivals, Qvals, alpha=1, phi=0, I_o=0, Q_o=0, IF=10e6, predistort=True):
     # predistortion_matrix = np.array(
     #     ((1,  np.tan(phi*2*np.pi/360)),
@@ -7821,11 +7886,11 @@ def SSB_demod(Ivals, Qvals, alpha=1, phi=0, I_o=0, Q_o=0, IF=10e6, predistort=Tr
     trace_length = len(Ivals)
     tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
     if predistort:
-        Ivals=Ivals-I_o
-        Qvals=Qvals-Q_o
+        Ivals = Ivals-I_o
+        Qvals = Qvals-Q_o
         [Ivals, Qvals] = np.dot(predistortion_matrix, [Ivals, Qvals])
     cosI = np.array(np.cos(2*np.pi*IF*tbase))
     sinI = np.array(np.sin(2*np.pi*IF*tbase))
-    I=np.multiply(Ivals,cosI)-np.multiply(Qvals, sinI)
-    Q=np.multiply(Ivals,sinI)+np.multiply(Qvals, cosI)
+    I = np.multiply(Ivals, cosI)-np.multiply(Qvals, sinI)
+    Q = np.multiply(Ivals, sinI)+np.multiply(Qvals, cosI)
     return I, Q

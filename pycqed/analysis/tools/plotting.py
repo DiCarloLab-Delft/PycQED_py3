@@ -274,6 +274,16 @@ def flex_colormesh_plot_vs_xy(xvals, yvals, zvals, ax=None,
     zvals should be a list of arrays with the measured values with shape
     (len(yvals), len(xvals)).
     """
+
+    # First, we need to sort the data as otherwise we get odd plotting
+    # artefacts. An example is e.g., plotting a fourier transform
+    sorted_x_arguments = xvals.argsort()
+    xvals = xvals[sorted_x_arguments]
+    sorted_y_arguments = yvals.argsort()
+    yvals = yvals[sorted_y_arguments]
+    zvals = zvals[:,  sorted_x_arguments]
+    zvals = zvals[sorted_y_arguments, :]
+
     # create a figure and set of axes
     if ax is None:
         fig = plt.figure(figsize=(12, 7))
@@ -304,14 +314,12 @@ def flex_colormesh_plot_vs_xy(xvals, yvals, zvals, ax=None,
     # normalized plot
     if normalize:
         zvals /= np.mean(zvals, axis=0)
-# logarithmic plot
+    # logarithmic plot
     if log:
-
         for xx in range(len(xvals)):
             zvals[xx] = np.log(zvals[xx])/np.log(10)
 
     # add blocks to plot
-    # hold = kw.pop('hold',False)
     do_transpose = kw.pop('transpose', False)
     if do_transpose:
         colormap = ax.pcolormesh(ygrid.transpose(),
