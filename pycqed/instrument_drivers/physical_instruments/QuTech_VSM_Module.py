@@ -136,7 +136,7 @@ class QuTechVSMModule(SCPI):
 
         # Marker breakout board
         self.add_parameter('mbbc_state',
-                           doctring='Whether the _marker breakout board_ is '
+                           docstring='Whether the _marker breakout board_ is '
                                     'connected to the VSM.',
                            get_cmd='MBBC?',
                            vals=validators.Enum('connected', 'disconnected'))
