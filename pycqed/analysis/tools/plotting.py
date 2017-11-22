@@ -219,9 +219,11 @@ def flex_color_plot_vs_x(xvals, yvals, zvals, ax=None,
     if xwidth is None:
         xvals = np.array(xvals)
         xvertices = np.zeros(np.array(xvals.shape)+1)
+
+        dx = abs(np.max(xvals)-np.min(xvals))/len(xvals)
         xvertices[1:-1] = (xvals[:-1]+xvals[1:])/2.
-        xvertices[0] = xvals[0] - (xvals[1]-xvals[0])/2
-        xvertices[-1] = xvals[-1] + (xvals[-1]-xvals[-2])/2
+        xvertices[0] = xvals[0] - dx/2
+        xvertices[-1] = xvals[-1] + dx/2
     else:
         xvertices = []
         for xval in xvals:

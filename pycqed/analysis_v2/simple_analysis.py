@@ -9,6 +9,7 @@ We distinguish 3 cases (for the most trivial analyses)
 - 2D_multi_file (which inherits from 1D single file)
 
 """
+import numpy as np
 import pycqed.analysis_v2.base_analysis as ba
 
 
@@ -29,7 +30,6 @@ class Basic1DAnalysis(ba.BaseDataAnalysis):
                          options_dict=options_dict,
                          extract_only=extract_only, do_fitting=do_fitting)
         # self.single_timestamp = False
-
         self.params_dict = {'xlabel': 'sweep_name',
                             'xunit': 'sweep_unit',
                             'xvals': 'sweep_points',
@@ -37,22 +37,38 @@ class Basic1DAnalysis(ba.BaseDataAnalysis):
                             'value_names': 'value_names',
                             'value_units': 'value_units',
                             'measured_values': 'measured_values'}
+
+        # x2 is whatever parameter is varied between sweeps
+        x2 = self.options_dict.get('x2', None)
+        if x2 is not None:
+            self.params_dict['x2'] = x2
+
         self.numeric_params = []
         if auto:
             self.run_analysis()
 
     def prepare_plots(self):
         # assumes that value names are unique in an experiment
+
+        setlabel = self.raw_data_dict.get('x2', self.timestamps)
+        if 'x2' in self.options_dict.keys():
+            legend_title = self.options_dict.get('x2_label',
+                                                 self.options_dict['x2'])
+        else:
+            legend_title = 'timestamp'
+
         for i, val_name in enumerate(self.raw_data_dict['value_names'][0]):
             self.plot_dicts[val_name] = {
                 'plotfn': self.plot_line,
                 'xvals': self.raw_data_dict['xvals'],
                 'xlabel': self.raw_data_dict['xlabel'][0],
                 'xunit': self.raw_data_dict['xunit'][0][0],
-                'yvals': self.raw_data_dict['measured_values_ord_dict'][val_name],
+                'yvals': self.raw_data_dict['measured_values_ord_dict']
+                [val_name],
                 'ylabel': val_name,
                 'yunit': self.raw_data_dict['value_units'][0][i],
-                'setlabel': self.timestamps,
+                'setlabel': setlabel,
+                'legend_title': legend_title,
                 'title': (self.raw_data_dict['timestamps'][0]+' - ' +
                           self.raw_data_dict['timestamps'][-1] + '\n' +
                           self.raw_data_dict['measurementstring'][0]),
@@ -61,33 +77,48 @@ class Basic1DAnalysis(ba.BaseDataAnalysis):
 
 
 class Basic2DAnalysis(Basic1DAnalysis):
+    """
+    Extracts a 2D dataset from a set of 1D scans and plots the data.
+
+    Special options dict kwargs
+        "x2"  specifies the name of the parameter varied between the different
+              linescans.
+    """
+
     def prepare_plots(self):
         # assumes that value names are unique in an experiment
         super().prepare_plots()
         for i, val_name in enumerate(self.raw_data_dict['value_names'][0]):
             self.plot_dicts[val_name]['cmap'] = 'viridis'
 
+            if 'x2' in self.raw_data_dict.keys():
+                xvals = self.raw_data_dict['x2']
+                x2 = self.options_dict['x2']
+                xlabel = self.options_dict.get('x2_label', x2)
+                xunit = self.options_dict.get('x2_unit', '')
+            else:
+                xvals = np.arange(len(self.raw_data_dict['xvals']))
+                xlabel = 'Experiment idx'
+                xunit = ''
+
             self.plot_dicts[val_name+"_heatmap"] = {
-                'plotfn': self.plot_yslices,
-                'xvals': self.raw_data_dict['xvals'],
-                'xlabel': self.raw_data_dict['xlabel'][0],
-                'xunit': self.raw_data_dict['xunit'][0][0],
-                'yvals': self.raw_data_dict['datetime'],
-                'ylabel': 'Time',
-                'yunit': '',
-                'zvals': self.raw_data_dict['measured_values_ord_dict'][val_name],
+                'plotfn': self.plot_colorx,
+                'xvals': xvals,
+                'xlabel': xlabel,
+                'xunit': xunit,
+
+                'yvals': self.raw_data_dict['xvals'],
+                'ylabel': self.raw_data_dict['xlabel'][0],
+                'yunit': self.raw_data_dict['xunit'][0][0],
+
+                'zvals': self.raw_data_dict['measured_values_ord_dict']
+                [val_name],
                 'zlabel': val_name,
                 'zunit': self.raw_data_dict['value_units'][0][i],
-                'setlabel': self.timestamps,
+
                 'cmap': 'viridis',
                 'title': (self.raw_data_dict['timestamps'][0]+' - ' +
                           self.raw_data_dict['timestamps'][-1] + '\n' +
                           self.raw_data_dict['measurementstring'][0]),
                 'do_legend': True,
                 'legend_pos': 'upper right'}
-
-
-
-
-
-

@@ -135,6 +135,8 @@ class BaseDataAnalysis(object):
         else:
             self.t_stop = t_stop
         self.do_timestamp_blocks = self.options_dict.get('do_blocks', False)
+        self.do_individual_traces = self.options_dict.get(
+            'do_individual_traces', False)
         self.filter_no_analysis = self.options_dict.get(
             'filter_no_analysis', False)
         self.exact_label_match = self.options_dict.get(
@@ -143,8 +145,6 @@ class BaseDataAnalysis(object):
         ########################################
         # These options relate to the plotting #
         ########################################
-        if self.options_dict.get('apply_default_fig_settings', True):
-            def_fig.apply_default_figure_settings()
         self.plot_dicts = OrderedDict()
         self.axs = OrderedDict()
         self.figs = OrderedDict()
@@ -871,8 +871,11 @@ class BaseDataAnalysis(object):
             plot_xvals_step = 0
             plot_yvals_step = 0
         else:
-            plot_xvals_step = plot_xvals[1]-plot_xvals[0]
-            plot_yvals_step = plot_yvals[1]-plot_yvals[0]
+            plot_xvals_step = (abs(np.max(plot_xvals)-np.min(plot_xvals))/
+                len(plot_xvals))
+            plot_yvals_step = (abs(np.max(plot_yvals)-np.min(plot_yvals))/
+                len(plot_yvals))
+            # plot_yvals_step = plot_yvals[1]-plot_yvals[0]
 
         if plot_zrange is not None:
             fig_clim = plot_zrange
@@ -907,7 +910,6 @@ class BaseDataAnalysis(object):
             for tt in range(len(traces['zvals'])):
                 if self.verbose:
                     (print(t_vals[tt].shape) for key, t_vals in traces.items())
-                print(traces['xvals'][tt])
                 if plot_xwidth is not None:
                     xwidth = plot_xwidth[tt]
                 else:
@@ -917,7 +919,7 @@ class BaseDataAnalysis(object):
                             clim=fig_clim, cmap=plot_cmap,
                             xvals=traces['xvals'][tt],
                             yvals=traces['yvals'][tt],
-                            zvals=traces['zvals'][tt].transpose(),
+                            zvals=traces['zvals'][tt],  # .transpose(),
                             transpose=plot_transpose,
                             normalize=plot_normalize)
 
@@ -936,8 +938,8 @@ class BaseDataAnalysis(object):
                     max([max(xvals)+plot_xwidth[tt]/2
                          for tt, xvals in enumerate(plot_xvals)])
             else:
-                xmin, xmax = plot_xvals.min()-plot_xvals_step / \
-                    2., plot_xvals.max()+plot_xvals_step/2.
+                xmin = np.min(plot_xvals) - plot_xvals_step/2
+                xmax = np.max(plot_xvals) + plot_xvals_step/2
         else:
             xmin, xmax = plot_xrange
         if plot_transpose:
@@ -951,10 +953,9 @@ class BaseDataAnalysis(object):
                                   for tt, yvals in enumerate(plot_yvals)]), \
                     max([max(yvals[0])
                          for tt, yvals in enumerate(plot_yvals)])
-
             else:
-                ymin, ymax = plot_yvals.min()-plot_yvals_step / \
-                    2., plot_yvals.max()+plot_yvals_step/2.
+                ymin = np.min(plot_yvals) - plot_yvals_step / 2.
+                ymax = np.max(plot_yvals) + plot_yvals_step/2.
         else:
             ymin, ymax = plot_yrange
         if plot_transpose:

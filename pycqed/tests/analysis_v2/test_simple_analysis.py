@@ -23,9 +23,12 @@ class Test_SimpleAnalysis(unittest.TestCase):
                                options_dict={'scan_label': 'flipping'})
         self.assertEqual(a.timestamps, ['20170726_164845'])
 
+    def test_2D_analysis_multi_file(self):
 
-    # def test_2D_analysis_multi_file(self):
-    #     # giving only a single file
-    #     a = ma.Basic2DAnalysis(t_start='20170726_164845',
-    #                            options_dict={'scan_label': 'flipping'})
-    #     self.assertEqual(a.timestamps, ['20170726_164845'])
+        # N.B. by setting x2, x2_label and x2_unit in the options dict
+        # the values can be plotted versus the varied parameter between
+        # the linecuts
+        a = ma.Basic2DAnalysis(t_start='20170726_164521',
+                               t_stop='20170726_164845',
+                               options_dict={'scan_label': 'flipping'})
+        self.assertTrue(len(a.timestamps) > 5)
