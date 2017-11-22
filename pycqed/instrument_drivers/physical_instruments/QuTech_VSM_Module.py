@@ -163,7 +163,7 @@ class QuTechVSMModule(SCPI):
                                get_cmd='QUBIT'+ch_scpi+':FREQUENCY?',
                                set_cmd='QUBIT'+ch_scpi+':FREQUENCY {}',
                                vals=validators.Numbers(),
-                               get_parser=int)
+                               get_parser=float)
 
             colors = ', '.join(['black', 'blue', 'green', 'grey', 'orange',
                                 'red', 'white', 'yellow', 'dcl_blue',
