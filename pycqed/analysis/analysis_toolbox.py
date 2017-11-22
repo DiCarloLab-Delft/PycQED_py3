@@ -1935,8 +1935,16 @@ def get_color_order(i, max_num, cmap='viridis'):
 
 
 def get_color_list(max_num, cmap='viridis'):
-    '''Return an array of max_num colors take in even spacing from the
-    color map cmap.'''
+    '''
+    Return an array of max_num colors take in even spacing from the
+    color map cmap.
+    '''
+    # Default matplotlib colormaps have a discrete set of colors
+    if 'cmap' == 'Vega10':
+        max_num = max(max_num, 10)
+    if 'cmap' == 'Vega20':
+        max_num = max(max_num, 20)
+
     if isinstance(cmap, str):
         cmap = cm.get_cmap(cmap)
-    return [cmap(cmap)(i) for i in np.linspace(0.0, 1.0, max_num)]
+    return [cmap(i) for i in np.linspace(0.0, 1.0, max_num)]
