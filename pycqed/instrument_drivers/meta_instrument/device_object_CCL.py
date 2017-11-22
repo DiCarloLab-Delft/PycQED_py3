@@ -1,8 +1,5 @@
 import numpy as np
-import qcodes as qc
-import os
 import logging
-from copy import deepcopy
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter
@@ -10,9 +7,15 @@ from pycqed.analysis import multiplexed_RO_analysis as mra
 from pycqed.measurement import detector_functions as det
 from pycqed.measurement import sweep_functions as swf
 from pycqed.analysis import measurement_analysis as ma
-import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
-import pycqed.measurement.gate_set_tomography.gate_set_tomography_CC as gstCC
-import pygsti
+
+try:
+    from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
+    import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
+except ImportError:
+    logging.warning('Could not import OpenQL')
+    mqo = None
+    sqo = None
+
 from pycqed.analysis import tomography as tomo
 
 from collections import defaultdict
@@ -211,7 +214,7 @@ class DeviceCCL(Instrument):
             single_int_avg=single_int_avg,
             seg_per_point=seg_per_point)
         d.value_names = [qnames[0], qnames[1],
-                 'Corr ({}, {})'.format(qnames[0], qnames[1])]
+                         'Corr ({}, {})'.format(qnames[0], qnames[1])]
         return d
 
     def get_int_logging_detector(self, qubits: list=None,
