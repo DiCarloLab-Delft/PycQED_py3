@@ -266,7 +266,8 @@ class BaseDataAnalysis(object):
         self.params_dict['folder'] = 'folder'
 
         if self.do_timestamp_blocks:
-            self.raw_data_dict = {key: [] for key in list(self.params_dict.keys())}
+            self.raw_data_dict = {key: []
+                                  for key in list(self.params_dict.keys())}
             self.raw_data_dict['timestamps'] = []
             for tstamps in self.timestamps:
                 if self.verbose:
@@ -317,7 +318,8 @@ class BaseDataAnalysis(object):
                 for ii in range(len(self.raw_data_dict['temperatures'])):
                     exec("temp.append(%s)" %
                          (self.raw_data_dict['temperatures'][ii]))
-                    self.raw_data_dict['Tmc'].append(temp[ii].get('T_MClo', None))
+                    self.raw_data_dict['Tmc'].append(
+                        temp[ii].get('T_MClo', None))
                 self.raw_data_dict['temperatures'] = temp
 
         # this is a hacky way to use the same data extraction when there is
@@ -343,8 +345,10 @@ class BaseDataAnalysis(object):
                 measured_values_dict[key] = []
             for dset in self.raw_data_dict['measured_values']:
                 for i, col in enumerate(dset):
-                    measured_values_dict[self.raw_data_dict['value_names'][0][i]].append(col)
-            self.raw_data_dict['measured_values_ord_dict'] = measured_values_dict
+                    measured_values_dict[self.raw_data_dict[
+                        'value_names'][0][i]].append(col)
+            self.raw_data_dict[
+                'measured_values_ord_dict'] = measured_values_dict
 
     def process_data(self):
         """
@@ -659,10 +663,8 @@ class BaseDataAnalysis(object):
         if (isinstance(plot_xvals[0], numbers.Number) or
                 isinstance(plot_xvals[0], datetime.datetime)):
             plot_multiple = False
-            print('single x-y detected')
         else:
             plot_multiple = True
-            print('mulitple detected')
             assert(len(plot_xvals) == len(plot_yvals))
             assert(len(plot_xvals[0]) == len(plot_yvals[0]))
 
@@ -670,8 +672,10 @@ class BaseDataAnalysis(object):
             p_out = []
             len_color_cycle = pdict.get('len_color_cycle', len(plot_yvals))
             # Default gives max contrast
-            cmap = pdict.get('cmap', 'Vega10')  # Default matplotlib cycle
+            cmap = pdict.get('cmap', 'tab10')  # Default matplotlib cycle
             colors = get_color_list(len_color_cycle, cmap)
+            if cmap == 'tab10':
+                len_color_cycle = min(10, len_color_cycle)
 
             # plot_*vals is the list of *vals arrays
             for i, (xvals, yvals) in enumerate(zip(plot_xvals, plot_yvals)):
@@ -843,10 +847,13 @@ class BaseDataAnalysis(object):
                 ax[0].set_ylabel(pdict['ylabel'])
 
     def plot_color2D(self, pfunc, pdict, axs):
+        """
+
+        """
         plot_xvals = pdict['xvals']
         plot_yvals = pdict['yvals']
         plot_cbar = pdict.get('plotcbar', True)
-        plot_cmap = pdict.get('cmap', 'viridis')
+        plot_cmap = pdict.get('cmap', 'YlGn')
         plot_zrange = pdict.get('zrange', None)
         plot_yrange = pdict.get('yrange', None)
         plot_xrange = pdict.get('xrange', None)
@@ -872,11 +879,35 @@ class BaseDataAnalysis(object):
         else:
             fig_clim = [None, None]
 
+        trace = {}
+        block = {}
+        if self.do_individual_traces:
+            trace['xvals'] = plot_xvals
+            trace['yvals'] = plot_yvals
+            trace['zvals'] = plot_zvals
+        else:
+            trace['yvals'] = [plot_yvals]
+            trace['xvals'] = [plot_xvals]
+            trace['zvals'] = [plot_zvals]
+
+        # FIXME: we should get rid of do_timestamps_blocks
         if self.do_timestamp_blocks:
-            for tt in range(len(plot_zvals)):
+            block['xvals'] = trace['xvals']
+            block['yvals'] = trace['yvals']
+            block['zvals'] = trace['zvals']
+        else:
+            block['xvals'] = [trace['xvals']]
+            block['yvals'] = [trace['yvals']]
+            block['zvals'] = [trace['zvals']]
+
+        for ii in range(len(block['zvals'])):
+            traces = {}
+            for key, vals in block.items():
+                traces[key] = vals[ii]
+            for tt in range(len(traces['zvals'])):
                 if self.verbose:
-                    print(plot_xvals[tt].shape, plot_yvals[
-                          tt].shape, plot_zvals[tt].shape)
+                    (print(t_vals[tt].shape) for key, t_vals in traces.items())
+                print(traces['xvals'][tt])
                 if plot_xwidth is not None:
                     xwidth = plot_xwidth[tt]
                 else:
@@ -884,19 +915,19 @@ class BaseDataAnalysis(object):
                 out = pfunc(ax=axs,
                             xwidth=xwidth,
                             clim=fig_clim, cmap=plot_cmap,
-                            xvals=plot_xvals[tt],
-                            yvals=plot_yvals[tt],
-                            zvals=plot_zvals[tt].transpose(),
+                            xvals=traces['xvals'][tt],
+                            yvals=traces['yvals'][tt],
+                            zvals=traces['zvals'][tt].transpose(),
                             transpose=plot_transpose,
                             normalize=plot_normalize)
 
-        else:
-            out = pfunc(ax=axs, clim=fig_clim, cmap=plot_cmap,
-                        xvals=plot_xvals,
-                        yvals=plot_yvals,
-                        zvals=plot_zvals.transpose(),
-                        transpose=plot_transpose,
-                        normalize=plot_normalize)
+        # else:
+        #     out = pfunc(ax=axs, clim=fig_clim, cmap=plot_cmap,
+        #                 xvals=plot_xvals,
+        #                 yvals=plot_yvals,
+        #                 zvals=plot_zvals.transpose(),
+        #                 transpose=plot_transpose,
+        #                 normalize=plot_normalize)
 
         if plot_xrange is None:
             if plot_xwidth is not None:
@@ -1058,5 +1089,3 @@ class BaseDataAnalysis(object):
         axs.vlines(x, ymin, ymax, colors,
                    linestyles=linestyles, label=label, **pdict['line_kws'])
         axs.legend()
-
-

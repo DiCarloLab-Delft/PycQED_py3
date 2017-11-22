@@ -22,7 +22,8 @@ reload(csa)
 
 
 from pycqed.analysis_v2.base_analysis import *
-from pycqed.analysis_v2.simple_analysis import Basic1DAnalysis
+from pycqed.analysis_v2.simple_analysis import (
+    Basic1DAnalysis, Basic2DAnalysis)
 from pycqed.analysis_v2.timedomain_analysis import *
 from pycqed.analysis_v2.readout_analysis import *
 from pycqed.analysis_v2.syndrome_analysis import *

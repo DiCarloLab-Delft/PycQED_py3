@@ -1940,10 +1940,10 @@ def get_color_list(max_num, cmap='viridis'):
     color map cmap.
     '''
     # Default matplotlib colormaps have a discrete set of colors
-    if 'cmap' == 'Vega10':
-        max_num = max(max_num, 10)
-    if 'cmap' == 'Vega20':
-        max_num = max(max_num, 20)
+    if cmap == 'tab10':
+        max_num = 10
+    if cmap == 'tab20':
+        max_num = 20
 
     if isinstance(cmap, str):
         cmap = cm.get_cmap(cmap)

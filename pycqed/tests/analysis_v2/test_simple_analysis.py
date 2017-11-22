@@ -12,8 +12,10 @@ class Test_SimpleAnalysis(unittest.TestCase):
         ma.a_tools.datadir = self.datadir
 
     def test_1D_analysis_single_file(self):
-        a = ma.Basic1DAnalysis(t_start='20170726_164507', t_stop='20170726_164845',
+        a = ma.Basic1DAnalysis(t_start='20170726_164507',
+                               t_stop='20170726_164845',
                                options_dict={'scan_label': 'flipping'})
+        self.assertTrue(len(a.timestamps) > 5)
 
     def test_1D_analysis_multi_file(self):
         # giving only a single file

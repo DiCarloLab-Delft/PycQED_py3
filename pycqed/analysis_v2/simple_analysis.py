@@ -62,22 +62,32 @@ class Basic1DAnalysis(ba.BaseDataAnalysis):
 
 class Basic2DAnalysis(Basic1DAnalysis):
     def prepare_plots(self):
-        super.prepare_plots()
         # assumes that value names are unique in an experiment
+        super().prepare_plots()
         for i, val_name in enumerate(self.raw_data_dict['value_names'][0]):
-            self.plot_dicts[val_name] = {
-                'plotfn': self.plot_line,
+            self.plot_dicts[val_name]['cmap'] = 'viridis'
+
+            self.plot_dicts[val_name+"_heatmap"] = {
+                'plotfn': self.plot_yslices,
                 'xvals': self.raw_data_dict['xvals'],
                 'xlabel': self.raw_data_dict['xlabel'][0],
                 'xunit': self.raw_data_dict['xunit'][0][0],
-                'yvals': self.raw_data_dict['measured_values_ord_dict'][val_name],
-                'ylabel': val_name,
-                'yunit': self.raw_data_dict['value_units'][0][i],
+                'yvals': self.raw_data_dict['datetime'],
+                'ylabel': 'Time',
+                'yunit': '',
+                'zvals': self.raw_data_dict['measured_values_ord_dict'][val_name],
+                'zlabel': val_name,
+                'zunit': self.raw_data_dict['value_units'][0][i],
                 'setlabel': self.timestamps,
+                'cmap': 'viridis',
                 'title': (self.raw_data_dict['timestamps'][0]+' - ' +
                           self.raw_data_dict['timestamps'][-1] + '\n' +
                           self.raw_data_dict['measurementstring'][0]),
                 'do_legend': True,
                 'legend_pos': 'upper right'}
+
+
+
+
 
 
