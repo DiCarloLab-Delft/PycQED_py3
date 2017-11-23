@@ -233,11 +233,6 @@ class QuTech_AWG_Module(SCPI):
         self.detect_overflow()
         self.getErrors()
 
-    # command is run but using start and stop because
-    # FIXME: replace custom start function when proper error message has
-    # been implemented.
-    # self.add_function('start',
-    #                   call_cmd='awgcontrol:run:immediate')
     def start(self):
         '''
         Activates output on channels with the current settings. When started this function will check for possible warnings
@@ -472,8 +467,8 @@ class QuTech_AWG_Module(SCPI):
 
         Compatibility:  QWG
         """
-        # wv_val = vals.Arrays(min_value=-1, max_value=1)
-        # wv_val.validate(waveform)
+        wv_val = vals.Arrays(min_value=-1, max_value=1)
+        wv_val.validate(waveform)
 
         maxWaveLen = 2**17-4  # FIXME: this is the hardware max
 
