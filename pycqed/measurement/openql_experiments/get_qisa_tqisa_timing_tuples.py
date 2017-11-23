@@ -1,4 +1,5 @@
 import re
+import json
 """
 This file fixes issue 380 of https://github.com/DiCarloLab-Delft/PycQED_py3/issues/380
 These are the assumptions I am making:
@@ -6,9 +7,14 @@ These are the assumptions I am making:
     2) prepz cannot be in between the kernel
     3) CZ gate is always mapped to fl_cw_01
     4) The time tuples only show the time and gate cz
+    5) Each instruction line starts with 'bs' string
 """
 
-def get_qisa_tqisa_timing_tuples(qisa_file_path, tqisa_file_path):
+def get_qisa_tqisa_timing_tuples(qisa_file_path, tqisa_file_path, CCL_json_config):
+    # Load the hardware config json file (hardcoded for now)
+    with open(CCL_json_config,'r') as file_json:
+        config_map = json.load(file_json)
+
     # Set the counter for number of kernels encountered
     kernel_idx = 0
 
@@ -53,9 +59,19 @@ def get_qisa_tqisa_timing_tuples(qisa_file_path, tqisa_file_path):
 
 
     # We should be able to do all these things in a single pass
+    time_tuples = []
     with open(tqisa_file_path, 'r') as tq_file:
+        linenum = 0
         for line in tq_file:
-            print(line)
+            linenum += 1
+            # Get instruction line
+            if re.search(r"bs", line):
+                # Get the timing number
+                timing_num = re.search(r'\d+' ,line)
+                # Get the codewords
+                codewords = re.search(r'(?<=bs\s1)\w+', line)
+                result = ( int(timing_num.group(0)), codewords.group(0) )
+                print(result)
+                time_tuples.append(result)
 
-    time_tuples = [kernel_idx]
     return time_tuples
