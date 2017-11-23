@@ -10,6 +10,7 @@ Options:
   -t                Enable scanner and parser tracing while assembling
   -V, --version     Show the program version and exit
   -v, --verbose     Show informational messages while assembling
+  --dumpspecs       Output the opcode specifications that have been compiled into the assembler
   -h, --help        Show this help message and exit
 ```
 ---

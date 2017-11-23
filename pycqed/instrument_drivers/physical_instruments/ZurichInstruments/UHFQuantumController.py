@@ -196,11 +196,17 @@ class UHFQC(Instrument):
         self.sigouts_0_on(1)
         self.sigouts_1_on(1)
 
-        # QuExpress thresholds on DIO (mode == 2), AWG control of DIO (mode ==
-        # 1)
+        # > default mode: 0
+        #   In this mode the DIO cannot be controlled by the AWG, but it can be 
+        #   read by it. 
+        #   NOTE: please ensure to configure all DIO's as inputs in this mode.
+        # > AWG control of DIO (mode == 1)
+        # > QuExpress thresholds on DIO (mode == 2)
+
         self.dios_0_mode(2)
-        # Drive DIO bits 15 to 0
+        # UHFQC drives bit 15 to 0. The low two bytes
         self.dios_0_drive(0x3)
+
 
         # Configure the analog trigger input 1 of the AWG to assert on a rising
         # edge on Ref_Trigger 1 (front-panel of the instrument)
@@ -875,6 +881,7 @@ class UHFQC(Instrument):
         self.awgs_0_userregs_2(delay_samples)
 
         preamble = """
+const DIO_VALID = 0x80000000;
 const TRIGGER1  = 0x000001;
 const WINT_TRIG = 0x000010;
 const IAVG_TRIG = 0x000020;
@@ -890,8 +897,9 @@ if(getUserReg(1)){
 }\n"""
 
         loop_start = """
-repeat(loop_cnt) {
-\twaitDigTrigger(1, 1);
+while(1) {
+while ((getDIO() & DIO_VALID) == 0);
+set
 \tplayWave(Iwave, Qwave);\n"""
 
         end_string = """
@@ -934,6 +942,7 @@ setTrigger(0);"""
 
     def awg_sequence_acquisition(self):
         string = """
+const DIO_VALID = 0x80000000;
 const TRIGGER1  = 0x000001;
 const WINT_TRIG = 0x000010;
 const IAVG_TRIG = 0x000020;
@@ -947,7 +956,7 @@ if(getUserReg(1)){
   RO_TRIG=WINT_TRIG;
 }
 repeat(loop_cnt) {
-\twaitDigTrigger(1, 1);\n
+while ((getDIO() & DIO_VALID) == 0);
 \tsetTrigger(WINT_EN +RO_TRIG);
 \twait(5);
 \tsetTrigger(WINT_EN);

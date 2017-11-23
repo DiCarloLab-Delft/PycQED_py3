@@ -78,7 +78,7 @@
     13.0
   ],
   [
-      "awgs/0/dio/strobe/index",
+    "awgs/0/dio/strobe/index",
     "int",
     0,
     31.0

@@ -10,15 +10,15 @@
 
 
 from .SCPI import SCPI
-from qcodes.instrument.base import Instrument
 from ._CCL.CCLightMicrocode import CCLightMicrocode
-from qcodes import Parameter
-from qcodes.instrument.parameter import ManualParameter
+from qcodes import StandardParameter
 from qcodes import validators as vals
 import os
 import logging
 import json
 import sys
+import traceback
+import array
 
 # The assembler needs to be build first before it can be imported.
 # The default location is a copy of the build in the _CCL hidden folder next
@@ -27,10 +27,7 @@ import sys
 curdir = (os.path.dirname(__file__))
 CCLight_Assembler_dir = os.path.join(curdir, "_CCL", "qisa-as", "build")
 sys.path.append(CCLight_Assembler_dir)
-try:
-    from pyQisaAs import QISA_Driver
-except ImportError as e:
-    logging.warning(e)
+from pyQisaAs import QISA_Driver
 
 
 log = logging.getLogger(__name__)
@@ -57,7 +54,6 @@ class CCL(SCPI):
 
     def __init__(self, name, address, port, **kwargs):
         self.model = name
-        self._dummy_instr = False
         try:
             super().__init__(name, address, port, **kwargs)
         except Exception as e:
@@ -78,19 +74,11 @@ class CCL(SCPI):
         """
         The parser helper objects are initialized in this function.
         """
-        self.microcode = CCLightMicrocode()
+        self.CCL_microcode = CCLightMicrocode()
         self.QISA = QISA_Driver()
         self.QISA.enableScannerTracing(False)
         self.QISA.enableParserTracing(False)
         self.QISA.setVerbose(False)
-
-    def stop(self):
-        self.run(0),
-        self.enable(0)
-
-    def start(self):
-        self.enable(1)
-        self.run(1),
 
     def add_parameter(self, name,
                       parameter_class=Parameter, **kwargs):
@@ -120,7 +108,6 @@ class CCL(SCPI):
                     if (val_type == "Bool"):
                         # Bool can naturally only have 2 values, 0 or 1...
                         parameter["vals"] = vals.Ints(0, 1)
-                        parameter['get_parser'] = int
 
                     elif (val_type == "Non_Neg_Number"):
                         # Non negative integers
@@ -133,11 +120,9 @@ class CCL(SCPI):
                                 val_max = validator["range"][1]
 
                             parameter["vals"] = vals.Ints(val_min, val_max)
-                            parameter['get_parser'] = int
 
                         except Exception as e:
                             parameter["vals"] = vals.Ints(0, INT32_MAX)
-                            parameter['get_parser'] = int
                             log.warning("Range of validator not set correctly")
 
                     else:
@@ -186,10 +171,6 @@ class CCL(SCPI):
             set_cmd=self._upload_microcode,
             vals=vals.Strings()
         )
-        self.add_parameter('last_loaded_instructions',
-                           vals=vals.Strings(),
-                           initial_value='',
-                           parameter_class=ManualParameter)
 
     def _read_parameters(self):
         """
@@ -212,20 +193,19 @@ class CCL(SCPI):
             os.makedirs(parameters_folder_path)
 
         try:
-            file = open(self._s_file_name, "r")
+            file = open(self._s_file_name, "a+")
         except Exception as e:
             log.warning("parameter file for gettable " +
                         "parameters {} not found ({})".format(
                             self._s_file_name, e))
-        file_content = json.loads(file.read())
         try:
+            file_content = json.loads(file.read())
             self.parameter_file_version = file_content["version"]["software"]
         except Exception as e:
             self.parameter_file_version = 'NaN'
 
-        if (('swBuild' in self.version_info and
-                self.version_info['swBuild'] == self.parameter_file_version)
-                or self._dummy_instr):
+        if ('swBuild' in self.version_info and
+                self.version_info['swBuild'] == self.parameter_file_version):
             # Return the parameter list given by the txt file
             results = file_content["parameters"]
         else:
@@ -233,7 +213,7 @@ class CCL(SCPI):
             parameters_str = self.ask('QUTech:PARAMeters?')
             parameters_str = parameters_str.replace('\t', '\n')
             try:
-                file = open(self._s_file_name, 'x')
+                file = open(self._s_file_name, 'w')
                 file.write(parameters_str)
             except Exception as e:
                 log.warning("failed to write update the parameters in the" +
@@ -286,34 +266,30 @@ class CCL(SCPI):
         converts the bytes read to a bytearray which is required by
         binBlockWrite in SCPI.
         """
-        self.stop()
         if not isinstance(filename, str):
             raise ValueError(
-                "The parameter filename type({}) is incorrect. It should be str.".format(type(filename)))
+                "The parameter filename type({}) is incorrect. "
+                "It should be str.".format(type(filename)))
 
-        outputFilename = self._change_file_ext(filename, '.bin')
         success_parser = self.QISA.parse(filename)
 
         if success_parser is not True:
-            raise RuntimeError(self.QISA.getLastErrorMessage())
+            print("Error detected while assembling the file {}:".format(
+                filename))
+            print(self.QISA.getLastErrorMessage())
+            raise RuntimeError("Assembling failed.")
+        
+        instHex = self.QISA.getInstructionsAsHexStrings(False)
 
-        success_save = self.QISA.save(outputFilename)
+        intarray = []
+        for instr in instHex:
+            intarray.append(int(instr[2:], 16))
 
-        if success_save is not True:
-            raise Exception("Instruction save to binary failed")
-
-        binBlock = None
-
-        with open(outputFilename, 'rb') as insn_file:
-            binBlock = insn_file.read()
-
-        binBlock = bytearray(binBlock)
-
+        binBlock = bytearray(array.array('L', intarray))
+        print(binBlock)
         # write binblock
         hdr = 'QUTech:UploadInstructions '
         self.binBlockWrite(binBlock, hdr)
-        # write to last_loaded_instructions so it can conveniently be read back
-        self.last_loaded_instructions(filename)
 
     def _upload_microcode(self, filename):
         """
@@ -324,13 +300,15 @@ class CCL(SCPI):
 
         if not isinstance(filename, str):
             raise ValueError(
-                "The parameter filename type({}) is incorrect. It should be str.".format(type(filename)))
+                "The parameter filename type({}) is incorrect. "
+                "It should be str.".format(type(filename)))
 
-        self.microcode.load_microcode(filename)
-        binBlock = self.microcode.write_to_bin()
+        self.CCL_microcode.load_microcode(filename)
+        binBlock = self.CCL_microcode.write_to_bin()
         if not isinstance(binBlock, bytearray):
             raise ValueError(
-                "The parameter binBlock type({}) is incorrect. It should be bytearray.".format(type(binBlock)))
+                "The parameter binBlock type({}) is incorrect. "
+                "It should be bytearray.".format(type(binBlock)))
 
         # write binblock
         hdr = 'QUTech:UploadMicrocode '
@@ -357,111 +335,3 @@ class CCL(SCPI):
         base_name = os.path.splitext(os.path.basename(qumis_name))[0]
         fn = os.path.join(pathname, base_name + ext)
         return fn
-
-
-class dummy_CCL(CCL):
-    """
-    Dummy CCL all paramaters are manual and all other methods include pass
-    statements
-    """
-
-    def __init__(self, name, **kw):
-        Instrument.__init__(self, name=name, **kw)
-        self._dummy_instr = True
-        self.model = name
-        self.version_info = self.get_idn()
-        self.add_standard_parameters()
-        self.add_additional_parameters()
-        self.connect_message()
-        # required because of annoying IP instrument
-        self._port = ''
-        self._confirmation = ''
-        self._address = ''
-        self._terminator = ''
-        self._timeout = ''
-        self._persistent = ''
-
-    def get_idn(self):
-        return {'driver': str(self.__class__), 'name': self.name}
-
-    def add_standard_parameters(self):
-        """
-        Dummy version, all are manual parameters
-        """
-        self.parameter_list = self._read_parameters()
-
-        for parameter in self.parameter_list:
-            name = parameter["name"]
-            del parameter["name"]
-            # Remove these as this is for a Dummy instrument
-            if "get_cmd" in parameter:
-                del parameter["get_cmd"]
-            if "set_cmd" in parameter:
-                del parameter["set_cmd"]
-
-            if ("vals" in parameter):
-                validator = parameter["vals"]
-                try:
-                    val_type = validator["type"]
-
-                    if (val_type == "Bool"):
-                        # Bool can naturally only have 2 values, 0 or 1...
-                        parameter["vals"] = vals.Ints(0, 1)
-
-                    elif (val_type == "Non_Neg_Number"):
-                        # Non negative integers
-                        try:
-                            if ("range" in validator):
-                                # if range key is specified in the parameter,
-                                # then, the validator is limited to the
-                                # specified min,max values
-                                val_min = validator["range"][0]
-                                val_max = validator["range"][1]
-
-                            parameter["vals"] = vals.Ints(val_min, val_max)
-
-                        except Exception as e:
-                            parameter["vals"] = vals.Ints(0, INT32_MAX)
-                            log.warning("Range of validator not set correctly")
-
-                    else:
-                        log.warning("Failed to set the validator for the" +
-                                    " parameter " + name + ", because of a" +
-                                    " unknown validator type: '" + val_type +
-                                    "'")
-
-                except Exception as e:
-                    log.warning(
-                        "Failed to set the validator for the parameter " +
-                        name + ".(%s)", str(e))
-
-            try:
-                self.add_parameter(name, parameter_class=ManualParameter,
-                                   **parameter)
-
-            except Exception as e:
-                log.warning("Failed to create the parameter " + name +
-                            ", because of a unknown keyword in this" +
-                            " parameter.(%s)", str(e))
-
-    def add_additional_parameters(self):
-        """
-        Dummy version, parameters are added as manual parameters
-        """
-        self.add_parameter(
-            'upload_instructions',
-            label=('Upload instructions'),
-            docstring='It uploads the instructions to the CCLight. ' +
-            'Valid input is a string representing the filename',
-            parameter_class=ManualParameter,
-            vals=vals.Strings()
-        )
-
-        self.add_parameter(
-            'upload_microcode',
-            label=('Upload microcode'),
-            docstring='It uploads the microcode to the CCLight. ' +
-            'Valid input is a string representing the filename',
-            parameter_class=ManualParameter,
-            vals=vals.Strings()
-        )

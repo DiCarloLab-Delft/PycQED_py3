@@ -6,6 +6,9 @@ disassemblyOutputFilename = 'test_disassembly.out'
 
 print ("QISA_AS Version: ", QISA_Driver.getVersion())
 
+print ("Retrieving QISA Opcode specification...")
+print (QISA_Driver.dumpOpcodeSpecification())
+
 driver = QISA_Driver()
 
 driver.enableScannerTracing(False)
@@ -16,8 +19,17 @@ print ("parsing file ", inputFilename)
 success = driver.parse(inputFilename)
 
 if success:
-    print ("Generated assembly:")
-    print (driver.getInstructionsAsHexStrings())
+    print ("Generated instructions:")
+    instHex = driver.getInstructionsAsHexStrings(False)
+    for inst in instHex:
+        print ("  " + inst)
+    print()
+
+    print ("Generated instructions, including binary:")
+    instHexBin = driver.getInstructionsAsHexStrings(True)
+    for inst in instHexBin:
+        print ("  " + inst)
+    print()
 
     print ("Saving instructions to file: ", outputFilename)
     success = driver.save(outputFilename)

@@ -8,6 +8,7 @@
 #include <map>
 #include <set>
 #include <algorithm>
+#include <bitset>
 
 #include "qisa_parser.tab.hh"
 
@@ -95,6 +96,15 @@ public:
   ~QISA_Driver()
   {}
 
+  /**
+   * Reset the driver such that it can be used for assembly/disassembly again.
+   *
+   * @note
+   *   A reset() is done implicitly at each call to parse()/disassemble().
+   */
+  DllExport void
+  reset();
+
   // Handling the scanner.
   bool
   scanBegin (); // Note: implementation in qisa_lexer.l
@@ -133,6 +143,8 @@ public:
   DllExport static std::string
   getVersion();
 
+  DllExport static std::string
+  dumpOpcodeSpecification();
 
   DllExport void
   enableParserTracing(bool enabled);
@@ -151,10 +163,12 @@ public:
    * Retrieve the generated code as a list of strings that contain the hex values of the encoded
    * instructions.
    *
+   * @param withBinaryOutput If true, the binary representation of the instruction will be appended to the hex codes.
+   *
    * @return The generated instructions, one decoded instruction per line.
    */
-  DllExport std::string
-  getInstructionsAsHexStrings();
+  DllExport std::vector<std::string>
+  getInstructionsAsHexStrings(bool withBinaryOutput);
 
   /**
    * Retrieve the disassembled instructions as a multi-line string.
@@ -211,6 +225,14 @@ public:
   addExpectationErrorMessage(const std::string& expected_item);
 
 
+  /**
+   * Add an error message that describes that the parser was expecting a condition.
+   * This version only adds the message if the parser generated error doesn't already contains a reference to an expected token.
+   * This is to prevent multiple (possibly different) messages about expectations.
+   * The error location is not altered.
+   */
+  void
+  addExpectedConditionErrorMessage();
 
 
   // Symbol table management functions
@@ -591,6 +613,12 @@ public:
                int64_t addr,
                const QISA::location& addr_loc);
 
+  /* GOTO  addr          */
+  bool
+  generate_GOTO(const QISA::location& inst_loc,
+               int64_t addr,
+               const QISA::location& addr_loc);
+
   /* BRN   addr          */
   bool
   generate_BRN(const QISA::location& inst_loc,
@@ -643,6 +671,17 @@ public:
                  const QISA::location& rs_loc);
 
 
+  /**
+   * @return True if the lexer already has discovered that the file has terminated, false otherwise.
+   */
+  bool hadEOF() const { return _hadEOF; }
+
+  /**
+   * Record the fact that the lexer has discovered that the file has terminated.
+   * It is used by the lexer to append a new-line at the end of file.
+   */
+  void haveEOF() { _hadEOF = true; }
+
 
   // The name of the file being parsed.
   // Used later to pass the file name to the location tracker.
@@ -667,7 +706,8 @@ public:
    * Used to set the opcodes of the instructions.
    * The code for this is defined in an automatically generated file.
    */
-  void setOpcodes();
+  static void
+  setOpcodes();
 
   /**
    * Get an opcode for a given instruction name.
@@ -870,8 +910,19 @@ public:
   };
 
 
-  std::string
+  static std::string
   getHex(uint64_t val, int nDigits);
+
+  /**
+   * Represent a value as binary, of which the nibbles are interspaced.
+   * @tparam T_val Type of the value to represent.
+   * @param value Value to represent
+   * @return Binary representation of the value.
+   */
+  template <typename T_val>
+  std::string
+  getSpacedBinary(T_val value);
+
 
   bool
   disassembleInstruction(qisa_instruction_type inst, DisassembledInstruction& disassembledInst);
@@ -1021,6 +1072,10 @@ private: // -- variables
   // Specifies the verbosity of the assembler.
   bool _verbose;
 
+  // Used to track if we have already had an EOF character.
+  // This is set from within the lexer when it sees an EOF character.
+  bool _hadEOF;
+
   // Total number of registers available in processor, per kind of register.
   int _nrOfRegisters[4];
 
@@ -1075,6 +1130,9 @@ private: // -- variables
 
   // The following two are used for disassembly of quantum instructions.
 
+  // Contains the opcodes for the quantum instructions that do not have an argument.
+  static std::set<int> _q_inst_arg_none;
+
   // Contains the opcodes for the quantum instructions specifying an st argument.
   static std::set<int> _q_inst_arg_st;
 
@@ -1097,6 +1155,9 @@ private: // -- variables
   // Names of the known branch conditions.
   // Used for pretty printing.
   std::map<uint8_t, std::string> _branchConditionNames;
+
+  // Names of the condition aliases that will be translated into the primitive versions.
+  std::map<std::string, uint8_t> _branchConditionAliases;
 
   // Structure to fill if a non-defined label is encountered.
   // It might be defined later on...
@@ -1218,6 +1279,29 @@ SrcType QISA_Driver::reverseBits(const SrcType src)
 
   return revBits;
 }
+
+template <typename T_val>
+std::string
+QISA_Driver::getSpacedBinary(T_val value)
+{
+  std::bitset<sizeof(T_val) * 8> binary(value);
+
+  std::ostringstream ss;
+
+  int bitCount = (binary.size()) - 1;
+  while (bitCount >= 0)
+  {
+    ss << binary[bitCount];
+    if ((bitCount != 0) && (bitCount%4 == 0))
+    {
+      ss << " ";
+    }
+    bitCount--;
+  }
+
+  return ss.str();
+}
+
 
 
 
