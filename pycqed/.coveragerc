@@ -4,8 +4,7 @@ omit =
     */__init__.py
     test.py
     tests/*
-    instrument_drivers/*
-    instrument_drivers/*/*
+    instrument_drivers/physical_instruments/*
     analysis/*
     scripts/*
     utils/reload_code.py

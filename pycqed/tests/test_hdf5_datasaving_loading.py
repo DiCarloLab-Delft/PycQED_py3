@@ -31,6 +31,12 @@ class Test_HDF5(unittest.TestCase):
         self.mock_parabola_2 = DummyParHolder('mock_parabola_2')
         self.station.add_component(self.mock_parabola_2)
 
+    @classmethod
+    def tearDownClass(self):
+        self.MC.close()
+        self.mock_parabola.close()
+        self.mock_parabola_2.close()
+
     def test_storing_and_loading_station_snapshot(self):
         """
         Stores and writes a station (instrument) snapshot.
