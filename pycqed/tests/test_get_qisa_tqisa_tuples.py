@@ -23,7 +23,7 @@ class Test_get_tqisa_tuples(unittest.TestCase):
         except :
             raise Exception('Unable to read result file')
 
-        tuple_result = get_tuple_result()
+        tuple_result = self.get_tuple_result()
 
         result =  get_qisa_tqisa_timing_tuples( 
                                                 sample_qisa_fp,
@@ -44,7 +44,7 @@ class Test_get_tqisa_tuples(unittest.TestCase):
 
 
 
-    def get_tuple_result():
+    def get_tuple_result(self):
         tuple_result = [
                          (0, 'prepz s0'), 
                          (10000, 'prepz s10'), 
