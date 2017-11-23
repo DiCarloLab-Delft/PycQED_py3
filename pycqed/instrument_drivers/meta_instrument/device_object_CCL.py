@@ -581,14 +581,17 @@ class DeviceCCL(Instrument):
         q1idx = q1.cfg_qubit_nr()
 
         UHFQC = q0.instr_acquisition.get_instr()
+        self.ro_acq_weight_type('optimal')
         self.prepare_for_timedomain()
 
-        # Important that this happens before calibrating the weights
-        UHFQC.quex_trans_offset_weightfunction_0(0)
-        UHFQC.quex_trans_offset_weightfunction_1(0)
-        UHFQC.upload_transformation_matrix([[1, 0], [0, 1]])
 
         if calibrate_optimal_weights:
+            # Important that this happens before calibrating the weights
+            # 5 is the number of channels in the UHFQC
+            for i in range(5):
+                UHFQC.set('quex_trans_offset_weightfunction_{}'.format(i), 0)
+
+            UHFQC.upload_transformation_matrix(np.eye(5))
             q0.calibrate_optimal_weights(
                 analyze=True, verify=verify_optimal_weights)
             q1.calibrate_optimal_weights(
