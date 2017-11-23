@@ -11,11 +11,11 @@ class Test_get_tqisa_tuples(unittest.TestCase):
 
         file_paths_root = os.path.join(pq.__path__[0], 'tests', 'get_qisa_tqisa_timing_tuples_files')
         
-        result_fp       = file_paths_root + 'sample_main.result'
-        sample_qisa_fp  = file_paths_root + 'sample_main.qisa'
-        sample_tqisa_fp = file_paths_root + 'sample_main.tqisa'
-        ccl_config_json = file_paths_root + 'ccl_config_new.json'
-        output_fp       = file_paths_root + 'sample_main.qisa.out'
+        result_fp       = file_paths_root + '/sample_main.result'
+        sample_qisa_fp  = file_paths_root + '/sample_main.qisa'
+        sample_tqisa_fp = file_paths_root + '/sample_main.tqisa'
+        ccl_config_json = file_paths_root + '/ccl_config_new.json'
+        output_fp       = file_paths_root + '/sample_main.qisa.out'
 
         try:
             with open(result_fp,'r') as result_file:
