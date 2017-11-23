@@ -67,7 +67,7 @@ class MeasurementAnalysis(object):
         self.font_size = kw.get('font_size', 11)  # font sizes
         self.tick_length = kw.get('tick_length', 4)  # tick lengths
         self.tick_width = kw.get('tick_width', 0.5)  # tick line widths
-        self.marker_size = kw.get('marker_size', None)
+        self.marker_size = kw.get('marker_size', 4)
         # marker size for data points
         self.line_width = kw.get('line_width', 2)
         # line widths connecting data points

@@ -260,7 +260,7 @@ class Qubit(Instrument):
         try:
             freq_res_par = self.freq_res
             freq_RO_par = self.ro_freq
-        except AttributeError():
+        except AttributeError:
             logging.warning('Rename the f_res parameter to freq_res')
             freq_res_par = self.f_res
             freq_RO_par = self.f_RO
@@ -821,7 +821,7 @@ class Transmon(Qubit):
             ampl = a.fit_res[1].params['period'].value/2.
 
         if update:
-            self.Q_amp180.set(ampl)
+            self.amp180.set(ampl)
         return ampl
 
     def calibrate_pulse_amplitude_flipping(self,

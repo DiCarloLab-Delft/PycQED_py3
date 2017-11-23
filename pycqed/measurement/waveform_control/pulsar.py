@@ -215,7 +215,7 @@ class Pulsar(Instrument):
             self._stop_AWG(AWG)
 
     def program_awgs(self, sequence, *elements, AWGs='all', channels='all',
-                     loop=True, allow_first_nonzero=False, verbose=False):
+                     loop=True, allow_first_nonzero=True, verbose=False):
         """
         Args:
             sequence: The `Sequence` object that determines the segment order,
@@ -285,7 +285,7 @@ class Pulsar(Instrument):
         self._clock_prequeried(False)
 
     def _program_AWG5014(self, obj, sequence, el_wfs, loop=True,
-                         allow_first_nonzero=False):
+                         allow_first_nonzero=True):
         """
         Program the AWG with a sequence of segments.
 
