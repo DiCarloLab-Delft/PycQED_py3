@@ -126,6 +126,13 @@ def calibrate(config_json: str):
     print('*'*80)
     options = json.loads(config_json)
 
+    # Get the kernel_type
+    if 'kernel_type' in options:
+        kernel_type = options['kernel_type']
+    else:
+        print('Could not find kernel_type in the json options file')
+        kernel_type = 'execute_CCL'
+
     # relies on this being added explicitly
     cal_graph = station.calibration_graph
     if 'readout' in options:
@@ -163,7 +170,7 @@ def calibrate(config_json: str):
     cal_graph.demonstrator_cal(verbose=True)
 
     # Send over the results of the calibrations
-    send_calibration_data()
+    send_calibration_data(kernel_type)
 
 
 def _retrieve_file_from_url(file_url: str):
@@ -235,7 +242,7 @@ def _simulate_quantumsim(file_path, options):
 
 # Send the callibration of the machine every 10 minutes
 # This function is blocking!
-def send_calibration_data():
+def send_calibration_data(kernel_type: str):
 
     banned_pars = ['IDN', 'RO_optimal_weights_I', 'RO_optimal_weights_Q',
                    'qasm_config']
@@ -254,7 +261,8 @@ def send_calibration_data():
         except KeyError as e:
             logging.warning(e)
     tc.client.publish_custom_msg({
-        "calibration": calibration
+        "calibration": calibration,
+        "kernel_type": kernel_type
     })
     print('Calibration data send')
 
