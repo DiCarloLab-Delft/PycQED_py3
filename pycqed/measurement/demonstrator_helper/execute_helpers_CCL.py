@@ -127,9 +127,9 @@ def calibrate(config_json: str):
     options = json.loads(config_json)
 
     # Get the kernel_type
-    if 'kernel_type' in options:
+    try:
         kernel_type = options['kernel_type']
-    else:
+    except:
         print('Could not find kernel_type in the json options file')
         kernel_type = 'execute_CCL'
 
