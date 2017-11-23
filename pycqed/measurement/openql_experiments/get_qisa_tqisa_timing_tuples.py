@@ -69,8 +69,9 @@ def get_qisa_tqisa_timing_tuples(qisa_file_path, tqisa_file_path, CCL_json_confi
                 # Get the timing number
                 timing_num = re.search(r'\d+' ,line)
                 # Get the codewords
-                codewords = re.search(r'(?<=bs\s1)\w+', line)
-                result = ( int(timing_num.group(0)), codewords.group(0) )
+                codewords = re.split(r'bs 1', line)
+                print(codewords)
+                result = ( int(timing_num.group(0)), linenum )
                 print(result)
                 time_tuples.append(result)
 
