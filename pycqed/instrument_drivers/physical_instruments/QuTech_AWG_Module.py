@@ -20,7 +20,7 @@ import warnings
 
 
 from qcodes.instrument.parameter import Parameter
-from qcodes.instrument.parameter import Command, no_setter
+from qcodes.instrument.parameter import Command
 
 
 # Note: the HandshakeParameter is a temporary param that should be replaced
@@ -38,7 +38,7 @@ class HandshakeParameter(Parameter):
         if isinstance(set_cmd, str):
             set_cmd += '\n *OPC?'
         self._set = Command(arg_count=1, cmd=set_cmd, exec_str=exec_str,
-                            input_parser=set_parser, no_cmd_function=no_setter)
+                            input_parser=set_parser)
 
         self.has_set = set_cmd is not None
 
@@ -183,7 +183,7 @@ class QuTech_AWG_Module(SCPI):
         self.add_parameter('Wlist',
                            label='Waveform list',
                            get_cmd=self._getWlist)
-        
+
         self.add_parameter('get_system_status',
                            unit='JSON',
                            label=('System status'),
@@ -507,4 +507,3 @@ class QuTech_AWG_Module(SCPI):
         def get_func():
             return fun(ch)
         return get_func
-
