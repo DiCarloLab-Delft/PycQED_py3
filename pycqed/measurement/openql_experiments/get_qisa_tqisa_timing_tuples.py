@@ -15,7 +15,8 @@ but I am just not in the mood anymore to check for more regex...
 -KKL 23/11/2017
 """
 
-def get_qisa_tqisa_timing_tuples(qisa_file_path, tqisa_file_path, CCL_json_config):
+def get_qisa_tqisa_timing_tuples( qisa_file_path, tqisa_file_path, 
+                                  CCL_json_config, output_path:str = None ) :
     # Load the hardware config json file
     # The idea is then to search for the codewords and then map it back to the gates
     with open(CCL_json_config,'r') as file_json:
@@ -30,7 +31,12 @@ def get_qisa_tqisa_timing_tuples(qisa_file_path, tqisa_file_path, CCL_json_confi
     first_prepz = True
     first_CZ = True
     # Open the output file
-    with open(qisa_file_path + ".mod", 'w') as mod_qisa_file:
+    if (output_path == None):
+        output_file = qisa_file_path + ".out"
+    else:
+        output_file = output_path
+
+    with open(output_file, 'w') as mod_qisa_file:
         # Open the original qisa file
         with open(qisa_file_path, 'r') as qisa_file :
 
@@ -88,6 +94,7 @@ def get_qisa_tqisa_timing_tuples(qisa_file_path, tqisa_file_path, CCL_json_confi
                              )
                 except:
                     result = ( int(timing_num.group(0)), codewords[1].strip() )
+                
                 time_tuples.append(result)
 
     return time_tuples
