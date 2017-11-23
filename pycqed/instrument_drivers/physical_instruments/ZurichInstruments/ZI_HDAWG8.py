@@ -595,16 +595,11 @@ class ZI_HDAWG8(ZI_base_instrument):
         # Switch all outputs into direct mode
         if self.cfg_codeword_protocol() == 'flux':
             for ch in range(8):
-                try:
-                    self.set('sigouts_{}_direct'.format(ch), 0)
-                except:
-                    # Exception is here because not all AWG8 units have
-                    # been upgraded
-                    pass
+                self.set('sigouts_{}_direct'.format(ch), 0)
+                self.set('sigouts_{}_range'.format(ch), 5)
+
         # when doing flux pulses, set everything to amp mode
         else:
             for ch in range(8):
-                try:
-                    self.set('sigouts_{}_direct'.format(ch), 1)
-                except:
-                    pass
+                self.set('sigouts_{}_direct'.format(ch), 1)
+                self.set('sigouts_{}_range'.format(ch), .8)
