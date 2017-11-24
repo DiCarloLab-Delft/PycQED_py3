@@ -1811,7 +1811,7 @@ class Rabi_Analysis(TD_Analysis):
             if plot_errorbars:
                 a_tools.plot_errorbars(self.sweep_pts_wo_cal_pts,
                                        self.normalized_data_points,
-                                       ax=self.ax,only_bars=True,
+                                       ax=self.ax,
                                        linewidth=self.axes_line_width,
                                        marker='none',
                                        markersize=self.marker_size)

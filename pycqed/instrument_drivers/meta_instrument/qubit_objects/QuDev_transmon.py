@@ -1597,9 +1597,8 @@ class QuDev_transmon(Qubit):
                 qb_name=self.name,
                 analyze_ef=analyze_ef,
                 label=label,
-                amp_only=amp_only,
                 close_fig=close_fig,**kw)
-            self.f_qubit(SpecA.fitted_freq)
+
             f0 = SpecA.fitted_freq
             if update:
                 self.f_qubit(f0)
@@ -2181,7 +2180,7 @@ class QuDev_transmon(Qubit):
             return
 
     def find_qscale(self, qscales, label=None, for_ef=False, update=False,
-                    MC=None, close_fig=True, last_ge_pulse=True, upload=False,
+                    MC=None, close_fig=True, last_ge_pulse=True, upload=True,
                     cal_points=True, no_cal_points=None, **kw):
 
         '''
