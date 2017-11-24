@@ -19,7 +19,7 @@ class Base_MW_LutMan(Base_LutMan):
         self.spec_func = wf.block_pulse
 
         self._add_channel_params()
-        self.add_parameter('mw_amp180', unit='V', vals=vals.Numbers(-1, 1),
+        self.add_parameter('mw_amp180', unit='frac', vals=vals.Numbers(-1, 1),
                            parameter_class=ManualParameter,
                            initial_value=0.1)
         self.add_parameter('mw_amp90_scale',
@@ -43,7 +43,7 @@ class Base_MW_LutMan(Base_LutMan):
                            parameter_class=ManualParameter,
                            initial_value=20e-9)
         self.add_parameter('spec_amp',
-                           vals=vals.Numbers(), unit='V',
+                           vals=vals.Numbers(), unit='frac',
                            parameter_class=ManualParameter,
                            initial_value=1)
 
