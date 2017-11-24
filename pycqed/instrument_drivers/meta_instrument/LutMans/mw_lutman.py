@@ -216,30 +216,12 @@ class QWG_MW_LutMan(Base_MW_LutMan):
         self._num_channels = 4
         super().__init__(name, **kw)
 
-    def set_default_lutmap(self):
-        """
-        Set's the default lutmap for standard microwave drive pulses.
-        """
-        def_lm = self._def_lm
-        LutMap = {}
-        # N.B. The main difference between the AWG8 and QWG in the lutmap
-        # is the naming of the codeword params.
-        for cw_idx, cw_key in enumerate(def_lm):
-            LutMap[cw_key] = (
-                'codeword_{}_ch{}_waveform'.format(cw_idx, self.channel_I()),
-                'codeword_{}_ch{}_waveform'.format(cw_idx, self.channel_Q()))
-        self.LutMap(LutMap)
 
-    def load_waveform_onto_AWG_lookuptable(self, waveform_name: str,
-                                           regenerate_waveforms: bool=False):
-        raise NotImplementedError('Awaits resolution of issue #322')
-
-
-class AWG8_MW_LutMan(Base_MW_LutMan):
+class AWG8_MW_LutMan(QWG_MW_LutMan):
 
     def __init__(self, name, **kw):
-        self._num_channels = 8
         super().__init__(name, **kw)
+        self._num_channels = 8
 
     def set_default_lutmap(self):
         """
@@ -341,3 +323,32 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
             DI, DQ = np.dot(M_D, val[2:4])  # Mixer correction Derivative comp.
             wave_dict[key] = GI, GQ, DI, DQ
         return wave_dict
+
+
+# Not the cleanest inheritance but whatever - MAR Nov 2017
+class QWG_VSM_MW_LutMan(AWG8_VSM_MW_LutMan):
+
+    def load_waveforms_onto_AWG_lookuptable(
+            self, regenerate_waveforms: bool=True,  stop_start: bool = True):
+        return Base_MW_LutMan.load_waveforms_onto_AWG_lookuptable(
+            self=self,
+            regenerate_waveforms=regenerate_waveforms, stop_start=stop_start)
+
+    def _add_channel_params(self):
+        # all channels are used and hardcoded in functionality
+        pass
+
+    def set_default_lutmap(self):
+        """
+        Set's the default lutmap for standard microwave drive pulses.
+        """
+        def_lm = self._def_lm
+        LutMap = {}
+        for cw_idx, cw_key in enumerate(def_lm):
+            LutMap[cw_key] = (
+                'wave_ch1_cw{:03}'.format(cw_idx),
+                'wave_ch1_cw{:03}'.format(cw_idx),
+                'wave_ch3_cw{:03}'.format(cw_idx),
+                'wave_ch4_cw{:03}'.format(cw_idx))
+        self.LutMap(LutMap)
+
