@@ -98,18 +98,6 @@ class QuTechVSMModule(SCPI):
                                get_parser=float)
 
     def add_marker_parameters(self):
-        # Set all markers in one go
-        self.add_parameter('marker_source',
-                           docstring='Set the marker source of all channels to '
-                                     'internal or external switching.',
-                           set_cmd='MARKER:SOURCE {}',
-                           vals=validators.Enum('int', 'ext'))
-        self.add_parameter('marker_state',
-                           docstring='Set the marker state of all channels on '
-                                     'or off.',
-                           set_cmd='MARKER:STATE {}',
-                           vals=validators.OnOff())
-
         # Each (module, channel) separately
         for mod in self.modules:
             mod_name = 'mod{m}'.format(m=mod)
@@ -144,12 +132,12 @@ class QuTechVSMModule(SCPI):
     def add_qubit_parameters(self):
         # Qubit attributes are set per channel row (so all modules in one go)
         for channel in self.channels:
-            ch_name = '_ch{c}'.format(c=channel)
+            ch_name = 'ch{c}'.format(c=channel)
             ch_scpi = ':CHANNEL{c}'.format(c=channel)
 
             doc_description = 'Qubit description on display ' \
                               'for row {c}'.format(c=channel)
-            self.add_parameter('qubit' + ch_name + '_description',
+            self.add_parameter(ch_name + '_description',
                                docstring=doc_description,
                                get_cmd='QUBIT'+ch_scpi+':DESCRIPTION?',
                                set_cmd='QUBIT'+ch_scpi+':DESCRIPTION {}',
@@ -157,7 +145,7 @@ class QuTechVSMModule(SCPI):
 
             doc_frequency = 'Qubit frequency in Hz for row {c}. ' \
                             'Range 4.0E9--8.0E9 Hz.'.format(c=channel)
-            self.add_parameter('qubit' + ch_name + '_frequency',
+            self.add_parameter(ch_name + '_frequency',
                                docstring=doc_frequency,
                                unit='Hz',
                                get_cmd='QUBIT'+ch_scpi+':FREQUENCY?',
@@ -173,42 +161,34 @@ class QuTechVSMModule(SCPI):
                         'or a RGB hex string like "#rrggbb".'.format(c=channel,
                                                                      lst=colors)
 
-            self.add_parameter('qubit' + ch_name + '_led_color',
+            self.add_parameter(ch_name + '_led_color',
                                docstring=doc_color,
                                get_cmd='QUBIT'+ch_scpi+':LEDCOLOR?',
                                set_cmd='QUBIT'+ch_scpi+':LEDCOLOR {}',
                                vals=validators.Strings())
 
-            # Individual channels can be switched on or off
-            for mod in self.modules:
-                mod_ch_name = '_mod{m}_ch{c}'.format(m=mod, c=channel)
-                mod_ch_scpi = ':MODULE{m}:CHANNEL{c}'.format(m=mod, c=channel)
+            # # Individual channels can be switched on or off
+            # for mod in self.modules:
+            #     mod_ch_name = 'mod{m}_ch{c}_switch_unknown'.format(m=mod, c=channel)
+            #     mod_ch_scpi = ':MODULE{m}:CHANNEL{c}'.format(m=mod, c=channel)
 
-                doc_on_off = 'On/off state for channel {c} of ' \
-                             'module {m}'.format(m=mod, c=channel)
-                self.add_parameter('qubit' + mod_ch_name,
-                                   docstring=doc_on_off,
-                                   get_cmd='QUBIT'+mod_ch_scpi+'?',
-                                   set_cmd='QUBIT'+mod_ch_scpi+' {}',
-                                   vals=validators.OnOff())
+            #     doc_on_off = 'On/off state for channel {c} of ' \
+            #                  'module {m}'.format(m=mod, c=channel)
+            #     self.add_parameter(mod_ch_name,
+            #                        docstring=doc_on_off,
+            #                        get_cmd='QUBIT'+mod_ch_scpi+'?',
+            #                        set_cmd='QUBIT'+mod_ch_scpi+' {}',
+            #                        vals=validators.OnOff())
 
     def add_calibration_parameters(self):
         # Raw calibration
         #  Two input pulses
         for pulse in ('gaussian', 'derivative'):
             #  Two DACs
-            for dac in ('attenuation', 'phase'):
+            for dac in ('att', 'phase'):
                 # All channels and modules at once (no getter)
-                doc_all_dac = 'Raw {d} DAC value (0--65535) for the {p} ' \
-                              'input of all channels.'.format(p=pulse, d=dac)
                 var_name = '_{p}_{d}_raw'.format(p=pulse, d=dac)
                 var_scpi = ':{p}:{d}:RAW'.format(p=pulse.upper(), d=dac.upper())
-
-                self.add_parameter('calibration' + var_name,
-                                   docstring=doc_all_dac,
-                                   set_cmd='CALIBRATION' + var_scpi + ' {}',
-                                   vals=validators.Ints(min_value=0,
-                                                        max_value=2**16-1))
 
                 # Individual outputs: per (module, channel) pair
                 for channel in self.channels:
@@ -217,15 +197,18 @@ class QuTechVSMModule(SCPI):
                                   'input of channel {c} ' \
                                   'of module {m}.'.format(p=pulse, d=dac,
                                                           c=channel, m=mod)
-                        ch_name = '_mod{m}_ch{c}'.format(m=mod, c=channel)
+                        ch_name = 'mod{m}_ch{c}'.format(m=mod, c=channel)
                         ch_scpi = ':MODULE{m}:CHANNEL{c}'.format(m=mod,
                                                                  c=channel)
                         scpi_name = 'CALIBRATION' + ch_scpi + var_scpi
                         self.add_parameter(
-                            'calibration' + ch_name + var_name,
+                            ch_name + var_name,
+                            label=ch_name + var_name,
                             docstring=doc_dac,
                             get_cmd=scpi_name + '?',
                             set_cmd=scpi_name + ' {}',
                             get_parser=int,
-                            vals=validators.Ints(min_value=0, max_value=2**16-1)
+                            set_parser=int,
+                            vals=validators.Numbers(min_value=0, max_value=2**16-1)
                         )
+
