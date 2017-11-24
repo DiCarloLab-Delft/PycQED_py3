@@ -65,6 +65,13 @@ class QuTech_AWG_Module(SCPI):
         self.add_parameters()
         self.connect_message()
 
+    def snapshot_base(self, update=False, params_to_skip_update=None):
+        if params_to_skip_update is None:
+            params_to_skip_update = self._params_to_skip_update
+        snap = super().snapshot_base(
+            update=update, params_to_skip_update=params_to_skip_update)
+        return snap
+
     def add_parameters(self):
         #######################################################################
         # QWG specific
@@ -162,16 +169,6 @@ class QuTech_AWG_Module(SCPI):
                                set_cmd=waveform_cmd+' "{}"',
                                vals=vals.Strings())
 
-        for cw in range(self.device_descriptor.numCodewords):
-            for j in range(self.device_descriptor.numChannels):
-                ch = j+1
-                # Codeword 0 corresponds to bitcode 0
-                cw_cmd = 'sequence:element{:d}:waveform{:d}'.format(cw, ch)
-                self.add_parameter('codeword_{}_ch{}_waveform'.format(cw, ch),
-                                   get_cmd=cw_cmd+'?',
-                                   set_cmd=cw_cmd+' "{:s}"',
-                                   vals=vals.Strings())
-
         # Waveform parameters
         self.add_parameter('WlistSize',
                            label='Waveform list size',
@@ -200,12 +197,6 @@ class QuTech_AWG_Module(SCPI):
                                                  # usefull when other logic is needed
                            docstring=doc_trgs_log_inp)
 
-
-        # This command is added manually
-        # self.add_function('deleteWaveform'
-        self.add_function('deleteWaveformAll',
-                          call_cmd='wlist:waveform:delete all')
-
         doc_sSG = "Synchronize both sideband frequency" \
             + " generators, i.e. restart them with their defined phases."
         self.add_function('syncSidebandGenerators',
@@ -218,6 +209,37 @@ class QuTech_AWG_Module(SCPI):
         #                   call_cmd='awgcontrol:run:immediate')
         self.add_function('stop',
                           call_cmd='awgcontrol:stop:immediate')
+
+    def _add_codeword_parameters(self):
+        self._params_to_skip_update = []
+        docst = ('Specifies a waveform for a specific codeword. ' +
+                 'The channel number corresponds' +
+                 ' to the channel as indicated on the device (1 is lowest).')
+        for j in range(self.device_descriptor.numChannels):
+            for cw in range(self.device_descriptor.numCodewords):
+                ch = j+1
+                parname = 'wave_ch{}_cw{:03}'.format(ch+1, cw)
+                self.add_parameter(
+                    parname,
+                    label='Waveform channel {} codeword {:03}'.format(
+                        ch+1, cw),
+                    vals=vals.Arrays(min_value=-1, max_value=1),
+                    set_cmd=self._gen_ch_cw_set_func(
+                        self._set_cw_waveform, ch, cw),
+                    get_cmd=self._gen_ch_cw_set_func(
+                        self._set_cw_waveform, ch, cw),
+                    docstring=docst)
+                self._params_to_skip_update.append(parname)
+
+    def _set_cw_waveform(self, ch: int, cw: int, waveform):
+        wf_name = 'wave_ch{}_cw{:03}'.format(ch, cw)
+        cw_cmd = 'sequence:element{:d}:waveform{:d}'.format(cw, ch)
+        self.createWaveformReal(wf_name, waveform)
+        self.write(cw_cmd + ' "{:s}"'.format(wf_name))
+
+    def _get_cw_waveform(self, ch: int, cw: int):
+        wf_name = 'wave_ch{}_cw{:03}'.format(ch, cw)
+        return self.getWaveformDataFloat(wf_name)
 
     def start(self):
         run_mode = self.run_mode()
@@ -436,3 +458,12 @@ class QuTech_AWG_Module(SCPI):
             return fun(ch)
         return get_func
 
+    def _gen_ch_cw_set_func(self, fun, ch, cw):
+        def set_func(val):
+            return fun(ch, cw, val)
+        return set_func
+
+    def _gen_ch_cw_get_func(self, fun, ch, cw):
+        def get_func():
+            return fun(ch, cw)
+        return get_func
