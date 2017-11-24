@@ -55,7 +55,7 @@ class QuTech_AWG_Module(SCPI):
         self.device_descriptor.numMarkers = 8
         self.device_descriptor.numTriggers = 8
         # Commented out until bug fixed
-        self.device_descriptor.numCodewords = 128
+        self.device_descriptor.numCodewords = 64
 
         # valid values
         self.device_descriptor.mvals_trigger_impedance = vals.Enum(50),
@@ -65,12 +65,6 @@ class QuTech_AWG_Module(SCPI):
         self.add_parameters()
         self.connect_message()
 
-    def snapshot_base(self, update=False, params_to_skip_update=None):
-        if params_to_skip_update is None:
-            params_to_skip_update = self._params_to_skip_update
-        snap = super().snapshot_base(
-            update=update, params_to_skip_update=params_to_skip_update)
-        return snap
 
     def add_parameters(self):
         #######################################################################
@@ -197,6 +191,11 @@ class QuTech_AWG_Module(SCPI):
                                                  # usefull when other logic is needed
                            docstring=doc_trgs_log_inp)
 
+        self._add_codeword_parameters()
+
+        self.add_function('deleteWaveformAll',
+                          call_cmd='wlist:waveform:delete all')
+
         doc_sSG = "Synchronize both sideband frequency" \
             + " generators, i.e. restart them with their defined phases."
         self.add_function('syncSidebandGenerators',
@@ -218,16 +217,17 @@ class QuTech_AWG_Module(SCPI):
         for j in range(self.device_descriptor.numChannels):
             for cw in range(self.device_descriptor.numCodewords):
                 ch = j+1
-                parname = 'wave_ch{}_cw{:03}'.format(ch+1, cw)
+
+                parname = 'wave_ch{}_cw{:03}'.format(ch, cw)
                 self.add_parameter(
                     parname,
                     label='Waveform channel {} codeword {:03}'.format(
-                        ch+1, cw),
+                        ch, cw),
                     vals=vals.Arrays(min_value=-1, max_value=1),
                     set_cmd=self._gen_ch_cw_set_func(
                         self._set_cw_waveform, ch, cw),
-                    get_cmd=self._gen_ch_cw_set_func(
-                        self._set_cw_waveform, ch, cw),
+                    get_cmd=self._gen_ch_cw_get_func(
+                        self._get_cw_waveform, ch, cw),
                     docstring=docst)
                 self._params_to_skip_update.append(parname)
 
