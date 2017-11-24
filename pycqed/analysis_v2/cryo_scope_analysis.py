@@ -7,9 +7,15 @@ import numpy as np
 from numpy.fft import fft, ifft, fftfreq
 
 
+# This is the version from before Nov 22 2017
+
+
 class RamZFluxArc(ba.BaseDataAnalysis):
     """
     Analysis for the 2D scan that is used to calibrate the FluxArc.
+
+    There exist two variant
+        TwoD -> single experimetn
     """
 
     def __init__(self, t_start: str=None, t_stop: str=None,
@@ -19,8 +25,6 @@ class RamZFluxArc(ba.BaseDataAnalysis):
                  f_demod: float=0, demodulate: bool=False):
         if options_dict is None:
             options_dict = dict()
-        options_dict['scan_label'] = options_dict.get('scan_label', 'Ram_Z')
-        options_dict['TwoD'] = True
 
         self.numeric_params = []
         super().__init__(t_start=t_start, t_stop=t_stop,

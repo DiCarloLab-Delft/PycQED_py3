@@ -16,9 +16,11 @@ import pycqed.analysis_v2.readout_analysis as ra
 reload(ra)
 import pycqed.analysis_v2.syndrome_analysis as sa
 reload(sa)
+# only one of these two files should exist in the end
 import pycqed.analysis_v2.cryo_scope_analysis as csa
 reload(csa)
-
+import pycqed.analysis_v2.cryo_scope_analysis_v2 as csa
+reload(csa)
 
 
 from pycqed.analysis_v2.base_analysis import *
@@ -28,3 +30,4 @@ from pycqed.analysis_v2.timedomain_analysis import *
 from pycqed.analysis_v2.readout_analysis import *
 from pycqed.analysis_v2.syndrome_analysis import *
 from pycqed.analysis_v2.cryo_scope_analysis import *
+from pycqed.analysis_v2.cryo_scope_analysis_v2 import RamZFluxArc
