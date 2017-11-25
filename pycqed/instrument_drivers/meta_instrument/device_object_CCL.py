@@ -416,7 +416,7 @@ class DeviceCCL(Instrument):
         for qb_name in self.qubits():
             qb = self.find_instrument(qb_name)
             VSM = qb.instr_VSM.get_instr()
-            VSM.set_all_switches_to('OFF')
+            #VSM.set_all_switches_to('OFF')
 
         # turn the desired channels on
         for qb_name in self.qubits():
@@ -425,22 +425,22 @@ class DeviceCCL(Instrument):
             # Configure VSM
             # N.B. This configure VSM block is geared specifically to the
             # Duplexer/BlueBox VSM
-            VSM = qb.instr_VSM.get_instr()
-            Gin = qb.mw_vsm_ch_Gin()
-            Din = qb.mw_vsm_ch_Din()
-            out = qb.mw_vsm_ch_out()
+            # VSM = qb.instr_VSM.get_instr()
+            # Gin = qb.mw_vsm_ch_in()
+            # Din = qb.mw_vsm_ch_in()
+            # out = qb.mw_vsm_mod_out()
 
-            VSM.set('in{}_out{}_switch'.format(Gin, out), qb.mw_vsm_switch())
-            VSM.set('in{}_out{}_switch'.format(Din, out), qb.mw_vsm_switch())
+            # VSM.set('in{}_out{}_switch'.format(Gin, out), qb.mw_vsm_switch())
+            # VSM.set('in{}_out{}_switch'.format(Din, out), qb.mw_vsm_switch())
 
-            VSM.set('in{}_out{}_att'.format(Gin, out), qb.mw_vsm_G_att())
-            VSM.set('in{}_out{}_att'.format(Din, out), qb.mw_vsm_D_att())
-            VSM.set('in{}_out{}_phase'.format(Gin, out), qb.mw_vsm_G_phase())
-            VSM.set('in{}_out{}_phase'.format(Din, out), qb.mw_vsm_D_phase())
+            # VSM.set('in{}_out{}_att'.format(Gin, out), qb.mw_vsm_G_att())
+            # VSM.set('in{}_out{}_att'.format(Din, out), qb.mw_vsm_D_att())
+            # VSM.set('in{}_out{}_phase'.format(Gin, out), qb.mw_vsm_G_phase())
+            # VSM.set('in{}_out{}_phase'.format(Din, out), qb.mw_vsm_D_phase())
 
-            self.instr_CC.get_instr().set(
-                'vsm_channel_delay{}'.format(qb.cfg_qubit_nr()),
-                qb.mw_vsm_delay())
+            # self.instr_CC.get_instr().set(
+            #     'vsm_channel_delay{}'.format(qb.cfg_qubit_nr()),
+            #     qb.mw_vsm_delay())
 
     def prepare_for_timedomain(self):
         self.prepare_readout()

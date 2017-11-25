@@ -814,11 +814,13 @@ class CCLight_Transmon(Qubit):
     def _prep_mw_pulses(self):
         MW_LutMan = self.instr_LutMan_MW.get_instr()
 
-        # 4-channels are used for VSM based AWG's.
-        MW_LutMan.channel_GI(0+self.mw_awg_ch())
-        MW_LutMan.channel_GQ(1+self.mw_awg_ch())
-        MW_LutMan.channel_DI(2+self.mw_awg_ch())
-        MW_LutMan.channel_DQ(3+self.mw_awg_ch())
+        # QWG lutman has hardcoded channels.
+        if hasattr(MW_LutMan, 'channel_GI'):
+            # 4-channels are used for VSM based AWG's.
+            MW_LutMan.channel_GI(0+self.mw_awg_ch())
+            MW_LutMan.channel_GQ(1+self.mw_awg_ch())
+            MW_LutMan.channel_DI(2+self.mw_awg_ch())
+            MW_LutMan.channel_DQ(3+self.mw_awg_ch())
         # updating the lutmap is required to make sure channels are correct
         MW_LutMan.set_default_lutmap()
 
@@ -837,16 +839,23 @@ class CCLight_Transmon(Qubit):
         if self.cfg_prepare_awg():
             MW_LutMan.load_waveforms_onto_AWG_lookuptable()
 
-        # N.B. This part is AWG8 specific
         AWG = MW_LutMan.AWG.get_instr()
-        AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()-1),
-                self.mw_mixer_offs_GI())
-        AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()+0),
-                self.mw_mixer_offs_GQ())
-        AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()+1),
-                self.mw_mixer_offs_DI())
-        AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()+2),
-                self.mw_mixer_offs_DQ())
+        if AWG.__class__.__name__ == 'QuTech_AWG_Module':
+            # N.B. This part is QWG specific
+            AWG.ch1_offset(self.mw_mixer_offs_GI())
+            AWG.ch2_offset(self.mw_mixer_offs_GQ())
+            AWG.ch3_offset(self.mw_mixer_offs_DI())
+            AWG.ch4_offset(self.mw_mixer_offs_DQ())
+        else:
+            # N.B. This part is AWG8 specific
+            AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()-1),
+                    self.mw_mixer_offs_GI())
+            AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()+0),
+                    self.mw_mixer_offs_GQ())
+            AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()+1),
+                    self.mw_mixer_offs_DI())
+            AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()+2),
+                    self.mw_mixer_offs_DQ())
 
     def _prep_td_configure_VSM(self):
         # Configure VSM
@@ -923,14 +932,20 @@ class CCLight_Transmon(Qubit):
         # turn relevant channels on
         MW_LutMan = self.instr_LutMan_MW.get_instr()
         AWG = MW_LutMan.AWG.get_instr()
-        # This part is AWG8 specific and wont work with a QWG
-        awg_ch = self.mw_awg_ch()
-        AWG.stop()
-        AWG.set('sigouts_{}_on'.format(awg_ch-1), 1)
-        AWG.set('sigouts_{}_on'.format(awg_ch), 1)
-        chGI_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch-1)]
-        chGQ_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch+0)]
-        # End of AWG8 specific part
+
+        if AWG.__class__.__name__ == 'QuTech_AWG_Module':
+            chGI_par = AWG.parameters['ch1_offset']
+            chGQ_par = AWG.parameters['ch2_offset']
+
+        else:
+            # This part is AWG8 specific and wont work with a QWG
+            awg_ch = self.mw_awg_ch()
+            AWG.stop()
+            AWG.set('sigouts_{}_on'.format(awg_ch-1), 1)
+            AWG.set('sigouts_{}_on'.format(awg_ch), 1)
+            chGI_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch-1)]
+            chGQ_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch+0)]
+            # End of AWG8 specific part
 
         VSM = self.instr_VSM.get_instr()
         # VSM.set_all_switches_to('OFF')
@@ -942,9 +957,10 @@ class CCLight_Transmon(Qubit):
 
         ch_in = self.mw_vsm_ch_in()
         mod_out = self.mw_vsm_mod_out()
-        VSM.set('mod{}_ch{}_marker_state'.format(mod_out, ch_in), 'on')
-        VSM.set('mod{}_ch{}_derivative_att_raw'.format(mod_out, ch_in), 0)
-        VSM.set('mod{}_ch{}_gaussian_att_raw'.format(mod_out, ch_in), 500000)
+        # module 8 is hardcoded for use mixer calls (signal hound)
+        VSM.set('mod8_ch{}_marker_state'.format(ch_in), 'on')
+        VSM.set('mod8_ch{}_derivative_att_raw'.format(ch_in), 0)
+        VSM.set('mod8_ch{}_gaussian_att_raw'.format(ch_in), 50000)
 
 
 
@@ -952,28 +968,32 @@ class CCLight_Transmon(Qubit):
         offset_I, offset_Q = mixer_carrier_cancellation(
             SH=self.instr_SH.get_instr(), source=self.instr_LO_mw.get_instr(),
             MC=self.instr_MC.get_instr(),
-            chI_par=chGI_par, chQ_par=chGQ_par, x0=(0.5, 0.5))
+            chI_par=chGI_par, chQ_par=chGQ_par)
         if update:
             self.mw_mixer_offs_GI(offset_I)
             self.mw_mixer_offs_GQ(offset_Q)
 
         # VSM.set('in{}_out{}_switch'.format(Gin, out), 'OFF')
         # VSM.set('in{}_out{}_switch'.format(Din, out), 'ON')
-        VSM.set('mod{}_ch{}_derivative_att_raw'.format(mod_out, ch_in), 50000)
-        VSM.set('mod{}_ch{}_gaussian_att_raw'.format(mod_out, ch_in), 0)
+        VSM.set('mod8_ch{}_derivative_att_raw'.format(ch_in), 50000)
+        VSM.set('mod8_ch{}_gaussian_att_raw'.format(ch_in), 0)
 
-        # This part is AWG8 specific and wont work with a QWG
-        AWG.set('sigouts_{}_on'.format(awg_ch+1), 1)
-        AWG.set('sigouts_{}_on'.format(awg_ch+2), 1)
-        chDI_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch+1)]
-        chDQ_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch+2)]
-        # End of AWG8 specific part
+        if AWG.__class__.__name__ == 'QuTech_AWG_Module':
+            chDI_par = AWG.parameters['ch3_offset']
+            chDQ_par = AWG.parameters['ch4_offset']
+        else:
+            # This part is AWG8 specific and wont work with a QWG
+            AWG.set('sigouts_{}_on'.format(awg_ch+1), 1)
+            AWG.set('sigouts_{}_on'.format(awg_ch+2), 1)
+            chDI_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch+1)]
+            chDQ_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch+2)]
+            # End of AWG8 specific part
 
         # Calibrate Derivative component mixer
         offset_I, offset_Q = mixer_carrier_cancellation(
             SH=self.instr_SH.get_instr(), source=self.instr_LO_mw.get_instr(),
             MC=self.instr_MC.get_instr(),
-            chI_par=chDI_par, chQ_par=chDQ_par, x0=(0.5, 0.5))
+            chI_par=chDI_par, chQ_par=chDQ_par)
         if update:
             self.mw_mixer_offs_DI(offset_I)
             self.mw_mixer_offs_DQ(offset_Q)

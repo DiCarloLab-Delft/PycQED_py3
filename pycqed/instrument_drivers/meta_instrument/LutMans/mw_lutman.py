@@ -19,6 +19,10 @@ class Base_MW_LutMan(Base_LutMan):
         self.spec_func = wf.block_pulse
 
         self._add_channel_params()
+        self.add_parameter('cfg_sideband_mode',
+                           vals=vals.Enum('real-time', 'static'),
+                           initial_value='static',
+                           parameter_class=ManualParameter)
         self.add_parameter('mw_amp180', unit='frac', vals=vals.Numbers(-1, 1),
                            parameter_class=ManualParameter,
                            initial_value=0.1)
@@ -79,62 +83,66 @@ class Base_MW_LutMan(Base_LutMan):
 
     def generate_standard_waveforms(self):
         self._wave_dict = {}
+        if self.cfg_sideband_mode() == 'static':
+            f_modulation = self.mw_modulation()
+        else:
+            f_modulation = 0
 
         self._wave_dict['I'] = self.wf_func(
             amp=0, sigma_length=self.mw_gauss_width(),
-            f_modulation=self.mw_modulation(),
+            f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=0,
             motzoi=0)
         self._wave_dict['rX180'] = self.wf_func(
             amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
-            f_modulation=self.mw_modulation(),
+            f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=0,
             motzoi=self.mw_motzoi())
         self._wave_dict['rY180'] = self.wf_func(
             amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
-            f_modulation=self.mw_modulation(),
+            f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=90,
             motzoi=self.mw_motzoi())
         self._wave_dict['rX90'] = self.wf_func(
             amp=self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
-            f_modulation=self.mw_modulation(),
+            f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=0,
             motzoi=self.mw_motzoi())
         self._wave_dict['rY90'] = self.wf_func(
             amp=self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
-            f_modulation=self.mw_modulation(),
+            f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=90,
             motzoi=self.mw_motzoi())
         self._wave_dict['rXm90'] = self.wf_func(
             amp=-1*self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
-            f_modulation=self.mw_modulation(),
+            f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=0,
             motzoi=self.mw_motzoi())
         self._wave_dict['rYm90'] = self.wf_func(
             amp=-1*self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
-            f_modulation=self.mw_modulation(),
+            f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=90,
             motzoi=self.mw_motzoi())
 
         self._wave_dict['rPhi180'] = self.wf_func(
             amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
-            f_modulation=self.mw_modulation(),
+            f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=self.mw_phi(),
             motzoi=self.mw_motzoi())
         self._wave_dict['rPhi90'] = self.wf_func(
             amp=self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
-            f_modulation=self.mw_modulation(),
+            f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=self.mw_phi(),
             motzoi=self.mw_motzoi())
         self._wave_dict['rPhim90'] = self.wf_func(
             amp=-1*self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
-            f_modulation=self.mw_modulation(),
+            f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=self.mw_phi(),
             motzoi=self.mw_motzoi())
         self._wave_dict['spec'] = self.spec_func(
@@ -149,7 +157,7 @@ class Base_MW_LutMan(Base_LutMan):
             self._wave_dict['r{}_90'.format(angle)] = self.wf_func(
                 amp=self.mw_amp180()*self.mw_amp90_scale(),
                 sigma_length=self.mw_gauss_width(),
-                f_modulation=self.mw_modulation(),
+                f_modulation=f_modulation,
                 sampling_rate=self.sampling_rate(), phase=angle,
                 motzoi=self.mw_motzoi())
 
@@ -330,6 +338,13 @@ class QWG_VSM_MW_LutMan(AWG8_VSM_MW_LutMan):
 
     def load_waveforms_onto_AWG_lookuptable(
             self, regenerate_waveforms: bool=True,  stop_start: bool = True):
+        AWG = self.AWG.get_instr()
+        if self.cfg_sideband_mode() == 'real-time':
+            AWG.ch_pair1_sideband_frequency(self.mw_modulation())
+            AWG.ch_pair3_sideband_frequency(self.mw_modulation())
+        else:
+            AWG.ch_pair1_sideband_frequency(0)
+            AWG.ch_pair3_sideband_frequency(0)
         return Base_MW_LutMan.load_waveforms_onto_AWG_lookuptable(
             self=self,
             regenerate_waveforms=regenerate_waveforms, stop_start=stop_start)
@@ -347,7 +362,7 @@ class QWG_VSM_MW_LutMan(AWG8_VSM_MW_LutMan):
         for cw_idx, cw_key in enumerate(def_lm):
             LutMap[cw_key] = (
                 'wave_ch1_cw{:03}'.format(cw_idx),
-                'wave_ch1_cw{:03}'.format(cw_idx),
+                'wave_ch2_cw{:03}'.format(cw_idx),
                 'wave_ch3_cw{:03}'.format(cw_idx),
                 'wave_ch4_cw{:03}'.format(cw_idx))
         self.LutMap(LutMap)
