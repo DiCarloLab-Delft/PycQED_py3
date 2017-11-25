@@ -308,7 +308,6 @@ class CCL(SCPI):
             intarray.append(int(instr[2:], 16))
 
         binBlock = bytearray(array.array('L', intarray))
-        print(binBlock)
         # write binblock
         hdr = 'QUTech:UploadInstructions '
         self.binBlockWrite(binBlock, hdr)
