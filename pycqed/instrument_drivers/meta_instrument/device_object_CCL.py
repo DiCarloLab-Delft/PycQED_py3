@@ -1,8 +1,5 @@
 import numpy as np
-import qcodes as qc
-import os
 import logging
-from copy import deepcopy
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter
@@ -10,9 +7,15 @@ from pycqed.analysis import multiplexed_RO_analysis as mra
 from pycqed.measurement import detector_functions as det
 from pycqed.measurement import sweep_functions as swf
 from pycqed.analysis import measurement_analysis as ma
-import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
-import pycqed.measurement.gate_set_tomography.gate_set_tomography_CC as gstCC
-import pygsti
+
+try:
+    from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
+    import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
+except ImportError:
+    logging.warning('Could not import OpenQL')
+    mqo = None
+    sqo = None
+
 from pycqed.analysis import tomography as tomo
 
 from collections import defaultdict
@@ -211,7 +214,7 @@ class DeviceCCL(Instrument):
             single_int_avg=single_int_avg,
             seg_per_point=seg_per_point)
         d.value_names = [qnames[0], qnames[1],
-                 'Corr ({}, {})'.format(qnames[0], qnames[1])]
+                         'Corr ({}, {})'.format(qnames[0], qnames[1])]
         return d
 
     def get_int_logging_detector(self, qubits: list=None,
@@ -413,7 +416,7 @@ class DeviceCCL(Instrument):
         for qb_name in self.qubits():
             qb = self.find_instrument(qb_name)
             VSM = qb.instr_VSM.get_instr()
-            VSM.set_all_switches_to('OFF')
+            #VSM.set_all_switches_to('OFF')
 
         # turn the desired channels on
         for qb_name in self.qubits():
@@ -422,22 +425,22 @@ class DeviceCCL(Instrument):
             # Configure VSM
             # N.B. This configure VSM block is geared specifically to the
             # Duplexer/BlueBox VSM
-            VSM = qb.instr_VSM.get_instr()
-            Gin = qb.mw_vsm_ch_Gin()
-            Din = qb.mw_vsm_ch_Din()
-            out = qb.mw_vsm_ch_out()
+            # VSM = qb.instr_VSM.get_instr()
+            # Gin = qb.mw_vsm_ch_in()
+            # Din = qb.mw_vsm_ch_in()
+            # out = qb.mw_vsm_mod_out()
 
-            VSM.set('in{}_out{}_switch'.format(Gin, out), qb.mw_vsm_switch())
-            VSM.set('in{}_out{}_switch'.format(Din, out), qb.mw_vsm_switch())
+            # VSM.set('in{}_out{}_switch'.format(Gin, out), qb.mw_vsm_switch())
+            # VSM.set('in{}_out{}_switch'.format(Din, out), qb.mw_vsm_switch())
 
-            VSM.set('in{}_out{}_att'.format(Gin, out), qb.mw_vsm_G_att())
-            VSM.set('in{}_out{}_att'.format(Din, out), qb.mw_vsm_D_att())
-            VSM.set('in{}_out{}_phase'.format(Gin, out), qb.mw_vsm_G_phase())
-            VSM.set('in{}_out{}_phase'.format(Din, out), qb.mw_vsm_D_phase())
+            # VSM.set('in{}_out{}_att'.format(Gin, out), qb.mw_vsm_G_att())
+            # VSM.set('in{}_out{}_att'.format(Din, out), qb.mw_vsm_D_att())
+            # VSM.set('in{}_out{}_phase'.format(Gin, out), qb.mw_vsm_G_phase())
+            # VSM.set('in{}_out{}_phase'.format(Din, out), qb.mw_vsm_D_phase())
 
-            self.instr_CC.get_instr().set(
-                'vsm_channel_delay{}'.format(qb.cfg_qubit_nr()),
-                qb.mw_vsm_delay())
+            # self.instr_CC.get_instr().set(
+            #     'vsm_channel_delay{}'.format(qb.cfg_qubit_nr()),
+            #     qb.mw_vsm_delay())
 
     def prepare_for_timedomain(self):
         self.prepare_readout()
@@ -578,14 +581,17 @@ class DeviceCCL(Instrument):
         q1idx = q1.cfg_qubit_nr()
 
         UHFQC = q0.instr_acquisition.get_instr()
+        self.ro_acq_weight_type('optimal')
         self.prepare_for_timedomain()
 
-        # Important that this happens before calibrating the weights
-        UHFQC.quex_trans_offset_weightfunction_0(0)
-        UHFQC.quex_trans_offset_weightfunction_1(0)
-        UHFQC.upload_transformation_matrix([[1, 0], [0, 1]])
 
         if calibrate_optimal_weights:
+            # Important that this happens before calibrating the weights
+            # 5 is the number of channels in the UHFQC
+            for i in range(5):
+                UHFQC.set('quex_trans_offset_weightfunction_{}'.format(i), 0)
+
+            UHFQC.upload_transformation_matrix(np.eye(5))
             q0.calibrate_optimal_weights(
                 analyze=True, verify=verify_optimal_weights)
             q1.calibrate_optimal_weights(

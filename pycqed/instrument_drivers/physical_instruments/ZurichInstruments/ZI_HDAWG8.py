@@ -159,41 +159,43 @@ class ZI_HDAWG8(ZI_base_instrument):
         count_ok = True
         ok = 0
         data = self._dev.getv('awgs/' + str(awg) + '/dio/data')
-        #print_timing_diagram(data, [30, 31])
         for n, d in enumerate(data):
             curr_strobe = (d & strobe) != 0
             curr_valid = (d & valid) != 0
 
-            if (last_strobe != None) and (curr_strobe and not last_strobe):
+            if count_high:
+              if curr_strobe:
+                strobe_high += 1
+              else:
+                if (strobe_low > 0) and (strobe_low != strobe_high):
+                    count_ok = False
+
+            if count_low:
+              if not curr_strobe:
+                strobe_low += 1
+              else:
+                if (strobe_high > 0) and (strobe_low != strobe_high):
+                    count_ok = False
+
+            if (last_strobe != None):
+              if (curr_strobe and not last_strobe):
                 got_strobe_re = True
                 strobe_high = 0
                 count_high = True
+                count_low = False
                 index_high = n
-            if (last_strobe != None) and (not curr_strobe and last_strobe):
+              elif (not curr_strobe and last_strobe):
                 got_strobe_fe = True
                 strobe_low = 0
                 count_low = True
+                count_high = False
                 index_low = n
+
             if (last_valid != None) and (curr_valid and not last_valid):
                 got_valid_re = True
             if (last_valid != None) and (not curr_valid and last_valid):
                 got_valid_fe = True
 
-            if count_high and curr_strobe:
-                strobe_high += 1
-            elif count_high and not curr_strobe:
-                if (strobe_low > 0) and (strobe_low != strobe_high):
-                    count_ok = False
-                    #print('Checking high to low: {} != {} @ {}'.format(strobe_high, strobe_low, n))
-                count_high = False
-
-            if count_low and curr_valid:
-                strobe_low += 1
-            elif count_low and curr_valid:
-                if (strobe_high > 0) and (strobe_low != strobe_high):
-                    count_ok = False
-                    #print('Checking low to high: {} != {} @ {}'.format(strobe_high, strobe_low, n))
-                count_low = False
 
             got_bits |= (d & mask)
             last_strobe = curr_strobe
@@ -244,6 +246,35 @@ class ZI_HDAWG8(ZI_base_instrument):
 
     def calibrate_dio_protocol(self):
         # TODO: add docstrings to make it more clear
+        print("Checking DIO protocol...")
+        done = 4*[False]
+        timeout = 5
+        while not all(done):
+            ok = True
+            for i in range(4):
+                print('  Checking AWG {} '.format(i), end='')
+                protocol = self._check_protocol(i)
+                if protocol != 0:
+                    ok = False
+                    done[i] = False
+                    print('[FAILURE]')
+                    self._print_check_protocol_error_message(protocol)
+                else:
+                    done[i] = True
+                    print('[SUCCESS]')
+            if not ok:
+                print("  A problem was detected with the protocol. Will try to reinitialize the clock as it sometimes helps.")
+                self._dev.seti('awgs/*/enable', 0)
+                self._dev.seti('system/extclk', 0)
+                time.sleep(1)
+                self._dev.seti('system/extclk', 1)
+                time.sleep(1)
+                self._dev.seti('awgs/*/enable', 1)
+                timeout -= 1
+                if timeout <= 0:
+                    print("  Too many retries, aborting!")
+                    return False
+
         ok = True
         print("Calibrating DIO protocol delays...")
         for i in range(4):
@@ -562,18 +593,13 @@ class ZI_HDAWG8(ZI_base_instrument):
         self._dev.daq.setInt('/' + self._dev.device +
                              '/sigouts/*/enables/*', 0)
         # Switch all outputs into direct mode
-        if self.cfg_codeword_protocol() != 'flux':
+        if self.cfg_codeword_protocol() == 'flux':
             for ch in range(8):
-                try:
-                    self.set('sigouts_{}_direct'.format(ch), 0)
-                except:
-                    # Exception is here because not all AWG8 units have
-                    # been upgraded
-                    pass
+                self.set('sigouts_{}_direct'.format(ch), 0)
+                self.set('sigouts_{}_range'.format(ch), 5)
+
         # when doing flux pulses, set everything to amp mode
         else:
             for ch in range(8):
-                try:
-                    self.set('sigouts_{}_direct'.format(ch), 1)
-                except:
-                    pass
+                self.set('sigouts_{}_direct'.format(ch), 1)
+                self.set('sigouts_{}_range'.format(ch), .8)

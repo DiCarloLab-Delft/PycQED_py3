@@ -8,19 +8,26 @@ from other files in the analysis_v2 module.
 from importlib import reload
 import pycqed.analysis_v2.base_analysis as ba
 reload(ba)
+import pycqed.analysis_v2.simple_analysis as sa
+reload(sa)
 import pycqed.analysis_v2.timedomain_analysis as ta
 reload(ta)
 import pycqed.analysis_v2.readout_analysis as ra
 reload(ra)
 import pycqed.analysis_v2.syndrome_analysis as sa
 reload(sa)
+# only one of these two files should exist in the end
 import pycqed.analysis_v2.cryo_scope_analysis as csa
+reload(csa)
+import pycqed.analysis_v2.cryo_scope_analysis_v2 as csa
 reload(csa)
 
 
-
 from pycqed.analysis_v2.base_analysis import *
+from pycqed.analysis_v2.simple_analysis import (
+    Basic1DAnalysis, Basic2DAnalysis)
 from pycqed.analysis_v2.timedomain_analysis import *
 from pycqed.analysis_v2.readout_analysis import *
 from pycqed.analysis_v2.syndrome_analysis import *
 from pycqed.analysis_v2.cryo_scope_analysis import *
+from pycqed.analysis_v2.cryo_scope_analysis_v2 import RamZFluxArc

@@ -2,9 +2,6 @@ import unittest
 import numpy as np
 import pycqed as pq
 import os
-# # hack for badly installed matplotlib on maserati pc
-# import matplotlib
-# matplotlib.use('QT4Agg')
 from pycqed.analysis_v2 import measurement_analysis as ma
 
 

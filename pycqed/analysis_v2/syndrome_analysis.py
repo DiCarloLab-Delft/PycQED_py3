@@ -9,20 +9,23 @@ class Single_Qubit_RoundsToEvent_Analysis(ba.BaseDataAnalysis):
     def __init__(self, t_start: str=None, t_stop: str=None,
                  data_file_path: str=None,
                  options_dict: dict=None, extract_only: bool=False,
+                 extract_metadata: bool=True,
                  do_fitting: bool=True, auto=True):
         super().__init__(t_start=t_start, t_stop=t_stop,
                          data_file_path=data_file_path,
                          options_dict=options_dict,
                          extract_only=extract_only, do_fitting=do_fitting)
         self.single_timestamp = False
+        self.extract_metadata = extract_metadata
         exp_meta_str = 'Experimental Data.Experimental Metadata.'
         self.params_dict = {
             'measurementstring': 'measurementstring',
-            'measured_values': 'measured_values',
-            'depletion_time': exp_meta_str+'depletion_time',
-            'net_gate': exp_meta_str+'net_gate',
-            'sequence_type': exp_meta_str+'sequence_type',
-            'feedback': exp_meta_str+'feedback'}
+            'measured_values': 'measured_values'}
+        if self.extract_metadata:
+            self.params_dict['depletion_time'] = exp_meta_str+'depletion_time'
+            self.params_dict['net_gate'] = exp_meta_str+'net_gate'
+            self.params_dict['sequence_type'] = exp_meta_str+'sequence_type'
+            self.params_dict['feedback'] = exp_meta_str+'feedback'
 
         self.numeric_params = []
         if auto:
@@ -31,13 +34,17 @@ class Single_Qubit_RoundsToEvent_Analysis(ba.BaseDataAnalysis):
     def process_data(self):
         """
         """
+        # this option is used when the data is not extracted from the datafiles
+        net_gate = self.raw_data_dict.get('net_gate', ['pi'])
+        feedback = self.raw_data_dict.get('feedback', [False])[0]
+
         # N.B. flipping is the default (net_gate = pi-pulse)
         net_pulse_pat = 'flipping'
-        if not len(set(self.raw_data_dict['net_gate'])) == 1:
+        if not len(set(net_gate)) == 1:
             logging.warning('Different net pulses in dataset.')
-        if self.raw_data_dict['net_gate'][0] == 'i':
+        if net_gate[0] == 'i':
             net_pulse_pat = 'constant'
-        if self.raw_data_dict['feedback'][0]:
+        if feedback:
             net_pulse_pat = 'FB_to_ground'
 
         exp_pattern = self.options_dict.get('exp_pattern', net_pulse_pat)

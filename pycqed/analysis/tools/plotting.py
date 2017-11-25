@@ -219,9 +219,11 @@ def flex_color_plot_vs_x(xvals, yvals, zvals, ax=None,
     if xwidth is None:
         xvals = np.array(xvals)
         xvertices = np.zeros(np.array(xvals.shape)+1)
+
+        dx = abs(np.max(xvals)-np.min(xvals))/len(xvals)
         xvertices[1:-1] = (xvals[:-1]+xvals[1:])/2.
-        xvertices[0] = xvals[0] - (xvals[1]-xvals[0])/2
-        xvertices[-1] = xvals[-1] + (xvals[-1]-xvals[-2])/2
+        xvertices[0] = xvals[0] - dx/2
+        xvertices[-1] = xvals[-1] + dx/2
     else:
         xvertices = []
         for xval in xvals:
@@ -229,18 +231,21 @@ def flex_color_plot_vs_x(xvals, yvals, zvals, ax=None,
     # y coordinates
     yvertices = []
     for xx in range(len(xvals)):
+        # Important to sort arguments in case unsorted (e.g., FFT freqs)
+        sorted_yarguments = yvals[xx].argsort()
+        yvals[xx] = yvals[xx][sorted_yarguments]
+        zvals[xx] = zvals[xx][sorted_yarguments]
+
         yvertices.append(np.zeros(np.array(yvals[xx].shape)+1))
         yvertices[xx][1:-1] = (yvals[xx][:-1]+yvals[xx][1:])/2.
         yvertices[xx][0] = yvals[xx][0] - (yvals[xx][1]-yvals[xx][0])/2
         yvertices[xx][-1] = yvals[xx][-1] + (yvals[xx][-1]-yvals[xx][-2])/2
 
-    # normalized plot
-    if normalize:
-        for xx in range(len(xvals)):
+        # normalized plot
+        if normalize:
             zvals[xx] /= np.mean(zvals[xx])
-    # logarithmic plot
-    if log:
-        for xx in range(len(xvals)):
+        # logarithmic plot
+        if log:
             zvals[xx] = np.log(zvals[xx])/np.log(10)
 
     # add blocks to plot

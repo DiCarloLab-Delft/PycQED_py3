@@ -6,6 +6,7 @@ import numpy as np
 import copy
 from collections import OrderedDict
 
+import numbers
 from matplotlib import pyplot as plt
 from matplotlib import cm
 from pycqed.analysis import analysis_toolbox as a_tools
@@ -14,7 +15,7 @@ from pycqed.analysis.analysis_toolbox import get_color_order as gco
 from pycqed.analysis.analysis_toolbox import get_color_list
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 from pycqed.analysis.tools.plotting import (
-    flex_colormesh_plot_vs_xy, flex_color_plot_vs_x, )#flex_image_plot_vs_xy)
+    flex_colormesh_plot_vs_xy, flex_color_plot_vs_x)
 # import pycqed.analysis_v2.default_figure_settings_analysis as def_fig
 from . import default_figure_settings_analysis as def_fig
 from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -134,6 +135,8 @@ class BaseDataAnalysis(object):
         else:
             self.t_stop = t_stop
         self.do_timestamp_blocks = self.options_dict.get('do_blocks', False)
+        self.do_individual_traces = self.options_dict.get(
+            'do_individual_traces', False)
         self.filter_no_analysis = self.options_dict.get(
             'filter_no_analysis', False)
         self.exact_label_match = self.options_dict.get(
@@ -142,8 +145,6 @@ class BaseDataAnalysis(object):
         ########################################
         # These options relate to the plotting #
         ########################################
-        if self.options_dict.get('apply_default_fig_settings', True):
-            def_fig.apply_default_figure_settings()
         self.plot_dicts = OrderedDict()
         self.axs = OrderedDict()
         self.figs = OrderedDict()
@@ -265,7 +266,8 @@ class BaseDataAnalysis(object):
         self.params_dict['folder'] = 'folder'
 
         if self.do_timestamp_blocks:
-            self.raw_data_dict = {key: [] for key in list(self.params_dict.keys())}
+            self.raw_data_dict = {key: []
+                                  for key in list(self.params_dict.keys())}
             self.raw_data_dict['timestamps'] = []
             for tstamps in self.timestamps:
                 if self.verbose:
@@ -316,7 +318,8 @@ class BaseDataAnalysis(object):
                 for ii in range(len(self.raw_data_dict['temperatures'])):
                     exec("temp.append(%s)" %
                          (self.raw_data_dict['temperatures'][ii]))
-                    self.raw_data_dict['Tmc'].append(temp[ii].get('T_MClo', None))
+                    self.raw_data_dict['Tmc'].append(
+                        temp[ii].get('T_MClo', None))
                 self.raw_data_dict['temperatures'] = temp
 
         # this is a hacky way to use the same data extraction when there is
@@ -330,6 +333,22 @@ class BaseDataAnalysis(object):
             self.raw_data_dict['timestamp'] = self.timestamps[0]
         self.raw_data_dict['timestamps'] = self.timestamps
         self.raw_data_dict['nr_experiments'] = len(self.timestamps)
+
+        # Converts a multi file 'measured_values' dict to an ordered dict
+        # from which values can be easily extracted
+        if ('measured_values' in self.raw_data_dict and
+                'value_names' in self.raw_data_dict and
+                not self.single_timestamp):
+            # the not self.single_timestamp is there for legacy reasons
+            measured_values_dict = OrderedDict()
+            for key in (self.raw_data_dict['value_names'][0]):
+                measured_values_dict[key] = []
+            for dset in self.raw_data_dict['measured_values']:
+                for i, col in enumerate(dset):
+                    measured_values_dict[self.raw_data_dict[
+                        'value_names'][0][i]].append(col)
+            self.raw_data_dict[
+                'measured_values_ord_dict'] = measured_values_dict
 
     def process_data(self):
         """
@@ -613,6 +632,11 @@ class BaseDataAnalysis(object):
         pdict['handles'] = p_out
 
     def plot_line(self, pdict, axs):
+        """
+        Basic line plotting function.
+        Takes either an x and y array or a list of x and y arrays.
+        Detection happens based on types of the data
+        """
         pfunc = getattr(axs, pdict.get('func', 'plot'))
         plot_xvals = pdict['xvals']
         plot_yvals = pdict['yvals']
@@ -624,7 +648,8 @@ class BaseDataAnalysis(object):
         plot_xrange = pdict.get('xrange', None)
         plot_yrange = pdict.get('yrange', None)
         plot_linekws = pdict.get('line_kws', {})
-        plot_multiple = pdict.get('multiple', False)
+
+        # plot_multiple = pdict.get('multiple', False)
         plot_linestyle = pdict.get('linestyle', '-')
         plot_marker = pdict.get('marker', 'o')
         dataset_desc = pdict.get('setdesc', '')
@@ -633,26 +658,33 @@ class BaseDataAnalysis(object):
         dataset_label = pdict.get('setlabel', list(range(len(plot_yvals))))
         do_legend = pdict.get('do_legend', False)
 
+        # Detect if two arrays/lists of x and yvals are passed or a list
+        # of x-arrays and a list of y-arrays
+        if (isinstance(plot_xvals[0], numbers.Number) or
+                isinstance(plot_xvals[0], datetime.datetime)):
+            plot_multiple = False
+        else:
+            plot_multiple = True
+            assert(len(plot_xvals) == len(plot_yvals))
+            assert(len(plot_xvals[0]) == len(plot_yvals[0]))
+
         if plot_multiple:
             p_out = []
             len_color_cycle = pdict.get('len_color_cycle', len(plot_yvals))
-            cmap = pdict.get('cmap', 'Vega10')  # Default matplotlib cycle
+            # Default gives max contrast
+            cmap = pdict.get('cmap', 'tab10')  # Default matplotlib cycle
+            colors = get_color_list(len_color_cycle, cmap)
+            if cmap == 'tab10':
+                len_color_cycle = min(10, len_color_cycle)
 
-            # Colors: default should be following matplotlibs default color
-            # cycle. When a colormap is specified, colors are taken evenly
-            # spaced from that colormap.
-            if cmap == 'Vega10':
-                colors = [cm.Vega10(i) for i in range(len(plot_yvals))]
-            else:
-                colors = get_color_list(len_color_cycle, cmap)
-
-            for ii, this_yvals in enumerate(plot_yvals):
-                p_out.append(pfunc(plot_xvals, this_yvals,
+            # plot_*vals is the list of *vals arrays
+            for i, (xvals, yvals) in enumerate(zip(plot_xvals, plot_yvals)):
+                p_out.append(pfunc(xvals, yvals,
                                    linestyle=plot_linestyle,
                                    marker=plot_marker,
-                                   color=colors[ii % len_color_cycle],
+                                   color=colors[i % len_color_cycle],
                                    label='%s%s' % (
-                                       dataset_desc, dataset_label[ii]),
+                                       dataset_desc, dataset_label[i]),
                                    **plot_linekws))
 
         else:
@@ -662,7 +694,7 @@ class BaseDataAnalysis(object):
                           **plot_linekws)
 
         if plot_xrange is None:
-            pass # Do not set xlim if xrange is None as the axs gets reused
+            pass  # Do not set xlim if xrange is None as the axs gets reused
         else:
             xmin, xmax = plot_xrange
             axs.set_xlim(xmin, xmax)
@@ -815,10 +847,13 @@ class BaseDataAnalysis(object):
                 ax[0].set_ylabel(pdict['ylabel'])
 
     def plot_color2D(self, pfunc, pdict, axs):
+        """
+
+        """
         plot_xvals = pdict['xvals']
         plot_yvals = pdict['yvals']
         plot_cbar = pdict.get('plotcbar', True)
-        plot_cmap = pdict.get('cmap', 'viridis')
+        plot_cmap = pdict.get('cmap', 'YlGn')
         plot_zrange = pdict.get('zrange', None)
         plot_yrange = pdict.get('yrange', None)
         plot_xrange = pdict.get('xrange', None)
@@ -836,19 +871,45 @@ class BaseDataAnalysis(object):
             plot_xvals_step = 0
             plot_yvals_step = 0
         else:
-            plot_xvals_step = plot_xvals[1]-plot_xvals[0]
-            plot_yvals_step = plot_yvals[1]-plot_yvals[0]
+            plot_xvals_step = (abs(np.max(plot_xvals)-np.min(plot_xvals))/
+                len(plot_xvals))
+            plot_yvals_step = (abs(np.max(plot_yvals)-np.min(plot_yvals))/
+                len(plot_yvals))
+            # plot_yvals_step = plot_yvals[1]-plot_yvals[0]
 
         if plot_zrange is not None:
             fig_clim = plot_zrange
         else:
             fig_clim = [None, None]
 
+        trace = {}
+        block = {}
+        if self.do_individual_traces:
+            trace['xvals'] = plot_xvals
+            trace['yvals'] = plot_yvals
+            trace['zvals'] = plot_zvals
+        else:
+            trace['yvals'] = [plot_yvals]
+            trace['xvals'] = [plot_xvals]
+            trace['zvals'] = [plot_zvals]
+
+        # FIXME: we should get rid of do_timestamps_blocks
         if self.do_timestamp_blocks:
-            for tt in range(len(plot_zvals)):
+            block['xvals'] = trace['xvals']
+            block['yvals'] = trace['yvals']
+            block['zvals'] = trace['zvals']
+        else:
+            block['xvals'] = [trace['xvals']]
+            block['yvals'] = [trace['yvals']]
+            block['zvals'] = [trace['zvals']]
+
+        for ii in range(len(block['zvals'])):
+            traces = {}
+            for key, vals in block.items():
+                traces[key] = vals[ii]
+            for tt in range(len(traces['zvals'])):
                 if self.verbose:
-                    print(plot_xvals[tt].shape, plot_yvals[
-                          tt].shape, plot_zvals[tt].shape)
+                    (print(t_vals[tt].shape) for key, t_vals in traces.items())
                 if plot_xwidth is not None:
                     xwidth = plot_xwidth[tt]
                 else:
@@ -856,19 +917,19 @@ class BaseDataAnalysis(object):
                 out = pfunc(ax=axs,
                             xwidth=xwidth,
                             clim=fig_clim, cmap=plot_cmap,
-                            xvals=plot_xvals[tt],
-                            yvals=plot_yvals[tt],
-                            zvals=plot_zvals[tt].transpose(),
+                            xvals=traces['xvals'][tt],
+                            yvals=traces['yvals'][tt],
+                            zvals=traces['zvals'][tt],  # .transpose(),
                             transpose=plot_transpose,
                             normalize=plot_normalize)
 
-        else:
-            out = pfunc(ax=axs, clim=fig_clim, cmap=plot_cmap,
-                        xvals=plot_xvals,
-                        yvals=plot_yvals,
-                        zvals=plot_zvals.transpose(),
-                        transpose=plot_transpose,
-                        normalize=plot_normalize)
+        # else:
+        #     out = pfunc(ax=axs, clim=fig_clim, cmap=plot_cmap,
+        #                 xvals=plot_xvals,
+        #                 yvals=plot_yvals,
+        #                 zvals=plot_zvals.transpose(),
+        #                 transpose=plot_transpose,
+        #                 normalize=plot_normalize)
 
         if plot_xrange is None:
             if plot_xwidth is not None:
@@ -877,8 +938,8 @@ class BaseDataAnalysis(object):
                     max([max(xvals)+plot_xwidth[tt]/2
                          for tt, xvals in enumerate(plot_xvals)])
             else:
-                xmin, xmax = plot_xvals.min()-plot_xvals_step / \
-                    2., plot_xvals.max()+plot_xvals_step/2.
+                xmin = np.min(plot_xvals) - plot_xvals_step/2
+                xmax = np.max(plot_xvals) + plot_xvals_step/2
         else:
             xmin, xmax = plot_xrange
         if plot_transpose:
@@ -892,10 +953,9 @@ class BaseDataAnalysis(object):
                                   for tt, yvals in enumerate(plot_yvals)]), \
                     max([max(yvals[0])
                          for tt, yvals in enumerate(plot_yvals)])
-
             else:
-                ymin, ymax = plot_yvals.min()-plot_yvals_step / \
-                    2., plot_yvals.max()+plot_yvals_step/2.
+                ymin = np.min(plot_yvals) - plot_yvals_step / 2.
+                ymax = np.max(plot_yvals) + plot_yvals_step/2.
         else:
             ymin, ymax = plot_yrange
         if plot_transpose:
