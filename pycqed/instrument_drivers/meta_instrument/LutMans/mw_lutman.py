@@ -348,7 +348,7 @@ class QWG_VSM_MW_LutMan(AWG8_VSM_MW_LutMan):
 
         for ch in range(1,5):
             # ensures amplitude specified is in
-            AWG.set(ch{}_amp, 1)
+            AWG.set('ch{}_amp'.format(ch), 1)
         return Base_MW_LutMan.load_waveforms_onto_AWG_lookuptable(
             self=self,
             regenerate_waveforms=regenerate_waveforms, stop_start=stop_start)
