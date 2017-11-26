@@ -83,13 +83,29 @@ br_alias_fwd:     BRA        addr
 
 # Quantum double format instructions (some).
 
-bs 1 X s0
-bs 2 X s0 | Y s1
-bs 3 X s0 | C,Y s1 | CNOT t2
+bs 1 CW_01 s0
+bs 2 CW_01 s0 | FLUX_01 s1
+bs 3 CW_01 s0 | C,FLUX_01 s1 | CNOT t2
 bs 4 QNOP | QNOP
 bs 5 QNOP
-bs 6 QNOP | X s3
-bs 7 X s0 | Y s1 | CNOT t63 | X s6
+bs 6 QNOP | CW_01 s3
+bs 7 CW_01 s0 | FLUX_01 s1 | CNOT t63 | CW_01 s6
 
-bs 7 X s0 | Y s1
-bs 0 CNOT t63 | X s6
+bs 7 CW_01 s0 | FLUX_01 s1
+bs 0 CNOT t63 | CW_01 s6
+
+# Alternative specification of BS
+
+# Implicitly wait 1 quantum cycle before executing the bundle
+# (of one quantum instruction).
+cw_10 s2
+
+# Start the specified bundle immediately.
+0 cw_11 s3
+
+
+# Wait 2 quantum cycles before executing the bundle
+2 cw_11 s3
+
+# Implicit quantum cycle wait specification (1), multi-instruction bundle.
+cw_12 s5 | CNOT t3 | SWAP t4

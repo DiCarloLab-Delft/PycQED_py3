@@ -61,6 +61,7 @@
 }
 
 %param { QISA::QISA_Driver& driver }
+%param { void* flex_scanner }
 
 %locations
 
@@ -235,7 +236,7 @@ instruction
   | label_decl statement NEWLINE
   | JUNK
     {
-      driver.error(@1, "Illegal output detected.");
+      driver.error(@1, "Illegal input detected.");
       YYABORT;
     }
   ;

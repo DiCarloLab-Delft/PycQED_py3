@@ -10,11 +10,17 @@
 #include <algorithm>
 #include <bitset>
 
+// Tell Flex the lexer's prototype ...
+#ifndef YY_TYPEDEF_YY_SCANNER_T
+#define YY_TYPEDEF_YY_SCANNER_T
+typedef void* yyscan_t;
+#endif
+
 #include "qisa_parser.tab.hh"
 
-// Tell Flex the lexer's prototype ...
+
 # define YY_DECL \
-    QISA::QISA_Parser::symbol_type yylex (QISA::QISA_Driver& driver)
+    QISA::QISA_Parser::symbol_type yylex (QISA::QISA_Driver& driver, yyscan_t yyscanner)
 // ... and declare it for the parser's sake.
 YY_DECL;
 
@@ -106,10 +112,16 @@ public:
   reset();
 
   // Handling the scanner.
+
+   // Note: implementation in qisa_lexer.l
   bool
-  scanBegin (); // Note: implementation in qisa_lexer.l
+  scanBegin (yyscan_t* flex_scanner);
+
+  // Note: implementation in qisa_lexer.l
   void
-  scanEnd (); // Note: implementation in qisa_lexer.l
+  scanEnd (yyscan_t flex_scanner);
+
+
 
   DllExport void
   enableScannerTracing(bool enabled);
