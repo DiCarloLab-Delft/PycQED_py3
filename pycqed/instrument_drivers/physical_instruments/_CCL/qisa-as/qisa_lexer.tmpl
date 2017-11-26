@@ -16,6 +16,7 @@ uint8_t text_to_uint8(QISA::QISA_Driver& driver, const char* text);
 static QISA::location loc;
 %}
 
+%option reentrant
 %option debug
 %option nodefault
 %option noyywrap
@@ -208,8 +209,18 @@ uint8_t text_to_uint8(QISA::QISA_Driver& driver, const char* text)
 
 
 bool
-QISA::QISA_Driver::scanBegin()
+QISA::QISA_Driver::scanBegin(yyscan_t* flex_scanner)
 {
+  yylex_init(flex_scanner);
+
+  // This is needed to make the yy_flex_debug and yyin macros work.
+  struct yyguts_t * yyg = (struct yyguts_t*)*flex_scanner;
+
+  // Initialize the static variable loc.
+  // Otherwise, the current location keeps increasing each time
+  // a new file is processed.
+  loc = location();
+
   yy_flex_debug = _traceScanning;
 
   if (!(yyin = fopen (_filename.c_str (), "r")))
@@ -237,7 +248,12 @@ QISA::QISA_Driver::scanBegin()
 }
 
 void
-QISA::QISA_Driver::scanEnd()
+QISA::QISA_Driver::scanEnd(yyscan_t flex_scanner)
 {
+  // This is needed to make the yyin macro work.
+  struct yyguts_t * yyg = (struct yyguts_t*)flex_scanner;
+
   fclose (yyin);
+
+  yylex_destroy(flex_scanner);
 }

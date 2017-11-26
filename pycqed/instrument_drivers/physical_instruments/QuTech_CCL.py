@@ -48,7 +48,7 @@ CHAR_MAX = +127
 CHAR_MIN = -128
 
 id_field_table = {
-    'vendor'        : 'vender',
+    'vendor'        : 'vendor',
     'model'         : 'model',
     'serial'        : 'serial',
     'fwVersion'     : 'firmware',
@@ -307,9 +307,16 @@ class CCL(SCPI):
 
         return self.version_info
 
-    def print_readable_idn():
-        for key, value in ccl.version_info.items():
+    def print_readable_idn(self):
+        for key, value in self.version_info.items():
             print("{0: >30s} :  {1:}".format(key, value))
+
+    def print_qisa_opcodes(self):
+        if self.QISA is None:
+            log.info("The assembler of CCLight has not been initialized yet.")
+            return
+
+        print(self.QISA.dumpOpcodeSpecification())
 
 ###############################################################################
 

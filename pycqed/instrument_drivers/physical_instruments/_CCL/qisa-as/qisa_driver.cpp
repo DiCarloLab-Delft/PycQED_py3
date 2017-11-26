@@ -159,19 +159,21 @@ QISA_Driver::parse(const std::string &filename)
   // First, reset the driver to get a clean start.
   reset();
 
+  yyscan_t flex_scanner;
+
   _filename = filename;
-  bool success = scanBegin ();
+  bool success = scanBegin(&flex_scanner);
 
   if (!success)
   {
     return false;
   }
 
-  QISA_Parser parser (*this);
+  QISA_Parser parser (*this, flex_scanner);
   parser.set_debug_level (_traceParsing);
 
   int parser_result = parser.parse ();
-  scanEnd ();
+  scanEnd(flex_scanner);
 
   if (parser_result == 0)
   {
