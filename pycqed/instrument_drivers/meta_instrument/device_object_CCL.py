@@ -485,11 +485,11 @@ class DeviceCCL(Instrument):
                 q0_label=q0, q1_label=q1)
             return a
 
-    def measure_two_qubit_AllXY(self, q0: str, q1: str,
+    def measure_two_qubit_allxy(self, q0: str, q1: str,
                                 sequence_type='sequential',
                                 replace_q1_pulses_X180: bool=False,
-                                analyze=True, close_fig=True,
-                                prepare_for_timedomain=True, MC=None):
+                                analyze: bool=True, close_fig: bool=True,
+                                prepare_for_timedomain: bool=True, MC=None):
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain()

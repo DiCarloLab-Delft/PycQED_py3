@@ -1414,12 +1414,13 @@ class CCLight_Transmon(Qubit):
         ad_func_pars = {'adaptive_function': nelder_mead,
                         'x0': initial_values,
                         'initial_step': initial_steps,
-                        'par_idx': 1,
                         'minimize': False}
 
         MC.set_adaptive_function_parameters(ad_func_pars)
         MC.set_optimization_method('nelder_mead')
-        MC.run(name='Restless_tuneup'+self.msmt_suffix, mode='adaptive')
+        MC.run(name='Restless_tuneup_{}Cl_{}seeds'.format(
+                nr_cliffords, nr_cliffords) + self.msmt_suffix,
+                mode='adaptive')
         a=ma.OptimizationAnalysis(label='Restless_tuneup')
 
         if update:
@@ -1697,12 +1698,6 @@ class CCLight_Transmon(Qubit):
                                     times[-1]+4*dt)])
 
         self.prepare_for_timedomain()
-
-        # testing if the pulses are locked to the modulation frequency
-        if not all([np.round(t*1e9) % (1/self.mw_freq_mod.get()*1e9)
-                    == 0 for t in times]):
-            raise ValueError(
-                'timesteps must be multiples of modulation period')
 
         # adding 'artificial' detuning by detuning the qubit LO
         if freq_qubit is None:

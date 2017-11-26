@@ -411,10 +411,19 @@ class Qubit(Instrument):
 
     def calibrate_frequency_ramsey(self,
                                    steps=[1, 1, 3, 10, 30, 100, 300, 1000],
-                                   stepsize=None, verbose=True, update=True,
-                                   close_fig=True):
-        if stepsize is None:
-            stepsize = abs(1/self.mw_freq_mod())
+                                   stepsize:float =20e-9,
+                                   verbose: bool=True, update: bool=True,
+                                   close_fig: bool=True):
+        """
+        Runs an iterative procudere of ramsey experiments to estimate
+        frequency detuning to converge to the qubit frequency up to the limit
+        set by T2*.
+
+        steps:
+            multiples of the initial stepsize on which to run the
+        stepsize:
+            smalles stepsize in ns for which to run ramsey experiments.
+        """
         cur_freq = self.freq_qubit.get()
         # Steps don't double to be more robust against aliasing
         for n in steps:
