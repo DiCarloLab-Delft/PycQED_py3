@@ -350,6 +350,11 @@ class CCL(SCPI):
 
         instHex = self.QISA.getInstructionsAsHexStrings(False)
 
+        if len(instHex) > 8191:
+            log.warning("Failed to upload instructions: program length ({})"
+                " exceeds allowed maximum value 8192.".format(len(instHex)))
+            return
+
         intarray = []
         for instr in instHex:
             intarray.append(int(instr[2:], 16))
