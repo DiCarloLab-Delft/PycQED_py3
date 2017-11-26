@@ -412,6 +412,7 @@ class UHFQC(Instrument):
 
     def acquisition_get(self, samples, acquisition_time=0.010,
                         timeout=0, channels=set([0, 1]), mode='rl'):
+        logging.warning("acquisition_get is deprecated (Nov 2017). Dont' use it!")
         # Define the channels to use
         paths = dict()
         data = dict()
@@ -520,7 +521,7 @@ class UHFQC(Instrument):
         return data
 
     def acquisition(self, samples, acquisition_time=0.010, timeout=0,
-                    channels=set([0, 1]), mode='rl'):
+                    channels=(0, 1), mode='rl'):
         self.acquisition_initialize(channels, mode)
         data = self.acquisition_poll(samples, acquisition_time, timeout)
         self.acquisition_finalize()
