@@ -5814,7 +5814,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
             working folder
         NoCalPoints             (default=4)
             number of calibration points
-        print_fit_results       (default=True)
+        print_fit_results       (default=False)
             print the fit report
         print_frequency         (default=False)
             whether to print the f_ge and f_gf/2
@@ -6150,7 +6150,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         if print_fit_results is True:
             print(self.fit_res.fit_report())
 
-        if kw.get('print_frequency',False):
+        if kw.get('print_frequency', False):
             if analyze_ef:
                 print('f_ge = {:.5} (GHz) \t f_ge Stderr = {:.5} (MHz) \n'
                       'f_gf/2 = {:.5} (GHz) \t f_gf/2 Stderr = {:.5} '
