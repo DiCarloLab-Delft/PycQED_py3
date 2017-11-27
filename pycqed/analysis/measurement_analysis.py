@@ -1147,7 +1147,7 @@ class TD_Analysis(MeasurementAnalysis):
         close_file = kw.pop('close_file',True)
 
         super().run_default_analysis(show=show,
-            close_file=False, **kw)
+            close_file=close_file, **kw)
 
         self.add_analysis_datagroup_to_file()
 
@@ -1718,7 +1718,7 @@ class Rabi_Analysis(TD_Analysis):
 
         super().run_default_analysis(show=show,
                                      close_file=close_file,
-                                     close_main_figure=True,
+                                     close_main_fig=True,
                                      save_fig=False, **kw)
 
         show_guess = kw.get('show_guess', False)
@@ -2472,7 +2472,7 @@ class QScale_Analysis(TD_Analysis):
 
         super().run_default_analysis(show=show,
                                      close_file=close_file,
-                                     close_main_figure=True,
+                                     close_main_fig=True,
                                      save_fig=False, **kw)
 
         # Only the unfolding part here is unique to this analysis
@@ -3140,6 +3140,7 @@ class SSRO_Analysis(MeasurementAnalysis):
                          masked=False, **kw):
 
         plot = kw.get('plot', True)
+        show = kw.get('show', False)
 
         min_voltage_1 = np.min(shots_I_1_rot)
         min_voltage_0 = np.min(shots_I_0_rot)
@@ -3188,7 +3189,10 @@ class SSRO_Analysis(MeasurementAnalysis):
             else:
                 filename = 'raw-cumulative-histograms'
             self.save_fig(fig, figname=filename, close_fig=self.close_fig, **kw)
-            plt.show()
+            if show:
+                plt.show()
+            else:
+                plt.clf()
 
         # saving the results
         if 'SSRO_Fidelity' not in self.analysis_group:
@@ -3205,6 +3209,7 @@ class SSRO_Analysis(MeasurementAnalysis):
                      **kw):
 
         plot = kw.get('plot', True)
+        show = kw.get('show', False)
 
         # Sorting data for analytical fitting
         S_sorted_I_1 = np.sort(shots_I_1_rot)
@@ -3416,7 +3421,10 @@ class SSRO_Analysis(MeasurementAnalysis):
             else:
                 filename = 'S-curves'
             self.save_fig(fig, figname=filename, **kw)
-            plt.show()
+            if show:
+                plt.show()
+            else:
+                plt.clf()
 
             # plotting the histograms
             fig, axes = plt.subplots(figsize=(7, 4))
@@ -3502,7 +3510,10 @@ class SSRO_Analysis(MeasurementAnalysis):
                 filename = 'Histograms'
 
             self.save_fig(fig, figname=filename, **kw)
-            plt.show()
+            if show:
+                plt.show()
+            else:
+                plt.clf()
 
         self.save_fitted_parameters(fit_res_double_0,
                                     var_name='fit_res_double_0')
@@ -3943,7 +3954,7 @@ class T1_Analysis(TD_Analysis):
 
         super().run_default_analysis(show=show,
                                      close_file=close_file,
-                                     close_main_figure=True,
+                                     close_main_fig=True,
                                      save_fig=False,**kw)
 
         show_guess = kw.get('show_guess', False)
@@ -4069,6 +4080,8 @@ class Ramsey_Analysis(TD_Analysis):
         self.make_fig_two_dets = kw.get('make_fig', True)
         if (type(self.artificial_detuning) is list ) and \
                 (len(self.artificial_detuning)>1):
+            # if multiple artificial detunings, do not make the default figure
+            # in TD_Analysis
             kw['make_fig'] = False
 
         super(Ramsey_Analysis, self).__init__(**kw)
@@ -4219,7 +4232,7 @@ class Ramsey_Analysis(TD_Analysis):
 
         super().run_default_analysis(
             close_file=close_file,
-            close_main_figure=True,save_fig=False,**kw)
+            close_main_fig=True,save_fig=False,**kw)
 
         verbose = kw.get('verbose', False)
         # Get old values for qubit frequency
