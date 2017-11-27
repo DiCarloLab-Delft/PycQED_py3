@@ -3963,9 +3963,9 @@ class T1_Analysis(TD_Analysis):
         T1_err_micro_sec = self.T1_dict['T1_stderr']*1e6
         #Print T1 and error on screen
         if kw.get('print_parameters', False):
-            print('T1 = {:.5f} ('.format(T1_micro_sec)+'µs) \t '
+            print('T1 = {:.5f} ('.format(T1_micro_sec)+'Âµs) \t '
                   'T1 StdErr = {:.5f} ('.format(
-                   T1_err_micro_sec)+'µs)')
+                   T1_err_micro_sec)+'Âµs)')
 
         #Plot best fit and initial fit + data
         if self.make_fig:
@@ -4264,10 +4264,10 @@ class Ramsey_Analysis(TD_Analysis):
                   '\t\tqubit frequency stderr = {:.7f} (MHz)'.format(
                 self.ramsey_freq['freq_stderr']*1e-6)+
                 '\nT2* = {:.5f} '.format(
-                self.T2_star['T2_star']*self.scale) +'('+'µ'+unit+')'+
+                self.T2_star['T2_star']*self.scale) +'('+'ï¿½'+unit+')'+
                 '\t\tT2* stderr = {:.5f} '.format(
                 self.T2_star['T2_star_stderr']*self.scale) +
-                '('+'µ'+unit+')')
+                '('+'ï¿½'+unit+')')
 
         if close_file:
             self.data_file.close()
