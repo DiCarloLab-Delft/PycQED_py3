@@ -1,0 +1,12 @@
+# Measurement fiducial gate strings for two-qubit GST with X90, Y90, and CZ
+{}
+Gix
+Giy
+GixGix
+Gxi
+Gyi
+GxiGxi
+GxiGix
+GxiGiy
+GyiGix
+GyiGiy

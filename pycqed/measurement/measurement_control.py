@@ -185,6 +185,7 @@ class MeasurementControl(Instrument):
             sweep_points = self.get_sweep_points()
             if len(self.sweep_functions) == 1:
                 self.get_measurement_preparetime()
+                self.sweep_functions[0].set_parameter(sweep_points[0])
                 self.detector_function.prepare(
                     sweep_points=self.get_sweep_points())
                 self.measure_hard()
@@ -627,7 +628,7 @@ class MeasurementControl(Instrument):
                                           y=self.sweep_pts_y,
                                           z=self.TwoD_array[:, :, j],
                                           xlabel=slabels[0], xunit=sunits[0],
-                                          ylabel=sunits[1], yunit=sunits[1],
+                                          ylabel=slabels[1], yunit=sunits[1],
                                           zlabel=zlabels[j], zunit=zunits[j],
                                           subplot=j+1,
                                           cmap='viridis')

@@ -6,6 +6,7 @@ import os
 import time
 import datetime
 import warnings
+from copy import deepcopy
 from collections import OrderedDict as od
 from matplotlib import pyplot as plt
 from matplotlib import colors
@@ -20,7 +21,7 @@ from .tools.file_handling import *
 from .tools.data_manipulation import *
 from .tools.plotting import *
 import colorsys as colors
-
+from matplotlib import cm
 
 datadir = get_default_datadir()
 print('Data directory set to:', datadir)
@@ -139,8 +140,9 @@ def latest_data(contains='', older_than=None, newer_than=None, or_equal=False,
     i = len(daydirs)-1
     while len(measdirs) == 0 and i >= 0:
         daydir = daydirs[i]
-        # this makes sure hidden folders (OS related) are not searched
-        if not daydir.startswith('.'):
+        # this makes sure that (most) non day dirs do not get searched
+        # as they should start with a digit (e.g. YYYYMMDD)
+        if daydir[0].isdigit():
             all_measdirs = [d for d in os.listdir(
                 os.path.join(search_dir, daydir))]
             all_measdirs.sort()
@@ -424,8 +426,7 @@ def get_data_from_ma_v2(ma, param_names, numeric_params=None):
                     if param_end in list(temp.attrs.keys()):
                         data[param] = temp.attrs[param_end]
                     elif param_end in list(temp.keys()):
-                        data[param] = temp[param_end]
-
+                        data[param] = temp[param_end].value
         if numeric_params is not None:
             if param in numeric_params:
                 data[param] = np.double(data[param])
@@ -435,8 +436,7 @@ def get_data_from_ma_v2(ma, param_names, numeric_params=None):
 
 def get_data_from_ma(ma, param_names, data_version=2, numeric_params=None):
     if data_version == 1:
-        data = get_data_from_ma_v1(ma, param_names,
-                                   numeric_params=numeric_params)
+        data = get_data_from_ma_v1(ma, param_names)
     elif data_version == 2:
         data = get_data_from_ma_v2(ma, param_names,
                                    numeric_params=numeric_params)
@@ -539,7 +539,7 @@ def get_data_from_timestamp_list(timestamps,
                 ana.finish()
             except Exception as inst:
                 logging.warning('Error "%s" when processing timestamp %s' %
-                      (inst, timestamp))
+                                (inst, timestamp))
                 raise
 
     if len(remove_timestamps) > 0:
@@ -559,11 +559,7 @@ def get_data_from_timestamp_list(timestamps,
                     out_data[nparam] = np.array(
                         [np.double(val) for val in out_data[nparam]])
                 except ValueError as instance:
-                    if 'could not broadcast' in instance.message:
-                        out_data[nparam] = [
-                            np.double(val) for val in out_data[nparam]]
-                    else:
-                        raise(instance)
+                    raise(instance)
 
     out_data['timestamps'] = get_timestamps
 
@@ -878,6 +874,193 @@ def smooth(x, window_len=11, window='hanning'):
     return y[edge:-edge]
 
 
+def find_second_peak(sweep_pts=None, data_dist_smooth=None,
+                     key=None, peaks=None, percentile=20, optimize=False,
+                     verbose=False):
+
+    """
+    Used for qubit spectroscopy analysis. Find the second gf/2 peak/dip based on
+    the location of the tallest peak found, given in peaks, which is the result
+    of peak_finder. The algorithm takes the index of this tallest peak and looks
+    to the right and to the left of it for the tallest peaks in these new
+    ranges. The resulting two new peaks are compared and the tallest/deepest
+    one is chosen.
+
+    Args:
+        sweep_pts (array):      the sweep points array in your measurement
+                                (typically frequency)
+        data_dist_smooth (array):   the smoothed y data of your spectroscopy
+                                    measurement, typically result of
+                                    calculate_distance_ground_state for a qubit
+                                    spectroscopy
+        key (str):  the feature to search for, 'peak' or 'dip'
+        peaks (dict):   the dict returned by peak_finder containing the
+                        peaks/dips values for the tallest peak around which
+                        this routine will search for second peak/dip
+        percentile (int):   percentile of data defining background noise; gets
+                            passed to peak_finder
+        optimize (bool):    the peak_finder optimize parameter
+        verbose (bool):     print detailed logging information
+
+    Returns:
+        f0  (float):                frequency of ge transition
+        f0_gf_over_2 (float):       frequency of gf/2 transition
+        kappa_guess (float):        guess for the kappa of the ge peak/dip
+        kappa_guess_ef (float):     guess for the kappa of the gf/2 peak/dip
+    """
+
+    tallest_peak = peaks[key] #the ge freq
+    tallest_peak_idx = peaks[key+'_idx']
+    tallest_peak_width = peaks[key+'_width']
+    if verbose:
+        print('Largest '+key+' is at ', tallest_peak)
+
+    # Calculate how many data points away from the tallest peak
+    # to look left and right. Should be 50MHz away.
+    freq_range = sweep_pts[-1]-sweep_pts[0]
+    num_points = sweep_pts.size
+    n = int(50e6*num_points/freq_range)
+    m = int(50e6*num_points/freq_range)
+
+    # Search for 2nd peak (f_ge) to the right of the first (tallest)
+    while(int(len(sweep_pts)-1) <= int(tallest_peak_idx+n) and
+                  n>0):
+        # Reduce n if outside of range
+        n -= 1
+    if (int(tallest_peak_idx+n)) == sweep_pts.size:
+        # If n points to the right of tallest peak is the range edge:
+        n = 0
+    if not ((int(tallest_peak_idx+n)) >= sweep_pts.size):
+        if verbose:
+            print('Searching for the gf/2 {:} {:} points to the right of the largest'
+                  ' in the range {:.5}-{:.5}'.format(
+                  key,
+                  n,
+                  sweep_pts[int(tallest_peak_idx+n)],
+                  sweep_pts[-1]) )
+
+        peaks_right = peak_finder(
+            sweep_pts[int(tallest_peak_idx+n)::],
+            data_dist_smooth[int(tallest_peak_idx+n)::],
+            percentile=percentile,
+            num_sigma_threshold=1,
+            optimize=optimize,
+            window_len=0,
+            key=key)
+
+        # The peak/dip found to the right of the tallest is assumed to be
+        # the ge peak, which means that the tallest was in fact the gf/2 peak
+        if verbose:
+            print('Right '+key+' is at ', peaks_right[key])
+        subset_right = data_dist_smooth[int(tallest_peak_idx+n)::]
+        val_right = subset_right[peaks_right[key+'_idx']]
+        f0_right = peaks_right[key]
+        kappa_guess_right = peaks_right[key+'_width']
+        f0_gf_over_2_right = tallest_peak
+        kappa_guess_ef_right = tallest_peak_width
+    else:
+        if verbose:
+            print('Right '+key+' is None')
+        val_right = 0
+        f0_right = 0
+        kappa_guess_right = 0
+        f0_gf_over_2_right = tallest_peak
+        kappa_guess_ef_right = tallest_peak_width
+
+    # Search for 2nd peak (f_gf/2) to the left of the first (tallest)
+    while(int(tallest_peak_idx-m)<0 and m>0):
+        # Reduce m if outside of range
+        m -= 1
+    if int(tallest_peak_idx-m) == 0:
+        # If m points to the left of tallest peak is the range edge:
+        m = 0
+    if not (int(tallest_peak_idx-m) <= 0):
+        if verbose:
+            print('Searching for the gf/2 {:} {:} points to the left of the '
+                  'largest, in the range {:.5}-{:.5}'.format(
+                  key,
+                  m,
+                  sweep_pts[0],
+                  sweep_pts[int(tallest_peak_idx-m-1)]) )
+
+        peaks_left = peak_finder(
+            sweep_pts[0:int(tallest_peak_idx-m)],
+            data_dist_smooth[0:int(tallest_peak_idx-m)],
+            percentile=percentile,
+            num_sigma_threshold=1,
+            optimize=optimize,
+            window_len=0,
+            key=key)
+
+        # The peak/dip found to the left of the tallest is assumed to be
+        # the gf/2 peak, which means that the tallest was indeed the ge peak
+        if verbose:
+            print('Left '+key+' is at ', peaks_left[key])
+        subset_left = data_dist_smooth[0:int(tallest_peak_idx-m)]
+        val_left = subset_left[peaks_left[key+'_idx']]
+        f0_left = tallest_peak
+        kappa_guess_left = tallest_peak_width
+        f0_gf_over_2_left = peaks_left[key]
+        kappa_guess_ef_left = peaks_left[key+'_width']
+    else:
+        if verbose:
+            print('Left '+key+' is None')
+        val_left = 0
+        f0_left = tallest_peak
+        kappa_guess_left = tallest_peak_width
+        f0_gf_over_2_left = 0
+        kappa_guess_ef_left = 0
+
+    if np.abs(val_left) > np.abs(val_right):
+        # If peak on the left taller than peak on the right, then
+        # the second peak is to the left of the tallest and it is indeed
+        # the gf/2 peak, while the tallest is the ge peak.
+        if np.abs(f0_gf_over_2_left - tallest_peak) > 50e6:
+            # If the two peaks found are separated by at least 50MHz,
+            # then both the ge and gf/2 have been found.
+            if verbose:
+                print('Both f_ge and f_gf/2 '+key+'s have been found. '
+                      'f_ge was assumed to the LEFT of f_gf/2.')
+        else:
+            # If not, then it is just some other signal.
+            logging.warning('The f_gf/2 '+key+' was not found. Fitting to '
+                                    'the next largest '+key+' found.')
+
+        f0 = f0_left
+        kappa_guess = kappa_guess_left
+        f0_gf_over_2 = f0_gf_over_2_left
+        kappa_guess_ef = kappa_guess_ef_left
+
+    elif np.abs(val_left) < np.abs(val_right):
+        # If peak on the right taller than peak on the left, then
+        # the second peak is to the right of the tallest and it is in fact
+        # the ge peak, while the tallest is the gf/2 peak.
+        if np.abs(f0_right - tallest_peak) > 50e6:
+            # If the two peaks found are separated by at least 50MHz,
+            # then both the ge and gf/2 have been found.
+            if verbose:
+                print('Both f_ge and f_gf/2 have been found. '
+                      'f_ge was assumed to the RIGHT of f_gf/2.')
+        else:
+            # If not, then it is just some other signal.
+            logging.warning('The f_gf/2 '+key+' was not found. Fitting to '
+                                    'the next largest '+key+' found.')
+        f0 = f0_right
+        kappa_guess = kappa_guess_right
+        f0_gf_over_2 = f0_gf_over_2_right
+        kappa_guess_ef = kappa_guess_ef_right
+
+    else:
+        # If the peaks on the right and left are equal, or cannot be compared,
+        # then there was probably no second peak, and only noise was found.
+        logging.warning('Only f_ge has been found.')
+        f0 = tallest_peak
+        kappa_guess = tallest_peak_width
+        f0_gf_over_2 = tallest_peak
+        kappa_guess_ef = tallest_peak_width
+
+    return f0, f0_gf_over_2, kappa_guess, kappa_guess_ef
+
 def peak_finder_v2(x, y, perc=90, window_len=11):
     '''
     Peak finder based on argrelextrema function from scipy
@@ -891,21 +1074,100 @@ def peak_finder_v2(x, y, perc=90, window_len=11):
     sort_mask = np.argsort(y[array_peaks])[::-1]
     return peaks_x[sort_mask]
 
+def cut_edges(array, window_len=11):
+    array = array[(window_len//2):-(window_len//2)]
+    return array
 
-def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
+def peak_finder(x, y, percentile=20, num_sigma_threshold=5, window_len=11,
+                key=None, optimize=False):
+    """
+    Uses look_for_peak_dips (the old peak_finder routine renamed) to find peaks/
+    dips. If optimize==False, results from look_for_peak_dips is returned,
+    and this routine is the same as the old peak_finder routine.
+    If optimize==True, reruns look_for_peak_dips until tallest (for peaks)
+    data point/lowest (for dips) data point has been found.
 
-    def cut_edges(array, window_len=11):
-        array = array[(window_len/2):-(window_len/2)]
-        return array
+    :param x:                       x data
+    :param y:                       y data
+    :param percentile:              percentile of data defining background noise
+    :param num_sigma_threshold:     number of std deviations above background
+                                    where to look for data
+    :param key:                     'peak' or 'dip'; tell look_for_peaks_dips
+                                    to return only the peaks or the dips
+    :param optimize:                re-run look_for_peak_dips until tallest
+                                    (for peaks) data point/lowest (for dip) data
+                                    point has been found
+    :return:                        dict of peaks, dips, or both from
+                                    look_for_peaks_dips
+    """
+
+    # First search for peaks/dips
+    search_result = look_for_peaks_dips(x=x, y_smoothed=y, percentile=percentile,
+                                        num_sigma_threshold=num_sigma_threshold,
+                                        key=key, window_len=window_len)
+
+    if optimize:
+    # Rerun if the found peak/dip is smaller/larger than the largest/
+    # smallest data point
+
+        y_for_test = deepcopy(y)
+        # Figure out if the data set has peaks or dips
+        if key is not None:
+            key_1 = key
+        else:
+            if search_result['dip'] is None:
+                key_1 = 'peak'
+            elif search_result['peak'] is None:
+                key_1 = 'dip'
+                y_for_test = -y_for_test
+            elif np.abs(y[search_result['dip_idx']]) < \
+                    np.abs(y[search_result['peak_idx']]):
+                key_1 = 'peak'
+            elif np.abs(y[search_result['dip_idx']]) > \
+                 np.abs(y[search_result['peak_idx']]):
+                key_1 = 'dip'
+                y_for_test = -y_for_test
+            else:
+                logging.error('Cannot determine for sure if data set has peaks '
+                              'or dips. Assume peaks.')
+                key_1 = 'peak'
+
+        if (y_for_test[search_result[key_1+'_idx']] < max(y_for_test)):
+            while ((y_for_test[search_result[key_1+'_idx']] < max(y_for_test)) and
+                    (num_sigma_threshold<100) and
+                        (len(search_result[key_1+'s_idx'])>1)):
+
+                search_result_1 = deepcopy(search_result)
+                num_sigma_threshold += 1
+
+                search_result = look_for_peaks_dips(x=x,y_smoothed=y,
+                                    percentile=percentile,
+                                    num_sigma_threshold=(num_sigma_threshold),
+                                    key=key_1, window_len=window_len)
+
+                if search_result[key_1+'_idx'] is None:
+                    search_result = search_result_1
+                    break
+
+            print('Peak Finder: Optimal num_sigma_threshold after optimization '
+                  'is ', num_sigma_threshold)
+
+    return search_result
+
+def look_for_peaks_dips(x, y_smoothed, percentile=20, window_len=11,
+                        num_sigma_threshold=5, key=None):
+
     '''
     Peak finding algorithm designed by Serwan
     1 smooth data
     2 Define the threshold based on background data
     3
+
+    key:    'peak' or 'dip'; return only the peaks or the dips
     '''
 
     # Smooth the data
-    y_smoothed = smooth(y, window_len=window_len)
+    y_smoothed = smooth(y_smoothed, window_len=window_len)
 
     # Finding peaks
     # Defining the threshold
@@ -918,9 +1180,12 @@ def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
     threshold = background_mean + num_sigma_threshold * background_std
 
     thresholdlst = np.arange(y_smoothed.size)[y_smoothed > threshold]
-    datthreshold = y_smoothed[thresholdlst]
+    #datthreshold = y_smoothed[thresholdlst]
 
-    kk = 0
+    if thresholdlst.size is 0:
+        kk = 0
+    else:
+        kk = thresholdlst[0]
     inpeak = False
     peakranges = []
     peak_indices = []
@@ -940,7 +1205,7 @@ def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
                     inpeak = False
                     peakranges.append([peakfmin, peakfmax])
 
-        peakranges.append([peakfmin, peakfmax])
+            peakranges.append([peakfmin, peakfmax])
         for elem in peakranges:
             try:
                 if elem[0] != elem[1]:
@@ -948,17 +1213,34 @@ def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
                                      np.argmax(y_smoothed[elem[0]:elem[1]])]
                 else:
                     peak_indices += [elem[0]]
-                peak_widths += [x[elem[1]] - x[elem[0]]]
+                #peak_widths += [x[elem[1]] - x[elem[0]]]
             except:
                 pass
-        peaks = np.take(x, peak_indices)  # Frequencies of peaks
-        peak_vals = np.take(y_smoothed, peak_indices)  # values of peaks
-        peak_index = peak_indices[np.argmax(peak_vals)]  # idx of highest peak
-        peak = x[peak_index]
+
+        #eliminate duplicates
+        peak_indices = np.unique(peak_indices)
+
+        #Take an approximate peak width for each peak index
+        for i,idx in enumerate(peak_indices):
+            if (idx+i+1)<x.size and (idx-i-1)>=0:
+                #ensure data points idx+i+1 and idx-i-1 are inside sweep pts
+                peak_widths += [ (x[idx+i+1] - x[idx-i-1])/5 ]
+            elif (idx+i+1)>x.size and (idx-i-1)>=0:
+                peak_widths += [ (x[idx] - x[idx-i])/5 ]
+            elif (idx+i+1)<x.size and (idx-i-1)<0:
+                peak_widths += [ (x[idx+i] - x[idx])/5 ]
+            else:
+                peak_widths += [ 5e6 ]
+
+        peaks = np.take(x, peak_indices)                   #Frequencies of peaks
+        peak_vals = np.take(y_smoothed, peak_indices)           #values of peaks
+        peak_index = peak_indices[np.argmax(peak_vals)]
         peak_width = peak_widths[np.argmax(peak_vals)]
+        peak = x[peak_index]                          #Frequency of highest peak
 
     else:
         peak = None
+        peak_vals = None
         peak_index = None
         peaks = []
         peak_width = None
@@ -973,8 +1255,12 @@ def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
     threshold = background_mean - num_sigma_threshold * background_std
 
     thresholdlst = np.arange(y_smoothed.size)[y_smoothed < threshold]
-    datthreshold = y_smoothed[thresholdlst]
-    kk = 0
+    #datthreshold = y_smoothed[thresholdlst]
+
+    if thresholdlst.size is 0:
+        kk = 0
+    else:
+        kk = thresholdlst[0]
     indip = False
     dipranges = []
     dip_indices = []
@@ -994,7 +1280,7 @@ def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
                     indip = False
                     dipranges.append([dipfmin, dipfmax])
 
-        dipranges.append([dipfmin, dipfmax])
+            dipranges.append([dipfmin, dipfmax])
         for elem in dipranges:
             try:
                 if elem[0] != elem[1]:
@@ -1002,26 +1288,60 @@ def peak_finder(x, y, percentile=70, num_sigma_threshold=5, window_len=11):
                                     np.argmin(y_smoothed[elem[0]:elem[1]])]
                 else:
                     dip_indices += [elem[0]]
-                dip_widths += [x[elem[1]] - x[elem[0]]]
+                #dip_widths += [x[elem[1]] - x[elem[0]]]
             except:
                 pass
+
+        #eliminate duplicates
+        dip_indices = np.unique(dip_indices)
+
+        #Take an approximate dip width for each dip index
+        for i,idx in enumerate(dip_indices):
+            if (idx+i+1)<x.size and (idx-i-1)>=0:         #ensure data points
+                                                          #idx+i+1 and idx-i-1
+                                                          #are inside sweep pts
+                dip_widths += [ (x[idx+i+1] - x[idx-i-1])/5 ]
+            elif (idx+i+1)>x.size and (idx-i-1)>=0:
+                dip_widths += [ (x[idx] - x[idx-i])/5 ]
+            elif (idx+i+1)<x.size and (idx-i-1)<0:
+                dip_widths += [ (x[idx+i] - x[idx])/5 ]
+            else:
+                dip_widths += [ 5e6 ]
+
         dips = np.take(x, dip_indices)
         dip_vals = np.take(y_smoothed, dip_indices)
         dip_index = dip_indices[np.argmin(dip_vals)]
+        dip_width = dip_widths[np.argmax(dip_vals)]
         dip = x[dip_index]
-        dip_width = dip_widths[np.argmin(dip_vals)]
+
     else:
         dip = None
+        dip_vals = None
         dip_index = None
         dips = []
         dip_width = None
 
-    return {'peak': peak, 'peak_idx': peak_index,
-            'peak_width': peak_width, 'peak_widths': peak_widths,
-            'peaks': peaks, 'peaks_idx': peak_indices,
-            'dip': dip, 'dip_idx': dip_index,
-            'dip_width': dip_width, 'dip_widths': dip_widths,
-            'dips': dips, 'dips_idx': dip_indices}
+    if key == 'peak':
+        return {'peak': peak, 'peak_idx': peak_index, 'peak_values':peak_vals,
+                'peak_width': peak_width, 'peak_widths': peak_widths,
+                'peaks': peaks, 'peaks_idx': peak_indices,
+                'dip': None, 'dip_idx': None, 'dip_values':[],
+                'dip_width': None, 'dip_widths': [],
+                'dips': [], 'dips_idx': []}
+    elif key == 'dip':
+        return {'peak': None, 'peak_idx': None, 'peak_values':[],
+                'peak_width': None, 'peak_widths': [],
+                'peaks': [], 'peaks_idx': [],
+                'dip': dip, 'dip_idx': dip_index, 'dip_values':dip_vals,
+                'dip_width': dip_width, 'dip_widths': dip_widths,
+                'dips': dips, 'dips_idx': dip_indices}
+    else:
+        return {'peak': peak, 'peak_idx': peak_index, 'peak_values':peak_vals,
+                'peak_width': peak_width, 'peak_widths': peak_widths,
+                'peaks': peaks, 'peaks_idx': peak_indices,
+                'dip': dip, 'dip_idx': dip_index, 'dip_values':dip_vals,
+                'dip_width': dip_width, 'dip_widths': dip_widths,
+                'dips': dips, 'dips_idx': dip_indices}
 
 
 def calculate_distance_ground_state(data_real, data_imag, percentile=70,
@@ -1172,10 +1492,14 @@ def normalize_data_v3(data, cal_zero_points=np.arange(-4, -2, 1),
 
 
 def datetime_from_timestamp(timestamp):
-    if len(timestamp) == 14:
-        return datetime.datetime.strptime(timestamp, "%Y%m%d%H%M%S")
-    else:
-        return datetime.datetime.strptime(timestamp, "%Y%m%d_%H%M%S")
+    try:
+        if len(timestamp) == 14:
+            return datetime.datetime.strptime(timestamp, "%Y%m%d%H%M%S")
+        elif len(timestamp) == 15:
+            return datetime.datetime.strptime(timestamp, "%Y%m%d_%H%M%S")
+    except Exception as e:
+        print('Invalid timestamp :"{}"'.format(timestamp))
+        raise e
 
 
 def timestamp_from_datetime(date):
@@ -1275,34 +1599,39 @@ def color_plot(x, y, z, fig, ax, cax=None,
 
     xlabel = kw.pop('xlabel', None)
     ylabel = kw.pop('ylabel', None)
+    x_unit = kw.pop('x_unit', None)
+    y_unit = kw.pop('y_unit', None)
     zlabel = kw.pop('zlabel', None)
 
     xlim = kw.pop('xlim', None)
     ylim = kw.pop('ylim', None)
 
     if plot_title is not None:
-        ax.set_title(plot_title, y=1.05)
+        ax.set_title(plot_title, y=1.05, fontsize=18)
+
+    ax.get_yaxis().set_tick_params(direction='out')
+    ax.get_xaxis().set_tick_params(direction='out')
+
     if transpose:
-        ax.set_xlabel(ylabel)
-        ax.set_ylabel(xlabel)
         ax.set_xlim(y_vertices[0], y_vertices[-1])
         ax.set_ylim(x_vertices[0], x_vertices[-1])
         if xlim is not None:
             ax.set_xlim(ylim)
         if ylim is not None:
             ax.set_ylim(xlim)
+        set_xlabel(ax, ylabel, unit=y_unit)
+        set_ylabel(ax, xlabel, unit=x_unit)
+
     else:
-        ax.set_xlabel(xlabel)
-        ax.set_ylabel(ylabel)
         ax.set_xlim(x_vertices[0], x_vertices[-1])
         ax.set_ylim(y_vertices[0], y_vertices[-1])
         if xlim is not None:
             ax.set_xlim(xlim)
         if ylim is not None:
             ax.set_ylim(ylim)
+        set_xlabel(ax, xlabel, unit=x_unit)
+        set_ylabel(ax, ylabel, unit=y_unit)
 
-    ax.get_yaxis().set_tick_params(direction='out')
-    ax.get_xaxis().set_tick_params(direction='out')
     if add_colorbar:
         if cax is None:
             ax_divider = make_axes_locatable(ax)
@@ -1346,7 +1675,7 @@ def color_plot_slices(xvals, yvals, zvals, ax=None,
     # various plot options
     # define colormap
     cmap = kw.pop('cmap', 'viridis')
-    clim = kw.pop('clim', [None, None])
+    #clim = kw.pop('clim', [None, None])
     # normalized plot
     if normalize:
         for xx in range(len(xvals)):
@@ -1357,13 +1686,13 @@ def color_plot_slices(xvals, yvals, zvals, ax=None,
             zvals[xx] = np.log(zvals[xx])/np.log(10)
 
     # add blocks to plot
-    hold = kw.pop('hold', False)
+    #hold = kw.pop('hold', False)
     for xx in range(len(xvals)):
         tempzvals = np.array([np.append(zvals[xx], np.array(0)),
                               np.append(zvals[xx], np.array(0))]).transpose()
-        im = ax.pcolor(xvertices[xx:xx+2],
-                       yvertices[xx],
-                       tempzvals, cmap=cmap)
+        # im = ax.pcolor(xvertices[xx:xx+2],
+        #                yvertices[xx],
+        #                tempzvals, cmap=cmap)
     return ax
 
 
@@ -1435,6 +1764,24 @@ def color_plot_interpolated(x, y, z, ax=None,
             cbar.set_label(zlabel)
         return ax, CS, cbar
     return ax, CS
+
+def plot_errorbars(x, y, ax=None, linewidth=2 ,markersize=2, marker='none'):
+
+    if ax is None:
+        new_plot_created = True
+        f, ax = plt.subplots()
+    else:
+        new_plot_created = False
+
+    standard_error = np.std(y)/np.sqrt(y.size)
+
+    ax.errorbar( x, y, yerr=standard_error, ecolor='k', fmt=marker,
+                     linewidth=linewidth, markersize=markersize)
+
+    if new_plot_created:
+        return f,ax
+    else:
+        return
 
 
 ######################################################################
@@ -1577,7 +1924,19 @@ def find_min(x, y, return_fit=False, perc=30):
         return x_min, y_min
 
 
-def get_color_order(i, max_num):
+def get_color_order(i, max_num, cmap='viridis'):
     # take a blue to red scale from 0 to max_num
     # uses HSV system, H_red = 0, H_green = 1/3 H_blue=2/3
-    return colors.hsv_to_rgb(2.*float(i)/(float(max_num)*3.), 1., 1.)
+    # return colors.hsv_to_rgb(2.*float(i)/(float(max_num)*3.), 1., 1.)
+    print('It is recommended to use the updated function "get_color_cycle".')
+    if isinstance(cmap, str):
+        cmap = cm.get_cmap(cmap)
+    return cmap((i/max_num) % 1)
+
+
+def get_color_list(max_num, cmap='viridis'):
+    '''Return an array of max_num colors take in even spacing from the
+    color map cmap.'''
+    if isinstance(cmap, str):
+        cmap = cm.get_cmap(cmap)
+    return [cmap(cmap)(i) for i in np.linspace(0.0, 1.0, max_num)]

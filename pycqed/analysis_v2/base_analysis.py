@@ -5,15 +5,21 @@ This is based on the REM analysis from PycQED_py2 (as of July 7 2017)
 import os
 import numpy as np
 import copy
+from collections import OrderedDict
 
 from matplotlib import pyplot as plt
+from matplotlib import cm
 from pycqed.analysis import analysis_toolbox as a_tools
-import pycqed.analysis_v2.default_figure_settings_analysis as def_fig
+from pycqed.utilities.general import NumpyJsonEncoder
+from pycqed.analysis.analysis_toolbox import get_color_order as gco
+from pycqed.analysis.analysis_toolbox import get_color_list
+from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
+# import pycqed.analysis_v2.default_figure_settings_analysis as def_fig
+from . import default_figure_settings_analysis as def_fig
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import datetime
 import json
 import lmfit
-gco = a_tools.get_color_order
 
 
 class BaseDataAnalysis(object):
@@ -42,8 +48,10 @@ class BaseDataAnalysis(object):
     """
 
     def __init__(self, t_start: str=None, t_stop: str=None,
-                 TwoD: bool=False, options_dict: dict=None,
-                 extract_only: bool=False, do_fitting: bool=False):
+                TwoD: bool=False, options_dict: dict=None,
+                data_file_path: str=None,
+                options_dict: dict=None, extract_only: bool=False,
+                do_fitting: bool=False):
         '''
         This is the __init__ of the abstract base class.
         It is intended to be called at the start of the init of the child
@@ -67,10 +75,25 @@ class BaseDataAnalysis(object):
         and a bunch of stuff specified in the options dict
         (TODO: should this not always be extracted from the
         dict to prevent double refs? )
+
+        There are several ways to specify where the data should be loaded
+        from.
+            data_file_path: directly give the file path of a data file that
+                should be loaded.
+            t_start, t_stop: give a range of timestamps in where data is
+                loaded from. Filtering options can be given through the
+                options dictionary. If t_stop is omitted, the extraction
+                routine looks for the data with time stamp t_start.
+            none of the above: look for the last data which matches the
+                filtering options from the options dictionary.
+        Note: data_file_path has priority, i.e. if this argument is given
+        time stamps are ignored.
         '''
         self.single_timestamp = False
+        # initialize an empty dict to store results of analysis
+        self.proc_data_dict = OrderedDict()
         if options_dict is None:
-            self.options_dict = dict()
+            self.options_dict = OrderedDict()
         else:
             self.options_dict = options_dict
 
@@ -84,14 +107,27 @@ class BaseDataAnalysis(object):
             self.labels = [scan_label]
         else:
             self.labels = scan_label
-        if t_start is None and t_stop is None:
+
+        # Initialize to None such that the attribute always exists.
+        self.data_file_path = None
+        if t_start is None and t_stop is None and data_file_path is None:
+            # Nothing specified -> find last file with label
             # This is quite a hacky way to support finding the last file
             # with a certain label, something that was trivial in the old
             # analysis. A better solution should be implemented.
             self.t_start = a_tools.latest_data(scan_label,
                                                return_timestamp=True)[0]
-        else:
+        elif data_file_path is not None:
+            # Data file path specified ignore timestamps
+            self.extract_from_file = True
+            self.t_start = None
+            self.data_file_path = data_file_path
+        elif t_start is not None:
+            # No data file specified -> use timestamps
             self.t_start = t_start
+        else:
+            raise ValueError('Either t_start or data_file_path must be '
+                             'given.')
 
         if t_stop is None:
             self.t_stop = self.t_start
@@ -108,11 +144,15 @@ class BaseDataAnalysis(object):
         # These options relate to the plotting #
         ########################################
         def_fig.apply_default_figure_settings()
-        self.plot_dicts = dict()
         self.fit_dicts = dict()
-        self.axs = dict()
-        self.figs = dict()
         self.processed_data_dict = dict()
+
+        if self.options_dict.get('apply_default_fig_settings', True):
+            def_fig.apply_default_figure_settings()
+        self.plot_dicts = OrderedDict()
+        self.axs = OrderedDict()
+        self.figs = OrderedDict()
+
         self.presentation_mode = self.options_dict.get(
             'presentation_mode', False)
         self.tight_fig = self.options_dict.get('tight_fig', True)
@@ -124,6 +164,8 @@ class BaseDataAnalysis(object):
                                                                False)
         self.options_dict['save_figs'] = self.options_dict.get(
             'save_figs', True)
+        self.options_dict['close_figs'] = self.options_dict.get(
+            'close_figs', True)
         ####################################################
         # These options relate to what analysis to perform #
         ####################################################
@@ -151,8 +193,10 @@ class BaseDataAnalysis(object):
         self.prepare_plots()   # specify default plots
         if not self.extract_only:
             self.plot(key_list='auto')  # make the plots
+
             if self.options_dict['save_figs']:
-                self.save_figures()
+                self.save_figures(close_figs=self.options_dict['close_figs'])
+
 
     def get_timestamps(self):
         """
@@ -208,12 +252,16 @@ class BaseDataAnalysis(object):
             - single timestamp only
         """
 
-        if self.t_start[-5:] == '.json':
-            self.use_json = True
-            self.extract_data_json()
+        if self.data_file_path is not None:
+            extension = self.data_file_path.split('.')[-1]
+            if extension == 'json':
+                with open(self.data_file_path, 'r') as file:
+                    self.raw_data_dict = json.load(file)
+            else:
+                raise RuntimeError('Cannot load data from file "{}". '
+                                   'Unknown file extension "{}"'
+                                   .format(self.data_file_path, extension))
             return
-        else:
-            self.use_json = False
 
         self.get_timestamps()
         # this disables the data extraction for other files if there is only
@@ -306,6 +354,7 @@ class BaseDataAnalysis(object):
         # print [[key, type(val), len(val)] for key, val in
         # self.raw_data_dict.items()]
         self.raw_data_dict['timestamps'] = [self.t_start]
+        self.raw_data_dict['nr_experiments'] = len(self.timestamps)
 
     def process_data(self):
         """
@@ -330,9 +379,12 @@ class BaseDataAnalysis(object):
 
     def save_figures(self, savedir: str=None, savebase: str =None,
                      tag_tstamp: bool=True,
-                     fmt: str ='png', key_list: list='auto'):
+                     fmt: str ='png', key_list: list='auto',
+                     close_figs: bool=True):
         if savedir is None:
             savedir = self.raw_data_dict.get('folder', '')
+            if isinstance(savedir, list):
+                savedir = savedir[0]
         if savebase is None:
             savebase = ''
         if tag_tstamp:
@@ -340,14 +392,64 @@ class BaseDataAnalysis(object):
         else:
             tstag = ''
 
-        if key_list is 'auto' or key_list is None:
+        if key_list == 'auto' or key_list is None:
             key_list = self.figs.keys()
         for key in key_list:
             savename = os.path.join(savedir, savebase+key+tstag+'.'+fmt)
             self.axs[key].figure.savefig(savename, fmt=fmt)
+            if close_figs:
+                plt.close(self.axs[key].figure)
+
+    def save_data(self, savedir: str=None, savebase: str=None,
+                  tag_tstamp: bool=True,
+                  fmt: str='json', key_list='auto'):
+        '''
+        Saves the data from self.raw_data_dict to file.
+
+        Args:
+            savedir (string):
+                    Directory where the file is saved. If this is None, the
+                    file is saved in self.raw_data_dict['folder'] or the working
+                    directory of the console.
+            savebase (string):
+                    Base name for the saved file.
+            tag_tstamp (bool):
+                    Whether to append the timestamp of the first to the base
+                    name.
+            fmt (string):
+                    File extension for the format in which the file should
+                    be saved.
+            key_list (list or 'auto'):
+                    Specifies which keys from self.raw_data_dict are saved.
+                    If this is 'auto' or None, all keys-value pairs are
+                    saved.
+        '''
+        if savedir is None:
+            savedir = self.raw_data_dict.get('folder', '')
+            if isinstance(savedir, list):
+                savedir = savedir[0]
+        if savebase is None:
+            savebase = ''
+        if tag_tstamp:
+            tstag = '_'+self.raw_data_dict['timestamps'][0]
+        else:
+            tstag = ''
+
+        if key_list == 'auto' or key_list is None:
+            key_list = self.raw_data_dict.keys()
+
+        save_dict = {}
+        for k in key_list:
+            save_dict[k] = self.raw_data_dict[k]
+
+        filepath = os.path.join(savedir, savebase + tstag + '.' + fmt)
+        with open(filepath, 'w') as file:
+            json.dump(save_dict, file, cls=NumpyJsonEncoder, indent=4)
+        print('Data saved to "{}".'.format(filepath))
 
     def prepare_fitting(self):
-        pass
+        # initialize everything to an empty dict if not overwritten
+        self.fit_dicts = OrderedDict()
 
     def run_fitting(self):
         '''
@@ -360,12 +462,17 @@ class BaseDataAnalysis(object):
         for key, fit_dict in self.fit_dicts.items():
             guess_dict = fit_dict.get('guess_dict', None)
             guess_pars = fit_dict.get('guess_pars', None)
-            fit_guess_fn = fit_dict.get('fit_guess_fn', None)
-            fit_fn = fit_dict.get('fit_fn', None)
             fit_yvals = fit_dict['fit_yvals']
             fit_xvals = fit_dict['fit_xvals']
 
-            model = fit_dict.get('model', lmfit.Model(fit_fn))
+            model = fit_dict.get('model', None)
+            if model is None:
+                fit_fn = fit_dict.get('fit_fn', None)
+                model = fit_dict.get('model', lmfit.Model(fit_fn))
+            fit_guess_fn = fit_dict.get('fit_guess_fn', None)
+            if fit_guess_fn is None:
+                fit_guess_fn = model.guess
+
             if self.do_timestamp_blocks:
                 fit_dict['fit_res'] = []
                 for tt in range(len(fit_yvals)):
@@ -383,9 +490,13 @@ class BaseDataAnalysis(object):
                 if guess_pars is None:
                     if guess_dict is None:
                         guess_dict = fit_guess_fn(**fit_yvals, **fit_xvals)
-                    for key, val in list(guess_dict.items()):
-                        model.set_param_hint(key, **val)
-                    guess_pars = model.make_params()
+
+                        if isinstance(guess_dict, lmfit.Parameters):
+                            guess_pars = guess_dict
+                        else:
+                            for key, val in list(guess_dict.items()):
+                                model.set_param_hint(key, **val)
+                            guess_pars = model.make_params()
 
                 fit_dict['fit_res'] = model.fit(
                     params=guess_pars, **fit_xvals, **fit_yvals)
@@ -406,7 +517,7 @@ class BaseDataAnalysis(object):
         if key_list is 'auto':
             key_list = self.auto_keys
         if key_list is None:
-            key_list = list(self.plot_dicts.keys())
+            key_list = self.plot_dicts.keys()
         if type(key_list) is str:
             key_list = [key_list]
         self.key_list = key_list
@@ -449,7 +560,8 @@ class BaseDataAnalysis(object):
             pdict = self.plot_dicts[key]
             # this check is needed as not all plots have xvals e.g., plot_text
             if 'xvals' in pdict.keys():
-                if type(pdict['xvals'][0]) is datetime.datetime:
+                if (type(pdict['xvals'][0]) is datetime.datetime and
+                        key in self.axs.keys()):
                     self.axs[key].figure.autofmt_xdate()
 
     def plot_for_presentation(self, key_list=None, no_label=False):
@@ -466,9 +578,11 @@ class BaseDataAnalysis(object):
         # xvals interpreted as edges for a bar plot
         plot_xedges = pdict['xvals']
         plot_yvals = pdict['yvals']
-        plot_xlabel = pdict['xlabel']
-        plot_ylabel = pdict['ylabel']
-        plot_title = pdict['title']
+        plot_xlabel = pdict.get('xlabel', None)
+        plot_ylabel = pdict.get('ylabel', None)
+        plot_xunit = pdict.get('xunit', None)
+        plot_yunit = pdict.get('yunit', None)
+        plot_title = pdict.get('title', None)
         plot_xrange = pdict.get('xrange', None)
         plot_yrange = pdict.get('yrange', None)
         plot_barkws = pdict.get('bar_kws', {})
@@ -509,17 +623,16 @@ class BaseDataAnalysis(object):
             axs.set_title(plot_title)
 
         if do_legend:
+            legend_ncol = pdict.get('legend_ncol', 1)
+            legend_title = pdict.get('legend_title', None)
             legend_pos = pdict.get('legend_pos', 'best')
-            legend = axs.legend(loc=legend_pos, frameon=1)
-            frame = legend.get_frame()
-            frame.set_alpha(0.8)
-            frame.set_linewidth(0)
-            frame.set_edgecolor(None)
-            frame.set_facecolor('white')
+            axs.legend(title=legend_title, loc=legend_pos, ncol=legend_ncol)
 
         if self.tight_fig:
             axs.figure.tight_layout()
 
+        set_xlabel(axs, plot_xlabel, plot_xunit)
+        set_ylabel(axs, plot_ylabel, plot_yunit)
         pdict['handles'] = p_out
 
     def plot_line(self, pdict, axs):
@@ -528,6 +641,8 @@ class BaseDataAnalysis(object):
         plot_yvals = pdict['yvals']
         plot_xlabel = pdict.get('xlabel', None)
         plot_ylabel = pdict.get('ylabel', None)
+        plot_xunit = pdict.get('xunit', None)
+        plot_yunit = pdict.get('yunit', None)
         plot_title = pdict.get('title', None)
         plot_xrange = pdict.get('xrange', None)
         plot_yrange = pdict.get('yrange', None)
@@ -541,15 +656,24 @@ class BaseDataAnalysis(object):
         dataset_label = pdict.get('setlabel', list(range(len(plot_yvals))))
         do_legend = pdict.get('do_legend', False)
 
-        plot_xvals_step = plot_xvals[1]-plot_xvals[0]
-
         if plot_multiple:
             p_out = []
+            len_color_cycle = pdict.get('len_color_cycle', len(plot_yvals))
+            cmap = pdict.get('cmap', 'Vega10')  # Default matplotlib cycle
+
+            # Colors: default should be following matplotlibs default color
+            # cycle. When a colormap is specified, colors are taken evenly
+            # spaced from that colormap.
+            if cmap == 'Vega10':
+                colors = [cm.Vega10(i) for i in range(len(plot_yvals))]
+            else:
+                colors = get_color_list(len_color_cycle, cmap)
+
             for ii, this_yvals in enumerate(plot_yvals):
                 p_out.append(pfunc(plot_xvals, this_yvals,
                                    linestyle=plot_linestyle,
                                    marker=plot_marker,
-                                   color=gco(ii, len(plot_yvals)-1),
+                                   color=colors[ii % len_color_cycle],
                                    label='%s%s' % (
                                        dataset_desc, dataset_label[ii]),
                                    **plot_linekws))
@@ -561,19 +685,15 @@ class BaseDataAnalysis(object):
                           **plot_linekws)
 
         if plot_xrange is None:
-            # maybe better to do nothing if xrange is None?
-            max_x = np.max(plot_xvals)
-            min_x = np.min(plot_xvals)
-            span = np.abs(max_x - min_x)
-            xmin, xmax = min_x - 0.02*span, max_x+0.02*span
+            pass # Do not set xlim if xrange is None as the axs gets reused
         else:
             xmin, xmax = plot_xrange
-        axs.set_xlim(xmin, xmax)
+            axs.set_xlim(xmin, xmax)
 
         if plot_xlabel is not None:
-            axs.set_xlabel(plot_xlabel)
+            set_xlabel(axs, plot_xlabel, plot_xunit)
         if plot_ylabel is not None:
-            axs.set_ylabel(plot_ylabel)
+            set_ylabel(axs, plot_ylabel, plot_yunit)
         if plot_yrange is not None:
             ymin, ymax = plot_yrange
             axs.set_ylim(ymin, ymax)
@@ -582,11 +702,19 @@ class BaseDataAnalysis(object):
             axs.set_title(plot_title)
 
         if do_legend:
+            legend_ncol = pdict.get('legend_ncol', 1)
+            legend_title = pdict.get('legend_title', None)
             legend_pos = pdict.get('legend_pos', 'best')
-            axs.legend(loc=legend_pos)
+            axs.legend(title=legend_title, loc=legend_pos, ncol=legend_ncol)
 
         if self.tight_fig:
             axs.figure.tight_layout()
+
+            # Need to set labels again, because tight_layout can screw them up
+            if plot_xlabel is not None:
+                set_xlabel(axs, plot_xlabel, plot_xunit)
+            if plot_ylabel is not None:
+                set_ylabel(axs, plot_ylabel, plot_yunit)
 
         pdict['handles'] = p_out
 
@@ -641,6 +769,10 @@ class BaseDataAnalysis(object):
             axs.set_title(plot_title)
 
         if do_legend:
+            legend_ncol = pdict.get('legend_ncol', 1)
+            legend_title = pdict.get('legend_title', None)
+            legend_pos = pdict.get('legend_pos', 'best')
+            axs.legend(title=legend_title, loc=legend_pos, ncol=legend_ncol)
             legend_pos = pdict.get('legend_pos', 'best')
             # box_props = dict(boxstyle='Square', facecolor='white', alpha=0.6)
             legend = axs.legend(loc=legend_pos, frameon=1)
@@ -943,3 +1075,19 @@ class BaseDataAnalysis(object):
               verticalalignment=verticalalignment,
               horizontalalignment=horizontalalignment,
               bbox=box_props)
+
+    def plot_vlines(self, pdict, axs):
+        """
+        Helper function to add vlines to a plot
+        """
+        pfunc = getattr(axs, pdict.get('func', 'vlines'))
+        x = pdict['x']
+        ymin = pdict['ymin']
+        ymax = pdict['ymax']
+        label = pdict.get('setlabel', None)
+        colors = pdict.get('colors', None)
+        linestyles = pdict.get('linestyles', '--')
+
+        axs.vlines(x, ymin, ymax, colors,
+                   linestyles=linestyles, label=label, **pdict['line_kws'])
+        axs.legend()

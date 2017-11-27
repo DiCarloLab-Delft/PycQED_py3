@@ -33,6 +33,7 @@ class ControlBox_LookuptableManager(Instrument):
 
         logging.info(__name__ + ' : Initializing instrument')
         super().__init__(name, **kw)
+        logging.warning('The ControlBox_LookuptableManager is deprecated.')
 
         self.add_parameter('CBox',
                            parameter_class=InstrumentParameter)
@@ -154,15 +155,6 @@ class ControlBox_LookuptableManager(Instrument):
         self._voltage_min = -1.0
         self._voltage_max = 1.0-1.0/2**13
 
-    def run_test_suite(self):
-        # pass the CBox to the module so it can be used in the tests
-        from importlib import reload
-        from .tests import test_suite
-        reload(test_suite)
-        test_suite.lm = self
-        suite = unittest.TestLoader().loadTestsFromTestCase(
-            test_suite.LutManTests)
-        unittest.TextTestRunner(verbosity=2).run(suite)
 
     def generate_standard_pulses(self):
         '''
@@ -392,3 +384,5 @@ class ControlBox_LookuptableManager(Instrument):
                                                       int(i), I_ch, I_wave)
             self.CBox.get_instr().set_awg_lookuptable(self.awg_nr(),
                                                       int(i), Q_ch, Q_wave)
+        if len(indices) == 0:
+            raise ValueError('Pulse {} not in lut_mapping'.format(pulse_name))

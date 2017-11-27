@@ -28,8 +28,10 @@ class UHFQC_LookuptableManagerManager(Instrument):
 
     def __init__(self, name, UHFQC, **kw):
 
+        logging.warning('The UHFQC_LookuptableManagerManager is deprecated')
         logging.info(__name__ + ' : Initializing instrument')
         super().__init__(name, **kw)
+
 
         self.UHFQC = UHFQC
         self.add_parameter('mixer_QI_amp_ratio', vals=vals.Numbers(),
@@ -203,7 +205,6 @@ class UHFQC_LookuptableManagerManager(Instrument):
                          self._voltage_max)
         self.UHFQC.awg_sequence_acquisition_and_pulse(
             I_wave, Q_wave, self.acquisition_delay())
-        print('wave {} should be loaded in UHFQC'.format(pulse_name))
 
     def give_back_wave_forms(self, pulse_name):
         '''
