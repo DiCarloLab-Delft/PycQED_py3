@@ -1079,10 +1079,10 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(pulse_pars_list, RO_pars,
             # if qb0 has a Z_pulse, remove the 'refpoint' key in the pulse pars
             # dict of the next qubit which has an SSB pulse
             Zp0_idxs = [] # indices of the Z pulses on qb0
-            for i, px in enumerate(pulse_list):
+            for w, px in enumerate(pulse_list):
                 if (px['target_qubit']==pulse_pars_list[0]['target_qubit'] and
                             px['pulse_type']=='Z_pulse'):
-                    Zp0_idxs.append(i)
+                    Zp0_idxs.append(w)
             if len(Zp0_idxs)>0:
                 for y in Zp0_idxs:
                     #look at the pulses applied on qb1...qbn
@@ -1121,15 +1121,16 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(pulse_pars_list, RO_pars,
                 if 'Z' not in first_pulses['pulse_type']:
                     first_pulses['pulse_delay'] += post_msmt_delay
 
-            # print('pulse_keys_by_qubit ', pulse_keys_by_qubit)
-            # print('\nfinal pulse_list ', pulse_list)
-            # print('\nlen_pulse_list/nr_qubits ',(len(pulse_list)-1)/n)
-            # print('\nnr_finite_duration_pulses/nr_qubits ',
-            #       len([x for x in pulse_list[:-1]
-            #            if 'Z' not in x['pulse_type']])/n)
-            # print('\nnr_Z_pulses/nr_qubits ', len([x for x in pulse_list
-            #                                        if 'Z' in x['pulse_type']])/n)
-
+            if verbose:
+                print('pulse_keys_by_qubit ', pulse_keys_by_qubit)
+                # print('\nfinal pulse_list ', pulse_list)
+                print('\nlen_pulse_list/nr_qubits ',(len(pulse_list)-1)/n)
+                print('\nnr_finite_duration_pulses/nr_qubits ',
+                      len([x for x in pulse_list[:-1]
+                           if 'Z' not in x['pulse_type']])/n)
+                print('\nnr_Z_pulses/nr_qubits ', len([x for x in pulse_list
+                                                       if 'Z' in x['pulse_type']])/n)
+                print('\n i ', i)
             el = multi_pulse_elt(i, station, pulse_list)
             el_list.append(el)
             seq.append_element(el, trigger_wait=True)
@@ -1173,10 +1174,10 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(pulse_pars_list, RO_pars,
             # if qb0 has a Z_pulse, remove the 'refpoint' key of the next
             # pulse dict which is not a Z_pulse
             Zp0_idxs = [] # indices of the Z pulses on qb0
-            for i, px in enumerate(pulse_list):
+            for w, px in enumerate(pulse_list):
                 if (px['target_qubit']==pulse_pars_list[0]['target_qubit']
                         and px['pulse_type']=='Z_pulse'):
-                    Zp0_idxs.append(i)
+                    Zp0_idxs.append(w)
             if len(Zp0_idxs)>0:
                 for y in Zp0_idxs:
                     #look at the pulses applied on qb1...qbn
@@ -1216,15 +1217,16 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(pulse_pars_list, RO_pars,
                 if 'Z' not in first_pulses['pulse_type']:
                     first_pulses['pulse_delay'] += post_msmt_delay
 
-            # print('pulse_list_keys ', pulse_list_keys)
-            # print('\nfinal pulse_list ', pulse_list)
-            # print('\nlen_pulse_list/nr_qubits ',(len(pulse_list)-1)/n)
-            # print('\nnr_finite_duration_pulses/nr_qubits ',
-            #       len([x for x in pulse_list[:-1]
-            #            if 'Z' not in x['pulse_type']])/n)
-            # print('\nnr_Z_pulses/nr_qubits ', len([x for x in pulse_list
-            #                                        if 'Z' in x['pulse_type']])/n)
-
+            if verbose:
+                print('pulse_list_keys ', pulse_list_keys)
+                # print('\nfinal pulse_list ', pulse_list)
+                print('\nlen_pulse_list/nr_qubits ',(len(pulse_list)-1)/n)
+                print('\nnr_finite_duration_pulses/nr_qubits ',
+                      len([x for x in pulse_list[:-1]
+                           if 'Z' not in x['pulse_type']])/n)
+                print('\nnr_Z_pulses/nr_qubits ', len([x for x in pulse_list
+                                                       if 'Z' in x['pulse_type']])/n)
+                print('\n i ', i)
             el = multi_pulse_elt(i, station, pulse_list)
             el_list.append(el)
             seq.append_element(el, trigger_wait=True)

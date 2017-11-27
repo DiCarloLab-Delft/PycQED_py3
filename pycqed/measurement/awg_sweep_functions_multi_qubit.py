@@ -191,7 +191,6 @@ class n_qubit_Simultaneous_Randomized_Benchmarking_one_length(swf.Hard_Sweep):
         self.return_seq = return_seq
         self.gate_decomposition = gate_decomposition
         self.interleaved_gate = interleaved_gate
-        self.parallel_pulses = parallel_pulses
         self.idx_for_RB = idx_for_RB
         self.verbose = verbose
 
