@@ -1496,6 +1496,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
         data_raw = self.UHFQC.acquisition_poll(
             samples=self.nr_sweep_points, arm=False, acquisition_time=0.01)
+
         # the self.channels should be the same as data_raw.keys().
         # this is to be tested (MAR 26-9-2017)
         data = np.array([data_raw[key]
@@ -1508,6 +1509,12 @@ class UHFQC_integrated_average_detector(Hard_Detector):
                     'quex_trans_offset_weightfunction_{}'.format(channel))
         if not self.real_imag:
             data = self.convert_to_polar(data)
+
+        no_virtual_channels = len(self.value_names)//len(self.channels)
+
+        data = np.reshape(data.T,
+                          (-1, no_virtual_channels, len(self.channels))).T
+        data = data.reshape((len(self.value_names), -1))
         return data
 
     def convert_to_polar(self, data):
@@ -2032,9 +2039,8 @@ class UHFQC_single_qubit_statistics_logging_det(UHFQC_statistics_logging_det):
         if channel_name is None:
             channel_name = ['ch{}'.format(channel)]
 
-        self.value_names = ['{} counts'.format(channel),
-                            '{} flips'.format(channel),
-                            '{} state errors'.format(channel)]
+        self.value_names = ['ch{} flips'.format(channel),
+                            'ch{} 1-counts'.format(channel)]
         if not self.normalize_counts:
             self.value_units = '#'*len(self.value_names)
         else:
@@ -2058,8 +2064,9 @@ class UHFQC_single_qubit_statistics_logging_det(UHFQC_statistics_logging_det):
         return two_bit_sm
 
     def acquire_data_point(self, **kw):
-        # Returns only the data for the relevant channel
-        return super().acquire_data_point()[0:3]
+        # Returns only the data for the relevant channel and then
+        # reverts the order to start with the number of flips
+        return super().acquire_data_point()[:2][::-1]
 
 # --------------------------------------------
 # Fake detectors
