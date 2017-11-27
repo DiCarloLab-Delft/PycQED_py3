@@ -469,6 +469,47 @@ class CCLight_Transmon(Qubit):
             vals=vals.Ints(), initial_value=1,
             parameter_class=ManualParameter)
 
+        # Currently this has only the parameters for 1 CZ gate.
+        # in the future there will be 5 distinct flux operations for which
+        # parameters have to be stored.
+        # cz to all nearest neighbours (of which 2 are only phase corr) and
+        # the "park" operation.
+        self.add_parameter('fl_cz_length', vals=vals.Numbers(),
+                           unit='s', initial_value=35e-9,
+                           parameter_class=ManualParameter)
+        self.add_parameter('fl_cz_lambda_2', vals=vals.Numbers(),
+                           initial_value=0,
+                           parameter_class=ManualParameter)
+        self.add_parameter('fl_cz_lambda_3', vals=vals.Numbers(),
+                           initial_value=0,
+                           parameter_class=ManualParameter)
+        self.add_parameter('fl_cz_theta_f', vals=vals.Numbers(),
+                           unit='deg',
+                           initial_value=80,
+                           parameter_class=ManualParameter)
+        self.add_parameter('fl_cz_V_per_phi0', vals=vals.Numbers(),
+                           unit='V', initial_value=1,
+                           parameter_class=ManualParameter)
+        self.add_parameter('fl_cz_freq_01_max', vals=vals.Numbers(),
+                           unit='Hz', parameter_class=ManualParameter)
+        self.add_parameter('fl_cz_J2', vals=vals.Numbers(),
+                           unit='Hz',
+                           initial_value=50e6,
+                           parameter_class=ManualParameter)
+        self.add_parameter('fl_cz_freq_interaction', vals=vals.Numbers(),
+                           unit='Hz',
+                           parameter_class=ManualParameter)
+        self.add_parameter('fl_cz_phase_corr_length',
+                           unit='s',
+                           initial_value=5e-9, vals=vals.Numbers(),
+                           parameter_class=ManualParameter)
+        self.add_parameter('fl_cz_phase_corr_amp',
+                           unit='V',
+                           initial_value=0, vals=vals.Numbers(),
+                           parameter_class=ManualParameter)
+
+
+
     def add_config_parameters(self):
         self.add_parameter(
             'cfg_trigger_period', label='Trigger period',
