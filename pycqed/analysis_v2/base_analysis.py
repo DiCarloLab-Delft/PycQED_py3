@@ -42,8 +42,8 @@ class BaseDataAnalysis(object):
     """
 
     def __init__(self, t_start: str=None, t_stop: str=None,
-                 options_dict: dict=None, extract_only: bool=False,
-                 do_fitting: bool=False):
+                 TwoD: bool=False, options_dict: dict=None,
+                 extract_only: bool=False, do_fitting: bool=False):
         '''
         This is the __init__ of the abstract base class.
         It is intended to be called at the start of the init of the child
@@ -763,10 +763,10 @@ class BaseDataAnalysis(object):
             traces = {}
             for key,vals in block.items():
                 traces[key] = vals[ii]
+            # print(traces)
             for tt in range(len(traces['zvals'])):
                 if self.verbose:
                     (print(t_vals[tt].shape) for key,t_vals in traces.items())
-                print(traces['xvals'][tt])
                 if plot_xwidth is not None:
                     xwidth = plot_xwidth[tt]
                 else:
@@ -774,9 +774,9 @@ class BaseDataAnalysis(object):
                 out = pfunc(ax=axs,
                             xwidth=xwidth,
                             clim=fig_clim, cmap=plot_cmap,
-                            xvals=traces['xvals'][tt],
-                            yvals=traces['yvals'][tt],
-                            zvals=traces['zvals'][tt].transpose(),
+                            xvals=[traces['xvals'][tt]],
+                            yvals=[traces['yvals'][tt]],
+                            zvals=[traces['zvals'][tt].transpose()],
                             transpose=plot_transpose,
                             normalize=plot_normalize)
 
@@ -806,10 +806,24 @@ class BaseDataAnalysis(object):
 
         if plot_yrange is None:
             if plot_xwidth is not None:
-                ymin, ymax = min([min(yvals[0])
-                                  for tt, yvals in enumerate(plot_yvals)]), \
-                    max([max(yvals[0])
-                         for tt, yvals in enumerate(plot_yvals)])
+
+                ymin, ymax = [], []
+                for ytraces in block['yvals']:
+                    ymin_trace, ymax_trace = [], []
+                    for yvals in ytraces:
+                        ymin_trace.append(min(yvals))
+                        ymax_trace.append(max(yvals))
+                    ymin.append(min(ymin_trace))
+                    ymax.append(max(ymax_trace))
+                ymin = min(ymin)
+                ymax = max(ymax)
+                #     print(ytraces)
+                #     break
+                # # print(block['yvals'])
+                # ymin, ymax = min([min(yvals[0])
+                #                   for tt, yvals in enumerate(plot_yvals)]), \
+                #     max([max(yvals[0])
+                #          for tt, yvals in enumerate(plot_yvals)])
 
             else:
                 ymin, ymax = plot_yvals.min()-plot_yvals_step / \

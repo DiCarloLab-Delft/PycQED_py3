@@ -12,19 +12,33 @@ from pycqed.analysis.tools import data_manipulation as dm_tools
 from pycqed.analysis import fitting_models as fit_mods
 import lmfit
 
+import importlib
+importlib.reload(ba)
+
 class Spectroscopy(ba.BaseDataAnalysis):
-    def __init__(self, t_start,
-                 options_dict,
-                 t_stop = None,
-                 extract_only=False,
-                 auto=True):
+    def __init__(self, t_start, options_dict,
+                 t_stop = None, TwoD=False,
+                 extract_only=False, auto=True):
         super(Spectroscopy, self).__init__(t_start, t_stop=t_stop,
-                                             options_dict=options_dict,
-                                             extract_only=extract_only)
+                                           TwoD=TwoD,
+                                           options_dict=options_dict,
+                                           extract_only=extract_only)
         self.extract_fitparams = self.options_dict.get('fitparams',True)
-        self.params_dict = {'freq':'sweep_points',
+        self.params_dict = {'freq_label': 'sweep_name',
+                            'freq_unit': 'sweep_unit',
+                            'measurementstring': 'measurementstring',
+                            'freq':'sweep_points',
                             'amp':'amp',
                             'phase':'phase'}
+
+        # {'xlabel': 'sweep_name',
+        # 'xunit': 'sweep_unit',
+        # 'measurementstring': 'measurementstring',
+        # 'sweep_points': 'sweep_points',
+        # 'value_names': 'value_names',
+        # 'value_units': 'value_units',
+        # 'measured_values': 'measured_values'}
+        self.TwoD = TwoD
         if self.extract_fitparams:
             self.params_dict.update({'fitparams':'fit_params'})
 
@@ -36,7 +50,7 @@ class Spectroscopy(ba.BaseDataAnalysis):
 
     def process_data(self):
         proc_dat_dict = self.processed_data_dict
-        proc_dat_dict['freq_label'] = 'Frequency (GHz)'
+        proc_dat_dict['freq_label'] = 'Frequency'
         proc_dat_dict['amp_label'] = 'Transmission amplitude (arb. units)'
 
         proc_dat_dict['phase_label'] = 'Transmission phase (degrees)'
@@ -48,8 +62,13 @@ class Spectroscopy(ba.BaseDataAnalysis):
             proc_dat_dict['plot_frequency'] = np.squeeze(self.raw_data_dict['freq'])
             proc_dat_dict['plot_amp'] = np.squeeze(self.raw_data_dict['amp'])
             proc_dat_dict['plot_phase'] = np.squeeze(self.raw_data_dict['phase'])
+            if self.TwoD:
+                x_numbers = np.array([[tt] for tt in range(len(self.raw_data_dict['timestamps']))])
+                xvals = self.options_dict.get('xvals',)
+                # proc_dat_dict['plot_xvals'] =
+
         else:
-            #TRANSPOSE ALSO NEEDS TO BE CODED FOR 2D
+            # multiple timestamps, len(self.raw_data_dict['timestamps']) > 1
             proc_dat_dict['plot_xvals'] = self.options_dict.get('xvals',np.array([[tt] for tt in range(len(self.raw_data_dict['timestamps']))]))
             proc_dat_dict['plot_xwidth'] = self.options_dict.get('xwidth',None)
             proc_dat_dict['plot_xlabel'] = self.options_dict.get('xlabel','Scan number')
@@ -63,6 +82,7 @@ class Spectroscopy(ba.BaseDataAnalysis):
                 proc_dat_dict['plot_amp'] = np.array(self.raw_data_dict['amp'])
 
             else:
+                # manual setting of plot_xwidths
                 proc_dat_dict['plot_frequency'] = self.raw_data_dict['freq']
                 proc_dat_dict['plot_phase'] = self.raw_data_dict['phase']
                 proc_dat_dict['plot_amp'] = self.raw_data_dict['amp']
@@ -76,27 +96,43 @@ class Spectroscopy(ba.BaseDataAnalysis):
     def prepare_plots(self):
         proc_dat_dict = self.processed_data_dict
         if len(self.raw_data_dict['timestamps']) == 1:
-            plot_fn = self.plot_line
-            self.plot_dicts['amp'] = {'plotfn': plot_fn,
-                            'xvals': proc_dat_dict['plot_frequency'],
-                            'yvals': proc_dat_dict['plot_amp'],
-                            'title': 'Spectroscopy amplitude: %s'%(self.timestamps[0]),
-                            'xlabel': proc_dat_dict['freq_label'],
-                            'ylabel': proc_dat_dict['amp_label'],
+            self.plot_dicts['amp'] = {'title': 'Spectroscopy amplitude: %s'%(self.timestamps[0]),
                             'yrange': proc_dat_dict['amp_range'],
                             'plotsize': proc_dat_dict['plotsize']
                             }
-            self.plot_dicts['phase'] = {'plotfn': plot_fn,
-                            'xvals': proc_dat_dict['plot_frequency'],
-                            'yvals': proc_dat_dict['plot_phase'],
-                            'title': 'Spectroscopy phase: %s'%(self.timestamps[0]),
-                            'xlabel': proc_dat_dict['freq_label'],
-                            'ylabel': proc_dat_dict['phase_label'],
+            self.plot_dicts['phase'] = {'title': 'Spectroscopy phase: %s'%(self.timestamps[0]),
                             'yrange': proc_dat_dict['phase_range'],
                             'plotsize': proc_dat_dict['plotsize']
                             }
+            if self.TwoD:
+                plot_fn = self.plot_colorxy
+
+                # plot_dicts['amp']['xvals'] = proc_dat_dict['plot_xvals']
+                self.plot_dicts['amp']['yvals'] = proc_dat_dict['plot_frequency']
+                self.plot_dicts['amp']['zvals'] = proc_dat_dict['plot_amp']
+                self.plot_dicts['amp']['ylabel'] = proc_dat_dict['freq_label']
+                self.plot_dicts['amp']['zlabel'] = proc_dat_dict['amp_label']
+
+                # plot_dicts['phase']['xvals'] = proc_dat_dict['plot_xvals']
+                self.plot_dicts['phase']['yvals'] = proc_dat_dict['plot_frequency']
+                self.plot_dicts['phase']['zvals'] = proc_dat_dict['plot_phase']
+                self.plot_dicts['phase']['ylabel'] = proc_dat_dict['freq_label']
+                self.plot_dicts['phase']['zlabel'] = proc_dat_dict['phase_label']
+            else:
+                plot_fn = self.plot_line
+
+                self.plot_dicts['amp']['xvals'] = proc_dat_dict['plot_frequency']
+                self.plot_dicts['amp']['yvals'] = proc_dat_dict['plot_amp']
+                self.plot_dicts['amp']['xlabel'] = proc_dat_dict['freq_label']
+                self.plot_dicts['amp']['ylabel'] = proc_dat_dict['amp_label']
+
+                self.plot_dicts['phase']['xvals'] = proc_dat_dict['plot_frequency']
+                self.plot_dicts['phase']['yvals'] = proc_dat_dict['phase_label']
+                self.plot_dicts['phase']['xlabel'] = proc_dat_dict['freq_label']
+                self.plot_dicts['phase']['ylabel'] = proc_dat_dict['phase_label']
+            self.plot_dicts['amp']['plotfn'] = plot_fn
+            self.plot_dicts['phase']['plotfn'] = plot_fn
         else:
-            print('plotting not yet coded up for multiple traces')
             plotcbar = self.options_dict.get('colorbar',True)
             plot_fn = self.plot_colorx #(self, pdict, axs)
             self.plot_dicts['amp'] = {'plotfn': plot_fn,
@@ -178,11 +214,11 @@ class ResonatorSpectroscopy(Spectroscopy):
             raise NotImplementedError('This functions guess function is not coded up yet')
             #TODO HangerFuncAmplitude Guess
         elif fitting_model == 'lorentzian':
-            print('This functions guess function is not coded up yet')
+            raise NotImplementedError('This functions guess function is not coded up yet')
             fit_fn = fit_mods.Lorentzian
             #TODO LorentzianGuess
         elif fitting_model == 'complex':
-            print('This functions guess function is not coded up yet')
+            raise NotImplementedError('This functions guess function is not coded up yet')
             fit_fn = fit_mods.HangerFuncComplex
             #TODO HangerFuncComplexGuess
 
