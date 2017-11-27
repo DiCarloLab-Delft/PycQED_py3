@@ -1570,7 +1570,7 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
 
             correlation_channel = -1
             # 4 is the (current) max number of weights in the UHFQC (v5)
-            for ch in range(4):
+            for ch in range(9):
                 if ch in self.channels:
                     # Disable correlation mode as this is used for normal
                     # acquisition

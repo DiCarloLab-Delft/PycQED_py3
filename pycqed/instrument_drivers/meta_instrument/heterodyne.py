@@ -258,8 +258,8 @@ class HeterodyneInstrument(Instrument):
         return d[0][0]+1j*d[1][0]
 
     def probe_UHFQC(self):
-        if self._awg_seq_parameters_changed or \
-           self._UHFQC_awg_parameters_changed:
+        if (self._awg_seq_parameters_changed or
+           self._UHFQC_awg_parameters_changed) and self.auto_seq_loading():
             self.prepare()
 
         dataset = self._acquisition_instr.acquisition_poll(

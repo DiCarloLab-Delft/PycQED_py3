@@ -61,6 +61,10 @@ class QuDev_transmon(Qubit):
                            initial_value=0, parameter_class=ManualParameter)
         self.add_parameter('T1_ef', label='Qubit relaxation', unit='s',
                            initial_value=0, parameter_class=ManualParameter)
+        self.add_parameter('T2', label='Qubit dephasing Echo', unit='s',
+                           initial_value=0, parameter_class=ManualParameter)
+        self.add_parameter('T2_ef', label='Qubit dephasing Echo', unit='s',
+                           initial_value=0, parameter_class=ManualParameter)
         self.add_parameter('T2_star', label='Qubit dephasing', unit='s',
                            initial_value=0, parameter_class=ManualParameter)
         self.add_parameter('T2_star_ef', label='Qubit dephasing', unit='s',
@@ -310,6 +314,7 @@ class QuDev_transmon(Qubit):
             self.readout_UC_LO.pulsemod_state('Off')
             self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
             self.readout_UC_LO.on()
+        self.heterodyne.prepare()
 
 
 
@@ -1967,7 +1972,7 @@ class QuDev_transmon(Qubit):
         return
 
     def find_frequency_T2_ramsey(self, times, artificial_detuning=0,
-                                 upload=False, MC=None, label=None,
+                                 upload=True, MC=None, label=None,
                                  cal_points=True, no_cal_points=None,
                                  analyze=True, close_fig=True, update=False,
                                  for_ef=False, last_ge_pulse=False, **kw):
@@ -2131,7 +2136,7 @@ class QuDev_transmon(Qubit):
 
         if analyze:
 
-            RamseyA = ma.Ramsey_Analysis_multiple_detunings(
+            RamseyA = ma.Ramsey_Analysis(
                 auto=True,
                 label=label,
                 qb_name=self.name,

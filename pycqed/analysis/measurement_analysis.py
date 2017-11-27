@@ -19,7 +19,7 @@ import pylab
 from pycqed.analysis.tools import data_manipulation as dm_tools
 import imp
 import math
-import pygsti
+# import pygsti
 from math import erfc
 from scipy.signal import argrelmax, argrelmin
 from copy import deepcopy
@@ -1534,13 +1534,13 @@ class Rabi_Analysis(TD_Analysis):
             analyze for EF transition
         make_fig          (default=True)
             plot the fitted data
-        print_fit_results (default=True)
+        print_fit_results (default=False)
             print the fit report
         show              (default=False)
             show the plots
         show_guess        (default=False)
             plot with initial guess values
-        print_parameters   (default=True)
+        print_parameters   (default=False)
             print the pi&piHalf pulses amplitudes
         plot_amplitudes   (default=True)
             plot the pi&piHalf pulses amplitudes
@@ -2445,7 +2445,9 @@ class QScale_Analysis(TD_Analysis):
             show the plot
         show_guess        (default=False)
             plot with initial guess values
-        print_parameters       (default=True)
+        print_fit_results (default=False)
+            print the fit report
+        print_parameters       (default=False)
             print the found qscale value and stddev
         plot_title        (default=measurementstring)
             the title for the plot as a string
@@ -3945,7 +3947,7 @@ class T1_Analysis(TD_Analysis):
                                      t=self.sweep_points[:-self.NoCalPoints],
                                      params=self.params)
 
-        if kw.get('print_fit_results',False):
+        if kw.get('print_fit_results', False):
             print(fit_res.fit_report())
 
         return fit_res
@@ -4088,7 +4090,7 @@ class Ramsey_Analysis(TD_Analysis):
 
     def fit_Ramsey(self, x, y, **kw):
 
-        print_fit_results = kw.pop('print_fit_results',False)
+        print_fit_results = kw.pop('print_fit_results', False)
         damped_osc_mod = fit_mods.ExpDampOscModel
         average = np.mean(y)
 
@@ -4227,12 +4229,11 @@ class Ramsey_Analysis(TD_Analysis):
         ax.plot(x, y, 'r-',linewidth=self.line_width)
 
 
-    def run_default_analysis(self, print_fit_results=False,
-                             close_file=False, **kw):
+    def run_default_analysis(self, close_file=False, **kw):
 
         super().run_default_analysis(
             close_file=close_file,
-            close_main_fig=True,save_fig=False,**kw)
+            close_main_fig=True, save_fig=False,**kw)
 
         verbose = kw.get('verbose', False)
         # Get old values for qubit frequency
@@ -4277,10 +4278,10 @@ class Ramsey_Analysis(TD_Analysis):
                   '\t\tqubit frequency stderr = {:.7f} (MHz)'.format(
                 self.ramsey_freq['freq_stderr']*1e-6)+
                 '\nT2* = {:.5f} '.format(
-                self.T2_star['T2_star']*self.scale) +'('+'�'+unit+')'+
+                self.T2_star['T2_star']*self.scale) +'('+'µ'+unit+')'+
                 '\t\tT2* stderr = {:.5f} '.format(
                 self.T2_star['T2_star_stderr']*self.scale) +
-                '('+'�'+unit+')')
+                '('+'µ'+unit+')')
 
         if close_file:
             self.data_file.close()
@@ -8345,257 +8346,257 @@ class Ram_Z_Analysis(MeasurementAnalysis):
         self.save_fig(fig, 'Ram-Z_dac_arc.png')
 
 
-class GST_Analysis(TD_Analysis):
-    '''
-    Analysis for Gate Set Tomography. Extracts data from the files, bins it
-    correctly and writes the counts to a file in the format required by
-    pyGSTi. The actual analysis is then run using the tools from pyGSTi.
-    '''
-    def __init__(self, timestamp=None, nr_qubits: int=1, **kw):
-        '''
-        Args:
-            nr_qubits (int):
-                    Number of qubits with which the GST was run.
-        '''
-        self.exp_per_file = 0
-        self.hard_repetitions = 0
-        self.soft_repetitions = 0
-        self.exp_list = []
-        self.gs_target = None
-        self.prep_fids = None
-        self.meas_fids = None
-        self.germs = None
-        self.max_lengths = []
-
-        self.nr_qubits = nr_qubits
-        self.counts = []
-        super().__init__(cal_points=False, make_fig=False,
-                         timestamp=timestamp, **kw)
-
-    def run_default_analysis(self, **kw):
-        self.close_file = kw.get('close_file', True)
-        self.get_naming_and_values()
-        self.exp_metadata = h5d.read_dict_from_hdf5(
-            {}, self.data_file['Experimental Data']['Experimental Metadata'])
-
-        self.gs_target = pygsti.io.load_gateset(
-            self.exp_metadata['gs_target'])
-        self.meas_fids = pygsti.io.load_gatestring_list(
-            self.exp_metadata['meas_fids'])
-        self.prep_fids = pygsti.io.load_gatestring_list(
-            self.exp_metadata['prep_fids'])
-        self.germs = pygsti.io.load_gatestring_list(
-            self.exp_metadata['germs'])
-        self.max_lengths = self.exp_metadata['max_lengths']
-        self.exp_per_file = self.exp_metadata['exp_per_file']
-        self.exp_last_file = self.exp_metadata['exp_last_file']
-        self.hard_repetitions = self.exp_metadata['hard_repetitions']
-        self.soft_repetitions = self.exp_metadata['soft_repetitions']
-        self.nr_hard_segs = self.exp_metadata['nr_hard_segs']
-
-        self.exp_list = pygsti.construction.make_lsgst_experiment_list(
-            self.gs_target.gates.keys(), self.prep_fids, self.meas_fids,
-            self.germs, self.max_lengths)
-
-        # Count the results. Method depends on how many qubits were used.
-        if self.nr_qubits == 1:
-            self.counts, self.spam_label_order = self.count_results_1Q()
-        elif self.nr_qubits == 2:
-            self.counts, self.spam_label_order = self.count_results_2Q()
-        else:
-            raise NotImplementedError(
-                'GST analysis for {} qubits is not implemented.'
-                .format(self.nr_qubits))
-
-        # Write extracted counts to file.
-        self.pygsti_fn = os.path.join(self.folder, 'pyGSTi_dataset.txt')
-        self.write_GST_datafile(self.pygsti_fn, self.counts,
-                                self.spam_label_order)
-
-        # Run pyGSTi analysis and create report.
-        self.results = pygsti.do_long_sequence_gst(
-            self.pygsti_fn, self.gs_target, self.prep_fids, self.meas_fids,
-            self.germs, self.max_lengths)
-
-        with open(os.path.join(self.folder,
-                               'pyGSTi_results.p'), 'wb') as file:
-            pickle.dump(self.results, file)
-
-        self.report_fn = os.path.join(self.folder, 'pyGSTi_report.pdf')
-        self.results.create_full_report_pdf(confidenceLevel=95,
-                                            filename=self.report_fn,
-                                            verbosity=2)
-
-    def write_GST_datafile(self, filepath: str, counts: list, labels=()):
-        '''
-        Write the measured counts to a file in pyGSTi format.
-        Args:
-            filepath (string):
-                    Full path of the file to be written.
-            counts (list):
-                    List pf tuples (gate_seq_str, ...), where the first
-                    entry is the string representation of the gate sequence,
-                    and the following entries are the counts for the counts
-                    for the different measurement operators.
-            labels (list):
-                    List of the labels for the measurement operators. Note
-                    that is just for readability and does not affect the
-                    order in which the counts are written. The order should
-                    be the same as in the pyGSTi gateset definition.
-        '''
-        # The directive strings tells the pyGSTi parser which column
-        # corresponds to which SPAM label.
-        directive_string = ('## Columns = ' +
-                            ', '.join(['{} count'] * len(labels))
-                            .format(*labels))
-        with open(filepath, 'w') as file:
-            file.writelines(directive_string)
-            for tup in counts:
-                file.writelines(('\n' + '{}  ' * len(tup)).format(*tup))
-
-    def count_results_1Q(self):
-        # Find the results that belong to the same GST sequence and sum up the
-        # counts.
-
-        # This determines in which order the results are written.
-        # The strings in this list must be the same SPAM labels as defined
-        # in the pyGSTi target gateset.
-        spam_label_order = ['plus', 'minus']  # plus = |0>, minus = |1>
-
-        # First, reshape data according to soft repetitions.
-        counts = []
-        data = np.reshape(self.measured_values[0],
-                          (self.soft_repetitions, -1))
-        # Each row (i.e. data[i, :]) now contains one of the soft repetitions
-        # containing all of the required GST experiments. They are however
-        # still ordered in segments according to the hard repetitions.
-        # d: distance between measurements of same sequence
-        # l: length of index range corresponding to one segment
-        d = self.exp_per_file
-        l = self.exp_per_file * self.hard_repetitions
-        for i in range(self.nr_hard_segs - int(self.exp_last_file != 0)):
-            # For every segment... subtract 1 from nr_hard_segs to exclude
-            # last file if the last file has a different number of experiments
-            block_idx = i * l
-
-            for seq_idx in range(self.exp_per_file):
-                # For every sequence in the current segment
-                # The full index is index of the segment plus index
-                # (block_idx) of the sequence in the segment (seq_idx)
-                one_count = 0
-                for soft_idx in range(self.soft_repetitions):
-                    # For all soft repetitions: sum up "1" counts.
-                    one_count += np.sum(
-                        data[soft_idx, block_idx+seq_idx:block_idx+l:d],
-                        dtype=int)
-                zero_count = (self.hard_repetitions * self.soft_repetitions -
-                              one_count)
-
-                counts.append((self.exp_list[i+seq_idx].str,
-                               zero_count, one_count))
-
-        # If the last file has a different number of experiments, count those
-        # separately
-        if self.exp_last_file != 0:
-            d_last = self.exp_last_file
-            l_last = self.exp_last_file * self.hard_repetitions
-            block_idx = l * (self.hard_repetitions - 1)
-
-            for seq_idx in range(self.exp_last_file):
-                one_count = 0
-                for soft_idx in range(self.soft_repetitions):
-                    one_count += np.sum(
-                        data[soft_idx,
-                             block_idx+seq_idx:block_idx+l_last:d_last],
-                        dtype=int)
-                zero_count = (self.hard_repetitions * self.soft_repetitions -
-                              one_count)
-
-                counts.append(
-                    (self.exp_list[self.nr_hard_segs-1 + seq_idx].str,
-                     zero_count, one_count))
-        return counts, spam_label_order
-
-    def count_results_2Q(self):
-        # Find the results that belong to the same GST sequence and sum up the
-        # counts.
-
-        # This determines in which order the results are written.
-        # The strings in this list must be the same SPAM labels as defined
-        # in the pyGSTi target gateset.
-        # 'up' = |0>, 'dn' = |1>
-        spam_label_order = ['upup', 'updn', 'dnup', 'dndn']
-
-        # First, reshape data according to soft repetitions.
-        # IMPORTANT NOTE: This assumes that the first column in the measured
-        # values is the readout of the least significant qubit. This is
-        # important because it has to be consistent with how the pyGSTi spam
-        # labels are defined.
-        counts = []
-        data_q0 = np.reshape(self.measured_values[0],
-                             (self.soft_repetitions, -1))
-        data_q1 = np.reshape(self.measured_values[1],
-                             (self.soft_repetitions, -1))
-
-        # Each row (i.e. data[i, :]) now contains one of the soft repetitions
-        # containing all of the required GST experiments. They are however
-        # still ordered in segments according to the hard repetitions.
-        # d: distance between measurements of same sequence
-        # l: length of index range corresponding to one segment
-        d = self.exp_per_file
-        l = self.exp_per_file * self.hard_repetitions
-
-        for i in range(self.nr_hard_segs - int(self.exp_last_file != 0)):
-            # For every segment... subtract 1 from nr_hard_segs to exclude
-            # last file if the last file has a different number of experiments
-            block_idx = i * l
-
-            for seq_idx in range(self.exp_per_file):
-                # For every sequence in the current segment
-                new_count = (0, 0, 0, 0)
-
-                for soft_idx in range(self.soft_repetitions):
-                    for x in range(0, l, d):
-                        q0_bit = data_q0[soft_idx, block_idx+seq_idx+x]
-                        q1_bit = data_q1[soft_idx, block_idx+seq_idx+x]
-                        if not q0_bit and not q1_bit:
-                            new_count[0] += 1
-                        elif q0_bit and not q1_bit:
-                            new_count[1] += 1
-                        elif not q0_bit and q1_bit:
-                            new_count[2] += 1
-                        else:
-                            new_count[3] += 1
-
-                counts.append((self.exp_list[i+seq_idx].str, *new_count))
-
-        # If the last file has a different number of experiments, count those
-        # separately
-        if self.exp_last_file != 0:
-            d_last = self.exp_last_file
-            l_last = self.exp_last_file * self.hard_repetitions
-            block_idx = l * (self.hard_repetitions - 1)
-
-            for seq_idx in range(self.exp_last_file):
-                new_count = (0, 0, 0, 0)
-                for soft_idx in range(self.soft_repetitions):
-                    for x in range(0, l_last, d_last):
-                        q0_bit = data_q0[soft_idx, block_idx+seq_idx+x]
-                        q1_bit = data_q1[soft_idx, block_idx+seq_idx+x]
-                        if not q0_bit and not q1_bit:
-                            new_count[0] += 1
-                        elif q0_bit and not q1_bit:
-                            new_count[1] += 1
-                        elif not q0_bit and q1_bit:
-                            new_count[2] += 1
-                        else:
-                            new_count[3] += 1
-
-                counts.append(
-                    (self.exp_list[self.nr_hard_segs-1 + seq_idx].str,
-                     *new_count))
-
-        return counts, spam_label_order
+# class GST_Analysis(TD_Analysis):
+#     '''
+#     Analysis for Gate Set Tomography. Extracts data from the files, bins it
+#     correctly and writes the counts to a file in the format required by
+#     pyGSTi. The actual analysis is then run using the tools from pyGSTi.
+#     '''
+#     def __init__(self, timestamp=None, nr_qubits: int=1, **kw):
+#         '''
+#         Args:
+#             nr_qubits (int):
+#                     Number of qubits with which the GST was run.
+#         '''
+#         self.exp_per_file = 0
+#         self.hard_repetitions = 0
+#         self.soft_repetitions = 0
+#         self.exp_list = []
+#         self.gs_target = None
+#         self.prep_fids = None
+#         self.meas_fids = None
+#         self.germs = None
+#         self.max_lengths = []
+#
+#         self.nr_qubits = nr_qubits
+#         self.counts = []
+#         super().__init__(cal_points=False, make_fig=False,
+#                          timestamp=timestamp, **kw)
+#
+#     def run_default_analysis(self, **kw):
+#         self.close_file = kw.get('close_file', True)
+#         self.get_naming_and_values()
+#         self.exp_metadata = h5d.read_dict_from_hdf5(
+#             {}, self.data_file['Experimental Data']['Experimental Metadata'])
+#
+#         self.gs_target = pygsti.io.load_gateset(
+#             self.exp_metadata['gs_target'])
+#         self.meas_fids = pygsti.io.load_gatestring_list(
+#             self.exp_metadata['meas_fids'])
+#         self.prep_fids = pygsti.io.load_gatestring_list(
+#             self.exp_metadata['prep_fids'])
+#         self.germs = pygsti.io.load_gatestring_list(
+#             self.exp_metadata['germs'])
+#         self.max_lengths = self.exp_metadata['max_lengths']
+#         self.exp_per_file = self.exp_metadata['exp_per_file']
+#         self.exp_last_file = self.exp_metadata['exp_last_file']
+#         self.hard_repetitions = self.exp_metadata['hard_repetitions']
+#         self.soft_repetitions = self.exp_metadata['soft_repetitions']
+#         self.nr_hard_segs = self.exp_metadata['nr_hard_segs']
+#
+#         self.exp_list = pygsti.construction.make_lsgst_experiment_list(
+#             self.gs_target.gates.keys(), self.prep_fids, self.meas_fids,
+#             self.germs, self.max_lengths)
+#
+#         # Count the results. Method depends on how many qubits were used.
+#         if self.nr_qubits == 1:
+#             self.counts, self.spam_label_order = self.count_results_1Q()
+#         elif self.nr_qubits == 2:
+#             self.counts, self.spam_label_order = self.count_results_2Q()
+#         else:
+#             raise NotImplementedError(
+#                 'GST analysis for {} qubits is not implemented.'
+#                 .format(self.nr_qubits))
+#
+#         # Write extracted counts to file.
+#         self.pygsti_fn = os.path.join(self.folder, 'pyGSTi_dataset.txt')
+#         self.write_GST_datafile(self.pygsti_fn, self.counts,
+#                                 self.spam_label_order)
+#
+#         # Run pyGSTi analysis and create report.
+#         self.results = pygsti.do_long_sequence_gst(
+#             self.pygsti_fn, self.gs_target, self.prep_fids, self.meas_fids,
+#             self.germs, self.max_lengths)
+#
+#         with open(os.path.join(self.folder,
+#                                'pyGSTi_results.p'), 'wb') as file:
+#             pickle.dump(self.results, file)
+#
+#         self.report_fn = os.path.join(self.folder, 'pyGSTi_report.pdf')
+#         self.results.create_full_report_pdf(confidenceLevel=95,
+#                                             filename=self.report_fn,
+#                                             verbosity=2)
+#
+#     def write_GST_datafile(self, filepath: str, counts: list, labels=()):
+#         '''
+#         Write the measured counts to a file in pyGSTi format.
+#         Args:
+#             filepath (string):
+#                     Full path of the file to be written.
+#             counts (list):
+#                     List pf tuples (gate_seq_str, ...), where the first
+#                     entry is the string representation of the gate sequence,
+#                     and the following entries are the counts for the counts
+#                     for the different measurement operators.
+#             labels (list):
+#                     List of the labels for the measurement operators. Note
+#                     that is just for readability and does not affect the
+#                     order in which the counts are written. The order should
+#                     be the same as in the pyGSTi gateset definition.
+#         '''
+#         # The directive strings tells the pyGSTi parser which column
+#         # corresponds to which SPAM label.
+#         directive_string = ('## Columns = ' +
+#                             ', '.join(['{} count'] * len(labels))
+#                             .format(*labels))
+#         with open(filepath, 'w') as file:
+#             file.writelines(directive_string)
+#             for tup in counts:
+#                 file.writelines(('\n' + '{}  ' * len(tup)).format(*tup))
+#
+#     def count_results_1Q(self):
+#         # Find the results that belong to the same GST sequence and sum up the
+#         # counts.
+#
+#         # This determines in which order the results are written.
+#         # The strings in this list must be the same SPAM labels as defined
+#         # in the pyGSTi target gateset.
+#         spam_label_order = ['plus', 'minus']  # plus = |0>, minus = |1>
+#
+#         # First, reshape data according to soft repetitions.
+#         counts = []
+#         data = np.reshape(self.measured_values[0],
+#                           (self.soft_repetitions, -1))
+#         # Each row (i.e. data[i, :]) now contains one of the soft repetitions
+#         # containing all of the required GST experiments. They are however
+#         # still ordered in segments according to the hard repetitions.
+#         # d: distance between measurements of same sequence
+#         # l: length of index range corresponding to one segment
+#         d = self.exp_per_file
+#         l = self.exp_per_file * self.hard_repetitions
+#         for i in range(self.nr_hard_segs - int(self.exp_last_file != 0)):
+#             # For every segment... subtract 1 from nr_hard_segs to exclude
+#             # last file if the last file has a different number of experiments
+#             block_idx = i * l
+#
+#             for seq_idx in range(self.exp_per_file):
+#                 # For every sequence in the current segment
+#                 # The full index is index of the segment plus index
+#                 # (block_idx) of the sequence in the segment (seq_idx)
+#                 one_count = 0
+#                 for soft_idx in range(self.soft_repetitions):
+#                     # For all soft repetitions: sum up "1" counts.
+#                     one_count += np.sum(
+#                         data[soft_idx, block_idx+seq_idx:block_idx+l:d],
+#                         dtype=int)
+#                 zero_count = (self.hard_repetitions * self.soft_repetitions -
+#                               one_count)
+#
+#                 counts.append((self.exp_list[i+seq_idx].str,
+#                                zero_count, one_count))
+#
+#         # If the last file has a different number of experiments, count those
+#         # separately
+#         if self.exp_last_file != 0:
+#             d_last = self.exp_last_file
+#             l_last = self.exp_last_file * self.hard_repetitions
+#             block_idx = l * (self.hard_repetitions - 1)
+#
+#             for seq_idx in range(self.exp_last_file):
+#                 one_count = 0
+#                 for soft_idx in range(self.soft_repetitions):
+#                     one_count += np.sum(
+#                         data[soft_idx,
+#                              block_idx+seq_idx:block_idx+l_last:d_last],
+#                         dtype=int)
+#                 zero_count = (self.hard_repetitions * self.soft_repetitions -
+#                               one_count)
+#
+#                 counts.append(
+#                     (self.exp_list[self.nr_hard_segs-1 + seq_idx].str,
+#                      zero_count, one_count))
+#         return counts, spam_label_order
+#
+#     def count_results_2Q(self):
+#         # Find the results that belong to the same GST sequence and sum up the
+#         # counts.
+#
+#         # This determines in which order the results are written.
+#         # The strings in this list must be the same SPAM labels as defined
+#         # in the pyGSTi target gateset.
+#         # 'up' = |0>, 'dn' = |1>
+#         spam_label_order = ['upup', 'updn', 'dnup', 'dndn']
+#
+#         # First, reshape data according to soft repetitions.
+#         # IMPORTANT NOTE: This assumes that the first column in the measured
+#         # values is the readout of the least significant qubit. This is
+#         # important because it has to be consistent with how the pyGSTi spam
+#         # labels are defined.
+#         counts = []
+#         data_q0 = np.reshape(self.measured_values[0],
+#                              (self.soft_repetitions, -1))
+#         data_q1 = np.reshape(self.measured_values[1],
+#                              (self.soft_repetitions, -1))
+#
+#         # Each row (i.e. data[i, :]) now contains one of the soft repetitions
+#         # containing all of the required GST experiments. They are however
+#         # still ordered in segments according to the hard repetitions.
+#         # d: distance between measurements of same sequence
+#         # l: length of index range corresponding to one segment
+#         d = self.exp_per_file
+#         l = self.exp_per_file * self.hard_repetitions
+#
+#         for i in range(self.nr_hard_segs - int(self.exp_last_file != 0)):
+#             # For every segment... subtract 1 from nr_hard_segs to exclude
+#             # last file if the last file has a different number of experiments
+#             block_idx = i * l
+#
+#             for seq_idx in range(self.exp_per_file):
+#                 # For every sequence in the current segment
+#                 new_count = (0, 0, 0, 0)
+#
+#                 for soft_idx in range(self.soft_repetitions):
+#                     for x in range(0, l, d):
+#                         q0_bit = data_q0[soft_idx, block_idx+seq_idx+x]
+#                         q1_bit = data_q1[soft_idx, block_idx+seq_idx+x]
+#                         if not q0_bit and not q1_bit:
+#                             new_count[0] += 1
+#                         elif q0_bit and not q1_bit:
+#                             new_count[1] += 1
+#                         elif not q0_bit and q1_bit:
+#                             new_count[2] += 1
+#                         else:
+#                             new_count[3] += 1
+#
+#                 counts.append((self.exp_list[i+seq_idx].str, *new_count))
+#
+#         # If the last file has a different number of experiments, count those
+#         # separately
+#         if self.exp_last_file != 0:
+#             d_last = self.exp_last_file
+#             l_last = self.exp_last_file * self.hard_repetitions
+#             block_idx = l * (self.hard_repetitions - 1)
+#
+#             for seq_idx in range(self.exp_last_file):
+#                 new_count = (0, 0, 0, 0)
+#                 for soft_idx in range(self.soft_repetitions):
+#                     for x in range(0, l_last, d_last):
+#                         q0_bit = data_q0[soft_idx, block_idx+seq_idx+x]
+#                         q1_bit = data_q1[soft_idx, block_idx+seq_idx+x]
+#                         if not q0_bit and not q1_bit:
+#                             new_count[0] += 1
+#                         elif q0_bit and not q1_bit:
+#                             new_count[1] += 1
+#                         elif not q0_bit and q1_bit:
+#                             new_count[2] += 1
+#                         else:
+#                             new_count[3] += 1
+#
+#                 counts.append(
+#                     (self.exp_list[self.nr_hard_segs-1 + seq_idx].str,
+#                      *new_count))
+#
+#         return counts, spam_label_order
 
 
 class CZ_1Q_phase_analysis(TD_Analysis):
