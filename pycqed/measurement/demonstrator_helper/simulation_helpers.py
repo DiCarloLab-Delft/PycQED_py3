@@ -58,8 +58,6 @@ def _simulate_QX(file_path, options):
         qxc.connect()
         qxc.create_qubits(2)
         qx_sweep = swf.QX_Hard_Sweep(qxc, file_path)
-        qx_sweep.parameter_name = 'Circuit number '
-        qx_sweep.unit = '#'
         num_avg = options.get('num_avg', 10000)  # 10000 is the default
 
         qx_detector = QX_Hard_Detector(qxc, [file_path], num_avg=num_avg)
@@ -85,10 +83,11 @@ def _simulate_quantumsim(file_path, options):
         'Q0': {'T1': 30e3, 'T2': 17e3, 'frac1_0': 0.0189, 'frac1_1': 0.918},
         'Q1': {'T1': 30e3, 'T2': 17e3, 'frac1_0': 0.068, 'frac1_1': 0.949},
         'q0': {'T1': 30e3, 'T2': 17e3, 'frac1_0': 0.0189, 'frac1_1': 0.918},
-        'q1': {'T1': 30e3, 'T2': 17e3, 'frac1_0': 0.068, 'frac1_1': 0.949}}
+        'q1': {'T1': 30e3, 'T2': 17e3, 'frac1_0': 0.068, 'frac1_1': 0.949},
+        'default': {'T1': 30e3, 'T2': 17e3, 'frac1_0': 0.068, 'frac1_1': 0.949}}
 
     quantumsim_det = Quantumsim_Two_QB_Hard_Detector(
-        file_path, dt=(40, 280), qubit_parameters=qubit_parameters)
+        file_path, timegrid=20, gate_1_step=1, gate_2_step=5, qubit_parameters=qubit_parameters)
     sweep_points = range(len(quantumsim_det.parser.circuits))
 
     MC.set_detector_function(quantumsim_det)
