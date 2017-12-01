@@ -163,13 +163,14 @@ class MeasurementControl(Instrument):
                 else:
                     raise ValueError('Mode "{}" not recognized.'
                                      .format(self.mode))
-                result = self.dset[()]
-                self.save_MC_metadata(self.data_object)  # timing labels etc
-                if exp_metadata is not None:
-                    self.save_exp_metadata(exp_metadata, self.data_object)
-                return_dict = self.create_experiment_result_dict()
             except KeyboardFinish as e:
                 print(e)
+            result = self.dset[()]
+            self.get_measurement_endtime()
+            self.save_MC_metadata(self.data_object)  # timing labels etc
+            if exp_metadata is not None:
+                self.save_exp_metadata(exp_metadata, self.data_object)
+            return_dict = self.create_experiment_result_dict()
 
         self.finish(result)
         return return_dict
@@ -244,7 +245,6 @@ class MeasurementControl(Instrument):
         for sweep_function in self.sweep_functions:
             sweep_function.finish()
         self.detector_function.finish()
-        self.get_measurement_endtime()
 
         return
 
@@ -287,10 +287,6 @@ class MeasurementControl(Instrument):
         self.update_instrument_monitor()
         self.update_plotmon(force_update=True)
         self.update_plotmon_adaptive(force_update=True)
-        self.get_measurement_endtime()
-        if self.verbose():
-            print('Optimization completed in {:.4g}s'.format(
-                self.endtime-self.begintime))
         return
 
     def measure_hard(self):
@@ -1146,7 +1142,7 @@ class MeasurementControl(Instrument):
                 'serial': '', 'firmware': '2.0'}
 
 
-class KeyboardFinish(Exception):
+class KeyboardFinish(KeyboardInterrupt):
     """
     Indicates that the user safely aborts/finishes the experiment.
     Used to finish the experiment without raising an exception.
