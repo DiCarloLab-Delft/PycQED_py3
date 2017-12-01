@@ -1437,10 +1437,10 @@ class UHFQC_integrated_average_detector(Hard_Detector):
                                                   channel)
         if result_logging_mode == 'raw':
             self.value_units = ['V']*len(self.channels)
-            self.scaling_factor = 1/(1.8e9*integration_length*nr_averages)
+            self.scaling_factor = 1#/(1.8e9*integration_length*nr_averages)
         elif result_logging_mode == 'lin_trans':
             self.value_units = ['a.u.']*len(self.channels)
-            self.scaling_factor = 1/nr_averages
+            self.scaling_factor = 1#/nr_averages
 
         elif result_logging_mode == 'digitized':
             self.value_units = ['frac']*len(self.channels)
@@ -1720,7 +1720,7 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
 
     def get_values(self):
         # Slightly different way to deal with scaling factor
-        self.scaling_factor = 1 / (1.8e9*self.integration_length)
+        self.scaling_factor = 1 #/ (1.8e9*self.integration_length)
 
         if self.AWG is not None:
             self.AWG.stop()
@@ -1793,7 +1793,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
                                                   channel)
         if result_logging_mode == 'raw':
             self.value_units = ['V']*len(self.channels)
-            self.scaling_factor = 1/(1.8e9*integration_length)
+            self.scaling_factor = 1#/(1.8e9*integration_length)
         else:
             self.value_units = ['']*len(self.channels)
             self.scaling_factor = 1
@@ -2384,3 +2384,4 @@ class DDM_integration_logging_det(Hard_Detector):
     def finish(self):
         if self.AWG is not None:
             self.AWG.stop()
+

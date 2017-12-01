@@ -629,15 +629,15 @@ class CCLight_Transmon(Qubit):
         #         self.spec_vsm_att())
         #         VSM.set('in{}_out{}_switch'.format(self.spec_vsm_ch_in(),
         #                                    self.spec_vsm_ch_out()), mode)
-        VSM.set('mod{}_ch{}_gaussian_att_raw'.format(
-                self.spec_vsm_ch_out(),self.spec_vsm_ch_in()),
-                self.spec_vsm_att())
-        VSM.set('mod{}_ch{}_marker_state'.format(
-                self.spec_vsm_ch_out(),self.spec_vsm_ch_in()),'on')
-        VSM.set('mod{}_ch{}_marker_state'.format(
-                self.mw_vsm_ch_out(),self.mw_vsm_ch_in()),'off')
-        VSM.set('mod{}_marker_source'.format(
-                self.spec_vsm_ch_in()),marker_source)
+        # VSM.set('mod{}_ch{}_gaussian_att_raw'.format(
+        #         self.spec_vsm_ch_out(),self.spec_vsm_ch_in()),
+        #         self.spec_vsm_att())
+        # VSM.set('mod{}_ch{}_marker_state'.format(
+        #         self.spec_vsm_ch_out(),self.spec_vsm_ch_in()),'on')
+        # VSM.set('mod{}_ch{}_marker_state'.format(
+        #         self.mw_vsm_ch_out(),self.mw_vsm_ch_in()),'off')
+        # VSM.set('mod{}_marker_source'.format(
+        #         self.spec_vsm_ch_in()),marker_source)
 
         self.instr_spec_source.get_instr().power(self.spec_pow())
 
@@ -1227,7 +1227,7 @@ class CCLight_Transmon(Qubit):
                 if update_threshold:
                     # UHFQC threshold is wrong, the magic number is a
                     #  dirty hack. This works. we don't know why.
-                    magic_scale_factor = 0.655
+                    magic_scale_factor = 1#0.655
                     self.ro_acq_threshold(a.proc_data_dict['threshold_raw'] *
                                           magic_scale_factor)
                 if update:
@@ -1320,9 +1320,8 @@ class CCLight_Transmon(Qubit):
         self.ro_acq_averages(old_avg)
 
         # Calculate optimal weights
-        optimized_weights_I = transients[1][0] - transients[0][0]
-        optimized_weights_Q = transients[1][1] - transients[0][1]
-
+        optimized_weights_I = -(transients[1][0] - transients[0][0])
+        optimized_weights_Q = -(transients[1][1] - transients[0][1])
         # joint rescaling to +/-1 Volt
         maxI = np.max(np.abs(optimized_weights_I))
         maxQ = np.max(np.abs(optimized_weights_Q))
