@@ -225,11 +225,12 @@ class QWG_MW_LutMan(Base_MW_LutMan):
         super().__init__(name, **kw)
 
 
-class AWG8_MW_LutMan(QWG_MW_LutMan):
+class AWG8_MW_LutMan(Base_MW_LutMan):
 
     def __init__(self, name, **kw):
-        super().__init__(name, **kw)
         self._num_channels = 8
+        super().__init__(name, **kw)
+
 
     def set_default_lutmap(self):
         """
