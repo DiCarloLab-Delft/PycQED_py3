@@ -321,7 +321,7 @@ def CryoscopeGoogle(qubit_idx: int, buffer_time1, times, platf_cfg: str):
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
-    pass
+
 
 # FIMXE: merge into the real chevron seq
 def Chevron_hack(qubit_idx: int, qubit_idx_spec,
@@ -411,9 +411,6 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int,
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
 
-
-
-
 def two_qubit_tomo_bell(bell_state, q0, q1,
                         platf_cfg):
     '''
@@ -487,6 +484,120 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
             p.add_kernel(k)
     # 7 repetitions is because of assumptions in tomo analysis
     p = add_two_q_cal_points(p, platf=platf, q0=q0, q1=q1, reps_per_cal_pt=7)
+    p.compile()
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
+def two_qubit_DJ(q0, q1,platf_cfg):
+    '''
+    Two qubit Deutsch-Josza.
+
+    Args:
+        q0, q1          (str): names of the target qubits
+    '''
+    # Recovery pulse is the same for all Bell states
+    after_pulse_q1 = 'rym90'
+
+    # # Define compensation pulses
+    # # FIXME: needs to be added
+    # print('Warning: not using compensation pulses.')
+
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="two_qubit_DJ",
+                nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    # experiments
+    #1
+    k = Kernel("DJ1", p=platf)
+    k.prepz(q0)  # to ensure enough separation in timing
+    k.prepz(q1)  # to ensure enough separation in timing
+    # prerotations
+    k.gate('ry90', q0)
+    k.gate('rym90', q1)
+    #post rotations
+    k.gate('ry90', q0)
+    k.gate('ry90', q1)
+    # measure
+    k.measure(q0)
+    k.measure(q1)
+    p.add_kernel(k)
+
+    #2
+    k = Kernel("DJ2", p=platf)
+    k.prepz(q0)  # to ensure enough separation in timing
+    k.prepz(q1)  # to ensure enough separation in timing
+    # prerotations
+    k.gate('ry90', q0)
+    k.gate('rym90', q1)
+    # rotations
+    k.gate('rx180', q1)
+    #post rotations
+    k.gate('ry90', q0)
+    k.gate('ry90', q1)
+    # measure
+    k.measure(q0)
+    k.measure(q1)
+    p.add_kernel(k)
+
+    #3
+    k = Kernel("DJ3", p=platf)
+    k.prepz(q0)  # to ensure enough separation in timing
+    k.prepz(q1)  # to ensure enough separation in timing
+    # prerotations
+    k.gate('ry90', q0)
+    k.gate('rym90', q1)
+    # rotations
+    k.gate('ry90', q1)
+    k.gate('rx180', q0)
+    k.gate('rx180', q1)
+
+    # Hardcoded flux pulse, FIXME use actual CZ
+    k.gate('wait', [2, 0], 100)
+    k.gate('fl_cw_01', 2, 0)
+    # FIXME hardcoded extra delays
+    k.gate('wait', [2, 0], 200)
+
+    k.gate('rx180', q0)
+    k.gate('ry90', q1)
+
+    #post rotations
+    k.gate('ry90', q0)
+    k.gate('ry90', q1)
+    # measure
+    k.measure(q0)
+    k.measure(q1)
+    p.add_kernel(k)
+
+    #4
+    k = Kernel("DJ4", p=platf)
+    k.prepz(q0)  # to ensure enough separation in timing
+    k.prepz(q1)  # to ensure enough separation in timing
+    # prerotations
+    k.gate('ry90', q0)
+    k.gate('rym90', q1)
+    # rotations
+    k.gate('rym90', q1)
+    # Hardcoded flux pulse, FIXME use actual CZ
+    k.gate('wait', [2, 0], 100)
+    k.gate('fl_cw_01', 2, 0)
+    # FIXME hardcoded extra delays
+    k.gate('wait', [2, 0], 200)
+
+    k.gate('rx180', q1)
+    k.gate('rym90', q1)
+
+    #post rotations
+    k.gate('ry90', q0)
+    k.gate('ry90', q1)
+    # measure
+    k.measure(q0)
+    k.measure(q1)
+    p.add_kernel(k)
+
+    # 7 repetitions is because of assumptions in tomo analysis
+    #p = add_two_q_cal_points(p, platf=platf, q0=q0, q1=q1, reps_per_cal_pt=7)
     p.compile()
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
