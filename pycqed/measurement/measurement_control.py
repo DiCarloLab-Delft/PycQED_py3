@@ -127,6 +127,8 @@ class MeasurementControl(Instrument):
         self.soft_iteration = 0
         self.set_measurement_name(name)
         self.print_measurement_start_msg()
+
+
         self.mode = mode
         self.iteration = 0  # used in determining data writing indices
         # needs to be defined here because of the with statement below
@@ -135,35 +137,39 @@ class MeasurementControl(Instrument):
 
         with h5d.Data(name=self.get_measurement_name(),
                       datadir=self.datadir()) as self.data_object:
-            self.get_measurement_begintime()
-            # Commented out because requires git shell interaction from python
-            # self.get_git_hash()
-            # Such that it is also saved if the measurement fails
-            # (might want to overwrite again at the end)
-            self.save_instrument_settings(self.data_object)
-            self.create_experimentaldata_dataset()
-            if mode is not 'adaptive':
-                try:
-                    # required for 2D plotting and data storing.
-                    # try except because some swf get the sweep points in the
-                    # prepare statement. This needs a proper fix
-                    self.xlen = len(self.get_sweep_points())
-                except:
-                    self.xlen = 1
-            if self.mode == '1D':
-                self.measure()
-            elif self.mode == '2D':
-                self.measure_2D()
-            elif self.mode == 'adaptive':
-                self.measure_soft_adaptive()
-            else:
-                raise ValueError('Mode "{}" not recognized.'
-                                 .format(self.mode))
-            result = self.dset[()]
-            self.save_MC_metadata(self.data_object)  # timing labels etc
-            if exp_metadata is not None:
-                self.save_exp_metadata(exp_metadata, self.data_object)
-            return_dict = self.create_experiment_result_dict()
+            try:
+                self.check_keyboard_interrupt()
+                self.get_measurement_begintime()
+                # Commented out because requires git shell interaction from python
+                # self.get_git_hash()
+                # Such that it is also saved if the measurement fails
+                # (might want to overwrite again at the end)
+                self.save_instrument_settings(self.data_object)
+                self.create_experimentaldata_dataset()
+                if mode is not 'adaptive':
+                    try:
+                        # required for 2D plotting and data storing.
+                        # try except because some swf get the sweep points in the
+                        # prepare statement. This needs a proper fix
+                        self.xlen = len(self.get_sweep_points())
+                    except:
+                        self.xlen = 1
+                if self.mode == '1D':
+                    self.measure()
+                elif self.mode == '2D':
+                    self.measure_2D()
+                elif self.mode == 'adaptive':
+                    self.measure_soft_adaptive()
+                else:
+                    raise ValueError('Mode "{}" not recognized.'
+                                     .format(self.mode))
+                result = self.dset[()]
+                self.save_MC_metadata(self.data_object)  # timing labels etc
+                if exp_metadata is not None:
+                    self.save_exp_metadata(exp_metadata, self.data_object)
+                return_dict = self.create_experiment_result_dict()
+            except KeyboardFinish as e:
+                print(e)
 
         self.finish(result)
         return return_dict
@@ -969,7 +975,11 @@ class MeasurementControl(Instrument):
             if msvcrt.kbhit():
                 key = msvcrt.getch()
                 if b'q' in key:
-                    raise KeyboardInterrupt('Human interupt q')
+                    # this causes a KeyBoardInterrupt
+                    raise KeyboardInterrupt('Human "q" terminated experiment.')
+                elif b'f' in key:
+                    # this should not raise an exception
+                    raise KeyboardFinish('Human "f" terminated experiment safely.')
         except Exception:
             pass
 
@@ -1134,3 +1144,11 @@ class MeasurementControl(Instrument):
         """
         return {'vendor': 'PycQED', 'model': 'MeasurementControl',
                 'serial': '', 'firmware': '2.0'}
+
+
+class KeyboardFinish(Exception):
+    """
+    Indicates that the user safely aborts/finishes the experiment.
+    Used to finish the experiment without raising an exception.
+    """
+    pass
