@@ -6,6 +6,9 @@ def generate_config(filename: str,
                     flux_pulse_duration: int=40,
                     ro_duration: int = 800,
                     mw_mw_buffer=0,
+                    ro_latency: int = 0,
+                    mw_latency: int = 0,
+                    fl_latency: int = 0,
                     init_duration: int = 200000):
     """
     Generates a configuration file for OpenQL for use with the CCLight.
@@ -171,7 +174,7 @@ def generate_config(filename: str,
     for q in qubits:
         cfg["instructions"]["measure {}".format(q)] = {
             "duration": ro_duration,
-            "latency": 0,
+            "latency": ro_latency,
             "qubits": [q],
             "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
             "disable_optimization": False,
@@ -186,7 +189,7 @@ def generate_config(filename: str,
         for q in qubits:
             cfg["instructions"][lut_map[CW].format(q)] = {
                 "duration": mw_pulse_duration,
-                "latency": 0,
+                "latency": mw_latency,
                 "qubits": [q],
                 "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
                 "disable_optimization": False,
@@ -198,7 +201,7 @@ def generate_config(filename: str,
 
             cfg["instructions"]['C'+lut_map[CW].format(q)] = {
                 "duration": mw_pulse_duration,
-                "latency": 0,
+                "latency": mw_latency,
                 "qubits": [q],
                 "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
                 "disable_optimization": False,
@@ -213,7 +216,7 @@ def generate_config(filename: str,
         for q in qubits:
             cfg["instructions"]["cw_{:02} {}".format(CW, q)] = {
                 "duration": mw_pulse_duration,
-                "latency": 0,
+                "latency": mw_latency,
                 "qubits": [q],
                 "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
                 "disable_optimization": False,
@@ -223,13 +226,26 @@ def generate_config(filename: str,
                 "cc_light_codeword": CW,
                 "cc_light_opcode": 8+CW}
 
+    for q in qubits:
+        cfg["instructions"]["compensate {}".format(q)] = {
+            "duration": mw_pulse_duration,
+            "latency": mw_latency,
+            "qubits": [q],
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "disable_optimization": False,
+            "type": "mw",
+            "cc_light_instr_type": "single_qubit_gate",
+            "cc_light_instr": "cw_00",
+            "cc_light_codeword": 0,
+            "cc_light_opcode": 8+0}
+
     # N.B. The codewords for CZ pulses need to be further specified.
     # I do not expect this to be correct for now.
     for ft in flux_tuples:
         # FIXME add space back in
         cfg["instructions"]["cz {},{}".format(ft[0], ft[1])] = {
             "duration": flux_pulse_duration,
-            "latency": 0,
+            "latency": fl_latency,
             "qubits": [ft[0], ft[1]],
             "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
             "disable_optimization": True,
@@ -246,7 +262,7 @@ def generate_config(filename: str,
             cfg["instructions"]["fl_cw_{:02} {},{}".format(cw_flux,
                                                            ft[0], ft[1])] = {
                 "duration": flux_pulse_duration,
-                "latency": 0,
+                "latency": fl_latency,
                 "qubits": [ft[0], ft[1]],
                 "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
                 "disable_optimization": True,

@@ -668,4 +668,54 @@ class DeviceCCL(Instrument):
                 self.find_instrument(q0).fl_cz_phase_corr_amp(phase_corr_amp)
             return True
 
+def calibrate_flux_timing(self, q0: str, q1: str,
+                                    times,
+                                    waveform = 'cz_z',
+                                    update: bool = True,
+                                    prepare_for_timedomain: bool=True, MC=None):
+
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        q0idx = self.find_instrument(q0).cfg_qubit_nr()
+        q1idx = self.find_instrument(q1).cfg_qubit_nr()
+        fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
+
+        p = mqo.CZ_calibration_seq(q0idx, q1idx,
+                                   platf_cfg=self.cfg_openql_platform_fn(),
+                                   CZ_disabled=False, add_cal_points=False,
+                                   angles=[90])
+
+        CC = self.instr_CC.get_instr()
+        CC.upload_instructions(p.filename)
+        CC.start()
+
+        s = swf.FLsweep(fl_lutman, fl_lutman.cz_phase_corr_amp,
+                        waveform)
+
+
+        d = self.get_correlation_detector(single_int_avg=True, seg_per_point=2)
+        d.detector_control='hard'
+        # the order of self.qubits is used in the correlation detector
+        # and is required for the analysis
+        ch_idx = self.qubits().index(q0)
+
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.repeat(amps, 2))
+        MC.set_detector_function(d)
+        MC.run('{}_CZphase'.format(q0))
+
+        a = ma2.CZ_1QPhaseCal_Analysis(options_dict={'ch_idx': ch_idx})
+
+        phase_corr_amp = a.get_zero_phase_diff_intersect()
+        if phase_corr_amp > np.max(amps) or phase_corr_amp< np.min(amps):
+            print('Calibration failed, intersect outside of initial range')
+            return False
+        else:
+            if update:
+                self.find_instrument(q0).fl_cz_phase_corr_amp(phase_corr_amp)
+            return True
+
 

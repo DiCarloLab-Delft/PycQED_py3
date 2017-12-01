@@ -125,6 +125,12 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                            vals=vals.Numbers(0, 12e-6),
                            # 12us is current max of AWG8
                            parameter_class=ManualParameter)
+        self.add_parameter('sq_delay', unit='s',
+                           label='Square pulse length',
+                           initial_value=0e-9,
+                           vals=vals.Numbers(0, 12e-6),
+                           # 12us is current max of AWG8
+                           parameter_class=ManualParameter)
 
         self.add_parameter('cz_length', vals=vals.Numbers(),
                            unit='s', initial_value=35e-9,
@@ -171,7 +177,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         self._wave_dict['i'] = np.zeros(42)
         self._wave_dict['square'] = wf.single_channel_block(
             amp=self.sq_amp(), length=self.sq_length(),
-            sampling_rate=self.sampling_rate(), delay=0)
+            sampling_rate=self.sampling_rate(), delay=self.sq_delay())
         self._wave_dict['park'] = np.zeros(42)
 
         self._wave_dict['cz'] = wf.martinis_flux_pulse(
