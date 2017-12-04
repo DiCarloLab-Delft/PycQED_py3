@@ -14,6 +14,7 @@ from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import measurement_analysis as ma2
 from pycqed.measurement.calibration_toolbox import (
     mixer_carrier_cancellation)
+from pycqed.measurement.calibration_toolbox import mixer_skewness_cal_UHFQC_adaptive
 
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import detector_functions as det
@@ -1040,6 +1041,54 @@ class CCLight_Transmon(Qubit):
             self.mw_mixer_offs_DQ(offset_Q)
         return True
 
+    def calibrate_mixer_skewness_RO(self, update=True):
+        '''
+        Calibrates the mixer skewness using mixer_skewness_cal_UHFQC_adaptive
+        see calibration toolbox for details
+        '''
+
+        #using the restless tuning sequence
+        p = sqo.randomized_benchmarking(
+            self.cfg_qubit_nr(), self.cfg_openql_platform_fn(),
+            nr_cliffords=[1],
+            net_clifford=1, nr_seeds=1, restless=True, cal_points=False)
+        self.instr_CC.get_instr().upload_instructions(p.filename)
+        self.instr_CC.get_instr().start()
+
+        LutMan = self.instr_LutMan_RO.get_instr()
+        LutMan.apply_mixer_predistortion_matrix(True)
+        MC = self.instr_MC.get_instr()
+        S1 = swf.lutman_par(
+            LutMan, LutMan.mixer_alpha, single=False, run=True)
+        S2 = swf.lutman_par(
+            LutMan, LutMan.mixer_phi, single=False, run=True)
+
+        detector = det.Signal_Hound_fixed_frequency(
+            self.instr_SH.get_instr(), frequency=(self.instr_LO_ro.get_instr().frequency() -
+                       self.ro_freq_mod()),
+            Navg=5, delay=0.0, prepare_each_point=False)
+
+        ad_func_pars = {'adaptive_function': nelder_mead,
+                    'x0': [1.0, 0.0],
+                    'initial_step': [.15, 10],
+                    'no_improv_break': 15,
+                    'minimize': True,
+                    'maxiter': 500}
+        MC.set_sweep_functions([S1, S2])
+        MC.set_detector_function(detector)  # sets test_detector
+        MC.set_adaptive_function_parameters(ad_func_pars)
+        MC.run(name='Spurious_sideband', mode='adaptive')
+        a = ma.OptimizationAnalysis(auto=True, label='Spurious_sideband')
+        alpha = a.optimization_result[0][0]
+        phi = a.optimization_result[0][1]
+
+        if update:
+            self.ro_pulse_mixer_phi.set(phi)
+            self.ro_pulse_mixer_alpha.set(alpha)
+            LutMan.mixer_alpha(alpha)
+            LutMan.mixer_phi(phi)
+
+
     def calibrate_mixer_offsets_RO(self, update: bool=True) -> bool:
         '''
         Calibrates the mixer skewness and updates the I and Q offsets in
@@ -1589,7 +1638,7 @@ class CCLight_Transmon(Qubit):
 
         if two_par:
             if initial_steps is None:
-                initial_steps = [-0.1*amp0, -0.1*amp1]
+                initial_steps = [-0.5*amp0, -0.5*amp1]
             ad_func_pars = {'adaptive_function': nelder_mead,
                             'x0': [amp0, amp1],
                             'initial_step': initial_steps,

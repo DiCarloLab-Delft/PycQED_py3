@@ -400,9 +400,9 @@ class UHFQC(Instrument):
     def sync(self):
         self._daq.sync()
 
-    def acquisition_arm(self):
+    def acquisition_arm(self, single=True):
         # time.sleep(0.01)
-        self._daq.asyncSetInt('/' + self._device + '/awgs/0/single', 1)
+        self._daq.asyncSetInt('/' + self._device + '/awgs/0/single', single)
         self._daq.syncSetInt('/' + self._device + '/awgs/0/enable', 1)
         # t0=time.time()
         # time.sleep(0.001)
