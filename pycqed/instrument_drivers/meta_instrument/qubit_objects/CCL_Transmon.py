@@ -1845,6 +1845,39 @@ class CCLight_Transmon(Qubit):
                 options_dict={'scan_label': 'flipping'})
         return a
 
+
+    def measure_motzoi(self, motzoi_atts=np.linspace(0, 50e3, 31),
+                       prepare_for_timedomain: bool=True,
+                       MC=None, analyze=True, close_fig=True):
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+        p = sqo.motzoi_XY(
+            qubit_idx=self.cfg_qubit_nr(),
+            platf_cfg=self.cfg_openql_platform_fn())
+        self.instr_CC.get_instr().upload_instructions(p.filename)
+
+        d = self.int_avg_det_single
+        d.seg_per_point = 2
+        d.detector_control = 'hard'
+
+        VSM = self.instr_VSM.get_instr()
+        mod_out = self.mw_vsm_mod_out()
+        ch_in = self.mw_vsm_ch_in()
+        D_par = VSM.parameters['mod{}_ch{}_derivative_att_raw'.format(mod_out, ch_in)]
+
+        MC.set_sweep_function(D_par)
+        MC.set_sweep_points(np.repeat(motzoi_atts, 2))
+        MC.set_detector_function(d)
+
+        MC.run('Motzoi_XY'+self.msmt_suffix)
+        if analyze:
+            a = ma.Motzoi_XY_analysis(
+                auto=True, cal_points=None, close_fig=close_fig)
+            return a
+
+
     def measure_randomized_benchmarking(self, nr_cliffords=2**np.arange(12),
                                         nr_seeds=100,
                                         double_curves=False,
