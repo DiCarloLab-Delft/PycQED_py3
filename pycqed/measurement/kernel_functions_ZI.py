@@ -8,6 +8,7 @@ This implements three basic filters and a rounding function
 - multipath_filter2
 
 """
+import logging
 import numpy as np
 from scipy import signal
 
@@ -26,15 +27,29 @@ def bias_tee_correction(ysig, tau: float, sampling_rate: float=1):
     return filtered_signal
 
 
-def exponential_decay_correction(ysig, tau: float,
-                                 amp: float, offset: float,
+def exponential_decay_correction(ysig, tau: float, amp: float,
                                  sampling_rate: float=1):
     """
     Corrects for an exponential decay using a linear IIR filter.
-    """
-    alpha = offset + amp
-    k = tau*sampling_rate
 
+    Fitting should be done to the following function:
+        y = gc*(1 - amp *exp(-t/tau))
+    where gc is a gain correction factor that is ignored in the corrections.
+    """
+
+    # alpha ~1/8 is like averaging 8 samples, sets the timescale for averaging
+    # larger alphas break the approximation of the low pass filter
+    # numerical instability occurs if alpha > .03
+    alpha = 1 - np.exp(-1/(sampling_rate*tau))
+    if alpha > 0.03:
+        logging.warning('large alpha, expect unstable filter')
+    k = amp
+    print('alpha', alpha)
+    print('k', k)
+
+    # filter consists of 2 parts:
+    #   y[n] = y[n-1] + alpha*(x[n]-y[n-1])  # <- adds in time decay
+    #   yy[n] = (1-k)*x[n] + k*y[n]          # <- rescales the output
     beta = 1-alpha
     b = [(1-k*alpha)/(1-k), -beta/(1-k)]
     a = [1, -beta]

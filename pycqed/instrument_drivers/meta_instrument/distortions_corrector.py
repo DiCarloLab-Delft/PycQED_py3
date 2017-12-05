@@ -1,3 +1,9 @@
+"""
+This file contains the Distortions_corrector.
+
+An object used to correct distortions using an interactive procedure
+involving repeated measurements.
+"""
 import pycqed.analysis.fitting_models as fm
 import pycqed.measurement.kernel_functions as kf
 import numpy as np
@@ -529,7 +535,7 @@ class Distortion_corrector():
             'name': self.filename + '_' + str(self._iteration),
             'filter_params': {
                 'b0': 1,
-                'b1': 1/tau,
+                'b1': 1/tau,  # incorrect because not units of #samples
                 'a1': 0
             },
             'fit': {
@@ -1225,8 +1231,6 @@ class Distortion_corrector():
                         nr_plot_pts=self.nr_plot_points)
         print('Updated square amp from {} to {}'.format(old_square_amp,
                                                         square_amp))
-
-
 
 
 class Dummy_distortion_corrector(Distortion_corrector):
