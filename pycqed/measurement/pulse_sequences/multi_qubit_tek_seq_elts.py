@@ -1114,12 +1114,8 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(pulse_pars_list, RO_pars,
                 first_x_pulse_idx = pulse_list.index(first_x_pulse)
             except:
                 first_x_pulse_idx = 0
-            pulse_list[first_x_pulse_idx:n*(first_x_pulse_idx//n+1)] = \
-                deepcopy(pulse_list[first_x_pulse_idx:n*(first_x_pulse_idx//n+1)])
-            for first_pulses in \
-                    pulse_list[first_x_pulse_idx:n*(first_x_pulse_idx//n+1)]:
-                if 'Z' not in first_pulses['pulse_type']:
-                    first_pulses['pulse_delay'] += post_msmt_delay
+            pulse_list[first_x_pulse_idx] = deepcopy(pulse_list[first_x_pulse_idx])
+            pulse_list[first_x_pulse_idx]['pulse_delay'] += post_msmt_delay
 
             if verbose:
                 print('pulse_keys_by_qubit ', pulse_keys_by_qubit)
@@ -1210,12 +1206,8 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(pulse_pars_list, RO_pars,
                 first_x_pulse_idx = pulse_list.index(first_x_pulse)
             except:
                 first_x_pulse_idx = 0
-            pulse_list[first_x_pulse_idx:n*(first_x_pulse_idx//n+1)] = \
-                deepcopy(pulse_list[first_x_pulse_idx:n*(first_x_pulse_idx//n+1)])
-            for first_pulses in \
-                    pulse_list[first_x_pulse_idx:n*(first_x_pulse_idx//n+1)]:
-                if 'Z' not in first_pulses['pulse_type']:
-                    first_pulses['pulse_delay'] += post_msmt_delay
+            pulse_list[first_x_pulse_idx] = deepcopy(pulse_list[first_x_pulse_idx])
+            pulse_list[first_x_pulse_idx]['pulse_delay'] += post_msmt_delay
 
             if verbose:
                 print('pulse_list_keys ', pulse_list_keys)

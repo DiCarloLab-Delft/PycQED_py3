@@ -935,7 +935,7 @@ class QuDev_transmon(Qubit):
 
     def measure_randomized_benchmarking(self, nr_cliffords=None, nr_seeds=50,
                                         MC=None, close_fig=True,
-                                        upload=True, analyze=True,
+                                        upload=False, analyze=True,
                                         gate_decomp='HZ', label=None,
                                         cal_points=True,
                                         interleaved_gate=None,
@@ -1312,7 +1312,8 @@ class QuDev_transmon(Qubit):
 
         label = 'RO_theta'
         if self.RO_acq_weight_function_Q() is None:
-            self.RO_acq_weight_function_Q((self.RO_acq_weight_function_I() + 1)%5)
+            self.RO_acq_weight_function_Q(
+                (self.RO_acq_weight_function_I() + 1)%9)
         self.set_default_readout_weights(theta=0)
         prev_shots = self.RO_acq_shots()
         self.RO_acq_shots(2*(self.RO_acq_shots()//2))
@@ -1950,6 +1951,9 @@ class QuDev_transmon(Qubit):
         interleaved_gate = kw.pop('interleaved_gate', None)
         T1 = kw.pop('T1', None)
         T2 = kw.pop('T1', None)
+
+        if det_func is None:
+            det_func = self.int_avg_det
 
         if T1 is None and self.T1() is not None:
             T1 = self.T1()
