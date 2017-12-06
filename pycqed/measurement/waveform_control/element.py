@@ -398,7 +398,7 @@ class Element:
 
 
 def calculate_time_correction(t0, fixed_point=1e-6):
-    return np.round((fixed_point-t0) % fixed_point, decimals=9)
+    return np.round((fixed_point-t0) % fixed_point, decimals=11)
 
 
 def is_divisible_by_clock(value, clock=1e9):

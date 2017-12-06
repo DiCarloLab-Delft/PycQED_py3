@@ -949,6 +949,7 @@ class Randomized_Benchmarking_nr_cliffords(swf.Soft_Sweep):
 
     def set_parameter(self, val):
         self.RB_sweepfunction.nr_cliffords_value = val
+        self.RB_sweepfunction.upload = True
         self.RB_sweepfunction.prepare()
 
 class Randomized_Benchmarking_one_length(swf.Hard_Sweep):
@@ -959,7 +960,7 @@ class Randomized_Benchmarking_one_length(swf.Hard_Sweep):
                  interleaved_gate=None,
                  cal_points=True,
                  seq_name=None,
-                 upload=True):
+                 upload=False):
 
         super().__init__()
         self.pulse_pars = pulse_pars

@@ -179,4 +179,3 @@ def randomized_benchmarking_sequence(n_cl, desired_net_cl=0,
 
     rb_cliffords = np.append(rb_cliffords, recovery_clifford)
     return rb_cliffords
-
