@@ -12,6 +12,9 @@ from pycqed.analysis.tools import data_manipulation as dm_tools
 from pycqed.analysis import fitting_models as fit_mods
 import lmfit
 
+import importlib
+importlib.reload(ba)
+
 class Spectroscopy(ba.BaseDataAnalysis):
     def __init__(self, t_start,
                  options_dict,
@@ -24,9 +27,20 @@ class Spectroscopy(ba.BaseDataAnalysis):
                                              extract_only=extract_only,
                                              do_fitting =do_fitting)
         self.extract_fitparams = self.options_dict.get('fitparams',True)
-        self.params_dict = {'freq':'sweep_points',
+        self.params_dict = {'freq_label': 'sweep_name',
+                            'freq_unit': 'sweep_unit',
+                            'measurementstring': 'measurementstring',
+                            'freq':'sweep_points',
                             'amp':'amp',
                             'phase':'phase'}
+
+        # {'xlabel': 'sweep_name',
+        # 'xunit': 'sweep_unit',
+        # 'measurementstring': 'measurementstring',
+        # 'sweep_points': 'sweep_points',
+        # 'value_names': 'value_names',
+        # 'value_units': 'value_units',
+        # 'measured_values': 'measured_values'}
         if self.extract_fitparams:
             self.params_dict.update({'fitparams':'fit_params'})
 
@@ -65,13 +79,10 @@ class Spectroscopy(ba.BaseDataAnalysis):
                 proc_data_dict['plot_amp'] = np.array(self.raw_data_dict['amp'])
 
             else:
+                # manual setting of plot_xwidths
                 proc_data_dict['plot_frequency'] = self.raw_data_dict['freq']
                 proc_data_dict['plot_phase'] = self.raw_data_dict['phase']
                 proc_data_dict['plot_amp'] = self.raw_data_dict['amp']
-
-
-
-
 
 
 
@@ -98,7 +109,6 @@ class Spectroscopy(ba.BaseDataAnalysis):
                             'plotsize': proc_data_dict['plotsize']
                             }
         else:
-            print('plotting not yet coded up for multiple traces')
             plotcbar = self.options_dict.get('colorbar',True)
             plot_fn = self.plot_colorx #(self, pdict, axs)
             self.plot_dicts['amp'] = {'plotfn': plot_fn,
@@ -181,11 +191,11 @@ class ResonatorSpectroscopy(Spectroscopy):
             raise NotImplementedError('This functions guess function is not coded up yet')
             #TODO HangerFuncAmplitude Guess
         elif fitting_model == 'lorentzian':
-            print('This functions guess function is not coded up yet')
+            raise NotImplementedError('This functions guess function is not coded up yet')
             fit_fn = fit_mods.Lorentzian
             #TODO LorentzianGuess
         elif fitting_model == 'complex':
-            print('This functions guess function is not coded up yet')
+            raise NotImplementedError('This functions guess function is not coded up yet')
             fit_fn = fit_mods.HangerFuncComplex
             #TODO HangerFuncComplexGuess
 
