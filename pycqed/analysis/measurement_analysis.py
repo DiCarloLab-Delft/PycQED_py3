@@ -679,6 +679,7 @@ class MeasurementAnalysis(object):
         self.plot_title = kw.get('plot_title',
                                  self.measurementstring + '\n' +
                                  self.timestamp_string)
+        plot_the_title = kw.get('plot_the_title', True)
         xlabel = kw.get('xlabel', None)
         ylabel = kw.get('ylabel', None)
 
@@ -688,10 +689,11 @@ class MeasurementAnalysis(object):
     #                  verticalalignment = 'bottom',
         #              y=1)
         # fig.suptitle(self.plot_title)
-        fig.text(0.5, 1, self.plot_title, fontsize=self.font_size,
-                 horizontalalignment='center',
-                 verticalalignment = 'bottom',
-                 transform = ax.transAxes)
+        if plot_the_title:
+            fig.text(0.5, 1, self.plot_title, fontsize=self.font_size,
+                     horizontalalignment='center',
+                     verticalalignment = 'bottom',
+                     transform = ax.transAxes)
 
         if log:
             ax.set_yscale('log')
@@ -5472,7 +5474,7 @@ class RandomizedBenchmarking_Analysis_new(TD_Analysis):
         self.analysis_group.attrs.create('corrected data based on',
                                          'calibration points'.encode('utf-8'))
 
-        self.fit_res = self.fit_data(self.data, self.n_cl)
+        self.fit_res = self.fit_data(self.data, self.n_cl, **kw)
         self.fit_results = [self.fit_res]
         self.save_fitted_parameters(fit_res=self.fit_res, var_name='F|1>')
         if self.make_fig:
@@ -5516,7 +5518,7 @@ class RandomizedBenchmarking_Analysis_new(TD_Analysis):
             textstr += ('\n$F_{Cl}^{T_1}$  = ' +
                         '{:.6g}%'.format(F_T1*100))
 
-        self.ax.text(0.025, 0.95, textstr, transform=self.ax.transAxes,
+        ax.text(0.025, 0.95, textstr, transform=ax.transAxes,
                      fontsize=self.font_size, verticalalignment='top',
                      bbox=self.box_props)
 
@@ -5639,10 +5641,10 @@ class RandomizedBenchmarking_Analysis_new(TD_Analysis):
                                expr='(p + (1-p)/2)')
         RBModel.set_param_hint('error_per_Clifford',  # vary=False,
                                expr='1-fidelity_per_Clifford')
-        if self.gate_decomp is 'XY':
+        if self.gate_decomp == 'XY':
             RBModel.set_param_hint('fidelity_per_gate',  # vary=False,
                                    expr='fidelity_per_Clifford**(1./1.875)')
-        elif self.gate_decomp is 'HZ':
+        elif self.gate_decomp == 'HZ':
             RBModel.set_param_hint('fidelity_per_gate',  # vary=False,
                                    expr='fidelity_per_Clifford**(1./1.125)')
         else:
