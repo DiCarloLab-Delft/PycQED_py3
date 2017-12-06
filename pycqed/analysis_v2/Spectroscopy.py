@@ -264,37 +264,36 @@ class ResonatorSpectroscopy(Spectroscopy):
 
     def prepare_plots(self):
         super(ResonatorSpectroscopy, self).prepare_plots()
-        print('shit be workin yo3')
 
-    # def plot_fitting(self):
-    #     if self.do_fitting:
-    #         for key, fit_dict in self.fit_dicts.items():
-    #             fit_results = fit_dict['fit_res']
-    #             ax = self.axs['amp']
-    #             if len(self.raw_data_dict['timestamps']) == 1:
-    #                 ax.plot(list(fit_dict['fit_xvals'].values())[0], fit_results.best_fit, 'r-', linewidth=1.5)
-    #                 textstr = 'f0 = %.5f $\pm$ %.1g GHz' % (fit_results.params['f0'].value, fit_results.params['f0'].stderr) + '\n' \
-    #                     'Q = %.4g $\pm$ %.0g' % (fit_results.params['Q'].value, fit_results.params['Q'].stderr) + '\n' \
-    #                     'Qc = %.4g $\pm$ %.0g' % (fit_results.params['Qc'].value, fit_results.params['Qc'].stderr) + '\n' \
-    #                     'Qi = %.4g $\pm$ %.0g' % (fit_results.params['Qi'].value, fit_results.params['Qi'].stderr)
-    #                 box_props = dict(boxstyle='Square', facecolor='white', alpha=0.8)
-    #                 self.box_props = {key:val for key, val in box_props.items()}
-    #                 self.box_props.update({'linewidth':0})
-    #                 self.box_props['alpha'] = 0.
-    #                 ax.text(0.03, 0.95, textstr, transform=ax.transAxes, fontsize=14,
-    #                         verticalalignment='top', bbox=self.box_props)
-    #             else:
-    #                 reso_freqs = [fit_results[tt].params['f0'].value*1e9 for tt in range(len(self.raw_data_dict['timestamps']))]
-    #                 ax.plot(np.squeeze(self.plot_xvals),
-    #                         reso_freqs,
-    #                         'o',
-    #                         color='m',
-    #                         markersize=3)
+    def plot_fitting(self):
+        if self.do_fitting:
+            for key, fit_dict in self.fit_dicts.items():
+                fit_results = fit_dict['fit_res']
+                ax = self.axs['amp']
+                if len(self.raw_data_dict['timestamps']) == 1:
+                    ax.plot(list(fit_dict['fit_xvals'].values())[0], fit_results.best_fit, 'r-', linewidth=1.5)
+                    textstr = 'f0 = %.5f $\pm$ %.1g GHz' % (fit_results.params['f0'].value, fit_results.params['f0'].stderr) + '\n' \
+                        'Q = %.4g $\pm$ %.0g' % (fit_results.params['Q'].value, fit_results.params['Q'].stderr) + '\n' \
+                        'Qc = %.4g $\pm$ %.0g' % (fit_results.params['Qc'].value, fit_results.params['Qc'].stderr) + '\n' \
+                        'Qi = %.4g $\pm$ %.0g' % (fit_results.params['Qi'].value, fit_results.params['Qi'].stderr)
+                    box_props = dict(boxstyle='Square', facecolor='white', alpha=0.8)
+                    self.box_props = {key:val for key, val in box_props.items()}
+                    self.box_props.update({'linewidth':0})
+                    self.box_props['alpha'] = 0.
+                    ax.text(0.03, 0.95, textstr, transform=ax.transAxes, fontsize=14,
+                            verticalalignment='top', bbox=self.box_props)
+                else:
+                    reso_freqs = [fit_results[tt].params['f0'].value*1e9 for tt in range(len(self.raw_data_dict['timestamps']))]
+                    ax.plot(np.squeeze(self.plot_xvals),
+                            reso_freqs,
+                            'o',
+                            color='m',
+                            markersize=3)
 
-    # def plot(self, key_list=None, axs_dict=None, presentation_mode=None,no_label=False):
-    #     super(ResonatorSpectroscopy, self).plot(key_list=key_list, axs_dict=axs_dict, presentation_mode=presentation_mode)
-    #     if self.do_fitting:
-    #         self.plot_fitting()
+    def plot(self, key_list=None, axs_dict=None, presentation_mode=None,no_label=False):
+        super(ResonatorSpectroscopy, self).plot(key_list=key_list, axs_dict=axs_dict, presentation_mode=presentation_mode)
+        if self.do_fitting:
+            self.plot_fitting()
 
 class ResonatorDacSweep(ResonatorSpectroscopy):
     def __init__(self, t_start,
