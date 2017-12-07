@@ -536,7 +536,7 @@ class Distortion_corrector():
             'filter_params': {
                 'b0': 1,
                 'b1': 1/tau,  # incorrect because not units of #samples
-                'a1': 0
+                'a1': 0  # 'a0': 1 by definition
             },
             'fit': {
                 'model': 'high-pass',

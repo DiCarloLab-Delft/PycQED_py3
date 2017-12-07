@@ -18,7 +18,8 @@ def bias_tee_correction(ysig, tau: float, sampling_rate: float=1):
     Corrects for a bias tee correction using a linear IIR filter with time
     constant tau.
     """
-    k = tau*sampling_rate
+    # factor 2 comes from bilinear transform
+    k = 2*tau*sampling_rate
     b = [1, -1]
     a = [(k+1)/k, -(k-1)/k]
 
