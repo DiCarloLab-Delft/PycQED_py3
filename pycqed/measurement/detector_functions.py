@@ -146,8 +146,10 @@ class Soft_Detector(Detector_Function):
     def acquire_data_point(self, **kw):
         return np.random.random()
 
-    def prepare(self):
+    def prepare(self, sweep_points=None):
         pass
+
+
 ##########################################################################
 ##########################################################################
 ####################     Hardware Controlled Detectors     ###############
@@ -890,6 +892,7 @@ class Function_Detector(Soft_Detector):
     """
 
     def __init__(self, get_function, value_names=None,
+                 detector_control='soft',
                  value_units=None, msmt_kw={}, result_keys=None, **kw):
         super().__init__()
         self.get_function = get_function
@@ -897,6 +900,7 @@ class Function_Detector(Soft_Detector):
         self.value_names = value_names
         self.value_units = value_units
         self.msmt_kw = msmt_kw
+        self.detector_control = detector_control
         if self.value_names is None:
             self.value_names = result_keys
         if self.value_units is None:
@@ -922,6 +926,9 @@ class Function_Detector(Soft_Detector):
             if len(results) == 1:
                 return results[0]  # for a single entry we don't want a list
             return results
+
+    def get_values(self):
+        return self.acquire_data_point()
 
 
 class Detect_simulated_hanger_Soft(Soft_Detector):

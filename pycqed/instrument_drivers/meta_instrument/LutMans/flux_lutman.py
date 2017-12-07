@@ -95,9 +95,8 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         self.add_parameter('cfg_max_wf_length',
                            parameter_class=ManualParameter,
-                           initial_value=12e-6,
-                           unit='s',
-                           vals=vals.Numbers(0, 12e-6))
+                           initial_value=100e-6,
+                           unit='s', vals=vals.Numbers(0, 100e-6))
 
     def set_default_lutmap(self):
         """
@@ -122,8 +121,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         self.add_parameter('sq_length', unit='s',
                            label='Square pulse length',
                            initial_value=40e-9,
-                           vals=vals.Numbers(0, 12e-6),
-                           # 12us is current max of AWG8
+                           vals=vals.Numbers(0, 100e-6),
                            parameter_class=ManualParameter)
         self.add_parameter('sq_delay', unit='s',
                            label='Square pulse length',
