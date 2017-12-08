@@ -110,7 +110,7 @@ def single_channel_block(amp, length, sampling_rate=2e8, delay=0):
 
     block = amp * np.ones(int(pulse_samples))
     Zeros = np.zeros(int(delay_samples))
-    pulse = list(Zeros)+list(block)
+    pulse = np.array(list(Zeros)+list(block))
     return pulse
 
 

@@ -1,4 +1,7 @@
 """
+N.B. I have started a v2 of this instrument that should be forward compatible
+with real time linear distortions in Dec 2017 -MAR
+
 This file contains the Distortions_corrector.
 
 An object used to correct distortions using an interactive procedure
@@ -193,7 +196,7 @@ class Distortion_corrector():
     def empty_kernel_list(self):
         self.kernel_object.kernel_list([])
 
-    def measure_trace(self, verbuse=True):
+    def measure_trace(self, verbose=True):
         raise NotImplementedError(
             'Base class is not attached to physical instruments and does not '
             'implement measurements.')

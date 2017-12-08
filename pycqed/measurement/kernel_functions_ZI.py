@@ -64,9 +64,6 @@ def exponential_decay_correction(ysig, tau: float, amp: float,
     if alpha > 0.03:
         logging.warning('large alpha, expect unstable filter')
 
-    print('alpha', alpha)
-    print('k', k)
-
     # hint: to get the inverse just use the filter with (a, b, ysig)
     filtered_signal = signal.lfilter(b, a, ysig)
     return filtered_signal

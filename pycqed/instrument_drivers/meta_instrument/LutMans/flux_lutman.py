@@ -236,7 +236,15 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         uses the Kernel object to distort waveforms
         """
         k = self.instr_distortion_kernel.get_instr()
-        distorted_waveform = k.convolve_kernel(
-            [k.kernel(), waveform],
-            length_samples=int(self.cfg_max_wf_length()*self.sampling_rate()))
+
+        # duck typing the distort waveform method
+        if hasattr(k, 'distort_waveform'):
+            distorted_waveform = k.distort_waveform(
+                waveform,
+                length_samples=int(
+                    self.cfg_max_wf_length()*self.sampling_rate()))
+        else: # old kernel object does not have this method
+            distorted_waveform = k.convolve_kernel(
+                [k.kernel(), waveform],
+                length_samples=int(self.cfg_max_wf_length()*self.sampling_rate()))
         return distorted_waveform
