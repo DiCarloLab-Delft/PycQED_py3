@@ -193,12 +193,12 @@ class QuTechVSMModule(SCPI):
                                    vals=validators.OnOff())
 
     def add_calibration_parameters(self):
-        # Raw calibration
+        # Raw Calibration
         #  Two input pulses
         for pulse in ('gaussian', 'derivative'):
             #  Two DACs
             for dac in ('attenuation', 'phase'):
-                # All channels and modules at once (no getter)
+                # All channels and modules at once (no getter, only raw)
                 doc_all_dac = 'Raw {d} DAC value (0--65535) for the {p} ' \
                               'input of all channels.'.format(p=pulse, d=dac)
                 var_name = '_{p}_{d}_raw'.format(p=pulse, d=dac)
@@ -213,6 +213,7 @@ class QuTechVSMModule(SCPI):
                 # Individual outputs: per (module, channel) pair
                 for channel in self.channels:
                     for mod in self.modules:
+                        # Raw DAC values
                         doc_dac = 'Raw {d} DAC value (0--65535) for the {p} ' \
                                   'input of channel {c} ' \
                                   'of module {m}.'.format(p=pulse, d=dac,
@@ -229,3 +230,110 @@ class QuTechVSMModule(SCPI):
                             get_parser=int,
                             vals=validators.Ints(min_value=0, max_value=2**16-1)
                         )
+
+        # Attenuation and phase
+        #  Two input pulses
+        for pulse in ('gaussian', 'derivative'):
+            # Attenuation for all channels and modules at once (no getter)
+            doc_att = 'Attenuation value (in dB) for the {p} ' \
+                      'input of all channels.'.format(p=pulse)
+            var_name = '_{p}_att_db'.format(p=pulse)
+            var_scpi = ':{p}:ATTENUATION:DB'.format(p=pulse.upper())
+            self.add_parameter('calibration' + var_name,
+                               docstring=doc_att,
+                               set_cmd='CALIBRATION' + var_scpi + ' {}',
+                               unit='dB',
+                               vals=validators.Numbers(),
+                               get_parser=float)
+
+            doc_att = 'Attenuation value (linear) for the {p} ' \
+                      'input of all channels.'.format(p=pulse)
+            var_name = '_{p}_att_lin'.format(p=pulse)
+            var_scpi = ':{p}:ATTENUATION:LIN'.format(p=pulse.upper())
+            self.add_parameter('calibration' + var_name,
+                               docstring=doc_att,
+                               set_cmd='CALIBRATION' + var_scpi + ' {}',
+                               vals=validators.Numbers(),
+                               get_parser=float)
+
+            # Phase for all channels and modules at once (no getter)
+            doc_phs = 'Phase value (in rad) for the {p} ' \
+                      'input of all channels.'.format(p=pulse)
+            var_name = '_{p}_phs_rad'.format(p=pulse)
+            var_scpi = ':{p}:PHASE:RAD'.format(p=pulse.upper())
+            self.add_parameter('calibration' + var_name,
+                               docstring=doc_phs,
+                               set_cmd='CALIBRATION' + var_scpi + ' {}',
+                               unit='rad',
+                               vals=validators.Numbers(),
+                               get_parser=float)
+
+            doc_phs = 'Phase value (in deg) for the {p} ' \
+                      'input of all channels.'.format(p=pulse)
+            var_name = '_{p}_phs_deg'.format(p=pulse)
+            var_scpi = ':{p}:PHASE:DEG'.format(p=pulse.upper())
+            self.add_parameter('calibration' + var_name,
+                               docstring=doc_phs,
+                               set_cmd='CALIBRATION' + var_scpi + ' {}',
+                               unit='deg',
+                               vals=validators.Numbers(),
+                               get_parser=float)
+
+            # Individual outputs: per (module, channel) pair
+            for channel in self.channels:
+                for mod in self.modules:
+                    ch_name = '_mod{m}_ch{c}'.format(m=mod, c=channel)
+                    ch_scpi = ':MODULE{m}:CHANNEL{c}'.format(m=mod, c=channel)
+
+                    doc_var = 'Attenuation value (in dB) for the {p} ' \
+                              'input of channel {c} ' \
+                              'of module {m}.'.format(p=pulse, c=channel, m=mod)
+                    var_name = ch_name + '_{p}_att_db'.format(p=pulse)
+                    var_scpi = ch_scpi + ':{p}:ATTENUATION:DB'.format(p=pulse.upper())
+                    scpi_name = 'CALIBRATION' + var_scpi
+                    self.add_parameter('calibration' + var_name,
+                                       docstring=doc_var,
+                                       get_cmd=scpi_name + '?',
+                                       set_cmd=scpi_name + ' {}',
+                                       unit='dB',
+                                       get_parser=float,
+                                       vals=validators.Numbers())
+                    doc_var = 'Attenuation value (linear) for the {p} ' \
+                              'input of channel {c} ' \
+                              'of module {m}.'.format(p=pulse, c=channel, m=mod)
+                    var_name = ch_name + '_{p}_att_lin'.format(p=pulse)
+                    var_scpi = ch_scpi + ':{p}:ATTENUATION:LIN'.format(p=pulse.upper())
+                    scpi_name = 'CALIBRATION' + var_scpi
+                    self.add_parameter('calibration' + var_name,
+                                       docstring=doc_var,
+                                       get_cmd=scpi_name + '?',
+                                       set_cmd=scpi_name + ' {}',
+                                       get_parser=float,
+                                       vals=validators.Numbers())
+
+                    doc_var = 'Phase value (in rad) for the {p} ' \
+                              'input of channel {c} ' \
+                              'of module {m}.'.format(p=pulse, c=channel, m=mod)
+                    var_name = ch_name + '_{p}_phs_rad'.format(p=pulse)
+                    var_scpi = ch_scpi + ':{p}:PHASE:RAD'.format(p=pulse.upper())
+                    scpi_name = 'CALIBRATION' + var_scpi
+                    self.add_parameter('calibration' + var_name,
+                                       docstring=doc_var,
+                                       get_cmd=scpi_name + '?',
+                                       set_cmd=scpi_name + ' {}',
+                                       unit='rad',
+                                       get_parser=float,
+                                       vals=validators.Numbers())
+                    doc_var = 'Phase value (in deg) for the {p} ' \
+                              'input of channel {c} ' \
+                              'of module {m}.'.format(p=pulse, c=channel, m=mod)
+                    var_name = ch_name + '_{p}_phs_deg'.format(p=pulse)
+                    var_scpi = ch_scpi + ':{p}:PHASE:DEG'.format(p=pulse.upper())
+                    scpi_name = 'CALIBRATION' + var_scpi
+                    self.add_parameter('calibration' + var_name,
+                                       docstring=doc_var,
+                                       get_cmd=scpi_name + '?',
+                                       set_cmd=scpi_name + ' {}',
+                                       unit='deg',
+                                       get_parser=float,
+                                       vals=validators.Numbers())
