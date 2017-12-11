@@ -83,13 +83,13 @@ class QuTechVSMModule(SCPI):
                        'on module {m}, channel {c}.'.format(m=mod, c=channel))
                 ch_name = '{m}_ch{c}'.format(m=mod_name, c=channel)
                 ch_scpi = '{m}:CHANNEL{c}'.format(m=mod_scpi, c=channel)
-                self.add_parameter(ch_name + '_temperature',
+                self.add_parameter('temperature_' + ch_name,
                                    docstring=doc,
                                    unit='℃',
                                    get_cmd='TEMPERATURE:'+ch_scpi+'?',
                                    get_parser=float)
             # Digital sensor
-            self.add_parameter(mod_name + '_temperature_digital',
+            self.add_parameter('temperature_' + mod_name + '_digital',
                                docstring='Temperature (in ℃) of the separate '
                                          'digital temperature sensor on each '
                                          'module.',
@@ -116,7 +116,7 @@ class QuTechVSMModule(SCPI):
             mod_scpi = 'MODULE{m}'.format(m=mod)
 
             doc_source = 'Marker source of module {m}.'.format(m=mod)
-            self.add_parameter(mod_name + '_marker_source',
+            self.add_parameter('marker_' + mod_name + '_source',
                                docstring=doc_source,
                                get_cmd='MARKER:'+mod_scpi+':SOURCE?',
                                set_cmd='MARKER:'+mod_scpi+':SOURCE {}',
@@ -128,7 +128,7 @@ class QuTechVSMModule(SCPI):
                                                             c=channel)
                 doc_state = 'Marker state of module {m}, ' \
                             'channel {c}.'.format(m=mod, c=channel)
-                self.add_parameter(mod_ch_name + '_marker_state',
+                self.add_parameter('marker_' + mod_ch_name + '_state',
                                    docstring=doc_state,
                                    get_cmd='MARKER:'+mod_ch_scpi+':STATE?',
                                    set_cmd='MARKER:'+mod_ch_scpi+':STATE {}',
