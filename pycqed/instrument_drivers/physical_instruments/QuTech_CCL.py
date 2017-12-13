@@ -23,15 +23,9 @@ import traceback
 import array
 import re
 
-# The assembler needs to be build first before it can be imported.
-# The default location is a copy of the build in the _CCL hidden folder next
-# to this instrument driver. A better solution is needed to prevent build
-# issues, this is documented in issue #65 of the CCL repo.
-curdir = (os.path.dirname(__file__))
-CCLight_Assembler_dir = os.path.join(curdir, "_CCL", "qisa-as", "build")
-sys.path.append(CCLight_Assembler_dir)
+
 try:
-    from pyQisaAs import QISA_Driver
+    from qisa_as import QISA_Driver, qisa_qmap
 except ImportError as e:
     logging.warning(e)
 
@@ -98,6 +92,13 @@ class CCL(SCPI):
         self.QISA.enableScannerTracing(False)
         self.QISA.enableParserTracing(False)
         self.QISA.setVerbose(False)
+
+        curdir = os.path.dirname(__file__)
+        qmap_fn = os.path.join(curdir, '_CCL', 'qisa_opcode.qmap')
+        success = self.QISA.loadQuantumInstructions(qmap_fn)
+        if not success:
+            print ("Error: ", driver.getLastErrorMessage())
+            print ("Failed to load quantum instructions from dictionaries.")
 
     def stop(self):
         self.run(0),
@@ -316,7 +317,62 @@ class CCL(SCPI):
             log.info("The assembler of CCLight has not been initialized yet.")
             return
 
-        print(self.QISA.dumpOpcodeSpecification())
+        print(self.QISA.dumpInstructionsSpecification())
+
+    def print_microcode(self):
+        if self.microcode is None:
+            log.info("The microcode unit of CCLight has not been"
+                " initialized yet.")
+            return
+
+        self.microcode.dump_microcode()
+
+    def print_qisa_with_microcode(self):
+        if self.microcode is None:
+            log.info("The microcode unit of CCLight has not been"
+                " initialized yet.")
+            return
+
+        if self.QISA is None:
+            log.info("The assembler of CCLight has not been initialized yet.")
+            return
+
+        q_arg = {}
+
+        insn_opcodes_str = self.QISA.dumpInstructionsSpecification()
+        lines = insn_opcodes_str.split('\n')
+        trimed_lines = [line.strip() for line in lines \
+                        if line.startswith('def_q')]
+
+        # put every instruction with its opcode into a dict
+        for line in trimed_lines:
+            name, opcode = line.split('=')
+            name = name.strip().lower()
+            opcode = opcode.strip().lower()
+
+            # convert the opcode into an integer
+            if opcode.startswith("0x"):
+                base = 16
+            elif opcode.startswith("0o"):
+                base = 8
+            elif opcode.startswith("0b"):
+                base = 2
+            else:
+                base = 10
+            opcode = int(opcode, base)
+
+            if name.startswith("def_q_arg_none"):
+                q_arg[name[16:-2]] = opcode
+            if name.startswith("def_q_arg_tt"):
+                q_arg[name[14:-2]] = opcode
+            if name.startswith("def_q_arg_st"):
+                q_arg[name[14:-2]] = opcode
+
+        print("Instruction      Codewords")
+        for key, value in q_arg.items():
+            print('  {:<10s}:  '.format(key), end = '')
+            self.microcode.print_cs_line_no_header(value)
+            print("")
 
 ###############################################################################
 
@@ -340,7 +396,7 @@ class CCL(SCPI):
                 "The parameter filename type({}) is incorrect. "
                 "It should be str.".format(type(filename)))
 
-        success_parser = self.QISA.parse(filename)
+        success_parser = self.QISA.assemble(filename)
 
         if success_parser is not True:
             print("Error detected while assembling the file {}:".format(
