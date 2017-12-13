@@ -360,10 +360,11 @@ class CCL(SCPI):
             intarray.append(int(instr[2:], 16))
 
         binBlock = bytearray(array.array('L', intarray))
+        # print("binblock size:", len(binBlock))
         # write binblock
         hdr = 'QUTech:UploadInstructions '
         self.binBlockWrite(binBlock, hdr)
-        print("CCL: Sending instructions to the hardware finished.")
+        # print("CCL: Sending instructions to the hardware finished.")
 
         # write to last_loaded_instructions so it can conveniently be read back
         self.last_loaded_instructions(filename)
