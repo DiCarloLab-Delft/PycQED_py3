@@ -95,9 +95,8 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         self.add_parameter('cfg_max_wf_length',
                            parameter_class=ManualParameter,
-                           initial_value=12e-6,
-                           unit='s',
-                           vals=vals.Numbers(0, 12e-6))
+                           initial_value=100e-6,
+                           unit='s', vals=vals.Numbers(0, 100e-6))
 
     def set_default_lutmap(self):
         """
@@ -122,6 +121,11 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         self.add_parameter('sq_length', unit='s',
                            label='Square pulse length',
                            initial_value=40e-9,
+                           vals=vals.Numbers(0, 100e-6),
+                           parameter_class=ManualParameter)
+        self.add_parameter('sq_delay', unit='s',
+                           label='Square pulse length',
+                           initial_value=0e-9,
                            vals=vals.Numbers(0, 12e-6),
                            # 12us is current max of AWG8
                            parameter_class=ManualParameter)
@@ -171,7 +175,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         self._wave_dict['i'] = np.zeros(42)
         self._wave_dict['square'] = wf.single_channel_block(
             amp=self.sq_amp(), length=self.sq_length(),
-            sampling_rate=self.sampling_rate(), delay=0)
+            sampling_rate=self.sampling_rate(), delay=self.sq_delay())
         self._wave_dict['park'] = np.zeros(42)
 
         self._wave_dict['cz'] = wf.martinis_flux_pulse(
@@ -232,7 +236,15 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         uses the Kernel object to distort waveforms
         """
         k = self.instr_distortion_kernel.get_instr()
-        distorted_waveform = k.convolve_kernel(
-            [k.kernel(), waveform],
-            length_samples=int(self.cfg_max_wf_length()*self.sampling_rate()))
+
+        # duck typing the distort waveform method
+        if hasattr(k, 'distort_waveform'):
+            distorted_waveform = k.distort_waveform(
+                waveform,
+                length_samples=int(
+                    self.cfg_max_wf_length()*self.sampling_rate()))
+        else: # old kernel object does not have this method
+            distorted_waveform = k.convolve_kernel(
+                [k.kernel(), waveform],
+                length_samples=int(self.cfg_max_wf_length()*self.sampling_rate()))
         return distorted_waveform

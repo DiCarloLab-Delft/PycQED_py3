@@ -1946,5 +1946,9 @@ def get_color_list(max_num, cmap='viridis'):
         max_num = 20
 
     if isinstance(cmap, str):
-        cmap = cm.get_cmap(cmap)
+        try:
+            cmap = cm.get_cmap(cmap)
+        except ValueError:
+            logging.warning('Using Vega10 as a fallback, upgrade matplotlib')
+            cmap = cm.get_cmap('Vega10')
     return [cmap(i) for i in np.linspace(0.0, 1.0, max_num)]

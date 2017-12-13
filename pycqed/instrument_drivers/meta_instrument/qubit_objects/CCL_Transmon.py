@@ -14,6 +14,7 @@ from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import measurement_analysis as ma2
 from pycqed.measurement.calibration_toolbox import (
     mixer_carrier_cancellation)
+from pycqed.measurement.calibration_toolbox import mixer_skewness_cal_UHFQC_adaptive
 
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import detector_functions as det
@@ -469,6 +470,47 @@ class CCLight_Transmon(Qubit):
             vals=vals.Ints(), initial_value=1,
             parameter_class=ManualParameter)
 
+        # Currently this has only the parameters for 1 CZ gate.
+        # in the future there will be 5 distinct flux operations for which
+        # parameters have to be stored.
+        # cz to all nearest neighbours (of which 2 are only phase corr) and
+        # the "park" operation.
+        self.add_parameter('fl_cz_length', vals=vals.Numbers(),
+                           unit='s', initial_value=35e-9,
+                           parameter_class=ManualParameter)
+        self.add_parameter('fl_cz_lambda_2', vals=vals.Numbers(),
+                           initial_value=0,
+                           parameter_class=ManualParameter)
+        self.add_parameter('fl_cz_lambda_3', vals=vals.Numbers(),
+                           initial_value=0,
+                           parameter_class=ManualParameter)
+        self.add_parameter('fl_cz_theta_f', vals=vals.Numbers(),
+                           unit='deg',
+                           initial_value=80,
+                           parameter_class=ManualParameter)
+        self.add_parameter('fl_cz_V_per_phi0', vals=vals.Numbers(),
+                           unit='V', initial_value=1,
+                           parameter_class=ManualParameter)
+        self.add_parameter('fl_cz_freq_01_max', vals=vals.Numbers(),
+                           unit='Hz', parameter_class=ManualParameter)
+        self.add_parameter('fl_cz_J2', vals=vals.Numbers(),
+                           unit='Hz',
+                           initial_value=50e6,
+                           parameter_class=ManualParameter)
+        self.add_parameter('fl_cz_freq_interaction', vals=vals.Numbers(),
+                           unit='Hz',
+                           parameter_class=ManualParameter)
+        self.add_parameter('fl_cz_phase_corr_length',
+                           unit='s',
+                           initial_value=5e-9, vals=vals.Numbers(),
+                           parameter_class=ManualParameter)
+        self.add_parameter('fl_cz_phase_corr_amp',
+                           unit='V',
+                           initial_value=0, vals=vals.Numbers(),
+                           parameter_class=ManualParameter)
+
+
+
     def add_config_parameters(self):
         self.add_parameter(
             'cfg_trigger_period', label='Trigger period',
@@ -588,15 +630,15 @@ class CCLight_Transmon(Qubit):
         #         self.spec_vsm_att())
         #         VSM.set('in{}_out{}_switch'.format(self.spec_vsm_ch_in(),
         #                                    self.spec_vsm_ch_out()), mode)
-        VSM.set('mod{}_ch{}_gaussian_att_raw'.format(
-                self.spec_vsm_ch_out(),self.spec_vsm_ch_in()),
-                self.spec_vsm_att())
-        VSM.set('mod{}_ch{}_marker_state'.format(
-                self.spec_vsm_ch_out(),self.spec_vsm_ch_in()),'on')
-        VSM.set('mod{}_ch{}_marker_state'.format(
-                self.mw_vsm_ch_out(),self.mw_vsm_ch_in()),'off')
-        VSM.set('mod{}_marker_source'.format(
-                self.spec_vsm_ch_in()),marker_source)
+        # VSM.set('mod{}_ch{}_gaussian_att_raw'.format(
+        #         self.spec_vsm_ch_out(),self.spec_vsm_ch_in()),
+        #         self.spec_vsm_att())
+        # VSM.set('mod{}_ch{}_marker_state'.format(
+        #         self.spec_vsm_ch_out(),self.spec_vsm_ch_in()),'on')
+        # VSM.set('mod{}_ch{}_marker_state'.format(
+        #         self.mw_vsm_ch_out(),self.mw_vsm_ch_in()),'off')
+        # VSM.set('mod{}_marker_source'.format(
+        #         self.spec_vsm_ch_in()),marker_source)
 
         self.instr_spec_source.get_instr().power(self.spec_pow())
 
@@ -999,6 +1041,54 @@ class CCLight_Transmon(Qubit):
             self.mw_mixer_offs_DQ(offset_Q)
         return True
 
+    def calibrate_mixer_skewness_RO(self, update=True):
+        '''
+        Calibrates the mixer skewness using mixer_skewness_cal_UHFQC_adaptive
+        see calibration toolbox for details
+        '''
+
+        #using the restless tuning sequence
+        p = sqo.randomized_benchmarking(
+            self.cfg_qubit_nr(), self.cfg_openql_platform_fn(),
+            nr_cliffords=[1],
+            net_clifford=1, nr_seeds=1, restless=True, cal_points=False)
+        self.instr_CC.get_instr().upload_instructions(p.filename)
+        self.instr_CC.get_instr().start()
+
+        LutMan = self.instr_LutMan_RO.get_instr()
+        LutMan.apply_mixer_predistortion_matrix(True)
+        MC = self.instr_MC.get_instr()
+        S1 = swf.lutman_par(
+            LutMan, LutMan.mixer_alpha, single=False, run=True)
+        S2 = swf.lutman_par(
+            LutMan, LutMan.mixer_phi, single=False, run=True)
+
+        detector = det.Signal_Hound_fixed_frequency(
+            self.instr_SH.get_instr(), frequency=(self.instr_LO_ro.get_instr().frequency() -
+                       self.ro_freq_mod()),
+            Navg=5, delay=0.0, prepare_each_point=False)
+
+        ad_func_pars = {'adaptive_function': nelder_mead,
+                    'x0': [1.0, 0.0],
+                    'initial_step': [.15, 10],
+                    'no_improv_break': 15,
+                    'minimize': True,
+                    'maxiter': 500}
+        MC.set_sweep_functions([S1, S2])
+        MC.set_detector_function(detector)  # sets test_detector
+        MC.set_adaptive_function_parameters(ad_func_pars)
+        MC.run(name='Spurious_sideband', mode='adaptive')
+        a = ma.OptimizationAnalysis(auto=True, label='Spurious_sideband')
+        alpha = a.optimization_result[0][0]
+        phi = a.optimization_result[0][1]
+
+        if update:
+            self.ro_pulse_mixer_phi.set(phi)
+            self.ro_pulse_mixer_alpha.set(alpha)
+            LutMan.mixer_alpha(alpha)
+            LutMan.mixer_phi(phi)
+
+
     def calibrate_mixer_offsets_RO(self, update: bool=True) -> bool:
         '''
         Calibrates the mixer skewness and updates the I and Q offsets in
@@ -1186,7 +1276,7 @@ class CCLight_Transmon(Qubit):
                 if update_threshold:
                     # UHFQC threshold is wrong, the magic number is a
                     #  dirty hack. This works. we don't know why.
-                    magic_scale_factor = 0.655
+                    magic_scale_factor = 1#0.655
                     self.ro_acq_threshold(a.proc_data_dict['threshold_raw'] *
                                           magic_scale_factor)
                 if update:
@@ -1279,9 +1369,8 @@ class CCLight_Transmon(Qubit):
         self.ro_acq_averages(old_avg)
 
         # Calculate optimal weights
-        optimized_weights_I = transients[1][0] - transients[0][0]
-        optimized_weights_Q = transients[1][1] - transients[0][1]
-
+        optimized_weights_I = -(transients[1][0] - transients[0][0])
+        optimized_weights_Q = -(transients[1][1] - transients[0][1])
         # joint rescaling to +/-1 Volt
         maxI = np.max(np.abs(optimized_weights_I))
         maxQ = np.max(np.abs(optimized_weights_Q))
@@ -1414,12 +1503,13 @@ class CCLight_Transmon(Qubit):
         ad_func_pars = {'adaptive_function': nelder_mead,
                         'x0': initial_values,
                         'initial_step': initial_steps,
-                        'par_idx': 1,
                         'minimize': False}
 
         MC.set_adaptive_function_parameters(ad_func_pars)
         MC.set_optimization_method('nelder_mead')
-        MC.run(name='Restless_tuneup'+self.msmt_suffix, mode='adaptive')
+        MC.run(name='Restless_tuneup_{}Cl_{}seeds'.format(
+                nr_cliffords, nr_cliffords) + self.msmt_suffix,
+                mode='adaptive')
         a=ma.OptimizationAnalysis(label='Restless_tuneup')
 
         if update:
@@ -1548,7 +1638,7 @@ class CCLight_Transmon(Qubit):
 
         if two_par:
             if initial_steps is None:
-                initial_steps = [-0.1*amp0, -0.1*amp1]
+                initial_steps = [-0.5*amp0, -0.5*amp1]
             ad_func_pars = {'adaptive_function': nelder_mead,
                             'x0': [amp0, amp1],
                             'initial_step': initial_steps,
@@ -1698,12 +1788,6 @@ class CCLight_Transmon(Qubit):
 
         self.prepare_for_timedomain()
 
-        # testing if the pulses are locked to the modulation frequency
-        if not all([np.round(t*1e9) % (1/self.mw_freq_mod.get()*1e9)
-                    == 0 for t in times]):
-            raise ValueError(
-                'timesteps must be multiples of modulation period')
-
         # adding 'artificial' detuning by detuning the qubit LO
         if freq_qubit is None:
             freq_qubit = self.freq_qubit()
@@ -1809,6 +1893,39 @@ class CCLight_Transmon(Qubit):
             a = ma2.FlippingAnalysis(
                 options_dict={'scan_label': 'flipping'})
         return a
+
+
+    def measure_motzoi(self, motzoi_atts=np.linspace(0, 50e3, 31),
+                       prepare_for_timedomain: bool=True,
+                       MC=None, analyze=True, close_fig=True):
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+        p = sqo.motzoi_XY(
+            qubit_idx=self.cfg_qubit_nr(),
+            platf_cfg=self.cfg_openql_platform_fn())
+        self.instr_CC.get_instr().upload_instructions(p.filename)
+
+        d = self.int_avg_det_single
+        d.seg_per_point = 2
+        d.detector_control = 'hard'
+
+        VSM = self.instr_VSM.get_instr()
+        mod_out = self.mw_vsm_mod_out()
+        ch_in = self.mw_vsm_ch_in()
+        D_par = VSM.parameters['mod{}_ch{}_derivative_att_raw'.format(mod_out, ch_in)]
+
+        MC.set_sweep_function(D_par)
+        MC.set_sweep_points(np.repeat(motzoi_atts, 2))
+        MC.set_detector_function(d)
+
+        MC.run('Motzoi_XY'+self.msmt_suffix)
+        if analyze:
+            a = ma.Motzoi_XY_analysis(
+                auto=True, cal_points=None, close_fig=close_fig)
+            return a
+
 
     def measure_randomized_benchmarking(self, nr_cliffords=2**np.arange(12),
                                         nr_seeds=100,

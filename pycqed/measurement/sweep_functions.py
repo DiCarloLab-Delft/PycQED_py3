@@ -261,6 +261,7 @@ class Hard_Sweep(Sweep_function):
         super(Hard_Sweep, self).__init__()
         self.sweep_control = 'hard'
         self.parameter_name = 'None'
+        self.name = 'Hard_Sweep'
         self.unit = 'a.u.'
 
     def start_acquistion(self):
@@ -815,7 +816,7 @@ class QWG_lutman_custom_wave_chunks(Soft_Sweep):
 
 class lutman_par(Soft_Sweep):
 
-    def __init__(self, LutMan, LutMan_parameter, **kw):
+    def __init__(self, LutMan, LutMan_parameter, single=True, run=False,**kw):
         self.set_kw()
         self.name = LutMan_parameter.name
         self.parameter_name = LutMan_parameter.label
@@ -823,10 +824,16 @@ class lutman_par(Soft_Sweep):
         self.sweep_control = 'soft'
         self.LutMan = LutMan
         self.LutMan_parameter = LutMan_parameter
+        self.run = run
+        self.single = single
 
     def set_parameter(self, val):
         self.LutMan_parameter.set(val)
+        if self.run:
+            self.LutMan.AWG.get_instr().awgs_0_enable(False)
         self.LutMan.load_DIO_triggered_sequence_onto_UHFQC()
+        if self.run:
+            self.LutMan.AWG.get_instr().acquisition_arm(single=self.single)
 
 
 class lutman_par_dB_attenuation(Soft_Sweep):
@@ -875,3 +882,43 @@ class two_par_joint_sweep(Soft_Sweep):
     def set_parameter(self, val):
         self.par_A.set(val)
         self.par_B.set(val*self.par_ratio)
+
+
+class FLsweep(Soft_Sweep):
+    """
+    Special sweep function for AWG8 flux pulses, includes "hack" program
+    required because of bad triggering of DIO pulses.
+    """
+    def __init__(self, lm, par, waveform_name, **kw):
+        super().__init__(**kw)
+        self.lm = lm
+        self.par = par
+        self.waveform_name = waveform_name
+        self.parameter_name = par.name
+        self.unit = par.unit
+        self.name = par.name
+
+    def set_parameter(self, val):
+        awg_hack_program = """
+        while (1) {
+          waitDIOTrigger();
+          playWave("dev8005_wave_ch1_cw002", "dev8005_wave_ch2_cw002");
+        }
+        """
+        awg_hack_program_cz = """
+        while (1) {
+          waitDIOTrigger();
+          playWave("dev8005_wave_ch1_cw001", "dev8005_wave_ch2_cw001");
+        }
+        """
+        awg = self.lm.AWG.get_instr()
+        self.par(val)
+        self.lm.load_waveform_onto_AWG_lookuptable(
+            self.waveform_name, regenerate_waveforms=True)
+        if 'z' in self.waveform_name:
+            awg.configure_awg_from_string(0, awg_hack_program_cz)
+        else:
+            awg.configure_awg_from_string(0, awg_hack_program)
+
+        awg.configure_codeword_protocol()
+        awg.start()

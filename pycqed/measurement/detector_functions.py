@@ -146,8 +146,10 @@ class Soft_Detector(Detector_Function):
     def acquire_data_point(self, **kw):
         return np.random.random()
 
-    def prepare(self):
+    def prepare(self, sweep_points=None):
         pass
+
+
 ##########################################################################
 ##########################################################################
 ####################     Hardware Controlled Detectors     ###############
@@ -890,6 +892,7 @@ class Function_Detector(Soft_Detector):
     """
 
     def __init__(self, get_function, value_names=None,
+                 detector_control='soft',
                  value_units=None, msmt_kw={}, result_keys=None, **kw):
         super().__init__()
         self.get_function = get_function
@@ -897,6 +900,7 @@ class Function_Detector(Soft_Detector):
         self.value_names = value_names
         self.value_units = value_units
         self.msmt_kw = msmt_kw
+        self.detector_control = detector_control
         if self.value_names is None:
             self.value_names = result_keys
         if self.value_units is None:
@@ -922,6 +926,9 @@ class Function_Detector(Soft_Detector):
             if len(results) == 1:
                 return results[0]  # for a single entry we don't want a list
             return results
+
+    def get_values(self):
+        return self.acquire_data_point()
 
 
 class Detect_simulated_hanger_Soft(Soft_Detector):
@@ -1437,10 +1444,10 @@ class UHFQC_integrated_average_detector(Hard_Detector):
                                                   channel)
         if result_logging_mode == 'raw':
             self.value_units = ['V']*len(self.channels)
-            self.scaling_factor = 1/(1.8e9*integration_length*nr_averages)
+            self.scaling_factor = 1#/(1.8e9*integration_length*nr_averages)
         elif result_logging_mode == 'lin_trans':
             self.value_units = ['a.u.']*len(self.channels)
-            self.scaling_factor = 1/nr_averages
+            self.scaling_factor = 1#/nr_averages
 
         elif result_logging_mode == 'digitized':
             self.value_units = ['frac']*len(self.channels)
@@ -1496,6 +1503,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
         data_raw = self.UHFQC.acquisition_poll(
             samples=self.nr_sweep_points, arm=False, acquisition_time=0.01)
+
         # the self.channels should be the same as data_raw.keys().
         # this is to be tested (MAR 26-9-2017)
         data = np.array([data_raw[key]
@@ -1508,6 +1516,12 @@ class UHFQC_integrated_average_detector(Hard_Detector):
                     'quex_trans_offset_weightfunction_{}'.format(channel))
         if not self.real_imag:
             data = self.convert_to_polar(data)
+
+        no_virtual_channels = len(self.value_names)//len(self.channels)
+
+        data = np.reshape(data.T,
+                          (-1, no_virtual_channels, len(self.channels))).T
+        data = data.reshape((len(self.value_names), -1))
         return data
 
     def convert_to_polar(self, data):
@@ -1713,7 +1727,7 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
 
     def get_values(self):
         # Slightly different way to deal with scaling factor
-        self.scaling_factor = 1 / (1.8e9*self.integration_length)
+        self.scaling_factor = 1 #/ (1.8e9*self.integration_length)
 
         if self.AWG is not None:
             self.AWG.stop()
@@ -1786,7 +1800,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
                                                   channel)
         if result_logging_mode == 'raw':
             self.value_units = ['V']*len(self.channels)
-            self.scaling_factor = 1/(1.8e9*integration_length)
+            self.scaling_factor = 1#/(1.8e9*integration_length)
         else:
             self.value_units = ['']*len(self.channels)
             self.scaling_factor = 1
@@ -2032,9 +2046,8 @@ class UHFQC_single_qubit_statistics_logging_det(UHFQC_statistics_logging_det):
         if channel_name is None:
             channel_name = ['ch{}'.format(channel)]
 
-        self.value_names = ['{} counts'.format(channel),
-                            '{} flips'.format(channel),
-                            '{} state errors'.format(channel)]
+        self.value_names = ['ch{} flips'.format(channel),
+                            'ch{} 1-counts'.format(channel)]
         if not self.normalize_counts:
             self.value_units = '#'*len(self.value_names)
         else:
@@ -2058,8 +2071,9 @@ class UHFQC_single_qubit_statistics_logging_det(UHFQC_statistics_logging_det):
         return two_bit_sm
 
     def acquire_data_point(self, **kw):
-        # Returns only the data for the relevant channel
-        return super().acquire_data_point()[0:3]
+        # Returns only the data for the relevant channel and then
+        # reverts the order to start with the number of flips
+        return super().acquire_data_point()[:2][::-1]
 
 # --------------------------------------------
 # Fake detectors
@@ -2377,3 +2391,4 @@ class DDM_integration_logging_det(Hard_Detector):
     def finish(self):
         if self.AWG is not None:
             self.AWG.stop()
+

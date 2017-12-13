@@ -18,6 +18,9 @@ def single_flux_pulse_seq(qubit_indices: tuple,
     k = Kernel("main", p=platf)
     for idx in qubit_indices:
         k.prepz(idx)  # to ensure enough separation in timing
+        k.prepz(idx)  # to ensure enough separation in timing
+        k.prepz(idx)  # to ensure enough separation in timing
+
     for i in range(7):
         k.gate('CW_00', i)
     k.gate('fl_cw_02', qubit_indices[0], qubit_indices[1])
@@ -321,7 +324,7 @@ def CryoscopeGoogle(qubit_idx: int, buffer_time1, times, platf_cfg: str):
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
-    pass
+
 
 # FIMXE: merge into the real chevron seq
 def Chevron_hack(qubit_idx: int, qubit_idx_spec,
@@ -368,46 +371,48 @@ def Chevron_hack(qubit_idx: int, qubit_idx_spec,
     return p
 
 
-def chevron_seq(fluxing_qubit: str, spectator_qubit: str,
-                excite_q1: bool=False, RO_target='all'):
-    '''
-    Single chevron sequence that does a swap on |01> <-> |10> or |11> <-> |20>.
 
-    Args:
-        fluxing_qubit (str): name of the qubit that is fluxed/
-        spectator qubit (str): name of the qubit with which the fluxing
-                            qubit interacts.
-        RO_target   (str): can be q0, q1, or 'all'
-        excite_q1   (bool): choose whether to excite q1, thus choosing
-                            between the |01> <-> |10> and the |11> <-> |20>
-                            swap.
-    '''
-    raise NotImplementedError()
-    # filename = join(base_qasm_path, 'chevron_seq.qasm')
-    # qasm_file = mopen(filename, mode='w')
-    # qasm_file.writelines('qubit {} \nqubit {} \n'.format(fluxing_qubit,
-    #                                                      spectator_qubit))
+def Chevron(qubit_idx: int, qubit_idx_spec: int,
+            buffer_time, buffer_time2, platf_cfg: str):
+    """
+    Single qubit Ramsey sequence.
+    Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
 
-    # qasm_file.writelines('\ninit_all\n')
-    # if excite_q1:
-    #     qasm_file.writelines('X180 {} | X180 {}\n'.format(fluxing_qubit,
-    #                                                       spectator_qubit))
-    # else:
-    #     qasm_file.writelines('X180 {}\n'.format(fluxing_qubit))
-    # qasm_file.writelines('square {}\n'.format(fluxing_qubit))
-    # if excite_q1:
-    #     # fluxing_qubit is rotated to ground-state to have better contrast
-    #     # (|0> and |2> instead of |1> and |2>)
-    #     qasm_file.writelines('X180 {}\n'.format(fluxing_qubit))
-    # if RO_target == 'all':
-    #     qasm_file.writelines('RO {} | RO {}\n'.format(fluxing_qubit,
-    #                                                   spectator_qubit))
-    # else:
-    #     qasm_file.writelines('RO {} \n'.format(RO_target))
+    Input pars:
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        qubit_idx_spec: int specifying the spectator qubit
+        buffer_time   :
+        buffer_time2  :
 
-    # qasm_file.close()
-    # return qasm_file
+        platf_cfg:      filename of the platform config file
+    Returns:
+        p:              OpenQL Program object containing
 
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="Chevron", nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    buffer_nanoseconds = int(round(buffer_time/1e-9))
+    buffer_nanoseconds2 = int(round(buffer_time2/1e-9))
+
+    k = Kernel("Chevron", p=platf)
+    k.prepz(qubit_idx)
+    k.gate('rx90', qubit_idx_spec)
+    k.gate('rx180', qubit_idx)
+    k.gate("wait", [qubit_idx], buffer_nanoseconds)
+    k.gate('fl_cw_02', 2, 0)
+    k.gate('wait', [qubit_idx], buffer_nanoseconds2)
+    k.gate('rx180', qubit_idx)
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+
+    p.compile()
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
 
 def two_qubit_tomo_bell(bell_state, q0, q1,
                         platf_cfg):
@@ -466,6 +471,8 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
             # Hardcoded flux pulse, FIXME use actual CZ
             k.gate('wait', [2, 0], 100)
             k.gate('fl_cw_01', 2, 0)
+            # FIXME hardcoded extra delays
+            k.gate('wait', [2, 0], 200)
             # after-rotations
             k.gate(after_pulse_q1, q1)
             # tomo pulses
@@ -480,6 +487,120 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
             p.add_kernel(k)
     # 7 repetitions is because of assumptions in tomo analysis
     p = add_two_q_cal_points(p, platf=platf, q0=q0, q1=q1, reps_per_cal_pt=7)
+    p.compile()
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
+def two_qubit_DJ(q0, q1,platf_cfg):
+    '''
+    Two qubit Deutsch-Josza.
+
+    Args:
+        q0, q1          (str): names of the target qubits
+    '''
+    # Recovery pulse is the same for all Bell states
+    after_pulse_q1 = 'rym90'
+
+    # # Define compensation pulses
+    # # FIXME: needs to be added
+    # print('Warning: not using compensation pulses.')
+
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="two_qubit_DJ",
+                nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    # experiments
+    #1
+    k = Kernel("DJ1", p=platf)
+    k.prepz(q0)  # to ensure enough separation in timing
+    k.prepz(q1)  # to ensure enough separation in timing
+    # prerotations
+    k.gate('ry90', q0)
+    k.gate('rym90', q1)
+    #post rotations
+    k.gate('ry90', q0)
+    k.gate('ry90', q1)
+    # measure
+    k.measure(q0)
+    k.measure(q1)
+    p.add_kernel(k)
+
+    #2
+    k = Kernel("DJ2", p=platf)
+    k.prepz(q0)  # to ensure enough separation in timing
+    k.prepz(q1)  # to ensure enough separation in timing
+    # prerotations
+    k.gate('ry90', q0)
+    k.gate('rym90', q1)
+    # rotations
+    k.gate('rx180', q1)
+    #post rotations
+    k.gate('ry90', q0)
+    k.gate('ry90', q1)
+    # measure
+    k.measure(q0)
+    k.measure(q1)
+    p.add_kernel(k)
+
+    #3
+    k = Kernel("DJ3", p=platf)
+    k.prepz(q0)  # to ensure enough separation in timing
+    k.prepz(q1)  # to ensure enough separation in timing
+    # prerotations
+    k.gate('ry90', q0)
+    k.gate('rym90', q1)
+    # rotations
+    k.gate('ry90', q1)
+    k.gate('rx180', q0)
+    k.gate('rx180', q1)
+
+    # Hardcoded flux pulse, FIXME use actual CZ
+    k.gate('wait', [2, 0], 100)
+    k.gate('fl_cw_01', 2, 0)
+    # FIXME hardcoded extra delays
+    k.gate('wait', [2, 0], 200)
+
+    k.gate('rx180', q0)
+    k.gate('ry90', q1)
+
+    #post rotations
+    k.gate('ry90', q0)
+    k.gate('ry90', q1)
+    # measure
+    k.measure(q0)
+    k.measure(q1)
+    p.add_kernel(k)
+
+    #4
+    k = Kernel("DJ4", p=platf)
+    k.prepz(q0)  # to ensure enough separation in timing
+    k.prepz(q1)  # to ensure enough separation in timing
+    # prerotations
+    k.gate('ry90', q0)
+    k.gate('rym90', q1)
+    # rotations
+    k.gate('rym90', q1)
+    # Hardcoded flux pulse, FIXME use actual CZ
+    k.gate('wait', [2, 0], 100)
+    k.gate('fl_cw_01', 2, 0)
+    # FIXME hardcoded extra delays
+    k.gate('wait', [2, 0], 200)
+
+    k.gate('rx180', q1)
+    k.gate('rym90', q1)
+
+    #post rotations
+    k.gate('ry90', q0)
+    k.gate('ry90', q1)
+    # measure
+    k.measure(q0)
+    k.measure(q1)
+    p.add_kernel(k)
+
+    # 7 repetitions is because of assumptions in tomo analysis
+    #p = add_two_q_cal_points(p, platf=platf, q0=q0, q1=q1, reps_per_cal_pt=7)
     p.compile()
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
@@ -523,7 +644,11 @@ def CZ_calibration_seq(q0: int, q1: int, platf_cfg: str,
             if not CZ_disabled:
                 k.gate('fl_cw_01', 2, 0)
             # hardcoded angles, must be uploaded to AWG
-            k.gate('cw_{:02}'.format(i+9), q0)
+            if angle == 90:
+                # special because the cw phase pulses go in mult of 20 deg
+                k.gate('ry90', q0)
+            else:
+                k.gate('cw_{:02}'.format(i+9), q0)
             if case == 'excitation':
                 k.gate('rx180', q1)
 
@@ -572,6 +697,7 @@ def CZ_poisoned_purity_seq(q0, q1, platf_cfg: str):
         # Hardcoded flux pulse, FIXME use actual CZ
         k.gate('wait', [2, 0], 100)
         k.gate('fl_cw_01', 2, 0)
+        k.gate('wait', [2, 0], 300)
         k.gate('rym90', q1)
 
         # Perform pulses to measure the purity of both qubits

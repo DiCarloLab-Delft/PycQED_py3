@@ -48,3 +48,23 @@ class Test_flipping_analysis(unittest.TestCase):
         self.assertAlmostEqual(s*known_detuning, 1, places=places)
         print('Scale factor {:.4f} known detuning {:.4f}'.format(
             s, known_detuning))
+
+
+class CZ_1QPhaseCal_Analysis(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(self):
+        self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
+        ma.a_tools.datadir = self.datadir
+
+    def test_zero_phase_diff_intersect(self):
+        a = ma.CZ_1QPhaseCal_Analysis(t_start='20171126_180251',
+                                      options_dict={'ch_idx':1})
+        self.assertAlmostEqual(a.get_zero_phase_diff_intersect(),
+                               .058, places=3)
+
+
+        a = ma.CZ_1QPhaseCal_Analysis(t_start='20171126_181327',
+                                      options_dict={'ch_idx':0})
+        self.assertAlmostEqual(a.get_zero_phase_diff_intersect(),
+                               .1218, places=3)

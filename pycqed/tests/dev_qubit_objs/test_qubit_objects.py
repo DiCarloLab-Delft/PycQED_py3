@@ -26,6 +26,7 @@ from pycqed.instrument_drivers.meta_instrument.qubit_objects.CC_transmon import 
 from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import dummy_CCL
 from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
 
+Dummy_VSM_not_fixed = True
 
 try:
     import openql
@@ -108,19 +109,23 @@ class Test_QO(unittest.TestCase):
         self.CCL_qubit.mw_mixer_offs_DI(.3)
         self.CCL_qubit.mw_mixer_offs_DQ(.4)
 
+    @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_instantiate_QuDevTransmon(self):
         QDT = QuDev_transmon('QuDev_transmon',
                              MC=None, heterodyne_instr=None, cw_source=None)
         QDT.close()
 
+    @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_instantiate_TekTransmon(self):
         TT = Tektronix_driven_transmon('TT')
         TT.close()
 
+    @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_instantiate_CBoxv3_transmon(self):
         CT = CBox_v3_driven_transmon('CT')
         CT.close()
 
+    @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_instantiate_QWG_transmon(self):
         QT = QWG_driven_transmon('QT')
         QT.close()
@@ -128,6 +133,7 @@ class Test_QO(unittest.TestCase):
     ##############################################
     # calculate methods
     ##############################################
+    @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_calc_freq(self):
         self.CCL_qubit.cfg_qubit_freq_calc_method('latest')
         self.CCL_qubit.calculate_frequency()
@@ -138,6 +144,7 @@ class Test_QO(unittest.TestCase):
     # basic prepare methods
     ##############################################
 
+    @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_prep_for_continuous_wave(self):
         self.CCL_qubit.ro_acq_weight_type('optimal')
         with self.assertRaises(ValueError):
@@ -145,6 +152,7 @@ class Test_QO(unittest.TestCase):
         self.CCL_qubit.ro_acq_weight_type('SSB')
         self.CCL_qubit.prepare_for_continuous_wave()
 
+    @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_prep_cw_config_vsm(self):
 
         self.CCL_qubit.spec_vsm_ch_in(2)
@@ -159,19 +167,23 @@ class Test_QO(unittest.TestCase):
         self.assertEqual(self.VSM.in2_out2_switch(), 'OFF')
         self.assertEqual(self.VSM.in2_out1_att(), 112)
 
+    @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_prep_for_fluxing(self):
         self.CCL_qubit.prepare_for_fluxing()
 
     @unittest.skip('Not Implemented')
+    @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_prep_flux_bias(self):
         raise NotImplementedError()
 
     ##############################################
     # Testing prepare for readout
     ##############################################
+    @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_prep_readout(self):
         self.CCL_qubit.prepare_readout()
 
+    @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_prep_ro_instantiate_detectors(self):
         self.MC.soft_avg(1)
 
@@ -192,6 +204,7 @@ class Test_QO(unittest.TestCase):
 
         self.assertEqual(self.MC.soft_avg(), 4)
 
+    @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_prep_ro_MW_sources(self):
         LO = self.CCL_qubit.instr_LO_ro.get_instr()
         LO.off()
@@ -209,6 +222,7 @@ class Test_QO(unittest.TestCase):
         self.assertEqual(LO.frequency(), 5.43e9-200e6)
         self.assertEqual(LO.power(), 20)
 
+    @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_prep_ro_pulses(self):
         self.CCL_qubit.ro_pulse_res_nr(3)
         self.CCL_qubit.ro_pulse_mixer_alpha(1.1)
@@ -231,6 +245,7 @@ class Test_QO(unittest.TestCase):
         self.assertEqual(self.UHFQC.sigouts_0_offset(), .01)
         self.assertEqual(self.UHFQC.sigouts_1_offset(), .02)
 
+    @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_prep_ro_integration_weigths(self):
         IF = 50e6
         self.CCL_qubit.ro_freq_mod(IF)
@@ -285,9 +300,11 @@ class Test_QO(unittest.TestCase):
     ########################################################
     #          Test prepare for timedomain                 #
     ########################################################
+    @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_prep_for_timedomain(self):
         self.CCL_qubit.prepare_for_timedomain()
 
+    @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_prep_td_sources(self):
 
         self.MW1.off()
@@ -302,6 +319,7 @@ class Test_QO(unittest.TestCase):
         self.assertEqual(self.MW2.frequency(), 4.56e9 + 100e6)
         self.assertEqual(self.MW2.power(), 13)
 
+    @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_prep_td_pulses(self):
         self.CCL_qubit.mw_awg_ch(5)
         self.CCL_qubit.mw_G_mixer_alpha(1.02)
@@ -329,6 +347,7 @@ class Test_QO(unittest.TestCase):
         self.assertEqual(self.AWG.sigouts_6_offset(), .3)
         self.assertEqual(self.AWG.sigouts_7_offset(), .4)
 
+    @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_prep_td_config_vsm(self):
         self.CCL_qubit.mw_vsm_switch('ON')
         self.CCL_qubit.mw_vsm_G_att(10234)
@@ -345,10 +364,12 @@ class Test_QO(unittest.TestCase):
     ###################################################
     #          Test basic experiments                 #
     ###################################################
+    @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_cal_mixer_offsets_drive(self):
         self.CCL_qubit.calibrate_mixer_offsets_drive()
 
     @unittest.skipIf(openql_import_fail, 'OpenQL not present')
+    @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_resonator_spec(self):
         self.CCL_qubit.ro_acq_weight_type('SSB')
 
@@ -363,6 +384,7 @@ class Test_QO(unittest.TestCase):
         self.CCL_qubit.measure_heterodyne_spectroscopy(freqs=freqs)
 
     @unittest.skipIf(openql_import_fail, 'OpenQL not present')
+    @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_resonator_power(self):
         self.CCL_qubit.ro_acq_weight_type('SSB')
         freqs = np.linspace(6e9, 6.5e9, 31)
@@ -373,17 +395,20 @@ class Test_QO(unittest.TestCase):
         self.CCL_qubit.measure_resonator_power(freqs=freqs, powers=powers)
 
     @unittest.skipIf(openql_import_fail, 'OpenQL not present')
+    @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_measure_transients(self):
         self.CCL_qubit.ro_acq_input_average_length(2e-6)
         self.CCL_qubit.measure_transients()
 
     @unittest.skipIf(openql_import_fail, 'OpenQL not present')
+    @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_qubit_spec(self):
         freqs = np.linspace(6e9, 6.5e9, 31)
         self.CCL_qubit.measure_spectroscopy(freqs=freqs)
 
     # @unittest.skip('NotImplementedError')
     @unittest.skipIf(openql_import_fail, 'OpenQL not present')
+    @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_find_qubit_freq(self):
         self.CCL_qubit.cfg_qubit_freq_calc_method('latest')
         self.CCL_qubit.find_frequency()
@@ -391,10 +416,12 @@ class Test_QO(unittest.TestCase):
         self.CCL_qubit.find_frequency()
 
     @unittest.skipIf(openql_import_fail, 'OpenQL not present')
+    @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_AllXY(self):
         self.CCL_qubit.measure_allxy()
 
     @unittest.skipIf(openql_import_fail, 'OpenQL not present')
+    @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_T1(self):
         self.CCL_qubit.measure_T1(
             times=np.arange(0, 1e-6, 20e-9), update=False)
@@ -402,6 +429,7 @@ class Test_QO(unittest.TestCase):
         self.CCL_qubit.measure_T1(update=False)
 
     @unittest.skipIf(openql_import_fail, 'OpenQL not present')
+    @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_Ramsey(self):
         self.CCL_qubit.mw_freq_mod(100e6)
         self.CCL_qubit.measure_Ramsey(times=np.arange(0, 1e-6, 20e-9),
@@ -410,6 +438,7 @@ class Test_QO(unittest.TestCase):
         self.CCL_qubit.measure_Ramsey(update=False)
 
     @unittest.skipIf(openql_import_fail, 'OpenQL not present')
+    @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_echo(self):
         self.CCL_qubit.mw_freq_mod(100e6)
         # self.CCL_qubit.measure_echo(times=np.arange(0,2e-6,40e-9))

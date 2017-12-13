@@ -13,6 +13,18 @@ class Base_MW_LutMan(Base_LutMan):
         angle = i * 20
         _def_lm.append('r{}_90'.format(angle))
 
+    def set_default_lutmap(self):
+        """
+        Set's the default lutmap for standard microwave drive pulses.
+        """
+        def_lm = self._def_lm
+        LutMap = {}
+        for cw_idx, cw_key in enumerate(def_lm):
+            LutMap[cw_key] = (
+                'wave_ch{}_cw{:03}'.format(self.channel_I(), cw_idx),
+                'wave_ch{}_cw{:03}'.format(self.channel_Q(), cw_idx))
+        self.LutMap(LutMap)
+
     def _add_waveform_parameters(self):
         # defined here so that the VSM based LutMan can overwrite this
         self.wf_func = wf.mod_gauss
@@ -225,23 +237,11 @@ class QWG_MW_LutMan(Base_MW_LutMan):
         super().__init__(name, **kw)
 
 
-class AWG8_MW_LutMan(QWG_MW_LutMan):
+class AWG8_MW_LutMan(Base_MW_LutMan):
 
     def __init__(self, name, **kw):
-        super().__init__(name, **kw)
         self._num_channels = 8
-
-    def set_default_lutmap(self):
-        """
-        Set's the default lutmap for standard microwave drive pulses.
-        """
-        def_lm = self._def_lm
-        LutMap = {}
-        for cw_idx, cw_key in enumerate(def_lm):
-            LutMap[cw_key] = (
-                'wave_ch{}_cw{:03}'.format(self.channel_I(), cw_idx),
-                'wave_ch{}_cw{:03}'.format(self.channel_Q(), cw_idx))
-        self.LutMap(LutMap)
+        super().__init__(name, **kw)
 
     def load_waveforms_onto_AWG_lookuptable(
             self, regenerate_waveforms: bool=True, stop_start: bool = True):
@@ -345,6 +345,10 @@ class QWG_VSM_MW_LutMan(AWG8_VSM_MW_LutMan):
         else:
             AWG.ch_pair1_sideband_frequency(0)
             AWG.ch_pair3_sideband_frequency(0)
+
+        for ch in range(1, 5):
+            # ensures amplitude specified is in
+            AWG.set('ch{}_amp'.format(ch), 1)
         return Base_MW_LutMan.load_waveforms_onto_AWG_lookuptable(
             self=self,
             regenerate_waveforms=regenerate_waveforms, stop_start=stop_start)
@@ -366,4 +370,3 @@ class QWG_VSM_MW_LutMan(AWG8_VSM_MW_LutMan):
                 'wave_ch3_cw{:03}'.format(cw_idx),
                 'wave_ch4_cw{:03}'.format(cw_idx))
         self.LutMap(LutMap)
-

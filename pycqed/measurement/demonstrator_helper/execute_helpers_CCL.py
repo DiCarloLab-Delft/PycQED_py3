@@ -115,15 +115,11 @@ def execute(qisa_file_url: str, tqisa_file_url:str, qasm_file_url:str,  config_j
 def calibrate(config_json: str):
     """
     Perform calibrations based on the options specified in the config_json.
-    Calibrations are performed using the dependency graph
+    Calibrations are performed using the dependency graph.
+
+    N.B. on this helper no calibration protocol is defined so it only
+    updates the calibration data in the overview.
     """
-    print('*'*80)
-    print('\t options')
-    print('*'*80)
-
-    print(config_json)
-
-    print('*'*80)
     options = json.loads(config_json)
 
     # Get the kernel_type
@@ -132,42 +128,6 @@ def calibrate(config_json: str):
     except:
         print('Could not find kernel_type in the json options file')
         kernel_type = 'execute_CCL'
-
-    # relies on this being added explicitly
-    cal_graph = station.calibration_graph
-    if 'readout' in options:
-        if options['readout']:
-            cal_graph.multiplexed_RO.state('needs calibration')
-
-    if 'single_qubit_gates' in options:
-        if options['single_qubit_gates']:
-            sqg_nodes = ['QL_freq_ramsey', 'QL_motzoi',
-                         'QL_amplitude_fine', 'QL_RB',
-                         'QR_freq_ramsey', 'QR_motzoi',
-                         'QR_amplitude_fine', 'QR_RB', 'TD_char']
-            for node in sqg_nodes:
-                cal_graph.nodes[node].state('needs calibration')
-
-    if 'time_domain_char' in options:
-        if options['time_domain_char']:
-            tdc_nodes = ['QL_T1', 'QL_T2s', 'QL_echo',
-                         'QR_T1', 'QR_T2s', 'QR_echo', 'TD_char']
-            for node in tdc_nodes:
-                cal_graph.nodes[node].state('needs calibration')
-
-    if 'cz_single_qubit_phase' in options:
-        if options['cz_single_qubit_phase']:
-            sqp_nodes = ['CZ_QR_phase', 'CZ_QL_phase', 'CZ']
-            for node in sqp_nodes:
-                cal_graph.nodes[node].state('needs calibration')
-
-    if 'two_qubit_gate' in options:
-        if options['two_qubit_gate']:
-            cz_nodes = ['CZ_conditional_phase',
-                        'CZ_QR_phase', 'CZ_QL_phase', 'CZ']
-            for node in cz_nodes:
-                cal_graph.nodes[node].state('needs calibration')
-    cal_graph.demonstrator_cal(verbose=True)
 
     # Send over the results of the calibrations
     send_calibration_data(kernel_type)
@@ -240,19 +200,18 @@ def _simulate_quantumsim(file_path, options):
     return dat
 
 
-# Send the callibration of the machine every 10 minutes
-# This function is blocking!
 def send_calibration_data(kernel_type: str):
+    """
+    Sends a snapshot containing the latest calibration data
+    """
 
-    banned_pars = ['IDN', 'RO_optimal_weights_I', 'RO_optimal_weights_Q',
+    banned_pars = ['IDN', 'ro_acq_weight_func_I', 'ro_acq_weight_func_Q',
                    'qasm_config']
-    # threading.Timer(10, _send_calibration).start()
-    # snapshot = MC.station.snapshot()
-    snapshot = qc.station.snapshot()
+    snapshot = st.snapshot()
     calibration = {
         "q0": snapshot["instruments"]["QL"],
-        "q1": snapshot["instruments"]["QR"],
-        'fridge': snapshot["instruments"]["Maserati_fridge_mon"]
+        "q1": snapshot["instruments"]["QR"]
+        # 'fridge': snapshot["instruments"]["Maserati_fridge_mon"]
     }
     for par in banned_pars:
         try:
@@ -264,6 +223,10 @@ def send_calibration_data(kernel_type: str):
         "calibration": calibration,
         "kernel_type": kernel_type
     })
+
+    # print({
+    #     "calibration": calibration,
+    #     "kernel_type": kernel_type})
     print('Calibration data send')
 
 
