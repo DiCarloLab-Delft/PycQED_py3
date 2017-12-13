@@ -46,17 +46,10 @@ class test_SI_unit_aware_labels(unittest.TestCase):
         set_xlabel(ax, 'Distance', 'm')
         set_ylabel(ax, 'Amplitude', 'V')
 
-        xticks = ax.get_xticks()
-        xtick_labels = ax.get_xticklabels()
-        xtick_label_vals = [float(xl.get_text()) for xl in xtick_labels]
-        for xt, xl in zip(xticks, xtick_label_vals):
-            self.assertEqual(xt*1e-3, xl)
-
-        yticks = ax.get_yticks()
-        ytick_labels = ax.get_yticklabels()
-        ytick_label_vals = [float(yl.get_text()) for yl in ytick_labels]
-        for yt, yl in zip(yticks, ytick_label_vals):
-            self.assertAlmostEqual(yt*1e6, yl)
+        xlab = ax.get_xlabel()
+        ylab = ax.get_ylabel()
+        self.assertEqual(xlab, 'Distance (km)')
+        self.assertEqual(ylab, 'Amplitude (μV)')
 
     def test_SI_val_to_msg_str(self):
         val, unit = SI_val_to_msg_str(1030, 'm')
