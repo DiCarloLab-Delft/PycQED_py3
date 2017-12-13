@@ -3,8 +3,8 @@ Currently empty should contain the plotting tools portion of the
 analysis toolbox
 '''
 import matplotlib.pyplot as plt
+import matplotlib
 from matplotlib import cm
-import colorsys as colors
 import numpy as np
 
 SI_PREFIXES = 'yzafpnμm kMGTPEZY'
@@ -26,7 +26,10 @@ def set_xlabel(axis, label, unit=None, **kw):
         xticks = axis.get_xticks()
         scale_factor, unit = SI_prefix_and_scale_factor(
             val=max(abs(xticks)), unit=unit)
-        axis.set_xticklabels(xticks*scale_factor)
+        formatter = matplotlib.ticker.FuncFormatter(lambda x, pos:
+                                                    x*scale_factor)
+        axis.xaxis.set_major_formatter(formatter)
+
         axis.set_xlabel(label+' ({})'.format(unit), **kw)
     else:
         axis.set_xlabel(label, **kw)
@@ -48,7 +51,10 @@ def set_ylabel(axis, label, unit=None, **kw):
         yticks = axis.get_yticks()
         scale_factor, unit = SI_prefix_and_scale_factor(
             val=max(abs(yticks)), unit=unit)
-        axis.set_yticklabels(yticks*scale_factor)
+        formatter = matplotlib.ticker.FuncFormatter(lambda x, pos:
+                                                    x*scale_factor)
+        axis.yaxis.set_major_formatter(formatter)
+
         axis.set_ylabel(label+' ({})'.format(unit), **kw)
     else:
         axis.set_ylabel(label, **kw)
@@ -83,7 +89,7 @@ def SI_prefix_and_scale_factor(val, unit=None):
     else:
         scale_factor = 1
 
-    if unit == None:
+    if unit is None:
         unit = ''  # to ensure proper return value
     return scale_factor, unit
 
@@ -112,7 +118,7 @@ def SI_val_to_msg_str(val: float, unit: str=None, return_type=str):
 
     value_str = return_type(val)
     # To ensure right type of return value
-    if unit == None:
+    if unit is None:
         unit = ''
     return value_str, unit
 
