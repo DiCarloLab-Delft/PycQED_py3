@@ -232,6 +232,17 @@ def gain_corr_ExpDecayFunc(t, tau, amp, gc):
     return y
 
 
+def gain_corr_double_ExpDecayFunc(t, tau_A, tau_B, amp_A, amp_B, gc):
+    """
+    Specific form of an exponential decay used for flux corrections.
+    Includes a "gain correction" parameter that is ignored when correcting
+    the distortions.
+    """
+    y = gc*(1+amp_A*np.exp(-t/tau_A)+ amp_B*np.exp(-t/tau_B))
+    return y
+
+
+
 def ExpDampOscFunc(t, tau, n, frequency, phase, amplitude,
                    oscillation_offset, exponential_offset):
     return amplitude*np.exp(-(t/tau)**n)*(np.cos(

@@ -3898,8 +3898,8 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
                 (1-self.fit_res.params['fidelity_per_Clifford'].value)*100,
                 (self.fit_res.params['fidelity_per_Clifford'].stderr)*100) +
             '\n\tOffset\t= {:.4g} $\pm$ ({:.4g})'.format(
-                (self.fit_res.params['offset'].value),
-                (self.fit_res.params['offset'].stderr)))
+               (self.fit_res.params['offset'].value),
+               (self.fit_res.params['offset'].stderr)))
         if F_T1 is not None:
             textstr += ('\n\t  $F_{Cl}^{T_1}$  = ' +
                         '{:.6g}%'.format(F_T1*100))
@@ -7663,7 +7663,7 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
         optimization_stop = optimization_window[-1]
         start_sample = int(optimization_start*1.8e9)
         stop_sample = int(optimization_stop*1.8e9)
-        shift_w = 80e-9
+        shift_w = 0e-9
         start_sample_w = int((optimization_start-shift_w)*1.8e9)
         stop_sample_w = int((optimization_stop-shift_w)*1.8e9)
         depletion_cost_d = np.mean(rms(I0[start_sample:stop_sample]) +
