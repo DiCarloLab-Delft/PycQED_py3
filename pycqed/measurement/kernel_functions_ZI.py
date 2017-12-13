@@ -34,7 +34,7 @@ def exponential_decay_correction(ysig, tau: float, amp: float,
     Corrects for an exponential decay using a linear IIR filter.
 
     Fitting should be done to the following function:
-        y = gc*(1 - amp *exp(-t/tau))
+        y = gc*(1 + amp *exp(-t/tau))
     where gc is a gain correction factor that is ignored in the corrections.
     """
 
@@ -50,22 +50,22 @@ def exponential_decay_correction(ysig, tau: float, amp: float,
         # compensating overshoot by a low-pass filter
         # correction filter y[n] = (1-k)*x[n] + k*u[n] = x[n] + k*(u[n]-x[n])
         # where u[n] = u[n-1] + alpha*(x[n] - u[n-1])
-        b = [(1-k + k*alpha), -(1-k)*(1-alpha)]
+        a = [(1-k + k*alpha), -(1-k)*(1-alpha)]
     else:
         k = -amp/(1+amp)/(1-alpha)
         # compensating low-pass by an overshoot
         # correction filter y[n] = (1+k)*x[n] - k*u[n] = x[n] - k*(u[n]-x[n])
         # where u[n] = u[n-1] + alpha*(x[n] - u[n-1])
-        b = [(1 + k - k*alpha), -(1+k)*(1-alpha)]
+        a = [(1 + k - k*alpha), -(1+k)*(1-alpha)]
 
     # while the denominator stays the same
-    a = [1, -(1-alpha)]
+    b = [1, -(1-alpha)]
 
     if alpha > 0.03:
         logging.warning('large alpha, expect unstable filter')
 
     # hint: to get the inverse just use the filter with (a, b, ysig)
-    filtered_signal = signal.lfilter(b, a, ysig)
+    filtered_signal = signal.lfilter(a, b, ysig)
     return filtered_signal
 
 
