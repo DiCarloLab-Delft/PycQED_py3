@@ -1249,7 +1249,7 @@ class CBox_v3_driven_transmon(Transmon):
         if analyze:
             a = ma.Ramsey_Analysis(auto=True, close_fig=True)
             if update:
-                self.T2_star(a.T2_star)
+                self.T2_star(a.T2_star['T2_star'])
             if verbose:
                 fitted_freq = a.fit_res.params['frequency'].value
                 print('Artificial detuning: {:.2e}'.format(
