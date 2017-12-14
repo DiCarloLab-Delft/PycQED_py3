@@ -73,7 +73,6 @@ class MeasurementAnalysis(object):
             self.run_default_analysis(TwoD=TwoD, **kw)
 
     def set_plot_parameter_values(self, **kw):
-
         #dpi for plots
         self.dpi = kw.pop('dpi', 300)
         #font sizes
@@ -87,7 +86,7 @@ class MeasurementAnalysis(object):
         #tick line widths
         self.tick_width = kw.pop('tick_width', 0.5)
         #marker size for data points
-        self.marker_size = kw.pop('marker_size', 3)
+        self.marker_size = kw.pop('marker_size', None)
         #marker size for special points like
         self.marker_size_special = kw.pop('marker_size_special', 8)
         #peak freq., Rabi pi and pi/2 amplitudes
@@ -1977,7 +1976,13 @@ class Rabi_Analysis(TD_Analysis):
                 piPulse_std = freq_std/freq_fit
                 piHalfPulse_std = freq_std/freq_fit
             else:
-                n = np.arange(-2, 3)
+
+                if self.normalized_data_points[0] > \
+                        np.mean(self.normalized_data_points):
+                    n = np.arange(-2, 3) + 0.5
+                else:
+                    n = np.arange(-2, 3)
+
                 piPulse_vals = (2*n*np.pi+np.pi-phase_fit)/(2*np.pi*freq_fit)
                 piHalfPulse_vals = (2*n*np.pi+np.pi/2-phase_fit)/(2*np.pi*freq_fit)
 
@@ -4202,10 +4207,13 @@ class Ramsey_Analysis(TD_Analysis):
         if textbox:
             textstr = ('$f_{qubit \_ old}$ = %.7g GHz'
                        % (self.qubit_freq_spec*1e-9) +
-                        '\n$f_{qubit \_ new}$ = %.7g $ GHz \pm$ (%.5g) GHz'
+                        '\n$f_{qubit \_ new}$ = %.7g $\pm$ (%.5g) GHz'
                        % (self.qubit_frequency*1e-9,
                           fit_res.params['frequency'].stderr*1e-9) +
-                       '\n$f_{Ramsey}$ = %.5g $ MHz \pm$ (%.5g) MHz'
+                       '\n$\Delta f$ = %.5g $ \pm$ (%.5g) MHz'
+                       % ((self.qubit_frequency-self.qubit_freq_spec)*1e-6,
+                          fit_res.params['frequency'].stderr*1e-6) +
+                       '\n$f_{Ramsey}$ = %.5g $\pm$ (%.5g) MHz'
                        % (fit_res.params['frequency'].value*1e-6,
                           fit_res.params['frequency'].stderr*1e-6) +
                        '\n$T_2^\star$ = %.6g '
@@ -4255,13 +4263,19 @@ class Ramsey_Analysis(TD_Analysis):
             if self.for_ef:
                 self.qubit_freq_spec = \
                     float(instr_set[self.qb_name].attrs['f_ef_qubit'])
+            elif 'freq_qubit' in kw.keys():
+                self.qubit_freq_spec = kw['freq_qubit']
             else:
-                self.qubit_freq_spec = \
-                    float(instr_set[self.qb_name].attrs['f_qubit'])
+                try:
+                    self.qubit_freq_spec = \
+                            float(instr_set[self.qb_name].attrs['f_qubit'])
+                except KeyError:
+                    self.qubit_freq_spec = \
+                        float(instr_set[self.qb_name].attrs['freq_qubit'])
         except (TypeError, KeyError, ValueError):
-            logging.warning('qb_name is unknown. Setting previously measured value '
-                            'of the qubit frequency to 0. New qubit frequency '
-                            'might be incorrect.')
+            logging.warning('qb_name is unknown. Setting previously measured '
+                            'value of the qubit frequency to 0. New qubit '
+                            'frequency might be incorrect.')
             self.qubit_freq_spec = 0
 
         self.scale = 1e6
