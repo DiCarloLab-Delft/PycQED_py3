@@ -184,15 +184,16 @@ class QuTech_AWG_Module(SCPI):
                            label='Waveform list',
                            get_cmd=self._getWlist)
 
-        self.add_parameter('get_system_status',
-                           unit='JSON',
-                           label=('System status'),
-                           get_cmd='SYSTem:STAtus?',
-                           vals=vals.Strings(),
-                           get_parser=self.JSON_parser,
-                           docstring='Reads the current system status. E.q. channel ' \
-                             +'status: on or off, overflow, underdrive.\n' \
-                             +'Return:\n     JSON object with system status')
+        # Hotfix for Intel demo: QWGs does not support this feature
+        # self.add_parameter('get_system_status',
+        #                    unit='JSON',
+        #                    label=('System status'),
+        #                    get_cmd='SYSTem:STAtus?',
+        #                    vals=vals.Strings(),
+        #                    get_parser=self.JSON_parser,
+        #                    docstring='Reads the current system status. E.q. channel ' \
+        #                      +'status: on or off, overflow, underdrive.\n' \
+        #                      +'Return:\n     JSON object with system status')
 
         # Trigger parameters
         doc_trgs_log_inp = 'Reads the current input values on the all the trigger ' \
@@ -230,7 +231,8 @@ class QuTech_AWG_Module(SCPI):
         Shutsdown output on channels. When stoped will check for errors or overflow
         '''
         self.write('awgcontrol:stop:immediate')
-        self.detect_overflow()
+        # Hotfix for Intel demo: QWGs does not support this feature
+        #self.detect_overflow()
         self.getErrors()
 
     def start(self):
@@ -244,11 +246,12 @@ class QuTech_AWG_Module(SCPI):
 
         self.getErrors()
 
-        status = self.get_system_status()
-        warn_msg = self.detect_underdrive(status)
+        # Hotfix for Intel demo: QWGs does not support this feature
+        # status = self.get_system_status()
+        # warn_msg = self.detect_underdrive(status)
 
-        if(len(warn_msg) > 0):
-            warnings.warn(', '.join(warn_msg))
+        # if(len(warn_msg) > 0):
+        #     warnings.warn(', '.join(warn_msg))
 
     def _setMatrix(self, chPair, mat):
         '''
@@ -270,17 +273,18 @@ class QuTech_AWG_Module(SCPI):
         M = M.reshape(2, 2, order='F')
         return(M)
 
-    def detect_overflow(self):
-        '''
-        Will raise an error if on a channel overflow happened
-        '''
-        status = self.get_system_status()
-        err_msg = [];
-        for channel in status["channels"]:
-            if(channel["overflow"] == True):
-                err_msg.append("Wave overflow detected on channel: {}".format(channel["id"]))
-        if(len(err_msg) > 0):
-            raise RuntimeError(err_msg)
+    # Hotfix for Intel demo: QWGs does not support this feature
+    # def detect_overflow(self):
+    #     '''
+    #     Will raise an error if on a channel overflow happened
+    #     '''
+    #     status = self.get_system_status()
+    #     err_msg = [];
+    #     for channel in status["channels"]:
+    #         if(channel["overflow"] == True):
+    #             err_msg.append("Wave overflow detected on channel: {}".format(channel["id"]))
+    #     if(len(err_msg) > 0):
+    #         raise RuntimeError(err_msg)
 
     def detect_underdrive(self, status):
         '''
