@@ -722,7 +722,7 @@ class MeasurementAnalysis(object):
             ax.spines[axis].set_linewidth(self.axes_line_width)
 
         # Plot:
-        ax.plot(x, y, marker, markersize=self.marker_size,
+        line = ax.plot(x, y, marker, markersize=self.marker_size,
                     linewidth=self.line_width, label=label)
 
 
@@ -740,7 +740,10 @@ class MeasurementAnalysis(object):
                 self.save_fig(fig, xlabel=xlabel, ylabel=(ylabel+'_log'), **kw)
             else:
                 self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
-        return
+        if kw.get('return_line', False):
+            return line
+        else:
+            return
 
     def plotly_plot(self, x=None, y=None, fit_res=None, **kw):
 
@@ -5425,63 +5428,64 @@ class RandomizedBenchmarking_Analysis_new(TD_Analysis):
 
     def run_default_analysis(self, **kw):
 
-        close_main_fig = kw.pop('close_main_fig', True)
-        close_file = kw.pop('close_file', True)
-        if self.cal_points is None:
-            self.cal_points = [list(range(-4, -2)), list(range(-2, 0))]
+        if not kw.pop('skip', False):
+            close_main_fig = kw.pop('close_main_fig', True)
+            close_file = kw.pop('close_file', True)
+            if self.cal_points is None:
+                self.cal_points = [list(range(-4, -2)), list(range(-2, 0))]
 
-        MeasurementAnalysis.run_default_analysis(self, close_file=False, **kw)
+            MeasurementAnalysis.run_default_analysis(self, close_file=False, **kw)
 
-        self.add_analysis_datagroup_to_file()
+            self.add_analysis_datagroup_to_file()
 
-        self.n_cl = np.unique(self.sweep_points_2D)
-        nr_sweep_pts = self.sweep_points.size #nr_seeds+NoCalPts
-        self.nr_seeds = nr_sweep_pts - 2*len(self.cal_points[0])
-        data = np.zeros(self.n_cl.size)
+            self.n_cl = np.unique(self.sweep_points_2D)
+            nr_sweep_pts = self.sweep_points.size #nr_seeds+NoCalPts
+            self.nr_seeds = nr_sweep_pts - 2*len(self.cal_points[0])
+            data = np.zeros(self.n_cl.size)
 
-        data_rearranged = [np.zeros((self.n_cl.size, nr_sweep_pts)),
-                           np.zeros((self.n_cl.size, nr_sweep_pts))]
-        I = self.measured_values[0]
-        Q = self.measured_values[1]
-        for i in range(self.n_cl.size):
-            for j in range(nr_sweep_pts):
-                data_rearranged[0][i, j] = I[j, i]
-                data_rearranged[1][i, j] = Q[j, i]
-        self.data_rearranged = data_rearranged
-        a = np.zeros((2, nr_sweep_pts))  #this is an array with the same shape as
-                                     #as measured_values for TwoD==False
-        self.data_calibrated = deepcopy(self.data_rearranged[0])
-        for i in range(self.n_cl.size):
-            a[0] = data_rearranged[0][i]
-            a[1] = data_rearranged[1][i]
-            data_calibrated = a_tools.rotate_and_normalize_data(a,
-                                                        self.cal_points[0],
-                                                        self.cal_points[1])[0]
-            self.data_calibrated[i] = data_calibrated
-            data_calibrated = data_calibrated[:-int(self.NoCalPoints)]
-            data[i] = np.mean(data_calibrated)
+            data_rearranged = [np.zeros((self.n_cl.size, nr_sweep_pts)),
+                               np.zeros((self.n_cl.size, nr_sweep_pts))]
+            I = self.measured_values[0]
+            Q = self.measured_values[1]
+            for i in range(self.n_cl.size):
+                for j in range(nr_sweep_pts):
+                    data_rearranged[0][i, j] = I[j, i]
+                    data_rearranged[1][i, j] = Q[j, i]
+            self.data_rearranged = data_rearranged
+            a = np.zeros((2, nr_sweep_pts))  #this is an array with the same shape as
+                                         #as measured_values for TwoD==False
+            self.data_calibrated = deepcopy(self.data_rearranged[0])
+            for i in range(self.n_cl.size):
+                a[0] = data_rearranged[0][i]
+                a[1] = data_rearranged[1][i]
+                data_calibrated = a_tools.rotate_and_normalize_data(a,
+                                                            self.cal_points[0],
+                                                            self.cal_points[1])[0]
+                self.data_calibrated[i] = data_calibrated
+                data_calibrated = data_calibrated[:-int(self.NoCalPoints)]
+                data[i] = np.mean(data_calibrated)
 
-        self.calibrated_data_points = np.zeros(shape=(self.data_calibrated.shape[0],
-                                               self.nr_seeds))
-        for i,d in enumerate(self.data_calibrated):
-            self.calibrated_data_points[i] = d[:-int(2*len(self.cal_points[0]))]
+            self.calibrated_data_points = np.zeros(shape=(self.data_calibrated.shape[0],
+                                                   self.nr_seeds))
+            for i,d in enumerate(self.data_calibrated):
+                self.calibrated_data_points[i] = d[:-int(2*len(self.cal_points[0]))]
 
-        self.data = data
-        #data = self.corr_data[:-1*(len(self.cal_points[0]*2))]
-        #n_cl = self.sweep_points[:-1*(len(self.cal_points[0]*2))]
+            self.data = data
+            #data = self.corr_data[:-1*(len(self.cal_points[0]*2))]
+            #n_cl = self.sweep_points[:-1*(len(self.cal_points[0]*2))]
 
-        self.add_dataset_to_analysisgroup('Corrected data', self.data)
-        self.analysis_group.attrs.create('corrected data based on',
-                                         'calibration points'.encode('utf-8'))
+            self.add_dataset_to_analysisgroup('Corrected data', self.data)
+            self.analysis_group.attrs.create('corrected data based on',
+                                             'calibration points'.encode('utf-8'))
 
-        self.fit_res = self.fit_data(self.data, self.n_cl, **kw)
-        self.fit_results = [self.fit_res]
-        self.save_fitted_parameters(fit_res=self.fit_res, var_name='F|1>')
-        if self.make_fig:
-            self.make_figures(close_main_fig=close_main_fig, **kw)
+            self.fit_res = self.fit_data(self.data, self.n_cl, **kw)
+            self.fit_results = [self.fit_res]
+            self.save_fitted_parameters(fit_res=self.fit_res, var_name='F|1>')
+            if self.make_fig:
+                self.make_figures(close_main_fig=close_main_fig, **kw)
 
-        if close_file:
-            self.data_file.close()
+            if close_file:
+                self.data_file.close()
         return
 
     def calc_T1_limited_fidelity(self, T1, T2, pulse_delay):
@@ -5503,7 +5507,7 @@ class RandomizedBenchmarking_Analysis_new(TD_Analysis):
 
         return F_cl, p
 
-    def add_textbox(self, ax, F_T1=None, plot_T1_lim=True):
+    def add_textbox(self, ax, F_T1=None, plot_T1_lim=True, **kw):
 
         textstr = ('$F_{Cl}$'+' = {:.6g} $\pm$ ({:.4g})%'.format(
             self.fit_res.params['fidelity_per_Clifford'].value*100,
@@ -5518,9 +5522,14 @@ class RandomizedBenchmarking_Analysis_new(TD_Analysis):
             textstr += ('\n$F_{Cl}^{T_1}$  = ' +
                         '{:.6g}%'.format(F_T1*100))
 
-        ax.text(0.025, 0.95, textstr, transform=ax.transAxes,
-                     fontsize=self.font_size, verticalalignment='top',
-                     bbox=self.box_props)
+        horizontal_alignment = kw.pop('horizontal_alignment', 'left')
+        horiz_place = 0.025
+        if horizontal_alignment=='right':
+            horiz_place = 0.975
+
+        ax.text(horiz_place, 0.95, textstr, transform=ax.transAxes,
+                fontsize=self.font_size, verticalalignment='top',
+                horizontalalignment=horizontal_alignment, bbox=self.box_props)
 
     def make_figures(self, close_main_fig, **kw):
 
@@ -5574,7 +5583,8 @@ class RandomizedBenchmarking_Analysis_new(TD_Analysis):
                 F_T1, p_T1 = self.calc_T1_limited_fidelity(
                     self.T1, self.T2, self.pulse_delay)
                 T1_limited_curve = fit_mods.RandomizedBenchmarkingDecay(
-                    x_fine, -0.5, p_T1, 0.5)
+                    x_fine, self.fit_res.best_values['Amplitude'], p_T1,
+                    self.fit_res.best_values['offset'])
                 self.ax.plot(x_fine, T1_limited_curve, '-.', color='C1',
                              linewidth=self.line_width,
                              label=r'$T_{1}$-limit')
@@ -5632,7 +5642,7 @@ class RandomizedBenchmarking_Analysis_new(TD_Analysis):
 
         RBModel = lmfit.Model(fit_mods.RandomizedBenchmarkingDecay)
         # RBModel = fit_mods.RBModel
-        RBModel.set_param_hint('Amplitude', value=-0.5)
+        RBModel.set_param_hint('Amplitude', value=0)#-0.5)
         RBModel.set_param_hint('p', value=.99)
         RBModel.set_param_hint('offset', value=.5)
         # From Magesan et al., Scalable and Robust Randomized Benchmarking
