@@ -4213,7 +4213,7 @@ class Ramsey_Analysis(TD_Analysis):
                        '\n$\Delta f$ = %.5g $ \pm$ (%.5g) MHz'
                        % ((self.qubit_frequency-self.qubit_freq_spec)*1e-6,
                           fit_res.params['frequency'].stderr*1e-6) +
-                       '\n$f_{Ramsey}$ = %.5g $\pm$ (%.5g) MHz'
+                       '\n$f_{Ramsey}$ = %.5g $ \pm$ (%.5g) MHz'
                        % (fit_res.params['frequency'].value*1e-6,
                           fit_res.params['frequency'].stderr*1e-6) +
                        '\n$T_2^\star$ = %.6g '
@@ -4268,10 +4268,11 @@ class Ramsey_Analysis(TD_Analysis):
             else:
                 try:
                     self.qubit_freq_spec = \
-                            float(instr_set[self.qb_name].attrs['f_qubit'])
+                        float(instr_set[self.qb_name].attrs['f_qubit'])
                 except KeyError:
                     self.qubit_freq_spec = \
                         float(instr_set[self.qb_name].attrs['freq_qubit'])
+
         except (TypeError, KeyError, ValueError):
             logging.warning('qb_name is unknown. Setting previously measured '
                             'value of the qubit frequency to 0. New qubit '
