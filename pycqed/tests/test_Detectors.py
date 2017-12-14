@@ -113,6 +113,88 @@ class Test_Detectors(unittest.TestCase):
         with self.assertRaises(ValueError):
             d.statemap_to_array(invalid_sm)
 
+    def test_multi_det_basics(self):
+        def dummy_function_1(val_a, val_b):
+            return val_a
+
+        def dummy_function_2(val_a, val_b):
+            return val_a + val_b
+
+        # Testing input of a simple dict
+        x = self.mock_parabola.x
+        d0 = det.Function_Detector(dummy_function_1, value_names=['a'],
+                                   value_units=['my_unit'],
+                                   msmt_kw={'val_a': x, 'val_b': 1})
+        d1 = det.Function_Detector(dummy_function_2, value_names=['b'],
+                                   value_units=None,
+                                   msmt_kw={'val_a': x, 'val_b': 1})
+
+        dm = det.Multi_Detector([d0, d1], det_idx_suffix=False)
+        self.assertEqual(dm.value_names, ['a', 'b'])
+        self.assertEqual(dm.value_units, ['my_unit', 'a.u.'])
+
+        dm_suffix = det.Multi_Detector([d0, d1], det_idx_suffix=True)
+        self.assertEqual(dm_suffix.value_names, ['a_det0', 'b_det1'])
+        self.assertEqual(dm_suffix.value_units,  ['my_unit', 'a.u.'])
+
+        dh = det.Dummy_Detector_Hard()
+        with self.assertRaises(ValueError):
+            dm = det.Multi_Detector([dh, d0])
+
+    def test_Multi_Detector_soft(self):
+        def dummy_function_1(val_a, val_b):
+            return val_a, val_b
+
+        def dummy_function_2(val_a, val_b):
+            return val_a + val_b
+
+        # Testing input of a simple dict
+        x = self.mock_parabola.x
+        d0 = det.Function_Detector(dummy_function_1, value_names=['a', 'b'],
+                                   value_units=['my_unit', 'a.u.'],
+                                   msmt_kw={'val_a': x, 'val_b': 1})
+        d1 = det.Function_Detector(dummy_function_2, value_names=['b'],
+                                   value_units=None,
+                                   msmt_kw={'val_a': x, 'val_b': 1})
+
+        dm = det.Multi_Detector([d0, d1], det_idx_suffix=False)
+        self.assertEqual(dm.value_names, ['a', 'b', 'b'])
+        self.assertEqual(dm.value_units, ['my_unit', 'a.u.', 'a.u.'])
+
+        dm_suffix = det.Multi_Detector([d0, d1], det_idx_suffix=True)
+        self.assertEqual(dm_suffix.value_names, ['a_det0',
+                                                 'b_det0', 'b_det1'])
+        self.assertEqual(dm_suffix.value_units,  ['my_unit', 'a.u.', 'a.u.'])
+
+        xvals = np.linspace(0, 10, 10)
+        self.MC.set_sweep_function(self.mock_parabola.x)
+        self.MC.set_sweep_points(xvals)
+        self.MC.set_detector_function(dm)
+        dat = self.MC.run("multi_detector")
+        dset = dat["dset"]
+        np.testing.assert_array_almost_equal(xvals, dset[:, 1])
+        np.testing.assert_array_almost_equal(np.ones(len(xvals)), dset[:, 2])
+        np.testing.assert_array_almost_equal(xvals+1, dset[:, 3])
+
+    def test_Multi_Detector_hard(self):
+        sweep_pts = np.linspace(0, 10, 5)
+        d0 = det.Dummy_Detector_Hard()
+        d1 = det.Dummy_Detector_Hard()
+        dm = det.Multi_Detector([d0, d1])
+
+        self.MC.set_sweep_function(None_Sweep(sweep_control='hard'))
+        self.MC.set_sweep_points(sweep_pts)
+        self.MC.set_detector_function(dm)
+        dat = self.MC.run('Multi_hard')
+        dset = dat['dset']
+        x = dset[:, 0]
+        y = [np.sin(x / np.pi), np.cos(x/np.pi)]
+        np.testing.assert_array_almost_equal(x, sweep_pts)
+        np.testing.assert_array_almost_equal(y[0], dset[:, 1])
+        np.testing.assert_array_almost_equal(y[1], dset[:, 2])
+        np.testing.assert_array_almost_equal(y[0], dset[:, 3])
+        np.testing.assert_array_almost_equal(y[1], dset[:, 4])
+
     @classmethod
     def tearDownClass(self):
         self.MC.close()
