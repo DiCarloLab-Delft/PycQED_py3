@@ -396,6 +396,30 @@ class ZI_HDAWG8(ZI_base_instrument):
         t1 = time.time()
         print('Set all zeros waveforms in {:.1f} s'.format(t1-t0))
 
+    def upload_waveform_realtime(self, w0, w1, awg_nr:int, wf_nr:int =1):
+        """
+        Warning! This method should be used with care.
+        Uploads a waveform to the awg in realtime, note that this get's
+        overwritten if a new program is uploaded.
+
+        Arguments:
+            w0   (array): waveform for ch0 of the awg pair.
+            w1   (array): waveform for ch1 of the awg pair.
+            awg_nr (int): awg_nr indicating what awg pair to use.
+            wf_nr  (int): waveform in memory to overwrite, default is 1.
+
+        There are a few important notes when using this method
+        - w0 and w1 must be of the same length
+        - any parts of a waveform longer than w0/w1 will not be overwritten.
+        - loading speed depends on the size of w0 and w1 and is ~80ms for 20us.
+
+        """
+        c = np.vstack((w0, w1)).reshape((-2,), order='F')
+        self._dev.seti('awgs/{}/waveform/index'.format(awg_nr), wf_nr)
+        self._dev.setv('awgs/{}/waveform/data'.format(awg_nr), c)
+        self._dev.seti('awgs/{}/enable'.format(awg_nr), wf_nr)
+
+
     def upload_codeword_program(self, awgs=np.arange(4)):
         """
         Generates a program that plays the codeword waves for each channel.
