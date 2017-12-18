@@ -60,7 +60,7 @@ elif AWG_type == 'flux':
         'qisa_test_assembly','consecutive_cws_flux.qisa'))
 
 print(example_fp)
-CCL.upload_instructions(example_fp)
+CCL.eqasm_program(example_fp)
 CCL.start()
 
 

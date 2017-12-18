@@ -13,6 +13,7 @@ from .SCPI import SCPI
 from qcodes.instrument.base import Instrument
 from ._CCL.CCLightMicrocode import CCLightMicrocode
 from qcodes import Parameter
+from collections import OrderedDict
 from qcodes.instrument.parameter import ManualParameter
 from qcodes import validators as vals
 import os
@@ -25,8 +26,12 @@ import re
 
 
 try:
+    # qisa_as can be installed from the qisa-as folder in the ElecPrj_CCLight
+    # repostiory. Current version is 2.2.0 (Dec 18 2017)
     from qisa_as import QISA_Driver, qisa_qmap
 except ImportError as e:
+    # Do not raise error to be able to use a dummy CCL when no assembler
+    # is installed.
     logging.warning(e)
 
 
@@ -54,9 +59,6 @@ class CCL(SCPI):
     def __init__(self, name, address, port, log_level=False, **kwargs):
         self.model = name
         self._dummy_instr = False
-        if isinstance(debug_mode, bool) is False:
-            raise ValueError("The initialization parameter debug_mode should be ")
-        self._debug_mode = debug_mode
         try:
             super().__init__(name, address, port, **kwargs)
         except Exception as e:
@@ -85,10 +87,8 @@ class CCL(SCPI):
 
         curdir = os.path.dirname(__file__)
         qmap_fn = os.path.join(curdir, '_CCL', 'qisa_opcode.qmap')
-        success = self.QISA.loadQuantumInstructions(qmap_fn)
-        if not success:
-            print ("Error: ", driver.getLastErrorMessage())
-            print ("Failed to load quantum instructions from dictionaries.")
+
+        self.qisa_opcode(qmap_fn)
 
     def stop(self):
         self.run(0),
@@ -98,12 +98,6 @@ class CCL(SCPI):
         self.enable(1)
         self.run(1)
 
-    def add_parameter(self, name, parameter_class=Parameter, **kwargs):
-        """
-        Function to manually add a qcodes parameter. Useful for nonstandard
-        forms of the scpiCmds.
-        """
-        super(CCL, self).add_parameter(name, parameter_class, **kwargs)
 
     def add_standard_parameters(self):
         """
@@ -166,30 +160,40 @@ class CCL(SCPI):
     def add_additional_parameters(self):
         """
         Certain hardware specific parameters cannot be generated
-        automatically. This function generates the upload_instructions and
-        upload_microcode parameters for the user. They are special because
+        automatically. This function generates the functions to upload
+        instructions for the user. They are special because
         these functions use the _upload_instructions and _upload_microcode
-        functions internally, and they output block binary data using the
+        functions internally, and they output binary data using the
         SCPI.py driver, which is not qcodes standard. Therefore,
-        we have to manually create them specifically for CC-Light.
+        we have to manually created them specifically for CC-Light.
         """
         self.add_parameter(
-            'upload_instructions',
-            label=('Upload instructions'),
-            docstring='It uploads the instructions to the CC-Light. ' +
-            'Valid input is a string representing the filename',
+            'eqasm_program',
+            label=('eQASM program'),
+            docstring='Uploads the eQASM program to the CC-Light. ' +
+            'Valid input is a string representing the filename.',
             set_cmd=self._upload_instructions,
             vals=vals.Strings()
         )
 
         self.add_parameter(
-            'upload_microcode',
-            label=('Upload microcode'),
-            docstring='It uploads the microcode to the CC-Light. ' +
-            'Valid input is a string representing the filename',
+            'control_store',
+            label=('Control store'),
+            docstring='Uploads the microcode to the CC-Light. ' +
+            'Valid input is a string representing the filename.',
             set_cmd=self._upload_microcode,
             vals=vals.Strings()
         )
+
+        self.add_parameter(
+            'qisa_opcode',
+            label=('QISA opcode qmap'),
+            docstring='Uploads the opcode.qmap to the CC-Light assembler. ' +
+            'Valid input is a string representing the filename.',
+            set_cmd=self._upload_opcode_qmap,
+            vals=vals.Strings()
+        )
+
         self.add_parameter('last_loaded_instructions',
                            vals=vals.Strings(),
                            initial_value='',
@@ -211,7 +215,7 @@ class CCL(SCPI):
             os.makedirs(param_file_dir)
 
         self.param_file_name = os.path.join(param_file_dir,
-                                            'ccl_param_nodes.txt')
+                                            'ccl_param_nodes.json')
 
         open_file_success = False
         try:
@@ -264,8 +268,13 @@ class CCL(SCPI):
                 "CC-Light: \n {}".format(raw_param_string))
 
         try:
+            # file.write(raw_param_string)
+            # load dump combination is to sort and indent
+            param_dict = json.loads(raw_param_string)
             file = open(self.param_file_name, 'w')
-            file.write(raw_param_string)
+            par_str = json.dumps(param_dict,
+                                  indent=4, sort_keys=True)
+            file.write(par_str)
             file.close()
         except Exception as e:
             log.info("Failed to update CC-Light local parameter file:", str(e))
@@ -282,28 +291,6 @@ class CCL(SCPI):
         except Exception as e:
             logging.warn('Error: failed to retrive IDN from CC-Light.', str(e))
 
-
-        # # the pattern that contains all symbols used to strip the
-        # # raw string received from CC-Light
-        # pattern = re.compile("\s*,\s*|\s*;\s*")
-
-        # try:
-        #     # split the raw string into different fields, each field is a
-        #     # string with the format "key=value"
-        #     id_fields = [x.strip() for x in pattern.split(id_string) if x]
-
-        #     # convert to dictionary
-        #     for field in id_fields:
-        #         a, b = field.split("=")
-        #         if str(a) not in id_field_table:
-        #             raise ValueError("Unexpected IDN field received from "
-        #                 "CC-Light.")
-        #         self.version_info[id_field_table[str(a)]] = str(b)
-
-        # except Exception:
-        #     logging.warn("Bad IDN message received from CC-Light: {}".format(
-        #         id_string))
-
         return self.version_info
 
     def print_readable_idn(self):
@@ -317,7 +304,7 @@ class CCL(SCPI):
 
         print(self.QISA.dumpInstructionsSpecification())
 
-    def print_microcode(self):
+    def print_control_store(self):
         if self.microcode is None:
             log.info("The microcode unit of CCLight has not been"
                 " initialized yet.")
@@ -325,7 +312,7 @@ class CCL(SCPI):
 
         self.microcode.dump_microcode()
 
-    def print_qisa_with_microcode(self):
+    def print_qisa_with_control_store(self):
         if self.microcode is None:
             log.info("The microcode unit of CCLight has not been"
                 " initialized yet.")
@@ -335,7 +322,7 @@ class CCL(SCPI):
             log.info("The assembler of CCLight has not been initialized yet.")
             return
 
-        q_arg = {}
+        q_arg = OrderedDict()
 
         insn_opcodes_str = self.QISA.dumpInstructionsSpecification()
         lines = insn_opcodes_str.split('\n')
@@ -445,6 +432,14 @@ class CCL(SCPI):
         # write binblock
         hdr = 'QUTech:UploadMicrocode '
         self.binBlockWrite(binBlock, hdr)
+
+    def _upload_opcode_qmap(self, filename: str):
+        success = self.QISA.loadQuantumInstructions(filename)
+        if not success:
+            logging.warning("Error: ", driver.getLastErrorMessage())
+            logging.warning("Failed to load quantum instructions from dictionaries.")
+
+        return success
 
     def _set_vsm_chan_delay(self, chanNum, value):
         """
@@ -558,7 +553,7 @@ class dummy_CCL(CCL):
         Dummy version, parameters are added as manual parameters
         """
         self.add_parameter(
-            'upload_instructions',
+            'eqasm_program',
             label=('Upload instructions'),
             docstring='It uploads the instructions to the CC-Light. ' +
             'Valid input is a string representing the filename',
@@ -567,10 +562,16 @@ class dummy_CCL(CCL):
         )
 
         self.add_parameter(
-            'upload_microcode',
+            'control_store',
             label=('Upload microcode'),
             docstring='It uploads the microcode to the CC-Light. ' +
             'Valid input is a string representing the filename',
+            parameter_class=ManualParameter,
+            vals=vals.Strings()
+        )
+
+        self.add_parameter(
+            'qisa_opcode',
             parameter_class=ManualParameter,
             vals=vals.Strings()
         )

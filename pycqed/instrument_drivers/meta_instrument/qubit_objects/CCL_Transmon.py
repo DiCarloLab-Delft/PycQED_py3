@@ -990,7 +990,7 @@ class CCLight_Transmon(Qubit):
         p = sqo.vsm_timing_cal_sequence(
             qubit_idx=self.cfg_qubit_nr(),
             platf_cfg=self.cfg_openql_platform_fn())
-        CCL.upload_instructions(p.filename)
+        CCL.eqasm_program(p.filename)
         CCL.start()
         print('CCL program is running. Parameter "mw_vsm_delay" can now be '
               'calibrated by hand.')
@@ -1105,7 +1105,7 @@ class CCLight_Transmon(Qubit):
             self.cfg_qubit_nr(), self.cfg_openql_platform_fn(),
             nr_cliffords=[1],
             net_clifford=1, nr_seeds=1, restless=True, cal_points=False)
-        self.instr_CC.get_instr().upload_instructions(p.filename)
+        self.instr_CC.get_instr().eqasm_program(p.filename)
         self.instr_CC.get_instr().start()
 
         LutMan = self.instr_LutMan_RO.get_instr()
@@ -1174,7 +1174,7 @@ class CCLight_Transmon(Qubit):
         CCL.stop()
         p = sqo.CW_RO_sequence(qubit_idx=self.cfg_qubit_nr(),
                                platf_cfg=self.cfg_openql_platform_fn())
-        CCL.upload_instructions(p.filename)
+        CCL.eqasm_program(p.filename)
         # CCL gets started in the int_avg detector
 
         MC.set_sweep_function(swf.Heterodyne_Frequency_Sweep_simple(
@@ -1198,7 +1198,7 @@ class CCLight_Transmon(Qubit):
         CCL.stop()
         p = sqo.CW_RO_sequence(qubit_idx=self.cfg_qubit_nr(),
                                platf_cfg=self.cfg_openql_platform_fn())
-        CCL.upload_instructions(p.filename)
+        CCL.eqasm_program(p.filename)
         # CCL gets started in the int_avg detector
 
         MC.set_sweep_function(swf.Heterodyne_Frequency_Sweep_simple(
@@ -1229,7 +1229,7 @@ class CCLight_Transmon(Qubit):
         CCL.stop()
         p = sqo.CW_RO_sequence(qubit_idx=self.cfg_qubit_nr(),
                                platf_cfg=self.cfg_openql_platform_fn())
-        CCL.upload_instructions(p.filename)
+        CCL.eqasm_program(p.filename)
         # CCL gets started in the int_avg detector
 
         MC.set_sweep_function(swf.Heterodyne_Frequency_Sweep_simple(
@@ -1266,7 +1266,7 @@ class CCLight_Transmon(Qubit):
             qubit_idx=self.cfg_qubit_nr(),
             spec_pulse_length=self.spec_pulse_length(),
             platf_cfg=self.cfg_openql_platform_fn())
-        CCL.upload_instructions(p.filename)
+        CCL.eqasm_program(p.filename)
         # CCL gets started in the int_avg detector
 
         # The spec pulse is a MW pulse that contains not modulation
@@ -1301,7 +1301,7 @@ class CCLight_Transmon(Qubit):
             p = sqo.off_on(
                 qubit_idx=self.cfg_qubit_nr(), pulse_comb='off_on',
                 platf_cfg=self.cfg_openql_platform_fn())
-            self.instr_CC.get_instr().upload_instructions(p.filename)
+            self.instr_CC.get_instr().eqasm_program(p.filename)
         else:
             p = None  # object needs to exist for the openql_sweep to work
 
@@ -1365,7 +1365,7 @@ class CCLight_Transmon(Qubit):
             p = sqo.off_on(
                 qubit_idx=self.cfg_qubit_nr(), pulse_comb='on',
                 platf_cfg=self.cfg_openql_platform_fn())
-            self.instr_CC.get_instr().upload_instructions(p.filename)
+            self.instr_CC.get_instr().eqasm_program(p.filename)
         else:
             p = None  # object needs to exist for the openql_sweep to work
 
@@ -1464,7 +1464,7 @@ class CCLight_Transmon(Qubit):
         G_par = VSM.parameters['mod{}_ch{}_gaussian_att_raw'.format(mod_out, ch_in)]
         D_par = VSM.parameters['mod{}_ch{}_derivative_att_raw'.format(mod_out, ch_in)]
         s = swf.two_par_joint_sweep(G_par, D_par, preserve_ratio=True)
-        self.instr_CC.get_instr().upload_instructions(p.filename)
+        self.instr_CC.get_instr().eqasm_program(p.filename)
         MC.set_sweep_function(s)
         MC.set_sweep_points(atts)
         # real_imag is acutally not polar and as such works for opt weights
@@ -1545,7 +1545,7 @@ class CCLight_Transmon(Qubit):
             self.cfg_qubit_nr(), self.cfg_openql_platform_fn(),
             nr_cliffords=[nr_cliffords],
             net_clifford=3, nr_seeds=nr_seeds, restless=True, cal_points=False)
-        self.instr_CC.get_instr().upload_instructions(p.filename)
+        self.instr_CC.get_instr().eqasm_program(p.filename)
         self.instr_CC.get_instr().start()
 
 
@@ -1756,7 +1756,7 @@ class CCLight_Transmon(Qubit):
                 qubit_idx=self.cfg_qubit_nr(), sequence_type=sequence_type,
                 platf_cfg=self.cfg_openql_platform_fn(), net_gate=net_gate,
                 feedback=feedback)
-            self.instr_CC.get_instr().upload_instructions(p.filename)
+            self.instr_CC.get_instr().eqasm_program(p.filename)
         else:
             p = None  # object needs to exist for the openql_sweep to work
         s = swf.OpenQL_Sweep(openql_program=p,
@@ -1973,7 +1973,7 @@ class CCLight_Transmon(Qubit):
         p = sqo.motzoi_XY(
             qubit_idx=self.cfg_qubit_nr(),
             platf_cfg=self.cfg_openql_platform_fn())
-        self.instr_CC.get_instr().upload_instructions(p.filename)
+        self.instr_CC.get_instr().eqasm_program(p.filename)
 
 
 
@@ -2064,4 +2064,4 @@ def load_range_of_oql_programs(programs, counter_param, CC):
     """
     program = programs[counter_param()]
     counter_param((counter_param()+1) % len(programs))
-    CC.upload_instructions(program.filename)
+    CC.eqasm_program(program.filename)
