@@ -14,7 +14,7 @@ from qcodes.instrument.parameter import (
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import measurement_analysis as ma2
 from pycqed.measurement.calibration_toolbox import (
-    mixer_carrier_cancellation)
+    mixer_carrier_cancellation, multi_channel_mixer_carrier_cancellation)
 from pycqed.measurement.calibration_toolbox import mixer_skewness_cal_UHFQC_adaptive
 
 from pycqed.measurement import sweep_functions as swf
@@ -698,12 +698,7 @@ class CCLight_Transmon(Qubit):
                 nr_averages=self.ro_acq_averages(),
                 nr_samples=int(self.ro_acq_input_average_length()*1.8e9))
 
-            self.int_avg_det = det.UHFQC_integrated_average_detector(
-                UHFQC=UHFQC, AWG=self.instr_CC.get_instr(),
-                channels=ro_channels,
-                result_logging_mode=result_logging_mode,
-                nr_averages=self.ro_acq_averages(),
-                integration_length=self.ro_acq_integration_length())
+            self.int_avg_det = self.get_int_avg_det()
 
             self.int_avg_det_single = det.UHFQC_integrated_average_detector(
                 UHFQC=UHFQC, AWG=self.instr_CC.get_instr(),
@@ -720,6 +715,36 @@ class CCLight_Transmon(Qubit):
                 integration_length=self.ro_acq_integration_length())
         else:
             raise NotImplementedError()
+
+    def get_int_avg_det(self, **kw):
+        """
+        Instantiates an integration average detector using parameters from
+        the qubit object. **kw get passed on to the class when instantiating
+        the detector function.
+        """
+
+        if self.ro_acq_weight_type() == 'optimal':
+            ro_channels = [self.ro_acq_weight_chI()]
+
+            if self.ro_acq_digitized():
+                result_logging_mode = 'digitized'
+            else:
+                result_logging_mode = 'lin_trans'
+        else:
+            ro_channels = [self.ro_acq_weight_chI(),
+                           self.ro_acq_weight_chQ()]
+            result_logging_mode = 'raw'
+
+        int_avg_det= det.UHFQC_integrated_average_detector(
+        UHFQC=self.instr_acquisition.get_instr(),
+        AWG=self.instr_CC.get_instr(),
+        channels=ro_channels,
+        result_logging_mode=result_logging_mode,
+        nr_averages=self.ro_acq_averages(),
+        integration_length=self.ro_acq_integration_length(), **kw)
+
+        return int_avg_det
+
 
     def _prep_ro_sources(self):
         LO = self.instr_LO_ro.get_instr()
@@ -985,18 +1010,28 @@ class CCLight_Transmon(Qubit):
         if AWG.__class__.__name__ == 'QuTech_AWG_Module':
             chGI_par = AWG.parameters['ch1_offset']
             chGQ_par = AWG.parameters['ch2_offset']
+            chDI_par = AWG.parameters['ch3_offset']
+            chDQ_par = AWG.parameters['ch4_offset']
 
         else:
             # This part is AWG8 specific and wont work with a QWG
             awg_ch = self.mw_awg_ch()
             AWG.stop()
             AWG.set('sigouts_{}_on'.format(awg_ch-1), 1)
-            AWG.set('sigouts_{}_on'.format(awg_ch), 1)
+            AWG.set('sigouts_{}_on'.format(awg_ch+0), 1)
+            AWG.set('sigouts_{}_on'.format(awg_ch+1), 1)
+            AWG.set('sigouts_{}_on'.format(awg_ch+2), 1)
+
             chGI_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch-1)]
             chGQ_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch+0)]
+            chDI_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch+1)]
+            chDQ_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch+2)]
             # End of AWG8 specific part
+        offset_pars = [chGI_par, chGQ_par, chDI_par, chDQ_par]
 
         VSM = self.instr_VSM.get_instr()
+
+        # Commented out code contains legacy code for the Blue Box VSM
         # VSM.set_all_switches_to('OFF')
         # Gin = self.mw_vsm_ch_Gin()
         # Din = self.mw_vsm_ch_Din()
@@ -1007,46 +1042,57 @@ class CCLight_Transmon(Qubit):
         ch_in = self.mw_vsm_ch_in()
         mod_out = self.mw_vsm_mod_out()
         # module 8 is hardcoded for use mixer calls (signal hound)
+        VSM.set('mod8_marker_source'.format(ch_in), 'int')
         VSM.set('mod8_ch{}_marker_state'.format(ch_in), 'on')
-        VSM.set('mod8_ch{}_derivative_att_raw'.format(ch_in), 0)
+        VSM.set('mod8_ch{}_derivative_att_raw'.format(ch_in), 50000)
         VSM.set('mod8_ch{}_gaussian_att_raw'.format(ch_in), 50000)
 
-
-
-        # Calibrate Gaussian component mixer
-        offset_I, offset_Q = mixer_carrier_cancellation(
+        offsets = multi_channel_mixer_carrier_cancellation(
             SH=self.instr_SH.get_instr(), source=self.instr_LO_mw.get_instr(),
             MC=self.instr_MC.get_instr(),
-            chI_par=chGI_par, chQ_par=chGQ_par)
+            channel_pars=offset_pars)
+
         if update:
-            self.mw_mixer_offs_GI(offset_I)
-            self.mw_mixer_offs_GQ(offset_Q)
+            self.mw_mixer_offs_GI(offsets[0])
+            self.mw_mixer_offs_GQ(offsets[1])
+            self.mw_mixer_offs_DI(offsets[2])
+            self.mw_mixer_offs_DQ(offsets[3])
 
-        # VSM.set('in{}_out{}_switch'.format(Gin, out), 'OFF')
-        # VSM.set('in{}_out{}_switch'.format(Din, out), 'ON')
-        VSM.set('mod8_ch{}_derivative_att_raw'.format(ch_in), 50000)
-        VSM.set('mod8_ch{}_gaussian_att_raw'.format(ch_in), 0)
-
-        if AWG.__class__.__name__ == 'QuTech_AWG_Module':
-            chDI_par = AWG.parameters['ch3_offset']
-            chDQ_par = AWG.parameters['ch4_offset']
-        else:
-            # This part is AWG8 specific and wont work with a QWG
-            AWG.set('sigouts_{}_on'.format(awg_ch+1), 1)
-            AWG.set('sigouts_{}_on'.format(awg_ch+2), 1)
-            chDI_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch+1)]
-            chDQ_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch+2)]
-            # End of AWG8 specific part
-
-        # Calibrate Derivative component mixer
-        offset_I, offset_Q = mixer_carrier_cancellation(
-            SH=self.instr_SH.get_instr(), source=self.instr_LO_mw.get_instr(),
-            MC=self.instr_MC.get_instr(),
-            chI_par=chDI_par, chQ_par=chDQ_par)
-        if update:
-            self.mw_mixer_offs_DI(offset_I)
-            self.mw_mixer_offs_DQ(offset_Q)
         return True
+        # # Calibrate Gaussian component mixer
+        # offset_I, offset_Q = mixer_carrier_cancellation(
+        #     SH=self.instr_SH.get_instr(), source=self.instr_LO_mw.get_instr(),
+        #     MC=self.instr_MC.get_instr(),
+        #     chI_par=chGI_par, chQ_par=chGQ_par)
+        # if update:
+        #     self.mw_mixer_offs_GI(offset_I)
+        #     self.mw_mixer_offs_GQ(offset_Q)
+
+        # # VSM.set('in{}_out{}_switch'.format(Gin, out), 'OFF')
+        # # VSM.set('in{}_out{}_switch'.format(Din, out), 'ON')
+        # VSM.set('mod8_ch{}_derivative_att_raw'.format(ch_in), 50000)
+        # VSM.set('mod8_ch{}_gaussian_att_raw'.format(ch_in), 0)
+
+        # if AWG.__class__.__name__ == 'QuTech_AWG_Module':
+        #     chDI_par = AWG.parameters['ch3_offset']
+        #     chDQ_par = AWG.parameters['ch4_offset']
+        # else:
+        #     # This part is AWG8 specific and wont work with a QWG
+        #     AWG.set('sigouts_{}_on'.format(awg_ch+1), 1)
+        #     AWG.set('sigouts_{}_on'.format(awg_ch+2), 1)
+        #     chDI_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch+1)]
+        #     chDQ_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch+2)]
+        #     # End of AWG8 specific part
+
+        # # Calibrate Derivative component mixer
+        # offset_I, offset_Q = mixer_carrier_cancellation(
+        #     SH=self.instr_SH.get_instr(), source=self.instr_LO_mw.get_instr(),
+        #     MC=self.instr_MC.get_instr(),
+        #     chI_par=chDI_par, chQ_par=chDQ_par)
+        # if update:
+        #     self.mw_mixer_offs_DI(offset_I)
+        #     self.mw_mixer_offs_DQ(offset_Q)
+        # return True
 
     def calibrate_mixer_skewness_RO(self, update=True):
         '''
@@ -1929,8 +1975,13 @@ class CCLight_Transmon(Qubit):
             platf_cfg=self.cfg_openql_platform_fn())
         self.instr_CC.get_instr().upload_instructions(p.filename)
 
-        d = self.int_avg_det_single
-        d.seg_per_point = 2
+
+
+        # d = self.get_int_avg_det(seg_per_point=2, single_int_avg=True)
+        # d.detector_control = 'hard'
+        # Tested but does not yet work well with soft averages
+        d = self.get_int_avg_det(single_int_avg=True, values_per_point=2,
+                                 values_per_point_suffex=['yX', 'xY'])
         d.detector_control = 'hard'
 
         VSM = self.instr_VSM.get_instr()
@@ -1939,7 +1990,7 @@ class CCLight_Transmon(Qubit):
         D_par = VSM.parameters['mod{}_ch{}_derivative_att_raw'.format(mod_out, ch_in)]
 
         MC.set_sweep_function(D_par)
-        MC.set_sweep_points(np.repeat(motzoi_atts, 2))
+        MC.set_sweep_points(motzoi_atts)
         MC.set_detector_function(d)
 
         MC.run('Motzoi_XY'+self.msmt_suffix)
