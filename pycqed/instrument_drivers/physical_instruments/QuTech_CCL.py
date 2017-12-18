@@ -46,6 +46,8 @@ INT32_MIN = -2147483648
 CHAR_MAX = +127
 CHAR_MIN = -128
 
+MAX_NUM_INSN = 2**15
+
 class CCL(SCPI):
     """
     This is class is used to serve as the driver between the user and the
@@ -391,14 +393,19 @@ class CCL(SCPI):
 
         instHex = self.QISA.getInstructionsAsHexStrings(False)
 
-        if len(instHex) > 8191:
-            log.warning("Failed to upload instructions: program length ({})"
-                " exceeds allowed maximum value 8192.".format(len(instHex)))
-            return
-
         intarray = []
         for instr in instHex:
             intarray.append(int(instr[2:], 16))
+
+        # add a stop instruction at the end of the program
+        intarray.append(0x10000000)
+
+        if len(intarray) > MAX_NUM_INSN:
+            log.warning("Failed to upload instructions: program length ({})"
+                " exceeds allowed maximum value ({}).".format(len(intarray),
+                    MAX_NUM_INSN))
+            return
+
 
         binBlock = bytearray(array.array('L', intarray))
         # print("binblock size:", len(binBlock))
