@@ -14,7 +14,7 @@ from qcodes.instrument.parameter import (
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import measurement_analysis as ma2
 from pycqed.measurement.calibration_toolbox import (
-    mixer_carrier_cancellation)
+    mixer_carrier_cancellation, multi_channel_mixer_carrier_cancellation)
 from pycqed.measurement.calibration_toolbox import mixer_skewness_cal_UHFQC_adaptive
 
 from pycqed.measurement import sweep_functions as swf
@@ -698,12 +698,7 @@ class CCLight_Transmon(Qubit):
                 nr_averages=self.ro_acq_averages(),
                 nr_samples=int(self.ro_acq_input_average_length()*1.8e9))
 
-            self.int_avg_det = det.UHFQC_integrated_average_detector(
-                UHFQC=UHFQC, AWG=self.instr_CC.get_instr(),
-                channels=ro_channels,
-                result_logging_mode=result_logging_mode,
-                nr_averages=self.ro_acq_averages(),
-                integration_length=self.ro_acq_integration_length())
+            self.int_avg_det = self.get_int_avg_det()
 
             self.int_avg_det_single = det.UHFQC_integrated_average_detector(
                 UHFQC=UHFQC, AWG=self.instr_CC.get_instr(),
@@ -720,6 +715,36 @@ class CCLight_Transmon(Qubit):
                 integration_length=self.ro_acq_integration_length())
         else:
             raise NotImplementedError()
+
+    def get_int_avg_det(self, **kw):
+        """
+        Instantiates an integration average detector using parameters from
+        the qubit object. **kw get passed on to the class when instantiating
+        the detector function.
+        """
+
+        if self.ro_acq_weight_type() == 'optimal':
+            ro_channels = [self.ro_acq_weight_chI()]
+
+            if self.ro_acq_digitized():
+                result_logging_mode = 'digitized'
+            else:
+                result_logging_mode = 'lin_trans'
+        else:
+            ro_channels = [self.ro_acq_weight_chI(),
+                           self.ro_acq_weight_chQ()]
+            result_logging_mode = 'raw'
+
+        int_avg_det= det.UHFQC_integrated_average_detector(
+        UHFQC=self.instr_acquisition.get_instr(),
+        AWG=self.instr_CC.get_instr(),
+        channels=ro_channels,
+        result_logging_mode=result_logging_mode,
+        nr_averages=self.ro_acq_averages(),
+        integration_length=self.ro_acq_integration_length(), **kw)
+
+        return int_avg_det
+
 
     def _prep_ro_sources(self):
         LO = self.instr_LO_ro.get_instr()
@@ -965,7 +990,7 @@ class CCLight_Transmon(Qubit):
         p = sqo.vsm_timing_cal_sequence(
             qubit_idx=self.cfg_qubit_nr(),
             platf_cfg=self.cfg_openql_platform_fn())
-        CCL.upload_instructions(p.filename)
+        CCL.eqasm_program(p.filename)
         CCL.start()
         print('CCL program is running. Parameter "mw_vsm_delay" can now be '
               'calibrated by hand.')
@@ -985,18 +1010,28 @@ class CCLight_Transmon(Qubit):
         if AWG.__class__.__name__ == 'QuTech_AWG_Module':
             chGI_par = AWG.parameters['ch1_offset']
             chGQ_par = AWG.parameters['ch2_offset']
+            chDI_par = AWG.parameters['ch3_offset']
+            chDQ_par = AWG.parameters['ch4_offset']
 
         else:
             # This part is AWG8 specific and wont work with a QWG
             awg_ch = self.mw_awg_ch()
             AWG.stop()
             AWG.set('sigouts_{}_on'.format(awg_ch-1), 1)
-            AWG.set('sigouts_{}_on'.format(awg_ch), 1)
+            AWG.set('sigouts_{}_on'.format(awg_ch+0), 1)
+            AWG.set('sigouts_{}_on'.format(awg_ch+1), 1)
+            AWG.set('sigouts_{}_on'.format(awg_ch+2), 1)
+
             chGI_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch-1)]
             chGQ_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch+0)]
+            chDI_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch+1)]
+            chDQ_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch+2)]
             # End of AWG8 specific part
+        offset_pars = [chGI_par, chGQ_par, chDI_par, chDQ_par]
 
         VSM = self.instr_VSM.get_instr()
+
+        # Commented out code contains legacy code for the Blue Box VSM
         # VSM.set_all_switches_to('OFF')
         # Gin = self.mw_vsm_ch_Gin()
         # Din = self.mw_vsm_ch_Din()
@@ -1007,46 +1042,57 @@ class CCLight_Transmon(Qubit):
         ch_in = self.mw_vsm_ch_in()
         mod_out = self.mw_vsm_mod_out()
         # module 8 is hardcoded for use mixer calls (signal hound)
+        VSM.set('mod8_marker_source'.format(ch_in), 'int')
         VSM.set('mod8_ch{}_marker_state'.format(ch_in), 'on')
-        VSM.set('mod8_ch{}_derivative_att_raw'.format(ch_in), 0)
+        VSM.set('mod8_ch{}_derivative_att_raw'.format(ch_in), 50000)
         VSM.set('mod8_ch{}_gaussian_att_raw'.format(ch_in), 50000)
 
-
-
-        # Calibrate Gaussian component mixer
-        offset_I, offset_Q = mixer_carrier_cancellation(
+        offsets = multi_channel_mixer_carrier_cancellation(
             SH=self.instr_SH.get_instr(), source=self.instr_LO_mw.get_instr(),
             MC=self.instr_MC.get_instr(),
-            chI_par=chGI_par, chQ_par=chGQ_par)
+            channel_pars=offset_pars)
+
         if update:
-            self.mw_mixer_offs_GI(offset_I)
-            self.mw_mixer_offs_GQ(offset_Q)
+            self.mw_mixer_offs_GI(offsets[0])
+            self.mw_mixer_offs_GQ(offsets[1])
+            self.mw_mixer_offs_DI(offsets[2])
+            self.mw_mixer_offs_DQ(offsets[3])
 
-        # VSM.set('in{}_out{}_switch'.format(Gin, out), 'OFF')
-        # VSM.set('in{}_out{}_switch'.format(Din, out), 'ON')
-        VSM.set('mod8_ch{}_derivative_att_raw'.format(ch_in), 50000)
-        VSM.set('mod8_ch{}_gaussian_att_raw'.format(ch_in), 0)
-
-        if AWG.__class__.__name__ == 'QuTech_AWG_Module':
-            chDI_par = AWG.parameters['ch3_offset']
-            chDQ_par = AWG.parameters['ch4_offset']
-        else:
-            # This part is AWG8 specific and wont work with a QWG
-            AWG.set('sigouts_{}_on'.format(awg_ch+1), 1)
-            AWG.set('sigouts_{}_on'.format(awg_ch+2), 1)
-            chDI_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch+1)]
-            chDQ_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch+2)]
-            # End of AWG8 specific part
-
-        # Calibrate Derivative component mixer
-        offset_I, offset_Q = mixer_carrier_cancellation(
-            SH=self.instr_SH.get_instr(), source=self.instr_LO_mw.get_instr(),
-            MC=self.instr_MC.get_instr(),
-            chI_par=chDI_par, chQ_par=chDQ_par)
-        if update:
-            self.mw_mixer_offs_DI(offset_I)
-            self.mw_mixer_offs_DQ(offset_Q)
         return True
+        # # Calibrate Gaussian component mixer
+        # offset_I, offset_Q = mixer_carrier_cancellation(
+        #     SH=self.instr_SH.get_instr(), source=self.instr_LO_mw.get_instr(),
+        #     MC=self.instr_MC.get_instr(),
+        #     chI_par=chGI_par, chQ_par=chGQ_par)
+        # if update:
+        #     self.mw_mixer_offs_GI(offset_I)
+        #     self.mw_mixer_offs_GQ(offset_Q)
+
+        # # VSM.set('in{}_out{}_switch'.format(Gin, out), 'OFF')
+        # # VSM.set('in{}_out{}_switch'.format(Din, out), 'ON')
+        # VSM.set('mod8_ch{}_derivative_att_raw'.format(ch_in), 50000)
+        # VSM.set('mod8_ch{}_gaussian_att_raw'.format(ch_in), 0)
+
+        # if AWG.__class__.__name__ == 'QuTech_AWG_Module':
+        #     chDI_par = AWG.parameters['ch3_offset']
+        #     chDQ_par = AWG.parameters['ch4_offset']
+        # else:
+        #     # This part is AWG8 specific and wont work with a QWG
+        #     AWG.set('sigouts_{}_on'.format(awg_ch+1), 1)
+        #     AWG.set('sigouts_{}_on'.format(awg_ch+2), 1)
+        #     chDI_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch+1)]
+        #     chDQ_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch+2)]
+        #     # End of AWG8 specific part
+
+        # # Calibrate Derivative component mixer
+        # offset_I, offset_Q = mixer_carrier_cancellation(
+        #     SH=self.instr_SH.get_instr(), source=self.instr_LO_mw.get_instr(),
+        #     MC=self.instr_MC.get_instr(),
+        #     chI_par=chDI_par, chQ_par=chDQ_par)
+        # if update:
+        #     self.mw_mixer_offs_DI(offset_I)
+        #     self.mw_mixer_offs_DQ(offset_Q)
+        # return True
 
     def calibrate_mixer_skewness_RO(self, update=True):
         '''
@@ -1059,7 +1105,7 @@ class CCLight_Transmon(Qubit):
             self.cfg_qubit_nr(), self.cfg_openql_platform_fn(),
             nr_cliffords=[1],
             net_clifford=1, nr_seeds=1, restless=True, cal_points=False)
-        self.instr_CC.get_instr().upload_instructions(p.filename)
+        self.instr_CC.get_instr().eqasm_program(p.filename)
         self.instr_CC.get_instr().start()
 
         LutMan = self.instr_LutMan_RO.get_instr()
@@ -1128,7 +1174,7 @@ class CCLight_Transmon(Qubit):
         CCL.stop()
         p = sqo.CW_RO_sequence(qubit_idx=self.cfg_qubit_nr(),
                                platf_cfg=self.cfg_openql_platform_fn())
-        CCL.upload_instructions(p.filename)
+        CCL.eqasm_program(p.filename)
         # CCL gets started in the int_avg detector
 
         MC.set_sweep_function(swf.Heterodyne_Frequency_Sweep_simple(
@@ -1152,7 +1198,7 @@ class CCLight_Transmon(Qubit):
         CCL.stop()
         p = sqo.CW_RO_sequence(qubit_idx=self.cfg_qubit_nr(),
                                platf_cfg=self.cfg_openql_platform_fn())
-        CCL.upload_instructions(p.filename)
+        CCL.eqasm_program(p.filename)
         # CCL gets started in the int_avg detector
 
         MC.set_sweep_function(swf.Heterodyne_Frequency_Sweep_simple(
@@ -1183,7 +1229,7 @@ class CCLight_Transmon(Qubit):
         CCL.stop()
         p = sqo.CW_RO_sequence(qubit_idx=self.cfg_qubit_nr(),
                                platf_cfg=self.cfg_openql_platform_fn())
-        CCL.upload_instructions(p.filename)
+        CCL.eqasm_program(p.filename)
         # CCL gets started in the int_avg detector
 
         MC.set_sweep_function(swf.Heterodyne_Frequency_Sweep_simple(
@@ -1220,7 +1266,7 @@ class CCLight_Transmon(Qubit):
             qubit_idx=self.cfg_qubit_nr(),
             spec_pulse_length=self.spec_pulse_length(),
             platf_cfg=self.cfg_openql_platform_fn())
-        CCL.upload_instructions(p.filename)
+        CCL.eqasm_program(p.filename)
         # CCL gets started in the int_avg detector
 
         # The spec pulse is a MW pulse that contains not modulation
@@ -1255,7 +1301,7 @@ class CCLight_Transmon(Qubit):
             p = sqo.off_on(
                 qubit_idx=self.cfg_qubit_nr(), pulse_comb='off_on',
                 platf_cfg=self.cfg_openql_platform_fn())
-            self.instr_CC.get_instr().upload_instructions(p.filename)
+            self.instr_CC.get_instr().eqasm_program(p.filename)
         else:
             p = None  # object needs to exist for the openql_sweep to work
 
@@ -1319,7 +1365,7 @@ class CCLight_Transmon(Qubit):
             p = sqo.off_on(
                 qubit_idx=self.cfg_qubit_nr(), pulse_comb='on',
                 platf_cfg=self.cfg_openql_platform_fn())
-            self.instr_CC.get_instr().upload_instructions(p.filename)
+            self.instr_CC.get_instr().eqasm_program(p.filename)
         else:
             p = None  # object needs to exist for the openql_sweep to work
 
@@ -1418,7 +1464,7 @@ class CCLight_Transmon(Qubit):
         G_par = VSM.parameters['mod{}_ch{}_gaussian_att_raw'.format(mod_out, ch_in)]
         D_par = VSM.parameters['mod{}_ch{}_derivative_att_raw'.format(mod_out, ch_in)]
         s = swf.two_par_joint_sweep(G_par, D_par, preserve_ratio=True)
-        self.instr_CC.get_instr().upload_instructions(p.filename)
+        self.instr_CC.get_instr().eqasm_program(p.filename)
         MC.set_sweep_function(s)
         MC.set_sweep_points(atts)
         # real_imag is acutally not polar and as such works for opt weights
@@ -1499,7 +1545,7 @@ class CCLight_Transmon(Qubit):
             self.cfg_qubit_nr(), self.cfg_openql_platform_fn(),
             nr_cliffords=[nr_cliffords],
             net_clifford=3, nr_seeds=nr_seeds, restless=True, cal_points=False)
-        self.instr_CC.get_instr().upload_instructions(p.filename)
+        self.instr_CC.get_instr().eqasm_program(p.filename)
         self.instr_CC.get_instr().start()
 
 
@@ -1710,7 +1756,7 @@ class CCLight_Transmon(Qubit):
                 qubit_idx=self.cfg_qubit_nr(), sequence_type=sequence_type,
                 platf_cfg=self.cfg_openql_platform_fn(), net_gate=net_gate,
                 feedback=feedback)
-            self.instr_CC.get_instr().upload_instructions(p.filename)
+            self.instr_CC.get_instr().eqasm_program(p.filename)
         else:
             p = None  # object needs to exist for the openql_sweep to work
         s = swf.OpenQL_Sweep(openql_program=p,
@@ -1927,10 +1973,15 @@ class CCLight_Transmon(Qubit):
         p = sqo.motzoi_XY(
             qubit_idx=self.cfg_qubit_nr(),
             platf_cfg=self.cfg_openql_platform_fn())
-        self.instr_CC.get_instr().upload_instructions(p.filename)
+        self.instr_CC.get_instr().eqasm_program(p.filename)
 
-        d = self.int_avg_det_single
-        d.seg_per_point = 2
+
+
+        # d = self.get_int_avg_det(seg_per_point=2, single_int_avg=True)
+        # d.detector_control = 'hard'
+        # Tested but does not yet work well with soft averages
+        d = self.get_int_avg_det(single_int_avg=True, values_per_point=2,
+                                 values_per_point_suffex=['yX', 'xY'])
         d.detector_control = 'hard'
 
         VSM = self.instr_VSM.get_instr()
@@ -1939,7 +1990,7 @@ class CCLight_Transmon(Qubit):
         D_par = VSM.parameters['mod{}_ch{}_derivative_att_raw'.format(mod_out, ch_in)]
 
         MC.set_sweep_function(D_par)
-        MC.set_sweep_points(np.repeat(motzoi_atts, 2))
+        MC.set_sweep_points(motzoi_atts)
         MC.set_detector_function(d)
 
         MC.run('Motzoi_XY'+self.msmt_suffix)
@@ -2013,4 +2064,4 @@ def load_range_of_oql_programs(programs, counter_param, CC):
     """
     program = programs[counter_param()]
     counter_param((counter_param()+1) % len(programs))
-    CC.upload_instructions(program.filename)
+    CC.eqasm_program(program.filename)

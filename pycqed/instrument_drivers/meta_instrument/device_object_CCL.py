@@ -639,7 +639,7 @@ class DeviceCCL(Instrument):
                                    angles=[90])
 
         CC = self.instr_CC.get_instr()
-        CC.upload_instructions(p.filename)
+        CC.eqasm_program(p.filename)
         CC.start()
 
         s = swf.FLsweep(fl_lutman, fl_lutman.cz_phase_corr_amp,
@@ -689,7 +689,7 @@ def calibrate_flux_timing(self, q0: str, q1: str,
                                    angles=[90])
 
         CC = self.instr_CC.get_instr()
-        CC.upload_instructions(p.filename)
+        CC.eqasm_program(p.filename)
         CC.start()
 
         s = swf.FLsweep(fl_lutman, fl_lutman.cz_phase_corr_amp,

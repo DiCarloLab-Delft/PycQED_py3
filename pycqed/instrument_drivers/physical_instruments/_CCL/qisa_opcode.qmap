@@ -1,4 +1,7 @@
-    # quantum instructions (double instruction format)
+# This is a default qisa_opcode.qmap file used by the driver when no
+# opcode.qmap is specified.
+
+# quantum instructions (double instruction format)
 # no arguments
 def_q_arg_none["qnop"] = 0x00
 def_q_arg_st["CW_00"]   = 0x8

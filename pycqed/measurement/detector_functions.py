@@ -5,6 +5,7 @@ Measurement Control.
 import numpy as np
 import logging
 import time
+from string import ascii_uppercase
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis.fit_toolbox import functions as fn
 from pycqed.measurement.waveform_control import pulse
@@ -1407,6 +1408,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
                  real_imag: bool=True,
                  seg_per_point: int =1, single_int_avg: bool =False,
                  chunk_size: int=None,
+                 values_per_point: int=1, values_per_point_suffex:list=None,
                  prepare_function=None, prepare_function_kwargs: dict=None,
                  **kw):
         """
@@ -1430,10 +1432,20 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         real_imag (bool)     : if False returns data in polar coordinates
                                 useful for e.g., spectroscopy
                                 #FIXME -> should be named "polar"
-        seg_per_point (int)  : number of segments per sweep point
         single_int_avg (bool): if True makes this a soft detector
-        """
 
+        Args relating to changing the amoung of points being detected:
+
+        seg_per_point (int)  : number of segments per sweep point,
+                does not do any renaming or reshaping.
+                Here for deprecation reasons.
+        chunk_size    (int)  : used in single shot readout experiments.
+        values_per_point (int): number of values to measure per sweep point.
+                creates extra column/value_names in the dataset for each channel.
+        values_per_point_suffex (list): suffex to add to channel names for
+                each value. should be a list of strings with lenght equal to
+                values per point.
+        """
         super().__init__()
         self.UHFQC = UHFQC
         self.name = '{}_UHFQC_integrated_average'.format(result_logging_mode)
@@ -1453,11 +1465,19 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             self.value_units = ['frac']*len(self.channels)
             self.scaling_factor = 1
 
+        self.value_names, self.value_units = self._add_value_name_suffex(
+            value_names=self.value_names, value_units=self.value_units,
+            values_per_point=values_per_point,
+            values_per_point_suffex=values_per_point_suffex)
+
         self.single_int_avg = single_int_avg
         if self.single_int_avg:
             self.detector_control = 'soft'
 
-        self.seg_per_point = seg_per_point
+        # Directly specifying seg_per_point is deprecated. values_per_point
+        #replaces this functionality -MAR Dec 2017
+        self.seg_per_point = max(seg_per_point, values_per_point)
+
 
         self.AWG = AWG
         self.nr_averages = nr_averages
@@ -1472,16 +1492,39 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.prepare_function_kwargs = prepare_function_kwargs
         self._set_real_imag(real_imag)
 
+    def _add_value_name_suffex(self, value_names: list, value_units:list,
+                               values_per_point:int,
+                               values_per_point_suffex:list):
+        """
+        For use with multiple values_per_point. Adds
+        """
+        if values_per_point == 1:
+            return value_names, value_units
+        else:
+            new_value_names = []
+            new_value_units = []
+            if values_per_point_suffex is None:
+                values_per_point_suffex = ascii_uppercase[:len(value_names)]
+
+            for vn, vu in zip(value_names, value_units):
+                for val_suffix in values_per_point_suffex:
+                    new_value_names.append('{} {}'.format(vn, val_suffix))
+                    new_value_units.append(vu)
+                    print('hi')
+
+            return new_value_names, new_value_units
+
     def _set_real_imag(self, real_imag=False):
         """
         Function so that real imag can be changed after initialization
         """
 
         self.real_imag = real_imag
-        if self.result_logging_mode == 'raw':
-            self.value_units = ['V']*len(self.channels)
-        else:
-            self.value_units = ['']*len(self.channels)
+        # Commented this out as it is already done in the init -MAR Dec 2017
+        # if self.result_logging_mode == 'raw':
+        #     self.value_units = ['V']*len(self.channels)
+        # else:
+        #     self.value_units = ['']*len(self.channels)
 
         if not self.real_imag:
             if len(self.channels) != 2:

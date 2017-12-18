@@ -304,7 +304,7 @@ class OpenQL_Sweep(Hard_Sweep):
 
     def prepare(self, **kw):
         if self.upload:
-            self.CCL.upload_instructions(self.openql_program.filename)
+            self.CCL.eqasm_program(self.openql_program.filename)
 
 
 class OpenQL_File_Sweep(Hard_Sweep):
@@ -322,7 +322,7 @@ class OpenQL_File_Sweep(Hard_Sweep):
 
     def prepare(self, **kw):
         if self.upload:
-            self.CCL.upload_instructions(self.filename)
+            self.CCL.eqasm_program(self.filename)
 
 
 class QASM_Sweep_v2(Hard_Sweep):
