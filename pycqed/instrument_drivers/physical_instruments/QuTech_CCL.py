@@ -41,19 +41,6 @@ INT32_MIN = -2147483648
 CHAR_MAX = +127
 CHAR_MIN = -128
 
-id_field_table = {
-    'vendor'        : 'vendor',
-    'model'         : 'model',
-    'serial'        : 'serial',
-    'fwVersion'     : 'firmware',
-    'fwBuild'       : 'Firmware Build Time',
-    'swVersion'     : 'Embedded Software Version',
-    'swBuild'       : 'Embedded Software Build Time',
-    'kmodVersion'   : 'Kernel Module Version',
-    'kmodBuild'     : 'Kernel Module Build Time'
-}
-
-
 class CCL(SCPI):
     """
     This is class is used to serve as the driver between the user and the
@@ -64,9 +51,12 @@ class CCL(SCPI):
     """
     exceptionLevel = logging.CRITICAL
 
-    def __init__(self, name, address, port, **kwargs):
+    def __init__(self, name, address, port, log_level=False, **kwargs):
         self.model = name
         self._dummy_instr = False
+        if isinstance(debug_mode, bool) is False:
+            raise ValueError("The initialization parameter debug_mode should be ")
+        self._debug_mode = debug_mode
         try:
             super().__init__(name, address, port, **kwargs)
         except Exception as e:
@@ -215,7 +205,7 @@ class CCL(SCPI):
         """
         dir_path = os.path.dirname(os.path.abspath(__file__))
 
-        param_file_dir = os.path.join(dir_path, 'qutech_parameter_files')
+        param_file_dir = os.path.join(dir_path, '_CCL')
 
         if not os.path.exists(param_file_dir):
             os.makedirs(param_file_dir)
@@ -235,13 +225,18 @@ class CCL(SCPI):
         if open_file_success:
             try:
                 file_content = json.loads(file.read())
-                self.saved_param_version = file_content["version"]["software"]
+                file.close()
                 read_file_success = True
             except Exception as e:
                 log.info("Error while reading CC-Light local parameter file."
                         " Will update it from the hardware.")
 
         if read_file_success:
+            self.saved_param_version = None
+            if "Embedded Software Build Time" in file_content["version"]:
+                self.saved_param_version = \
+                    file_content["version"]["Embedded Software Build Time"]
+
             # check if the saved parameters have the same version number
             # as CC-Light, if yes, return the saved one.
             if (('Embedded Software Build Time' in self.version_info and
@@ -257,15 +252,15 @@ class CCL(SCPI):
         try:
             raw_param_string = self.ask('QUTech:PARAMeters?')
         except Exception as e:
-            log.warning("Failed to retrieve parameter information from CC-Light"
-                " hardware: ", e)
+            raise ValueError("Failed to retrieve parameter information"
+                " from CC-Light hardware: ", e)
 
         raw_param_string = raw_param_string.replace('\t', '\n')
 
         try:
             results = json.loads(raw_param_string)["parameters"]
         except Exception as e:
-            log.warning("Unrecognized parameter information received from "
+            raise ValueError("Unrecognized parameter information received from "
                 "CC-Light: \n {}".format(raw_param_string))
 
         try:
@@ -282,29 +277,32 @@ class CCL(SCPI):
         try:
             id_string = ""
             id_string = self.ask('*IDN?')
-        except Exception:
-            logging.warn('Error: failed to retrive IDN from CC-Light.')
+            id_string = id_string.replace("'", "\"")
+            self.version_info = json.loads(id_string)
+        except Exception as e:
+            logging.warn('Error: failed to retrive IDN from CC-Light.', str(e))
 
-        # the pattern that contains all symbols used to strip the
-        # raw string received from CC-Light
-        pattern = re.compile("\s*,\s*|\s*;\s*")
 
-        try:
-            # split the raw string into different fields, each field is a
-            # string with the format "key=value"
-            id_fields = [x.strip() for x in pattern.split(id_string) if x]
+        # # the pattern that contains all symbols used to strip the
+        # # raw string received from CC-Light
+        # pattern = re.compile("\s*,\s*|\s*;\s*")
 
-            # convert to dictionary
-            for field in id_fields:
-                a, b = field.split("=")
-                if str(a) not in id_field_table:
-                    raise ValueError("Unexpected IDN field received from "
-                        "CC-Light.")
-                self.version_info[id_field_table[str(a)]] = str(b)
+        # try:
+        #     # split the raw string into different fields, each field is a
+        #     # string with the format "key=value"
+        #     id_fields = [x.strip() for x in pattern.split(id_string) if x]
 
-        except Exception:
-            logging.warn("Bad IDN message received from CC-Light: {}".format(
-                id_string))
+        #     # convert to dictionary
+        #     for field in id_fields:
+        #         a, b = field.split("=")
+        #         if str(a) not in id_field_table:
+        #             raise ValueError("Unexpected IDN field received from "
+        #                 "CC-Light.")
+        #         self.version_info[id_field_table[str(a)]] = str(b)
+
+        # except Exception:
+        #     logging.warn("Bad IDN message received from CC-Light: {}".format(
+        #         id_string))
 
         return self.version_info
 
