@@ -21,16 +21,11 @@ import json
 import sys
 import traceback
 import array
+import re
 
-# The assembler needs to be build first before it can be imported.
-# The default location is a copy of the build in the _CCL hidden folder next
-# to this instrument driver. A better solution is needed to prevent build
-# issues, this is documented in issue #65 of the CCL repo.
-curdir = (os.path.dirname(__file__))
-CCLight_Assembler_dir = os.path.join(curdir, "_CCL", "qisa-as", "build")
-sys.path.append(CCLight_Assembler_dir)
+
 try:
-    from pyQisaAs import QISA_Driver
+    from qisa_as import QISA_Driver, qisa_qmap
 except ImportError as e:
     logging.warning(e)
 
@@ -46,7 +41,6 @@ INT32_MIN = -2147483648
 CHAR_MAX = +127
 CHAR_MIN = -128
 
-
 class CCL(SCPI):
     """
     This is class is used to serve as the driver between the user and the
@@ -57,9 +51,12 @@ class CCL(SCPI):
     """
     exceptionLevel = logging.CRITICAL
 
-    def __init__(self, name, address, port, **kwargs):
+    def __init__(self, name, address, port, log_level=False, **kwargs):
         self.model = name
         self._dummy_instr = False
+        if isinstance(debug_mode, bool) is False:
+            raise ValueError("The initialization parameter debug_mode should be ")
+        self._debug_mode = debug_mode
         try:
             super().__init__(name, address, port, **kwargs)
         except Exception as e:
@@ -70,11 +67,11 @@ class CCL(SCPI):
                   " to connect")
             self.remove_instance(self)
             super().__init__(name, address, port, **kwargs)
-        self.version_info = self.get_idn()
+        self.get_idn()
         self.add_standard_parameters()
         self.add_additional_parameters()
-        self.connect_message()
         self._initialize_insn_microcode_parsers()
+        self.connect_message()
 
     def _initialize_insn_microcode_parsers(self):
         """
@@ -86,6 +83,13 @@ class CCL(SCPI):
         self.QISA.enableParserTracing(False)
         self.QISA.setVerbose(False)
 
+        curdir = os.path.dirname(__file__)
+        qmap_fn = os.path.join(curdir, '_CCL', 'qisa_opcode.qmap')
+        success = self.QISA.loadQuantumInstructions(qmap_fn)
+        if not success:
+            print ("Error: ", driver.getLastErrorMessage())
+            print ("Failed to load quantum instructions from dictionaries.")
+
     def stop(self):
         self.run(0),
         self.enable(0)
@@ -94,8 +98,7 @@ class CCL(SCPI):
         self.enable(1)
         self.run(1)
 
-    def add_parameter(self, name,
-                      parameter_class=Parameter, **kwargs):
+    def add_parameter(self, name, parameter_class=Parameter, **kwargs):
         """
         Function to manually add a qcodes parameter. Useful for nonstandard
         forms of the scpiCmds.
@@ -173,7 +176,7 @@ class CCL(SCPI):
         self.add_parameter(
             'upload_instructions',
             label=('Upload instructions'),
-            docstring='It uploads the instructions to the CCLight. ' +
+            docstring='It uploads the instructions to the CC-Light. ' +
             'Valid input is a string representing the filename',
             set_cmd=self._upload_instructions,
             vals=vals.Strings()
@@ -182,7 +185,7 @@ class CCL(SCPI):
         self.add_parameter(
             'upload_microcode',
             label=('Upload microcode'),
-            docstring='It uploads the microcode to the CCLight. ' +
+            docstring='It uploads the microcode to the CC-Light. ' +
             'Valid input is a string representing the filename',
             set_cmd=self._upload_microcode,
             vals=vals.Strings()
@@ -200,76 +203,174 @@ class CCL(SCPI):
         gets sent via TCP/IP. This function also writes out the json-file,
         for user inspection. The function returns a json string.
         """
-        path = os.path.abspath(__file__)
-        dir_path = os.path.dirname(path)
-        parameters_folder_path = os.path.join(dir_path,
-                                              'QuTech_CCL_Parameter_Files')
+        dir_path = os.path.dirname(os.path.abspath(__file__))
 
-        # Open the file and read the version number
-        self._s_file_name = os.path.join(
-            parameters_folder_path, 'QuTech_CCL_Parameters.txt')
+        param_file_dir = os.path.join(dir_path, '_CCL')
 
-        if not os.path.exists(parameters_folder_path):
-            os.makedirs(parameters_folder_path)
+        if not os.path.exists(param_file_dir):
+            os.makedirs(param_file_dir)
 
+        self.param_file_name = os.path.join(param_file_dir,
+                                            'ccl_param_nodes.txt')
+
+        open_file_success = False
         try:
-            file = open(self._s_file_name, "r")
+            file = open(self.param_file_name, "r")
+            open_file_success = True
         except Exception as e:
-            log.warning("parameter file for gettable " +
-                        "parameters {} not found ({})".format(
-                            self._s_file_name, e))
-        file_content = json.loads(file.read())
-        try:
-            self.parameter_file_version = file_content["version"]["software"]
-        except Exception as e:
-            self.parameter_file_version = 'NaN'
+            log.info("CC-Light local parameter file {} not found ({})".format(
+                            self.param_file_name, e))
 
-        if (('swBuild' in self.version_info and
-                self.version_info['swBuild'] == self.parameter_file_version)
-                or self._dummy_instr):
-            # Return the parameter list given by the txt file
-            results = file_content["parameters"]
-        else:
-            # Update the parameter list to the data that is given by the ccl
-            parameters_str = self.ask('QUTech:PARAMeters?')
-            parameters_str = parameters_str.replace('\t', '\n')
+        read_file_success = False
+        if open_file_success:
             try:
-                file = open(self._s_file_name, 'x')
-                file.write(parameters_str)
+                file_content = json.loads(file.read())
+                file.close()
+                read_file_success = True
             except Exception as e:
-                log.warning("failed to write update the parameters in the" +
-                            " parameter file" + ".(%s)", str(e))
-            results = json.loads(parameters_str)["parameters"]
+                log.info("Error while reading CC-Light local parameter file."
+                        " Will update it from the hardware.")
+
+        if read_file_success:
+            self.saved_param_version = None
+            if "Embedded Software Build Time" in file_content["version"]:
+                self.saved_param_version = \
+                    file_content["version"]["Embedded Software Build Time"]
+
+            # check if the saved parameters have the same version number
+            # as CC-Light, if yes, return the saved one.
+            if (('Embedded Software Build Time' in self.version_info and
+                  (self.version_info['Embedded Software Build Time'] ==
+                  self.saved_param_version)) or
+                self._dummy_instr):
+                results = file_content["parameters"]
+                return results
+            else:
+                log.info("CC-Light local parameter file out of date."
+                    " Will update it from the hardware.")
+
+        try:
+            raw_param_string = self.ask('QUTech:PARAMeters?')
+        except Exception as e:
+            raise ValueError("Failed to retrieve parameter information"
+                " from CC-Light hardware: ", e)
+
+        raw_param_string = raw_param_string.replace('\t', '\n')
+
+        try:
+            results = json.loads(raw_param_string)["parameters"]
+        except Exception as e:
+            raise ValueError("Unrecognized parameter information received from "
+                "CC-Light: \n {}".format(raw_param_string))
+
+        try:
+            file = open(self.param_file_name, 'w')
+            file.write(raw_param_string)
+            file.close()
+        except Exception as e:
+            log.info("Failed to update CC-Light local parameter file:", str(e))
+
         return results
 
     def get_idn(self):
-        # Overloading get_idn function to format CCL versions
+        self.version_info = {}
         try:
-            idstr = ''  # in case self.ask fails
-            idstr = self.ask('*IDN?')
-            # form is supposed to be comma-separated, but we've seen
-            # other separators occasionally
-            for separator in ',;:':
-                # split into no more than 4 parts, so we don't lose info
-                idparts = [p.strip() for p in idstr.split(separator, 8)]
-                if len(idparts) > 1:
-                    break
-            # in case parts at the end are missing, fill in None
-            if len(idparts) < 9:
-                idparts += [None] * (9 - len(idparts))
-            for i in range(0, 9):
-                idparts[i] = idparts[i].split('=')[1]
-        except Exception:
-            logging.warn('Error getting or interpreting *IDN?: ' + repr(idstr))
-            idparts = [None, None, None, None, None, None]
+            id_string = ""
+            id_string = self.ask('*IDN?')
+            id_string = id_string.replace("'", "\"")
+            self.version_info = json.loads(id_string)
+        except Exception as e:
+            logging.warn('Error: failed to retrive IDN from CC-Light.', str(e))
 
-        # some strings include the word 'model' at the front of model
-        if str(idparts[1]).lower().startswith('model'):
-            idparts[1] = str(idparts[1])[9:].strip()
 
-        return dict(zip(('vendor', 'model', 'serial', 'fwVersion', 'fwBuild',
-                         'swVersion', 'swBuild', 'kmodVersion',
-                         'kmodBuild'), idparts))
+        # # the pattern that contains all symbols used to strip the
+        # # raw string received from CC-Light
+        # pattern = re.compile("\s*,\s*|\s*;\s*")
+
+        # try:
+        #     # split the raw string into different fields, each field is a
+        #     # string with the format "key=value"
+        #     id_fields = [x.strip() for x in pattern.split(id_string) if x]
+
+        #     # convert to dictionary
+        #     for field in id_fields:
+        #         a, b = field.split("=")
+        #         if str(a) not in id_field_table:
+        #             raise ValueError("Unexpected IDN field received from "
+        #                 "CC-Light.")
+        #         self.version_info[id_field_table[str(a)]] = str(b)
+
+        # except Exception:
+        #     logging.warn("Bad IDN message received from CC-Light: {}".format(
+        #         id_string))
+
+        return self.version_info
+
+    def print_readable_idn(self):
+        for key, value in self.version_info.items():
+            print("{0: >30s} :  {1:}".format(key, value))
+
+    def print_qisa_opcodes(self):
+        if self.QISA is None:
+            log.info("The assembler of CCLight has not been initialized yet.")
+            return
+
+        print(self.QISA.dumpInstructionsSpecification())
+
+    def print_microcode(self):
+        if self.microcode is None:
+            log.info("The microcode unit of CCLight has not been"
+                " initialized yet.")
+            return
+
+        self.microcode.dump_microcode()
+
+    def print_qisa_with_microcode(self):
+        if self.microcode is None:
+            log.info("The microcode unit of CCLight has not been"
+                " initialized yet.")
+            return
+
+        if self.QISA is None:
+            log.info("The assembler of CCLight has not been initialized yet.")
+            return
+
+        q_arg = {}
+
+        insn_opcodes_str = self.QISA.dumpInstructionsSpecification()
+        lines = insn_opcodes_str.split('\n')
+        trimed_lines = [line.strip() for line in lines \
+                        if line.startswith('def_q')]
+
+        # put every instruction with its opcode into a dict
+        for line in trimed_lines:
+            name, opcode = line.split('=')
+            name = name.strip().lower()
+            opcode = opcode.strip().lower()
+
+            # convert the opcode into an integer
+            if opcode.startswith("0x"):
+                base = 16
+            elif opcode.startswith("0o"):
+                base = 8
+            elif opcode.startswith("0b"):
+                base = 2
+            else:
+                base = 10
+            opcode = int(opcode, base)
+
+            if name.startswith("def_q_arg_none"):
+                q_arg[name[16:-2]] = opcode
+            if name.startswith("def_q_arg_tt"):
+                q_arg[name[14:-2]] = opcode
+            if name.startswith("def_q_arg_st"):
+                q_arg[name[14:-2]] = opcode
+
+        print("Instruction      Codewords")
+        for key, value in q_arg.items():
+            print('  {:<10s}:  '.format(key), end = '')
+            self.microcode.print_cs_line_no_header(value)
+            print("")
 
 ###############################################################################
 
@@ -293,7 +394,7 @@ class CCL(SCPI):
                 "The parameter filename type({}) is incorrect. "
                 "It should be str.".format(type(filename)))
 
-        success_parser = self.QISA.parse(filename)
+        success_parser = self.QISA.assemble(filename)
 
         if success_parser is not True:
             print("Error detected while assembling the file {}:".format(
@@ -303,14 +404,21 @@ class CCL(SCPI):
 
         instHex = self.QISA.getInstructionsAsHexStrings(False)
 
+        if len(instHex) > 8191:
+            log.warning("Failed to upload instructions: program length ({})"
+                " exceeds allowed maximum value 8192.".format(len(instHex)))
+            return
+
         intarray = []
         for instr in instHex:
             intarray.append(int(instr[2:], 16))
 
         binBlock = bytearray(array.array('L', intarray))
+        # print("binblock size:", len(binBlock))
         # write binblock
         hdr = 'QUTech:UploadInstructions '
         self.binBlockWrite(binBlock, hdr)
+        # print("CCL: Sending instructions to the hardware finished.")
 
         # write to last_loaded_instructions so it can conveniently be read back
         self.last_loaded_instructions(filename)
@@ -452,7 +560,7 @@ class dummy_CCL(CCL):
         self.add_parameter(
             'upload_instructions',
             label=('Upload instructions'),
-            docstring='It uploads the instructions to the CCLight. ' +
+            docstring='It uploads the instructions to the CC-Light. ' +
             'Valid input is a string representing the filename',
             parameter_class=ManualParameter,
             vals=vals.Strings()
@@ -461,7 +569,7 @@ class dummy_CCL(CCL):
         self.add_parameter(
             'upload_microcode',
             label=('Upload microcode'),
-            docstring='It uploads the microcode to the CCLight. ' +
+            docstring='It uploads the microcode to the CC-Light. ' +
             'Valid input is a string representing the filename',
             parameter_class=ManualParameter,
             vals=vals.Strings()
