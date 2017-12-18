@@ -27,7 +27,7 @@ from pycqed.analysis_v2.base_analysis import *
 from pycqed.analysis_v2.simple_analysis import (
     Basic1DAnalysis, Basic2DAnalysis)
 from pycqed.analysis_v2.timedomain_analysis import (
-    FlippingAnalysis, CZ_1QPhaseCal_Analysis)
+    FlippingAnalysis, Intersect_Analysis, CZ_1QPhaseCal_Analysis)
 from pycqed.analysis_v2.readout_analysis import *
 from pycqed.analysis_v2.syndrome_analysis import *
 from pycqed.analysis_v2.cryo_scope_analysis import *

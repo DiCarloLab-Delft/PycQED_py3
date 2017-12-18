@@ -5,6 +5,7 @@ from pycqed.analysis import fitting_models as fit_mods
 from pycqed.analysis import analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str
+from copy import deepcopy
 
 class Single_Qubit_TimeDomainAnalysis(ba.BaseDataAnalysis):
 
@@ -223,11 +224,177 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
                 'box_props': 'fancy',
                 'text_string': self.raw_data_dict['scale_factor_msg']}
 
+class Intersect_Analysis(Single_Qubit_TimeDomainAnalysis):
+    """
+    Analysis to extract the intercept of two parameters.
+
+    relevant options_dict parameters
+        ch_idx_A (int) specifies first channel for intercept
+        ch_idx_B (int) specifies second channel for intercept if same as first
+            it will assume data was taken interleaved.
+    """
+    def __init__(self, t_start: str=None, t_stop: str=None,
+                 data_file_path: str=None,
+                 options_dict: dict=None, extract_only: bool=False,
+                 do_fitting: bool=True, auto=True):
+
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         extract_only=extract_only, do_fitting=do_fitting)
+        self.single_timestamp = False
+
+        self.params_dict = {'xlabel': 'sweep_name',
+                            'xvals': 'sweep_points',
+                            'xunit': 'sweep_unit',
+                            'measurementstring': 'measurementstring',
+                            'value_names': 'value_names',
+                            'value_units': 'value_units',
+                            'measured_values': 'measured_values'}
+
+        self.numeric_params = []
+        if auto:
+            self.run_analysis()
+
+
+    def process_data(self):
+        """
+        selects the relevant acq channel based on "ch_idx_A" and "ch_idx_B"
+        specified in the options dict. If ch_idx_A and ch_idx_B are the same
+        it will unzip the data.
+        """
+        self.proc_data_dict = deepcopy(self.raw_data_dict)
+        # The channel containing the data must be specified in the options dict
+        ch_idx_A = self.options_dict.get('ch_idx_A', 0)
+        ch_idx_B = self.options_dict.get('ch_idx_B', 0)
+
+
+        self.proc_data_dict['ylabel'] = self.raw_data_dict['value_names'][0][ch_idx_A]
+        self.proc_data_dict['yunit'] = self.raw_data_dict['value_units'][0][ch_idx_A]
+
+        if ch_idx_A == ch_idx_B:
+            yvals = list(self.raw_data_dict['measured_values_ord_dict'].values())[ch_idx_A][0]
+            self.proc_data_dict['xvals_A'] = self.raw_data_dict['xvals'][0][::2]
+            self.proc_data_dict['xvals_B'] = self.raw_data_dict['xvals'][0][1::2]
+            self.proc_data_dict['yvals_A'] = yvals[::2]
+            self.proc_data_dict['yvals_B'] = yvals[1::2]
+        else:
+            self.proc_data_dict['xvals_A'] = self.raw_data_dict['xvals'][0]
+            self.proc_data_dict['xvals_B'] = self.raw_data_dict['xvals'][0]
+
+            self.proc_data_dict['yvals_A'] = list(self.raw_data_dict
+                ['measured_values_ord_dict'].values())[ch_idx_A][0]
+            self.proc_data_dict['yvals_B'] = list(self.raw_data_dict
+                ['measured_values_ord_dict'].values())[ch_idx_B][0]
+
+    def prepare_fitting(self):
+        self.fit_dicts = OrderedDict()
+
+        self.fit_dicts['line_fit_A'] = {
+            'model': lmfit.models.PolynomialModel(degree=2),
+            'fit_xvals': {'x': self.proc_data_dict['xvals_A']},
+            'fit_yvals': {'data': self.proc_data_dict['yvals_A']}}
+
+        self.fit_dicts['line_fit_B'] = {
+            'model': lmfit.models.PolynomialModel(degree=2),
+            'fit_xvals': {'x': self.proc_data_dict['xvals_B']},
+            'fit_yvals': {'data': self.proc_data_dict['yvals_B']}}
+
+
+    def analyze_fit_results(self):
+        fr_0 = self.fit_res['line_fit_A'].best_values
+        fr_1 = self.fit_res['line_fit_B'].best_values
+
+        c0 = (fr_0['c0'] - fr_1['c0'])
+        c1 = (fr_0['c1'] - fr_1['c1'])
+        c2 = (fr_0['c2'] - fr_1['c2'])
+        poly_coeff = [c0, c1, c2]
+        poly = np.polynomial.polynomial.Polynomial([fr_0['c0'],
+                                                   fr_0['c1'], fr_0['c2']])
+        ic = np.polynomial.polynomial.polyroots(poly_coeff)
+
+        self.proc_data_dict['intersect_L'] = ic[0], poly(ic[0])
+        self.proc_data_dict['intersect_R'] = ic[1], poly(ic[1])
+
+        if (((np.min(self.proc_data_dict['xvals']))< ic[0]) and
+                ( ic[0] < (np.max(self.proc_data_dict['xvals'])))):
+            self.proc_data_dict['intersect'] =self.proc_data_dict['intersect_L']
+        else:
+            self.proc_data_dict['intersect'] =self.proc_data_dict['intersect_R']
+
+    def prepare_plots(self):
+        self.plot_dicts['main'] = {
+            'plotfn': self.plot_line,
+            'xvals': self.proc_data_dict['xvals_A'],
+            'xlabel': self.proc_data_dict['xlabel'][0],
+            'xunit': self.proc_data_dict['xunit'][0][0],
+            'yvals': self.proc_data_dict['yvals_A'],
+            'ylabel': self.proc_data_dict['ylabel'],
+            'yunit': self.proc_data_dict['yunit'],
+            'setlabel': 'A',
+            'title': (self.proc_data_dict['timestamps'][0] + ' \n' +
+                      self.proc_data_dict['measurementstring'][0]),
+            'do_legend': True,
+            'yrange': (0,1),
+            'legend_pos': 'upper right'}
+
+        self.plot_dicts['on'] = {
+            'plotfn': self.plot_line,
+            'ax_id': 'main',
+            'xvals': self.proc_data_dict['xvals_B'],
+            'xlabel': self.proc_data_dict['xlabel'][0],
+            'xunit': self.proc_data_dict['xunit'][0][0],
+            'yvals': self.proc_data_dict['yvals_B'],
+            'ylabel': self.proc_data_dict['ylabel'],
+            'yunit': self.proc_data_dict['yunit'],
+            'setlabel': 'B',
+            'do_legend': True,
+            'legend_pos': 'upper right'}
+
+        if self.do_fitting:
+            self.plot_dicts['line_fit_A'] = {
+                'ax_id': 'main',
+                'plotfn': self.plot_fit,
+                'fit_res': self.fit_dicts['line_fit_A']['fit_res'],
+                'plot_init': self.options_dict['plot_init'],
+                'setlabel': 'Fit A',
+                'do_legend': True}
+            self.plot_dicts['line_fit_B'] = {
+                'ax_id': 'main',
+                'plotfn': self.plot_fit,
+                'fit_res': self.fit_dicts['line_fit_B']['fit_res'],
+                'plot_init': self.options_dict['plot_init'],
+                'setlabel': 'Fit B',
+                'do_legend': True}
+
+
+            ic, ic_unit = SI_val_to_msg_str(
+                self.proc_data_dict['intersect'][0],
+                 self.proc_data_dict['xunit'][0][0], return_type=float)
+            self.plot_dicts['intercept_message'] = {
+                'ax_id': 'main',
+                'plotfn': self.plot_line,
+                'xvals': [self.proc_data_dict['intersect'][0]],
+                'yvals': [self.proc_data_dict['intersect'][1]],
+                'line_kws': {'alpha': .5, 'color':'gray',
+                            'markersize':15},
+                'marker': 'o',
+                'setlabel': 'Intercept: {:.1f} {}'.format(ic, ic_unit),
+                'do_legend': True}
+
+    def get_intersect(self):
+
+        return self.proc_data_dict['intersect']
+
+
 
 class CZ_1QPhaseCal_Analysis(ba.BaseDataAnalysis):
     """
     Analysis to extract the intercept for a single qubit phase calibration
     experiment
+
+    N.B. this is a less generic version of "Intersect_Analysis" and should
+    be deprecated (MAR Dec 2017)
     """
     def __init__(self, t_start: str=None, t_stop: str=None,
                  data_file_path: str=None,
