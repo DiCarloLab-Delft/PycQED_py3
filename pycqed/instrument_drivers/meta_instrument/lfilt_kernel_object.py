@@ -27,6 +27,11 @@ class LinDistortionKernel(Instrument):
                            initial_value=1e9,
                            vals=vals.Numbers())
 
+        self.add_parameter('cfg_gain_correction',
+                           parameter_class=ManualParameter,
+                           initial_value=1,
+                           vals=vals.Numbers())
+
         for i in range(self._num_models):
             self.add_parameter('filter_model_{:02}'.format(i),
                                parameter_class=ManualParameter,
@@ -77,5 +82,20 @@ class LinDistortionKernel(Instrument):
                         raise KeyError('Model {} not recognized'.format(model))
                 else:
                     raise NotImplementedError()
-
+        y_sig *= self.cfg_gain_correction()
         return y_sig
+
+
+    def print_overview(self):
+        print("*"*80)
+        print("Overview of {}".format(self.name))
+        for filt_id in range(self._num_models):
+
+            filt = self.get('filter_model_{:02}'.format(filt_id))
+            if filt != {}:
+                model = filt['model']
+                params= filt['params']
+
+                print('Model {} {}: \n {}'.format(filt_id, model, params))
+
+        print("*"*80)

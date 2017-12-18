@@ -9,7 +9,8 @@ except ImportError:
 
 from .qubit_object import Qubit
 from qcodes.utils import validators as vals
-from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter
+from qcodes.instrument.parameter import (
+    _BaseParameter,  ManualParameter, InstrumentRefParameter)
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import measurement_analysis as ma2
 from pycqed.measurement.calibration_toolbox import (
@@ -542,7 +543,13 @@ class CCLight_Transmon(Qubit):
                            # this is to effictively hardcode the cycle time
                            vals=vals.Enum(20e-9))
         # TODO: add docstring (Oct 2017)
-        self.add_parameter('cfg_prepare_awg', vals=vals.Bool(),
+        self.add_parameter('cfg_prepare_ro_awg', vals=vals.Bool(),
+                           docstring=('If False disables uploading pusles '
+                                      'to AWG8 and UHFQC'),
+                           initial_value=True,
+                           parameter_class=ManualParameter)
+
+        self.add_parameter('cfg_prepare_mw_awg', vals=vals.Bool(),
                            docstring=('If False disables uploading pusles '
                                       'to AWG8 and UHFQC'),
                            initial_value=True,
@@ -652,9 +659,9 @@ class CCLight_Transmon(Qubit):
         """
         self._prep_ro_instantiate_detectors()
         self._prep_ro_sources()
-        # if self.cfg_prepare_awg():
-        self._prep_ro_pulse()
-        self._prep_ro_integration_weights()
+        if self.cfg_prepare_ro_awg():
+            self._prep_ro_pulse()
+            self._prep_ro_integration_weights()
 
     def _prep_ro_instantiate_detectors(self):
         self.instr_MC.get_instr().soft_avg(self.ro_soft_avg())
@@ -878,7 +885,7 @@ class CCLight_Transmon(Qubit):
         MW_LutMan.G_mixer_alpha(self.mw_G_mixer_alpha())
         MW_LutMan.D_mixer_phi(self.mw_D_mixer_phi())
         MW_LutMan.D_mixer_alpha(self.mw_D_mixer_alpha())
-        if self.cfg_prepare_awg():
+        if self.cfg_prepare_mw_awg():
             MW_LutMan.load_waveforms_onto_AWG_lookuptable()
 
         AWG = MW_LutMan.AWG.get_instr()
@@ -1466,15 +1473,22 @@ class CCLight_Transmon(Qubit):
         ch_in = self.mw_vsm_ch_in()
         G_att_par = VSM.parameters['mod{}_ch{}_gaussian_att_raw'.format(mod_out, ch_in)]
         D_att_par = VSM.parameters['mod{}_ch{}_derivative_att_raw'.format(mod_out, ch_in)]
+        D_phase_par = VSM.parameters['mod{}_ch{}_derivative_phase_raw'.format(mod_out, ch_in)]
+
         freq_par = self.instr_LO_mw.get_instr().frequency
 
         sweep_pars = []
-        if 'G_att' in parameter_list:
-            sweep_pars.append(G_att_par)
-        if 'D_att' in parameter_list:
-            sweep_pars.append(D_att_par)
-        if 'freq' in parameter_list:
-            sweep_pars.append(freq_par)
+        for par in parameter_list:
+            if par == 'G_att':
+                sweep_pars.append(G_att_par)
+            elif par == 'D_att':
+                sweep_pars.append(D_att_par)
+            elif par == 'D_phase':
+                sweep_pars.append(D_phase_par)
+            elif par == 'freq':
+                sweep_pars.append(freq_par)
+            else:
+                raise NotImplementedError("Parameter {} not recognized".format(par))
 
         if initial_values is None:
             # use the current values of the parameters being varied.
@@ -1512,19 +1526,25 @@ class CCLight_Transmon(Qubit):
                 mode='adaptive')
         a=ma.OptimizationAnalysis(label='Restless_tuneup')
 
+
         if update:
             opt_par_values = a.optimization_result[0]
-            if 'G_att' in parameter_list:
-                G_idx = parameter_list.index('G_att')
-                self.mw_vsm_G_att(opt_par_values[G_idx])
-            if 'D_att' in parameter_list:
-                D_idx = parameter_list.index('D_att')
-                self.mw_vsm_D_att(opt_par_values[D_idx])
-            if 'freq' in parameter_list:
-                freq_idx = parameter_list.index('freq')
-                # We are varying the LO frequency in the opt, not the q freq.
-                self.freq_qubit(opt_par_values[freq_idx] +
-                                self.mw_freq_mod.get())
+            for par in parameter_list:
+                if par == 'G_att':
+                        G_idx = parameter_list.index('G_att')
+                        self.mw_vsm_G_att(opt_par_values[G_idx])
+                elif par == 'D_att':
+                        D_idx = parameter_list.index('D_att')
+                        self.mw_vsm_D_att(opt_par_values[D_idx])
+                elif par == 'D_phase':
+                        D_idx = parameter_list.index('D_att')
+                        self.mw_vsm_D_phase(opt_par_values[D_idx])
+                elif par == 'freq':
+                        freq_idx = parameter_list.index('freq')
+                        # We are varying the LO frequency in the opt, not the q freq.
+                        self.freq_qubit(opt_par_values[freq_idx] +
+                                        self.mw_freq_mod.get())
+
 
 
     def calibrate_mw_gates_allxy(self, nested_MC=None,
@@ -1806,9 +1826,11 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_points(times)
         MC.set_detector_function(d)
         MC.run('Ramsey'+label+self.msmt_suffix)
-        a = ma.Ramsey_Analysis(auto=True, close_fig=True)
+        a = ma.Ramsey_Analysis(auto=True, close_fig=True,
+                               freq_qubit=freq_qubit,
+                               artificial_detuning=artificial_detuning)
         if update:
-            self.T2_star(a.T2_star)
+            self.T2_star(a.T2_star['T2_star']) # dict containing val and stderr
         return a.T2_star
 
     def measure_echo(self, times=None, MC=None,
@@ -1972,7 +1994,7 @@ class CCLight_Transmon(Qubit):
         MC.set_detector_function(d)
         MC.run('RB_{}seeds'.format(nr_seeds)+self.msmt_suffix)
         if double_curves:
-            a = ma.ma.RB_double_curve_Analysis(
+            a = ma.RB_double_curve_Analysis(
                 T1=self.T1(),
                 pulse_delay=self.mw_gauss_width.get()*4)
         else:

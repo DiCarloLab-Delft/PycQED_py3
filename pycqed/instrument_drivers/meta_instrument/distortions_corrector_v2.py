@@ -424,7 +424,17 @@ class Distortion_corrector(Instrument):
         self.vw.clear()
         self.vw.add(x=plot_t_pts[start_idx:stop_idx:step],
                     y=self.waveform[start_idx:stop_idx:step],
-                    symbol='o', name='Measured waveform')
+                    symbol='o', symbolSize=5, name='Measured waveform')
+
+        if self.predicted_waveform is not None:
+            start_idx = np.argmin(np.abs(self.time_pts - start_time))
+            stop_idx = np.argmin(np.abs(self.time_pts - stop_time))
+            step = max(
+                int(len(self.time_pts[start_idx:stop_idx]) // nr_plot_pts), 1)
+            self.vw.add(x=self.time_pts[start_idx:stop_idx:step],
+                        y=self.predicted_waveform[start_idx:stop_idx:step],
+                        name='Predicted waveform')
+
         self.vw.add(x=[start_time, stop_time],
                     y=[self.waveform[stop_idx]]*2,
                     color=(150, 150, 150))
@@ -434,6 +444,8 @@ class Distortion_corrector(Instrument):
         self.vw.add(x=[start_time, stop_time],
                     y=[-self.waveform[stop_idx]]*2,
                     color=(150, 150, 150))
+
+
 
         # Set the y-range to previous value
         if save_y_range and not err:
@@ -456,19 +468,9 @@ class Distortion_corrector(Instrument):
         self.plot_trace(start_time=start_time, stop_time=stop_time,
                         save_y_range=save_y_range, nr_plot_pts=nr_plot_pts)
 
-        # Add predicted wave
-        if self.predicted_waveform is not None:
-            start_idx = np.argmin(np.abs(self.time_pts - start_time))
-            stop_idx = np.argmin(np.abs(self.time_pts - stop_time))
-            step = max(
-                int(len(self.time_pts[start_idx:stop_idx]) // nr_plot_pts), 1)
-            self.vw.add(x=self.time_pts[start_idx:stop_idx:step],
-                        y=self.predicted_waveform[start_idx:stop_idx:step],
-                        name='Predicted waveform')
-
         self.vw.add(x=self.time_pts[self._start_idx:self._stop_idx],
                     y=self.fitted_waveform,
-                    color='#ff7f0e',
+                    color = '#2ca02c',
                     name='Fit')
 
         # Labels need to be set in the end, else they don't show sometimes
