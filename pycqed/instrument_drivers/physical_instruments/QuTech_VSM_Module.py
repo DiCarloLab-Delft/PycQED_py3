@@ -225,7 +225,7 @@ class QuTechVSMModule(SCPI):
                     var_name = ch_name + '_{p}_att_db'.format(p=pulse)
                     var_scpi = ch_scpi + ':{p}:ATTENUATION:DB'.format(p=pulse.upper())
                     scpi_name = 'CALIBRATION' + var_scpi
-                    self.add_parameter('calibration' + var_name,
+                    self.add_parameter(var_name,
                                        docstring=doc_var,
                                        get_cmd=scpi_name + '?',
                                        set_cmd=scpi_name + ' {}',
@@ -238,7 +238,7 @@ class QuTechVSMModule(SCPI):
                     var_name = ch_name + '_{p}_att_lin'.format(p=pulse)
                     var_scpi = ch_scpi + ':{p}:ATTENUATION:LIN'.format(p=pulse.upper())
                     scpi_name = 'CALIBRATION' + var_scpi
-                    self.add_parameter('calibration' + var_name,
+                    self.add_parameter(var_name,
                                        docstring=doc_var,
                                        get_cmd=scpi_name + '?',
                                        set_cmd=scpi_name + ' {}',
@@ -264,7 +264,7 @@ class QuTechVSMModule(SCPI):
                     var_name = ch_name + '_{p}_phs_deg'.format(p=pulse)
                     var_scpi = ch_scpi + ':{p}:PHASE:DEG'.format(p=pulse.upper())
                     scpi_name = 'CALIBRATION' + var_scpi
-                    self.add_parameter('calibration' + var_name,
+                    self.add_parameter(var_name,
                                        docstring=doc_var,
                                        get_cmd=scpi_name + '?',
                                        set_cmd=scpi_name + ' {}',
