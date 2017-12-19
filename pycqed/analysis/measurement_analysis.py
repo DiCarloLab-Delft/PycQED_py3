@@ -1949,7 +1949,13 @@ class Rabi_Analysis(TD_Analysis):
                 piPulse_std = freq_std/freq_fit
                 piHalfPulse_std = freq_std/freq_fit
             else:
-                n = np.arange(-2, 3)
+
+                if self.normalized_data_points[0] > \
+                        np.mean(self.normalized_data_points):
+                    n = np.arange(-2, 3) + 0.5
+                else:
+                    n = np.arange(-2, 3)
+
                 piPulse_vals = (2*n*np.pi+np.pi-phase_fit)/(2*np.pi*freq_fit)
                 piHalfPulse_vals = (2*n*np.pi+np.pi/2-phase_fit)/(2*np.pi*freq_fit)
 
@@ -5840,8 +5846,8 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         verbose = kw.get('verbose',False)
 
         try:
-            data_amp=self.measured_values[0]
-            data_phase=self.measured_values[1]
+            data_amp = self.measured_values[0]
+            data_phase = self.measured_values[1]
             data_real = data_amp * np.cos(np.pi * data_phase / 180)
             data_imag = data_amp * np.sin(np.pi * data_phase / 180)
             self.data_dist = a_tools.calculate_distance_ground_state(
