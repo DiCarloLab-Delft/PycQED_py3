@@ -239,6 +239,13 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             self.proc_data_dict['measurement_induced_relaxation'] = \
                 norm_factor * bv1['A_amplitude']
 
+        # calculating the signal-to-noise ratio
+        signal = abs(mu_0-mu_1)
+        noise = (sigma_0 + sigma_1)/2
+        self.proc_data_dict['signal'] = signal
+        self.proc_data_dict['noise'] = noise
+        self.proc_data_dict['SNR'] = signal/noise
+
         def CDF_0_discr(x):
             return fit_mods.gaussianCDF(x, 1, mu=mu_0, sigma=sigma_0)
 
@@ -425,8 +432,10 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             # To add text only to the legend I create some "fake" data
             rel_exc_str = ('Mmt. Ind. Rel.: {:.1f}%\n'.format(
                 self.proc_data_dict['measurement_induced_relaxation']*100) +
-                'Residual Exc.: {:.1f}%'.format(
-                    self.proc_data_dict['residual_excitation']*100))
+                'Residual Exc.: {:.1f}%\n'.format(
+                    self.proc_data_dict['residual_excitation']*100)+
+                'SNR: {:.2f}'.format(self.proc_data_dict['SNR']))
+
             self.plot_dicts['rel_exc_msg'] = {
                 'ax_id': '1D_histogram',
                 'plotfn': self.plot_line,

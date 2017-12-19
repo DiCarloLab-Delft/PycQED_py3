@@ -15,6 +15,7 @@ class Test_SSRO_discrimination_analysis(unittest.TestCase):
         self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
         ma.a_tools.datadir = self.datadir
 
+
     def assertBetween(self, value, min_v, max_v):
         """Fail if value is not between min and max_v (inclusive)."""
         self.assertGreaterEqual(value, min_v)
