@@ -1975,28 +1975,28 @@ class Rabi_Analysis(TD_Analysis):
                 piHalfPulse = 1/(4*freq_fit)
                 piPulse_std = freq_std/freq_fit
                 piHalfPulse_std = freq_std/freq_fit
-            else:
 
-                if self.normalized_data_points[0] > \
-                        np.mean(self.normalized_data_points):
-                    n = np.arange(-2, 3) + 0.5
-                else:
-                    n = np.arange(-2, 3)
+            else:
+                n = np.arange(-2, 3, 0.5)
 
                 piPulse_vals = (2*n*np.pi+np.pi-phase_fit)/(2*np.pi*freq_fit)
                 piHalfPulse_vals = (2*n*np.pi+np.pi/2-phase_fit)/(2*np.pi*freq_fit)
-
-                try:
-                    piPulse = np.min(np.take(piPulse_vals,
-                                             np.where(piPulse_vals>=0)))
-                except ValueError:
-                    piPulse = np.asarray([])
 
                 try:
                     piHalfPulse = np.min(np.take(piHalfPulse_vals,
                                                  np.where(piHalfPulse_vals>=0)))
                 except ValueError:
                     piHalfPulse = np.asarray([])
+
+                try:
+                    if piHalfPulse.size != 0:
+                        piPulse = np.min(np.take(
+                            piPulse_vals, np.where(piPulse_vals>=piHalfPulse)))
+                    else:
+                        piPulse = np.min(np.take(piPulse_vals,
+                                                 np.where(piPulse_vals>=0.001)))
+                except ValueError:
+                    piPulse = np.asarray([])
 
                 if piPulse.size==0 or piPulse>max(self.sweep_points):
                     i=0
