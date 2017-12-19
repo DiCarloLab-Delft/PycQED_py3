@@ -38,6 +38,14 @@ class Test_Rabi_analysis(unittest.TestCase):
         a = ma.Rabi_Analysis(timestamp='20170607_211203', auto=False)
         self.assertAlmostEqual(a.get_measured_amp180(), 0.3839/2, places=2)
 
+    def test_Rabi_other_params(self):
+
+        a = ma.Rabi_Analysis(timestamp='20170607_160504')
+        self.assertAlmostEqual(1/a.fit_result.values['frequency'], 0.3839, places=2)
+
+        a = ma.Rabi_Analysis(timestamp='20170607_160504')
+        self.assertAlmostEqual(a.rabi_amplitudes['piPulse'], 0.3839/2, places=2)
+
 
 class Test_DoubleFreq_analysis(unittest.TestCase):
 
@@ -170,3 +178,18 @@ class test_motzoi_analysis(unittest.TestCase):
     def test_motzoi_single_weight(self):
         a = ma.Motzoi_XY_analysis(timestamp='20170607_210555')
         self.assertAlmostEqual(a.optimal_motzoi, -0.2856, places=2)
+
+
+class Test_qscale_analysis(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(self):
+        self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
+        ma.a_tools.datadir = self.datadir
+
+    def test_qscale_analysis(self):
+        a = ma.QScale_Analysis(timestamp='20170929_165005')
+        self.assertAlmostEqual(a.optimal_qscale['qscale'], 0.03178, places=2)
+
+        a = ma.QScale_Analysis(timestamp='20170929_205730')
+        self.assertAlmostEqual(a.optimal_qscale['qscale'], 0.07973, places=2)

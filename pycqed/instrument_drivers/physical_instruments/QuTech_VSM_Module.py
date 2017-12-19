@@ -36,12 +36,9 @@ Notes:      # General
             the _gaussian_ pulse and the _derivative_ pulse. For each pulse the
             attenuation and phase can be controlled via a 16bit DAC.
             Setting raw attenuation and phase DAC values does not
-            control the channel attenuation and phase linearly, so a calibration
-            table has to be used to find DAC values for given attenuation and
-            phase.
-
-            Currently the calibration table is not implemented yet on the
-            VSM firmware, so only RAW calibration commands are available.
+            control the channel attenuation and phase linearly, so in addition
+            to the RAW parameters a calibration table has to be used to find
+            DAC values for given attenuation and phase.
 
 Bugs:       Probably.
 """
@@ -98,18 +95,6 @@ class QuTechVSMModule(SCPI):
                                get_parser=float)
 
     def add_marker_parameters(self):
-        # Set all markers in one go
-        self.add_parameter('marker_source',
-                           docstring='Set the marker source of all channels to '
-                                     'internal or external switching.',
-                           set_cmd='MARKER:SOURCE {}',
-                           vals=validators.Enum('int', 'ext'))
-        self.add_parameter('marker_state',
-                           docstring='Set the marker state of all channels on '
-                                     'or off.',
-                           set_cmd='MARKER:STATE {}',
-                           vals=validators.OnOff())
-
         # Each (module, channel) separately
         for mod in self.modules:
             mod_name = 'mod{m}'.format(m=mod)
@@ -198,18 +183,8 @@ class QuTechVSMModule(SCPI):
         for pulse in ('gaussian', 'derivative'):
             #  Two DACs
             for dac in ('attenuation', 'phase'):
-                # All channels and modules at once (no getter, only raw)
-                doc_all_dac = 'Raw {d} DAC value (0--65535) for the {p} ' \
-                              'input of all channels.'.format(p=pulse, d=dac)
                 var_name = '_{p}_{d}_raw'.format(p=pulse, d=dac)
                 var_scpi = ':{p}:{d}:RAW'.format(p=pulse.upper(), d=dac.upper())
-
-                self.add_parameter('calibration' + var_name,
-                                   docstring=doc_all_dac,
-                                   set_cmd='CALIBRATION' + var_scpi + ' {}',
-                                   vals=validators.Ints(min_value=0,
-                                                        max_value=2**16-1))
-
                 # Individual outputs: per (module, channel) pair
                 for channel in self.channels:
                     for mod in self.modules:
@@ -234,52 +209,6 @@ class QuTechVSMModule(SCPI):
         # Attenuation and phase
         #  Two input pulses
         for pulse in ('gaussian', 'derivative'):
-            # Attenuation for all channels and modules at once (no getter)
-            doc_att = 'Attenuation value (in dB) for the {p} ' \
-                      'input of all channels.'.format(p=pulse)
-            var_name = '_{p}_att_db'.format(p=pulse)
-            var_scpi = ':{p}:ATTENUATION:DB'.format(p=pulse.upper())
-            self.add_parameter('calibration' + var_name,
-                               docstring=doc_att,
-                               set_cmd='CALIBRATION' + var_scpi + ' {}',
-                               unit='dB',
-                               vals=validators.Numbers(),
-                               get_parser=float)
-
-            doc_att = 'Attenuation value (linear) for the {p} ' \
-                      'input of all channels.'.format(p=pulse)
-            var_name = '_{p}_att_lin'.format(p=pulse)
-            var_scpi = ':{p}:ATTENUATION:LIN'.format(p=pulse.upper())
-            self.add_parameter('calibration' + var_name,
-                               docstring=doc_att,
-                               set_cmd='CALIBRATION' + var_scpi + ' {}',
-                               vals=validators.Numbers(),
-                               get_parser=float)
-
-            # Phase for all channels and modules at once (no getter)
-            doc_phs = 'Phase value (in rad) for the {p} ' \
-                      'input of all channels.'.format(p=pulse)
-            var_name = '_{p}_phs_rad'.format(p=pulse)
-            var_scpi = ':{p}:PHASE:RAD'.format(p=pulse.upper())
-            self.add_parameter('calibration' + var_name,
-                               docstring=doc_phs,
-                               set_cmd='CALIBRATION' + var_scpi + ' {}',
-                               unit='rad',
-                               vals=validators.Numbers(),
-                               get_parser=float)
-
-            doc_phs = 'Phase value (in deg) for the {p} ' \
-                      'input of all channels.'.format(p=pulse)
-            var_name = '_{p}_phs_deg'.format(p=pulse)
-            var_scpi = ':{p}:PHASE:DEG'.format(p=pulse.upper())
-            self.add_parameter('calibration' + var_name,
-                               docstring=doc_phs,
-                               set_cmd='CALIBRATION' + var_scpi + ' {}',
-                               unit='deg',
-                               vals=validators.Numbers(),
-                               get_parser=float)
-
-            # Individual outputs: per (module, channel) pair
             for channel in self.channels:
                 for mod in self.modules:
                     ch_name = '_mod{m}_ch{c}'.format(m=mod, c=channel)

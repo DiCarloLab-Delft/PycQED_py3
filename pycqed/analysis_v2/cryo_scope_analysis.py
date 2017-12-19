@@ -1,3 +1,5 @@
+import lmfit
+from collections import OrderedDict
 import pycqed.analysis_v2.base_analysis as ba
 import pycqed.measurement.waveform_control_CC.waveform as wf
 import pycqed.analysis.fitting_models as fit_mods
@@ -5,10 +7,17 @@ import numpy as np
 from numpy.fft import fft, ifft, fftfreq
 
 
-class RamZAnalysisInterleaved(ba.BaseDataAnalysis):
-    '''
-    Analysis for the Ram-Z measurement (interleaved case).
-    '''
+# This is the version from before Nov 22 2017
+
+
+class RamZFluxArc(ba.BaseDataAnalysis):
+    """
+    Analysis for the 2D scan that is used to calibrate the FluxArc.
+
+    There exist two variant
+        TwoD -> single experimetn
+    """
+
     def __init__(self, t_start: str=None, t_stop: str=None,
                  data_file_path: str=None,
                  options_dict: dict=None, extract_only: bool=False,
@@ -16,7 +25,140 @@ class RamZAnalysisInterleaved(ba.BaseDataAnalysis):
                  f_demod: float=0, demodulate: bool=False):
         if options_dict is None:
             options_dict = dict()
-        options_dict['scan_label'] = 'Ram_Z'
+
+        self.numeric_params = []
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         extract_only=extract_only, do_fitting=do_fitting)
+        self.single_timestamp = True
+
+        # Now actually extract the parameters and the data
+        self.params_dict = {
+            'xlabel': 'sweep_name',
+            'xunit': 'sweep_unit',
+            'ylabel': 'sweep_name_2D',
+            'yunit': 'sweep_unit_2D',
+            'measurementstring': 'measurementstring',
+            'xvals': 'sweep_points',
+            'yvals': 'sweep_points_2D',
+            'value_names': 'value_names',
+            'value_units': 'value_units',
+            'measured_values': 'measured_values',
+
+            # # Qubit parameters
+            # 'f_max': '{}.f_max'.format(self.data_dict['qubit_name']),
+            # 'E_c': '{}.E_c'.format(self.data_dict['qubit_name']),
+            # 'V_offset': '{}.V_offset'.format(self.data_dict['qubit_name']),
+            # 'V_per_phi0':
+            #     '{}.V_per_phi0'.format(self.data_dict['qubit_name']),
+            # 'asymmetry':
+            #     '{}.asymmetry'.format(self.data_dict['qubit_name']),
+        }
+        if auto:
+            self.run_analysis()
+
+    def process_data(self):
+        FFT = np.zeros(np.shape(self.raw_data_dict['measured_values'][0]))
+        for i, vals in enumerate(self.raw_data_dict['measured_values'][0]):
+            FFT[i, 1:] = np.abs(np.fft.fft(vals))[1:]
+        dt = self.raw_data_dict['yvals'][1] - self.raw_data_dict['yvals'][0]
+        freqs = np.fft.fftfreq(len(vals), dt)
+
+        self.proc_data_dict['FFT'] = FFT
+        self.proc_data_dict['FFT_yvals'] = freqs
+        self.proc_data_dict['FFT_ylabel'] = 'Frequency'
+        self.proc_data_dict['FFT_yunit'] = 'Hz'
+        self.proc_data_dict['FFT_zlabel'] = 'Magnitude'
+        self.proc_data_dict['FFT_zunit'] = 'a.u.'
+
+        FFT_peak_idx = []
+        for i in range(np.shape(self.proc_data_dict['FFT'])[0]):
+            FFT_peak_idx.append(np.argmax(
+                self.proc_data_dict['FFT'][i, :len(freqs)//2]))
+        self.proc_data_dict['FFT_peak_idx'] = FFT_peak_idx
+        self.proc_data_dict['FFT_peak_freqs'] = freqs[FFT_peak_idx]
+
+    def prepare_fitting(self):
+        self.fit_dicts = OrderedDict()
+        start_fit_idx = self.options_dict.get('start_fit_idx', 0)
+        stop_fit_idx = self.options_dict.get('stop_fit_idx', -1)
+
+        self.fit_dicts['parabola_fit'] = {
+            'model': lmfit.models.PolynomialModel(degree=2),
+            'fit_xvals': {'x': self.raw_data_dict['xvals'][start_fit_idx:stop_fit_idx]},
+            'fit_yvals': {'data':
+                self.proc_data_dict['FFT_peak_freqs'][start_fit_idx:stop_fit_idx]}}
+
+    def prepare_plots(self):
+        self.plot_dicts['raw_data'] = {
+            'plotfn': self.plot_colorxy,
+            'title': self.timestamps[0] + ' raw data',
+            'xvals': self.raw_data_dict['xvals'],
+            'xlabel': self.raw_data_dict['xlabel'],
+            'xunit': self.raw_data_dict['xunit'],
+            'yvals': self.raw_data_dict['yvals'],
+            'ylabel': self.raw_data_dict['ylabel'],
+            'yunit': self.raw_data_dict['yunit'],
+            'zvals': self.raw_data_dict['measured_values'][0],
+            'zlabel': self.raw_data_dict['value_names'][0],
+            'zunit': self.raw_data_dict['value_units'][0],
+            'do_legend': True, }
+
+        self.plot_dicts['fourier_data'] = {
+            'plotfn': self.plot_colorxy,
+            'title': self.timestamps[0] + ' fourier transformed data',
+            'xvals': self.raw_data_dict['xvals'],
+            'xlabel': self.raw_data_dict['xlabel'],
+            'xunit': self.raw_data_dict['xunit'],
+
+            'yvals': self.proc_data_dict['FFT_yvals'],
+            'ylabel': self.proc_data_dict['FFT_ylabel'],
+            'yunit': self.proc_data_dict['FFT_yunit'],
+            'zvals': self.proc_data_dict['FFT'],
+            'zlabel': self.proc_data_dict['FFT_zlabel'],
+            'zunit': self.proc_data_dict['FFT_zunit'],
+            'do_legend': True, }
+
+        self.plot_dicts['fourier_peaks'] = {
+            'plotfn': self.plot_line,
+            'xvals': self.raw_data_dict['xvals'],
+            'yvals': self.proc_data_dict['FFT_peak_freqs'],
+            'ax_id': 'fourier_data',
+            'marker': 'o',
+            'line_kws': {'color': 'C1', 'markersize': 5,
+                         'markeredgewidth': .2,
+                         'markerfacecolor': 'None'},
+            'linestyle': '',
+            'setlabel': 'Fourier maxima', 'do_legend': True,
+            'legend_pos': 'right'}
+
+        if self.do_fitting:
+            self.plot_dicts['parabola_fit'] = {
+                'ax_id': 'fourier_data',
+                'plotfn': self.plot_fit,
+                'fit_res': self.fit_dicts['parabola_fit']['fit_res'],
+                'plot_init': self.options_dict['plot_init'],
+                'setlabel': 'parabola fit',
+                'do_legend': True,
+                'line_kws': {'color': 'C3'},
+
+                'legend_pos': 'upper right'}
+
+
+class RamZAnalysisInterleaved(ba.BaseDataAnalysis):
+    '''
+    Analysis for the Ram-Z measurement (interleaved case).
+    '''
+
+    def __init__(self, t_start: str=None, t_stop: str=None,
+                 data_file_path: str=None,
+                 options_dict: dict=None, extract_only: bool=False,
+                 do_fitting: bool=True, auto=True,
+                 f_demod: float=0, demodulate: bool=False):
+        if options_dict is None:
+            options_dict = dict()
+        options_dict['scan_label'] = options_dict.get('scan_label', 'Ram_Z')
         options_dict['tight_fig'] = False
         options_dict['apply_default_fig_settings'] = False
 
@@ -211,8 +353,9 @@ class RamZAnalysisInterleaved(ba.BaseDataAnalysis):
 
 class DistortionFineAnalysis(ba.BaseDataAnalysis):
     '''
-    Analysis for the enhanced cryogenic oscilloscpe.
+    Analysis for the enhanced cryogenic oscilloscope.
     '''
+
     def __init__(self, t_start: str=None, t_stop: str=None,
                  data_file_path: str=None,
                  options_dict: dict=None, extract_only: bool=False,

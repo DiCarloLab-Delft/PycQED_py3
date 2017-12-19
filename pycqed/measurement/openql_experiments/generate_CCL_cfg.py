@@ -3,8 +3,12 @@ import json
 
 def generate_config(filename: str,
                     mw_pulse_duration: int = 20,
+                    flux_pulse_duration: int=40,
                     ro_duration: int = 800,
                     mw_mw_buffer=0,
+                    ro_latency: int = 0,
+                    mw_latency: int = 0,
+                    fl_latency: int = 0,
                     init_duration: int = 200000):
     """
     Generates a configuration file for OpenQL for use with the CCLight.
@@ -13,8 +17,9 @@ def generate_config(filename: str,
         mw_pulse_duration (int) : duration of the mw_pulses in ns.
             N.B. this should be 20 as the VSM marker is hardcoded to be of that
             length.
+        flux_pulse_duration (int) : duration of flux pulses in ns.
         ro_duration       (int) : duration of the readout, including depletion
-         in ns.
+                                    in ns.
         init_duration     (int) : duration of the initialization/reset
             operation in ns. This corresponds to the wait time before every
             experiment.
@@ -62,10 +67,21 @@ def generate_config(filename: str,
                           "2": [5, 6]
                       }
                       },
-             "meas_units": {"count": 2,
-                            "connection_map": {"0": [0, 2, 3, 5, 6],
-                                               "1": [1, 4]}
+             "meas_units": {"count": 7,
+                            "connection_map": {"0": [0],
+                                               "1": [1],
+                                               "2": [2],
+                                               "3": [3],
+                                               "4": [4],
+                                               "5": [5],
+                                               "6": [6]
+                                               }
                             },
+             # FIXME OpenQL #103
+             # "meas_units": {"count": 2,
+             #                "connection_map": {"0": [0, 2, 3, 5, 6],
+             #                                   "1": [1, 4]}
+             #                },
              "edges": {"count": 8,
                        "connection_map": {
                            "0": [2],
@@ -106,24 +122,40 @@ def generate_config(filename: str,
             ]
         },
 
-       "gate_decomposition": {
-          "x %0" : ["rx180 %0"],
-          "roty90 %0" : ["ry90 %0"],
-          "cnot %0,%1" : ["ry90 %1","cz %0,%1","ry90 %1"]
-       },
-   }
+        "gate_decomposition": {
+            "x %0": ["rx180 %0"],
+            "y %0": ["ry180 %0"],
+            "roty90 %0": ["ry90 %0"],
+            "cnot %0,%1": ["ry90 %1", "cz %0,%1", "ry90 %1"],
+            # Clifford decomposition per Eptstein et al. Phys. Rev. A 89, 062321
+            # (2014)
+            "cl_0 %0": ['i %0'],
+            "cl_1 %0": ['ry90 %0', 'rx90 %0'],
+            "cl_2 %0": ['rxm90 %0', 'rym90 %0'],
+            "cl_3 %0": ['rx180 %0'],
+            "cl_4 %0": ['rym90 %0', 'rxm90 %0'],
+            "cl_5 %0": ['rx90 %0', 'rym90 %0'],
+            "cl_6 %0": ['ry180 %0'],
+            "cl_7 %0": ['rym90 %0', 'rx90 %0'],
+            "cl_8 %0": ['rx90 %0', 'ry90 %0'],
+            "cl_9 %0": ['rx180 %0', 'ry180 %0'],
+            "cl_10 %0": ['ry90 %0', 'rxm90 %0'],
+            "cl_11 %0": ['rxm90 %0', 'ry90 %0'],
 
-    # cfg["gate_decomposition"]: {
-    #     "x q0": ["x q0"],
-    #     "ry180 q0": ["ry180 q0"],
-    #     "z q0": ["z q0"],
-    #     "h q0": ["h q0"],
-    #     "t q0": ["t q0"],
-    #     "tdag q0": ["tdag q0"],
-    #     "s q0": ["s q0"],
-    #     "sdag q0": ["sdag q0"],
-    #     "cnot q0,q1": ["cnot q0,q1"]
-    # }
+            "cl_12 %0": ['ry90 %0', 'rx180 %0'],
+            "cl_13 %0": ['rxm90 %0'],
+            "cl_14 %0": ['rx90 %0', 'rym90 %0', 'rxm90 %0'],
+            "cl_15 %0": ['rym90 %0'],
+            "cl_16 %0": ['rx90 %0'],
+            "cl_17 %0": ['rx90 %0', 'ry90 %0', 'rx90 %0'],
+            "cl_18 %0": ['rym90 %0', 'rx180 %0'],
+            "cl_19 %0": ['rx90 %0', 'ry180 %0'],
+            "cl_20 %0": ['rx90 %0', 'rym90 %0', 'rx90 %0'],
+            "cl_21 %0": ['ry90 %0'],
+            "cl_22 %0": ['rxm90 %0', 'ry180 %0'],
+            "cl_23 %0": ['rx90 %0', 'ry90 %0', 'rxm90 %0']
+        },
+    }
 
     for q in qubits:
         cfg["instructions"]["prepz {}".format(q)] = {
@@ -132,7 +164,7 @@ def generate_config(filename: str,
             "qubits": [q],
             "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
             "disable_optimization": True,
-            "type": "mw",
+            "type": "none",
             "cc_light_instr_type": "single_qubit_gate",
             "cc_light_instr": "prepz",
             "cc_light_codeword": 0,
@@ -142,7 +174,7 @@ def generate_config(filename: str,
     for q in qubits:
         cfg["instructions"]["measure {}".format(q)] = {
             "duration": ro_duration,
-            "latency": 0,
+            "latency": ro_latency,
             "qubits": [q],
             "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
             "disable_optimization": False,
@@ -157,59 +189,90 @@ def generate_config(filename: str,
         for q in qubits:
             cfg["instructions"][lut_map[CW].format(q)] = {
                 "duration": mw_pulse_duration,
-                "latency": 0,
+                "latency": mw_latency,
                 "qubits": [q],
                 "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
                 "disable_optimization": False,
                 "type": "mw",
                 "cc_light_instr_type": "single_qubit_gate",
-                "cc_light_instr": "CW_{:02}".format(CW),
+                "cc_light_instr": "cw_{:02}".format(CW),
                 "cc_light_codeword": CW,
                 "cc_light_opcode": 8+CW}
 
             cfg["instructions"]['C'+lut_map[CW].format(q)] = {
                 "duration": mw_pulse_duration,
-                "latency": 0,
+                "latency": mw_latency,
                 "qubits": [q],
                 "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
                 "disable_optimization": False,
                 "type": "mw",
                 "cc_light_instr_type": "single_qubit_gate",
-                "cc_light_instr": "C_CW_{:02}".format(CW),
+                "cc_light_instr": "C_cw_{:02}".format(CW),
                 "cc_light_codeword": CW,
                 "cc_light_opcode": 32+8+CW,
                 "cc_light_cond": 1}
 
     for CW in range(32):
         for q in qubits:
-            cfg["instructions"]["CW_{:02} {}".format(CW, q)] = {
+            cfg["instructions"]["cw_{:02} {}".format(CW, q)] = {
                 "duration": mw_pulse_duration,
-                "latency": 0,
+                "latency": mw_latency,
                 "qubits": [q],
                 "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
                 "disable_optimization": False,
                 "type": "mw",
                 "cc_light_instr_type": "single_qubit_gate",
-                "cc_light_instr": "CW_{:02}".format(CW),
+                "cc_light_instr": "cw_{:02}".format(CW),
                 "cc_light_codeword": CW,
                 "cc_light_opcode": 8+CW}
+
+    for q in qubits:
+        cfg["instructions"]["compensate {}".format(q)] = {
+            "duration": mw_pulse_duration,
+            "latency": mw_latency,
+            "qubits": [q],
+            "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+            "disable_optimization": False,
+            "type": "mw",
+            "cc_light_instr_type": "single_qubit_gate",
+            "cc_light_instr": "cw_00",
+            "cc_light_codeword": 0,
+            "cc_light_opcode": 8+0}
 
     # N.B. The codewords for CZ pulses need to be further specified.
     # I do not expect this to be correct for now.
     for ft in flux_tuples:
-        cfg["instructions"]["CZ {}, {}".format(ft[0], ft[1])] = {
-            "duration": 80,
-            "latency": 0,
+        # FIXME add space back in
+        cfg["instructions"]["cz {},{}".format(ft[0], ft[1])] = {
+            "duration": flux_pulse_duration,
+            "latency": fl_latency,
             "qubits": [ft[0], ft[1]],
             "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
             "disable_optimization": True,
             "type": "flux",
             "cc_light_instr_type": "two_qubits_gate",
-            "cc_light_instr": "cz",
+            "cc_light_instr": "fl_cw_{:02}".format(1),
             "cc_light_right_codeword": 1,
-            "cc_light_left_codeword": 2,
-            "cc_light_opcode": 128
+            "cc_light_left_codeword": 1,
+            "cc_light_opcode": 128+1
         }
+
+    for cw_flux in range(8):
+        for ft in flux_tuples:
+            cfg["instructions"]["fl_cw_{:02} {},{}".format(cw_flux,
+                                                           ft[0], ft[1])] = {
+                "duration": flux_pulse_duration,
+                "latency": fl_latency,
+                "qubits": [ft[0], ft[1]],
+                "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+                "disable_optimization": True,
+                "type": "flux",
+                "cc_light_instr_type": "two_qubits_gate",
+                "cc_light_instr": "fl_cw_{:02}".format(cw_flux),
+                "cc_light_right_codeword": cw_flux,
+                "cc_light_left_codeword": cw_flux,
+                "cc_light_opcode": 128+cw_flux
+            }
 
     with open(filename, 'w') as f:
         json.dump(cfg, f, indent=4)

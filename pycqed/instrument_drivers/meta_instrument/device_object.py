@@ -262,6 +262,8 @@ class TwoQubitDevice(DeviceObject):
             correlations=[(w0, w1)],
             nr_averages=self.RO_acq_averages(),
             integration_length=q0.RO_acq_integration_length())
+        d.value_names = [qnames[0], qnames[1],
+                         'Corr ({}, {})'.format(qnames[0], qnames[1])]
         return d
 
     def get_integration_logging_detector(self):
