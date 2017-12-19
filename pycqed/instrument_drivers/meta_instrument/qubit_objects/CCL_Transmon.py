@@ -1468,9 +1468,11 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_points(times)
         MC.set_detector_function(d)
         MC.run('Ramsey'+self.msmt_suffix)
-        a = ma.Ramsey_Analysis(auto=True, close_fig=True)
+        a = ma.Ramsey_Analysis(auto=True, close_fig=True,
+                               freq_qubit=freq_qubit,
+                               artificial_detuning=artificial_detuning)
         if update:
-            self.T2_star(a.T2_star)
+            self.T2_star(a.T2_star['T2_star']) # dict containing val and stderr
         return a.T2_star
 
     def measure_echo(self, times=None, MC=None,
