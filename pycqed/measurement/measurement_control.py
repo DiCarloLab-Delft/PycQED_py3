@@ -1009,7 +1009,7 @@ class MeasurementControl(Instrument):
             if not hasattr(sweep_func, 'sweep_control'):
                 sweep_func = wrap_par_to_swf(sweep_func)
                 sweep_functions[i] = sweep_func
-            sweep_function_names.append(str(swf.__class__.__name__))
+            sweep_function_names.append(str(sweep_func.name))
         self.sweep_functions = sweep_functions
         self.set_sweep_function_names(sweep_function_names)
 
