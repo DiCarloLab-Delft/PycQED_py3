@@ -21,6 +21,8 @@ import pycqed.analysis_v2.cryo_scope_analysis as csa
 reload(csa)
 import pycqed.analysis_v2.cryo_scope_analysis_v2 as csa
 reload(csa)
+import pycqed.analysis_v2.distortions_analysis as da
+reload(da)
 
 
 from pycqed.analysis_v2.base_analysis import *
@@ -32,3 +34,4 @@ from pycqed.analysis_v2.readout_analysis import *
 from pycqed.analysis_v2.syndrome_analysis import *
 from pycqed.analysis_v2.cryo_scope_analysis import *
 from pycqed.analysis_v2.cryo_scope_analysis_v2 import RamZFluxArc
+from pycqed.analysis_v2.distortions_analysis import Scope_Trace_analysis

@@ -1090,3 +1090,19 @@ class BaseDataAnalysis(object):
         axs.vlines(x, ymin, ymax, colors,
                    linestyles=linestyles, label=label, **pdict['line_kws'])
         axs.legend()
+
+    def plot_matplot_ax_method(self, pdict, axs):
+        """
+        Used to use any of the methods of a matplotlib axis object through
+        the pdict interface.
+
+        An example pdict would be:
+            {'func': 'axhline',
+             'plot_kw': {'y': 0.5, 'mfc': 'green'}}
+        which would call
+            ax.axhline(y=0.5, mfc='green')
+        to plot a horizontal green line at y=0.5
+
+        """
+        pfunc = getattr(axs, pdict.get('func'))
+        pfunc(**pdict['plot_kws'])
