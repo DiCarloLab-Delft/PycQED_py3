@@ -305,6 +305,8 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         """
         k = self.instr_distortion_kernel.get_instr()
 
+        if len(waveform)> self.cfg_max_wf_length()*self.sampling_rate():
+            raise ValueError('Waveform too long.')
         # duck typing the distort waveform method
         if hasattr(k, 'distort_waveform'):
             distorted_waveform = k.distort_waveform(
