@@ -346,8 +346,8 @@ class MeasurementControl(Instrument):
         self.update_plotmon()
         if self.mode == '2D':
             self.update_plotmon_2D_hard()
-        self.print_progress(stop_idx)
         self.iteration += 1
+        self.print_progress(stop_idx)
         return new_data
 
     def measurement_function(self, x):

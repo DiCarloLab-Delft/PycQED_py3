@@ -1409,6 +1409,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
                  seg_per_point: int =1, single_int_avg: bool =False,
                  chunk_size: int=None,
                  values_per_point: int=1, values_per_point_suffex:list=None,
+                 always_prepare:bool=False,
                  prepare_function=None, prepare_function_kwargs: dict=None,
                  **kw):
         """
@@ -1445,6 +1446,10 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         values_per_point_suffex (list): suffex to add to channel names for
                 each value. should be a list of strings with lenght equal to
                 values per point.
+        always_prepare (bool) : when True the acquire/get_values method will
+            first call the prepare statement. This is particularly important
+            when it is both a single_int_avg detector and acquires multiple
+            segments per point.
         """
         super().__init__()
         self.UHFQC = UHFQC
@@ -1473,7 +1478,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.single_int_avg = single_int_avg
         if self.single_int_avg:
             self.detector_control = 'soft'
-
+        # useful in combination with single int_avg
+        self.always_prepare = always_prepare
         # Directly specifying seg_per_point is deprecated. values_per_point
         #replaces this functionality -MAR Dec 2017
         self.seg_per_point = max(seg_per_point, values_per_point)
@@ -1510,8 +1516,6 @@ class UHFQC_integrated_average_detector(Hard_Detector):
                 for val_suffix in values_per_point_suffex:
                     new_value_names.append('{} {}'.format(vn, val_suffix))
                     new_value_units.append(vu)
-                    print('hi')
-
             return new_value_names, new_value_units
 
     def _set_real_imag(self, real_imag=False):
@@ -1535,6 +1539,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             self.value_units[1] = 'deg'
 
     def get_values(self):
+        if self.always_prepare:
+            self.prepare()
         if self.AWG is not None:
             self.AWG.stop()
         self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters

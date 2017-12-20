@@ -7,6 +7,7 @@ except ImportError:
     logging.warning('Could not import OpenQL')
     sqo = None
 
+from pycqed.utilities.general import gen_sweep_pts
 from .qubit_object import Qubit
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import (
@@ -995,6 +996,26 @@ class CCLight_Transmon(Qubit):
         print('CCL program is running. Parameter "mw_vsm_delay" can now be '
               'calibrated by hand.')
 
+    def calibrate_motzoi(self, MC=None, verbose=True, update=True):
+        """
+        Calibrates the motzoi VSM attenauation prameter
+        """
+        motzois = gen_sweep_pts(center=30e3, span=30e3, num=31)
+
+        # large range
+        a = self.measure_motzoi(MC=MC, motzoi_atts=motzois, analyze=True)
+        opt_motzoi = a.get_intersect()[0]
+        if opt_motzoi > max(motzois) or opt_motzoi < min(motzois):
+            if verbose:
+                print('optimal motzoi {:.3f} '.format(opt_motzoi) +
+                      'outside of measured span, aborting')
+            return False
+        if update:
+            if verbose:
+                print('Setting motzoi to {:.3f}'.format(opt_motzoi))
+            self.mw_vsm_D_att(opt_motzoi)
+        return opt_motzoi
+
     def calibrate_mixer_offsets_drive(self, update: bool =True)-> bool:
         '''
         Calibrates the mixer skewness and updates the I and Q offsets in
@@ -1975,14 +1996,9 @@ class CCLight_Transmon(Qubit):
             platf_cfg=self.cfg_openql_platform_fn())
         self.instr_CC.get_instr().eqasm_program(p.filename)
 
-
-
-        # d = self.get_int_avg_det(seg_per_point=2, single_int_avg=True)
-        # d.detector_control = 'hard'
-        # Tested but does not yet work well with soft averages
         d = self.get_int_avg_det(single_int_avg=True, values_per_point=2,
-                                 values_per_point_suffex=['yX', 'xY'])
-        d.detector_control = 'hard'
+                                 values_per_point_suffex=['yX', 'xY'],
+                                 always_prepare=True)
 
         VSM = self.instr_VSM.get_instr()
         mod_out = self.mw_vsm_mod_out()
@@ -1994,11 +2010,20 @@ class CCLight_Transmon(Qubit):
         MC.set_detector_function(d)
 
         MC.run('Motzoi_XY'+self.msmt_suffix)
-        if analyze:
-            a = ma.Motzoi_XY_analysis(
-                auto=True, cal_points=None, close_fig=close_fig)
-            return a
 
+        if analyze:
+            if self.ro_acq_weight_type() == 'optimal':
+                a = ma2.Intersect_Analysis(
+                    options_dict={'ch_idx_A': 0,
+                                  'ch_idx_B': 1})
+            else:
+                # if statement required if 2 channels readout
+                logging.warning(
+                    'It is recommended to do this with optimal weights')
+                a = ma2.Intersect_Analysis(
+                    options_dict={'ch_idx_A': 0,
+                                  'ch_idx_B': 2})
+            return a
 
     def measure_randomized_benchmarking(self, nr_cliffords=2**np.arange(12),
                                         nr_seeds=100,
