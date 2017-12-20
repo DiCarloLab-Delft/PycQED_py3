@@ -375,7 +375,6 @@ def Chevron_hack(qubit_idx: int, qubit_idx_spec,
 def Chevron(qubit_idx: int, qubit_idx_spec: int,
             buffer_time, buffer_time2, platf_cfg: str):
     """
-    Single qubit Ramsey sequence.
     Writes output files to the directory specified in openql.
     Output directory is set as an attribute to the program for convenience.
 

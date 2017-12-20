@@ -889,7 +889,7 @@ class FLsweep(Soft_Sweep):
     Special sweep function for AWG8 flux pulses, includes "hack" program
     required because of bad triggering of DIO pulses.
     """
-    def __init__(self, lm, par, waveform_name, **kw):
+    def __init__(self, lm, par, waveform_name, realtime_loading=True, **kw):
         super().__init__(**kw)
         self.lm = lm
         self.par = par
@@ -897,8 +897,9 @@ class FLsweep(Soft_Sweep):
         self.parameter_name = par.name
         self.unit = par.unit
         self.name = par.name
+        self.realtime_loading = realtime_loading
 
-    def set_parameter(self, val):
+    def prepare(self):
         awg_hack_program = """
         while (1) {
           waitDIOTrigger();
@@ -912,7 +913,6 @@ class FLsweep(Soft_Sweep):
         }
         """
         awg = self.lm.AWG.get_instr()
-        self.par(val)
         self.lm.load_waveform_onto_AWG_lookuptable(
             self.waveform_name, regenerate_waveforms=True)
         if 'z' in self.waveform_name:
@@ -922,3 +922,12 @@ class FLsweep(Soft_Sweep):
 
         awg.configure_codeword_protocol()
         awg.start()
+
+    def set_parameter(self, val):
+        self.par(val)
+        if self.realtime_loading:
+            self.lm.load_waveform_realtime(
+                self.waveform_name)
+        else:
+            self.lm.load_waveform_onto_AWG_lookuptable(
+                self.waveform_name, regenerate_waveforms=True)

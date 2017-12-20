@@ -299,13 +299,7 @@ class DeviceCCL(Instrument):
                 nr_averages=self.ro_acq_averages(),
                 nr_samples=int(self.ro_acq_integration_length()*1.8e9))
 
-            self.int_avg_det = det.UHFQC_integrated_average_detector(
-                UHFQC=UHFQC, AWG=self.instr_CC.get_instr(),
-                channels=ro_ch_idx,
-                result_logging_mode=result_logging_mode,
-                nr_averages=self.ro_acq_averages(),
-                integration_length=self.ro_acq_integration_length())
-
+            self.int_avg_det = self.get_int_avg_det()
             self.int_avg_det.value_names = value_names
 
             self.int_avg_det_single = det.UHFQC_integrated_average_detector(
@@ -317,6 +311,33 @@ class DeviceCCL(Instrument):
                 integration_length=self.ro_acq_integration_length())
 
             self.int_avg_det_single.value_names = value_names
+
+    def get_int_avg_det(self, **kw):
+        """
+        Instantiates an integration average detector using parameters from
+        the qubit object. **kw get passed on to the class when instantiating
+        the detector function.
+        """
+        if self.ro_acq_weight_type() == 'optimal':
+            if self.ro_acq_digitized():
+                result_logging_mode = 'digitized'
+            else:
+                result_logging_mode = 'lin_trans'
+        else:
+            result_logging_mode = 'raw'
+
+        acq_instruments, ro_ch_idx, value_names = \
+            self._get_ro_channels_and_labels(self.ro_qubits_list())
+
+        int_avg_det= det.UHFQC_integrated_average_detector(
+            channels=ro_ch_idx,
+            UHFQC=self.find_instrument(acq_instruments[0]),
+            AWG=self.instr_CC.get_instr(),
+            result_logging_mode=result_logging_mode,
+            nr_averages=self.ro_acq_averages(),
+            integration_length=self.ro_acq_integration_length(), **kw)
+
+        return int_avg_det
 
     def _prep_ro_sources(self):
         """
@@ -453,6 +474,11 @@ class DeviceCCL(Instrument):
 
         self._prep_td_configure_VSM()
 
+
+    ########################################################
+    # Measurement methods
+    ########################################################
+
     def measure_two_qubit_tomo_bell(self, q0: str, q1: str,
                                     bell_state=0,
                                     analyze=True, close_fig=True,
@@ -565,6 +591,97 @@ class DeviceCCL(Instrument):
             a = mra.two_qubit_ssro_fidelity('SSRO_{}_{}'.format(q0, q1))
         return a
 
+    def measure_chevron(self, q0: str, q_spec: str,
+                        amps, lengths,
+                        prepare_for_timedomain=True, MC=None):
+        """
+        Measure a chevron by flux pulsing q0.
+        q0 is put in an excited at the beginning of the sequence and pulsed
+        back at the end.
+        The spectator qubit (q_spec) performs a ramsey experiment over
+        the flux pulse.
+        """
+
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        assert q0 in self.qubits()
+        assert q_spec in self.qubits()
+
+        q0idx = self.find_instrument(q0).cfg_qubit_nr()
+        q_specidx = self.find_instrument(q_spec).cfg_qubit_nr()
+
+        # buffer times are hardcoded for now FIXME!
+        p = mqo.Chevron(q0idx, q_specidx, buffer_time=100e-9,
+                        buffer_time2=1750e-9,
+                        platf_cfg=self.cfg_openql_platform_fn())
+        self.instr_CC.get_instr().eqasm_program(p.filename)
+        self.instr_CC.get_instr().start()
+
+        fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
+
+        awg = fl_lutman.AWG.get_instr()
+        awg_ch = fl_lutman.cfg_awg_channel()-1 # -1 is to account for starting at 1
+        ch_pair = awg_ch%2
+        awg_nr = awg_ch//2
+
+        amp_par = awg.parameters['awgs_{}_outputs_{}_amplitude'.format(
+            awg_nr, ch_pair)]
+
+        sw = swf.FLsweep(fl_lutman, fl_lutman.sq_length,
+                         realtime_loading=True,
+                         waveform_name='square')
+        d = self.get_correlation_detector(single_int_avg=True,
+                                          seg_per_point=1)
+
+        MC.set_sweep_function(amp_par)
+        MC.set_sweep_function_2D(sw)
+        MC.set_sweep_points(amps)
+        MC.set_sweep_points_2D(lengths)
+        MC.set_detector_function(d)
+
+        MC.run('Chevron {} {}'.format(q0, q_spec), mode='2D')
+        ma.TwoD_Analysis()
+
+
+    def measure_cryoscope(self, q0:str, times,
+                          MC=None,
+                          experiment_name='Cryoscope',
+                          prepare_for_timedomain:bool=True):
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        assert q0 in self.qubits()
+        q0idx = self.find_instrument(q0).cfg_qubit_nr()
+
+        p = mqo.Cryoscope(q0idx, buffer_time1=20e-9,
+                          buffer_time2=2000e-9,
+                          platf_cfg=self.cfg_openql_platform_fn())
+        self.instr_CC.get_instr().eqasm_program(p.filename)
+        self.instr_CC.get_instr().start()
+
+        fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
+        sw = swf.FLsweep(fl_lutman, fl_lutman.sq_length,
+                         realtime_loading=True,
+                         waveform_name='square')
+        MC.set_sweep_function(sw)
+        MC.set_sweep_points(times)
+        d = self.get_int_avg_det(values_per_point=2,
+                                 values_per_point_suffex=['cos', 'sin'],
+                                 single_int_avg=True,
+                                 always_prepare=True)
+        MC.set_detector_function(d)
+        MC.run(experiment_name)
+
+
+    ########################################################
+    # Calibration methods
+    ########################################################
+
     def calibrate_mux_RO(self,
                          calibrate_optimal_weights=True,
                          verify_optimal_weights=False,
@@ -617,7 +734,6 @@ class DeviceCCL(Instrument):
         # a = self.check_mux_RO(update=update, update_threshold=update_threshold)
         return True
 
-
     def calibrate_cz_single_q_phase(self, q0: str, q1: str,
                                     amps,
                                     waveform = 'cz_z',
@@ -668,7 +784,7 @@ class DeviceCCL(Instrument):
                 self.find_instrument(q0).fl_cz_phase_corr_amp(phase_corr_amp)
             return True
 
-def calibrate_flux_timing(self, q0: str, q1: str,
+    def calibrate_flux_timing(self, q0: str, q1: str,
                                     times,
                                     waveform = 'cz_z',
                                     update: bool = True,
