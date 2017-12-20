@@ -769,20 +769,8 @@ class Distortion_corrector(Instrument):
         '''
         Prints a summary of all corrections that have been applied.
         '''
-        print('\n********\n'
-              'Summary of corrected distortions:\n'
-              '********')
-        print('Number of applied corrections: {}'.format(self._iteration))
-        i = 0
-        for key, item in self.kernel_combined_dict['metadata'].items():
-            print('{}: {}'.format(i, key))
-            print('Fit parameters:')
-            for param, val in item['fit'].items():
-                print('\t{} = {}'.format(param, val))
-            i += 1
+        self.instr_dist_kern.get_instr().print_overview()
 
-        print('End of summary.')
-        print('********')
 
     def _set_square_amp(self, square_amp: float):
         old_square_amp = self.square_amp
@@ -873,20 +861,31 @@ class RT_distortion_corrector_AWG8(Distortion_corrector):
 
 
 
-def detect_edge(y, edge_level=0.1):
+# def detect_edge(y, edge_level=0.1):
+#     """
+#     Trivial edge detection algortihm
+#     """
+#     edge_idx = -1
+#     abs_edge_change = (np.max(y) - np.min(y))*edge_level
+#     for i in range(len(y) - 1):
+#         if (y[i+1] - y[i]) > abs_edge_change:
+#             edge_idx = i
+#             print('edge detected at idx:', edge_idx)
+#             break
+#     if edge_idx < 0:
+#         # This is an important error but should not crash the
+#         # process
+#         logging.warning('Failed to find rising edge.')
+#         edge_idx = 0
+#     return edge_idx
+
+
+def detect_edge(y, edge_level=0.10):
     """
-    Trivial edge detection algortihm
+    Detects the first crossing of some threshold and returns the index
     """
-    edge_idx = -1
-    abs_edge_change = (np.max(y) - np.min(y))*edge_level
-    for i in range(len(y) - 1):
-        if (y[i+1] - y[i]) > abs_edge_change:
-            edge_idx = i
-            print('edge detected at idx:', edge_idx)
-            break
-    if edge_idx < 0:
-        # This is an important error but should not crash the
-        # process
-        logging.warning('Failed to find rising edge.')
-        edge_idx = 0
-    return edge_idx
+
+    th = y > edge_level*np.max(y)
+    # marks all but the first occurence of True to False
+    th[1:][th[:-1] & th[1:]] = False
+    return np.where(th)[0][0]
