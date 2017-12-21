@@ -11,26 +11,40 @@ from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel)
 
 import scipy.signal as ss
 import scipy.optimize as so
+import scipy.interpolate as si
 
-def normalize_sincos(data, window_size_frac=500, window_size=None, do_envelope=True):
+
+def normalize_sincos(
+        data,
+        window_size_frac=500,
+        window_size=None,
+        do_envelope=True):
 
     if window_size is None:
-        window_size = len(data)//window_size_frac
+        window_size = len(data) // window_size_frac
 
-        #window size for savgol filter must be odd
-        window_size -= (window_size+1)%2
+        # window size for savgol filter must be odd
+        window_size -= (window_size + 1) % 2
 
     mean_data_r = ss.savgol_filter(data.real, window_size, 0, 0)
     mean_data_i = ss.savgol_filter(data.imag, window_size, 0, 0)
 
-    mean_data = mean_data_r + 1j*mean_data_i
+    mean_data = mean_data_r + 1j * mean_data_i
 
     if do_envelope:
-        envelope = np.sqrt(ss.savgol_filter((np.abs(data-mean_data))**2, window_size, 0, 0))
+        envelope = np.sqrt(
+            ss.savgol_filter(
+                (np.abs(
+                    data -
+                    mean_data))**2,
+                window_size,
+                0,
+                0))
     else:
         envelope = 1
-    norm_data = ((data-mean_data)/envelope)
+    norm_data = ((data - mean_data) / envelope)
     return norm_data
+
 
 def fft_based_freq_guess_complex(y):
     """
@@ -40,24 +54,27 @@ def fft_based_freq_guess_complex(y):
     """
     fft = np.fft.fft(y)[1:len(y)]
     freq_guess_idx = np.argmax(np.abs(fft))
-    if freq_guess_idx >= len(y)//2:
+    if freq_guess_idx >= len(y) // 2:
         freq_guess_idx -= len(y)
-    freq_guess = 1/len(y)*(freq_guess_idx+1)
-    #freq_guess = 2.4e9/window_size*np.mean(np.abs(fft)*np.arange(1, window_size//2))
+    freq_guess = 1 / len(y) * (freq_guess_idx + 1)
 
-    phase_guess = np.angle(fft[freq_guess_idx])+np.pi/2
-    amp_guess = np.absolute(fft[freq_guess_idx])/len(y)
+    phase_guess = np.angle(fft[freq_guess_idx]) + np.pi / 2
+    amp_guess = np.absolute(fft[freq_guess_idx]) / len(y)
     offset_guess = np.mean(y)
 
     return freq_guess, phase_guess, offset_guess, amp_guess
 
 
-
 class CryoscopeAnalyzer:
-    def __init__(self, time, complex_data, norm_window_size=61, demod_freq=None,
-                 derivative_window_length=None, derivative_order=2,
-                 nyquist_order=0,
-                 demod_smooth=None):
+    def __init__(
+            self,
+            time,
+            complex_data,
+            norm_window_size=61,
+            demod_freq=None,
+            derivative_window_length=None,
+            derivative_order=2,
+            demod_smooth=None):
         """
         analyse a cryoscope measurement.
 
@@ -83,42 +100,43 @@ class CryoscopeAnalyzer:
         self.demod_smooth = demod_smooth
         self.nyquist_order = nyquist_order
 
-        self.sampling_rate = 1/(self.time[1] - self.time[0])
+        self.sampling_rate = 1 / (self.time[1] - self.time[0])
 
         if self.derivative_window_length is None:
-            self.derivative_window_length = 7/self.sampling_rate
+            self.derivative_window_length = 7 / self.sampling_rate
 
-        self.derivative_window_size = max(3, int(self.derivative_window_length
-                                                 * self.sampling_rate))
-        self.derivative_window_size += (self.derivative_window_size+1)%2
+        self.derivative_window_size = max(
+            3, int(self.derivative_window_length * self.sampling_rate))
+        self.derivative_window_size += (self.derivative_window_size + 1) % 2
 
         if self.demod_freq is None:
-            self.demod_freq = -fft_based_freq_guess_complex(self.norm_data)[0] \
-                *self.sampling_rate
+            self.demod_freq = - \
+                fft_based_freq_guess_complex(self.norm_data)[0] * self.sampling_rate
 
-        self.demod_data = np.exp(2*np.pi*1j*self.time*self.demod_freq)\
-            *self.norm_data
+        self.demod_data = np.exp(
+            2 * np.pi * 1j * self.time * self.demod_freq) * self.norm_data
 
         if self.demod_smooth:
             n, o = self.demod_smooth
             r, i = self.demod_data.real, self.demod_data.imag
             r = ss.savgol_filter(r, n, o, 0)
             i = ss.savgol_filter(i, n, o, 0)
-            self.demod_data = r + 1j*i
+            self.demod_data = r + 1j * i
 
-
-        # extract the phase. unwrapping only works well if demodulation is good!
+        # extract the phase. unwrapping only works well if demodulation is
+        # good!
         self.phase = np.unwrap(np.angle(self.demod_data))
 
         # extract frequency by a lowpass-derivative filter.
-        # savitzky golay filter: take sliding window of length `window_length`
-        # fit polynomial, return derivative at middle point
-        self.detuning = ss.savgol_filter(self.phase/(2*np.pi),
-                                         window_length=self.derivative_window_size,
-                                         polyorder=derivative_order, deriv=1)\
-            *self.sampling_rate
 
-
+        # use a savitzky golay filter: it take sliding window of length `window_length`,
+        # fits a polynomial, returns derivative at middle point
+        self.detuning = ss.savgol_filter(
+            self.phase / (
+                2 * np.pi),
+            window_length=self.derivative_window_size,
+            polyorder=derivative_order,
+            deriv=1) * self.sampling_rate
         self.real_detuning = self.get_real_detuning(self.nyquist_order)
 
 
@@ -142,11 +160,10 @@ class CryoscopeAnalyzer:
             raise NotImplementedError('Add a "freq_to_amp" method.')
 
 
-
     def plot_short_time_fft(self, window_size=100):
 
         f, t, Zxx = ss.stft(self.norm_data, fs=self.sampling_rate, nperseg=window_size,
-                            noverlap=0.95*window_size, return_onesided=False)
+                            noverlap=0.95 * window_size, return_onesided=False)
         m = np.argsort(f)
 
         ax = plt.gca()
@@ -174,7 +191,12 @@ class CryoscopeAnalyzer:
     def plot_normalized_data(self, style=".-"):
         ax = plt.gca()
         ax.set_title("Normalized cryoscope data")
-        ax.plot(self.time, self.norm_data.real, style, label="Re", color="blue")
+        ax.plot(
+            self.time,
+            self.norm_data.real,
+            style,
+            label="Re",
+            color="blue")
         ax.plot(self.time, self.norm_data.imag, style, label="Im", color="red")
         ax.legend()
         ax.set_xlabel("Time")
@@ -185,8 +207,18 @@ class CryoscopeAnalyzer:
     def plot_demodulated_data(self, style=".-"):
         ax = plt.gca()
         ax.set_title("Demodulated cryoscope data")
-        ax.plot(self.time, self.demod_data.real, style, label="Re", color="blue")
-        ax.plot(self.time, self.demod_data.imag, style, label="Im", color="red")
+        ax.plot(
+            self.time,
+            self.demod_data.real,
+            style,
+            label="Re",
+            color="blue")
+        ax.plot(
+            self.time,
+            self.demod_data.imag,
+            style,
+            label="Im",
+            color="red")
         ax.legend()
         ax.set_xlabel("Time")
         ax.set_ylabel("Amplitude")
@@ -203,9 +235,9 @@ class CryoscopeAnalyzer:
         ax = plt.gca()
         plt.title("Cryoscope demodulated phase")
         if wrap:
-            plt.plot(self.time, self.phase%(2*np.pi),".", color="blue")
+            plt.plot(self.time, self.phase % (2 * np.pi), ".", color="blue")
         else:
-            plt.plot(self.time, self.phase,".", label="Im", color="blue")
+            plt.plot(self.time, self.phase, ".", label="Im", color="blue")
         plt.xlabel("Time")
         plt.ylabel("Phase")
         formatter = matplotlib.ticker.EngFormatter(unit='s')
@@ -231,7 +263,6 @@ class CryoscopeAnalyzer:
         for n in nyquists:
             if show_demod_freq:
                 plt.axhline(-self.demod_freq + self.sampling_rate*n)
-
             real_detuning = self.get_real_detuning(n)
             ax.plot(self.time, real_detuning, style)
         set_xlabel(ax, 'Time', 's')
@@ -246,9 +277,16 @@ class CryoscopeAnalyzer:
         set_ylabel(ax, 'Amplitude', 'V')
 
 def sincos_model_real_imag(times, freq, phase):
-    r, i = np.cos(2*np.pi*times*freq+phase), np.sin(2*np.pi*times*freq+phase)
+    r, i = np.cos(2 *
+                  np.pi *
+                  times *
+                  freq +
+                  phase), np.sin(2 *
+                                 np.pi *
+                                 times *
+                                 freq +
+                                 phase)
     return np.hstack((r, i))
-
 
 
 class DacArchAnalysis:
@@ -258,9 +296,14 @@ class DacArchAnalysis:
     supersampled signals, after constructing the arc, fits a polynomial
     in order to facilitate interpolation.
     """
-    def __init__(self, times, amps, data,
-                 poly_fit_order=2, invert_frequency_sign=False,
-                 plot_fits=False):
+    def __init__(
+            self,
+            times,
+            amps,
+            data,
+            poly_fit_order=2,
+            invert_frequency_sign=False,
+            plot_fits=False):
         """
         Extract a dac arch from a set of cryoscope-style measurements.
 
@@ -281,7 +324,7 @@ class DacArchAnalysis:
 
         self.poly_fit_order = poly_fit_order
 
-        self.sampling_rate = 1/(self.times[1] - self.times[0])
+        self.sampling_rate = 1 / (self.times[1] - self.times[0])
 
         self.freqs = []
 
@@ -292,12 +335,9 @@ class DacArchAnalysis:
 
         self.norm_data = np.array(self.norm_data)
 
-
-
         for nd in self.norm_data:
             guess_f, guess_ph, *_ = fft_based_freq_guess_complex(nd)
             guess_f *= self.sampling_rate
-
 
             nd_real_imag = np.hstack([nd.real, nd.imag])
 
@@ -316,27 +356,58 @@ class DacArchAnalysis:
 
             self.freqs.append(fit[0])
 
-
         self.freqs = np.array(self.freqs)
 
         self.nyquist = np.cumsum(self.freqs[1:] < self.freqs[:-1])
         self.nyquist = np.hstack(([0], self.nyquist))
 
-        self.freqs = self.freqs + self.nyquist*self.sampling_rate
+        self.freqs = self.freqs + self.nyquist * self.sampling_rate
 
         if invert_frequency_sign:
             self.freqs = -self.freqs
 
-
         self.poly_fit = np.polyfit(self.amps, self.freqs, self.poly_fit_order)
 
-
-
+        self._inv_interpolation = None
 
     def amp_to_freq(self, amp):
+        """
+        Find the frequency that corresponds to a given amplitude by evaluating the fit to the extracted data.
+        """
         return np.polyval(self.poly_fit, amp)
 
-    def freq_to_amp(self, freq):
+    def freq_to_amp(self, freq, kind='interpolate'):
+        """
+        Find the amplitude that corresponds to a given frequency, by numerically inverting the fit.
+
+        freq: The frequency or set of frequencies.
+        kind: Which technique to use:
+            "interpolate": Uses numerical interpolation to find the inverse. Only works if freq is in the range of measured dac values.
+            "root": Finds the inverse of the model numerical. Slow, but can extrapolate.
+        """
+
+        if kind == 'interpolate':
+            if self._inv_interpolation is None:
+                no_samples = 50
+                self.sampled_amps = np.linspace(
+                    np.min(
+                        self.amps), np.max(
+                        self.amps), no_samples)
+
+                self.sampled_freqs = self.amp_to_freq(self.sampled_amps)
+
+                self._inv_interpolation = si.interp1d(
+                    self.sampled_freqs, self.sampled_amps, kind='cubic')
+            return self._inv_interpolation(freq)
+        if kind == 'root':
+            return np.vectorize(self._freq_to_amp_root)(freq)
+
+        raise ValueError("`kind` not understood")
+
+    def _freq_to_amp_root(self, freq):
+        """
+        Find the amplitude corresponding to a given frequency by numerically inverting the fit.
+        """
 
         poly = np.array(self.poly_fit)
         poly[-1] -= freq
@@ -353,7 +424,6 @@ class DacArchAnalysis:
         dist_from_range = np.abs(roots[real_mask] - np.mean(self.amps))
 
         return roots[real_mask][np.argmin(dist_from_range)].real
-
 
     def plot_freqs(self):
         plt.plot(self.amps, self.freqs, ".-")
@@ -374,13 +444,12 @@ class DacArchAnalysis:
 
         ffts = np.fft.fft(self.norm_data)
 
-
-        freqs = np.arange(len(ffts[0]))*self.sampling_rate/len(ffts[0])
+        freqs = np.arange(len(ffts[0])) * self.sampling_rate / len(ffts[0])
 
         print("shape freqs", freqs.shape)
 
         def shift_helper(x):
-            diff = np.diff(x)/2
+            diff = np.diff(x) / 2
             diff = np.hstack((diff[0], diff, -diff[-1]))
             xshift = np.hstack((x, x[-1])) - diff
             return xshift
@@ -396,9 +465,8 @@ class DacArchAnalysis:
         formatter = matplotlib.ticker.EngFormatter(unit='Hz')
         ax.yaxis.set_major_formatter(formatter)
 
-        plt.scatter(self.amps, self.freqs%self.sampling_rate, color="red")
+        plt.scatter(self.amps, self.freqs % self.sampling_rate, color="red")
 
         aa = np.linspace(min(self.amps), max(self.amps), 300)
 
-        plt.plot(aa, np.polyval(self.poly_fit, aa)%self.sampling_rate, ".r")
-
+        plt.plot(aa, np.polyval(self.poly_fit, aa) % self.sampling_rate, ".r")
