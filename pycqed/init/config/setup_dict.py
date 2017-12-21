@@ -21,11 +21,9 @@ mac_dict = {'203178706891063': 'CDickel_Desktop',
             '23213':'Malay_Laptop',
             '31054844829911': 'Sjoerd_laptop',
             '26830024075025': 'Qudev_testbench',
-<<<<<<< HEAD
-            '167746770147462':'Luthi_Desktop'
-=======
-            '17912121714974': 'Thijs_laptop'
->>>>>>> f0a8df6c5b6b16abcc3d105249459d83f3d6415a
+            '167746770147462':'Luthi_Desktop',
+            '17912121714974': 'Thijs_laptop',
+            '238177194084913': 'Thijs_Desktop'
             }
 
 data_dir_dict = {'tud276606_FPGA_PC': 'D:\Experiments/CBox_Testing/Data',
@@ -51,12 +49,10 @@ data_dir_dict = {'tud276606_FPGA_PC': 'D:\Experiments/CBox_Testing/Data',
                  r'Nathans_Laptop': 'D:/nlangford\My Documents\Projects\Rabi Model\Experiment_1504\Data',
                  'Bart_Laptop': 'C:\Experiments/NumericalOptimization/Data',
                  'Qudev_testbench' : r'E:\Control software\data',
-<<<<<<< HEAD
                 # 'Florian_Desktop': r'\\131.180.82.190\\Experiments\\1605_NWv7A2\\Data' # To Maserati
                  # 'Florian_Desktop': r'\\TUD277620\\Experiments\\1704_NWv74_Magnet\\Data' # To Ducati
                  # 'Luthi_Desktop': r'\\TUD277620\\Experiments\\1607_NWv7A4_Magnet\\Data' # To Ducati Old
-                 'Luthi_Desktop': r'\\TUD277620\Experiments\1711_NWv7A4_PCS_Magnet\Data'
-=======
-                 'Thijs_laptop' : 'C:\\Users\\Thijs\\Documents\\TUDelft\\PhD\\Data'
->>>>>>> f0a8df6c5b6b16abcc3d105249459d83f3d6415a
+                 'Luthi_Desktop': r'\\TUD277620\Experiments\1711_NWv7A4_PCS_Magnet\Data',
+                 'Thijs_laptop' : 'C:\\Users\\Thijs\\Documents\\TUDelft\\PhD\\Data',
+                 'Thijs_Desktop': r'\\TUD277620\Experiments\\1711_NWv7A4_PCS_Magnet\Data'
                  }
