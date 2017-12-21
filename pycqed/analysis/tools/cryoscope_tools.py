@@ -7,6 +7,7 @@ Dec 2017
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker
+from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel)
 
 import scipy.signal as ss
 import scipy.optimize as so
@@ -55,6 +56,7 @@ def fft_based_freq_guess_complex(y):
 class CryoscopeAnalyzer:
     def __init__(self, time, complex_data, norm_window_size=61, demod_freq=None,
                  derivative_window_length=None, derivative_order=2,
+                 nyquist_order=0,
                  demod_smooth=None):
         """
         analyse a cryoscope measurement.
@@ -79,19 +81,23 @@ class CryoscopeAnalyzer:
         self.demod_freq = demod_freq
         self.derivative_window_length = derivative_window_length
         self.demod_smooth = demod_smooth
+        self.nyquist_order = nyquist_order
 
         self.sampling_rate = 1/(self.time[1] - self.time[0])
 
         if self.derivative_window_length is None:
             self.derivative_window_length = 7/self.sampling_rate
 
-        self.derivative_window_size = max(3, int(self.derivative_window_length * self.sampling_rate))
+        self.derivative_window_size = max(3, int(self.derivative_window_length
+                                                 * self.sampling_rate))
         self.derivative_window_size += (self.derivative_window_size+1)%2
 
         if self.demod_freq is None:
-            self.demod_freq = -fft_based_freq_guess_complex(self.norm_data)[0]*self.sampling_rate
+            self.demod_freq = -fft_based_freq_guess_complex(self.norm_data)[0] \
+                *self.sampling_rate
 
-        self.demod_data = np.exp(2*np.pi*1j*self.time*self.demod_freq)*self.norm_data
+        self.demod_data = np.exp(2*np.pi*1j*self.time*self.demod_freq)\
+            *self.norm_data
 
         if self.demod_smooth:
             n, o = self.demod_smooth
@@ -109,7 +115,33 @@ class CryoscopeAnalyzer:
         # fit polynomial, return derivative at middle point
         self.detuning = ss.savgol_filter(self.phase/(2*np.pi),
                                          window_length=self.derivative_window_size,
-                                         polyorder=derivative_order, deriv=1)*self.sampling_rate
+                                         polyorder=derivative_order, deriv=1)\
+            *self.sampling_rate
+
+
+        self.real_detuning = self.get_real_detuning(self.nyquist_order)
+
+
+    def get_real_detuning(self, nyquist_order=None):
+        if nyquist_order is None:
+            nyquist_order = self.nyquist_order
+
+        real_detuning = self.detuning-self.demod_freq+self.sampling_rate*nyquist_order
+        return real_detuning
+
+    def get_amplitudes(self):
+        """
+        Converts the real detuning to amplitude
+        """
+        real_detuning = self.get_real_detuning()
+        if hasattr(self, 'freq_to_amp'):
+
+            amplitudes = self.freq_to_amp(real_detuning)
+            return amplitudes
+        else:
+            raise NotImplementedError('Add a "freq_to_amp" method.')
+
+
 
     def plot_short_time_fft(self, window_size=100):
 
@@ -190,21 +222,28 @@ class CryoscopeAnalyzer:
         formatter = matplotlib.ticker.EngFormatter(unit='Hz')
         ax.yaxis.set_major_formatter(formatter)
 
-    def plot_frequency(self, nyquists=[0], style=".-", show_demod_freq=True):
+    def plot_frequency(self, nyquists=None, style=".-", show_demod_freq=True):
         ax = plt.gca()
         plt.title("Detuning frequency")
-        plt.xlabel("Time")
-        plt.ylabel("Frequency")
-        formatter = matplotlib.ticker.EngFormatter(unit='s')
-        ax.xaxis.set_major_formatter(formatter)
-        formatter = matplotlib.ticker.EngFormatter(unit='Hz')
-        ax.yaxis.set_major_formatter(formatter)
+
+        if nyquists is None:
+            nyquists = [self.nyquist_order]
         for n in nyquists:
             if show_demod_freq:
                 plt.axhline(-self.demod_freq + self.sampling_rate*n)
-            real_detuning = self.detuning-self.demod_freq+self.sampling_rate*n
-            plt.plot(self.time, real_detuning, style)
 
+            real_detuning = self.get_real_detuning(n)
+            ax.plot(self.time, real_detuning, style)
+        set_xlabel(ax, 'Time', 's')
+        set_ylabel(ax, 'Frequency', 'Hz')
+
+    def plot_amplitude(self, nyquists=None, style=".-"):
+        ax = plt.gca()
+        plt.title("Cryoscope amplitude")
+        amp = self.get_amplitudes()
+        ax.plot(self.time, amp, style)
+        set_xlabel(ax, 'Time', 's')
+        set_ylabel(ax, 'Amplitude', 'V')
 
 def sincos_model_real_imag(times, freq, phase):
     r, i = np.cos(2*np.pi*times*freq+phase), np.sin(2*np.pi*times*freq+phase)
@@ -219,7 +258,9 @@ class DacArchAnalysis:
     supersampled signals, after constructing the arc, fits a polynomial
     in order to facilitate interpolation.
     """
-    def __init__(self, times, amps, data, poly_fit_order=2, invert_frequency_sign=False, plot_fits=False):
+    def __init__(self, times, amps, data,
+                 poly_fit_order=2, invert_frequency_sign=False,
+                 plot_fits=False):
         """
         Extract a dac arch from a set of cryoscope-style measurements.
 
@@ -260,7 +301,9 @@ class DacArchAnalysis:
 
             nd_real_imag = np.hstack([nd.real, nd.imag])
 
-            fit, err = so.curve_fit(sincos_model_real_imag, self.times, nd_real_imag, p0=[guess_f, guess_ph])
+            fit, err = so.curve_fit(sincos_model_real_imag,
+                                    self.times, nd_real_imag,
+                                    p0=[guess_f, guess_ph])
 
             if plot_fits:
                 plt.figure()
