@@ -140,8 +140,9 @@ def latest_data(contains='', older_than=None, newer_than=None, or_equal=False,
     i = len(daydirs)-1
     while len(measdirs) == 0 and i >= 0:
         daydir = daydirs[i]
-        # this makes sure hidden folders (OS related) are not searched
-        if not daydir.startswith('.'):
+        # this makes sure that (most) non day dirs do not get searched
+        # as they should start with a digit (e.g. YYYYMMDD)
+        if daydir[0].isdigit():
             all_measdirs = [d for d in os.listdir(
                 os.path.join(search_dir, daydir))]
             all_measdirs.sort()
@@ -538,7 +539,7 @@ def get_data_from_timestamp_list(timestamps,
                 ana.finish()
             except Exception as inst:
                 logging.warning('Error "%s" when processing timestamp %s' %
-                      (inst, timestamp))
+                                (inst, timestamp))
                 raise
 
     if len(remove_timestamps) > 0:
@@ -1596,10 +1597,14 @@ def normalize_data_v3(data, cal_zero_points=np.arange(-4, -2, 1),
 
 
 def datetime_from_timestamp(timestamp):
-    if len(timestamp) == 14:
-        return datetime.datetime.strptime(timestamp, "%Y%m%d%H%M%S")
-    else:
-        return datetime.datetime.strptime(timestamp, "%Y%m%d_%H%M%S")
+    try:
+        if len(timestamp) == 14:
+            return datetime.datetime.strptime(timestamp, "%Y%m%d%H%M%S")
+        elif len(timestamp) == 15:
+            return datetime.datetime.strptime(timestamp, "%Y%m%d_%H%M%S")
+    except Exception as e:
+        print('Invalid timestamp :"{}"'.format(timestamp))
+        raise e
 
 
 def timestamp_from_datetime(date):
@@ -1865,6 +1870,7 @@ def color_plot_interpolated(x, y, z, ax=None,
         return ax, CS, cbar
     return ax, CS
 
+
 def plot_errorbars(x, y, ax=None, linewidth=2 ,markersize=2, marker='none'):
 
     if ax is None:
@@ -2022,6 +2028,16 @@ def find_min(x, y, return_fit=False, perc=30):
         return x_min, y_min, my_fit_res
     else:
         return x_min, y_min
+
+
+def get_color_order(i, max_num, cmap='viridis'):
+    # take a blue to red scale from 0 to max_num
+    # uses HSV system, H_red = 0, H_green = 1/3 H_blue=2/3
+    # return colors.hsv_to_rgb(2.*float(i)/(float(max_num)*3.), 1., 1.)
+    print('It is recommended to use the updated function "get_color_cycle".')
+    if isinstance(cmap, str):
+        cmap = cm.get_cmap(cmap)
+    return cmap((i/max_num) % 1)
 
 
 def get_color_list(max_num, cmap='viridis'):

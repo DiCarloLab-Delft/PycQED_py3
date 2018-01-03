@@ -220,7 +220,7 @@ def load_settings_onto_instrument_v2(instrument, load_from_instr: str=None,
 
     for parname, par in ins_group['parameters'].items():
         try:
-            if instrument.parameters[parname].has_set:
+            if hasattr(instrument.parameters[parname], 'set'):
                 instrument.set(parname, par['value'])
         except Exception as e:
             print('Could not set parameter: "{}" to "{}" '

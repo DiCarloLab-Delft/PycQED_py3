@@ -5,6 +5,7 @@ This is based on the REM analysis from PycQED_py2 (as of July 7 2017)
 import os
 import numpy as np
 import copy
+from collections import OrderedDict
 
 from matplotlib import pyplot as plt
 from matplotlib import cm
@@ -88,8 +89,10 @@ class BaseDataAnalysis(object):
         time stamps are ignored.
         '''
         self.single_timestamp = False
+        # initialize an empty dict to store results of analysis
+        self.proc_data_dict = OrderedDict()
         if options_dict is None:
-            self.options_dict = dict()
+            self.options_dict = OrderedDict()
         else:
             self.options_dict = options_dict
 
@@ -140,9 +143,9 @@ class BaseDataAnalysis(object):
         ########################################
         if self.options_dict.get('apply_default_fig_settings', True):
             def_fig.apply_default_figure_settings()
-        self.plot_dicts = dict()
-        self.axs = dict()
-        self.figs = dict()
+        self.plot_dicts = OrderedDict()
+        self.axs = OrderedDict()
+        self.figs = OrderedDict()
         self.presentation_mode = self.options_dict.get(
             'presentation_mode', False)
         self.tight_fig = self.options_dict.get('tight_fig', True)
@@ -231,7 +234,7 @@ class BaseDataAnalysis(object):
         Extracts the data specified in
             self.params_dict
             self.numeric_params
-        and stores it into: self.data_dict
+        and stores it into: self.raw_data_dict
 
         Data extraction is now supported in three different ways
             - using json
@@ -243,7 +246,7 @@ class BaseDataAnalysis(object):
             extension = self.data_file_path.split('.')[-1]
             if extension == 'json':
                 with open(self.data_file_path, 'r') as file:
-                    self.data_dict = json.load(file)
+                    self.raw_data_dict = json.load(file)
             else:
                 raise RuntimeError('Cannot load data from file "{}". '
                                    'Unknown file extension "{}"'
@@ -261,8 +264,8 @@ class BaseDataAnalysis(object):
         self.params_dict['folder'] = 'folder'
 
         if self.do_timestamp_blocks:
-            self.data_dict = {key: [] for key in list(self.params_dict.keys())}
-            self.data_dict['timestamps'] = []
+            self.raw_data_dict = {key: [] for key in list(self.params_dict.keys())}
+            self.raw_data_dict['timestamps'] = []
             for tstamps in self.timestamps:
                 if self.verbose:
                     print(len(tstamps), type(tstamps))
@@ -271,60 +274,61 @@ class BaseDataAnalysis(object):
                     ma_type=self.ma_type,
                     TwoD=TwoD, numeric_params=self.numeric_params,
                     filter_no_analysis=self.filter_no_analysis)
-                for key in self.data_dict:
-                    self.data_dict[key].append(temp_dict[key])
+                for key in self.raw_data_dict:
+                    self.raw_data_dict[key].append(temp_dict[key])
 
             # Use timestamps to calculate datetimes and add to dictionary
-            self.data_dict['datetime'] = []
-            for tstamps in self.data_dict['timestamps']:
-                self.data_dict['datetime'].append(
+            self.raw_data_dict['datetime'] = []
+            for tstamps in self.raw_data_dict['timestamps']:
+                self.raw_data_dict['datetime'].append(
                     [a_tools.datetime_from_timestamp(ts) for ts in tstamps])
 
             # Convert temperature data to dictionary form and extract Tmc
             # N.B. This has the hardcoded temperature names from pycqed_py2
-            if 'temperatures' in self.data_dict:
-                self.data_dict['Tmc'] = []
+            if 'temperatures' in self.raw_data_dict:
+                self.raw_data_dict['Tmc'] = []
                 for ii, temperatures in enumerate(
-                        self.data_dict['temperatures']):
+                        self.raw_data_dict['temperatures']):
                     temp = []
-                    self.data_dict['Tmc'].append([])
+                    self.raw_data_dict['Tmc'].append([])
                     for ii in range(len(temperatures)):
                         exec("temp.append(%s)" % (temperatures[ii]))
-                        self.data_dict['Tmc'][ii].append(
+                        self.raw_data_dict['Tmc'][ii].append(
                             temp[ii].get('T_MClo', None))
-                    self.data_dict['temperatures'][ii] = temp
+                    self.raw_data_dict['temperatures'][ii] = temp
 
         else:
-            self.data_dict = a_tools.get_data_from_timestamp_list(
+            self.raw_data_dict = a_tools.get_data_from_timestamp_list(
                 self.timestamps, param_names=self.params_dict,
                 ma_type=self.ma_type,
                 TwoD=TwoD, numeric_params=self.numeric_params,
                 filter_no_analysis=self.filter_no_analysis)
 
             # Use timestamps to calculate datetimes and add to dictionary
-            self.data_dict['datetime'] = [a_tools.datetime_from_timestamp(
-                timestamp) for timestamp in self.data_dict['timestamps']]
+            self.raw_data_dict['datetime'] = [a_tools.datetime_from_timestamp(
+                timestamp) for timestamp in self.raw_data_dict['timestamps']]
 
             # Convert temperature data to dictionary form and extract Tmc
-            if 'temperatures' in self.data_dict:
+            if 'temperatures' in self.raw_data_dict:
                 temp = []
-                self.data_dict['Tmc'] = []
-                for ii in range(len(self.data_dict['temperatures'])):
+                self.raw_data_dict['Tmc'] = []
+                for ii in range(len(self.raw_data_dict['temperatures'])):
                     exec("temp.append(%s)" %
-                         (self.data_dict['temperatures'][ii]))
-                    self.data_dict['Tmc'].append(temp[ii].get('T_MClo', None))
-                self.data_dict['temperatures'] = temp
+                         (self.raw_data_dict['temperatures'][ii]))
+                    self.raw_data_dict['Tmc'].append(temp[ii].get('T_MClo', None))
+                self.raw_data_dict['temperatures'] = temp
 
         # this is a hacky way to use the same data extraction when there is
         # many files as when there is few files.
         if self.single_timestamp:
             new_dict = {}
-            for key, value in self.data_dict.items():
+            for key, value in self.raw_data_dict.items():
                 if key != 'timestamps':
                     new_dict[key] = value[0]
-            self.data_dict = new_dict
-            self.data_dict['timestamp'] = self.timestamps[0]
-        self.data_dict['timestamps'] = self.timestamps
+            self.raw_data_dict = new_dict
+            self.raw_data_dict['timestamp'] = self.timestamps[0]
+        self.raw_data_dict['timestamps'] = self.timestamps
+        self.raw_data_dict['nr_experiments'] = len(self.timestamps)
 
     def process_data(self):
         """
@@ -352,13 +356,15 @@ class BaseDataAnalysis(object):
                      fmt: str ='png', key_list: list='auto',
                      close_figs: bool=True):
         if savedir is None:
-            savedir = self.data_dict.get('folder', '')
+            savedir = self.raw_data_dict.get('folder', '')
+            if isinstance(savedir, list):
+                savedir = savedir[0]
             if isinstance(savedir, list):
                 savedir = savedir[0]
         if savebase is None:
             savebase = ''
         if tag_tstamp:
-            tstag = '_'+self.data_dict['timestamps'][0]
+            tstag = '_'+self.raw_data_dict['timestamps'][0]
         else:
             tstag = ''
 
@@ -374,12 +380,12 @@ class BaseDataAnalysis(object):
                   tag_tstamp: bool=True,
                   fmt: str='json', key_list='auto'):
         '''
-        Saves the data from self.data_dict to file.
+        Saves the data from self.raw_data_dict to file.
 
         Args:
             savedir (string):
                     Directory where the file is saved. If this is None, the
-                    file is saved in self.data_dict['folder'] or the working
+                    file is saved in self.raw_data_dict['folder'] or the working
                     directory of the console.
             savebase (string):
                     Base name for the saved file.
@@ -390,35 +396,36 @@ class BaseDataAnalysis(object):
                     File extension for the format in which the file should
                     be saved.
             key_list (list or 'auto'):
-                    Specifies which keys from self.data_dict are saved.
+                    Specifies which keys from self.raw_data_dict are saved.
                     If this is 'auto' or None, all keys-value pairs are
                     saved.
         '''
         if savedir is None:
-            savedir = self.data_dict.get('folder', '')
+            savedir = self.raw_data_dict.get('folder', '')
             if isinstance(savedir, list):
                 savedir = savedir[0]
         if savebase is None:
             savebase = ''
         if tag_tstamp:
-            tstag = '_'+self.data_dict['timestamps'][0]
+            tstag = '_'+self.raw_data_dict['timestamps'][0]
         else:
             tstag = ''
 
         if key_list == 'auto' or key_list is None:
-            key_list = self.data_dict.keys()
+            key_list = self.raw_data_dict.keys()
 
         save_dict = {}
         for k in key_list:
-            save_dict[k] = self.data_dict[k]
+            save_dict[k] = self.raw_data_dict[k]
 
         filepath = os.path.join(savedir, savebase + tstag + '.' + fmt)
         with open(filepath, 'w') as file:
-            json.dump(save_dict, file, cls=NumpyJsonEncoder)
+            json.dump(save_dict, file, cls=NumpyJsonEncoder, indent=4)
         print('Data saved to "{}".'.format(filepath))
 
     def prepare_fitting(self):
-        pass
+        # initialize everything to an empty dict if not overwritten
+        self.fit_dicts = OrderedDict()
 
     def run_fitting(self):
         '''
@@ -431,18 +438,23 @@ class BaseDataAnalysis(object):
         for key, fit_dict in self.fit_dicts.items():
             guess_dict = fit_dict.get('guess_dict', None)
             guess_pars = fit_dict.get('guess_pars', None)
-            fit_guess_fn = fit_dict.get('fit_guess_fn', None)
-            fit_fn = fit_dict.get('fit_fn', None)
             fit_yvals = fit_dict['fit_yvals']
             fit_xvals = fit_dict['fit_xvals']
 
-            model = fit_dict.get('model', lmfit.Model(fit_fn))
+            model = fit_dict.get('model', None)
+            if model is None:
+                fit_fn = fit_dict.get('fit_fn', None)
+                model = fit_dict.get('model', lmfit.Model(fit_fn))
+            fit_guess_fn = fit_dict.get('fit_guess_fn', None)
+            if fit_guess_fn is None:
+                fit_guess_fn = model.guess
+
             if self.do_timestamp_blocks:
                 fit_dict['fit_res'] = []
                 for tt in range(len(fit_yvals)):
                     if guess_pars is None:
                         if guess_dict is None:
-                            guess_dict = fit_guess_fn(fit_yvals[tt],
+                            guess_dict = fit_guess_fn(**fit_yvals[tt],
                                                       **fit_xvals[tt])
                         for key, val in list(guess_dict.items()):
                             model.set_param_hint(key, **val)
@@ -453,10 +465,13 @@ class BaseDataAnalysis(object):
             else:
                 if guess_pars is None:
                     if guess_dict is None:
-                        guess_dict = fit_guess_fn(fit_yvals, **fit_xvals)
-                    for key, val in list(guess_dict.items()):
-                        model.set_param_hint(key, **val)
-                    guess_pars = model.make_params()
+                        guess_dict = fit_guess_fn(**fit_yvals, **fit_xvals)
+                        if isinstance(guess_dict, lmfit.Parameters):
+                            guess_pars = guess_dict
+                        else:
+                            for key, val in list(guess_dict.items()):
+                                model.set_param_hint(key, **val)
+                            guess_pars = model.make_params()
 
                 fit_dict['fit_res'] = model.fit(
                     params=guess_pars, **fit_xvals, **fit_yvals)
@@ -477,7 +492,7 @@ class BaseDataAnalysis(object):
         if key_list is 'auto':
             key_list = self.auto_keys
         if key_list is None:
-            key_list = list(self.plot_dicts.keys())
+            key_list = self.plot_dicts.keys()
         if type(key_list) is str:
             key_list = [key_list]
         self.key_list = key_list
@@ -520,7 +535,8 @@ class BaseDataAnalysis(object):
             pdict = self.plot_dicts[key]
             # this check is needed as not all plots have xvals e.g., plot_text
             if 'xvals' in pdict.keys():
-                if type(pdict['xvals'][0]) is datetime.datetime:
+                if (type(pdict['xvals'][0]) is datetime.datetime and
+                        key in self.axs.keys()):
                     self.axs[key].figure.autofmt_xdate()
 
     def plot_for_presentation(self, key_list=None, no_label=False):
@@ -537,9 +553,11 @@ class BaseDataAnalysis(object):
         # xvals interpreted as edges for a bar plot
         plot_xedges = pdict['xvals']
         plot_yvals = pdict['yvals']
-        plot_xlabel = pdict['xlabel']
-        plot_ylabel = pdict['ylabel']
-        plot_title = pdict['title']
+        plot_xlabel = pdict.get('xlabel', None)
+        plot_ylabel = pdict.get('ylabel', None)
+        plot_xunit = pdict.get('xunit', None)
+        plot_yunit = pdict.get('yunit', None)
+        plot_title = pdict.get('title', None)
         plot_xrange = pdict.get('xrange', None)
         plot_yrange = pdict.get('yrange', None)
         plot_barkws = pdict.get('bar_kws', {})
@@ -588,6 +606,8 @@ class BaseDataAnalysis(object):
         if self.tight_fig:
             axs.figure.tight_layout()
 
+        set_xlabel(axs, plot_xlabel, plot_xunit)
+        set_ylabel(axs, plot_ylabel, plot_yunit)
         pdict['handles'] = p_out
 
     def plot_line(self, pdict, axs):
@@ -640,14 +660,10 @@ class BaseDataAnalysis(object):
                           **plot_linekws)
 
         if plot_xrange is None:
-            # maybe better to do nothing if xrange is None?
-            max_x = np.max(plot_xvals)
-            min_x = np.min(plot_xvals)
-            span = np.abs(max_x - min_x)
-            xmin, xmax = min_x - 0.02*span, max_x+0.02*span
+            pass # Do not set xlim if xrange is None as the axs gets reused
         else:
             xmin, xmax = plot_xrange
-        axs.set_xlim(xmin, xmax)
+            axs.set_xlim(xmin, xmax)
 
         if plot_xlabel is not None:
             set_xlabel(axs, plot_xlabel, plot_xunit)
@@ -996,3 +1012,19 @@ class BaseDataAnalysis(object):
               verticalalignment=verticalalignment,
               horizontalalignment=horizontalalignment,
               bbox=box_props)
+
+    def plot_vlines(self, pdict, axs):
+        """
+        Helper function to add vlines to a plot
+        """
+        pfunc = getattr(axs, pdict.get('func', 'vlines'))
+        x = pdict['x']
+        ymin = pdict['ymin']
+        ymax = pdict['ymax']
+        label = pdict.get('setlabel', None)
+        colors = pdict.get('colors', None)
+        linestyles = pdict.get('linestyles', '--')
+
+        axs.vlines(x, ymin, ymax, colors,
+                   linestyles=linestyles, label=label, **pdict['line_kws'])
+        axs.legend()
