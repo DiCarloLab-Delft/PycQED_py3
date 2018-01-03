@@ -1746,7 +1746,7 @@ class Rabi_Analysis(TD_Analysis):
 
         super().run_default_analysis(show=show,
                                      close_file=close_file,
-                                     close_main_figure=True,
+                                     close_main_fig=True,
                                      save_fig=False, **kw)
 
         show_guess = kw.get('show_guess', False)
@@ -2506,7 +2506,7 @@ class QScale_Analysis(TD_Analysis):
 
         super().run_default_analysis(show=show,
                                      close_file=close_file,
-                                     close_main_figure=True,
+                                     close_main_fig=True,
                                      save_fig=False, **kw)
 
         # Only the unfolding part here is unique to this analysis
