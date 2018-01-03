@@ -63,6 +63,8 @@ class QuDev_transmon(Qubit):
                            initial_value=0, parameter_class=ManualParameter)
         self.add_parameter('T2_star', label='Qubit dephasing', unit='s',
                            initial_value=0, parameter_class=ManualParameter)
+        self.add_parameter('T2', label='Qubit Echo dephasing', unit='s',
+                           initial_value=0, parameter_class=ManualParameter)
         self.add_parameter('T2_star_ef', label='Qubit dephasing', unit='s',
                            initial_value=0, parameter_class=ManualParameter)
         # self.add_parameter('amp180', label='Qubit pi pulse amp', unit='V',

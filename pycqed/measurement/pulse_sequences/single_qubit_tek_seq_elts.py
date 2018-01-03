@@ -921,7 +921,8 @@ def get_pulse_dict_from_pars(pulse_pars):
     Z180 = deepcopy(pulse_pars)
     Z180['pulse_type'] = 'Z_pulse'
     for i in pulse_pars.keys():
-        if i not in ['phase', 'pulse_type', 'pulse_delay','operation_type']:
+        if i not in ['phase', 'pulse_type', 'pulse_delay','operation_type',
+                     'target_qubit', 'refpoint']:
             del Z180[i]
 
     pulses = {'I': deepcopy(pulse_pars),

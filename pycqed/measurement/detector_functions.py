@@ -1570,7 +1570,7 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
 
             correlation_channel = -1
             # 4 is the (current) max number of weights in the UHFQC (v5)
-            for ch in range(4):
+            for ch in range(9):
                 if ch in self.channels:
                     # Disable correlation mode as this is used for normal
                     # acquisition
@@ -1609,12 +1609,25 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             copy_int_weights_imag = \
                 self.UHFQC.get('quex_wint_weights_{}_imag'.format(corr[0]))[
                     0]['vector']
+
+            copy_rot_matrix_real = \
+                self.UHFQC.get('quex_rot_{}_real'.format(corr[0]))
+            copy_rot_matrix_imag = \
+                self.UHFQC.get('quex_rot_{}_imag'.format(corr[0]))
+
             self.UHFQC.set(
                 'quex_wint_weights_{}_real'.format(correlation_channel),
                 copy_int_weights_real)
             self.UHFQC.set(
                 'quex_wint_weights_{}_imag'.format(correlation_channel),
                 copy_int_weights_imag)
+
+            self.UHFQC.set(
+                'quex_rot_{}_real'.format(correlation_channel),
+                copy_rot_matrix_real)
+            self.UHFQC.set(
+                'quex_rot_{}_imag'.format(correlation_channel),
+                copy_rot_matrix_imag)
             # Enable correlation mode one the correlation output channel and
             # set the source to the second source channel
             self.UHFQC.set('quex_corr_{}_mode'.format(correlation_channel), 1)
@@ -1644,7 +1657,6 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
         data_raw = self.UHFQC.acquisition_poll(samples=self.nr_sweep_points,
                                                arm=False,
                                                acquisition_time=0.01)
-
         data = []
         if self.thresholding:
             for key in data_raw.keys():

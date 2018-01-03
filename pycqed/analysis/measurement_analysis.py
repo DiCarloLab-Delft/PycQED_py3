@@ -8796,7 +8796,8 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
             data_slice = self.data[:,i:i+length_single-1]
 
             thetas = data_slice[0]
-            ampls = np.abs(data_slice[2] + 1j*data_slice[3])
+            ampls = np.abs((data_slice[2]-data_slice[2, 0]) + 1j*(data_slice[3] -
+                                                                data_slice[3, 0]))
 
             if extrapolate_phase:
                 phase_guess = phase_list[-1] + (phase_list[-1] - phase_list[-2])
@@ -8830,7 +8831,7 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
 
             self.fig.subplots_adjust(hspace=0.7)
 
-            self.fig.show()
+            plt.show()
 
         self.fitted_phases = np.array(phase_list)
 
