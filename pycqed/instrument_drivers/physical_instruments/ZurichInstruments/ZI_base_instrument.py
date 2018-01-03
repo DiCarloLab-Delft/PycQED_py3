@@ -3,6 +3,8 @@ import os
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from zhinst.ziPython import ziListEnum as ziListEnum
+import logging
+log = logging.getLogger(__name__)
 
 
 class ZI_base_instrument(Instrument):
@@ -40,7 +42,7 @@ class ZI_base_instrument(Instrument):
                 par_kw['docstring'] += '\nOptions:\n' + str(par['Options'])
 
             # Creates type dependent get/set methods
-            if par['Type'] == 'Integer (64 bit)':
+            if par['Type'] == 'Integer (64 bit)' or par['Type'] == 'Integer (enumerated)':
                 par_kw['set_cmd'] = self._gen_set_func(self._dev.seti, parfunc)
                 par_kw['get_cmd'] = self._gen_get_func(self._dev.geti, parfunc)
                 # min/max not implemented yet for ZI auto docstrings #352
@@ -58,13 +60,14 @@ class ZI_base_instrument(Instrument):
                 # min/max not implemented yet for ZI auto docstrings #352
                 par_kw['vals'] = vals.Arrays()
 
-            elif par['Type'] == 'CoreString':
-                par_kw['get_cmd'] = self._gen_get_func(self._dev.getd, parfunc)
+            elif par['Type'] == 'String':
+                par_kw['get_cmd'] = self._gen_get_func(self._dev.daq.getString, parfunc)
                 par_kw['set_cmd'] = None  # Not implemented
                 par_kw['vals'] = vals.Strings()
 
             else:
-                raise NotImplementedError
+                log.error("Unimplemented parameter type '{}' for '{}'".format(par['Type'], parfunc))
+                continue
 
             # If not readable/writable the methods are removed after the type
             # dependent loop to keep this more readable.

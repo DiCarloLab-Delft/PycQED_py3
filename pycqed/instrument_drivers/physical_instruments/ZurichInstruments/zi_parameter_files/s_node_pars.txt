@@ -24,6 +24,24 @@
     3.0
   ],
   [
+    "awgs/0/dio/delay/index",
+    "int_8bit",
+    0,
+    255
+  ],
+  [
+    "awgs/0/dio/delay/value",
+    "int_64",
+    0,
+    4294967295
+  ],
+  [
+    "awgs/0/dio/snapshot",
+    "int_8bit",
+    0,
+    255
+  ],
+  [
     "awgs/0/dio/strobe/index",
     "int",
     0,
@@ -96,48 +114,6 @@
     13.0
   ],
   [
-      "awgs/0/dio/strobe/index",
-    "int",
-    0,
-    31.0
-  ],
-  [
-    "awgs/0/dio/strobe/slope",
-    "int",
-    0,
-    3.0
-  ],
-  [
-    "awgs/0/dio/valid/index",
-    "int",
-    0,
-    31.0
-  ],
-  [
-    "awgs/0/dio/valid/polarity",
-    "int",
-    0,
-    3.0
-  ],
-  [
-    "awgs/0/dio/delay/index",
-    "int",
-    0,
-    31
-  ],
-  [
-    "awgs/0/dio/delay/value",
-    "int",
-    0,
-    3
-  ],
-  [
-    "awgs/0/dio/snapshot",
-    "int",
-    0,
-    1
-  ],
-  [
     "awgs/0/triggers/0/channel",
     "int_8bit",
     0,
@@ -171,7 +147,7 @@
     "awgs/0/triggers/0/hysteresis/absolute",
     "float",
     0,
-    1500000026624.0
+    999999995904.0
   ],
   [
     "awgs/0/triggers/0/hysteresis/mode",
@@ -237,7 +213,7 @@
     "awgs/0/triggers/1/hysteresis/absolute",
     "float",
     0,
-    1500000026624.0
+    20.0
   ],
   [
     "awgs/0/triggers/1/hysteresis/mode",
@@ -249,7 +225,7 @@
     "awgs/0/triggers/1/hysteresis/relative",
     "float",
     0,
-    999999995904.0
+    20.0
   ],
   [
     "awgs/0/triggers/1/level",
@@ -453,7 +429,7 @@
     "sigouts/0/amplitudes/3",
     "float",
     -0.75,
-    0.75
+    0.14999771118164062
   ],
   [
     "sigouts/0/autorange",
@@ -1881,7 +1857,7 @@
     "quex/wint/length",
     "int",
     0,
-    16777216.0
+    4096.0
   ],
   [
     "quex/wint/mode",
@@ -1978,53 +1954,5 @@
     "bool",
     0,
     1.0
-  ],
-  [
-    "triggers/in/0/imp50",
-    "bool",
-    0,
-    1.0
-  ],
-  [
-    "triggers/in/0/level",
-    "float",
-    -4.99981689453125,
-    5.000091552734375
-  ],
-  [
-    "triggers/in/1/imp50",
-    "bool",
-    0,
-    1.0
-  ],
-  [
-    "triggers/in/1/level",
-    "float",
-    -4.99981689453125,
-    5.000091552734375
-  ],
-  [
-    "triggers/in/2/imp50",
-    "bool",
-    0,
-    1.0
-  ],
-  [
-    "triggers/in/2/level",
-    "float",
-    -5.000114440917969,
-    4.999885559082031
-  ],
-  [
-    "triggers/in/3/imp50",
-    "bool",
-    0,
-    1.0
-  ],
-  [
-    "triggers/in/3/level",
-    "float",
-    -5.000114440917969,
-    4.999885559082031
   ]
 ]
