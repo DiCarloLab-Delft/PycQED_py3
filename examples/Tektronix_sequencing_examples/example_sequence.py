@@ -17,12 +17,12 @@ imp.reload(pulsar)
 # Warning! This does overwrite your pulsar settings (if such a device exists)
 station.pulsar = pulsar.Pulsar()
 station.pulsar.AWG = station.components['AWG']
-station.pulsar.define_channel(id='ch1', name='RF', type='analog',
-                              high=0.541, low=-0.541,
-                              offset=0., delay=211e-9, active=True)
-station.pulsar.define_channel(id='ch1_marker1', name='MW_pulsemod', type='marker',
-                              high=2.0, low=0, offset=0.,
-                              delay=(44+166-8)*1e-9, active=True)
+station.pulsar.define_channel(id='ch1', name='RF')
+station.pulsar.RF_amp(0.541)
+station.pulsar.RF_delay(211e-9)
+station.pulsar.define_channel(id='ch1_marker1', name='MW_pulsemod')
+station.pulsar.MW_pulsemod_amp(2.0)
+station.pulsar.MW_pulsemod_delay((44+166-8)*1e-9)
 
 station.pulsar.AWG_sequence_cfg = {
     'SAMPLING_RATE': 1e9,
@@ -82,11 +82,11 @@ special_element.add(special_pulse)
 # names)
 seq = pulsar.Sequence('A Sequence')
 seq.append(name='first_element', wfname='a_test_element', trigger_wait=True,
-           goto_target='first_element', jump_target='first special element')
+           goto_target='first_element')
 seq.append('first special element', 'Another_element',
            repetitions=5)
 seq.append('third element', 'a_test_element', trigger_wait=True,
-           goto_target='third element', jump_target='second special element')
+           goto_target='third element')
 seq.append('second special element', 'Another_element',
            repetitions=5)
 

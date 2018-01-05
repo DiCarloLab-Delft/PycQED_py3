@@ -971,7 +971,7 @@ def n_qubit_off_on(pulse_pars_list, RO_pars, return_seq=False, verbose=False,
     for i, pulse_pars in enumerate(pulse_pars_list):
         pars = pulse_pars.copy()
         if i != 0 and parallel_pulses:
-            pars['refpoint'] = 'start'
+            pars['refpoint'] = 'simultaneous'
         pulses = add_suffix_to_dict_keys(
             get_pulse_dict_from_pars(pars), ' {}'.format(i))
         pulse_dict.update(pulses)
@@ -1001,6 +1001,80 @@ def n_qubit_off_on(pulse_pars_list, RO_pars, return_seq=False, verbose=False,
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
+
+def n_qubit_reset(pulse_pars_list, RO_pars, feedback_delay, nr_resets=1,
+                  return_seq=False, verbose=False, codeword_indices=None):
+    n = len(pulse_pars_list)
+    seq_name = '{}_qubit_{}_reset_sequence'.format(n, nr_resets)
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+
+    # Create a dict with the parameters for all the pulses
+    pulse_dict = {'RO': RO_pars}
+    for i, pulse_pars in enumerate(pulse_pars_list):
+        pars = pulse_pars.copy()
+        pulses = add_suffix_to_dict_keys(
+            get_pulse_dict_from_pars(pars), ' {}'.format(i))
+        pulse_dict.update(pulses)
+    spacerpulse = {'pulse_type': 'SquarePulse',
+                   'channel': RO_pars['acq_marker_channel'],
+                   'amplitude': 0.0,
+                   'length': feedback_delay,
+                   'pulse_delay': 0}
+    pulse_dict.update({'spacer': spacerpulse})
+
+    # create the state-preparation elements and the state reset elements
+    for state in range(2 ** n):
+        pulses = []
+        for qb in range(n):
+            if state & (1 << qb):
+                pulses += [pulse_dict['X180 {}'.format(qb)].copy()]
+            else:
+                pulses += [pulse_dict['I {}'.format(qb)].copy()]
+            if qb != 0:
+                pulses[-1]['refpoint'] = 'simultaneous'
+        statename = str(state).zfill(len(str(2**n - 1)))
+        el = multi_pulse_elt(state, station, pulses, name='prepare' + statename)
+        el_list.append(el)
+        # FIXME: these elements need to have the pulses at the very start.
+        el = multi_pulse_elt(state, station, pulses, name='reset' + statename,
+                             trigger=False)
+        el_list.append(el)
+
+    # create the reset element
+    pulses = [pulse_dict['RO'], pulse_dict['spacer']]
+    el = multi_pulse_elt(state, station, pulses, name='readout', trigger=False)
+    el_list.append(el)
+
+    # Create the sequence
+    for state in range(2 ** n):
+        statename = str(state).zfill(len(str(2 ** n - 1)))
+        seq.insert('prepare'+statename, 'prepare'+statename, trigger_wait=True)
+        for i in range(nr_resets):
+            seq.insert('readout' + statename + '_' + str(i), 'readout',
+                       trigger_wait=False, flags={'readout'})
+            seq.insert('codeword' + statename + '_' + str(i), 'codeword',
+                       trigger_wait=False)
+        seq.insert('readout' + statename + '_final', 'readout',
+                   trigger_wait=False, flags={'readout'})
+
+    # Create the codeword table
+    if codeword_indices is None:
+        codeword_indices = np.arange(n)
+    for state in range(2 ** n):
+        statename = str(state).zfill(len(str(2 ** n - 1)))
+        codeword = 0
+        for qb in range(n):
+            if state & (1 << qb):
+                codeword |= (1 << codeword_indices[qb])
+        seq.codewords[codeword] = 'reset' + statename
+
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+
     if return_seq:
         return seq, el_list
     else:

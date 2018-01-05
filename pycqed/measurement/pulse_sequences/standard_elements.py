@@ -24,8 +24,9 @@ reload(pulse_library)
 reload(element)
 
 
-def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
-    '''
+def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
+                    trigger=True):
+    """
     Input args
         i:          index of the element, ensures unique element name
         station:    qcodes station object, contains AWG etc
@@ -36,7 +37,7 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
         element:    for use with the pulsar sequencer
 
     Note: this function is used to generate most standard elements we use.
-    '''
+    """
     # Prevents accidently overwriting pulse pars in this list
     pulse_list = deepcopy(pulse_list)
     last_op_type = 'other'  # used for determining relevant buffers
@@ -46,8 +47,8 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
         if hasattr(station, 'sequencer_config'):
             sequencer_config = station.sequencer_config
         else:
-            logging.warning('No sequencer config detected, using default ' +
-                            '\n you can specify one as station.sequencer_config')
+            logging.warning('No sequencer config detected, using default \n you'
+                            ' can specify one as station.sequencer_config')
             sequencer_config = {'RO_fixed_point': 1e-6,
                                 'Buffer_Flux_Flux': 0,
                                 'Buffer_Flux_MW': 0,
@@ -65,13 +66,19 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
     ##########################
     # Instantiate an element #
     ##########################
+    if name is None:
+        name = '{}-pulse-elt_{}'.format(len(pulse_list), i)
     el = element.Element(
-        name='{}-pulse-elt_{}'.format(len(pulse_list), i),
+        name=name,
         pulsar=station.pulsar,
-        readout_fixed_point=sequencer_config['RO_fixed_point'])
-    for cname in station.pulsar.channels:  # Exists to ensure there are no empty channels
-        el.add(pulse.SquarePulse(name='refpulse_0', channel=cname,
-                                 amplitude=0, length=1e-9))
+        readout_fixed_point=sequencer_config['RO_fixed_point'],
+        ignore_delays=not trigger)
+    if trigger:
+        el.fixed_point_applied = True
+        # Exists to ensure there are no empty channels
+        for cname in station.pulsar.channels:
+            el.add(pulse.SquarePulse(name='refpulse_0', channel=cname,
+                                     amplitude=0, length=1e-9))
 
 
     # exists to ensure that channel is not high when waiting for trigger
@@ -232,10 +239,11 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
                refpulse=last_pulse, refpoint='end')
 
     # Trigger the slave AWG-s
-    slave_triggers = sequencer_config.get('slave_AWG_trig_channels', [])
-    for cname in slave_triggers:
-        el.add(pulse.SquarePulse(name='slave_trigger', channel=cname,
-                                 amplitude=1, length=20e-9), start=10e-9)
+    if trigger:
+        slave_triggers = sequencer_config.get('slave_AWG_trig_channels', [])
+        for cname in slave_triggers:
+            el.add(pulse.SquarePulse(name='slave_trigger', channel=cname,
+                                     amplitude=1, length=20e-9), start=10e-9)
 
     return el
 
