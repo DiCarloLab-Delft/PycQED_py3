@@ -240,16 +240,19 @@ class HDAWG8Pulsar:
         if not isinstance(obj, HDAWG8Pulsar._supportedAWGtypes):
             return super()._program_awg(obj, sequence, el_wfs, loop)
 
+
         for awg_nr in [0, 1, 2, 3]:
             ch1id = 'ch{}'.format(awg_nr * 2 + 1)
             ch2id = 'ch{}'.format(awg_nr * 2 + 2)
+
+            prev_dio_valid_polarity = obj.get('awgs_{}_dio_valid_polarity'.format(awg_nr))
 
             # Create waveform definitions
             header = ""
             elements_with_non_zero_first_points = []
             wfnames = {ch1id: [], ch2id: []}
             wfdata = {ch1id: [], ch2id: []}
-            i = 1
+            #i = 1
             for (_, el), cid_wfs in sorted(el_wfs.items()):
                 for cid in [ch1id, ch2id]:
                     if cid in cid_wfs:
@@ -259,10 +262,10 @@ class HDAWG8Pulsar:
                         wfdata[cid].append(cid_wf)
                         if cid_wf[0] != 0.:
                             elements_with_non_zero_first_points.append(el)
-                        header += 'wave {} = ramp({}, 0, {});\n'.format(
-                            simplify_name(wfname), len(cid_wf), 1 / i
-                        )
-                        i += 1
+                        #header += 'wave {} = ramp({}, 0, {});\n'.format(
+                        #    simplify_name(wfname), len(cid_wf), 1 / i
+                        #)
+                        #i += 1
                     else:
                         wfnames[cid].append(None)
                         wfdata[cid].append(None)
@@ -273,15 +276,21 @@ class HDAWG8Pulsar:
                 for (_, el), cid_wfs in sorted(el_wfs.items()):
                     if el == wfname:
                         if ch1id in cid_wfs and ch2id in cid_wfs:
-                            waveform_table += "setWaveDIO({}, {}, {});\n" \
-                                .format(cw, simplify_name(wfname + '_' + ch1id),
+                            waveform_table += \
+                                'setWaveDIO({0}, "{1}_{2}", "{1}_{3}");\n' \
+                                .format(cw, obj._devname,
+                                        simplify_name(wfname + '_' + ch1id),
                                         simplify_name(wfname + '_' + ch2id))
                         elif ch1id in cid_wfs and ch2id not in cid_wfs:
-                            waveform_table += "setWaveDIO({}, 1, {});\n" \
-                                .format(cw, simplify_name(wfname + '_' + ch1id))
+                            waveform_table += \
+                                'setWaveDIO({}, 1, "{}_{}");\n' \
+                                .format(cw, obj._devname,
+                                        simplify_name(wfname + '_' + ch1id))
                         elif ch1id not in cid_wfs and ch2id in cid_wfs:
-                            waveform_table += "setWaveDIO({}, 2, {});\n" \
-                                .format(cw, simplify_name(wfname + '_' + ch2id))
+                            waveform_table += \
+                                'setWaveDIO({}, 2, "{}_{}");\n' \
+                                    .format(cw, obj._devname,
+                                            simplify_name(wfname + '_' + ch2id))
 
             # Create main loop and footer
             if loop:
@@ -302,26 +311,33 @@ class HDAWG8Pulsar:
                 else:
                     if el['trigger_wait']:
                         if el['wfname'] in elements_with_non_zero_first_points:
-                            log.warning('Pulsar: Trigger wait set for element {} '
-                                'with a non-zero first point'.format(el['wfname']))
+                            log.warning('Pulsar: Trigger wait set for element '
+                                        '{} with a non-zero first '
+                                        'point'.format(el['wfname']))
                     name_ch1 = el['wfname'] + '_' + ch1id
                     name_ch2 = el['wfname'] + '_' + ch2id
                     if name_ch1 not in wfnames[ch1id]: name_ch1 = None
                     if name_ch2 not in wfnames[ch2id]: name_ch2 = None
                     main_loop += self._HDAWG8_element_seqc(
                         el['repetitions'], el['trigger_wait'],
-                        simplify_name(name_ch1), simplify_name(name_ch2))
+                        '"{}_{}"'.format(obj._devname, simplify_name(name_ch1)),
+                        '"{}_{}"'.format(obj._devname, simplify_name(name_ch2)))
             awg_str = header + waveform_table + main_loop + footer
-            obj.configure_awg_from_string(awg_nr, awg_str,
-                                          timeout=obj.timeout())
 
-            # populate the waveforms with data
-            i = 0
-            for data1, data2 in zip(wfdata[ch1id], wfdata[ch2id]):
-                if data1 is None and data2 is None:
-                    continue
-                obj.awg_update_waveform(awg_nr, i, data1, data2)
-                i += 1
+            # write the waveforms to csv files
+            for data, wfname in zip(wfdata[ch1id], wfnames[ch1id]):
+                if wfdata is not None:
+                    obj._write_csv_waveform(simplify_name(wfname), data)
+            for data, wfname in zip(wfdata[ch2id], wfnames[ch2id]):
+                if wfdata is not None:
+                    obj._write_csv_waveform(simplify_name(wfname), data)
+
+            obj.configure_awg_from_string(awg_nr, awg_str,
+                              timeout=obj.timeout())
+
+            obj.set('awgs_{}_dio_valid_polarity'.format(awg_nr),
+                    prev_dio_valid_polarity)
+
         return awg_str
 
     def _is_AWG_running(self, obj):
@@ -699,7 +715,7 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
                            set_cmd=self._set_default_AWG,
                            get_cmd=self._get_default_AWG)
         self.add_parameter('master_AWG', parameter_class=InstrumentParameter,
-                           initial_value=master_AWG)
+                           initial_value=master_AWG, vals=vals.Strings())
 
         self.channels = set()
         self.last_sequence = None
