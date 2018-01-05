@@ -396,29 +396,38 @@ class ZI_HDAWG8(ZI_base_instrument):
         t1 = time.time()
         print('Set all zeros waveforms in {:.1f} s'.format(t1-t0))
 
-    def upload_waveform_realtime(self, w0, w1, awg_nr:int, wf_nr:int =1):
-        """
+    def awg_update_waveform(self, awg_nr: int, index: int, data1, data2=None):
+        """Immediately updates the waveform with the given index.
+
+        The waveform in the waveform viewer in the LabOne web interface is not
+        updated. If data for both AWG channels is given, then the lengths must
+        match.
+
         Warning! This method should be used with care.
-        Uploads a waveform to the awg in realtime, note that this get's
-        overwritten if a new program is uploaded.
+        Note that the waveform get's overwritten if a new program is uploaded.
+        Any parts of a waveform longer than data1/data2 will not be overwritten.
+        Loading speed depends on the size of data1 and data2 and is ~80ms for
+        20us waveform.
 
-        Arguments:
-            w0   (array): waveform for ch0 of the awg pair.
-            w1   (array): waveform for ch1 of the awg pair.
-            awg_nr (int): awg_nr indicating what awg pair to use.
-            wf_nr  (int): waveform in memory to overwrite, default is 1.
-
-        There are a few important notes when using this method
-        - w0 and w1 must be of the same length
-        - any parts of a waveform longer than w0/w1 will not be overwritten.
-        - loading speed depends on the size of w0 and w1 and is ~80ms for 20us.
-
+        Args:
+            awg_nr: The index of the virtual AWG to update the channels for.
+            index:  Index of the waveform to update. Corresponds to the order of
+                    waveforms in the AWG/Waveform tab in the web interface.
+                    Starts from 0.
+            data1:  Waveform data for channel 1.
+            data2:  Optional waveform data for channel 2.
         """
-        c = np.vstack((w0, w1)).reshape((-2,), order='F')
-        self._dev.seti('awgs/{}/waveform/index'.format(awg_nr), wf_nr)
-        self._dev.setv('awgs/{}/waveform/data'.format(awg_nr), c)
-        self._dev.seti('awgs/{}/enable'.format(awg_nr), wf_nr)
-
+        if data1 is None and data2 is None:
+            return
+        elif data1 is None:
+            data = data2
+        elif data2 is None:
+            data = data1
+        else:
+            data = np.vstack((data1, data2,)).reshape((-1,), order='F')
+        self.set('awgs_{}_waveform_index'.format(awg_nr), index)
+        self.set('awgs_{}_waveform_data'.format(awg_nr), data)
+        self._dev.daq.sync()  # Is this necessary?
 
     def upload_codeword_program(self, awgs=np.arange(4)):
         """
@@ -510,6 +519,9 @@ class ZI_HDAWG8(ZI_base_instrument):
                                                program_string=program,
                                                timeout=self.timeout())
         self.configure_codeword_protocol()
+
+    def clock_freq(self, awg_nr):
+        return 2.4e9 / (2 ** self.get('awgs_{}_time'.format(awg_nr)))
 
     def configure_codeword_protocol(self, default_dio_timing: bool=False):
         """
