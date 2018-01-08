@@ -2657,8 +2657,6 @@ class QuDev_transmon(Qubit):
                         label=measurement_string,
                         X90_separation=X90_separation,
                         flux_pulse_length=pulse_length,
-                        gauss_sigma=self.gauss_sigma,
-                        nr_gauss_sigma=self.nr_sigma,
                         qb_name=self.name,
                         auto=False)
             flux_pulse_ma.run_delay_analysis(show=True)
@@ -2671,6 +2669,90 @@ class QuDev_transmon(Qubit):
             return flux_pulse_ma.fitted_delay
         else:
             return
+
+
+
+    def calibrate_flux_pulse_frequency(self,MC=None, thetas=None, ampls=None,
+                                       analyze=False,
+                                       update=False,**kw):
+        """
+        flux pulse timing frequency
+
+        does a 2D measuement of the type:
+
+                      X90_separation
+                < -- ---- ----------- --->
+                |X90|  --------------     |X90|  ---  |RO|
+                       | fluxpulse |
+
+        where the flux pulse amplitude and the angle of the second X90 pulse
+        are swept.
+
+        Args:
+            MC: measurement control object
+            thetas: numpy array with angles (in rad) for the Ramsey type
+            ampls: numpy array with amplitudes (in V) swept through
+                as flux pulse amplitudes
+            analyze: bool, if True, then the measured data
+                gets analyzed (
+
+
+        """
+
+        if MC is None:
+            MC = self.MC
+
+        channel = self.flux_pulse_channel()
+        clock_rate = MC.station.pulsar.clock(channel)
+        T_sample = 1./clock_rate
+
+        X90_separation = kw.pop('X90_separation', 200e-9)
+        distorted = kw.pop('distorted', False)
+        distortion_dict = kw.pop('distortion_dict', None)
+        pulse_length = kw.pop('pulse_length', 30e-9)
+        self.flux_pulse_length(pulse_length)
+        pulse_delay = kw.pop('pulse_delay', 50e-9)
+        self.flux_pulse_delay(pulse_delay)
+
+
+
+        measurement_string = 'Flux_pulse_frequency_calibration_{}'.format(self.name)
+
+        if thetas is None:
+            thetas = np.linspace(0, 2*np.pi, 8, endpoint=False)
+        if ampls is None:
+            ampls = np.linspace(0,1,21)
+
+        self.set_default_readout_weights()
+        self.prepare_for_timedomain()
+        self.update_detector_functions()
+        detector_fun = self.int_avg_det
+
+        s1 = awg_swf.Ramsey_interleaved_fluxpulse_sweep(
+            self,
+            X90_separation=X90_separation,
+            distorted=distorted,
+            distortion_dict=distortion_dict)
+        s2 = awg_swf.Ramsey_fluxpulse_ampl_sweep(self, s1)
+
+        MC.set_sweep_function(s1)
+        MC.set_sweep_points(thetas)
+        MC.set_sweep_function_2D(s2)
+        MC.set_sweep_points_2D(ampls)
+        MC.set_detector_function(detector_fun)
+        MC.run_2D(measurement_string)
+
+        if analyze:
+            flux_pulse_ma = ma.Fluxpulse_Ramsey_2D_Analysis(
+                label=measurement_string,
+                X90_separation=X90_separation,
+                flux_pulse_length=pulse_length,
+                qb_name=self.name,
+                auto=False)
+
+            flux_pulse_ma.fit_all(extrapolate_phase=True, plot=True)
+
+
 
 
 

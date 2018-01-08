@@ -1525,8 +1525,7 @@ def FluxTrack(operation_dict, q0,
 
 def Ramsey_with_flux_pulse_meas_seq(thetas, qb, X90_separation, verbose=False,
                                     upload=True, return_seq=False,
-                                    distorted=False,distortion_dict=None,
-                                    compensation_pulses=False):
+                                    distorted=False,distortion_dict=None):
     '''
     Performs a Ramsey with interleaved Flux pulse
 
@@ -1578,21 +1577,13 @@ def Ramsey_with_flux_pulse_meas_seq(thetas, qb, X90_separation, verbose=False,
         flux_pulse_delay_hack -= flux_pulse['buffer']
     flux_pulse['pulse_delay'] += flux_pulse_delay_hack
 
-    flux_pulse_comp = deepcopy(flux_pulse)
-    if compensation_pulses:
-        flux_pulse_comp['amplitude'] = -  flux_pulse['amplitude']
-    else:
-        flux_pulse_comp['amplitude'] = 0
-    flux_pulse_comp['refpoint'] = 'start'
-    flux_pulse_comp['pulse_delay'] = 500e-9 - flux_pulse_delay_hack \
-                                        - flux_pulse['pulse_delay']
 
     for i, theta in enumerate(thetas):
 
         X90_2['phase'] = theta*180/np.pi
         el = multi_pulse_elt(i, station,
                              [pulses['X90'], X90_2, RO_pars,
-                              flux_pulse, flux_pulse_comp])
+                              flux_pulse])
         if distorted is True:
             if distortion_dict is not None:
                 el = fluxpulse_predistortion.distort_qudev(el,distortion_dict)
@@ -1611,8 +1602,7 @@ def Ramsey_with_flux_pulse_meas_seq(thetas, qb, X90_separation, verbose=False,
 def Chevron_flux_pulse_length_seq(lengths, qb_control, qb_target, spacing=50e-9,
                                   verbose=False,cal_points=False,
                                   upload=True, return_seq=False,distorted=False,
-                                  distortion_dict=None,
-                                  compensation_pulses=False):
+                                  distortion_dict=None):
 
     '''
     chevron sequence (sweep of the flux pulse length)
@@ -1654,15 +1644,6 @@ def Chevron_flux_pulse_length_seq(lengths, qb_control, qb_target, spacing=50e-9,
     flux_pulse_control['refpoint'] = 'end'
     flux_pulse_control['pulse_delay'] = spacing
 
-    flux_pulse_comp = deepcopy(flux_pulse_control)
-    if compensation_pulses:
-        flux_pulse_comp['amplitude'] = -  flux_pulse_control['amplitude']
-    else:
-        flux_pulse_comp['amplitude'] = 0
-    flux_pulse_comp['refpoint'] = 'end'
-    flux_pulse_comp['delay'] = spacing
-
-
     max_length = np.max(lengths)
 
     RO_pars_target['refpoint'] = 'start'
@@ -1674,22 +1655,18 @@ def Chevron_flux_pulse_length_seq(lengths, qb_control, qb_target, spacing=50e-9,
 
     for i, length in enumerate(lengths):
         flux_pulse_control['length'] = length
-        flux_pulse_comp['length'] = length
 
         if cal_points and (i == (len(lengths)-4) or i == (len(lengths)-3)):
             el = multi_pulse_elt(i, station, [RO_pars_target])
         elif cal_points and (i == (len(lengths)-2) or i == (len(lengths)-1)):
             flux_pulse_control['amplitude'] = 0
-            flux_pulse_comp['amplitude'] = 0
             el = multi_pulse_elt(i, station, [X180_control, X180_target,
                                               flux_pulse_control,
-                                              RO_pars_target,
-                                              flux_pulse_comp])
+                                              RO_pars_target])
         else:
             el = multi_pulse_elt(i, station, [X180_control,X180_target,
                                               flux_pulse_control,
-                                              RO_pars_target,
-                                              flux_pulse_comp])
+                                              RO_pars_target])
 
         if distorted is True:
             if distortion_dict is not None:
@@ -1794,14 +1771,125 @@ def Chevron_flux_pulse_ampl_seq(ampls, qb_control,
         return seq_name
 
 
+def flux_pulse_CPhase_seq(sweep_points,qb_control, qb_target,
+                          sweep_mode='length',
+                          X90_phase=0,
+                          spacing=50e-9,
+                          verbose=False,cal_points=False,
+                          upload=True, return_seq=False,
+                          distorted=False,
+                          distortion_dict=None,
+                          ):
+
+    '''
+    chevron like sequence (sweep of the flux pulse length)
+    where the phase is measures.
+    The sequence function is programmed, such that it either can take lengths, amplitudes or phases to sweep.
+
+    Timings of sequence
+                                  <-- length -->
+                                    or amplitude
+    qb_control:    |X180|  ---   |  fluxpulse   |
+
+    qb_target:     |X90|  ------------------------------|X90|--------  |RO|
+                         <------>                       X90_phase
+                         spacing
+    args:
+        sweep_points: np.array containing the lengths of the fluxpulses
+        qb_control: instance of the qubit class
+        qb_control: instance of the qubit class
+        sweep_mode: str, either 'length', 'amplitude' or amplitude
+        X90_phase: float, phase of the second X90 pulse in rad
+        spacing: float
+
+    '''
+
+
+    qb_name_control = qb_control.name
+    qb_name_target = qb_target.name
+    operation_dict_control = qb_control.get_operation_dict()
+    operation_dict_target = qb_target.get_operation_dict()
+    pulse_pars_control = qb_control.get_drive_pars()
+    pulse_pars_target = qb_target.get_drive_pars()
+    RO_pars_target = qb_target.get_RO_pars()
+    seq_name = 'Chevron_sequence_flux_{}_sweep_rel_phase_meas'.format(sweep_mode)
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+
+    pulses_control = get_pulse_dict_from_pars(pulse_pars_control)
+    pulses_target = get_pulse_dict_from_pars(pulse_pars_target)
+
+    X180_control = pulses_control['X180']
+    X180_control['refpoint'] = 'start'
+    X90_target = pulses_target['X90']
+    X90_target['refpoint'] = 'start'
+
+    X90_target_2 = deepcopy(X90_target)
+    X90_target_2['phase'] = X90_phase*180/np.pi
+    #     X90_target_2['phase'] = 1
+
+    flux_pulse_control = operation_dict_control["flux "+qb_name_control]
+    flux_pulse_control['refpoint'] = 'end'
+    flux_pulse_control['delay'] = spacing
+
+
+    if sweep_mode == 'length':
+        max_length = np.max(sweep_points)
+    else:
+        max_length = flux_pulse_control['length']
+
+    X90_target_2['refpoint'] = 'start'
+    X90_target_2['pulse_delay'] = max_length + spacing
+
+    RO_pars_target['refpoint'] = 'end'
+
+    if flux_pulse_control['pulse_type'] == 'GaussFluxPulse':
+        flux_pulse_control['pulse_delay'] -= flux_pulse_control['buffer']
+        X90_target_2['pulse_delay'] -= 2* flux_pulse_control['buffer']
+
+    for i, sweep_point in enumerate(sweep_points):
+        if sweep_mode == 'length':
+            flux_pulse_control['length'] = sweep_point
+        elif sweep_mode == 'amplitude':
+            flux_pulse_control['amplitude'] = sweep_point
+        elif sweep_mode == 'phase':
+            X90_target_2['phase'] = sweep_point*180/np.pi
+
+        if cal_points and (i == (len(sweep_points)-4) or i == (len(sweep_points)-3)):
+            el = multi_pulse_elt(i, station, [RO_pars_target])
+        elif cal_points and (i == (len(sweep_points)-2) or i == (len(sweep_points)-1)):
+            flux_pulse_control['amplitude'] = 0
+            el = multi_pulse_elt(i, station, [X180_control, X90_target,
+                                              flux_pulse_control, X90_target_2,
+                                              RO_pars_target])
+        else:
+            el = multi_pulse_elt(i, station, [X180_control,X90_target,
+                                              flux_pulse_control,X90_target_2,
+                                              RO_pars_target])
+
+        if distorted is True:
+            if distortion_dict is not None:
+                el = fluxpulse_predistortion.distort_qudev(el,distortion_dict)
+            else:
+                raise ValueError('Must specify distortion dictionary')
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
+
+
 def fluxpulse_scope_sequence(delays, qb, verbose=False,
                              cal_points=False,
                              upload=True,
                              return_seq=False,
                              distorted=False,
                              distortion_dict=None,
-                             spacing=30e-9,
-                             compensation_pulses=False):
+                             spacing=30e-9):
     '''
     Performs X180 pulse on top of a fluxpulse
 
@@ -1826,14 +1914,6 @@ def fluxpulse_scope_sequence(delays, qb, verbose=False,
 
     pulses = get_pulse_dict_from_pars(pulse_pars)
     flux_pulse = operation_dict["flux "+qb_name]
-    flux_pulse_comp = deepcopy(flux_pulse)
-    if compensation_pulses:
-        flux_pulse_comp['amplitude'] = -  flux_pulse['amplitude']
-    else:
-        flux_pulse_comp['amplitude'] = 0
-    flux_pulse_comp['refpoint'] = 'end'
-    flux_pulse_comp['delay'] = spacing
-
 
     X180_2 = deepcopy(pulses['X180'])
     X180_2['refpoint'] = 'start'
@@ -1846,9 +1926,9 @@ def fluxpulse_scope_sequence(delays, qb, verbose=False,
             el = multi_pulse_elt(i, station, [RO_pars])
         elif cal_points and (i == (len(delays)-2) or i == (len(delays)-1)):
             flux_pulse['amplitude'] = 0
-            el = multi_pulse_elt(i, station, [flux_pulse,X180_2,RO_pars,flux_pulse_comp])
+            el = multi_pulse_elt(i, station, [flux_pulse,X180_2,RO_pars])
         else:
-            el = multi_pulse_elt(i, station, [flux_pulse,X180_2,RO_pars,flux_pulse_comp])
+            el = multi_pulse_elt(i, station, [flux_pulse,X180_2,RO_pars])
         if distorted is True and distortion_dict is not None:
             el = fluxpulse_predistortion.distort_qudev(el,distortion_dict)
         el_list.append(el)

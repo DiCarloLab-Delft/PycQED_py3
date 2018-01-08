@@ -8715,7 +8715,6 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
 
     """
     def __init__(self, X90_separation=None,flux_pulse_length=None,
-                 gauss_sigma=None, nr_gauss_sigma=None,
                  qb_name=None, label='Ramsey_interleaved_flux_pulse',
                  run_default_super=True, **kw):
         kw['label'] = label
@@ -8734,8 +8733,6 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
         self.delay_fit_res = None
         self.X90_separation = X90_separation
         self.flux_pulse_length = flux_pulse_length
-        self.gauss_sigma = gauss_sigma
-        self.nr_gauss_sigma = nr_gauss_sigma
         self.return_fit = kw.pop('return_fit', False)
 
         if run_default_super:
