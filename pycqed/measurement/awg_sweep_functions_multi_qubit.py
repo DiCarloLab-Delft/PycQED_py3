@@ -125,7 +125,7 @@ class five_qubit_off_on(swf.Hard_Sweep):
 class n_qubit_off_on(swf.Hard_Sweep):
 
     def __init__(self, pulse_pars_list, RO_pars, upload=True,
-                 return_seq=False, preselection=False, parallel_pulses=False,
+                 preselection=False, parallel_pulses=False,
                  verbose=False, RO_spacing=200e-9):
         super().__init__()
         self.pulse_pars_list = pulse_pars_list
@@ -138,7 +138,6 @@ class n_qubit_off_on(swf.Hard_Sweep):
             samples *= 2
         self.sweep_points = np.arange(samples)
         self.verbose = verbose
-        self.return_seq = return_seq
         self.preselection = preselection
         self.parallel_pulses = parallel_pulses
         self.RO_spacing = RO_spacing
@@ -151,8 +150,31 @@ class n_qubit_off_on(swf.Hard_Sweep):
                                 preselection=self.preselection,
                                 parallel_pulses=self.parallel_pulses,
                                 RO_spacing=self.RO_spacing,
-                                return_seq=self.return_seq,
                                 verbose=self.verbose)
+
+class n_qubit_reset(swf.Hard_Sweep):
+    def __init__(self, pulse_pars_list, RO_pars, feedback_delay, nr_resets=1,
+                 upload=True, verbose=False):
+        super().__init__()
+        self.pulse_pars_list = pulse_pars_list
+        self.RO_pars = RO_pars
+        self.feedback_delay = feedback_delay
+        self.upload = upload
+        self.parameter_name = 'sample'
+        self.unit = '#'
+        self.nr_resets = nr_resets
+        samples = nr_resets*2**len(pulse_pars_list)
+        self.sweep_points = np.arange(samples)
+        self.verbose = verbose
+        self.name = '{}_qubit_{}_reset'.format(len(pulse_pars_list), nr_resets)
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs2.n_qubit_reset(pulse_pars_list=self.pulse_pars_list,
+                               RO_pars=self.RO_pars,
+                               feedback_delay=self.feedback_delay,
+                               nr_resets=self.nr_resets,
+                               verbose=self.verbose)
 
 
 class two_qubit_AllXY(swf.Hard_Sweep):

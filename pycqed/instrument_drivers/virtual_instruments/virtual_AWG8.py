@@ -26,12 +26,16 @@ class VirtualAWG8(Instrument):
 
         self._add_codeword_parameters()
         self.add_dummy_parameters()
+        self._awg_str = [''] * 4
+        self._waveforms = [{}, {}, {}, {}]
 
     def add_dummy_parameters(self):
         parnames = []
         for i in range(8):
             parnames.append('sigouts_{}_offset'.format(i))
             parnames.append('sigouts_{}_on'.format(i))
+        for i in range(4):
+            parnames.append('awgs_{}_enable'.format(i))
 
         for par in parnames:
             self.add_parameter(par, parameter_class=ManualParameter)
@@ -67,6 +71,9 @@ class VirtualAWG8(Instrument):
                     docstring=docst)
                 self._params_to_skip_update.append(parname)
 
+    def clock_freq(self, awg_nr):
+        return 2.4e9
+
     def upload_codeword_program(self):
         pass
 
@@ -75,3 +82,9 @@ class VirtualAWG8(Instrument):
 
     def start(self):
         pass
+
+    def configure_awg_from_string(self, awg_nr, awg_str, timeout):
+        self._awg_str[awg_nr] = awg_str
+
+    def awg_update_waveform(self, awg_nr, i, data1, data2):
+        self._waveforms[awg_nr][i] = (data1.copy(), data2.copy())

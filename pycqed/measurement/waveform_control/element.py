@@ -6,7 +6,6 @@
 import numpy as np
 import pprint
 from copy import deepcopy
-from pycqed.measurement.waveform_control import pulsar as ps
 import logging
 
 
@@ -135,7 +134,7 @@ class Element:
 
     def channel_delay(self, c):
         if not self.ignore_delays:
-            return self.pulsar.channels[c]['delay']
+            return self.pulsar.get('{}_delay'.format(c))
         else:
             return 0
 
@@ -287,8 +286,7 @@ class Element:
 
         for c in self.pulsar.channels:
             nsamples = self.samples(c)
-            wfs[c] = np.zeros(nsamples) + \
-                     self.pulsar.channels[c]['offset']
+            wfs[c] = np.zeros(nsamples)
             tvals[c] = np.arange(nsamples) / self._clock(c)
         # we first compute the ideal function values
         for p in self.pulses:
@@ -305,10 +303,8 @@ class Element:
                             'Pulse {} on channel {} in element {} starts at a '
                             'negative time. Please increase the RO_fixpoint.'
                                 .format(p, c, self.name))
-                    chan_tvals[c] = np.round(tvals[c].copy()[idx0:idx1] +
-                                             self.channel_delay(c) +
-                                             self.time_offset,
-                                             ps.SIGNIFICANT_DIGITS)
+                    chan_tvals[c] = tvals[c].copy()[idx0:idx1] + \
+                                    self.channel_delay(c) + self.time_offset
             pulsewfs = self.pulses[p].get_wfs(chan_tvals)
 
             for c in self.pulses[p].channels:
@@ -329,14 +325,16 @@ class Element:
         """
         tvals, wfs = self.ideal_waveforms()
         for wf in wfs:
-            hi = self.pulsar.channels[wf]['high']
-            lo = self.pulsar.channels[wf]['low']
             if self.chan_distorted[wf]:
                 wfs[wf] = self.distorted_wfs[wf]
             if len(wfs[wf]) == 0:
                 continue
+            offset = self.pulsar.get('{}_offset'.format(wf))
+            amp = self.pulsar.get('{}_amp'.format(wf))
+            hi = offset + amp
+            lo = offset - amp
             # truncate all values that are out of bounds
-            if self.pulsar.channels[wf]['type'] == 'analog':
+            if self.pulsar.get('{}_type'.format(wf)) == 'analog':
                 if np.max(wfs[wf]) > hi:
                     logging.warning('Clipping waveform {} > {}'.format(
                                     max(wfs[wf]), hi))
@@ -345,9 +343,9 @@ class Element:
                                     min(wfs[wf]), lo))
                 wfs[wf][wfs[wf] > hi] = hi
                 wfs[wf][wfs[wf] < lo] = lo
-            elif self.pulsar.channels[wf]['type'] == 'marker':
-                wfs[wf][wfs[wf] > lo] = hi
-                wfs[wf][wfs[wf] < lo] = lo
+            elif self.pulsar.get('{}_type'.format(wf)) == 'marker':
+                wfs[wf][wfs[wf] > offset] = hi
+                wfs[wf][wfs[wf] < offset] = offset
         return tvals, wfs
 
     def normalized_waveforms(self):
@@ -358,14 +356,16 @@ class Element:
         tvals, wfs = self.waveforms()
 
         for wf in wfs:
-            hi = self.pulsar.channels[wf]['high']
-            lo = self.pulsar.channels[wf]['low']
+            offset = self.pulsar.get('{}_offset'.format(wf))
+            amp = self.pulsar.get('{}_amp'.format(wf))
+            hi = offset + amp
+            lo = offset - amp
 
-            if self.pulsar.channels[wf]['type'] == 'analog':
+            if self.pulsar.get('{}_type'.format(wf)) == 'analog':
                 wfs[wf] = (2.0*wfs[wf] - hi - lo) / (hi - lo)
-            elif self.pulsar.channels[wf]['type'] == 'marker':
-                wfs[wf][wfs[wf] > lo] = 1
-                wfs[wf][wfs[wf] <= lo] = 0
+            if self.pulsar.get('{}_type'.format(wf)) == 'marker':
+                wfs[wf][wfs[wf] > offset] = 1
+                wfs[wf][wfs[wf] <= offset] = 0
         return tvals, wfs
 
     # testing and inspection
@@ -396,7 +396,6 @@ class Element:
 # Helper functions, previously part of the element object but moved outside
 # to be able to use them in other modules (eg higher level parts of the
 # sequencer)
-
 
 def calculate_time_correction(t0, fixed_point=1e-6):
     return np.round((fixed_point-t0) % fixed_point, decimals=11)

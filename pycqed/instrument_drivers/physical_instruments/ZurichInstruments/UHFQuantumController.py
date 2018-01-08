@@ -86,7 +86,7 @@ class UHFQC(Instrument):
             init = False
 
         self.add_parameter('timeout', unit='s',
-                           initial_value=10,
+                           initial_value=30,
                            parameter_class=ManualParameter)
         for parameter in s_node_pars:
             parname = parameter[0].replace("/", "_")
@@ -161,9 +161,9 @@ class UHFQC(Instrument):
                            set_cmd=self._do_set_AWG_file,
                            vals=vals.Anything())
         # storing an offset correction parameter for all weight functions,
-        # this allows normalized calibration when performing cross-talk suppressed
-        # readout
-        for i in range(5):
+        # this allows normalized calibration when performing cross-talk
+        # suppressed readout
+        for i in range(9):
             self.add_parameter("quex_trans_offset_weightfunction_{}".format(i),
                                unit='',  # unit is adc value
                                label='RO normalization offset',
@@ -219,6 +219,7 @@ class UHFQC(Instrument):
         self.quex_deskew_1_col_1(1.0)
 
         self.quex_wint_delay(0)
+        self.quex_iavg_delay(0)
 
         # Setting the clock to external
         self.system_extclk(1)
@@ -229,23 +230,19 @@ class UHFQC(Instrument):
         self.awgs_0_dio_valid_index(16)
         self.awgs_0_dio_valid_polarity(2) # high polarity
 
-
-
-
-
         # We probably need to adjust some delays here...
         #self.awgs_0_dio_delay_index(31)
         #self.awgs_0_dio_delay_value(1)
 
         # No rotation on the output of the weighted integration unit, i.e. take
         # real part of result
-        for i in range(0, 4):
+        for i in range(0, 9):
             eval('self.quex_rot_{0}_real(1.0)'.format(i))
             eval('self.quex_rot_{0}_imag(0.0)'.format(i))
 
         # No cross-coupling in the matrix multiplication (identity matrix)
-        for i in range(0, 4):
-            for j in range(0, 4):
+        for i in range(0, 9):
+            for j in range(0, 9):
                 if i == j:
                     eval('self.quex_trans_{0}_col_{1}_real(1)'.format(i, j))
                 else:
@@ -256,19 +253,23 @@ class UHFQC(Instrument):
         self.quex_rl_avgcnt(LOG2_RL_AVG_CNT)
         self.quex_rl_source(2)
 
-        # Ready for readout. Writing a '1' to these nodes activates the automatic readout of results.
-        # This functionality should be used once the ziPython driver has been improved to handle
-        # the 'poll' commands of these results correctly. Until then, we write a '0' to the nodes
-        # to prevent automatic result readout. It is then necessary to poll e.g. the AWG in order to
-        # detect when the measurement is complete, and then manually fetch the results using the 'get'
-        # command. Disabling the automatic result readout speeds up the operation a bit, since we avoid
-        # sending the same data twice.
+        # Ready for readout. Writing a '1' to these nodes activates the
+        # automatic readout of results. This functionality should be used once
+        # the ziPython driver has been improved to handle the 'poll' commands
+        # of these results correctly. Until then, we write a '0' to the nodes
+        # to prevent automatic result readout. It is then necessary to poll
+        # e.g. the AWG in order to detect when the measurement is complete, and
+        # then manually fetch the results using the 'get' command. Disabling
+        # the automatic result readout speeds up the operation a bit, since we
+        # avoid sending the same data twice.
         self.quex_iavg_readout(0)
         self.quex_rl_readout(0)
 
-        # The custom firmware will feed through the signals on Signal Input 1 to Signal Output 1 and Signal Input 2 to Signal Output 2
-        # when the AWG is OFF. For most practical applications this is not really useful. We, therefore, disable the generation of
-        # these signals on the output here.
+        # The custom firmware will feed through the signals on Signal Input 1
+        # to Signal Output 1 and Signal Input 2 to Signal Output 2 when the AWG
+        # is OFF. For most practical applications this is not really useful.
+        # We, therefore, disable the generation of these signals on the output
+        # here.
         self.sigouts_0_enables_3(0)
         self.sigouts_1_enables_7(0)
 
@@ -400,18 +401,21 @@ class UHFQC(Instrument):
     def sync(self):
         self._daq.sync()
 
-    def acquisition_arm(self):
-        # time.sleep(0.01)
-        self._daq.asyncSetInt('/' + self._device + '/awgs/0/single', 1)
+    def acquisition_arm(self, single=True):
+        self._daq.asyncSetInt('/' + self._device + '/awgs/0/single', single)
         self._daq.syncSetInt('/' + self._device + '/awgs/0/enable', 1)
-        # t0=time.time()
-        # time.sleep(0.001)
-        # self._daq.sync()
-        # deltat=time.time()-t0
-        # print('UHFQC syncing took {}'.format(deltat))
+
+    def start(self):
+        """Tektronix-style start command"""
+        self._daq.syncSetInt('/' + self._device + '/awgs/0/enable', 1)
+
+    def stop(self):
+        """Tektronix-style stop command"""
+        self._daq.syncSetInt('/' + self._device + '/awgs/0/enable', 0)
 
     def acquisition_get(self, samples, acquisition_time=0.010,
                         timeout=0, channels=set([0, 1]), mode='rl'):
+        logging.warning("acquisition_get is deprecated (Nov 2017). Dont' use it!")
         # Define the channels to use
         paths = dict()
         data = dict()
@@ -481,7 +485,8 @@ class UHFQC(Instrument):
             samples (int): the expected number of samples
             arm    (bool): if true arms the acquisition, disable when you
                            need synchronous acquisition with some external dev
-            acquisition_time (float): time in sec between polls? # TODO check with Niels H
+            acquisition_time (float): time in sec between polls?
+                                      # TODO check with Niels H
             timeout (float): time in seconds before timeout Error is raised.
 
         """
@@ -520,7 +525,7 @@ class UHFQC(Instrument):
         return data
 
     def acquisition(self, samples, acquisition_time=0.010, timeout=0,
-                    channels=set([0, 1]), mode='rl'):
+                    channels=(0, 1), mode='rl'):
         self.acquisition_initialize(channels, mode)
         data = self.acquisition_poll(samples, acquisition_time, timeout)
         self.acquisition_finalize()
@@ -557,9 +562,9 @@ class UHFQC(Instrument):
         self._daq.unsubscribe('/' + self._device + '/auxins/0/sample')
 
     def create_parameter_files(self):
-        # this functions retrieves all possible settable and gettable parameters from the device.
-        # Additionally, iot gets all minimum and maximum values for the
-        # parameters by trial and error
+        # this functions retrieves all possible settable and gettable
+        # parameters from the device. Additionally, iot gets all minimum and
+        # maximum values for the parameters by trial and error
 
         s_node_pars = []
         d_node_pars = []
@@ -961,7 +966,31 @@ wait(10);
 setTrigger(0);"""
         self.awg_string(string)
 
-    def awg_update_waveform(self, index, data):
+    def awg_update_waveform(self, index, data1, data2=None):
+        """Immideately updates the waveform with the given index.
+
+        The waveform in the waveform viewer in the LabOne web interface is not
+        updated. If data for both AWG channels is given, then the lengths must
+        match.
+
+        Warning! This method should be used with care.
+        Note that the waveform get's overwritten if a new program is uploaded.
+
+        Args:
+            index: Index of the waveform to update. Corresponds to the order of
+                   waveforms in the AWG/Waveform tab in the web interface.
+                   Starts from 0.
+            data1: Waveform data for channel 1.
+            data2: Optional waveform data for channel 2.
+        """
+        if data1 is None and data2 is None:
+            return
+        elif data1 is None:
+            data = data2
+        elif data2 is None:
+            data = data1
+        else:
+            data = np.vstack((data1, data2,)).reshape((-1,), order='F')
         self.awgs_0_waveform_index(index)
         self.awgs_0_waveform_data(data)
         self._daq.sync()
@@ -975,17 +1004,16 @@ setTrigger(0);"""
         coswave = RO_amp*np.cos(2*np.pi*array*f_RO_mod/f_sampling)
         Iwave = (coswave+sinwave)/np.sqrt(2)
         Qwave = (coswave-sinwave)/np.sqrt(2)
-        # Iwave, Qwave = PG.mod_pulse(np.ones(samples), np.zeros(samples), f=f_RO_mod, phase=0, sampling_rate=f_sampling)
         self.awg_sequence_acquisition_and_pulse(
             Iwave, Qwave, acquisition_delay)
 
     def upload_transformation_matrix(self, matrix):
         for i in range(np.shape(matrix)[0]):  # looping over the rows
             for j in range(np.shape(matrix)[1]):  # looping over the colums
-                eval(
-                    'self.quex_trans_{}_col_{}_real(matrix[{}][{}])'.format(j, i, i, j))
+                eval('self.quex_trans_{}_col_{}_real(matrix[{}][{}])'
+                     .format(j, i, i, j))
 
-    def download_transformation_matrix(self, nr_rows=4, nr_cols=4):
+    def download_transformation_matrix(self, nr_rows=9, nr_cols=9):
         matrix = np.zeros([nr_rows, nr_cols])
         for i in range(np.shape(matrix)[0]):  # looping over the rows
             for j in range(np.shape(matrix)[1]):  # looping over the colums
