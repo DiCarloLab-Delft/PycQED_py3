@@ -8716,7 +8716,8 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
     """
     def __init__(self, X90_separation=None,flux_pulse_length=None,
                  gauss_sigma=None, nr_gauss_sigma=None,
-                 qb_name=None, label='Ramsey_interleaved_flux_pulse', **kw):
+                 qb_name=None, label='Ramsey_interleaved_flux_pulse',
+                 run_default_super=True, **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
         kw['close_file'] = False
@@ -8737,8 +8738,9 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
         self.nr_gauss_sigma = nr_gauss_sigma
         self.return_fit = kw.pop('return_fit', False)
 
-        super(self.__class__, self).run_default_analysis(TwoD=True,
-                                                         close_file=False)
+        if run_default_super:
+            super(self.__class__, self).run_default_analysis(TwoD=True,
+                                                             close_file=False)
 
 
 
@@ -8779,7 +8781,7 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
 
         return fit_res
 
-    def fit_all(self, plot=False, extrapolate_phase=False,return_ampl=False):
+    def fit_all(self, plot=False, extrapolate_phase=False, return_ampl=False):
 
         phase_list = [0,0]
         amplitude_list = []
