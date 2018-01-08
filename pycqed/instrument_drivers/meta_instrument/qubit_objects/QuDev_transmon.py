@@ -2674,7 +2674,8 @@ class QuDev_transmon(Qubit):
 
     def calibrate_flux_pulse_frequency(self,MC=None, thetas=None, ampls=None,
                                        analyze=False,
-                                       update=False,**kw):
+                                       plot=False,
+                                       **kw):
         """
         flux pulse timing frequency
 
@@ -2704,7 +2705,6 @@ class QuDev_transmon(Qubit):
 
         channel = self.flux_pulse_channel()
         clock_rate = MC.station.pulsar.clock(channel)
-        T_sample = 1./clock_rate
 
         X90_separation = kw.pop('X90_separation', 200e-9)
         distorted = kw.pop('distorted', False)
@@ -2713,10 +2713,6 @@ class QuDev_transmon(Qubit):
         self.flux_pulse_length(pulse_length)
         pulse_delay = kw.pop('pulse_delay', 50e-9)
         self.flux_pulse_delay(pulse_delay)
-
-
-
-        measurement_string = 'Flux_pulse_frequency_calibration_{}'.format(self.name)
 
         if thetas is None:
             thetas = np.linspace(0, 2*np.pi, 8, endpoint=False)
@@ -2740,17 +2736,64 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_function_2D(s2)
         MC.set_sweep_points_2D(ampls)
         MC.set_detector_function(detector_fun)
-        MC.run_2D(measurement_string)
+
+        measurement_string_1 = 'Flux_pulse_frequency_calibration_{}_1'.format(self.name)
+        MC.run_2D(measurement_string_1)
+
+        MC.set_sweep_points_2D(-ampls)
+
+        measurement_string_2 = 'Flux_pulse_frequency_calibration_{}_2'.format(self.name)
+        MC.run_2D(measurement_string_2)
 
         if analyze:
-            flux_pulse_ma = ma.Fluxpulse_Ramsey_2D_Analysis(
-                label=measurement_string,
+            flux_pulse_ma_1 = ma.Fluxpulse_Ramsey_2D_Analysis(
+                label=measurement_string_1,
                 X90_separation=X90_separation,
                 flux_pulse_length=pulse_length,
                 qb_name=self.name,
                 auto=False)
+            flux_pulse_ma_1.fit_all(extrapolate_phase=True, plot=True)
 
-            flux_pulse_ma.fit_all(extrapolate_phase=True, plot=True)
+            flux_pulse_ma_2 = ma.Fluxpulse_Ramsey_2D_Analysis(
+                label=measurement_string_2,
+                X90_separation=X90_separation,
+                flux_pulse_length=pulse_length,
+                qb_name=self.name,
+                auto=False)
+            flux_pulse_ma_2.fit_all(extrapolate_phase=True, plot=True)
+
+            instrument_settings = flux_pulse_ma_1.data_file['Instrument settings']
+            qubit_attrs = instrument_settings[self.name].attrs
+            E_c = kw.pop('E_c', qubit_attrs.get('E_c', 0.3e9))
+            f_max = kw.pop('f_max', qubit_attrs.get('f_max', self.f_qubit()))
+            V_per_phi0 = kw.pop('V_per_phi0',
+                                qubit_attrs.get('V_per_phi0', 1.))
+            dac_sweet_spot = kw.pop('dac_sweet_spot',
+                                    qubit_attrs.get('dac_sweet_spot', 0))
+
+            phases = np.concatenate(flux_pulse_ma_2.fitted_phases[-1:0:-1],
+                                    flux_pulse_ma_1.fitted_phases)
+            ampls = np.concatenate(flux_pulse_ma_2.sweep_points_2D[-1:0:-1],
+                                   flux_pulse_ma_1.sweep_points_2D)
+
+            freqs = f_max - phases/(2*np.pi*pulse_length)
+
+            fit_res = ma.fit_qubit_frequency(ampls, freqs, E_c=E_c, f_max=f_max,
+                                             V_per_phi0=V_per_phi0,
+                                             dac_sweet_spot=dac_sweet_spot
+                                             )
+            print(fit_res.fit_report())
+
+            if plot:
+                fit_res.plot()
+
+            return fit_res
+
+
+
+
+
+
 
 
 
