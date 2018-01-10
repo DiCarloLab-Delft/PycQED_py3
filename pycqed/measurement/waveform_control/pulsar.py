@@ -55,6 +55,11 @@ class UHFQCPulsar:
                            get_cmd=lambda _=obj.name: _)
         self.add_parameter('{}_type'.format(name),
                            get_cmd=lambda: 'analog')
+        self.add_parameter('{}_granularity'.format(name),
+                           get_cmd=lambda: 8)
+        self.add_parameter('{}_min_samples'.format(name),
+                           get_cmd=lambda: 8)
+
         self.add_parameter('{}_delay'.format(name), initial_value=0,
                            label='{} delay'.format(name), unit='s',
                            parameter_class=ManualParameter,
@@ -220,6 +225,10 @@ class HDAWG8Pulsar:
                            get_cmd=lambda _=obj.name: _)
         self.add_parameter('{}_type'.format(name),
                            get_cmd=lambda: 'analog')
+        self.add_parameter('{}_granularity'.format(name),
+                           get_cmd=lambda: 8)
+        self.add_parameter('{}_min_samples'.format(name),
+                           get_cmd=lambda: 8)
         self.add_parameter('{}_delay'.format(name), initial_value=0,
                            label='{} delay'.format(name), unit='s',
                            parameter_class=ManualParameter,
@@ -582,6 +591,11 @@ class AWG5014Pulsar:
                            docstring="Global delay applied to this channel. "
                                      "Positive values move pulses on this "
                                      "channel forward in  time")
+        self.add_parameter('{}_granularity'.format(name),
+                           get_cmd=lambda: 4)
+        self.add_parameter('{}_min_samples'.format(name),
+                           get_cmd=lambda: 4) # Can not be triggered faster
+                                              # than 1 us.
         if id in ['ch1', 'ch2', 'ch3', 'ch4']:
             self.add_parameter('{}_type'.format(name),
                                get_cmd=lambda: 'analog')

@@ -20,9 +20,6 @@ class Element:
         self.name = name
         self.pulsar = pulsar
 
-        # should granularity be device/channel specific
-        self.granularity = kw.pop('granularity', 4)
-        self.min_samples = kw.pop('min_samples', 960)
         self.ignore_offset_correction = kw.pop('ignore_offset_correction',
                                                False)
 
@@ -106,9 +103,9 @@ class Element:
         if len(ends) == 0:
             return 0
         samples = max(ends)+1
-        if samples < self.min_samples:
-            samples = self.min_samples
-        while samples % self.granularity != 0:
+        if samples < self.pulsar.get('{}_min_samples'.format(c)):
+            samples = self.pulsar.get('{}_min_samples'.format(c))
+        while samples % self.pulsar.get('{}_granularity'.format(c)) != 0:
             samples += 1
         return samples
 

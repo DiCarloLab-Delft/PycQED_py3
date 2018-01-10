@@ -1008,14 +1008,17 @@ def n_qubit_off_on(pulse_pars_list, RO_pars, return_seq=False, verbose=False,
         return seq_name
 
 def n_qubit_reset(pulse_pars_list, RO_pars, feedback_delay, nr_resets=1,
-                  return_seq=False, verbose=False, codeword_indices=None):
+                  return_seq=False, verbose=False, codeword_indices=None,
+                  upload=True):
     n = len(pulse_pars_list)
     seq_name = '{}_qubit_{}_reset_sequence'.format(n, nr_resets)
     seq = sequence.Sequence(seq_name)
     el_list = []
 
     # Create a dict with the parameters for all the pulses
-    pulse_dict = {'RO': RO_pars}
+    pars = RO_pars.copy()
+    pars['pulse_delay'] = max(pars['pulse_delay'], -pars['acq_marker_delay'])
+    pulse_dict = {'RO': pars}
     for i, pulse_pars in enumerate(pulse_pars_list):
         pars = pulse_pars.copy()
         pulses = add_suffix_to_dict_keys(
@@ -1074,7 +1077,8 @@ def n_qubit_reset(pulse_pars_list, RO_pars, feedback_delay, nr_resets=1,
                 codeword |= (1 << codeword_indices[qb])
         seq.codewords[codeword] = 'reset' + statename
 
-    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
 
     if return_seq:
         return seq, el_list

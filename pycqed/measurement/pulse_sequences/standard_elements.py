@@ -82,14 +82,9 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
         pulsar=station.pulsar,
         readout_fixed_point=sequencer_config['RO_fixed_point'],
         ignore_delays=not trigger)
-    if trigger:
+    if not trigger:
         el.fixed_point_applied = True
         el.ignore_offset_correction = True
-    #    # Exists to ensure there are no empty channels
-    #    for cname in station.pulsar.channels:
-    #        el.add(pulse.SquarePulse(name='refpulse_0', channel=cname,
-    #                                 amplitude=0, length=1e-9))
-
 
     # exists to ensure that channel is not high when waiting for trigger
     # and to allow negavtive pulse delay of elements up to 300 ns
@@ -217,7 +212,8 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
 
             elif (pulse_pars['pulse_type'] == 'MW_IQmod_pulse_UHFQC' or
                   pulse_pars['pulse_type'] == 'Multiplexed_UHFQC_pulse'):
-                # "adding a 0 amp pulse because the sequencer needs an element for timing
+                # "adding a 0 amp pulse because the sequencer needs an element
+                # for timing
                 last_pulse = el.add(pulse.SquarePulse(
                     name='RO_marker', amplitude=0,
                     length=pulse_pars['length'],
@@ -267,21 +263,18 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
             refpoint=pulse_pars['refpoint'],
             operation_type=pulse_pars['operation_type'])
 
-    # This pulse ensures that the sequence always ends at zero amp
-    if len(flux_compensation_pulse_list) > 0:
-        final_len = 500e-9
-    else:
-        final_len = 1e-9
-    #for cname in station.pulsar.channels:
-    #    el.add(pulse.SquarePulse(name='final_empty_pulse', channel=cname,
-    #                             amplitude=0, length=final_len),
-    #           refpulse=last_pulse, refpoint='end')
+    # make sure that the waveforms on all the channels end at the same time
+    # in case the next element is ran back to back with this one.
+    for cname in station.pulsar.channels:
+        el.add(pulse.SquarePulse(name='empty_pulse', channel=cname,
+                                 amplitude=0, length=1e-9),
+               refpulse=last_pulse, refpoint='end', refpoint_new='end')
 
-    # Trigger the slave AWG-s
-
+    # switch to global timing for adding the trigger pulses.
     el.shift_all_pulses(-el.offset())
     el.ignore_offset_correction = True
 
+    # Trigger the slave AWG-s
     if trigger:
         slave_triggers = sequencer_config.get('slave_AWG_trig_channels', [])
         for cname in slave_triggers:

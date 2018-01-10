@@ -1,9 +1,13 @@
+import os
 import numpy as np
+import logging
 
 from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
 
+import ctypes
+from ctypes.wintypes import MAX_PATH
 
 class VirtualAWG8(Instrument):
     """
@@ -28,14 +32,39 @@ class VirtualAWG8(Instrument):
         self.add_dummy_parameters()
         self._awg_str = [''] * 4
         self._waveforms = [{}, {}, {}, {}]
+        self._devname = 'virt_awg8'
+
+        if os.name == 'nt':
+            dll = ctypes.windll.shell32
+            buf = ctypes.create_unicode_buffer(MAX_PATH + 1)
+            if dll.SHGetSpecialFolderPathW(None, buf, 0x0005, False):
+                _basedir = buf.value
+            else:
+                logging.warning('Could not extract my documents folder')
+        else:
+            _basedir = os.path.expanduser('~')
+        self.lab_one_webserver_path = os.path.join(
+            _basedir, 'Zurich Instruments', 'LabOne', 'WebServer')
 
     def add_dummy_parameters(self):
         parnames = []
         for i in range(8):
             parnames.append('sigouts_{}_offset'.format(i))
             parnames.append('sigouts_{}_on'.format(i))
+            parnames.append('sigouts_{}_direct'.format(i))
+            parnames.append('triggers_in_{}_imp50'.format(i))
+            parnames.append('triggers_in_{}_level'.format(i))
         for i in range(4):
             parnames.append('awgs_{}_enable'.format(i))
+            parnames.append('awgs_{}_auxtriggers_0_channel'.format(i))
+            parnames.append('awgs_{}_auxtriggers_0_slope'.format(i))
+            parnames.append('awgs_{}_dio_mask_value'.format(i))
+            parnames.append('awgs_{}_dio_mask_shift'.format(i))
+            parnames.append('awgs_{}_dio_strobe_index'.format(i))
+            parnames.append('awgs_{}_dio_strobe_slope'.format(i))
+            parnames.append('awgs_{}_dio_valid_index'.format(i))
+            parnames.append('awgs_{}_dio_valid_polarity'.format(i))
+        parnames.append('system_extclk')
 
         for par in parnames:
             self.add_parameter(par, parameter_class=ManualParameter)
@@ -88,3 +117,22 @@ class VirtualAWG8(Instrument):
 
     def awg_update_waveform(self, awg_nr, i, data1, data2):
         self._waveforms[awg_nr][i] = (data1.copy(), data2.copy())
+
+    def _write_csv_waveform(self, wf_name: str, waveform):
+        filename = os.path.join(
+            self.lab_one_webserver_path, 'awg', 'waves',
+            self._devname+'_'+wf_name+'.csv')
+        with open(filename, 'w') as f:
+            np.savetxt(filename, waveform, delimiter=",")
+
+    def _read_csv_waveform(self, wf_name: str):
+        filename = os.path.join(
+            self.lab_one_webserver_path, 'awg', 'waves',
+            self._devname+'_'+wf_name+'.csv')
+        try:
+            return np.genfromtxt(filename, delimiter=',')
+        except OSError as e:
+            # if the waveform does not exist yet dont raise exception
+            logging.warning(e)
+            print(e)
+            return None
