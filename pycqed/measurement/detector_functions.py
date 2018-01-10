@@ -1796,6 +1796,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
             self.AWG.stop()
         self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
         self.UHFQC.acquisition_arm()
+
         # starting AWG
         if self.AWG is not None:
             self.AWG.start()

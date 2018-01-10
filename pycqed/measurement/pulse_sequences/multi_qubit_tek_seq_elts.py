@@ -959,7 +959,7 @@ def two_qubit_tomo_cphase_cardinal(cardinal_state,
 
 
 def n_qubit_off_on(pulse_pars_list, RO_pars, return_seq=False, verbose=False,
-                   parallel_pulses=False, preselection=False,
+                   parallel_pulses=False, preselection=False, upload=True,
                    RO_spacing=200e-9):
     n = len(pulse_pars_list)
     seq_name = '{}_qubit_OffOn_sequence'.format(n)
@@ -1000,7 +1000,8 @@ def n_qubit_off_on(pulse_pars_list, RO_pars, return_seq=False, verbose=False,
         el = multi_pulse_elt(i, station, pulses)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
