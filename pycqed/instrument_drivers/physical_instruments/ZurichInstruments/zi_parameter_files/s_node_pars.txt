@@ -67,9 +67,9 @@
   ],
   [
     "awgs/0/enable",
-    "int_8bit",
+    "bool",
     0,
-    255
+    1.0
   ],
   [
     "awgs/0/outputs/0/amplitude",
@@ -147,7 +147,7 @@
     "awgs/0/triggers/0/hysteresis/absolute",
     "float",
     0,
-    999999995904.0
+    1500000026624.0
   ],
   [
     "awgs/0/triggers/0/hysteresis/mode",
@@ -225,7 +225,7 @@
     "awgs/0/triggers/1/hysteresis/relative",
     "float",
     0,
-    20.0
+    13.333333015441895
   ],
   [
     "awgs/0/triggers/1/level",
@@ -429,7 +429,7 @@
     "sigouts/0/amplitudes/3",
     "float",
     -0.75,
-    0.14999771118164062
+    0.75
   ],
   [
     "sigouts/0/autorange",
@@ -471,7 +471,7 @@
     "sigouts/1/amplitudes/7",
     "float",
     -0.75,
-    0.75
+    0.07500457763671875
   ],
   [
     "sigouts/1/autorange",
@@ -1954,5 +1954,53 @@
     "bool",
     0,
     1.0
+  ],
+  [
+    "triggers/in/0/imp50",
+    "bool",
+    0,
+    1.0
+  ],
+  [
+    "triggers/in/0/level",
+    "float",
+    -4.99981689453125,
+    5.000091552734375
+  ],
+  [
+    "triggers/in/1/imp50",
+    "bool",
+    0,
+    1.0
+  ],
+  [
+    "triggers/in/1/level",
+    "float",
+    -4.99981689453125,
+    5.000091552734375
+  ],
+  [
+    "triggers/in/2/imp50",
+    "bool",
+    0,
+    1.0
+  ],
+  [
+    "triggers/in/2/level",
+    "float",
+    -5.000114440917969,
+    4.999885559082031
+  ],
+  [
+    "triggers/in/3/imp50",
+    "bool",
+    0,
+    1.0
+  ],
+  [
+    "triggers/in/3/level",
+    "float",
+    -5.000114440917969,
+    4.999885559082031
   ]
 ]

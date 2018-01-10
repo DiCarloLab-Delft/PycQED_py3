@@ -240,7 +240,6 @@ class HDAWG8Pulsar:
         if not isinstance(obj, HDAWG8Pulsar._supportedAWGtypes):
             return super()._program_awg(obj, sequence, el_wfs, loop)
 
-
         for awg_nr in [0, 1, 2, 3]:
             ch1id = 'ch{}'.format(awg_nr * 2 + 1)
             ch2id = 'ch{}'.format(awg_nr * 2 + 2)
@@ -260,7 +259,7 @@ class HDAWG8Pulsar:
                         cid_wf = cid_wfs[cid]
                         wfnames[cid].append(wfname)
                         wfdata[cid].append(cid_wf)
-                        if cid_wf[0] != 0.:
+                        if len(cid_wf) > 0 and cid_wf[0] != 0.:
                             elements_with_non_zero_first_points.append(el)
                         #header += 'wave {} = ramp({}, 0, {});\n'.format(
                         #    simplify_name(wfname), len(cid_wf), 1 / i
@@ -316,24 +315,33 @@ class HDAWG8Pulsar:
                                         'point'.format(el['wfname']))
                     name_ch1 = el['wfname'] + '_' + ch1id
                     name_ch2 = el['wfname'] + '_' + ch2id
-                    if name_ch1 not in wfnames[ch1id]: name_ch1 = None
-                    if name_ch2 not in wfnames[ch2id]: name_ch2 = None
-                    main_loop += self._HDAWG8_element_seqc(
-                        el['repetitions'], el['trigger_wait'],
-                        '"{}_{}"'.format(obj._devname, simplify_name(name_ch1)),
-                        '"{}_{}"'.format(obj._devname, simplify_name(name_ch2)))
+                    if name_ch1 not in wfnames[ch1id] or wfnames[ch1id] is None:
+                        name_ch1 = None
+                    if name_ch2 not in wfnames[ch2id] or wfnames[ch1id] is None:
+                        name_ch2 = None
+                    if name_ch1 is not None:
+                        name_ch1 = '"{}_{}"'.format(obj._devname,
+                                                    simplify_name(name_ch1))
+                    if name_ch2 is not None:
+                        name_ch2 = '"{}_{}"'.format(obj._devname,
+                                                    simplify_name(name_ch2))
+                    if name_ch1 is not None or name_ch2 is not None:
+                        main_loop += self._HDAWG8_element_seqc(
+                            el['repetitions'], el['trigger_wait'],
+                            name_ch1, name_ch2)
             awg_str = header + waveform_table + main_loop + footer
 
             # write the waveforms to csv files
             for data, wfname in zip(wfdata[ch1id], wfnames[ch1id]):
-                if wfdata is not None:
+                if data is not None:
                     obj._write_csv_waveform(simplify_name(wfname), data)
             for data, wfname in zip(wfdata[ch2id], wfnames[ch2id]):
-                if wfdata is not None:
+                if data is not None:
                     obj._write_csv_waveform(simplify_name(wfname), data)
 
-            obj.configure_awg_from_string(awg_nr, awg_str,
-                              timeout=obj.timeout())
+            # here we want to use a timeout value longer than the obj.timeout()
+            # as programming the AWGs takes more time than normal communications
+            obj.configure_awg_from_string(awg_nr, awg_str, timeout=180)
 
             obj.set('awgs_{}_dio_valid_polarity'.format(awg_nr),
                     prev_dio_valid_polarity)
@@ -344,8 +352,8 @@ class HDAWG8Pulsar:
         if not isinstance(obj, HDAWG8Pulsar._supportedAWGtypes):
             return super()._is_AWG_running(obj)
 
-        return any([obj.awgs_0_enable(), obj.awgs_1_enable(),
-                    obj.awgs_2_enable(), obj.awgs_3_enable()])
+        return all([obj.get('awgs_{}_enable'.format(awg_nr)) for awg_nr in
+                    self._HDAWG8_active_AWGs(obj)])
 
     def _clock(self, obj, cid):
         if not isinstance(obj, HDAWG8Pulsar._supportedAWGtypes):
@@ -381,6 +389,17 @@ class HDAWG8Pulsar:
         return repeat_open_str + wait_wave_str + trigger_str + play_str + \
                repeat_close_str
 
+    def _HDAWG8_active_AWGs(self, obj):
+        result = set()
+        for channel in self.channels:
+            if not self.get('{}_active'.format(channel)):
+                continue
+            if self.get('{}_AWG'.format(channel)) != obj.name:
+                continue
+            ch_nr = int(self.get('{}_id'.format(channel))[2])
+            result.add((ch_nr - 1)//2)
+        return result
+
 class AWG5014Pulsar:
     """
     Defines the Tektronix AWG5014 specific functionality for the Pulsar class
@@ -390,6 +409,18 @@ class AWG5014Pulsar:
     def _program_awg(self, obj, sequence, el_wfs, loop=True):
         if not isinstance(obj, AWG5014Pulsar._supportedAWGtypes):
             return super()._program_awg(obj, sequence, el_wfs, loop)
+
+        #print(obj.name)
+        #import pprint
+        #pprint.pprint(el_wfs)
+
+        pars = {'ch{}_m{}_low'.format(ch+1, m+1) for ch in range(4)
+                for m in range(2)}
+        pars |= {'ch{}_m{}_high'.format(ch+1, m+1) for ch in range(4)
+                for m in range(2)}
+        old_vals = {}
+        for par in pars:
+            old_vals[par] = obj.get(par)
 
         old_timeout = obj.timeout()
         obj.timeout(max(180, old_timeout))
@@ -407,7 +438,7 @@ class AWG5014Pulsar:
         packed_waveforms = {}
         elements_with_non_zero_first_points = set()
         for (_, el), cid_wfs in sorted(el_wfs.items()):
-            maxlen = 0
+            maxlen = 512
             for wf in cid_wfs.values():
                 maxlen = max(maxlen, len(wf))
             for grp in grps:
@@ -415,7 +446,7 @@ class AWG5014Pulsar:
                 # arrange waveforms from input data and pad with zeros for
                 # equal length
                 for cid in self._AWG5014_group_ids(grp):
-                    grp_wfs[cid] = cid_wfs.get(cid, np.zeros(1))
+                    grp_wfs[cid] = cid_wfs.get(cid, np.zeros(maxlen))
                     grp_wfs[cid] = np.pad(grp_wfs[cid],
                                           (0, maxlen - len(grp_wfs[cid])),
                                           'constant',
@@ -507,6 +538,8 @@ class AWG5014Pulsar:
             awg_file = None
 
         obj.timeout(old_timeout)
+        for par in pars:
+            obj.set(par, old_vals[par])
 
         time.sleep(.1)
         # Waits for AWG to be ready
@@ -670,7 +703,7 @@ class AWG5014Pulsar:
                 channel_cfg['MARKER1_METHOD_' + cid[2]] = 2
                 channel_cfg['MARKER2_METHOD_' + cid[2]] = 2
                 channel_cfg['MARKER{}_LOW_{}'.format(cid[-1], cid[2])] = \
-                    off - amp
+                    off
                 channel_cfg['MARKER{}_HIGH_{}'.format(cid[-1], cid[2])] = \
                     off + amp
             channel_cfg['CHANNEL_STATE_' + cid[2]] = 0
@@ -951,7 +984,7 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
         fail = None
         obj = self.AWG_obj(AWG=AWG)
         try:
-            super()._is_AWG_running(obj)
+            return super()._is_AWG_running(obj)
         except AttributeError as e:
             fail = e
         if fail is not None:

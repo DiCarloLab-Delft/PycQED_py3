@@ -71,7 +71,12 @@ class Element:
                 for c in self.pulses[p].channels:
                     t0s.append(self.pulses[p].t0() -
                                self.channel_delay(c))
-            return min(t0s)
+            offset = min(t0s)
+            if self.fixed_point_applied:
+                offset += calculate_time_correction(offset,
+                                                    self.readout_fixed_point) -\
+                          self.readout_fixed_point
+            return offset
 
     def ideal_length(self):
         """
@@ -124,7 +129,7 @@ class Element:
         Shifts all pulses by a time dt, this is used for correcting the phase
         of a fixed reference.
         """
-        self.ignore_offset_correction = True
+        #self.ignore_offset_correction = True
         for name, pulse in self.pulses.items():
             pulse._t0 += dt
 
@@ -172,6 +177,8 @@ class Element:
         if name is None:
             name = self._auto_pulse_name(pulse.name)
 
+        #print('adding pulse ' + name)
+
         t0 = start - pulse.start_offset
         if refpoint not in ['start', 'center', 'end']:
             raise ValueError('refpoint not recognized')
@@ -215,6 +222,12 @@ class Element:
             time_corr = calculate_time_correction(t0, self.readout_fixed_point)
             self.shift_all_pulses(time_corr)
             self.fixed_point_applied = True
+            #print('adding time correction of {}'.format(time_corr))
+
+        #print('added pulse t0 is {}'.format(pulse.t0()))
+
+        #print('offset is {}'.format(self.offset()))
+
         return name
 
     def append(self, *pulses):
@@ -398,7 +411,7 @@ class Element:
 # sequencer)
 
 def calculate_time_correction(t0, fixed_point=1e-6):
-    return np.round((fixed_point-t0) % fixed_point, decimals=11)
+    return (fixed_point-t0) % fixed_point
 
 
 def is_divisible_by_clock(value, clock=1e9):

@@ -154,7 +154,7 @@ class n_qubit_off_on(swf.Hard_Sweep):
 
 class n_qubit_reset(swf.Hard_Sweep):
     def __init__(self, pulse_pars_list, RO_pars, feedback_delay, nr_resets=1,
-                 upload=True, verbose=False):
+                 upload=True, verbose=False, codeword_indices=None):
         super().__init__()
         self.pulse_pars_list = pulse_pars_list
         self.RO_pars = RO_pars

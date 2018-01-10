@@ -576,8 +576,8 @@ class UHFQC(Instrument):
         # json.dump([, d_file, default=int)
         for pattern in patterns:
             print("extracting parameters of type", pattern)
-            all_nodes = set(self.find('*{}*'.format(pattern)))
-            s_nodes = set(self.finds('*{}*'.format(pattern)))
+            all_nodes = set(self.find('/{}/*{}*'.format(self._device, pattern)))
+            s_nodes = set(self.finds('/{}/*{}*'.format(self._device, pattern)))
             d_nodes = all_nodes.difference(s_nodes)
             print(len(all_nodes))
             # extracting info from the setting nodes

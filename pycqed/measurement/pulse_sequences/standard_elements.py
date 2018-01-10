@@ -75,7 +75,8 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
     no_of_pulses = len(pulse_list) - count_z
 
     if name is None:
-        name = '{}-pulse-elt_{}'.format(no_of_pulses, i),
+        name = '{}-pulse-elt_{}'.format(no_of_pulses, i)
+    
     el = element.Element(
         name=name,
         pulsar=station.pulsar,
@@ -83,10 +84,11 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
         ignore_delays=not trigger)
     if trigger:
         el.fixed_point_applied = True
-        # Exists to ensure there are no empty channels
-        for cname in station.pulsar.channels:
-            el.add(pulse.SquarePulse(name='refpulse_0', channel=cname,
-                                     amplitude=0, length=1e-9))
+        el.ignore_offset_correction = True
+    #    # Exists to ensure there are no empty channels
+    #    for cname in station.pulsar.channels:
+    #        el.add(pulse.SquarePulse(name='refpulse_0', channel=cname,
+    #                                 amplitude=0, length=1e-9))
 
 
     # exists to ensure that channel is not high when waiting for trigger
@@ -97,11 +99,13 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
     last_pulse = None
     # Make sure that there are no empty channels and we can have a negative
     # pulse delay of up to 400 ns
-    for cname in station.pulsar.channels:
-        last_pulse = el.add(pulse.SquarePulse(name='refpulse', channel=cname,
-                                              amplitude=0, length=400e-9),
-                            refpulse=last_pulse,
-                            refpoint='start')
+    #if trigger:
+    #    for cname in station.pulsar.channels:
+    #        last_pulse = el.add(pulse.SquarePulse(name='refpulse',
+    #                                              channel=cname,
+    #                                              amplitude=0, length=400e-9),
+    #                            refpulse=last_pulse,
+    #                            refpoint='start')
 
     ##############################
     # Add all pulses one by one  #
@@ -268,12 +272,16 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
         final_len = 500e-9
     else:
         final_len = 1e-9
-    for cname in station.pulsar.channels:
-        el.add(pulse.SquarePulse(name='final_empty_pulse', channel=cname,
-                                 amplitude=0, length=final_len),
-               refpulse=last_pulse, refpoint='end')
+    #for cname in station.pulsar.channels:
+    #    el.add(pulse.SquarePulse(name='final_empty_pulse', channel=cname,
+    #                             amplitude=0, length=final_len),
+    #           refpulse=last_pulse, refpoint='end')
 
     # Trigger the slave AWG-s
+
+    el.shift_all_pulses(-el.offset())
+    el.ignore_offset_correction = True
+
     if trigger:
         slave_triggers = sequencer_config.get('slave_AWG_trig_channels', [])
         for cname in slave_triggers:

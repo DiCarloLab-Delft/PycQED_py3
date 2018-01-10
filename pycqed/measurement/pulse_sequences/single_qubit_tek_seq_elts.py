@@ -64,7 +64,7 @@ def Pulsed_spec_seq(spec_pars, RO_pars, upload=True, return_seq=False):
         seq.append_element(el, trigger_wait=True)
     if upload:
         station.pulsar.program_awgs(seq, *el_list, verbose=False)
-    return seq
+    return seq, el_list
 
 
 def photon_number_splitting_seq(spec_pars, RO_pars, disp_pars, upload=True, return_seq=False):
@@ -105,7 +105,7 @@ def photon_number_splitting_seq(spec_pars, RO_pars, disp_pars, upload=True, retu
     return seq
 
 
-def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6, no_cal_points=2,
+def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=0, no_cal_points=2,
              cal_points=True, verbose=False, upload=True, return_seq=False):
     '''
     Rabi sequence for a single qubit using the tektronix.
@@ -837,7 +837,6 @@ def QScale(qscales, pulse_pars, RO_pars,
     '''
     seq_name = 'QScale'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     pulse_combinations=[['X90','X180'],['X90','Y180'],['X90','mY180']]
     pulses = get_pulse_dict_from_pars(pulse_pars)

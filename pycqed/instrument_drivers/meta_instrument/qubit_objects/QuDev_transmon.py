@@ -266,6 +266,11 @@ class QuDev_transmon(Qubit):
             UHFQC=self.UHFQC, AWG=self.AWG, nr_averages=self.RO_acq_averages(),
             nr_samples=4096)
 
+        self.dig_log_det = det.UHFQC_integration_logging_det(
+            UHFQC=self.UHFQC, AWG=self.AWG, channels=channels,
+            integration_length=self.RO_acq_integration_length(),
+            nr_shots=self.RO_acq_shots(), result_logging_mode='digitized')
+
     def prepare_for_continuous_wave(self):
         self.heterodyne.auto_seq_loading(True)
         if self.cw_source is not None:
@@ -1165,7 +1170,8 @@ class QuDev_transmon(Qubit):
         return tuple(ret)
 
     def find_ssro_fidelity(self, nreps=1, MC=None, analyze=True, close_fig=True,
-                           no_fits=False, upload=True, preselection_pulse=True):
+                           no_fits=False, upload=True, preselection_pulse=True,
+                           thresholded=False):
         """
         Conduct an off-on measurement on the qubit recording single-shot
         results and determine the single shot readout fidelity.
@@ -1228,7 +1234,10 @@ class QuDev_transmon(Qubit):
         if preselection_pulse:
             spoints //= 2
         MC.set_sweep_points(np.arange(self.RO_acq_shots()))
-        MC.set_detector_function(self.int_log_det)
+        if thresholded:
+            MC.set_detector_function(self.dig_log_det)
+        else:
+            MC.set_detector_function(self.int_log_det)
         prev_avg = MC.soft_avg()
         MC.soft_avg(1)
 
@@ -1246,7 +1255,10 @@ class QuDev_transmon(Qubit):
 
         if analyze:
             rotate = self.RO_acq_weight_function_Q() is not None
-            channels = self.int_log_det.value_names
+            if thresholded:
+                channels = self.dig_log_det.value_names
+            else:
+                channels = self.int_log_det.value_names
             if preselection_pulse:
                 nr_samples = 4
                 sample_0 = 0
