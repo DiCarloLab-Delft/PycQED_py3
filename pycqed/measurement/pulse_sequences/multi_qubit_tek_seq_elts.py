@@ -1044,12 +1044,12 @@ def n_qubit_reset(pulse_pars_list, RO_pars, feedback_delay, nr_resets=1,
         statename = str(state).zfill(len(str(2**n - 1)))
         el = multi_pulse_elt(state, station, pulses, name='prepare' + statename)
         el_list.append(el)
-        # FIXME: these elements need to have the pulses at the very start.
-        el = multi_pulse_elt(state, station, pulses, name='reset' + statename,
-                             trigger=False)
+        el = multi_pulse_elt(state, station, pulses + [pulse_dict['RO'],
+                                                       pulse_dict['spacer']],
+                             name='reset' + statename, trigger=False)
         el_list.append(el)
 
-    # create the reset element
+    # create the readout element
     pulses = [pulse_dict['RO'], pulse_dict['spacer']]
     el = multi_pulse_elt(state, station, pulses, name='readout', trigger=False)
     el_list.append(el)
@@ -1058,13 +1058,11 @@ def n_qubit_reset(pulse_pars_list, RO_pars, feedback_delay, nr_resets=1,
     for state in range(2 ** n):
         statename = str(state).zfill(len(str(2 ** n - 1)))
         seq.insert('prepare'+statename, 'prepare'+statename, trigger_wait=True)
+        seq.insert('readout' + statename, 'readout',
+                   trigger_wait=False, flags={'readout'})
         for i in range(nr_resets):
-            seq.insert('readout' + statename + '_' + str(i), 'readout',
-                       trigger_wait=False, flags={'readout'})
             seq.insert('codeword' + statename + '_' + str(i), 'codeword',
                        trigger_wait=False)
-        seq.insert('readout' + statename + '_final', 'readout',
-                   trigger_wait=False, flags={'readout'})
 
     # Create the codeword table
     if codeword_indices is None:

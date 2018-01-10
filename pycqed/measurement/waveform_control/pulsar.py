@@ -447,7 +447,7 @@ class AWG5014Pulsar:
         packed_waveforms = {}
         elements_with_non_zero_first_points = set()
         for (_, el), cid_wfs in sorted(el_wfs.items()):
-            maxlen = 512
+            maxlen = 1
             for wf in cid_wfs.values():
                 maxlen = max(maxlen, len(wf))
             for grp in grps:
@@ -459,6 +459,11 @@ class AWG5014Pulsar:
                     grp_wfs[cid] = np.pad(grp_wfs[cid],
                                           (0, maxlen - len(grp_wfs[cid])),
                                           'constant',
+                                          constant_values=0)
+                    # pad with 4 samples to make multi-element segments
+                    # synchronize nicely with the ZI AWG8, that leaves an 8
+                    # sample gap between the elements that play back to back.
+                    grp_wfs[cid] = np.pad(grp_wfs[cid], (0, 4), 'constant',
                                           constant_values=0)
                     if grp_wfs[cid][0] != 0.:
                         elements_with_non_zero_first_points.add(el)
