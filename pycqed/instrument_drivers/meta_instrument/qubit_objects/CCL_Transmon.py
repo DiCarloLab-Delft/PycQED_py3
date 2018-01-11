@@ -1230,7 +1230,7 @@ class CCLight_Transmon(Qubit):
         ro_lm = self.instr_LutMan_RO.get_instr()
         m_amp_par = ro_lm.parameters[
             'M_amp_R{}'.format(self.ro_pulse_res_nr())]
-        s2 = swf.lutman_par_dB_attenuation(
+        s2 = swf.lutman_par_dB_attenuation_UHFQC_dig_trig(
             LutMan=ro_lm, LutMan_parameter=m_amp_par)
         MC.set_sweep_function_2D(s2)
         MC.set_sweep_points_2D(powers)

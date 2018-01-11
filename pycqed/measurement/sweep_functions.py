@@ -811,10 +811,7 @@ class QWG_lutman_custom_wave_chunks(Soft_Sweep):
                 self.wave_func(paramVal), append_compensation=True,
                 pulse_name=pulseName, codeword=self.codewords[i])
 
-# lookuptable sweepfunctions for UHFQC
-
-
-class lutman_par(Soft_Sweep):
+class lutman_par_UHFQC_dig_trig(Soft_Sweep):
 
     def __init__(self, LutMan, LutMan_parameter, single=True, run=False,**kw):
         self.set_kw()
@@ -830,13 +827,35 @@ class lutman_par(Soft_Sweep):
     def set_parameter(self, val):
         self.LutMan_parameter.set(val)
         if self.run:
+            # specific for AWG8
             self.LutMan.AWG.get_instr().awgs_0_enable(False)
         self.LutMan.load_DIO_triggered_sequence_onto_UHFQC()
         if self.run:
             self.LutMan.AWG.get_instr().acquisition_arm(single=self.single)
 
 
-class lutman_par_dB_attenuation(Soft_Sweep):
+class lutman_par_dB_attenuation_UHFQC_dig_trig(Soft_Sweep):
+
+    def __init__(self, LutMan, LutMan_parameter, run=False, **kw):
+        self.set_kw()
+        self.name = LutMan_parameter.name
+        self.parameter_name = LutMan_parameter.label
+        self.unit = 'dB'
+        self.sweep_control = 'soft'
+        self.LutMan = LutMan
+        self.LutMan_parameter = LutMan_parameter
+        self.run = run
+
+    def set_parameter(self, val):
+        self.LutMan_parameter.set(10**(val/20))
+        if self.run:
+            self.LutMan.AWG.get_instr().awgs_0_enable(False)
+        self.LutMan.load_DIO_triggered_sequence_onto_UHFQC()
+        if self.run:
+            self.LutMan.AWG.get_instr().acquisition_arm(single=self.single)
+
+
+class lutman_par_dB_attenuation_QWG(Soft_Sweep):
 
     def __init__(self, LutMan, LutMan_parameter, **kw):
         self.set_kw()
@@ -849,8 +868,6 @@ class lutman_par_dB_attenuation(Soft_Sweep):
 
     def set_parameter(self, val):
         self.LutMan_parameter.set(10**(val/20))
-        self.LutMan.load_DIO_triggered_sequence_onto_UHFQC()
-        self.LutMan_parameter.set(val)
         self.LutMan.load_pulses_onto_AWG_lookuptable(regenerate_pulses=True)
         self.LutMan.QWG.get_instr().start()
         self.LutMan.QWG.get_instr().getOperationComplete()
