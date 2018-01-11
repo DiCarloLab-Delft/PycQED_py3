@@ -34,7 +34,7 @@ CCL = QuTech_CCL.CCL('CCL', address='192.168.0.11', port=5025)
 cs_filepath = os.path.join(pq.__path__[0], 'measurement','openql_experiments',
                            'output','cs.txt')
 
-CCL.upload_microcode(cs_filepath)
+CCL.control_store(cs_filepath)
 
 # AWG8 = ZI_HDAWG8.ZI_HDAWG8('AWG8_8003', device='dev8003')
 AWG8 = ZI_HDAWG8.ZI_HDAWG8('AWG8_8004', device='dev8004')
