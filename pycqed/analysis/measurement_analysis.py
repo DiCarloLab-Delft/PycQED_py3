@@ -7585,7 +7585,7 @@ class butterfly_analysis(MeasurementAnalysis):
 
 def fit_qubit_frequency(sweep_points, data, mode='dac',
                         vary_E_c=True, vary_f_max=True,
-                        vary_dac_flux_coeff=True,
+                        vary_V_per_phi0=True,
                         vary_dac_sweet_spot=True,
                         data_file=None, **kw):
     '''
@@ -7611,8 +7611,8 @@ def fit_qubit_frequency(sweep_points, data, mode='dac',
     # Extract initial values, first from kw, then data file, then default
     E_c = kw.pop('E_c', qubit_attrs.get('E_c', 0.3e9))
     f_max = kw.pop('f_max', qubit_attrs.get('f_max', np.max(data)))
-    dac_flux_coeff = kw.pop('dac_flux_coefficient',
-                            qubit_attrs.get('dac_flux_coefficient', 1.))
+    V_per_phi0 = kw.pop('V_per_phi0',
+                            qubit_attrs.get('V_per_phi0', 1.))
     dac_sweet_spot = kw.pop('dac_sweet_spot',
                             qubit_attrs.get('dac_sweet_spot', 0))
     flux_zero = kw.pop('flux_zero', qubit_attrs.get('flux_zero', 10))
@@ -7623,9 +7623,9 @@ def fit_qubit_frequency(sweep_points, data, mode='dac',
                                       min=0, max=500e6)
         Q_dac_freq_mod.set_param_hint('f_max', value=f_max,
                                       vary=vary_f_max)
-        Q_dac_freq_mod.set_param_hint('dac_flux_coefficient',
-                                      value=dac_flux_coeff,
-                                      vary=vary_dac_flux_coeff)
+        Q_dac_freq_mod.set_param_hint('V_per_phi0',
+                                      value=V_per_phi0,
+                                      vary=vary_V_per_phi0)
         Q_dac_freq_mod.set_param_hint('dac_sweet_spot',
                                       value=dac_sweet_spot,
                                       vary=vary_dac_sweet_spot)
@@ -8953,6 +8953,10 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
             self.data_file.close()
 
         return self.delay_fit_res
+
+
+
+
 
     def plot_results(self, show_guess=False):
 

@@ -81,8 +81,8 @@ def Qubit_dac_to_freq(dac_voltage, f_max, E_c,
         V_per_phi0 = np.pi/dac_flux_coefficient
 
     qubit_freq = (f_max + E_c)*(
-        asymmetry**2 + (1 - asymmetry**2) *
-        np.sqrt(abs(np.cos(np.pi / V_per_phi0 *
+        asymmetry**2. + (1. - asymmetry**2) *
+        np.sqrt(np.abs(np.cos(np.pi / V_per_phi0 *
                            (dac_voltage - dac_sweet_spot))))) - E_c
     return qubit_freq
 
@@ -618,7 +618,7 @@ SlopedHangerAmplitudeModel = lmfit.Model(SlopedHangerFuncAmplitude)
 PolyBgHangerAmplitudeModel = lmfit.Model(PolyBgHangerFuncAmplitude)
 HangerComplexModel = lmfit.Model(HangerFuncComplex)
 SlopedHangerComplexModel = lmfit.Model(SlopedHangerFuncComplex)
-QubitFreqDacModel = lmfit.Model(QubitFreqDac)
+QubitFreqDacModel = lmfit.Model(Qubit_dac_to_freq)
 QubitFreqFluxModel = lmfit.Model(QubitFreqFlux)
 TwinLorentzModel = lmfit.Model(TwinLorentzFunc)
 LorentzianModel = lmfit.Model(Lorentzian)
