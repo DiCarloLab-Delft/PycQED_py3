@@ -8,6 +8,7 @@ from pycqed.measurement.waveform_control import sequence
 from pycqed.utilities.general import add_suffix_to_dict_keys
 from pycqed.measurement.pulse_sequences.standard_elements import multi_pulse_elt
 from pycqed.measurement.pulse_sequences.standard_elements import distort_and_compensate
+import pycqed.measurement.waveform_control.fluxpulse_predistortion as fluxpulse_predistortion
 
 from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import get_pulse_dict_from_pars
 from importlib import reload
@@ -1005,3 +1006,199 @@ def n_qubit_off_on(pulse_pars_list, RO_pars, return_seq=False, verbose=False,
         return seq, el_list
     else:
         return seq_name
+
+
+def two_qubit_tomo_bell_qudev(bell_state,
+                              qb_c,
+                              qb_t,
+                              # RO_target,
+                              RO_pars,
+                              num_flux_pulses=0,
+                              distortion_dict=None,
+                              CZ_disabled=False,
+                              cal_points_with_flux_pulses=True,
+                              verbose=False,
+                              # station=None,
+                              upload=True
+                              ):
+    '''
+        qb_c is the control qubit (pulsed)
+        qb_t is the target qubit
+    '''
+
+
+    if station is None:
+        logging.warning('No station specified.')
+
+    qCZ = qb_c.name
+    qS = qb_t.name
+
+    sequencer_config = station.sequencer_config
+    operation_dict = qb_c.get_operation_dict()
+    operation_dict.update(qb_t.get_operation_dict())
+
+
+    seq_name = '2_qubit_Bell_Tomo_%d_seq' % bell_state
+    seq = sequence.Sequence(seq_name)
+    station.pulsar.update_channel_settings()
+    el_list = []
+    tomo_list_qS = []
+    tomo_list_qCZ = []
+    # Tomo pulses span a basis covering all the cardinal points
+    # tomo_pulses = ['I ', 'X180 ', 'X90 ', 'Y90 ', 'mX90 ', 'mY90 ']
+    tomo_pulses = ['I ', 'X180 ', 'Y90 ', 'mY90 ', 'X90 ', 'mX90 ']
+    for tp in tomo_pulses:
+        tomo_list_qS += [tp+qS]
+        tomo_list_qCZ += [tp+qCZ]
+
+    ###########################
+    # Defining sub sequences #
+    ###########################
+    # This forms the base sequence, note that gate1, gate2 and after_pulse will
+    # be replaced to prepare the desired state and tomo1 and tomo2 will be
+    # replaced with tomography pulses
+    base_sequence = num_flux_pulses*['flux ' + qCZ]
+    base_sequence.extend(
+        ['gate1 ' + qS, 'gate2 ' + qCZ, 'CZ_corr ' + qS, 'CZ_corr ' + qCZ,
+         'CZ ' + qCZ, 'after_pulse',
+         'tomo1 '+qCZ, 'tomo2 '+qS])#, 'RO '+RO_target])
+
+    # Calibration points
+    # every calibration point is repeated 7 times to have 64 elts in totalb
+    # cal_points = [['I '+qCZ, 'I '+qS, 'RO '+RO_target]]*7 + \
+    #              [['I '+qCZ, 'X180 '+qS, 'RO '+RO_target]]*7 + \
+    #              [['X180 '+qCZ, 'I '+qS, 'RO '+RO_target]]*7 + \
+    #              [['X180 '+qCZ, 'X180 '+qS, 'RO '+RO_target]]*7
+    cal_points = [['I '+qCZ, 'I '+qS]]*7 + \
+                 [['I '+qCZ, 'X180 '+qS]]*7 + \
+                 [['X180 '+qCZ, 'I '+qS]]*7 + \
+                 [['X180 '+qCZ, 'X180 '+qS]]*7
+
+    if CZ_disabled:
+        operation_dict['CZ'+qCZ]['amplitude'] = 0
+    #         operation_dict['CZ '+qCZ]['phase_corr_pulse_amp'] = 0
+
+    ################################################
+    # Creating additional pulses for this sequence #
+    ################################################
+    # the recovery SWAP is identical to the regular SWAP operation, unless
+    # an rSWAP is explicitly contained in the operation dict
+    for qb in [qS,qCZ]:
+        if ('CZ_corr ' + qb) not in operation_dict.keys():
+            operation_dict['CZ_corr ' + qb] = deepcopy(operation_dict['Z180 ' + qb])
+            operation_dict['CZ_corr ' + qb]['refpoint'] = 'simultaneous'
+    # operation_dict['CZ_corr ' + qCZ]['phase'] = 0
+    # operation_dict['CZ_corr ' + qS]['phase'] = 0
+    operation_dict['CZ_corr ' + qCZ]['phase'] = operation_dict['CZ ' + qCZ]['dynamic_phase']
+    operation_dict['CZ_corr ' + qS]['phase'] = operation_dict['CZ ' + qCZ]['dynamic_phase_target']
+
+    ################
+    # Bell states  #
+    ################
+    if bell_state == 0:  # |Phi_m>=|00>-|11>
+        gate1 = 'Y90 ' + qS
+        gate2 = 'Y90 ' + qCZ
+        after_pulse = 'mY90 ' + qCZ
+    elif bell_state == 1:  # |Phi_p>=|00>+|11> -> |Psi_m>=|01> - |10>
+        gate1 = 'mY90 ' + qS
+        gate2 = 'Y90 ' + qCZ
+        after_pulse = 'mY90 ' + qCZ
+    elif bell_state == 2:  # |Psi_m>=|01> - |10> -> |Phi_p>=|00>+|11>
+        gate1 = 'Y90 ' + qS
+        gate2 = 'mY90 ' + qCZ
+        after_pulse = 'mY90 ' + qCZ
+    elif bell_state == 3:  # |Psi_p>=|01> + |10>
+        gate1 = 'Y90 ' + qS
+        gate2 = 'Y90 ' + qCZ
+        after_pulse = 'Y90 ' + qCZ
+
+    # Below are states with the initial pulse on the CP-qubit disabled
+    # these are not Bell states but are used for debugging
+    elif bell_state == 0+10:  # |00>+|11>
+        gate1 = 'Y90 ' + qS
+        gate2 = 'I ' + qCZ
+        after_pulse = 'mY90 ' + qCZ
+    elif bell_state == 1+10:
+        gate1 = 'mY90 ' + qS
+        gate2 = 'I ' + qCZ
+        after_pulse = 'mY90 ' + qCZ
+    elif bell_state == 2+10:  # |01> - |10>
+        gate1 = 'Y90 ' + qS
+        gate2 = 'I ' + qCZ
+        after_pulse = 'mY90 ' + qCZ
+    elif bell_state == 3+10:
+        gate1 = 'mY90 ' + qS
+        gate2 = 'I ' + qCZ
+        after_pulse = 'mY90 ' + qCZ
+
+    # Below are states with the initial pulse on the SWAP-qubit disabled
+    # these are not Bell states but are used for debugging
+    elif bell_state == 0 + 20:  # |00>+|11>
+        gate1 = 'I ' + qS
+        gate2 = 'Y90 ' + qCZ
+        after_pulse = 'mY90 ' + qCZ
+    elif bell_state == 1 + 20:  # |01> - |10>
+        gate1 = 'I ' + qS
+        gate2 = 'Y90 ' + qCZ
+        after_pulse = 'mY90 ' + qCZ
+    elif bell_state == 2 + 20:
+        gate1 = 'I ' + qS
+        gate2 = 'mY90 ' + qCZ
+        after_pulse = 'mY90 ' + qCZ
+    elif bell_state == 3 + 20:
+        gate1 = 'mY90 ' + qS
+        gate2 = 'mY90 ' + qCZ
+        after_pulse = 'mY90 ' + qCZ
+
+    #     print('Compensation qCP {:.3f}'.format(
+    #         operation_dict['CZ_corr ' + qCZ]['amplitude']))
+    #     print('Compensation qS {:.3f}'.format(
+    #         operation_dict['SWAP_corr ' + qS]['amplitude']))
+
+    ########################################################
+    #  Here the actual pulses of all elements get defined  #
+    ########################################################
+    # We start by replacing the state prepartion pulses
+    base_sequence[base_sequence.index('gate1 ' + qS)] = gate1
+    base_sequence[base_sequence.index('gate2 ' + qCZ)] = gate2
+    base_sequence[base_sequence.index('after_pulse')] = after_pulse
+
+    seq_pulse_list = []
+
+    for i in range(36):
+        tomo_idx_qS = int(i % 6)
+        tomo_idx_qCZ = int(((i - tomo_idx_qS)/6) % 6)
+        base_sequence[-2] = tomo_list_qCZ[tomo_idx_qCZ]
+        base_sequence[-1] = tomo_list_qS[tomo_idx_qS]
+        seq_pulse_list += [deepcopy(base_sequence)]
+    print(len(cal_points))
+    for cal_pulses in cal_points:
+        if cal_points_with_flux_pulses:
+            #not functional with preflux pulses!
+            base_sequence[0] = 'I ' + qS
+            base_sequence[1] = 'I ' + qCZ
+            base_sequence[5] = 'I ' + qCZ
+            base_sequence[-2:] = cal_pulses
+            seq_pulse_list += [deepcopy(base_sequence)]
+        else:
+            seq_pulse_list += [cal_pulses]
+
+    for i, pulse_list in enumerate(seq_pulse_list):
+        # print('pulse_list ', pulse_list)
+        pulses = []
+        for p in pulse_list:
+            pulses += [operation_dict[p]]
+        # print('pulses ', len(pulses))
+        pulses += [RO_pars]
+
+        el = multi_pulse_elt(i, station, pulses, sequencer_config)
+        if distortion_dict is not None:
+            el = fluxpulse_predistortion.distort_qudev(el,distortion_dict)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+
+    # return seq, pulses
+    return seq, el_list

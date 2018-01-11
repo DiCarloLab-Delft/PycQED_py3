@@ -1346,6 +1346,56 @@ class QuDev_transmon(Qubit):
             self.set_default_readout_weights(theta=ana.theta)
         return ana.theta
 
+    def measure_dynamic_phase(self, flux_pulse_length=None,
+                              flux_pulse_amp=None, phases=None,
+                              distortion_dict=None, distorted=True,
+                              compensation_pulses=False,
+                              MC=None, label=None):
+
+        if flux_pulse_amp is None:
+            raise ValueError('flux_pulse_amp is not specified.')
+        if flux_pulse_length is None:
+            raise ValueError('flux_pulse_length is not specified.')
+        if phases is None:
+            phases = np.linspace(0, 4*np.pi, 16)
+            print('Sweeping over phases=np.linspace(0, 4*np.pi, 16).')
+        if distortion_dict is None:
+            logging.warning('Distortion dict was not specified.')
+
+        if MC is None:
+            MC = self.MC
+
+        if label is None:
+            label = 'Ramsey_interleaved_flux_pulse_{}_filter_{}'.format(
+                self.name, str(distorted))
+
+        self.set_default_readout_weights()
+        self.prepare_for_timedomain()
+        self.update_detector_functions()
+
+        self.flux_pulse_length(flux_pulse_length)
+        ampls = np.array([0, flux_pulse_amp])
+
+        X90_separation = self.flux_pulse_delay() + self.flux_pulse_length()
+
+        s1 = awg_swf.Ramsey_interleaved_fluxpulse_sweep(
+            self, X90_separation=X90_separation,
+            distorted=distorted, distortion_dict=distortion_dict,
+            compensation_pulses=compensation_pulses)
+
+        s2 = awg_swf.Ramsey_fluxpulse_ampl_sweep(self, s1)
+
+        MC.soft_avg(1)
+        MC.set_sweep_function(s1)
+        MC.set_sweep_points(phases)
+        MC.set_sweep_function_2D(s2)
+        MC.set_sweep_points_2D(ampls)
+        MC.set_detector_function(self.int_avg_det)
+        MC.run_2D(name=label)
+
+        ma.MeasurementAnalysis(TwoD=True)
+
+
     def measure_flux_detuning(self, flux_params=None, n=1, ramsey_times=None,
                               artificial_detuning=0, MC=None,
                               analyze=True, close_fig=True, upload=True,

@@ -183,3 +183,38 @@ class two_qubit_AllXY(swf.Hard_Sweep):
                                   verbose=self.verbose,
                                   X_mid=self.X_mid,
                                   simultaneous=self.simultaneous)
+
+
+class tomo_Bell(swf.Hard_Sweep):
+
+    def __init__(self, bell_state, qb_c, qb_t, RO_pars, num_flux_pulses=0, upload=True,
+                 distortion_dict=None, CZ_disabled=False,  cal_points_with_flux_pulses=True,
+                 verbose=False, return_seq=False):
+        super().__init__()
+        self.bell_state = bell_state
+        self.qb_c = qb_c
+        self.qb_t = qb_t
+        self.RO_pars = RO_pars
+        self.num_flux_pulses = num_flux_pulses
+        self.upload = upload
+        self.distortion_dict = distortion_dict
+        self.CZ_disabled = CZ_disabled
+        self.cal_points_with_flux_pulses = cal_points_with_flux_pulses
+        self.parameter_name = 'sample'
+        self.unit = '#'
+        self.verbose = verbose
+        self.return_seq = return_seq
+        self.name = 'tomo_Bell'
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs2.BellTomo.two_qubit_tomo_bell_qudev(
+                bell_state=self.bell_state,
+                qb_c=self.qb_c, qb_t=self.qb_t,
+                RO_pars=self.RO_pars,
+                num_flux_pulses=self.num_flux_pulses,
+                distortion_dict=self.distortion_dict,
+                CZ_disabled=self.CZ_disabled,
+                cal_points_with_flux_pulses=self.cal_points_with_flux_pulses,
+                verbose=self.verbose,
+                upload=self.upload)

@@ -74,7 +74,7 @@ class MeasurementAnalysis(object):
         self.dpi = 600                  #dpi for plots
 
         self.axes_line_width=0.5        #lw of axes and text boxes
-        self.font_size = 11             #font sizes
+        self.font_size = 14             #font sizes
         self.tick_length = 4            #tick lengths
         self.tick_width = 0.5           #tick line widths
         self.marker_size=3              #marker size for data points
@@ -131,9 +131,9 @@ class MeasurementAnalysis(object):
     def default_fig(self, **kw):
         #these are the standard figure sizes for PRL
         if self.no_of_columns==1:
-            figsize = kw.get('figsize', (7, 4))
+            self.figsize = kw.get('figsize', (7, 4))
         elif self.no_of_columns==2:
-            figsize = kw.get('figsize', (3.375, 2.25))
+            self.figsize = kw.get('figsize', (3.375, 2.25))
         else:
             raise ValueError('Only 1 or 2 columns are supported at the moment.')
 
