@@ -74,6 +74,7 @@ class CryoscopeAnalyzer:
             demod_freq=None,
             derivative_window_length=None,
             derivative_order=2,
+            nyquist_order=0,
             demod_smooth=None):
         """
         analyse a cryoscope measurement.
@@ -180,8 +181,8 @@ class CryoscopeAnalyzer:
     def plot_raw_data(self, style=".-"):
         ax = plt.gca()
         ax.set_title("Raw cryoscope data")
-        ax.plot(self.time, self.data.real, style, label="Re", color="blue")
-        ax.plot(self.time, self.data.imag, style, label="Im", color="red")
+        ax.plot(self.time, self.data.real, style, label="Re", color="C0")
+        ax.plot(self.time, self.data.imag, style, label="Im", color="C1")
         ax.legend()
         ax.set_xlabel("Time")
         ax.set_ylabel("Amplitude")
@@ -196,8 +197,8 @@ class CryoscopeAnalyzer:
             self.norm_data.real,
             style,
             label="Re",
-            color="blue")
-        ax.plot(self.time, self.norm_data.imag, style, label="Im", color="red")
+            color="C0")
+        ax.plot(self.time, self.norm_data.imag, style, label="Im", color="C1")
         ax.legend()
         ax.set_xlabel("Time")
         ax.set_ylabel("Amplitude")
@@ -212,13 +213,13 @@ class CryoscopeAnalyzer:
             self.demod_data.real,
             style,
             label="Re",
-            color="blue")
+            color="C0")
         ax.plot(
             self.time,
             self.demod_data.imag,
             style,
             label="Im",
-            color="red")
+            color="C1")
         ax.legend()
         ax.set_xlabel("Time")
         ax.set_ylabel("Amplitude")
@@ -235,9 +236,9 @@ class CryoscopeAnalyzer:
         ax = plt.gca()
         plt.title("Cryoscope demodulated phase")
         if wrap:
-            plt.plot(self.time, self.phase % (2 * np.pi), ".", color="blue")
+            plt.plot(self.time, self.phase % (2 * np.pi), ".", color="C0")
         else:
-            plt.plot(self.time, self.phase, ".", label="Im", color="blue")
+            plt.plot(self.time, self.phase, ".", label="Im", color="C0")
         plt.xlabel("Time")
         plt.ylabel("Phase")
         formatter = matplotlib.ticker.EngFormatter(unit='s')
@@ -246,7 +247,7 @@ class CryoscopeAnalyzer:
     def plot_detuning(self):
         ax = plt.gca()
         plt.title("Detuning from demodulation frequency")
-        plt.plot(self.time, self.detuning, ".-", color="blue")
+        plt.plot(self.time, self.detuning, ".-", color="C0")
         plt.xlabel("Time")
         plt.ylabel("Frequency")
         formatter = matplotlib.ticker.EngFormatter(unit='s')
@@ -397,7 +398,9 @@ class DacArchAnalysis:
                 self.sampled_freqs = self.amp_to_freq(self.sampled_amps)
 
                 self._inv_interpolation = si.interp1d(
-                    self.sampled_freqs, self.sampled_amps, kind='cubic')
+                    self.sampled_freqs, self.sampled_amps, kind='cubic',
+                    bounds_error=False,
+                    fill_value='extrapolate')
             return self._inv_interpolation(freq)
         if kind == 'root':
             return np.vectorize(self._freq_to_amp_root)(freq)
@@ -465,7 +468,7 @@ class DacArchAnalysis:
         formatter = matplotlib.ticker.EngFormatter(unit='Hz')
         ax.yaxis.set_major_formatter(formatter)
 
-        plt.scatter(self.amps, self.freqs % self.sampling_rate, color="red")
+        plt.scatter(self.amps, self.freqs % self.sampling_rate, color="C1")
 
         aa = np.linspace(min(self.amps), max(self.amps), 300)
 
