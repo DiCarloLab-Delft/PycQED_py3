@@ -136,8 +136,8 @@ class VirtualAWG5014(Tektronix_AWG5014):
             cids = []
             for i in range(1, 5):
                 cids.append('ch{}'.format(i))
-                cids.append('ch{}_marker1'.format(i))
-                cids.append('ch{}_marker2'.format(i))
+                cids.append('ch{}_m1'.format(i))
+                cids.append('ch{}_m2'.format(i))
 
         #fig, axs = plt.subplots(len(cids), 1, sharex=True)
         fig, axs = plt.subplots(len(cids), 1, sharex=False)
@@ -152,9 +152,9 @@ class VirtualAWG5014(Tektronix_AWG5014):
 
             i += 1
 
-            if cid[4:] == 'marker1':
+            if cid[4:] == 'm1':
                 ydata = np.float_((pwfs // 16384) % 2)
-            elif cid[4:] == 'marker2':
+            elif cid[4:] == 'm2':
                 ydata = np.float_((pwfs // 32768) % 2)
             else:
                 ydata = (np.float_(np.bitwise_and(pwfs, 16383)) - 8191)/8191

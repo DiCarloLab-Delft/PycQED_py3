@@ -1,6 +1,5 @@
 # some convenience tools
 #
-import inspect
 import logging
 import numpy as np
 import os
@@ -22,7 +21,7 @@ from .tools.file_handling import *
 from .tools.data_manipulation import *
 from .tools.plotting import *
 import colorsys as colors
-
+from matplotlib import cm
 
 datadir = get_default_datadir()
 print('Data directory set to:', datadir)
@@ -141,8 +140,9 @@ def latest_data(contains='', older_than=None, newer_than=None, or_equal=False,
     i = len(daydirs)-1
     while len(measdirs) == 0 and i >= 0:
         daydir = daydirs[i]
-        # this makes sure hidden folders (OS related) are not searched
-        if not daydir.startswith('.'):
+        # this makes sure that (most) non day dirs do not get searched
+        # as they should start with a digit (e.g. YYYYMMDD)
+        if daydir[0].isdigit():
             all_measdirs = [d for d in os.listdir(
                 os.path.join(search_dir, daydir))]
             all_measdirs.sort()
@@ -426,8 +426,7 @@ def get_data_from_ma_v2(ma, param_names, numeric_params=None):
                     if param_end in list(temp.attrs.keys()):
                         data[param] = temp.attrs[param_end]
                     elif param_end in list(temp.keys()):
-                        data[param] = temp[param_end]
-
+                        data[param] = temp[param_end].value
         if numeric_params is not None:
             if param in numeric_params:
                 data[param] = np.double(data[param])
@@ -437,8 +436,7 @@ def get_data_from_ma_v2(ma, param_names, numeric_params=None):
 
 def get_data_from_ma(ma, param_names, data_version=2, numeric_params=None):
     if data_version == 1:
-        data = get_data_from_ma_v1(ma, param_names,
-                                   numeric_params=numeric_params)
+        data = get_data_from_ma_v1(ma, param_names)
     elif data_version == 2:
         data = get_data_from_ma_v2(ma, param_names,
                                    numeric_params=numeric_params)
@@ -541,7 +539,7 @@ def get_data_from_timestamp_list(timestamps,
                 ana.finish()
             except Exception as inst:
                 logging.warning('Error "%s" when processing timestamp %s' %
-                      (inst, timestamp))
+                                (inst, timestamp))
                 raise
 
     if len(remove_timestamps) > 0:
@@ -561,11 +559,7 @@ def get_data_from_timestamp_list(timestamps,
                     out_data[nparam] = np.array(
                         [np.double(val) for val in out_data[nparam]])
                 except ValueError as instance:
-                    if 'could not broadcast' in instance.message:
-                        out_data[nparam] = [
-                            np.double(val) for val in out_data[nparam]]
-                    else:
-                        raise(instance)
+                    raise(instance)
 
     out_data['timestamps'] = get_timestamps
 
@@ -863,8 +857,7 @@ def smooth(x, window_len=11, window='hanning'):
 
     if not window in ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']:
         raise ValueError(
-            "Window is on of 'flat', 'hanning', 'hamming', 'bartlett', "
-            "'blackman'")
+            "Window is on of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'")
 
     s = np.r_[x[window_len-1:0:-1], x, x[-1:-window_len:-1]]
 
@@ -881,7 +874,7 @@ def smooth(x, window_len=11, window='hanning'):
     return y[edge:-edge]
 
 
-def find_second_peak(sweep_pts_cut_edges=None, data_dist_smooth=None,
+def find_second_peak(sweep_pts=None, data_dist_smooth=None,
                      key=None, peaks=None, percentile=20, optimize=False,
                      verbose=False):
 
@@ -892,51 +885,73 @@ def find_second_peak(sweep_pts_cut_edges=None, data_dist_smooth=None,
     to the right and to the left of it for the tallest peaks in these new
     ranges. The resulting two new peaks are compared and the tallest/deepest
     one is chosen.
+
+    Args:
+        sweep_pts (array):      the sweep points array in your measurement
+                                (typically frequency)
+        data_dist_smooth (array):   the smoothed y data of your spectroscopy
+                                    measurement, typically result of
+                                    calculate_distance_ground_state for a qubit
+                                    spectroscopy
+        key (str):  the feature to search for, 'peak' or 'dip'
+        peaks (dict):   the dict returned by peak_finder containing the
+                        peaks/dips values for the tallest peak around which
+                        this routine will search for second peak/dip
+        percentile (int):   percentile of data defining background noise; gets
+                            passed to peak_finder
+        optimize (bool):    the peak_finder optimize parameter
+        verbose (bool):     print detailed logging information
+
+    Returns:
+        f0  (float):                frequency of ge transition
+        f0_gf_over_2 (float):       frequency of gf/2 transition
+        kappa_guess (float):        guess for the kappa of the ge peak/dip
+        kappa_guess_ef (float):     guess for the kappa of the gf/2 peak/dip
     """
 
     tallest_peak = peaks[key] #the ge freq
     tallest_peak_idx = peaks[key+'_idx']
     tallest_peak_width = peaks[key+'_width']
-    tallest_peak_val = data_dist_smooth[tallest_peak_idx]
     if verbose:
-        print('Largest peak is at ',tallest_peak)
+        print('Largest '+key+' is at ', tallest_peak)
 
     # Calculate how many data points away from the tallest peak
     # to look left and right. Should be 50MHz away.
-    freq_range = sweep_pts_cut_edges[-1]-sweep_pts_cut_edges[0]
-    num_points = sweep_pts_cut_edges.size
+    freq_range = sweep_pts[-1]-sweep_pts[0]
+    num_points = sweep_pts.size
     n = int(50e6*num_points/freq_range)
     m = int(50e6*num_points/freq_range)
 
     # Search for 2nd peak (f_ge) to the right of the first (tallest)
-    while(int(len(sweep_pts_cut_edges)-1) <= int(tallest_peak_idx+n) and
+    while(int(len(sweep_pts)-1) <= int(tallest_peak_idx+n) and
                   n>0):
         # Reduce n if outside of range
         n -= 1
-    if (int(tallest_peak_idx+n)) == sweep_pts_cut_edges.size:
+    if (int(tallest_peak_idx+n)) == sweep_pts.size:
         # If n points to the right of tallest peak is the range edge:
         n = 0
-    if not ((int(tallest_peak_idx+n)) >= sweep_pts_cut_edges.size):
+    if not ((int(tallest_peak_idx+n)) >= sweep_pts.size):
         if verbose:
             print('Searching for the gf/2 {:} {:} points to the right of the largest'
                   ' in the range {:.5}-{:.5}'.format(
                   key,
                   n,
-                  sweep_pts_cut_edges[int(tallest_peak_idx+n)],
-                  sweep_pts_cut_edges[-1]) )
+                  sweep_pts[int(tallest_peak_idx+n)],
+                  sweep_pts[-1]) )
 
         peaks_right = peak_finder(
-            sweep_pts_cut_edges[int(tallest_peak_idx+n)::],
+            sweep_pts[int(tallest_peak_idx+n)::],
             data_dist_smooth[int(tallest_peak_idx+n)::],
             percentile=percentile,
             num_sigma_threshold=1,
             optimize=optimize,
+            window_len=0,
             key=key)
 
         # The peak/dip found to the right of the tallest is assumed to be
         # the ge peak, which means that the tallest was in fact the gf/2 peak
         if verbose:
-            print('Right peak is at ', peaks_right[key])
+            print('Right '+key+' is at ', peaks_right[key])
         subset_right = data_dist_smooth[int(tallest_peak_idx+n)::]
         val_right = subset_right[peaks_right[key+'_idx']]
         f0_right = peaks_right[key]
@@ -945,7 +960,7 @@ def find_second_peak(sweep_pts_cut_edges=None, data_dist_smooth=None,
         kappa_guess_ef_right = tallest_peak_width
     else:
         if verbose:
-            print('Right peak is None')
+            print('Right '+key+' is None')
         val_right = 0
         f0_right = 0
         kappa_guess_right = 0
@@ -965,21 +980,22 @@ def find_second_peak(sweep_pts_cut_edges=None, data_dist_smooth=None,
                   'largest, in the range {:.5}-{:.5}'.format(
                   key,
                   m,
-                  sweep_pts_cut_edges[0],
-                  sweep_pts_cut_edges[int(tallest_peak_idx-m-1)]) )
+                  sweep_pts[0],
+                  sweep_pts[int(tallest_peak_idx-m-1)]) )
 
         peaks_left = peak_finder(
-            sweep_pts_cut_edges[0:int(tallest_peak_idx-m)],
+            sweep_pts[0:int(tallest_peak_idx-m)],
             data_dist_smooth[0:int(tallest_peak_idx-m)],
             percentile=percentile,
             num_sigma_threshold=1,
             optimize=optimize,
+            window_len=0,
             key=key)
 
         # The peak/dip found to the left of the tallest is assumed to be
         # the gf/2 peak, which means that the tallest was indeed the ge peak
         if verbose:
-            print('Left peak is at ', peaks_left[key])
+            print('Left '+key+' is at ', peaks_left[key])
         subset_left = data_dist_smooth[0:int(tallest_peak_idx-m)]
         val_left = subset_left[peaks_left[key+'_idx']]
         f0_left = tallest_peak
@@ -988,7 +1004,7 @@ def find_second_peak(sweep_pts_cut_edges=None, data_dist_smooth=None,
         kappa_guess_ef_left = peaks_left[key+'_width']
     else:
         if verbose:
-            print('Left peak is None')
+            print('Left '+key+' is None')
         val_left = 0
         f0_left = tallest_peak
         kappa_guess_left = tallest_peak_width
@@ -1003,7 +1019,7 @@ def find_second_peak(sweep_pts_cut_edges=None, data_dist_smooth=None,
             # If the two peaks found are separated by at least 50MHz,
             # then both the ge and gf/2 have been found.
             if verbose:
-                print('Both f_ge and f_gf/2 have been found. '
+                print('Both f_ge and f_gf/2 '+key+'s have been found. '
                       'f_ge was assumed to the LEFT of f_gf/2.')
         else:
             # If not, then it is just some other signal.
@@ -1062,29 +1078,33 @@ def cut_edges(array, window_len=11):
     array = array[(window_len//2):-(window_len//2)]
     return array
 
-def peak_finder(x, y, percentile=20, num_sigma_threshold=5,
-                key=None, optimize=True):
+def peak_finder(x, y, percentile=20, num_sigma_threshold=5, window_len=11,
+                key=None, optimize=False):
     """
     Uses look_for_peak_dips (the old peak_finder routine renamed) to find peaks/
-    dips. If optimize==True, reruns look_for_peak_dips until tallest (for peaks)
-    data point/lowest (for dip) data point has been found.
+    dips. If optimize==False, results from look_for_peak_dips is returned,
+    and this routine is the same as the old peak_finder routine.
+    If optimize==True, reruns look_for_peak_dips until tallest (for peaks)
+    data point/lowest (for dips) data point has been found.
 
     :param x:                       x data
     :param y:                       y data
     :param percentile:              percentile of data defining background noise
     :param num_sigma_threshold:     number of std deviations above background
                                     where to look for data
-    :param key:                     'peak' or 'dip'
+    :param key:                     'peak' or 'dip'; tell look_for_peaks_dips
+                                    to return only the peaks or the dips
     :param optimize:                re-run look_for_peak_dips until tallest
                                     (for peaks) data point/lowest (for dip) data
                                     point has been found
-    :return:                        dict from look_for_peaks_dips
+    :return:                        dict of peaks, dips, or both from
+                                    look_for_peaks_dips
     """
 
     # First search for peaks/dips
     search_result = look_for_peaks_dips(x=x, y_smoothed=y, percentile=percentile,
                                         num_sigma_threshold=num_sigma_threshold,
-                                        key=key)
+                                        key=key, window_len=window_len)
 
     if optimize:
     # Rerun if the found peak/dip is smaller/larger than the largest/
@@ -1123,7 +1143,7 @@ def peak_finder(x, y, percentile=20, num_sigma_threshold=5,
                 search_result = look_for_peaks_dips(x=x,y_smoothed=y,
                                     percentile=percentile,
                                     num_sigma_threshold=(num_sigma_threshold),
-                                    key=key_1)
+                                    key=key_1, window_len=window_len)
 
                 if search_result[key_1+'_idx'] is None:
                     search_result = search_result_1
@@ -1134,22 +1154,20 @@ def peak_finder(x, y, percentile=20, num_sigma_threshold=5,
 
     return search_result
 
-def look_for_peaks_dips(x, y_smoothed, percentile=20,
+def look_for_peaks_dips(x, y_smoothed, percentile=20, window_len=11,
                         num_sigma_threshold=5, key=None):
-
-# Originally:
-# def peak_finder(x, y, percentile=20, num_sigma_threshold=5,
-#                         window_len=3, analyze_ef=False):
 
     '''
     Peak finding algorithm designed by Serwan
     1 smooth data
     2 Define the threshold based on background data
     3
+
+    key:    'peak' or 'dip'; return only the peaks or the dips
     '''
 
     # Smooth the data
-    #y_smoothed = smooth(y, window_len=window_len)
+    y_smoothed = smooth(y_smoothed, window_len=window_len)
 
     # Finding peaks
     # Defining the threshold
@@ -1162,7 +1180,7 @@ def look_for_peaks_dips(x, y_smoothed, percentile=20,
     threshold = background_mean + num_sigma_threshold * background_std
 
     thresholdlst = np.arange(y_smoothed.size)[y_smoothed > threshold]
-    datthreshold = y_smoothed[thresholdlst]
+    #datthreshold = y_smoothed[thresholdlst]
 
     if thresholdlst.size is 0:
         kk = 0
@@ -1204,9 +1222,8 @@ def look_for_peaks_dips(x, y_smoothed, percentile=20,
 
         #Take an approximate peak width for each peak index
         for i,idx in enumerate(peak_indices):
-            if (idx+i+1)<x.size and (idx-i-1)>=0:          #ensure data points
-                                                           #idx+i+1 and idx-i-1
-                                                           #are inside sweep pts
+            if (idx+i+1)<x.size and (idx-i-1)>=0:
+                #ensure data points idx+i+1 and idx-i-1 are inside sweep pts
                 peak_widths += [ (x[idx+i+1] - x[idx-i-1])/5 ]
             elif (idx+i+1)>x.size and (idx-i-1)>=0:
                 peak_widths += [ (x[idx] - x[idx-i])/5 ]
@@ -1238,7 +1255,7 @@ def look_for_peaks_dips(x, y_smoothed, percentile=20,
     threshold = background_mean - num_sigma_threshold * background_std
 
     thresholdlst = np.arange(y_smoothed.size)[y_smoothed < threshold]
-    datthreshold = y_smoothed[thresholdlst]
+    #datthreshold = y_smoothed[thresholdlst]
 
     if thresholdlst.size is 0:
         kk = 0
@@ -1327,28 +1344,23 @@ def look_for_peaks_dips(x, y_smoothed, percentile=20,
                 'dips': dips, 'dips_idx': dip_indices}
 
 
-def calculate_distance_ground_state(data_amp, data_phase=None, percentile=70,
+def calculate_distance_ground_state(data_real, data_imag, percentile=70,
                                     normalize=False):
     ''' Calculates the distance from the ground state by assuming that
         for the largest part of the data, the system is in its ground state
     '''
-    if data_phase is not None:
-        data_real = data_amp * np.cos(np.pi * data_phase / 180)
-        data_imag = data_amp * np.sin(np.pi * data_phase / 180)
-        perc_real = np.percentile(data_real, percentile)
-        perc_imag = np.percentile(data_imag, percentile)
-        mean_real = np.mean(np.take(data_real,
-                                    np.where(data_real < perc_real)[0]))
-        mean_imag = np.mean(np.take(data_imag,
-                                    np.where(data_imag < perc_imag)[0]))
-        data_real_dist = data_real - mean_real
-        data_imag_dist = data_imag - mean_imag
-        data_dist = np.abs(data_real_dist + 1.j * data_imag_dist)
-    else:
-        perc = np.percentile(data_amp, percentile)
-        mean = np.mean(np.take(data_amp, np.where(data_amp < perc)[0]))
-        data_dist = data_amp - mean
+    perc_real = np.percentile(data_real, percentile)
+    perc_imag = np.percentile(data_imag, percentile)
 
+    mean_real = np.mean(np.take(data_real,
+                                np.where(data_real < perc_real)[0]))
+    mean_imag = np.mean(np.take(data_imag,
+                                np.where(data_imag < perc_imag)[0]))
+
+    data_real_dist = data_real - mean_real
+    data_imag_dist = data_imag - mean_imag
+
+    data_dist = np.abs(data_real_dist + 1.j * data_imag_dist)
     if normalize:
         data_dist /= np.max(data_dist)
     return data_dist
@@ -1373,7 +1385,8 @@ def calculate_rotation_matrix(delta_I, delta_Q):
     '''
 
     angle = np.arctan2(delta_Q, delta_I)
-    rotation_matrix = np.transpose(np.matrix([[np.cos(angle), -1*np.sin(angle)],
+    rotation_matrix = np.transpose(
+        np.matrix([[np.cos(angle), -1*np.sin(angle)],
                    [np.sin(angle), np.cos(angle)]]))
     return rotation_matrix
 
@@ -1383,8 +1396,8 @@ def normalize_TD_data(data, data_zero, data_one):
 
 
 def normalize_data(data):
-    print('a_tools.normalize_data is deprecated, recommend using '
-        'a_tools.normalize_data_v2()')
+    print(
+        'a_tools.normalize_data is deprecated, recommend using a_tools.normalize_data_v2()')
     return data / np.mean(data)
 
 
@@ -1428,7 +1441,6 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
                                  correspond to one
     '''
     # Extract zero and one coordinates
-    start_at_zero = kw.get('start_at_zero', False)
 
     if np.all([cal_zero_points==None, cal_one_points==None,
                zero_coord==None, one_coord==None]):
@@ -1478,9 +1490,6 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
 
         #find distance from points on line to end of line
         rotated_data = np.sqrt(x_data**2+y_data**2)
-        if start_at_zero and (rotated_data[0] > np.mean(rotated_data)):
-            rotated_data = -rotated_data
-            rotated_data -= min(rotated_data)
 
         normalized_data = rotated_data
 
@@ -1489,7 +1498,7 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
         # normalized_data = (rotated_data - min(rotated_data))/max_min_distance
 
     else:
-        # for 4 anf 6 cal points
+        # for 4
         if zero_coord is not None:
             I_zero = zero_coord[0]
             Q_zero = zero_coord[1]
@@ -1512,26 +1521,23 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
         # Rotate the data
         M = calculate_rotation_matrix(I_one-I_zero, Q_one-Q_zero)
         outp = [np.asarray(elem)[0] for elem in M * trans_data]
-        [rotated_data_ch1, rotated_data_ch2] = outp
+        rotated_data_ch1 = outp[0]
 
         # Normalize the data
         one_zero_dist = np.sqrt((I_one-I_zero)**2 + (Q_one-Q_zero)**2)
         normalized_data = rotated_data_ch1/one_zero_dist
-
-        if start_at_zero and (normalized_data[0] > np.mean(normalized_data)):
-            normalized_data = -normalized_data
-            normalized_data -= min(normalized_data)
 
     return [normalized_data, zero_coord, one_coord]
 
 def rotate_and_normalize_data_no_cal_points(data, **kw):
 
     """
-    Rotates and normalizes data based on principal component analysis.
+    Rotates and projects data based on principal component analysis.
     (Source: http://www.cs.otago.ac.nz/cosc453/student_tutorials/
     principal_components.pdf)
+    Assumes data has shape (2, nr_sweep_pts), ie the shape of
+    MeasurementAnalysis.measured_values.
     """
-    start_at_zero = kw.pop('start_at_zero', False)
 
     #translate each column in the data by its mean
     mean_x = np.mean(data[0])
@@ -1565,11 +1571,6 @@ def rotate_and_normalize_data_no_cal_points(data, **kw):
     # max_min_difference = max(normalized_data -  min(normalized_data))
     # normalized_data = (normalized_data-min(normalized_data))/max_min_difference
 
-    # Ensure trace starts at closest to zero
-    if start_at_zero and (normalized_data[0] > np.mean(normalized_data)):
-        normalized_data = -normalized_data
-        normalized_data -= min(normalized_data)
-
     return normalized_data
 
 def normalize_data_v3(data, cal_zero_points=np.arange(-4, -2, 1),
@@ -1596,10 +1597,14 @@ def normalize_data_v3(data, cal_zero_points=np.arange(-4, -2, 1),
 
 
 def datetime_from_timestamp(timestamp):
-    if len(timestamp) == 14:
-        return datetime.datetime.strptime(timestamp, "%Y%m%d%H%M%S")
-    else:
-        return datetime.datetime.strptime(timestamp, "%Y%m%d_%H%M%S")
+    try:
+        if len(timestamp) == 14:
+            return datetime.datetime.strptime(timestamp, "%Y%m%d%H%M%S")
+        elif len(timestamp) == 15:
+            return datetime.datetime.strptime(timestamp, "%Y%m%d_%H%M%S")
+    except Exception as e:
+        print('Invalid timestamp :"{}"'.format(timestamp))
+        raise e
 
 
 def timestamp_from_datetime(date):
@@ -1775,7 +1780,7 @@ def color_plot_slices(xvals, yvals, zvals, ax=None,
     # various plot options
     # define colormap
     cmap = kw.pop('cmap', 'viridis')
-    clim = kw.pop('clim', [None, None])
+    #clim = kw.pop('clim', [None, None])
     # normalized plot
     if normalize:
         for xx in range(len(xvals)):
@@ -1786,13 +1791,13 @@ def color_plot_slices(xvals, yvals, zvals, ax=None,
             zvals[xx] = np.log(zvals[xx])/np.log(10)
 
     # add blocks to plot
-    hold = kw.pop('hold', False)
+    #hold = kw.pop('hold', False)
     for xx in range(len(xvals)):
         tempzvals = np.array([np.append(zvals[xx], np.array(0)),
                               np.append(zvals[xx], np.array(0))]).transpose()
-        im = ax.pcolor(xvertices[xx:xx+2],
-                       yvertices[xx],
-                       tempzvals, cmap=cmap)
+        # im = ax.pcolor(xvertices[xx:xx+2],
+        #                yvertices[xx],
+        #                tempzvals, cmap=cmap)
     return ax
 
 
@@ -1929,7 +1934,7 @@ def calculate_transmon_transitions(EC, EJ, asym=0, reduced_flux=0,
     return transitions[:no_transitions]
 
 
-def fit_EC_EJ(f01, f12, **kw):
+def fit_EC_EJ(f01, f12):
     '''
     Calculates EC and EJ from f01 and f12 by numerical optimization.
     '''
@@ -1938,12 +1943,7 @@ def fit_EC_EJ(f01, f12, **kw):
     EC0 = f01-f12
     EJ0 = (f01+EC0)**2/(8*EC0)
 
-    asym = kw.pop('asym',0)
-    reduced_flux = kw.pop('reduced_flux',0)
-    dim = kw.pop('dim',None)
-
-    penaltyfn = lambda Es: calculate_transmon_transitions(
-        *Es,asym=asym,reduced_flux=reduced_flux,dim=dim)-[f01, f12]
+    penaltyfn = lambda Es: calculate_transmon_transitions(*Es)-[f01, f12]
     (EC, EJ), success = optimize.leastsq(penaltyfn, (EC0, EJ0))
     return EC, EJ
 
@@ -2049,7 +2049,19 @@ def find_min(x, y, return_fit=False, perc=30):
         return x_min, y_min
 
 
-def get_color_order(i, max_num):
+def get_color_order(i, max_num, cmap='viridis'):
     # take a blue to red scale from 0 to max_num
     # uses HSV system, H_red = 0, H_green = 1/3 H_blue=2/3
-    return colors.hsv_to_rgb(2.*float(i)/(float(max_num)*3.), 1., 1.)
+    # return colors.hsv_to_rgb(2.*float(i)/(float(max_num)*3.), 1., 1.)
+    print('It is recommended to use the updated function "get_color_cycle".')
+    if isinstance(cmap, str):
+        cmap = cm.get_cmap(cmap)
+    return cmap((i/max_num) % 1)
+
+
+def get_color_list(max_num, cmap='viridis'):
+    '''Return an array of max_num colors take in even spacing from the
+    color map cmap.'''
+    if isinstance(cmap, str):
+        cmap = cm.get_cmap(cmap)
+    return [cmap(cmap)(i) for i in np.linspace(0.0, 1.0, max_num)]

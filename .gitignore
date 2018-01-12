@@ -117,12 +117,20 @@ $RECYCLE.BIN/
 *.qasm
 # micro instruction assembly files
 *.asm
+*.qisa
+*.bin
+*.tqisa
+*.dbpd
+*.dot
 *.qumis
 *.txt
 *.png
+pycqed/measurement/openql_experiments/output/*
 
 # data files
 # test data files should be explicitly added by hand (overriding .gitignore)
 data/*
 *.hdf5
+.idea
+*.json
 

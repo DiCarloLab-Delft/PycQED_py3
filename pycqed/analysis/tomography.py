@@ -721,7 +721,6 @@ def get_bell_pauli_exp(bell_idx, theta_q0=0, theta_q1=0, return_raw=False):
         return np.concatenate(([1], pauli1, pauli2, paulic))
 
 
-
 def calc_fid2_cardinal(pauli_op_dis, cardinal_state):
     """
     Calculates fidelity using the pauli set representation of the state

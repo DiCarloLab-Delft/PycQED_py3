@@ -423,7 +423,21 @@ class Assembler():
         MAX_WAIT_TIME.
         '''
         i = 0
+        old_i = -1
         while i < len(self.label_instrs):
+            if old_i == i:
+                print("i:", i)
+                for k, li in enumerate(self.label_instrs):
+                    print(k, li)
+                print("\n\n*****************lines around the error:")
+                print(i-2, self.label_instrs[i-2])
+                print(i-1, self.label_instrs[i-1])
+                print(i-0,  self.label_instrs[i])
+                print(i+1, self.label_instrs[i+1])
+                print(i+2, self.label_instrs[i+2])
+                raise ValueError("Infinite loop while splitting long wait")
+
+            old_i = i
             label_instr = self.label_instrs[i]
 
             # I only care the WAIT instruction here.
@@ -431,7 +445,7 @@ class Assembler():
                 i = i + 1
                 continue
             remain_wait_time = int(label_instr[2])
-            if remain_wait_time < self.MAX_WAIT_TIME:
+            if remain_wait_time <= self.MAX_WAIT_TIME:
                 i += 1
             while (remain_wait_time > self.MAX_WAIT_TIME):
                 self.label_instrs[i][2] = str(self.MAX_WAIT_TIME)

@@ -19,21 +19,16 @@ class Test_SingleQubitTek(unittest.TestCase):
         self.pulsar = Pulsar('Pulsar' + str(time.time()), self.AWG.name)
         for i in range(4):
             self.pulsar.define_channel(id='ch{}'.format(i+1),
-                                          name='ch{}'.format(i+1),
-                                          type='analog',
-                                          # max safe IQ voltage
-                                          high=.7, low=-.7,
-                                          offset=0.0, delay=0, active=True)
-            self.pulsar.define_channel(id='ch{}_marker1'.format(i+1),
-                                          name='ch{}_marker1'.format(i+1),
-                                          type='marker',
-                                          high=2.0, low=0, offset=0.,
-                                          delay=0, active=True)
-            self.pulsar.define_channel(id='ch{}_marker2'.format(i+1),
-                                          name='ch{}_marker2'.format(i+1),
-                                          type='marker',
-                                          high=2.0, low=0, offset=0.,
-                                          delay=0, active=True)
+                                       name='ch{}'.format(i+1))
+            self.pulsar.define_channel(id='ch{}_m1'.format(i+1),
+                                       name='ch{}_marker1'.format(i+1))
+            self.pulsar.define_channel(id='ch{}_m2'.format(i+1),
+                                          name='ch{}_marker2'.format(i+1))
+            # max safe IQ voltage
+            self.pulsar.set('ch{}_amp'.format(i + 1), 0.7)
+            self.pulsar.set('ch{}_marker1_amp'.format(i+1), 2.0)
+            self.pulsar.set('ch{}_marker2_amp'.format(i+1), 2.0)
+
 
         self.pulse_pars = {
             'I_channel': 'ch1',

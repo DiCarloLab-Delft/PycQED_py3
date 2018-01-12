@@ -12,6 +12,7 @@ roughly split into
 import numpy as np
 import matplotlib.pyplot as plt
 
+
 def count_rounds_to_error(series):
     '''
     returns the index of the first entry that is different
@@ -131,6 +132,19 @@ def count_rounds_since_flip_split(series):
 
 
 def binary_derivative(series):
+    '''
+    Used to extract transitions between flipping and non-flipping
+    part of data traces.
+
+    When there is no change the value is 0.
+    If there is a change the value is 1.
+    '''
+    d_series = np.array([0 if series[i+1] == series[i] else 1
+                         for i in range(len(series)-1)])
+    return d_series
+
+
+def binary_derivative_old(series):
     '''
     Used to extract transitions between flipping and non-flipping
     part of data traces.
@@ -284,6 +298,60 @@ def count_error_fractions(trace):
             one_counter += 1
 
     return no_err_counter, single_err_counter, double_err_counter, zero_counter, one_counter
+
+
+def mark_errors_flipping(events):
+    '''
+    Marks error fractions
+    '''
+    single_errors = np.zeros(len(events)-1)
+    double_errors = np.zeros(len(events)-2)
+
+    for i in range(len(events)-1):
+            # A single error is associated with a qubit error
+            if (events[i] == events[i+1]):
+                single_errors[i] = 1
+                if i < (len(events)-2):
+                    # two identical outcomes equal to one
+                    if (events[i] == events[i+2]):
+                        double_errors[i] = 1
+    return single_errors, double_errors
+
+
+def mark_errors_constant(events):
+    '''
+    Marks error fractions
+    '''
+    single_errors = np.zeros(len(events)-1)
+    double_errors = np.zeros(len(events)-2)
+
+    for i in range(len(events)-1):
+            # A single error is associated with a qubit error
+            if (events[i] != events[i+1]):
+                single_errors[i] = 1
+                if i < (len(events)-2):
+                    # two identical outcomes equal to one
+                    if (events[i+1] != events[i+2]):
+                        double_errors[i] = 1
+    return single_errors, double_errors
+
+
+def mark_errors_FB_to_ground(events):
+    '''
+    Marks error fractions
+    '''
+    single_errors = np.zeros(len(events)-1)
+    double_errors = np.zeros(len(events)-2)
+
+    for i in range(len(events)-1):
+            # A single error is associated with a qubit error
+            if (events[i] == 1):
+                single_errors[i] = 1
+                if i < (len(events)-2):
+                    # two identical outcomes equal to one
+                    if (events[i+1] == 1):
+                        double_errors[i] = 1
+    return single_errors, double_errors
 
 
 def flatten_2D_histogram(H, xedges, yedges):

@@ -1254,7 +1254,7 @@ class QScale(swf.Hard_Sweep):
         self.upload = upload
         self.name = 'QScale'
         self.parameter_name = 'QScale_factor'
-        self.unit = ' '
+        self.unit = ''
         self.cal_points = cal_points
         sweep_pts = np.repeat(qscales, 3)
         # self.sweep_points = np.append(sweep_pts,

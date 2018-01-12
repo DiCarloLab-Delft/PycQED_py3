@@ -61,7 +61,7 @@ class Test_MeasurementControl(unittest.TestCase):
         self.assertEqual(dat['value_units'], ['mV', 'mV'])
 
     @unittest.skipIf(
-        "TRAVIS" in os.environ and os.environ["TRAVIS"] == "true",
+        "TRAVIS" in os.environ,
         "Skipping this test on Travis CI.")
     def test_data_location(self):
         sweep_pts = np.linspace(0, 10, 30)

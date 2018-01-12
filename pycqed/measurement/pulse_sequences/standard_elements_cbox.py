@@ -380,7 +380,7 @@ def pulsed_spec_elt_with_RF_mod(i, station, IF,
                    refpulse=refpulse, refpoint='start')
         # RO modulation tone
         el.add(pulse.cp(CosP), name='RO-Cos-{}'.format(i),
-               start=RO_pulse_delay, refpoint='end',
+               start=RO_pulse_delay-spec_pulse_length, refpoint='end',
                refpulse='Spec-marker-{}{}'.format(i, j))
         el.add(pulse.cp(SinP), name='RO-Sin-{}'.format(i),
                start=0, refpoint='start', refpulse='RO-Cos-{}'.format(i))

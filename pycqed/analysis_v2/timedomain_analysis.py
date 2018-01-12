@@ -1,5 +1,6 @@
 import lmfit
 import numpy as np
+from collections import OrderedDict
 from pycqed.analysis import fitting_models as fit_mods
 from pycqed.analysis import analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
@@ -30,16 +31,16 @@ class Single_Qubit_TimeDomainAnalysis(ba.BaseDataAnalysis):
             # default for all standard Timedomain experiments
             cal_points = [list(range(-4, -2)), list(range(-2, 0))]
 
-        if len(self.data_dict['measured_values']) == 1:
+        if len(self.raw_data_dict['measured_values']) == 1:
             # if only one weight function is used rotation is not required
-            self.data_dict['corr_data'] = a_tools.normalize_data_v3(
-                self.data_dict['measured_values'][0],
+            self.proc_data_dict['corr_data'] = a_tools.normalize_data_v3(
+                self.raw_data_dict['measured_values'][0],
                 cal_zero_points=cal_points[0],
                 cal_one_points=cal_points[1])
         else:
-            self.data_dict['corr_data'], zero_coord, one_coord = \
+            self.proc_data_dict['corr_data'], zero_coord, one_coord = \
                 a_tools.rotate_and_normalize_data(
-                    data=self.data_dict['measured_values'][0:2],
+                    data=self.raw_data_dict['measured_values'][0:2],
                     zero_coord=zero_coord,
                     one_coord=one_coord,
                     cal_zero_points=cal_points[0],
@@ -49,7 +50,7 @@ class Single_Qubit_TimeDomainAnalysis(ba.BaseDataAnalysis):
         # way that the "new" analysis works.
 
         # self.add_dataset_to_analysisgroup('Corrected data',
-        #                                   self.data_dict['corr_data'])
+        #                                   self.proc_data_dict['corr_data'])
 
 
 class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
@@ -80,15 +81,15 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
             self.run_analysis()
 
     def prepare_fitting(self):
-        self.fit_dicts = {}
+        self.fit_dicts = OrderedDict()
         # Even though we expect an exponentially damped oscillation we use
         # a simple cosine as this gives more reliable fitting and we are only
         # interested in extracting the frequency of the oscillation
         cos_mod = lmfit.Model(fit_mods.CosFunc)
 
-        guess_pars = fit_mods.Cos_guess(model=cos_mod,
-                                        t=self.data_dict['sweep_points'][:-4],
-                                        data=self.data_dict['corr_data'][:-4])
+        guess_pars = fit_mods.Cos_guess(
+            model=cos_mod, t=self.raw_data_dict['sweep_points'][:-4],
+            data=self.proc_data_dict['corr_data'][:-4])
 
         # This enforces the oscillation to start at the equator
         # and ensures that any over/under rotation is absorbed in the
@@ -100,8 +101,8 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
 
         self.fit_dicts['cos_fit'] = {
             'fit_fn': fit_mods.CosFunc,
-            'fit_xvals': {'t': self.data_dict['sweep_points'][:-4]},
-            'fit_yvals': {'data': self.data_dict['corr_data'][:-4]},
+            'fit_xvals': {'t': self.raw_data_dict['sweep_points'][:-4]},
+            'fit_yvals': {'data': self.proc_data_dict['corr_data'][:-4]},
             'guess_pars': guess_pars}
 
         # In the case there are very few periods we fall back on a small
@@ -110,8 +111,8 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
         # the detuning can be estimated using on a small angle approximation
         # c1 = d/dN (cos(2*pi*f N) ) evaluated at N = 0 -> c1 = -2*pi*f
         poly_mod.set_param_hint('frequency', expr='-c1/(2*pi)')
-        guess_pars = poly_mod.guess(x=self.data_dict['sweep_points'][:-4],
-                                    data=self.data_dict['corr_data'][:-4])
+        guess_pars = poly_mod.guess(x=self.raw_data_dict['sweep_points'][:-4],
+                                    data=self.proc_data_dict['corr_data'][:-4])
         # Constraining the line ensures that it will only give a good fit
         # if the small angle approximation holds
         guess_pars['c0'].vary = False
@@ -119,24 +120,24 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
 
         self.fit_dicts['line_fit'] = {
             'model': poly_mod,
-            'fit_xvals': {'x': self.data_dict['sweep_points'][:-4]},
-            'fit_yvals': {'data': self.data_dict['corr_data'][:-4]},
+            'fit_xvals': {'x': self.raw_data_dict['sweep_points'][:-4]},
+            'fit_yvals': {'data': self.proc_data_dict['corr_data'][:-4]},
             'guess_pars': guess_pars}
 
     def analyze_fit_results(self):
         sf_line = self._get_scale_factor_line()
         sf_cos = self._get_scale_factor_cos()
-        self.data_dict['scale_factor'] = self.get_scale_factor()
+        self.proc_data_dict['scale_factor'] = self.get_scale_factor()
 
         msg = 'Scale fact. based on '
-        if self.data_dict['scale_factor'] == sf_cos:
+        if self.proc_data_dict['scale_factor'] == sf_cos:
             msg += 'cos fit\n'
         else:
             msg += 'line fit\n'
         msg += 'cos fit: {:.4f}\n'.format(sf_cos)
         msg += 'line fit: {:.4f}'.format(sf_line)
 
-        self.data_dict['scale_factor_msg'] = msg
+        self.raw_data_dict['scale_factor_msg'] = msg
         # TODO: save scale factor to file
 
     def get_scale_factor(self):
@@ -184,15 +185,15 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
     def prepare_plots(self):
         self.plot_dicts['main'] = {
             'plotfn': self.plot_line,
-            'xvals': self.data_dict['sweep_points'],
-            'xlabel': self.data_dict['xlabel'],
-            'xunit': self.data_dict['xunit'],  # does not do anything yet
-            'yvals': self.data_dict['corr_data'],
+            'xvals': self.raw_data_dict['sweep_points'],
+            'xlabel': self.raw_data_dict['xlabel'],
+            'xunit': self.raw_data_dict['xunit'],  # does not do anything yet
+            'yvals': self.proc_data_dict['corr_data'],
             'ylabel': 'Excited state population',
             'yunit': '',
             'setlabel': 'data',
-            'title': (self.data_dict['timestamp'] + ' ' +
-                      self.data_dict['measurementstring']),
+            'title': (self.raw_data_dict['timestamp'] + ' ' +
+                      self.raw_data_dict['measurementstring']),
             'do_legend': True,
             'legend_pos': 'upper right'}
 
@@ -220,4 +221,4 @@ class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
                 'ypos': 0.15,
                 'plotfn': self.plot_text,
                 'box_props': 'fancy',
-                'text_string': self.data_dict['scale_factor_msg']}
+                'text_string': self.raw_data_dict['scale_factor_msg']}

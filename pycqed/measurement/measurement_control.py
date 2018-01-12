@@ -127,6 +127,8 @@ class MeasurementControl(Instrument):
         self.soft_iteration = 0
         self.set_measurement_name(name)
         self.print_measurement_start_msg()
+
+
         self.mode = mode
         self.iteration = 0  # used in determining data writing indices
         # needs to be defined here because of the with statement below
@@ -135,31 +137,36 @@ class MeasurementControl(Instrument):
 
         with h5d.Data(name=self.get_measurement_name(),
                       datadir=self.datadir()) as self.data_object:
-            self.get_measurement_begintime()
-            # Commented out because requires git shell interaction from python
-            # self.get_git_hash()
-            # Such that it is also saved if the measurement fails
-            # (might want to overwrite again at the end)
-            self.save_instrument_settings(self.data_object)
-            self.create_experimentaldata_dataset()
-            if mode is not 'adaptive':
-                try:
-                    # required for 2D plotting and data storing.
-                    # try except because some swf get the sweep points in the
-                    # prepare statement. This needs a proper fix
-                    self.xlen = len(self.get_sweep_points())
-                except:
-                    self.xlen = 1
-            if self.mode == '1D':
-                self.measure()
-            elif self.mode == '2D':
-                self.measure_2D()
-            elif self.mode == 'adaptive':
-                self.measure_soft_adaptive()
-            else:
-                raise ValueError('Mode "{}" not recognized.'
-                                 .format(self.mode))
+            try:
+                self.check_keyboard_interrupt()
+                self.get_measurement_begintime()
+                # Commented out because requires git shell interaction from python
+                # self.get_git_hash()
+                # Such that it is also saved if the measurement fails
+                # (might want to overwrite again at the end)
+                self.save_instrument_settings(self.data_object)
+                self.create_experimentaldata_dataset()
+                if mode is not 'adaptive':
+                    try:
+                        # required for 2D plotting and data storing.
+                        # try except because some swf get the sweep points in the
+                        # prepare statement. This needs a proper fix
+                        self.xlen = len(self.get_sweep_points())
+                    except:
+                        self.xlen = 1
+                if self.mode == '1D':
+                    self.measure()
+                elif self.mode == '2D':
+                    self.measure_2D()
+                elif self.mode == 'adaptive':
+                    self.measure_soft_adaptive()
+                else:
+                    raise ValueError('Mode "{}" not recognized.'
+                                     .format(self.mode))
+            except KeyboardFinish as e:
+                print(e)
             result = self.dset[()]
+            self.get_measurement_endtime()
             self.save_MC_metadata(self.data_object)  # timing labels etc
             if exp_metadata is not None:
                 self.save_exp_metadata(exp_metadata, self.data_object)
@@ -185,6 +192,7 @@ class MeasurementControl(Instrument):
             sweep_points = self.get_sweep_points()
             if len(self.sweep_functions) == 1:
                 self.get_measurement_preparetime()
+                self.sweep_functions[0].set_parameter(sweep_points[0])
                 self.detector_function.prepare(
                     sweep_points=self.get_sweep_points())
                 self.measure_hard()
@@ -238,7 +246,6 @@ class MeasurementControl(Instrument):
         for sweep_function in self.sweep_functions:
             sweep_function.finish()
         self.detector_function.finish()
-        self.get_measurement_endtime()
 
         return
 
@@ -281,10 +288,6 @@ class MeasurementControl(Instrument):
         self.update_instrument_monitor()
         self.update_plotmon(force_update=True)
         self.update_plotmon_adaptive(force_update=True)
-        self.get_measurement_endtime()
-        if self.verbose():
-            print('Optimization completed in {:.4g}s'.format(
-                self.endtime-self.begintime))
         return
 
     def measure_hard(self):
@@ -628,7 +631,7 @@ class MeasurementControl(Instrument):
                                           y=self.sweep_pts_y,
                                           z=self.TwoD_array[:, :, j],
                                           xlabel=slabels[0], xunit=sunits[0],
-                                          ylabel=sunits[1], yunit=sunits[1],
+                                          ylabel=slabels[1], yunit=sunits[1],
                                           zlabel=zlabels[j], zunit=zunits[j],
                                           subplot=j+1,
                                           cmap='viridis')
@@ -969,7 +972,11 @@ class MeasurementControl(Instrument):
             if msvcrt.kbhit():
                 key = msvcrt.getch()
                 if b'q' in key:
-                    raise KeyboardInterrupt('Human interupt q')
+                    # this causes a KeyBoardInterrupt
+                    raise KeyboardInterrupt('Human "q" terminated experiment.')
+                elif b'f' in key:
+                    # this should not raise an exception
+                    raise KeyboardFinish('Human "f" terminated experiment safely.')
         except Exception:
             pass
 
@@ -1134,3 +1141,11 @@ class MeasurementControl(Instrument):
         """
         return {'vendor': 'PycQED', 'model': 'MeasurementControl',
                 'serial': '', 'firmware': '2.0'}
+
+
+class KeyboardFinish(KeyboardInterrupt):
+    """
+    Indicates that the user safely aborts/finishes the experiment.
+    Used to finish the experiment without raising an exception.
+    """
+    pass
