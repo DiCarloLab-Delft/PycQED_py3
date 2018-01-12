@@ -559,7 +559,7 @@ def fidelity_from_standard_formula(bell_state, rho, state_rotation=None):
     state_rotation(qutip Quantum object): a rotation matrix to rotate
         the bell state
     """
-    bell_state_map = {0:'01', 1:'00' ,2:'11', 3:'10'}
+    bell_state_map = {0:'01', 1:'00' , 2:'11', 3:'10'}
     qtp_bell_state = bell_state_map[bell_state]
 
     if state_rotation is None:
@@ -738,25 +738,39 @@ def calc_fid2_cardinal(pauli_op_dis, cardinal_state):
 
 
 # def calc_fid2_bell(pauli_op_dis, target_bell_idx, theta=0):
-def calc_fid2_bell(rho, target_bell_idx, theta=0, fidelity_type=None):
+def calc_fid2_bell(rho, target_bell_idx, theta_qb0=0, theta_qb1=0,
+                   fidelity_type=None):
     """
     Calculates fidelity to one of the 4 bell states. Allows varying the angle
     """
-    pauli_op_dis = pauli_ops_from_density_matrix(rho)
-    pauli_expectations = np.concatenate(order_pauli_output2(pauli_op_dis))
-    sets_bell = get_bell_pauli_exp(target_bell_idx, theta)
-
-    state_rotation = qtp.tensor(qtp.rotation(qtp.sigmaz(), theta),qtp.identity(2))
-    fidelity_standard = fidelity_from_standard_formula(
-        target_bell_idx, rho, state_rotation=state_rotation)
-
-    original_fidelity = 0.25*(1 + np.dot(pauli_expectations, sets_bell[1:]))
 
     if fidelity_type is 'standard':
+        state_rotation = qtp.tensor(qtp.rotation(qtp.sigmaz(), theta_qb0),
+                                    qtp.rotation(qtp.sigmaz(), theta_qb1))
+        fidelity_standard = fidelity_from_standard_formula(
+            target_bell_idx, rho, state_rotation=state_rotation)
+
         return fidelity_standard
+
     elif fidelity_type is 'both':
+        pauli_op_dis = pauli_ops_from_density_matrix(rho)
+        pauli_expectations = np.concatenate(order_pauli_output2(pauli_op_dis))
+        sets_bell = get_bell_pauli_exp(target_bell_idx, theta_qb0)
+        original_fidelity = 0.25*(1 + np.dot(pauli_expectations, sets_bell[1:]))
+
+        state_rotation = qtp.tensor(qtp.rotation(qtp.sigmaz(), theta_qb0),
+                                    qtp.rotation(qtp.sigmaz(), theta_qb1))
+        fidelity_standard = fidelity_from_standard_formula(
+            target_bell_idx, rho, state_rotation=state_rotation)
+
         return original_fidelity, fidelity_standard
+
     else:
+        pauli_op_dis = pauli_ops_from_density_matrix(rho)
+        pauli_expectations = np.concatenate(order_pauli_output2(pauli_op_dis))
+        sets_bell = get_bell_pauli_exp(target_bell_idx, theta_qb0)
+        original_fidelity = 0.25*(1 + np.dot(pauli_expectations, sets_bell[1:]))
+
         return original_fidelity
 
 
@@ -1057,8 +1071,10 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         ########################
         if self.MLE:
             self.operators_fit = self.operators_mle
+            self.rho_fit = self.rho_2
         else:
             self.operators_fit = self.operators
+            self.rho_fit = self.rho
         """
         bell_idx (int) : integer referring to a specific bell state.
             0: |Phi_m> = |00> - |11>   (<XX>,<YY>,<ZZ>) = (-1,+1,+1)
@@ -1133,7 +1149,7 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         savename = os.path.abspath(os.path.join(
             self.folder, figname))
         # value of 450dpi is arbitrary but higher than default
-        fig1.savefig(savename, format=self.fig_format, dpi=450)
+        fig1.savefig(savename, format=self.fig_format, dpi=self.dpi)
         if self.close_fig:
             plt.close(fig1)
 
@@ -1161,7 +1177,7 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         ax.set_title('Least squares tomography.')
         if self.verbose > 0:
             print(self.rho)
-        qtp.matrix_histogram_complex(self.rho, xlabels=['00', '01', '10', '11'],
+        matrix_histogram_complex(self.rho, xlabels=['00', '01', '10', '11'],
                                      ylabels=['00', '01', '10', '11'],
                                      fig=fig2, ax=fig2.add_subplot(
             122, projection='3d'))
@@ -1171,16 +1187,24 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         if self.target_bell is not None or self.target_cardinal is not None:
             msg += '\nFidelity: {:.3f}'.format(self.fidelity)
         if self.target_bell is not None:
-            theta_vec = np.linspace(0., 2*np.pi, 1001)
-            fid_vec = np.zeros(theta_vec.shape)
-            fid_vec_standard = np.zeros(theta_vec.shape)
-            for i, theta in enumerate(theta_vec):
-                fid_vec[i], fid_vec_standard[i] = calc_fid2_bell(self.rho,
-                                            self.target_bell, theta,
-                                            fidelity_type='both')
+            theta_vec_qb0 = np.linspace(0., 2*np.pi, 100)
+            theta_vec_qb1 = np.linspace(0., 2*np.pi, 100)
+            fid_vec = np.zeros(theta_vec_qb0.shape)
+            fid_vec_standard = np.zeros((len(theta_vec_qb0),
+                                         len(theta_vec_qb1)))
+            for i, theta0 in enumerate(theta_vec_qb0):
+                fid_vec[i] = calc_fid2_bell(self.rho,
+                                        self.target_bell, theta_qb0=theta0)
+
+                for j, theta1 in enumerate(theta_vec_qb1):
+                    fid_vec_standard[i][j] = calc_fid2_bell(
+                        self.rho,
+                        self.target_bell,
+                        theta0, theta1,
+                        fidelity_type='standard')
             msg += '\nMAX Fidelity {:.3f} \n  at {:.1f} deg'.format(
                 np.max(fid_vec),
-                theta_vec[np.argmax(fid_vec)]*180./np.pi)
+                theta_vec_qb0[np.argmax(fid_vec)]*180./np.pi)
         ax.text(0.05, 0.95, msg,
                 transform=ax.transAxes,
                 fontsize=self.font_size,
@@ -1193,9 +1217,14 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         if self.fidelity_standard_LI is not None:
             msg += '\nFidelity: {:.3f}'.format(self.fidelity_standard_LI)
         if fid_vec_standard is not None:
-            msg += '\nMAX Fidelity {:.3f} \n  at {:.1f} deg'.format(
+            idxs_f_max = np.unravel_index(np.argmax(fid_vec_standard),
+                                          dims=(len(theta_vec_qb0),
+                                                len(theta_vec_qb1)))
+            msg += ('\nMAX Fidelity %.3f: \n  $\phi_{' + self.q0_label +
+                '}=$%.1f deg \n  $\phi_{' + self.q1_label + '}=$%.1f deg') %(
                 np.max(fid_vec_standard),
-                theta_vec[np.argmax(fid_vec_standard)]*180./np.pi)
+                theta_vec_qb0[idxs_f_max[0]]*180./np.pi,
+                theta_vec_qb1[idxs_f_max[1]]*180./np.pi)
         ax.text(0.05, 0.05, msg,
                 transform=ax.transAxes,
                 fontsize=self.font_size,
@@ -1208,7 +1237,7 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         savename = os.path.abspath(os.path.join(
             self.folder, figname))
         # value of 450dpi is arbitrary but higher than default
-        fig2.savefig(savename, format=self.fig_format, dpi=450)
+        fig2.savefig(savename, format=self.fig_format, dpi=self.dpi)
         if self.close_fig:
             plt.close(fig2)
 
@@ -1234,7 +1263,7 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         else:
             txt_x_pos = 10
         plot_operators(self.operators_mle, ax, labels=self.meas_op_labels)
-        qtp.matrix_histogram_complex(self.rho_2, xlabels=['00', '01', '10', '11'],
+        matrix_histogram_complex(self.rho_2, xlabels=['00', '01', '10', '11'],
                                      ylabels=['00', '01', '10', '11'],
                                      fig=fig3,
                                      ax=fig3.add_subplot(122, projection='3d'))
@@ -1244,16 +1273,25 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         msg = 'Purity: {:.3f}\nFidelity: {:.3f}'.format(
             purity, self.fidelity_mle)
         if self.target_bell is not None:
-            theta_vec = np.linspace(0., 2*np.pi, 1001)
-            fid_vec = np.zeros(theta_vec.shape)
-            fid_vec_standard = np.zeros(theta_vec.shape)
-            for i, theta in enumerate(theta_vec):
-                fid_vec[i], fid_vec_standard[i] = calc_fid2_bell(self.rho_2,
-                                            self.target_bell, theta,
-                                            fidelity_type='both')
+            theta_vec_qb0 = np.linspace(0., 2*np.pi, 100)
+            theta_vec_qb1 = np.linspace(0., 2*np.pi, 100)
+            fid_vec = np.zeros(theta_vec_qb0.shape)
+            fid_vec_standard = np.zeros((len(theta_vec_qb0),
+                                         len(theta_vec_qb1)))
+            for i, theta0 in enumerate(theta_vec_qb0):
+                fid_vec[i] = calc_fid2_bell(self.rho_2,
+                                             self.target_bell, theta0)
+
+                for j, theta1 in enumerate(theta_vec_qb1):
+                    fid_vec_standard[i][j] = calc_fid2_bell(
+                        self.rho_2,
+                        self.target_bell,
+                        theta0, theta1,
+                        fidelity_type='standard')
+
             msg += '\nMAX Fidelity {:.3f} \n  at {:.1f} deg'.format(
                 np.max(fid_vec),
-                theta_vec[np.argmax(fid_vec)]*180./np.pi)
+                theta_vec_qb0[np.argmax(fid_vec)]*180./np.pi)
         # msg += str('\nMAX Fidelity {:.3f}: \n  ' + self.q0_label
         #         + '={:.1f} deg \n  ' + self.q1_label
         #         + '={:.1f} deg').format(self.best_fidelity,
@@ -1270,9 +1308,16 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         if self.fidelity_standard_mle is not None:
             msg += '\nFidelity: {:.3f}'.format(self.fidelity_standard_mle)
         if fid_vec_standard is not None:
-            msg += '\nMAX Fidelity {:.3f} \n  at {:.1f} deg'.format(
-                np.max(fid_vec_standard),
-                theta_vec[np.argmax(fid_vec_standard)]*180./np.pi)
+            idxs_f_max = np.unravel_index(np.argmax(fid_vec_standard),
+                                          dims=(len(theta_vec_qb0),
+                                                len(theta_vec_qb1)))
+
+            msg += ('\nMAX Fidelity %.3f: \n  $\phi_{' + self.q0_label +
+                    '}=$%.1f deg \n  $\phi_{' + self.q1_label + '}=$%.1f deg') \
+                   %(np.max(fid_vec_standard),
+                     theta_vec_qb0[idxs_f_max[0]]*180./np.pi,
+                     theta_vec_qb1[idxs_f_max[1]]*180./np.pi)
+
         ax.text(0.05, 0.05, msg,
                 transform=ax.transAxes,
                 fontsize=self.font_size,
@@ -1282,14 +1327,13 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
 
         ax.set_title('Max likelihood estimation tomography')
 
-
         figname = 'MLE-Tomography_Exp_{}.{}'.format(self.exp_name,
                                                     self.fig_format)
         fig3.suptitle(self.exp_name+' ' + self.timestamp_string, size=16)
         savename = os.path.abspath(os.path.join(
             self.folder, figname))
         # value of 450dpi is arbitrary but higher than default
-        fig3.savefig(savename, format=self.fig_format, dpi=450)
+        fig3.savefig(savename, format=self.fig_format, dpi=self.dpi)
         if self.close_fig:
             plt.close(fig3)
 
@@ -1300,22 +1344,23 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
             ([1], np.concatenate(order_pauli_output2(self.fit_res.best_fit))))
         plot_target_pauli_set(ordered_fit, ax)
         plot_operators(self.operators_fit, ax=ax, labels=self.meas_op_labels)
+
         fidelity = np.dot(self.fit_res.best_fit, self.operators_fit)*0.25
 
         # standard way of getting fidelity (Re(<psi|rho|psi>))
-        self.rho_best_fit = density_matrix_from_pauli_ops(
-            self.fit_res.best_fit,
-            self.tomo.basis_vector,
-            self.tomo.n_qubits)
+        angle_LSQ = self.fit_res.best_values['angle_LSQ']
+        angle_MSQ = self.fit_res.best_values['angle_MSQ']
+        state_rotation = qtp.tensor(qtp.rotation(qtp.sigmaz(), angle_LSQ),
+                                    qtp.rotation(qtp.sigmaz(), angle_MSQ))
         self.fidelity_standard = fidelity_from_standard_formula(
-            self.target_bell, self.rho_best_fit)
+            self.target_bell, self.rho_fit, state_rotation=state_rotation)
 
-        self.best_fidelity = fidelity
-        angle_LSQ_deg = self.fit_res.best_values['angle_LSQ']*180./np.pi
-        angle_MSQ_deg = self.fit_res.best_values['angle_MSQ']*180./np.pi
+        self.best_fidelity = self.fidelity_standard
+        angle_LSQ_deg = angle_LSQ*180./np.pi
+        angle_MSQ_deg = angle_MSQ*180./np.pi
 
         msg = "Chi sqr. %.3f" % self.fit_res.chisqr
-        msg += ('\nFidelity %.3f at \n  $\phi_{' + self.q0_label
+        msg += ('\nFidelity to fit %.3f at \n  $\phi_{' + self.q0_label
                + '}=$%.1f deg \n  $\phi_{' + self.q1_label + '}=$%.1f deg') \
                % (fidelity, angle_LSQ_deg, angle_MSQ_deg)
         ax.text(0.02, 0.95, msg,
@@ -1324,7 +1369,8 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                 verticalalignment='top',
                 horizontalalignment='left')
 
-        msg = ('\nFidelity standard %.3f at \n  $\phi_{' + self.q0_label
+        msg = 'Standard formula'
+        msg += ('\nFidelity to fit %.3f at \n  $\phi_{' + self.q0_label
                 + '}=$%.1f deg \n  $\phi_{' + self.q1_label + '}=$%.1f deg') \
                % (self.fidelity_standard, angle_LSQ_deg, angle_MSQ_deg)
         ax.text(0.02, 0.05, msg,
@@ -1339,23 +1385,226 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         savename = os.path.abspath(os.path.join(
             self.folder, figname))
         # value of 450dpi is arbitrary but higher than default
-        fig2.savefig(savename, format=self.fig_format, dpi=450)
+        fig2.savefig(savename, format=self.fig_format, dpi=self.dpi)
         if self.close_fig:
             plt.close(fig2)
-        # angle_LSQ_deg = self.fit_res.best_values['angle_LSQ']*180./np.pi
-        # angle_MSQ_deg = self.fit_res.best_values['angle_MSQ']*180./np.pi
-        # ax.set_title('Fit of single qubit phase errors')
-        # msg = ('MAX Fidelity at %.3f $\phi_{' + self.q1_label
-        #        + '}=$%.1f deg and $\phi_{' + self.q0_label + '}=$%.1f deg')\
-        #        % (fidelity, angle_LSQ_deg, angle_MSQ_deg)
-        # msg += "\n Chi sqr. %.3f" % self.fit_res.chisqr
-        # ax.text(0.5, .6, msg)
-        # figname = 'Fit_report_{}.{}'.format(self.exp_name,
-        #                                     self.fig_format)
-        # fig2.suptitle(self.exp_name+' ' + self.timestamp_string, size=16)
-        # savename = os.path.abspath(os.path.join(
-        #     self.folder, figname))
-        # # value of 450dpi is arbitrary but higher than default
-        # fig2.savefig(savename, format=self.fig_format, dpi=450)
-        # if self.close_fig:
-        #     plt.close(fig2)
+
+
+#####################################################################
+#### Rewrite the QuTip matrix_histogram_complex plotting function ###
+#####################################################################
+from qutip.qobj import Qobj
+import matplotlib as mpl
+from mpl_toolkits.mplot3d import Axes3D
+# from qutip.matplotlib_utilities import complex_phase_cmap
+
+def matrix_histogram_complex(M, xlabels=None, ylabels=None,
+                             title=None, limits=None, phase_limits=None,
+                             colorbar=True, fig=None, ax=None,
+                             threshold=None):
+    """
+    Copied from : http://qutip.org/docs/3.1.0/modules/qutip/visualization.html
+
+    Draw a histogram for the amplitudes of matrix M, using the argument
+    of each element for coloring the bars, with the given x and y labels
+    and title.
+
+    Parameters
+    ----------
+    M : Matrix of Qobj
+        The matrix to visualize
+
+    xlabels : list of strings
+        list of x labels
+
+    ylabels : list of strings
+        list of y labels
+
+    title : string
+        title of the plot (optional)
+
+    limits : list/array with two float numbers
+        The z-axis limits [min, max] (optional)
+
+    phase_limits : list/array with two float numbers
+        The phase-axis (colorbar) limits [min, max] (optional)
+
+    ax : a matplotlib axes instance
+        The axes context in which the plot will be drawn.
+
+    threshold: float (None)
+        Threshold for when bars of smaller height should be transparent. If
+        not set, all bars are colored according to the color map.
+
+    Returns
+    -------
+    fig, ax : tuple
+        A tuple of the matplotlib figure and axes instances used to produce
+        the figure.
+
+    Raises
+    ------
+    ValueError
+        Input argument is not valid.
+
+    """
+
+    if isinstance(M, Qobj):
+        # extract matrix data from Qobj
+        M = M.full()
+
+    n = np.size(M)
+    xpos, ypos = np.meshgrid(range(M.shape[0]), range(M.shape[1]))
+    xpos = xpos.T.flatten() - 0.5
+    ypos = ypos.T.flatten() - 0.5
+    zpos = np.zeros(n)
+    dx = dy = 0.8 * np.ones(n)
+    Mvec = M.flatten()
+    dz = abs(Mvec)
+
+    # make small numbers real, to avoid random colors
+    idx, = np.where(abs(Mvec) < 0.001)
+    Mvec[idx] = abs(Mvec[idx])
+
+    if phase_limits:  # check that limits is a list type
+        phase_min = phase_limits[0]
+        phase_max = phase_limits[1]
+    else:
+        phase_min = -np.pi
+        phase_max = np.pi
+
+    norm = mpl.colors.Normalize(phase_min, phase_max)
+    cmap = complex_phase_cmap()
+
+    colors = cmap(norm(np.angle(Mvec)))
+    if threshold is not None:
+        colors[:, 3] = 1 * (dz > threshold)
+
+    if ax is None:
+        fig = plt.figure()
+        ax = Axes3D(fig, azim=-35, elev=35)
+
+    ax.bar3d(xpos, ypos, zpos, dx, dy, dz, color=colors)
+
+    if title and fig:
+        ax.set_title(title)
+
+    # x axis
+    ax.axes.w_xaxis.set_major_locator(plt.IndexLocator(1, -0.5))
+    if xlabels:
+        ax.set_xticklabels(xlabels)
+    ax.tick_params(axis='x', labelsize=12)
+
+    # y axis
+    ax.axes.w_yaxis.set_major_locator(plt.IndexLocator(1, -0.5))
+    if ylabels:
+        ax.set_yticklabels(ylabels)
+    ax.tick_params(axis='y', labelsize=12)
+
+    # z axis
+    if limits and isinstance(limits, list):
+        ax.set_zlim3d(limits)
+    else:
+        ax.set_zlim3d([0, 1])  # use min/max
+    # ax.set_zlabel('abs')
+
+    # color axis
+    if colorbar:
+        cax, kw = mpl.colorbar.make_axes(ax, shrink=.75, pad=.0)
+        cb = mpl.colorbar.ColorbarBase(cax, cmap=cmap, norm=norm)
+        cb.set_ticks([-np.pi, -np.pi / 2, 0, np.pi / 2, np.pi])
+        cb.set_ticklabels(
+            (r'$-\pi$', r'$-\pi/2$', r'$0$', r'$\pi/2$', r'$\pi$'))
+        cb.set_label('arg')
+
+    return fig, ax
+
+
+def complex_phase_cmap():
+    """
+    Copied from : http://pydoc.net/qutip/3.1.0/qutip.matplotlib_utilities/
+
+    Create a cyclic colormap for representing the phase of complex variables
+
+    Returns
+    -------
+    cmap :
+        A matplotlib linear segmented colormap.
+    """
+    # original
+    # cdict = {'blue': ((0.00, 0.0, 0.0),
+    #                   (0.25, 0.0, 0.0),
+    #                   (0.50, 1.0, 1.0),
+    #                   (0.75, 1.0, 1.0),
+    #                   (1.00, 0.0, 0.0)),
+    #          'green': ((0.00, 0.0, 0.0),
+    #                    (0.25, 1.0, 1.0),
+    #                    (0.50, 0.0, 0.0),
+    #                    (0.75, 1.0, 1.0),
+    #                    (1.00, 0.0, 0.0)),
+    #          'red': ((0.00, 1.0, 1.0),
+    #                  (0.25, 0.5, 0.5),
+    #                  (0.50, 0.0, 0.0),
+    #                  (0.75, 0.0, 0.0),
+    #                  (1.00, 1.0, 1.0))}
+
+    # Okish
+    # cdict = {'blue': ((0.00, 0.0, 0.0),
+    #                   (0.25, 0.0, 0.0),
+    #                   (0.50, 1.0, 1.0),
+    #                   (0.75, 1.0, 1.0),
+    #                   (1.00, 0.0, 0.0)),
+    #          'green': ((0.00, 0.0, 0.0),
+    #                    # (0.25, 1.0, 1.0),
+    #                    (0.50, 1.0, 1.0),
+    #                    # (0.75, 1.0, 1.0),
+    #                    (1.00, 0.0, 0.0)),
+    #          'red': ((0.00, 1.0, 1.0),
+    #                  (0.25, 0.5, 0.5),
+    #                  (0.50, 0.0, 0.0),
+    #                  (0.75, 0.0, 0.0),
+    #                  (1.00, 1.0, 1.0))}
+
+    # # OK
+    # cdict = {'blue': ((0.00, 0.0, 0.0),
+    #                   (0.25, 0.0, 0.0),
+    #                   (0.50, 1.0, 1.0),
+    #                   (0.75, 1.0, 1.0),
+    #                   (1.00, 0.0, 0.0)),
+    #          'green': ((0.00, 0.0, 0.0),
+    #                    # (0.25, 1.0, 1.0),
+    #                    (0.50, 1.0, 1.0),
+    #                    # (0.75, 1.0, 1.0),
+    #                    (1.00, 0.0, 0.0)),
+    #          'red': ((0.00, 1.0, 1.0),
+    #                  (0.25, 0.0, 0.0),
+    #                  (0.50, 0.0, 0.0),
+    #                  (0.75, 0.0, 0.0),
+    #                  (1.00, 1.0, 1.0))}
+
+
+    cdict = {'red':   ((0.0, 1.0, 1.0),
+                       (0.25, 0.0, 0.0),
+                       (0.5, 0.0, 0.0),
+                       (0.75, 1.0, 1.0),
+                       (1.0, 1.0, 1.0)),
+
+              'green': ((0.0, 0.0, 0.0),
+                        (0.25, 1.0, 1.0),
+                        (0.5, 0.0, 0.0),
+                        (0.75, 1.0, 1.0),
+                        (1.0, 0.0, 0.0)),
+
+              'blue':  ((0.0, 0.0, 0.0),
+                        (0.25, 1.0, 1.0),
+                        (0.5, 1.0, 1.0),
+                        (0.75, 0.0, 0.0),
+                        (1.0, 0.0, 0.0)),
+              }
+
+    # clist = [(1, 0, 0), (0, 1, 0), (0, 0, 1)]  # R -> G -> B
+
+    cmap = mpl.colors.LinearSegmentedColormap('phase_colormap', cdict, 256)
+    # cmap = mpl.colors.LinearSegmentedColormap.from_list('phase_colormap', clist, 256)
+
+    return cmap
