@@ -154,6 +154,65 @@ class n_qubit_off_on(swf.Hard_Sweep):
                                 return_seq=self.return_seq,
                                 verbose=self.verbose)
 
+class n_qubit_Simultaneous_Randomized_Benchmarking_nr_cliffords(swf.Soft_Sweep):
+
+    def __init__(self, sweep_control='soft',
+                 n_qubit_RB_sweepfunction=None):
+        super().__init__()
+
+        self.sweep_control = sweep_control
+        # self.sweep_points = nr_cliffords
+        self.n_qubit_RB_sweepfunction = n_qubit_RB_sweepfunction
+        self.name = 'n_qubit_Simultaneous_Randomized_Benchmarking_nr_cliffords'
+        self.parameter_name = 'Nr of Cliffords'
+        self.unit = '#'
+
+
+    def set_parameter(self, val):
+        self.n_qubit_RB_sweepfunction.nr_cliffords_value = val
+        self.n_qubit_RB_sweepfunction.upload = True
+        self.n_qubit_RB_sweepfunction.prepare()
+
+
+class n_qubit_Simultaneous_Randomized_Benchmarking_one_length(swf.Hard_Sweep):
+
+    def __init__(self, pulse_pars_list, RO_pars, nr_cliffords_value, #int
+                 gate_decomposition='HZ', interleaved_gate=None,
+                 upload=False, return_seq=False, seq_name=None,
+                 CxC_RB=True, idx_for_RB=0,
+                 verbose=False):
+
+        super().__init__()
+        self.pulse_pars_list = pulse_pars_list
+        self.RO_pars = RO_pars
+        self.upload = upload
+        self.nr_cliffords_value = nr_cliffords_value
+        self.CxC_RB = CxC_RB
+        self.seq_name = seq_name
+        self.return_seq = return_seq
+        self.gate_decomposition = gate_decomposition
+        self.interleaved_gate = interleaved_gate
+        self.idx_for_RB = idx_for_RB
+        self.verbose = verbose
+
+        self.parameter_name = 'Nr of Seeds'
+        self.unit = '#'
+        self.name = 'n_qubit_Simultaneous_Randomized_Benchmarking_one_length'
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs2.n_qubit_simultaneous_randomized_benchmarking_seq(
+                self.pulse_pars_list, self.RO_pars,
+                nr_cliffords_value=self.nr_cliffords_value,
+                gate_decomposition=self.gate_decomposition,
+                interleaved_gate=self.interleaved_gate,
+                nr_seeds=self.sweep_points,
+                CxC_RB=self.CxC_RB,
+                idx_for_RB=self.idx_for_RB,
+                seq_name=self.seq_name,
+                return_seq=self.return_seq,
+                verbose=self.verbose)
+
 
 class two_qubit_AllXY(swf.Hard_Sweep):
 

@@ -3,7 +3,7 @@ from pycqed.measurement.randomized_benchmarking.clifford_group import(
     clifford_lookuptable)
 
 from pycqed.measurement.randomized_benchmarking.clifford_decompositions \
-    import(gate_decomposition)
+    import (HZ_gate_decomposition, XY_gate_decomposition)
 
 
 def calculate_net_clifford(cliffords):
@@ -36,15 +36,91 @@ def calculate_recovery_clifford(cl_in, desired_cl=0):
 
 
 def decompose_clifford_seq(clifford_sequence,
-                           gate_decomposition=gate_decomposition):
+                           gate_decomp='HZ'):
+
+    if gate_decomp is 'HZ':
+        gate_decomposition = HZ_gate_decomposition
+    elif gate_decomp is 'XY':
+        gate_decomposition = XY_gate_decomposition
+    else:
+        raise ValueError('Specify a valid gate decomposition, "HZ" or "XY".')
+
     decomposed_seq = []
+
     for cl in clifford_sequence:
         decomposed_seq.extend(gate_decomposition[cl])
     return decomposed_seq
 
+def decompose_clifford_seq_n_qubits(clifford_sequence_list, gate_decomp='HZ'):
+
+    """
+    Returns list of physical pulses for each Clifford element for each qubit in
+    the following format: [ [C_pl0_qb0], [C_pl0_qb1],.., [C_pl0_qbN],...,
+     [C_plN_qb0], ..., [C_plN_qbN] ], where C_pli_qbj is the pulse decomposition
+     of the ith Clifford element for qubit j.
+    :param clifford_sequence_list: list of lists of random Cliffords for each qubit
+    :param gate_decomp: the physical decomposition for the Cliffords
+    :return: decomposed_seq
+    """
+    if gate_decomp is 'HZ':
+        gate_decomposition = HZ_gate_decomposition
+    elif gate_decomp is 'XY':
+        gate_decomposition = XY_gate_decomposition
+    else:
+        raise ValueError('Specify a valid gate decomposition, "HZ" or "XY".')
+
+    # convert clifford_sequence_list to an array
+    clifford_sequence_array = np.zeros(
+        shape=(len(clifford_sequence_list), len(clifford_sequence_list[0])),
+        dtype=type(clifford_sequence_list[0][0]))
+
+    for i, cl_lst in enumerate(clifford_sequence_list):
+        clifford_sequence_array[i] = cl_lst
+
+    decomposed_seq = []
+
+    # iterate over columns; decompose each element in the column into physical
+    # pulses and ensure that the same number of finite duration pulses, and the
+    # same total number of pulses occur for each Clifford element, i.e. pad with
+    # 'I' and 'Z0' pulses
+    # example: decomposed_seq_temp = [Cl0, Cl1, Cl2] = [['X90'], ['mZ90'],
+    # ['Z180', 'X90', 'Z90']] after padding we have [['X90', 'Z0', 'Z0'],
+    # ['mZ90', 'I', 'Z0'], ['Z180', 'X90', 'Z90']]. We do this because each of
+    # these sublists of pulses are applied in parallel to different qubits.
+    for idx1 in range(clifford_sequence_array.shape[1]):
+        decomposed_seq_temp = []
+        decomposed_seq_temp.extend(
+            [gate_decomposition[clifford_sequence_array[idx0][idx1]] for
+             idx0 in range(clifford_sequence_array.shape[0])])
+
+        # add extra I pulses to make each Clifford decomposition
+        # have the same total duration
+        nr_finite_duration_pulses = [len([y for y in x if 'Z' not in y]) for
+                                     x in decomposed_seq_temp]
+        for i, pulse_list in enumerate(decomposed_seq_temp):
+            if nr_finite_duration_pulses[i]<max(nr_finite_duration_pulses):
+                diff_finite_duration_pulses = max(nr_finite_duration_pulses)-\
+                                              nr_finite_duration_pulses[i]
+                pulse_list = pulse_list + ['I']*diff_finite_duration_pulses
+            decomposed_seq_temp[i] = pulse_list
+
+        # if all qubits receive same number of finite duration pulses in their
+        # respective Cl_i, patch with Z0 pulses until all qubits receive the
+        # same total nr of pulses
+        pulse_list_lengths = [len(j) for j in decomposed_seq_temp]
+        for i, pulse_list in enumerate(decomposed_seq_temp):
+            if pulse_list_lengths[i]<max(pulse_list_lengths):
+                nr_Z0_to_add = max(pulse_list_lengths)-pulse_list_lengths[i]
+                pulse_list = pulse_list + ['Z0']*nr_Z0_to_add
+            decomposed_seq_temp[i] = pulse_list
+
+        decomposed_seq.extend(decomposed_seq_temp)
+
+    return decomposed_seq
+
 
 def convert_clifford_sequence_to_tape(clifford_sequence, lutmapping,
-                                      gate_decomposition=gate_decomposition):
+                                      gate_decomp='HZ'):
     '''
     Converts a list of qubit operations to the relevant pulse elements
 
@@ -54,6 +130,14 @@ def convert_clifford_sequence_to_tape(clifford_sequence, lutmapping,
     # I cannot test it at this moment (MAR)
     # decomposed_seq = decompose_clifford_seq(clifford_sequence,
     #                                         gate_decomposition)
+
+    if gate_decomp is 'HZ':
+        gate_decomposition = HZ_gate_decomposition
+    elif gate_decomp is 'XY':
+        gate_decomposition = XY_gate_decomposition
+    else:
+        raise ValueError('Specify a valid gate decomposition, "HZ" or "XY".')
+
     decomposed_seq = []
     for cl in clifford_sequence:
         decomposed_seq.extend(gate_decomposition[cl])
@@ -64,7 +148,7 @@ def convert_clifford_sequence_to_tape(clifford_sequence, lutmapping,
 
 
 def randomized_benchmarking_sequence(n_cl, desired_net_cl=0,
-                                     seed=None):
+                                     seed=None, interleaved_gate=None):
     '''
     Generates a sequence of length "n_cl" random cliffords and appends a
     recovery clifford to make the net result correspond to applying the
@@ -72,6 +156,8 @@ def randomized_benchmarking_sequence(n_cl, desired_net_cl=0,
     The default behaviour is that the net clifford corresponds to an
     identity ("0"). If you want e.g. an inverting sequence you should set
     the desired_net_cl to "3" (corresponds to Pauli X).
+
+    If IRB, pass in interleaved_gate as string. Example: 'X180'.
     '''
     if seed is None:
         rb_cliffords = np.random.randint(0, 24, int(n_cl))
@@ -79,11 +165,17 @@ def randomized_benchmarking_sequence(n_cl, desired_net_cl=0,
         rng_seed = np.random.RandomState(seed)
         rb_cliffords = rng_seed.randint(0, 24, int(n_cl))
 
+    if interleaved_gate is not None:
+        rb_cliffords = np.repeat(rb_cliffords,2)
+        try:
+            gate_idx = HZ_gate_decomposition.index([interleaved_gate])
+        except ValueError:
+            gate_idx = XY_gate_decomposition.index([interleaved_gate])
+        rb_cliffords[1::2] = [gate_idx]*(len(rb_cliffords)//2)
+
     net_clifford = calculate_net_clifford(rb_cliffords)
     recovery_clifford = calculate_recovery_clifford(
         net_clifford, desired_net_cl)
 
     rb_cliffords = np.append(rb_cliffords, recovery_clifford)
-
     return rb_cliffords
-

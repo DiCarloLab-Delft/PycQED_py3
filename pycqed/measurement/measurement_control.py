@@ -818,7 +818,7 @@ class MeasurementControl(Instrument):
             logging.warning('No station object specified, could not save',
                             ' instrument settings')
         else:
-            # This saves the snapshot of the entire setup
+            # # This saves the snapshot of the entire setup
             # snap_grp = data_object.create_group('Snapshot')
             # snap = self.station.snapshot()
             # h5d.write_dict_to_hdf5(snap, entry_point=snap_grp)

@@ -8,6 +8,7 @@ from pycqed.measurement.waveform_control import sequence
 from pycqed.utilities.general import add_suffix_to_dict_keys
 from pycqed.measurement.pulse_sequences.standard_elements import multi_pulse_elt
 from pycqed.measurement.pulse_sequences.standard_elements import distort_and_compensate
+from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
 import pycqed.measurement.waveform_control.fluxpulse_predistortion as fluxpulse_predistortion
 
 from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import get_pulse_dict_from_pars
@@ -1006,6 +1007,229 @@ def n_qubit_off_on(pulse_pars_list, RO_pars, return_seq=False, verbose=False,
         return seq, el_list
     else:
         return seq_name
+
+
+def n_qubit_simultaneous_randomized_benchmarking_seq(pulse_pars_list, RO_pars,
+                                                     nr_cliffords_value, #scalar
+                                                     nr_seeds,           #array
+                                                     idx_for_RB=0,
+                                                     return_seq=False,
+                                                     CxC_RB=True,
+                                                     net_clifford=0,
+                                                     gate_decomposition='HZ',
+                                                     interleaved_gate=None,
+                                                     post_msmt_delay=3e-6,
+                                                     seq_name=None,
+                                                     verbose=False):
+
+    # Here RO_pars must contain the RO pulse for multiplexed RO on the
+    # relevant qubits.
+    # idx_for_RB refers to the index of the pulse_pars in pulse_pars_list
+    # which will undergo the RB protocol in the case CxC_RB==False (i.e. the
+    # position of the Z operator when we measure ZIII..I, IZII..I, IIZI..I etc.
+
+    # get number of qubits
+    n = len(pulse_pars_list)
+
+    # Create a dict with the parameters for all the pulses
+    pulse_dict = {'RO': RO_pars}
+    for i, pulse_pars in enumerate(pulse_pars_list):
+        pars = pulse_pars.copy()
+        if i != 0:
+            pars['refpoint'] = 'start'
+
+        pulse_dict_qb = deepcopy(get_pulse_dict_from_pars(pars))
+        Z0 = deepcopy(pulse_dict_qb['Z180'])
+        Z0['phase'] = 0
+        pulse_dict_qb.update({'Z0': Z0})
+        pulses = add_suffix_to_dict_keys(pulse_dict_qb, ' {}'.format(i))
+        pulse_dict.update(pulses)
+
+    if CxC_RB:
+        if seq_name is None:
+            seq_name = 'CxC_RB_sequence'
+        seq = sequence.Sequence(seq_name)
+        el_list = []
+
+        for i in nr_seeds:
+            clifford_sequence_list = []
+            for index in range(n):
+                clifford_sequence_list.append(rb.randomized_benchmarking_sequence(
+                    nr_cliffords_value, desired_net_cl=net_clifford,
+                    interleaved_gate=interleaved_gate))
+
+            pulse_keys = rb.decompose_clifford_seq_n_qubits(
+                clifford_sequence_list,
+                gate_decomp=gate_decomposition)
+
+            # interleave pulses for each qubit to obtain [pulse0_qb0,
+            # pulse0_qb1,...pulse0_qbN,...,pulseN_qb0, pulseN_qb1,...,pulseN_qbN]
+            pulse_keys_w_suffix = []
+            for k, lst in enumerate(pulse_keys):
+                pulse_keys_w_suffix.append([x+' '+str(k % n) for x in lst])
+            pulse_keys_by_qubit = []
+            for k in range(n):
+                pulse_keys_by_qubit.append([x for l in pulse_keys_w_suffix[k::n]
+                                            for x in l])
+
+            pulse_list = []
+            for j in range(len(pulse_keys_by_qubit[0])):
+                for k in range(n):
+                    pulse_list.append(pulse_dict[pulse_keys_by_qubit[k][j]])
+
+            # if qb0 has a Z_pulse, remove the 'refpoint' key in the pulse pars
+            # dict of the next qubit which has an SSB pulse
+            Zp0_idxs = [] # indices of the Z pulses on qb0
+            for w, px in enumerate(pulse_list):
+                if (px['target_qubit']==pulse_pars_list[0]['target_qubit'] and
+                            px['pulse_type']=='Z_pulse'):
+                    Zp0_idxs.append(w)
+            if len(Zp0_idxs)>0:
+                for y in Zp0_idxs:
+                    #look at the pulses applied on qb1...qbn
+                    qubit_length_pulse_list = pulse_list[y+1:y+n]
+                    # for each pulse in pulse_list where qb0 has a Z pulse,
+                    # look at the n-1 entries (qubits) and save the indices
+                    # of all SSB pulse parameters
+                    SSB_after_Z_on_qb0 = [y+1+qubit_length_pulse_list.index(j)
+                                          for j in qubit_length_pulse_list
+                                          if j['pulse_type']!='Z_pulse']
+                    if len(SSB_after_Z_on_qb0)>0:
+                        # if SSB pulses were found, delete the 'refpoint' entry
+                        # in the first qb after qb0 that has an SSB pulse
+                        first_SSB = next(y+1+qubit_length_pulse_list.index(j)
+                                         for j in qubit_length_pulse_list
+                                         if j['pulse_type']!='Z_pulse')
+                        temp_SSB_pulse = deepcopy(pulse_list[first_SSB])
+                        temp_SSB_pulse.pop('refpoint')
+                        pulse_list[first_SSB] = temp_SSB_pulse
+
+            # add RO pulse pars at the end
+            pulse_list += [RO_pars]
+
+            # find index of first pulse in pulse_list that is not a Z pulse
+            # copy this pulse and set extra wait
+            try:
+                first_x_pulse = next(j for j in pulse_list
+                                     if 'Z' not in j['pulse_type'])
+                first_x_pulse_idx = pulse_list.index(first_x_pulse)
+            except:
+                first_x_pulse_idx = 0
+            pulse_list[first_x_pulse_idx] = deepcopy(pulse_list[first_x_pulse_idx])
+            pulse_list[first_x_pulse_idx]['pulse_delay'] += post_msmt_delay
+
+            if verbose:
+                print('pulse_keys_by_qubit ', pulse_keys_by_qubit)
+                # print('\nfinal pulse_list ', pulse_list)
+                print('\nlen_pulse_list/nr_qubits ',(len(pulse_list)-1)/n)
+                print('\nnr_finite_duration_pulses/nr_qubits ',
+                      len([x for x in pulse_list[:-1]
+                           if 'Z' not in x['pulse_type']])/n)
+                print('\nnr_Z_pulses/nr_qubits ', len([x for x in pulse_list
+                                                       if 'Z' in x['pulse_type']])/n)
+                print('\n i ', i)
+            el = multi_pulse_elt(i, station, pulse_list)
+            el_list.append(el)
+            seq.append_element(el, trigger_wait=True)
+
+    else:
+
+        if idx_for_RB > n-1:
+            raise ValueError('idx_for_RB cannot exceed (nr_of_qubits-1).')
+
+        if seq_name is None:
+            seq_name = 'CxI_IxC_RB_sequence'
+        seq = sequence.Sequence(seq_name)
+        el_list = []
+
+        for i in nr_seeds:
+            cl_seq = rb.randomized_benchmarking_sequence(
+                nr_cliffords_value, desired_net_cl=net_clifford,
+                interleaved_gate=interleaved_gate)
+            pulse_keys = rb.decompose_clifford_seq(
+                cl_seq,
+                gate_decomp=gate_decomposition)
+
+            C_pulse_list_keys = [x+' '+str(idx_for_RB) for x in pulse_keys]
+            pulse_list_keys = len(C_pulse_list_keys)*n*['']
+            pulse_list_keys[idx_for_RB::n] = C_pulse_list_keys
+
+            # populate remaining positions in pulse_list with I pulses if
+            # the pulse from RB is a finite-duration pulse, or with Z0 if the
+            # pulse from RB is a Z puls
+            for index in range(0,int(len(pulse_list_keys)),n):
+                for j, key in enumerate(pulse_list_keys[index:index+n]):
+                    if key=='':
+                        if 'Z' in pulse_list_keys[index:index+n][idx_for_RB]:
+                            pulse_list_keys[index+j] = 'Z0 '+ str(j)
+                        else:
+                            pulse_list_keys[index+j] = 'I '+ str(j)
+
+            # create pulse list to upload
+            pulse_list = [pulse_dict[x] for x in pulse_list_keys]
+
+            # if qb0 has a Z_pulse, remove the 'refpoint' key of the next
+            # pulse dict which is not a Z_pulse
+            Zp0_idxs = [] # indices of the Z pulses on qb0
+            for w, px in enumerate(pulse_list):
+                if (px['target_qubit']==pulse_pars_list[0]['target_qubit']
+                        and px['pulse_type']=='Z_pulse'):
+                    Zp0_idxs.append(w)
+            if len(Zp0_idxs)>0:
+                for y in Zp0_idxs:
+                    #look at the pulses applied on qb1...qbn
+                    qubit_length_pulse_list = pulse_list[y+1:y+n]
+                    # for each pulse in pulse_list where qb0 has a Z pulse,
+                    # look at the n-1 entries (qubits) and save the indices
+                    # of all SSB pulse parameters
+                    SSB_after_Z_on_qb0 = [y+1+qubit_length_pulse_list.index(j)
+                                          for j in qubit_length_pulse_list
+                                          if j['pulse_type']!='Z_pulse']
+                    if len(SSB_after_Z_on_qb0)>0:
+                        # if SSB pulses were found, delete the 'refpoint' entry
+                        # in the first qb after qb0 that has an SSB pulse
+                        first_SSB = next(y+1+qubit_length_pulse_list.index(j)
+                                         for j in qubit_length_pulse_list
+                                         if j['pulse_type']!='Z_pulse')
+                        temp_SSB_pulse = deepcopy(pulse_list[first_SSB])
+                        temp_SSB_pulse.pop('refpoint')
+                        pulse_list[first_SSB] = temp_SSB_pulse
+
+            # add RO pars
+            pulse_list += [RO_pars]
+
+            # find first_x_pulse = first pulse in pulse_list that is not a Z pulse
+            # Copy this pulse and the next first_x_pulse_idx*n-first_x_pulse_idx,
+            # and set extra wait
+            try:
+                first_x_pulse = next(j for j in pulse_list
+                                     if 'Z' not in j['pulse_type'])
+                first_x_pulse_idx = pulse_list.index(first_x_pulse)
+            except:
+                first_x_pulse_idx = 0
+            pulse_list[first_x_pulse_idx] = deepcopy(pulse_list[first_x_pulse_idx])
+            pulse_list[first_x_pulse_idx]['pulse_delay'] += post_msmt_delay
+
+            if verbose:
+                print('pulse_list_keys ', pulse_list_keys)
+                # print('\nfinal pulse_list ', pulse_list)
+                print('\nlen_pulse_list/nr_qubits ',(len(pulse_list)-1)/n)
+                print('\nnr_finite_duration_pulses/nr_qubits ',
+                      len([x for x in pulse_list[:-1]
+                           if 'Z' not in x['pulse_type']])/n)
+                print('\nnr_Z_pulses/nr_qubits ', len([x for x in pulse_list
+                                                       if 'Z' in x['pulse_type']])/n)
+                print('\n i ', i)
+            el = multi_pulse_elt(i, station, pulse_list)
+            el_list.append(el)
+            seq.append_element(el, trigger_wait=True)
+
+    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
+
 
 
 def two_qubit_tomo_bell_qudev(bell_state,

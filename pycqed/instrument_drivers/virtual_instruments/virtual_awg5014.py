@@ -139,7 +139,8 @@ class VirtualAWG5014(Tektronix_AWG5014):
                 cids.append('ch{}_marker1'.format(i))
                 cids.append('ch{}_marker2'.format(i))
 
-        fig, axs = plt.subplots(len(cids), 1, sharex=True)
+        #fig, axs = plt.subplots(len(cids), 1, sharex=True)
+        fig, axs = plt.subplots(len(cids), 1, sharex=False)
         # fig, axs = plt.subplots(len(cids), 1, sharex=False)
 
         i = 0
@@ -167,6 +168,15 @@ class VirtualAWG5014(Tektronix_AWG5014):
             # ax.set_ylabel(cid,rotation=0,fontsize=8)
             # ax.set_yticklabels(ax.get_yticks(),fontsize=5)
             ax.yaxis.set_label_coords(-.15, 0.5)
+            if xlim != 'All':
+                ax.set_xlim(xlim)
+            # if costum_ylabels is None:
+            #     ax.set_ylabel(cid,rotation=0)
+            # else:
+            #     ax.set_ylabel(costum_ylabels[cid],rotation=0)
+            # # ax.set_ylabel(cid,rotation=0,fontsize=8)
+            # # ax.set_yticklabels(ax.get_yticks(),fontsize=5)
+            # ax.yaxis.set_label_coords(-.15, 0.5)
             if xlim != 'All':
                 ax.set_xlim(xlim)
             if i == len(cids):

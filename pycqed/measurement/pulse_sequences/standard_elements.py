@@ -69,7 +69,6 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None):
     # don't count the Z_pulses when specifying number of pulses in element name
     count_z = 0
     for pls in pulse_list:
-
         if 'Z_pulse' in pls['pulse_type']:
             count_z += 1
     no_of_pulses = len(pulse_list) - count_z
