@@ -6,6 +6,10 @@
     Usage:
     Bugs:
     Tabs: 4
+Revision history:
+ *    0.1.0   :            : KKL  : * Created this file.
+ *    0.2.0   :            : XFu  : * Refined the intialization process.
+ *    0.2.1   : 13-01-2018 : XFu  : * Change the parameters into integer.
 """
 
 
@@ -61,6 +65,7 @@ class CCL(SCPI):
     def __init__(self, name, address, port, log_level=False, **kwargs):
         self.model = name
         self._dummy_instr = False
+        self.driver_version = "0.2.1"
         try:
             super().__init__(name, address, port, **kwargs)
         except Exception as e:
@@ -74,10 +79,10 @@ class CCL(SCPI):
         self.get_idn()
         self.add_standard_parameters()
         self.add_additional_parameters()
-        self._initialize_insn_microcode_parsers()
+        self._init_submodules()
         self.connect_message()
 
-    def _initialize_insn_microcode_parsers(self):
+    def _init_submodules(self):
         """
         The parser helper objects are initialized in this function.
         """
@@ -119,26 +124,19 @@ class CCL(SCPI):
                     val_type = validator["type"]
 
                     if (val_type == "Bool"):
-                        # Bool can naturally only have 2 values, 0 or 1...
                         parameter["vals"] = vals.Ints(0, 1)
                         parameter['get_parser'] = int
 
                     elif (val_type == "Non_Neg_Number"):
-                        # Non negative integers
-                        try:
-                            if ("range" in validator):
-                                # if range key is specified in the parameter,
-                                # then, the validator is limited to the
-                                # specified min,max values
-                                val_min = validator["range"][0]
-                                val_max = validator["range"][1]
+                        if ("range" in validator):
+                            val_min = validator["range"][0]
+                            val_max = validator["range"][1]
+                        else:
+                            val_min = 0
+                            val_max = INT32_MAX
 
-                            parameter["vals"] = vals.Ints(val_min, val_max)
-
-                        except Exception as e:
-                            parameter["vals"] = vals.Ints(0, INT32_MAX)
-                            parameter['get_parser'] = int
-                            log.warning("Range of validator not set correctly")
+                        parameter["vals"] = vals.Ints(val_min, val_max)
+                        parameter['get_parser'] = int
 
                     else:
                         log.warning("Failed to set the validator for the" +
@@ -152,6 +150,11 @@ class CCL(SCPI):
                         name + ".(%s)", str(e))
 
             try:
+                log.info("Adding parameter:")
+                for key, value in parameter.items():
+                    log.info("\t", key, value)
+                log.info("\n")
+
                 self.add_parameter(name, **parameter)
 
             except Exception as e:
