@@ -1978,10 +1978,10 @@ class Rabi_Analysis(TD_Analysis):
                 piHalfPulse_std = freq_std/freq_fit
 
             else:
-                n = np.arange(-2, 3, 0.5)
+                n = np.arange(-2, 3)
 
-                piPulse_vals = (2*n*np.pi+np.pi-phase_fit)/(2*np.pi*freq_fit)
-                piHalfPulse_vals = (2*n*np.pi+np.pi/2-phase_fit)/(2*np.pi*freq_fit)
+                piPulse_vals = (n*np.pi+phase_fit)/(2*np.pi*freq_fit)
+                piHalfPulse_vals = (n*np.pi+np.pi/2+phase_fit)/(2*np.pi*freq_fit)
 
                 try:
                     piHalfPulse = np.min(np.take(piHalfPulse_vals,
