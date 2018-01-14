@@ -1052,68 +1052,53 @@ class CCLight_Transmon(Qubit):
 
         VSM = self.instr_VSM.get_instr()
 
-        # Commented out code contains legacy code for the Blue Box VSM
-        # VSM.set_all_switches_to('OFF')
-        # Gin = self.mw_vsm_ch_Gin()
-        # Din = self.mw_vsm_ch_Din()
-        # out = self.mw_vsm_ch_out()
-        # VSM.set('in{}_out{}_switch'.format(Gin, out), 'ON')
-        # VSM.set('in{}_out{}_switch'.format(Din, out), 'OFF')
-
         ch_in = self.mw_vsm_ch_in()
         mod_out = self.mw_vsm_mod_out()
         # module 8 is hardcoded for use mixer calls (signal hound)
         VSM.set('mod8_marker_source'.format(ch_in), 'int')
         VSM.set('mod8_ch{}_marker_state'.format(ch_in), 'on')
-        VSM.set('mod8_ch{}_derivative_att_raw'.format(ch_in), 50000)
-        VSM.set('mod8_ch{}_gaussian_att_raw'.format(ch_in), 50000)
 
-        offsets = multi_channel_mixer_carrier_cancellation(
+        #####
+        # This snippet is the 4 parameter joint optimization
+        #####
+        # VSM.set('mod8_ch{}_gaussian_att_raw'.format(ch_in), 50000)
+        # VSM.set('mod8_ch{}_derivative_att_raw'.format(ch_in), 50000)
+        # # offsets = multi_channel_mixer_carrier_cancellation(
+        #     SH=self.instr_SH.get_instr(), source=self.instr_LO_mw.get_instr(),
+        #     MC=self.instr_MC.get_instr(),
+        #     channel_pars=offset_pars)
+
+        # if update:
+        #     self.mw_mixer_offs_GI(offsets[0])
+        #     self.mw_mixer_offs_GQ(offsets[1])
+        #     self.mw_mixer_offs_DI(offsets[2])
+        #     self.mw_mixer_offs_DQ(offsets[3])
+
+        # return True
+
+        # Calibrate Gaussian component mixer
+        VSM.set('mod8_ch{}_gaussian_att_raw'.format(ch_in), 50000)
+        VSM.set('mod8_ch{}_derivative_att_raw'.format(ch_in), 0)
+        offset_I, offset_Q = mixer_carrier_cancellation(
             SH=self.instr_SH.get_instr(), source=self.instr_LO_mw.get_instr(),
             MC=self.instr_MC.get_instr(),
-            channel_pars=offset_pars)
-
+            chI_par=chGI_par, chQ_par=chGQ_par)
         if update:
-            self.mw_mixer_offs_GI(offsets[0])
-            self.mw_mixer_offs_GQ(offsets[1])
-            self.mw_mixer_offs_DI(offsets[2])
-            self.mw_mixer_offs_DQ(offsets[3])
+            self.mw_mixer_offs_GI(offset_I)
+            self.mw_mixer_offs_GQ(offset_Q)
 
+        # Calibrate Derivative component mixer
+        VSM.set('mod8_ch{}_gaussian_att_raw'.format(ch_in), 0)
+        VSM.set('mod8_ch{}_derivative_att_raw'.format(ch_in), 50000)
+
+        offset_I, offset_Q = mixer_carrier_cancellation(
+            SH=self.instr_SH.get_instr(), source=self.instr_LO_mw.get_instr(),
+            MC=self.instr_MC.get_instr(),
+            chI_par=chDI_par, chQ_par=chDQ_par)
+        if update:
+            self.mw_mixer_offs_DI(offset_I)
+            self.mw_mixer_offs_DQ(offset_Q)
         return True
-        # # Calibrate Gaussian component mixer
-        # offset_I, offset_Q = mixer_carrier_cancellation(
-        #     SH=self.instr_SH.get_instr(), source=self.instr_LO_mw.get_instr(),
-        #     MC=self.instr_MC.get_instr(),
-        #     chI_par=chGI_par, chQ_par=chGQ_par)
-        # if update:
-        #     self.mw_mixer_offs_GI(offset_I)
-        #     self.mw_mixer_offs_GQ(offset_Q)
-
-        # # VSM.set('in{}_out{}_switch'.format(Gin, out), 'OFF')
-        # # VSM.set('in{}_out{}_switch'.format(Din, out), 'ON')
-        # VSM.set('mod8_ch{}_derivative_att_raw'.format(ch_in), 50000)
-        # VSM.set('mod8_ch{}_gaussian_att_raw'.format(ch_in), 0)
-
-        # if AWG.__class__.__name__ == 'QuTech_AWG_Module':
-        #     chDI_par = AWG.parameters['ch3_offset']
-        #     chDQ_par = AWG.parameters['ch4_offset']
-        # else:
-        #     # This part is AWG8 specific and wont work with a QWG
-        #     AWG.set('sigouts_{}_on'.format(awg_ch+1), 1)
-        #     AWG.set('sigouts_{}_on'.format(awg_ch+2), 1)
-        #     chDI_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch+1)]
-        #     chDQ_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch+2)]
-        #     # End of AWG8 specific part
-
-        # # Calibrate Derivative component mixer
-        # offset_I, offset_Q = mixer_carrier_cancellation(
-        #     SH=self.instr_SH.get_instr(), source=self.instr_LO_mw.get_instr(),
-        #     MC=self.instr_MC.get_instr(),
-        #     chI_par=chDI_par, chQ_par=chDQ_par)
-        # if update:
-        #     self.mw_mixer_offs_DI(offset_I)
-        #     self.mw_mixer_offs_DQ(offset_Q)
-        # return True
 
     def calibrate_mixer_skewness_RO(self, update=True):
         '''
@@ -1523,7 +1508,8 @@ class CCLight_Transmon(Qubit):
             parameter_list: list = ['G_att', 'D_att', 'freq'],
             initial_values: list =None,
             initial_steps: list= [5e3, 10e3, 3e6],
-            nr_cliffords: int=80, nr_seeds:int=40, update: bool=True,
+            nr_cliffords: int=80, nr_seeds:int=40,
+            verbose:bool = True, update: bool=True,
             prepare_for_timedomain: bool=True):
 
         if MC is None:
@@ -1589,12 +1575,15 @@ class CCLight_Transmon(Qubit):
         MC.set_adaptive_function_parameters(ad_func_pars)
         MC.set_optimization_method('nelder_mead')
         MC.run(name='Restless_tuneup_{}Cl_{}seeds'.format(
-                nr_cliffords, nr_cliffords) + self.msmt_suffix,
+                nr_cliffords, nr_seeds) + self.msmt_suffix,
                 mode='adaptive')
         a=ma.OptimizationAnalysis(label='Restless_tuneup')
 
 
         if update:
+            if verbose:
+                print("Updating parameters in qubit object")
+
             opt_par_values = a.optimization_result[0]
             for par in parameter_list:
                 if par == 'G_att':
