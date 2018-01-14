@@ -428,7 +428,7 @@ class MeasurementAnalysis(object):
                     par_group.attrs.create(name=par_name, data=par_val)
                     #par_dict = vars(par_val)
                 else:
-                    par_group.attrs.create(name=par_name,data=par_val)
+                    fit_grp.attrs.create(name=par_name, data=par_val)
 
     def run_default_analysis(self, TwoD=False, close_file=True,
                              show=False, log=False, transpose=False, **kw):
