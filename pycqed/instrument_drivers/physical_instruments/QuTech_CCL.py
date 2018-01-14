@@ -79,10 +79,10 @@ class CCL(SCPI):
         self.get_idn()
         self.add_standard_parameters()
         self.add_additional_parameters()
-        self._initialize_insn_microcode_parsers()
+        self._init_submodules()
         self.connect_message()
 
-    def _initialize_insn_microcode_parsers(self):
+    def _init_submodules(self):
         """
         The parser helper objects are initialized in this function.
         """
