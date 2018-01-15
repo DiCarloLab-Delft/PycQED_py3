@@ -1,5 +1,6 @@
 import logging
 import numpy as np
+import matplotlib.pyplot as plt
 
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
@@ -110,10 +111,10 @@ class QuDev_transmon(Qubit):
                            vals=vals.Numbers(min_value=10e-9, max_value=2.2e-6),
                            parameter_class=ManualParameter)
         self.add_parameter('RO_acq_weight_function_I', initial_value=0,
-                           vals=vals.Enum(0, 1, 2, 3, 4, 5),
+                           vals=vals.Enum(0, 1, 2, 3, 4, 5, 6, 7, 8),
                            parameter_class=ManualParameter)
         self.add_parameter('RO_acq_weight_function_Q', initial_value=1,
-                           vals=vals.Enum(None, 0, 1, 2, 3, 4, 5),
+                           vals=vals.Enum(None, 0, 1, 2, 3, 4, 5, 6, 7, 8),
                            parameter_class=ManualParameter)
         self.add_parameter('RO_acq_shots', initial_value=4094,
                            docstring='Number of single shot measurements to do'
@@ -122,11 +123,34 @@ class QuDev_transmon(Qubit):
                            parameter_class=ManualParameter)
 
         self.add_parameter('RO_IQ_angle', initial_value=0,
-                           docstring='The angle of the readout transmission'
-                                     'on the IQ plane that provides the '
-                                     'highest discrimination for the e- '
-                                     'and g- states',
-                           label='RO IQ angle', unit='rad',
+                           docstring='The phase of the integration weights when'
+                                     'using SSB, DSB or square_rot integration '
+                                     'weights', label='RO IQ angle', unit='rad',
+                           parameter_class=ManualParameter)
+
+        self.add_parameter('ro_acq_weight_func_I', vals=vals.Arrays(),
+                           label='Optimized weights for I channel',
+                           parameter_class=ManualParameter)
+        self.add_parameter('ro_acq_weight_func_Q', vals=vals.Arrays(),
+                           label='Optimized weights for Q channel',
+                           parameter_class=ManualParameter)
+        self.add_parameter('ro_acq_input_average_length', unit='s',
+                           initial_value=2.275e-6, docstring='The measurement '
+                               'time in input averaging mode',
+                           label='Input average measurement time',
+                           vals=vals.Numbers(0, 2.275e-6),
+                           parameter_class=ManualParameter)
+        self.add_parameter('ro_acq_weight_type', initial_value='DSB',
+                           vals=vals.Enum('SSB', 'DSB', 'optimal',
+                                          'square_rot', 'manual'),
+                           docstring=(
+                               'Determines what type of integration weights to '
+                               'use: \n\tSSB: Single sideband demodulation\n\t'
+                               'DSB: Double sideband demodulation\n\toptimal: '
+                               'waveforms specified in "ro_acq_weight_func_I" '
+                               'and "ro_acq_weight_func_Q"\n\tsquare_rot: uses '
+                               'a single integration channel with boxcar '
+                               'weights'),
                            parameter_class=ManualParameter)
 
         # add pulsed spectroscopy pulse parameters
@@ -238,15 +262,15 @@ class QuDev_transmon(Qubit):
         self.add_pulse_parameter('flux', 'flux_f_pulse_mod', 'flux_mod_frequency',
                                  initial_value=None, vals=vals.Numbers())
 
-
-
         self.update_detector_functions()
 
     def get_idn(self):
         return {'driver': str(self.__class__), 'name': self.name}
 
     def update_detector_functions(self):
-        if self.RO_acq_weight_function_Q() is None:
+
+        if self.RO_acq_weight_function_Q() is None or \
+           self.ro_acq_weight_type() not in ['SSB', 'DSB']:
             channels = [self.RO_acq_weight_function_I()]
         else:
             channels = [self.RO_acq_weight_function_I(),
@@ -376,6 +400,9 @@ class QuDev_transmon(Qubit):
             self.readout_UC_LO.pulsemod_state('Off')
             self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
             self.readout_UC_LO.on()
+
+        self.set_readout_weights()
+
 
     def measure_resonator_spectroscopy(self, freqs=None, MC=None,
                                         analyze=True, close_fig=True):
@@ -961,213 +988,140 @@ class QuDev_transmon(Qubit):
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
                                    qb_name=self.name)
 
-    def set_default_readout_weights(self, channels=(0, 1), theta=None):
+    def measure_transients(self, MC=None, cases=('off', 'on'), upload=True,
+                           analyze=True, **kw):
         """
-        Sets the integration weights of the channels `RO_acq_weight_I` and
-        `RO_acq_weight_Q` to the default sinusoidal values. The integration
-        result of I channel is the integral of
-        `cos(w*t)*ch0(t) + sin(w*t)*ch1(t)` and of Q channel is the integral of
-        `cos(w*t)*ch0(t) - sin(w*t)*ch1(t)`.
-
-        Args:
-            channels: An iterable of UHFLI ports that are used for the input
-                      signal. E.g. for using just the first input port one
-                      would use `(0,)`, if using both input ports, one would use
-                      the default value `(0, 1)`.
+        If the resulting transients will be used to caclulate the optimal
+        weight functions, then it is important that the UHFQC iavg_delay and
+        wint_delay are calibrated such that the weights and traces are
+        aligned: iavg_delay = 2*wint_delay.
         """
-
-        if theta is None:
-            theta = self.RO_IQ_angle()
-
-        trace_length = 4096
-        tbase = np.arange(0, trace_length / 1.8e9, 1 / 1.8e9)
-        cosI = np.array(np.cos(2 * np.pi * self.f_RO_mod() * tbase + theta))
-        sinI = np.array(np.sin(2 * np.pi * self.f_RO_mod() * tbase + theta))
-
-        c1 = self.RO_acq_weight_function_I()
-        c2 = self.RO_acq_weight_function_Q()
-
-        if 0 in channels:
-            self.UHFQC.set('quex_wint_weights_{}_real'.format(c1), cosI)
-            self.UHFQC.set('quex_rot_{}_real'.format(c1), 1)
-            if c2 is not None:
-                self.UHFQC.set('quex_wint_weights_{}_real'.format(c2), sinI)
-                self.UHFQC.set('quex_rot_{}_real'.format(c2), 1)
-        else:
-            self.UHFQC.set('quex_rot_{}_real'.format(c1), 0)
-            if c2 is not None:
-                self.UHFQC.set('quex_rot_{}_real'.format(c2), 0)
-        if 1 in channels:
-            self.UHFQC.set('quex_wint_weights_{}_imag'.format(c1), sinI)
-            self.UHFQC.set('quex_rot_{}_imag'.format(c1), 1)
-            if c2 is not None:
-                self.UHFQC.set('quex_wint_weights_{}_imag'.format(c2), cosI)
-                self.UHFQC.set('quex_rot_{}_imag'.format(c2), -1)
-        else:
-            self.UHFQC.set('quex_rot_{}_imag'.format(c1), 0)
-            if c2 is not None:
-                self.UHFQC.set('quex_rot_{}_imag'.format(c2), 0)
-
-    def calibrate_readout_weights(self, MC=None, update=True, channels=(0, 1),
-                                  close_fig=True, upload=True, filter_t=None,
-                                  subtract_offset=False, **kw):
-        """
-        Sets the weight function of the UHFLI channel
-        `self.RO_acq_weight_function_I` to the difference of the traces of the
-        qubit prepared in the |0> and |1> state, which is optimal assuming that
-        the standard deviation over different measurements of both traces is
-        a constant. Sets `self.RO_acq_weight_function_Q` to `None`.
-
-        Args:
-            MC: MeasurementControl object to use for the measurement. Defaults
-                to `self.MC`.
-            update: Boolean flag, whether to update the UHFQC integration
-                    weight. Default `True`.
-            channels: An iterable of UHFLI ports that are used for the input
-                      signal. E.g. for using just the first input port one
-                      would use `(0,)`, if using both input ports, one would use
-                      the default value `(0, 1)`.
-            analyze: Boolean flag to run default default analysis generating
-                     plots of the traces.
-            close_fig: Boolean flag to close the matplotlib's figure. If
-                       `False`, then the plots can be viewed with `plt.show()`
-                       Default `True`.
-            upload: Whether to reupload the AWG waveforms. Currently
-                    unimplemented
-            filter_t: The type of filter to apply to the measured difference
-                      of the average g- and e-trace.
-
-        Returns:
-            Optimal weight(s) for state discrimination.
-        """
-
-        old_averages = self.RO_acq_averages()
-        self.RO_acq_averages(2**15)
+        if MC is None:
+            MC = self.instr_MC.get_instr()
 
         self.prepare_for_timedomain()
-        if MC is None:
-            MC = self.MC
+        npoints = int(self.ro_acq_input_average_length()*1.8e9)
+        if 'off' in cases:
+            MC.set_sweep_function(awg_swf.OffOn(
+                pulse_pars=self.get_drive_pars(),
+                RO_pars=self.get_RO_pars(),
+                pulse_comb='OffOff',
+                upload=upload))
+            MC.set_sweep_points(np.linspace(0, npoints/1.8e9, npoints,
+                                            endpoint=False))
+            MC.set_detector_function(self.inp_avg_det)
+            MC.run(name='timetrace_off' + self.msmt_suffix)
+            if analyze:
+                ma.MeasurementAnalysis(auto=True, qb_name=self.name, **kw)
 
-        MC.set_sweep_function(awg_swf.OffOn(
-            pulse_pars=self.get_drive_pars(),
-            RO_pars=self.get_RO_pars(),
-            pulse_comb='OffOff'))
-        MC.set_sweep_points(np.arange(2))
-        MC.set_detector_function(self.inp_avg_det)
-        MC.run(name='Weight_calib_0'+self.msmt_suffix)
+        if 'on' in cases:
+            MC.set_sweep_function(awg_swf.OffOn(
+                pulse_pars=self.get_drive_pars(),
+                RO_pars=self.get_RO_pars(),
+                pulse_comb='OnOn',
+                upload=upload))
+            MC.set_sweep_points(np.linspace(0, npoints/1.8e9, npoints,
+                                            endpoint=False))
+            MC.set_detector_function(self.inp_avg_det)
+            MC.run(name='timetrace_on' + self.msmt_suffix)
+            if analyze:
+                ma.MeasurementAnalysis(auto=True, qb_name=self.name, **kw)
 
-        MA = ma.MeasurementAnalysis(auto=False)
-        MA.get_naming_and_values()
-        MA.data_file.close()
-        data0 = MA.measured_values
-
-        MC.set_sweep_function(awg_swf.OffOn(
-            pulse_pars=self.get_drive_pars(),
-            RO_pars=self.get_RO_pars(),
-            pulse_comb='OnOn'))
-        MC.set_sweep_points(np.arange(2))
-        MC.set_detector_function(self.inp_avg_det)
-        MC.run(name='Weight_calib_1' + self.msmt_suffix)
-
-        MA = ma.MeasurementAnalysis(auto=False)
-        MA.get_naming_and_values()
-        MA.data_file.close()
-        data1 = MA.measured_values
-
-        self.RO_acq_averages(old_averages)
-
-        weights_I = data1[0] - data0[0]
-        weights_Q = data1[1] - data0[1]
-        if subtract_offset:
-            weights_I -= (np.min(weights_I) + np.max(weights_I))/2
-            weights_Q -= (np.min(weights_Q) + np.max(weights_Q))/2
-
-        contrast = np.sqrt(np.sum((data1[0] - data0[0])**2 + \
-                                  (data1[1] - data0[1])**2))
-        print('\ng-e trace contrast: {}'.format(contrast))
-
-        if filter_t == 'gaussian':
-            data = weights_I + 1j*weights_Q
-            sigma = kw.get('filter_sigma', 10/self.f_RO_mod())
-
-            kernel = np.arange(-5*sigma, 5*sigma, 1/1.8e9)
-            kernel -= np.mean(kernel)
-            kernel = np.exp(-kernel**2 / (2*sigma**2)) * \
-                     np.exp(-2j*np.pi*kernel*self.f_RO_mod())
-
-            pad_len = len(kernel)
-            data = np.pad(data, (pad_len, pad_len), 'constant')
-            data = np.convolve(data, kernel, mode='same')
-            data = data[pad_len+1:-pad_len+1]
-
-            weights_I = np.real(data)
-            weights_Q = np.imag(data)
-        elif filter_t == 'blackman-harris':
-            data = weights_I + 1j*weights_Q
-            sigma = kw.get('filter_sigma', 10/self.f_RO_mod())
-            N = int(1.8e9*sigma/0.1385072985484252)
-            n = np.arange(N)
-            a0, a1, a2, a3 = 0.35875, 0.48829, 0.14128, 0.01168
-            envelope = -a3*np.cos(6*np.pi*n/(N-1))
-            envelope += a2*np.cos(4*np.pi*n/(N-1))
-            envelope -= a1*np.cos(2*np.pi*n/(N-1))
-            envelope += a0
-            times = n/1.8e9
-            times -= np.mean(times)
-            kernel = envelope * np.exp(-2j*np.pi*times*self.f_RO_mod())
-
-            pad_len = len(kernel)
-            data = np.pad(data, (pad_len, pad_len), 'constant')
-            data = np.convolve(data, kernel, mode='same')
-            data = data[pad_len+1:-pad_len+1]
-
-            weights_I = np.real(data)
-            weights_Q = np.imag(data)
-        elif filter_t == 'uniform':
-            data = weights_I + 1j*weights_Q
-            tbase = np.linspace(0, len(data)/1.8, len(data), endpoint=False)
-            p = np.abs(data)
-            p /= np.sum(p)
-            angle = np.sum(p*np.angle(data*np.exp(2j*np.pi*tbase*self.f_RO_mod())))
-            data = np.exp(-2j*np.pi*tbase*self.f_RO_mod() + 1j*angle)
-
-            weights_I = np.real(data)
-            weights_Q = np.imag(data)
-        elif filter_t == 'none':
+    def set_readout_weights(self):
+        # readout integration weights:
+        if self.ro_acq_weight_type() == 'manual':
             pass
+        elif self.ro_acq_weight_type() == 'optimal':
+            if (self.ro_acq_weight_func_I() is None or
+                        self.ro_acq_weight_func_Q() is None):
+                logging.warning('Optimal weights are None, not setting '
+                                'integration weights')
+            else:
+                # When optimal weights are used, only the RO I weight
+                # channel is used
+                self.UHFQC.set('quex_wint_weights_{}_real'.format(
+                               self.RO_acq_weight_function_I()),
+                               self.ro_acq_weight_func_I().copy())
+                self.UHFQC.set('quex_wint_weights_{}_imag'.format(
+                               self.RO_acq_weight_function_I()),
+                               self.ro_acq_weight_func_Q().copy())
+
+                self.UHFQC.set('quex_rot_{}_real'.format(
+                               self.RO_acq_weight_function_I()), 1.0)
+                self.UHFQC.set('quex_rot_{}_imag'.format(
+                               self.RO_acq_weight_function_I()), -1.0)
         else:
-            raise KeyError('Unknown filter type: {}'.format(filter_t))
+            tbase = np.arange(0, 4096 / 1.8e9, 1 / 1.8e9)
+            theta = self.RO_IQ_angle()
+            cosI = np.array(np.cos(2 * np.pi * self.f_RO_mod() * tbase + theta))
+            sinI = np.array(np.sin(2 * np.pi * self.f_RO_mod() * tbase + theta))
+            c1 = self.RO_acq_weight_function_I()
+            c2 = self.RO_acq_weight_function_Q()
+            if self.ro_acq_weight_type() == 'SSB':
+                self.UHFQC.set('quex_wint_weights_{}_real'.format(c1), cosI)
+                self.UHFQC.set('quex_rot_{}_real'.format(c1), 1)
+                self.UHFQC.set('quex_wint_weights_{}_real'.format(c2), sinI)
+                self.UHFQC.set('quex_rot_{}_real'.format(c2), 1)
+                self.UHFQC.set('quex_wint_weights_{}_imag'.format(c1), sinI)
+                self.UHFQC.set('quex_rot_{}_imag'.format(c1), 1)
+                self.UHFQC.set('quex_wint_weights_{}_imag'.format(c2), cosI)
+                self.UHFQC.set('quex_rot_{}_imag'.format(c2), -1)
+            elif self.ro_acq_weight_type() == 'DSB':
+                self.UHFQC.set('quex_wint_weights_{}_real'.format(c1), cosI)
+                self.UHFQC.set('quex_rot_{}_real'.format(c1), 1)
+                self.UHFQC.set('quex_wint_weights_{}_real'.format(c2), sinI)
+                self.UHFQC.set('quex_rot_{}_real'.format(c2), 1)
+                self.UHFQC.set('quex_rot_{}_imag'.format(c1), 0)
+                self.UHFQC.set('quex_rot_{}_imag'.format(c2), 0)
+            elif self.ro_acq_weight_type() == 'square_rot':
+                self.UHFQC.set('quex_wint_weights_{}_real'.format(c1), cosI)
+                self.UHFQC.set('quex_rot_{}_real'.format(c1), 1)
+                self.UHFQC.set('quex_wint_weights_{}_imag'.format(c1), sinI)
+                self.UHFQC.set('quex_rot_{}_imag'.format(c1), 1)
 
-        max_diff = np.max([np.max(np.abs(weights_I)),
-                           np.max(np.abs(weights_Q))])
-        weights_I /= max_diff
-        weights_Q /= max_diff
 
+    def find_optimized_weights(self, MC=None, update=True, measure=True, **kw):
+        # FIXME: Make a proper analysis class for this (Ants, 04.12.2017)
+        if measure:
+           self.measure_transients(MC, analyze=False, **kw)
+        MAon = ma.MeasurementAnalysis(label='timetrace_on')
+        MAoff = ma.MeasurementAnalysis(label='timetrace_off')
+        don = MAon.measured_values[0] + 1j * MAon.measured_values[1]
+        doff = MAoff.measured_values[0] + 1j * MAoff.measured_values[1]
         if update:
-            c = self.RO_acq_weight_function_I()
-            self.RO_acq_weight_function_Q(None)
-            if 0 in channels:
-                self.UHFQC.set('quex_wint_weights_{}_real'.format(c),
-                               np.array(weights_I))
-                self.UHFQC.set('quex_rot_{}_real'.format(c), 1)
-            else:
-                self.UHFQC.set('quex_rot_{}_real'.format(c), 0)
-            if 1 in channels:
-                self.UHFQC.set('quex_wint_weights_{}_imag'.format(c),
-                               np.array(weights_Q))
-                self.UHFQC.set('quex_rot_{}_imag'.format(c), 1)
-            else:
-                self.UHFQC.set('quex_rot_{}_imag'.format(c), 0)
-            self.ssro_contrast(contrast)
-
-        # format the return value to the same shape as channels.
-        ret = []
-        for chan in channels:
-            if chan == 0:
-                ret.append(weights_I)
-            if chan == 1:
-                ret.append(weights_Q)
-        return tuple(ret)
+            wre = np.real(don - doff)
+            wim = np.imag(don - doff)
+            k = max(np.max(np.abs(wre)), np.max(np.abs(wim)))
+            wre /= k
+            wim /= k
+            self.ro_acq_weight_func_I(wre)
+            self.ro_acq_weight_func_Q(wim)
+        if kw.get('plot', True):
+            tbase = MAon.sweep_points
+            modulation = np.exp(2j * np.pi * self.f_RO__mod() * tbase)
+            plt.subplot(311)
+            plt.plot(tbase / 1e-9, np.real(don * modulation), '-', label='I')
+            plt.plot(tbase / 1e-9, np.imag(don * modulation), '-', label='Q')
+            plt.ylabel('d.c. voltage,\npi pulse (V)')
+            plt.xlim(0, kw.get('tmax', 300))
+            plt.legend()
+            plt.subplot(312)
+            plt.plot(tbase / 1e-9, np.real(doff * modulation), '-', label='I')
+            plt.plot(tbase / 1e-9, np.imag(doff * modulation), '-', label='Q')
+            plt.ylabel('d.c. voltage,\nno pi pulse (V)')
+            plt.xlim(0, kw.get('tmax', 300))
+            plt.legend()
+            plt.subplot(313)
+            plt.plot(tbase / 1e-9, np.real((don - doff) * modulation), '-',
+                     label='I')
+            plt.plot(tbase / 1e-9, np.imag((don - doff) * modulation), '-',
+                     label='Q')
+            plt.ylabel('d.c. voltage\ndifference (V)')
+            plt.xlim(0, kw.get('tmax', 300))
+            plt.legend()
+            plt.xlabel('Time (ns)')
+            MAoff.save_fig(plt.gcf(), 'timetraces', xlabel='time',
+                           ylabel='voltage')
 
     def find_ssro_fidelity(self, nreps=1, MC=None, analyze=True, close_fig=True,
                            no_fits=False, upload=True, preselection_pulse=True,
