@@ -520,3 +520,192 @@ class CZ_1QPhaseCal_Analysis(ba.BaseDataAnalysis):
     def get_zero_phase_diff_intersect(self):
 
         return self.proc_data_dict['zero_phase_diff_intersect']
+
+
+
+
+
+class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
+    """
+    Analysis to extract quantities from a conditional oscillation.
+
+    """
+    def __init__(self, t_start: str=None, t_stop: str=None,
+                 data_file_path: str=None,
+                 options_dict: dict=None, extract_only: bool=False,
+                 do_fitting: bool=True, auto=True):
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         extract_only=extract_only, do_fitting=do_fitting)
+        self.single_timestamp = False
+
+        self.params_dict = {'xlabel': 'sweep_name',
+                            'xunit': 'sweep_unit',
+                            'xvals': 'sweep_points',
+                            'measurementstring': 'measurementstring',
+                            'value_names': 'value_names',
+                            'value_units': 'value_units',
+                            'measured_values': 'measured_values'}
+
+        self.numeric_params = []
+        if auto:
+            self.run_analysis()
+
+    def process_data(self):
+        """
+        selects the relevant acq channel based on "ch_idx_osc" and
+        "ch_idx_spec" in the options dict and then splits the data for the
+        off and on cases
+        """
+        self.proc_data_dict = OrderedDict()
+        # The channel containing the data must be specified in the options dict
+        ch_idx_spec = self.options_dict.get('ch_idx_spec', 0)
+        ch_idx_osc = self.options_dict.get('ch_idx_osc', 1)
+
+        for idx, type_str in zip([ch_idx_osc, ch_idx_spec], ['osc', 'spec']):
+            yvals = list(self.raw_data_dict['measured_values_ord_dict'].values())[idx][0]
+            self.proc_data_dict['ylabel_{}'.format(type_str)] = self.raw_data_dict['value_names'][0][idx]
+            self.proc_data_dict['yunit'] = self.raw_data_dict['value_units'][0][idx]
+            self.proc_data_dict['yvals_{}_off'.format(type_str)] = yvals[:-4:2]
+            self.proc_data_dict['yvals_{}_on'.format(type_str)] = yvals[1:-4:2]
+
+        self.proc_data_dict['xvals_off'] = self.raw_data_dict['xvals'][0][:-4:2]
+        self.proc_data_dict['xvals_on'] = self.raw_data_dict['xvals'][0][1:-4:2]
+
+
+
+    def prepare_fitting(self):
+        self.fit_dicts = OrderedDict()
+        cos_mod0 = lmfit.Model(fit_mods.CosFunc)
+        cos_mod0.guess = fit_mods.Cos_guess.__get__(cos_mod0, cos_mod0.__class__)
+        self.fit_dicts['cos_fit_off'] = {
+            'model': cos_mod0,
+            'fit_xvals': {'t': self.proc_data_dict['xvals_off']},
+            'fit_yvals': {'data': self.proc_data_dict['yvals_osc_off']}}
+
+        cos_mod1 = lmfit.Model(fit_mods.CosFunc)
+        cos_mod1.guess = fit_mods.Cos_guess.__get__(cos_mod1, cos_mod1.__class__)
+        self.fit_dicts['cos_fit_on'] = {
+            'model': cos_mod1,
+            'fit_xvals': {'t': self.proc_data_dict['xvals_on']},
+            'fit_yvals': {'data': self.proc_data_dict['yvals_osc_on']}}
+
+    def analyze_fit_results(self):
+        fr_0 = self.fit_res['cos_fit_off'].best_values
+        fr_1 = self.fit_res['cos_fit_on'].best_values
+
+        phi0 = np.rad2deg(fr_0['phase'])
+        phi1 = np.rad2deg(fr_1['phase'])
+        self.proc_data_dict['phi_0'] = phi0
+        self.proc_data_dict['phi_1'] = phi1
+        self.proc_data_dict['phi_cond'] = phi1 -phi0
+
+        self.proc_data_dict['osc_amp'] = np.mean([fr_0['amplitude'],
+                                                 fr_1['amplitude']])
+        self.proc_data_dict['missing_fraction'] = (
+            np.mean(self.proc_data_dict['yvals_spec_on']) -
+            np.mean(self.proc_data_dict['yvals_spec_off']))
+
+
+    def prepare_plots(self):
+        self.plot_dicts['main'] = {
+            'plotfn': self.plot_line,
+            'xvals': self.proc_data_dict['xvals_off'],
+            'xlabel': self.raw_data_dict['xlabel'][0],
+            'xunit': self.raw_data_dict['xunit'][0][0],
+            'yvals': self.proc_data_dict['yvals_osc_off'],
+            'ylabel': self.proc_data_dict['ylabel_osc'],
+            'yunit': self.proc_data_dict['yunit'],
+            'setlabel': 'CZ off',
+            'title': (self.raw_data_dict['timestamps'][0] + ' \n' +
+                      self.raw_data_dict['measurementstring'][0]),
+            'do_legend': True,
+            'yrange': (0,1),
+            'legend_pos': 'upper right'}
+
+        self.plot_dicts['on'] = {
+            'plotfn': self.plot_line,
+            'ax_id': 'main',
+            'xvals': self.proc_data_dict['xvals_on'],
+            'xlabel': self.raw_data_dict['xlabel'][0],
+            'xunit': self.raw_data_dict['xunit'][0][0],
+            'yvals': self.proc_data_dict['yvals_osc_on'],
+            'ylabel': self.proc_data_dict['ylabel_osc'],
+            'yunit': self.proc_data_dict['yunit'],
+            'setlabel': 'CZ on',
+            'do_legend': True,
+            'legend_pos': 'upper right'}
+
+        if self.do_fitting:
+            self.plot_dicts['cos_fit_off'] = {
+                'ax_id': 'main',
+                'plotfn': self.plot_fit,
+                'fit_res': self.fit_dicts['cos_fit_off']['fit_res'],
+                'plot_init': self.options_dict['plot_init'],
+                'setlabel': 'Fit CZ off',
+                'do_legend': True}
+            self.plot_dicts['cos_fit_on'] = {
+                'ax_id': 'main',
+                'plotfn': self.plot_fit,
+                'fit_res': self.fit_dicts['cos_fit_on']['fit_res'],
+                'plot_init': self.options_dict['plot_init'],
+                'setlabel': 'Fit CZ on',
+                'do_legend': True}
+
+
+            phase_message = (
+                'Phase off: {:.1f} deg\nPhase on: {:.1f} deg\n'
+                'Phase diff.: {:.1f} deg\n Oscillation amp.: {:.4f}'.format(
+                    self.proc_data_dict['phi_0'],
+                    self.proc_data_dict['phi_1'],
+                    self.proc_data_dict['phi_cond'],
+                    self.proc_data_dict['osc_amp']))
+            self.plot_dicts['phase_message'] = {
+                'ax_id': 'main',
+                'ypos': 0.25,
+                'plotfn': self.plot_text,
+                'box_props': 'fancy',
+                'line_kws': {'alpha': 0},
+                'text_string': phase_message}
+
+
+        self.plot_dicts['spectator_qubit'] = {
+            'plotfn': self.plot_line,
+            'xvals': self.proc_data_dict['xvals_off'],
+            'xlabel': self.raw_data_dict['xlabel'][0],
+            'xunit': self.raw_data_dict['xunit'][0][0],
+            'yvals': self.proc_data_dict['yvals_spec_off'],
+            'ylabel': self.proc_data_dict['ylabel_spec'],
+            'yunit': self.proc_data_dict['yunit'],
+            'setlabel': 'CZ off',
+            'title': (self.raw_data_dict['timestamps'][0] + ' \n' +
+                      self.raw_data_dict['measurementstring'][0]),
+            'do_legend': True,
+            'yrange': (0,1),
+            'legend_pos': 'upper right'}
+
+        self.plot_dicts['spec_on'] = {
+            'plotfn': self.plot_line,
+            'ax_id': 'spectator_qubit',
+            'xvals': self.proc_data_dict['xvals_on'],
+            'xlabel': self.raw_data_dict['xlabel'][0],
+            'xunit': self.raw_data_dict['xunit'][0][0],
+            'yvals': self.proc_data_dict['yvals_spec_on'],
+            'ylabel': self.proc_data_dict['ylabel_spec'],
+            'yunit': self.proc_data_dict['yunit'],
+            'setlabel': 'CZ on',
+            'do_legend': True,
+            'legend_pos': 'upper right'}
+
+        if self.do_fitting:
+            leak_msg = (
+                'Missing fraction: {:.2f} % '.format(
+                    self.proc_data_dict['missing_fraction']*100))
+            self.plot_dicts['leak_msg'] = {
+                'ax_id': 'spectator_qubit',
+                'ypos': 0.7,
+                'plotfn': self.plot_text,
+                'box_props': 'fancy',
+                'line_kws': {'alpha': 0},
+                'text_string': leak_msg}

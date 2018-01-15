@@ -54,7 +54,6 @@ class MeasurementAnalysis(object):
 
     def __init__(self, TwoD=False, folder=None, auto=True,
                  cmap_chosen='viridis', no_of_columns=1, qb_name=None, **kw):
-
         if folder is None:
             self.folder = a_tools.get_folder(**kw)
         else:
@@ -910,8 +909,6 @@ class OptimizationAnalysis_v2(MeasurementAnalysis):
                     x=self.sweep_points[0], y=self.sweep_points[1],
                     z=self.measured_values[i], ax=ax,
                     zlabel=self.value_names[i])
-                ax.set_xlabel(self.parameter_labels[0])
-                ax.set_ylabel(self.parameter_labels[1])
                 ax.plot(self.sweep_points[0],
                         self.sweep_points[1], '-o', c='grey')
                 ax.plot(self.sweep_points[0][-1], self.sweep_points[1][-1],
@@ -920,7 +917,8 @@ class OptimizationAnalysis_v2(MeasurementAnalysis):
                                     self.timestamp_string + '_' +
                                     self.measurementstring, 40))
                 ax.set_title(plot_title)
-
+                set_xlabel(ax, self.parameter_names[0], self.parameter_units[0])
+                set_ylabel(ax, self.parameter_names[1], self.parameter_units[1])
                 self.save_fig(f, figname=base_figname, **kw)
 
 
@@ -1592,8 +1590,8 @@ class Rabi_Analysis(TD_Analysis):
         kw['label'] = label
         kw['h5mode'] = 'r+'
 
-        super(self.__class__, self).__init__(qb_name=qb_name,
-                                             NoCalPoints=NoCalPoints, **kw)
+        super().__init__(qb_name=qb_name,
+                         NoCalPoints=NoCalPoints, **kw)
 
     def fit_data(self, print_fit_results=True, verbose=False, separate_fits=False):
 
@@ -2189,8 +2187,10 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
     def run_default_analysis(self, close_file=True, **kw):
         normalize_to_cal_points = kw.get('normalize_to_cal_points', True)
         self.normalize_to_cal_points = normalize_to_cal_points
+
         self.get_naming_and_values()
         self.oscillating_qubit = kw.get('oscillating_qubit', 0)
+
         if normalize_to_cal_points:
             if self.oscillating_qubit == 0:
                 cal_0I = np.mean([self.measured_values[0][-4],
@@ -2221,7 +2221,6 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
                 self.measured_values[0] - cal_0I)/(cal_1I-cal_0I)
             self.measured_values[1][:] = (
                 self.measured_values[1] - cal_0Q)/(cal_1Q-cal_0Q)
-        # self.measured_values = self.measured_values
 
         self.sort_data()
 
@@ -2237,30 +2236,31 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
         self.x_idx = self.sweep_points[::2]
         self.y_exc = ['', '']
         self.y_idx = ['', '']
+
         for i in range(2):
             self.y_exc[i] = self.measured_values[i][1::2]
             self.y_idx[i] = self.measured_values[i][::2]
             if self.normalize_to_cal_points:
                 self.y_exc[i] = self.y_exc[i][:-2]
                 self.y_idx[i] = self.y_idx[i][:-2]
-
         if self.normalize_to_cal_points:
             self.x_idx = self.x_idx[:-2]
             self.x_exc = self.x_exc[:-2]
-    # def calculate_cost_func(self, **kw):
-    #     num_points = len(self.sweep_points)-4
 
-    #     id_dat_swp = self.measured_values[1][:num_points//2]
-    #     ex_dat_swp = self.measured_values[1][num_points//2:-4]
+    def calculate_cost_func(self, **kw):
+        num_points = len(self.sweep_points)-4
 
-    #     id_dat_cp = self.measured_values[0][:num_points//2]
-    #     ex_dat_cp = self.measured_values[0][num_points//2:-4]
+        id_dat_swp = self.measured_values[1][:num_points//2]
+        ex_dat_swp = self.measured_values[1][num_points//2:-4]
 
-    #     maximum_difference = max((id_dat_cp-ex_dat_cp))
-    #     # I think the labels are wrong in excited and identity but the value
-    #     # we get is correct
-    #     missing_swap_pop = np.mean(ex_dat_swp - id_dat_swp)
-    #     self.cost_func_val = maximum_difference, missing_swap_pop
+        id_dat_cp = self.measured_values[0][:num_points//2]
+        ex_dat_cp = self.measured_values[0][num_points//2:-4]
+
+        maximum_difference = max((id_dat_cp-ex_dat_cp))
+        # I think the labels are wrong in excited and identity but the value
+        # we get is correct
+        missing_swap_pop = np.mean(ex_dat_swp - id_dat_swp)
+        self.cost_func_val = maximum_difference, missing_swap_pop
 
     def make_figures(self, **kw):
         # calculate fitted curves
@@ -2277,15 +2277,10 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
 
         self.fig, self.axs = plt.subplots(2, 1, figsize=(5, 6))
         for i in [0, 1]:
-            # self.axs[i].ticklabel_format(useOffset=False)
             self.axs[i].plot(self.x_idx, self.y_idx[i], '-o',
                              label='no excitation')
             self.axs[i].plot(self.x_exc, self.y_exc[i], '-o',
                              label='excitation')
-
-            # self.axs[i].set_xlabel(self.xlabel)
-            # self.axs[i].set_ylabel(self.ylabels[i])
-
             if i == self.oscillating_qubit:
                 plot_title = kw.pop('plot_title', textwrap.fill(
                                     self.timestamp_string + '_' +
@@ -2295,13 +2290,7 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
                 self.axs[i].legend()
             else:
                 plot_title = ''
-
             set_xlabel(self.axs[i], self.sweep_name, self.sweep_unit[0])
-            ymi = min(self.axs[i].get_yticks())
-            yma = max(self.axs[i].get_yticks())
-            # somehow not setting this limit changes the tick locations after
-            # they have been set. Unclear what causes this.
-            self.axs[i].set_ylim(ymi, yma)
             set_ylabel(self.axs[i], self.value_names[i], self.value_units[i])
 
         self.save_fig(self.fig, fig_tight=True, **kw)

@@ -479,6 +479,60 @@ class DeviceCCL(Instrument):
     # Measurement methods
     ########################################################
 
+    def measure_conditional_oscillation(self, q0: str, q1: str,
+                                        prepare_for_timedomain=True, MC=None,
+                                        verbose=True):
+        """
+        Measures the "conventional cost function" for the CZ gate that
+        is a conditional oscillation.
+        """
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        assert q0 in self.qubits()
+        assert q1 in self.qubits()
+        q0idx = self.find_instrument(q0).cfg_qubit_nr()
+        q1idx = self.find_instrument(q1).cfg_qubit_nr()
+
+        # These are hardcoded angles in the mw_lutman for the AWG8
+        angles = np.arange(0, 341, 20)
+        p = mqo.CZ_calibration_seq(q0idx, q1idx, platf_cfg=self.cfg_openql_platform_fn(),
+                                   angles=angles,
+                                   CZ_disabled=False)
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr(),
+                             parameter_name='Phase', unit='deg')
+        d = self.get_correlation_detector()
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(p.sweep_points)
+        MC.set_detector_function(self.get_correlation_detector())
+        MC.run('conditional_oscillation{}'.format(self.msmt_suffix))
+
+
+        a = ma2.Conditional_Oscillation_Analysis(
+            options_dict={'ch_idx_osc': self.qubits().index(q0),
+                          'ch_idx_spec': self.qubits.index(q1)})
+
+        if verbose:
+            # also here to quickly see what dict entries of the
+            # analysis are important.
+            info_msg = (
+                'Phase off: {:.1f} deg\nPhase on: {:.1f} deg\n'
+                'Phase diff.: {:.1f} deg\nOscillation amp.: {:.4f}\n'
+                'Missing fraction {:.2f} %'.format(
+                    a.proc_data_dict['phi_0'],
+                    a.proc_data_dict['phi_1'],
+                    a.proc_data_dict['phi_cond'],
+                    a.proc_data_dict['osc_amp'],
+                    a.proc_data_dict['missing_fraction']*100))
+            print(info_msg)
+
+        return a
+
+
+
+
     def measure_two_qubit_tomo_bell(self, q0: str, q1: str,
                                     bell_state=0,
                                     analyze=True, close_fig=True,
@@ -504,7 +558,7 @@ class DeviceCCL(Instrument):
         # 36 tomo rotations + 7*4 calibration points
         MC.set_sweep_points(np.arange(36+7*4))
         MC.set_detector_function(d)
-        MC.run('TwoQubitBellTomo_{}_{}_{}'.format(q0, q1, self.msmt_suffix))
+        MC.run('TwoQubitBellTomo_{}_{}{}'.format(q0, q1, self.msmt_suffix))
         if analyze:
             a = tomo.Tomo_Multiplexed(
                 label='Tomo',
@@ -542,7 +596,7 @@ class DeviceCCL(Instrument):
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(42))
         MC.set_detector_function(d)
-        MC.run('TwoQubitAllXY_{}_{}_{}'.format(q0, q1, self.msmt_suffix))
+        MC.run('TwoQubitAllXY_{}_{}{}'.format(q0, q1, self.msmt_suffix))
         if analyze:
             a = ma.MeasurementAnalysis(close_main_fig=close_fig)
         return a

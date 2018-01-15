@@ -614,6 +614,9 @@ def CZ_calibration_seq(q0: int, q1: int, platf_cfg: str,
     '''
     Sequence used to calibrate flux pulses for CZ gates.
 
+    q0 is the oscilating qubit
+    q1 is the spectator qubit
+
     Timing of the sequence:
     q0:   --   X90  C-Phase  Rphi90   --       RO
     q1: (X180)  --     --       --   (X180)    RO
