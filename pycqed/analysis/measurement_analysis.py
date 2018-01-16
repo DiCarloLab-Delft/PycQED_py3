@@ -46,7 +46,7 @@ except ImportError as e:
         raise
 
 
-imp.reload(dm_tools)
+importlib.reload(dm_tools)
 
 
 class MeasurementAnalysis(object):
