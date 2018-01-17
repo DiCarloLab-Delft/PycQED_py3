@@ -87,6 +87,59 @@ def mixer_carrier_cancellation(SH, source, MC,
     return ch_1_min, ch_2_min
 
 
+def multi_channel_mixer_carrier_cancellation(SH, source, MC,
+                               channel_pars,
+                               frequency: float=None,
+                               SH_ref_level: float=-40,
+                               init_stepsize: float=0.1,
+                               x0: tuple=None):
+    """
+    Varies the mixer offsets to minimize leakage at the carrier frequency.
+    this is a generic version compatible with multiple channels.
+
+    Args:
+        SH           (instr) : Signal hound used to measure power
+        source       (instr) : mw_source that provides the leakage tone
+        MC           (instr) :
+        channel_pars  (par)  : list of offset parameters
+        frequency    (float) : the frequency in Hz at which to minimize leakage
+        SH_ref_level (float) : Signal hound reference level
+        init_stepsize (float): initial stepsize for Nelder mead algorithm
+        x0           (tuple) : starting point for optimization
+    returns:
+        optimization_result (tuple): a tuple containing the final value for
+                                     each of the varied parameters.
+    """
+
+    source.on()
+    if frequency is None:
+        frequency = source.frequency()
+    else:
+        source.frequency(frequency)
+
+    SH.ref_lvl(SH_ref_level)
+    detector = det.Signal_Hound_fixed_frequency(
+        SH, frequency=(source.frequency()),
+        Navg=5, delay=0.0, prepare_each_point=False)
+
+    if x0 is None:
+        x0 = [0.0]*len(channel_pars)
+
+    ad_func_pars = {'adaptive_function': nelder_mead,
+                    'x0': x0,
+                    'initial_step': [init_stepsize]*len(channel_pars),
+                    'no_improv_break': 15,
+                    'minimize': True,
+                    'maxiter': 500}
+    MC.set_sweep_functions(channel_pars)
+    MC.set_detector_function(detector)  # sets test_detector
+    MC.set_adaptive_function_parameters(ad_func_pars)
+    MC.run(name='Offset_calibration', mode='adaptive')
+    a = ma.OptimizationAnalysis(label='Offset_calibration')
+
+    return a.optimization_result[0]
+
+
 def mixer_skewness_calibration_QWG(SH, source, QWG,
                                    alpha, phi,
                                    MC,

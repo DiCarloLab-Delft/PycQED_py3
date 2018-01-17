@@ -218,6 +218,12 @@ class Qubit(Instrument):
                              analyze=True, close_fig=True):
         raise NotImplementedError()
 
+
+    def measure_resonator_power(self, freqs, powers,
+                                MC=None, analyze: bool=True,
+                                close_fig: bool=True):
+        raise NotImplementedError()
+
     def measure_transients(self, MC=None, analyze: bool=True,
                            cases=('off', 'on'),
                            prepare: bool=True, depletion_analysis: bool=True,
@@ -258,7 +264,7 @@ class Qubit(Instrument):
         try:
             freq_res_par = self.freq_res
             freq_RO_par = self.ro_freq
-        except AttributeError():
+        except:
             logging.warning('Rename the f_res parameter to freq_res')
             freq_res_par = self.f_res
             freq_RO_par = self.f_RO
@@ -402,6 +408,61 @@ class Qubit(Instrument):
         """
         raise NotImplementedError
         return True
+
+    def calibrate_frequency_ramsey(self,
+                                   steps=[1, 1, 3, 10, 30, 100, 300, 1000],
+                                   stepsize:float =20e-9,
+                                   verbose: bool=True, update: bool=True,
+                                   close_fig: bool=True):
+        """
+        Runs an iterative procudere of ramsey experiments to estimate
+        frequency detuning to converge to the qubit frequency up to the limit
+        set by T2*.
+
+        steps:
+            multiples of the initial stepsize on which to run the
+        stepsize:
+            smalles stepsize in ns for which to run ramsey experiments.
+        """
+        cur_freq = self.freq_qubit()
+        # Steps don't double to be more robust against aliasing
+        for n in steps:
+            times = np.arange(self.mw_gauss_width()*4,
+                              50*n*stepsize, n*stepsize)
+            artificial_detuning = 2.5/times[-1]
+            self.measure_ramsey(times,
+                                artificial_detuning=artificial_detuning,
+                                freq_qubit=cur_freq,
+                                label='_{}pulse_sep'.format(n),
+                                analyze=False)
+            a = ma.Ramsey_Analysis(auto=True, close_fig=close_fig,
+                                   freq_qubit=cur_freq,
+                                   artificial_detuning=artificial_detuning,
+                                   close_file=False)
+            fitted_freq = a.fit_res.params['frequency'].value
+            measured_detuning = fitted_freq-artificial_detuning
+            cur_freq =  a.qubit_frequency
+
+            qubit_ana_grp = a.analysis_group.create_group(self.msmt_suffix)
+            qubit_ana_grp.attrs['artificial_detuning'] = \
+                str(artificial_detuning)
+            qubit_ana_grp.attrs['measured_detuning'] = \
+                str(measured_detuning)
+            qubit_ana_grp.attrs['estimated_qubit_freq'] = str(cur_freq)
+            a.finish()  # make sure I close the file
+            if verbose:
+                print('Measured detuning:{:.2e}'.format(measured_detuning))
+                print('Setting freq to: {:.9e}, \n'.format(cur_freq))
+            if times[-1] > 2.*a.T2_star['T2_star']:
+                # If the last step is > T2* then the next will be for sure
+                if verbose:
+                    print('Breaking of measurement because of T2*')
+                break
+        if verbose:
+            print('Converged to: {:.9e}'.format(cur_freq))
+        if update:
+            self.freq_qubit(cur_freq)
+        return cur_freq
 
     def calculate_frequency(self, calc_method=None, V_per_phi0=None, V=None):
         '''
@@ -721,6 +782,8 @@ class Transmon(Qubit):
                                 label='_{}pulse_sep'.format(n),
                                 analyze=False)
             a = ma.Ramsey_Analysis(auto=True, close_fig=close_fig,
+                                   qb_name=self.name,
+                                   artificial_detuning=artificial_detuning,
                                    close_file=False)
             fitted_freq = a.fit_res.params['frequency'].value
             measured_detuning = fitted_freq-artificial_detuning
@@ -736,7 +799,8 @@ class Transmon(Qubit):
             if verbose:
                 print('Measured detuning:{:.2e}'.format(measured_detuning))
                 print('Setting freq to: {:.9e}, \n'.format(cur_freq))
-            if times[-1] > 2.*a.T2_star:
+
+            if times[-1] > 2.*a.T2_star['T2_star']:
                 # If the last step is > T2* then the next will be for sure
                 if verbose:
                     print('Breaking of measurement because of T2*')

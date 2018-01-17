@@ -1,9 +1,18 @@
+"""
+N.B. I have started a v2 of this instrument that should be forward compatible
+with real time linear distortions in Dec 2017 -MAR
+
+This file contains the Distortions_corrector.
+
+An object used to correct distortions using an interactive procedure
+involving repeated measurements.
+"""
 import pycqed.analysis.fitting_models as fm
 import pycqed.measurement.kernel_functions as kf
 import numpy as np
 import scipy.linalg
 import scipy.interpolate as sc_intpl
-from scipy.signal import argrelmin
+from pycqed.analysis import fitting_models as fit_mods
 import lmfit
 import os.path
 import datetime
@@ -13,8 +22,11 @@ from qcodes.plots.pyqtgraph import QtPlot
 
 
 class Distortion_corrector():
-    def __init__(self, kernel_object, nr_plot_points=1000,
-                 auto_save_plots=True):
+
+    def __init__(self, kernel_object, square_amp: float=1,
+                 nr_plot_points: int=1000,
+                 sampling_rate: float=1e9,
+                 auto_save_plots: bool=True):
         '''
         Instantiates an object.
 
@@ -22,6 +34,9 @@ class Distortion_corrector():
             kernel_object (Instrument):
                     kernel object instrument that handles applying kernels to
                     flux pulses.
+            square_amp (float):
+                    Amplitude of the square pulse that is applied. This is
+                    needed for correct normalization of the step response.
             nr_plot_points (int):
                     Number of points of the waveform that are plotted. Can be
                     changed in self.nr_plot_points.
@@ -35,18 +50,21 @@ class Distortion_corrector():
         self._t_start_loop = 0  # sets x range for plotting during loop
         self._t_stop_loop = 30e-6
         self.nr_plot_points = nr_plot_points
+        self.sampling_rate = sampling_rate
+
+        self.square_amp = square_amp
 
         # Kernels
         self.kernel_length = 0
         self.kernel_combined_dict = {}
         self.new_kernel_dict = {}
 
-        self.ker_obj = kernel_object
+        self.kernel_object = kernel_object
 
         # Files
         self.filename = ''
-        self.kernel_dir = self.ker_obj.kernel_dir()
-        self.data_dir = self.kernel_dir  # where traces and plots are saved
+        # where traces and plots are saved
+        self.data_dir = self.kernel_object.kernel_dir()
         self._iteration = 0
         self.auto_save_plots = auto_save_plots
 
@@ -68,7 +86,11 @@ class Distortion_corrector():
         self._loop_helpstring = str(
             'h:      Print this help.\n'
             'q:      Quit the loop.\n'
-            'p:      Print the parameters of the last fit.\n'
+            'p <pars>:\n'
+            '        Print the parameters of the last fit if pars not given.\n'
+            '        If pars are given in the form of JSON string, \n'
+            '        e.g., {"parA": a, "parB": b} the parameters of the last\n'
+            '        fit are updated with those provided.'
             's <filename>:\n'
             '        Save the current plot to "filename.png".\n'
             'model <name>:\n'
@@ -79,7 +101,10 @@ class Distortion_corrector():
             '        Set the x-range of the plot to (min, max). The points\n'
             '        outside this range are not plotted. The number of\n'
             '        points plotted in the given interval is fixed to\n'
-            '        self.nr_plot_points (default=1000).')
+            '        self.nr_plot_points (default=1000).\n'
+            'square_amp <amp> \n'
+            '        Set the square_amp used to normalize measured waveforms.\n'
+            '        If amp = "?" the current square_amp is printed.')
 
         # Make window for plots
         self.vw = QtPlot(window_title='Distortions', figsize=(600, 400))
@@ -87,31 +112,39 @@ class Distortion_corrector():
     def load_kernel_file(self, filename):
         '''
         Loads kernel dictionary (containing kernel and metadata) from a JSON
-        file. This function looks only in the directory self.kernel_dir for
-        the file.
+        file. This function looks only in the directory
+        self.kernel_object.kernel_dir() for the file.
         Returns a dictionary of the kernel and metadata.
         '''
-        with open(os.path.join(self.kernel_dir, filename)) as infile:
+        with open(os.path.join(self.kernel_object.kernel_dir(),
+                               filename)) as infile:
             data = json.load(infile)
         return data
 
     def save_kernel_file(self, kernel_dict, filename):
         '''
         Saves kernel dictionary (containing kernel and metadata) to a JSON
-        file in the directory self.kernel_dir.
+        file in the directory self.kernel_object.kernel_dir().
         '''
-        with open(os.path.join(self.kernel_dir, filename), 'w') as outfile:
-            json.dump(kernel_dict, outfile)
+        directory = self.kernel_object.kernel_dir()
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        with open(os.path.join(directory, filename),
+                  'w') as outfile:
+            json.dump(kernel_dict, outfile, indent=True, sort_keys=True)
 
     def save_plot(self, filename):
         try:
-            self.vw.save(os.path.join(self.data_dir, filename))
+            directory = self.kernel_object.kernel_dir()
+            if not os.path.exists(directory):
+                os.makedirs(directory)
+            # FIXME: saving disabled as it is currently broken.
+            # self.vw.save(os.path.join(self.kernel_object.kernel_dir(),
+            #                           filename))
         except Exception as e:
             logging.warning('Could not save plot.')
 
-    def open_new_correction(self, kernel_length, AWG_sampling_rate,
-                            name='{}_corr'.format(
-                                datetime.date.today().strftime('%y%m%d'))):
+    def open_new_correction(self, kernel_length, AWG_sampling_rate, name):
         '''
         Opens a new correction with name 'filename', i.e. initializes the
         combined kernel to a Dirac delta and empties kernel_list of the
@@ -142,7 +175,7 @@ class Distortion_corrector():
                               '{}_combined.json'.format(self.filename))
 
         # Configure kernel object
-        self.ker_obj.add_kernel_to_kernel_list(
+        self.kernel_object.add_kernel_to_kernel_list(
             '{}_combined.json'.format(self.filename))
 
     def resume_correction(self, filename):
@@ -157,13 +190,13 @@ class Distortion_corrector():
         self.kernel_length = len(self.kernel_combined_dict['kernel'])
 
         # Configure kernel object
-        self.ker_obj.kernel_list([])
-        self.ker_obj.add_kernel_to_kernel_list(filename)
+        self.kernel_object.kernel_list([])
+        self.kernel_object.add_kernel_to_kernel_list(filename)
 
     def empty_kernel_list(self):
-        self.ker_obj.kernel_list([])
+        self.kernel_object.kernel_list([])
 
-    def measure_trace(self, verbuse=True):
+    def measure_trace(self, verbose=True):
         raise NotImplementedError(
             'Base class is not attached to physical instruments and does not '
             'implement measurements.')
@@ -171,7 +204,7 @@ class Distortion_corrector():
     def fit_exp_model(self, start_time_fit, end_time_fit):
         '''
         Fits an exponential of the form
-            A * exp(-t/tau) + C
+            A * exp(-t/tau) + offset
         to the last trace that was measured (self.waveform).
         The fit model and result are saved in self.fit_model and self.fit_res,
         respectively. The new predistortion kernel and information about the
@@ -190,8 +223,8 @@ class Distortion_corrector():
                                       value=self.waveform[self._stop_idx],
                                       vary=True)
         self.fit_model.set_param_hint('amplitude',
-                                      value=self.waveform[self._start_idx] -
-                                      self.waveform[self._stop_idx],
+                                      value=(self.waveform[self._start_idx] -
+                                             self.waveform[self._stop_idx]),
                                       vary=True)
         self.fit_model.set_param_hint('tau',
                                       value=end_time_fit-start_time_fit,
@@ -204,48 +237,43 @@ class Distortion_corrector():
             data=self.waveform[self._start_idx:self._stop_idx],
             t=self.time_pts[self._start_idx:self._stop_idx],
             params=params)
+
         self.fitted_waveform = fit_res.eval(
             t=self.time_pts[self._start_idx:self._stop_idx])
 
         # Analytic form of the predistorted square pulse (input that creates a
         # square pulse at the output)
-        C = fit_res.best_values['offset']
-        A = fit_res.best_values['amplitude']
-        a = A / C
-        aTilde = a / (a + 1)
+        offset = fit_res.best_values['offset']
+        amp = fit_res.best_values['amplitude']
         tau = fit_res.best_values['tau']
-        tauTilde = tau * (a + 1)
-
-        tPts = np.arange(0, self.kernel_length*1e-9, 1e-9)  # TODO AWG sampling rate
-        predist_step = (1 - aTilde * np.exp(-tPts/tauTilde)) / C
 
         # Check if parameters are physical and print warnings if not
         if tau < 0:
             print('Warning: unphysical tau = {} (expect tau > 0).'
                   .format(tau))
-        if C < 0:
-            print('Warning: unphysical C = {} (expect C > 0)'.format(C))
+        if offset < 0:
+            print('Warning: unphysical offset = {} (expect offset > 0)'.format(
+                offset))
 
         # Save the results
         self.fit_res = fit_res
-        self.new_step = predist_step
-        # Take every 5th point because sampling rate of AWG is 1 GHz and
-        # sampling rate of scope is 5 GHz.
-        # TODO: un-hardcode this
-        new_ker = kf.kernel_from_kernel_stepvec(predist_step)
+        new_ker = kf.decay_kernel(
+            amp=amp, tau=tau, offset=offset,
+            length=self.kernel_object.corrections_length(),
+            sampling_rate=self.sampling_rate)
 
         self.new_kernel_dict = {
             'name': self.filename + '_' + str(self._iteration),
             'filter_params': {
-                'b0': 1 / (C + A),
-                'b1': 1 / (tau * (C + A)),
-                'a1': -C / (tau * (C + A))
+                'b0': 1 / (offset + amp),
+                'b1': 1 / (tau * (offset + amp)),
+                'a1': -offset / (tau * (offset + amp))
             },
             'fit': {
                 'model': 'exponential',
-                'A': A,
+                'amp': amp,
                 'tau': tau,
-                'C': C
+                'offset': offset
             },
             'kernel': list(new_ker)
         }
@@ -311,7 +339,8 @@ class Distortion_corrector():
         tau = fit_res.best_values['tau{}'.format(maxInd)]
         tauTilde = tau * (a + 1)
 
-        tPts = np.arange(0, self.kernel_length*1e-9, 1e-9)  # TODO AWG sampling rate
+        tPts = np.arange(0, self.kernel_length/self.sampling_rate,
+                         1/self.sampling_rate)
         predist_step = (1 - aTilde * np.exp(-tPts/tauTilde)) / C
 
         # Check if parameters are physical and print warnings if not
@@ -413,7 +442,8 @@ class Distortion_corrector():
         tau = fit_res.best_values['tau{}'.format(maxInd)]
         tauTilde = tau * (a + 1)
 
-        tPts = np.arange(0, self.kernel_length*1e-9, 1e-9)  # TODO AWG sampling rate
+        tPts = np.arange(0, self.kernel_length/self.sampling_rate,
+                         1/self.sampling_rate)
         predist_step = (1 - aTilde * np.exp(-tPts/tauTilde)) / C
 
         # Check if parameters are physical and print warnings if not
@@ -473,7 +503,7 @@ class Distortion_corrector():
                                       vary=False)
         self.fit_model.set_param_hint('amplitude',
                                       value=1,
-                                      vary=False)
+                                      vary=True)
         self.fit_model.set_param_hint('n', value=1, vary=False)
         params = self.fit_model.make_params()
 
@@ -489,7 +519,8 @@ class Distortion_corrector():
         # square pulse at the output)
         tau = fit_res.best_values['tau']
 
-        tPts = np.arange(0, self.kernel_length*1e-9, 1e-9)  # TODO AWG sampling rate
+        tPts = np.arange(0, self.kernel_length/self.sampling_rate,
+                         1/self.sampling_rate)
         predist_step = tPts/tau + 1
 
         # Check if parameters are physical and print warnings if not
@@ -507,8 +538,8 @@ class Distortion_corrector():
             'name': self.filename + '_' + str(self._iteration),
             'filter_params': {
                 'b0': 1,
-                'b1': 1/tau,
-                'a1': 0
+                'b1': 1/tau,  # incorrect because not units of #samples
+                'a1': 0  # 'a0': 1 by definition
             },
             'fit': {
                 'model': 'high-pass',
@@ -575,7 +606,8 @@ class Distortion_corrector():
         C = fit_res.best_values['exponential_offset']
         l = (omega * tau)**2
 
-        tPts = np.arange(0, self.kernel_length*1e-9, 1e-9)  # TODO: sampling rate
+        tPts = np.arange(0, self.kernel_length*1e-9,
+                         1e-9)  # TODO: sampling rate
         predist_step = (1 + tPts / tau * (1 + l) + l *
                         (np.exp(-tPts / tau) - 1)) / A
 
@@ -772,7 +804,7 @@ class Distortion_corrector():
         self.save_kernel_file(self.new_kernel_dict, full_name)
 
         # Add new kernel to the kernel list in the kernel object
-        self.ker_obj.add_kernel_to_kernel_list(full_name)
+        self.kernel_object.add_kernel_to_kernel_list(full_name)
 
     def apply_new_kernel(self):
         '''
@@ -786,18 +818,17 @@ class Distortion_corrector():
             self.new_kernel_dict['kernel'])[:self.kernel_length]
         self.kernel_combined_dict['kernel'] = list(ker_combined)
 
-        self.kernel_combined_dict['metadata'][self.new_kernel_dict['name']] =\
-            {
-                'fit': self.new_kernel_dict['fit'],
-                'filter_params': self.new_kernel_dict['filter_params'],
-                'name': self.new_kernel_dict['name']
+        self.kernel_combined_dict['metadata'][self.new_kernel_dict['name']] = {
+            'fit': self.new_kernel_dict['fit'],
+            'filter_params': self.new_kernel_dict['filter_params'],
+            'name': self.new_kernel_dict['name']
         }
 
         # Remove the last correction from the kernel list in the kernel
         # object, since it is now included in the combined kernel.
         test_kernel_name = '{}_{}.json'.format(self.filename, self._iteration)
-        if test_kernel_name in self.ker_obj.kernel_list():
-            self.ker_obj.remove_kernel_from_kernel_list(
+        if test_kernel_name in self.kernel_object.kernel_list():
+            self.kernel_object.remove_kernel_from_kernel_list(
                 '{}_{}.json'.format(self.filename, self._iteration))
 
         self.kernel_combined_dict['iteration'] += 1
@@ -809,7 +840,7 @@ class Distortion_corrector():
         # Have to manually set _config_chaned in the kernel object, because
         # we're just overwriting the same file and kernel_list is not
         # necessarily changed.
-        self.ker_obj._config_changed = True
+        self.kernel_object._config_changed = True
 
     def discard_new_kernel(self):
         '''
@@ -817,8 +848,8 @@ class Distortion_corrector():
         '''
         # Remove kernel from kernel list
         test_kernel_name = '{}_{}.json'.format(self.filename, self._iteration)
-        if test_kernel_name in self.ker_obj.kernel_list():
-            self.ker_obj.remove_kernel_from_kernel_list(
+        if test_kernel_name in self.kernel_object.kernel_list():
+            self.kernel_object.remove_kernel_from_kernel_list(
                 '{}_{}.json'.format(self.filename, self._iteration))
 
     def recalculate_combined_kernel(self):
@@ -849,7 +880,7 @@ class Distortion_corrector():
         # Have to manually set _config_chaned in the kernel object, because
         # we're just overwriting the same file and kernel_list is not
         # changed.
-        self.ker_obj._config_changed = True
+        self.kernel_object._config_changed = True
 
     def interactive_loop(self):
         '''
@@ -880,8 +911,8 @@ class Distortion_corrector():
                 filename = '{}_RT_corr'.format(
                     datetime.date.today().strftime('%y%m%d'))
             self.open_new_correction(
-                kernel_length=self.ker_obj.corrections_length(),
-                AWG_sampling_rate=self.AWG_lutman.sampling_rate(),
+                kernel_length=self.kernel_object.corrections_length(),
+                AWG_sampling_rate=self.sampling_rate,
                 name=filename)
         else:
             # Continue working with current kernel; nothing to do
@@ -924,7 +955,7 @@ class Distortion_corrector():
             elif self._fit_model_loop == 'double_exponential':
                 self.fit_double_exp_model(fit_start, fit_stop)
             elif self._fit_model_loop == 'triple_exponential':
-                self.fit_triple_exp_model(fit_start, fit_start)
+                self.fit_triple_exp_model(fit_start, fit_stop)
             elif self._fit_model_loop == 'high-pass':
                 self.fit_high_pass(fit_start, fit_stop)
             elif self._fit_model_loop == 'damped_osc':
@@ -1028,11 +1059,14 @@ class Distortion_corrector():
             repeat = False
 
         elif inp_elements[0] == 'p':
-            try:
-                for param, val in self.new_kernel_dict['fit'].items():
-                    print('{} = {}'.format(param, val))
-            except KeyError:
-                print('No fit has been done yet!')
+            if len(inp_elements) == 1:
+                try:
+                    for param, val in self.new_kernel_dict['fit'].items():
+                        print('{} = {}'.format(param, val))
+                except KeyError:
+                    print('No fit has been done yet!')
+            else:
+                self._update_latest_params(json_string=inp[1:])
 
         elif (inp_elements[0] == 's' and len(inp_elements == 2)):
             self.save_plot('{}.png'.format(inp_elements[1]))
@@ -1046,6 +1080,16 @@ class Distortion_corrector():
                 print('Model "{}" unknown. Please choose from {}.'
                       .format(inp_elements[1], self.known_fit_models))
 
+        elif (inp_elements[0] == 'square_amp' and len(inp_elements) == 2):
+            if inp_elements[1] == '?':
+                print('square_amp is {}'.format(self.square_amp))
+            else:
+                try:
+                    square_amp = float(inp_elements[1])
+                    self._set_square_amp(square_amp)
+                except ValueError:
+                    print('Square_amp can only be set to a float')
+
         elif valid_inputs != 'any':
             if inp not in valid_inputs:
                 print('Valid inputs: {}'.format(valid_inputs))
@@ -1057,6 +1101,79 @@ class Distortion_corrector():
             repeat = False
 
         return repeat, quit
+
+    def _update_latest_params(self, json_string):
+        """
+        Uses a JSON formatted string to update the parameters of the
+        latest fit.
+
+        For each model does the following
+            1. update the 'fit' dict
+            2. update the 'filter_params' dict
+            3. recalculate the kernel
+            4. calculate the new "fit"
+            5. Plot the new "fit"
+
+        Currently only supported for the high-pass and exponential model.
+        """
+        try:
+            par_dict = json.loads(json_string)
+        except Exception as e:
+            print(e)
+            return
+
+        # 1. update the 'fit' dict
+        self.new_kernel_dict['fit'].update(par_dict)
+
+        if self._fit_model_loop == 'high-pass':
+            tau = self.new_kernel_dict['fit']['tau']
+            # 2. update the filter_params' dict
+            self.new_kernel_dict['filter_params'] = {
+                'b0': 1,
+                'b1': 1/tau,
+                'a1': 0}
+            # 3. recalculate the kernel
+            tPts = np.arange(0, self.kernel_length/self.sampling_rate,
+                             1/self.sampling_rate)
+            predist_step = tPts/tau + 1
+            self.new_kernel_dict['kernel'] = \
+                list(kf.kernel_from_kernel_stepvec(predist_step))
+            # 4. calculate the fit
+            self.fitted_waveform = self.fit_res.eval(
+                t=self.time_pts[self._start_idx:self._stop_idx], tau=tau)
+
+        elif self._fit_model_loop == 'exponential':
+            amp = self.new_kernel_dict['fit']['amp']
+            tau = self.new_kernel_dict['fit']['tau']
+            offset = self.new_kernel_dict['fit']['offset']
+
+            # 2. update the 'filter_params' dict
+            self.new_kernel_dict['filter_params'] = {
+                'b0': 1 / (offset + amp),
+                'b1': 1 / (tau * (offset + amp)),
+                'a1': -offset / (tau * (offset + amp))}
+            # 3. recalculate the new kernel
+            self.new_kernel_dict['kernel'] = list(kf.decay_kernel(
+                amp=amp, tau=tau, offset=offset,
+                length=self.kernel_object.corrections_length(),
+                sampling_rate=self.sampling_rate))
+            # 4. calculate the fit
+            self.fitted_waveform = self.fit_res.eval(
+                t=self.time_pts[self._start_idx:self._stop_idx],
+                offset=offset, amplitude=amp, tau=tau)
+
+        elif self._fit_model_loop == 'double_exponential':
+            print('Updating params not implemented for double_exponential')
+        elif self._fit_model_loop == 'triple_exponential':
+            print('Updating params not implemented for triple_exponential')
+        elif self._fit_model_loop == 'damped_osc':
+            print('Updating params not implemented for damped_osc')
+        elif self._fit_model_loop == 'spline':
+            print('Updating params not implemented for spline')
+
+        # The fit results still have to be updated
+        self.plot_fit(self._t_start_loop, self._t_stop_loop,
+                      nr_plot_pts=self.nr_plot_points)
 
     def print_summary(self):
         '''
@@ -1077,8 +1194,122 @@ class Distortion_corrector():
         print('End of summary.')
         print('********')
 
+    def detect_edge_and_normalize_wf(self, waveform, edge_level=0.1):
+        """
+        Detects the edge of a waveform and cuts of the leading zeros as well
+        as normalizes the waveform to "self.square_amp".
 
-class RT_distortion_corrector(Distortion_corrector):
+        args:
+            waveform      (array) : the raw_waveform
+            edge_level    (float) : fractional change to declare an edge
+        Returns:
+            norm_waveform (array) : shifted and normalized waveform
+        """
+        # Normalize waveform and find rising edge
+        edge_idx = -1
+        abs_edge_change = (np.max(waveform) - np.min(waveform))*edge_level
+
+        for i in range(len(waveform) - 1):
+            if waveform[i+1] - waveform[i] > abs_edge_change:
+                edge_idx = i
+                break
+        if edge_idx < 0:
+            # This is an important error but should not crash the
+            # process
+            logging.warning('Failed to find rising edge.')
+            self.edge_idx = 0
+            return waveform
+        norm_waveform = (waveform -
+                         np.mean(waveform[:edge_idx-1])) / self.square_amp
+        # FIXME: this should be returned and other methods should use this
+        self.edge_idx = edge_idx
+        return norm_waveform
+
+    def _set_square_amp(self, square_amp: float):
+        old_square_amp = self.square_amp
+        self.square_amp = square_amp
+        if len(self.waveform) > 0:
+            self.waveform = self.waveform*old_square_amp/self.square_amp
+        self.plot_trace(self._t_start_loop, self._t_stop_loop,
+                        nr_plot_pts=self.nr_plot_points)
+        print('Updated square amp from {} to {}'.format(old_square_amp,
+                                                        square_amp))
+
+
+class Dummy_distortion_corrector(Distortion_corrector):
+
+    def measure_trace(self, verbose=True):
+        sampling_rate = 5e9
+        # Generate some dummy square wave
+        self.raw_waveform = np.concatenate([np.zeros(100), np.ones(50000),
+                                            np.zeros(1000)])
+        noise = np.random.rand(len(self.raw_waveform)) * 0.02
+        self.raw_waveform += noise
+
+        self.raw_waveform = np.convolve(
+            self.raw_waveform,  self.kernel_object.get_decay_kernel_1())
+
+        self.raw_time_pts = np.arange(len(self.raw_waveform))/sampling_rate
+        # Normalize waveform and find rising edge
+        self.waveform = self.detect_edge_and_normalize_wf(self.raw_waveform)
+        self.time_pts = np.arange(len(self.waveform))/sampling_rate
+
+
+class RT_distortion_corrector_AWG8(Distortion_corrector):
+
+    def __init__(self, flux_lutman, measure_scope_trace, square_amp: float,
+                 nr_plot_points: int=1000, ):
+        '''
+        Instantiates an object.
+        Note: Sampling rate of the scope is assumed to be 5 GHz. Sampling rate
+        of the AWG is assumed to be 1 GHz.
+
+        Args:
+            flux_lutman (Instrument):
+                    Lookup table manager for the AWG.
+            oscilloscope (Instrument):
+                    Oscilloscope instrument.
+
+            nr_plot_points (int):
+                    Number of points of the waveform that are plotted. Can be
+                    changed in self.nr_plot_points.
+        '''
+        self.flux_lutman = flux_lutman
+        self.measure_scope_trace = measure_scope_trace
+        super().__init__(
+            kernel_object=flux_lutman.instr_distortion_kernel.get_instr(),
+            square_amp=square_amp, sampling_rate=2.4e9,
+            nr_plot_points=nr_plot_points)
+
+        self.raw_waveform = []
+        self.raw_time_pts = []
+
+    def measure_trace(self, verbose=True):
+        '''
+        Measure a trace with the oscilloscope.
+        Raw data is saved to self.raw_time_pts and self.raw_waveform.
+        Data clipped to start at the rising edge is saved to self.time_pts
+        and self.waveform.
+
+        N.B. This measure trace method makes two assumptions
+            1. The scope is properly configured.
+            2. The CCLight is running the correct program that triggers the
+               AWG8.
+        '''
+        # Upload waveform
+        self.flux_lutman.load_waveform_onto_AWG_lookuptable(
+            'square', regenerate_waveforms=True)
+        if verbose:
+            print('Measuring trace...')
+        self.raw_time_pts, self.raw_waveform = self.measure_scope_trace()
+
+        # Normalize waveform and find rising edge
+        self.waveform = self.detect_edge_and_normalize_wf(self.raw_waveform,
+                                                          edge_level=0.05)
+        self.time_pts = self.raw_time_pts - self.raw_time_pts[self.edge_idx]
+
+
+class RT_distortion_corrector_QWG(Distortion_corrector):
     '''
     Class for applying corrections for room-temperature distortions to flux
     pulses.
@@ -1088,7 +1319,7 @@ class RT_distortion_corrector(Distortion_corrector):
     #   - check TODOs in this file
     #   - waveform length will become parameter in QWG_flux_lutman
     #       -> adapt this class to handle that
-    def __init__(self, AWG_lutman, oscilloscope, square_amp: float,
+    def __init__(self, AWG_lutman, measure_scope_trace, square_amp: float,
                  nr_plot_points: int=1000):
         '''
         Instantiates an object.
@@ -1100,17 +1331,15 @@ class RT_distortion_corrector(Distortion_corrector):
                     Lookup table manager for the AWG.
             oscilloscope (Instrument):
                     Oscilloscope instrument.
-            square_amp (float):
-                    Amplitude of the square pulse that is applied. This is
-                    needed for correct normalization of the step response.
+
             nr_plot_points (int):
                     Number of points of the waveform that are plotted. Can be
                     changed in self.nr_plot_points.
         '''
         self.AWG_lutman = AWG_lutman
-        self.scope = oscilloscope
-        self.square_amp = square_amp  # Normalization for step
+        self.measure_scope_trace = measure_scope_trace
         super().__init__(kernel_object=AWG_lutman.F_kernel_instr.get_instr(),
+                         square_amp=square_amp,
                          nr_plot_points=nr_plot_points)
 
         self.raw_waveform = []
@@ -1130,8 +1359,7 @@ class RT_distortion_corrector(Distortion_corrector):
 
         if verbose:
             print('Measuring trace...')
-        self.raw_time_pts, self.raw_waveform = \
-            self.scope.measure_trace()
+        self.raw_time_pts, self.raw_waveform = self.measure_scope_trace()
 
         # Measurement should be implemented using measurement_control
         # self.data_dir should be set to data dir of last measurement
@@ -1139,22 +1367,93 @@ class RT_distortion_corrector(Distortion_corrector):
         # self.data_dir = a.folder
 
         # Normalize waveform and find rising edge
-        edge_idx = -1
-        for i in range(len(self.raw_waveform) - 1):
-            if self.raw_waveform[i+1] - self.raw_waveform[i] > 0.01:
-                edge_idx = i
-                break
-        if edge_idx < 0:
-            raise ValueError('Failed to find rising edge.')
-        waveform = (self.raw_waveform -
-                    np.mean(self.raw_waveform[:edge_idx-1])) / self.square_amp
+        self.waveform = self.detect_edge_and_normalize_wf(self.raw_waveform)
+        # Sampling rate hardcoded to 5 GHz
+        self.time_pts = np.arange(len(self.waveform)) / 5e9
 
-        self.waveform = waveform[edge_idx:]
+
+class RT_distortion_corrector_5014(Distortion_corrector):
+    '''
+    Class for applying corrections for room-temperature distortions to flux
+    pulses.
+    '''
+
+    # TODO:
+    #   - check TODOs in this file
+    #   - waveform length will become parameter in QWG_flux_lutman
+    #       -> adapt this class to handle that
+    def __init__(self, kernel, AWG, oscilloscope, square_amp: float,
+                 nr_plot_points: int=1000):
+        '''
+        Instantiates an object.
+        Note: Sampling rate of the scope is assumed to be 5 GHz. Sampling rate
+        of the AWG is assumed to be 1 GHz.
+
+        Args:
+            AWG_lutman (Instrument):
+                    Lookup table manager for the AWG.
+            oscilloscope (Instrument):
+                    Oscilloscope instrument.
+            square_amp (float):
+                    Amplitude of the square pulse that is applied. This is
+                    needed for correct normalization of the step response.
+            nr_plot_points (int):
+                    Number of points of the waveform that are plotted. Can be
+                    changed in self.nr_plot_points.
+        '''
+
+        self.scope = oscilloscope
+        self.AWG = AWG
+        super().__init__(kernel_object=kernel, square_amp=square_amp,
+                         nr_plot_points=nr_plot_points)
+
+        self.raw_waveform = []
+        self.raw_time_pts = []
+
+    def measure_trace(self, verbose=True, upload=True):
+        '''
+        Measure a trace with the oscilloscope.
+        Raw data is saved to self.raw_time_pts and self.raw_waveform.
+        Data clipped to start at the rising edge is saved to self.time_pts
+        and self.waveform.
+        '''
+        # Upload waveform
+        if upload:
+            from pycqed.measurement.pulse_sequences import fluxing_sequences
+
+            distortions_dict = {
+                'ch_list': ['ch3'],
+                'ch3': self.kernel_object.get_corrections_kernel()
+            }
+            self.AWG.stop()
+            pulse_pars = {'pulse_type': 'SquarePulse',
+                          'pulse_delay': .1e-6,
+                          'channel': 'ch3',
+                          'amplitude': self.square_amp,
+                          'length': 8e-6,
+                          'dead_time_length': 2e-6}
+            fluxing_sequences.single_pulse_seq(pulse_pars=pulse_pars,
+                                               distortion_dict=distortions_dict)
+            self.AWG.start()
+            self.AWG.run()
+
+        if verbose:
+            print('Measuring trace...')
+        self.raw_time_pts, self.raw_waveform = self.scope.measure_trace()
+
+        # Measurement should be implemented using measurement_control
+        # self.data_dir should be set to data dir of last measurement
+        # a = ma.MeasurementAnalysis()
+        # self.data_dir = a.folder
+
+        # Normalize waveform and find rising edge
+        self.waveform = self.detect_edge_and_normalize_wf(self.raw_waveform)
         # Sampling rate hardcoded to 5 GHz
         self.time_pts = np.arange(len(self.waveform)) / 5e9
 
 
 class Cryo_distortion_corrector(Distortion_corrector):
+
     def __init__(self, time_pts, qubit, demodulate: bool=False,
                  f_demod: float=0, square_amp: float=1,
                  nr_plot_points: int=4000,
@@ -1187,6 +1486,7 @@ class Cryo_distortion_corrector(Distortion_corrector):
         self.qubit = qubit
         super().__init__(
             kernel_object=self.AWG_lutman.F_kernel_instr.get_instr(),
+            square_amp=square_amp,
             nr_plot_points=nr_plot_points)
         self.time_pts = time_pts
         self.phases = []
@@ -1195,7 +1495,6 @@ class Cryo_distortion_corrector(Distortion_corrector):
         self.V_per_phi0 = self.qubit.V_per_phi0()
         self.V_0 = self.qubit.V_offset()
         self.f_demod = f_demod
-        self.square_amp = square_amp
         self.demodulate = demodulate
 
     def measure_trace(self, verbose=True):
@@ -1214,12 +1513,10 @@ class Cryo_distortion_corrector(Distortion_corrector):
             f_demod=self.f_demod,
             flux_amp_analysis=self.square_amp)
 
-        self.data_dir = a.folder
-
         self.waveform = a.step_response
         self.phases = a.phases
 
-    def fit_spline_phase(self, start_time_fit: float, end_time_fit:float,
+    def fit_spline_phase(self, start_time_fit: float, end_time_fit: float,
                          s: float=0.001, weight_tau='auto',
                          disable_inversion: bool=False):
         '''

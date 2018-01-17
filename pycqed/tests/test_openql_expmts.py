@@ -4,6 +4,7 @@ import numpy as np
 
 try:
     from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
+    from pycqed.measurement.openql_experiments import multi_qubit_oql as mqo
     from pycqed.measurement.openql_experiments.generate_CCL_cfg import  \
         generate_config
     from openql import openql as ql
@@ -24,6 +25,8 @@ try:
                             init_duration=200000)
             # If this compiles we conclude that the generated config is valid
             sqo.AllXY(qubit_idx=0, platf_cfg=test_config_fn)
+            mqo.single_flux_pulse_seq(qubit_indices=(2, 0),
+                                      platf_cfg=test_config_fn)
 
     class Test_single_qubit_seqs_CCL(unittest.TestCase):
 
@@ -73,6 +76,38 @@ try:
             sqo.off_on(0, pulse_comb='off', platf_cfg=config_fn)
             sqo.off_on(0, pulse_comb='on', platf_cfg=config_fn)
             sqo.off_on(0, pulse_comb='off_on', platf_cfg=config_fn)
+
+        def test_randomized_benchmarking(self):
+            nr_cliffords = 2**np.arange(10)
+            sqo.randomized_benchmarking(0, platf_cfg=config_fn,
+                                        nr_cliffords=nr_cliffords, nr_seeds=3)
+
+    class Test_multi_qubit_seqs_CCL(unittest.TestCase):
+
+        def test_single_flux_pulse_seq(self):
+            mqo.single_flux_pulse_seq(qubit_indices=(2, 0),
+                                      platf_cfg=config_fn)
+
+        def test_flux_staircase_seq(self):
+            mqo.flux_staircase_seq(platf_cfg=config_fn)
+
+        def test_two_qubit_off_on(self):
+            mqo.two_qubit_off_on(q0=0, q1=1, platf_cfg=config_fn)
+
+        def test_two_qubit_tomo_cardinal(self):
+            mqo.two_qubit_tomo_cardinal(cardinal=3,
+                                        q0=0, q1=1, platf_cfg=config_fn)
+
+        def test_two_qubit_AllXY(self):
+            mqo.two_qubit_AllXY(q0=0, q1=1, platf_cfg=config_fn,
+                                sequence_type='sequential',
+                                replace_q1_pulses_X180=False,
+                                double_points=True)
+
+            mqo.two_qubit_AllXY(q0=0, q1=1, platf_cfg=config_fn,
+                                sequence_type='simultaneous',
+                                replace_q1_pulses_X180=False,
+                                double_points=True)
 
 
 except ImportError as e:
