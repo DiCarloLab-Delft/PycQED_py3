@@ -329,7 +329,7 @@ class DeviceCCL(Instrument):
         acq_instruments, ro_ch_idx, value_names = \
             self._get_ro_channels_and_labels(self.ro_qubits_list())
 
-        int_avg_det= det.UHFQC_integrated_average_detector(
+        int_avg_det = det.UHFQC_integrated_average_detector(
             channels=ro_ch_idx,
             UHFQC=self.find_instrument(acq_instruments[0]),
             AWG=self.instr_CC.get_instr(),
@@ -438,7 +438,7 @@ class DeviceCCL(Instrument):
         for qb_name in self.qubits():
             qb = self.find_instrument(qb_name)
             VSM = qb.instr_VSM.get_instr()
-            #VSM.set_all_switches_to('OFF')
+            # VSM.set_all_switches_to('OFF')
 
         # turn the desired channels on
         for qb_name in self.qubits():
@@ -474,7 +474,6 @@ class DeviceCCL(Instrument):
 
         self._prep_td_configure_VSM()
 
-
     ########################################################
     # Measurement methods
     ########################################################
@@ -509,10 +508,9 @@ class DeviceCCL(Instrument):
         MC.set_detector_function(self.get_correlation_detector())
         MC.run('conditional_oscillation{}'.format(self.msmt_suffix))
 
-
         a = ma2.Conditional_Oscillation_Analysis(
             options_dict={'ch_idx_osc': self.qubits().index(q0),
-                          'ch_idx_spec': self.qubits.index(q1)})
+                          'ch_idx_spec': self.qubits().index(q1)})
 
         if verbose:
             # also here to quickly see what dict entries of the
@@ -529,9 +527,6 @@ class DeviceCCL(Instrument):
             print(info_msg)
 
         return a
-
-
-
 
     def measure_two_qubit_tomo_bell(self, q0: str, q1: str,
                                     bell_state=0,
@@ -677,8 +672,8 @@ class DeviceCCL(Instrument):
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
 
         awg = fl_lutman.AWG.get_instr()
-        awg_ch = fl_lutman.cfg_awg_channel()-1 # -1 is to account for starting at 1
-        ch_pair = awg_ch%2
+        awg_ch = fl_lutman.cfg_awg_channel()-1  # -1 is to account for starting at 1
+        ch_pair = awg_ch % 2
         awg_nr = awg_ch//2
 
         amp_par = awg.parameters['awgs_{}_outputs_{}_amplitude'.format(
@@ -699,11 +694,10 @@ class DeviceCCL(Instrument):
         MC.run('Chevron {} {}'.format(q0, q_spec), mode='2D')
         ma.TwoD_Analysis()
 
-
-    def measure_cryoscope(self, q0:str, times,
+    def measure_cryoscope(self, q0: str, times,
                           MC=None,
                           experiment_name='Cryoscope',
-                          prepare_for_timedomain:bool=True):
+                          prepare_for_timedomain: bool=True):
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
         if MC is None:
@@ -731,7 +725,6 @@ class DeviceCCL(Instrument):
         MC.set_detector_function(d)
         MC.run(experiment_name)
 
-
     ########################################################
     # Calibration methods
     ########################################################
@@ -755,7 +748,6 @@ class DeviceCCL(Instrument):
         UHFQC = q0.instr_acquisition.get_instr()
         self.ro_acq_weight_type('optimal')
         self.prepare_for_timedomain()
-
 
         if calibrate_optimal_weights:
             # Important that this happens before calibrating the weights
@@ -790,7 +782,7 @@ class DeviceCCL(Instrument):
 
     def calibrate_cz_single_q_phase(self, q0: str, q1: str,
                                     amps,
-                                    waveform = 'cz_z',
+                                    waveform='cz_z',
                                     update: bool = True,
                                     prepare_for_timedomain: bool=True, MC=None):
 
@@ -815,9 +807,8 @@ class DeviceCCL(Instrument):
         s = swf.FLsweep(fl_lutman, fl_lutman.cz_phase_corr_amp,
                         waveform)
 
-
         d = self.get_correlation_detector(single_int_avg=True, seg_per_point=2)
-        d.detector_control='hard'
+        d.detector_control = 'hard'
         # the order of self.qubits is used in the correlation detector
         # and is required for the analysis
         ch_idx = self.qubits().index(q0)
@@ -830,7 +821,7 @@ class DeviceCCL(Instrument):
         a = ma2.CZ_1QPhaseCal_Analysis(options_dict={'ch_idx': ch_idx})
 
         phase_corr_amp = a.get_zero_phase_diff_intersect()
-        if phase_corr_amp > np.max(amps) or phase_corr_amp< np.min(amps):
+        if phase_corr_amp > np.max(amps) or phase_corr_amp < np.min(amps):
             print('Calibration failed, intersect outside of initial range')
             return False
         else:
@@ -839,10 +830,10 @@ class DeviceCCL(Instrument):
             return True
 
     def calibrate_flux_timing(self, q0: str, q1: str,
-                                    times,
-                                    waveform = 'cz_z',
-                                    update: bool = True,
-                                    prepare_for_timedomain: bool=True, MC=None):
+                              times,
+                              waveform='cz_z',
+                              update: bool = True,
+                              prepare_for_timedomain: bool=True, MC=None):
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
@@ -865,9 +856,8 @@ class DeviceCCL(Instrument):
         s = swf.FLsweep(fl_lutman, fl_lutman.cz_phase_corr_amp,
                         waveform)
 
-
         d = self.get_correlation_detector(single_int_avg=True, seg_per_point=2)
-        d.detector_control='hard'
+        d.detector_control = 'hard'
         # the order of self.qubits is used in the correlation detector
         # and is required for the analysis
         ch_idx = self.qubits().index(q0)
@@ -880,12 +870,10 @@ class DeviceCCL(Instrument):
         a = ma2.CZ_1QPhaseCal_Analysis(options_dict={'ch_idx': ch_idx})
 
         phase_corr_amp = a.get_zero_phase_diff_intersect()
-        if phase_corr_amp > np.max(amps) or phase_corr_amp< np.min(amps):
+        if phase_corr_amp > np.max(amps) or phase_corr_amp < np.min(amps):
             print('Calibration failed, intersect outside of initial range')
             return False
         else:
             if update:
                 self.find_instrument(q0).fl_cz_phase_corr_amp(phase_corr_amp)
             return True
-
-

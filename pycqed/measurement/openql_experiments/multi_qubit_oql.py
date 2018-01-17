@@ -235,7 +235,8 @@ def two_qubit_AllXY(q0: int, q1: int, platf_cfg: str,
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
 
-def Cryoscope(qubit_idx: int, buffer_time1, buffer_time2, platf_cfg: str):
+def Cryoscope(qubit_idx: int, buffer_time1=0, buffer_time2=0,
+              platf_cfg: str=''):
     """
     Single qubit Ramsey sequence.
     Writes output files to the directory specified in openql.
@@ -467,11 +468,7 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
             k.gate(prep_pulse_q1, q1)
             # FIXME hardcoded edge because of
             # brainless "directed edge recources" in compiler
-            # Hardcoded flux pulse, FIXME use actual CZ
-            k.gate('wait', [2, 0], 100)
             k.gate('fl_cw_01', 2, 0)
-            # FIXME hardcoded extra delays
-            k.gate('wait', [2, 0], 200)
             # after-rotations
             k.gate(after_pulse_q1, q1)
             # tomo pulses
@@ -641,8 +638,6 @@ def CZ_calibration_seq(q0: int, q1: int, platf_cfg: str,
             if case == 'excitation':
                 k.gate('rx180', q1)
             k.gate('rx90', q0)
-            # Hardcoded flux pulse, FIXME use actual CZ
-            k.gate('wait', [2, 0], 100)
             if not CZ_disabled:
                 k.gate('fl_cw_01', 2, 0)
             # hardcoded angles, must be uploaded to AWG
@@ -696,10 +691,7 @@ def CZ_poisoned_purity_seq(q0, q1, platf_cfg: str):
         # Create a Bell state:  |00> + |11>
         k.gate('rym90', q0)
         k.gate('ry90', q1)
-        # Hardcoded flux pulse, FIXME use actual CZ
-        k.gate('wait', [2, 0], 100)
         k.gate('fl_cw_01', 2, 0)
-        k.gate('wait', [2, 0], 300)
         k.gate('rym90', q1)
 
         # Perform pulses to measure the purity of both qubits
@@ -720,62 +712,6 @@ def CZ_poisoned_purity_seq(q0, q1, platf_cfg: str):
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
-
-
-def chevron_block_seq(q0_name, q1_name, no_of_points,
-                      excite_q1=False, wait_after_trigger=40e-9,
-                      wait_during_flux=400e-9, clock_cycle=1e-9,
-                      RO_target='all', mw_pulse_duration=40e-9,
-                      cal_points=True):
-    '''
-    Sequence for measuring a block of a chevron, i.e. using different codewords
-    for different pulse lengths.
-
-    Args:
-        q0, q1        (str): names of the addressed qubits.
-                             q0 is the pulse that experiences the flux pulse.
-        RO_target     (str): can be q0, q1, or 'all'
-        excite_q1    (bool): choose whether to excite q1, thus choosing
-                             between the |01> <-> |10> and the |11> <-> |20>
-                             swap.
-        wait_after_trigger (float): delay time in seconds after sending the
-                             trigger for the flux pulse
-        clock_cycle (float): period of the internal AWG clock
-        wait_time     (int): wait time between triggering QWG and RO
-        cal_points   (bool): whether to use calibration points or not
-    '''
-    raise NotImplementedError()
-    # filename = join(base_qasm_path, 'chevron_block_seq.qasm')
-    # qasm_file = mopen(filename, mode='w')
-    # qasm_file.writelines('qubit {} \nqubit {} \n'.format(q0_name, q1_name))
-
-    # for i in range(no_of_points):
-    #     qasm_file.writelines('\ninit_all\n')
-
-    #     qasm_file.writelines('QWG trigger {}\n'.format(i))
-    #     if excite_q1:
-    #         wait_after_trigger -= mw_pulse_duration
-    #     qasm_file.writelines(
-    #         'I {}\n'.format(int(wait_after_trigger//clock_cycle)))
-    #     qasm_file.writelines('X180 {}\n'.format(q0_name))
-    #     if excite_q1:
-    #         qasm_file.writelines('X180 {}\n'.format(q1_name))
-    #     qasm_file.writelines(
-    #         'I {}\n'.format(int(wait_during_flux//clock_cycle)))
-    #     if excite_q1:
-    #         # q0 is rotated to ground-state to have better contrast
-    #         # (|0> and |2> instead of |1> and |2>)
-    #         qasm_file.writelines('X180 {}\n'.format(q0_name))
-    #     qasm_file.writelines('RO {} \n'.format(RO_target))
-
-    # if cal_points:
-    #     # Add calibration pulses
-    #     cal_pulses = []
-    #     for seq in cal_points_2Q:
-    #         cal_pulses += [[seq[0], seq[1], 'RO ' + RO_target + '\n']]
-
-    # qasm_file.close()
-    # return qasm_file
 
 
 def CZ_state_cycling_light(q0: str, q1: str, N: int=1):

@@ -135,8 +135,10 @@ class CCL(SCPI):
                             val_min = 0
                             val_max = INT32_MAX
 
-                        parameter["vals"] = vals.Ints(val_min, val_max)
+                        parameter["vals"] = vals.PermissiveInts(val_min,
+                                                                val_max)
                         parameter['get_parser'] = int
+                        parameter['set_parser'] = int
 
                     else:
                         log.warning("Failed to set the validator for the" +

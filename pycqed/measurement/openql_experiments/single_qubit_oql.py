@@ -584,7 +584,8 @@ def add_single_qubit_cal_points(p, platf, qubit_idx):
         p.add_kernel(k)
 
 
-def FluxTimingCalibration(qubit_idx: int, buffer_time1, times, platf_cfg: str):
+def FluxTimingCalibration(qubit_idx: int, buffer_time1, times, platf_cfg: str,
+                          cal_points: bool=True):
     """
     A Ramsey sequence with varying waiting times `times` around a flux pulse.
     """
@@ -593,9 +594,10 @@ def FluxTimingCalibration(qubit_idx: int, buffer_time1, times, platf_cfg: str):
                 p=platf)
 
     buffer_nanoseconds1 = int(round(buffer_time1/1e-9))
-
+    # don't use last 4 points if calibration points are used
+    if cal_points:
+        times= times[:-4]
     for t in times:
-
         t_nanoseconds = int(round(t/1e-9))
 
         k = Kernel("pifluxpi", p=platf)
@@ -610,40 +612,8 @@ def FluxTimingCalibration(qubit_idx: int, buffer_time1, times, platf_cfg: str):
         k.measure(qubit_idx)
         p.add_kernel(k)
 
-
-    p.compile(verbose=False)
-    # attribute get's added to program to help finding the output files
-    p.output_dir = ql.get_output_dir()
-    p.filename = join(p.output_dir, p.name + '.qisa')
-    return p
-
-
-def FluxTimingCalibration2(qubit_idx: int, buffer_time1, times, platf_cfg: str):
-    """
-    A Ramsey sequence with varying waiting times `times` around a flux pulse.
-    """
-    platf = Platform('OpenQL_Platform', platf_cfg)
-    p = Program(pname="FluxTimingCalibration", nqubits=platf.get_qubit_number(),
-                p=platf)
-
-    buffer_nanoseconds1 = int(round(buffer_time1/1e-9))
-
-    for t in times:
-
-        t_nanoseconds = int(round(t/1e-9))
-
-        k = Kernel("pifluxpi", p=platf)
-        k.prepz(qubit_idx)
-        k.gate('rx180', qubit_idx)
-        if buffer_nanoseconds1 > 10:
-            k.gate("wait", [qubit_idx], buffer_nanoseconds1)
-        k.gate('fl_cw_02', 2, 0)
-        if t_nanoseconds > 10:
-            k.gate("wait", [qubit_idx], t_nanoseconds)
-        k.gate('rx180', qubit_idx)
-        k.measure(qubit_idx)
-        p.add_kernel(k)
-
+    if cal_points:
+        add_single_qubit_cal_points(p, platf=platf, qubit_idx=qubit_idx)
 
     p.compile(verbose=False)
     # attribute get's added to program to help finding the output files
