@@ -1978,22 +1978,28 @@ class Rabi_Analysis(TD_Analysis):
                 piHalfPulse = 1/(4*freq_fit)
                 piPulse_std = freq_std/freq_fit
                 piHalfPulse_std = freq_std/freq_fit
+
             else:
-                n = np.arange(-2, 3)
+                n = np.arange(-2, 3, 0.5)
+
                 piPulse_vals = (2*n*np.pi+np.pi-phase_fit)/(2*np.pi*freq_fit)
                 piHalfPulse_vals = (2*n*np.pi+np.pi/2-phase_fit)/(2*np.pi*freq_fit)
-
-                try:
-                    piPulse = np.min(np.take(piPulse_vals,
-                                             np.where(piPulse_vals>=0)))
-                except ValueError:
-                    piPulse = np.asarray([])
 
                 try:
                     piHalfPulse = np.min(np.take(piHalfPulse_vals,
                                                  np.where(piHalfPulse_vals>=0)))
                 except ValueError:
                     piHalfPulse = np.asarray([])
+
+                try:
+                    if piHalfPulse.size != 0:
+                        piPulse = np.min(np.take(
+                            piPulse_vals, np.where(piPulse_vals>=piHalfPulse)))
+                    else:
+                        piPulse = np.min(np.take(piPulse_vals,
+                                                 np.where(piPulse_vals>=0.001)))
+                except ValueError:
+                    piPulse = np.asarray([])
 
                 if piPulse.size==0 or piPulse>max(self.sweep_points):
                     i=0
@@ -4293,9 +4299,9 @@ class Ramsey_Analysis(TD_Analysis):
                         float(instr_set[self.qb_name].attrs['freq_qubit'])
 
         except (TypeError, KeyError, ValueError):
-            logging.warning('qb_name is unknown. Setting previously measured value '
-                            'of the qubit frequency to 0. New qubit frequency '
-                            'might be incorrect.')
+            logging.warning('qb_name is unknown. Setting previously measured '
+                            'value of the qubit frequency to 0. New qubit '
+                            'frequency might be incorrect.')
             self.qubit_freq_spec = 0
 
         self.scale = 1e6
