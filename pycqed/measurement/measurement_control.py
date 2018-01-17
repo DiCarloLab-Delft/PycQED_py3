@@ -128,7 +128,6 @@ class MeasurementControl(Instrument):
         self.set_measurement_name(name)
         self.print_measurement_start_msg()
 
-
         self.mode = mode
         self.iteration = 0  # used in determining data writing indices
         # needs to be defined here because of the with statement below
@@ -273,12 +272,18 @@ class MeasurementControl(Instrument):
         if (isinstance(adaptive_function, types.FunctionType) or
                 isinstance(adaptive_function, np.ufunc)):
             try:
-                adaptive_function(self.optimization_function, **self.af_pars)
+                # exists so it is possible to extract the result
+                # of an optimization post experiment
+                self.adaptive_result = \
+                    adaptive_function(self.optimization_function,
+                                      **self.af_pars)
             except StopIteration:
                 print('Reached f_termination: %s' % (self.f_termination))
         else:
             raise Exception('optimization function: "%s" not recognized'
                             % adaptive_function)
+        self.save_optimization_results(adaptive_function,
+                                       result=self.adaptive_result)
 
         for sweep_function in self.sweep_functions:
             sweep_function.finish()
@@ -426,12 +431,10 @@ class MeasurementControl(Instrument):
 
         Measurement function with scaling to correct physical value
         '''
-        if hasattr(self.x_scale, '__iter__'):  # to check if
+        if self.x_scale is not None:
             for i in range(len(x)):
                 x[i] = float(x[i])/float(self.x_scale[i])
-        elif self.x_scale != 1:  # only rescale if needed
-            for i in range(len(x)):
-                x[i] = float(x[i])/float(self.x_scale[i])
+
         if self.minimize_optimization:
             vals = self.measurement_function(x)
             if (self.f_termination is not None):
@@ -665,8 +668,6 @@ class MeasurementControl(Instrument):
         self.time_last_ad_plot_update = time.time()
         self.secondary_QtPlot.clear()
 
-        slabels = self.sweep_par_names
-        sunits = self.sweep_par_units
         zlabels = self.detector_function.value_names
         zunits = self.detector_function.value_units
 
@@ -807,6 +808,35 @@ class MeasurementControl(Instrument):
         param_list = dict_to_ordered_tuples(self.af_pars)
         for (param, val) in param_list:
             opt_sets_grp.attrs[param] = str(val)
+
+    def save_optimization_results(self, adaptive_function, result):
+        """
+        Saves the result of an adaptive measurement (optimization) to
+        the hdf5 file.
+
+        Contains some hardcoded data reshufling based on known adaptive
+        functions.
+        """
+        opt_res_grp = self.data_object.create_group('Optimization_result')
+
+        if adaptive_function.__module__ == 'cma.evolution_strategy':
+            res_dict = {'xopt':  result[0],
+                        'fopt':  result[1],
+                        'evalsopt': result[2],
+                        'evals': result[3],
+                        'iterations': result[4],
+                        'xmean': result[5],
+                        'stds': result[6],
+                        'stop': result[-3]}
+                        # entries below cannot be stored
+                        # 'cmaes': result[-2],
+                        # 'logger': result[-1]}
+        elif adaptive_function.__module__ == 'pycqed.measurement.optimization':
+            res_dict = {'xopt':  result[0],
+                        'fopt':  result[1]}
+        else:
+            res_dict = {'opt':  result}
+        h5d.write_dict_to_hdf5(res_dict, entry_point=opt_res_grp)
 
     def save_instrument_settings(self, data_object=None, *args):
         '''
@@ -975,7 +1005,8 @@ class MeasurementControl(Instrument):
                     raise KeyboardInterrupt('Human "q" terminated experiment.')
                 elif b'f' in key:
                     # this should not raise an exception
-                    raise KeyboardFinish('Human "f" terminated experiment safely.')
+                    raise KeyboardFinish(
+                        'Human "f" terminated experiment safely.')
         except Exception:
             pass
 
@@ -1089,13 +1120,17 @@ class MeasurementControl(Instrument):
 
         Reserved keywords:
             "adaptive_function":    function
-            "x_scale": 1            float rescales values for adaptive function
+            "x_scale": (array)     rescales sweep parameters for
+                adaptive function, defaults to None (no rescaling).
+                Each sweep_function/parameter is rescaled by dividing by
+                the respective component of x_scale.
             "minimize": False       Bool, inverts value to allow minimizing
                                     or maximizing
             "f_termination" None    terminates the loop if the measured value
                                     is smaller than this value
             "par_idx": 0            If a parameter returns multiple values,
                                     specifies which one to use.
+
         Common keywords (used in python nelder_mead implementation):
             "x0":                   list of initial values
             "initial_step"
@@ -1104,9 +1139,8 @@ class MeasurementControl(Instrument):
         """
         self.af_pars = adaptive_function_parameters
 
-        # scaling should not be used if a "direc" argument is available
-        # in the adaptive function itself, if not specified equals 1
-        self.x_scale = self.af_pars.pop('x_scale', 1)
+        # x_scale is expected to be an array or list.
+        self.x_scale = self.af_pars.pop('x_scale', None)
         self.par_idx = self.af_pars.pop('par_idx', 0)
         # Determines if the optimization will minimize or maximize
         self.minimize_optimization = self.af_pars.pop('minimize', True)

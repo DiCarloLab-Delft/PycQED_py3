@@ -20,7 +20,7 @@ class DummyParHolder(Instrument):
         super().__init__(name, **kw)
 
         # Instrument parameters
-        for parname in ['x', 'y', 'z']:
+        for parname in ['x', 'y', 'z', 'x0', 'y0', 'z0']:
             self.add_parameter(parname, unit='m',
                                parameter_class=ManualParameter,
                                vals=vals.Numbers(), initial_value=0)
@@ -55,8 +55,10 @@ class DummyParHolder(Instrument):
 
     def _measure_parabola(self):
         time.sleep(self.delay())
-        return (self.x()**2 + self.y()**2 + self.z()**2 +
-                self.noise()*np.random.rand(1))
+        return ((self.x()-self.x0())**2 +
+                       (self.y()-self.y0())**2 +
+                       (self.z()-self.z0())**2 +
+                        self.noise()*np.random.rand(1))
 
     def _measure_skewed_parabola(self):
         '''
