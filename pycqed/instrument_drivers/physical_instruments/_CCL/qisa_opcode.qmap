@@ -1,0 +1,57 @@
+# This is a default qisa_opcode.qmap file used by the driver when no
+# opcode.qmap is specified.
+
+# quantum instructions (double instruction format)
+# no arguments
+def_q_arg_none["qnop"] = 0x00
+def_q_arg_st["CW_00"]   = 0x8
+def_q_arg_st["CW_01"]   = 0x9
+def_q_arg_st["CW_02"]   = 0xa
+def_q_arg_st["CW_03"]   = 0xb
+def_q_arg_st["CW_04"]   = 0xc
+def_q_arg_st["CW_05"]   = 0xd
+def_q_arg_st["CW_06"]   = 0xe
+def_q_arg_st["CW_07"]   = 0xf
+def_q_arg_st["CW_08"]   = 0x10
+def_q_arg_st["CW_09"]   = 0x11
+def_q_arg_st["CW_10"]   = 0x12
+def_q_arg_st["CW_11"]   = 0x13
+def_q_arg_st["CW_12"]   = 0x14
+def_q_arg_st["CW_13"]   = 0x15
+def_q_arg_st["CW_14"]   = 0x16
+def_q_arg_st["CW_15"]   = 0x17
+def_q_arg_st["CW_16"]   = 0x18
+def_q_arg_st["CW_17"]   = 0x19
+def_q_arg_st["CW_18"]   = 0x1a
+def_q_arg_st["CW_19"]   = 0x1b
+def_q_arg_st["CW_20"]   = 0x1c
+def_q_arg_st["CW_21"]   = 0x1d
+def_q_arg_st["CW_22"]   = 0x1e
+def_q_arg_st["CW_23"]   = 0x1f
+def_q_arg_st["CW_24"]   = 0x20
+def_q_arg_st["CW_25"]   = 0x21
+def_q_arg_st["CW_26"]   = 0x22
+def_q_arg_st["CW_27"]   = 0x23
+def_q_arg_st["CW_28"]   = 0x24
+def_q_arg_st["CW_29"]   = 0x25
+def_q_arg_st["CW_30"]   = 0x26
+def_q_arg_st["CW_31"]   = 0x27
+def_q_arg_st["C_CW_00"] = 0x28
+def_q_arg_st["C_CW_07"] = 0x2f
+def_q_arg_st["C_CW_01"] = 0x29
+def_q_arg_st["C_CW_03"] = 0x2b
+def_q_arg_st["C_CW_05"] = 0x2d
+def_q_arg_st["C_CW_02"] = 0x2a
+def_q_arg_st["C_CW_04"] = 0x2c
+def_q_arg_st["C_CW_06"] = 0x2e
+def_q_arg_st["C_CW_08"] = 0x30
+def_q_arg_tt["FL_CW_00"]    = 0x80
+def_q_arg_tt["FL_CW_01"]    = 0x81
+def_q_arg_tt["FL_CW_02"]    = 0x82
+def_q_arg_tt["FL_CW_03"]    = 0x83
+def_q_arg_tt["FL_CW_04"]    = 0x84
+def_q_arg_tt["FL_CW_05"]    = 0x85
+def_q_arg_tt["FL_CW_06"]    = 0x86
+def_q_arg_tt["FL_CW_07"]    = 0x87
+def_q_arg_st["measz"]   = 0x4
+def_q_arg_st["prepz"]   = 0x2

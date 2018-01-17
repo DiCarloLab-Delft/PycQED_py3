@@ -142,14 +142,14 @@ def write_dict_to_hdf5(data_dict: dict, entry_point):
     """
     for key, item in data_dict.items():
         # Basic types
-        if isinstance(item, (str, float, int, bool,
+        if isinstance(item, (str, float, int, bool, np.number,
                              np.float_, np.int_, np.bool_)):
             try:
                 entry_point.attrs[key] = item
             except Exception as e:
                 print('Exception occurred while writing'
                       ' {}:{} of type {}'.format(key, item, type(item)))
-                raise e
+                logging.warning(e)
         elif isinstance(item, np.ndarray):
             entry_point.create_dataset(key, data=item)
         elif item is None:

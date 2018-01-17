@@ -25,6 +25,6 @@ ccl.upload_microcode('./qisa_test_assembly/cs.txt')
 # The assembler needs to be rebuild whenver the config file
 # for OpenQL changes.
 
-ccl.upload_instructions(p.filename)
+ccl.eqasm_program(p.filename)
 ccl.enable(1)
 ccl.run(1)

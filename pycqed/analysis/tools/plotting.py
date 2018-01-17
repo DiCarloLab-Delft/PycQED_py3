@@ -225,9 +225,11 @@ def flex_color_plot_vs_x(xvals, yvals, zvals, ax=None,
     if xwidth is None:
         xvals = np.array(xvals)
         xvertices = np.zeros(np.array(xvals.shape)+1)
+
+        dx = abs(np.max(xvals)-np.min(xvals))/len(xvals)
         xvertices[1:-1] = (xvals[:-1]+xvals[1:])/2.
-        xvertices[0] = xvals[0] - (xvals[1]-xvals[0])/2
-        xvertices[-1] = xvals[-1] + (xvals[-1]-xvals[-2])/2
+        xvertices[0] = xvals[0] - dx/2
+        xvertices[-1] = xvals[-1] + dx/2
     else:
         xvertices = []
         for xval in xvals:
@@ -235,18 +237,21 @@ def flex_color_plot_vs_x(xvals, yvals, zvals, ax=None,
     # y coordinates
     yvertices = []
     for xx in range(len(xvals)):
+        # Important to sort arguments in case unsorted (e.g., FFT freqs)
+        sorted_yarguments = yvals[xx].argsort()
+        yvals[xx] = yvals[xx][sorted_yarguments]
+        zvals[xx] = zvals[xx][sorted_yarguments]
+
         yvertices.append(np.zeros(np.array(yvals[xx].shape)+1))
         yvertices[xx][1:-1] = (yvals[xx][:-1]+yvals[xx][1:])/2.
         yvertices[xx][0] = yvals[xx][0] - (yvals[xx][1]-yvals[xx][0])/2
         yvertices[xx][-1] = yvals[xx][-1] + (yvals[xx][-1]-yvals[xx][-2])/2
 
-    # normalized plot
-    if normalize:
-        for xx in range(len(xvals)):
+        # normalized plot
+        if normalize:
             zvals[xx] /= np.mean(zvals[xx])
-    # logarithmic plot
-    if log:
-        for xx in range(len(xvals)):
+        # logarithmic plot
+        if log:
             zvals[xx] = np.log(zvals[xx])/np.log(10)
 
     # add blocks to plot
@@ -280,6 +285,16 @@ def flex_colormesh_plot_vs_xy(xvals, yvals, zvals, ax=None,
     zvals should be a list of arrays with the measured values with shape
     (len(yvals), len(xvals)).
     """
+
+    # First, we need to sort the data as otherwise we get odd plotting
+    # artefacts. An example is e.g., plotting a fourier transform
+    sorted_x_arguments = xvals.argsort()
+    xvals = xvals[sorted_x_arguments]
+    sorted_y_arguments = yvals.argsort()
+    yvals = yvals[sorted_y_arguments]
+    zvals = zvals[:,  sorted_x_arguments]
+    zvals = zvals[sorted_y_arguments, :]
+
     # create a figure and set of axes
     if ax is None:
         fig = plt.figure(figsize=(12, 7))
@@ -310,14 +325,12 @@ def flex_colormesh_plot_vs_xy(xvals, yvals, zvals, ax=None,
     # normalized plot
     if normalize:
         zvals /= np.mean(zvals, axis=0)
-# logarithmic plot
+    # logarithmic plot
     if log:
-
         for xx in range(len(xvals)):
             zvals[xx] = np.log(zvals[xx])/np.log(10)
 
     # add blocks to plot
-    # hold = kw.pop('hold',False)
     do_transpose = kw.pop('transpose', False)
     if do_transpose:
         colormap = ax.pcolormesh(ygrid.transpose(),

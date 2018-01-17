@@ -83,10 +83,11 @@ def _simulate_quantumsim(file_path, options):
         'Q0': {'T1': 30e3, 'T2': 17e3, 'frac1_0': 0.0189, 'frac1_1': 0.918},
         'Q1': {'T1': 30e3, 'T2': 17e3, 'frac1_0': 0.068, 'frac1_1': 0.949},
         'q0': {'T1': 30e3, 'T2': 17e3, 'frac1_0': 0.0189, 'frac1_1': 0.918},
-        'q1': {'T1': 30e3, 'T2': 17e3, 'frac1_0': 0.068, 'frac1_1': 0.949}}
+        'q1': {'T1': 30e3, 'T2': 17e3, 'frac1_0': 0.068, 'frac1_1': 0.949},
+        'default': {'T1': 30e3, 'T2': 17e3, 'frac1_0': 0.068, 'frac1_1': 0.949}}
 
     quantumsim_det = Quantumsim_Two_QB_Hard_Detector(
-        file_path, dt=(40, 280), qubit_parameters=qubit_parameters)
+        file_path, timegrid=20, gate_1_step=1, gate_2_step=5, qubit_parameters=qubit_parameters)
     sweep_points = range(len(quantumsim_det.parser.circuits))
 
     MC.set_detector_function(quantumsim_det)
