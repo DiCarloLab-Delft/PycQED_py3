@@ -1047,7 +1047,7 @@ class QuDev_transmon(Qubit):
         aligned: iavg_delay = 2*wint_delay.
         """
         if MC is None:
-            MC = self.instr_MC.get_instr()
+            MC = self.MC
 
         self.prepare_for_timedomain()
         npoints = int(self.ro_acq_input_average_length()*1.8e9)
@@ -1133,7 +1133,7 @@ class QuDev_transmon(Qubit):
     def find_optimized_weights(self, MC=None, update=True, measure=True, **kw):
         # FIXME: Make a proper analysis class for this (Ants, 04.12.2017)
         if measure:
-           self.measure_transients(MC, analyze=False, **kw)
+            self.measure_transients(MC, analyze=False, **kw)
         MAon = ma.MeasurementAnalysis(label='timetrace_on')
         MAoff = ma.MeasurementAnalysis(label='timetrace_off')
         don = MAon.measured_values[0] + 1j * MAon.measured_values[1]
@@ -1147,8 +1147,9 @@ class QuDev_transmon(Qubit):
             self.ro_acq_weight_func_I(wre)
             self.ro_acq_weight_func_Q(wim)
         if kw.get('plot', True):
-            tbase = MAon.sweep_points
-            modulation = np.exp(2j * np.pi * self.f_RO__mod() * tbase)
+            npoints = len(MAon.sweep_points)
+            tbase = np.linspace(0, npoints/1.8e9, npoints, endpoint=False)
+            modulation = np.exp(2j * np.pi * self.f_RO_mod() * tbase)
             plt.subplot(311)
             plt.plot(tbase / 1e-9, np.real(don * modulation), '-', label='I')
             plt.plot(tbase / 1e-9, np.imag(don * modulation), '-', label='Q')
@@ -1172,6 +1173,7 @@ class QuDev_transmon(Qubit):
             plt.xlabel('Time (ns)')
             MAoff.save_fig(plt.gcf(), 'timetraces', xlabel='time',
                            ylabel='voltage')
+            plt.close()
 
     def find_ssro_fidelity(self, nreps=1, MC=None, analyze=True, close_fig=True,
                            no_fits=False, upload=True, preselection_pulse=True,
@@ -2510,50 +2512,87 @@ class QuDev_transmon(Qubit):
 
         return EC, EJ
 
-    def find_dispersive_shift(self, freqs=None, label = 'pulsed-spec',
-                              update=False, **kw):
+    def find_readout_frequency(self, freqs=None, update=False, MC=None, **kw):
         """
-        NOT IMPLEMENTED YET
-        Finds the dispersive shift chi (in MHz) but doing 2 pulsed
-        spectroscopies, one where a pi pulse is applied beforehand, and one
-        where no pi pulse is applied.
-
-        WARNING: Does not automatically update the qubit EC and EJ parameters.
-        Set update=True if you want this!
-
-        Arguments:
-            freqs            frequency range over which to sweep
-            label            label of the analysis routine
-            update:          whether to update the qubit chi parameter or not
-
-        Keyword Arguments:
-            f_span
-            f_mean
-            nr_points
-
-        Returns: the dispersive shift + stderr
+        You need a working pi-pulse for this to work. Also, if your
+        readout pulse length is much longer than the T1, the results will not
+        be nice as the excited state spectrum will be mixed with the ground
+        state spectrum.
         """
 
+        # FIXME: Make proper analysis class for this (Ants, 04.12.2017)
         if not update:
-            logging.warning("Does not automatically update the qubit "
-                            "dispersive shift parameter. "
-                            "Set update=True if you want this!")
-
+            logging.info("Does not automatically update the RO resonator "
+                         "parameters. Set update=True if you want this!")
         if freqs is None:
-            f_span = kw.get('f_span', 100e6)
-            f_mean = kw.get('f_mean', self.f_qubit())
-            nr_points = kw.get('nr_points', 100)
-            if f_mean == 0:
-                logging.warning("find_dispersive_shift does not know over "
-                                "what frequency range to sweep. "
-                                "Please specify the "
-                                "f_mean or the freqs function parameter.")
-                return 0
+            if self.f_RO() is not None:
+                f_span = kw.pop('f_span', 20e6)
+                fmin = self.f_RO() - f_span
+                fmax = self.f_RO() + f_span
+                n_freq = kw.pop('n_freq', 401)
+                freqs = np.linspace(fmin, fmax, n_freq)
             else:
-                freqs = np.linspace(f_mean - f_span/2, f_mean + f_span/2,
-                                    nr_points)
+                raise ValueError("Unspecified frequencies for find_resonator_"
+                                 "frequency and no previous value exists")
+        if np.any(freqs < 500e6):
+            logging.warning('Some of the values in the freqs array might be '
+                            'too small. The units should be Hz.')
+        if MC is None:
+            MC = self.MC
 
-        #Perform measurements
+        self.measure_dispersive_shift(freqs, MC=MC, analyze=False, **kw)
+        MAon = ma.MeasurementAnalysis(label='on-spec' + self.msmt_suffix)
+        MAoff = ma.MeasurementAnalysis(label='off-spec' + self.msmt_suffix)
+        cdaton = MAon.measured_values[0] * \
+                 np.exp(1j * np.pi * MAon.measured_values[1] / 180)
+        cdatoff = MAoff.measured_values[0] * \
+                  np.exp(1j * np.pi * MAoff.measured_values[1] / 180)
+        fmax = freqs[np.argmax(np.abs(cdaton - cdatoff))]
+        if update:
+            self.f_RO(fmax)
+        if kw.pop('plot', True):
+            plt.plot(freqs / 1e9, np.abs(cdatoff),
+                     label='qubit in $|g\\rangle$')
+            plt.plot(freqs / 1e9, np.abs(cdaton),
+                     label='qubit in $|e\\rangle$')
+            plt.plot(freqs / 1e9, np.abs(cdaton - cdatoff),
+                     label='difference')
+            plt.vlines(fmax / 1e9, 0,
+                       max(np.abs(cdatoff).max(), np.abs(cdaton).max()),
+                       label='$\\nu_{{RO}} = {:.4f}$ GHz'.format(fmax / 1e9))
+            plt.xlabel('Frequency (GHz)')
+            plt.ylabel('Transmission amplitude (arb.)')
+            plt.legend(loc='center left')
+            MAoff.save_fig(plt.gcf(), 'chishift', ylabel='trans-amp')
+        return fmax
+
+    def measure_dispersive_shift(self, freqs, MC=None, analyze=True, **kw):
+        # FIXME: Remove dependancy on heterodyne!
+        if np.any(freqs < 500e6):
+            logging.warning(('Some of the values in the freqs array might be '
+                             'too small. The units should be Hz.'))
+        if MC is None:
+            MC = self.MC
+        self.prepare_for_pulsed_spec()
+        self.drive_LO.pulsemod_state('off')
+        self.drive_LO.power(self.drive_LO_pow())
+        heterodyne = self.heterodyne
+        for mode in ('on', 'off'):
+            sq.OffOn_seq(pulse_pars=self.get_drive_pars(),
+                         RO_pars=self.get_RO_pars(),
+                         pulse_comb='O{0}O{0}'.format(mode[1:]))
+            MC.set_sweep_function(heterodyne.frequency)
+            MC.set_sweep_points(freqs)
+            demod_mode = 'single' if self.heterodyne.single_sideband_demod() \
+                else 'double'
+            MC.set_detector_function(det.Heterodyne_probe(
+                self.heterodyne,
+                trigger_separation=self.heterodyne.trigger_separation(),
+                demod_mode=demod_mode))
+            self.AWG.start()
+            MC.run(name='{}-spec{}'.format(mode, self.msmt_suffix))
+            if analyze:
+                ma.MeasurementAnalysis(qb_name=self.name, **kw)
 
 
     def get_spec_pars(self):
