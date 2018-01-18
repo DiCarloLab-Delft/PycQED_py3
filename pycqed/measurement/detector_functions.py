@@ -978,25 +978,7 @@ class Heterodyne_probe(Soft_Detector):
         self.HS.prepare()
 
     def acquire_data_point(self, **kw):
-        passed = False
-        c = 0
-        while(not passed):
-            S21 = self.HS.probe()
-            cond_a = ((abs(S21)/self.last) >
-                      self.threshold) or ((self.last/abs(S21)) > self.threshold)
-            cond_b = self.HS.frequency() >= self.last_frequency
-            if cond_a and cond_b:
-                passed = False
-            else:
-                passed = True
-            if self.first or c > 3:
-                passed = True
-            # if not passed:
-            #     print('retrying HS probe')
-            c += 1
-        self.last_frequency = self.HS.frequency()
-        self.first = False
-        self.last = abs(S21)
+        S21 = self.HS.probe()
         return abs(S21), np.angle(S21)/(2*np.pi)*360,  # S21.real, S21.imag
 
     def finish(self):
