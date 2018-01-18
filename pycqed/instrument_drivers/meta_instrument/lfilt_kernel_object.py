@@ -54,12 +54,13 @@ class LinDistortionKernel(Instrument):
                 return filt_id
         raise ValueError('No empty filter')
 
-
     def distort_waveform(self, waveform, length_samples: int=None):
-        filter_models = []
-        if length_samples!= None:
+        if length_samples is not None:
             extra_samples = length_samples - len(waveform)
-            y_sig = np.concatenate([waveform, np.zeros(extra_samples)])
+            if extra_samples >= 0:
+                y_sig = np.concatenate([waveform, np.zeros(extra_samples)])
+            else:
+                y_sig = waveform[:extra_samples]
         else:
             y_sig = waveform
         for filt_id in range(self._num_models):
@@ -85,7 +86,6 @@ class LinDistortionKernel(Instrument):
         y_sig *= self.cfg_gain_correction()
         return y_sig
 
-
     def print_overview(self):
         print("*"*80)
         print("Overview of {}".format(self.name))
@@ -94,7 +94,7 @@ class LinDistortionKernel(Instrument):
             filt = self.get('filter_model_{:02}'.format(filt_id))
             if filt != {}:
                 model = filt['model']
-                params= filt['params']
+                params = filt['params']
 
                 print('Model {} {}: \n {}'.format(filt_id, model, params))
 

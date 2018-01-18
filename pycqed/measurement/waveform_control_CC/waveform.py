@@ -297,17 +297,14 @@ def mod_gauss_VSM(amp, sigma_length, f_modulation, axis='x', phase=0,
 # Flux pulses
 #####################################################
 
-def martinis_flux_pulse(length, lambda_2, lambda_3, theta_f,
-                        f_01_max,
-                        J2,
-                        V_offset=0,
-                        V_per_phi0=1,
-                        E_c=250e6,
-                        f_bus=None,
-                        f_interaction=None,
-                        asymmetry=0,
-                        sampling_rate=1e9,
-                        return_unit='V'):
+def martinis_flux_pulse(length: float, lambda_2: float, lambda_3: float,
+                        theta_f: float,
+                        f_01_max: float, J2: float,
+                        V_offset: float=0, V_per_phi0: float=1,
+                        E_c: float=250e6, f_bus: float =None,
+                        f_interaction: float =None,
+                        asymmetry: float =0, sampling_rate: float =1e9,
+                        return_unit: str='V'):
     """
     Returns the pulse specified by Martinis and Geller
     Phys. Rev. A 90 022307 (2014).
@@ -317,7 +314,7 @@ def martinis_flux_pulse(length, lambda_2, lambda_3, theta_f,
     note that the lambda coefficients are rescaled to ensure that the center
     of the pulse has a value corresponding to theta_f.
 
-    length          (float)
+    length          (float) lenght of the waveform (s)
     lambda_2
     lambda_3
 
@@ -332,7 +329,7 @@ def martinis_flux_pulse(length, lambda_2, lambda_3, theta_f,
     f_interaction   (float) interaction frequency (Hz).
     asymmetry       (float) qubit asymmetry
 
-    sampling_rate   (float)
+    sampling_rate   (float) sampling rate of the AWG (Hz)
     return_unit     (enum: ['V', 'eps', 'f01', 'theta']) whether to return the
                     pulse expressed in units of theta: the reference frame of
                     the interaction, units of epsilon: detuning to the bus
@@ -388,8 +385,6 @@ def martinis_flux_pulse(length, lambda_2, lambda_3, theta_f,
     interp_wave = scipy.interpolate.interp1d(
         t/scale, theta_wave_clipped, bounds_error=False,
         fill_value=0)(t_samples)
-
-
 
     # Return in the specified units
     if return_unit == 'theta':
