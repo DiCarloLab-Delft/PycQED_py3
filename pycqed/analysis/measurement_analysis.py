@@ -660,12 +660,12 @@ class MeasurementAnalysis(object):
         if plot_the_title:
             fig.text(0.5, 1, self.plot_title, fontsize=self.font_size,
                      horizontalalignment='center',
-                     verticalalignment = 'bottom',
-                     transform = ax.transAxes)
+                     verticalalignment='bottom',
+                     transform=ax.transAxes)
 
         # Plot:
-        ax.plot(x, y, marker, markersize=self.marker_size,
-                linewidth=self.line_width, label=label)
+        line = ax.plot(x, y, marker, markersize=self.marker_size,
+                       linewidth=self.line_width, label=label)
 
         if log:
             ax.set_yscale('log')
@@ -690,9 +690,7 @@ class MeasurementAnalysis(object):
         for axis in ['top', 'bottom', 'left', 'right']:
             ax.spines[axis].set_linewidth(self.axes_line_width)
 
-        # Plot:
-        line = ax.plot(x, y, marker, markersize=self.marker_size,
-                    linewidth=self.line_width, label=label)
+
         # Set axis labels
         xlabel = kw.get('xlabel', None)
         ylabel = kw.get('ylabel', None)

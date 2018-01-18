@@ -256,12 +256,12 @@ class QuDev_transmon(Qubit):
                                  initial_value=None, vals=vals.Numbers())
         self.add_pulse_parameter('flux', 'flux_pulse_delay', 'pulse_delay',
                                  initial_value=None, vals=vals.Numbers())
-        # self.add_pulse_parameter('flux', 'flux_pulse_buffer', 'buffer',
-        #                          initial_value=None, vals=vals.Numbers())
-        # self.add_pulse_parameter('flux', 'flux_pulse_sigma', 'sigma',
-        #                          initial_value=0, vals=vals.Numbers())
-        # self.add_pulse_parameter('flux', 'flux_f_pulse_mod', 'mod_frequency',
-        #                          initial_value=None, vals=vals.Numbers())
+        self.add_pulse_parameter('flux', 'flux_pulse_buffer', 'buffer',
+                                 initial_value=None, vals=vals.Numbers())
+        self.add_pulse_parameter('flux', 'flux_pulse_sigma', 'sigma',
+                                 initial_value=0, vals=vals.Numbers())
+        self.add_pulse_parameter('flux', 'flux_f_pulse_mod', 'mod_frequency',
+                                 initial_value=None, vals=vals.Numbers())
         # self.add_pulse_parameter('flux','flux_pulse_buffer','pulse_buffer',
         #                          initial_value=None,vals= vals.Numbers())
         # self.add_pulse_parameter('flux','kernel_path','kernel_path',
@@ -1305,7 +1305,7 @@ class QuDev_transmon(Qubit):
         if self.RO_acq_weight_function_Q() is None:
             self.RO_acq_weight_function_Q(
                 (self.RO_acq_weight_function_I() + 1)%9)
-        self.set_default_readout_weights(theta=0)
+        self.set_readout_weights(theta=0)
         prev_shots = self.RO_acq_shots()
         self.RO_acq_shots(2*(self.RO_acq_shots()//2))
         self.prepare_for_timedomain()
@@ -1339,13 +1339,12 @@ class QuDev_transmon(Qubit):
                                preselection=False)
         if update:
             self.RO_IQ_angle(ana.theta)
-            self.set_default_readout_weights(theta=ana.theta)
+            self.set_readout_weights(theta=ana.theta)
         return ana.theta
 
     def measure_dynamic_phase(self, flux_pulse_length=None,
                               flux_pulse_amp=None, phases=None,
                               distortion_dict=None, distorted=True,
-                              compensation_pulses=False,
                               MC=None, label=None):
 
         if flux_pulse_amp is None:
@@ -1365,7 +1364,7 @@ class QuDev_transmon(Qubit):
             label = 'Ramsey_interleaved_flux_pulse_{}_filter_{}'.format(
                 self.name, str(distorted))
 
-        self.set_default_readout_weights()
+        self.set_readout_weights()
         self.prepare_for_timedomain()
         self.update_detector_functions()
 
@@ -1376,8 +1375,7 @@ class QuDev_transmon(Qubit):
 
         s1 = awg_swf.Ramsey_interleaved_fluxpulse_sweep(
             self, X90_separation=X90_separation,
-            distorted=distorted, distortion_dict=distortion_dict,
-            compensation_pulses=compensation_pulses)
+            distorted=distorted, distortion_dict=distortion_dict)
 
         s2 = awg_swf.Ramsey_fluxpulse_ampl_sweep(self, s1)
 
@@ -2573,10 +2571,16 @@ class QuDev_transmon(Qubit):
                              'too small. The units should be Hz.'))
         if MC is None:
             MC = self.MC
+
+        heterodyne = self.heterodyne
+        heterodyne.f_RO_mod(self.f_RO_mod())
+        heterodyne.RO_length(self.RO_pulse_length())
+        heterodyne.mod_amp(self.RO_amp())
         self.prepare_for_pulsed_spec()
         self.drive_LO.pulsemod_state('off')
         self.drive_LO.power(self.drive_LO_pow())
-        heterodyne = self.heterodyne
+        self.UHFQC.quex_wint_length(self.RO_acq_integration_length()*1.8e9)
+
         for mode in ('on', 'off'):
             sq.OffOn_seq(pulse_pars=self.get_drive_pars(),
                          RO_pars=self.get_RO_pars(),
@@ -2701,9 +2705,8 @@ class QuDev_transmon(Qubit):
                                X90_separation + 1.5*buffer_factor*self.flux_pulse_length(),
                                res*T_sample)
 
-        self.set_default_readout_weights()
         self.prepare_for_timedomain()
-        self.update_detector_functions()
+
         detector_fun = self.int_avg_det
 
         s1 = awg_swf.Ramsey_interleaved_fluxpulse_sweep(
@@ -2787,9 +2790,7 @@ class QuDev_transmon(Qubit):
         if ampls is None:
             ampls = np.linspace(0,1,21)
 
-        self.set_default_readout_weights()
         self.prepare_for_timedomain()
-        self.update_detector_functions()
         detector_fun = self.int_avg_det
 
         s1 = awg_swf.Ramsey_interleaved_fluxpulse_sweep(

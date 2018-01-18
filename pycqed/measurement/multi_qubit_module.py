@@ -441,7 +441,7 @@ def get_multiplexed_readout_pulse_dictionary(qubits):
 
 def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
                                                nr_shots=4095, UHFQC=None,
-                                               pulsar=None):
+                                               pulsar=None, correlations=None):
     max_int_len = 0
     for qb in qubits:
         if qb.RO_acq_integration_length() > max_int_len:
@@ -473,6 +473,14 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
             integration_length=max_int_len, nr_averages=nr_averages),
         'inp_avg_det': det.UHFQC_input_average_detector(
             UHFQC=UHFQC, AWG=pulsar, nr_averages=nr_averages, nr_samples=4096),
+        'int_corr_det': det.UHFQC_input_average_detector(
+            UHFQC=UHFQC, AWG=pulsar, channels=channels,
+            integration_length=max_int_len, nr_averages=nr_averages,
+            correlations=correlations),
+        'dig_corr_det': det.UHFQC_input_average_detector(
+            UHFQC=UHFQC, AWG=pulsar, channels=channels,
+            integration_length=max_int_len, nr_averages=nr_averages,
+            correlations=correlations, thresholding=True),
     }
 
 def calculate_minimal_readout_spacing(qubits, ro_slack=10e-9, drive_pulses=0):
