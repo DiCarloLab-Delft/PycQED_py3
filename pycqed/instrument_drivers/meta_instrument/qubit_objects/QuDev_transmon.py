@@ -67,8 +67,6 @@ class QuDev_transmon(Qubit):
                            initial_value=0, parameter_class=ManualParameter)
         self.add_parameter('T2_star', label='Qubit dephasing', unit='s',
                            initial_value=0, parameter_class=ManualParameter)
-        self.add_parameter('T2', label='Qubit Echo dephasing', unit='s',
-                           initial_value=0, parameter_class=ManualParameter)
         self.add_parameter('T2_star_ef', label='Qubit dephasing', unit='s',
                            initial_value=0, parameter_class=ManualParameter)
         # self.add_parameter('amp180', label='Qubit pi pulse amp', unit='V',
@@ -112,10 +110,10 @@ class QuDev_transmon(Qubit):
                            vals=vals.Numbers(min_value=10e-9, max_value=2.2e-6),
                            parameter_class=ManualParameter)
         self.add_parameter('RO_acq_weight_function_I', initial_value=0,
-                           vals=vals.Enum(0, 1, 2, 3, 4, 5),
+                           vals=vals.Enum(0, 1, 2, 3, 4, 5, 6, 7, 8),
                            parameter_class=ManualParameter)
         self.add_parameter('RO_acq_weight_function_Q', initial_value=1,
-                           vals=vals.Enum(None, 0, 1, 2, 3, 4, 5),
+                           vals=vals.Enum(None, 0, 1, 2, 3, 4, 5, 6, 7, 8),
                            parameter_class=ManualParameter)
         self.add_parameter('RO_acq_shots', initial_value=4094,
                            docstring='Number of single shot measurements to do'
@@ -124,11 +122,34 @@ class QuDev_transmon(Qubit):
                            parameter_class=ManualParameter)
 
         self.add_parameter('RO_IQ_angle', initial_value=0,
-                           docstring='The angle of the readout transmission'
-                                     'on the IQ plane that provides the '
-                                     'highest discrimination for the e- '
-                                     'and g- states',
-                           label='RO IQ angle', unit='rad',
+                           docstring='The phase of the integration weights when'
+                                     'using SSB, DSB or square_rot integration '
+                                     'weights', label='RO IQ angle', unit='rad',
+                           parameter_class=ManualParameter)
+
+        self.add_parameter('ro_acq_weight_func_I', vals=vals.Arrays(),
+                           label='Optimized weights for I channel',
+                           parameter_class=ManualParameter)
+        self.add_parameter('ro_acq_weight_func_Q', vals=vals.Arrays(),
+                           label='Optimized weights for Q channel',
+                           parameter_class=ManualParameter)
+        self.add_parameter('ro_acq_input_average_length', unit='s',
+                           initial_value=2.275e-6, docstring='The measurement '
+                               'time in input averaging mode',
+                           label='Input average measurement time',
+                           vals=vals.Numbers(0, 2.275e-6),
+                           parameter_class=ManualParameter)
+        self.add_parameter('ro_acq_weight_type', initial_value='SSB',
+                           vals=vals.Enum('SSB', 'DSB', 'optimal',
+                                          'square_rot', 'manual'),
+                           docstring=(
+                               'Determines what type of integration weights to '
+                               'use: \n\tSSB: Single sideband demodulation\n\t'
+                               'DSB: Double sideband demodulation\n\toptimal: '
+                               'waveforms specified in "ro_acq_weight_func_I" '
+                               'and "ro_acq_weight_func_Q"\n\tsquare_rot: uses '
+                               'a single integration channel with boxcar '
+                               'weights'),
                            parameter_class=ManualParameter)
 
         # add pulsed spectroscopy pulse parameters
@@ -273,7 +294,9 @@ class QuDev_transmon(Qubit):
         return {'driver': str(self.__class__), 'name': self.name}
 
     def update_detector_functions(self):
-        if self.RO_acq_weight_function_Q() is None:
+
+        if self.RO_acq_weight_function_Q() is None or \
+           self.ro_acq_weight_type() not in ['SSB', 'DSB']:
             channels = [self.RO_acq_weight_function_I()]
         else:
             channels = [self.RO_acq_weight_function_I(),
@@ -345,7 +368,12 @@ class QuDev_transmon(Qubit):
             self.readout_UC_LO.pulsemod_state('Off')
             self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
             self.readout_UC_LO.on()
+
+        self.heterodyne._awg_seq_parameters_changed = True
+        self.heterodyne._UHFQC_awg_parameters_changed = True
         self.heterodyne.prepare()
+        self.heterodyne._awg_seq_parameters_changed = False
+        self.heterodyne._UHFQC_awg_parameters_changed = False
 
 
 
@@ -403,6 +431,9 @@ class QuDev_transmon(Qubit):
             self.readout_UC_LO.pulsemod_state('Off')
             self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
             self.readout_UC_LO.on()
+
+        self.set_readout_weights()
+
 
     def measure_resonator_spectroscopy(self, freqs=None, MC=None,
                                         analyze=True, close_fig=True):

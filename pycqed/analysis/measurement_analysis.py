@@ -4322,7 +4322,12 @@ class Ramsey_Analysis(TD_Analysis):
                 print('Performing Ramsey Analysis for 1 artificial detuning.')
             self.one_art_det_analysis(**kw)
 
+        self.save_computed_parameters({'artificial_detuning':
+                                           self.artificial_detuning},
+                                      var_name=self.value_names[0])
         self.save_computed_parameters(self.T2_star,
+                                      var_name=self.value_names[0])
+        self.save_computed_parameters({'qubit_freq': self.qubit_frequency},
                                       var_name=self.value_names[0])
 
         #Print the T2_star values on screen
@@ -6201,10 +6206,12 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
             data_phase = self.measured_values[1]
             data_real = data_amp * np.cos(np.pi * data_phase / 180)
             data_imag = data_amp * np.sin(np.pi * data_phase / 180)
-            self.data_dist = a_tools.calculate_distance_ground_state(
-                data_real=data_real,
-                data_imag=data_imag,
-                normalize=False)
+            self.data_dist = a_tools.rotate_and_normalize_data_no_cal_points(
+                np.array([data_real, data_imag]))
+            # self.data_dist = a_tools.calculate_distance_ground_state(
+            #     data_real=data_real,
+            #     data_imag=data_imag,
+            #     normalize=False)
         except:
             # Quick fix to make it work with pulsed spec which does not
             # return both I,Q and, amp and phase
