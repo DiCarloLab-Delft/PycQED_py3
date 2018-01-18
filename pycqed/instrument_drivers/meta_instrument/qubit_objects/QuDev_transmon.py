@@ -1343,35 +1343,44 @@ class QuDev_transmon(Qubit):
         return ana.theta
 
     def measure_dynamic_phase(self, flux_pulse_length=None,
-                              flux_pulse_amp=None, phases=None,
+                              flux_pulse_amp=None, thetas=None,
                               distortion_dict=None, distorted=True,
+                              X90_separation=None, flux_pulse_channel=None,
                               MC=None, label=None):
 
         if flux_pulse_amp is None:
             raise ValueError('flux_pulse_amp is not specified.')
         if flux_pulse_length is None:
             raise ValueError('flux_pulse_length is not specified.')
-        if phases is None:
-            phases = np.linspace(0, 4*np.pi, 16)
-            print('Sweeping over phases=np.linspace(0, 4*np.pi, 16).')
+        if thetas is None:
+            thetas = np.linspace(0, 4*np.pi, 16)
+            print('Sweeping over phases thata=np.linspace(0, 4*np.pi, 16).')
         if distortion_dict is None:
             logging.warning('Distortion dict was not specified.')
 
         if MC is None:
             MC = self.MC
 
+
+        if flux_pulse_channel is not None:
+            flux_pulse_channel_backup = self.flux_pulse_channel()
+            self.flux_pulse_channel(flux_pulse_channel)
+
+
         if label is None:
-            label = 'Ramsey_interleaved_flux_pulse_{}_filter_{}'.format(
-                self.name, str(distorted))
+            label = 'Dynamic_phase_measurement_{}_{}_filter_{}'.format(
+                self.name, self.flux_pulse_channel(), str(distorted))
 
         self.set_readout_weights()
         self.prepare_for_timedomain()
         self.update_detector_functions()
 
         self.flux_pulse_length(flux_pulse_length)
+
         ampls = np.array([0, flux_pulse_amp])
 
-        X90_separation = self.flux_pulse_delay() + self.flux_pulse_length()
+        if X90_separation is None:
+            X90_separation = 2*self.flux_pulse_delay() + self.flux_pulse_length()
 
         s1 = awg_swf.Ramsey_interleaved_fluxpulse_sweep(
             self, X90_separation=X90_separation,
@@ -1381,14 +1390,17 @@ class QuDev_transmon(Qubit):
 
         MC.soft_avg(1)
         MC.set_sweep_function(s1)
-        MC.set_sweep_points(phases)
+        MC.set_sweep_points(thetas)
         MC.set_sweep_function_2D(s2)
         MC.set_sweep_points_2D(ampls)
         MC.set_detector_function(self.int_avg_det)
         MC.run_2D(name=label)
 
-        ma.MeasurementAnalysis(TwoD=True)
+        MA = ma.MeasurementAnalysis(TwoD=True)
 
+        self.flux_pulse_channel(flux_pulse_channel_backup)
+
+        return MA
 
     def measure_flux_detuning(self, flux_params=None, n=1, ramsey_times=None,
                               artificial_detuning=0, MC=None,
@@ -2857,6 +2869,114 @@ class QuDev_transmon(Qubit):
                 fit_res.plot()
 
             return fit_res
+
+
+    def calibrate_CPhase_dynamic_phases(self,MC=None,
+                                        qubit_target=None,
+                                        thetas=None,
+                                        ampls=None,
+                                        analyze=True,
+                                        update=False,
+                                        **kw):
+        """
+        CPhase dynamic phase calibration
+
+        does a measuement of the type:
+
+                      X90_separation
+                < -- ---- ----------- --->
+                |X90|  --------------     |X90|  ---  |RO|
+                       | fluxpulse |
+
+        where  the angle of the second X90 pulse is swept for
+        the flux pulse amplitude  in [0,cphase_ampl].
+
+        Args:
+            MC: measurement control object
+            thetas: numpy array with angles (in rad) for the Ramsey type
+            ampls: numpy array with amplitudes (in V) swept through
+                as flux pulse amplitudes
+            analyze: bool, if True, then the measured data
+                gets analyzed (
+
+
+        """
+
+        if MC is None:
+            MC = self.MC
+
+        channel = self.flux_pulse_channel()
+
+        X90_separation = kw.pop('X90_separation', 2*self.CZ_pulse_length())
+        distorted = kw.pop('distorted', False)
+        distortion_dict = kw.pop('distortion_dict', None)
+        pulse_length = kw.pop('pulse_length', self.CZ_pulse_length())
+        self.flux_pulse_length(pulse_length)
+        pulse_delay = kw.pop('pulse_delay', 0.5*2*self.CZ_pulse_length())
+        self.flux_pulse_delay(pulse_delay)
+        channel_backup = self.flux_pulse_channel()
+        self.flux_pulse_channel(channel)
+
+        if thetas is None:
+            thetas = np.linspace(0, 2*np.pi, 8, endpoint=False)
+        flux_pulse_amp = self.CZ_pulse_amp()
+
+        measurement_string = 'CZ_dynPhase_calibration_{}'.format(self.name)
+
+        MA_control = self.measure_dynamic_phase(
+            flux_pulse_length=pulse_length,
+            flux_pulse_amp=flux_pulse_amp,
+            thetas=thetas,
+            distorted=distorted,
+            distortion_dict=distortion_dict,
+            MC=MC,
+            label=measurement_string
+            )
+
+        MA_target = qubit_target.measure_dynamic_phase(
+            flux_pulse_length=pulse_length,
+            flux_pulse_amp=flux_pulse_amp,
+            thetas=thetas,
+            flux_pulse_channel=channel,
+            distorted=distorted,
+            distortion_dict=distortion_dict,
+            MC=MC,
+            label=measurement_string
+            )
+
+        if analyze:
+            flux_pulse_ma_control = ma.Fluxpulse_Ramsey_2D_Analysis(
+                label=MA_control.measurementstring,
+                X90_separation=X90_separation,
+                flux_pulse_length=pulse_length,
+                qb_name=self.name,
+                auto=False)
+            phases_control = flux_pulse_ma_control.fit_all(extrapolate_phase=False,
+                                                           plot=True)
+            dynamic_phase_control = phases_control[1] - phases_control[0]
+
+            print('fitted dynamic phase on {}: {} [rad]'.format(self.name,
+                                                                dynamic_phase_control))
+
+            flux_pulse_ma_target = ma.Fluxpulse_Ramsey_2D_Analysis(
+                label=MA_target.measurementstring,
+                X90_separation=X90_separation,
+                flux_pulse_length=pulse_length,
+                qb_name=self.name,
+                auto=False)
+            phases_target = flux_pulse_ma_target.fit_all(extrapolate_phase=False,
+                                                         plot=True)
+            dynamic_phase_target = phases_target[1] - phases_target[0]
+
+            print('fitted dynamic phase on {}: {} [rad]'.format(qubit_target.name,
+                                                                dynamic_phase_target))
+
+            if update:
+                self.CZ_dynamic_phase(dynamic_phase_control)
+                self.CZ_dynamic_phase_target(dynamic_phase_target)
+
+            return dynamic_phase_control,dynamic_phase_target
+
 
 
 
