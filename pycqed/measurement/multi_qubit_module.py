@@ -1,14 +1,20 @@
+
+
 import numpy as np
-from pycqed.measurement import awg_sweep_functions as awg_swf
-from pycqed.measurement import detector_functions as det
-from pycqed.analysis import measurement_analysis as ma
-import qcodes as qc
-from pycqed.analysis import tomography as tomo
+import matplotlib.pyplot as plt
+import logging
 
-from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as mqs
+import pycqed.measurement.sweep_functions as swf
+import pycqed.measurement.awg_sweep_functions as awg_swf
+import pycqed.measurement.awg_sweep_functions_multi_qubit as awg_swf2
+import pycqed.measurement.pulse_sequences.multi_qubit_tek_seq_elts as mqs
 import pycqed.measurement.pulse_sequences.fluxing_sequences as fsqs
-station = qc.station
+import pycqed.measurement.detector_functions as det
+import pycqed.analysis.measurement_analysis as ma
+import pycqed.analysis.tomography as tomo
 
+import qcodes as qc
+station = qc.station
 
 def measure_two_qubit_AllXY(device, q0_name, q1_name,
                             sequence_type='sequential', MC=None):
@@ -337,3 +343,253 @@ def tomo2Q_cphase_cardinal(cardinal_state, device, qS_name, qCZ_name, CPhase=Tru
                                          qCZ_name,
                                          mmt_label))
     # return tomo_swf.seq
+
+
+def multiplexed_pulse(qubits, f_LO, upload=True, plot_filename=None):
+    """
+    Sets up a frequency-multiplexed pulse on the awg-sequencer of the UHFQC.
+    Updates the qubit ro_pulse_type parameter. This needs to be reverted if
+    thq qubit object is to update its readout pulse later on.
+
+    Args:
+        qubits: A list of qubits to do a pulse for.
+        f_LO: The LO frequency that will be used.
+        upload: Whether to update the hardware instrument settings.
+        plot_filename: The file to save the plot of the multiplexed pulse PSD. 
+            If `None` or `True`, plot is only shown, and not saved. If `False`,
+            no plot is generated.
+
+    Returns:
+        The generated pulse waveform.
+    """
+
+    fs = 1.8e9
+
+    pulses = {}
+    maxlen = 0
+
+    for qb in qubits:
+        qb.RO_pulse_type('Multiplexed_pulse_UHFQC')
+        qb.f_RO_mod(qb.f_RO() - f_LO)
+        samples = int(qb.RO_pulse_length() * fs)
+        tbase = np.linspace(0, samples / fs, samples, endpoint=False)
+        pulse = qb.RO_amp() * np.exp(
+            -2j * np.pi * qb.f_RO_mod() * tbase + 0.25j * np.pi)
+        pulses[qb.name] = pulse
+        if pulse.size > maxlen:
+            maxlen = pulse.size
+
+    pulse = np.zeros(maxlen, dtype=np.complex)
+    for p in pulses.values():
+        pulse += np.pad(p, (0, maxlen - p.size), mode='constant',
+                        constant_values=0)
+
+    if plot_filename is not False:
+        pulse_fft = np.fft.fft(
+            np.pad(pulse, (1000, 1000), mode='constant', constant_values=0))
+        pulse_fft = np.fft.fftshift(pulse_fft)
+        fbase = np.fft.fftfreq(pulse_fft.size, 1 / fs)
+        fbase = np.fft.fftshift(fbase)
+        fbase = f_LO - fbase
+        y = 20 * np.log10(np.abs(pulse_fft))
+        plt.plot(fbase / 1e9, y, '-', lw=0.7)
+        ymin, ymax = np.max(y) - 40, np.max(y) + 5
+        plt.ylim(ymin, ymax)
+        plt.vlines(f_LO / 1e9, ymin, ymax, colors='0.5', linestyles='dotted',
+                   lw=0.7, )
+        plt.text(f_LO / 1e9, ymax, 'LO', rotation=90, va='top', ha='right')
+        for qb in qubits:
+            plt.vlines([qb.f_RO() / 1e9, 2 * f_LO / 1e9 - qb.f_RO() / 1e9],
+                       ymin, ymax, colors='0.5', linestyles=['solid', 'dotted'],
+                       lw=0.7)
+            plt.text(qb.f_RO() / 1e9, ymax, qb.name, rotation=90, va='top',
+                     ha='right')
+            plt.text(2 * f_LO / 1e9 - qb.f_RO() / 1e9, ymax, qb.name,
+                     rotation=90, va='top', ha='right')
+
+        plt.ylabel('power (dB)')
+        plt.xlabel('frequency (GHz)')
+        if isinstance(plot_filename, str):
+            plt.savefig(plot_filename, bbox_inches='tight')
+        plt.show()
+
+    if upload:
+        UHFQC = qubits[0].UHFQC
+        UHFQC.awg_sequence_acquisition_and_pulse(np.real(pulse).copy(),
+                                                 np.imag(pulse).copy(),
+                                                 acquisition_delay=0)
+        LO = qubits[0].readout_DC_LO
+        LO.frequency(f_LO)
+
+
+def get_multiplexed_readout_pulse_dictionary(qubits):
+    """Takes the readout pulse parameters from the first qubit in `qubits`"""
+    maxlen = 0
+    for qb in qubits:
+        if qb.RO_pulse_length() > maxlen:
+            maxlen = qb.ro_pulse_square_length()
+    return {'RO_pulse_marker_channel': qubits[0].ro_trigger_channel(),
+            'acq_marker_channel': qubits[0].ro_trigger_channel(),
+            'acq_marker_delay': qubits[0].ro_trigger_delay(),
+            'amplitude': 0.0,
+            'length': maxlen,
+            'operation_type': 'RO',
+            'phase': 0,
+            'pulse_delay': qubits[0].ro_pulse_delay(),
+            'pulse_type': 'Multiplexed_UHFQC_pulse',
+            'target_qubit': ','.join([qb.name for qb in qubits])}
+
+def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
+                                               nr_shots=4095, UHFQC=None,
+                                               pulsar=None):
+    max_int_len = 0
+    for qb in qubits:
+        if qb.RO_acq_integration_length() > max_int_len:
+            max_int_len = qb.RO_acq_integration_length()
+    channels = []
+    for qb in qubits:
+        channels += [qb.RO_acq_weight_function_I()]
+        if qb.ro_acq_weight_type() in ['SSB', 'DSB']:
+            if qb.RO_acq_weight_function_Q() is not None:
+                channels += [qb.RO_acq_weight_function_Q()]
+
+    for qb in qubits:
+        if UHFQC is None:
+            UHFQC = qb.UHFQC
+        if pulsar is None:
+            pulsar = qb.AWG
+        break
+    return {
+        'int_log_det': det.UHFQC_integration_logging_det(
+            UHFQC=UHFQC, AWG=pulsar, channels=channels,
+            integration_length=max_int_len, nr_shots=nr_shots,
+            result_logging_mode='raw'),
+        'dig_log_det': det.UHFQC_integration_logging_det(
+            UHFQC=UHFQC, AWG=pulsar, channels=channels,
+            integration_length=max_int_len, nr_shots=nr_shots,
+            result_logging_mode='digitized'),
+        'int_avg_det': det.UHFQC_integrated_average_detector(
+            UHFQC=UHFQC, AWG=pulsar, channels=channels,
+            integration_length=max_int_len, nr_averages=nr_averages),
+        'inp_avg_det': det.UHFQC_input_average_detector(
+            UHFQC=UHFQC, AWG=pulsar, nr_averages=nr_averages, nr_samples=4096),
+    }
+
+def calculate_minimal_readout_spacing(qubits, ro_slack=10e-9, drive_pulses=0):
+    UHFQC = None
+    for qb in qubits:
+        UHFQC = qb.UHFQC
+        break
+    drive_pulse_len = None
+    max_ro_len = 0
+    max_int_length = 0
+    for qb in qubits:
+        if drive_pulse_len is not None:
+            if drive_pulse_len != qb.gauss_sigma()*qb.nr_sigma() and \
+                            drive_pulses != 0:
+                logging.warning('Caution! Not all qubit drive pulses are the '
+                                'same length. This might cause trouble in the '
+                                'sequence.')
+            drive_pulse_len = max(drive_pulse_len,
+                                  qb.gauss_sigma()*qb.nr_sigma())
+        else:
+            drive_pulse_len = qb.gauss_sigma()*qb.nr_sigma()
+        max_ro_len = max(max_ro_len, qb.RO_pulse_length())
+        max_int_length = max(max_int_length, qb.RO_acq_integration_length())
+
+    ro_spacing = 2 * UHFQC.quex_wint_delay() / 1.8e9
+    ro_spacing += max_int_length
+    ro_spacing += ro_slack
+    ro_spacing -= drive_pulse_len
+    ro_spacing -= max_ro_len
+    return ro_spacing
+
+def measure_multiplexed_readout(qubits, f_LO, nreps=4, liveplot=False,
+                                ro_spacing=None, preselection=True, MC=None,
+                                plot_filename=False, ro_slack=10e-9):
+
+    multiplexed_pulse(qubits, f_LO, upload=True, plot_filename=plot_filename)
+
+    for qb in qubits:
+        if MC is None:
+            MC = qb.MC
+        else:
+            break
+
+    if ro_spacing is None:
+        ro_spacing = calculate_minimal_readout_spacing(qubits, ro_slack,
+                                                       drive_pulses=1)
+
+    sf = awg_swf2.n_qubit_off_on(
+        [qb.get_drive_pars() for qb in qubits],
+        get_multiplexed_readout_pulse_dictionary(qubits),
+        preselection=preselection,
+        parallel_pulses=True,
+        RO_spacing=ro_spacing)
+
+    m = 2 ** (len(qubits))
+    if preselection:
+        m *= 2
+    shots = 4094 - 4094 % m
+    df = get_multiplexed_readout_detector_functions(qubits, nr_shots=shots) \
+        ['int_log_det']
+
+    for qb in qubits:
+        qb.prepare_for_timedomain()
+
+    MC.live_plot_enabled(liveplot)
+    MC.soft_avg(1)
+    MC.set_sweep_function(sf)
+    MC.set_sweep_points(np.arange(shots))
+    MC.set_sweep_function_2D(swf.None_Sweep())
+    MC.set_sweep_points_2D(np.arange(nreps))
+    MC.set_detector_function(df)
+    MC.run_2D('{}_multiplexed_ssro'.format('-'.join(
+        [qb.name for qb in qubits])))
+
+
+def measure_active_reset(qubits, feedback_delay, nr_resets=1, nreps=1,
+                         MC=None, upload=True, sequence='reset_g',
+                         readout_delay=None):
+    """possible sequences: 'reset_g', 'reset_e', 'idle', 'flip'"""
+    for qb in qubits:
+        if MC is None:
+            MC = qb.MC
+        else:
+            break
+
+    # if readout_delay is None:
+    #     readout_delay = calculate_minimal_readout_spacing(qubits,
+    #                                                       drive_pulses=0)
+
+    sf = awg_swf2.n_qubit_reset(
+        pulse_pars_list=[qb.get_drive_pars() for qb in qubits],
+        RO_pars=get_multiplexed_readout_pulse_dictionary(qubits),
+        feedback_delay=feedback_delay,
+        readout_delay=readout_delay,
+        #sequence=sequence,
+        nr_resets=nr_resets,
+        upload=upload)
+
+    m = 2 ** (len(qubits))
+    m *= (nr_resets + 1)
+    shots = 4094 - 4094 % m
+    df = get_multiplexed_readout_detector_functions(qubits, nr_shots=shots) \
+        ['int_log_det']
+
+    prev_avg = MC.soft_avg()
+    MC.soft_avg(1)
+
+    for qb in qubits:
+        qb.prepare_for_timedomain()
+
+    MC.set_sweep_function(sf)
+    MC.set_sweep_points(np.arange(shots))
+    MC.set_sweep_function_2D(swf.None_Sweep())
+    MC.set_sweep_points_2D(np.arange(nreps))
+    MC.set_detector_function(df)
+
+    MC.run_2D(name='active_reset_{}_{}'.format(sequence, '-'.join(
+        [qb.name for qb in qubits])))
+
+    MC.soft_avg(prev_avg)
