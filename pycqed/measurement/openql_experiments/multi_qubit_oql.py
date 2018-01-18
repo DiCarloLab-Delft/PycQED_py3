@@ -235,6 +235,7 @@ def two_qubit_AllXY(q0: int, q1: int, platf_cfg: str,
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
 
+
 def Cryoscope(qubit_idx: int, buffer_time1=0, buffer_time2=0,
               platf_cfg: str=''):
     """
@@ -285,6 +286,7 @@ def Cryoscope(qubit_idx: int, buffer_time1=0, buffer_time2=0,
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
+
 
 def CryoscopeGoogle(qubit_idx: int, buffer_time1, times, platf_cfg: str):
     """
@@ -372,7 +374,6 @@ def Chevron_hack(qubit_idx: int, qubit_idx_spec,
     return p
 
 
-
 def Chevron(qubit_idx: int, qubit_idx_spec: int,
             buffer_time, buffer_time2, platf_cfg: str):
     """
@@ -413,6 +414,7 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int,
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
+
 
 def two_qubit_tomo_bell(bell_state, q0, q1,
                         platf_cfg):
@@ -488,7 +490,8 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
 
-def two_qubit_DJ(q0, q1,platf_cfg):
+
+def two_qubit_DJ(q0, q1, platf_cfg):
     '''
     Two qubit Deutsch-Josza.
 
@@ -508,14 +511,14 @@ def two_qubit_DJ(q0, q1,platf_cfg):
                 p=platf)
 
     # experiments
-    #1
+    # 1
     k = Kernel("DJ1", p=platf)
     k.prepz(q0)  # to ensure enough separation in timing
     k.prepz(q1)  # to ensure enough separation in timing
     # prerotations
     k.gate('ry90', q0)
     k.gate('rym90', q1)
-    #post rotations
+    # post rotations
     k.gate('ry90', q0)
     k.gate('ry90', q1)
     # measure
@@ -523,7 +526,7 @@ def two_qubit_DJ(q0, q1,platf_cfg):
     k.measure(q1)
     p.add_kernel(k)
 
-    #2
+    # 2
     k = Kernel("DJ2", p=platf)
     k.prepz(q0)  # to ensure enough separation in timing
     k.prepz(q1)  # to ensure enough separation in timing
@@ -532,7 +535,7 @@ def two_qubit_DJ(q0, q1,platf_cfg):
     k.gate('rym90', q1)
     # rotations
     k.gate('rx180', q1)
-    #post rotations
+    # post rotations
     k.gate('ry90', q0)
     k.gate('ry90', q1)
     # measure
@@ -540,7 +543,7 @@ def two_qubit_DJ(q0, q1,platf_cfg):
     k.measure(q1)
     p.add_kernel(k)
 
-    #3
+    # 3
     k = Kernel("DJ3", p=platf)
     k.prepz(q0)  # to ensure enough separation in timing
     k.prepz(q1)  # to ensure enough separation in timing
@@ -561,7 +564,7 @@ def two_qubit_DJ(q0, q1,platf_cfg):
     k.gate('rx180', q0)
     k.gate('ry90', q1)
 
-    #post rotations
+    # post rotations
     k.gate('ry90', q0)
     k.gate('ry90', q1)
     # measure
@@ -569,7 +572,7 @@ def two_qubit_DJ(q0, q1,platf_cfg):
     k.measure(q1)
     p.add_kernel(k)
 
-    #4
+    # 4
     k = Kernel("DJ4", p=platf)
     k.prepz(q0)  # to ensure enough separation in timing
     k.prepz(q1)  # to ensure enough separation in timing
@@ -587,7 +590,7 @@ def two_qubit_DJ(q0, q1,platf_cfg):
     k.gate('rx180', q1)
     k.gate('rym90', q1)
 
-    #post rotations
+    # post rotations
     k.gate('ry90', q0)
     k.gate('ry90', q1)
     # measure
@@ -603,11 +606,66 @@ def two_qubit_DJ(q0, q1,platf_cfg):
     return p
 
 
-def CZ_calibration_seq(q0: int, q1: int, platf_cfg: str,
-                       CZ_disabled=False,
-                       angles=np.arange(0, 360, 20),
-                       add_cal_points=True,
-                       cases=('no_excitation', 'excitation')):
+def two_qubit_repeated_parity_check(qD: int, qA: int, platf_cfg: str,
+                                    number_of_repetitions: int = 10,
+                                    initialization_msmt: bool=False):
+    """
+    Implements a circuit for repeated parity checks.
+
+    Circuit looks as follows:
+
+    Data    (M)|------0------- | ^N- M
+               |      |        |
+    Ancilla (M)|--y90-0-y90-M- |   - M
+
+    The initial "M" measurement is optional, the circuit is repated N times
+    At the end both qubits are measured.
+
+    Arguments:
+        qD :        Data qubit, this is the qubit that the repeated parity
+                    check will be performed on.
+        qA :        Ancilla qubit, qubit that the parity will be mapped onto.
+        platf_cfg:  filename of the platform config file
+        number_of_repetitions: number of times to repeat the circuit
+        initialization_msmt : whether to start with an initial measurement
+                    to prepare the starting state.
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="repeated_parity_check",
+                nqubits=platf.get_qubit_number(), p=platf)
+
+    k = Kernel('repeated_parity_check', p=platf)
+    if initialization_msmt:
+        k.measure(qD)
+        k.measure(qA)
+        for i in number_of_repetitions:
+            # hardcoded barrier because of openQL #104
+            k.gate('wait', [qA, qD], 0)
+            k.gate('ry90', qA)
+            if i == 0:
+                # Flux cw_03 it he repeated cz gate
+                k.gate('fl_cw_03', qA, qD)
+            else:
+                k.gate('fl_cw_00', qA, qD)
+            k.gate('ry90', qA)
+            k.measure(qA)
+        k.measure(qD)
+        # hardcoded barrier because of openQL #104
+        k.gate('wait', [qA, qD], 0)
+
+    p.compile()
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
+
+def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
+                                CZ_disabled=False,
+                                angles=np.arange(0, 360, 20),
+                                wait_time=0,
+                                add_cal_points=True,
+                                cases=('no_excitation', 'excitation')):
     '''
     Sequence used to calibrate flux pulses for CZ gates.
 
@@ -622,8 +680,7 @@ def CZ_calibration_seq(q0: int, q1: int, platf_cfg: str,
         q0, q1      (str): names of the addressed qubits
         RO_target   (str): can be q0, q1, or 'all'
         CZ_disabled (bool): disable CZ gate
-        excitations (bool/str): can be True, False, or 'both_cases'
-        clock_cycle (float): period of the internal AWG clock
+        angles      (array): angles of the recovery pulse
         wait_time   (int): wait time in seconds after triggering the flux
     '''
     platf = Platform('OpenQL_Platform', platf_cfg)
@@ -640,6 +697,7 @@ def CZ_calibration_seq(q0: int, q1: int, platf_cfg: str,
             k.gate('rx90', q0)
             if not CZ_disabled:
                 k.gate('fl_cw_01', 2, 0)
+            k.gate('wait', [2, 0], wait_time)
             # hardcoded angles, must be uploaded to AWG
             if angle == 90:
                 # special because the cw phase pulses go in mult of 20 deg
@@ -653,7 +711,7 @@ def CZ_calibration_seq(q0: int, q1: int, platf_cfg: str,
             k.measure(q1)
             # Implements a barrier to align timings
             # k.gate('wait', [q0, q1], 0)
-            # hardcoded because of openQL #104
+            # hardcoded barrier because of openQL #104
             k.gate('wait', [2, 0], 0)
 
             p.add_kernel(k)

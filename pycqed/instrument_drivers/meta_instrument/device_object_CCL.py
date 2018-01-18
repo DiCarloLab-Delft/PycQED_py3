@@ -496,7 +496,7 @@ class DeviceCCL(Instrument):
 
         # These are hardcoded angles in the mw_lutman for the AWG8
         angles = np.arange(0, 341, 20)
-        p = mqo.CZ_calibration_seq(q0idx, q1idx, platf_cfg=self.cfg_openql_platform_fn(),
+        p = mqo.conditional_oscillation_seq(q0idx, q1idx, platf_cfg=self.cfg_openql_platform_fn(),
                                    angles=angles,
                                    CZ_disabled=False)
         s = swf.OpenQL_Sweep(openql_program=p,
@@ -795,7 +795,7 @@ class DeviceCCL(Instrument):
         q1idx = self.find_instrument(q1).cfg_qubit_nr()
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
 
-        p = mqo.CZ_calibration_seq(q0idx, q1idx,
+        p = mqo.conditional_oscillation_seq(q0idx, q1idx,
                                    platf_cfg=self.cfg_openql_platform_fn(),
                                    CZ_disabled=False, add_cal_points=False,
                                    angles=[90])
@@ -844,7 +844,7 @@ class DeviceCCL(Instrument):
         q1idx = self.find_instrument(q1).cfg_qubit_nr()
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
 
-        p = mqo.CZ_calibration_seq(q0idx, q1idx,
+        p = mqo.conditional_oscillation_seq(q0idx, q1idx,
                                    platf_cfg=self.cfg_openql_platform_fn(),
                                    CZ_disabled=False, add_cal_points=False,
                                    angles=[90])
