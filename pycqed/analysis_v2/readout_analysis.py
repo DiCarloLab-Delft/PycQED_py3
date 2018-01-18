@@ -204,7 +204,13 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         self._infid_vs_th = infid_vs_th
 
         opt_fid = minimize(infid_vs_th, (bv0['A_center']+bv0['B_center'])/2)
-        self.proc_data_dict['F_assignment_fit'] = 1-opt_fid['fun']
+
+        # for some reason the fit sometimes returns a list of values
+        if isinstance(opt_fid['fun'], float):
+            self.proc_data_dict['F_assignment_fit'] = (1-opt_fid['fun'])
+        else:
+            self.proc_data_dict['F_assignment_fit'] = (1-opt_fid['fun'])[0]
+
         self.proc_data_dict['threshold_fit'] = opt_fid['x'][0]
 
         # Calculate the fidelity of both
@@ -253,7 +259,13 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         self._disc_infid_vs_th = disc_infid_vs_th
 
         opt_fid = minimize(disc_infid_vs_th, (mu_0 + mu_1)/2)
-        self.proc_data_dict['F_discr'] = 1-opt_fid['fun']
+
+        # for some reason the fit sometimes returns a list of values
+        if isinstance(opt_fid['fun'], float):
+            self.proc_data_dict['F_discr'] = (1-opt_fid['fun'])
+        else:
+            self.proc_data_dict['F_discr'] = (1-opt_fid['fun'])[0]
+
         self.proc_data_dict['threshold_discr'] = opt_fid['x'][0]
 
     def prepare_plots(self):
@@ -362,6 +374,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         thr, th_unit = SI_val_to_msg_str(
             self.proc_data_dict['threshold_raw'],
             self.proc_data_dict['shots_xunit'], return_type=float)
+
         raw_th_msg = (
             'Raw threshold: {:.2f} {}\n'.format(
                 thr, th_unit) +
@@ -386,9 +399,10 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             fit_th_msg = (
                 'Fit threshold: {:.2f} {}\n'.format(
                     thr, th_unit) +
-                r'$F_{A}$-fit: ' +
-                r'{:.3f}'.format(
-                    self.proc_data_dict['F_assignment_fit']))
+                 r'$F_{A}$-fit: '+
+                 r'{:.3f}'.format(self.proc_data_dict['F_assignment_fit']))
+
+
             self.plot_dicts['fit_threshold'] = {
                 'ax_id': '1D_histogram',
                 'plotfn': self.plot_vlines,
@@ -408,8 +422,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 'Discr. threshold: {:.2f} {}\n'.format(
                     thr, th_unit) +
                 r'$F_{D}$: ' +
-                r'{:.3f}'.format(
-                    self.proc_data_dict['F_discr']))
+                ' {:.3f}'.format(self.proc_data_dict['F_discr']))
             self.plot_dicts['discr_threshold'] = {
                 'ax_id': '1D_histogram',
                 'plotfn': self.plot_vlines,
