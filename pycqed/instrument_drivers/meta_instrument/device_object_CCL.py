@@ -131,6 +131,23 @@ class DeviceCCL(Instrument):
         self._prep_ro_integration_weights()
         self._prep_ro_instantiate_detectors()
 
+    def prepare_fluxing(self):
+        # prepares by loading the awg_hack_program
+        q0 = self.qubits()[0]
+        fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
+        awg = fl_lutman.AWG.get_instr()
+
+        awg_hack_program_cz = """
+        while (1) {
+          waitDIOTrigger();
+          playWave("dev8005_wave_ch1_cw001", "dev8005_wave_ch2_cw001");
+        }
+        """
+
+        awg.configure_awg_from_string(0, awg_hack_program_cz)
+        awg.configure_codeword_protocol()
+        awg.start()
+
     def _prep_ro_setup_qubits(self):
         """
         set the parameters of the individual qubits to be compatible
@@ -466,6 +483,7 @@ class DeviceCCL(Instrument):
 
     def prepare_for_timedomain(self):
         self.prepare_readout()
+        self.prepare_fluxing()
 
         for qb_name in self.qubits():
             qb = self.find_instrument(qb_name)
@@ -680,7 +698,7 @@ class DeviceCCL(Instrument):
             awg_nr, ch_pair)]
 
         sw = swf.FLsweep(fl_lutman, fl_lutman.sq_length,
-                         realtime_loading=True,
+                         realtime_loading=False,
                          waveform_name='square')
         d = self.get_correlation_detector(single_int_avg=True,
                                           seg_per_point=1)
@@ -793,7 +811,8 @@ class DeviceCCL(Instrument):
 
         q0idx = self.find_instrument(q0).cfg_qubit_nr()
         q1idx = self.find_instrument(q1).cfg_qubit_nr()
-        fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
+        fl_lutman_q0 = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
+        fl_lutman_q1 = self.find_instrument(q1).instr_LutMan_Flux.get_instr()
 
         p = mqo.conditional_oscillation_seq(q0idx, q1idx,
                                    platf_cfg=self.cfg_openql_platform_fn(),
@@ -804,8 +823,17 @@ class DeviceCCL(Instrument):
         CC.eqasm_program(p.filename)
         CC.start()
 
-        s = swf.FLsweep(fl_lutman, fl_lutman.cz_phase_corr_amp,
-                        waveform)
+        # other waveform is required for real-time reloading as the other
+        # waveform is normally overwritten
+        if waveform == 'cz_z':
+            other_waveform = fl_lutman_q1._wave_dict_dist['idle_z']
+        else:
+            other_waveform = fl_lutman_q1._wave_dict_dist['cz_z']
+        self.other_waveform = other_waveform
+
+        s = swf.FLsweep(fl_lutman_q0, fl_lutman_q0.cz_phase_corr_amp,
+                        waveform, realtime_loading=True,
+                        other_waveform=other_waveform)
 
         d = self.get_correlation_detector(single_int_avg=True, seg_per_point=2)
         d.detector_control = 'hard'
@@ -820,7 +848,10 @@ class DeviceCCL(Instrument):
 
         a = ma2.CZ_1QPhaseCal_Analysis(options_dict={'ch_idx': ch_idx})
 
-        phase_corr_amp = a.get_zero_phase_diff_intersect()
+        a = ma2.Intersect_Analysis(options_dict={'ch_idx_A': ch_idx,
+                                       'ch_idx_B': ch_idx})
+
+        phase_corr_amp = a.get_intersect()[0]
         if phase_corr_amp > np.max(amps) or phase_corr_amp < np.min(amps):
             print('Calibration failed, intersect outside of initial range')
             return False
