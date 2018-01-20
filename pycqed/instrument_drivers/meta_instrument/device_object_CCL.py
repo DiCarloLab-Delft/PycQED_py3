@@ -846,8 +846,6 @@ class DeviceCCL(Instrument):
         MC.set_detector_function(d)
         MC.run('{}_CZphase'.format(q0))
 
-        a = ma2.CZ_1QPhaseCal_Analysis(options_dict={'ch_idx': ch_idx})
-
         a = ma2.Intersect_Analysis(options_dict={'ch_idx_A': ch_idx,
                                        'ch_idx_B': ch_idx})
 

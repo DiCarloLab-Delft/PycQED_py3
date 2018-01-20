@@ -526,14 +526,14 @@ class BaseDataAnalysis(object):
                 # This fig variable should perhaps be a different
                 # variable for each plot!!
                 # This might fix a bug.
-                self.figs[key], self.axs[key] = plt.subplots(
+                self.figs[pdict['ax_id']], self.axs[pdict['ax_id']] = plt.subplots(
                     pdict.get('numplotsy', 1), pdict.get('numplotsx', 1),
                     sharex=pdict.get('sharex', False),
                     sharey=pdict.get('sharey', False),
                     figsize=pdict.get('plotsize', None))  # (8, 6)))
 
                 # transparent background around axes for presenting data
-                self.figs[key].patch.set_alpha(0)
+                self.figs[pdict['ax_id']].patch.set_alpha(0)
 
         if presentation_mode:
             self.plot_for_presentation(key_list=key_list, no_label=no_label)
@@ -607,10 +607,11 @@ class BaseDataAnalysis(object):
             xmin, xmax = plot_xedges.min(), plot_xedges.max()
         else:
             xmin, xmax = plot_xrange
-        axs.set_xlabel(plot_xlabel)
+        if plot_xlabel is not None:
+            set_xlabel(axs, plot_xlabel, plot_xunit)
+        if plot_ylabel is not None:
+            set_ylabel(axs, plot_ylabel, plot_yunit)
         axs.set_xlim(xmin, xmax)
-
-        axs.set_ylabel(plot_ylabel)
         if plot_yrange is not None:
             ymin, ymax = plot_yrange
             axs.set_ylim(ymin, ymax)
@@ -627,8 +628,6 @@ class BaseDataAnalysis(object):
         if self.tight_fig:
             axs.figure.tight_layout()
 
-        set_xlabel(axs, plot_xlabel, plot_xunit)
-        set_ylabel(axs, plot_ylabel, plot_yunit)
         pdict['handles'] = p_out
 
     def plot_line(self, pdict, axs):

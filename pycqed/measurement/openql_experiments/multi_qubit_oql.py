@@ -608,7 +608,8 @@ def two_qubit_DJ(q0, q1, platf_cfg):
 
 def two_qubit_repeated_parity_check(qD: int, qA: int, platf_cfg: str,
                                     number_of_repetitions: int = 10,
-                                    initialization_msmt: bool=False):
+                                    initialization_msmt: bool=False,
+                                    initial_states=[0, 1]):
     """
     Implements a circuit for repeated parity checks.
 
@@ -634,24 +635,39 @@ def two_qubit_repeated_parity_check(qD: int, qA: int, platf_cfg: str,
     p = Program(pname="repeated_parity_check",
                 nqubits=platf.get_qubit_number(), p=platf)
 
-    k = Kernel('repeated_parity_check', p=platf)
-    if initialization_msmt:
-        k.measure(qD)
-        k.measure(qA)
-        for i in number_of_repetitions:
+
+    for initial_state in initial_states:
+        k = Kernel('repeated_parity_check_{}'.format(initial_state), p=platf)
+        k.prepz(qD)
+        k.prepz(qA)
+
+        if initialization_msmt:
+            k.measure(qA)
+            k.measure(qD)
+            k.gate('wait', [2, 0], 0)
+        if initial_state== 1:
+            k.gate('rx180', qD)
+        for i in range(number_of_repetitions):
             # hardcoded barrier because of openQL #104
-            k.gate('wait', [qA, qD], 0)
+            k.gate('wait', [2, 0], 0)
+
+            # k.gate('wait', [qA, qD], 0)
             k.gate('ry90', qA)
             if i == 0:
                 # Flux cw_03 it he repeated cz gate
-                k.gate('fl_cw_03', qA, qD)
+                k.gate('fl_cw_03', 2, 0)
+                # k.gate('fl_cw_03', qA, qD)
             else:
-                k.gate('fl_cw_00', qA, qD)
+                k.gate('fl_cw_00', 2, 0)
+                # k.gate('fl_cw_00', qA, qD)
             k.gate('ry90', qA)
             k.measure(qA)
+
         k.measure(qD)
         # hardcoded barrier because of openQL #104
-        k.gate('wait', [qA, qD], 0)
+        k.gate('wait', [2, 0], 0)
+        # k.gate('wait', [qA, qD], 0)
+        p.add_kernel(k)
 
     p.compile()
     # attribute get's added to program to help finding the output files
@@ -661,11 +677,12 @@ def two_qubit_repeated_parity_check(qD: int, qA: int, platf_cfg: str,
 
 
 def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
-                                CZ_disabled=False,
+                                CZ_disabled: bool=False,
                                 angles=np.arange(0, 360, 20),
-                                wait_time=0,
-                                add_cal_points=True,
-                                cases=('no_excitation', 'excitation')):
+                                wait_time: int=0,
+                                add_cal_points: bool=True,
+                                cases: list=('no_excitation', 'excitation'),
+                                flux_codeword:str='fl_cw_01' ):
     '''
     Sequence used to calibrate flux pulses for CZ gates.
 
@@ -684,7 +701,8 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
         wait_time   (int): wait time in seconds after triggering the flux
     '''
     platf = Platform('OpenQL_Platform', platf_cfg)
-    p = Program(pname="CZ_calibration_seq", nqubits=platf.get_qubit_number(),
+    p = Program(pname="conditional_oscillation_seq",
+                nqubits=platf.get_qubit_number(),
                 p=platf)
     # These angles correspond to special pi/2 pulses in the lutman
     for i, angle in enumerate(angles):
@@ -696,7 +714,7 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
                 k.gate('rx180', q1)
             k.gate('rx90', q0)
             if not CZ_disabled:
-                k.gate('fl_cw_01', 2, 0)
+                k.gate(flux_codeword, 2, 0)
             k.gate('wait', [2, 0], wait_time)
             # hardcoded angles, must be uploaded to AWG
             if angle == 90:

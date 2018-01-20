@@ -931,10 +931,18 @@ class FLsweep(Soft_Sweep):
           playWave("dev8005_wave_ch1_cw001", "dev8005_wave_ch2_cw001");
         }
         """
+        awg_hack_program_multi_cz = """
+        while (1) {
+          waitDIOTrigger();
+          playWave("dev8005_wave_ch1_cw004", "dev8005_wave_ch2_cw004");
+        }
+        """
         awg = self.lm.AWG.get_instr()
         self.lm.load_waveform_onto_AWG_lookuptable(
             self.waveform_name, regenerate_waveforms=True)
-        if 'z' in self.waveform_name:
+        if 'multi' in self.waveform_name:
+            awg.configure_awg_from_string(0, awg_hack_program_multi_cz)
+        elif 'z' in self.waveform_name:
             awg.configure_awg_from_string(0, awg_hack_program_cz)
         else:
             awg.configure_awg_from_string(0, awg_hack_program)
