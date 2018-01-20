@@ -1517,14 +1517,26 @@ def two_qubit_entanglement_by_parity_measurement(
          | q2   |           |              ||      | q2   |
     |q2> |======|-----------*-------------Y180-----|======|
     
-    segment divided into elements:
+    required elements:
         prepare x prep_sequences:
             contains everything up to the first readout
-        parity_measurement x 2 (for the two readout results) 
-            contains everything up to 
-    
-    
-    
+        feedback x 2 (for the two readout results):
+            contains conditional Y80 on q1 and q2
+        repeated_round x1:
+            contains everything after preparation up to the feedback readout
+        tomography x 6**2:
+            measure all observables of the two qubits X/Y/Z
+        flux_compenstaion x 1:
+            
+    total segments: prep_sequences * 36.
+    each segment has the following elements:
+        prep
+        feedback (codeword)
+        nr_rounds x
+            repeated round
+            feedback (codeword)
+        tomography
+        flux compensation x nr_rounds
     """
 
 
@@ -1538,4 +1550,5 @@ def two_qubit_entanglement_by_parity_measurement(
         prep_sequences = [['Y90 ' + q0n, 'Y90s' + q2n], ]
 
     for prep_sequence in prep_sequences:
+        pass
 

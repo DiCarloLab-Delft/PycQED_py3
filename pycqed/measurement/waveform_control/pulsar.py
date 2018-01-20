@@ -6,8 +6,9 @@ import numpy as np
 import logging
 from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ManualParameter
-from qcodes.utils import validators as vals
+import qcodes.utils.validators as vals
 from pycqed.instrument_drivers.pq_parameters import InstrumentParameter
+import pycqed.measurement.waveform_control.element as element
 import string
 import time
 
@@ -59,7 +60,8 @@ class UHFQCPulsar:
                            get_cmd=lambda: 8)
         self.add_parameter('{}_min_samples'.format(name),
                            get_cmd=lambda: 8)
-
+        self.add_parameter('{}_precompile'.format(name),
+                           get_cmd=lambda: False)
         self.add_parameter('{}_delay'.format(name), initial_value=0,
                            label='{} delay'.format(name), unit='s',
                            parameter_class=ManualParameter,
@@ -74,6 +76,15 @@ class UHFQCPulsar:
                            parameter_class=ManualParameter)
         self.add_parameter('{}_active'.format(name), initial_value=True,
                            label='{} active'.format(name), vals=vals.Bool(),
+                           parameter_class=ManualParameter)
+        self.add_parameter('{}_distortion'.format(name),
+                           label='{} distortion mode'.format(name),
+                           initial_value='off',
+                           vals=vals.Enum('off', 'precalculate'),
+                           parameter_class=ManualParameter)
+        self.add_parameter('{}_distortion_dict'.format(name),
+                           label='{} distortion dictionary'.format(name),
+                           vals=vals.Dict(),
                            parameter_class=ManualParameter)
 
 
@@ -229,6 +240,9 @@ class HDAWG8Pulsar:
                            get_cmd=lambda: 8)
         self.add_parameter('{}_min_samples'.format(name),
                            get_cmd=lambda: 8)
+        self.add_parameter('{}_precompile'.format(name), initial_value=False,
+                           label='{} precompile segments'.format(name),
+                           parameter_class=ManualParameter, vals=vals.Bools())
         self.add_parameter('{}_delay'.format(name), initial_value=0,
                            label='{} delay'.format(name), unit='s',
                            parameter_class=ManualParameter,
@@ -243,6 +257,15 @@ class HDAWG8Pulsar:
                            parameter_class=ManualParameter)
         self.add_parameter('{}_active'.format(name), initial_value=True,
                            label='{} active'.format(name), vals=vals.Bool(),
+                           parameter_class=ManualParameter)
+        self.add_parameter('{}_distortion'.format(name),
+                           label='{} distortion mode'.format(name),
+                           initial_value='off',
+                           vals=vals.Enum('off', 'precalculate'),
+                           parameter_class=ManualParameter)
+        self.add_parameter('{}_distortion_dict'.format(name),
+                           label='{} distortion dictionary'.format(name),
+                           vals=vals.Dict(),
                            parameter_class=ManualParameter)
 
     def _program_awg(self, obj, sequence, el_wfs, loop=True):
@@ -599,9 +622,12 @@ class AWG5014Pulsar:
         self.add_parameter('{}_granularity'.format(name),
                            get_cmd=lambda: 4)
         self.add_parameter('{}_min_samples'.format(name),
-                           get_cmd=lambda: 4) # Can not be triggered faster
-                                              # than 1 us.
-        if id in ['ch1', 'ch2', 'ch3', 'ch4']:
+                           get_cmd=lambda: 252)  # Can not be triggered faster
+                                                 # than 210 ns.
+        self.add_parameter('{}_precompile'.format(name), initial_value=False,
+                           label='{} precompile segments'.format(name),
+                           parameter_class=ManualParameter, vals=vals.Bools())
+        if id in ['ch1', 'ch2', 'ch3', 'ch4']:  # analog
             self.add_parameter('{}_type'.format(name),
                                get_cmd=lambda: 'analog')
             self.add_parameter('{}_offset'.format(name),
@@ -614,7 +640,16 @@ class AWG5014Pulsar:
                                set_cmd=self._AWG5014_setter(obj, id, 'amp'),
                                get_cmd=self._AWG5014_getter(obj, id, 'amp'),
                                vals=vals.Numbers(0.01, 2.25))
-        else: # marker
+            self.add_parameter('{}_distortion'.format(name),
+                               label='{} distortion mode'.format(name),
+                               initial_value='off',
+                               vals=vals.Enum('off', 'precalculate'),
+                               parameter_class=ManualParameter)
+            self.add_parameter('{}_distortion_dict'.format(name),
+                               label='{} distortion dictionary'.format(name),
+                               vals=vals.Dict(),
+                               parameter_class=ManualParameter)
+        else:  # marker
             self.add_parameter('{}_type'.format(name),
                                get_cmd=lambda: 'marker')
             self.add_parameter('{}_offset'.format(name),
@@ -935,17 +970,56 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
         if channels == 'all':
             channels = self.channels
 
+        precompiled_channels = set()
+        precompiled_awgs = set()
+        normal_channels = set()
+        normal_awgs = set()
+        for c in channels:
+            awg = self.get('{}_AWG'.format(c))
+            if self.get('{}_precompile'.format(c)):
+                if awg in normal_awgs:
+                    raise Exception('AWG {} contains precompiled and not '
+                                    'precompiled segments. Can not program '
+                                    'AWGs'.format(awg))
+                precompiled_awgs.add(awg)
+                precompiled_channels.add(c)
+            else:
+                if awg in precompiled_awgs:
+                    raise Exception('AWG {} contains precompiled and not '
+                                    'precompiled channels. Can not program '
+                                    'AWGs'.format(awg))
+                normal_awgs.add(awg)
+                normal_channels.add(c)
+
         # prequery all AWG clock values
         self._clock_prequeried(True)
 
+        if len(precompiled_awgs) > 0:
+            precompiled_sequence = sequence.precompiled_sequence()
+            elements = {el.name: el for el in elements}
+            for segment in precompiled_sequence.elements:
+                element_list = []
+                for wf in segment['wfname']:
+                    if wf == 'codeword':
+                        for wfname in precompiled_sequence.codewords.values():
+                            wf = wfname
+                    element_list.append(elements[wf])
+                new_elt = element.combine_elements(element_list)
+                segment['wfname'] = new_elt.name
+                elements[new_elt.name] = new_elt
+
+
         # dict(name of AWG ->
-        #      dict(element name ->
+        #      dict(i, element name ->
         #           dict(channel id ->
         #                waveform data)))
         AWG_wfs = {}
 
-        for i, el in enumerate(elements):
-            tvals, waveforms = el.normalized_waveforms()
+        for i, el in enumerate(elements.values()):
+            if isinstance(el.name, tuple):
+                tvals, waveforms = el.normalized_waveforms(precompiled_channels)
+            else:
+                tvals, waveforms = el.normalized_waveforms(normal_channels)
             for cname in waveforms:
                 if cname not in channels:
                     continue
@@ -963,11 +1037,14 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
 
         for AWG in AWG_wfs:
             obj = self.AWG_obj(AWG=AWG)
-            self._program_awg(obj, sequence, AWG_wfs[AWG], loop=loop)
+            if AWG in normal_awgs:
+                self._program_awg(obj, sequence, AWG_wfs[AWG], loop=loop)
+            else:
+                self._program_awg(obj, precompiled_sequence, AWG_wfs[AWG],
+                                  loop=loop)
+
 
         self._clock_prequeried(False)
-
-
 
     def _program_awg(self, obj, sequence, el_wfs, loop=True):
         """

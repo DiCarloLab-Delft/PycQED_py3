@@ -99,3 +99,75 @@ class Sequence:
         the arguments to make an element
         """
         self.insert(element.name, element.name, **kw)
+
+    def precompiled_sequence(self):
+        """
+        Creates a new sequence where element repetitions have been
+        unwrapped and consecutive elements that do not wait for a trigger have
+        been merged into one. The 'wfname' field of the compiled elements is 
+        a tuple, containing names of all the elements that have been compiled
+        together.
+        """
+
+        precompiled_sequence = Sequence(self.name + '_precompiled')
+        precompiled_sequence.codewords = self.codewords.copy()
+        visited = set()
+        i_elt = 0
+
+        while True:
+            # add first element of the precompiled element
+            visited |= {i_elt}
+            elt = self.elements[i_elt]
+            if elt['trigger_wait']:
+                for i in range(elt['nr_repetitions']):
+                    precompiled_sequence.elements.append(
+                        {'name': [elt['name'] + '_' + str(i)],
+                         'wfname': [elt['wfname']],
+                         'repetitions': 1,
+                         'trigger_wait': elt['trigger_wait'],
+                         'goto_target': None,
+                         'flags': elt['flags'].copy()}
+                    )
+            else:
+                precompiled_sequence.elements.append(
+                    {'name': [elt['name'] + 'x' + str(elt['repetitions'])],
+                     'wfname': [elt['wfname']]*elt['repetitions'],
+                     'repetitions': 1,
+                     'trigger_wait': False,
+                     'goto_target': None,
+                     'flags': elt['flags'].copy()}
+                )
+                if 'readout' in elt['flags'] and elt['repetitions'] > 1:
+                    precompiled_sequence.elements[-1]['flags'] |= \
+                        {'readout_in_middle'}
+            if elt['goto_target'] is None:
+                i_elt += 1
+            else:
+                i_elt = elt['goto_target']
+            if i_elt >= len(self.elements) or i_elt in visited:
+                for elt in precompiled_sequence.elements:
+                    elt['name'] = ','.join(elt['name'])
+                    elt['wfname'] = tuple(elt['wfname'])
+                return precompiled_sequence
+
+            # add all following elements that should not wait for a trigger
+            while not self.elements[i_elt]['trigger_wait']:
+                visited |= {i_elt}
+                elt = self.elements[i_elt]
+                precompiled_sequence.elements[-1]['name'] += \
+                    [elt['name'] + 'x' + str(elt['repetitions'])]
+                precompiled_sequence.elements[-1]['wfname'] += \
+                    [elt['wfname']] * elt['repetitions']
+                if ('readout' in precompiled_sequence.elements[-1]['flags']) or\
+                   ('readout' in elt['flags'] and elt['repetitions'] > 1):
+                    precompiled_sequence.elements[-1]['flags'] |= \
+                        {'readout_in_middle'}
+                if elt['goto_target'] is None:
+                    i_elt += 1
+                else:
+                    i_elt = elt['goto_target']
+                if i_elt >= len(self.elements) or i_elt in visited:
+                    for elt in precompiled_sequence.elements:
+                        elt['name'] = ','.join(elt['name'])
+                        elt['wfname'] = tuple(elt['wfname'])
+                    return precompiled_sequence

@@ -7,6 +7,7 @@ import numpy as np
 import pprint
 from copy import deepcopy
 import logging
+import pycqed.measurement.waveform_control.fluxpulse_predistortion as flux_dist
 
 
 class Element:
@@ -34,12 +35,6 @@ class Element:
 
         self.pulses = {}
         self._last_added_pulse = None
-
-        self.distorted_wfs = {}
-        self.chan_distorted = {}
-        for c in self.pulsar.channels:
-            self.chan_distorted[c] = False
-
 
     # tools for time calculations
 
@@ -84,7 +79,7 @@ class Element:
         for p in self.pulses:
             for c in self.pulses[p].channels:
                 ts.append(self.pulse_end_time(p, c))
-        return max(ts)
+        return max(ts) if len(ts) > 0 else 0
 
     def length(self, c):
         """
@@ -290,16 +285,21 @@ class Element:
             self.pulses[pname].stop_offset
 
     # computing the numerical waveform
-    def ideal_waveforms(self):
+    def ideal_waveforms(self, channels=None):
         wfs = {}
         tvals = {}
 
         for c in self.pulsar.channels:
+            if channels is not None and c not in channels:
+                continue
             nsamples = self.samples(c)
             wfs[c] = np.zeros(nsamples)
             tvals[c] = np.arange(nsamples) / self._clock(c)
         # we first compute the ideal function values
         for p in self.pulses:
+            if channels is not None and \
+               len(set(self.pulses[p].channels) & set(channels)) == 0:
+                continue
             chan_tvals = {}
             for c in self.pulses[p].channels:
                 if not self.global_time:
@@ -311,20 +311,21 @@ class Element:
                     if idx0 < 0 or idx1 < 0:
                         raise Exception(
                             'Pulse {} on channel {} in element {} starts at a '
-                            'negative time. Please increase the RO_fixpoint.'
-                                .format(p, c, self.name))
+                            'negative time.'.format(p, c, self.name))
                     chan_tvals[c] = tvals[c].copy()[idx0:idx1] + \
                                     self.channel_delay(c) + self.time_offset
             pulsewfs = self.pulses[p].get_wfs(chan_tvals)
 
             for c in self.pulses[p].channels:
+                if channels is not None and c not in channels:
+                    continue
                 idx0 = self.pulse_start_sample(p, c)
                 idx1 = self.pulse_end_sample(p, c) + 1
                 wfs[c][idx0:idx1] += pulsewfs[c]
 
         return tvals, wfs
 
-    def waveforms(self):
+    def waveforms(self, channels=None):
         """
         return:
             tvals, wfs
@@ -333,37 +334,51 @@ class Element:
         Trunctates/clips (channel-imposed) all values
         that are out of bounds
         """
-        tvals, wfs = self.ideal_waveforms()
-        for wf in wfs:
-            if self.chan_distorted[wf]:
-                wfs[wf] = self.distorted_wfs[wf]
-            if len(wfs[wf]) == 0:
+        tvals, wfs = self.ideal_waveforms(channels)
+        for c in wfs:
+            # do predistortion
+            if self.pulsar.get('{}_distortion'.format(c)) == 'precalculate':
+                distortion_dictionary = self.pulsar.get(
+                    '{}_distortion_dict'.format(c))
+                fir_kernels = distortion_dictionary.get('FIR', None)
+                if fir_kernels is not None:
+                    if hasattr(fir_kernels, '__iter__') and not \
+                       hasattr(fir_kernels[0], '__iter__'): # 1 kernel only
+                        wfs[c] = flux_dist.filter_fir(fir_kernels, wfs[c])
+                    else:
+                        for kernel in fir_kernels:
+                            wfs[c] = flux_dist.filter_fir(kernel, wfs[c])
+                iir_filters = distortion_dictionary.get('IIR', None)
+                if iir_filters is not None:
+                    wfs[c] = flux_dist.filter_iir(iir_filters[0],
+                                                  iir_filters[1], wfs[c])
+            if len(wfs[c]) == 0:
                 continue
-            offset = self.pulsar.get('{}_offset'.format(wf))
-            amp = self.pulsar.get('{}_amp'.format(wf))
+
+            # truncate all values that are out of bounds
+            offset = self.pulsar.get('{}_offset'.format(c))
+            amp = self.pulsar.get('{}_amp'.format(c))
             hi = offset + amp
             lo = offset - amp
-            # truncate all values that are out of bounds
-            if self.pulsar.get('{}_type'.format(wf)) == 'analog':
-                if np.max(wfs[wf]) > hi:
+            if self.pulsar.get('{}_type'.format(c)) == 'analog':
+                if np.max(wfs[c]) > hi:
                     logging.warning('Clipping waveform {} > {}'.format(
-                                    max(wfs[wf]), hi))
-                if np.min(wfs[wf]) < lo:
+                                    max(wfs[c]), hi))
+                if np.min(wfs[c]) < lo:
                     logging.warning('Clipping waveform {} < {}'.format(
-                                    min(wfs[wf]), lo))
-                wfs[wf][wfs[wf] > hi] = hi
-                wfs[wf][wfs[wf] < lo] = lo
-            elif self.pulsar.get('{}_type'.format(wf)) == 'marker':
-                wfs[wf][wfs[wf] > offset] = hi
-                wfs[wf][wfs[wf] < offset] = offset
+                                    min(wfs[c]), lo))
+                np.clip(wfs[c], lo, hi, out=wfs[c])
+            elif self.pulsar.get('{}_type'.format(c)) == 'marker':
+                wfs[c][wfs[c] > offset] = hi
+                wfs[c][wfs[c] <= offset] = offset
         return tvals, wfs
 
-    def normalized_waveforms(self):
+    def normalized_waveforms(self, channels=None):
         """
         Returns the final numeric arrays, in which channel-imposed
         restrictions are obeyed (bounds, TTL)
         """
-        tvals, wfs = self.waveforms()
+        tvals, wfs = self.waveforms(channels)
 
         for wf in wfs:
             offset = self.pulsar.get('{}_offset'.format(wf))
@@ -423,3 +438,24 @@ def is_divisible_by_clock(value, clock=1e9):
         return True
     else:
         return False
+
+def combine_elements(element_list):
+    name = (el.name for el in element_list)
+    element = Element(name, element_list[0].pulsar,
+                      ignore_offset_correction=True,
+                      global_time=True,
+                      time_offset=0,
+                      ignore_delays=True)
+    element.fixed_point_applied = True
+    for originalel in element_list:
+        pulsar = originalel.pulsar
+        originalel.pulsar = None
+        el = deepcopy(originalel)
+        originalel.pulsar = pulsar
+        el.shift_all_pulses(-el.offset() + element.ideal_length())
+        pulses = {el.name + '_' + p: el.pulses[p] for p in el.pulses}
+        for p in pulses:
+            pulses[p].name = p
+        element.pulses.update(pulses)
+    return element
+

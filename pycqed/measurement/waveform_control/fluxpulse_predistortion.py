@@ -94,10 +94,10 @@ def distort_qudev(element, distortion_dict):
         if kernelvecs is not None:
             if np.array(kernelvecs).shape[0] == 1 and \
                     len(np.array(kernelvecs).shape) == 1:
-                wf_dist = filter_fir(kernelvecs,wfs_dict[ch])
+                wf_dist = filter_fir(kernelvecs, wfs_dict[ch])
             else:
                 for kernelvec in kernelvecs:
-                    wf_dist = filter_fir(kernelvec,wfs_dict[ch])
+                    wf_dist = filter_fir(kernelvec, wf_dist[ch])
         if distortion_dict[ch]['IIR'] is not None:
             aIIRfilterList,bIIRfilterList = distortion_dict[ch]['IIR']
             wf_dist = filter_iir(aIIRfilterList,bIIRfilterList,wf_dist)

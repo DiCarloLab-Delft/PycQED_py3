@@ -288,7 +288,7 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
 
     # make sure that the waveforms on all the channels end at the same time
     # in case the next element is ran back to back with this one.
-    min_el_len = 300e-9 if trigger else 1e-9
+    min_el_len = 210e-9
     for cname in station.pulsar.channels:
         el.add(pulse.SquarePulse(name='empty_pulse', channel=cname,
                                  amplitude=0, length=min_el_len),
