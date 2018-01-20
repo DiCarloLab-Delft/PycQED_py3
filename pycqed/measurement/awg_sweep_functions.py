@@ -2033,9 +2033,11 @@ class Chevron_ampl_fast_swf(swf.Soft_Sweep):
     the amplitude of the fluxpulse is swept. Used in combination with
     the Chevron_length_hard_swf class.
     '''
-    def __init__(self, qb_control,qb_target,channel,AWG):
+    def __init__(self, qb_control,qb_target,AWG,channel=None):
 
         super().__init__()
+        if channel is None:
+            channel = qb_control.flux_pulse_channel()[-3:]
         self.channel = channel
         self.AWG = AWG
         self.name = 'Chevron flux pulse amplitude sweep'
@@ -2044,18 +2046,32 @@ class Chevron_ampl_fast_swf(swf.Soft_Sweep):
         self.qb_control = qb_control
         self.qb_target = qb_target
         self.flux_pulse_ampl_backup = self.qb_control.flux_pulse_amp()
-        self.qb_control.flux_pulse_amp(1.) # used for correct amplitude
+        self.sign_pulse = 1.
 
     def prepare(self):
-        pass
+
+        if np.sign(np.min(self.sweep_points)) != \
+                np.sign(np.max(self.sweep_points)):
+            logging.warning('Please do not use flux pulse'
+                            'amplitudes with different signs!')
+        else:
+            self.sign_pulse = np.sign(self.sweep_points[0])
+
+        if type(self.channel) == int:
+            self.qb_control.flux_pulse_amp(0.25*self.sign_pulse*self.AWG.get(
+                'ch{}_amp'.format(self.channel))) # used for correct amplitude
+        else:
+            self.qb_control.flux_pulse_amp(0.25*self.sign_pulse*self.AWG.get(
+                '{}_amp'.format(self.channel))) # used for correct amplitude
 
     def set_parameter(self, val, **kw):
+
         self.AWG.stop()
         if type(self.channel) == int:
-            exec('self.AWG.ch{}_amp({})'.format(self.channel, 4.*val))
+            exec('self.AWG.ch{}_amp({})'.format(self.channel, 4*val*self.sign_pulse))
             # factor of 4 for correct amplitude
         else:
-            exec('self.AWG.{}_amp({})'.format(self.channel, 4.*val))
+            exec('self.AWG.{}_amp({})'.format(self.channel, 4*val*self.sign_pulse))
             # factor of 4 for correct amplitude
         self.AWG.start()
 
