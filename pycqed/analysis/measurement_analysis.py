@@ -6285,7 +6285,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                                            value=amplitude_guess)  # ,
             # min=4*np.var(self.data_dist))
             LorentzianModel.set_param_hint('offset',
-                                           value=np.mean(self.data_dist),
+                                           value=0,
                                            vary=True)
             LorentzianModel.set_param_hint('kappa',
                                            value=kappa_guess,

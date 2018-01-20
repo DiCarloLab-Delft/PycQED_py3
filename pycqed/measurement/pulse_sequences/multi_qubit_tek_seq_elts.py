@@ -1324,13 +1324,13 @@ def two_qubit_tomo_bell_qudev(bell_state,
         gate1 = 'Y90 ' + qS
         gate2 = 'Y90 ' + qCZ
         after_pulse = 'mY90 ' + qCZ
-    elif bell_state == 1:  # |Phi_p>=|00>+|11> -> |Psi_m>=|01> - |10>
-        gate1 = 'mY90 ' + qS
-        gate2 = 'Y90 ' + qCZ
-        after_pulse = 'mY90 ' + qCZ
-    elif bell_state == 2:  # |Psi_m>=|01> - |10> -> |Phi_p>=|00>+|11>
+    elif bell_state == 1:  # |Phi_p>=|00>+|11>
         gate1 = 'Y90 ' + qS
         gate2 = 'mY90 ' + qCZ
+        after_pulse = 'mY90 ' + qCZ
+    elif bell_state == 2:  # |Psi_m>=|01> - |10>
+        gate1 = 'mY90 ' + qS
+        gate2 = 'Y90 ' + qCZ
         after_pulse = 'mY90 ' + qCZ
     elif bell_state == 3:  # |Psi_p>=|01> + |10>
         gate1 = 'Y90 ' + qS
