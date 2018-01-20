@@ -1504,3 +1504,38 @@ def n_qubit_reset(pulse_pars_list, RO_pars, feedback_delay, nr_resets=1,
         return seq, el_list
     else:
         return seq_name
+
+
+def two_qubit_entanglement_by_parity_measurement(
+        q0, q1, q2, prep_sequences=None, nr_rounds=1):
+    """
+                |           x nr_rounds            |
+    
+    |q0> |======|--------*-------------------------|======|
+         | prep |        |                         | tomo |
+    |q1> | q0,  |--Y90s--*--*--mY90--meas=====Y180 | q0,  |
+         | q2   |           |              ||      | q2   |
+    |q2> |======|-----------*-------------Y180-----|======|
+    
+    segment divided into elements:
+        prepare x prep_sequences:
+            contains everything up to the first readout
+        parity_measurement x 2 (for the two readout results) 
+            contains everything up to 
+    
+    
+    
+    """
+
+
+
+
+    q0n = q0.name
+    q1n = q1.name
+    q2n = q2.name
+
+    if prep_sequences is None:
+        prep_sequences = [['Y90 ' + q0n, 'Y90s' + q2n], ]
+
+    for prep_sequence in prep_sequences:
+

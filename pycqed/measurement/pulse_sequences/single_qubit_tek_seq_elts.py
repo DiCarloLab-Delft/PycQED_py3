@@ -1024,6 +1024,12 @@ def get_pulse_dict_from_pars(pulse_pars):
     pulses['Z90']['phase'] += 90
     pulses['mZ90']['phase'] += -90
 
+    pulses_sim = {key + 's': deepcopy(val) for key, val in pulses.items()}
+    for val in pulses.values():
+        val['refpoint'] = 'simultaneous'
+
+    pulses.update(pulses_sim)
+
     return pulses
 
 def Z(theta=0, pulse_pars=None):
