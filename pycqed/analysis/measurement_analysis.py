@@ -9382,6 +9382,9 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
         if print_fit_results:
             print(fit_res.fit_report())
 
+        if fit_res.best_values['amplitude'] < 0.:
+            fit_res.best_values['phase'] += np.pi
+
         return fit_res
 
     def fit_all(self, plot=False, extrapolate_phase=False, return_ampl=False):
@@ -9401,8 +9404,9 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
             data_slice = self.data[:,i:i+length_single-1]
 
             thetas = data_slice[0]
-            ampls = np.abs((data_slice[2]-data_slice[2, 0]) + 1j*(data_slice[3] -
-                                                                data_slice[3, 0]))
+            ampls = data_slice[2]
+            # ampls = np.abs((data_slice[2]-data_slice[2, 0]) + 1j*(data_slice[3] -
+            #                                                     data_slice[3, 0]))
 
             if extrapolate_phase:
                 phase_guess = phase_list[-1] + (phase_list[-1] - phase_list[-2])
