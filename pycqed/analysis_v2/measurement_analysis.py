@@ -32,7 +32,9 @@ from pycqed.analysis_v2.timedomain_analysis import (
     FlippingAnalysis, Intersect_Analysis, CZ_1QPhaseCal_Analysis,
     Conditional_Oscillation_Analysis)
 from pycqed.analysis_v2.readout_analysis import *
-from pycqed.analysis_v2.syndrome_analysis import *
+from pycqed.analysis_v2.syndrome_analysis import (
+    Single_Qubit_RoundsToEvent_Analysis, One_Qubit_Paritycheck_Analysis)
+
 from pycqed.analysis_v2.cryo_scope_analysis import *
 from pycqed.analysis_v2.cryo_scope_analysis_v2 import RamZFluxArc
 from pycqed.analysis_v2.distortions_analysis import Scope_Trace_analysis

@@ -21,6 +21,7 @@ from pycqed.measurement.calibration_toolbox import mixer_skewness_cal_UHFQC_adap
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import detector_functions as det
 
+import cma
 from pycqed.measurement.optimization import nelder_mead
 
 
@@ -906,6 +907,8 @@ class CCLight_Transmon(Qubit):
         MW_LutMan.mw_motzoi(self.mw_motzoi())
         MW_LutMan.mw_modulation(self.mw_freq_mod())
 
+        MW_LutMan.spec_amp(self.spec_amp())
+
         # Mixer params
         MW_LutMan.G_mixer_phi(self.mw_G_mixer_phi())
         MW_LutMan.G_mixer_alpha(self.mw_G_mixer_alpha())
@@ -1266,6 +1269,7 @@ class CCLight_Transmon(Qubit):
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
+
         # Snippet here to create and upload the CCL instructions
         CCL = self.instr_CC.get_instr()
         p = sqo.pulsed_spec_seq(
@@ -1275,7 +1279,7 @@ class CCLight_Transmon(Qubit):
         CCL.eqasm_program(p.filename)
         # CCL gets started in the int_avg detector
 
-        # The spec pulse is a MW pulse that contains not modulation
+        # The spec pulse is a MW pulse that contains no modulation
 
         spec_source = self.instr_spec_source.get_instr()
         spec_source.on()
@@ -1507,8 +1511,8 @@ class CCLight_Transmon(Qubit):
             self, MC=None,
             parameter_list: list = ['G_att', 'D_att', 'freq'],
             initial_values: list =None,
-            initial_steps: list= [5e3, 10e3, 3e6],
-            nr_cliffords: int=80, nr_seeds:int=40,
+            initial_steps: list= [2e3, 3e3, 1e6],
+            nr_cliffords: int=80, nr_seeds:int=80,
             verbose:bool = True, update: bool=True,
             prepare_for_timedomain: bool=True):
 
@@ -1567,13 +1571,14 @@ class CCLight_Transmon(Qubit):
 
         MC.set_detector_function(d)
 
-        ad_func_pars = {'adaptive_function': nelder_mead,
+        ad_func_pars = {'adaptive_function': cma.fmin,
                         'x0': initial_values,
-                        'initial_step': initial_steps,
-                        'minimize': False}
+                        'sigma0': 1,
+                        'noise_handler': cma.NoiseHandler(len(initial_values)),
+                        'minimize': False,
+                        'options': {'cma_stds': initial_steps}}
 
         MC.set_adaptive_function_parameters(ad_func_pars)
-        MC.set_optimization_method('nelder_mead')
         MC.run(name='Restless_tuneup_{}Cl_{}seeds'.format(
                 nr_cliffords, nr_seeds) + self.msmt_suffix,
                 mode='adaptive')

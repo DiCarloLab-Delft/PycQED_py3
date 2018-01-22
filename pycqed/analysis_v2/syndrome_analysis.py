@@ -1,4 +1,5 @@
 import logging
+from copy import copy
 import numpy as np
 import pycqed.analysis_v2.base_analysis as ba
 import pycqed.analysis.tools.data_manipulation as dm_tools
@@ -149,3 +150,207 @@ class Single_Qubit_RoundsToEvent_Analysis(ba.BaseDataAnalysis):
             'line_kws': {'markerfacecolor': 'None', 'markeredgecolor': 'red',
                          'markersize': 15},
             'setlabel': 'Double events', 'do_legend': True, 'legend_pos': 'right'}
+
+
+
+
+
+
+class One_Qubit_Paritycheck_Analysis(ba.BaseDataAnalysis):
+    """
+    Analysis for the (repeated) parity check or indirect measurement
+    of a single qubit corresponding to the following circuit
+
+                          ^(N)
+    Data: M -|-(x)-0-----|-M
+             |     |     |
+    Anc.: M -|--X--0-X-M-|-M
+
+    This analysis gives
+
+    relevant options_dict parameters
+        ch_idx_anc (int) specifies the readout channel for the ancilla qubit
+        ch_idx_data (int) specifies the readout channel for the data qubit.
+
+        post_sel_th_anc (float)
+        post_sel_th_data (float)
+        nr_of_measurements (int) The number of repetitions of the circuit,
+            used in the data binning.
+
+
+    """
+
+    def __init__(self, t_start: str=None, t_stop: str=None,
+                 data_file_path: str=None,
+                 options_dict: dict=None, extract_only: bool=False,
+                 do_fitting: bool=True, auto=True):
+
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         extract_only=extract_only, do_fitting=do_fitting)
+
+
+        # self.single_timestamp = False
+        self.params_dict = {'xlabel': 'sweep_name',
+                            'xunit': 'sweep_unit',
+                            'xvals': 'sweep_points',
+                            'measurementstring': 'measurementstring',
+                            'value_names': 'value_names',
+                            'value_units': 'value_units',
+                            'measured_values': 'measured_values'}
+        self.numeric_params = []
+        if auto:
+            self.run_analysis()
+
+    def process_data(self):
+        ch_idx_anc = self.options_dict.get('ch_idx_anc', 0)
+        ch_idx_data = self.options_dict.get('ch_idx_data', 1)
+        nr_of_measurements = self.options_dict.get('nr_of_measurements', 11)
+        post_sel_th_anc = self.options_dict.get('post_sel_th_anc', 0)
+        post_sel_th_data = self.options_dict.get('post_sel_th_data', 0)
+
+        ass_th_anc = self.options_dict.get('ass_th_anc', post_sel_th_anc)
+
+
+        post_select = self.options_dict.get('post_select', True)
+
+        nr_bins = self.options_dict.get('nr_bins', 100)
+
+
+
+        shots_anc = list(self.raw_data_dict['measured_values_ord_dict'].values())\
+            [ch_idx_anc][0]
+        shots_data = list(self.raw_data_dict['measured_values_ord_dict'].values())\
+            [ch_idx_data][0]
+
+        self.proc_data_dict['shots_anc'] = shots_anc
+        self.proc_data_dict['shots_data'] = shots_data
+
+        # Data binning
+        prep0_anc = copy(shots_anc[::nr_of_measurements*2])
+        meas0_anc = copy(shots_anc[1::nr_of_measurements*2])
+        prep1_anc = copy(shots_anc[nr_of_measurements::nr_of_measurements*2])
+        meas1_anc = copy(shots_anc[nr_of_measurements+1::nr_of_measurements*2])
+
+
+        prep0_data = copy(shots_data[::nr_of_measurements*2])
+        meas0_data = copy(shots_data[1::nr_of_measurements*2])
+        prep1_data = copy(shots_data[nr_of_measurements::nr_of_measurements*2])
+        meas1_data = copy(shots_data[nr_of_measurements+1::nr_of_measurements*2])
+
+        # post selection
+        if post_select:
+            meas0_anc[np.where(prep0_anc > post_sel_th_anc)] = np.nan
+            meas0_anc[np.where(prep0_data > post_sel_th_data)] = np.nan
+            meas1_anc[np.where(prep1_anc > post_sel_th_anc)] = np.nan
+            meas1_anc[np.where(prep1_data > post_sel_th_data)] = np.nan
+
+            meas0_data[np.where(prep0_anc > post_sel_th_anc)] = np.nan
+            meas0_data[np.where(prep0_data > post_sel_th_data)] = np.nan
+            meas1_data[np.where(prep1_anc > post_sel_th_anc)] = np.nan
+            meas1_data[np.where(prep1_data > post_sel_th_data)] = np.nan
+
+        # Histogramming
+        self.proc_data_dict['prep0_anc_hist'] = np.histogram(
+            prep0_anc, bins=nr_bins,
+            range=(np.min(shots_anc), np.max(shots_anc)))
+        self.proc_data_dict['prep1_anc_hist'] = np.histogram(
+            prep1_anc, bins=nr_bins,
+            range=(np.min(shots_anc), np.max(shots_anc)))
+
+        self.proc_data_dict['meas0_anc_hist'] = np.histogram(
+            meas0_anc, bins=nr_bins,
+            range=(np.min(shots_anc), np.max(shots_anc)))
+        self.proc_data_dict['meas1_anc_hist'] = np.histogram(
+            meas1_anc, bins=nr_bins,
+            range=(np.min(shots_anc), np.max(shots_anc)))
+
+        self.proc_data_dict['prep0_data_hist'] = np.histogram(
+            prep0_data, bins=nr_bins,
+            range=(np.min(shots_data), np.max(shots_data)))
+        self.proc_data_dict['prep1_data_hist'] = np.histogram(
+            prep1_data, bins=nr_bins,
+            range=(np.min(shots_data), np.max(shots_data)))
+        self.proc_data_dict['meas0_data_hist'] = np.histogram(
+            meas0_data, bins=nr_bins,
+            range=(np.min(shots_data), np.max(shots_data)))
+        self.proc_data_dict['meas1_data_hist'] = np.histogram(
+            meas1_data, bins=nr_bins,
+            range=(np.min(shots_data), np.max(shots_data)))
+
+
+        F_ass_1 = np.sum(meas1_anc<ass_th_anc) /(np.sum(meas1_anc>ass_th_anc) + np.sum(meas1_anc<ass_th_anc))
+        F_ass_0 = np.sum(meas0_anc>ass_th_anc) /(np.sum(meas0_anc>ass_th_anc) + np.sum(meas0_anc<ass_th_anc))
+
+        F_ass_avg = 1-(1-F_ass_0+1-F_ass_1)/2
+        self.proc_data_dict['F_ass']=F_ass_avg
+
+
+    def prepare_plots(self):
+        self.plot_dicts['meas0_anc'] = {
+                    'xlabel': 'anc dac value',
+                    'title': 'Ancilla qubit histograms' + '\n'+self.timestamps[0],
+                    'ylabel': 'Counts',
+                    'plotfn': self.plot_bar,
+                    'xvals': self.proc_data_dict['meas0_anc_hist'][1],
+                    'yvals': self.proc_data_dict['meas0_anc_hist'][0],
+                    'ax_id': '1D_histogram_anc',
+                    'bar_kws': {'log': False, 'alpha': .4, 'facecolor': 'C0',
+                                'edgecolor': 'C0'},
+                    'setlabel': 'Data prep. in: |0>'}
+
+        self.plot_dicts['meas1_anc'] = {
+                    'plotfn': self.plot_bar,
+                    'xvals': self.proc_data_dict['meas1_anc_hist'][1],
+                    'yvals': self.proc_data_dict['meas1_anc_hist'][0],
+                    'ax_id': '1D_histogram_anc',
+                    'bar_kws': {'log': False, 'alpha': .4, 'facecolor': 'C3',
+                                'edgecolor': 'C3'},
+                    'setlabel': 'Data prep. in: |1>'}
+
+
+        self.plot_dicts['text_msg'] = {
+            'ax_id': '1D_histogram_anc',
+            'ypos': 0.75,
+            'plotfn': self.plot_text,
+            'box_props': 'fancy',
+            'text_string': 'F avg. ass.: {:.2f} %'.format(self.proc_data_dict['F_ass']*100)}
+
+        self.plot_dicts['meas0_data'] = {
+                    'xlabel': 'data dac value',
+                    'title': 'Data qubit histograms' + '\n'+self.timestamps[0],
+                    'ylabel': 'Counts',
+                    'plotfn': self.plot_bar,
+                    'xvals': self.proc_data_dict['meas0_data_hist'][1],
+                    'yvals': self.proc_data_dict['meas0_data_hist'][0],
+                    'ax_id': '1D_histogram_data',
+                    'bar_kws': {'log': False, 'alpha': .4, 'facecolor': 'C0',
+                                'edgecolor': 'C0'},
+                    'setlabel': 'Data prep. in: |0>'}
+        self.plot_dicts['meas1_data'] = {
+                    'plotfn': self.plot_bar,
+                    'xvals': self.proc_data_dict['meas1_data_hist'][1],
+                    'yvals': self.proc_data_dict['meas1_data_hist'][0],
+                    'ax_id': '1D_histogram_data',
+                    'bar_kws': {'log': False, 'alpha': .4, 'facecolor': 'C3',
+                                'edgecolor': 'C3'},
+                    'setlabel': 'Data prep. in: |1>'}
+
+
+        # a.plot_dicts = plot_dicts
+        # # Clear the plots using this snippet
+        # a.axs_dict = None
+        # a.pdict = None
+        # a.axs ={}
+        # a.figs = {}
+        # # end of clear plots snippet
+
+        # a.plot()
+        # axanc = a.axs['1D_histogram_anc']
+        # axanc.legend()
+
+        # axanc = a.axs['1D_histogram_anc']
+        # axanc.legend()
+
+        # a.save_figures(close_figs=False)

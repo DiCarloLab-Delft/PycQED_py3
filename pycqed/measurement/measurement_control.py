@@ -82,6 +82,14 @@ class MeasurementControl(Instrument):
                            parameter_class=ManualParameter,
                            initial_value=True)
 
+        self.add_parameter(
+            'cfg_clipping_mode', vals=vals.Bool(),
+            docstring='Clipping mode, when True ignores ValueErrors  when '
+            'setting parameters. This can be useful when running optimizations',
+            parameter_class=ManualParameter,
+            initial_value=False)
+
+
         self.add_parameter('instrument_monitor',
                            parameter_class=ManualParameter,
                            initial_value=None,
@@ -383,7 +391,14 @@ class MeasurementControl(Instrument):
                 prev_swp_pt = self.last_sweep_pts[::-1][i]
                 if swp_pt != prev_swp_pt:
                     # only set if not equal to previous point
-                    sweep_function.set_parameter(swp_pt)
+                    try:
+                        sweep_function.set_parameter(swp_pt)
+                    except ValueError as e:
+                        if self.cfg_clipping_mode():
+                            logging.warning('MC clipping mode caught exception:')
+                            logging.warning(e)
+                        else:
+                            raise e
             # x[::-1] changes the order in which the parameters are set, so
             # it is first the outer sweep point and then the inner.This
             # is generally not important except for specifics: f.i. the phase

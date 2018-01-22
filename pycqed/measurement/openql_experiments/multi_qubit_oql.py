@@ -1,6 +1,7 @@
 from os.path import join, dirname
 import numpy as np
 import openql.openql as ql
+from pycqed.utilities.general import suppress_stdout
 from openql.openql import Program, Kernel, Platform
 
 base_qasm_path = join(dirname(__file__), 'qasm_files')
@@ -25,7 +26,8 @@ def single_flux_pulse_seq(qubit_indices: tuple,
         k.gate('CW_00', i)
     k.gate('fl_cw_02', qubit_indices[0], qubit_indices[1])
     p.add_kernel(k)
-    p.compile()
+    with suppress_stdout():
+        p.compile()
     # attribute is added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
@@ -50,7 +52,8 @@ def flux_staircase_seq(platf_cfg: str):
         k.gate("wait", [0, 1, 2, 3], 200)  # because scheduling is wrong.
 
     p.add_kernel(k)
-    p.compile()
+    with suppress_stdout():
+        p.compile()
     # attribute is added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
@@ -70,7 +73,8 @@ def two_qubit_off_on(q0: int, q1: int, platf_cfg: str):
     p = Program(pname="two_qubit_off_on", nqubits=platf.get_qubit_number(),
                 p=platf)
     p = add_two_q_cal_points(p, platf=platf, q0=q0, q1=q1)
-    p.compile()
+    with suppress_stdout():
+        p.compile()
     # attribute is added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
@@ -119,7 +123,8 @@ def two_qubit_tomo_cardinal(cardinal: int, q0: int, q1: int, platf_cfg: str):
     # script for Tektronix driven qubits. I do not know if this repetition
     # is important or even necessary here.
     p = add_two_q_cal_points(p, platf=platf, q0=0, q1=1, reps_per_cal_pt=7)
-    p.compile()
+    with suppress_stdout():
+        p.compile()
     # attribute is added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
@@ -229,7 +234,8 @@ def two_qubit_AllXY(q0: int, q1: int, platf_cfg: str,
         k.measure(q1)
         p.add_kernel(k)
 
-    p.compile()
+    with suppress_stdout():
+        p.compile()
     # attribute is added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
@@ -281,7 +287,8 @@ def Cryoscope(qubit_idx: int, buffer_time1=0, buffer_time2=0,
     # adding the calibration points
     # add_single_qubit_cal_points(p, platf=platf, qubit_idx=qubit_idx)
 
-    p.compile()
+    with suppress_stdout():
+        p.compile()
     # attribute get's added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
@@ -322,7 +329,8 @@ def CryoscopeGoogle(qubit_idx: int, buffer_time1, times, platf_cfg: str):
         k.measure(qubit_idx)
         p.add_kernel(k)
 
-    p.compile()
+    with suppress_stdout():
+        p.compile()
     # attribute get's added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
@@ -367,7 +375,8 @@ def Chevron_hack(qubit_idx: int, qubit_idx_spec,
     # adding the calibration points
     # add_single_qubit_cal_points(p, platf=platf, qubit_idx=qubit_idx)
 
-    p.compile()
+    with suppress_stdout():
+        p.compile()
     # attribute get's added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
@@ -409,7 +418,8 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int,
     k.measure(qubit_idx)
     p.add_kernel(k)
 
-    p.compile()
+    with suppress_stdout():
+        p.compile()
     # attribute get's added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
@@ -485,7 +495,8 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
             p.add_kernel(k)
     # 7 repetitions is because of assumptions in tomo analysis
     p = add_two_q_cal_points(p, platf=platf, q0=q0, q1=q1, reps_per_cal_pt=7)
-    p.compile()
+    with suppress_stdout():
+        p.compile()
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
@@ -600,7 +611,8 @@ def two_qubit_DJ(q0, q1, platf_cfg):
 
     # 7 repetitions is because of assumptions in tomo analysis
     #p = add_two_q_cal_points(p, platf=platf, q0=q0, q1=q1, reps_per_cal_pt=7)
-    p.compile()
+    with suppress_stdout():
+        p.compile()
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
@@ -669,7 +681,8 @@ def two_qubit_repeated_parity_check(qD: int, qA: int, platf_cfg: str,
         # k.gate('wait', [qA, qD], 0)
         p.add_kernel(k)
 
-    p.compile()
+    with suppress_stdout():
+        p.compile()
     # attribute get's added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
@@ -735,7 +748,8 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
             p.add_kernel(k)
     if add_cal_points:
         p = add_two_q_cal_points(p, platf=platf, q0=q0, q1=q1)
-    p.compile()
+    with suppress_stdout():
+        p.compile()
     # attribute get's added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
@@ -749,7 +763,7 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
     return p
 
 
-def CZ_poisoned_purity_seq(q0, q1, platf_cfg: str):
+def CZ_poisoned_purity_seq(q0, q1, platf_cfg: str, cal_points: bool=True):
     """
     Creates the |00> + |11> Bell state and does a partial tomography in
     order to determine the purity of both qubits.
@@ -782,8 +796,27 @@ def CZ_poisoned_purity_seq(q0, q1, platf_cfg: str):
         k.gate('wait', [2, 0], 0)
 
         p.add_kernel(k)
+    if cal_points:
+        k = Kernel("Cal 00", p=platf)
+        k.prepz(q0)
+        k.prepz(q1)
+        k.measure(q0)
+        k.measure(q1)
+        k.gate('wait', [2, 0], 0)
+        p.add_kernel(k)
+        k = Kernel("Cal 11", p=platf)
+        k.prepz(q0)
+        k.prepz(q1)
+        k.gate("rx180", q0)
+        k.gate("rx180", q1)
+        k.measure(q0)
+        k.measure(q1)
+        k.gate('wait', [2, 0], 0)
+        p.add_kernel(k)
 
-    p.compile()
+
+    with suppress_stdout():
+        p.compile()
     # attribute get's added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
