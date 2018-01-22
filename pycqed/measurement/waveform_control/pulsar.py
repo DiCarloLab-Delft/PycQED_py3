@@ -86,7 +86,17 @@ class UHFQCPulsar:
                            label='{} distortion dictionary'.format(name),
                            vals=vals.Dict(),
                            parameter_class=ManualParameter)
-
+        self.add_parameter('{}_charge_buildup_compensation'.format(name),
+                           parameter_class=ManualParameter,
+                           vals=vals.Bool(), inital_value=False)
+        self.add_parameter('{}_discharge_timescale'.format(name),
+                           parameter_class=ManualParameter,
+                           vals=vals.MultiType(vals.Numbers(0),
+                                               vals.Enum(None)),
+                           initial_value=None)
+        self.add_parameter('{}_compensation_pulse_scale'.format(name),
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(0., 1.), initial_value=0.5)
 
     def _program_awg(self, obj, sequence, el_wfs, loop=True):
         if not isinstance(obj, UHFQCPulsar._supportedAWGtypes):
@@ -267,6 +277,17 @@ class HDAWG8Pulsar:
                            label='{} distortion dictionary'.format(name),
                            vals=vals.Dict(),
                            parameter_class=ManualParameter)
+        self.add_parameter('{}_charge_buildup_compensation'.format(name),
+                           parameter_class=ManualParameter,
+                           vals=vals.Bool(), inital_value=False)
+        self.add_parameter('{}_discharge_timescale'.format(name),
+                           parameter_class=ManualParameter,
+                           vals=vals.MultiType(vals.Numbers(0),
+                                               vals.Enum(None)),
+                           initial_value=None)
+        self.add_parameter('{}_compensation_pulse_scale'.format(name),
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(0., 1.), initial_value=0.5)
 
     def _program_awg(self, obj, sequence, el_wfs, loop=True):
         if not isinstance(obj, HDAWG8Pulsar._supportedAWGtypes):
@@ -649,6 +670,17 @@ class AWG5014Pulsar:
                                label='{} distortion dictionary'.format(name),
                                vals=vals.Dict(),
                                parameter_class=ManualParameter)
+            self.add_parameter('{}_charge_buildup_compensation'.format(name),
+                               parameter_class=ManualParameter,
+                               vals=vals.Bool(), inital_value=False)
+            self.add_parameter('{}_discharge_timescale'.format(name),
+                               parameter_class=ManualParameter,
+                               vals=vals.MultiType(vals.Numbers(0),
+                                                   vals.Enum(None)),
+                               initial_value=None)
+            self.add_parameter('{}_compensation_pulse_scale'.format(name),
+                               parameter_class=ManualParameter,
+                               vals=vals.Numbers(0., 1.), initial_value=0.5)
         else:  # marker
             self.add_parameter('{}_type'.format(name),
                                get_cmd=lambda: 'marker')
@@ -970,6 +1002,7 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
         if channels == 'all':
             channels = self.channels
 
+        # find the awgs that need to have the elements precompiled
         precompiled_channels = set()
         precompiled_awgs = set()
         normal_channels = set()
@@ -994,6 +1027,7 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
         # prequery all AWG clock values
         self._clock_prequeried(True)
 
+        # create the precompiled elements
         if len(precompiled_awgs) > 0:
             precompiled_sequence = sequence.precompiled_sequence()
             elements = {el.name: el for el in elements}
@@ -1007,7 +1041,6 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
                 new_elt = element.combine_elements(element_list)
                 segment['wfname'] = new_elt.name
                 elements[new_elt.name] = new_elt
-
 
         # dict(name of AWG ->
         #      dict(i, element name ->

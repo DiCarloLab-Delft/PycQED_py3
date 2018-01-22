@@ -335,25 +335,55 @@ class Element:
         that are out of bounds
         """
         tvals, wfs = self.ideal_waveforms(channels)
+
+        # add charge buildup compensation pulse
         for c in wfs:
-            # do predistortion
-            if self.pulsar.get('{}_distortion'.format(c)) == 'precalculate':
-                distortion_dictionary = self.pulsar.get(
-                    '{}_distortion_dict'.format(c))
-                fir_kernels = distortion_dictionary.get('FIR', None)
-                if fir_kernels is not None:
-                    if hasattr(fir_kernels, '__iter__') and not \
-                       hasattr(fir_kernels[0], '__iter__'): # 1 kernel only
-                        wfs[c] = flux_dist.filter_fir(fir_kernels, wfs[c])
+            if self.pulsar.get('{}_type'.format(c)) == 'analog':
+                if self.pulsar.get('{}_charge_buildup_compensation'.format(c)):
+                    tau = self.pulsar.get('{}_discharge_timescale'.format(c))
+                    amp = self.pulsar.get('{}_amp'.format(c))
+                    amp *= self.pulsar.get('{}_compensation_pulse_scale'
+                                           .format(c))
+                    t = tvals[c]
+                    dt = t[1] - t[0]
+                    tend = t[-1] + dt
+                    wf = wfs[c]
+                    if tau is None:
+                        integral = wf.sum()*dt
+                        if integral > 0:
+                            amp = -amp
+                        tcomp = -integral/amp
                     else:
-                        for kernel in fir_kernels:
-                            wfs[c] = flux_dist.filter_fir(kernel, wfs[c])
-                iir_filters = distortion_dictionary.get('IIR', None)
-                if iir_filters is not None:
-                    wfs[c] = flux_dist.filter_iir(iir_filters[0],
-                                                  iir_filters[1], wfs[c])
+                        integral = (wf*np.exp((t-tend)/tau)).sum()*dt
+                        if integral > 0:
+                            amp = -amp
+                        tcomp = tau*np.log(1 - integral/(amp*tau))
+                    textra = np.arange(tend, tend + 2*tcomp, dt)
+                    t = np.append(t, textra)
+                    wf = np.append(wf, amp*(textra < tend + tcomp))
+                    tvals[c] = t
+                    wfs[c] = wf
+
+        # do predistortion
+        for c in wfs:
             if len(wfs[c]) == 0:
                 continue
+            if self.pulsar.get('{}_type'.format(c)) == 'analog':
+                if self.pulsar.get('{}_distortion'.format(c)) == 'precalculate':
+                    distortion_dictionary = self.pulsar.get(
+                        '{}_distortion_dict'.format(c))
+                    fir_kernels = distortion_dictionary.get('FIR', None)
+                    if fir_kernels is not None:
+                        if hasattr(fir_kernels, '__iter__') and not \
+                           hasattr(fir_kernels[0], '__iter__'): # 1 kernel only
+                            wfs[c] = flux_dist.filter_fir(fir_kernels, wfs[c])
+                        else:
+                            for kernel in fir_kernels:
+                                wfs[c] = flux_dist.filter_fir(kernel, wfs[c])
+                    iir_filters = distortion_dictionary.get('IIR', None)
+                    if iir_filters is not None:
+                        wfs[c] = flux_dist.filter_iir(iir_filters[0],
+                                                      iir_filters[1], wfs[c])
 
             # truncate all values that are out of bounds
             offset = self.pulsar.get('{}_offset'.format(c))
