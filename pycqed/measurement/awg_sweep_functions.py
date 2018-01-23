@@ -1901,6 +1901,7 @@ class Ramsey_fluxpulse_ampl_sweep(swf.Soft_Sweep):
 
     def set_parameter(self, val, **kw):
         self.qb.flux_pulse_amp(val)
+        self.hard_sweep.upload = True
         self.hard_sweep.prepare()
 
     def finish(self):
@@ -2021,6 +2022,7 @@ class Chevron_ampl_swf(swf.Soft_Sweep):
 
     def set_parameter(self, val, **kw):
         self.qb_control.flux_pulse_amp(val)
+        self.hard_sweep.upload = True
         self.hard_sweep.prepare()
 
     def finish(self):

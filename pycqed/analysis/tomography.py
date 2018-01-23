@@ -566,7 +566,7 @@ def fidelity_from_standard_formula(bell_state, rho, state_rotation=None):
         state = qtp.bell_state(state=qtp_bell_state)
     else:
         state = state_rotation*qtp.bell_state(state=qtp_bell_state)
-    return np.real((state.dag()*rho*state).data[0,0])
+    return float(np.real((state.dag()*rho*state).data[0,0]))
 
 def plot_target_pauli_set(pauli_set, ax):
     width = 0.6
@@ -1186,8 +1186,8 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         if self.target_bell is not None or self.target_cardinal is not None:
             msg += '\nFidelity: {:.3f}'.format(self.fidelity)
         if self.target_bell is not None:
-            theta_vec_qb0 = np.linspace(0., 2*np.pi, 100)
-            theta_vec_qb1 = np.linspace(0., 2*np.pi, 100)
+            theta_vec_qb0 = np.linspace(0., 2*np.pi, 50)
+            theta_vec_qb1 = np.linspace(0., 2*np.pi, 50)
             fid_vec = np.zeros(theta_vec_qb0.shape)
             fid_vec_standard = np.zeros((len(theta_vec_qb0),
                                          len(theta_vec_qb1)))
@@ -1272,8 +1272,8 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         msg = 'Purity: {:.3f}\nFidelity: {:.3f}'.format(
             purity, self.fidelity_mle)
         if self.target_bell is not None:
-            theta_vec_qb0 = np.linspace(0., 2*np.pi, 100)
-            theta_vec_qb1 = np.linspace(0., 2*np.pi, 100)
+            theta_vec_qb0 = np.linspace(0., 2*np.pi, 50)
+            theta_vec_qb1 = np.linspace(0., 2*np.pi, 50)
             fid_vec = np.zeros(theta_vec_qb0.shape)
             fid_vec_standard = np.zeros((len(theta_vec_qb0),
                                          len(theta_vec_qb1)))

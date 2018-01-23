@@ -9399,12 +9399,15 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
         else:
             self.fig,self.ax = (None,None)
 
-        for i in np.arange(0,len(self.sweep_points_2D)*length_single,length_single):
+        for i in np.arange(0,len(self.sweep_points_2D)*length_single, length_single):
 
             data_slice = self.data[:,i:i+length_single-1]
 
             thetas = data_slice[0]
-            ampls = data_slice[2]
+            # ampls = data_slice[2]
+            ampls = a_tools.rotate_and_normalize_data_no_cal_points(
+                np.array([data_slice[2], data_slice[3]]))
+
             # ampls = np.abs((data_slice[2]-data_slice[2, 0]) + 1j*(data_slice[3] -
             #                                                     data_slice[3, 0]))
 
@@ -9613,3 +9616,93 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
             self.ax.legend(['data','guess','fit'])
         else:
             self.ax.legend(['data','fit'])
+
+
+class Dynamic_phase_Analysis(Fluxpulse_Ramsey_2D_Analysis):
+
+    def __init__(self, X90_separation=None, flux_pulse_amp=None,
+                 flux_pulse_length=None,
+                 qb_name=None, label='Dynamic_phase_analysis',
+                 run_default_super=True, **kw):
+
+        kw['label'] = label
+        kw['h5mode'] = 'r+'
+        kw['close_file'] = False
+        super(self.__class__, self).__init__(TwoD=True,
+                                             start_at_zero=True,
+                                             qb_name=qb_name, **kw)
+
+        self.flux_pulse_amp = flux_pulse_amp
+
+    def run_default_analysis(self, close_file=True, **kw):
+
+        length_single = len(self.sweep_points)
+        phases = {}
+
+        textstr = ''
+        self.fig = plt.figure()
+        self.ax = self.fig.add_subplot(111)
+
+        for index, i in enumerate(np.arange(0, len(self.sweep_points_2D)* \
+                length_single, length_single)):
+
+            if i==0:
+                label = 'no flux pulse'
+            else:
+                label = 'with flux pulse'
+
+            data_slice = self.data[:, i:i+length_single-1]
+            thetas = data_slice[0]
+
+            ampls = a_tools.rotate_and_normalize_data_no_cal_points(
+                np.array([data_slice[2], data_slice[3]]))
+
+            # fit to cosine
+            fit_res = self.fit_single_cos(thetas, ampls,
+                                        print_fit_results=False,
+                                        phase_guess=0)
+
+            # plot
+            self.ax.plot(thetas, ampls, 'o-', label=label)
+
+            thetas_fine = np.linspace(thetas[0], thetas[-1], len(thetas)*100)
+            if fit_res.best_values['amplitude']>0:
+                data_fit_fine = fit_mods.CosFunc(thetas_fine,
+                                                 **fit_res.best_values)
+            else:
+                fit_res_temp = deepcopy(fit_res)
+                fit_res_temp.best_values['amplitude'] = \
+                    -fit_res_temp.best_values['amplitude']
+                data_fit_fine = fit_mods.CosFunc(thetas_fine,
+                                                 **fit_res_temp.best_values)
+
+            self.ax.plot(thetas_fine, data_fit_fine, 'r')
+
+            self.ax.set_title('dynamic phase msmt {} at {}ns {}mV {}'.format(
+                self.qb_name, self.flux_pulse_length,
+                self.flux_pulse_amp,self.timestamp_string))
+            self.ax.set_xlabel(r'Phase of 2nd pi/2 pulse, $\phi$[rad]')
+            self.ax.set_ylabel('Response (V)')
+
+            self.ax.legend()
+            phases[self.sweep_points_2D[index]] = \
+                fit_res.best_values['phase']*180/np.pi
+            textstr += 'phase_{} =\n{:0.3f}\n'.format(label,
+                          phases[self.sweep_points_2D[index]])
+
+        dyn_phase = phases[self.sweep_points_2D[1]] - \
+            phases[self.sweep_points_2D[0]]
+        textstr += 'dyn_phase_{} =\n{:0.3f}'.format(self.qb_name, dyn_phase)
+        self.ax.text(1.05, 0.5, textstr, transform=self.ax.transAxes,
+                fontsize=self.font_size, verticalalignment='center',
+                horizontalalignment='left', bbox=self.box_props)
+
+        plt.savefig(self.folder+'\\cos_fit.png', dpi=300, bbox_inches='tight')
+
+        if kw.pop('show'):
+            plt.show()
+
+        if close_file:
+            self.data_file.close()
+
+        return dyn_phase
