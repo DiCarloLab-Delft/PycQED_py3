@@ -15,7 +15,7 @@ import subprocess
 from functools import reduce  # forward compatibility for Python 3
 import operator
 
-from contextlib import contextmanager
+from contextlib import ContextDecorator
 
 
 def get_git_revision_hash():
@@ -234,7 +234,6 @@ def load_settings_onto_instrument_v2(instrument, load_from_instr: str=None,
     return True
 
 
-
 def send_email(subject='PycQED needs your attention!',
                body='', email=None):
     # Import smtplib for the actual sending function
@@ -432,6 +431,7 @@ class NumpyJsonEncoder(json.JSONEncoder):
     for saving in JSON files.
     Also converts datetime objects to strings.
     '''
+
     def default(self, o):
         if isinstance(o, np.integer):
             return int(o)
@@ -444,7 +444,8 @@ class NumpyJsonEncoder(json.JSONEncoder):
         else:
             return super().default(o)
 
-class suppress_stdout(object):
+
+class suppress_stdout(ContextDecorator):
     '''
     A context manager for doing a "deep suppression" of stdout and stderr in
     Python, i.e. will suppress all print, even if the print originates in a
@@ -459,19 +460,19 @@ class suppress_stdout(object):
     '''
     def __init__(self):
         # Open a pair of null files
-        self.null_fds =  [os.open(os.devnull,os.O_RDWR) for x in range(2)]
+        self.null_fds = [os.open(os.devnull, os.O_RDWR) for x in range(2)]
         # Save the actual stdout (1) and stderr (2) file descriptors.
         self.save_fds = [os.dup(1), os.dup(2)]
 
     def __enter__(self):
         # Assign the null pointers to stdout and stderr.
-        os.dup2(self.null_fds[0],1)
-        os.dup2(self.null_fds[1],2)
+        os.dup2(self.null_fds[0], 1)
+        os.dup2(self.null_fds[1], 2)
 
     def __exit__(self, *_):
         # Re-assign the real stdout/stderr back to (1) and (2)
-        os.dup2(self.save_fds[0],1)
-        os.dup2(self.save_fds[1],2)
+        os.dup2(self.save_fds[0], 1)
+        os.dup2(self.save_fds[1], 2)
         # Close all file descriptors
         for fd in self.null_fds + self.save_fds:
             os.close(fd)
