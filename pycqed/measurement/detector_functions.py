@@ -3,6 +3,7 @@ Module containing a collection of detector functions used by the
 Measurement Control.
 '''
 import numpy as np
+from copy import deepcopy
 import logging
 import time
 from pycqed.analysis import analysis_toolbox as a_tools
@@ -1411,7 +1412,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         super().__init__()
         self.UHFQC = UHFQC
         self.name = '{}_UHFQC_integrated_average'.format(result_logging_mode)
-        self.channels = channels
+        self.channels = deepcopy(channels)
         self.value_names = ['']*len(self.channels)
         for i, channel in enumerate(self.channels):
             self.value_names[i] = '{} w{}'.format(result_logging_mode,
@@ -1768,15 +1769,12 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             correlation_channel = -1
             # 4 is the (current) max number of weights in the UHFQC (v5)
             for ch in range(9):
-                if ch in self.channels:
-                    # Disable correlation mode as this is used for normal
-                    # acquisition
-                    self.UHFQC.set('quex_corr_{}_mode'.format(ch), 0)
-
                 if ch not in self.channels:
                     # selects the lowest available free channel
-                    self.channels += [ch]
                     correlation_channel = ch
+                    self.channels += [ch]
+                    self.correlation_channels += [correlation_channel]
+
                     print('Using channel {} for correlation ({}, {}).'
                           .format(ch, corr[0], corr[1]))
                     # correlation mode is turned on in the
@@ -1784,52 +1782,6 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
                     break
             if correlation_channel < 0:
                 raise ValueError('No free channel available for correlation.')
-
-            self.correlation_channels += [correlation_channel]
-
-    # def set_threshold(self, threshold_levle=0, ch_to_copy=None):
-    #
-    #     if ch_to_copy is not None:
-    #         if ch_to_copy not in self.channels:
-    #             raise ValueError('Channel to copy should be in channels')
-    #
-    #         for ch in range(9):
-    #             if ch not in self.channels:
-    #                 # selects the lowest available free channel
-    #                 self.channels += [ch]
-    #
-    #                 # copy ch_to_copy into ch
-    #                 copy_int_weights_real = \
-    #                     self.UHFQC.get('quex_wint_weights_{}_real'.format(ch_to_copy))[
-    #                         0]['vector']
-    #                 copy_int_weights_imag = \
-    #                     self.UHFQC.get('quex_wint_weights_{}_imag'.format(ch_to_copy))[
-    #                         0]['vector']
-    #
-    #                 copy_rot_matrix_real = \
-    #                     self.UHFQC.get('quex_rot_{}_real'.format(ch_to_copy))
-    #                 copy_rot_matrix_imag = \
-    #                     self.UHFQC.get('quex_rot_{}_imag'.format(ch_to_copy))
-    #
-    #                 self.UHFQC.set(
-    #                     'quex_wint_weights_{}_real'.format(ch),
-    #                     copy_int_weights_real)
-    #                 self.UHFQC.set(
-    #                     'quex_wint_weights_{}_imag'.format(ch),
-    #                     copy_int_weights_imag)
-    #
-    #                 self.UHFQC.set(
-    #                     'quex_rot_{}_real'.format(ch),
-    #                     copy_rot_matrix_real)
-    #                 self.UHFQC.set(
-    #                     'quex_rot_{}_imag'.format(ch),
-    #                     copy_rot_matrix_imag)
-    #
-    #                 print('Using channel {} for correlation ({}, {}).'
-    #                       .format(ch, corr[0], corr[1]))
-    #                 # correlation mode is turned on in the
-    #                 # set_up_correlation_weights method
-    #                 break
 
     def set_up_correlation_weights(self):
         if self.thresholding:
@@ -1840,6 +1792,12 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             # correlations mode before threshold
             self.UHFQC.quex_rl_source(4)
         # Configure correlation mode
+        for ch in self.channels:
+            if ch not in self.correlation_channels:
+                # Disable correlation mode as this is used for normal
+                # acquisition
+                self.UHFQC.set('quex_corr_{}_mode'.format(ch), 0)
+
         for correlation_channel, corr in zip(self.correlation_channels,
                                              self.correlations):
             # Duplicate source channel to the correlation channel and select

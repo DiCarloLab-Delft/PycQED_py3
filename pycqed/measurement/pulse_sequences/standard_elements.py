@@ -114,7 +114,11 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
                 pass
     target_qubit_names = list(set(temp_qubit_names))
     phase_offset = {} # used for software Z-gates
-    [phase_offset.update({qb_name: 0}) for qb_name in target_qubit_names]
+    for qb_name in target_qubit_names:
+        phase_offset.update({qb_name: 0})
+
+    # from pprint import pprint
+    # pprint(phase_offset)
     j = 0
     for i, pulse_pars in enumerate(pulse_list):
         # Default values for backwards compatibility
@@ -179,6 +183,9 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
                             pulse_pars_new['phase'] = (total_phase % 360
                                                        if total_phase >= 0
                                                        else total_phase % (-360))
+                            # print('\nphase offset: ', phase_offset[pulse_pars['target_qubit']])
+                            # print('old phase: ', pulse_pars['phase'])
+                            # print('new phase: ', pulse_pars_new['phase'])
 
                 try:
                     # Look for the function in pl = pulse_lib
@@ -190,6 +197,13 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
                     except AttributeError:
                         raise KeyError('pulse_type {} not recognized'.format(
                             pulse_pars_new['pulse_type']))
+
+                try:
+                    print('\nphase offset: ', phase_offset[pulse_pars['target_qubit']])
+                    print('old phase: ', pulse_pars['phase'])
+                    print('new phase: ', pulse_pars_new['phase'])
+                except KeyError:
+                    pass
 
                 last_pulse = el.add(
                     pulse_func(name=pulse_pars_new['pulse_type']+'_'+str(j),

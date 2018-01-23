@@ -1577,12 +1577,26 @@ def Ramsey_with_flux_pulse_meas_seq(thetas, qb, X90_separation, verbose=False,
         flux_pulse_delay_hack -= flux_pulse['buffer']
     flux_pulse['pulse_delay'] += flux_pulse_delay_hack
 
+    if ('CZ_corr ' + qb.name) not in operation_dict.keys():
+        operation_dict['CZ_corr ' + qb.name] = deepcopy(operation_dict['Z180 ' + qb.name])
+        operation_dict['CZ_corr ' + qb.name]['refpoint'] = 'end'
 
+    print('flux pulse amp: ', flux_pulse['amplitude'])
+    if flux_pulse['amplitude'] != 0:
+        operation_dict['CZ_corr ' + qb.name]['phase'] = operation_dict['CZ ' + qb.name]['dynamic_phase']
+    else:
+        operation_dict['CZ_corr ' + qb.name]['phase'] = 0
+
+    print('flux pulse delay ', flux_pulse['pulse_delay'])
+    print('CZ corr phase: ', operation_dict['CZ_corr ' + qb.name]['phase'])
     for i, theta in enumerate(thetas):
 
         X90_2['phase'] = theta*180/np.pi
+        # incomplete fix later!!!
         el = multi_pulse_elt(i, station,
-                             [pulses['X90'], X90_2, RO_pars,
+                             # [pulses['X90'], X90_2,
+                             [pulses['X90'], operation_dict['CZ_corr ' + qb.name], X90_2,
+                              RO_pars,
                               flux_pulse])
         if distorted is True:
             if distortion_dict is not None:
