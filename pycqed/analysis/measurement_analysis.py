@@ -640,6 +640,15 @@ class MeasurementAnalysis(object):
 
             self.ylabels = [a+' (' + b + ')' for a, b in zip(self.value_names,
                                                              self.value_units)]
+
+            if 'optimization_result' in self.g:
+                self.optimization_result = OrderedDict({
+                    'generation': self.g['optimization_result'][:, 0],
+                    'evals':  self.g['optimization_result'][:, 1],
+                    'xfavorite':  self.g['optimization_result'][:, 2:2+len(self.parameter_names)],
+                    'stds':  self.g['optimization_result'][:, 2+len(self.parameter_names):2+2*len(self.parameter_names)],
+                    'fbest':  self.g['optimization_result'][:, -len(self.parameter_names)-1],
+                    'xbest': self.g['optimization_result'][:, -len(self.parameter_names):]})
         else:
             raise ValueError('datasaving_format "%s " not recognized'
                              % datasaving_format)
@@ -931,10 +940,6 @@ class OptimizationAnalysis(MeasurementAnalysis):
                 ['MC'].attrs['optimization_method']
         except:
             optimization_method = 'Numerical'
-            # This is because the MC is no longer an instrument and thus
-            # does not get saved, I have to re add this (MAR 1/2016)
-            logging.warning('Could not extract optimization method from' +
-                            ' data file')
 
         for i, meas_vals in enumerate(self.measured_values):
             if (not plot_all) & (i >= 1):
