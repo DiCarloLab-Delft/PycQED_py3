@@ -94,20 +94,33 @@ def distort_qudev(element, distortion_dict):
         if kernelvecs is not None:
             if np.array(kernelvecs).shape[0] == 1 and \
                     len(np.array(kernelvecs).shape) == 1:
-                wf_dist = filter_fir(kernelvecs,wfs_dict[ch])
+                wf_dist = filter_fir(kernelvecs,wf_dist)
             else:
                 for kernelvec in kernelvecs:
-                    wf_dist = filter_fir(kernelvec,wfs_dict[ch])
+                    wf_dist = filter_fir(kernelvec,wf_dist)
         if distortion_dict[ch]['IIR'] is not None:
             aIIRfilterList,bIIRfilterList = distortion_dict[ch]['IIR']
             wf_dist = filter_iir(aIIRfilterList,bIIRfilterList,wf_dist)
-        # set the last point to zero, such that the AWG holds
-        # a zero afer the waveform is finished
+        # set the first and the last point to zero, such that the AWG holds
+        # a zero after and before the waveform
         wf_dist[-1] = 0.
+        wf_dist[0] = 0.
         element.distorted_wfs[ch] = wf_dist
     return element
 
 def gaussian_filter_kernel(sigma,nr_sigma,dt):
+    '''
+    function to generate a Gaussian filter kernel with specified sigma and
+    filter kernel width (nr_sigma).
+
+    Args:
+        sigma (float): width of the Gaussian
+        nr_sigma (int): specifies the length of the filter kernel
+        dt (float): AWG sampling period
+
+    Returns:
+        kernel (numpy array): Gaussian filter kernel
+    '''
     nr_samples = int(nr_sigma*sigma/dt)
     if nr_samples == 0:
         logging.warning('sigma too small (much smaller than sampling rate).')

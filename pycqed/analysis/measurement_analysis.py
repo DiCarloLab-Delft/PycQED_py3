@@ -9316,7 +9316,17 @@ def SSB_demod(Ivals, Qvals, alpha=1, phi=0, I_o=0, Q_o=0, IF=10e6, predistort=Tr
 
 class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
     """
+    Measurement analysis class to analyse Ramsey type measrements
+    with an interleaved flux pulse
 
+    Args:
+        X90_separation (float): separation between the two X90 pulses
+        flux_pulse_length (float): length of the flux pulse in seconds
+                                    (used to calculate freq. shifts)
+        qb_name (str): qubit name
+        label (str): measurement label
+        run_default_super:
+        **kw:
 
 
     """
@@ -9421,7 +9431,10 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
 
             if plot:
                 self.ax[0].plot(thetas, ampls, 'k.')
-                self.ax[0].plot(thetas, fit_res.best_fit, 'r-')
+                thetas_fit = np.linspace(thetas[0],thetas[-1],128)
+                ampls_fit = fit_res.eval(t=thetas_fit)
+                print(len(ampls_fit),len(thetas_fit))
+                self.ax[0].plot(thetas_fit, ampls_fit, 'r-')
 
         phase_list.pop(0)
         phase_list.pop(0)
@@ -9433,9 +9446,10 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
             self.ax[0].set_ylabel('|S21| (arb. units)')
             self.ax[0].legend(['data','fits'])
 
-            self.ax[1].plot(self.sweep_points_2D/1e-9,phase_list)
+            self.ax[1].plot(self.sweep_points_2D,phase_list)
             self.ax[1].set_title('fitted phases')
-            self.ax[1].set_xlabel(self.parameter_names[1]+' (ns)')
+            self.ax[1].set_xlabel(self.parameter_names[1]
+                                  +' '+self.parameter_units[1])
             self.ax[1].set_ylabel('phase (rad)')
 
             self.fig.subplots_adjust(hspace=0.7)
@@ -9452,6 +9466,9 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
 
     def fit_delay(self,X90_separation=None,flux_pulse_length=None, plot=False,
                   print_fit_results=False,return_fit=None):
+        '''
+        method to fit the relative delay of the flux pulse to the drive pulses
+        '''
 
         if X90_separation is None:
             X90_separation = self.X90_separation

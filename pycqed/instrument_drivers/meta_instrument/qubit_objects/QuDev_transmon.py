@@ -2761,7 +2761,7 @@ class QuDev_transmon(Qubit):
                                        ampls_bidirectional = False,
                                        **kw):
         """
-        flux pulse timing frequency
+        flux pulse frequency calibration
 
         does a 2D measuement of the type:
 
