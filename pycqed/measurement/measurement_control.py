@@ -89,7 +89,6 @@ class MeasurementControl(Instrument):
             parameter_class=ManualParameter,
             initial_value=False)
 
-
         self.add_parameter('instrument_monitor',
                            parameter_class=ManualParameter,
                            initial_value=None,
@@ -395,7 +394,8 @@ class MeasurementControl(Instrument):
                         sweep_function.set_parameter(swp_pt)
                     except ValueError as e:
                         if self.cfg_clipping_mode():
-                            logging.warning('MC clipping mode caught exception:')
+                            logging.warning(
+                                'MC clipping mode caught exception:')
                             logging.warning(e)
                         else:
                             raise e
@@ -790,7 +790,8 @@ class MeasurementControl(Instrument):
             'Data', (0, len(self.sweep_functions) +
                      len(self.detector_function.value_names)),
             maxshape=(None, len(self.sweep_functions) +
-                      len(self.detector_function.value_names)), dtype='float64')
+                      len(self.detector_function.value_names)),
+            dtype='float64')
         self.get_column_names()
         self.dset.attrs['column_names'] = h5d.encode_to_utf8(self.column_names)
         # Added to tell analysis how to extract the data
@@ -824,6 +825,45 @@ class MeasurementControl(Instrument):
         for (param, val) in param_list:
             opt_sets_grp.attrs[param] = str(val)
 
+    def save_cma_optimization_results(self, es):
+        """
+        This function is to be used as the callback when running cma.fmin.
+        It get's handed an instance of an EvolutionaryStrategy (es).
+        From here it extracts the results and stores these in the hdf5 file
+        of the experiment.
+        """
+        # code extra verbose to understand what is going on
+        generation = es.result.iterations
+        evals = es.result.evaluations
+        xfavorite = es.result.xfavorite  # center of distribution, best est
+        stds = es.result.stds   # stds of distribution, stds of xfavorite
+        fbest = es.result.fbest  # best ever measured
+        xbest = es.result.xbest  # coordinates of best ever measured
+
+        if not self.minimize_optimization:
+            fbest = -fbest
+
+        results_array = np.concatenate([[generation, evals],
+                                        xfavorite, stds,
+                                        [fbest], xbest])
+        if (not 'optimization_result'
+                in self.data_object['Experimental Data'].keys()):
+            opt_res_grp = self.data_object['Experimental Data']
+            self.opt_res_dset = opt_res_grp.create_dataset(
+                'optimization_result', (0, len(results_array)),
+                maxshape=(None, len(results_array)),
+                dtype='float64')
+            self.opt_res_dset.attrs['column_names'] = h5d.encode_to_utf8(
+                'generation, ' + 'evaluations, ' +
+                'xfavorite, ' * len(xfavorite) +
+                'stds, '*len(stds) +
+                'fbest, ' + 'xbest, '*len(xbest))
+
+        old_shape = self.opt_res_dset.shape
+        new_shape = (old_shape[0]+1, old_shape[1])
+        self.opt_res_dset.resize(new_shape)
+        self.opt_res_dset[-1, :] = results_array
+
     def save_optimization_results(self, adaptive_function, result):
         """
         Saves the result of an adaptive measurement (optimization) to
@@ -843,9 +883,9 @@ class MeasurementControl(Instrument):
                         'xmean': result[5],
                         'stds': result[6],
                         'stop': result[-3]}
-                        # entries below cannot be stored
-                        # 'cmaes': result[-2],
-                        # 'logger': result[-1]}
+            # entries below cannot be stored
+            # 'cmaes': result[-2],
+            # 'logger': result[-1]}
         elif adaptive_function.__module__ == 'pycqed.measurement.optimization':
             res_dict = {'xopt':  result[0],
                         'fopt':  result[1]}
@@ -1160,6 +1200,11 @@ class MeasurementControl(Instrument):
         # Determines if the optimization will minimize or maximize
         self.minimize_optimization = self.af_pars.pop('minimize', True)
         self.f_termination = self.af_pars.pop('f_termination', None)
+
+        # ensures the cma optimization results are saved during the experiment
+        if (self.af_pars['adaptive_function'].__module__ ==
+                'cma.evolution_strategy' and 'callback' not in self.af_pars):
+            self.af_pars['callback'] = self.save_cma_optimization_results
 
     def get_adaptive_function_parameters(self):
         return self.af_pars
