@@ -1512,7 +1512,7 @@ class CCLight_Transmon(Qubit):
             parameter_list: list = ['G_att', 'D_att', 'freq'],
             initial_values: list =None,
             initial_steps: list= [2e3, 3e3, 1e6],
-            nr_cliffords: int=80, nr_seeds:int=80,
+            nr_cliffords: int=80, nr_seeds:int=200,
             verbose:bool = True, update: bool=True,
             prepare_for_timedomain: bool=True):
 
@@ -1945,7 +1945,7 @@ class CCLight_Transmon(Qubit):
             self.T2_echo(a.fit_res.params['tau'].value)
         return a
 
-    def measure_flipping(self, number_of_flips=np.arange(20), equator=False,
+    def measure_flipping(self, number_of_flips=np.arange(20), equator=True,
                          MC=None, analyze=True, close_fig=True, update=True):
 
         if MC is None:
@@ -1964,6 +1964,8 @@ class CCLight_Transmon(Qubit):
         self.prepare_for_timedomain()
         p = sqo.flipping(number_of_flips=nf, equator=equator,
                          qubit_idx=self.cfg_qubit_nr(),
+                         parameter_name='Number of pi-pulses',
+                         unit='#',
                          platf_cfg=self.cfg_openql_platform_fn())
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr())

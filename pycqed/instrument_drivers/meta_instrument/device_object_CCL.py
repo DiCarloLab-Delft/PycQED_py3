@@ -127,7 +127,8 @@ class DeviceCCL(Instrument):
     def prepare_readout(self):
         self._prep_ro_setup_qubits()
         self._prep_ro_sources()
-        self._prep_ro_pulses()
+        # commented out because it conflicts with setting in the qubit object
+        # self._prep_ro_pulses()
         self._prep_ro_integration_weights()
         self._prep_ro_instantiate_detectors()
 
@@ -660,7 +661,8 @@ class DeviceCCL(Instrument):
 
     def measure_chevron(self, q0: str, q_spec: str,
                         amps, lengths,
-                        prepare_for_timedomain=True, MC=None):
+                        prepare_for_timedomain=True, MC=None,
+                        waveform_name='square'):
         """
         Measure a chevron by flux pulsing q0.
         q0 is put in an excited at the beginning of the sequence and pulsed
@@ -697,9 +699,17 @@ class DeviceCCL(Instrument):
         amp_par = awg.parameters['awgs_{}_outputs_{}_amplitude'.format(
             awg_nr, ch_pair)]
 
-        sw = swf.FLsweep(fl_lutman, fl_lutman.sq_length,
-                         realtime_loading=False,
-                         waveform_name='square')
+        if waveform_name == 'square':
+            sw = swf.FLsweep(fl_lutman, fl_lutman.sq_length,
+                             realtime_loading=False,
+                             waveform_name=waveform_name)
+        elif waveform_name == 'cz_z':
+            sw = swf.FLsweep(fl_lutman, fl_lutman.cz_length,
+                             realtime_loading=False,
+                             waveform_name=waveform_name)
+        else:
+            raise ValueError()
+
         d = self.get_correlation_detector(single_int_avg=True,
                                           seg_per_point=1)
 

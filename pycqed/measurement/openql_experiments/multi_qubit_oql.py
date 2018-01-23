@@ -763,6 +763,135 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
     return p
 
 
+def grovers_two_qubit_all_inputs(q0: int, q1: int, platf_cfg: str,
+                                 precompiled_flux: bool=True,
+                                 cal_points: bool=True):
+    """
+    Writes the QASM sequence for Grover's algorithm on two qubits.
+    Sequence:
+        q0: G0 -       - mY90 -    - mY90  - RO
+                 CZ_ij          CZ
+        q1: G1 -       - mY90 -    - mY90  - RO
+    whit all combinations of (ij) = omega.
+    G0 and G1 are Y90 or Y90, depending on the (ij).
+
+    Args:
+        q0_name, q1_name (string):
+                Names of the qubits to which the sequence is applied.
+        RO_target (string):
+                Readout target. Can be a qubit name or 'all'.
+        precompiled_flux (bool):
+                Determies if the full waveform for the flux pulses is
+                precompiled, thus only needing one trigger at the start,
+                or if every flux pulse should be triggered individually.
+        cal_points (bool):
+                Whether to add calibration points.
+
+    Returns:
+        qasm_file: a reference to the new QASM file object.
+    """
+
+    if not precompiled_flux:
+        raise NotImplementedError('Currently only precompiled flux pulses '
+                                  'are supported.')
+
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="Grovers_two_qubit_all_inputs",
+                nqubits=platf.get_qubit_number(), p=platf)
+
+    for G0 in ['ry90', 'rym90']:
+        for G1 in ['ry90', 'rym90']:
+            k = Kernel('Gr{}_{}'.format(G0, G1),  p=platf)
+            k.prepz(q0)
+            k.prepz(q1)
+            k.gate(G0, q0)
+            k.gate(G1, q1)
+            k.gate('fl_cw_03', 2,0) # flux cw03 is the multi_cz pulse
+            k.gate('ry90', q0)
+            k.gate('ry90', q1)
+            # k.gate('fl_cw_00', 2,0)
+            k.gate('wait', [2, 0], 260)
+            k.gate('ry90', q0)
+            k.gate('ry90', q1)
+            k.measure(q0)
+            k.measure(q1)
+            k.gate('wait', [2, 0], 0)
+            p.add_kernel(k)
+
+    if cal_points:
+        p = add_two_q_cal_points(p, platf=platf, q0=q0, q1=q1)
+    with suppress_stdout():
+        p.compile()
+
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
+def grovers_tomography(q0: int, q1: int, omega:int, platf_cfg: str,
+                       precompiled_flux: bool=True,
+                       cal_points: bool=True):
+
+    if not precompiled_flux:
+        raise NotImplementedError('Currently only precompiled flux pulses '
+                                  'are supported.')
+
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="Grovers_tomo_two_qubit_all_inputs",
+                nqubits=platf.get_qubit_number(), p=platf)
+
+    tomo_gates = ['i', 'rx180', 'ry90', 'rym90', 'rx90', 'rxm90']
+
+
+    if omega == 0:
+        G0 = 'ry90'
+        G1 = 'ry90'
+    elif omega == 1:
+        G0 = 'ry90'
+        G1 = 'rym90'
+    elif omega == 2:
+        G0 = 'rym90'
+        G1 = 'ry90'
+    elif omega == 3:
+        G0 = 'rym90'
+        G1 = 'rym90'
+    else:
+        raise ValueError('omega must be in [0, 3]')
+
+
+    for p_q1 in tomo_gates:
+        for p_q0 in tomo_gates:
+            k = Kernel('Gr{}_{}_tomo_{}_{}'.format(G0, G1, p_q0, p_q1),
+                       p=platf)
+            k.prepz(q0)
+            k.prepz(q1)
+            k.gate(G0, q0)
+            k.gate(G1, q1)
+            k.gate('fl_cw_03', 2,0) # flux cw03 is the multi_cz pulse
+            k.gate('ry90', q0)
+            k.gate('ry90', q1)
+            # k.gate('fl_cw_00', 2,0)
+            k.gate('wait', [2, 0], 260)
+            k.gate('ry90', q0)
+            k.gate('ry90', q1)
+
+            # tomo pulses
+            k.gate(p_q1, q0)
+            k.gate(p_q0, q1)
+
+            k.measure(q0)
+            k.measure(q1)
+            k.gate('wait', [2, 0], 0)
+            p.add_kernel(k)
+
+    p = add_two_q_cal_points(p, platf=platf, q0=q0, q1=q1, reps_per_cal_pt=7)
+    with suppress_stdout():
+        p.compile()
+
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
+
 def CZ_poisoned_purity_seq(q0, q1, platf_cfg: str, cal_points: bool=True):
     """
     Creates the |00> + |11> Bell state and does a partial tomography in

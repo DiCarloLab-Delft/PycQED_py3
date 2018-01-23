@@ -1713,13 +1713,15 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
                 raise ValueError('Correlations should be in channels')
 
             correlation_channel = -1
-            # 4 is the (current) max number of weights in the UHFQC (v5)
+
+            # # 4 is the (current) max number of weights in the UHFQC (v5)
             for ch in range(4):
                 if ch in self.channels:
                     # Disable correlation mode as this is used for normal
                     # acquisition
                     self.UHFQC.set('quex_corr_{}_mode'.format(ch), 0)
 
+                # Find the first unused channel to set up as correlation
                 if ch not in self.channels:
                     # selects the lowest available free channel
                     self.channels += [ch]
@@ -1729,6 +1731,8 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
                     # correlation mode is turned on in the
                     # set_up_correlation_weights method
                     break
+                    # FIXME, can currently only use one correlation
+
             if correlation_channel < 0:
                 raise ValueError('No free channel available for correlation.')
 
@@ -1759,6 +1763,16 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             self.UHFQC.set(
                 'quex_wint_weights_{}_imag'.format(correlation_channel),
                 copy_int_weights_imag)
+
+            copy_rot_real = self.UHFQC.get('quex_rot_{}_real'.format(corr[0]))
+            copy_rot_imag = self.UHFQC.get('quex_rot_{}_imag'.format(corr[0]))
+            self.UHFQC.set('quex_rot_{}_real'.format(correlation_channel),
+                           copy_rot_real)
+            self.UHFQC.set('quex_rot_{}_imag'.format(correlation_channel),
+                           copy_rot_imag)
+
+
+
             # Enable correlation mode one the correlation output channel and
             # set the source to the second source channel
             self.UHFQC.set('quex_corr_{}_mode'.format(correlation_channel), 1)
