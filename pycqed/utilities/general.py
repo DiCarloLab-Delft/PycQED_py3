@@ -1,4 +1,5 @@
-import os, sys
+import os
+import sys
 import numpy as np
 import h5py
 import json
@@ -458,6 +459,7 @@ class suppress_stdout(ContextDecorator):
         suppress-stdout-stderr-print-from-python-functions"
 
     '''
+
     def __init__(self):
         # Open a pair of null files
         self.null_fds = [os.open(os.devnull, os.O_RDWR) for x in range(2)]
