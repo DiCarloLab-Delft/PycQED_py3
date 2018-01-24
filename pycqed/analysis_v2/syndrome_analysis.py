@@ -210,6 +210,10 @@ class One_Qubit_Paritycheck_Analysis(ba.BaseDataAnalysis):
             self.run_analysis()
 
     def process_data(self):
+
+        # Shorthand reference to proc_data_dict to keep code more readable
+        dat_dict = self.proc_data_dict
+
         ch_idx_anc = self.options_dict.get('ch_idx_anc', 0)
         ch_idx_data = self.options_dict.get('ch_idx_data', 1)
         nr_of_measurements = self.options_dict.get('nr_of_measurements', 11)
@@ -224,97 +228,107 @@ class One_Qubit_Paritycheck_Analysis(ba.BaseDataAnalysis):
 
         nr_bins = self.options_dict.get('nr_bins', 100)
 
-
-
         shots_anc = list(self.raw_data_dict['measured_values_ord_dict'].values())\
             [ch_idx_anc][0]
         shots_data = list(self.raw_data_dict['measured_values_ord_dict'].values())\
             [ch_idx_data][0]
 
-        self.proc_data_dict['shots_anc'] = shots_anc
-        self.proc_data_dict['shots_data'] = shots_data
+        dat_dict['shots_anc'] = shots_anc
+        dat_dict['shots_data'] = shots_data
 
         # Data binning
-        prep0_anc = copy(shots_anc[::nr_of_measurements*2])
-        meas0_anc = copy(shots_anc[1::nr_of_measurements*2])
-        prep1_anc = copy(shots_anc[nr_of_measurements::nr_of_measurements*2])
-        meas1_anc = copy(shots_anc[nr_of_measurements+1::nr_of_measurements*2])
+        (prep_0_anc, meas_0_anc, trace_0_anc, prep_1_anc, meas_1_anc,
+            trace_1_anc) = repeated_parity_data_binning(
+            dat_dict['shots_anc'], 11)
+        (prep_0_data, meas_0_data, trace_0_data, prep_1_data, meas_1_data,
+            trace_1_data) = repeated_parity_data_binning(
+            dat_dict['shots_data'], 11)
 
 
-        prep0_data = copy(shots_data[::nr_of_measurements*2])
-        meas0_data = copy(shots_data[1::nr_of_measurements*2])
-        prep1_data = copy(shots_data[nr_of_measurements::nr_of_measurements*2])
-        meas1_data = copy(shots_data[nr_of_measurements+1::nr_of_measurements*2])
+        dat_dict['trace_0_anc'] = trace_0_anc
+        # Digitizing traces
+        dat_dict['trace_0_anc_dig'] = dm_tools.digitize(trace_0_anc, dig_th_anc)
+        dat_dict['trace_0_data_dig'] = dm_tools.digitize(trace_0_data, dig_th_data)
+        dat_dict['trace_1_anc_dig'] = dm_tools.digitize(trace_1_anc, dig_th_anc)
+        dat_dict['trace_1_data_dig'] = dm_tools.digitize(trace_1_data, dig_th_data)
 
         # post selection
         if post_select:
-            meas0_anc[np.where(prep0_anc > post_sel_th_anc)] = np.nan
-            meas0_anc[np.where(prep0_data > post_sel_th_data)] = np.nan
-            meas1_anc[np.where(prep1_anc > post_sel_th_anc)] = np.nan
-            meas1_anc[np.where(prep1_data > post_sel_th_data)] = np.nan
-
-            meas0_data[np.where(prep0_anc > post_sel_th_anc)] = np.nan
-            meas0_data[np.where(prep0_data > post_sel_th_data)] = np.nan
-            meas1_data[np.where(prep1_anc > post_sel_th_anc)] = np.nan
-            meas1_data[np.where(prep1_data > post_sel_th_data)] = np.nan
+            for arr in [meas_0_anc, meas_0_data, trace_0_anc, trace_0_data,
+                dat_dict['trace_0_anc_dig'], dat_dict['trace_0_data_dig']]:
+                arr = post_select_init_measurement(
+                    thresholds = (post_sel_th_anc, post_sel_th_data),
+                    init_measurements=(prep_0_anc, prep_0_data), array=arr)
+            for arr in [meas_1_anc, meas_1_data, trace_1_anc, trace_1_data]:
+                arr = post_select_init_measurement(
+                    thresholds = (post_sel_th_anc, post_sel_th_data),
+                    init_measurements=(prep_1_anc, prep_1_data), array=arr)
 
         # Histogramming
-        self.proc_data_dict['prep0_anc_hist'] = np.histogram(
-            prep0_anc, bins=nr_bins,
+        dat_dict['prep_0_anc_hist'] = np.histogram(
+            prep_0_anc, bins=nr_bins,
             range=(np.min(shots_anc), np.max(shots_anc)))
-        self.proc_data_dict['prep1_anc_hist'] = np.histogram(
-            prep1_anc, bins=nr_bins,
-            range=(np.min(shots_anc), np.max(shots_anc)))
-
-        self.proc_data_dict['meas0_anc_hist'] = np.histogram(
-            meas0_anc, bins=nr_bins,
-            range=(np.min(shots_anc), np.max(shots_anc)))
-        self.proc_data_dict['meas1_anc_hist'] = np.histogram(
-            meas1_anc, bins=nr_bins,
+        dat_dict['prep_1_anc_hist'] = np.histogram(
+            prep_1_anc, bins=nr_bins,
             range=(np.min(shots_anc), np.max(shots_anc)))
 
-        self.proc_data_dict['prep0_data_hist'] = np.histogram(
-            prep0_data, bins=nr_bins,
+        dat_dict['meas_0_anc_hist'] = np.histogram(
+            meas_0_anc, bins=nr_bins,
+            range=(np.min(shots_anc), np.max(shots_anc)))
+        dat_dict['meas_1_anc_hist'] = np.histogram(
+            meas_1_anc, bins=nr_bins,
+            range=(np.min(shots_anc), np.max(shots_anc)))
+
+        dat_dict['prep_0_data_hist'] = np.histogram(
+            prep_0_data, bins=nr_bins,
             range=(np.min(shots_data), np.max(shots_data)))
-        self.proc_data_dict['prep1_data_hist'] = np.histogram(
-            prep1_data, bins=nr_bins,
+        dat_dict['prep_1_data_hist'] = np.histogram(
+            prep_1_data, bins=nr_bins,
             range=(np.min(shots_data), np.max(shots_data)))
-        self.proc_data_dict['meas0_data_hist'] = np.histogram(
-            meas0_data, bins=nr_bins,
+        dat_dict['meas_0_data_hist'] = np.histogram(
+            meas_0_data, bins=nr_bins,
             range=(np.min(shots_data), np.max(shots_data)))
-        self.proc_data_dict['meas1_data_hist'] = np.histogram(
-            meas1_data, bins=nr_bins,
+        dat_dict['meas_1_data_hist'] = np.histogram(
+            meas_1_data, bins=nr_bins,
             range=(np.min(shots_data), np.max(shots_data)))
 
 
-        F_ass_1 = np.sum(meas1_anc<dig_th_anc) /(np.sum(meas1_anc>dig_th_anc) + np.sum(meas1_anc<dig_th_anc))
-        F_ass_0 = np.sum(meas0_anc>dig_th_anc) /(np.sum(meas0_anc>dig_th_anc) + np.sum(meas0_anc<dig_th_anc))
+        F_ass_1 = np.sum(meas_1_anc<dig_th_anc) /(
+            np.sum(meas_1_anc>dig_th_anc) + np.sum(meas_1_anc<dig_th_anc))
+        F_ass_0 = np.sum(meas_0_anc>dig_th_anc) /(
+            np.sum(meas_0_anc>dig_th_anc) + np.sum(meas_0_anc<dig_th_anc))
 
         F_ass_avg = 1-(1-F_ass_0+1-F_ass_1)/2
-        self.proc_data_dict['F_ass']=F_ass_avg
-
+        self.proc_data_dict['F_ass'] = F_ass_avg
 
     def prepare_plots(self):
+        self.prepare_ancilla_ro_histogram()
+        self.prepare_data_ro_histogram()
+        self.prepare_typical_trace_plot()
 
+
+
+
+    def prepare_ancilla_ro_histogram(self):
         #########################################
         # Ancilla qubit figures
         #########################################
-        self.plot_dicts['meas0_anc'] = {
+        self.plot_dicts['meas_0_anc'] = {
                     'xlabel': 'anc dac value',
                     'title': 'Ancilla qubit histograms' + '\n'+self.timestamps[0],
                     'ylabel': 'Counts',
                     'plotfn': self.plot_bar,
-                    'xvals': self.proc_data_dict['meas0_anc_hist'][1],
-                    'yvals': self.proc_data_dict['meas0_anc_hist'][0],
+                    'xvals': self.proc_data_dict['meas_0_anc_hist'][1],
+                    'yvals': self.proc_data_dict['meas_0_anc_hist'][0],
                     'ax_id': '1D_histogram_anc',
                     'bar_kws': {'log': False, 'alpha': .4, 'facecolor': 'C0',
                                 'edgecolor': 'C0'},
                     'setlabel': 'Data prep. in: |0>'}
 
-        self.plot_dicts['meas1_anc'] = {
+        self.plot_dicts['meas_1_anc'] = {
                     'plotfn': self.plot_bar,
-                    'xvals': self.proc_data_dict['meas1_anc_hist'][1],
-                    'yvals': self.proc_data_dict['meas1_anc_hist'][0],
+                    'xvals': self.proc_data_dict['meas_1_anc_hist'][1],
+                    'yvals': self.proc_data_dict['meas_1_anc_hist'][0],
                     'ax_id': '1D_histogram_anc',
                     'bar_kws': {'log': False, 'alpha': .4, 'facecolor': 'C3',
                                 'edgecolor': 'C3'},
@@ -330,8 +344,8 @@ class One_Qubit_Paritycheck_Analysis(ba.BaseDataAnalysis):
 
 
 
-        max_cnts = np.max([np.max(self.proc_data_dict['meas0_anc_hist'][0]),
-                           np.max(self.proc_data_dict['meas1_anc_hist'][0])])
+        max_cnts = np.max([np.max(self.proc_data_dict['meas_0_anc_hist'][0]),
+                           np.max(self.proc_data_dict['meas_1_anc_hist'][0])])
         ps_th = self.options_dict.get('post_sel_th_anc', 0)
         dig_th = self.options_dict.get('dig_th_anc', ps_th)
         self.plot_dicts['post_sel_th_anc'] = {
@@ -361,31 +375,32 @@ class One_Qubit_Paritycheck_Analysis(ba.BaseDataAnalysis):
 
 
 
+    def prepare_data_ro_histogram(self):
         #########################################
         # Data qubit figures
         #########################################
-        self.plot_dicts['meas0_data'] = {
+        self.plot_dicts['meas_0_data'] = {
                     'xlabel': 'data dac value',
                     'title': 'Data qubit histograms' + '\n'+self.timestamps[0],
                     'ylabel': 'Counts',
                     'plotfn': self.plot_bar,
-                    'xvals': self.proc_data_dict['meas0_data_hist'][1],
-                    'yvals': self.proc_data_dict['meas0_data_hist'][0],
+                    'xvals': self.proc_data_dict['meas_0_data_hist'][1],
+                    'yvals': self.proc_data_dict['meas_0_data_hist'][0],
                     'ax_id': '1D_histogram_data',
                     'bar_kws': {'log': False, 'alpha': .4, 'facecolor': 'C0',
                                 'edgecolor': 'C0'},
                     'setlabel': 'Data prep. in: |0>'}
-        self.plot_dicts['meas1_data'] = {
+        self.plot_dicts['meas_1_data'] = {
                     'plotfn': self.plot_bar,
-                    'xvals': self.proc_data_dict['meas1_data_hist'][1],
-                    'yvals': self.proc_data_dict['meas1_data_hist'][0],
+                    'xvals': self.proc_data_dict['meas_1_data_hist'][1],
+                    'yvals': self.proc_data_dict['meas_1_data_hist'][0],
                     'ax_id': '1D_histogram_data',
                     'bar_kws': {'log': False, 'alpha': .4, 'facecolor': 'C3',
                                 'edgecolor': 'C3'},
                     'setlabel': 'Data prep. in: |1>'}
 
-        max_cnts = np.max([np.max(self.proc_data_dict['meas0_data_hist'][0]),
-                           np.max(self.proc_data_dict['meas1_data_hist'][0])])
+        max_cnts = np.max([np.max(self.proc_data_dict['meas_0_data_hist'][0]),
+                           np.max(self.proc_data_dict['meas_1_data_hist'][0])])
         ps_th = self.options_dict.get('post_sel_th_data', 0)
         dig_th = self.options_dict.get('dig_th_data', ps_th)
         self.plot_dicts['post_sel_th_data'] = {
@@ -413,6 +428,95 @@ class One_Qubit_Paritycheck_Analysis(ba.BaseDataAnalysis):
             'setlabel': 'Digitization thres. {:.2f}'.format(dig_th),
             'do_legend': True}
 
+    def prepare_typical_trace_plot(self):
+
+        idx = self.options_dict.get('idx_typ_0', 0)
+        raw_pat = self.proc_data_dict['trace_0_anc_dig'][idx, :]
+        self.plot_dicts['typical_trace_0'] = {
+            'plotfn': self.plot_line,
+            'ax_id': 'typical_trace',
+            'xvals': np.arange(len(raw_pat))+1,
+            'yvals': raw_pat,
+            'xlabel': 'Measurement #',
+            'ylabel': 'Declared state',
+            'yrange': (-1.05, 1.05),  # FIXME change to ylim in base analysis
+            'setlabel': 'Initial state |0>',
+            'title': 'Typical trace of Ancilla outcomes',
+            'do_legend': True,
+            'legend_pos': 'right'}
+
+        idx = self.options_dict.get('idx_typ_1', 1)
+        raw_pat = self.proc_data_dict['trace_1_anc_dig'][idx, :]
+        self.plot_dicts['typical_trace_1'] = {
+            'plotfn': self.plot_line,
+            'ax_id': 'typical_trace',
+            'xvals': np.arange(len(raw_pat))+1,
+            'yvals': raw_pat,
+            'xlabel': 'Measurement #',
+            'ylabel': 'Declared state',
+            'yrange': (-1.05, 1.05),  # FIXME change to ylim in base analysis
+            'setlabel': 'Initial state |1>',
+            'title': 'Typical trace of Ancilla outcomes',
+            'do_legend': True,
+            'legend_pos': 'right'}
+
+
+
+def post_select_init_measurement(thresholds, init_measurements, array):
+
+    if len(np.shape(array)) == 1:
+        array[np.where(init_measurements[0] > thresholds[0])] = np.nan
+        array[np.where(init_measurements[1]> thresholds[1])] = np.nan
+    elif len(np.shape(array)) ==2:
+
+        # print(array)
+        # for i in np.where(init_measurements[0] > thresholds[0]):
+        #     array[i, :] = np.nan
+
+        # print(np.where(init_measurements[0] > thresholds[0]))
+        # array[np.where(init_measurements[0] > thresholds[0]), :] = np.nan
+        # array[np.where(init_measurements[1]> thresholds[1]), :] = np.nan
+        pass
+
+    else:
+        raise ValueErrory('Data shape not recognized')
+
+    return array
+
+def repeated_parity_data_binning(shots, nr_of_meas:int):
+    """
+    Used for data binning of the repeated parity check experiment.
+    Assumes the data qubit is alternatively prepared in 0 and 1.
+
+    Args:
+        shots (1D array) : array containing all measured values of 1 qubit
+        nr_of_meas (int) : number of measurement per prepared state.
+            used to determine the period for data binning. Includes
+            the initialization measurement.
+
+    Returns
+        prep_0  (1D array)  outcomes of the initialization measurement
+        meas_0  (1D array)  outcomes of the first measurement
+        trace_0 (2D array)  traces
+
+        prep_1  (1D array)
+        meas_1  (1D array)
+        trace_1 (2D array)
+    """
+
+    prep_0 = copy(shots[::nr_of_meas*2])
+    meas_0 = copy(shots[1::nr_of_meas*2])
+
+    prep_1 = copy(shots[nr_of_meas::nr_of_meas*2])
+    meas_1 = copy(shots[nr_of_meas+1::nr_of_meas*2])
+
+    trace_0 = np.zeros((len(prep_0), nr_of_meas-1))
+    trace_1 = np.zeros((len(prep_1), nr_of_meas-1))
+    for i in range(len(prep_0)):
+        trace_0[i, :] = shots[1+(2*i)*nr_of_meas: (2*i+1)*nr_of_meas]
+        trace_1[i, :] = shots[1+(2*i+1)*nr_of_meas: (2*i+2)*nr_of_meas]
+
+    return (prep_0, meas_0, trace_0, prep_1, meas_1, trace_1)
 
 
         # a.plot_dicts = plot_dicts
