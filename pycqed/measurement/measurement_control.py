@@ -853,6 +853,8 @@ class MeasurementControl(Instrument):
                 'optimization_result', (0, len(results_array)),
                 maxshape=(None, len(results_array)),
                 dtype='float64')
+
+            # FIXME: Jan 2018, add the names of the parameters to column names
             self.opt_res_dset.attrs['column_names'] = h5d.encode_to_utf8(
                 'generation, ' + 'evaluations, ' +
                 'xfavorite, ' * len(xfavorite) +
