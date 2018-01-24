@@ -50,6 +50,7 @@ class BaseDataAnalysis(object):
     """
 
     def __init__(self, t_start: str=None, t_stop: str=None,
+                 label: str='',
                  data_file_path: str=None,
                  options_dict: dict=None, extract_only: bool=False,
                  do_fitting: bool=False):
@@ -103,7 +104,7 @@ class BaseDataAnalysis(object):
         ################################################
         # These options determine what data to extract #
         ################################################
-        scan_label = self.options_dict.get('scan_label', '')
+        scan_label = self.options_dict.get('scan_label', label)
         if type(scan_label) is not list:
             self.labels = [scan_label]
         else:

@@ -8,11 +8,13 @@ import pycqed.analysis.tools.data_manipulation as dm_tools
 class Single_Qubit_RoundsToEvent_Analysis(ba.BaseDataAnalysis):
 
     def __init__(self, t_start: str=None, t_stop: str=None,
+                 label: str='',
                  data_file_path: str=None,
                  options_dict: dict=None, extract_only: bool=False,
                  extract_metadata: bool=True,
                  do_fitting: bool=True, auto=True):
         super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
                          data_file_path=data_file_path,
                          options_dict=options_dict,
                          extract_only=extract_only, do_fitting=do_fitting)
@@ -172,8 +174,12 @@ class One_Qubit_Paritycheck_Analysis(ba.BaseDataAnalysis):
         ch_idx_anc (int) specifies the readout channel for the ancilla qubit
         ch_idx_data (int) specifies the readout channel for the data qubit.
 
-        post_sel_th_anc (float)
+        post_sel_th_anc  (float)
         post_sel_th_data (float)
+        dig_th_anc       (float)
+        dig_th_data      (float)
+
+
         nr_of_measurements (int) The number of repetitions of the circuit,
             used in the data binning.
 
@@ -181,12 +187,12 @@ class One_Qubit_Paritycheck_Analysis(ba.BaseDataAnalysis):
     """
 
     def __init__(self, t_start: str=None, t_stop: str=None,
-                 data_file_path: str=None,
+                 label:str ='', data_file_path: str=None,
                  options_dict: dict=None, extract_only: bool=False,
                  do_fitting: bool=True, auto=True):
 
         super().__init__(t_start=t_start, t_stop=t_stop,
-                         data_file_path=data_file_path,
+                         label=label, data_file_path=data_file_path,
                          options_dict=options_dict,
                          extract_only=extract_only, do_fitting=do_fitting)
 
@@ -210,7 +216,8 @@ class One_Qubit_Paritycheck_Analysis(ba.BaseDataAnalysis):
         post_sel_th_anc = self.options_dict.get('post_sel_th_anc', 0)
         post_sel_th_data = self.options_dict.get('post_sel_th_data', 0)
 
-        ass_th_anc = self.options_dict.get('ass_th_anc', post_sel_th_anc)
+        dig_th_anc = self.options_dict.get('dig_th_anc', post_sel_th_anc)
+        dig_th_data = self.options_dict.get('dig_th_anc', post_sel_th_data)
 
 
         post_select = self.options_dict.get('post_select', True)
@@ -280,14 +287,18 @@ class One_Qubit_Paritycheck_Analysis(ba.BaseDataAnalysis):
             range=(np.min(shots_data), np.max(shots_data)))
 
 
-        F_ass_1 = np.sum(meas1_anc<ass_th_anc) /(np.sum(meas1_anc>ass_th_anc) + np.sum(meas1_anc<ass_th_anc))
-        F_ass_0 = np.sum(meas0_anc>ass_th_anc) /(np.sum(meas0_anc>ass_th_anc) + np.sum(meas0_anc<ass_th_anc))
+        F_ass_1 = np.sum(meas1_anc<dig_th_anc) /(np.sum(meas1_anc>dig_th_anc) + np.sum(meas1_anc<dig_th_anc))
+        F_ass_0 = np.sum(meas0_anc>dig_th_anc) /(np.sum(meas0_anc>dig_th_anc) + np.sum(meas0_anc<dig_th_anc))
 
         F_ass_avg = 1-(1-F_ass_0+1-F_ass_1)/2
         self.proc_data_dict['F_ass']=F_ass_avg
 
 
     def prepare_plots(self):
+
+        #########################################
+        # Ancilla qubit figures
+        #########################################
         self.plot_dicts['meas0_anc'] = {
                     'xlabel': 'anc dac value',
                     'title': 'Ancilla qubit histograms' + '\n'+self.timestamps[0],
@@ -312,11 +323,47 @@ class One_Qubit_Paritycheck_Analysis(ba.BaseDataAnalysis):
 
         self.plot_dicts['text_msg'] = {
             'ax_id': '1D_histogram_anc',
-            'ypos': 0.75,
+            'ypos': 0.6,
             'plotfn': self.plot_text,
             'box_props': 'fancy',
             'text_string': 'F avg. ass.: {:.2f} %'.format(self.proc_data_dict['F_ass']*100)}
 
+
+
+        max_cnts = np.max([np.max(self.proc_data_dict['meas0_anc_hist'][0]),
+                           np.max(self.proc_data_dict['meas1_anc_hist'][0])])
+        ps_th = self.options_dict.get('post_sel_th_anc', 0)
+        dig_th = self.options_dict.get('dig_th_anc', ps_th)
+        self.plot_dicts['post_sel_th_anc'] = {
+            'ax_id': '1D_histogram_anc',
+            'plotfn': self.plot_vlines,
+            'x': ps_th,
+            'ymin': 0,
+            'ymax': max_cnts*1.05,
+            'colors': '.3',
+            'linestyles': 'dashed',
+            'line_kws': {'linewidth': .8},
+            'setlabel': 'Post sel. thres. {:.2f}'.format(ps_th),
+            'do_legend': True}
+
+        ps_th = self.options_dict.get('dig_th_anc', 0)
+        self.plot_dicts['dig_th_anc'] = {
+            'ax_id': '1D_histogram_anc',
+            'plotfn': self.plot_vlines,
+            'x': dig_th,
+            'ymin': 0,
+            'ymax': max_cnts*1.05,
+            'colors': '.3',
+            'linestyles': 'solid',
+            'line_kws': {'linewidth': .8},
+            'setlabel': 'Digitization thres. {:.2f}'.format(dig_th),
+            'do_legend': True}
+
+
+
+        #########################################
+        # Data qubit figures
+        #########################################
         self.plot_dicts['meas0_data'] = {
                     'xlabel': 'data dac value',
                     'title': 'Data qubit histograms' + '\n'+self.timestamps[0],
@@ -336,6 +383,36 @@ class One_Qubit_Paritycheck_Analysis(ba.BaseDataAnalysis):
                     'bar_kws': {'log': False, 'alpha': .4, 'facecolor': 'C3',
                                 'edgecolor': 'C3'},
                     'setlabel': 'Data prep. in: |1>'}
+
+        max_cnts = np.max([np.max(self.proc_data_dict['meas0_data_hist'][0]),
+                           np.max(self.proc_data_dict['meas1_data_hist'][0])])
+        ps_th = self.options_dict.get('post_sel_th_data', 0)
+        dig_th = self.options_dict.get('dig_th_data', ps_th)
+        self.plot_dicts['post_sel_th_data'] = {
+            'ax_id': '1D_histogram_data',
+            'plotfn': self.plot_vlines,
+            'x': ps_th,
+            'ymin': 0,
+            'ymax': max_cnts*1.05,
+            'colors': '.3',
+            'linestyles': 'dashed',
+            'line_kws': {'linewidth': .8},
+            'setlabel': 'Post sel. thres. {:.2f}'.format(ps_th),
+            'do_legend': True}
+
+        ps_th = self.options_dict.get('dig_th_data', 0)
+        self.plot_dicts['dig_th_data'] = {
+            'ax_id': '1D_histogram_data',
+            'plotfn': self.plot_vlines,
+            'x': dig_th,
+            'ymin': 0,
+            'ymax': max_cnts*1.05,
+            'colors': '.3',
+            'linestyles': 'solid',
+            'line_kws': {'linewidth': .8},
+            'setlabel': 'Digitization thres. {:.2f}'.format(dig_th),
+            'do_legend': True}
+
 
 
         # a.plot_dicts = plot_dicts
