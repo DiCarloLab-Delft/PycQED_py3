@@ -131,6 +131,7 @@ pycqed/measurement/openql_experiments/output/*
 # test data files should be explicitly added by hand (overriding .gitignore)
 data/*
 *.hdf5
-.idea
+*.sdpa
+*.sol
 *.json
-
+.idea
