@@ -179,6 +179,9 @@ class One_Qubit_Paritycheck_Analysis(ba.BaseDataAnalysis):
         dig_th_anc       (float)
         dig_th_data      (float)
 
+        exp_pat_0       (str)
+        exp_pat_1       (str)
+
 
         nr_of_measurements (int) The number of repetitions of the circuit,
             used in the data binning.
@@ -247,22 +250,42 @@ class One_Qubit_Paritycheck_Analysis(ba.BaseDataAnalysis):
 
         dat_dict['trace_0_anc'] = trace_0_anc
         # Digitizing traces
-        dat_dict['trace_0_anc_dig'] = dm_tools.digitize(trace_0_anc, dig_th_anc)
-        dat_dict['trace_0_data_dig'] = dm_tools.digitize(trace_0_data, dig_th_data)
-        dat_dict['trace_1_anc_dig'] = dm_tools.digitize(trace_1_anc, dig_th_anc)
-        dat_dict['trace_1_data_dig'] = dm_tools.digitize(trace_1_data, dig_th_data)
+        dat_dict['trace_0_anc_dig'] = dm_tools.digitize(
+            trace_0_anc, dig_th_anc, zero_state=0)
+        dat_dict['trace_0_data_dig'] = dm_tools.digitize(
+            trace_0_data, dig_th_data, zero_state=0)
+        dat_dict['trace_1_anc_dig'] = dm_tools.digitize(
+            trace_1_anc, dig_th_anc, zero_state=0)
+        dat_dict['trace_1_data_dig'] = dm_tools.digitize(
+            trace_1_data, dig_th_data, zero_state=0)
 
         # post selection
         if post_select:
-            for arr in [meas_0_anc, meas_0_data, trace_0_anc, trace_0_data,
-                dat_dict['trace_0_anc_dig'], dat_dict['trace_0_data_dig']]:
-                arr = post_select_init_measurement(
-                    thresholds = (post_sel_th_anc, post_sel_th_data),
-                    init_measurements=(prep_0_anc, prep_0_data), array=arr)
+            dat_dict['post_sel_idx_0'] = get_post_select_indices(
+                (post_sel_th_anc, post_sel_th_data), (prep_0_anc, prep_0_data))
+            dat_dict['post_sel_idx_1'] = get_post_select_indices(
+                (post_sel_th_anc, post_sel_th_data), (prep_1_anc, prep_1_data))
+
+            for arr in [meas_0_anc, meas_0_data, trace_0_anc, trace_0_data]:
+                arr[dat_dict['post_sel_idx_0']] = np.nan
             for arr in [meas_1_anc, meas_1_data, trace_1_anc, trace_1_data]:
-                arr = post_select_init_measurement(
-                    thresholds = (post_sel_th_anc, post_sel_th_data),
-                    init_measurements=(prep_1_anc, prep_1_data), array=arr)
+                arr[dat_dict['post_sel_idx_1']] = np.nan
+
+        # Counting the rounds to event
+        dat_dict['RTE_0'] = count_RTE(dat_dict['trace_0_anc_dig'],
+                                      exp_pattern='alternating', init_state=0)
+        dat_dict['RTE_1'] = count_RTE(dat_dict['trace_1_anc_dig'],
+                                      exp_pattern='constant', init_state=0)
+
+        dat_dict['RTE_0_ps'] = copy(dat_dict['RTE_0'])
+        dat_dict['RTE_0_ps'][dat_dict['post_sel_idx_0']] = np.nan
+        dat_dict['RTE_1_ps'] = copy(dat_dict['RTE_1'])
+        dat_dict['RTE_1_ps'][dat_dict['post_sel_idx_1']] = np.nan
+
+        dat_dict['mRTE_0_ps'] = np.nanmean(dat_dict['RTE_0_ps'])
+        dat_dict['mRTE_1_ps'] = np.nanmean(dat_dict['RTE_1_ps'])
+
+
 
         # Histogramming
         dat_dict['prep_0_anc_hist'] = np.histogram(
@@ -293,6 +316,16 @@ class One_Qubit_Paritycheck_Analysis(ba.BaseDataAnalysis):
             range=(np.min(shots_data), np.max(shots_data)))
 
 
+        # Histogramming RTE
+
+        dat_dict['prep_0_RTE_hist'] = np.histogram(
+            dat_dict['RTE_0_ps'], bins=nr_of_measurements+1,
+            range=(-0.5, nr_of_measurements+0.5))
+        dat_dict['prep_1_RTE_hist'] = np.histogram(
+            dat_dict['RTE_1_ps'], bins=nr_of_measurements+1,
+            range=(-0.5, nr_of_measurements+0.5))
+
+
         F_ass_1 = np.sum(meas_1_anc<dig_th_anc) /(
             np.sum(meas_1_anc>dig_th_anc) + np.sum(meas_1_anc<dig_th_anc))
         F_ass_0 = np.sum(meas_0_anc>dig_th_anc) /(
@@ -305,6 +338,7 @@ class One_Qubit_Paritycheck_Analysis(ba.BaseDataAnalysis):
         self.prepare_ancilla_ro_histogram()
         self.prepare_data_ro_histogram()
         self.prepare_typical_trace_plot()
+        self.prepare_RTE_histogram()
 
 
 
@@ -439,7 +473,7 @@ class One_Qubit_Paritycheck_Analysis(ba.BaseDataAnalysis):
             'yvals': raw_pat,
             'xlabel': 'Measurement #',
             'ylabel': 'Declared state',
-            'yrange': (-1.05, 1.05),  # FIXME change to ylim in base analysis
+            'yrange': (-.05, 1.05),  # FIXME change to ylim in base analysis
             'setlabel': 'Initial state |0>',
             'title': 'Typical trace of Ancilla outcomes',
             'do_legend': True,
@@ -454,34 +488,46 @@ class One_Qubit_Paritycheck_Analysis(ba.BaseDataAnalysis):
             'yvals': raw_pat,
             'xlabel': 'Measurement #',
             'ylabel': 'Declared state',
-            'yrange': (-1.05, 1.05),  # FIXME change to ylim in base analysis
+            'yrange': (-.05, 1.05),  # FIXME change to ylim in base analysis
             'setlabel': 'Initial state |1>',
             'title': 'Typical trace of Ancilla outcomes',
             'do_legend': True,
             'legend_pos': 'right'}
 
+    def prepare_RTE_histogram(self):
+        self.plot_dicts['RTE_0'] = {
+                    'xlabel': 'Measurement #',
+                    'title': 'RTE histogram' + '\n'+self.timestamps[0],
+                    'ylabel': 'Counts',
+                    'plotfn': self.plot_bar,
+                    'xvals': self.proc_data_dict['prep_0_RTE_hist'][1],
+                    'yvals': self.proc_data_dict['prep_0_RTE_hist'][0],
+                    'ax_id': 'RTE_histogram_data',
+                    'bar_kws': {'log': False, 'alpha': .4, 'facecolor': 'C0',
+                                'edgecolor': 'C0'},
+                    'setlabel': 'Data prep. in: |0>\n Mean RTE: {:.2f}'.format(
+                        self.proc_data_dict['mRTE_0_ps'])}
+        self.plot_dicts['RTE_1'] = {
+                    'plotfn': self.plot_bar,
+                    'xvals': self.proc_data_dict['prep_1_RTE_hist'][1],
+                    'yvals': self.proc_data_dict['prep_1_RTE_hist'][0],
+                    'ax_id': 'RTE_histogram_data',
+                    'bar_kws': {'log': False, 'alpha': .4, 'facecolor': 'C3',
+                                'edgecolor': 'C3'},
+                    'setlabel': 'Data prep. in: |1>\n Mean RTE: {:.2f}'.format(
+                        self.proc_data_dict['mRTE_1_ps']),
+                    'do_legend':True}
 
 
-def post_select_init_measurement(thresholds, init_measurements, array):
+def get_post_select_indices(thresholds, init_measurements):
+    post_select_indices = []
+    for th, in_m in zip(thresholds, init_measurements):
+        post_select_indices.append(np.where(in_m> th)[0])
 
-    if len(np.shape(array)) == 1:
-        array[np.where(init_measurements[0] > thresholds[0])] = np.nan
-        array[np.where(init_measurements[1]> thresholds[1])] = np.nan
-    elif len(np.shape(array)) ==2:
+    post_select_indices = np.unique(np.concatenate(post_select_indices))
+    return post_select_indices
 
-        # print(array)
-        # for i in np.where(init_measurements[0] > thresholds[0]):
-        #     array[i, :] = np.nan
 
-        # print(np.where(init_measurements[0] > thresholds[0]))
-        # array[np.where(init_measurements[0] > thresholds[0]), :] = np.nan
-        # array[np.where(init_measurements[1]> thresholds[1]), :] = np.nan
-        pass
-
-    else:
-        raise ValueErrory('Data shape not recognized')
-
-    return array
 
 def repeated_parity_data_binning(shots, nr_of_meas:int):
     """
@@ -519,19 +565,46 @@ def repeated_parity_data_binning(shots, nr_of_meas:int):
     return (prep_0, meas_0, trace_0, prep_1, meas_1, trace_1)
 
 
-        # a.plot_dicts = plot_dicts
-        # # Clear the plots using this snippet
-        # a.axs_dict = None
-        # a.pdict = None
-        # a.axs ={}
-        # a.figs = {}
-        # # end of clear plots snippet
+def count_RTE(traces, exp_pattern: str, init_state: int):
+    """
+    Args:
+        traces (list of 1D arrays): of declared states as 0 and 1
+        exp_pattern (str) : "constant" or "alternating"
+    """
+    RTE = np.zeros(len(traces))
 
-        # a.plot()
-        # axanc = a.axs['1D_histogram_anc']
-        # axanc.legend()
+    RTE_larger_than_length = False
+    if init_state not in (0, 1):
+        raise ValueError('Initial state should be 0 or 1')
+    if exp_pattern not in ['constant', 'alternating']:
+        raise ValueError("exp_pattern should be 'constant' or 'alternating'")
 
-        # axanc = a.axs['1D_histogram_anc']
-        # axanc.legend()
+    for i, t in enumerate(traces):
+        if exp_pattern == 'constant':
+            if init_state == 0:
+                try:
+                    RTE[i] = min(np.where( t >0.5)[0])+1
+                except ValueError:
+                    RTE[i] = len(t) + 1
+                    RTE_larger_than_length = True
 
-        # a.save_figures(close_figs=False)
+            else:
+                try:
+                    RTE[i] = min(np.where(t < 0.5)[0])+1
+                except ValueError:
+                    RTE[i] = len(t)+1
+                    RTE_larger_than_length = True
+
+
+        elif exp_pattern == 'alternating':
+            try:
+                t = np.append([init_state], t)
+                dt = dm_tools.binary_derivative(t)
+                RTE[i] = min(np.where(dt<0.5)[0])+1 # Detect first time there is no flip
+            except ValueError:
+                RTE[i] = len(t)+1
+                RTE_larger_than_length = True
+    if RTE_larger_than_length:
+        print('Sequences with no errors measured')
+    return RTE
+

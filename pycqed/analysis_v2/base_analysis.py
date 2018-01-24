@@ -588,20 +588,21 @@ class BaseDataAnalysis(object):
         dataset_label = pdict.get('setlabel', list(range(len(plot_yvals))))
         do_legend = pdict.get('do_legend', False)
 
-        plot_xleft = plot_xedges[:-1]
         plot_xwidth = (plot_xedges[1:]-plot_xedges[:-1])
+        # center is left edge + widht /2
+        plot_centers = plot_xedges[:-1] + plot_xwidth/2
 
         if plot_multiple:
             p_out = []
             for ii, this_yvals in enumerate(plot_yvals):
-                p_out.append(pfunc(plot_xleft, this_yvals, width=plot_xwidth,
+                p_out.append(pfunc(plot_centers, this_yvals, width=plot_xwidth,
                                    color=gco(ii, len(plot_yvals)-1),
                                    label='%s%s' % (
                                        dataset_desc, dataset_label[ii]),
                                    **plot_barkws))
 
         else:
-            p_out = pfunc(plot_xleft, plot_yvals, width=plot_xwidth,
+            p_out = pfunc(plot_centers, plot_yvals, width=plot_xwidth,
                           label='%s%s' % (dataset_desc, dataset_label),
                           **plot_barkws)
         if plot_xrange is None:

@@ -7130,10 +7130,10 @@ class butterfly_analysis(MeasurementAnalysis):
 
             self.data_exc_post = dm_tools.postselect(threshold=threshold_init,
                                                      data=self.data_exc,
-                                                     positive_case=case)[:, 1:]
+                                                     one_larger_than_threshold=case)[:, 1:]
             self.data_rel_post = dm_tools.postselect(threshold=threshold_init,
                                                      data=self.data_rel,
-                                                     positive_case=case)[:, 1:]
+                                                     one_larger_than_threshold=case)[:, 1:]
 
             self.data_exc_pre_postselect = self.data_exc
             self.data_rel_pre_postselect = self.data_rel
@@ -7158,10 +7158,10 @@ class butterfly_analysis(MeasurementAnalysis):
         if digitize:
             self.data_exc = dm_tools.digitize(threshold=threshold,
                                               data=self.data_exc,
-                                              positive_case=case)
+                                              one_larger_than_threshold=case)
             self.data_rel = dm_tools.digitize(threshold=threshold,
                                               data=self.data_rel,
-                                              positive_case=case)
+                                              one_larger_than_threshold=case)
         if close_file:
             self.data_file.close()
         if auto is True:
