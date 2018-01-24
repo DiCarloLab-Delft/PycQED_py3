@@ -5,7 +5,6 @@ import json
 import os
 import sys
 import numpy as np
-
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from fnmatch import fnmatch
@@ -378,6 +377,7 @@ class UHFQC(Instrument):
 
     def close(self):
         self._daq.disconnectDevice(self._device)
+        super().close()
 
     def find(self, *args):
         nodes = self._daq.listNodes('/', 7)
