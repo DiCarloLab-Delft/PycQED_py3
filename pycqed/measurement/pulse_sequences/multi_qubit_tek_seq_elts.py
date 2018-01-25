@@ -2,24 +2,18 @@ import logging
 import itertools
 import numpy as np
 from copy import deepcopy
-from pycqed.measurement.waveform_control import element
-from pycqed.measurement.waveform_control import pulse
-from pycqed.measurement.waveform_control import sequence
+import pycqed.measurement.waveform_control.sequence as sequence
 from pycqed.utilities.general import add_suffix_to_dict_keys
-from pycqed.measurement.pulse_sequences.standard_elements import multi_pulse_elt
-from pycqed.measurement.pulse_sequences.standard_elements import distort_and_compensate
-from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
-import pycqed.measurement.waveform_control.fluxpulse_predistortion as fluxpulse_predistortion
-import pycqed.measurement.multi_qubit_module as mqm
-
-from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import get_pulse_dict_from_pars
-from importlib import reload
-reload(pulse)
-from ..waveform_control import pulse_library
-reload(pulse_library)
+from pycqed.measurement.pulse_sequences.standard_elements import \
+    multi_pulse_elt, distort_and_compensate
+import pycqed.measurement.randomized_benchmarking.randomized_benchmarking as rb
+import pycqed.measurement.waveform_control.fluxpulse_predistortion as \
+    fluxpulse_predistortion
+from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import \
+    get_pulse_dict_from_pars
+import pycqed.instrument_drivers.meta_instrument.device_object as device
 
 station = None
-reload(element)
 kernel_dir = 'kernels/'
 # You need to explicitly set this before running any functions from this module
 # I guess there are cleaner solutions :)
@@ -1516,7 +1510,7 @@ def two_qubit_entanglement_by_parity_measurement(
     
     |q0> |======|---------*------------------------|======|
          | prep |         |                        | tomo |
-    |q1> | q0,  |--mY90s--*--*--Y90--meas=====Y180 | q0,  |
+    |q1> | q0,  |--mY90s--*--*--Y90--meas=====Y180-| q0,  |
          | q2   |            |             ||      | q2   |
     |q2> |======|------------*------------Y180-----|======|
     
@@ -1545,7 +1539,7 @@ def two_qubit_entanglement_by_parity_measurement(
     q2n = q2.name
 
     operation_dict = {
-        'RO': mqm.get_multiplexed_readout_pulse_dictionary([q0, q1, q2])
+        'RO': device.get_multiplexed_readout_pulse_dictionary([q0, q1, q2])
     }
     operation_dict.update({
         'I_fb': {'pulse_type': 'SquarePulse',

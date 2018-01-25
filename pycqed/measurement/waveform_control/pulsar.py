@@ -58,8 +58,10 @@ class UHFQCPulsar:
                            get_cmd=lambda: 'analog')
         self.add_parameter('{}_granularity'.format(name),
                            get_cmd=lambda: 8)
-        self.add_parameter('{}_min_samples'.format(name),
-                           get_cmd=lambda: 8)
+        self.add_parameter('{}_min_length'.format(name),
+                           get_cmd=lambda: 8 / 1.8e9)
+        self.add_parameter('{}_inter_element_deadtime'.format(name),
+                           get_cmd=lambda: 8 / 1.8e9)
         self.add_parameter('{}_precompile'.format(name),
                            get_cmd=lambda: False)
         self.add_parameter('{}_delay'.format(name), initial_value=0,
@@ -88,7 +90,7 @@ class UHFQCPulsar:
                            parameter_class=ManualParameter)
         self.add_parameter('{}_charge_buildup_compensation'.format(name),
                            parameter_class=ManualParameter,
-                           vals=vals.Bool(), inital_value=False)
+                           vals=vals.Bool(), initial_value=False)
         self.add_parameter('{}_discharge_timescale'.format(name),
                            parameter_class=ManualParameter,
                            vals=vals.MultiType(vals.Numbers(0),
@@ -240,6 +242,7 @@ class HDAWG8Pulsar:
             raise KeyError('Invalid HDAWG8 channel id: {}'.format(id))
 
         # FIXME: Make these parameters change the correct values
+
         self.add_parameter('{}_id'.format(name),
                            get_cmd=lambda _=id: _)
         self.add_parameter('{}_AWG'.format(name),
@@ -248,11 +251,13 @@ class HDAWG8Pulsar:
                            get_cmd=lambda: 'analog')
         self.add_parameter('{}_granularity'.format(name),
                            get_cmd=lambda: 8)
-        self.add_parameter('{}_min_samples'.format(name),
-                           get_cmd=lambda: 8)
+        self.add_parameter('{}_min_length'.format(name),
+                           get_cmd=lambda: 8 / 2.4e9)
+        self.add_parameter('{}_inter_element_deadtime'.format(name),
+                           get_cmd=lambda: 8 / 2.4e9)
         self.add_parameter('{}_precompile'.format(name), initial_value=False,
                            label='{} precompile segments'.format(name),
-                           parameter_class=ManualParameter, vals=vals.Bools())
+                           parameter_class=ManualParameter, vals=vals.Bool())
         self.add_parameter('{}_delay'.format(name), initial_value=0,
                            label='{} delay'.format(name), unit='s',
                            parameter_class=ManualParameter,
@@ -279,7 +284,7 @@ class HDAWG8Pulsar:
                            parameter_class=ManualParameter)
         self.add_parameter('{}_charge_buildup_compensation'.format(name),
                            parameter_class=ManualParameter,
-                           vals=vals.Bool(), inital_value=False)
+                           vals=vals.Bool(), initial_value=False)
         self.add_parameter('{}_discharge_timescale'.format(name),
                            parameter_class=ManualParameter,
                            vals=vals.MultiType(vals.Numbers(0),
@@ -463,10 +468,6 @@ class AWG5014Pulsar:
         if not isinstance(obj, AWG5014Pulsar._supportedAWGtypes):
             return super()._program_awg(obj, sequence, el_wfs, loop)
 
-        #print(obj.name)
-        #import pprint
-        #pprint.pprint(el_wfs)
-
         pars = {'ch{}_m{}_low'.format(ch+1, m+1) for ch in range(4)
                 for m in range(2)}
         pars |= {'ch{}_m{}_high'.format(ch+1, m+1) for ch in range(4)
@@ -504,11 +505,7 @@ class AWG5014Pulsar:
                                           (0, maxlen - len(grp_wfs[cid])),
                                           'constant',
                                           constant_values=0)
-                    # pad with 4 samples to make multi-element segments
-                    # synchronize nicely with the ZI AWG8, that leaves an 8
-                    # sample gap between the elements that play back to back.
-                    # grp_wfs[cid] = np.pad(grp_wfs[cid], (0, 4), 'constant',
-                    #                       constant_values=0)
+
                     if grp_wfs[cid][0] != 0.:
                         elements_with_non_zero_first_points.add(el)
                 wfname = el + '_' + grp
@@ -642,12 +639,14 @@ class AWG5014Pulsar:
                                      "channel forward in  time")
         self.add_parameter('{}_granularity'.format(name),
                            get_cmd=lambda: 4)
-        self.add_parameter('{}_min_samples'.format(name),
-                           get_cmd=lambda: 252)  # Can not be triggered faster
-                                                 # than 210 ns.
+        self.add_parameter('{}_min_length'.format(name),
+                           get_cmd=lambda: 210e-9)  # Can not be triggered faster
+                                                    # than 210 ns.
+        self.add_parameter('{}_inter_element_deadtime'.format(name),
+                           get_cmd=lambda: 0)
         self.add_parameter('{}_precompile'.format(name), initial_value=False,
                            label='{} precompile segments'.format(name),
-                           parameter_class=ManualParameter, vals=vals.Bools())
+                           parameter_class=ManualParameter, vals=vals.Bool())
         if id in ['ch1', 'ch2', 'ch3', 'ch4']:  # analog
             self.add_parameter('{}_type'.format(name),
                                get_cmd=lambda: 'analog')
@@ -672,7 +671,7 @@ class AWG5014Pulsar:
                                parameter_class=ManualParameter)
             self.add_parameter('{}_charge_buildup_compensation'.format(name),
                                parameter_class=ManualParameter,
-                               vals=vals.Bool(), inital_value=False)
+                               vals=vals.Bool(), initial_value=False)
             self.add_parameter('{}_discharge_timescale'.format(name),
                                parameter_class=ManualParameter,
                                vals=vals.MultiType(vals.Numbers(0),
@@ -835,7 +834,12 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
                            get_cmd=self._get_default_AWG)
         self.add_parameter('master_AWG', parameter_class=InstrumentParameter,
                            initial_value=master_AWG, vals=vals.Strings())
-
+        self.add_parameter('inter_element_spacing',
+                           vals=vals.MultiType(vals.Numbers(0),
+                                               vals.Enum('auto')),
+                           set_cmd=self._set_inter_element_spacing,
+                           get_cmd=self._get_inter_element_spacing)
+        self._inter_element_spacing = 'auto'
         self.channels = set()
         self.last_sequence = None
         self.last_elements = None
@@ -1050,9 +1054,9 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
 
         for i, el in enumerate(elements.values()):
             if isinstance(el.name, tuple):
-                tvals, waveforms = el.normalized_waveforms(precompiled_channels)
+                _, waveforms = el.normalized_waveforms(precompiled_channels)
             else:
-                tvals, waveforms = el.normalized_waveforms(normal_channels)
+                _, waveforms = el.normalized_waveforms(normal_channels)
             for cname in waveforms:
                 if cname not in channels:
                     continue
@@ -1130,6 +1134,19 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
 
     def _get_default_AWG(self):
         return self.AWG.name
+
+    def _set_inter_element_spacing(self, val):
+        self._inter_element_spacing = val
+
+    def _get_inter_element_spacing(self):
+        if self._inter_element_spacing != 'auto':
+            return self._inter_element_spacing
+        else:
+            max_spacing = 0
+            for c in self.channels:
+                max_spacing = max(max_spacing, self.get(
+                    '{}_inter_element_deadtime'.format(c)))
+            return max_spacing
 
     def _clock_prequeried(self, status):
         if status:

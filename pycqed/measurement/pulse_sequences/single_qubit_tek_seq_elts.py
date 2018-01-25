@@ -981,16 +981,6 @@ def get_pulse_dict_from_pars(pulse_pars):
     return:
         pulses: dictionary of pulse_pars dictionaries
     '''
-    pi_amp = pulse_pars['amplitude']
-    pi2_amp = pulse_pars['amplitude']*pulse_pars['amp90_scale']
-
-    # Software Z-gate: apply phase offset to all subsequent X and Y pulses
-    Z180 = deepcopy(pulse_pars)
-    Z180['pulse_type'] = 'Z_pulse'
-    for i in pulse_pars.keys():
-        if i not in ['phase', 'pulse_type', 'pulse_delay','operation_type',
-                     'target_qubit', 'refpoint']:
-            del Z180[i]
 
     pulses = {'I': deepcopy(pulse_pars),
               'X180': deepcopy(pulse_pars),
@@ -1000,11 +990,10 @@ def get_pulse_dict_from_pars(pulse_pars):
               'Y180': deepcopy(pulse_pars),
               'mY180': deepcopy(pulse_pars),
               'Y90': deepcopy(pulse_pars),
-              'mY90': deepcopy(pulse_pars),
-              'Z180': Z180,
-              'mZ180': deepcopy(Z180),
-              'Z90': deepcopy(Z180),
-              'mZ90': deepcopy(Z180)}
+              'mY90': deepcopy(pulse_pars)}
+
+    pi_amp = pulse_pars['amplitude']
+    pi2_amp = pulse_pars['amplitude'] * pulse_pars['amp90_scale']
 
     pulses['I']['amplitude'] = 0
     pulses['mX180']['amplitude'] = -pi_amp
@@ -1019,16 +1008,27 @@ def get_pulse_dict_from_pars(pulse_pars):
     pulses['mY90']['amplitude'] = -pi2_amp
     pulses['mY90']['phase'] += 90
 
-    pulses['Z180']['phase'] += 180
-    pulses['mZ180']['phase'] += -180
-    pulses['Z90']['phase'] += 90
-    pulses['mZ90']['phase'] += -90
-
     pulses_sim = {key + 's': deepcopy(val) for key, val in pulses.items()}
     for val in pulses.values():
         val['refpoint'] = 'simultaneous'
 
     pulses.update(pulses_sim)
+
+    # Software Z-gate: apply phase offset to all subsequent X and Y pulses
+    target_qubit = pulse_pars.get('target_qubit', None)
+    if target_qubit is not None:
+        Z180 = {'pulse_type': 'Z_pulse',
+                'basis_rotation': {target_qubit: 0},
+                'target_qubit': target_qubit,
+                'operation_type': 'Virtual'}
+        pulses.update({'Z180': Z180,
+                       'mZ180': deepcopy(Z180),
+                       'Z90': deepcopy(Z180),
+                       'mZ90': deepcopy(Z180)})
+        pulses['Z180']['basis_rotation'][target_qubit] += 180
+        pulses['mZ180']['basis_rotation'][target_qubit] += -180
+        pulses['Z90']['basis_rotation'][target_qubit] += 90
+        pulses['mZ90']['basis_rotation'][target_qubit] += -90
 
     return pulses
 

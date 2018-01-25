@@ -61,12 +61,13 @@ class Element:
             t0s = []
             for p in self.pulses:
                 for c in self.pulses[p].channels:
-                    t0s.append(self.pulses[p].t0() -
-                               self.channel_delay(c))
+                    if self.pulsar.get('{}_active'.format(c)):
+                        t0s.append(self.pulses[p].t0() -
+                                   self.channel_delay(c))
             offset = min(t0s)
             if self.fixed_point_applied:
-                offset += calculate_time_correction(offset,
-                                                    self.readout_fixed_point) -\
+                offset += calculate_time_correction(
+                              offset, self.readout_fixed_point) - \
                           self.readout_fixed_point
             return offset
 
@@ -79,7 +80,9 @@ class Element:
         for p in self.pulses:
             for c in self.pulses[p].channels:
                 ts.append(self.pulse_end_time(p, c))
-        return max(ts) if len(ts) > 0 else 0
+
+        return (max(ts) if len(ts) > 0 else 0.) + \
+               self.pulsar.inter_element_spacing()
 
     def length(self, c):
         """
@@ -97,9 +100,10 @@ class Element:
                 ends.append(self.pulse_end_sample(p, c))
         if len(ends) == 0:
             return 0
-        samples = max(ends)+1
-        if samples < self.pulsar.get('{}_min_samples'.format(c)):
-            samples = self.pulsar.get('{}_min_samples'.format(c))
+        samples = max(ends) + 1
+        samples += self.pulsar.inter_element_spacing() / self._clock(c)
+        samples = max(samples, self.pulsar.get('{}_min_length'.format(c)) *
+                               self._clock(c))
         while samples % self.pulsar.get('{}_granularity'.format(c)) != 0:
             samples += 1
         return samples
@@ -294,7 +298,7 @@ class Element:
                 continue
             nsamples = self.samples(c)
             wfs[c] = np.zeros(nsamples)
-            tvals[c] = np.arange(nsamples) / self._clock(c)
+            tvals[c] = np.arange(nsamples) / self._clock(c) + self.time_offset
         # we first compute the ideal function values
         for p in self.pulses:
             if channels is not None and \
@@ -313,7 +317,7 @@ class Element:
                             'Pulse {} on channel {} in element {} starts at a '
                             'negative time.'.format(p, c, self.name))
                     chan_tvals[c] = tvals[c].copy()[idx0:idx1] + \
-                                    self.channel_delay(c) + self.time_offset
+                                    self.channel_delay(c)
             pulsewfs = self.pulses[p].get_wfs(chan_tvals)
 
             for c in self.pulses[p].channels:
@@ -431,6 +435,8 @@ class Element:
         overview['channels'] = {}
         channels = overview['channels']
         for c in self.pulsar.channels:
+            if not self.pulsar.get('{}_active'.format(c)):
+                continue
             channels[c] = {}
             channels[c]['length'] = self.length(c)
             channels[c]['samples'] = self.samples(c)
@@ -440,6 +446,8 @@ class Element:
             pulses[p] = {}
             pulses[p]['length'] = self.pulse_length(p)
             for c in self.pulses[p].channels:
+                if not self.pulsar.get('{}_active'.format(c)):
+                    continue
                 pulses[p][c] = {}
                 pulses[p][c]['start time'] = self.pulse_start_time(p, c)
                 pulses[p][c]['end time'] = self.pulse_end_time(p, c)

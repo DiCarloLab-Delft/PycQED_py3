@@ -20,8 +20,8 @@ from pycqed.analysis import measurement_analysis as ma
 import pycqed.measurement.gate_set_tomography.gate_set_tomography_CC as gstCC
 import pygsti
 from pycqed.utilities.general import gen_sweep_pts
-from pycqed_scripts.experiments.Starmon_1702.clean_scripts.functions import \
-    CZ_cost_Z_amp
+# from pycqed_scripts.experiments.Starmon_1702.clean_scripts.functions import \
+#     CZ_cost_Z_amp
 
 
 class DeviceObject(Instrument):
@@ -975,3 +975,65 @@ class TwoQubitDevice(DeviceObject):
     #     MC.set_detector_function(d)
     #     MC.run('CZ_Z_amp')
     #     ma.MeasurementAnalysis(label='CZ_Z_amp')
+
+
+def get_multiplexed_readout_pulse_dictionary(qubits):
+    """Takes the readout pulse parameters from the first qubit in `qubits`"""
+    maxlen = 0
+    for qb in qubits:
+        if qb.RO_pulse_length() > maxlen:
+            maxlen = qb.ro_pulse_square_length()
+    return {'RO_pulse_marker_channel': qubits[0].ro_trigger_channel(),
+            'acq_marker_channel': qubits[0].ro_trigger_channel(),
+            'acq_marker_delay': qubits[0].ro_trigger_delay(),
+            'amplitude': 0.0,
+            'length': maxlen,
+            'operation_type': 'RO',
+            'phase': 0,
+            'pulse_delay': qubits[0].ro_pulse_delay(),
+            'pulse_type': 'Multiplexed_UHFQC_pulse',
+            'target_qubit': ','.join([qb.name for qb in qubits])}
+
+def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
+                                               nr_shots=4095, UHFQC=None,
+                                               pulsar=None, correlations=None):
+    max_int_len = 0
+    for qb in qubits:
+        if qb.RO_acq_integration_length() > max_int_len:
+            max_int_len = qb.RO_acq_integration_length()
+    channels = []
+    for qb in qubits:
+        channels += [qb.RO_acq_weight_function_I()]
+        if qb.ro_acq_weight_type() in ['SSB', 'DSB']:
+            if qb.RO_acq_weight_function_Q() is not None:
+                channels += [qb.RO_acq_weight_function_Q()]
+
+    for qb in qubits:
+        if UHFQC is None:
+            UHFQC = qb.UHFQC
+        if pulsar is None:
+            pulsar = qb.AWG
+        break
+    return {
+        'int_log_det': det.UHFQC_integration_logging_det(
+            UHFQC=UHFQC, AWG=pulsar, channels=channels,
+            integration_length=max_int_len, nr_shots=nr_shots,
+            result_logging_mode='raw'),
+        'dig_log_det': det.UHFQC_integration_logging_det(
+            UHFQC=UHFQC, AWG=pulsar, channels=channels,
+            integration_length=max_int_len, nr_shots=nr_shots,
+            result_logging_mode='digitized'),
+        'int_avg_det': det.UHFQC_integrated_average_detector(
+            UHFQC=UHFQC, AWG=pulsar, channels=channels,
+            integration_length=max_int_len, nr_averages=nr_averages),
+        'inp_avg_det': det.UHFQC_input_average_detector(
+            UHFQC=UHFQC, AWG=pulsar, nr_averages=nr_averages, nr_samples=4096),
+        'int_corr_det': det.UHFQC_input_average_detector(
+            UHFQC=UHFQC, AWG=pulsar, channels=channels,
+            integration_length=max_int_len, nr_averages=nr_averages,
+            correlations=correlations),
+        'dig_corr_det': det.UHFQC_input_average_detector(
+            UHFQC=UHFQC, AWG=pulsar, channels=channels,
+            integration_length=max_int_len, nr_averages=nr_averages,
+            correlations=correlations, thresholding=True),
+    }

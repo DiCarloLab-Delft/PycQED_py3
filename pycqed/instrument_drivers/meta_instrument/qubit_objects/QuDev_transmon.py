@@ -247,7 +247,7 @@ class QuDev_transmon(Qubit):
         # add flux pulse parameters
         self.add_operation('flux')
         self.add_pulse_parameter('flux', 'flux_pulse_type', 'pulse_type',
-                                 initial_value=None, vals=vals.Strings())
+                                 get_cmd=lambda: 'SquarePulse')
         self.add_pulse_parameter('flux', 'flux_pulse_channel', 'channel',
                                  initial_value=None, vals=vals.Strings())
         self.add_pulse_parameter('flux', 'flux_pulse_amp', 'amplitude',
@@ -255,36 +255,6 @@ class QuDev_transmon(Qubit):
         self.add_pulse_parameter('flux', 'flux_pulse_length', 'length',
                                  initial_value=None, vals=vals.Numbers())
         self.add_pulse_parameter('flux', 'flux_pulse_delay', 'pulse_delay',
-                                 initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('flux', 'flux_pulse_buffer', 'buffer',
-                                 initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('flux', 'flux_pulse_sigma', 'sigma',
-                                 initial_value=0, vals=vals.Numbers())
-        self.add_pulse_parameter('flux', 'flux_f_pulse_mod', 'mod_frequency',
-                                 initial_value=None, vals=vals.Numbers())
-        # self.add_pulse_parameter('flux','flux_pulse_buffer','pulse_buffer',
-        #                          initial_value=None,vals= vals.Numbers())
-        # self.add_pulse_parameter('flux','kernel_path','kernel_path',
-        #                          initial_value=None,vals=vals.Strings())
-
-        # add flux pulse parameters
-        self.add_operation('CZ')
-        self.add_pulse_parameter('CZ', 'CZ_qb_target', 'qb_target',
-                                 initial_value=None, vals=vals.Strings())
-        self.add_pulse_parameter('CZ', 'CZ_pulse_type', 'pulse_type',
-                                 initial_value=None, vals=vals.Strings())
-        self.add_pulse_parameter('CZ', 'CZ_pulse_channel', 'channel',
-                                 initial_value=None, vals=vals.Strings())
-        self.add_pulse_parameter('CZ', 'CZ_pulse_amp', 'amplitude',
-                                 initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('CZ', 'CZ_pulse_length', 'length',
-                                 initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('CZ', 'CZ_pulse_delay', 'pulse_delay',
-                                 initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('CZ', 'CZ_dynamic_phase', 'dynamic_phase',
-                                 initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('CZ', 'CZ_dynamic_phase_target',
-                                 'dynamic_phase_target',
                                  initial_value=None, vals=vals.Numbers())
 
         self.update_detector_functions()
@@ -2635,7 +2605,6 @@ class QuDev_transmon(Qubit):
         operation_dict['X180 ' + self.name]['operation_type'] = 'MW'
         operation_dict['X180_ef ' + self.name]['operation_type'] = 'MW'
         operation_dict['flux ' + self.name]['operation_type'] = 'Flux'
-        operation_dict['CZ ' + self.name]['operation_type'] = 'Flux'
         operation_dict['X180_ef ' + self.name]['I_channel'] = \
             operation_dict['X180 ' + self.name]['I_channel']
         operation_dict['X180_ef ' + self.name]['Q_channel'] = \
@@ -2986,11 +2955,37 @@ class QuDev_transmon(Qubit):
                 self.CZ_dynamic_phase(dynamic_phase_control)
                 self.CZ_dynamic_phase_target(dynamic_phase_target)
 
-            return dynamic_phase_control,dynamic_phase_target
+            return dynamic_phase_control, dynamic_phase_target
 
 
+def add_CZ_pulse(qbc, qbt):
+    """
+    Args:
+        qbc: Control qubit. A QudevTransmon object corresponding to the qubit
+             that we apply the flux pulse on.
+        qbt: Target qubit. A QudevTransmon object corresponding to the qubit
+             we induce the conditional phase on.
+    """
+    # add flux pulse parameters
+    op_name = 'CZ ' + qbt.name
+    ps_name = 'CZ_' + qbt.name
+    qbc.add_operation(op_name)
 
-
+    qbc.add_pulse_parameter(op_name, ps_name + '_target',  'qb_target',
+                            get_cmd=lambda _=qbc.name + ',' + qbt.name: _)
+    qbc.add_pulse_parameter(op_name, ps_name + '_pulse_type', 'pulse_type',
+                            get_cmd=lambda: 'SquarePulse')
+    qbc.add_pulse_parameter(op_name, ps_name + '_channel', 'channel',
+                            initial_value='', vals=vals.Strings())
+    qbc.add_pulse_parameter(op_name, ps_name + '_amp', 'amplitude',
+                            initial_value=0, vals=vals.Numbers())
+    qbc.add_pulse_parameter(op_name, ps_name + '_length', 'length',
+                            initial_value=0, vals=vals.Numbers(0))
+    qbc.add_pulse_parameter(op_name, ps_name + '_delay', 'pulse_delay',
+                            initial_value=0, vals=vals.Numbers())
+    qbc.add_pulse_parameter(op_name, ps_name + '_dynamic_phases',
+                            'basis_rotation', initial_value={},
+                            vals=vals.Dict())
 
 
 
