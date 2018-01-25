@@ -183,8 +183,9 @@ class One_Qubit_Paritycheck_Analysis(ba.BaseDataAnalysis):
         exp_pat_1       (str)
 
 
-        nr_of_measurements (int) The number of repetitions of the circuit,
-            used in the data binning.
+        nr_of_meas (int) : number of measurement per prepared state.
+            used to determine the period for data binning. Includes
+            the initialization measurement.
 
 
     """
@@ -219,7 +220,8 @@ class One_Qubit_Paritycheck_Analysis(ba.BaseDataAnalysis):
 
         ch_idx_anc = self.options_dict.get('ch_idx_anc', 0)
         ch_idx_data = self.options_dict.get('ch_idx_data', 1)
-        nr_of_measurements = self.options_dict.get('nr_of_measurements', 11)
+        nr_of_meas = self.options_dict.get('nr_of_meas', 5)
+        print(nr_of_meas)
         post_sel_th_anc = self.options_dict.get('post_sel_th_anc', 0)
         post_sel_th_data = self.options_dict.get('post_sel_th_data', 0)
 
@@ -242,10 +244,10 @@ class One_Qubit_Paritycheck_Analysis(ba.BaseDataAnalysis):
         # Data binning
         (prep_0_anc, meas_0_anc, trace_0_anc, prep_1_anc, meas_1_anc,
             trace_1_anc) = repeated_parity_data_binning(
-            dat_dict['shots_anc'], 11)
+            dat_dict['shots_anc'], nr_of_meas)
         (prep_0_data, meas_0_data, trace_0_data, prep_1_data, meas_1_data,
             trace_1_data) = repeated_parity_data_binning(
-            dat_dict['shots_data'], 11)
+            dat_dict['shots_data'], nr_of_meas)
 
 
         dat_dict['trace_0_anc'] = trace_0_anc
@@ -319,11 +321,11 @@ class One_Qubit_Paritycheck_Analysis(ba.BaseDataAnalysis):
         # Histogramming RTE
 
         dat_dict['prep_0_RTE_hist'] = np.histogram(
-            dat_dict['RTE_0_ps'], bins=nr_of_measurements+1,
-            range=(-0.5, nr_of_measurements+0.5))
+            dat_dict['RTE_0_ps'], bins=nr_of_meas+1,
+            range=(-0.5, nr_of_meas+0.5))
         dat_dict['prep_1_RTE_hist'] = np.histogram(
-            dat_dict['RTE_1_ps'], bins=nr_of_measurements+1,
-            range=(-0.5, nr_of_measurements+0.5))
+            dat_dict['RTE_1_ps'], bins=nr_of_meas+1,
+            range=(-0.5, nr_of_meas+0.5))
 
 
         F_ass_1 = np.sum(meas_1_anc<dig_th_anc) /(
@@ -368,44 +370,42 @@ class One_Qubit_Paritycheck_Analysis(ba.BaseDataAnalysis):
                                 'edgecolor': 'C3'},
                     'setlabel': 'Data prep. in: |1>'}
 
+        if not self.presentation_mode:
+            self.plot_dicts['text_msg'] = {
+                'ax_id': '1D_histogram_anc',
+                'ypos': 0.6,
+                'plotfn': self.plot_text,
+                'box_props': 'fancy',
+                'text_string': 'F avg. ass.: {:.2f} %'.format(
+                    self.proc_data_dict['F_ass']*100)}
+            max_cnts = np.max([np.max(self.proc_data_dict['meas_0_anc_hist'][0]),
+                               np.max(self.proc_data_dict['meas_1_anc_hist'][0])])
+            ps_th = self.options_dict.get('post_sel_th_anc', 0)
+            dig_th = self.options_dict.get('dig_th_anc', ps_th)
+            self.plot_dicts['post_sel_th_anc'] = {
+                'ax_id': '1D_histogram_anc',
+                'plotfn': self.plot_vlines,
+                'x': ps_th,
+                'ymin': 0,
+                'ymax': max_cnts*1.05,
+                'colors': '.3',
+                'linestyles': 'dashed',
+                'line_kws': {'linewidth': .8},
+                'setlabel': 'Post sel. thres. {:.2f}'.format(ps_th),
+                'do_legend': True}
 
-        self.plot_dicts['text_msg'] = {
-            'ax_id': '1D_histogram_anc',
-            'ypos': 0.6,
-            'plotfn': self.plot_text,
-            'box_props': 'fancy',
-            'text_string': 'F avg. ass.: {:.2f} %'.format(self.proc_data_dict['F_ass']*100)}
-
-
-
-        max_cnts = np.max([np.max(self.proc_data_dict['meas_0_anc_hist'][0]),
-                           np.max(self.proc_data_dict['meas_1_anc_hist'][0])])
-        ps_th = self.options_dict.get('post_sel_th_anc', 0)
-        dig_th = self.options_dict.get('dig_th_anc', ps_th)
-        self.plot_dicts['post_sel_th_anc'] = {
-            'ax_id': '1D_histogram_anc',
-            'plotfn': self.plot_vlines,
-            'x': ps_th,
-            'ymin': 0,
-            'ymax': max_cnts*1.05,
-            'colors': '.3',
-            'linestyles': 'dashed',
-            'line_kws': {'linewidth': .8},
-            'setlabel': 'Post sel. thres. {:.2f}'.format(ps_th),
-            'do_legend': True}
-
-        ps_th = self.options_dict.get('dig_th_anc', 0)
-        self.plot_dicts['dig_th_anc'] = {
-            'ax_id': '1D_histogram_anc',
-            'plotfn': self.plot_vlines,
-            'x': dig_th,
-            'ymin': 0,
-            'ymax': max_cnts*1.05,
-            'colors': '.3',
-            'linestyles': 'solid',
-            'line_kws': {'linewidth': .8},
-            'setlabel': 'Digitization thres. {:.2f}'.format(dig_th),
-            'do_legend': True}
+            ps_th = self.options_dict.get('dig_th_anc', 0)
+            self.plot_dicts['dig_th_anc'] = {
+                'ax_id': '1D_histogram_anc',
+                'plotfn': self.plot_vlines,
+                'x': dig_th,
+                'ymin': 0,
+                'ymax': max_cnts*1.05,
+                'colors': '.3',
+                'linestyles': 'solid',
+                'line_kws': {'linewidth': .8},
+                'setlabel': 'Digitization thres. {:.2f}'.format(dig_th),
+                'do_legend': True}
 
 
 
@@ -554,6 +554,7 @@ def repeated_parity_data_binning(shots, nr_of_meas:int):
     trace_1 = np.zeros((len(prep_1), nr_of_meas-1))
     for i in range(len(prep_0)):
         trace_0[i, :] = shots[1+(2*i)*nr_of_meas: (2*i+1)*nr_of_meas]
+
         trace_1[i, :] = shots[1+(2*i+1)*nr_of_meas: (2*i+2)*nr_of_meas]
 
     return (prep_0, meas_0, trace_0, prep_1, meas_1, trace_1)

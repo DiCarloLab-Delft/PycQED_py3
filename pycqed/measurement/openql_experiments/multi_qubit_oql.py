@@ -656,7 +656,7 @@ def two_qubit_repeated_parity_check(qD: int, qA: int, platf_cfg: str,
         if initialization_msmt:
             k.measure(qA)
             k.measure(qD)
-            k.gate('wait', [2, 0], 0)
+            k.gate('wait', [2, 0], 500)
         if initial_state== 1:
             k.gate('rx180', qD)
         for i in range(number_of_repetitions):

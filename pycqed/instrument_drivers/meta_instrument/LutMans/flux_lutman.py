@@ -166,14 +166,14 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                            initial_value=0, vals=vals.Numbers(),
                            parameter_class=ManualParameter)
 
-        for i in range(10):
+        for i in range(40):
             self.add_parameter('mcz_phase_corr_amp_{}'.format(i+1), unit='V',
                                label='Phase correction amplitude {}'.format(
                                i+1),
                                initial_value=0, vals=vals.Numbers(),
                                parameter_class=ManualParameter)
         self.add_parameter('mcz_nr_of_repeated_gates',
-                           initial_value=1, vals=vals.PermissiveInts(1, 10),
+                           initial_value=1, vals=vals.PermissiveInts(1, 40),
                            parameter_class=ManualParameter)
         self.add_parameter('mcz_gate_separation', unit='s',
                            label='Gate separation',  initial_value=0,
