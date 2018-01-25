@@ -73,9 +73,12 @@ try:
                           platf_cfg=config_fn)
 
         def test_off_on(self):
-            sqo.off_on(0, pulse_comb='off', platf_cfg=config_fn)
-            sqo.off_on(0, pulse_comb='on', platf_cfg=config_fn)
-            sqo.off_on(0, pulse_comb='off_on', platf_cfg=config_fn)
+            sqo.off_on(0, pulse_comb='off', initialize=False,
+                       platf_cfg=config_fn)
+            sqo.off_on(0, pulse_comb='on', initialize=False,
+                       platf_cfg=config_fn)
+            sqo.off_on(0, pulse_comb='off_on', initialize=False,
+                       platf_cfg=config_fn)
 
         def test_randomized_benchmarking(self):
             nr_cliffords = 2**np.arange(10)

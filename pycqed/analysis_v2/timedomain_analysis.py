@@ -532,9 +532,11 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
     """
     def __init__(self, t_start: str=None, t_stop: str=None,
                  data_file_path: str=None,
+                 label: str='',
                  options_dict: dict=None, extract_only: bool=False,
                  do_fitting: bool=True, auto=True):
         super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
                          data_file_path=data_file_path,
                          options_dict=options_dict,
                          extract_only=extract_only, do_fitting=do_fitting)
@@ -562,16 +564,37 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         # The channel containing the data must be specified in the options dict
         ch_idx_spec = self.options_dict.get('ch_idx_spec', 0)
         ch_idx_osc = self.options_dict.get('ch_idx_osc', 1)
+        normalize_to_cal_points = self.options_dict.get('normalize_to_cal_points', True)
+        cal_points = [
+                        [[-4, -3], [-2, -1]],
+                        [[-4, -2], [-3, -1]],
+                       ]
 
+
+        i = 0
         for idx, type_str in zip([ch_idx_osc, ch_idx_spec], ['osc', 'spec']):
             yvals = list(self.raw_data_dict['measured_values_ord_dict'].values())[idx][0]
             self.proc_data_dict['ylabel_{}'.format(type_str)] = self.raw_data_dict['value_names'][0][idx]
             self.proc_data_dict['yunit'] = self.raw_data_dict['value_units'][0][idx]
-            self.proc_data_dict['yvals_{}_off'.format(type_str)] = yvals[:-4:2]
-            self.proc_data_dict['yvals_{}_on'.format(type_str)] = yvals[1:-4:2]
 
-        self.proc_data_dict['xvals_off'] = self.raw_data_dict['xvals'][0][:-4:2]
-        self.proc_data_dict['xvals_on'] = self.raw_data_dict['xvals'][0][1:-4:2]
+            if normalize_to_cal_points:
+                yvals = a_tools.normalize_data_v3(yvals,
+                    cal_zero_points=cal_points[i][0],
+                    cal_one_points=cal_points[i][1])
+                i +=1
+
+                self.proc_data_dict['yvals_{}_off'.format(type_str)] = yvals[::2]
+                self.proc_data_dict['yvals_{}_on'.format(type_str)] = yvals[1::2]
+                self.proc_data_dict['xvals_off'] = self.raw_data_dict['xvals'][0][::2]
+                self.proc_data_dict['xvals_on'] = self.raw_data_dict['xvals'][0][1::2]
+
+            else:
+                self.proc_data_dict['yvals_{}_off'.format(type_str)] = yvals[::2]
+                self.proc_data_dict['yvals_{}_on'.format(type_str)] = yvals[1::2]
+
+
+                self.proc_data_dict['xvals_off'] = self.raw_data_dict['xvals'][0][::2]
+                self.proc_data_dict['xvals_on'] = self.raw_data_dict['xvals'][0][1::2]
 
 
 
@@ -581,15 +604,15 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         cos_mod0.guess = fit_mods.Cos_guess.__get__(cos_mod0, cos_mod0.__class__)
         self.fit_dicts['cos_fit_off'] = {
             'model': cos_mod0,
-            'fit_xvals': {'t': self.proc_data_dict['xvals_off']},
-            'fit_yvals': {'data': self.proc_data_dict['yvals_osc_off']}}
+            'fit_xvals': {'t': self.proc_data_dict['xvals_off'][:-2]},
+            'fit_yvals': {'data': self.proc_data_dict['yvals_osc_off'][:-2]}}
 
         cos_mod1 = lmfit.Model(fit_mods.CosFunc)
         cos_mod1.guess = fit_mods.Cos_guess.__get__(cos_mod1, cos_mod1.__class__)
         self.fit_dicts['cos_fit_on'] = {
             'model': cos_mod1,
-            'fit_xvals': {'t': self.proc_data_dict['xvals_on']},
-            'fit_yvals': {'data': self.proc_data_dict['yvals_osc_on']}}
+            'fit_xvals': {'t': self.proc_data_dict['xvals_on'][:-2]},
+            'fit_yvals': {'data': self.proc_data_dict['yvals_osc_on'][:-2]}}
 
     def analyze_fit_results(self):
         fr_0 = self.fit_res['cos_fit_off'].best_values
@@ -621,7 +644,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             'title': (self.raw_data_dict['timestamps'][0] + ' \n' +
                       self.raw_data_dict['measurementstring'][0]),
             'do_legend': True,
-            'yrange': (0,1),
+            # 'yrange': (0,1),
             'legend_pos': 'upper right'}
 
         self.plot_dicts['on'] = {
@@ -682,7 +705,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             'title': (self.raw_data_dict['timestamps'][0] + ' \n' +
                       self.raw_data_dict['measurementstring'][0]),
             'do_legend': True,
-            'yrange': (0,1),
+            # 'yrange': (0,1),
             'legend_pos': 'upper right'}
 
         self.plot_dicts['spec_on'] = {
@@ -702,10 +725,10 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             leak_msg = (
                 'Missing fraction: {:.2f} % '.format(
                     self.proc_data_dict['missing_fraction']*100))
-            self.plot_dicts['leak_msg'] = {
-                'ax_id': 'spectator_qubit',
-                'ypos': 0.7,
-                'plotfn': self.plot_text,
-                'box_props': 'fancy',
-                'line_kws': {'alpha': 0},
-                'text_string': leak_msg}
+            # self.plot_dicts['leak_msg'] = {
+            #     'ax_id': 'spectator_qubit',
+            #     'ypos': 0.7,
+            #     'plotfn': self.plot_text,
+            #     'box_props': 'fancy',
+            #     'line_kws': {'alpha': 0},
+            #     'text_string': leak_msg}

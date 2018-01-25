@@ -1291,9 +1291,11 @@ class CCLight_Transmon(Qubit):
         if analyze:
             ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
 
-    def measure_ssro(self, MC=None, analyze: bool=True, nr_shots: int=1024*8,
+    def measure_ssro(self, MC=None, analyze: bool=True, nr_shots: int=4092*4,
                      cases=('off', 'on'), update_threshold: bool=True,
                      prepare: bool=True, no_figs: bool=False,
+                     post_select: bool = False,
+                     post_select_threshold: float =None,
                      update: bool=True,
                      verbose: bool=True):
         old_RO_digit = self.ro_acq_digitized()
@@ -1310,6 +1312,7 @@ class CCLight_Transmon(Qubit):
             self.prepare_for_timedomain()
             p = sqo.off_on(
                 qubit_idx=self.cfg_qubit_nr(), pulse_comb='off_on',
+                initialize=post_select,
                 platf_cfg=self.cfg_openql_platform_fn())
             self.instr_CC.get_instr().eqasm_program(p.filename)
         else:
@@ -1326,15 +1329,22 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
         d = self.int_log_det
+        d.nr_shots = 4092
         MC.set_detector_function(d)
         MC.run(
             'Measure_SSRO_{}'.format(self.msmt_suffix))
         MC.live_plot_enabled(old_plot_setting)
         if analyze:
             if len(d.value_names) == 1:
+
+                if post_select_threshold == None:
+                    post_select_threshold = self.ro_acq_threshold()
                 a = ma2.Singleshot_Readout_Analysis(
                     t_start=None, t_stop=None,
-                    options_dict={'scan_label': 'SSRO'},
+                    label='SSRO',
+                    options_dict={'post_select': post_select,
+                                  'nr_samples': 2+2*post_select,
+                                  'post_select_threshold': post_select_threshold},
                     extract_only=no_figs)
                 if update_threshold:
                     # UHFQC threshold is wrong, the magic number is a
@@ -1374,6 +1384,7 @@ class CCLight_Transmon(Qubit):
             # off as this is much faster than recompiling/uploading
             p = sqo.off_on(
                 qubit_idx=self.cfg_qubit_nr(), pulse_comb='on',
+                initialize=False,
                 platf_cfg=self.cfg_openql_platform_fn())
             self.instr_CC.get_instr().eqasm_program(p.filename)
         else:
@@ -1464,6 +1475,7 @@ class CCLight_Transmon(Qubit):
             self.prepare_for_timedomain()
         p = sqo.off_on(
             qubit_idx=self.cfg_qubit_nr(), pulse_comb='on',
+            initialize=False,
             platf_cfg=self.cfg_openql_platform_fn())
 
         VSM = self.instr_VSM.get_instr()

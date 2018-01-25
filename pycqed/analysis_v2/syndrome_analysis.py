@@ -261,9 +261,9 @@ class One_Qubit_Paritycheck_Analysis(ba.BaseDataAnalysis):
 
         # post selection
         if post_select:
-            dat_dict['post_sel_idx_0'] = get_post_select_indices(
+            dat_dict['post_sel_idx_0'] = dm_tools.get_post_select_indices(
                 (post_sel_th_anc, post_sel_th_data), (prep_0_anc, prep_0_data))
-            dat_dict['post_sel_idx_1'] = get_post_select_indices(
+            dat_dict['post_sel_idx_1'] = dm_tools.get_post_select_indices(
                 (post_sel_th_anc, post_sel_th_data), (prep_1_anc, prep_1_data))
 
             for arr in [meas_0_anc, meas_0_data, trace_0_anc, trace_0_data]:
@@ -519,13 +519,7 @@ class One_Qubit_Paritycheck_Analysis(ba.BaseDataAnalysis):
                     'do_legend':True}
 
 
-def get_post_select_indices(thresholds, init_measurements):
-    post_select_indices = []
-    for th, in_m in zip(thresholds, init_measurements):
-        post_select_indices.append(np.where(in_m> th)[0])
 
-    post_select_indices = np.unique(np.concatenate(post_select_indices))
-    return post_select_indices
 
 
 

@@ -390,8 +390,14 @@ class BaseDataAnalysis(object):
         if key_list == 'auto' or key_list is None:
             key_list = self.figs.keys()
         for key in key_list:
-            savename = os.path.join(savedir, savebase+key+tstag+'.'+fmt)
-            self.axs[key].figure.savefig(savename, fmt=fmt)
+            if self.presentation_mode:
+                savename = os.path.join(savedir, savebase+key+tstag+'presentation'+'.'+fmt)
+                self.axs[key].figure.savefig(savename, fmt=fmt)
+                savename = os.path.join(savedir, savebase+key+tstag+'presentation'+'.svg')
+                self.axs[key].figure.savefig(savename, fmt='svg')
+            else:
+                savename = os.path.join(savedir, savebase+key+tstag+'.'+fmt)
+                self.axs[key].figure.savefig(savename, fmt=fmt)
             if close_figs:
                 plt.close(self.axs[key].figure)
 
@@ -566,7 +572,7 @@ class BaseDataAnalysis(object):
             key_list = list(self.plot_dicts.keys())
         for key in key_list:
             self.plot_dicts[key]['title'] = None
-            self.axs[key].clear()
+
         self.plot(key_list=key_list, presentation_mode=False,
                   no_label=no_label)
 

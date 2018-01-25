@@ -262,6 +262,15 @@ def digitize(data, threshold: float, one_larger_than_threshold: bool=True,
     return data_digitized
 
 
+def get_post_select_indices(thresholds, init_measurements):
+    post_select_indices = []
+    for th, in_m in zip(thresholds, init_measurements):
+        post_select_indices.append(np.where(in_m> th)[0])
+
+    post_select_indices = np.unique(np.concatenate(post_select_indices))
+    return post_select_indices
+
+
 def postselect(data, threshold, positive_case=True):
     data_postselected = []
     if positive_case:
