@@ -1205,7 +1205,9 @@ class TD_Analysis(MeasurementAnalysis):
             if self.for_ef:
                 ylabel = r'$F$ $\left(|f \rangle \right) (arb. units)$'
             else:
-                ylabel = r'$F$ $\left(|e \rangle \right) (arb. units)$'
+                # ylabel = r'$F$ $\left(|e \rangle \right) (arb. units)$'
+                ylabel = r'$F$ $|1 \rangle$'
+
             self.plot_results_vs_sweepparam(x=self.sweep_points,
                                             y=self.normalized_values,
                                             fig=self.fig, ax=self.ax,
@@ -1214,9 +1216,6 @@ class TD_Analysis(MeasurementAnalysis):
                                             ylabel=ylabel,
                                             marker='o-',
                                             save=False)
-            # self.ax.set_ylim(min(min(self.normalized_values)-.1, -.1),
-            #                   max(max(self.normalized_values)+.1, 1.1))
-
             if save_fig:
                 if not close_main_fig:
                     # Hacked in here, good idea to only show the main fig but
@@ -2150,21 +2149,25 @@ class Echo_analysis(TD_Analysis):
         self.plot_results_vs_sweepparam(x=self.sweep_points,
                                         y=self.corr_data,
                                         fig=self.fig, ax=self.ax,
-                                        xlabel=self.xlabel,
+                                        xlabel=self.parameter_names[0],
+                                        x_unit=self.parameter_units[0],
                                         ylabel=r'F$|1\rangle$',
                                         save=False,
                                         plot_title=plot_title)
 
         self.ax.plot(x_fine, self.fit_res.eval(t=x_fine), label='fit')
-        textstr = '$T_2$={:.3g}$\pm$({:.3g})s '.format(
-            self.fit_res.params['tau'].value,
-            self.fit_res.params['tau'].stderr)
+
+        scale_factor, unit = SI_prefix_and_scale_factor(
+            self.fit_res.params['tau'].value, self.parameter_units[0])
+        textstr = '$T_2$={:.3g}$\pm$({:.3g}) {} '.format(
+            self.fit_res.params['tau'].value*scale_factor,
+            self.fit_res.params['tau'].stderr*scale_factor,
+            unit)
         if show_guess:
             self.ax.plot(x_fine, self.fit_res.eval(
                 t=x_fine, **self.fit_res.init_values), label='guess')
             self.ax.legend(loc='best')
 
-        self.ax.ticklabel_format(style='sci', scilimits=(0, 0))
         self.ax.text(0.4, 0.95, textstr, transform=self.ax.transAxes,
                      fontsize=11, verticalalignment='top',
                      bbox=self.box_props)
