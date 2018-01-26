@@ -720,6 +720,9 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
     # These angles correspond to special pi/2 pulses in the lutman
     for i, angle in enumerate(angles):
         for case in cases:
+            # cw_idx corresponds to special hardcoded angles in the lutman
+            cw_idx = angle//20 + 9
+
             k = Kernel("{}_{}".format(case, angle), p=platf)
             k.prepz(q0)
             k.prepz(q1)
@@ -734,7 +737,7 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
                 # special because the cw phase pulses go in mult of 20 deg
                 k.gate('ry90', q0)
             else:
-                k.gate('cw_{:02}'.format(i+9), q0)
+                k.gate('cw_{:02}'.format(cw_idx), q0)
             if case == 'excitation':
                 k.gate('rx180', q1)
 
@@ -758,7 +761,8 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
         cal_pts_idx = [361, 362, 363, 364]
     else:
         cal_pts_idx = []
-    p.sweep_points = np.concatenate([np.repeat(angles, 2), cal_pts_idx])
+
+    p.sweep_points = np.concatenate([np.repeat(angles, len(cases)), cal_pts_idx])
     p.set_sweep_points(p.sweep_points, len(p.sweep_points))
     return p
 
