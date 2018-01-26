@@ -269,31 +269,31 @@ class MeasurementControl(Instrument):
         specified in self.af_pars()
         '''
         self.save_optimization_settings()
-        adaptive_function = self.af_pars.pop('adaptive_function')
+        self.adaptive_function = self.af_pars.pop('adaptive_function')
         if self.live_plot_enabled():
-            self.initialize_plot_monitor()
+            # self.initialize_plot_monitor()
             self.initialize_plot_monitor_adaptive()
         for sweep_function in self.sweep_functions:
             sweep_function.prepare()
         self.detector_function.prepare()
         self.get_measurement_preparetime()
 
-        if adaptive_function == 'Powell':
-            adaptive_function = fmin_powell
-        if (isinstance(adaptive_function, types.FunctionType) or
-                isinstance(adaptive_function, np.ufunc)):
+        if self.adaptive_function == 'Powell':
+            self.adaptive_function = fmin_powell
+        if (isinstance(self.adaptive_function, types.FunctionType) or
+                isinstance(self.adaptive_function, np.ufunc)):
             try:
                 # exists so it is possible to extract the result
                 # of an optimization post experiment
                 self.adaptive_result = \
-                    adaptive_function(self.optimization_function,
+                    self.adaptive_function(self.optimization_function,
                                       **self.af_pars)
             except StopIteration:
                 print('Reached f_termination: %s' % (self.f_termination))
         else:
             raise Exception('optimization function: "%s" not recognized'
-                            % adaptive_function)
-        self.save_optimization_results(adaptive_function,
+                            % self.adaptive_function)
+        self.save_optimization_results(self.adaptive_function,
                                        result=self.adaptive_result)
 
         for sweep_function in self.sweep_functions:
@@ -685,6 +685,8 @@ class MeasurementControl(Instrument):
         '''
         Uses the Qcodes plotting windows for plotting adaptive plot updates
         '''
+        if self.adaptive_function.__module__ == 'cma.evolution_strategy':
+            return self.initialize_plot_monitor_adaptive_cma()
         self.time_last_ad_plot_update = time.time()
         self.secondary_QtPlot.clear()
 
@@ -701,6 +703,9 @@ class MeasurementControl(Instrument):
                                       symbol='o', symbolSize=5)
 
     def update_plotmon_adaptive(self, force_update=False):
+        if self.adaptive_function.__module__ == 'cma.evolution_strategy':
+            return self.update_plotmon_adaptive_cma(force_update=force_update)
+
         if self.live_plot_enabled():
             try:
                 if (time.time() - self.time_last_ad_plot_update >
@@ -715,6 +720,177 @@ class MeasurementControl(Instrument):
                         self.secondary_QtPlot.update_plot()
             except Exception as e:
                 logging.warning(e)
+
+
+    def initialize_plot_monitor_adaptive_cma(self):
+        '''
+        Uses the Qcodes plotting windows for plotting adaptive plot updates
+        '''
+        # new code
+        if self.main_QtPlot.traces != []:
+            self.main_QtPlot.clear()
+
+        self.curves = []
+        self.curves_best_ever = []
+        self.curves_distr_mean = []
+
+
+        xlabels = self.sweep_par_names
+        xunits = self.sweep_par_units
+        ylabels = self.detector_function.value_names
+        yunits = self.detector_function.value_units
+
+        j = 0
+        if (self._persist_ylabs == ylabels and
+                self._persist_xlabs == xlabels) and self.persist_mode():
+            persist = True
+        else:
+            persist = False
+        for yi, ylab in enumerate(ylabels):
+            for xi, xlab in enumerate(xlabels):
+                if persist:  # plotting persist first so new data on top
+                    yp = self._persist_dat[
+                        :, yi+len(self.sweep_function_names)]
+                    xp = self._persist_dat[:, xi]
+                    if len(xp) < self.plotting_max_pts():
+                        self.main_QtPlot.add(x=xp, y=yp,
+                                             subplot=j+1,
+                                             color=0.75,  # a grayscale value
+                                             symbol='o',
+                                             pen=None, # makes it a scatter
+                                             symbolSize=5)
+
+                self.main_QtPlot.add(x=[0], y=[0],
+                                     xlabel=xlab,
+                                     xunit=xunits[xi],
+                                     ylabel=ylab,
+                                     yunit=yunits[yi],
+                                     subplot=j+1,
+                                     pen=None,
+                                     # color=color_cycle[j % len(color_cycle)],
+                                     color=0.5,
+                                     symbol='o', symbolSize=5)
+                self.curves.append(self.main_QtPlot.traces[-1])
+
+
+                self.main_QtPlot.add(x=[0], y=[0],
+                                     xlabel=xlab,
+                                     xunit=xunits[xi],
+                                     ylabel=ylab,
+                                     yunit=yunits[yi],
+                                     subplot=j+1,
+                                     color=color_cycle[0],
+                                     symbol='o', symbolSize=5)
+                self.curves_distr_mean.append(self.main_QtPlot.traces[-1])
+
+                self.main_QtPlot.add(x=[0], y=[0],
+                                     xlabel=xlab,
+                                     xunit=xunits[xi],
+                                     ylabel=ylab,
+                                     yunit=yunits[yi],
+                                     subplot=j+1,
+                                     pen=None,
+                                     color=color_cycle[1],
+                                     symbol='star',  symbolSize=10)
+                self.curves_best_ever.append(self.main_QtPlot.traces[-1])
+
+
+                j += 1
+            self.main_QtPlot.win.nextRow()
+
+
+
+
+
+
+
+        self.time_last_ad_plot_update = time.time()
+        self.secondary_QtPlot.clear()
+
+        zlabels = self.detector_function.value_names
+        zunits = self.detector_function.value_units
+
+        for j in range(len(self.detector_function.value_names)):
+            self.secondary_QtPlot.add(x=[0],
+                                      y=[0],
+                                      xlabel='iteration',
+                                      ylabel=zlabels[j],
+                                      yunit=zunits[j],
+                                      subplot=j+1,
+                                      symbol='o', symbolSize=5)
+
+        self.secondary_QtPlot.add(x=[0], y=[0],
+                                  symbol='star', symbolsize=5,
+                                  subplot=1)
+
+    def update_plotmon_adaptive_cma(self, force_update=False):
+        """
+        Special adaptive plotmon for
+        """
+
+        if self.live_plot_enabled():
+            # try:
+                if (time.time() - self.time_last_ad_plot_update >
+                        self.plotting_interval() or force_update):
+                    ##########################################
+                    # Main plotmon
+                    ##########################################
+                    i = 0
+                    nr_sweep_funcs = len(self.sweep_function_names)
+
+                    # best_idx -1 as we count from 0 and best eval
+                    # counts from 1.
+                    best_index = int(self.opt_res_dset[-1, -1] - 1)
+
+                    for y_ind in range(len(self.detector_function.value_names)):
+                        for x_ind in range(nr_sweep_funcs):
+                            x = self.dset[:, x_ind]
+                            y = self.dset[:, nr_sweep_funcs+y_ind]
+
+                            self.curves[i]['config']['x'] = x
+                            self.curves[i]['config']['y'] = y
+
+                            best_x = x[best_index]
+                            best_y = y[best_index]
+                            self.curves_best_ever[i]['config']['x'] = [best_x]
+                            self.curves_best_ever[i]['config']['y'] = [best_y]
+                            mean_x = self.opt_res_dset[:, 2+x_ind]
+                            # std_x is needed to implement errorbars on X
+                            # std_x = self.opt_res_dset[:, 2+nr_sweep_funcs+x_ind]
+                            # to be replaced with an actual mean
+                            mean_y = self.opt_res_dset[:, 2+2*nr_sweep_funcs]
+                            # TODO: turn into errorbars
+                            self.curves_distr_mean[i]['config']['x'] = mean_x
+                            self.curves_distr_mean[i]['config']['y'] = mean_y
+
+                            i += 1
+
+
+                    self.main_QtPlot.update_plot()
+                    ##########################################
+                    # Secondary plotmon
+                    ##########################################
+                    for j in range(len(self.detector_function.value_names)):
+                        y_ind = len(self.sweep_functions) + j
+                        y = self.dset[:, y_ind]
+                        x = range(len(y))
+                        self.secondary_QtPlot.traces[j]['config']['x'] = x
+                        self.secondary_QtPlot.traces[j]['config']['y'] = y
+                        self.time_last_ad_plot_update = time.time()
+                        # self.secondary_QtPlot.update_plot()
+
+                    # number of evals column
+                    nr_of_evals = self.opt_res_dset[:, 1]
+                    best_func_val = self.opt_res_dset[:, len(self.sweep_functions)*2+2]
+                    self.secondary_QtPlot.traces[j+1]['config']['x'] = nr_of_evals
+                    self.secondary_QtPlot.traces[j+1]['config']['y'] = best_func_val
+
+                    self.secondary_QtPlot.update_plot()
+
+
+
+            # except Exception as e:
+            #     logging.warning(e)
 
     def update_plotmon_2D_hard(self):
         '''
@@ -844,13 +1020,14 @@ class MeasurementControl(Instrument):
         stds = es.result.stds   # stds of distribution, stds of xfavorite
         fbest = es.result.fbest  # best ever measured
         xbest = es.result.xbest  # coordinates of best ever measured
+        evals_best = es.result.evals_best # index of best measurement
 
         if not self.minimize_optimization:
             fbest = -fbest
 
         results_array = np.concatenate([[generation, evals],
                                         xfavorite, stds,
-                                        [fbest], xbest])
+                                        [fbest], xbest, [evals_best]])
         if (not 'optimization_result'
                 in self.data_object['Experimental Data'].keys()):
             opt_res_grp = self.data_object['Experimental Data']
@@ -864,7 +1041,8 @@ class MeasurementControl(Instrument):
                 'generation, ' + 'evaluations, ' +
                 'xfavorite, ' * len(xfavorite) +
                 'stds, '*len(stds) +
-                'fbest, ' + 'xbest, '*len(xbest))
+                'fbest, ' + 'xbest, '*len(xbest)+
+                'best evaluation,')
 
         old_shape = self.opt_res_dset.shape
         new_shape = (old_shape[0]+1, old_shape[1])

@@ -39,6 +39,8 @@ class DummyParHolder(Instrument):
                            get_cmd=self._measure_parabola)
         self.add_parameter('skewed_parabola', unit='V',
                            get_cmd=self._measure_skewed_parabola)
+        self.add_parameter('cos_mod_parabola', unit='V',
+                           get_cmd=self._measure_cos_mod_parabola)
 
         self.add_parameter('array_like', unit='a.u.',
                            parameter_class=ManualParameter,
@@ -59,6 +61,13 @@ class DummyParHolder(Instrument):
                        (self.y()-self.y0())**2 +
                        (self.z()-self.z0())**2 +
                         self.noise()*np.random.rand(1))
+
+    def _measure_cos_mod_parabola(self):
+        time.sleep(self.delay())
+        cos_val = np.cos(self.x()/10+self.y()/10 + self.z()/10)**2  # ensures always larger than 1
+        par = self._measure_parabola()
+        n = self.noise()*np.random.rand(1)
+        return cos_val*par + n + par/10
 
     def _measure_skewed_parabola(self):
         '''
