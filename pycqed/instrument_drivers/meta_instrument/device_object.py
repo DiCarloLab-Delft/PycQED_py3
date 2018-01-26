@@ -976,21 +976,20 @@ class TwoQubitDevice(DeviceObject):
     #     MC.run('CZ_Z_amp')
     #     ma.MeasurementAnalysis(label='CZ_Z_amp')
 
-
 def get_multiplexed_readout_pulse_dictionary(qubits):
     """Takes the readout pulse parameters from the first qubit in `qubits`"""
     maxlen = 0
     for qb in qubits:
         if qb.RO_pulse_length() > maxlen:
-            maxlen = qb.ro_pulse_square_length()
-    return {'RO_pulse_marker_channel': qubits[0].ro_trigger_channel(),
-            'acq_marker_channel': qubits[0].ro_trigger_channel(),
-            'acq_marker_delay': qubits[0].ro_trigger_delay(),
+            maxlen = qb.RO_pulse_length()
+    return {'RO_pulse_marker_channel': qubits[0].RO_acq_marker_channel(),
+            'acq_marker_channel': qubits[0].RO_acq_marker_channel(),
+            'acq_marker_delay': qubits[0].RO_acq_marker_delay(),
             'amplitude': 0.0,
             'length': maxlen,
             'operation_type': 'RO',
             'phase': 0,
-            'pulse_delay': qubits[0].ro_pulse_delay(),
+            'pulse_delay': qubits[0].RO_pulse_delay(),
             'pulse_type': 'Multiplexed_UHFQC_pulse',
             'target_qubit': ','.join([qb.name for qb in qubits])}
 
@@ -1028,11 +1027,11 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
             integration_length=max_int_len, nr_averages=nr_averages),
         'inp_avg_det': det.UHFQC_input_average_detector(
             UHFQC=UHFQC, AWG=pulsar, nr_averages=nr_averages, nr_samples=4096),
-        'int_corr_det': det.UHFQC_input_average_detector(
+        'int_corr_det': det.UHFQC_correlation_detector(
             UHFQC=UHFQC, AWG=pulsar, channels=channels,
             integration_length=max_int_len, nr_averages=nr_averages,
             correlations=correlations),
-        'dig_corr_det': det.UHFQC_input_average_detector(
+        'dig_corr_det': det.UHFQC_correlation_detector(
             UHFQC=UHFQC, AWG=pulsar, channels=channels,
             integration_length=max_int_len, nr_averages=nr_averages,
             correlations=correlations, thresholding=True),

@@ -223,6 +223,7 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
                     el.add(
                         Acq_marker, start=pulse_pars['acq_marker_delay'],
                         refpulse=last_pulse, refpoint='start')
+        # apply any virtual-z rotations in the pulse
         basis_rotation = pulse_pars.get('basis_rotation', {})
         for qubit_name, offset in basis_rotation.items():
             phase_offset[qubit_name] -= offset

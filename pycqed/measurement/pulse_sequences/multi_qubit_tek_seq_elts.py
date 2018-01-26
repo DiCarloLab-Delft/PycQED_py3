@@ -1260,7 +1260,6 @@ def two_qubit_tomo_bell_qudev(bell_state,
 
     seq_name = '2_qubit_Bell_Tomo_%d_seq' % bell_state
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     tomo_list_qS = []
     tomo_list_qCZ = []
@@ -1277,11 +1276,14 @@ def two_qubit_tomo_bell_qudev(bell_state,
     # This forms the base sequence, note that gate1, gate2 and after_pulse will
     # be replaced to prepare the desired state and tomo1 and tomo2 will be
     # replaced with tomography pulses
-    base_sequence = num_flux_pulses*['flux ' + qCZ]
-    base_sequence.extend(
-        ['gate1 ' + qS, 'gate2 ' + qCZ, 'CZ_corr ' + qS, 'CZ_corr ' + qCZ,
-         'CZ ' + qCZ, 'after_pulse',
-         'tomo1 '+qCZ, 'tomo2 '+qS])#, 'RO '+RO_target])
+    base_sequence = ['gate1 ' + qS, 'gate2 ' + qCZ, 'CZ_corr ' + qS,
+                     'CZ_corr ' + qCZ, 'CZ ' + qCZ, 'after_pulse',
+                     'tomo1 '+qCZ, 'tomo2 '+qS]
+    # base_sequence = num_flux_pulses*['flux ' + qCZ]
+    # base_sequence.extend(
+    #     ['gate1 ' + qS, 'gate2 ' + qCZ, 'CZ_corr ' + qS, 'CZ_corr ' + qCZ,
+    #      'CZ ' + qCZ, 'after_pulse',
+    #      'tomo1 '+qCZ, 'tomo2 '+qS])#, 'RO '+RO_target])
 
     # Calibration points
     # every calibration point is repeated 7 times to have 64 elts in totalb
@@ -1293,20 +1295,20 @@ def two_qubit_tomo_bell_qudev(bell_state,
                  [['I '+qCZ, 'X180 '+qS]]*7 + \
                  [['X180 '+qCZ, 'I '+qS]]*7 + \
                  [['X180 '+qCZ, 'X180 '+qS]]*7
+    operation_dict['I_CZ ' + qCZ] = deepcopy(operation_dict['CZ ' + qCZ])
+    operation_dict['I_CZ ' + qCZ]['amplitude'] = 0
 
     if CZ_disabled:
         operation_dict['CZ'+qCZ]['amplitude'] = 0
     #         operation_dict['CZ '+qCZ]['phase_corr_pulse_amp'] = 0
 
-    ################################################
-    # Creating additional pulses for this sequence #
-    ################################################
-    # the recovery SWAP is identical to the regular SWAP operation, unless
-    # an rSWAP is explicitly contained in the operation dict
-    for qb in [qS,qCZ]:
+    #######################################################
+    # Creating VZ pulses to compensate for dynamic phases #
+    #######################################################
+    for qb in [qS, qCZ]:
         if ('CZ_corr ' + qb) not in operation_dict.keys():
             operation_dict['CZ_corr ' + qb] = deepcopy(operation_dict['Z180 ' + qb])
-            operation_dict['CZ_corr ' + qb]['refpoint'] = 'simultaneous'
+            operation_dict['CZ_corr ' + qb]['refpoint'] = 'end'
     # operation_dict['CZ_corr ' + qCZ]['phase'] = 0
     # operation_dict['CZ_corr ' + qS]['phase'] = 0
     operation_dict['CZ_corr ' + qCZ]['phase'] = operation_dict['CZ ' + qCZ]['dynamic_phase']
@@ -1397,6 +1399,7 @@ def two_qubit_tomo_bell_qudev(bell_state,
             #not functional with preflux pulses!
             base_sequence[0] = 'I ' + qS
             base_sequence[1] = 'I ' + qCZ
+            base_sequence[4] = 'CZ ' + qCZ
             base_sequence[5] = 'I ' + qCZ
             base_sequence[-2:] = cal_pulses
             seq_pulse_list += [deepcopy(base_sequence)]
@@ -1410,7 +1413,9 @@ def two_qubit_tomo_bell_qudev(bell_state,
             pulses += [operation_dict[p]]
         # print('pulses ', len(pulses))
         pulses += [RO_pars]
-
+        # from pprint import pprint
+        # pprint(pulses)
+        # print('\n')
         el = multi_pulse_elt(i, station, pulses, sequencer_config)
         if distortion_dict is not None:
             el = fluxpulse_predistortion.distort_qudev(el,distortion_dict)
@@ -1420,7 +1425,7 @@ def two_qubit_tomo_bell_qudev(bell_state,
     if upload:
         station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
 
-    # return seq, pulses
+    # return seq, seq_pulse_list
     return seq, el_list
 
 

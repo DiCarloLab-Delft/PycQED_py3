@@ -282,7 +282,7 @@ class tomo_Bell(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         if self.upload:
-            sqs2.BellTomo.two_qubit_tomo_bell_qudev(
+            sqs2.two_qubit_tomo_bell_qudev(
                 bell_state=self.bell_state,
                 qb_c=self.qb_c, qb_t=self.qb_t,
                 RO_pars=self.RO_pars,
