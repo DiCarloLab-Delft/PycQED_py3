@@ -489,14 +489,27 @@ class BaseDataAnalysis(object):
                                   **fit_yvals[tt]))
             else:
                 if guess_pars is None:
-                    if guess_dict is None:
-                        guess_dict = fit_guess_fn(**fit_yvals, **fit_xvals)
-                        if isinstance(guess_dict, lmfit.Parameters):
-                            guess_pars = guess_dict
-                        else:
-                            for key, val in list(guess_dict.items()):
-                                model.set_param_hint(key, **val)
+                    if fit_guess_fn is not None:
+                        # a fit function should return lmfit parameter objects
+                        # but can also work by returning a dictionary of guesses
+                        guess_pars = fit_guess_fn(**fit_yvals, **fit_xvals)
+                        if not isinstance(guess_pars, lmfit.Parameters):
+                            for gd_key, val in list(guess_pars.items()):
+                                model.set_param_hint(gd_key, **val)
                             guess_pars = model.make_params()
+
+                        if guess_dict is not None:
+                            for gd_key, val in guess_dict.items():
+                                for attr, attr_val in val.items():
+                                    # e.g. setattr(guess_pars['frequency'], 'value', 20e6)
+                                    setattr(guess_pars[gd_key], attr, attr_val)
+                        # A guess can also be specified as a dictionary.
+                        # additionally this can be used to overwrite values
+                        # from the guess functions.
+                    else:
+                        for key, val in list(guess_dict.items()):
+                            model.set_param_hint(key, **val)
+                        guess_pars = model.make_params()
 
                 fit_dict['fit_res'] = model.fit(
                     params=guess_pars, **fit_xvals, **fit_yvals)

@@ -373,7 +373,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         # Thresholds and fidelity information     #
         ###########################################
 
-        if not self.presentation_mode: 
+        if not self.presentation_mode:
             max_cnts = np.max([np.max(self.proc_data_dict['hist_0'][0]),
                                np.max(self.proc_data_dict['hist_1'][0])])
 
@@ -481,7 +481,7 @@ def get_shots_zero_one(data, post_select: bool=False,
         post_select_shots_1 = data[nr_samples//2::nr_samples]
         shots_1 = data[nr_samples//2+1::nr_samples]
 
-        # Determine shots to remove 
+        # Determine shots to remove
         post_select_indices_0 = dm_tools.get_post_select_indices(
             thresholds=[post_select_threshold],
             init_measurements=[post_select_shots_0])
@@ -490,14 +490,10 @@ def get_shots_zero_one(data, post_select: bool=False,
             thresholds=[post_select_threshold],
             init_measurements=[post_select_shots_1])
 
-
-        print(len(shots_0))
         shots_0[post_select_indices_0] = np.nan
         shots_0 = shots_0[~np.isnan(shots_0)]
 
         shots_1[post_select_indices_1] = np.nan
         shots_1 = shots_1[~np.isnan(shots_1)]
-
-        print(len(shots_0))
 
     return shots_0, shots_1

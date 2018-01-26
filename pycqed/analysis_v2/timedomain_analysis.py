@@ -524,7 +524,6 @@ class CZ_1QPhaseCal_Analysis(ba.BaseDataAnalysis):
 
 
 
-
 class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
     """
     Analysis to extract quantities from a conditional oscillation.
@@ -604,6 +603,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         cos_mod0.guess = fit_mods.Cos_guess.__get__(cos_mod0, cos_mod0.__class__)
         self.fit_dicts['cos_fit_off'] = {
             'model': cos_mod0,
+            'guess_dict': {'frequency': {'value': 1/360, 'vary': False}},
             'fit_xvals': {'t': self.proc_data_dict['xvals_off'][:-2]},
             'fit_yvals': {'data': self.proc_data_dict['yvals_osc_off'][:-2]}}
 
@@ -611,6 +611,7 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         cos_mod1.guess = fit_mods.Cos_guess.__get__(cos_mod1, cos_mod1.__class__)
         self.fit_dicts['cos_fit_on'] = {
             'model': cos_mod1,
+            'guess_dict': {'frequency': {'value': 1/360, 'vary': False}},
             'fit_xvals': {'t': self.proc_data_dict['xvals_on'][:-2]},
             'fit_yvals': {'data': self.proc_data_dict['yvals_osc_on'][:-2]}}
 
@@ -725,10 +726,10 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             leak_msg = (
                 'Missing fraction: {:.2f} % '.format(
                     self.proc_data_dict['missing_fraction']*100))
-            # self.plot_dicts['leak_msg'] = {
-            #     'ax_id': 'spectator_qubit',
-            #     'ypos': 0.7,
-            #     'plotfn': self.plot_text,
-            #     'box_props': 'fancy',
-            #     'line_kws': {'alpha': 0},
-            #     'text_string': leak_msg}
+            self.plot_dicts['leak_msg'] = {
+                'ax_id': 'spectator_qubit',
+                'ypos': 0.7,
+                'plotfn': self.plot_text,
+                'box_props': 'fancy',
+                'line_kws': {'alpha': 0},
+                'text_string': leak_msg}
