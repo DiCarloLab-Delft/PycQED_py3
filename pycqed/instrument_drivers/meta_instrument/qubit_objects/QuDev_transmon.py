@@ -314,40 +314,22 @@ class QuDev_transmon(Qubit):
             f_RO = self.f_RO_resonator()
         else:
             f_RO = self.f_RO()
-        if self.RO_pulse_type() == 'Gated_MW_RO_pulse':
-            self.readout_RF.frequency(f_RO)
-            self.readout_RF.power(self.RO_pulse_power())
-            self.readout_RF.on()
-            self.UHFQC.awg_sequence_acquisition(acquisition_delay=0)
-        elif self.RO_pulse_type() == 'MW_IQmod_pulse_UHFQC':
-            eval('self.UHFQC.sigouts_{}_offset({})'.format(
-                self.RO_I_channel(), self.RO_I_offset()))
-            eval('self.UHFQC.sigouts_{}_offset({})'.format(
-                self.RO_Q_channel(), self.RO_Q_offset()))
-            self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(
-                f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
-                RO_pulse_length=self.RO_pulse_length(),
-                acquisition_delay=0)
-            self.readout_UC_LO.pulsemod_state('Off')
-            self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
-            self.readout_UC_LO.on()
-        elif self.RO_pulse_type() is 'Multiplexed_UHFQC_pulse':
-            # setting up the UHFQC awg sequence must be done externally by a
-            # readout manager
-            self.readout_UC_LO.pulsemod_state('Off')
-            self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
-            self.readout_UC_LO.on()
 
-        self.heterodyne.auto_seq_loading(True)
-        self.heterodyne._awg_seq_parameters_changed = True
-        self.heterodyne._UHFQC_awg_parameters_changed = True
-        self.heterodyne.prepare()
+        eval('self.UHFQC.sigouts_{}_offset({})'.format(
+            self.RO_I_channel(), self.RO_I_offset()))
+        eval('self.UHFQC.sigouts_{}_offset({})'.format(
+            self.RO_Q_channel(), self.RO_Q_offset()))
+        self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(
+            f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
+            RO_pulse_length=self.RO_pulse_length(),
+            acquisition_delay=0)
+        self.readout_UC_LO.pulsemod_state('Off')
+        self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
+        self.readout_UC_LO.on()
+
         self.heterodyne.auto_seq_loading(False)
-        self.heterodyne._awg_seq_parameters_changed = False
-        self.heterodyne._UHFQC_awg_parameters_changed = False
-
-
-
+        # self.heterodyne._awg_seq_parameters_changed = False
+        # self.heterodyne._UHFQC_awg_parameters_changed = False
 
     def prepare_for_timedomain(self):
         # cw source
