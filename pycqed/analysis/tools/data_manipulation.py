@@ -9,6 +9,7 @@ roughly split into
 - plotting tools
 
 '''
+from collections import deque
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -466,3 +467,23 @@ def get_outliers_bwd(x, threshold, plot_hist=False, ax=None):
 def get_outliers(x, threshold):
     return np.logical_and(get_outliers_fwd(x, threshold),
                           get_outliers_bwd(x, threshold)[::-1])
+
+
+def get_generations_by_index(generation_indices, array):
+    """
+    Given a list of indices
+    """
+    generation_indices[0]
+    generations = []
+
+    current_gen_indices = deque([0], maxlen=2)
+    for idx in generation_indices:
+        current_gen_indices.append(int(idx))
+        generations.append(array[current_gen_indices[0]: current_gen_indices[1]])
+
+    return generations
+
+def get_generation_means(generation_indices, array):
+    generations = get_generations_by_index(generation_indices, array)
+    means = [np.mean(gen) for gen in generations]
+    return means

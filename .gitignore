@@ -133,4 +133,4 @@ data/*
 *.hdf5
 .idea
 *.json
-
+*.dat

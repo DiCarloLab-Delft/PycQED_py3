@@ -12,11 +12,13 @@ from pycqed.utilities.get_default_datadir import get_default_datadir
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_swf
 from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_det
+from pycqed.analysis.tools.data_manipulation import get_generation_means
 
 from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
 from qcodes.plots.colors import color_cycle
+
 
 
 try:
@@ -746,6 +748,10 @@ class MeasurementControl(Instrument):
             persist = True
         else:
             persist = False
+
+        ##########################################
+        # Main plotmon
+        ##########################################
         for yi, ylab in enumerate(ylabels):
             for xi, xlab in enumerate(xlabels):
                 if persist:  # plotting persist first so new data on top
@@ -767,8 +773,7 @@ class MeasurementControl(Instrument):
                                      yunit=yunits[yi],
                                      subplot=j+1,
                                      pen=None,
-                                     # color=color_cycle[j % len(color_cycle)],
-                                     color=0.5,
+                                     color=color_cycle[0],
                                      symbol='o', symbolSize=5)
                 self.curves.append(self.main_QtPlot.traces[-1])
 
@@ -779,7 +784,7 @@ class MeasurementControl(Instrument):
                                      ylabel=ylab,
                                      yunit=yunits[yi],
                                      subplot=j+1,
-                                     color=color_cycle[0],
+                                     color=color_cycle[2],
                                      symbol='o', symbolSize=5)
                 self.curves_distr_mean.append(self.main_QtPlot.traces[-1])
 
@@ -798,30 +803,50 @@ class MeasurementControl(Instrument):
                 j += 1
             self.main_QtPlot.win.nextRow()
 
+        ##########################################
+        # Secondary plotmon
+        ##########################################
 
-
-
-
-
-
-        self.time_last_ad_plot_update = time.time()
         self.secondary_QtPlot.clear()
-
-        zlabels = self.detector_function.value_names
-        zunits = self.detector_function.value_units
-
+        self.iter_traces=[]
+        self.iter_bever_traces = []
+        self.iter_mean_traces = []
         for j in range(len(self.detector_function.value_names)):
             self.secondary_QtPlot.add(x=[0],
                                       y=[0],
-                                      xlabel='iteration',
-                                      ylabel=zlabels[j],
-                                      yunit=zunits[j],
+                                      name='Measured values',
+                                      xlabel='Iteration',
+                                      x_unit='#',
+                                      ylabel=ylabels[j],
+                                      yunit=yunits[j],
                                       subplot=j+1,
                                       symbol='o', symbolSize=5)
+            self.iter_traces.append(self.secondary_QtPlot.traces[-1])
 
-        self.secondary_QtPlot.add(x=[0], y=[0],
-                                  symbol='star', symbolsize=5,
-                                  subplot=1)
+            self.secondary_QtPlot.add(x=[0], y=[0],
+                                      symbol='star', symbolSize=15,
+                                      name='Best ever measured',
+                                      color=color_cycle[1],
+                                      xlabel='iteration',
+                                      x_unit='#',
+                                      ylabel=ylabels[j],
+                                      yunit=yunits[j],
+                                      subplot=j+1)
+            self.iter_bever_traces.append(self.secondary_QtPlot.traces[-1])
+            self.secondary_QtPlot.add(x=[0], y=[0],
+                                      color=color_cycle[2],
+                                      name='Generational mean',
+                                      symbol='o', symbolSize=8,
+                                      xlabel='iteration',
+                                      x_unit='#',
+                                      ylabel=ylabels[j],
+                                      yunit=yunits[j],
+                                      subplot=j+1)
+            self.iter_mean_traces.append(self.secondary_QtPlot.traces[-1])
+
+        # required for the first update call to work
+        self.time_last_ad_plot_update = time.time()
+
 
     def update_plotmon_adaptive_cma(self, force_update=False):
         """
@@ -842,10 +867,16 @@ class MeasurementControl(Instrument):
                     # counts from 1.
                     best_index = int(self.opt_res_dset[-1, -1] - 1)
 
-                    for y_ind in range(len(self.detector_function.value_names)):
+                    for j in range(len(self.detector_function.value_names)):
+                        y_ind = nr_sweep_funcs + j
+
+                        ##########################################
+                        # Main plotmon
+                        ##########################################
                         for x_ind in range(nr_sweep_funcs):
+
                             x = self.dset[:, x_ind]
-                            y = self.dset[:, nr_sweep_funcs+y_ind]
+                            y = self.dset[:, y_ind]
 
                             self.curves[i]['config']['x'] = x
                             self.curves[i]['config']['y'] = y
@@ -859,34 +890,38 @@ class MeasurementControl(Instrument):
                             # std_x = self.opt_res_dset[:, 2+nr_sweep_funcs+x_ind]
                             # to be replaced with an actual mean
                             mean_y = self.opt_res_dset[:, 2+2*nr_sweep_funcs]
+                            mean_y = get_generation_means(self.opt_res_dset[:, 1] , y)
                             # TODO: turn into errorbars
                             self.curves_distr_mean[i]['config']['x'] = mean_x
                             self.curves_distr_mean[i]['config']['y'] = mean_y
-
                             i += 1
-
-
-                    self.main_QtPlot.update_plot()
-                    ##########################################
-                    # Secondary plotmon
-                    ##########################################
-                    for j in range(len(self.detector_function.value_names)):
-                        y_ind = len(self.sweep_functions) + j
+                        ##########################################
+                        # Secondary plotmon
+                        ##########################################
+                        # Measured value vs function evaluation
                         y = self.dset[:, y_ind]
                         x = range(len(y))
-                        self.secondary_QtPlot.traces[j]['config']['x'] = x
-                        self.secondary_QtPlot.traces[j]['config']['y'] = y
-                        self.time_last_ad_plot_update = time.time()
-                        # self.secondary_QtPlot.update_plot()
+                        self.iter_traces[j]['config']['x'] = x
+                        self.iter_traces[j]['config']['y'] = y
 
-                    # number of evals column
-                    nr_of_evals = self.opt_res_dset[:, 1]
-                    best_func_val = self.opt_res_dset[:, len(self.sweep_functions)*2+2]
-                    self.secondary_QtPlot.traces[j+1]['config']['x'] = nr_of_evals
-                    self.secondary_QtPlot.traces[j+1]['config']['y'] = best_func_val
+                        # generational means
+                        gen_idx = self.opt_res_dset[:, 1]
+                        self.iter_mean_traces[j]['config']['x'] = gen_idx
+                        self.iter_mean_traces[j]['config']['y'] = mean_y
 
+
+
+                        # This plots the best ever measured value vs iteration
+                        # number of evals column
+                        best_evals_idx = (self.opt_res_dset[:, -1] - 1).astype(int)
+                        best_func_val = y[best_evals_idx]
+                        self.iter_bever_traces[j]['config']['x'] = best_evals_idx
+                        self.iter_bever_traces[j]['config']['y'] = best_func_val
+
+                    self.main_QtPlot.update_plot()
                     self.secondary_QtPlot.update_plot()
 
+                    self.time_last_ad_plot_update = time.time()
 
 
             # except Exception as e:
@@ -987,9 +1022,18 @@ class MeasurementControl(Instrument):
         data_group.attrs['value_units'] = h5d.encode_to_utf8(
             self.detector_function.value_units)
 
+
     def create_experiment_result_dict(self):
+        try :
+            # only exists as an open dataset when running an
+            # optimization
+            opt_res_dset = self.opt_res_dset[()]
+        except (ValueError, AttributeError) as e:
+            opt_res_dset = None
+
         result_dict = {
             "dset": self.dset[()],
+            "opt_res_dset": opt_res_dset,
             "sweep_parameter_names": self.sweep_par_names,
             "sweep_parameter_units": self.sweep_par_units,
             "value_names": self.detector_function.value_names,
@@ -1015,7 +1059,7 @@ class MeasurementControl(Instrument):
         """
         # code extra verbose to understand what is going on
         generation = es.result.iterations
-        evals = es.result.evaluations
+        evals = es.result.evaluations # number of evals at start of each gen
         xfavorite = es.result.xfavorite  # center of distribution, best est
         stds = es.result.stds   # stds of distribution, stds of xfavorite
         fbest = es.result.fbest  # best ever measured

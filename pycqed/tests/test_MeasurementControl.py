@@ -50,7 +50,7 @@ class Test_MeasurementControl(unittest.TestCase):
         np.testing.assert_array_almost_equal(y1, y[1, :])
 
         # Test that the return dictionary has the right entries
-        dat_keys = set(['dset', 'sweep_parameter_names',
+        dat_keys = set(['dset', 'opt_res_dset', 'sweep_parameter_names',
                         'sweep_parameter_units',
                         'value_names', 'value_units'])
         self.assertEqual(dat_keys, set(dat.keys()))
