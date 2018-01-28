@@ -7133,10 +7133,10 @@ class butterfly_analysis(MeasurementAnalysis):
 
             self.data_exc_post = dm_tools.postselect(threshold=threshold_init,
                                                      data=self.data_exc,
-                                                     one_larger_than_threshold=case)[:, 1:]
+                                                     positive_case=case)[:, 1:]
             self.data_rel_post = dm_tools.postselect(threshold=threshold_init,
                                                      data=self.data_rel,
-                                                     one_larger_than_threshold=case)[:, 1:]
+                                                     positive_case=case)[:, 1:]
 
             self.data_exc_pre_postselect = self.data_exc
             self.data_rel_pre_postselect = self.data_rel

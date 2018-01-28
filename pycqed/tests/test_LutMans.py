@@ -171,6 +171,7 @@ class Test_Flux_LutMan(unittest.TestCase):
         self.AWG8_Flux_LutMan.cz_theta_f(80)
         self.AWG8_Flux_LutMan.cz_freq_01_max(6.8e9)
         self.AWG8_Flux_LutMan.cz_J2(4.1e6)
+        self.AWG8_Flux_LutMan.cz_E_c(250e6)
         self.AWG8_Flux_LutMan.cz_freq_interaction(5.1e9)
 
     def test_generate_standard_flux_waveforms(self):
