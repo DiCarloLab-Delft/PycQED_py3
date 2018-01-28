@@ -24,9 +24,10 @@ from pycqed.instrument_drivers.meta_instrument.qubit_objects.QuDev_transmon impo
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.Tektronix_driven_transmon import Tektronix_driven_transmon
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.CC_transmon import CBox_v3_driven_transmon, QWG_driven_transmon
 from pycqed.instrument_drivers.physical_instruments.QuTech_CCL import dummy_CCL
+from pycqed.instrument_drivers.physical_instruments.QuTech_VSM_Module import Dummy_QuTechVSMModule
 from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
 
-Dummy_VSM_not_fixed = True
+Dummy_VSM_not_fixed = False
 
 try:
     import openql
@@ -49,7 +50,8 @@ class Test_QO(unittest.TestCase):
         self.UHFQC = dummy_UHFQC('UHFQC')
 
         self.CCL = dummy_CCL('CCL')
-        self.VSM = Dummy_Duplexer('VSM')
+        # self.VSM = Dummy_Duplexer('VSM')
+        self.VSM = Dummy_QuTechVSMModule('VSM')
 
         self.MC = measurement_control.MeasurementControl(
             'MC', live_plot_enabled=False, verbose=False)
@@ -115,12 +117,10 @@ class Test_QO(unittest.TestCase):
                              MC=None, heterodyne_instr=None, cw_source=None)
         QDT.close()
 
-    @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_instantiate_TekTransmon(self):
         TT = Tektronix_driven_transmon('TT')
         TT.close()
 
-    @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_instantiate_CBoxv3_transmon(self):
         CT = CBox_v3_driven_transmon('CT')
         CT.close()
@@ -152,7 +152,7 @@ class Test_QO(unittest.TestCase):
         self.CCL_qubit.ro_acq_weight_type('SSB')
         self.CCL_qubit.prepare_for_continuous_wave()
 
-    @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
+    @unittest.skipIf(True, 'Test for use with an old duplexer.')
     def test_prep_cw_config_vsm(self):
 
         self.CCL_qubit.spec_vsm_ch_in(2)
@@ -349,17 +349,15 @@ class Test_QO(unittest.TestCase):
 
     @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_prep_td_config_vsm(self):
-        self.CCL_qubit.mw_vsm_switch('ON')
         self.CCL_qubit.mw_vsm_G_att(10234)
         self.CCL_qubit.mw_vsm_D_phase(10206)
-        self.CCL_qubit.mw_vsm_ch_Gin(3)
-        self.CCL_qubit.mw_vsm_ch_Din(4)
-        self.CCL_qubit.mw_vsm_ch_out(2)
+        self.CCL_qubit.mw_vsm_ch_in(2)
+        self.CCL_qubit.mw_vsm_mod_out(5)
         self.CCL_qubit.prepare_for_timedomain()
 
-        self.assertEqual(self.VSM.in3_out2_switch(), 'ON')
-        self.assertEqual(self.VSM.in3_out2_att(), 10234)
-        self.assertEqual(self.VSM.in4_out2_phase(), 10206)
+        self.assertEqual(self.VSM.mod5_ch2_gaussian_att_raw(), 10234)
+        self.assertEqual(self.VSM.mod5_ch2_derivative_phase_raw(), 10206)
+
 
     ###################################################
     #          Test basic experiments                 #
@@ -432,10 +430,10 @@ class Test_QO(unittest.TestCase):
     @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_Ramsey(self):
         self.CCL_qubit.mw_freq_mod(100e6)
-        self.CCL_qubit.measure_Ramsey(times=np.arange(0, 1e-6, 20e-9),
+        self.CCL_qubit.measure_ramsey(times=np.arange(0, 1e-6, 20e-9),
                                       update=False)
         self.CCL_qubit.T2_star(20e-6)
-        self.CCL_qubit.measure_Ramsey(update=False)
+        self.CCL_qubit.measure_ramsey(update=False)
 
     @unittest.skipIf(openql_import_fail, 'OpenQL not present')
     @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
