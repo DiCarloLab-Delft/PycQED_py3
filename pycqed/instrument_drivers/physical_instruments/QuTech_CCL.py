@@ -483,6 +483,7 @@ class dummy_CCL(CCL):
 
     def __init__(self, name, **kw):
         Instrument.__init__(self, name=name, **kw)
+        self._ensure_connection = True
         self._dummy_instr = True
         self.model = name
         self.version_info = self.get_idn()
