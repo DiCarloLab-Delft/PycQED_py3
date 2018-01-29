@@ -290,8 +290,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             'xlabel': self.proc_data_dict['shots_xlabel'],
             'xunit': self.proc_data_dict['shots_xunit'],
             'ylabel': 'Counts',
-            'title': (self.proc_data_dict['timestamps'][0] + ' \n' +
-                      self.proc_data_dict['measurementstring'][0])}
+            'title': (self.timestamps[0] + ' \n' +
+                      self.raw_data_dict['measurementstring'][0])}
         self.plot_dicts['hist_1'] = {
             'ax_id': '1D_histogram',
             'plotfn': self.plot_bar,
