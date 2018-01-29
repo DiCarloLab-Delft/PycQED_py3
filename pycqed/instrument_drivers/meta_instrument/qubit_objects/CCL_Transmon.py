@@ -1332,7 +1332,7 @@ class CCLight_Transmon(Qubit):
         d.nr_shots = 4092
         MC.set_detector_function(d)
         MC.run(
-            'Measure_SSRO_{}'.format(self.msmt_suffix))
+            'SSRO{}'.format(self.msmt_suffix))
         MC.live_plot_enabled(old_plot_setting)
         if analyze:
             if len(d.value_names) == 1:

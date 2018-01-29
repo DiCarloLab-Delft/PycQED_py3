@@ -817,6 +817,7 @@ class MeasurementControl(Instrument):
                                       name='Measured values',
                                       xlabel='Iteration',
                                       x_unit='#',
+                                      color=color_cycle[0],
                                       ylabel=ylabels[j],
                                       yunit=yunits[j],
                                       subplot=j+1,
@@ -854,7 +855,7 @@ class MeasurementControl(Instrument):
         """
 
         if self.live_plot_enabled():
-            # try:
+            try:
                 if (time.time() - self.time_last_ad_plot_update >
                         self.plotting_interval() or force_update):
                     ##########################################
@@ -924,8 +925,8 @@ class MeasurementControl(Instrument):
                     self.time_last_ad_plot_update = time.time()
 
 
-            # except Exception as e:
-            #     logging.warning(e)
+            except Exception as e:
+                logging.warning(e)
 
     def update_plotmon_2D_hard(self):
         '''
