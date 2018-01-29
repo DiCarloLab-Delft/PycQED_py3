@@ -292,3 +292,29 @@ class tomo_Bell(swf.Hard_Sweep):
                 cal_points_with_flux_pulses=self.cal_points_with_flux_pulses,
                 verbose=self.verbose,
                 upload=self.upload)
+
+class two_qubit_parity(swf.Hard_Sweep):
+    def __init__(self, q0, q1, q2, feedback_delay, prep_sequence=None,
+                 tomography_basis=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
+                 upload=True, verbose=False):
+        super().__init__()
+        self.q0 = q0
+        self.q1 = q1
+        self.q2 = q2
+        self.feedback_delay = feedback_delay
+        self.tomography_basis = tomography_basis
+        self.prep_sequence = prep_sequence
+        self.upload = upload
+        self.parameter_name = 'sample'
+        self.unit = '#'
+        self.verbose = verbose
+        self.name = 'two_qubit_parity'
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs2.two_qubit_parity_measurement(
+                self.q0, self.q1, self.q2,
+                feedback_delay=self.feedback_delay,
+                prep_sequence=self.prep_sequence,
+                tomography_basis=self.tomography_basis,
+                verbose=self.verbose)

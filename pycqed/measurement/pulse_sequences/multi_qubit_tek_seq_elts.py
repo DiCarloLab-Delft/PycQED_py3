@@ -1506,12 +1506,13 @@ def n_qubit_reset(pulse_pars_list, RO_pars, feedback_delay, nr_resets=1,
         return seq_name
 
 
-def two_qubit_entanglement_by_parity_measurement(
-        q0, q1, q2, feedback_delay=900e-9, prep_sequences=None, nr_rounds=1,
+def two_qubit_parity_measurement(
+        q0, q1, q2, feedback_delay=900e-9, prep_sequence=None,
         tomography_basis=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
         upload=True, verbose=False, return_seq=False):
     """
-                |           x nr_rounds            |
+
+    |              elem 1               |  elem 2  | elem 3
     
     |q0> |======|---------*------------------------|======|
          | prep |         |                        | tomo |
@@ -1520,23 +1521,12 @@ def two_qubit_entanglement_by_parity_measurement(
     |q2> |======|------------*------------Y180-----|======|
     
     required elements:
-        prepare x prep_sequences:
+        prep_sequence:
             contains everything up to the first readout
         feedback x 2 (for the two readout results):
             contains conditional Y80 on q1 and q2
-        repeated_round x1:
-            contains everything after preparation up to the feedback readout
         tomography x 6**2:
             measure all observables of the two qubits X/Y/Z
-            
-    total segments: prep_sequences * 36.
-    each segment has the following elements:
-        prep
-        (nr_rounds - 1) x
-            feedback (codeword)
-            repeated round
-        feedback (codeword)
-        tomography x 36
     """
 
     q0n = q0.name
@@ -1544,8 +1534,9 @@ def two_qubit_entanglement_by_parity_measurement(
     q2n = q2.name
 
     operation_dict = {
-        'RO': device.get_multiplexed_readout_pulse_dictionary([q0, q1, q2])
+        'RO mux': device.get_multiplexed_readout_pulse_dictionary([q0, q1, q2])
     }
+
     operation_dict.update({
         'I_fb': {'pulse_type': 'SquarePulse',
                  'channel': operation_dict['RO']['acq_marker_channel'],
@@ -1557,67 +1548,55 @@ def two_qubit_entanglement_by_parity_measurement(
     operation_dict.update(q1.get_operation_dict())
     operation_dict.update(q2.get_operation_dict())
 
-    if prep_sequences is None:
-        prep_sequences = [['Y90 ' + q0n, 'Y90s' + q2n], ]
+    if prep_sequence is None:
+        prep_sequence = ['Y90 ' + q0n, 'Y90s' + q2n]
 
     # create the elements
     el_list = []
 
-    for i, prep_sequence in enumerate(prep_sequences):
-        prep_sequence = deepcopy(prep_sequence)
-        prep_sequence.append('mY90s ' + q1n)
-        prep_sequence.append('CZ ' + q0n + ' ' + q1n)
-        prep_sequence.append('CZ ' + q2n + ' ' + q1n)
-        prep_sequence.append('Y90 ' + q1n)
-        prep_sequence.append('RO')
-        prep_sequence.append('I_fb')
+    # main (first) element
+    sequence = deepcopy(prep_sequence)
+    sequence.append('mY90s ' + q1n)
+    sequence.append('CZ ' + q0n + ' ' + q1n)
+    sequence.append('CZ ' + q2n + ' ' + q1n)
+    sequence.append('Y90 ' + q1n)
+    sequence.append('RO ' + q1n)
+    sequence.append('I_fb')
+    pulse_list = [operation_dict[pulse] for pulse in sequence]
+    el_main = multi_pulse_elt(0, station, pulse_list, trigger=True, name='main')
+    el_list.append(el_main)
 
-        pulse_list = [operation_dict[pulse] for pulse in prep_sequence]
-
-        el_list.append(multi_pulse_elt(i, station, pulse_list, trigger=True,
-                                       name='prepare_{}'.format(i)))
-
-    fb_sequence_0 = ['I ' + q2n, 'I ' + q1n]
+    # feedback elements
+    fb_sequence_0 = ['I ' + q2n, 'Is ' + q1n]
     fb_sequence_1 = ['Y180 ' + q2n, 'Y180s ' + q1n]
     pulse_list = [operation_dict[pulse] for pulse in fb_sequence_0]
     el_list.append(multi_pulse_elt(0, station, pulse_list, name='feedback_0',
-                                   trigger=False))
+                                   trigger=False, previous_element=el_main))
     pulse_list = [operation_dict[pulse] for pulse in fb_sequence_1]
-    el_list.append(multi_pulse_elt(1, station, pulse_list, name='feedback_1',
-                                   trigger=False))
-    if nr_rounds > 1:
-        repeat_sequence = ['mY90s ' + q1n, 'CZ ' + q0n + ' ' + q1n,
-                           'CZ ' + q2n + ' ' + q1n, 'Y90 ' + q1n, 'RO', 'I_fb']
-        pulse_list = [operation_dict[pulse] for pulse in repeat_sequence]
-        el_list.append(multi_pulse_elt(0, station, pulse_list, name='repeat',
-                                       trigger=False))
+    el_fb = multi_pulse_elt(1, station, pulse_list, name='feedback_1',
+                            trigger=False, previous_element=el_main)
+    el_list.append(el_fb)
 
+    # tomography elements
     tomography_sequences = get_tomography_pulses(q0n, q2n,
                                                  basis_pulses=tomography_basis)
     for i, tomography_sequence in enumerate(tomography_sequences):
-        tomography_sequence.append('RO')
+        tomography_sequence.append('RO mux')
         pulse_list = [operation_dict[pulse] for pulse in tomography_sequence]
         el_list.append(multi_pulse_elt(i, station, pulse_list, trigger=False,
-                                       name='tomography_{}'.format(i)))
+                                       name='tomography_{}'.format(i),
+                                       previous_element=el_fb))
 
     # create the sequence
     seq_name = 'Two qubit entanglement by parity measurement'
     seq = sequence.Sequence(seq_name)
     seq.codewords[0] = 'feedback_0'
     seq.codewords[1] = 'feedback_1'
-    for i in range(len(prep_sequences)):
-        for j in range(len(tomography_basis)**2):
-            seq.append('prepare_{}_{}'.format(i, j), 'prepare_{}'.format(i),
-                       trigger_wait=True)
-            for k in range(nr_rounds - 1):
-                seq.append('feedback_{}_{}_{}'.format(i, j, k), 'codeword',
-                           trigger_wait=False)
-                seq.append('repeat_{}_{}_{}'.format(i, j, k+1), 'repeat',
-                           trigger_wait=False)
-            seq.append('feedback_{}_{}_{}'.format(i, j, nr_rounds - 1),
-                       'codeword', trigger_wait=False)
-            seq.append('tomography_{}_{}'.format(i, j),
-                       'tomography_{}'.format(j), trigger_wait=False)
+    for i in range(len(tomography_basis)**2):
+        seq.append('main_{}'.format(i), 'main', trigger_wait=True)
+        seq.append('feedback_{}'.format(i), 'codeword', trigger_wait=False)
+        seq.append('tomography_{}'.format(i), 'tomography_{}'.format(i),
+                   trigger_wait=False)
 
     if upload:
         station.pulsar.program_awgs(seq, *el_list, verbose=verbose)

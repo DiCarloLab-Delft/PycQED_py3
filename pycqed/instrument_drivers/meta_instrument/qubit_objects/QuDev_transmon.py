@@ -18,6 +18,7 @@ from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.utilities.general import add_suffix_to_dict_keys
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.qubit_object \
     import Qubit
+from pycqed.measurement import optimization as opti
 
 class QuDev_transmon(Qubit):
     def __init__(self, name, MC,
@@ -290,6 +291,14 @@ class QuDev_transmon(Qubit):
             integration_length=self.RO_acq_integration_length(),
             nr_shots=self.RO_acq_shots(), result_logging_mode='digitized')
 
+        self.int_avg_det_spec = det.UHFQC_integrated_average_detector(
+            UHFQC=self.UHFQC, result_logging_mode='raw',
+            channels=(self.RO_acq_weight_function_I(),
+                      self.RO_acq_weight_function_Q()),
+            nr_averages=self.RO_acq_averages(),
+            real_imag=True, single_int_avg=True,
+            integration_length=self.RO_acq_integration_length())
+
     def prepare_for_continuous_wave(self):
         self.heterodyne.auto_seq_loading(True)
         if self.cw_source is not None:
@@ -331,7 +340,7 @@ class QuDev_transmon(Qubit):
         # self.heterodyne._awg_seq_parameters_changed = False
         # self.heterodyne._UHFQC_awg_parameters_changed = False
 
-    def prepare_for_timedomain(self):
+    def prepare_for_timedomain(self, multiplexed=False):
         # cw source
         if self.cw_source is not None:
             self.cw_source.off()
@@ -345,10 +354,10 @@ class QuDev_transmon(Qubit):
         self.drive_LO.on()
 
         # drive modulation
-        #self.AWG.set(self.pulse_I_channel() + '_offset',
-        #             self.pulse_I_offset())
-        #self.AWG.set(self.pulse_Q_channel() + '_offset',
-        #             self.pulse_Q_offset())
+        self.AWG.set(self.pulse_I_channel() + '_offset',
+                     self.pulse_I_offset())
+        self.AWG.set(self.pulse_Q_channel() + '_offset',
+                     self.pulse_Q_offset())
 
         # readout LO
         if self.f_RO() is None:
@@ -360,25 +369,26 @@ class QuDev_transmon(Qubit):
         self.readout_DC_LO.on()
 
         # readout pulse
-        if self.RO_pulse_type() is 'MW_IQmod_pulse_UHFQC':
-            eval('self.UHFQC.sigouts_{}_offset({})'.format(
-                self.RO_I_channel(), self.RO_I_offset()))
-            eval('self.UHFQC.sigouts_{}_offset({})'.format(
-                self.RO_Q_channel(), self.RO_Q_offset()))
-            self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(
-                f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
-                RO_pulse_length=self.RO_pulse_length(),
-                acquisition_delay=0)
-            self.readout_UC_LO.pulsemod_state('Off')
-            self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
-            self.readout_UC_LO.on()
-        elif self.RO_pulse_type() is 'Gated_MW_RO_pulse':
-            self.readout_RF.pulsemod_state('On')
-            self.readout_RF.frequency(f_RO)
-            self.readout_RF.power(self.RO_pulse_power())
-            self.readout_RF.on()
-            self.UHFQC.awg_sequence_acquisition(acquisition_delay=0)
-        elif self.RO_pulse_type() is 'Multiplexed_UHFQC_pulse':
+        if not multiplexed:
+            if self.RO_pulse_type() is 'MW_IQmod_pulse_UHFQC':
+                eval('self.UHFQC.sigouts_{}_offset({})'.format(
+                    self.RO_I_channel(), self.RO_I_offset()))
+                eval('self.UHFQC.sigouts_{}_offset({})'.format(
+                    self.RO_Q_channel(), self.RO_Q_offset()))
+                self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(
+                    f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
+                    RO_pulse_length=self.RO_pulse_length(),
+                    acquisition_delay=0)
+                self.readout_UC_LO.pulsemod_state('Off')
+                self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
+                self.readout_UC_LO.on()
+            elif self.RO_pulse_type() is 'Gated_MW_RO_pulse':
+                self.readout_RF.pulsemod_state('On')
+                self.readout_RF.frequency(f_RO)
+                self.readout_RF.power(self.RO_pulse_power())
+                self.readout_RF.on()
+                self.UHFQC.awg_sequence_acquisition(acquisition_delay=0)
+        else:
             # setting up the UHFQC awg sequence must be done externally by a
             # readout manager
             self.readout_UC_LO.pulsemod_state('Off')
@@ -387,6 +397,87 @@ class QuDev_transmon(Qubit):
 
         self.set_readout_weights()
 
+    def prepare_for_mixer_calibration(self):
+        if self.cw_source is not None:
+            self.cw_source.off()
+
+        self.update_detector_functions()
+
+        # drive LO
+        self.drive_LO.pulsemod_state('Off')
+        self.drive_LO.frequency(self.f_qubit() - self.f_pulse_mod())
+        self.drive_LO.power(self.drive_LO_pow())
+        self.drive_LO.on()
+
+        # drive modulation
+        self.AWG.set(self.pulse_I_channel() + '_offset',
+                     self.pulse_I_offset())
+        self.AWG.set(self.pulse_Q_channel() + '_offset',
+                     self.pulse_Q_offset())
+
+        # readout LO
+        f_RO = self.drive_LO.frequency()
+        self.readout_DC_LO.pulsemod_state('Off')
+        self.readout_DC_LO.frequency(f_RO - self.f_RO_mod())
+        self.readout_DC_LO.on()
+
+        # UHFQC settings
+        self.UHFQC.awg_sequence_acquisition()
+        self.set_readout_weights('SSB')
+
+    def set_readout_weights(self, type=None):
+        if type is None:
+            type = self.ro_acq_weight_type()
+
+        if type == 'manual':
+            pass
+        elif type == 'optimal':
+            if (self.ro_acq_weight_func_I() is None or
+                        self.ro_acq_weight_func_Q() is None):
+                logging.warning('Optimal weights are None, not setting '
+                                'integration weights')
+            else:
+                # When optimal weights are used, only the RO I weight
+                # channel is used
+                self.UHFQC.set('quex_wint_weights_{}_real'.format(
+                               self.RO_acq_weight_function_I()),
+                               self.ro_acq_weight_func_I().copy())
+                self.UHFQC.set('quex_wint_weights_{}_imag'.format(
+                               self.RO_acq_weight_function_I()),
+                               self.ro_acq_weight_func_Q().copy())
+
+                self.UHFQC.set('quex_rot_{}_real'.format(
+                               self.RO_acq_weight_function_I()), 1.0)
+                self.UHFQC.set('quex_rot_{}_imag'.format(
+                               self.RO_acq_weight_function_I()), -1.0)
+        else:
+            tbase = np.arange(0, 4096 / 1.8e9, 1 / 1.8e9)
+            theta = self.RO_IQ_angle()
+            cosI = np.array(np.cos(2 * np.pi * self.f_RO_mod() * tbase + theta))
+            sinI = np.array(np.sin(2 * np.pi * self.f_RO_mod() * tbase + theta))
+            c1 = self.RO_acq_weight_function_I()
+            c2 = self.RO_acq_weight_function_Q()
+            if type == 'SSB':
+                self.UHFQC.set('quex_wint_weights_{}_real'.format(c1), cosI)
+                self.UHFQC.set('quex_rot_{}_real'.format(c1), 1)
+                self.UHFQC.set('quex_wint_weights_{}_real'.format(c2), sinI)
+                self.UHFQC.set('quex_rot_{}_real'.format(c2), 1)
+                self.UHFQC.set('quex_wint_weights_{}_imag'.format(c1), sinI)
+                self.UHFQC.set('quex_rot_{}_imag'.format(c1), 1)
+                self.UHFQC.set('quex_wint_weights_{}_imag'.format(c2), cosI)
+                self.UHFQC.set('quex_rot_{}_imag'.format(c2), -1)
+            elif type == 'DSB':
+                self.UHFQC.set('quex_wint_weights_{}_real'.format(c1), cosI)
+                self.UHFQC.set('quex_rot_{}_real'.format(c1), 1)
+                self.UHFQC.set('quex_wint_weights_{}_real'.format(c2), sinI)
+                self.UHFQC.set('quex_rot_{}_real'.format(c2), 1)
+                self.UHFQC.set('quex_rot_{}_imag'.format(c1), 0)
+                self.UHFQC.set('quex_rot_{}_imag'.format(c2), 0)
+            elif type == 'square_rot':
+                self.UHFQC.set('quex_wint_weights_{}_real'.format(c1), cosI)
+                self.UHFQC.set('quex_rot_{}_real'.format(c1), 1)
+                self.UHFQC.set('quex_wint_weights_{}_imag'.format(c1), sinI)
+                self.UHFQC.set('quex_rot_{}_imag'.format(c1), 1)
 
     def measure_resonator_spectroscopy(self, freqs=None, MC=None,
                                         analyze=True, close_fig=True):
@@ -1031,58 +1122,37 @@ class QuDev_transmon(Qubit):
             if analyze:
                 ma.MeasurementAnalysis(auto=True, qb_name=self.name, **kw)
 
-    def set_readout_weights(self):
-        # readout integration weights:
-        if self.ro_acq_weight_type() == 'manual':
-            pass
-        elif self.ro_acq_weight_type() == 'optimal':
-            if (self.ro_acq_weight_func_I() is None or
-                        self.ro_acq_weight_func_Q() is None):
-                logging.warning('Optimal weights are None, not setting '
-                                'integration weights')
-            else:
-                # When optimal weights are used, only the RO I weight
-                # channel is used
-                self.UHFQC.set('quex_wint_weights_{}_real'.format(
-                               self.RO_acq_weight_function_I()),
-                               self.ro_acq_weight_func_I().copy())
-                self.UHFQC.set('quex_wint_weights_{}_imag'.format(
-                               self.RO_acq_weight_function_I()),
-                               self.ro_acq_weight_func_Q().copy())
+    def calibrate_mixer_offsets_drive(self, MC=None, update=True, x0=(0., 0.),
+                                      initial_stepsize=0.1):
+        if MC is None:
+            MC = self.MC
+        self.prepare_for_mixer_calibration()
+        detector = self.int_avg_det_spec
+        ad_func_pars = {'adaptive_function': opti.nelder_mead,
+                        'x0': x0,
+                        'initial_step': [initial_stepsize, initial_stepsize],
+                        'no_improv_break': 15,
+                        'minimize': True,
+                        'maxiter': 500}
+        chI_par = self.AWG.parameters['{}_offset'.format(
+            self.pulse_I_channel())]
+        chQ_par = self.AWG.parameters['{}_offset'.format(
+            self.pulse_Q_channel())]
+        MC.set_sweep_functions([chI_par, chQ_par])
+        MC.set_detector_function(detector)  # sets test_detector
+        MC.set_adaptive_function_parameters(ad_func_pars)
+        MC.run(name='drive_offset_calibration'+self.msmt_suffix,
+               mode='adaptive')
+        a = ma.OptimizationAnalysis(label='drive_offset_calibration')
+        # v2 creates a pretty picture of the optimizations
+        ma.OptimizationAnalysis_v2(label='drive_offset_calibration')
 
-                self.UHFQC.set('quex_rot_{}_real'.format(
-                               self.RO_acq_weight_function_I()), 1.0)
-                self.UHFQC.set('quex_rot_{}_imag'.format(
-                               self.RO_acq_weight_function_I()), -1.0)
-        else:
-            tbase = np.arange(0, 4096 / 1.8e9, 1 / 1.8e9)
-            theta = self.RO_IQ_angle()
-            cosI = np.array(np.cos(2 * np.pi * self.f_RO_mod() * tbase + theta))
-            sinI = np.array(np.sin(2 * np.pi * self.f_RO_mod() * tbase + theta))
-            c1 = self.RO_acq_weight_function_I()
-            c2 = self.RO_acq_weight_function_Q()
-            if self.ro_acq_weight_type() == 'SSB':
-                self.UHFQC.set('quex_wint_weights_{}_real'.format(c1), cosI)
-                self.UHFQC.set('quex_rot_{}_real'.format(c1), 1)
-                self.UHFQC.set('quex_wint_weights_{}_real'.format(c2), sinI)
-                self.UHFQC.set('quex_rot_{}_real'.format(c2), 1)
-                self.UHFQC.set('quex_wint_weights_{}_imag'.format(c1), sinI)
-                self.UHFQC.set('quex_rot_{}_imag'.format(c1), 1)
-                self.UHFQC.set('quex_wint_weights_{}_imag'.format(c2), cosI)
-                self.UHFQC.set('quex_rot_{}_imag'.format(c2), -1)
-            elif self.ro_acq_weight_type() == 'DSB':
-                self.UHFQC.set('quex_wint_weights_{}_real'.format(c1), cosI)
-                self.UHFQC.set('quex_rot_{}_real'.format(c1), 1)
-                self.UHFQC.set('quex_wint_weights_{}_real'.format(c2), sinI)
-                self.UHFQC.set('quex_rot_{}_real'.format(c2), 1)
-                self.UHFQC.set('quex_rot_{}_imag'.format(c1), 0)
-                self.UHFQC.set('quex_rot_{}_imag'.format(c2), 0)
-            elif self.ro_acq_weight_type() == 'square_rot':
-                self.UHFQC.set('quex_wint_weights_{}_real'.format(c1), cosI)
-                self.UHFQC.set('quex_rot_{}_real'.format(c1), 1)
-                self.UHFQC.set('quex_wint_weights_{}_imag'.format(c1), sinI)
-                self.UHFQC.set('quex_rot_{}_imag'.format(c1), 1)
-
+        ch_1_min = a.optimization_result[0][0]
+        ch_2_min = a.optimization_result[0][1]
+        if update:
+            self.mw_mixer_offs_GI(ch_1_min)
+            self.mw_mixer_offs_GQ(ch_2_min)
+        return ch_1_min, ch_2_min
 
     def find_optimized_weights(self, MC=None, update=True, measure=True, **kw):
         # FIXME: Make a proper analysis class for this (Ants, 04.12.2017)

@@ -343,83 +343,6 @@ def tomo2Q_cphase_cardinal(cardinal_state, device, qS_name, qCZ_name, CPhase=Tru
                                          mmt_label))
     # return tomo_swf.seq
 
-
-def multiplexed_pulse(qubits, f_LO, upload=True, plot_filename=None):
-    """
-    Sets up a frequency-multiplexed pulse on the awg-sequencer of the UHFQC.
-    Updates the qubit ro_pulse_type parameter. This needs to be reverted if
-    thq qubit object is to update its readout pulse later on.
-
-    Args:
-        qubits: A list of qubits to do a pulse for.
-        f_LO: The LO frequency that will be used.
-        upload: Whether to update the hardware instrument settings.
-        plot_filename: The file to save the plot of the multiplexed pulse PSD. 
-            If `None` or `True`, plot is only shown, and not saved. If `False`,
-            no plot is generated.
-
-    Returns:
-        The generated pulse waveform.
-    """
-
-    fs = 1.8e9
-
-    pulses = {}
-    maxlen = 0
-
-    for qb in qubits:
-        qb.RO_pulse_type('Multiplexed_pulse_UHFQC')
-        qb.f_RO_mod(qb.f_RO() - f_LO)
-        samples = int(qb.RO_pulse_length() * fs)
-        tbase = np.linspace(0, samples / fs, samples, endpoint=False)
-        pulse = qb.RO_amp() * np.exp(
-            -2j * np.pi * qb.f_RO_mod() * tbase + 0.25j * np.pi)
-        pulses[qb.name] = pulse
-        if pulse.size > maxlen:
-            maxlen = pulse.size
-
-    pulse = np.zeros(maxlen, dtype=np.complex)
-    for p in pulses.values():
-        pulse += np.pad(p, (0, maxlen - p.size), mode='constant',
-                        constant_values=0)
-
-    if plot_filename is not False:
-        pulse_fft = np.fft.fft(
-            np.pad(pulse, (1000, 1000), mode='constant', constant_values=0))
-        pulse_fft = np.fft.fftshift(pulse_fft)
-        fbase = np.fft.fftfreq(pulse_fft.size, 1 / fs)
-        fbase = np.fft.fftshift(fbase)
-        fbase = f_LO - fbase
-        y = 20 * np.log10(np.abs(pulse_fft))
-        plt.plot(fbase / 1e9, y, '-', lw=0.7)
-        ymin, ymax = np.max(y) - 40, np.max(y) + 5
-        plt.ylim(ymin, ymax)
-        plt.vlines(f_LO / 1e9, ymin, ymax, colors='0.5', linestyles='dotted',
-                   lw=0.7, )
-        plt.text(f_LO / 1e9, ymax, 'LO', rotation=90, va='top', ha='right')
-        for qb in qubits:
-            plt.vlines([qb.f_RO() / 1e9, 2 * f_LO / 1e9 - qb.f_RO() / 1e9],
-                       ymin, ymax, colors='0.5', linestyles=['solid', 'dotted'],
-                       lw=0.7)
-            plt.text(qb.f_RO() / 1e9, ymax, qb.name, rotation=90, va='top',
-                     ha='right')
-            plt.text(2 * f_LO / 1e9 - qb.f_RO() / 1e9, ymax, qb.name,
-                     rotation=90, va='top', ha='right')
-
-        plt.ylabel('power (dB)')
-        plt.xlabel('frequency (GHz)')
-        if isinstance(plot_filename, str):
-            plt.savefig(plot_filename, bbox_inches='tight')
-        plt.show()
-
-    if upload:
-        UHFQC = qubits[0].UHFQC
-        UHFQC.awg_sequence_acquisition_and_pulse(np.real(pulse).copy(),
-                                                 np.imag(pulse).copy(),
-                                                 acquisition_delay=0)
-        LO = qubits[0].readout_DC_LO
-        LO.frequency(f_LO)
-
 def calculate_minimal_readout_spacing(qubits, ro_slack=10e-9, drive_pulses=0):
     UHFQC = None
     for qb in qubits:
@@ -453,7 +376,8 @@ def measure_multiplexed_readout(qubits, f_LO, nreps=4, liveplot=False,
                                 ro_spacing=None, preselection=True, MC=None,
                                 plot_filename=False, ro_slack=10e-9):
 
-    multiplexed_pulse(qubits, f_LO, upload=True, plot_filename=plot_filename)
+    device.multiplexed_pulse(qubits, f_LO, upload=True,
+                             plot_filename=plot_filename)
 
     for qb in qubits:
         if MC is None:
@@ -480,7 +404,7 @@ def measure_multiplexed_readout(qubits, f_LO, nreps=4, liveplot=False,
              nr_shots=shots)['int_log_det']
 
     for qb in qubits:
-        qb.prepare_for_timedomain()
+        qb.prepare_for_timedomain(multiplexed=True)
 
     MC.live_plot_enabled(liveplot)
     MC.soft_avg(1)
@@ -494,8 +418,7 @@ def measure_multiplexed_readout(qubits, f_LO, nreps=4, liveplot=False,
 
 
 def measure_active_reset(qubits, feedback_delay, nr_resets=1, nreps=1,
-                         MC=None, upload=True, sequence='reset_g',
-                         readout_delay=None):
+                         MC=None, upload=True, sequence='reset_g'):
     """possible sequences: 'reset_g', 'reset_e', 'idle', 'flip'"""
     for qb in qubits:
         if MC is None:
@@ -511,7 +434,6 @@ def measure_active_reset(qubits, feedback_delay, nr_resets=1, nreps=1,
         pulse_pars_list=[qb.get_drive_pars() for qb in qubits],
         RO_pars=device.get_multiplexed_readout_pulse_dictionary(qubits),
         feedback_delay=feedback_delay,
-        readout_delay=readout_delay,
         #sequence=sequence,
         nr_resets=nr_resets,
         upload=upload)
@@ -538,3 +460,44 @@ def measure_active_reset(qubits, feedback_delay, nr_resets=1, nreps=1,
         [qb.name for qb in qubits])))
 
     MC.soft_avg(prev_avg)
+
+
+def measure_two_qubit_parity(qb0, qb1, qb2, feedback_delay, f_LO, upload=True,
+                             MC=None, nr_averages=2**10, prep_sequence=None,
+                             tomography_basis=(
+                                 'I', 'X180', 'Y90', 'mY90', 'X90', 'mX90')):
+    """
+    Important things to check when running the experiment:
+        Is the readout separation commensurate with 225 MHz?
+    """
+
+    device.multiplexed_pulse([(qb1,), (qb0, qb1, qb2)], f_LO)
+
+
+    qubits = [qb0, qb1, qb2]
+    for qb in qubits:
+        if MC is None:
+            MC = qb.MC
+        else:
+            break
+
+    for qb in qubits:
+        qb.prepare_for_timedomain(multiplexed=True)
+
+    sf = awg_swf2.two_qubit_parity(qb0, qb1, qb2, feedback_delay=feedback_delay,
+                                   prep_sequence=prep_sequence,
+                                   tomography_basis=tomography_basis,
+                                   upload=upload, verbose=False)
+
+    df = device.get_multiplexed_readout_detector_functions(
+        qubits, nr_averages=nr_averages, correlations=[(
+            qb0.RO_acq_weight_function_I(), qb2.RO_acq_weight_function_I()
+        )])['int_corr_det']
+
+    MC.set_sweep_function(sf)
+    MC.set_sweep_points(2*len(tomography_basis)**2)
+    MC.set_detector_function(df)
+
+    MC.run(name='two_qubit_parity-{}'.format('_'.join([qb.name for qb in
+                                                       qubits])))
+
