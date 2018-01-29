@@ -13,7 +13,7 @@ from pycqed.measurement.waveform_control import element
 from pycqed.measurement.waveform_control import sequence
 from qcodes.instrument.parameter import _BaseParameter
 from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
-
+import pycqed.measurement.pulse_sequences.standard_elements as st_elts
 
 class Detector_Function(object):
 
@@ -100,6 +100,29 @@ class Multi_Detector(Detector_Function):
     def finish(self):
         for detector in self.detectors:
             detector.finish()
+
+
+class IndexDetector(Detector_Function):
+    def __init__(self, detector, index):
+        super().__init__()
+        self.detector = detector
+        self.index = index
+        self.name = detector.name + '[{}]'.format(index)
+        self.value_names = [detector.value_names[index]]
+        self.value_units = [detector.value_units[index]]
+        self.detector_control = detector.detector_control
+
+    def prepare(self, **kw):
+        self.detector.prepare(**kw)
+
+    def get_values(self):
+        return self.detector.get_values()[self.index]
+
+    def acquire_data_point(self):
+        return self.detector.acquire_data_point()[self.index]
+
+    def finish(self):
+        self.detector.finish()
 
 ###############################################################################
 ###############################################################################
@@ -2191,6 +2214,66 @@ class UHFQC_single_qubit_statistics_logging_det(UHFQC_statistics_logging_det):
     def acquire_data_point(self, **kw):
         # Returns only the data for the relevant channel
         return super().acquire_data_point()[0:3]
+
+class UHFQC_mixer_skewness_det(UHFQC_integrated_average_detector):
+    """
+    Based on the "UHFQC_integrated_average" detector.
+    generates an AWG seq to measure sideband transmission.
+    """
+
+    def __init__(self, UHFQC, station, UHFQC_channels, pulseIch,
+                 pulseQch, alpha, phi_skew, f_mod, amplitude=0.1,
+                 nr_averages=2**10, verbose=False):
+        super().__init__(UHFQC, AWG=station.pulsar, integration_length=2.725e-6,
+                         nr_averages=nr_averages, channels=UHFQC_channels,
+                         real_imag=False, single_int_avg=True)
+        self.name = 'UHFQC_mixer_skewness_det'
+        self.station = station
+        self.pulseIch = pulseIch
+        self.pulseQch = pulseQch
+        self.alpha = alpha
+        self.phi_skew = phi_skew
+        self.f_mod = f_mod
+        self.amplitude = amplitude
+        self.verbose = verbose
+
+
+    def acquire_data_point(self):
+        if self.verbose:
+            print('alpha: {:.3f}'.format(self.alpha()))
+            print('phi_skew: {:.3f}'.format(self.phi_skew()))
+        self.generate_awg_seq(self.alpha(), self.phi_skew(), self.f_mod)
+
+        return super().acquire_data_point()
+
+
+    def generate_awg_seq(self, alpha, phi_skew, f_mod):
+        cos_pulse = {'pulse_type': 'CosPulse',
+                     'channel': self.pulseIch,
+                     'frequency': f_mod,
+                     'length': 1e-6,
+                     'phase': phi_skew,
+                     'amplitude': self.amplitude * alpha}
+        sin_pulse = {'pulse_type': 'CosPulse',
+                     'channel': self.pulseQch,
+                     'frequency': f_mod,
+                     'length': 1e-6,
+                     'phase': 90,
+                     'amplitude': self.amplitude,
+                     'refpoint': 'simultaneous'}
+
+        el = st_elts.multi_pulse_elt(0, self.station, [cos_pulse, sin_pulse],
+                                     trigger=False)
+        seq = sequence.Sequence('Sideband_modulation_seq')
+        seq.append(name='SSB_modulation_el', wfname=el.name, trigger_wait=False)
+        self.station.pulsar.program_awgs(seq, el, channels=[self.pulseIch,
+                                                            self.pulseQch])
+
+    def prepare(self, **kw):
+        super().prepare(**kw)
+
+    def finish(self):
+        super().finish()
 
 
 class UHFQC_single_qubit_statistics_logging_det(UHFQC_statistics_logging_det):

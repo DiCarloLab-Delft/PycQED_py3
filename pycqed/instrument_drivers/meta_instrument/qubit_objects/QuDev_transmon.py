@@ -2,6 +2,8 @@ import logging
 import numpy as np
 import matplotlib.pyplot as plt
 
+import qcodes as qc
+
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
 
@@ -397,7 +399,14 @@ class QuDev_transmon(Qubit):
 
         self.set_readout_weights()
 
-    def prepare_for_mixer_calibration(self):
+    def prepare_for_mixer_calibration(self, suppress):
+        """
+        Sets up MWG and UHFQC settings for mixer calibration. It is up to the
+        user to set the switch configuration to the correct position.
+        Args:
+            suppress: 'drive LO' or 'sideband'. Determines the readout
+                      demodulation frequency.
+        """
         if self.cw_source is not None:
             self.cw_source.off()
 
@@ -409,14 +418,18 @@ class QuDev_transmon(Qubit):
         self.drive_LO.power(self.drive_LO_pow())
         self.drive_LO.on()
 
-        # drive modulation
+        # drive offsets
         self.AWG.set(self.pulse_I_channel() + '_offset',
                      self.pulse_I_offset())
         self.AWG.set(self.pulse_Q_channel() + '_offset',
                      self.pulse_Q_offset())
 
         # readout LO
-        f_RO = self.drive_LO.frequency()
+        if suppress == 'drive LO':
+            f_RO = self.drive_LO.frequency()
+        elif suppress == 'sideband':
+            f_RO = self.drive_LO.frequency() - self.f_pulse_mod()
+
         self.readout_DC_LO.pulsemod_state('Off')
         self.readout_DC_LO.frequency(f_RO - self.f_RO_mod())
         self.readout_DC_LO.on()
@@ -1122,11 +1135,11 @@ class QuDev_transmon(Qubit):
             if analyze:
                 ma.MeasurementAnalysis(auto=True, qb_name=self.name, **kw)
 
-    def calibrate_mixer_offsets_drive(self, MC=None, update=True, x0=(0., 0.),
+    def calibrate_drive_mixer_carrier(self, MC=None, update=True, x0=(0., 0.),
                                       initial_stepsize=0.1):
         if MC is None:
             MC = self.MC
-        self.prepare_for_mixer_calibration()
+        self.prepare_for_mixer_calibration(suppress='drive LO')
         detector = self.int_avg_det_spec
         ad_func_pars = {'adaptive_function': opti.nelder_mead,
                         'x0': x0,
@@ -1139,13 +1152,13 @@ class QuDev_transmon(Qubit):
         chQ_par = self.AWG.parameters['{}_offset'.format(
             self.pulse_Q_channel())]
         MC.set_sweep_functions([chI_par, chQ_par])
-        MC.set_detector_function(detector)  # sets test_detector
+        MC.set_detector_function(det.IndexDetector(detector, 0))
         MC.set_adaptive_function_parameters(ad_func_pars)
-        MC.run(name='drive_offset_calibration'+self.msmt_suffix,
+        MC.run(name='drive_carrier_calibration'+self.msmt_suffix,
                mode='adaptive')
-        a = ma.OptimizationAnalysis(label='drive_offset_calibration')
+        a = ma.OptimizationAnalysis(label='drive_carrier_calibration')
         # v2 creates a pretty picture of the optimizations
-        ma.OptimizationAnalysis_v2(label='drive_offset_calibration')
+        ma.OptimizationAnalysis_v2(label='drive_carrier_calibration')
 
         ch_1_min = a.optimization_result[0][0]
         ch_2_min = a.optimization_result[0][1]
@@ -1153,6 +1166,42 @@ class QuDev_transmon(Qubit):
             self.mw_mixer_offs_GI(ch_1_min)
             self.mw_mixer_offs_GQ(ch_2_min)
         return ch_1_min, ch_2_min
+
+    def calibrate_drive_mixer_skewness(self, MC=None, update=True,
+                                       initial_stepsize=(0.15, 10),
+                                       amplitude=0.1):
+        if MC is None:
+            MC = self.MC
+        self.prepare_for_mixer_calibration(suppress='sideband')
+
+        detector = det.UHFQC_mixer_skewness_det(
+            self.UHFQC, qc.station, [self.RO_acq_weight_function_I(),
+                                     self.RO_acq_weight_function_Q()],
+            self.pulse_I_channel(), self.pulse_Q_channel, self.alpha,
+            self.phi_skew, self.f_pulse_mod(), amplitude=amplitude,
+            nr_averages=self.RO_acq_averages(), verbose=False)
+        ad_func_pars = {'adaptive_function': opti.nelder_mead,
+                        'x0': [self.alpha(), self.phi_skew()],
+                        'initial_step': initial_stepsize,
+                        'no_improv_break': 12,
+                        'minimize': True,
+                        'maxiter': 500}
+        MC.set_sweep_functions([self.alpha, self.phi_skew])
+        MC.set_detector_function(det.IndexDetector(detector, 0))
+        MC.set_adaptive_function_parameters(ad_func_pars)
+        MC.run(name='drive_skewness_calibration'+self.msmt_suffix,
+               mode='adaptive')
+        a = ma.OptimizationAnalysis(label='drive_skewness_calibration')
+        # v2 creates a pretty picture of the optimizations
+        ma.OptimizationAnalysis_v2(label='drive_skewness_calibration')
+
+        # phi and alpha are the coefficients that go in the predistortion matrix
+        alpha = 1 / a.optimization_result[0][0]
+        phi = -1 * a.optimization_result[0][1]
+        if update:
+            self.alpha(alpha)
+            self.phi_skew(phi)
+        return phi, alpha
 
     def find_optimized_weights(self, MC=None, update=True, measure=True, **kw):
         # FIXME: Make a proper analysis class for this (Ants, 04.12.2017)
