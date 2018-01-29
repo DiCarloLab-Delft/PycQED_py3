@@ -191,12 +191,12 @@ def load_settings_onto_instrument_v2(instrument, load_from_instr: str=None,
     count = 0
     # Will try multiple times in case the last measurements failed and
     # created corrupt data files.
-    while success is False and count < 10:
+    while success is False and count < 3:
+        if filepath is None:
+            folder = a_tools.get_folder(timestamp=timestamp, label=label,
+                                        older_than=older_than)
+            filepath = a_tools.measurement_filename(folder)
         try:
-            if filepath is None:
-                folder = a_tools.get_folder(timestamp=timestamp, label=label,
-                                            older_than=older_than)
-                filepath = a_tools.measurement_filename(folder)
 
             f = h5py.File(filepath, 'r')
             snapshot = {}
@@ -208,12 +208,16 @@ def load_settings_onto_instrument_v2(instrument, load_from_instr: str=None,
                 ins_group = snapshot['instruments'][load_from_instr]
             success = True
         except Exception as e:
+            logging.warning('Exception occured reading from {}'.format(folder))
             logging.warning(e)
             # This check makes this snippet a bit more robust
             if folder is not None:
                 older_than = os.path.split(folder)[0][-8:] \
                     + '_' + os.path.split(folder)[1][:6]
+            # important to set all to None, otherwise the try except loop
+            # will not look for an earlier data file
             folder = None
+            filepath = None
             success = False
         count += 1
 
