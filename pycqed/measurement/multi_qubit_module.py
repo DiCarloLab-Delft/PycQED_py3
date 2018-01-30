@@ -601,3 +601,176 @@ def measure_active_reset(qubits, feedback_delay, nr_resets=1, nreps=1,
         [qb.name for qb in qubits])))
 
     MC.soft_avg(prev_avg)
+
+
+def measure_n_qubit_simultaneous_randomized_benchmarking(
+        qubits, f_LO,
+        CxC_RB=True, idx_for_RB=0, nr_seeds=50, nr_cliffords=None,
+        nr_averages=1024, thresholding=True,
+        V_th_a=None, #list with SCALED thresh level for each qubit
+        gate_decomp='HZ', interleaved_gate=None,
+        MC=None, UHFQC=None, pulsar=None, soft_avgs=1,
+        label=None, verbose=False):
+
+    '''
+    Performs a simultaneous randomized benchmarking experiment on n qubits.
+    type(nr_cliffords) == array
+    type(nr_seeds) == int
+    '''
+
+    if nr_cliffords is None:
+        raise ValueError("Unspecified nr_cliffords.")
+    if UHFQC is None:
+        UHFQC = qubits[0].UHFQC
+        logging.warning("Unspecified UHFQC instrument. Using qubits[0].UHFQC.")
+    if pulsar is None:
+        # CHECK THIS!!!!
+        pulsar = qubits[0].AWG
+        logging.warning("Unspecified pulsar instrument. Using qubits[0].AWG.")
+    if MC is None:
+        MC = qubits[0].MC
+        logging.warning("Unspecified MC object. Using qubits[0].MC.")
+
+    if label is None:
+        if CxC_RB:
+            label = '{}-qubit_CxC_RB_{}_{}_seeds_{}_cliffords'.format(
+                len(qubits), gate_decomp, nr_seeds, nr_cliffords[-1])
+        else:
+            label = '{}-qubit_CxI_IxC_{}_RB_{}_{}_seeds_{}_cliffords'.format(
+                len(qubits), idx_for_RB, gate_decomp,
+                nr_seeds, nr_cliffords[-1])
+
+    key = 'int'
+    if thresholding:
+        if V_th_a is None:
+            raise ValueError('Unknown threshold values.')
+        else:
+            label += '_thresh'
+            key = 'dig'
+            for thresh_level, qb in zip(V_th_a, qubits):
+                UHFQC.set('quex_thres_{}_level'.format(
+                    qb.RO_acq_weight_function_I()), thresh_level)
+
+    pulse_pars_list = [qb.get_drive_pars() for qb in qubits]
+    for qb in qubits:
+        qb.prepare_for_timedomain(multiplexed=True)
+
+    multiplexed_pulse(qubits, f_LO, upload=True, plot_filename=True)
+    RO_pars = get_multiplexed_readout_pulse_dictionary(qubits)
+
+    if len(qubits) == 2:
+        if len(nr_cliffords)==1:
+            raise ValueError('For a two qubit experiment, nr_cliffords must '
+                             'be an array of sequence lengths.')
+
+        correlations = [(qubits[0].RO_acq_weight_function_I(),
+                         qubits[1].RO_acq_weight_function_I())]
+
+        det_func = get_multiplexed_readout_detector_functions(
+            qubits, nr_averages=nr_averages, UHFQC=UHFQC,
+            pulsar=pulsar, correlations=correlations)[key+'_corr_det']
+
+        hard_sweep_points = np.arange(nr_seeds)
+        hard_sweep_func = \
+            awg_swf2.two_qubit_Simultaneous_RB_fixed_length(
+                pulse_pars_list=pulse_pars_list, RO_pars=RO_pars,
+                nr_cliffords_value=nr_cliffords[0], CxC_RB=CxC_RB,
+                idx_for_RB=idx_for_RB, upload=False,
+                gate_decomposition=gate_decomp,
+                interleaved_gate=interleaved_gate,
+                verbose=verbose)
+
+        soft_sweep_points = nr_cliffords
+        soft_sweep_func = \
+            awg_swf2.two_qubit_Simultaneous_RB_sequence_lengths(
+            n_qubit_RB_sweepfunction=hard_sweep_func)
+
+    else:
+        if not isinstance(nr_cliffords, float) or \
+                not isinstance(nr_cliffords, int):
+                    raise ValueError('For an experiment with more than two '
+                                     'qubits, nr_cliffords must int or float.')
+
+        det_func = get_multiplexed_readout_detector_functions(
+            qubits,UHFQC=UHFQC, pulsar=pulsar,
+            nr_shots=nr_averages)[key+'_log_det']
+
+        hard_sweep_points = np.arange(nr_averages)
+        hard_sweep_func = \
+            awg_swf2.two_qubit_Simultaneous_RB_fixed_length(
+                pulse_pars_list=pulse_pars_list, RO_pars=RO_pars,
+                nr_cliffords_value=nr_cliffords, CxC_RB=CxC_RB,
+                idx_for_RB=idx_for_RB, upload=True,
+                gate_decomposition=gate_decomp,
+                interleaved_gate=interleaved_gate,
+                verbose=verbose)
+
+        soft_sweep_points = np.arange(nr_seeds)
+        soft_sweep_func = swf.None_Sweep()
+
+    MC.soft_avg(soft_avgs)
+    MC.set_sweep_function(hard_sweep_func)
+    MC.set_sweep_points(hard_sweep_points)
+
+    MC.set_sweep_function_2D(soft_sweep_func)
+    MC.set_sweep_points_2D(soft_sweep_points)
+
+    MC.set_detector_function(det_func)
+    MC.run_2D(label)
+
+
+def measure_two_qubit_tomo_Bell(bell_state, qb_c, qb_t, f_LO, num_flux_pulses=0,
+                                distortion_dict=None, nr_averages=1024,
+                                upload=True, label=None, run=True, soft_avgs=1,
+                                cal_points_with_flux_pulses=False,
+                                MC=None, UHFQC=None, pulsar=None):
+
+    qubits = [qb_c, qb_t]
+    for qb in qubits:
+        qb.prepare_for_timedomain(multiplexed=True)
+
+    if UHFQC is None:
+        UHFQC = qb_c.UHFQC
+        logging.warning("Unspecified UHFQC instrument. Using qb_c.UHFQC.")
+    if pulsar is None:
+        # CHECK THIS!!!!
+        pulsar = qb_c.AWG
+        logging.warning("Unspecified pulsar instrument. Using qb_c.AWG.")
+    if MC is None:
+        MC = qb_c.MC
+        logging.warning("Unspecified MC object. Using qb_c.MC.")
+
+    Bell_state_dict = {'0':'phiMinus', '1':'phiPlus',
+                       '2':'psiMinus', '3':'psiPlus'}
+    if label is None:
+        label = '{}_tomo_Bell_{}_{}'.format(
+            Bell_state_dict[str(bell_state)], qb_c.name, qb_t.name)
+
+    if not cal_points_with_flux_pulses:
+        label += '_CalPts_wo_FluxPulses'
+    if num_flux_pulses!=0:
+        label += '_' + str(num_flux_pulses) + 'preFluxPulses'
+
+    multiplexed_pulse(qubits, f_LO, upload=True, plot_filename=True)
+    RO_pars = get_multiplexed_readout_pulse_dictionary(qubits)
+
+    correlations = [(qubits[0].RO_acq_weight_function_I(),
+                     qubits[1].RO_acq_weight_function_I())]
+
+    corr_det = get_multiplexed_readout_detector_functions(
+        qubits, nr_averages=nr_averages, UHFQC=UHFQC,
+        pulsar=pulsar, correlations=correlations)['int_corr_det']
+
+    tomo_Bell_swf_func = awg_swf2.tomo_Bell(
+        bell_state=bell_state, qb_c=qb_c, qb_t=qb_t,
+        RO_pars=RO_pars, num_flux_pulses=num_flux_pulses,
+        distortion_dict=distortion_dict,
+        cal_points_with_flux_pulses=cal_points_with_flux_pulses,
+        upload=upload)
+
+    MC.soft_avg(soft_avgs)
+    MC.set_sweep_function(tomo_Bell_swf_func)
+    MC.set_sweep_points(np.arange(64))
+    MC.set_detector_function(corr_det)
+    if run:
+        MC.run(label)

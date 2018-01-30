@@ -2173,11 +2173,13 @@ class QuDev_transmon(Qubit):
             # to correspond to the logic in Ramsey_seq_multiple_detunings
             # sequence
             len_art_det = len(artificial_detuning)
-            temp_array = np.zeros((times.size-no_cal_points)*len_art_det)
-            for i in range(len(artificial_detuning)):
+            # temp_array = np.zeros((times.size-no_cal_points)*len_art_det)
+            temp_array = np.zeros(times.size*len_art_det)
+            for i in range(len_art_det):
                 np.put(temp_array,list(range(i,temp_array.size,len_art_det)),
                        times)
-            times = np.append(temp_array,times[-no_cal_points::])
+            # times = np.append(temp_array,times[-no_cal_points::])
+            times = temp_array
 
             #Perform Ramsey multiple detunings
             if for_ef is False:
@@ -2409,11 +2411,16 @@ class QuDev_transmon(Qubit):
 
         # Each qscale value must be repeated 3 times to correspoond to the
         # logic in QScale sequence
-        temp_array = np.zeros(3*(qscales.size-no_cal_points))
+        # temp_array = np.zeros(3*(qscales.size-no_cal_points))
+        # np.put(temp_array,list(range(0,temp_array.size,3)),qscales)
+        # np.put(temp_array,list(range(1,temp_array.size,3)),qscales)
+        # np.put(temp_array,list(range(2,temp_array.size,3)),qscales)
+        # qscales = np.append(temp_array,qscales[-no_cal_points::])
+        temp_array = np.zeros(3*qscales.size)
         np.put(temp_array,list(range(0,temp_array.size,3)),qscales)
         np.put(temp_array,list(range(1,temp_array.size,3)),qscales)
         np.put(temp_array,list(range(2,temp_array.size,3)),qscales)
-        qscales = np.append(temp_array,qscales[-no_cal_points::])
+        qscales = temp_array
 
         #Perform the qscale calibration measurement
         if for_ef:
