@@ -616,23 +616,41 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
             'fit_yvals': {'data': self.proc_data_dict['yvals_osc_on'][:-2]}}
 
     def analyze_fit_results(self):
-        fr_0 = self.fit_res['cos_fit_off'].best_values
-        fr_1 = self.fit_res['cos_fit_on'].best_values
+        fr_0 = self.fit_res['cos_fit_off'].params
+        fr_1 = self.fit_res['cos_fit_on'].params
 
-        phi0 = np.rad2deg(fr_0['phase'])
-        phi1 = np.rad2deg(fr_1['phase'])
-        self.proc_data_dict['phi_0'] = phi0
-        self.proc_data_dict['phi_1'] = phi1
-        self.proc_data_dict['phi_cond'] = phi1 -phi0
+        phi0 = np.rad2deg(fr_0['phase'].value)
+        phi1 = np.rad2deg(fr_1['phase'].value)
 
-        self.proc_data_dict['osc_amp'] = np.mean([fr_0['amplitude'],
-                                                 fr_1['amplitude']])
+        phi0_stderr = np.rad2deg(fr_0['phase'].stderr)
+        phi1_stderr = np.rad2deg(fr_1['phase'].stderr)
+
+        self.proc_data_dict['phi_0'] = phi0, phi0_stderr
+        self.proc_data_dict['phi_1'] = phi1, phi1_stderr
+        phi_cond_stderr = (phi0_stderr**2+phi1_stderr**2)**.5
+        self.proc_data_dict['phi_cond'] = (phi1 -phi0), phi_cond_stderr
+
+
+        osc_amp = np.mean([fr_0['amplitude'], fr_1['amplitude']])
+        osc_amp_stderr = np.sqrt(fr_0['amplitude'].stderr**2 +
+                                 fr_1['amplitude']**2)/2
+
+        self.proc_data_dict['osc_amp_0'] = (fr_0['amplitude'].value,
+                                            fr_0['amplitude'].stderr)
+        self.proc_data_dict['osc_amp_1'] = (fr_1['amplitude'].value,
+                                            fr_1['amplitude'].stderr)
+
+        # self.proc_data_dict['osc_amp'] = (osc_amp, osc_amp_stderr)
         self.proc_data_dict['missing_fraction'] = (
-            np.mean(self.proc_data_dict['yvals_spec_on']) -
-            np.mean(self.proc_data_dict['yvals_spec_off']))
+            np.mean(self.proc_data_dict['yvals_spec_on'][:-2]) -
+            np.mean(self.proc_data_dict['yvals_spec_off'][:-2]))
 
 
     def prepare_plots(self):
+        self._prepare_main_oscillation_figure()
+        self._prepare_spectator_qubit_figure()
+
+    def _prepare_main_oscillation_figure(self):
         self.plot_dicts['main'] = {
             'plotfn': self.plot_line,
             'xvals': self.proc_data_dict['xvals_off'],
@@ -677,22 +695,42 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                 'setlabel': 'Fit CZ on',
                 'do_legend': True}
 
+            # offset as a guide for the eye
+            y = self.fit_res['cos_fit_off'].params['offset'].value
+            self.plot_dicts['cos_off_offset'] ={
+                'plotfn': self.plot_matplot_ax_method,
+                'ax_id':'main',
+                'func': 'axhline',
+                'plot_kws': {
+                    'y': y, 'color': 'C0', 'linestyle': 'dotted'}
+                    }
 
             phase_message = (
-                'Phase off: {:.1f} deg\nPhase on: {:.1f} deg\n'
-                'Phase diff.: {:.1f} deg\n Oscillation amp.: {:.4f}'.format(
-                    self.proc_data_dict['phi_0'],
-                    self.proc_data_dict['phi_1'],
-                    self.proc_data_dict['phi_cond'],
-                    self.proc_data_dict['osc_amp']))
+                'Phase diff.: {:.1f} $\pm$ {:.1f} deg\n'
+                'Phase off: {:.1f} $\pm$ {:.1f}deg\n'
+                'Phase on: {:.1f} $\pm$ {:.1f}deg\n'
+                'Osc. amp. off: {:.4f} $\pm$ {:.4f}\n'
+                'Osc. amp. on: {:.4f} $\pm$ {:.4f}'.format(
+                    self.proc_data_dict['phi_cond'][0],
+                    self.proc_data_dict['phi_cond'][1],
+                    self.proc_data_dict['phi_0'][0],
+                    self.proc_data_dict['phi_0'][1],
+                    self.proc_data_dict['phi_1'][0],
+                    self.proc_data_dict['phi_1'][1],
+                    self.proc_data_dict['osc_amp_0'][0],
+                    self.proc_data_dict['osc_amp_0'][1],
+                    self.proc_data_dict['osc_amp_1'][0],
+                    self.proc_data_dict['osc_amp_1'][1]))
             self.plot_dicts['phase_message'] = {
                 'ax_id': 'main',
-                'ypos': 0.25,
+                'ypos': 0.9,
+                'xpos': 1.45,
                 'plotfn': self.plot_text,
                 'box_props': 'fancy',
                 'line_kws': {'alpha': 0},
                 'text_string': phase_message}
 
+    def _prepare_spectator_qubit_figure(self):
 
         self.plot_dicts['spectator_qubit'] = {
             'plotfn': self.plot_line,
@@ -733,3 +771,12 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                 'box_props': 'fancy',
                 'line_kws': {'alpha': 0},
                 'text_string': leak_msg}
+            # offset as a guide for the eye
+            y = self.fit_res['cos_fit_on'].params['offset'].value
+            self.plot_dicts['cos_on_offset'] ={
+                'plotfn': self.plot_matplot_ax_method,
+                'ax_id':'main',
+                'func': 'axhline',
+                'plot_kws': {
+                    'y': y, 'color': 'C1', 'linestyle': 'dotted'}
+                    }

@@ -113,9 +113,9 @@ def poor_mans_2q_gst(q0: int, q1: int, platf_cfg: str,):
     """
 
     fp = join(gst_exp_filepath, 'PoorMans_2Q_GST.txt')
-    gateset = pygsti_expList_from_dataset(fp)
+    expList = pygsti_expList_from_dataset(fp)
     p = openql_program_from_pygsti_expList(
-        gateset, 'PoorMans_GST', [2, 0], platf_cfg=platf_cfg)
+        expList, 'PoorMans_GST', [2, 0], platf_cfg=platf_cfg)
     return p
 
 

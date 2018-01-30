@@ -534,15 +534,7 @@ class DeviceCCL(Instrument):
         if verbose:
             # also here to quickly see what dict entries of the
             # analysis are important.
-            info_msg = (
-                'Phase off: {:.1f} deg\nPhase on: {:.1f} deg\n'
-                'Phase diff.: {:.1f} deg\nOscillation amp.: {:.4f}\n'
-                'Missing fraction {:.2f} %'.format(
-                    a.proc_data_dict['phi_0'],
-                    a.proc_data_dict['phi_1'],
-                    a.proc_data_dict['phi_cond'],
-                    a.proc_data_dict['osc_amp'],
-                    a.proc_data_dict['missing_fraction']*100))
+            info_msg = (print(a.plot_dicts['phase_message']['text_string']))
             print(info_msg)
 
         return a
