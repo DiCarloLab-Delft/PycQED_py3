@@ -89,16 +89,16 @@ class Rabi(swf.Hard_Sweep):
         self.unit = 'V'
         self.return_seq = return_seq
 
-        if self.cal_points:
-            step = np.abs(self.sweep_points[-1]-self.sweep_points[-2])
-            self.sweep_points = np.concatenate(
-                [self.sweep_points,
-                [self.sweep_points[-1]+step,
-                 self.sweep_points[-1]+2*step,
-                 self.sweep_points[-1]+3*step,
-                 self.sweep_points[-1]+4*step]])
-
     def prepare(self, **kw):
+        # if self.cal_points:
+        #     step = np.abs(self.sweep_points[-1]-self.sweep_points[-2])
+        #     self.sweep_points = np.concatenate(
+        #         [self.sweep_points,
+        #          [self.sweep_points[-1]+step,
+        #           self.sweep_points[-1]+2*step,
+        #           self.sweep_points[-1]+3*step,
+        #           self.sweep_points[-1]+4*step]])
+
         if self.upload:
             sqs.Rabi_seq(amps=self.sweep_points,
                          pulse_pars=self.pulse_pars,

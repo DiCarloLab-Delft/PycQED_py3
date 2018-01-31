@@ -242,7 +242,7 @@ class UHFQC(Instrument):
 
         # No thresholding or correlation modes
         for i in range(0, 9):
-            eval('quex_thres_{0}_level(0)'.format(i))
+            eval('self.quex_thres_{0}_level(0)'.format(i))
             eval('self.quex_corr_{0}_mode(0)'.format(i))
             eval('self.quex_corr_{0}_source(0)'.format(i))
 
@@ -1009,7 +1009,7 @@ setTrigger(0);"""
             string = 'wave ' + name + ' = ' + string + ';\n'
         return string
 
-    def awg_sequence_acquisition(self):
+    def awg_sequence_acquisition(self, trigger=True):
         string = """
 const TRIGGER1  = 0x000001;
 const WINT_TRIG = 0x000010;
@@ -1024,10 +1024,11 @@ if(getUserReg(1)){
   RO_TRIG=WINT_TRIG;
 }
 repeat(loop_cnt) {
-\twaitDigTrigger(1, 1);\n
+""" + ("\twaitDigTrigger(1, 1);" if trigger else "") + """
 \tsetTrigger(WINT_EN + RO_TRIG);
 \twait(5);
 \tsetTrigger(WINT_EN);
+""" + ("\twait(2250);" if not trigger else "") + """
 }
 wait(10);
 setTrigger(0);"""

@@ -101,7 +101,8 @@ class Element:
         if len(ends) == 0:
             return 0
         samples = max(ends) + 1
-        samples += self.pulsar.inter_element_spacing() / self._clock(c)
+        samples += int(np.ceil(self.pulsar.inter_element_spacing() /
+                               self._clock(c)))
         samples = max(samples, self.pulsar.get('{}_min_length'.format(c)) *
                                self._clock(c))
         while samples % self.pulsar.get('{}_granularity'.format(c)) != 0:

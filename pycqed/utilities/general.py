@@ -202,7 +202,7 @@ def load_settings(instrument,
 
         if verbose:
             print('Loaded settings successfully from the HDF file.')
-            print('\nSetting parameters for {}.'.format(instrument_name))
+            print('Setting parameters for {}.'.format(instrument_name))
 
         params_to_set = kw.pop('params_to_set', [])
         if len(params_to_set)>0:
@@ -213,7 +213,7 @@ def load_settings(instrument,
             params_to_set = ins_group.attrs.items()
 
         for parameter, value in params_to_set:
-            if parameter in instrument.parameters.keys() and \
+            if parameter in instrument.parameters and \
                     hasattr(instrument.parameters[parameter], 'set'):
                 if value == 'None':  # None is saved as string in hdf5
                     try:
@@ -238,19 +238,20 @@ def load_settings(instrument,
                                   parameter, value, instrument_name))
                 else:
                     try:
-                        instrument.set(parameter, float(value))
+                        instrument.set(parameter, int(value))
                     except Exception:
                         try:
-                            instrument.set(parameter, value)
-                        except:
+                            instrument.set(parameter, float(value))
+                        except Exception:
                             try:
-                                instrument.set(parameter, int(value))
-                            except:
+                                instrument.set(parameter, value)
+                            except Exception:
                                 print('Could not set parameter "%s" to "%s"'
                                       ' for instrument "%s"' % (
                                           parameter, value, instrument_name))
 
         f.close()
+        print()
         return
     except Exception as e:
         logging.warning(e)

@@ -1032,9 +1032,9 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
         self._clock_prequeried(True)
 
         # create the precompiled elements
+        elements = {el.name: el for el in elements}
         if len(precompiled_awgs) > 0:
             precompiled_sequence = sequence.precompiled_sequence()
-            elements = {el.name: el for el in elements}
             for segment in precompiled_sequence.elements:
                 element_list = []
                 for wf in segment['wfname']:

@@ -250,7 +250,8 @@ class QuDev_transmon(Qubit):
         # add flux pulse parameters
         self.add_operation('flux')
         self.add_pulse_parameter('flux', 'flux_pulse_type', 'pulse_type',
-                                 get_cmd=lambda: 'SquarePulse')
+                                 initial_value='SquarePulse',
+                                 vals=vals.Enum('SquarePulse'))
         self.add_pulse_parameter('flux', 'flux_pulse_channel', 'channel',
                                  initial_value=None, vals=vals.Strings())
         self.add_pulse_parameter('flux', 'flux_pulse_amp', 'amplitude',
@@ -298,11 +299,13 @@ class QuDev_transmon(Qubit):
             channels=(self.RO_acq_weight_function_I(),
                       self.RO_acq_weight_function_Q()),
             nr_averages=self.RO_acq_averages(),
-            real_imag=True, single_int_avg=True,
+            real_imag=False, single_int_avg=True,
             integration_length=self.RO_acq_integration_length())
 
     def prepare_for_continuous_wave(self):
         self.heterodyne.auto_seq_loading(True)
+        self.heterodyne._awg_seq_parameters_changed = True
+        self.heterodyne._UHFQC_awg_parameters_changed = True
         if self.cw_source is not None:
             self.cw_source.off()
             self.cw_source.pulsemod_state('Off')
@@ -314,9 +317,9 @@ class QuDev_transmon(Qubit):
         if self.readout_UC_LO is not None:
             self.readout_UC_LO.pulsemod_state('Off')
 
+
     def prepare_for_pulsed_spec(self):
 
-        # Not working
         if self.cw_source is not None:
             self.cw_source.pulsemod_state('On')
             self.cw_source.on()
@@ -435,7 +438,7 @@ class QuDev_transmon(Qubit):
         self.readout_DC_LO.on()
 
         # UHFQC settings
-        self.UHFQC.awg_sequence_acquisition()
+        self.UHFQC.awg_sequence_acquisition(trigger=True)
         self.set_readout_weights('SSB')
 
     def set_readout_weights(self, type=None):
@@ -1136,7 +1139,7 @@ class QuDev_transmon(Qubit):
                 ma.MeasurementAnalysis(auto=True, qb_name=self.name, **kw)
 
     def calibrate_drive_mixer_carrier(self, MC=None, update=True, x0=(0., 0.),
-                                      initial_stepsize=0.1):
+                                      initial_stepsize=0.01):
         if MC is None:
             MC = self.MC
         self.prepare_for_mixer_calibration(suppress='drive LO')
@@ -1163,8 +1166,8 @@ class QuDev_transmon(Qubit):
         ch_1_min = a.optimization_result[0][0]
         ch_2_min = a.optimization_result[0][1]
         if update:
-            self.mw_mixer_offs_GI(ch_1_min)
-            self.mw_mixer_offs_GQ(ch_2_min)
+            self.pulse_I_offset(ch_1_min)
+            self.pulse_Q_offset(ch_2_min)
         return ch_1_min, ch_2_min
 
     def calibrate_drive_mixer_skewness(self, MC=None, update=True,
@@ -1177,7 +1180,7 @@ class QuDev_transmon(Qubit):
         detector = det.UHFQC_mixer_skewness_det(
             self.UHFQC, qc.station, [self.RO_acq_weight_function_I(),
                                      self.RO_acq_weight_function_Q()],
-            self.pulse_I_channel(), self.pulse_Q_channel, self.alpha,
+            self.pulse_I_channel(), self.pulse_Q_channel(), self.alpha,
             self.phi_skew, self.f_pulse_mod(), amplitude=amplitude,
             nr_averages=self.RO_acq_averages(), verbose=False)
         ad_func_pars = {'adaptive_function': opti.nelder_mead,
@@ -1582,10 +1585,6 @@ class QuDev_transmon(Qubit):
             logging.warning("Does not automatically update the RO "
                             "resonator parameters. "
                             "Set update=True if you want this!")
-        if np.any(freqs<500e6):
-            logging.warning(('Some of the values in the freqs array might be '
-                             'too small. The units should be Hz.'))
-
         if freqs is None:
             if self.f_RO_resonator() != 0 and self.Q_RO_resonator() != 0:
                 fmin = self.f_RO_resonator()*(1-10/self.Q_RO_resonator())
@@ -1594,6 +1593,10 @@ class QuDev_transmon(Qubit):
             else:
                 raise ValueError("Unspecified frequencies for find_resonator_"
                                  "frequency and no previous value exists")
+
+        if np.any(freqs<500e6):
+            logging.warning(('Some of the values in the freqs array might be '
+                             'too small. The units should be Hz.'))
 
         if MC is None:
             MC = self.MC
