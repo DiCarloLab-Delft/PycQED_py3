@@ -1581,21 +1581,18 @@ def Ramsey_with_flux_pulse_meas_seq(thetas, qb, X90_separation, verbose=False,
         operation_dict['CZ_corr ' + qb.name] = deepcopy(operation_dict['Z180 ' + qb.name])
         operation_dict['CZ_corr ' + qb.name]['refpoint'] = 'end'
 
-    print('flux pulse amp: ', flux_pulse['amplitude'])
     if flux_pulse['amplitude'] != 0:
         operation_dict['CZ_corr ' + qb.name]['phase'] = operation_dict['CZ ' + qb.name]['dynamic_phase']
     else:
         operation_dict['CZ_corr ' + qb.name]['phase'] = 0
 
-    print('flux pulse delay ', flux_pulse['pulse_delay'])
-    print('CZ corr phase: ', operation_dict['CZ_corr ' + qb.name]['phase'])
     for i, theta in enumerate(thetas):
 
         X90_2['phase'] = theta*180/np.pi
         # incomplete fix later!!!
         el = multi_pulse_elt(i, station,
-                             # [pulses['X90'], X90_2,
-                             [pulses['X90'], operation_dict['CZ_corr ' + qb.name], X90_2,
+                             [pulses['X90'], X90_2,
+                             # [pulses['X90'], operation_dict['CZ_corr ' + qb.name], X90_2,
                               RO_pars,
                               flux_pulse])
         if distorted is True:
@@ -1836,8 +1833,14 @@ def flux_pulse_CPhase_seq(sweep_points,qb_control, qb_target,
 
     X180_control = pulses_control['X180']
     X180_control['refpoint'] = 'start'
+    X180_target = pulses_target['X180']
+    X180_target['refpoint'] = 'start'
+
     X90_target = pulses_target['X90']
     X90_target['refpoint'] = 'start'
+
+    I_control = pulses_control['I']
+    I_control['refpoint'] = 'start'
 
     X90_target_2 = deepcopy(X90_target)
     X90_target_2['phase'] = X90_phase*180/np.pi
@@ -1845,7 +1848,7 @@ def flux_pulse_CPhase_seq(sweep_points,qb_control, qb_target,
 
     flux_pulse_control = operation_dict_control["flux "+qb_name_control]
     flux_pulse_control['refpoint'] = 'end'
-    flux_pulse_control['delay'] = spacing
+    flux_pulse_control['pulse_delay'] = spacing
 
 
     if sweep_mode == 'length':
@@ -1855,12 +1858,12 @@ def flux_pulse_CPhase_seq(sweep_points,qb_control, qb_target,
 
     X90_target_2['refpoint'] = 'start'
     X90_target_2['pulse_delay'] = max_length + spacing
+    I_target = pulses_target['I']
+    I_target['refpoint'] = 'start'
+    I_target['pulse_delay'] = max_length + spacing
 
     RO_pars_target['refpoint'] = 'end'
 
-    if flux_pulse_control['pulse_type'] == 'GaussFluxPulse':
-        flux_pulse_control['pulse_delay'] -= flux_pulse_control['buffer']
-        X90_target_2['pulse_delay'] -= 2* flux_pulse_control['buffer']
 
     for i, sweep_point in enumerate(sweep_points):
         if sweep_mode == 'length':
@@ -1874,8 +1877,8 @@ def flux_pulse_CPhase_seq(sweep_points,qb_control, qb_target,
             el = multi_pulse_elt(i, station, [RO_pars_target])
         elif cal_points and (i == (len(sweep_points)-2) or i == (len(sweep_points)-1)):
             flux_pulse_control['amplitude'] = 0
-            el = multi_pulse_elt(i, station, [X180_control, X90_target,
-                                              flux_pulse_control, X90_target_2,
+            el = multi_pulse_elt(i, station, [X180_target, I_control,
+                                              flux_pulse_control, I_target,
                                               RO_pars_target])
         else:
             el = multi_pulse_elt(i, station, [X180_control,X90_target,

@@ -256,16 +256,6 @@ class QuDev_transmon(Qubit):
                                  initial_value=None, vals=vals.Numbers())
         self.add_pulse_parameter('flux', 'flux_pulse_delay', 'pulse_delay',
                                  initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('flux', 'flux_pulse_buffer', 'buffer',
-                                 initial_value=None, vals=vals.Numbers())
-        self.add_pulse_parameter('flux', 'flux_pulse_sigma', 'sigma',
-                                 initial_value=0, vals=vals.Numbers())
-        self.add_pulse_parameter('flux', 'flux_f_pulse_mod', 'mod_frequency',
-                                 initial_value=None, vals=vals.Numbers())
-        # self.add_pulse_parameter('flux','flux_pulse_buffer','pulse_buffer',
-        #                          initial_value=None,vals= vals.Numbers())
-        # self.add_pulse_parameter('flux','kernel_path','kernel_path',
-        #                          initial_value=None,vals=vals.Strings())
 
         # add flux pulse parameters
         self.add_operation('CZ')
@@ -2542,7 +2532,7 @@ class QuDev_transmon(Qubit):
         if MC is None:
             MC = self.MC
 
-        measure_dispersive_shift(self, freqs, MC=MC, analyze=False, **kw)
+        self.measure_dispersive_shift(freqs, MC=MC, analyze=False, **kw)
         MAon = ma.MeasurementAnalysis(label='on-spec' + self.msmt_suffix)
         MAoff = ma.MeasurementAnalysis(label='off-spec' + self.msmt_suffix)
         cdaton = MAon.measured_values[0] * \
@@ -2562,10 +2552,11 @@ class QuDev_transmon(Qubit):
             plt.vlines(fmax / 1e9, 0,
                        max(np.abs(cdatoff).max(), np.abs(cdaton).max()),
                        label='$\\nu_{{RO}} = {:.4f}$ GHz'.format(fmax / 1e9))
-            plt.xlabel('Frequency, f (GHz)')
-            plt.ylabel('Transmission amplitude, |S21| (arb.)')
-            plt.title(r'$\chi$ shift {}'.format(self.name))
-            plt.legend(loc='center left')
+            plt.xlabel(r'Frequency, $f$ (GHz)')
+            plt.ylabel(r'Transmission amplitude, $|S_{21}|$ (arb.)')
+            plt.title(r'{} $\chi$ shift. {} and {}'.format(
+                self.name, MAon.timestamp_string, MAoff.timestamp_string))
+            plt.legend()
             MAoff.save_fig(plt.gcf(), 'chishift', ylabel='trans-amp')
         return fmax
 
@@ -2705,10 +2696,10 @@ class QuDev_transmon(Qubit):
             thetas = np.linspace(0, 2*np.pi, 8, endpoint=False)
         if delays is None:
             buffer_factor = int(X90_separation/self.flux_pulse_length())
-            total_time = X90_separation + 3*buffer_factor*self.flux_pulse_length()
+            total_time = X90_separation + buffer_factor*self.flux_pulse_length()
             res = int(total_time/T_sample/30)
-            delays = np.arange(-1.5*buffer_factor*self.flux_pulse_length(),
-                               X90_separation + 1.5*buffer_factor*self.flux_pulse_length(),
+            delays = np.arange(-0.5*buffer_factor*self.flux_pulse_length(),
+                               X90_separation + 0.5*buffer_factor*self.flux_pulse_length(),
                                res*T_sample)
 
         self.prepare_for_timedomain()
@@ -2739,7 +2730,9 @@ class QuDev_transmon(Qubit):
             flux_pulse_ma.run_delay_analysis(show=True)
 
             if update:
-                MC.station.pulsar.channels[channel]['delay'] -= flux_pulse_ma.fitted_delay
+                new_delay = self.AWG.get('{}_delay'.format(channel)) - \
+                            flux_pulse_ma.fitted_delay
+                self.AWG.set('{}_delay'.format(channel), new_delay)
                 print('updated delay of channel {}.'.format(channel))
             else:
                 logging.warning('Not updated, since update was disabled.')
@@ -2785,10 +2778,13 @@ class QuDev_transmon(Qubit):
         clock_rate = MC.station.pulsar.clock(channel)
 
         X90_separation = kw.pop('X90_separation', 200e-9)
+
         distorted = kw.pop('distorted', False)
         distortion_dict = kw.pop('distortion_dict', None)
+
         pulse_length = kw.pop('pulse_length', 30e-9)
         self.flux_pulse_length(pulse_length)
+
         pulse_delay = kw.pop('pulse_delay', 50e-9)
         self.flux_pulse_delay(pulse_delay)
 
@@ -2797,7 +2793,7 @@ class QuDev_transmon(Qubit):
 
 
         if ampls is None:
-            ampls = np.linspace(0,1,21)
+            ampls = np.linspace(0, 1, 21)
             ampls_flag = True
 
         self.prepare_for_timedomain()
@@ -2878,7 +2874,6 @@ class QuDev_transmon(Qubit):
 
     def calibrate_CPhase_dynamic_phases(self,
                                         flux_pulse_length=None,
-                                        qubit_target=None,
                                         flux_pulse_amp=None,
                                         thetas=None,
                                         distortion_dict=None,

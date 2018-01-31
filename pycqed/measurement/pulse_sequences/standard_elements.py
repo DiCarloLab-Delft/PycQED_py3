@@ -198,13 +198,6 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
                         raise KeyError('pulse_type {} not recognized'.format(
                             pulse_pars_new['pulse_type']))
 
-                try:
-                    print('\nphase offset: ', phase_offset[pulse_pars['target_qubit']])
-                    print('old phase: ', pulse_pars['phase'])
-                    print('new phase: ', pulse_pars_new['phase'])
-                except KeyError:
-                    pass
-
                 last_pulse = el.add(
                     pulse_func(name=pulse_pars_new['pulse_type']+'_'+str(j),
                                **pulse_pars_new),
@@ -299,6 +292,16 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
             start=t0, refpulse=last_pulse,
             refpoint=pulse_pars['refpoint'],
             operation_type=pulse_pars['operation_type'])
+
+        if j == len(flux_compensation_pulse_list) - 1:
+            last_pulse = el.add(pulse.SquarePulse(
+                name='empty_pulse', channel=pulse_pars['channel'],
+                amplitude=0, length=pulse_pars['length']),
+                refpulse=last_pulse, refpoint='end', refpoint_new='start')
+
+
+
+
 
     # make sure that the waveforms on all the channels end at the same time
     # in case the next element is ran back to back with this one.

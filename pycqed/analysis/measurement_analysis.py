@@ -9340,6 +9340,7 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
         self.X90_separation = X90_separation
         self.flux_pulse_length = flux_pulse_length
         self.return_fit = kw.pop('return_fit', False)
+        self.cal_points = kw.pop('cal_points', False)
 
         if run_default_super:
             super(self.__class__, self).run_default_analysis(TwoD=True,
@@ -9384,6 +9385,7 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
 
         if fit_res.best_values['amplitude'] < 0.:
             fit_res.best_values['phase'] += np.pi
+            fit_res.best_values['amplitude'] *= -1
 
         return fit_res
 
@@ -9399,19 +9401,24 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
         else:
             self.fig,self.ax = (None,None)
 
+        ampls_all_rotated = a_tools.rotate_and_normalize_data_no_cal_points(
+                                                self.data[2:]
+                                                )
+
         for i in np.arange(0,len(self.sweep_points_2D)*length_single, length_single):
 
-            data_slice = self.data[:,i:i+length_single-1]
+            data_slice = self.data[:,i:i+length_single]#-1]
 
             thetas = data_slice[0]
             # ampls = data_slice[2]
-            ampls = a_tools.rotate_and_normalize_data_no_cal_points(
-                np.array([data_slice[2], data_slice[3]]))
+            # ampls = a_tools.rotate_and_normalize_data_no_cal_points(
+            #     np.array([data_slice[2], data_slice[3]]))
+            ampls = ampls_all_rotated[i:i+length_single]
 
             # ampls = np.abs((data_slice[2]-data_slice[2, 0]) + 1j*(data_slice[3] -
             #                                                     data_slice[3, 0]))
 
-            if extrapolate_phase:
+            if extrapolate_phase and i > 1:
                 phase_guess = phase_list[-1] + (phase_list[-1] - phase_list[-2])
             else:
                 phase_guess = phase_list[-1]
@@ -9436,9 +9443,10 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
             self.ax[0].set_ylabel('|S21| (arb. units)')
             self.ax[0].legend(['data','fits'])
 
-            self.ax[1].plot(self.sweep_points_2D/1e-9,phase_list)
+            self.ax[1].plot(self.sweep_points_2D,phase_list)
             self.ax[1].set_title('fitted phases')
-            self.ax[1].set_xlabel(self.parameter_names[1]+' (ns)')
+            self.ax[1].set_xlabel(self.parameter_names[1] +
+                                  ' ('+ self.sweep_unit_2D + ')')
             self.ax[1].set_ylabel('phase (rad)')
 
             self.fig.subplots_adjust(hspace=0.7)
@@ -9496,7 +9504,7 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
                                         value=t_end_guess,
                                         vary=True)
         erf_window_model.set_param_hint('t_rise',
-                                        value=(t_end_guess - t_start_guess)/10.,
+                                        value=(t_end_guess - t_start_guess)/20.,
                                         vary=True)
         self.params_delay_fit = erf_window_model.make_params()
         self.delay_fit_res = erf_window_model.fit(data=self.fitted_phases,

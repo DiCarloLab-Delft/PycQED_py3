@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.special import erfc
+import scipy
 import lmfit
 import logging
 #################################
@@ -334,7 +334,7 @@ def gaussianCDF(x, amplitude, mu, sigma):
     """
     CDF of gaussian is P(X<=x) = .5 erfc((mu-x)/(sqrt(2)sig))
     """
-    return 0.5 * amplitude * erfc((mu - x) / (np.sqrt(2)*sigma))
+    return 0.5 * amplitude * scipy.special.erfc((mu - x) / (np.sqrt(2)*sigma))
 
 
 def double_gaussianCDF(x, A_amplitude, A_mu, A_sigma,
