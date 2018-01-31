@@ -576,6 +576,20 @@ class QuDev_transmon(Qubit):
         if MC is None:
             MC = self.MC
 
+        if cal_points:
+            step = np.abs(amps[-1]-amps[-2])
+            if no_cal_points == 4:
+                sweep_points = np.concatenate(
+                    [amps, [amps[-1]+step, amps[-1]+2*step, amps[-1]+3*step,
+                        amps[-1]+4*step]])
+            elif no_cal_points == 2:
+                sweep_points = np.concatenate(
+                    [amps, [amps[-1]+step, amps[-1]+2*step]])
+            else:
+                sweep_points = amps
+        else:
+            sweep_points = amps
+
         # Specify the sweep function, the sweep points,
         # and the detector function, and run the measurement
         MC.set_sweep_function(awg_swf.Rabi(pulse_pars=self.get_drive_pars(),
@@ -583,7 +597,7 @@ class QuDev_transmon(Qubit):
                                            cal_points=cal_points,
                                            no_cal_points=no_cal_points,
                                            upload=upload))
-        MC.set_sweep_points(amps)
+        MC.set_sweep_points(sweep_points)
         MC.set_detector_function(self.int_avg_det)
         MC.run(label)
 
@@ -608,14 +622,33 @@ class QuDev_transmon(Qubit):
         if MC is None:
             MC = self.MC
 
+        if self.cal_points:
+            if cal_points:
+                step = np.abs(amps[-1]-amps[-2])
+                if no_cal_points == 6:
+                    sweep_points = np.concatenate(
+                        [amps, [amps[-1]+step, amps[-1]+2*step, amps[-1]+3*step,
+                            amps[-1]+4*step, amps[-1]+5*step, amps[-1]+6*step]])
+                elif no_cal_points == 4:
+                    sweep_points = np.concatenate(
+                        [amps, [amps[-1]+step, amps[-1]+2*step, amps[-1]+3*step,
+                            amps[-1]+4*step]])
+                elif no_cal_points == 2:
+                    sweep_points = np.concatenate(
+                        [amps, [amps[-1]+step, amps[-1]+2*step]])
+                else:
+                    sweep_points = amps
+        else:
+            sweep_points = amps
+
         MC.set_sweep_function(awg_swf.Rabi_2nd_exc(
                         pulse_pars=self.get_drive_pars(),
                         pulse_pars_2nd=self.get_ef_drive_pars(),
                         RO_pars=self.get_RO_pars(),
                         last_ge_pulse=last_ge_pulse,
-                        amps=amps, n=n, upload=upload,
+                        n=n, upload=upload,
                         cal_points=cal_points, no_cal_points=no_cal_points))
-        MC.set_sweep_points(amps)
+        MC.set_sweep_points(sweep_points)
         MC.set_detector_function(self.int_avg_det)
         MC.run(label)
 
@@ -657,10 +690,18 @@ class QuDev_transmon(Qubit):
         if label is None:
             label = 'T1' + self.msmt_suffix
 
+        if cal_points:
+            step = np.abs(times[-1]-times[-2])
+            sweep_points = np.concatenate(
+                [times[-1], [times[-1]+step,  times[-1]+2*step,
+                    times[-1]+3*step, times[-1]+4*step]])
+        else:
+            sweep_points = times
+
         MC.set_sweep_function(awg_swf.T1(
             pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(),
             upload=upload, cal_points=cal_points))
-        MC.set_sweep_points(times)
+        MC.set_sweep_points(sweep_points)
         MC.set_detector_function(self.int_avg_det)
         MC.run(label)
 
@@ -686,6 +727,25 @@ class QuDev_transmon(Qubit):
         if MC is None:
             MC = self.MC
 
+        if cal_points:
+            step = np.abs(times[-1]-times[-2])
+            if no_cal_points == 6:
+                sweep_points = np.concatenate(
+                    [times[-1], [times[-1]+step,  times[-1]+2*step,
+                                 times[-1]+3*step, times[-1]+4*step,
+                                 times[-1]+5*step, times[-1]+6*step]])
+            elif no_cal_points == 4:
+                sweep_points = np.concatenate(
+                    [times[-1], [times[-1]+step,  times[-1]+2*step,
+                                 times[-1]+3*step, times[-1]+4*step]])
+            elif no_cal_points == 2:
+                sweep_points = np.concatenate(
+                    [times[-1], [times[-1]+step,  times[-1]+2*step]])
+            else:
+                sweep_points = times
+        else:
+            sweep_points = times
+
         MC.set_sweep_function(awg_swf.T1_2nd_exc(
                                 pulse_pars=self.get_drive_pars(),
                                 pulse_pars_2nd=self.get_ef_drive_pars(),
@@ -694,7 +754,7 @@ class QuDev_transmon(Qubit):
                                 cal_points=cal_points,
                                 no_cal_points=no_cal_points,
                                 last_ge_pulse=last_ge_pulse))
-        MC.set_sweep_points(times)
+        MC.set_sweep_points(sweep_points)
         MC.set_detector_function(self.int_avg_det)
         MC.run(label)
 
@@ -721,10 +781,18 @@ class QuDev_transmon(Qubit):
         if label is None:
             label = 'QScale'+self.msmt_suffix
 
+        if cal_points:
+            step = np.abs(qscales[-1] - qscales[-4])
+            sweep_points = np.concatenate(
+                [qscales, [qscales[-1] + step, qscales[-1] + 2*step,
+                    qscales[-1] + 3*step, qscales[-1] + 4*step]])
+        else:
+            sweep_points = qscales
+
         MC.set_sweep_function(awg_swf.QScale(qscales=qscales,
                 pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(),
                 upload=upload, cal_points=cal_points))
-        MC.set_sweep_points(qscales)
+        MC.set_sweep_points(sweep_points)
         MC.set_detector_function(self.int_avg_det)
         MC.run(label)
 
@@ -753,6 +821,25 @@ class QuDev_transmon(Qubit):
         if label is None:
             label = 'QScale_2nd_exc'+self.msmt_suffix
 
+        if cal_points:
+            step = np.abs(qscales[-1] - qscales[-4])
+            if no_cal_points == 6:
+                sweep_points = np.concatenate(
+                    [qscales, [qscales[-1] + step, qscales[-1] + 2*step,
+                               qscales[-1] + 3*step, qscales[-1] + 4*step,
+                               qscales[-1] + 5*step, qscales[-1] + 6*step]])
+            elif no_cal_points == 4:
+                sweep_points = np.concatenate(
+                    [qscales, [qscales[-1] + step, qscales[-1] + 2*step,
+                               qscales[-1] + 3*step, qscales[-1] + 4*step]])
+            elif no_cal_points == 2:
+                sweep_points = np.concatenate(
+                    [qscales, [qscales[-1] + step, qscales[-1] + 2*step]])
+            else:
+                sweep_points = qscales
+        else:
+            sweep_points = qscales
+
         MC.set_sweep_function(awg_swf.QScale_2nd_exc(
             qscales=qscales,
             pulse_pars=self.get_drive_pars(),
@@ -760,7 +847,7 @@ class QuDev_transmon(Qubit):
             RO_pars=self.get_RO_pars(),
             upload=upload, cal_points=cal_points, no_cal_points=no_cal_points,
             last_ge_pulse=last_ge_pulse))
-        MC.set_sweep_points(qscales)
+        MC.set_sweep_points(sweep_points)
         MC.set_detector_function(self.int_avg_det)
         MC.run(label)
 
@@ -796,12 +883,21 @@ class QuDev_transmon(Qubit):
         if label == '':
             label = 'Ramsey_mult_det' + self.msmt_suffix
 
+        if cal_points:
+            len_art_det = len(artificial_detunings)
+            step = np.abs(times[-1] - times[-len_art_det-1])
+            sweep_points = np.concatenate(
+                [times, [times[-1] + step, times[-1] + 2*step,
+                    times[-1] + 3*step, times[-1] + 4*step]])
+        else:
+            sweep_points = times
+
         Rams_swf = awg_swf.Ramsey_multiple_detunings(
             pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(),
             artificial_detunings=artificial_detunings, cal_points=cal_points,
             upload=upload)
         MC.set_sweep_function(Rams_swf)
-        MC.set_sweep_points(times)
+        MC.set_sweep_points(sweep_points)
         MC.set_detector_function(self.int_avg_det)
         MC.run(label)
 
@@ -833,12 +929,20 @@ class QuDev_transmon(Qubit):
         if label == '':
             label = 'Ramsey' + self.msmt_suffix
 
+        if cal_points:
+            step = np.abs(times[-1]-times[-2])
+            sweep_points = np.concatenate(
+                [times[-1], [times[-1]+step,  times[-1]+2*step,
+                             times[-1]+3*step, times[-1]+4*step]])
+        else:
+            sweep_points = times
+
         Rams_swf = awg_swf.Ramsey(
             pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(),
             artificial_detuning=artificial_detuning, cal_points=cal_points,
             upload=upload)
         MC.set_sweep_function(Rams_swf)
-        MC.set_sweep_points(times)
+        MC.set_sweep_points(sweep_points)
         MC.set_detector_function(self.int_avg_det)
         MC.run(label)
 
@@ -868,6 +972,25 @@ class QuDev_transmon(Qubit):
         if MC is None:
             MC = self.MC
 
+        if cal_points:
+            step = np.abs(times[-1]-times[-2])
+            if no_cal_points == 6:
+                sweep_points = np.concatenate(
+                    [times[-1], [times[-1]+step,  times[-1]+2*step,
+                                 times[-1]+3*step, times[-1]+4*step,
+                                 times[-1]+4*step, times[-1]+6*step]])
+            elif no_cal_points == 4:
+                sweep_points = np.concatenate(
+                    [times[-1], [times[-1]+step,  times[-1]+2*step,
+                                 times[-1]+3*step, times[-1]+4*step]])
+            elif no_cal_points == 2:
+                sweep_points = np.concatenate(
+                    [times[-1], [times[-1]+step,  times[-1]+2*step]])
+            else:
+                sweep_points = times
+        else:
+            sweep_points = times
+
         Rams_2nd_swf = awg_swf.Ramsey_2nd_exc(
             pulse_pars=self.get_drive_pars(),
             pulse_pars_2nd=self.get_ef_drive_pars(),
@@ -877,7 +1000,7 @@ class QuDev_transmon(Qubit):
             no_cal_points=no_cal_points,
             last_ge_pulse=last_ge_pulse)
         MC.set_sweep_function(Rams_2nd_swf)
-        MC.set_sweep_points(times)
+        MC.set_sweep_points(sweep_points)
         MC.set_detector_function(self.int_avg_det)
         MC.run(label)
 
@@ -909,6 +1032,26 @@ class QuDev_transmon(Qubit):
         if label is None:
             label = 'Ramsey_mult_det_2nd'+self.msmt_suffix
 
+        if cal_points:
+            len_art_det = len(artificial_detunings)
+            step = np.abs(times[-1] - times[-len_art_det-1])
+            if no_cal_points == 6:
+                sweep_points = np.concatenate(
+                    [times, [times[-1] + step, times[-1] + 2*step,
+                             times[-1] + 3*step, times[-1] + 4*step,
+                             times[-1] + 5*step, times[-1] + 6*step]])
+            elif no_cal_points == 4:
+                sweep_points = np.concatenate(
+                    [times, [times[-1] + step, times[-1] + 2*step,
+                             times[-1] + 3*step, times[-1] + 4*step]])
+            elif no_cal_points == 2:
+                sweep_points = np.concatenate(
+                    [times, [times[-1] + step, times[-1] + 2*step]])
+            else:
+                sweep_points = times
+        else:
+            sweep_points = times
+
         Rams_2nd_swf = awg_swf.Ramsey_2nd_exc_multiple_detunings(
             pulse_pars=self.get_drive_pars(),
             pulse_pars_2nd=self.get_ef_drive_pars(),
@@ -918,7 +1061,7 @@ class QuDev_transmon(Qubit):
             no_cal_points=no_cal_points,
             last_ge_pulse=last_ge_pulse)
         MC.set_sweep_function(Rams_2nd_swf)
-        MC.set_sweep_points(times)
+        MC.set_sweep_points(sweep_points)
         MC.set_detector_function(self.int_avg_det)
         MC.run(label)
 
@@ -988,6 +1131,16 @@ class QuDev_transmon(Qubit):
             label = 'RB_{}_{}_seeds_{}_cliffords'.format(
                 gate_decomp, nr_seeds, nr_cliffords[-1]) + self.msmt_suffix
 
+        nr_seeds_arr = np.arange(nr_seeds)
+        if cal_points:
+            step = np.abs(nr_seeds_arr [-1] - nr_seeds_arr [-2])
+            sweep_points1D = np.concatenate(
+                [nr_seeds_arr ,
+                 [nr_seeds_arr[-1]+step, nr_seeds_arr[-1]+2*step,
+                  nr_seeds_arr[-1]+3*step, nr_seeds_arr[-1]+4*step]])
+        else:
+            sweep_points1D = nr_seeds_arr
+
         RB_sweepfunction = awg_swf.Randomized_Benchmarking_one_length(
             pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(),
             cal_points=cal_points, gate_decomposition=gate_decomp,
@@ -997,10 +1150,10 @@ class QuDev_transmon(Qubit):
         RB_sweepfunction_2D = awg_swf.Randomized_Benchmarking_nr_cliffords(
             RB_sweepfunction=RB_sweepfunction)
 
-        MC.set_sweep_function( RB_sweepfunction )
-        MC.set_sweep_points( np.arange(nr_seeds) )
-        MC.set_sweep_function_2D( RB_sweepfunction_2D )
-        MC.set_sweep_points_2D( nr_cliffords )
+        MC.set_sweep_function(RB_sweepfunction)
+        MC.set_sweep_points(sweep_points1D)
+        MC.set_sweep_function_2D(RB_sweepfunction_2D)
+        MC.set_sweep_points_2D(nr_cliffords)
         if det_func is None:
             MC.set_detector_function(self.int_avg_det)
         else:
@@ -2166,7 +2319,7 @@ class QuDev_transmon(Qubit):
             # temp_array = np.zeros((times.size-no_cal_points)*len_art_det)
             temp_array = np.zeros(times.size*len_art_det)
             for i in range(len_art_det):
-                np.put(temp_array,list(range(i,temp_array.size,len_art_det)),
+                np.put(temp_array, list(range(i, temp_array.size, len_art_det)),
                        times)
             # times = np.append(temp_array,times[-no_cal_points::])
             times = temp_array
