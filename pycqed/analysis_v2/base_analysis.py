@@ -22,7 +22,8 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import datetime
 import json
 import lmfit
-
+import h5py
+from pycqed.measurement.hdf5_data import write_dict_to_hdf5
 
 class BaseDataAnalysis(object):
     """
@@ -184,6 +185,7 @@ class BaseDataAnalysis(object):
         if self.do_fitting:
             self.prepare_fitting()      # set up fit_dicts
             self.run_fitting()          # fitting to models
+            self.save_fit_results()
             self.analyze_fit_results()  # analyzing the results of the fits
 
         self.prepare_plots()   # specify default plots
@@ -515,6 +517,28 @@ class BaseDataAnalysis(object):
                     params=guess_pars, **fit_xvals, **fit_yvals)
 
             self.fit_res[key] = fit_dict['fit_res']
+
+    def save_fit_results(self):
+        """
+        Saves the fit results
+        """
+        fn = a_tools.measurement_filename(a_tools.get_folder(self.timestamps[0]))
+        with h5py.File(fn, 'r+') as data_file:
+            try:
+                analysis_group = data_file.create_group('Analysis')
+            except ValueError:
+                # If the analysis group already exists.
+                # Delete the old group and create a new group (overwrite).
+                del data_file['Analysis']
+                analysis_group = data_file.create_group('Analysis')
+
+            # Iterate over all the fit result dicts
+            for fr_key, fit_res in self.fit_res.items():
+                fr_group = analysis_group.create_group(fr_key)
+                # TODO: convert the params object to a simple dict
+                # write_dict_to_hdf5(fit_res.params, entry_point=fr_group)
+                write_dict_to_hdf5(fit_res.best_values, entry_point=fr_group)
+
 
     def plot(self, key_list=None, axs_dict=None,
              presentation_mode=None, no_label=False):
