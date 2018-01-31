@@ -91,18 +91,18 @@ def distort_qudev(element, distortion_dict):
         element.chan_distorted[ch] = True
         kernelvecs = distortion_dict[ch]['FIR']
         wf_dist = wfs_dict[ch]
-        if kernelvecs is not None:
-            if np.array(kernelvecs).shape[0] == 1 and \
-                    len(np.array(kernelvecs).shape) == 1:
-                wf_dist = filter_fir(kernelvecs, wfs_dict[ch])
+        if kernelvecs is not None and len(kernelvecs) > 0:
+            if not hasattr(kernelvecs[0], '__iter__'):
+                wf_dist = filter_fir(kernelvecs, wf_dist)
             else:
                 for kernelvec in kernelvecs:
-                    wf_dist = filter_fir(kernelvec, wf_dist[ch])
+                    wf_dist = filter_fir(kernelvec, wf_dist)
         if distortion_dict[ch]['IIR'] is not None:
             aIIRfilterList,bIIRfilterList = distortion_dict[ch]['IIR']
             wf_dist = filter_iir(aIIRfilterList,bIIRfilterList,wf_dist)
         # set the last point to zero, such that the AWG holds
         # a zero afer the waveform is finished
+        wf_dist[0] = 0.
         wf_dist[-1] = 0.
         element.distorted_wfs[ch] = wf_dist
     return element

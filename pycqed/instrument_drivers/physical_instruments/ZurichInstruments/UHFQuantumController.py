@@ -240,6 +240,12 @@ class UHFQC(Instrument):
             eval('self.quex_rot_{0}_real(1.0)'.format(i))
             eval('self.quex_rot_{0}_imag(0.0)'.format(i))
 
+        # No thresholding or correlation modes
+        for i in range(0, 9):
+            eval('quex_thres_{0}_level(0)'.format(i))
+            eval('self.quex_corr_{0}_mode(0)'.format(i))
+            eval('self.quex_corr_{0}_source(0)'.format(i))
+
         # No cross-coupling in the matrix multiplication (identity matrix)
         for i in range(0, 9):
             for j in range(0, 9):

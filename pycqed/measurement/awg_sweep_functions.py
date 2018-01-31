@@ -89,6 +89,15 @@ class Rabi(swf.Hard_Sweep):
         self.unit = 'V'
         self.return_seq = return_seq
 
+        if self.cal_points:
+            step = np.abs(self.sweep_points[-1]-self.sweep_points[-2])
+            self.sweep_points = np.concatenate(
+                [self.sweep_points,
+                [self.sweep_points[-1]+step,
+                 self.sweep_points[-1]+2*step,
+                 self.sweep_points[-1]+3*step,
+                 self.sweep_points[-1]+4*step]])
+
     def prepare(self, **kw):
         if self.upload:
             sqs.Rabi_seq(amps=self.sweep_points,
@@ -117,6 +126,15 @@ class Rabi_2nd_exc(swf.Hard_Sweep):
         self.unit = 'V'
         self.last_ge_pulse = last_ge_pulse
         self.return_seq = return_seq
+
+        if self.cal_points:
+            step = np.abs(self.sweep_points[-1]-self.sweep_points[-2])
+            self.sweep_points = np.concatenate(
+                [self.sweep_points[-1],
+                 [self.sweep_points[-1]+step,
+                  self.sweep_points[-1]+2*step,
+                  self.sweep_points[-1]+3*step,
+                  self.sweep_points[-1]+4*step]])
 
     def prepare(self, **kw):
         if self.upload:
@@ -834,6 +852,15 @@ class T1(swf.Hard_Sweep):
         self.parameter_name = 't'
         self.unit = 's'
 
+        if self.cal_points:
+            step = np.abs(self.sweep_points[-1]-self.sweep_points[-2])
+            self.sweep_points = np.concatenate(
+                [self.sweep_points[-1],
+                 [self.sweep_points[-1]+step,
+                  self.sweep_points[-1]+2*step,
+                  self.sweep_points[-1]+3*step,
+                  self.sweep_points[-1]+4*step]])
+
     def prepare(self, **kw):
         if self.upload:
             sqs.T1_seq(times=self.sweep_points,
@@ -857,6 +884,15 @@ class T1_2nd_exc(swf.Hard_Sweep):
         self.name = 'T1 2nd excited state'
         self.parameter_name = 't'
         self.unit = 's'
+
+        if self.cal_points:
+            step = np.abs(self.sweep_points[-1]-self.sweep_points[-2])
+            self.sweep_points = np.concatenate(
+                [self.sweep_points[-1],
+                 [self.sweep_points[-1]+step,
+                  self.sweep_points[-1]+2*step,
+                  self.sweep_points[-1]+3*step,
+                  self.sweep_points[-1]+4*step]])
 
     def prepare(self, **kw):
         if self.upload:
@@ -977,12 +1013,14 @@ class Randomized_Benchmarking_one_length(swf.Hard_Sweep):
         self.unit = '#'
         self.name = 'Randomized_Benchmarking_one_length'
 
-        # if self.cal_points:
-        #     self.sweep_points = np.concatenate([np.arange(self.nr_seeds),
-        #                                        [np.arange(self.nr_seeds)[-1]+.2,
-        #                                         np.arange(self.nr_seeds)[-1]+.3,
-        #                                         np.arange(self.nr_seeds)[-1]+.7,
-        #                                         np.arange(self.nr_seeds)[-1]+.8]])
+        if self.cal_points:
+            step = np.abs(self.sweep_points[-1]-self.sweep_points[-2])
+            self.sweep_points = np.concatenate(
+                [self.sweep_points,
+                 [self.sweep_points[-1]+step,
+                  self.sweep_points[-1]+2*step,
+                  self.sweep_points[-1]+3*step,
+                  self.sweep_points[-1]+4*step]])
 
     def prepare(self, **kw):
         if self.upload:
@@ -1057,6 +1095,15 @@ class Ramsey(swf.Hard_Sweep):
         self.parameter_name = 't'
         self.unit = 's'
 
+        if self.cal_points:
+            step = np.abs(self.sweep_points[-1]-self.sweep_points[-2])
+            self.sweep_points = np.concatenate(
+                [self.sweep_points[-1],
+                 [self.sweep_points[-1]+step,
+                  self.sweep_points[-1]+2*step,
+                  self.sweep_points[-1]+3*step,
+                  self.sweep_points[-1]+4*step]])
+
     def prepare(self, **kw):
         if self.upload:
             sqs.Ramsey_seq(times=self.sweep_points,
@@ -1082,6 +1129,17 @@ class Ramsey_multiple_detunings(swf.Hard_Sweep):
         self.name = 'Ramsey_mult_det'
         self.parameter_name = 't'
         self.unit = 's'
+
+        if self.cal_points:
+            len_art_det = len(self.artificial_detunings)
+            step = np.abs(self.sweep_points[-1] -
+                          self.sweep_points[-len_art_det-1])
+            self.sweep_points = np.concatenate(
+                [self.sweep_points,
+                 [self.sweep_points[-1] + step,
+                  self.sweep_points[-1] + 2*step,
+                  self.sweep_points[-1] + 3*step,
+                  self.sweep_points[-1] + 4*step]])
 
     def prepare(self, **kw):
         if self.upload:
@@ -1112,6 +1170,15 @@ class Ramsey_2nd_exc(swf.Hard_Sweep):
         self.return_seq = return_seq
         self.last_ge_pulse = last_ge_pulse
         self.no_cal_points = no_cal_points
+
+        if self.cal_points:
+            step = np.abs(self.sweep_points[-1]-self.sweep_points[-2])
+            self.sweep_points = np.concatenate(
+                [self.sweep_points[-1],
+                 [self.sweep_points[-1]+step,
+                  self.sweep_points[-1]+2*step,
+                  self.sweep_points[-1]+3*step,
+                  self.sweep_points[-1]+4*step]])
 
     def prepare(self, **kw):
         if self.upload:
@@ -1256,9 +1323,14 @@ class QScale(swf.Hard_Sweep):
         self.parameter_name = 'QScale_factor'
         self.unit = ''
         self.cal_points = cal_points
-        sweep_pts = np.repeat(qscales, 3)
-        # self.sweep_points = np.append(sweep_pts,
-        #                               [qscales[-1]+(qscales[-1]-qscales[-2])]*4)
+        if self.cal_points:
+            step = np.abs(self.sweep_points[-1]-self.sweep_points[-4])
+            self.sweep_points = np.concatenate(
+                [self.sweep_points,
+                 [self.sweep_points[-1] + step,
+                  self.sweep_points[-1] + 2*step,
+                  self.sweep_points[-1] + 3*step,
+                  self.sweep_points[-1] + 4*step]])
 
     def prepare(self, **kw):
         if self.upload:

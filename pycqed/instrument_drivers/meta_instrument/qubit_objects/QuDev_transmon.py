@@ -2262,11 +2262,13 @@ class QuDev_transmon(Qubit):
             # to correspond to the logic in Ramsey_seq_multiple_detunings
             # sequence
             len_art_det = len(artificial_detuning)
-            temp_array = np.zeros((times.size-no_cal_points)*len_art_det)
-            for i in range(len(artificial_detuning)):
+            # temp_array = np.zeros((times.size-no_cal_points)*len_art_det)
+            temp_array = np.zeros(times.size*len_art_det)
+            for i in range(len_art_det):
                 np.put(temp_array,list(range(i,temp_array.size,len_art_det)),
                        times)
-            times = np.append(temp_array,times[-no_cal_points::])
+            # times = np.append(temp_array,times[-no_cal_points::])
+            times = temp_array
 
             #Perform Ramsey multiple detunings
             if for_ef is False:
@@ -2498,11 +2500,16 @@ class QuDev_transmon(Qubit):
 
         # Each qscale value must be repeated 3 times to correspoond to the
         # logic in QScale sequence
-        temp_array = np.zeros(3*(qscales.size-no_cal_points))
+        # temp_array = np.zeros(3*(qscales.size-no_cal_points))
+        # np.put(temp_array,list(range(0,temp_array.size,3)),qscales)
+        # np.put(temp_array,list(range(1,temp_array.size,3)),qscales)
+        # np.put(temp_array,list(range(2,temp_array.size,3)),qscales)
+        # qscales = np.append(temp_array,qscales[-no_cal_points::])
+        temp_array = np.zeros(3*qscales.size)
         np.put(temp_array,list(range(0,temp_array.size,3)),qscales)
         np.put(temp_array,list(range(1,temp_array.size,3)),qscales)
         np.put(temp_array,list(range(2,temp_array.size,3)),qscales)
-        qscales = np.append(temp_array,qscales[-no_cal_points::])
+        qscales = temp_array
 
         #Perform the qscale calibration measurement
         if for_ef:
@@ -2624,7 +2631,7 @@ class QuDev_transmon(Qubit):
         if MC is None:
             MC = self.MC
 
-        measure_dispersive_shift(self, freqs, MC=MC, analyze=False, **kw)
+        self.measure_dispersive_shift(freqs, MC=MC, analyze=False, **kw)
         MAon = ma.MeasurementAnalysis(label='on-spec' + self.msmt_suffix)
         MAoff = ma.MeasurementAnalysis(label='off-spec' + self.msmt_suffix)
         cdaton = MAon.measured_values[0] * \
@@ -2644,10 +2651,11 @@ class QuDev_transmon(Qubit):
             plt.vlines(fmax / 1e9, 0,
                        max(np.abs(cdatoff).max(), np.abs(cdaton).max()),
                        label='$\\nu_{{RO}} = {:.4f}$ GHz'.format(fmax / 1e9))
-            plt.xlabel('Frequency, f (GHz)')
-            plt.ylabel('Transmission amplitude, |S21| (arb.)')
-            plt.title(r'$\chi$ shift {}'.format(self.name))
-            plt.legend(loc='center left')
+            plt.xlabel(r'Frequency, $f$ (GHz)')
+            plt.ylabel(r'Transmission amplitude, $|S_{21}|$ (arb.)')
+            plt.title(r'{} $\chi$ shift. {} and {}'.format(
+                self.name, MAon.timestamp_string, MAoff.timestamp_string))
+            plt.legend()
             MAoff.save_fig(plt.gcf(), 'chishift', ylabel='trans-amp')
         return fmax
 
@@ -2786,10 +2794,10 @@ class QuDev_transmon(Qubit):
             thetas = np.linspace(0, 2*np.pi, 8, endpoint=False)
         if delays is None:
             buffer_factor = int(X90_separation/self.flux_pulse_length())
-            total_time = X90_separation + 3*buffer_factor*self.flux_pulse_length()
+            total_time = X90_separation + buffer_factor*self.flux_pulse_length()
             res = int(total_time/T_sample/30)
-            delays = np.arange(-1.5*buffer_factor*self.flux_pulse_length(),
-                               X90_separation + 1.5*buffer_factor*self.flux_pulse_length(),
+            delays = np.arange(-0.5*buffer_factor*self.flux_pulse_length(),
+                               X90_separation + 0.5*buffer_factor*self.flux_pulse_length(),
                                res*T_sample)
 
         self.prepare_for_timedomain()
@@ -2820,7 +2828,9 @@ class QuDev_transmon(Qubit):
             flux_pulse_ma.run_delay_analysis(show=True)
 
             if update:
-                MC.station.pulsar.channels[channel]['delay'] -= flux_pulse_ma.fitted_delay
+                new_delay = self.AWG.get('{}_delay'.format(channel)) - \
+                            flux_pulse_ma.fitted_delay
+                self.AWG.set('{}_delay'.format(channel), new_delay)
                 print('updated delay of channel {}.'.format(channel))
             else:
                 logging.warning('Not updated, since update was disabled.')
@@ -2866,10 +2876,13 @@ class QuDev_transmon(Qubit):
         clock_rate = MC.station.pulsar.clock(channel)
 
         X90_separation = kw.pop('X90_separation', 200e-9)
+
         distorted = kw.pop('distorted', False)
         distortion_dict = kw.pop('distortion_dict', None)
+
         pulse_length = kw.pop('pulse_length', 30e-9)
         self.flux_pulse_length(pulse_length)
+
         pulse_delay = kw.pop('pulse_delay', 50e-9)
         self.flux_pulse_delay(pulse_delay)
 
@@ -2878,7 +2891,7 @@ class QuDev_transmon(Qubit):
 
 
         if ampls is None:
-            ampls = np.linspace(0,1,21)
+            ampls = np.linspace(0, 1, 21)
             ampls_flag = True
 
         self.prepare_for_timedomain()
@@ -2959,7 +2972,6 @@ class QuDev_transmon(Qubit):
 
     def calibrate_CPhase_dynamic_phases(self,
                                         flux_pulse_length=None,
-                                        qubit_target=None,
                                         flux_pulse_amp=None,
                                         thetas=None,
                                         distortion_dict=None,
