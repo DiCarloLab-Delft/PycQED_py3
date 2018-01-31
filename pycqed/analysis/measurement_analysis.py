@@ -676,6 +676,7 @@ class MeasurementAnalysis(object):
         # Plot:
         ax.plot(x, y, marker, markersize=self.marker_size,
                 linewidth=self.line_width, label=label)
+        ax.set_ylim(ymin=0)
 
         if log:
             ax.set_yscale('log')
@@ -5409,8 +5410,8 @@ class Homodyne_Analysis(MeasurementAnalysis):
             # this is the fit with a complex transmission curve WITHOUT slope
             data_amp = self.measured_values[0]
             data_angle = self.measured_values[1]
-            data_complex = np.add(
-                self.measured_values[2], 1j*self.measured_values[3])
+            data_complex = data_amp*np.cos(data_angle)+1j*data_amp*np.sin(data_angle) 
+            #np.add(self.measured_values[2], 1j*self.measured_values[3])
 
             # Initial guesses
             guess_A = max(data_amp)
