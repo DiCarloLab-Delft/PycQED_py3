@@ -109,7 +109,7 @@ class Rabi(swf.Hard_Sweep):
 
 class Rabi_2nd_exc(swf.Hard_Sweep):
 
-    def __init__(self, pulse_pars, pulse_pars_2nd, RO_pars, amps=None,
+    def __init__(self, pulse_pars, pulse_pars_2nd, RO_pars,
                  last_ge_pulse=True,
                  n=1, cal_points=True, no_cal_points=4, upload=True,
                  return_seq=False):
@@ -127,18 +127,10 @@ class Rabi_2nd_exc(swf.Hard_Sweep):
         self.last_ge_pulse = last_ge_pulse
         self.return_seq = return_seq
 
-        if self.cal_points:
-            step = np.abs(self.sweep_points[-1]-self.sweep_points[-2])
-            self.sweep_points = np.concatenate(
-                [self.sweep_points[-1],
-                 [self.sweep_points[-1]+step,
-                  self.sweep_points[-1]+2*step,
-                  self.sweep_points[-1]+3*step,
-                  self.sweep_points[-1]+4*step]])
-
     def prepare(self, **kw):
         if self.upload:
-            sqs2.Rabi_2nd_exc_seq(amps=self.sweep_points, last_ge_pulse=self.last_ge_pulse,
+            sqs2.Rabi_2nd_exc_seq(amps=self.sweep_points,
+                                  last_ge_pulse=self.last_ge_pulse,
                                   pulse_pars=self.pulse_pars,
                                   pulse_pars_2nd=self.pulse_pars_2nd,
                                   RO_pars=self.RO_pars, upload=self.upload,
@@ -852,15 +844,6 @@ class T1(swf.Hard_Sweep):
         self.parameter_name = 't'
         self.unit = 's'
 
-        if self.cal_points:
-            step = np.abs(self.sweep_points[-1]-self.sweep_points[-2])
-            self.sweep_points = np.concatenate(
-                [self.sweep_points[-1],
-                 [self.sweep_points[-1]+step,
-                  self.sweep_points[-1]+2*step,
-                  self.sweep_points[-1]+3*step,
-                  self.sweep_points[-1]+4*step]])
-
     def prepare(self, **kw):
         if self.upload:
             sqs.T1_seq(times=self.sweep_points,
@@ -884,15 +867,6 @@ class T1_2nd_exc(swf.Hard_Sweep):
         self.name = 'T1 2nd excited state'
         self.parameter_name = 't'
         self.unit = 's'
-
-        if self.cal_points:
-            step = np.abs(self.sweep_points[-1]-self.sweep_points[-2])
-            self.sweep_points = np.concatenate(
-                [self.sweep_points[-1],
-                 [self.sweep_points[-1]+step,
-                  self.sweep_points[-1]+2*step,
-                  self.sweep_points[-1]+3*step,
-                  self.sweep_points[-1]+4*step]])
 
     def prepare(self, **kw):
         if self.upload:
@@ -1013,15 +987,6 @@ class Randomized_Benchmarking_one_length(swf.Hard_Sweep):
         self.unit = '#'
         self.name = 'Randomized_Benchmarking_one_length'
 
-        if self.cal_points:
-            step = np.abs(self.sweep_points[-1]-self.sweep_points[-2])
-            self.sweep_points = np.concatenate(
-                [self.sweep_points,
-                 [self.sweep_points[-1]+step,
-                  self.sweep_points[-1]+2*step,
-                  self.sweep_points[-1]+3*step,
-                  self.sweep_points[-1]+4*step]])
-
     def prepare(self, **kw):
         if self.upload:
             sqs.Randomized_Benchmarking_seq_one_length(
@@ -1095,15 +1060,6 @@ class Ramsey(swf.Hard_Sweep):
         self.parameter_name = 't'
         self.unit = 's'
 
-        if self.cal_points:
-            step = np.abs(self.sweep_points[-1]-self.sweep_points[-2])
-            self.sweep_points = np.concatenate(
-                [self.sweep_points[-1],
-                 [self.sweep_points[-1]+step,
-                  self.sweep_points[-1]+2*step,
-                  self.sweep_points[-1]+3*step,
-                  self.sweep_points[-1]+4*step]])
-
     def prepare(self, **kw):
         if self.upload:
             sqs.Ramsey_seq(times=self.sweep_points,
@@ -1129,17 +1085,6 @@ class Ramsey_multiple_detunings(swf.Hard_Sweep):
         self.name = 'Ramsey_mult_det'
         self.parameter_name = 't'
         self.unit = 's'
-
-        if self.cal_points:
-            len_art_det = len(self.artificial_detunings)
-            step = np.abs(self.sweep_points[-1] -
-                          self.sweep_points[-len_art_det-1])
-            self.sweep_points = np.concatenate(
-                [self.sweep_points,
-                 [self.sweep_points[-1] + step,
-                  self.sweep_points[-1] + 2*step,
-                  self.sweep_points[-1] + 3*step,
-                  self.sweep_points[-1] + 4*step]])
 
     def prepare(self, **kw):
         if self.upload:
@@ -1170,15 +1115,6 @@ class Ramsey_2nd_exc(swf.Hard_Sweep):
         self.return_seq = return_seq
         self.last_ge_pulse = last_ge_pulse
         self.no_cal_points = no_cal_points
-
-        if self.cal_points:
-            step = np.abs(self.sweep_points[-1]-self.sweep_points[-2])
-            self.sweep_points = np.concatenate(
-                [self.sweep_points[-1],
-                 [self.sweep_points[-1]+step,
-                  self.sweep_points[-1]+2*step,
-                  self.sweep_points[-1]+3*step,
-                  self.sweep_points[-1]+4*step]])
 
     def prepare(self, **kw):
         if self.upload:
@@ -1323,14 +1259,6 @@ class QScale(swf.Hard_Sweep):
         self.parameter_name = 'QScale_factor'
         self.unit = ''
         self.cal_points = cal_points
-        if self.cal_points:
-            step = np.abs(self.sweep_points[-1]-self.sweep_points[-4])
-            self.sweep_points = np.concatenate(
-                [self.sweep_points,
-                 [self.sweep_points[-1] + step,
-                  self.sweep_points[-1] + 2*step,
-                  self.sweep_points[-1] + 3*step,
-                  self.sweep_points[-1] + 4*step]])
 
     def prepare(self, **kw):
         if self.upload:
