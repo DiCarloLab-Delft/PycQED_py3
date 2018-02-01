@@ -391,7 +391,7 @@ def CPMG_seq(times, pulse_pars, CPMG_order, RO_pars,
         seq.append_element(el, trigger_wait=True)
     if upload:
         station.components['AWG'].stop()
-        station.pulsar.program_awg(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:

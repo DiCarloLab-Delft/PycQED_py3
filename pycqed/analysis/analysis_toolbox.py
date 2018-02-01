@@ -118,7 +118,7 @@ def latest_data(contains='', older_than=None, newer_than=None, or_equal=False,
     is newer than the date given by the timestamp newer_than is returned
 
     If no fitting data is found, an exception is raised.
-    Except when you specifically ask not to to
+    Except when you specifically ask not to do
     this in: raise_exc = False, then a 'False' is returned.
     return_all = True: returns all the folders that satisfy
         the requirements (Cristian)

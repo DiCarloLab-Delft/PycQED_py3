@@ -951,7 +951,7 @@ repeat(loop_cnt) {
 \tsetTrigger(WINT_EN +RO_TRIG);
 \twait(5);
 \tsetTrigger(WINT_EN);
-\twait(300);
+//\twait(300);
 }
 wait(1000);
 setTrigger(0);"""

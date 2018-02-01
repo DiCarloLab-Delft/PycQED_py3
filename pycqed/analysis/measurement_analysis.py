@@ -4588,6 +4588,7 @@ class VNA_Analysis(MeasurementAnalysis):
 
         # prepare figure in log scale
         data_amp = self.measured_values[0]
+        print(data_amp)
 
         fig, ax = self.default_ax()
         self.plot_dB_from_linear(x=self.sweep_points,
