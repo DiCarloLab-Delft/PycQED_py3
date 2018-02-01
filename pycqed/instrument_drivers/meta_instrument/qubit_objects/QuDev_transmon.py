@@ -731,16 +731,16 @@ class QuDev_transmon(Qubit):
             step = np.abs(times[-1]-times[-2])
             if no_cal_points == 6:
                 sweep_points = np.concatenate(
-                    [times[-1], [times[-1]+step,  times[-1]+2*step,
+                    [times, [times[-1]+step,  times[-1]+2*step,
                                  times[-1]+3*step, times[-1]+4*step,
                                  times[-1]+5*step, times[-1]+6*step]])
             elif no_cal_points == 4:
                 sweep_points = np.concatenate(
-                    [times[-1], [times[-1]+step,  times[-1]+2*step,
+                    [times, [times[-1]+step,  times[-1]+2*step,
                                  times[-1]+3*step, times[-1]+4*step]])
             elif no_cal_points == 2:
                 sweep_points = np.concatenate(
-                    [times[-1], [times[-1]+step,  times[-1]+2*step]])
+                    [times, [times[-1]+step,  times[-1]+2*step]])
             else:
                 sweep_points = times
         else:
@@ -976,16 +976,16 @@ class QuDev_transmon(Qubit):
             step = np.abs(times[-1]-times[-2])
             if no_cal_points == 6:
                 sweep_points = np.concatenate(
-                    [times[-1], [times[-1]+step,  times[-1]+2*step,
+                    [times, [times[-1]+step,  times[-1]+2*step,
                                  times[-1]+3*step, times[-1]+4*step,
                                  times[-1]+4*step, times[-1]+6*step]])
             elif no_cal_points == 4:
                 sweep_points = np.concatenate(
-                    [times[-1], [times[-1]+step,  times[-1]+2*step,
+                    [times, [times[-1]+step,  times[-1]+2*step,
                                  times[-1]+3*step, times[-1]+4*step]])
             elif no_cal_points == 2:
                 sweep_points = np.concatenate(
-                    [times[-1], [times[-1]+step,  times[-1]+2*step]])
+                    [times, [times[-1]+step,  times[-1]+2*step]])
             else:
                 sweep_points = times
         else:
@@ -1135,7 +1135,7 @@ class QuDev_transmon(Qubit):
         if cal_points:
             step = np.abs(nr_seeds_arr [-1] - nr_seeds_arr [-2])
             sweep_points1D = np.concatenate(
-                [nr_seeds_arr ,
+                [nr_seeds_arr,
                  [nr_seeds_arr[-1]+step, nr_seeds_arr[-1]+2*step,
                   nr_seeds_arr[-1]+3*step, nr_seeds_arr[-1]+4*step]])
         else:
