@@ -53,13 +53,30 @@ class Soft_Sweep(Sweep_function):
 
 
 class Heterodyne_Frequency_Sweep(Soft_Sweep):
+    """
+    Performs a joint sweep of two microwave sources for the purpose of
+    varying a heterodyne frequency.
+    """
 
-    def __init__(self, RO_pulse_type,
-                 LO_source, IF,
+    def __init__(self, RO_pulse_type:str,
+                 LO_source, IF:float,
                  RF_source=None,
-                 sweep_control='soft',
+                 sweep_control:str='soft',
                  sweep_points=None,
                  **kw):
+        """
+        RO_pulse_type (str) : determines wether to only set the LO source
+            (in case of a modulated RF pulse) or set both the LO and RF source
+            to the required frequency. Can be:
+                "gated"             Will set both the LO and RF source
+                "pulse_modulated"   Will only set the LO source
+                "CW"                Will set both the LO and RF source
+        LO_source (instr) : instance of the LO instrument
+        IF (float)        : intermodulation frequency in Hz
+        RF_source (instr) : instance of the RF instrument, can be None
+            if the pulse type is "pulse_modulated"
+        """
+
         super(Heterodyne_Frequency_Sweep, self).__init__()
         self.sweep_control = sweep_control
         self.name = 'Heterodyne frequency'
@@ -69,13 +86,15 @@ class Heterodyne_Frequency_Sweep(Soft_Sweep):
         self.sweep_points = sweep_points
         self.LO_source = LO_source
         self.IF = IF
-        if 'gated' in self.RO_pulse_type.lower():
+        if (('gated' in self.RO_pulse_type.lower()) or
+            ('CW' in self.RO_pulse_type.lower())):
             self.RF_source = RF_source
 
     def set_parameter(self, val):
         # RF = LO + IF
         self.LO_source.frequency(val-self.IF)
-        if 'gated' in self.RO_pulse_type.lower():
+        if (('gated' in self.RO_pulse_type.lower()) or
+            ('CW' in self.RO_pulse_type.lower())):
             self.RF_source.frequency(val)
 
 
