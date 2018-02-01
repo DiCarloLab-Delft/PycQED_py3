@@ -1328,6 +1328,8 @@ class UHFQC_input_average_detector(Hard_Detector):
         for i, channel in enumerate(self.channels):
             self.value_names[i] = 'ch{}'.format(channel)
             self.value_units[i] = 'V'
+            # UHFQC returned data is in Volts
+            # January 2018 verified by Xavi
         self.AWG = AWG
         self.nr_samples = nr_samples
         self.nr_averages = nr_averages
@@ -1343,7 +1345,9 @@ class UHFQC_input_average_detector(Hard_Detector):
         data_raw = self.UHFQC.acquisition_poll(samples=self.nr_sweep_points,
                                                arm=False, acquisition_time=0.01)
         data = np.array([data_raw[key]
-                         for key in sorted(data_raw.keys())])  # *self.scaling_factor
+                         for key in sorted(data_raw.keys())]) 
+        # IMPORTANT: No re-scaling factor needed for input average mode as the UHFQC returns volts
+        # Verified January 2018 by Xavi
 
         return data
 
@@ -1420,6 +1424,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
         integration_length (float): integration length in seconds
         nr_averages (int)         : nr of averages per data point
+            IMPORTANT: this must be a power of 2
 
         result_logging_mode (str) :  options are
             - raw        -> returns raw data in V
@@ -1453,6 +1458,12 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         """
         super().__init__()
         self.UHFQC = UHFQC
+        #if nr_averages # is not a powe of 2: 
+        
+        #    raise ValueError('Some descriptive message {}'.format(nr_averages))
+        # if integration_length > some value: 
+        #     raise ValueError
+
         self.name = '{}_UHFQC_integrated_average'.format(result_logging_mode)
         self.channels = channels
         self.value_names = ['']*len(self.channels)
@@ -1460,11 +1471,14 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             self.value_names[i] = '{} w{}'.format(result_logging_mode,
                                                   channel)
         if result_logging_mode == 'raw':
-            self.value_units = ['V']*len(self.channels)
-            self.scaling_factor = 1#/(1.8e9*integration_length*nr_averages)
+            # Units are only valid when using SSB or DSB demodulation. 
+            # value corrsponds to the peak voltage of a cosine with the 
+            # demodulation frequency. 
+            self.value_units = ['Vpeak']*len(self.channels)
+            self.scaling_factor = 1/(1.8e9*integration_length*nr_averages)
         elif result_logging_mode == 'lin_trans':
             self.value_units = ['a.u.']*len(self.channels)
-            self.scaling_factor = 1#/nr_averages
+            self.scaling_factor = 1/nr_averages
 
         elif result_logging_mode == 'digitized':
             self.value_units = ['frac']*len(self.channels)

@@ -676,8 +676,7 @@ class MeasurementAnalysis(object):
         # Plot:
         ax.plot(x, y, marker, markersize=self.marker_size,
                 linewidth=self.line_width, label=label)
-        ax.set_ylim(ymin=0)
-
+        ax.set_ylim(ymin=0.0)
         if log:
             ax.set_yscale('log')
 
@@ -5498,7 +5497,8 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                             fig=fig, ax=ax,
                                             xlabel=self.sweep_name,
                                             x_unit=self.sweep_unit[0],
-                                            ylabel=str('S21_mag (arb. units)'),
+                                            ylabel=str('S21_mag'),
+                                            y_unit=self.value_units[0], 
                                             save=False)
 
         elif 'complex' in fitting_model:

@@ -8,7 +8,7 @@ from matplotlib import cm
 import numpy as np
 
 SI_PREFIXES = 'yzafpnμm kMGTPEZY'
-SI_UNITS = 'm,s,g,W,J,V,A,F,T,Hz,Ohm,S,N,C,px,b,B,K,Bar'.split(',')
+SI_UNITS = 'm,s,g,W,J,V,A,F,T,Hz,Ohm,S,N,C,px,b,B,K,Bar,Vpeak,Vpp,Vp,Vrms'.split(',')
 
 
 def set_xlabel(axis, label, unit=None, **kw):
