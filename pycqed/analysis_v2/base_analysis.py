@@ -15,8 +15,8 @@ from pycqed.analysis.analysis_toolbox import get_color_order as gco
 from pycqed.analysis.analysis_toolbox import get_color_list
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 # import pycqed.analysis_v2.default_figure_settings_analysis as def_fig
-from . import default_figure_settings_analysis as def_fig
-from mpl_toolkits.axes_grid1 import make_axes_locatable
+# from . import default_figure_settings_analysis as def_fig
+# from mpl_toolkits.axes_grid1 import make_axes_locatable
 import datetime
 import json
 import lmfit
@@ -47,10 +47,13 @@ class BaseDataAnalysis(object):
             self.plot(key_list='auto')  # make the plots
     """
 
-    def __init__(self, t_start: str=None, t_stop: str=None,
-                 data_file_path: str=None,
-                 options_dict: dict=None, extract_only: bool=False,
-                 do_fitting: bool=False):
+    def __init__(self, t_start: str=None, 
+                t_stop: str=None,
+                TwoD: bool=False, 
+                options_dict: dict=None,
+                data_file_path: str=None,
+                extract_only: bool=False,
+                do_fitting: bool=False):
         '''
         This is the __init__ of the abstract base class.
         It is intended to be called at the start of the init of the child
@@ -142,12 +145,12 @@ class BaseDataAnalysis(object):
         ########################################
         # These options relate to the plotting #
         ########################################
-        def_fig.apply_default_figure_settings()
+        # def_fig.apply_default_figure_settings()
         self.fit_dicts = dict()
         self.processed_data_dict = dict()
 
-        if self.options_dict.get('apply_default_fig_settings', True):
-            def_fig.apply_default_figure_settings()
+        # if self.options_dict.get('apply_default_fig_settings', True):
+        #     def_fig.apply_default_figure_settings()
         self.plot_dicts = OrderedDict()
         self.axs = OrderedDict()
         self.figs = OrderedDict()
@@ -536,7 +539,7 @@ class BaseDataAnalysis(object):
                     pdict.get('numplotsy', 1), pdict.get('numplotsx', 1),
                     sharex=pdict.get('sharex', False),
                     sharey=pdict.get('sharey', False),
-                    figsize=pdict.get('plotsize', None))  # (8, 6)))
+                    figsize=pdict.get('plotsize', (8, 6)))
 
         if presentation_mode:
             self.plot_for_presentation(key_list=key_list, no_label=no_label)
@@ -842,8 +845,8 @@ class BaseDataAnalysis(object):
     def plot_color2D(self, pfunc, pdict, axs):
         plot_xvals = pdict['xvals']
         plot_yvals = pdict['yvals']
-        plot_cbar = pdict.get('plotcbar', True)
-        plot_cmap = pdict.get('cmap', 'YlGn')
+        plot_cbar = pdict.get('plotcbar', False)
+        plot_cmap = pdict.get('cmap', 'YlGn_r')
         plot_zrange = pdict.get('zrange', None)
         plot_yrange = pdict.get('yrange', None)
         plot_xrange = pdict.get('xrange', None)
@@ -894,10 +897,10 @@ class BaseDataAnalysis(object):
             traces = {}
             for key,vals in block.items():
                 traces[key] = vals[ii]
+            # print(traces)
             for tt in range(len(traces['zvals'])):
                 if self.verbose:
                     (print(t_vals[tt].shape) for key,t_vals in traces.items())
-                print(traces['xvals'][tt])
                 if plot_xwidth is not None:
                     xwidth = plot_xwidth[tt]
                 else:
@@ -905,9 +908,9 @@ class BaseDataAnalysis(object):
                 out = pfunc(ax=axs,
                             xwidth=xwidth,
                             clim=fig_clim, cmap=plot_cmap,
-                            xvals=traces['xvals'][tt],
-                            yvals=traces['yvals'][tt],
-                            zvals=traces['zvals'][tt].transpose(),
+                            xvals=[traces['xvals'][tt]],
+                            yvals=[traces['yvals'][tt]],
+                            zvals=[traces['zvals'][tt].transpose()],
                             transpose=plot_transpose,
                             normalize=plot_normalize)
 
@@ -937,10 +940,24 @@ class BaseDataAnalysis(object):
 
         if plot_yrange is None:
             if plot_xwidth is not None:
-                ymin, ymax = min([min(yvals[0])
-                                  for tt, yvals in enumerate(plot_yvals)]), \
-                    max([max(yvals[0])
-                         for tt, yvals in enumerate(plot_yvals)])
+
+                ymin, ymax = [], []
+                for ytraces in block['yvals']:
+                    ymin_trace, ymax_trace = [], []
+                    for yvals in ytraces:
+                        ymin_trace.append(min(yvals))
+                        ymax_trace.append(max(yvals))
+                    ymin.append(min(ymin_trace))
+                    ymax.append(max(ymax_trace))
+                ymin = min(ymin)
+                ymax = max(ymax)
+                #     print(ytraces)
+                #     break
+                # # print(block['yvals'])
+                # ymin, ymax = min([min(yvals[0])
+                #                   for tt, yvals in enumerate(plot_yvals)]), \
+                #     max([max(yvals[0])
+                #          for tt, yvals in enumerate(plot_yvals)])
 
             else:
                 ymin, ymax = plot_yvals.min()-plot_yvals_step / \
