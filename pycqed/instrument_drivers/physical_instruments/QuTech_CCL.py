@@ -406,7 +406,7 @@ class CCL(SCPI):
         intarray.append(0x10000000)
 
         if len(intarray) > MAX_NUM_INSN:
-            log.warning("Failed to upload instructions: program length ({})"
+            raise OverflowError("Failed to upload instructions: program length ({})"
                 " exceeds allowed maximum value ({}).".format(len(intarray),
                     MAX_NUM_INSN))
             return

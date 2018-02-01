@@ -1586,7 +1586,7 @@ class CCLight_Transmon(Qubit):
         ad_func_pars = {'adaptive_function': cma.fmin,
                         'x0': initial_values,
                         'sigma0': 1,
-                        'noise_handler': cma.NoiseHandler(len(initial_values)),
+                        # 'noise_handler': cma.NoiseHandler(len(initial_values)),
                         'minimize': False,
                         'options': {'cma_stds': initial_steps}}
 
