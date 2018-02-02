@@ -391,21 +391,18 @@ class Element:
                                                       iir_filters[1], wfs[c])
 
             # truncate all values that are out of bounds
-            offset = self.pulsar.get('{}_offset'.format(c))
             amp = self.pulsar.get('{}_amp'.format(c))
-            hi = offset + amp
-            lo = offset - amp
             if self.pulsar.get('{}_type'.format(c)) == 'analog':
-                if np.max(wfs[c]) > hi:
+                if np.max(wfs[c]) > amp:
                     logging.warning('Clipping waveform {} > {}'.format(
-                                    max(wfs[c]), hi))
-                if np.min(wfs[c]) < lo:
+                                    np.max(wfs[c]), amp))
+                if np.min(wfs[c]) < -amp:
                     logging.warning('Clipping waveform {} < {}'.format(
-                                    min(wfs[c]), lo))
-                np.clip(wfs[c], lo, hi, out=wfs[c])
+                                    np.min(wfs[c]), -amp))
+                np.clip(wfs[c], -amp, amp, out=wfs[c])
             elif self.pulsar.get('{}_type'.format(c)) == 'marker':
-                wfs[c][wfs[c] > offset] = hi
-                wfs[c][wfs[c] <= offset] = offset
+                wfs[c][wfs[c] > 0] = amp
+                wfs[c][wfs[c] <= 0] = 0
         return tvals, wfs
 
     def normalized_waveforms(self, channels=None):
@@ -416,16 +413,13 @@ class Element:
         tvals, wfs = self.waveforms(channels)
 
         for wf in wfs:
-            offset = self.pulsar.get('{}_offset'.format(wf))
             amp = self.pulsar.get('{}_amp'.format(wf))
-            hi = offset + amp
-            lo = offset - amp
 
             if self.pulsar.get('{}_type'.format(wf)) == 'analog':
-                wfs[wf] = (2.0*wfs[wf] - hi - lo) / (hi - lo)
+                wfs[wf] = wfs[wf] / amp
             if self.pulsar.get('{}_type'.format(wf)) == 'marker':
-                wfs[wf][wfs[wf] > offset] = 1
-                wfs[wf][wfs[wf] <= offset] = 0
+                wfs[wf][wfs[wf] > 0] = 1
+                wfs[wf][wfs[wf] <= 0] = 0
         return tvals, wfs
 
     # testing and inspection

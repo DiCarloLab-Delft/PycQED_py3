@@ -42,7 +42,7 @@ class UHFQCPulsar:
     """
     _supportedAWGtypes = (UHFQC,)
 
-    def _create_parameters(self, name, id, obj):
+    def _create_parameters(self, name, id, obj, options):
 
         if not isinstance(obj, UHFQCPulsar._supportedAWGtypes):
             return super()._create_parameters(name, id, obj)
@@ -54,6 +54,8 @@ class UHFQCPulsar:
                            get_cmd=lambda _=id: _)
         self.add_parameter('{}_AWG'.format(name),
                            get_cmd=lambda _=obj.name: _)
+        self.add_parameter('{}_options'.format(name),
+                           get_cmd=lambda _=options.copy(): _)
         self.add_parameter('{}_type'.format(name),
                            get_cmd=lambda: 'analog')
         self.add_parameter('{}_granularity'.format(name),
@@ -233,7 +235,7 @@ class HDAWG8Pulsar:
     """
     _supportedAWGtypes = (ZI_HDAWG8, VirtualAWG8, )
 
-    def _create_parameters(self, name, id, obj):
+    def _create_parameters(self, name, id, obj, options):
 
         if not isinstance(obj, HDAWG8Pulsar._supportedAWGtypes):
             return super()._create_parameters(name, id, obj)
@@ -247,6 +249,8 @@ class HDAWG8Pulsar:
                            get_cmd=lambda _=id: _)
         self.add_parameter('{}_AWG'.format(name),
                            get_cmd=lambda _=obj.name: _)
+        self.add_parameter('{}_options'.format(name),
+                           get_cmd=lambda _=options.copy(): _)
         self.add_parameter('{}_type'.format(name),
                            get_cmd=lambda: 'analog')
         self.add_parameter('{}_granularity'.format(name),
@@ -487,6 +491,9 @@ class AWG5014Pulsar:
         grps = list(grps)
         grps.sort()
 
+        prev_offsets = {ch: obj.get('{}_DC_out'.format(ch)) for ch in
+                        ['ch1', 'ch2', 'ch3', 'ch4']}
+
         # create a packed waveform for each element for each channel group
         # in the sequence0
         packed_waveforms = {}
@@ -602,6 +609,18 @@ class AWG5014Pulsar:
 
         self._AWG5014_activate_channels(grps, obj.name)
 
+        hardware_offsets = False
+        for grp in grps:
+            cname = self._id_channel(grp, obj.name)
+            options = self.get('{}_options'.format(cname))
+            offset_mode = options.get('offset_mode', 'software')
+            if offset_mode == 'hardware':
+                hardware_offsets = True
+        if hardware_offsets:
+            obj.DC_output(1)
+        else:
+            obj.DC_output(0)
+
         _t = time.time() - _t0
         print(" finished in {:.2f} seconds.".format(_t))
         return awg_file
@@ -617,9 +636,11 @@ class AWG5014Pulsar:
             return super()._clock(obj, cid)
         return obj.clock_freq()
 
-    def _create_parameters(self, name, id, obj):
+    def _create_parameters(self, name, id, obj, options):
         if not isinstance(obj, AWG5014Pulsar._supportedAWGtypes):
-            return super()._create_parameters(name, id, obj)
+            return super()._create_parameters(name, id, obj, options)
+
+        offset_mode = options.get('offset_mode', 'software')
 
         if id not in ['ch1', 'ch1_m1', 'ch1_m2',
                       'ch2', 'ch2_m1', 'ch2_m2',
@@ -631,6 +652,8 @@ class AWG5014Pulsar:
                            get_cmd=lambda _=id: _)
         self.add_parameter('{}_AWG'.format(name),
                            get_cmd=lambda _=obj.name: _)
+        self.add_parameter('{}_options'.format(name),
+                           get_cmd=lambda _=options.copy(): _)
         self.add_parameter('{}_delay'.format(name), initial_value=0,
                            label='{} delay'.format(name), unit='s',
                            parameter_class=ManualParameter,
@@ -652,9 +675,11 @@ class AWG5014Pulsar:
                                get_cmd=lambda: 'analog')
             self.add_parameter('{}_offset'.format(name),
                                label='{} offset'.format(name), unit='V',
-                               set_cmd=self._AWG5014_setter(obj, id, 'offset'),
-                               get_cmd=self._AWG5014_getter(obj, id, 'offset'),
-                               vals=vals.Numbers(-.1, .1))
+                               set_cmd=self._AWG5014_setter(obj, id, 'offset',
+                                                            offset_mode),
+                               get_cmd=self._AWG5014_getter(obj, id, 'offset',
+                                                            offset_mode),
+                               vals=vals.Numbers())
             self.add_parameter('{}_amp'.format(name), initial_value=1,
                                label='{} amplitude'.format(name), unit='V',
                                set_cmd=self._AWG5014_setter(obj, id, 'amp'),
@@ -698,11 +723,18 @@ class AWG5014Pulsar:
                            parameter_class=ManualParameter)
 
     @staticmethod
-    def _AWG5014_setter(obj, id, par):
+    def _AWG5014_setter(obj, id, par, offset_mode=None):
         if id in ['ch1', 'ch2', 'ch3', 'ch4']:
             if par == 'offset':
-                def s(val):
-                    obj.set('{}_offset'.format(id), val)
+                if offset_mode == 'software':
+                    def s(val):
+                        obj.set('{}_offset'.format(id), val)
+                elif offset_mode == 'hardware':
+                    def s(val):
+                        obj.set('{}_DC_out'.format(id), val)
+                else:
+                    raise ValueError('Invalid offset mode for AWG5014: '
+                                     '{}'.format(offset_mode))
             elif par == 'amp':
                 def s(val):
                     obj.set('{}_amp'.format(id), 2*val)
@@ -724,11 +756,18 @@ class AWG5014Pulsar:
         return s
 
     @staticmethod
-    def _AWG5014_getter(obj, id, par):
+    def _AWG5014_getter(obj, id, par, offset_mode=None):
         if id in ['ch1', 'ch2', 'ch3', 'ch4']:
             if par == 'offset':
-                def g():
-                    return obj.get('{}_offset'.format(id))
+                if offset_mode == 'software':
+                    def g():
+                        return obj.get('{}_offset'.format(id))
+                elif offset_mode == 'hardware':
+                    def g():
+                        return obj.get('{}_DC_out'.format(id))
+                else:
+                    raise ValueError('Invalid offset mode for AWG5014: '
+                                     '{}'.format(offset_mode))
             elif par == 'amp':
                 def g():
                     return obj.get('{}_amp'.format(id))/2
@@ -777,13 +816,22 @@ class AWG5014Pulsar:
         for channel in self.channels:
             if self.get('{}_AWG'.format(channel)) != AWG:
                 continue
+            options = self.get('{}_options'.format(channel))
+            offset_mode = options.get('offset_mode', 'software')
             cid = self.get('{}_id'.format(channel))
             amp = self.get('{}_amp'.format(channel)) * 2
             off = self.get('{}_offset'.format(channel))
             if cid in ['ch1', 'ch2', 'ch3', 'ch4']:
                 channel_cfg['ANALOG_METHOD_' + cid[2]] = 1
                 channel_cfg['ANALOG_AMPLITUDE_' + cid[2]] = amp
-                channel_cfg['ANALOG_OFFSET_' + cid[2]] = off
+                if offset_mode == 'software':
+                    channel_cfg['ANALOG_OFFSET_' + cid[2]] = off
+                    channel_cfg['DC_OUTPUT_LEVEL_' + cid[2]] = 0
+                    channel_cfg['EXTERNAL_ADD_' + cid[2]] = 0
+                else:
+                    channel_cfg['ANALOG_OFFSET_' + cid[2]] = 0
+                    channel_cfg['DC_OUTPUT_LEVEL_' + cid[2]] = off
+                    channel_cfg['EXTERNAL_ADD_' + cid[2]] = 1
             else:
                 channel_cfg['MARKER1_METHOD_' + cid[2]] = 2
                 channel_cfg['MARKER2_METHOD_' + cid[2]] = 2
@@ -847,7 +895,7 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
         self._clock_prequeried_state = False
 
     # channel handling
-    def define_channel(self, name, id, AWG=None):
+    def define_channel(self, name, id, AWG=None, options=None):
         """
         The AWG object must be created before creating channels for that AWG
 
@@ -858,7 +906,11 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
                   ch#(_m#) with # a number and the part in () optional.
                   For UHFQC must be 'ch1' or 'ch2'.
             AWG:  name of the AWG this channel is on
+            options: extra options for this channel.
         """
+        if options is None:
+            options = {}
+
         if AWG is None:
             AWG = self.default_AWG()
 
@@ -875,7 +927,7 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
         obj = self.AWG_obj(AWG=AWG)
         fail = None
         try:
-            super()._create_parameters(name, id, obj)
+            super()._create_parameters(name, id, obj, options)
         except AttributeError as e:
             fail = e
         if fail is not None:

@@ -1567,34 +1567,29 @@ def Ramsey_with_flux_pulse_meas_seq(thetas, qb, X90_separation, verbose=False,
 
     pulses = get_pulse_dict_from_pars(pulse_pars)
     flux_pulse = operation_dict["flux "+qb_name]
+    flux_pulse['refpoint'] = 'center'
     X90_2 = deepcopy(pulses['X90'])
-    X90_2['pulse_delay'] = X90_separation
+    X90_2['pulse_delay'] = X90_separation - flux_pulse['pulse_delay']
     X90_2['refpoint'] = 'start'
 
-    flux_pulse_delay_hack = - (1.5*X90_2['sigma']*X90_2['nr_sigma']
-                               +X90_separation + RO_pars['length'])
-    if flux_pulse['pulse_type'] == 'GaussFluxPulse':
-        flux_pulse_delay_hack -= flux_pulse['buffer']
-    flux_pulse['pulse_delay'] += flux_pulse_delay_hack
-
-    if ('CZ_corr ' + qb.name) not in operation_dict.keys():
-        operation_dict['CZ_corr ' + qb.name] = deepcopy(operation_dict['Z180 ' + qb.name])
-        operation_dict['CZ_corr ' + qb.name]['refpoint'] = 'end'
-
-    if flux_pulse['amplitude'] != 0:
-        operation_dict['CZ_corr ' + qb.name]['phase'] = operation_dict['CZ ' + qb.name]['dynamic_phase']
-    else:
-        operation_dict['CZ_corr ' + qb.name]['phase'] = 0
+    #
+    # if ('CZ_corr ' + qb.name) not in operation_dict.keys():
+    #     operation_dict['CZ_corr ' + qb.name] = deepcopy(operation_dict['Z180 ' + qb.name])
+    #     operation_dict['CZ_corr ' + qb.name]['refpoint'] = 'end'
+    #
+    # if flux_pulse['amplitude'] != 0:
+    #     operation_dict['CZ_corr ' + qb.name]['phase'] = operation_dict['CZ ' + qb.name]['dynamic_phase']
+    # else:
+    #     operation_dict['CZ_corr ' + qb.name]['phase'] = 0
 
     for i, theta in enumerate(thetas):
 
         X90_2['phase'] = theta*180/np.pi
         # incomplete fix later!!!
         el = multi_pulse_elt(i, station,
-                             [pulses['X90'], X90_2,
+                             [pulses['X90'], flux_pulse,  X90_2,
                              # [pulses['X90'], operation_dict['CZ_corr ' + qb.name], X90_2,
-                              RO_pars,
-                              flux_pulse])
+                              RO_pars])
         if distorted is True:
             if distortion_dict is not None:
                 el = fluxpulse_predistortion.distort_qudev(el,distortion_dict)

@@ -14,6 +14,7 @@ from pycqed.measurement.waveform_control import sequence
 from qcodes.instrument.parameter import _BaseParameter
 from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
 import pycqed.measurement.pulse_sequences.standard_elements as st_elts
+import pycqed.measurement.pulse_sequences.calibration_elements as cal_elts
 
 class Detector_Function(object):
 
@@ -2240,46 +2241,17 @@ class UHFQC_mixer_skewness_det(UHFQC_integrated_average_detector):
         self.RO_trigger_separation = RO_trigger_separation
         self.RO_trigger_channel = RO_trigger_channel
 
-
     def acquire_data_point(self):
         if self.verbose:
             print('alpha: {:.3f}'.format(self.alpha()))
             print('phi_skew: {:.3f}'.format(self.phi_skew()))
-        self.generate_awg_seq(self.alpha(), self.phi_skew(), self.f_mod)
+        cal_elts.mixer_calibration_sequence(
+            self.RO_trigger_separation, self.amplitude, self.RO_trigger_channel,
+            self.pulseIch, self.pulseQch, f_pulse_mod=self.f_mod,
+            phi_skew=self.phi_skew(), alpha=self.alpha()
+        )
 
         return super().acquire_data_point()
-
-
-    def generate_awg_seq(self, alpha, phi_skew, f_mod):
-        RO_trigger = {'pulse_type': 'SquarePulse',
-                      'channel': self.RO_trigger_channel,
-                      'length': 20e-9,
-                      'amplitude': 1.,
-                      'pulse_delay': 0}
-        cos_pulse = {'pulse_type': 'CosPulse',
-                     'channel': self.pulseIch,
-                     'frequency': f_mod,
-                     'length': self.RO_trigger_separation,
-                     'phase': phi_skew,
-                     'amplitude': self.amplitude * alpha,
-                     'pulse_delay': 0,
-                     'refpoint': 'simultaneous'}
-        sin_pulse = {'pulse_type': 'CosPulse',
-                     'channel': self.pulseQch,
-                     'frequency': f_mod,
-                     'length': self.RO_trigger_separation,
-                     'phase': 90,
-                     'amplitude': self.amplitude,
-                     'pulse_delay': 0,
-                     'refpoint': 'simultaneous'}
-
-        el = st_elts.multi_pulse_elt(0, self.station,
-                                     [RO_trigger, cos_pulse, sin_pulse],
-                                     trigger=False)
-        seq = sequence.Sequence('Sideband_modulation_seq')
-        seq.append(name='SSB_modulation_el', wfname=el.name, trigger_wait=False)
-        self.station.pulsar.program_awgs(seq, el, channels=
-            [self.pulseIch, self.pulseQch, self.RO_trigger_channel])
 
     def prepare(self, **kw):
         super().prepare(**kw)

@@ -430,8 +430,10 @@ class MeasurementAnalysis(object):
                     par_group.attrs.create(name=par_name,data=par_val)
 
     def run_default_analysis(self, TwoD=False, close_file=True,
-                             show=False, log=False, transpose=False, **kw):
-
+                             show=False, transpose=False,
+                             plot_args=None, **kw):
+        if plot_args is None:
+            plot_args = {}
         if TwoD is False:
             self.get_naming_and_values()
             self.sweep_points = kw.pop('sweep_points', self.sweep_points)
@@ -480,11 +482,12 @@ class MeasurementAnalysis(object):
 
                 self.plot_results_vs_sweepparam(x=self.sweep_points,
                                                 y=self.measured_values[i],
-                                                fig=fig, ax=ax, log=log,
+                                                fig=fig, ax=ax,
                                                 xlabel=self.sweep_name,
                                                 x_unit=self.sweep_unit[0],
                                                 ylabel=self.ylabels[i],
-                                                save=False)
+                                                save=False,
+                                                **plot_args)
                 # fig.suptitle(self.plot_title)
             fig.subplots_adjust(hspace=0.5)
             if show:
@@ -1994,12 +1997,21 @@ class Rabi_Analysis(TD_Analysis):
                 piPulse_vals = (n*np.pi+phase_fit)/(2*np.pi*freq_fit)
                 piHalfPulse_vals = (n*np.pi+np.pi/2+phase_fit)/(2*np.pi*freq_fit)
 
+                # find piHalfPulse
                 try:
                     piHalfPulse = np.min(np.take(piHalfPulse_vals,
                                                  np.where(piHalfPulse_vals>=0)))
                 except ValueError:
                     piHalfPulse = np.asarray([])
 
+                if piHalfPulse.size==0 or piHalfPulse>max(self.sweep_points):
+                    i=0
+                    while (piHalfPulse_vals[i]<min(self.sweep_points) and
+                                   i<piHalfPulse_vals.size):
+                        i+=1
+                    piHalfPulse = piHalfPulse_vals[i]
+
+                # fin piPulse
                 try:
                     if piHalfPulse.size != 0:
                         piPulse = np.min(np.take(
@@ -2010,19 +2022,14 @@ class Rabi_Analysis(TD_Analysis):
                 except ValueError:
                     piPulse = np.asarray([])
 
-                if piPulse.size==0 or piPulse>max(self.sweep_points):
+                if piPulse.size==0: #or piPulse>max(self.sweep_points):
                     i=0
                     while (piPulse_vals[i]<min(self.sweep_points) and
                                    i<piPulse_vals.size):
                         i+=1
                     piPulse = piPulse_vals[i]
 
-                if piHalfPulse.size==0 or piHalfPulse>max(self.sweep_points):
-                    i=0
-                    while (piHalfPulse_vals[i]<min(self.sweep_points) and
-                                   i<piHalfPulse_vals.size):
-                        i+=1
-                    piHalfPulse = piHalfPulse_vals[i]
+
                 # piPulse = 1/(2*freq_fit) - phase_fit/(2*np.pi*freq_fit)
                 # piHalfPulse = 1/(4*freq_fit) - phase_fit/(2*np.pi*freq_fit)
 

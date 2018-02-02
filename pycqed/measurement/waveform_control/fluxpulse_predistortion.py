@@ -23,6 +23,10 @@ def import_iir(filename):
     '''
     IIRfilterList = np.loadtxt(filename,
                                delimiter=',')
+
+    if len(IIRfilterList.shape) == 1:
+        IIRfilterList = np.reshape(IIRfilterList,(1,len(IIRfilterList)))
+
     aIIRfilterList = np.transpose(np.vstack((np.ones(len(IIRfilterList)),
                                              -IIRfilterList[:,0])))
     bIIRfilterList = IIRfilterList[:,1:]
