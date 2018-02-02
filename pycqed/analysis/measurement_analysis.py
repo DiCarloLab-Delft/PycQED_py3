@@ -4063,7 +4063,7 @@ class T1_Analysis(TD_Analysis):
 
             best_vals = self.fit_res.best_values
             t = np.linspace(self.sweep_points[0],
-                            self.sweep_points[-self.NoCalPoints], 1000)
+                            self.sweep_points[-self.NoCalPoints-1], 1000)
 
             y = fit_mods.ExpDecayFunc(
                 t, tau=best_vals['tau'],

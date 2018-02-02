@@ -789,7 +789,7 @@ class QuDev_transmon(Qubit):
         else:
             sweep_points = qscales
 
-        MC.set_sweep_function(awg_swf.QScale(qscales=qscales,
+        MC.set_sweep_function(awg_swf.QScale(
                 pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(),
                 upload=upload, cal_points=cal_points))
         MC.set_sweep_points(sweep_points)
@@ -841,7 +841,7 @@ class QuDev_transmon(Qubit):
             sweep_points = qscales
 
         MC.set_sweep_function(awg_swf.QScale_2nd_exc(
-            qscales=qscales,
+            qscales=sweep_points,
             pulse_pars=self.get_drive_pars(),
             pulse_pars_2nd=self.get_ef_drive_pars(),
             RO_pars=self.get_RO_pars(),

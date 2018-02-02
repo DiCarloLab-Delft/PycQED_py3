@@ -1236,7 +1236,7 @@ class Motzoi_XY(swf.Hard_Sweep):
 
 class QScale(swf.Hard_Sweep):
 
-    def __init__(self, qscales, pulse_pars, RO_pars, upload=True,
+    def __init__(self, pulse_pars, RO_pars, upload=True,
                  cal_points=True):
         '''
         Measures 3 number of points per QScale parameter value specified
