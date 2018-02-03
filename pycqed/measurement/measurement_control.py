@@ -386,18 +386,25 @@ class MeasurementControl(Instrument):
             # is either expensive (e.g., loading a waveform) or has adverse
             # effects (e.g., phase scrambling when setting a MW frequency.
 
-            swp_pt = x[::-1][i]
 
+            # x[::-1] changes the order in which the parameters are set, so
+            # it is first the outer sweep point and then the inner.This
+            # is generally not important except for specifics: f.i. the phase
+            # of an agilent generator is reset to 0 when the frequency is set.
+            swp_pt = x[::-1][i]
+            # The value that was actually set. Returned by the sweep
+            # function if known.
+            set_val = None
             if self.iteration == 0:
                 # always set the first point
-                sweep_function.set_parameter(swp_pt)
+                set_val = sweep_function.set_parameter(swp_pt)
             else:
                 # start_idx -1 refers to the last written value
                 prev_swp_pt = self.last_sweep_pts[::-1][i]
                 if swp_pt != prev_swp_pt:
                     # only set if not equal to previous point
                     try:
-                        sweep_function.set_parameter(swp_pt)
+                        set_val = sweep_function.set_parameter(swp_pt)
                     except ValueError as e:
                         if self.cfg_clipping_mode():
                             logging.warning(
@@ -405,10 +412,13 @@ class MeasurementControl(Instrument):
                             logging.warning(e)
                         else:
                             raise e
-            # x[::-1] changes the order in which the parameters are set, so
-            # it is first the outer sweep point and then the inner.This
-            # is generally not important except for specifics: f.i. the phase
-            # of an agilent generator is reset to 0 when the frequency is set.
+                if isinstance(set_val, float):
+                    # The Value in x is overwritten by the value that the
+                    # sweep function returns. This allows saving the value
+                    # that was actually set rather than the one that was
+                    # intended. This does require custom support from
+                    # a sweep function.
+                    x[-i] = set_val
 
         # used for next iteration
         self.last_sweep_pts = x
@@ -422,9 +432,11 @@ class MeasurementControl(Instrument):
                             datasetshape[1])
         self.dset.resize(new_datasetshape)
         new_data = np.append(x, vals)
+
         old_vals = self.dset[start_idx:stop_idx, :]
         new_vals = ((new_data + old_vals*self.soft_iteration) /
                     (1+self.soft_iteration))
+
         self.dset[start_idx:stop_idx, :] = new_vals
         # update plotmon
         self.check_keyboard_interrupt()
