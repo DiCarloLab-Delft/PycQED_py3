@@ -522,7 +522,7 @@ class CZ_1QPhaseCal_Analysis(ba.BaseDataAnalysis):
         return self.proc_data_dict['zero_phase_diff_intersect']
 
 
-class Oscillation_Analysis(ma2.BaseDataAnalysis):
+class Oscillation_Analysis(ba.BaseDataAnalysis):
     """
     Very basic analysis to determine the phase of a single oscillation
     that has an assumed period of 360 degrees.

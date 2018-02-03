@@ -819,7 +819,7 @@ class Dummy_Detector_Soft(Soft_Detector):
         self.detector_control = 'soft'
         self.name = 'Dummy_Detector_Soft'
         self.value_names = ['I', 'Q']
-        self.value_units = ['mV', 'mV']
+        self.value_units = ['V', 'V']
         self.i = 0
         # self.x can be used to set x value externally
         self.x = None
@@ -1345,7 +1345,7 @@ class UHFQC_input_average_detector(Hard_Detector):
         data_raw = self.UHFQC.acquisition_poll(samples=self.nr_sweep_points,
                                                arm=False, acquisition_time=0.01)
         data = np.array([data_raw[key]
-                         for key in sorted(data_raw.keys())]) 
+                         for key in sorted(data_raw.keys())])
         # IMPORTANT: No re-scaling factor needed for input average mode as the UHFQC returns volts
         # Verified January 2018 by Xavi
 
@@ -1458,10 +1458,10 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         """
         super().__init__()
         self.UHFQC = UHFQC
-        #if nr_averages # is not a powe of 2: 
-        
+        #if nr_averages # is not a powe of 2:
+
         #    raise ValueError('Some descriptive message {}'.format(nr_averages))
-        # if integration_length > some value: 
+        # if integration_length > some value:
         #     raise ValueError
 
         self.name = '{}_UHFQC_integrated_average'.format(result_logging_mode)
@@ -1471,9 +1471,9 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             self.value_names[i] = '{} w{}'.format(result_logging_mode,
                                                   channel)
         if result_logging_mode == 'raw':
-            # Units are only valid when using SSB or DSB demodulation. 
-            # value corrsponds to the peak voltage of a cosine with the 
-            # demodulation frequency. 
+            # Units are only valid when using SSB or DSB demodulation.
+            # value corrsponds to the peak voltage of a cosine with the
+            # demodulation frequency.
             self.value_units = ['Vpeak']*len(self.channels)
             self.scaling_factor = 1/(1.8e9*integration_length*nr_averages)
         elif result_logging_mode == 'lin_trans':

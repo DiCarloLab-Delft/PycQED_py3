@@ -416,6 +416,8 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int,
     k.gate('wait', [qubit_idx], buffer_nanoseconds2)
     k.gate('rx180', qubit_idx)
     k.measure(qubit_idx)
+    k.measure(qubit_idx_spec)
+    k.gate("wait", [qubit_idx, qubit_idx_spec], 0)
     p.add_kernel(k)
 
     with suppress_stdout():
