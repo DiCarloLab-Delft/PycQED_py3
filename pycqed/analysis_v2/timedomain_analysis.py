@@ -522,6 +522,81 @@ class CZ_1QPhaseCal_Analysis(ba.BaseDataAnalysis):
         return self.proc_data_dict['zero_phase_diff_intersect']
 
 
+class Oscillation_Analysis(ba.BaseDataAnalysis):
+    """
+    Very basic analysis to determine the phase of a single oscillation
+    that has an assumed period of 360 degrees.
+    """
+    def __init__(self, t_start: str=None, t_stop: str=None,
+                 data_file_path: str=None,
+                 label: str='',
+                 options_dict: dict=None, extract_only: bool=False,
+                 do_fitting: bool=True, auto=True):
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         extract_only=extract_only, do_fitting=do_fitting)
+        self.single_timestamp = False
+
+        self.params_dict = {'xlabel': 'sweep_name',
+                            'xunit': 'sweep_unit',
+                            'xvals': 'sweep_points',
+                            'measurementstring': 'measurementstring',
+                            'value_names': 'value_names',
+                            'value_units': 'value_units',
+                            'measured_values': 'measured_values'}
+
+        self.numeric_params = []
+        if auto:
+            self.run_analysis()
+
+    def process_data(self):
+        self.proc_data_dict = OrderedDict()
+        idx = 1
+
+        self.proc_data_dict['yvals'] = list(self.raw_data_dict['measured_values_ord_dict'].values())[idx][0]
+        self.proc_data_dict['ylabel'] = self.raw_data_dict['value_names'][0][idx]
+        self.proc_data_dict['yunit'] = self.raw_data_dict['value_units'][0][idx]
+
+    def prepare_fitting(self):
+        self.fit_dicts = OrderedDict()
+        cos_mod = lmfit.Model(fit_mods.CosFunc)
+        cos_mod.guess = fit_mods.Cos_guess.__get__(cos_mod, cos_mod.__class__)
+        self.fit_dicts['cos_fit'] = {
+            'model': cos_mod,
+            'guess_dict': {'frequency': {'value': 1/360, 'vary': False}},
+            'fit_xvals': {'t': self.raw_data_dict['xvals'][0]},
+            'fit_yvals': {'data': self.proc_data_dict['yvals']}}
+
+    def analyze_fit_results(self):
+        fr = self.fit_res['cos_fit'].best_values
+        self.proc_data_dict['phi'] =  np.rad2deg(fr['phase'])
+
+
+    def prepare_plots(self):
+        self.plot_dicts['main'] = {
+            'plotfn': self.plot_line,
+            'xvals': self.raw_data_dict['xvals'][0],
+            'xlabel': self.raw_data_dict['xlabel'][0],
+            'xunit': self.raw_data_dict['xunit'][0][0],
+            'yvals': self.proc_data_dict['yvals'],
+            'ylabel': self.proc_data_dict['ylabel'],
+            'yunit': self.proc_data_dict['yunit'],
+            'title': (self.raw_data_dict['timestamps'][0] + ' \n' +
+                      self.raw_data_dict['measurementstring'][0]),
+            'do_legend': True,
+            # 'yrange': (0,1),
+            'legend_pos': 'upper right'}
+
+        if self.do_fitting:
+            self.plot_dicts['cos_fit'] = {
+                'ax_id': 'main',
+                'plotfn': self.plot_fit,
+                'fit_res': self.fit_dicts['cos_fit']['fit_res'],
+                'plot_init': self.options_dict['plot_init'],
+                'setlabel': 'Fit',
+                'do_legend': True}
 
 
 class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):

@@ -596,7 +596,6 @@ class DeviceCCL(Instrument):
                                 double_points=True)
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr())
-        d = self.int_avg_det
 
         d = self.get_correlation_detector()
         MC.set_sweep_function(s)

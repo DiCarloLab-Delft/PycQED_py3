@@ -51,6 +51,41 @@ class Soft_Sweep(Sweep_function):
 
 ##############################################################################
 
+class Elapsed_Time_Sweep(Soft_Sweep):
+    """
+    A sweep function to do a measurement periodically.
+    Set the sweep points to the times at which you want to probe the
+    detector function.
+    """
+
+    def __init__(self, sweep_control='soft',
+                 as_fast_as_possible: bool=False, **kw):
+        super().__init__()
+        self.sweep_control = sweep_control
+        self.name = 'Elapsed_Time_Sweep'
+        self.parameter_name = 'Time'
+        self.unit = 's'
+        self.as_fast_as_possible = as_fast_as_possible
+        self.time_first_set = None
+
+
+    def set_parameter(self, val):
+        if self.time_first_set is None:
+            self.time_first_set = time.time()
+            return 0
+        elapsed_time = time.time() - self.time_first_set
+        if self.as_fast_as_possible:
+            return elapsed_time
+
+        if elapsed_time > val:
+            logging.warning('Elapsed time {:.2f}s larger than desired {:2f}s'
+                            .format(elapsed_time, val))
+            return elapsed_time
+
+        while (time.time() - self.time_first_set) < val:
+            pass  # wait
+        elapsed_time = time.time() - self.time_first_set
+        return elapsed_time
 
 class Heterodyne_Frequency_Sweep(Soft_Sweep):
 

@@ -5409,7 +5409,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
             # this is the fit with a complex transmission curve WITHOUT slope
             data_amp = self.measured_values[0]
             data_angle = self.measured_values[1]
-            data_complex = data_amp*np.cos(data_angle)+1j*data_amp*np.sin(data_angle) 
+            data_complex = data_amp*np.cos(data_angle)+1j*data_amp*np.sin(data_angle)
             #np.add(self.measured_values[2], 1j*self.measured_values[3])
 
             # Initial guesses
@@ -5498,8 +5498,10 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                             xlabel=self.sweep_name,
                                             x_unit=self.sweep_unit[0],
                                             ylabel=str('S21_mag'),
-                                            y_unit=self.value_units[0], 
+                                            y_unit=self.value_units[0],
                                             save=False)
+            # ensures that amplitude plot starts at zero
+            ax.set_ylim(ymin=0.0)
 
         elif 'complex' in fitting_model:
             self.plot_complex_results(
@@ -7546,8 +7548,8 @@ class DoubleFrequency(TD_Analysis):
         ax.set_ylabel(r'$F |1\rangle$')
         ax.set_title('%s: Double Frequency analysis' % self.timestamp)
         ax.set_xlabel(r'Time ($\mu s$)')
-        ax.plot(plot_x*1e6, y, 'bo')
-        ax.plot(plot_x[:-4]*1e6, self.fit_plot, 'r-')
+        ax.plot(plot_x*1e6, y, 'o')
+        ax.plot(plot_x[:-4]*1e6, self.fit_plot, '-')
         fig.tight_layout()
         self.save_fig(fig, **kw)
         self.data_file.close()
