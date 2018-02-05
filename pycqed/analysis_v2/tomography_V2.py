@@ -1,6 +1,6 @@
 import time
 import numpy as np
-from pycqed.analysis import measurement_analysis as MA 
+from pycqed.analysis import measurement_analysis as MA
 from pycqed.analysis import ramiro_analysis as RA
 from pycqed.analysis import fitting_models as fit_mods
 import scipy as scipy
@@ -55,7 +55,7 @@ class TomoAnalysis():
         n_qubits --- default(2) the amount of qubits present in the expirement
         n_quadratures --- default(1(either I or Q)) The amount of complete measurement data sets. For example a combined IQ measurement has 2 measurement sets.
         tomo_vars  : since this tomo does not have access to the original data, the vars should be given by
-                        tomo_var_i = 1 / N_i * np.var(M_i) where i stands for the data corresponding to rotation i. 
+                        tomo_var_i = 1 / N_i * np.var(M_i) where i stands for the data corresponding to rotation i.
 
         """
         self.n_qubits = n_qubits
@@ -74,17 +74,17 @@ class TomoAnalysis():
         # generate the basis change matrix from pauli to comp and back
         A = np.zeros((self.n_states**2, self.n_states**2), dtype=complex)
         for i in range(self.n_states**2):
-            # do an orthonormal transformation. 
-            A[:,i] = np.ravel(self.basis_vector[i].full()) 
+            # do an orthonormal transformation.
+            A[:,i] = np.ravel(self.basis_vector[i].full())
         self.basis_pauli_to_comp_trafo_matrix= A / self.n_states
-        self.basis_comp_to_pauli_trafo_matrix= np.linalg.inv(A) 
+        self.basis_comp_to_pauli_trafo_matrix= np.linalg.inv(A)
         #get dims of qutip objects
         self.qt_dims = [[2 for i in range(self.n_qubits)], [2 for i in range(self.n_qubits)]]
-    if check_labels is True:
-            # prints the order of basis set corresponding to the 
-            # tomographic rotations
-            print(self.get_meas_operator_labels(n_qubits))
-            print(self.get_basis_labels(n_qubits))
+        if check_labels is True:
+                # prints the order of basis set corresponding to the
+                # tomographic rotations
+                print(self.get_meas_operator_labels(n_qubits))
+                print(self.get_basis_labels(n_qubits))
 
 
 
@@ -93,11 +93,11 @@ class TomoAnalysis():
         verbose=False):
         """
         Performs a linear tomography by simple inversion of the system of equations due to calibration points
-        TE_correction_matrix: a matrix multiplying the calibration points to correct for estimated mixture due to Thermal excitation. 
+        TE_correction_matrix: a matrix multiplying the calibration points to correct for estimated mixture due to Thermal excitation.
         """
         #some argument parsing to we allow more general input
         meas_operators = [meas_operators] if type(meas_operators) == qt.Qobj else meas_operators
-        
+
 
         #for each independent set of measurements(with their own measurement operator, calculate the coeff matrix)
         coeff_matrices = []
@@ -118,34 +118,34 @@ class TomoAnalysis():
                      dims=self.qt_dims)
         return (basis_decomposition, rho)
 
-        
+
 
     def execute_mle_T_matrix_tomo(self, measurement_operators, meas_tomo, weights_tomo =False,
                                 show_time=True, ftol=0.01, xtol=0.001, full_output=0, max_iter=100,
                                             TE_correction_matrix = None):
         """
         Performs a least squares optimization using fmin_powell in order to get the closest physically realisable state.
-    
+
         This is done by constructing a lower triangular matrix T consisting of 4 ** n qubits params
         Keyword arguments:
         measurement_operators: list of meas operators
         meas_tomo: list of n_rot measurements beloning to the measurmeent operator
         use_weights : default(False) Weighs the quadrature data by the std in the estimator of the mean
                     : since this tomo does not have access to the original data, the vars should be given by
-                        tomo_var_i = 1 / N_i * np.var(M_i) where i stands for the data corresponding to rotation i. 
+                        tomo_var_i = 1 / N_i * np.var(M_i) where i stands for the data corresponding to rotation i.
         --- arguments for scipy fmin_powel method below, see the powell documentation
         """
         # first we calculate the measurement matrices
         tstart = time.time()
 
         measurement_operators = [measurement_operators] if type(measurement_operators) == qt.Qobj else measurement_operators
-        
+
         measurement_vectors = []
         for measurement_operator in measurement_operators:
             measurement_vectors.append([m.full() for m in  self.get_measurement_vector(measurement_operator)])
         measurement_vector = np.vstack(measurement_vectors)
         # initiate with equal weights
-        self.weights = weights_tomo if weights_tomo else np.ones(len(measurement_vector)) 
+        self.weights = weights_tomo if weights_tomo else np.ones(len(measurement_vector))
         # save it in the object for use in optimization
         self.measurements_tomo = meas_tomo
         self.measurement_vector_numpy = measurement_vector
@@ -188,7 +188,7 @@ class TomoAnalysis():
 
         """
 
-        # If the tomography bins have zero counts, they not satisfy gaussian noise. If N>>1 then turning them into 1 fixes 
+        # If the tomography bins have zero counts, they not satisfy gaussian noise. If N>>1 then turning them into 1 fixes
         # convergence problems without screwing the total statistics/estimate.
         # if(np.sum(np.where(np.array(counts_tomo) == 0)) > 0):
                 # print("WARNING: Some bins contain zero counts, this violates gaussian assumptions. \n \
@@ -205,7 +205,7 @@ class TomoAnalysis():
 
         # add weights based on the total number of data points kept each run
         # N_total is a bit arbitrary but should be the average number of total counts of all runs, since in nathans code this
-        # average is estimated as a parameter. 
+        # average is estimated as a parameter.
         weights = N/float(N_total)
         #get the observables from the rotation operators and the bins kept(and their corresponding projection operators)
         measurement_vectors = []
@@ -222,7 +222,7 @@ class TomoAnalysis():
         n_estimate = rho_nathan.trace()
         # print(n_estimate)
         rho = qt.Qobj(rho_nathan / n_estimate,dims=self.qt_dims)
-        
+
         # if((np.abs(N_total - n_estimate) / N_total > 0.03)):
             # print('WARNING estimated N(%d) is not close to provided N(%d) '% (n_estimate,N_total))
 
@@ -296,7 +296,7 @@ class TomoAnalysis():
     def calibrate_measurement_operator(self, cal_meas, calibration_points=None, TE_correction_matrix=None, transform_to_pauli=False):
         """
         Calibrates the measurement operator in any basis. Assumes cal_meas are the eigenvalues of the calibration_points
-        defaults the calibration_points to be the computational basis projectors. 
+        defaults the calibration_points to be the computational basis projectors.
         If TE_correction_matrix is set, this alters the computational basis states
         """
         if calibration_points is None:
@@ -313,11 +313,11 @@ class TomoAnalysis():
         else:
             cal_probs = np.array(calibration_counts)#(calibration_counts / np.sum(calibration_counts, axis = 1, dtype=float)[:,np.newaxis])
         for probs in cal_probs.T:
-            #calibrate the measurement operator for each bin in the same way as done with average tomo. 
+            #calibrate the measurement operator for each bin in the same way as done with average tomo.
             M_bins.append(self.calibrate_measurement_operator(probs, calibration_points))
         return M_bins
 
-    
+
 
 # HELPERS
 
@@ -325,7 +325,7 @@ class TomoAnalysis():
 
     def trans_pauli_to_comp(self, rho_pauli):
         """
-        Converts a rho in the pauli basis, or pauli basis vector or Qobj of rho in pauli basis to comp basis. 
+        Converts a rho in the pauli basis, or pauli basis vector or Qobj of rho in pauli basis to comp basis.
         """
         if(rho_pauli.shape[0] == self.n_states):
             basis_decomposition = np.ravel(rho_pauli.full()) if (type(rho_pauli) ==  qt.Qobj) else np.ravel(rho_pauli)
@@ -337,7 +337,7 @@ class TomoAnalysis():
 
     def trans_comp_to_pauli(self, rho_comp):
         """
-        Converts a rho in the computational basis, or comp basis vector or Qobj of rho in computational basis to Pauli basis. 
+        Converts a rho in the computational basis, or comp basis vector or Qobj of rho in computational basis to Pauli basis.
         """
         if(rho_comp.shape[0] == self.n_states):
             basis_decomposition = np.ravel(rho_comp.full()) if (type(rho_comp) ==  qt.Qobj) else np.ravel(rho_comp)
@@ -382,9 +382,9 @@ class TomoAnalysis():
         else:
             return self.measurement_operator_labels
 
-    
+
     ###############################3
-    # MLE T Matrix functions 
+    # MLE T Matrix functions
     #
     def build_rho_from_triangular_params(self, t_params):
         # build the lower triangular matrix T
@@ -459,19 +459,19 @@ class TomoAnalysis():
 #
 # Data Generation (currently for 2 qubits only)
 #
-################################################################## 
+##################################################################
 
 def generate_tomo_data(rho, M, R, N, M_bins = None):
     """
-    Generates data for tomography. Both returns expectation values(used for average tomo) 
-    or bin counts( if you use thresholded tomo). Generates a single multinomial set of counts to get both data types. 
+    Generates data for tomography. Both returns expectation values(used for average tomo)
+    or bin counts( if you use thresholded tomo). Generates a single multinomial set of counts to get both data types.
     """
 
     #decompose the measurement operator in its spectrum
     eigenvals, eigenstates = M.eigenstates()
     if M_bins is None:
         M_bins =  comp_projectors
-    # now decompose the 
+    # now decompose the
     probs = []
     for state in eigenstates:
         #calculate probability of ending up in this state
@@ -480,7 +480,7 @@ def generate_tomo_data(rho, M, R, N, M_bins = None):
     counts = np.random.multinomial(N, probs)
     # use the simulated percentages of states found to calc voltages
     expectations =  sum((counts / float(N)) * eigenvals)
-    #calcultate bin counts via the projections of original eigenstates onto bin measurement operator. 
+    #calcultate bin counts via the projections of original eigenstates onto bin measurement operator.
     bin_counts = [sum([counts[j] * (M_bins[i] * qt.ket2dm(eigenstates[j])).tr().real
                   for j in range(len(eigenstates))])
                   for i in range(len(M_bins))]

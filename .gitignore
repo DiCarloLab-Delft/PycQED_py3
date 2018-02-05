@@ -134,4 +134,5 @@ data/*
 *.sdpa
 *.sol
 *.json
+*.dat
 .idea

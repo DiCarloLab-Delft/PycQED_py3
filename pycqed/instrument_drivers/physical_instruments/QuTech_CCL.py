@@ -406,7 +406,7 @@ class CCL(SCPI):
         intarray.append(0x10000000)
 
         if len(intarray) > MAX_NUM_INSN:
-            log.warning("Failed to upload instructions: program length ({})"
+            raise OverflowError("Failed to upload instructions: program length ({})"
                 " exceeds allowed maximum value ({}).".format(len(intarray),
                     MAX_NUM_INSN))
             return
@@ -483,6 +483,7 @@ class dummy_CCL(CCL):
 
     def __init__(self, name, **kw):
         Instrument.__init__(self, name=name, **kw)
+        self._ensure_connection = True
         self._dummy_instr = True
         self.model = name
         self.version_info = self.get_idn()

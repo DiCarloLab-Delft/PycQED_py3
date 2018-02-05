@@ -9,6 +9,7 @@ roughly split into
 - plotting tools
 
 '''
+from collections import deque
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -238,20 +239,37 @@ def butterfly_matrix_inversion(exc_coeffs, rel_coeffs):
             'eps10_1': eps10_1, 'eps11_1': eps11_1}
 
 
-def digitize(data, threshold, positive_case=True):
+def digitize(data, threshold: float, one_larger_than_threshold: bool=True,
+             zero_state: int = -1):
     '''
-    this funciton digitizes 2D arrays. When using postselection,
+    This funciton digitizes 2D arrays. When using postselection,
     first postselect if threshold for postslection is
     conservative than the threshold for digitization.
 
+    Args:
+        one_larger_than_threshold case :
+            if True returns +1 for values above threshold and (zero_state) for
+            values below threshold, the inverse if False.
+        zero_state (int) : how to note the zero_state, this should be either
+            -1 (eigenvalue) or 0 (ground state).
+
     '''
-    if positive_case:
-        data_digitized = np.asarray([[1 if d_element <= threshold else -1
+    if one_larger_than_threshold:
+        data_digitized = np.asarray([[1 if d_element >= threshold else zero_state
                                       for d_element in d_row] for d_row in data])
     else:
-        data_digitized = np.asarray([[1 if d_element >= threshold else -1
+        data_digitized = np.asarray([[1 if d_element <= threshold else zero_state
                                       for d_element in d_row] for d_row in data])
     return data_digitized
+
+
+def get_post_select_indices(thresholds, init_measurements):
+    post_select_indices = []
+    for th, in_m in zip(thresholds, init_measurements):
+        post_select_indices.append(np.where(in_m> th)[0])
+
+    post_select_indices = np.unique(np.concatenate(post_select_indices))
+    return post_select_indices
 
 
 def postselect(data, threshold, positive_case=True):
@@ -449,3 +467,23 @@ def get_outliers_bwd(x, threshold, plot_hist=False, ax=None):
 def get_outliers(x, threshold):
     return np.logical_and(get_outliers_fwd(x, threshold),
                           get_outliers_bwd(x, threshold)[::-1])
+
+
+def get_generations_by_index(generation_indices, array):
+    """
+    Given a list of indices
+    """
+    generation_indices[0]
+    generations = []
+
+    current_gen_indices = deque([0], maxlen=2)
+    for idx in generation_indices:
+        current_gen_indices.append(int(idx))
+        generations.append(array[current_gen_indices[0]: current_gen_indices[1]])
+
+    return generations
+
+def get_generation_means(generation_indices, array):
+    generations = get_generations_by_index(generation_indices, array)
+    means = [np.mean(gen) for gen in generations]
+    return means

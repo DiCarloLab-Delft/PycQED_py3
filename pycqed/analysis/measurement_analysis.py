@@ -2,6 +2,7 @@ import os
 import logging
 import numpy as np
 import pickle
+from collections import OrderedDict
 import h5py
 import matplotlib.lines as mlines
 import matplotlib
@@ -640,6 +641,15 @@ class MeasurementAnalysis(object):
 
             self.ylabels = [a+' (' + b + ')' for a, b in zip(self.value_names,
                                                              self.value_units)]
+
+            if 'optimization_result' in self.g:
+                self.optimization_result = OrderedDict({
+                    'generation': self.g['optimization_result'][:, 0],
+                    'evals':  self.g['optimization_result'][:, 1],
+                    'xfavorite':  self.g['optimization_result'][:, 2:2+len(self.parameter_names)],
+                    'stds':  self.g['optimization_result'][:, 2+len(self.parameter_names):2+2*len(self.parameter_names)],
+                    'fbest':  self.g['optimization_result'][:, -len(self.parameter_names)-1],
+                    'xbest': self.g['optimization_result'][:, -len(self.parameter_names):]})
         else:
             raise ValueError('datasaving_format "%s " not recognized'
                              % datasaving_format)
@@ -666,7 +676,6 @@ class MeasurementAnalysis(object):
         # Plot:
         ax.plot(x, y, marker, markersize=self.marker_size,
                 linewidth=self.line_width, label=label)
-
         if log:
             ax.set_yscale('log')
 
@@ -931,10 +940,6 @@ class OptimizationAnalysis(MeasurementAnalysis):
                 ['MC'].attrs['optimization_method']
         except:
             optimization_method = 'Numerical'
-            # This is because the MC is no longer an instrument and thus
-            # does not get saved, I have to re add this (MAR 1/2016)
-            logging.warning('Could not extract optimization method from' +
-                            ' data file')
 
         for i, meas_vals in enumerate(self.measured_values):
             if (not plot_all) & (i >= 1):
@@ -1199,7 +1204,9 @@ class TD_Analysis(MeasurementAnalysis):
             if self.for_ef:
                 ylabel = r'$F$ $\left(|f \rangle \right) (arb. units)$'
             else:
-                ylabel = r'$F$ $\left(|e \rangle \right) (arb. units)$'
+                # ylabel = r'$F$ $\left(|e \rangle \right) (arb. units)$'
+                ylabel = r'$F$ $|1 \rangle$'
+
             self.plot_results_vs_sweepparam(x=self.sweep_points,
                                             y=self.normalized_values,
                                             fig=self.fig, ax=self.ax,
@@ -1208,9 +1215,6 @@ class TD_Analysis(MeasurementAnalysis):
                                             ylabel=ylabel,
                                             marker='o-',
                                             save=False)
-            # self.ax.set_ylim(min(min(self.normalized_values)-.1, -.1),
-            #                   max(max(self.normalized_values)+.1, 1.1))
-
             if save_fig:
                 if not close_main_fig:
                     # Hacked in here, good idea to only show the main fig but
@@ -2144,21 +2148,25 @@ class Echo_analysis(TD_Analysis):
         self.plot_results_vs_sweepparam(x=self.sweep_points,
                                         y=self.corr_data,
                                         fig=self.fig, ax=self.ax,
-                                        xlabel=self.xlabel,
+                                        xlabel=self.parameter_names[0],
+                                        x_unit=self.parameter_units[0],
                                         ylabel=r'F$|1\rangle$',
                                         save=False,
                                         plot_title=plot_title)
 
         self.ax.plot(x_fine, self.fit_res.eval(t=x_fine), label='fit')
-        textstr = '$T_2$={:.3g}$\pm$({:.3g})s '.format(
-            self.fit_res.params['tau'].value,
-            self.fit_res.params['tau'].stderr)
+
+        scale_factor, unit = SI_prefix_and_scale_factor(
+            self.fit_res.params['tau'].value, self.parameter_units[0])
+        textstr = '$T_2$={:.3g}$\pm$({:.3g}) {} '.format(
+            self.fit_res.params['tau'].value*scale_factor,
+            self.fit_res.params['tau'].stderr*scale_factor,
+            unit)
         if show_guess:
             self.ax.plot(x_fine, self.fit_res.eval(
                 t=x_fine, **self.fit_res.init_values), label='guess')
             self.ax.legend(loc='best')
 
-        self.ax.ticklabel_format(style='sci', scilimits=(0, 0))
         self.ax.text(0.4, 0.95, textstr, transform=self.ax.transAxes,
                      fontsize=11, verticalalignment='top',
                      bbox=self.box_props)
@@ -5397,11 +5405,12 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                 f=data_x, verbose=False)
 
         elif fitting_model == 'complex':
+            # Implement slope fitting with Complex!! Xavi February 2018
             # this is the fit with a complex transmission curve WITHOUT slope
             data_amp = self.measured_values[0]
             data_angle = self.measured_values[1]
-            data_complex = np.add(
-                self.measured_values[2], 1j*self.measured_values[3])
+            data_complex = data_amp*np.cos(data_angle)+1j*data_amp*np.sin(data_angle)
+            #np.add(self.measured_values[2], 1j*self.measured_values[3])
 
             # Initial guesses
             guess_A = max(data_amp)
@@ -5488,8 +5497,11 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                             fig=fig, ax=ax,
                                             xlabel=self.sweep_name,
                                             x_unit=self.sweep_unit[0],
-                                            ylabel=str('S21_mag (arb. units)'),
+                                            ylabel=str('S21_mag'),
+                                            y_unit=self.value_units[0],
                                             save=False)
+            # ensures that amplitude plot starts at zero
+            ax.set_ylim(ymin=0.0)
 
         elif 'complex' in fitting_model:
             self.plot_complex_results(
@@ -5498,7 +5510,10 @@ class Homodyne_Analysis(MeasurementAnalysis):
             fig2, ax2 = self.default_ax()
             self.plot_results_vs_sweepparam(x=self.sweep_points, y=data_amp,
                                             fig=fig2, ax=ax2,
-                                            show=False, save=False)
+                                            show=False,  xlabel=self.sweep_name,
+                                            x_unit=self.sweep_unit[0],
+                                            ylabel=str('S21_mag'),
+                                            y_unit=self.value_units[0])
 
         elif fitting_model == 'lorentzian':
             self.plot_results_vs_sweepparam(x=self.sweep_points,
@@ -7152,10 +7167,10 @@ class butterfly_analysis(MeasurementAnalysis):
         if digitize:
             self.data_exc = dm_tools.digitize(threshold=threshold,
                                               data=self.data_exc,
-                                              positive_case=case)
+                                              one_larger_than_threshold=case)
             self.data_rel = dm_tools.digitize(threshold=threshold,
                                               data=self.data_rel,
-                                              positive_case=case)
+                                              one_larger_than_threshold=case)
         if close_file:
             self.data_file.close()
         if auto is True:
@@ -7533,8 +7548,8 @@ class DoubleFrequency(TD_Analysis):
         ax.set_ylabel(r'$F |1\rangle$')
         ax.set_title('%s: Double Frequency analysis' % self.timestamp)
         ax.set_xlabel(r'Time ($\mu s$)')
-        ax.plot(plot_x*1e6, y, 'bo')
-        ax.plot(plot_x[:-4]*1e6, self.fit_plot, 'r-')
+        ax.plot(plot_x*1e6, y, 'o')
+        ax.plot(plot_x[:-4]*1e6, self.fit_plot, '-')
         fig.tight_layout()
         self.save_fig(fig, **kw)
         self.data_file.close()

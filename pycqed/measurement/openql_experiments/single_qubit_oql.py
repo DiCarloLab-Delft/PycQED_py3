@@ -4,7 +4,7 @@ import numpy as np
 from os.path import join, dirname
 import openql.openql as ql
 from openql.openql import Program, Kernel, Platform
-
+from pycqed.utilities.general import suppress_stdout
 # from pycqed.utilities.general import mopen
 from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
 
@@ -35,7 +35,8 @@ def vsm_timing_cal_sequence(qubit_idx: int, platf_cfg: str):
     k.prepz(qubit_idx)  # to ensure enough separation in timing
     k.gate('spec', qubit_idx)
     p.add_kernel(k)
-    p.compile(verbose=False)
+    with suppress_stdout():
+        p.compile(verbose=False)
     # attribute get's added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
@@ -55,7 +56,8 @@ def CW_RO_sequence(qubit_idx: int, platf_cfg: str):
     k = Kernel("main", p=platf)
     k.measure(qubit_idx)
     p.add_kernel(k)
-    p.compile(verbose=False)
+    with suppress_stdout():
+        p.compile(verbose=False)
     # attribute get's added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
@@ -86,7 +88,8 @@ def pulsed_spec_seq(qubit_idx: int, spec_pulse_length: float,
         k.gate('spec', qubit_idx)
     k.measure(qubit_idx)
     p.add_kernel(k)
-    p.compile(verbose=False)
+    with suppress_stdout():
+        p.compile(verbose=False)
     # attribute get's added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
@@ -133,7 +136,8 @@ def flipping(qubit_idx: int, number_of_flips, platf_cfg: str,
             k.measure(qubit_idx)
         p.add_kernel(k)
 
-    p.compile(verbose=False)
+    with suppress_stdout():
+        p.compile(verbose=False)
     # attribute get's added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
@@ -184,7 +188,8 @@ def AllXY(qubit_idx: int, platf_cfg: str, double_points: bool=True):
             k.measure(qubit_idx)
             p.add_kernel(k)
 
-    p.compile(verbose=False)
+    with suppress_stdout():
+        p.compile(verbose=False)
     # attribute get's added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
@@ -222,7 +227,8 @@ def T1(times, qubit_idx: int, platf_cfg: str):
     # adding the calibration points
     add_single_qubit_cal_points(p, platf=platf, qubit_idx=qubit_idx)
 
-    p.compile(verbose=False)
+    with suppress_stdout():
+        p.compile(verbose=False)
     # attribute get's added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
@@ -260,7 +266,8 @@ def Ramsey(times, qubit_idx: int, platf_cfg: str):
     # adding the calibration points
     add_single_qubit_cal_points(p, platf=platf, qubit_idx=qubit_idx)
 
-    p.compile(verbose=False)
+    with suppress_stdout():
+        p.compile(verbose=False)
     # attribute get's added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
@@ -301,7 +308,8 @@ def echo(times, qubit_idx: int, platf_cfg: str):
     # adding the calibration points
     add_single_qubit_cal_points(p, platf=platf, qubit_idx=qubit_idx)
 
-    p.compile(verbose=False)
+    with suppress_stdout():
+        p.compile(verbose=False)
     # attribute get's added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
@@ -318,7 +326,8 @@ def single_elt_on(qubit_idx: int, platf_cfg: str):
     k.measure(qubit_idx)
     p.add_kernel(k)
 
-    p.compile(verbose=False)
+    with suppress_stdout():
+        p.compile(verbose=False)
     # attribute get's added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
@@ -326,15 +335,17 @@ def single_elt_on(qubit_idx: int, platf_cfg: str):
 
 
 
-def off_on(qubit_idx: int, pulse_comb: str, platf_cfg: str):
+def off_on(qubit_idx: int, pulse_comb: str, initialize: bool, platf_cfg: str):
     """
     Performs an 'off_on' sequence on the qubit specified.
-        off: prepz -      - RO
-        on:  prepz - x180 - RO
+        off: (RO) - prepz -      - RO
+        on:  (RO) - prepz - x180 - RO
     Args:
         qubit_idx (int) :
         pulse_comb (str): What pulses to play valid options are
             "off", "on", "off_on"
+        initialize (bool): if True does an extra initial measurement to
+            post select data.
         platf_cfg (str) : filepath of OpenQL platform config file
 
     Pulses can be optionally enabled by putting 'off', respectively 'on' in
@@ -347,12 +358,16 @@ def off_on(qubit_idx: int, pulse_comb: str, platf_cfg: str):
     if 'off' in pulse_comb.lower():
         k = Kernel("off", p=platf)
         k.prepz(qubit_idx)
+        if initialize:
+            k.measure(qubit_idx)
         k.measure(qubit_idx)
         p.add_kernel(k)
 
     if 'on' in pulse_comb.lower():
         k = Kernel("on", p=platf)
         k.prepz(qubit_idx)
+        if initialize:
+            k.measure(qubit_idx)
         k.gate('rx180', qubit_idx)
         k.measure(qubit_idx)
         p.add_kernel(k)
@@ -360,7 +375,8 @@ def off_on(qubit_idx: int, pulse_comb: str, platf_cfg: str):
     if ('on' not in pulse_comb.lower()) and ('off' not in pulse_comb.lower()):
         raise ValueError()
 
-    p.compile(verbose=False)
+    with suppress_stdout():
+        p.compile(verbose=False)
     # attribute get's added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
@@ -369,6 +385,15 @@ def off_on(qubit_idx: int, pulse_comb: str, platf_cfg: str):
 
 def butterfly(qubit_idx: int, initialize: bool, platf_cfg: str):
     """
+    Performs a 'butterfly' sequence on the qubit specified.
+        0:  prepz (RO) -      - RO - RO
+        1:  prepz (RO) - x180 - RO - RO
+
+    Args:
+        qubit_idx (int)  : index of the qubit
+        initialize (bool): if True does an extra initial measurement to
+            post select data.
+        platf_cfg (str)  : openql config used for setup.
 
     """
     platf = Platform('OpenQL_Platform', platf_cfg)
@@ -392,7 +417,8 @@ def butterfly(qubit_idx: int, initialize: bool, platf_cfg: str):
     k.measure(qubit_idx)
     p.add_kernel(k)
 
-    p.compile(verbose=False)
+    with suppress_stdout():
+        p.compile(verbose=False)
     # attribute get's added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
@@ -443,7 +469,8 @@ def RTE(qubit_idx: int, sequence_type: str, platf_cfg: str,
     k.measure(qubit_idx)
     p.add_kernel(k)
 
-    p.compile(verbose=False)
+    with suppress_stdout():
+        p.compile(verbose=False)
     # attribute get's added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
@@ -509,7 +536,8 @@ def randomized_benchmarking(qubit_idx: int, platf_cfg: str,
                     k.gate('cl_{}'.format(cl), qubit_idx)
                 k.measure(qubit_idx)
             p.add_kernel(k)
-    p.compile(verbose=False)
+    with suppress_stdout():
+        p.compile(verbose=False)
     # attribute get's added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
@@ -544,7 +572,8 @@ def motzoi_XY(qubit_idx:int, platf_cfg: str,
     k.measure(qubit_idx)
     p.add_kernel(k)
 
-    p.compile(verbose=False)
+    with suppress_stdout():
+        p.compile(verbose=False)
     # attribute get's added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
@@ -615,7 +644,8 @@ def FluxTimingCalibration(qubit_idx: int, buffer_time1, times, platf_cfg: str,
     if cal_points:
         add_single_qubit_cal_points(p, platf=platf, qubit_idx=qubit_idx)
 
-    p.compile(verbose=False)
+    with suppress_stdout():
+        p.compile(verbose=False)
     # attribute get's added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
@@ -657,7 +687,8 @@ def FluxTimingCalibration_2q(q0, q1, buffer_time1, times, platf_cfg: str):
         p.add_kernel(k)
 
 
-    p.compile(verbose=False)
+    with suppress_stdout():
+        p.compile(verbose=False)
     # attribute get's added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')

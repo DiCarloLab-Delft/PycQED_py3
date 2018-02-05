@@ -22,7 +22,8 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import datetime
 import json
 import lmfit
-
+import h5py
+from pycqed.measurement.hdf5_data import write_dict_to_hdf5
 
 class BaseDataAnalysis(object):
     """
@@ -50,6 +51,7 @@ class BaseDataAnalysis(object):
     """
 
     def __init__(self, t_start: str=None, t_stop: str=None,
+                 label: str='',
                  data_file_path: str=None,
                  options_dict: dict=None, extract_only: bool=False,
                  do_fitting: bool=False):
@@ -103,7 +105,7 @@ class BaseDataAnalysis(object):
         ################################################
         # These options determine what data to extract #
         ################################################
-        scan_label = self.options_dict.get('scan_label', '')
+        scan_label = self.options_dict.get('scan_label', label)
         if type(scan_label) is not list:
             self.labels = [scan_label]
         else:
@@ -183,6 +185,7 @@ class BaseDataAnalysis(object):
         if self.do_fitting:
             self.prepare_fitting()      # set up fit_dicts
             self.run_fitting()          # fitting to models
+            self.save_fit_results()
             self.analyze_fit_results()  # analyzing the results of the fits
 
         self.prepare_plots()   # specify default plots
@@ -389,8 +392,14 @@ class BaseDataAnalysis(object):
         if key_list == 'auto' or key_list is None:
             key_list = self.figs.keys()
         for key in key_list:
-            savename = os.path.join(savedir, savebase+key+tstag+'.'+fmt)
-            self.axs[key].figure.savefig(savename, fmt=fmt)
+            if self.presentation_mode:
+                savename = os.path.join(savedir, savebase+key+tstag+'presentation'+'.'+fmt)
+                self.axs[key].figure.savefig(savename, bbox_inches='tight', fmt=fmt)
+                savename = os.path.join(savedir, savebase+key+tstag+'presentation'+'.svg')
+                self.axs[key].figure.savefig(savename, bbox_inches='tight', fmt='svg')
+            else:
+                savename = os.path.join(savedir, savebase+key+tstag+'.'+fmt)
+                self.axs[key].figure.savefig(savename, bbox_inches='tight', fmt=fmt)
             if close_figs:
                 plt.close(self.axs[key].figure)
 
@@ -482,19 +491,54 @@ class BaseDataAnalysis(object):
                                   **fit_yvals[tt]))
             else:
                 if guess_pars is None:
-                    if guess_dict is None:
-                        guess_dict = fit_guess_fn(**fit_yvals, **fit_xvals)
-                        if isinstance(guess_dict, lmfit.Parameters):
-                            guess_pars = guess_dict
-                        else:
-                            for key, val in list(guess_dict.items()):
-                                model.set_param_hint(key, **val)
+                    if fit_guess_fn is not None:
+                        # a fit function should return lmfit parameter objects
+                        # but can also work by returning a dictionary of guesses
+                        guess_pars = fit_guess_fn(**fit_yvals, **fit_xvals)
+                        if not isinstance(guess_pars, lmfit.Parameters):
+                            for gd_key, val in list(guess_pars.items()):
+                                model.set_param_hint(gd_key, **val)
                             guess_pars = model.make_params()
+
+                        if guess_dict is not None:
+                            for gd_key, val in guess_dict.items():
+                                for attr, attr_val in val.items():
+                                    # e.g. setattr(guess_pars['frequency'], 'value', 20e6)
+                                    setattr(guess_pars[gd_key], attr, attr_val)
+                        # A guess can also be specified as a dictionary.
+                        # additionally this can be used to overwrite values
+                        # from the guess functions.
+                    else:
+                        for key, val in list(guess_dict.items()):
+                            model.set_param_hint(key, **val)
+                        guess_pars = model.make_params()
 
                 fit_dict['fit_res'] = model.fit(
                     params=guess_pars, **fit_xvals, **fit_yvals)
 
             self.fit_res[key] = fit_dict['fit_res']
+
+    def save_fit_results(self):
+        """
+        Saves the fit results
+        """
+        fn = a_tools.measurement_filename(a_tools.get_folder(self.timestamps[0]))
+        with h5py.File(fn, 'r+') as data_file:
+            try:
+                analysis_group = data_file.create_group('Analysis')
+            except ValueError:
+                # If the analysis group already exists.
+                # Delete the old group and create a new group (overwrite).
+                del data_file['Analysis']
+                analysis_group = data_file.create_group('Analysis')
+
+            # Iterate over all the fit result dicts
+            for fr_key, fit_res in self.fit_res.items():
+                fr_group = analysis_group.create_group(fr_key)
+                # TODO: convert the params object to a simple dict
+                # write_dict_to_hdf5(fit_res.params, entry_point=fr_group)
+                write_dict_to_hdf5(fit_res.best_values, entry_point=fr_group)
+
 
     def plot(self, key_list=None, axs_dict=None,
              presentation_mode=None, no_label=False):
@@ -526,14 +570,14 @@ class BaseDataAnalysis(object):
                 # This fig variable should perhaps be a different
                 # variable for each plot!!
                 # This might fix a bug.
-                self.figs[key], self.axs[key] = plt.subplots(
+                self.figs[pdict['ax_id']], self.axs[pdict['ax_id']] = plt.subplots(
                     pdict.get('numplotsy', 1), pdict.get('numplotsx', 1),
                     sharex=pdict.get('sharex', False),
                     sharey=pdict.get('sharey', False),
                     figsize=pdict.get('plotsize', None))  # (8, 6)))
 
                 # transparent background around axes for presenting data
-                self.figs[key].patch.set_alpha(0)
+                self.figs[pdict['ax_id']].patch.set_alpha(0)
 
         if presentation_mode:
             self.plot_for_presentation(key_list=key_list, no_label=no_label)
@@ -565,7 +609,7 @@ class BaseDataAnalysis(object):
             key_list = list(self.plot_dicts.keys())
         for key in key_list:
             self.plot_dicts[key]['title'] = None
-            self.axs[key].clear()
+
         self.plot(key_list=key_list, presentation_mode=False,
                   no_label=no_label)
 
@@ -587,30 +631,32 @@ class BaseDataAnalysis(object):
         dataset_label = pdict.get('setlabel', list(range(len(plot_yvals))))
         do_legend = pdict.get('do_legend', False)
 
-        plot_xleft = plot_xedges[:-1]
         plot_xwidth = (plot_xedges[1:]-plot_xedges[:-1])
+        # center is left edge + widht /2
+        plot_centers = plot_xedges[:-1] + plot_xwidth/2
 
         if plot_multiple:
             p_out = []
             for ii, this_yvals in enumerate(plot_yvals):
-                p_out.append(pfunc(plot_xleft, this_yvals, width=plot_xwidth,
+                p_out.append(pfunc(plot_centers, this_yvals, width=plot_xwidth,
                                    color=gco(ii, len(plot_yvals)-1),
                                    label='%s%s' % (
                                        dataset_desc, dataset_label[ii]),
                                    **plot_barkws))
 
         else:
-            p_out = pfunc(plot_xleft, plot_yvals, width=plot_xwidth,
+            p_out = pfunc(plot_centers, plot_yvals, width=plot_xwidth,
                           label='%s%s' % (dataset_desc, dataset_label),
                           **plot_barkws)
         if plot_xrange is None:
             xmin, xmax = plot_xedges.min(), plot_xedges.max()
         else:
             xmin, xmax = plot_xrange
-        axs.set_xlabel(plot_xlabel)
+        if plot_xlabel is not None:
+            set_xlabel(axs, plot_xlabel, plot_xunit)
+        if plot_ylabel is not None:
+            set_ylabel(axs, plot_ylabel, plot_yunit)
         axs.set_xlim(xmin, xmax)
-
-        axs.set_ylabel(plot_ylabel)
         if plot_yrange is not None:
             ymin, ymax = plot_yrange
             axs.set_ylim(ymin, ymax)
@@ -627,8 +673,6 @@ class BaseDataAnalysis(object):
         if self.tight_fig:
             axs.figure.tight_layout()
 
-        set_xlabel(axs, plot_xlabel, plot_xunit)
-        set_ylabel(axs, plot_ylabel, plot_yunit)
         pdict['handles'] = p_out
 
     def plot_line(self, pdict, axs):

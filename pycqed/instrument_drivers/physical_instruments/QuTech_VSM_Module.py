@@ -47,7 +47,9 @@ Bugs:       Probably.
 """
 
 from .SCPI import SCPI
+from qcodes.instrument.base import Instrument
 from qcodes import validators
+from qcodes.instrument.parameter import ManualParameter
 
 
 class QuTechVSMModule(SCPI):
@@ -272,3 +274,33 @@ class QuTechVSMModule(SCPI):
                                        get_parser=float,
                                        vals=validators.Numbers())
 
+
+
+class Dummy_QuTechVSMModule(QuTechVSMModule):
+
+    def __init__(self, name, nr_input_channels=4, nr_output_channels=2,
+                 **kw):
+        Instrument.__init__(self, name=name, **kw)
+
+
+        self._dummy_instr = True
+
+        self.modules = [1, 2, 3, 4, 5, 6, 7, 8]
+        self.channels = [1, 2, 3, 4]
+        self.add_parameters()
+        self._address = 'Dummy'
+        self._terminator = '\n'
+
+        self.IDN({'driver': str(self.__class__), 'model': self.name,
+                  'serial': 'Dummy', 'vendor': '', 'firmware': ''})
+        self.connect_message()
+
+    def add_parameter(self, name, parameter_class=ManualParameter,
+                      **kwargs):
+        kwargs.pop('get_cmd', 0)
+        kwargs.pop('set_cmd', 0)
+        kwargs.pop('get_parser', 0)
+        kwargs.pop('set_parser', 0)
+
+        super().add_parameter(name, parameter_class=parameter_class,
+                              **kwargs)

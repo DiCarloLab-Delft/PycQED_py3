@@ -38,9 +38,9 @@ CCL.control_store(cs_filepath)
 
 # AWG8 = ZI_HDAWG8.ZI_HDAWG8('AWG8_8003', device='dev8003')
 AWG8 = ZI_HDAWG8.ZI_HDAWG8('AWG8_8004', device='dev8004')
-#AWG8 = ZI_HDAWG8.ZI_HDAWG8('AWG8_8005', device='dev8005')
-#AWG8 = ZI_HDAWG8.ZI_HDAWG8('AWG8_8006', device='dev8006')
-# AWG8 = ZI_HDAWG8.ZI_HDAWG8('AWG8_8008', device='dev8008')
+# AWG8 = ZI_HDAWG8.ZI_HDAWG8('AWG8_8005', device='dev8005')
+# AWG8 = ZI_HDAWG8.ZI_HDAWG8('AWG8_8006', device='dev8006')
+# AWG8 = ZI_HDAWG8.ZI_HDAWG8('AWG8_8008', d/evice='dev8008')
 
 
 ##########################################
