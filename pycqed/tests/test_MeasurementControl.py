@@ -58,7 +58,7 @@ class Test_MeasurementControl(unittest.TestCase):
         self.assertEqual(dat['sweep_parameter_names'], ['pts'])
         self.assertEqual(dat['sweep_parameter_units'], ['arb. unit'])
         self.assertEqual(dat['value_names'], ['I', 'Q'])
-        self.assertEqual(dat['value_units'], ['mV', 'mV'])
+        self.assertEqual(dat['value_units'], ['V', 'V'])
 
     @unittest.skipIf(
         True,
