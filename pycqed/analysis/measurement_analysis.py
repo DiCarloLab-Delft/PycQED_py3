@@ -676,7 +676,6 @@ class MeasurementAnalysis(object):
         # Plot:
         ax.plot(x, y, marker, markersize=self.marker_size,
                 linewidth=self.line_width, label=label)
-        ax.set_ylim(ymin=0.0)
         if log:
             ax.set_yscale('log')
 
@@ -5406,6 +5405,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                 f=data_x, verbose=False)
 
         elif fitting_model == 'complex':
+            # Implement slope fitting with Complex!! Xavi February 2018
             # this is the fit with a complex transmission curve WITHOUT slope
             data_amp = self.measured_values[0]
             data_angle = self.measured_values[1]
@@ -5508,7 +5508,10 @@ class Homodyne_Analysis(MeasurementAnalysis):
             fig2, ax2 = self.default_ax()
             self.plot_results_vs_sweepparam(x=self.sweep_points, y=data_amp,
                                             fig=fig2, ax=ax2,
-                                            show=False, save=False)
+                                            show=False,  xlabel=self.sweep_name,
+                                            x_unit=self.sweep_unit[0],
+                                            ylabel=str('S21_mag'),
+                                            y_unit=self.value_units[0])
 
         elif fitting_model == 'lorentzian':
             self.plot_results_vs_sweepparam(x=self.sweep_points,
