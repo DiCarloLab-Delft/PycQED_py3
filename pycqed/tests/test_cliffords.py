@@ -87,3 +87,8 @@ class TestGateDecomposition(TestCase):
         from itertools import chain
         avg_nr_gates = len(list(chain(*gate_decomposition)))/24
         self.assertEqual(avg_nr_gates, 1.875)
+
+
+######################################################################
+# Two qubit clifford group below
+######################################################################
