@@ -1,3 +1,5 @@
+from os.path import join, dirname, abspath
+from pycqed.measurement.randomized_benchmarking.clifford_group import clifford_group_single_qubit
 from pycqed.measurement.randomized_benchmarking.clifford_decompositions \
     import(gate_decomposition)
 """
@@ -51,55 +53,53 @@ C1: element of the single qubit Clifford group
     but we follow the decomposition according to Barends et al.
 S1: element of the S1 group, a subgroup of the single qubit Clifford group
 
+S1[0] = I
+S1[1] = rY90, rX90
+S1[2] = rXm90, rYm90
+
+
 """
 
 ###################################
 # The single qubit Clifford group #
 ###################################
 
-# Sets written as physical gates in time. Left gate is applied first.
-C1 = [[]]*(24)
-# Paulis
-C1[0] = ['I']
-C1[1] = ['rX180']
-C1[2] = ['rY180']
-C1[3] = ['rY180', 'rX180']
-
-# 2pi/3 rotations
-C1[4] = ['rX90', 'rY90']
-C1[5] = ['rX90', 'rYm90']
-C1[6] = ['rXm90', 'rY90']
-C1[7] = ['rXm90', 'rYm90']
-C1[8] = ['rY90', 'rX90']
-C1[9] = ['rY90', 'rXm90']
-C1[10] = ['rYm90', 'rX90']
-C1[11] = ['rYm90', 'rXm90']
-
-# pi/2 rotations
-C1[12] = ['rX90']
-C1[13] = ['rXm90']
-C1[14] = ['rY90']
-C1[15] = ['rYm90']
-C1[16] = ['rXm90', 'rY90', 'rX90']
-C1[17] = ['rXm90', 'rYm90', 'rX90']
-
-# Hadamard-like
-C1[18] = ['rX180', 'rY90']
-C1[19] = ['rX180', 'rYm90']
-C1[20] = ['rY180', 'rY90']
-C1[21] = ['rY180', 'rYm90']
-C1[22] = ['rX90', 'rY90', 'rX90']
-C1[23] = ['rXm90', 'rY90', 'rXm90']
-
 # S1 Clifford subgroup
-S1 = [C1[0], C1[8], C1[7]]
-S1_rX90 = [C1[12], C1[22], C1[15]]
-S1_rY90 = [C1[14], C1[20], C1[17]]
+# S1 = [C1[0], C1[8], C1[7]]
+# S1_rX90 = [C1[12], C1[22], C1[15]]
+# S1_rY90 = [C1[14], C1[20], C1[17]]
+
+# 1. encoding gates/paulis
+# 2. How to multiply operators
+# 3. How to go from operator to Clifford decomposed into gates (11520 lookuptable)
+    # Lookuptable for inversion using hashes
+
+
+"""
+Encoding into the extended Pauli set
+We encode very Clifford into 3 2 bit integers
+    P = {phase_bit , \sigma_i, \sigma_j | i,j element {0, X, Y, Z}}
+    Encoding:
+        sign_bit:
+             1 + 0i -> 00
+             1j -> 01
+            -1 + 0i -> 10
+            -1j -> 11
+
+
+
+Example: rZ90 -> {
+"""
+
+
+
 
 
 class Clifford(object):
-    def __init__(self, operator):
-        self.operator = operator
+    # def __init__(self):
+    #     self.operator = operator
+    #     self.idx = None # int denoting the id of the Clifford
+    #     self.gate_decomposition = None
 
     def __mul__(self, other):
         """
@@ -110,62 +110,98 @@ class Clifford(object):
         net_op = self.operator*other.operator
         return Clifford(net_op)
 
-    def get_gates(self):
-        pass self.gates
+    def __repr__(self):
+        return '{}(idx={})'.format(self.__class__.__name__, self.idx)
 
-class Single_qubit_like(Clifford):
-    def __init__(self, idx: int):
-        assert(idx<24**2)
+    def __str__(self):
+        return str(self.gate_decomposition)
+
+class SingleQubitClifford(Clifford):
+    def __init__(self, idx: int, decomposition: str='Epstein'):
+        assert(idx<24)
         self.idx = idx
-        idx_q0 = idx%24
-        idx_q1 = idx//24
-        # FIXME: proper way of defining the operator
-        self.operator = C1_op[idx_q0], C1_op[idx_q1]
-        self.gates = C1[idx_q0], C1[idx_q1]
-
-class CNOT_like(Clifford):
-    def __init__(self, j:int):
-        assert(j<5184)
-        j1 = j % 24
-        j2 = (j // 24) % 24
-        j3 = S1_convert[(j // 576) % 3]
-        j4 = S1Y_convert[(j // 1728)]
-        self.operator = Pauli_prod([sqc1[j1],sqc2[j2],CX,sqc1[j3],sqc2[j4]])
-
-class iSWAP_like(Cliffordt):
-    def __init__(self, j:int):
-        assert(j<5184)
-        j1 = j % 24
-        j2 = (j // 24) % 24
-        j3 = S1Y_convert[(j // 576) % 3]
-        j4 = S1X_convert[(j // 1728)]
-        self.operator = Pauli_prod([sqc1[j1],sqc2[j2],iSWAP,sqc1[j3],sqc2[j4]])
-
-class SWAP_like(Clifford):
-    def __init__(self, j:int):
-        assert(j<576)
-        j1 = j % 24
-        j2 = j // 24
-        self.operator = Pauli_prod([sqc1[j1],sqc2[j2],SWAP])
+        self.pauli_transfer_matrix = clifford_group_single_qubit[idx]
+        if decomposition =='Epstein':
+            self.gate_decomposition  = gate_decomposition[idx]
 
 
+class TwoQubitClifford(Clifford):
+    def __init__(self, idx: int, decomposition: str='Epstein'):
+        assert(idx<11520)
+        self.idx = idx
+        raise NotImplemented()
+        # self.pauli_transfer_matrix = clifford_group_single_qubit[idx]
+        # if decomposition =='Epstein':
+        #     self.gate_decomposition  = gate_decomposition[idx]
 
 
-
-def C2_operator(j: int):
+def get_single_qubit_clifford_hash_table():
     """
-    Returns the pauli operator for element j of the two qubit
-    Clifford group C2.
-
-
+    Get's the single qubit clifford hash table. Requires this to be generated
+    first. To generate, execute "generate_clifford_hash_tables.py".
     """
-    if j < 576:
-        return SQ_class_operator(j)
-    elif j < 576 + 5184:
-        return CNOT_class_operator(j-576)
-    elif j< 576 + 2*5184:
-        return iSWAP_class_operator(j-576+5184)
-    elif j<11520:
-        return SWAP_class_operator(j-576+2*5184)
-    else:
-        raise ValueError('j ({}) must be smaller than {}')
+    hash_dir = join(abspath(dirname(__file__)), 'clifford_hash_tables')
+
+    with open(join(hash_dir, 'single_qubit_hash_lut.txt'),
+              'r') as f:
+        hash_table = [int(line.rstrip('\n')) for line in f]
+    return hash_table
+
+
+
+# class Single_qubit_like(Clifford):
+#     def __init__(self, idx: int):
+#         assert(idx<24**2)
+#         self.idx = idx
+#         idx_q0 = idx%24
+#         idx_q1 = idx//24
+#         # FIXME: proper way of defining the operator
+#         self.operator = C1_op[idx_q0], C1_op[idx_q1]
+#         self.gates = C1[idx_q0], C1[idx_q1]
+
+# class CNOT_like(Clifford):
+#     def __init__(self, j:int):
+#         assert(j<5184)
+#         j1 = j % 24
+#         j2 = (j // 24) % 24
+#         j3 = S1_convert[(j // 576) % 3]
+#         j4 = S1Y_convert[(j // 1728)]
+#         self.operator = Pauli_prod([sqc1[j1],sqc2[j2],CX,sqc1[j3],sqc2[j4]])
+
+# class iSWAP_like(Cliffordt):
+#     def __init__(self, j:int):
+#         assert(j<5184)
+#         j1 = j % 24
+#         j2 = (j // 24) % 24
+#         j3 = S1Y_convert[(j // 576) % 3]
+#         j4 = S1X_convert[(j // 1728)]
+#         self.operator = Pauli_prod([sqc1[j1],sqc2[j2],iSWAP,sqc1[j3],sqc2[j4]])
+
+# class SWAP_like(Clifford):
+#     def __init__(self, j:int):
+#         assert(j<576)
+#         j1 = j % 24
+#         j2 = j // 24
+#         self.operator = Pauli_prod([sqc1[j1],sqc2[j2],SWAP])
+
+
+
+
+
+# def C2_operator(j: int):
+#     """
+#     Returns the pauli operator for element j of the two qubit
+#     Clifford group C2.
+
+
+#     """
+#     if j < 576:
+#         return SQ_class_operator(j)
+#     elif j < 576 + 5184:
+#         return CNOT_class_operator(j-576)
+#     elif j< 576 + 2*5184:
+#         return iSWAP_class_operator(j-576+5184)
+#     elif j<11520:
+#         return SWAP_class_operator(j-576+2*5184)
+#     else:
+#         raise ValueError('j ({}) must be smaller than {}')

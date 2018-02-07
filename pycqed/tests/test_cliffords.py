@@ -1,5 +1,6 @@
 import numpy as np
 from unittest import TestCase
+from zlib import crc32
 
 from pycqed.measurement.randomized_benchmarking.clifford_group import(
     clifford_lookuptable, clifford_group_single_qubit)
@@ -10,6 +11,9 @@ import pycqed.measurement.randomized_benchmarking.randomized_benchmarking \
 from pycqed.measurement.randomized_benchmarking.clifford_decompositions \
     import(gate_decomposition)
 
+from pycqed.measurement.randomized_benchmarking import \
+    two_qubit_clifford_group as tqc
+from pycqed.measurement.randomized_benchmarking.generate_clifford_hash_tables import construct_clifford_lookuptable
 
 class TestLookuptable(TestCase):
     def test_unique_mapping(self):
@@ -92,3 +96,26 @@ class TestGateDecomposition(TestCase):
 ######################################################################
 # Two qubit clifford group below
 ######################################################################
+
+class TestHashedLookuptables(TestCase):
+    def test_single_qubit_hashtable_constructed(self):
+        hash_table = construct_clifford_lookuptable(tqc.SingleQubitClifford,
+                                                    np.arange(24))
+
+        for i in range(24):
+            Cl = tqc.SingleQubitClifford(i)
+            target_hash = crc32(Cl.pauli_transfer_matrix.tobytes())
+            table_idx = hash_table.index(target_hash)
+            self.assertEqual(table_idx, i)
+
+    def test_single_qubit_hashtable_file(self):
+        hash_table = tqc.get_single_qubit_clifford_hash_table()
+
+        for i in range(24):
+            Cl = tqc.SingleQubitClifford(i)
+            target_hash = crc32(Cl.pauli_transfer_matrix.tobytes())
+            table_idx = hash_table.index(target_hash)
+            self.assertEqual(table_idx, i)
+
+
+
