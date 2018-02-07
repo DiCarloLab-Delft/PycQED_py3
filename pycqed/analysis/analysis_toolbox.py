@@ -2065,8 +2065,20 @@ def get_color_list(max_num, cmap='viridis'):
     return [cmap(i) for i in np.linspace(0.0, 1.0, max_num)]
 
 
-def print_pars_table(n_ts=10,pars=None):
-    ts_list= return_last_n_timestamps(n_ts)
+def print_pars_table(n_ts=10, pars=None):
+    '''
+    Prints out a table containing the value for the indicated parameters from the last N timestamps.
+    Input:
+        n_ts (int), number of time-stamps to include in the table (rows).
+        pars (list), list spanning the parameters of interest (columns).
+
+    Every element on the list pars need to correspond to a parameter stored in the Instrument settings of the HDF5 data-files.
+    Examples:
+        pars = ['IVVI.dac1', 'IVVI.dac2', 'IVVI.dac3']
+        pars = ['Qubit.f_RO', 'Qubit.RO_acq_integration_length', 'Qubit.RO_pulse_power']
+        pars = ['Qubit.spec_pow', 'Qubit.RO_power_cw']
+    '''
+    ts_list = return_last_n_timestamps(n_ts)
     pdict = {}
     nparams = []
     for i,p in enumerate(pars):
