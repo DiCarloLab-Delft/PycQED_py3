@@ -1,7 +1,7 @@
 '''
 File:       QuTech_AWG_Module.py
 Author:     Wouter Vlothuizen, TNO/QuTech,
-            edited by Adriaan Rol
+            edited by Adriaan Rol, Gerco Versloot
 Purpose:    Instrument driver for Qutech QWG
 Usage:
 Notes:      It is possible to view the QWG log using ssh. To do this connect
@@ -131,6 +131,8 @@ class QuTech_AWG_Module(SCPI):
             offset_cmd = 'SOUR{}:VOLT:LEV:IMM:OFFS'.format(ch)
             state_cmd = 'OUTPUT{}:STATE'.format(ch)
             waveform_cmd = 'SOUR{}:WAV'.format(ch)
+            dac_temperature_cmd = 'STATus:DAC{}:TEMprature'.format(ch)
+            output_voltage_cmd = 'QUTEch:OUTPut{}:Voltage?'.format(ch)
             # Set channel first to ensure sensible sorting of pars
             # Compatibility: 5014, QWG
             self.add_parameter('ch{}_state'.format(ch),
@@ -164,6 +166,24 @@ class QuTech_AWG_Module(SCPI):
                                get_cmd=waveform_cmd+'?',
                                set_cmd=waveform_cmd+' "{}"',
                                vals=vals.Strings())
+
+            self.add_parameter('status_dac{}_temperature'.format(ch),
+                               unit='C',
+                               label=('DAC {} temperature'.format(ch)),
+                               get_cmd=dac_temperature_cmd + '?',
+                               get_parser=float,
+                               docstring='Reads the temperature of a DAC.\n' \
+                                 +'Temperature measurement interval is 10 seconds' \
+                                 +'Return:\n     float with temperature in Celsius')
+
+            self.add_parameter('output{}_voltage'.format(ch),
+                               unit='V',
+                               label=('Channel {} voltage output').format(ch),
+                               get_cmd=output_voltage_cmd + '?',
+                               get_parser=float,
+                               docstring='Reads the output voltage of a channel.\n' \
+                                 +'Measurement interval is 10 seconds' \
+                                 +'Return:\n     float in voltage')
 
         # Waveform parameters
         self.add_parameter('WlistSize',
