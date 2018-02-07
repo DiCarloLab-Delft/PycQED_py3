@@ -132,7 +132,7 @@ class QuTech_AWG_Module(SCPI):
             state_cmd = 'OUTPUT{}:STATE'.format(ch)
             waveform_cmd = 'SOUR{}:WAV'.format(ch)
             dac_temperature_cmd = 'STATus:DAC{}:TEMprature'.format(ch)
-            output_voltage_cmd = 'QUTEch:OUTPut{}:Voltage?'.format(ch)
+            output_voltage_cmd = 'QUTEch:OUTPut{}:Voltage'.format(ch)
             # Set channel first to ensure sensible sorting of pars
             # Compatibility: 5014, QWG
             self.add_parameter('ch{}_state'.format(ch),
