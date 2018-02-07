@@ -2,7 +2,7 @@ import numpy as np
 from unittest import TestCase
 
 from pycqed.measurement.randomized_benchmarking.clifford_group import(
-    clifford_lookuptable, Clifford_group)
+    clifford_lookuptable, clifford_group_single_qubit)
 
 import pycqed.measurement.randomized_benchmarking.randomized_benchmarking \
     as rb
@@ -17,14 +17,14 @@ class TestLookuptable(TestCase):
             self.assertFalse(len(row) > len(set(row)))
 
     def test_sum_of_rows(self):
-        expected_sum = np.sum(range(len(Clifford_group)))
+        expected_sum = np.sum(range(len(clifford_group_single_qubit)))
         for row in clifford_lookuptable:
             self.assertEqual(np.sum(row), expected_sum)
 
     def test_element_index_in_group(self):
         for row in clifford_lookuptable:
             for el in row:
-                self.assertTrue(el < len(Clifford_group))
+                self.assertTrue(el < len(clifford_group_single_qubit))
 
 
 class TestCalculateNetClifford(TestCase):
@@ -33,7 +33,7 @@ class TestCalculateNetClifford(TestCase):
         net_cl = rb.calculate_net_clifford(id_seq)
         self.assertEqual(net_cl, 0)
 
-        for i in range(len(Clifford_group)):
+        for i in range(len(clifford_group_single_qubit)):
             id_seq[3] = i
             net_cl = rb.calculate_net_clifford(id_seq)
             self.assertEqual(net_cl, i)
@@ -46,10 +46,10 @@ class TestCalculateNetClifford(TestCase):
 
 class TestRecoveryClifford(TestCase):
     def testInversionRandomSequence(self):
-        random_cliffords = np.random.randint(0, len(Clifford_group), 100)
+        random_cliffords = np.random.randint(0, len(clifford_group_single_qubit), 100)
         net_cl = rb.calculate_net_clifford(random_cliffords)
 
-        for des_cl in range(len(Clifford_group)):
+        for des_cl in range(len(clifford_group_single_qubit)):
             rec_cliff = rb.calculate_recovery_clifford(net_cl, des_cl)
             comb_seq = np.append(random_cliffords, rec_cliff)
 
@@ -62,7 +62,7 @@ class TestRecoveryClifford(TestCase):
 
 class TestRB_sequence(TestCase):
     def test_net_cliff(self):
-        for i in range(len(Clifford_group)):
+        for i in range(len(clifford_group_single_qubit)):
             rb_seq = rb.randomized_benchmarking_sequence(500, desired_net_cl=i)
             net_cliff = rb.calculate_net_clifford(rb_seq)
             self.assertEqual(net_cliff, i)
