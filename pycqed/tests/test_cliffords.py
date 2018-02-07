@@ -3,7 +3,8 @@ from unittest import TestCase
 from zlib import crc32
 
 from pycqed.measurement.randomized_benchmarking.clifford_group import(
-    clifford_lookuptable, clifford_group_single_qubit)
+    clifford_lookuptable, clifford_group_single_qubit,
+    X,Y,Z, H, S, S2, CZ)
 
 import pycqed.measurement.randomized_benchmarking.randomized_benchmarking \
     as rb
@@ -101,7 +102,6 @@ class TestHashedLookuptables(TestCase):
     def test_single_qubit_hashtable_constructed(self):
         hash_table = construct_clifford_lookuptable(tqc.SingleQubitClifford,
                                                     np.arange(24))
-
         for i in range(24):
             Cl = tqc.SingleQubitClifford(i)
             target_hash = crc32(Cl.pauli_transfer_matrix.tobytes())
@@ -117,5 +117,79 @@ class TestHashedLookuptables(TestCase):
             table_idx = hash_table.index(target_hash)
             self.assertEqual(table_idx, i)
 
+    def test_two_qubit_hashtable_constructed(self):
+        hash_table = construct_clifford_lookuptable(tqc.TwoQubitClifford,
+                                                    np.arange(11520))
+        for i in range(11520):
+            Cl = tqc.TwoQubitClifford(i)
+            target_hash = crc32(Cl.pauli_transfer_matrix.tobytes())
+            table_idx = hash_table.index(target_hash)
+            self.assertEqual(table_idx, i)
+
+    def test_two_qubit_hashtable_file(self):
+        hash_table = tqc.get_two_qubit_clifford_hash_table()
+        for i in range(11520):
+            Cl = tqc.TwoQubitClifford(i)
+            target_hash = crc32(Cl.pauli_transfer_matrix.tobytes())
+            table_idx = hash_table.index(target_hash)
+            self.assertEqual(table_idx, i)
+
+    def test_get_clifford_id(self):
+        for i in range(24):
+            Cl = tqc.SingleQubitClifford(i)
+            idx = tqc.get_clifford_id(Cl)
+            self.assertEqual(idx, Cl.idx)
+
+        for i in range(11520):
+            Cl = tqc.TwoQubitClifford(i)
+            idx = tqc.get_clifford_id(Cl)
+            self.assertEqual(idx, Cl.idx)
+
+class Test_CliffordGroupProperties(TestCase):
+
+    def test_single_qubit_group(self):
+        hash_table = tqc.get_single_qubit_clifford_hash_table()
+        self.assertEqual(len(hash_table), 24)
+        self.assertEqual(len(np.unique(hash_table)), 24)
+
+    def test_two_qubit_group(self):
+        hash_table = tqc.get_two_qubit_clifford_hash_table()
+        self.assertEqual(len(hash_table), 11520)
+        self.assertEqual(len(np.unique(hash_table)), 11520)
+
+
+
+
+
+
+
+class TestPauliTransferProps(TestCase):
+    """
+    Only the most basic test for the transfer matrices.
+    Intended to catch silly things like typos
+    """
+
+    def test_single_qubit_Paulis(self):
+        for pauli in [X, Y, Z]:
+            pauli2 = np.dot(pauli,pauli)
+            np.testing.assert_array_equal(pauli2,
+                                          np.eye(4, dtype=int))
+    def test_Hadamard(self):
+        np.testing.assert_array_equal(np.dot(H, H),
+                                      np.eye(4, dtype=int))
+    def test_S_gate(self):
+        np.testing.assert_array_equal(np.dot(S, S), S2)
+        np.testing.assert_array_equal(np.dot(S, S2), np.eye(4,dtype=int))
+
+    def test_cphase(self):
+            CZ2 = np.linalg.multi_dot([CZ, CZ])
+            CZ2 = np.dot(CZ, CZ)
+            np.testing.assert_array_equal(CZ2, np.eye(16, dtype=int))
+
+
+    def test_cphase(self):
+        CZ2 = np.linalg.multi_dot([CZ, CZ])
+        CZ2 = np.dot(CZ, CZ)
+        np.testing.assert_array_equal(CZ2, np.eye(16, dtype=int))
 
 
