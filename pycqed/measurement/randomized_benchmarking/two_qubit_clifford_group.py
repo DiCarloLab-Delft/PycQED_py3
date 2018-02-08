@@ -139,7 +139,7 @@ def CNOT_like_PTM(idx):
     CZ
     S1_q0 = np.kron(np.eye(4), S1[idx_2])
     S1y_q1 = np.kron(np.dot(C1[idx_3], Y90), np.eye(4))
-    return np.linalg.multi_dot([C1_q0, C1_q1, CZ, S1_q0, S1_q0])
+    return np.linalg.multi_dot([C1_q0, C1_q1, CZ, S1_q0, S1y_q1])
 
 def iSWAP_like_PTM(idx):
     """

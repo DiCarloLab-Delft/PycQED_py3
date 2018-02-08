@@ -1,4 +1,5 @@
 import numpy as np
+from unittest import expectedFailure
 from unittest import TestCase
 from zlib import crc32
 
@@ -151,6 +152,51 @@ class Test_CliffordGroupProperties(TestCase):
         hash_table = tqc.get_single_qubit_clifford_hash_table()
         self.assertEqual(len(hash_table), 24)
         self.assertEqual(len(np.unique(hash_table)), 24)
+
+    # Testing the subgroups of the Clifford group
+    def test_single_qubit_like_PTM(self):
+        hash_table = []
+        for idx in np.arange(24**2):
+            clifford = tqc.single_qubit_like_PTM(idx)
+            hash_val = crc32(clifford.tobytes())
+            hash_table.append(hash_val)
+        self.assertEqual(len(hash_table), 24**2)
+        self.assertEqual(len(np.unique(hash_table)), 24**2)
+        with self.assertRaises(AssertionError):
+            clifford = tqc.single_qubit_like_PTM(24**2+1)
+
+    def test_CNOT_like_PTM(self):
+        hash_table = []
+        for idx in np.arange(5184):
+            clifford = tqc.CNOT_like_PTM(idx)
+            hash_val = crc32(clifford.tobytes())
+            hash_table.append(hash_val)
+        self.assertEqual(len(hash_table), 5184)
+        self.assertEqual(len(np.unique(hash_table)), 5184)
+        with self.assertRaises(AssertionError):
+            clifford = tqc.CNOT_like_PTM(5184**2+1)
+
+    def test_iSWAP_like_PTM(self):
+        hash_table = []
+        for idx in np.arange(5184):
+            clifford = tqc.iSWAP_like_PTM(idx)
+            hash_val = crc32(clifford.tobytes())
+            hash_table.append(hash_val)
+        self.assertEqual(len(hash_table), 5184)
+        self.assertEqual(len(np.unique(hash_table)), 5184)
+        with self.assertRaises(AssertionError):
+            clifford = tqc.iSWAP_like_PTM(5184+1)
+
+    def test_SWAP_like_PTM(self):
+        hash_table = []
+        for idx in np.arange(24**2):
+            clifford = tqc.SWAP_like_PTM(idx)
+            hash_val = crc32(clifford.tobytes())
+            hash_table.append(hash_val)
+        self.assertEqual(len(hash_table), 24**2)
+        self.assertEqual(len(np.unique(hash_table)), 24**2)
+        with self.assertRaises(AssertionError):
+            clifford = tqc.SWAP_like_PTM(24**2+1)
 
     def test_two_qubit_group(self):
         hash_table = tqc.get_two_qubit_clifford_hash_table()
