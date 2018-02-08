@@ -2,6 +2,7 @@ import os
 import logging
 import numpy as np
 import pickle
+from collections import OrderedDict
 import h5py
 import matplotlib.lines as mlines
 import matplotlib
@@ -54,7 +55,6 @@ class MeasurementAnalysis(object):
 
     def __init__(self, TwoD=False, folder=None, auto=True,
                  cmap_chosen='viridis', no_of_columns=1, qb_name=None, **kw):
-
         if folder is None:
             self.folder = a_tools.get_folder(**kw)
         else:
@@ -428,7 +428,7 @@ class MeasurementAnalysis(object):
                     par_group.attrs.create(name=par_name, data=par_val)
                     #par_dict = vars(par_val)
                 else:
-                    par_group.attrs.create(name=par_name,data=par_val)
+                    fit_grp.attrs.create(name=par_name, data=par_val)
 
     def run_default_analysis(self, TwoD=False, close_file=True,
                              show=False, log=False, transpose=False, **kw):
@@ -641,6 +641,15 @@ class MeasurementAnalysis(object):
 
             self.ylabels = [a+' (' + b + ')' for a, b in zip(self.value_names,
                                                              self.value_units)]
+
+            if 'optimization_result' in self.g:
+                self.optimization_result = OrderedDict({
+                    'generation': self.g['optimization_result'][:, 0],
+                    'evals':  self.g['optimization_result'][:, 1],
+                    'xfavorite':  self.g['optimization_result'][:, 2:2+len(self.parameter_names)],
+                    'stds':  self.g['optimization_result'][:, 2+len(self.parameter_names):2+2*len(self.parameter_names)],
+                    'fbest':  self.g['optimization_result'][:, -len(self.parameter_names)-1],
+                    'xbest': self.g['optimization_result'][:, -len(self.parameter_names):]})
         else:
             raise ValueError('datasaving_format "%s " not recognized'
                              % datasaving_format)
@@ -667,7 +676,6 @@ class MeasurementAnalysis(object):
         # Plot:
         ax.plot(x, y, marker, markersize=self.marker_size,
                 linewidth=self.line_width, label=label)
-
         if log:
             ax.set_yscale('log')
 
@@ -910,8 +918,6 @@ class OptimizationAnalysis_v2(MeasurementAnalysis):
                     x=self.sweep_points[0], y=self.sweep_points[1],
                     z=self.measured_values[i], ax=ax,
                     zlabel=self.value_names[i])
-                ax.set_xlabel(self.parameter_labels[0])
-                ax.set_ylabel(self.parameter_labels[1])
                 ax.plot(self.sweep_points[0],
                         self.sweep_points[1], '-o', c='grey')
                 ax.plot(self.sweep_points[0][-1], self.sweep_points[1][-1],
@@ -920,7 +926,8 @@ class OptimizationAnalysis_v2(MeasurementAnalysis):
                                     self.timestamp_string + '_' +
                                     self.measurementstring, 40))
                 ax.set_title(plot_title)
-
+                set_xlabel(ax, self.parameter_names[0], self.parameter_units[0])
+                set_ylabel(ax, self.parameter_names[1], self.parameter_units[1])
                 self.save_fig(f, figname=base_figname, **kw)
 
 
@@ -933,10 +940,6 @@ class OptimizationAnalysis(MeasurementAnalysis):
                 ['MC'].attrs['optimization_method']
         except:
             optimization_method = 'Numerical'
-            # This is because the MC is no longer an instrument and thus
-            # does not get saved, I have to re add this (MAR 1/2016)
-            logging.warning('Could not extract optimization method from' +
-                            ' data file')
 
         for i, meas_vals in enumerate(self.measured_values):
             if (not plot_all) & (i >= 1):
@@ -1201,7 +1204,9 @@ class TD_Analysis(MeasurementAnalysis):
             if self.for_ef:
                 ylabel = r'$F$ $\left(|f \rangle \right) (arb. units)$'
             else:
-                ylabel = r'$F$ $\left(|e \rangle \right) (arb. units)$'
+                # ylabel = r'$F$ $\left(|e \rangle \right) (arb. units)$'
+                ylabel = r'$F$ $|1 \rangle$'
+
             self.plot_results_vs_sweepparam(x=self.sweep_points,
                                             y=self.normalized_values,
                                             fig=self.fig, ax=self.ax,
@@ -1210,9 +1215,6 @@ class TD_Analysis(MeasurementAnalysis):
                                             ylabel=ylabel,
                                             marker='o-',
                                             save=False)
-            # self.ax.set_ylim(min(min(self.normalized_values)-.1, -.1),
-            #                   max(max(self.normalized_values)+.1, 1.1))
-
             if save_fig:
                 if not close_main_fig:
                     # Hacked in here, good idea to only show the main fig but
@@ -1592,8 +1594,8 @@ class Rabi_Analysis(TD_Analysis):
         kw['label'] = label
         kw['h5mode'] = 'r+'
 
-        super(self.__class__, self).__init__(qb_name=qb_name,
-                                             NoCalPoints=NoCalPoints, **kw)
+        super().__init__(qb_name=qb_name,
+                         NoCalPoints=NoCalPoints, **kw)
 
     def fit_data(self, print_fit_results=True, verbose=False, separate_fits=False):
 
@@ -1980,22 +1982,28 @@ class Rabi_Analysis(TD_Analysis):
                 piHalfPulse = 1/(4*freq_fit)
                 piPulse_std = freq_std/freq_fit
                 piHalfPulse_std = freq_std/freq_fit
+
             else:
-                n = np.arange(-2, 3)
+                n = np.arange(-2, 3, 0.5)
+
                 piPulse_vals = (2*n*np.pi+np.pi-phase_fit)/(2*np.pi*freq_fit)
                 piHalfPulse_vals = (2*n*np.pi+np.pi/2-phase_fit)/(2*np.pi*freq_fit)
-
-                try:
-                    piPulse = np.min(np.take(piPulse_vals,
-                                             np.where(piPulse_vals>=0)))
-                except ValueError:
-                    piPulse = np.asarray([])
 
                 try:
                     piHalfPulse = np.min(np.take(piHalfPulse_vals,
                                                  np.where(piHalfPulse_vals>=0)))
                 except ValueError:
                     piHalfPulse = np.asarray([])
+
+                try:
+                    if piHalfPulse.size != 0:
+                        piPulse = np.min(np.take(
+                            piPulse_vals, np.where(piPulse_vals>=piHalfPulse)))
+                    else:
+                        piPulse = np.min(np.take(piPulse_vals,
+                                                 np.where(piPulse_vals>=0.001)))
+                except ValueError:
+                    piPulse = np.asarray([])
 
                 if piPulse.size==0 or piPulse>max(self.sweep_points):
                     i=0
@@ -2140,21 +2148,25 @@ class Echo_analysis(TD_Analysis):
         self.plot_results_vs_sweepparam(x=self.sweep_points,
                                         y=self.corr_data,
                                         fig=self.fig, ax=self.ax,
-                                        xlabel=self.xlabel,
+                                        xlabel=self.parameter_names[0],
+                                        x_unit=self.parameter_units[0],
                                         ylabel=r'F$|1\rangle$',
                                         save=False,
                                         plot_title=plot_title)
 
         self.ax.plot(x_fine, self.fit_res.eval(t=x_fine), label='fit')
-        textstr = '$T_2$={:.3g}$\pm$({:.3g})s '.format(
-            self.fit_res.params['tau'].value,
-            self.fit_res.params['tau'].stderr)
+
+        scale_factor, unit = SI_prefix_and_scale_factor(
+            self.fit_res.params['tau'].value, self.parameter_units[0])
+        textstr = '$T_2$={:.3g}$\pm$({:.3g}) {} '.format(
+            self.fit_res.params['tau'].value*scale_factor,
+            self.fit_res.params['tau'].stderr*scale_factor,
+            unit)
         if show_guess:
             self.ax.plot(x_fine, self.fit_res.eval(
                 t=x_fine, **self.fit_res.init_values), label='guess')
             self.ax.legend(loc='best')
 
-        self.ax.ticklabel_format(style='sci', scilimits=(0, 0))
         self.ax.text(0.4, 0.95, textstr, transform=self.ax.transAxes,
                      fontsize=11, verticalalignment='top',
                      bbox=self.box_props)
@@ -2189,8 +2201,10 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
     def run_default_analysis(self, close_file=True, **kw):
         normalize_to_cal_points = kw.get('normalize_to_cal_points', True)
         self.normalize_to_cal_points = normalize_to_cal_points
+
         self.get_naming_and_values()
         self.oscillating_qubit = kw.get('oscillating_qubit', 0)
+
         if normalize_to_cal_points:
             if self.oscillating_qubit == 0:
                 cal_0I = np.mean([self.measured_values[0][-4],
@@ -2221,7 +2235,6 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
                 self.measured_values[0] - cal_0I)/(cal_1I-cal_0I)
             self.measured_values[1][:] = (
                 self.measured_values[1] - cal_0Q)/(cal_1Q-cal_0Q)
-        # self.measured_values = self.measured_values
 
         self.sort_data()
 
@@ -2237,30 +2250,31 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
         self.x_idx = self.sweep_points[::2]
         self.y_exc = ['', '']
         self.y_idx = ['', '']
+
         for i in range(2):
             self.y_exc[i] = self.measured_values[i][1::2]
             self.y_idx[i] = self.measured_values[i][::2]
             if self.normalize_to_cal_points:
                 self.y_exc[i] = self.y_exc[i][:-2]
                 self.y_idx[i] = self.y_idx[i][:-2]
-
         if self.normalize_to_cal_points:
             self.x_idx = self.x_idx[:-2]
             self.x_exc = self.x_exc[:-2]
-    # def calculate_cost_func(self, **kw):
-    #     num_points = len(self.sweep_points)-4
 
-    #     id_dat_swp = self.measured_values[1][:num_points//2]
-    #     ex_dat_swp = self.measured_values[1][num_points//2:-4]
+    def calculate_cost_func(self, **kw):
+        num_points = len(self.sweep_points)-4
 
-    #     id_dat_cp = self.measured_values[0][:num_points//2]
-    #     ex_dat_cp = self.measured_values[0][num_points//2:-4]
+        id_dat_swp = self.measured_values[1][:num_points//2]
+        ex_dat_swp = self.measured_values[1][num_points//2:-4]
 
-    #     maximum_difference = max((id_dat_cp-ex_dat_cp))
-    #     # I think the labels are wrong in excited and identity but the value
-    #     # we get is correct
-    #     missing_swap_pop = np.mean(ex_dat_swp - id_dat_swp)
-    #     self.cost_func_val = maximum_difference, missing_swap_pop
+        id_dat_cp = self.measured_values[0][:num_points//2]
+        ex_dat_cp = self.measured_values[0][num_points//2:-4]
+
+        maximum_difference = max((id_dat_cp-ex_dat_cp))
+        # I think the labels are wrong in excited and identity but the value
+        # we get is correct
+        missing_swap_pop = np.mean(ex_dat_swp - id_dat_swp)
+        self.cost_func_val = maximum_difference, missing_swap_pop
 
     def make_figures(self, **kw):
         # calculate fitted curves
@@ -2277,15 +2291,10 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
 
         self.fig, self.axs = plt.subplots(2, 1, figsize=(5, 6))
         for i in [0, 1]:
-            # self.axs[i].ticklabel_format(useOffset=False)
             self.axs[i].plot(self.x_idx, self.y_idx[i], '-o',
                              label='no excitation')
             self.axs[i].plot(self.x_exc, self.y_exc[i], '-o',
                              label='excitation')
-
-            # self.axs[i].set_xlabel(self.xlabel)
-            # self.axs[i].set_ylabel(self.ylabels[i])
-
             if i == self.oscillating_qubit:
                 plot_title = kw.pop('plot_title', textwrap.fill(
                                     self.timestamp_string + '_' +
@@ -2295,13 +2304,7 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
                 self.axs[i].legend()
             else:
                 plot_title = ''
-
             set_xlabel(self.axs[i], self.sweep_name, self.sweep_unit[0])
-            ymi = min(self.axs[i].get_yticks())
-            yma = max(self.axs[i].get_yticks())
-            # somehow not setting this limit changes the tick locations after
-            # they have been set. Unclear what causes this.
-            self.axs[i].set_ylim(ymi, yma)
             set_ylabel(self.axs[i], self.value_names[i], self.value_units[i])
 
         self.save_fig(self.fig, fig_tight=True, **kw)
@@ -4304,9 +4307,9 @@ class Ramsey_Analysis(TD_Analysis):
                         float(instr_set[self.qb_name].attrs['freq_qubit'])
 
         except (TypeError, KeyError, ValueError):
-            logging.warning('qb_name is unknown. Setting previously measured value '
-                            'of the qubit frequency to 0. New qubit frequency '
-                            'might be incorrect.')
+            logging.warning('qb_name is unknown. Setting previously measured '
+                            'value of the qubit frequency to 0. New qubit '
+                            'frequency might be incorrect.')
             self.qubit_freq_spec = 0
 
         self.scale = 1e6
@@ -5402,11 +5405,12 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                 f=data_x, verbose=False)
 
         elif fitting_model == 'complex':
+            # Implement slope fitting with Complex!! Xavi February 2018
             # this is the fit with a complex transmission curve WITHOUT slope
             data_amp = self.measured_values[0]
             data_angle = self.measured_values[1]
-            data_complex = np.add(
-                self.measured_values[2], 1j*self.measured_values[3])
+            data_complex = data_amp*np.cos(data_angle)+1j*data_amp*np.sin(data_angle)
+            #np.add(self.measured_values[2], 1j*self.measured_values[3])
 
             # Initial guesses
             guess_A = max(data_amp)
@@ -5493,8 +5497,11 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                             fig=fig, ax=ax,
                                             xlabel=self.sweep_name,
                                             x_unit=self.sweep_unit[0],
-                                            ylabel=str('S21_mag (arb. units)'),
+                                            ylabel=str('S21_mag'),
+                                            y_unit=self.value_units[0],
                                             save=False)
+            # ensures that amplitude plot starts at zero
+            ax.set_ylim(ymin=0.0)
 
         elif 'complex' in fitting_model:
             self.plot_complex_results(
@@ -5503,7 +5510,10 @@ class Homodyne_Analysis(MeasurementAnalysis):
             fig2, ax2 = self.default_ax()
             self.plot_results_vs_sweepparam(x=self.sweep_points, y=data_amp,
                                             fig=fig2, ax=ax2,
-                                            show=False, save=False)
+                                            show=False,  xlabel=self.sweep_name,
+                                            x_unit=self.sweep_unit[0],
+                                            ylabel=str('S21_mag'),
+                                            y_unit=self.value_units[0])
 
         elif fitting_model == 'lorentzian':
             self.plot_results_vs_sweepparam(x=self.sweep_points,
@@ -7157,10 +7167,10 @@ class butterfly_analysis(MeasurementAnalysis):
         if digitize:
             self.data_exc = dm_tools.digitize(threshold=threshold,
                                               data=self.data_exc,
-                                              positive_case=case)
+                                              one_larger_than_threshold=case)
             self.data_rel = dm_tools.digitize(threshold=threshold,
                                               data=self.data_rel,
-                                              positive_case=case)
+                                              one_larger_than_threshold=case)
         if close_file:
             self.data_file.close()
         if auto is True:
@@ -7538,8 +7548,8 @@ class DoubleFrequency(TD_Analysis):
         ax.set_ylabel(r'$F |1\rangle$')
         ax.set_title('%s: Double Frequency analysis' % self.timestamp)
         ax.set_xlabel(r'Time ($\mu s$)')
-        ax.plot(plot_x*1e6, y, 'bo')
-        ax.plot(plot_x[:-4]*1e6, self.fit_plot, 'r-')
+        ax.plot(plot_x*1e6, y, 'o')
+        ax.plot(plot_x[:-4]*1e6, self.fit_plot, '-')
         fig.tight_layout()
         self.save_fig(fig, **kw)
         self.data_file.close()

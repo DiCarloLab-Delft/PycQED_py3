@@ -11,7 +11,7 @@ class Base_Flux_LutMan(Base_LutMan):
     # this default lutman is if a flux pulse can be done with only one
     # other qubit. this needs to be expanded if there are more qubits
     # to interact with.
-    _def_lm = ['i', 'cz_z', 'square', 'park']
+    _def_lm = ['i', 'cz_z', 'square', 'park', 'multi_cz']
 
     def render_wave(self, wave_name, show=True, time_units='s',
                     reload_pulses: bool=True, render_distorted_wave: bool=True,
@@ -90,6 +90,14 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                            unit='s',
                            vals=vals.Numbers())
 
+        self.add_parameter(
+            'cfg_pre_pulse_delay', unit='s', label='Pre pulse delay',
+            docstring='This parameter is used for fine timing corrections, the'
+                      ' correction is applied in distort_waveform.',
+            initial_value=0e-9,
+            vals=vals.Numbers(0, 1e-6),
+            parameter_class=ManualParameter)
+
         self.add_parameter('instr_distortion_kernel',
                            parameter_class=InstrumentRefParameter)
 
@@ -123,12 +131,6 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                            initial_value=40e-9,
                            vals=vals.Numbers(0, 100e-6),
                            parameter_class=ManualParameter)
-        self.add_parameter('sq_delay', unit='s',
-                           label='Square pulse length',
-                           initial_value=0e-9,
-                           vals=vals.Numbers(0, 12e-6),
-                           # 12us is current max of AWG8
-                           parameter_class=ManualParameter)
 
         self.add_parameter('cz_length', vals=vals.Numbers(),
                            unit='s', initial_value=35e-9,
@@ -148,15 +150,14 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                            parameter_class=ManualParameter)
         self.add_parameter('cz_freq_01_max', vals=vals.Numbers(),
                            unit='Hz', parameter_class=ManualParameter)
-        self.add_parameter('cz_J2', vals=vals.Numbers(),
-                           unit='Hz',
-                           initial_value=50e6,
+        self.add_parameter('cz_J2', vals=vals.Numbers(), unit='Hz',
+                           parameter_class=ManualParameter)
+        self.add_parameter('cz_E_c', vals=vals.Numbers(), unit='Hz',
                            parameter_class=ManualParameter)
         self.add_parameter('cz_freq_interaction', vals=vals.Numbers(),
                            unit='Hz',
                            parameter_class=ManualParameter)
-        self.add_parameter('cz_phase_corr_length',
-                           unit='s',
+        self.add_parameter('cz_phase_corr_length', unit='s',
                            initial_value=5e-9, vals=vals.Numbers(),
                            parameter_class=ManualParameter)
 
@@ -164,6 +165,22 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                            unit='V',
                            initial_value=0, vals=vals.Numbers(),
                            parameter_class=ManualParameter)
+
+        for i in range(40):
+            self.add_parameter('mcz_phase_corr_amp_{}'.format(i+1), unit='V',
+                               label='Phase correction amplitude {}'.format(
+                               i+1),
+                               initial_value=0, vals=vals.Numbers(),
+                               parameter_class=ManualParameter)
+        self.add_parameter('mcz_nr_of_repeated_gates',
+                           initial_value=1, vals=vals.PermissiveInts(1, 40),
+                           parameter_class=ManualParameter)
+        self.add_parameter('mcz_gate_separation', unit='s',
+                           label='Gate separation',  initial_value=0,
+                           docstring=('Separtion between the start of CZ gates'
+                                      'in the "multi_cz" gate'),
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(min_value=0))
 
     def generate_standard_waveforms(self):
         """
@@ -173,20 +190,24 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         # N.B. the  naming convention ._gen_{waveform_name} must be preserved
         # as it is used in the load_waveform_onto_AWG_lookuptable method.
         self._wave_dict['i'] = self._gen_i()
-        self._wave_dict['square'] =  self._gen_square()
-        self._wave_dict['park'] =  self._gen_park()
-        self._wave_dict['cz'] =  self._gen_cz()
-        self._wave_dict['cz_z'] =  self._gen_cz_z(regenerate_cz=False)
-        self._wave_dict['idle_z'] =  self._gen_idle_z()
+        self._wave_dict['square'] = self._gen_square()
+        self._wave_dict['park'] = self._gen_park()
+        self._wave_dict['cz'] = self._gen_cz()
+        self._wave_dict['cz_z'] = self._gen_cz_z(regenerate_cz=False)
+        self._wave_dict['idle_z'] = self._gen_idle_z()
+
+        # multi_cz is used because there is no real-time flux correction yet
+        self._wave_dict['multi_cz'] = self._gen_multi_cz(regenerate_cz=False)
+        self._wave_dict['multi_idle_z'] = self._gen_multi_idle_z(
+            regenerate_cz=False)
 
     def _gen_i(self):
         return np.zeros(42)
 
-
     def _gen_square(self):
-        return  wf.single_channel_block(
+        return wf.single_channel_block(
             amp=self.sq_amp(), length=self.sq_length(),
-            sampling_rate=self.sampling_rate(), delay=self.sq_delay())
+            sampling_rate=self.sampling_rate(), delay=0)
 
     def _gen_park(self):
         return np.zeros(42)
@@ -200,6 +221,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             f_01_max=self.cz_freq_01_max(),
             V_per_phi0=self.cz_V_per_phi0(),
             J2=self.cz_J2(),
+            E_c=self.cz_E_c(),
             f_interaction=self.cz_freq_interaction(),
             sampling_rate=self.sampling_rate(),
             return_unit='V')
@@ -216,6 +238,27 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         # CZ with phase correction
         return np.concatenate([self._wave_dict['cz'], phase_corr])
 
+    def _gen_multi_cz(self, regenerate_cz=True):
+        """
+        Composite waveform containing multiple cz gates
+        """
+        if regenerate_cz:
+            self._wave_dict['cz'] = self._gen_cz()
+
+        max_nr_samples = int(self.cfg_max_wf_length()*self.sampling_rate())
+
+        waveform = np.zeros(max_nr_samples)
+        for i in range(self.mcz_nr_of_repeated_gates()):
+            phase_corr = wf.single_channel_block(
+                amp=self.get('mcz_phase_corr_amp_{}'.format(i+1)),
+                length=self.cz_phase_corr_length(),
+                sampling_rate=self.sampling_rate(), delay=0)
+            cz_z = np.concatenate([self._wave_dict['cz'], phase_corr])
+            sample_start_idx = int(self.mcz_gate_separation() *
+                                   self.sampling_rate())*i
+            waveform[sample_start_idx:sample_start_idx+len(cz_z)] += cz_z
+        # CZ with phase correction
+        return waveform
 
     def _gen_idle_z(self, regenerate_cz=True):
         if regenerate_cz:
@@ -225,6 +268,29 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         return np.concatenate(
             [np.zeros(len(self._wave_dict['cz'])), phase_corr])
 
+    def _gen_multi_idle_z(self, regenerate_cz=False):
+        """
+        Composite waveform containing multiple cz gates
+        """
+        if regenerate_cz:
+            self._wave_dict['cz'] = self._gen_cz()
+
+        max_nr_samples = int(self.cfg_max_wf_length()*self.sampling_rate())
+
+        waveform = np.zeros(max_nr_samples)
+        for i in range(self.mcz_nr_of_repeated_gates()):
+            phase_corr = wf.single_channel_block(
+                amp=self.get('mcz_phase_corr_amp_{}'.format(i+1)),
+                length=self.cz_phase_corr_length(),
+                sampling_rate=self.sampling_rate(), delay=0)
+            cz_z = np.concatenate([np.zeros(len(self._wave_dict['cz'])),
+                                   phase_corr])
+            sample_start_idx = int(self.mcz_gate_separation() *
+                                   self.sampling_rate())*i
+            waveform[sample_start_idx:sample_start_idx+len(cz_z)] += cz_z
+        # CZ with phase correction
+        return waveform
+
     def load_waveform_onto_AWG_lookuptable(self, waveform_name: str,
                                            regenerate_waveforms: bool=False):
         """
@@ -232,7 +298,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         """
         if regenerate_waveforms:
             # only regenerate the one waveform that is desired
-            gen_wf_func =    getattr(self, '_gen_{}'.format(waveform_name))
+            gen_wf_func = getattr(self, '_gen_{}'.format(waveform_name))
             self._wave_dict[waveform_name] = gen_wf_func()
 
         waveform = self._wave_dict[waveform_name]
@@ -262,7 +328,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             - it will always regenerate the desired waveform.
             - it does not update the _wave_dict
         """
-        gen_wf_func =    getattr(self, '_gen_{}'.format(waveform_name))
+        gen_wf_func = getattr(self, '_gen_{}'.format(waveform_name))
         waveform = gen_wf_func()
 
         if self.cfg_append_compensation():
@@ -271,14 +337,14 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             waveform = self.distort_waveform(waveform)
             self._wave_dict_dist[waveform_name] = waveform
 
-        awg_ch = self.cfg_awg_channel()-1 # -1 is to account for starting at 1
-        ch_pair = awg_ch%2
+        awg_ch = self.cfg_awg_channel()-1  # -1 is to account for starting at 1
+        ch_pair = awg_ch % 2
         awg_nr = awg_ch//2
 
         if other_waveform is None:
             other_waveform = np.zeros(len(waveform))
 
-        if ch_pair ==0:
+        if ch_pair == 0:
             waveforms = (waveform, other_waveform)
         else:
             waveforms = (other_waveform, waveform)
@@ -286,7 +352,6 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         # wf_nr = 1 is the assumption of only a sinlge waveform in the program
         self.AWG.get_instr().upload_waveform_realtime(
             w0=waveforms[0], w1=waveforms[1], awg_nr=awg_nr, wf_nr=1)
-
 
     def add_compensation_pulses(self, waveform):
         """
@@ -301,9 +366,15 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
     def distort_waveform(self, waveform):
         """
-        uses the Kernel object to distort waveforms
+        Modifies the ideal waveform to correct for distortions and correct
+        fine delays.
+        Distortions are corrected using the kernel object.
         """
         k = self.instr_distortion_kernel.get_instr()
+
+        # Prepend zeros to delay waveform to correct for fine timing
+        delay_samples = int(self.cfg_pre_pulse_delay()*self.sampling_rate())
+        waveform = np.pad(waveform, (delay_samples, 0), 'constant')
 
         # duck typing the distort waveform method
         if hasattr(k, 'distort_waveform'):
@@ -311,8 +382,9 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                 waveform,
                 length_samples=int(
                     self.cfg_max_wf_length()*self.sampling_rate()))
-        else: # old kernel object does not have this method
+        else:  # old kernel object does not have this method
             distorted_waveform = k.convolve_kernel(
                 [k.kernel(), waveform],
-                length_samples=int(self.cfg_max_wf_length()*self.sampling_rate()))
+                length_samples=int(self.cfg_max_wf_length() *
+                                   self.sampling_rate()))
         return distorted_waveform

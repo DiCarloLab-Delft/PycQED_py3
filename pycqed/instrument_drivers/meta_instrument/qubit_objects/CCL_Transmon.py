@@ -7,6 +7,7 @@ except ImportError:
     logging.warning('Could not import OpenQL')
     sqo = None
 
+from pycqed.utilities.general import gen_sweep_pts
 from .qubit_object import Qubit
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import (
@@ -20,6 +21,7 @@ from pycqed.measurement.calibration_toolbox import mixer_skewness_cal_UHFQC_adap
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import detector_functions as det
 
+import cma
 from pycqed.measurement.optimization import nelder_mead
 
 
@@ -905,6 +907,8 @@ class CCLight_Transmon(Qubit):
         MW_LutMan.mw_motzoi(self.mw_motzoi())
         MW_LutMan.mw_modulation(self.mw_freq_mod())
 
+        MW_LutMan.spec_amp(self.spec_amp())
+
         # Mixer params
         MW_LutMan.G_mixer_phi(self.mw_G_mixer_phi())
         MW_LutMan.G_mixer_alpha(self.mw_G_mixer_alpha())
@@ -995,6 +999,26 @@ class CCLight_Transmon(Qubit):
         print('CCL program is running. Parameter "mw_vsm_delay" can now be '
               'calibrated by hand.')
 
+    def calibrate_motzoi(self, MC=None, verbose=True, update=True):
+        """
+        Calibrates the motzoi VSM attenauation prameter
+        """
+        motzois = gen_sweep_pts(center=30e3, span=30e3, num=31)
+
+        # large range
+        a = self.measure_motzoi(MC=MC, motzoi_atts=motzois, analyze=True)
+        opt_motzoi = a.get_intersect()[0]
+        if opt_motzoi > max(motzois) or opt_motzoi < min(motzois):
+            if verbose:
+                print('optimal motzoi {:.3f} '.format(opt_motzoi) +
+                      'outside of measured span, aborting')
+            return False
+        if update:
+            if verbose:
+                print('Setting motzoi to {:.3f}'.format(opt_motzoi))
+            self.mw_vsm_D_att(opt_motzoi)
+        return opt_motzoi
+
     def calibrate_mixer_offsets_drive(self, update: bool =True)-> bool:
         '''
         Calibrates the mixer skewness and updates the I and Q offsets in
@@ -1031,68 +1055,53 @@ class CCLight_Transmon(Qubit):
 
         VSM = self.instr_VSM.get_instr()
 
-        # Commented out code contains legacy code for the Blue Box VSM
-        # VSM.set_all_switches_to('OFF')
-        # Gin = self.mw_vsm_ch_Gin()
-        # Din = self.mw_vsm_ch_Din()
-        # out = self.mw_vsm_ch_out()
-        # VSM.set('in{}_out{}_switch'.format(Gin, out), 'ON')
-        # VSM.set('in{}_out{}_switch'.format(Din, out), 'OFF')
-
         ch_in = self.mw_vsm_ch_in()
         mod_out = self.mw_vsm_mod_out()
         # module 8 is hardcoded for use mixer calls (signal hound)
         VSM.set('mod8_marker_source'.format(ch_in), 'int')
         VSM.set('mod8_ch{}_marker_state'.format(ch_in), 'on')
-        VSM.set('mod8_ch{}_derivative_att_raw'.format(ch_in), 50000)
-        VSM.set('mod8_ch{}_gaussian_att_raw'.format(ch_in), 50000)
 
-        offsets = multi_channel_mixer_carrier_cancellation(
+        #####
+        # This snippet is the 4 parameter joint optimization
+        #####
+        # VSM.set('mod8_ch{}_gaussian_att_raw'.format(ch_in), 50000)
+        # VSM.set('mod8_ch{}_derivative_att_raw'.format(ch_in), 50000)
+        # # offsets = multi_channel_mixer_carrier_cancellation(
+        #     SH=self.instr_SH.get_instr(), source=self.instr_LO_mw.get_instr(),
+        #     MC=self.instr_MC.get_instr(),
+        #     channel_pars=offset_pars)
+
+        # if update:
+        #     self.mw_mixer_offs_GI(offsets[0])
+        #     self.mw_mixer_offs_GQ(offsets[1])
+        #     self.mw_mixer_offs_DI(offsets[2])
+        #     self.mw_mixer_offs_DQ(offsets[3])
+
+        # return True
+
+        # Calibrate Gaussian component mixer
+        VSM.set('mod8_ch{}_gaussian_att_raw'.format(ch_in), 50000)
+        VSM.set('mod8_ch{}_derivative_att_raw'.format(ch_in), 0)
+        offset_I, offset_Q = mixer_carrier_cancellation(
             SH=self.instr_SH.get_instr(), source=self.instr_LO_mw.get_instr(),
             MC=self.instr_MC.get_instr(),
-            channel_pars=offset_pars)
-
+            chI_par=chGI_par, chQ_par=chGQ_par)
         if update:
-            self.mw_mixer_offs_GI(offsets[0])
-            self.mw_mixer_offs_GQ(offsets[1])
-            self.mw_mixer_offs_DI(offsets[2])
-            self.mw_mixer_offs_DQ(offsets[3])
+            self.mw_mixer_offs_GI(offset_I)
+            self.mw_mixer_offs_GQ(offset_Q)
 
+        # Calibrate Derivative component mixer
+        VSM.set('mod8_ch{}_gaussian_att_raw'.format(ch_in), 0)
+        VSM.set('mod8_ch{}_derivative_att_raw'.format(ch_in), 50000)
+
+        offset_I, offset_Q = mixer_carrier_cancellation(
+            SH=self.instr_SH.get_instr(), source=self.instr_LO_mw.get_instr(),
+            MC=self.instr_MC.get_instr(),
+            chI_par=chDI_par, chQ_par=chDQ_par)
+        if update:
+            self.mw_mixer_offs_DI(offset_I)
+            self.mw_mixer_offs_DQ(offset_Q)
         return True
-        # # Calibrate Gaussian component mixer
-        # offset_I, offset_Q = mixer_carrier_cancellation(
-        #     SH=self.instr_SH.get_instr(), source=self.instr_LO_mw.get_instr(),
-        #     MC=self.instr_MC.get_instr(),
-        #     chI_par=chGI_par, chQ_par=chGQ_par)
-        # if update:
-        #     self.mw_mixer_offs_GI(offset_I)
-        #     self.mw_mixer_offs_GQ(offset_Q)
-
-        # # VSM.set('in{}_out{}_switch'.format(Gin, out), 'OFF')
-        # # VSM.set('in{}_out{}_switch'.format(Din, out), 'ON')
-        # VSM.set('mod8_ch{}_derivative_att_raw'.format(ch_in), 50000)
-        # VSM.set('mod8_ch{}_gaussian_att_raw'.format(ch_in), 0)
-
-        # if AWG.__class__.__name__ == 'QuTech_AWG_Module':
-        #     chDI_par = AWG.parameters['ch3_offset']
-        #     chDQ_par = AWG.parameters['ch4_offset']
-        # else:
-        #     # This part is AWG8 specific and wont work with a QWG
-        #     AWG.set('sigouts_{}_on'.format(awg_ch+1), 1)
-        #     AWG.set('sigouts_{}_on'.format(awg_ch+2), 1)
-        #     chDI_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch+1)]
-        #     chDQ_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch+2)]
-        #     # End of AWG8 specific part
-
-        # # Calibrate Derivative component mixer
-        # offset_I, offset_Q = mixer_carrier_cancellation(
-        #     SH=self.instr_SH.get_instr(), source=self.instr_LO_mw.get_instr(),
-        #     MC=self.instr_MC.get_instr(),
-        #     chI_par=chDI_par, chQ_par=chDQ_par)
-        # if update:
-        #     self.mw_mixer_offs_DI(offset_I)
-        #     self.mw_mixer_offs_DQ(offset_Q)
-        # return True
 
     def calibrate_mixer_skewness_RO(self, update=True):
         '''
@@ -1209,7 +1218,7 @@ class CCLight_Transmon(Qubit):
         ro_lm = self.instr_LutMan_RO.get_instr()
         m_amp_par = ro_lm.parameters[
             'M_amp_R{}'.format(self.ro_pulse_res_nr())]
-        s2 = swf.lutman_par_dB_attenuation(
+        s2 = swf.lutman_par_dB_attenuation_UHFQC_dig_trig(
             LutMan=ro_lm, LutMan_parameter=m_amp_par)
         MC.set_sweep_function_2D(s2)
         MC.set_sweep_points_2D(powers)
@@ -1260,6 +1269,7 @@ class CCLight_Transmon(Qubit):
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
+
         # Snippet here to create and upload the CCL instructions
         CCL = self.instr_CC.get_instr()
         p = sqo.pulsed_spec_seq(
@@ -1269,7 +1279,7 @@ class CCLight_Transmon(Qubit):
         CCL.eqasm_program(p.filename)
         # CCL gets started in the int_avg detector
 
-        # The spec pulse is a MW pulse that contains not modulation
+        # The spec pulse is a MW pulse that contains no modulation
 
         spec_source = self.instr_spec_source.get_instr()
         spec_source.on()
@@ -1281,9 +1291,11 @@ class CCLight_Transmon(Qubit):
         if analyze:
             ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
 
-    def measure_ssro(self, MC=None, analyze: bool=True, nr_shots: int=1024*8,
+    def measure_ssro(self, MC=None, analyze: bool=True, nr_shots: int=4092*4,
                      cases=('off', 'on'), update_threshold: bool=True,
                      prepare: bool=True, no_figs: bool=False,
+                     post_select: bool = False,
+                     post_select_threshold: float =None,
                      update: bool=True,
                      verbose: bool=True):
         old_RO_digit = self.ro_acq_digitized()
@@ -1300,6 +1312,7 @@ class CCLight_Transmon(Qubit):
             self.prepare_for_timedomain()
             p = sqo.off_on(
                 qubit_idx=self.cfg_qubit_nr(), pulse_comb='off_on',
+                initialize=post_select,
                 platf_cfg=self.cfg_openql_platform_fn())
             self.instr_CC.get_instr().eqasm_program(p.filename)
         else:
@@ -1316,15 +1329,22 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
         d = self.int_log_det
+        d.nr_shots = 4092
         MC.set_detector_function(d)
         MC.run(
-            'Measure_SSRO_{}'.format(self.msmt_suffix))
+            'SSRO{}'.format(self.msmt_suffix))
         MC.live_plot_enabled(old_plot_setting)
         if analyze:
             if len(d.value_names) == 1:
+
+                if post_select_threshold == None:
+                    post_select_threshold = self.ro_acq_threshold()
                 a = ma2.Singleshot_Readout_Analysis(
                     t_start=None, t_stop=None,
-                    options_dict={'scan_label': 'SSRO'},
+                    label='SSRO',
+                    options_dict={'post_select': post_select,
+                                  'nr_samples': 2+2*post_select,
+                                  'post_select_threshold': post_select_threshold},
                     extract_only=no_figs)
                 if update_threshold:
                     # UHFQC threshold is wrong, the magic number is a
@@ -1364,6 +1384,7 @@ class CCLight_Transmon(Qubit):
             # off as this is much faster than recompiling/uploading
             p = sqo.off_on(
                 qubit_idx=self.cfg_qubit_nr(), pulse_comb='on',
+                initialize=False,
                 platf_cfg=self.cfg_openql_platform_fn())
             self.instr_CC.get_instr().eqasm_program(p.filename)
         else:
@@ -1454,6 +1475,7 @@ class CCLight_Transmon(Qubit):
             self.prepare_for_timedomain()
         p = sqo.off_on(
             qubit_idx=self.cfg_qubit_nr(), pulse_comb='on',
+            initialize=False,
             platf_cfg=self.cfg_openql_platform_fn())
 
         VSM = self.instr_VSM.get_instr()
@@ -1501,8 +1523,9 @@ class CCLight_Transmon(Qubit):
             self, MC=None,
             parameter_list: list = ['G_att', 'D_att', 'freq'],
             initial_values: list =None,
-            initial_steps: list= [5e3, 10e3, 3e6],
-            nr_cliffords: int=80, nr_seeds:int=40, update: bool=True,
+            initial_steps: list= [2e3, 3e3, 1e6],
+            nr_cliffords: int=80, nr_seeds:int=200,
+            verbose:bool = True, update: bool=True,
             prepare_for_timedomain: bool=True):
 
         if MC is None:
@@ -1560,20 +1583,24 @@ class CCLight_Transmon(Qubit):
 
         MC.set_detector_function(d)
 
-        ad_func_pars = {'adaptive_function': nelder_mead,
+        ad_func_pars = {'adaptive_function': cma.fmin,
                         'x0': initial_values,
-                        'initial_step': initial_steps,
-                        'minimize': False}
+                        'sigma0': 1,
+                        # 'noise_handler': cma.NoiseHandler(len(initial_values)),
+                        'minimize': False,
+                        'options': {'cma_stds': initial_steps}}
 
         MC.set_adaptive_function_parameters(ad_func_pars)
-        MC.set_optimization_method('nelder_mead')
         MC.run(name='Restless_tuneup_{}Cl_{}seeds'.format(
-                nr_cliffords, nr_cliffords) + self.msmt_suffix,
+                nr_cliffords, nr_seeds) + self.msmt_suffix,
                 mode='adaptive')
         a=ma.OptimizationAnalysis(label='Restless_tuneup')
 
 
         if update:
+            if verbose:
+                print("Updating parameters in qubit object")
+
             opt_par_values = a.optimization_result[0]
             for par in parameter_list:
                 if par == 'G_att':
@@ -1930,7 +1957,7 @@ class CCLight_Transmon(Qubit):
             self.T2_echo(a.fit_res.params['tau'].value)
         return a
 
-    def measure_flipping(self, number_of_flips=np.arange(20), equator=False,
+    def measure_flipping(self, number_of_flips=np.arange(20), equator=True,
                          MC=None, analyze=True, close_fig=True, update=True):
 
         if MC is None:
@@ -1949,6 +1976,8 @@ class CCLight_Transmon(Qubit):
         self.prepare_for_timedomain()
         p = sqo.flipping(number_of_flips=nf, equator=equator,
                          qubit_idx=self.cfg_qubit_nr(),
+                         parameter_name='Number of pi-pulses',
+                         unit='#',
                          platf_cfg=self.cfg_openql_platform_fn())
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr())
@@ -1975,14 +2004,9 @@ class CCLight_Transmon(Qubit):
             platf_cfg=self.cfg_openql_platform_fn())
         self.instr_CC.get_instr().eqasm_program(p.filename)
 
-
-
-        # d = self.get_int_avg_det(seg_per_point=2, single_int_avg=True)
-        # d.detector_control = 'hard'
-        # Tested but does not yet work well with soft averages
         d = self.get_int_avg_det(single_int_avg=True, values_per_point=2,
-                                 values_per_point_suffex=['yX', 'xY'])
-        d.detector_control = 'hard'
+                                 values_per_point_suffex=['yX', 'xY'],
+                                 always_prepare=True)
 
         VSM = self.instr_VSM.get_instr()
         mod_out = self.mw_vsm_mod_out()
@@ -1994,11 +2018,20 @@ class CCLight_Transmon(Qubit):
         MC.set_detector_function(d)
 
         MC.run('Motzoi_XY'+self.msmt_suffix)
-        if analyze:
-            a = ma.Motzoi_XY_analysis(
-                auto=True, cal_points=None, close_fig=close_fig)
-            return a
 
+        if analyze:
+            if self.ro_acq_weight_type() == 'optimal':
+                a = ma2.Intersect_Analysis(
+                    options_dict={'ch_idx_A': 0,
+                                  'ch_idx_B': 1})
+            else:
+                # if statement required if 2 channels readout
+                logging.warning(
+                    'It is recommended to do this with optimal weights')
+                a = ma2.Intersect_Analysis(
+                    options_dict={'ch_idx_A': 0,
+                                  'ch_idx_B': 2})
+            return a
 
     def measure_randomized_benchmarking(self, nr_cliffords=2**np.arange(12),
                                         nr_seeds=100,

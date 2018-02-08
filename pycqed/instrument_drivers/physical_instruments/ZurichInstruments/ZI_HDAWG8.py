@@ -616,13 +616,13 @@ class ZI_HDAWG8(ZI_base_instrument):
         # Disable all function generators
         self._dev.daq.setInt('/' + self._dev.device +
                              '/sigouts/*/enables/*', 0)
-        # Switch all outputs into direct mode
+        # when doing flux pulses, set everything to amp mode
         if self.cfg_codeword_protocol() == 'flux':
             for ch in range(8):
                 self.set('sigouts_{}_direct'.format(ch), 0)
                 self.set('sigouts_{}_range'.format(ch), 5)
 
-        # when doing flux pulses, set everything to amp mode
+        # Switch all outputs into direct mode when not using flux pulses
         else:
             for ch in range(8):
                 self.set('sigouts_{}_direct'.format(ch), 1)

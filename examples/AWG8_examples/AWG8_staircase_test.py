@@ -34,13 +34,13 @@ CCL = QuTech_CCL.CCL('CCL', address='192.168.0.11', port=5025)
 cs_filepath = os.path.join(pq.__path__[0], 'measurement','openql_experiments',
                            'output','cs.txt')
 
-CCL.upload_microcode(cs_filepath)
+CCL.control_store(cs_filepath)
 
 # AWG8 = ZI_HDAWG8.ZI_HDAWG8('AWG8_8003', device='dev8003')
 AWG8 = ZI_HDAWG8.ZI_HDAWG8('AWG8_8004', device='dev8004')
-#AWG8 = ZI_HDAWG8.ZI_HDAWG8('AWG8_8005', device='dev8005')
-#AWG8 = ZI_HDAWG8.ZI_HDAWG8('AWG8_8006', device='dev8006')
-# AWG8 = ZI_HDAWG8.ZI_HDAWG8('AWG8_8008', device='dev8008')
+# AWG8 = ZI_HDAWG8.ZI_HDAWG8('AWG8_8005', device='dev8005')
+# AWG8 = ZI_HDAWG8.ZI_HDAWG8('AWG8_8006', device='dev8006')
+# AWG8 = ZI_HDAWG8.ZI_HDAWG8('AWG8_8008', d/evice='dev8008')
 
 
 ##########################################

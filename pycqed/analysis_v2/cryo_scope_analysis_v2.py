@@ -13,6 +13,7 @@ from numpy.fft import fft, ifft, fftfreq
 
 
 # This is the version from before Nov 22 2017
+# Should be replaced by the Brian's cryoscope tools (analysis/tools/cryoscope_tools)
 
 class RamZFluxArc(ba.BaseDataAnalysis):
     """

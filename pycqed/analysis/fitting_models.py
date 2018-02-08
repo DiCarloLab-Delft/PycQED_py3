@@ -526,7 +526,13 @@ def fft_freq_phase_guess(data, t):
     return freq_guess, ph_guess
 
 
-def Cos_guess(model, data, t):
+def Cos_guess(model, data, t, **kwargs):
+    """
+    Tip: to use this assign this guess function as a method to a model use:
+    model.guess = Cos_guess.__get__(
+        model, model.__class__)
+    """
+
     amp_guess = abs(max(data)-min(data))/2  # amp is positive by convention
     offs_guess = np.mean(data)
 
