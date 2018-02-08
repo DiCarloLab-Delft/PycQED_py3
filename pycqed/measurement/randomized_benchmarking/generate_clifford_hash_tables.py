@@ -18,7 +18,7 @@ def construct_clifford_lookuptable(generator, indices):
     for idx in indices:
         clifford = generator(idx=idx)
         # important to use crc32 hashing as this is a non-random hash
-        hash_val = crc32(clifford.pauli_transfer_matrix.tobytes())
+        hash_val = crc32(clifford.pauli_transfer_matrix.round().astype(int))
         lookuptable.append(hash_val)
     return lookuptable
 

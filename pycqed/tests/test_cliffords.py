@@ -105,7 +105,7 @@ class TestHashedLookuptables(TestCase):
                                                     np.arange(24))
         for i in range(24):
             Cl = tqc.SingleQubitClifford(i)
-            target_hash = crc32(Cl.pauli_transfer_matrix.tobytes())
+            target_hash = crc32(Cl.pauli_transfer_matrix.round().astype(int))
             table_idx = hash_table.index(target_hash)
             self.assertEqual(table_idx, i)
 
@@ -114,7 +114,7 @@ class TestHashedLookuptables(TestCase):
 
         for i in range(24):
             Cl = tqc.SingleQubitClifford(i)
-            target_hash = crc32(Cl.pauli_transfer_matrix.tobytes())
+            target_hash = crc32(Cl.pauli_transfer_matrix.round().astype(int))
             table_idx = hash_table.index(target_hash)
             self.assertEqual(table_idx, i)
 
@@ -123,7 +123,7 @@ class TestHashedLookuptables(TestCase):
                                                     np.arange(11520))
         for i in range(11520):
             Cl = tqc.TwoQubitClifford(i)
-            target_hash = crc32(Cl.pauli_transfer_matrix.tobytes())
+            target_hash = crc32(Cl.pauli_transfer_matrix.round().astype(int))
             table_idx = hash_table.index(target_hash)
             self.assertEqual(table_idx, i)
 
@@ -131,19 +131,19 @@ class TestHashedLookuptables(TestCase):
         hash_table = tqc.get_two_qubit_clifford_hash_table()
         for i in range(11520):
             Cl = tqc.TwoQubitClifford(i)
-            target_hash = crc32(Cl.pauli_transfer_matrix.tobytes())
+            target_hash = crc32(Cl.pauli_transfer_matrix.round().astype(int))
             table_idx = hash_table.index(target_hash)
             self.assertEqual(table_idx, i)
 
     def test_get_clifford_id(self):
         for i in range(24):
             Cl = tqc.SingleQubitClifford(i)
-            idx = tqc.get_clifford_id(Cl)
+            idx = tqc.get_clifford_id(Cl.pauli_transfer_matrix)
             self.assertEqual(idx, Cl.idx)
 
         for i in range(11520):
             Cl = tqc.TwoQubitClifford(i)
-            idx = tqc.get_clifford_id(Cl)
+            idx = tqc.get_clifford_id(Cl.pauli_transfer_matrix)
             self.assertEqual(idx, Cl.idx)
 
 class Test_CliffordGroupProperties(TestCase):
@@ -158,7 +158,7 @@ class Test_CliffordGroupProperties(TestCase):
         hash_table = []
         for idx in np.arange(24**2):
             clifford = tqc.single_qubit_like_PTM(idx)
-            hash_val = crc32(clifford.tobytes())
+            hash_val = crc32(clifford.round().astype(int))
             hash_table.append(hash_val)
         self.assertEqual(len(hash_table), 24**2)
         self.assertEqual(len(np.unique(hash_table)), 24**2)
@@ -169,7 +169,7 @@ class Test_CliffordGroupProperties(TestCase):
         hash_table = []
         for idx in np.arange(5184):
             clifford = tqc.CNOT_like_PTM(idx)
-            hash_val = crc32(clifford.tobytes())
+            hash_val = crc32(clifford.round().astype(int))
             hash_table.append(hash_val)
         self.assertEqual(len(hash_table), 5184)
         self.assertEqual(len(np.unique(hash_table)), 5184)
@@ -180,7 +180,7 @@ class Test_CliffordGroupProperties(TestCase):
         hash_table = []
         for idx in np.arange(5184):
             clifford = tqc.iSWAP_like_PTM(idx)
-            hash_val = crc32(clifford.tobytes())
+            hash_val = crc32(clifford.round().astype(int))
             hash_table.append(hash_val)
         self.assertEqual(len(hash_table), 5184)
         self.assertEqual(len(np.unique(hash_table)), 5184)
@@ -191,7 +191,7 @@ class Test_CliffordGroupProperties(TestCase):
         hash_table = []
         for idx in np.arange(24**2):
             clifford = tqc.SWAP_like_PTM(idx)
-            hash_val = crc32(clifford.tobytes())
+            hash_val = crc32(clifford.round().astype(int))
             hash_table.append(hash_val)
         self.assertEqual(len(hash_table), 24**2)
         self.assertEqual(len(np.unique(hash_table)), 24**2)
@@ -202,12 +202,6 @@ class Test_CliffordGroupProperties(TestCase):
         hash_table = tqc.get_two_qubit_clifford_hash_table()
         self.assertEqual(len(hash_table), 11520)
         self.assertEqual(len(np.unique(hash_table)), 11520)
-
-
-
-
-
-
 
 class TestPauliTransferProps(TestCase):
     """
@@ -237,5 +231,42 @@ class TestPauliTransferProps(TestCase):
         CZ2 = np.linalg.multi_dot([CZ, CZ])
         CZ2 = np.dot(CZ, CZ)
         np.testing.assert_array_equal(CZ2, np.eye(16, dtype=int))
+
+
+class TestCliffordCalculus(TestCase):
+
+    def test_products(self):
+        Cl_3 = tqc.SingleQubitClifford(3)
+        Cl_3*Cl_3
+        self.assertEqual(Cl_3.idx, 3) # Pauli X
+        self.assertEqual((Cl_3*Cl_3).idx, 0) # The identity
+
+        Cl_3 = tqc.TwoQubitClifford(3)
+        self.assertEqual(Cl_3.idx, 3) # Pauli X on q0
+        self.assertEqual((Cl_3*Cl_3).idx, 0) # The identity
+        product_hash = crc32((Cl_3*Cl_3).pauli_transfer_matrix.round().astype(int))
+        target_hash = crc32(tqc.TwoQubitClifford(0).pauli_transfer_matrix.round().astype(int))
+        self.assertEqual(product_hash, target_hash)
+
+    def test_inverse_single_qubit_clifford(self):
+        for i in range(24):
+            print(i)
+            Cl = tqc.SingleQubitClifford(i)
+            Cl_inv = Cl.get_inverse()
+
+            self.assertEqual((Cl_inv*Cl).idx, 0)
+
+
+
+
+
+    # def test_inverse_two_qubit_clifford(self):
+    #     for i in range(11520):
+    #         Cl = tqc.TwoQubitClifford(i)
+    #         Cl_inv = Cl.get_inverse()
+
+    #         self.assertEqual((Cl_inv*Cl).idx, 0)
+
+
 
 

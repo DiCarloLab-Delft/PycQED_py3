@@ -76,15 +76,24 @@ class Clifford(object):
         returns a new Clifford object that performs the net operation
         that is the product of both operations.
         """
-        net_op = np.dot(self, other)
+        net_op = np.dot(self.pauli_transfer_matrix,
+                        other.pauli_transfer_matrix)
         idx = get_clifford_id(net_op)
-        return Clifford(idx)
+        return self.__class__(idx)
 
     def __repr__(self):
         return '{}(idx={})'.format(self.__class__.__name__, self.idx)
 
     def __str__(self):
-        return str(self.gate_decomposition)
+        return '{} idx {}\n PTM: {}\n'.format(self.__class__.__name__, self.idx,
+                                            self.pauli_transfer_matrix.__str__,
+                                            )
+
+    def get_inverse(self):
+        inverse_ptm = np.linalg.inv(self.pauli_transfer_matrix).astype(int)
+        idx = get_clifford_id(inverse_ptm)
+        return self.__class__(idx)
+
 
 class SingleQubitClifford(Clifford):
     def __init__(self, idx: int, decomposition: str='Epstein'):
@@ -215,14 +224,14 @@ def get_two_qubit_clifford_hash_table():
     return hash_table
 
 
-def get_clifford_id(clifford):
+def get_clifford_id(pauli_transfer_matrix):
     """
-    returns the unique Id of each Clifford
+    returns the unique Id of a Clifford.
     """
-    unique_hash = crc32(clifford.pauli_transfer_matrix.tobytes())
-    if isinstance(clifford, SingleQubitClifford):
+    unique_hash = crc32(pauli_transfer_matrix.round().astype(int))
+    if np.array_equal(np.shape(pauli_transfer_matrix), (4, 4)):
         hash_table = get_single_qubit_clifford_hash_table()
-    elif isinstance(clifford, TwoQubitClifford):
+    elif np.array_equal(np.shape(pauli_transfer_matrix), (16, 16)):
         hash_table = get_two_qubit_clifford_hash_table()
     else:
         raise NotImplementedError()
