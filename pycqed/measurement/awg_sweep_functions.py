@@ -100,7 +100,7 @@ class Rabi(swf.Hard_Sweep):
 
 class Rabi_2nd_exc(swf.Hard_Sweep):
 
-    def __init__(self, pulse_pars, pulse_pars_2nd, RO_pars, amps=None,
+    def __init__(self, pulse_pars, pulse_pars_2nd, RO_pars,
                  last_ge_pulse=True,
                  n=1, cal_points=True, no_cal_points=4, upload=True,
                  return_seq=False):
@@ -120,7 +120,8 @@ class Rabi_2nd_exc(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         if self.upload:
-            sqs2.Rabi_2nd_exc_seq(amps=self.sweep_points, last_ge_pulse=self.last_ge_pulse,
+            sqs2.Rabi_2nd_exc_seq(amps=self.sweep_points,
+                                  last_ge_pulse=self.last_ge_pulse,
                                   pulse_pars=self.pulse_pars,
                                   pulse_pars_2nd=self.pulse_pars_2nd,
                                   RO_pars=self.RO_pars, upload=self.upload,
@@ -977,13 +978,6 @@ class Randomized_Benchmarking_one_length(swf.Hard_Sweep):
         self.unit = '#'
         self.name = 'Randomized_Benchmarking_one_length'
 
-        # if self.cal_points:
-        #     self.sweep_points = np.concatenate([np.arange(self.nr_seeds),
-        #                                        [np.arange(self.nr_seeds)[-1]+.2,
-        #                                         np.arange(self.nr_seeds)[-1]+.3,
-        #                                         np.arange(self.nr_seeds)[-1]+.7,
-        #                                         np.arange(self.nr_seeds)[-1]+.8]])
-
     def prepare(self, **kw):
         if self.upload:
             sqs.Randomized_Benchmarking_seq_one_length(
@@ -1242,7 +1236,7 @@ class Motzoi_XY(swf.Hard_Sweep):
 
 class QScale(swf.Hard_Sweep):
 
-    def __init__(self, qscales, pulse_pars, RO_pars, upload=True,
+    def __init__(self, pulse_pars, RO_pars, upload=True,
                  cal_points=True):
         '''
         Measures 3 number of points per QScale parameter value specified
@@ -1256,9 +1250,6 @@ class QScale(swf.Hard_Sweep):
         self.parameter_name = 'QScale_factor'
         self.unit = ''
         self.cal_points = cal_points
-        sweep_pts = np.repeat(qscales, 3)
-        # self.sweep_points = np.append(sweep_pts,
-        #                               [qscales[-1]+(qscales[-1]-qscales[-2])]*4)
 
     def prepare(self, **kw):
         if self.upload:

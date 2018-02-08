@@ -867,12 +867,16 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         self.exp_name = os.path.split(self.folder)[-1][7:]
         if self.single_shots:
             self.shots_q0 = np.zeros(
-                (self.nr_segments, int(len(self.measured_values[0])/self.nr_segments)))
+                (self.nr_segments, int(
+                    len(self.measured_values[0])/self.nr_segments)))
             self.shots_q1 = np.zeros(
-                (self.nr_segments, int(len(self.measured_values[1])/self.nr_segments)))
+                (self.nr_segments, int(
+                    len(self.measured_values[1])/self.nr_segments)))
             for i in range(self.nr_segments):
-                self.shots_q0[i, :] = self.measured_values[0][i::self.nr_segments]
-                self.shots_q1[i, :] = self.measured_values[1][i::self.nr_segments]
+                self.shots_q0[i, :] = \
+                    self.measured_values[0][i::self.nr_segments]
+                self.shots_q1[i, :] = \
+                    self.measured_values[1][i::self.nr_segments]
 
             # Get correlations between shots
             self.shots_q0q1 = np.multiply(self.shots_q1, self.shots_q0)
@@ -913,7 +917,8 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         h12_10 = np.mean(avg_h12[50:50+7])
         h12_11 = np.mean(avg_h12[57:])
 
-        # std_arr = np.array( std_h2_00, std_h2_01, std_h2_10, std_h2_11, std_h12_00, std_h12_01, std_h12_10, std_h12_11])
+        # std_arr = np.array( std_h2_00, std_h2_01, std_h2_10,
+        # std_h2_11, std_h12_00, std_h12_01, std_h12_10, std_h12_11])
         # plt.plot(std_arr)
         # plt.show()
 
