@@ -7,11 +7,16 @@ from pycqed.measurement.waveform_control import pulse
 from pycqed.measurement.waveform_control import sequence
 from pycqed.utilities.general import add_suffix_to_dict_keys
 from pycqed.measurement.pulse_sequences.standard_elements import multi_pulse_elt
-from pycqed.measurement.pulse_sequences.standard_elements import distort_and_compensate
-from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
-import pycqed.measurement.waveform_control.fluxpulse_predistortion as fluxpulse_predistortion
+from pycqed.measurement.pulse_sequences.standard_elements import \
+    distort_and_compensate
+from pycqed.measurement.randomized_benchmarking import \
+    randomized_benchmarking as rb
+import pycqed.measurement.waveform_control.fluxpulse_predistortion as \
+    fluxpulse_predistortion
 
-from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import get_pulse_dict_from_pars
+from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import \
+    get_pulse_dict_from_pars
+
 from importlib import reload
 reload(pulse)
 from ..waveform_control import pulse_library
@@ -1010,7 +1015,7 @@ def n_qubit_off_on(pulse_pars_list, RO_pars, return_seq=False, verbose=False,
         return seq_name
 
 
-def n_qubit_simultaneous_randomized_benchmarking_seq(pulse_pars_list, RO_pars,
+def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_list, RO_pars,
                                                      nr_cliffords_value, #scalar
                                                      nr_seeds,           #array
                                                      idx_for_RB=0,
@@ -1021,7 +1026,9 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(pulse_pars_list, RO_pars,
                                                      interleaved_gate=None,
                                                      post_msmt_delay=3e-6,
                                                      seq_name=None,
-                                                     verbose=False):
+                                                     verbose=False,
+                                                     CZ_info_list=None,
+                                                     upload=True):
 
     # Here RO_pars must contain the RO pulse for multiplexed RO on the
     # relevant qubits.
@@ -1029,22 +1036,65 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(pulse_pars_list, RO_pars,
     # which will undergo the RB protocol in the case CxC_RB==False (i.e. the
     # position of the Z operator when we measure ZIII..I, IZII..I, IIZI..I etc.
 
+    # TODO: add support for more than one CZ in the CZ_info_list -> make
+    # TODO: qbc, qbt into list, now they are variables.
+
     # get number of qubits
-    n = len(pulse_pars_list)
+    n = len(qubit_list)
 
     # Create a dict with the parameters for all the pulses
-    pulse_dict = {'RO': RO_pars}
-    for i, pulse_pars in enumerate(pulse_pars_list):
-        pars = pulse_pars.copy()
-        if i != 0:
-            pars['refpoint'] = 'start'
+    if CZ_info_list is not None:
+        CZ_info_list = [(qubit_list.index(qb_pairs[0]),
+                         qubit_list.index(qb_pairs[1])) for
+                        qb_pairs in CZ_info_list]
+        print('(qbc_idx, qbt_idx) = ', CZ_info_list)
 
-        pulse_dict_qb = deepcopy(get_pulse_dict_from_pars(pars))
-        Z0 = deepcopy(pulse_dict_qb['Z180'])
-        Z0['phase'] = 0
-        pulse_dict_qb.update({'Z0': Z0})
-        pulses = add_suffix_to_dict_keys(pulse_dict_qb, ' {}'.format(i))
-        pulse_dict.update(pulses)
+    pulse_dict = {'RO': RO_pars}
+
+    for qb_nr, qb in enumerate(qubit_list):
+        op_dict = qb.get_operation_dict()
+
+        op_dict['Z0 ' + qb.name] = deepcopy(op_dict['Z180 ' + qb.name])
+        op_dict['Z0 ' + qb.name]['basis_rotation'][qb.name] = 0
+
+        spacerpulse = {'pulse_type': 'SquarePulse',
+                       'channel': RO_pars['acq_marker_channel'],
+                       'amplitude': 0.0,
+                       'length': 30e-9,
+                       'pulse_delay': 0,
+                       'target_qubit': qb.name}
+        op_dict.update({'spacer': spacerpulse})
+
+        if CZ_info_list is not None:
+            for CZ_idxs in CZ_info_list:
+                qbc = qubit_list[CZ_idxs[0]]
+                qbt = qubit_list[CZ_idxs[1]]
+                # raise warning if the CZ pulse delay is not 0
+                for i in op_dict:
+                    if 'CZ' in i and op_dict[i]['pulse_delay']!=0:
+                        raise ValueError('CZ {} {} pulse_delay is not 0!'.
+                            format(qbt.name, qbc.name))
+                if qb.name == qubit_list[CZ_idxs[1]].name:
+
+                    op_dict['ICZ ' + qb.name] = \
+                        deepcopy(op_dict['I ' + qb.name])
+                    op_dict['ICZs ' + qb.name] = \
+                        deepcopy(op_dict['Is ' + qb.name])
+
+                    op_dict['ICZ ' + qb.name]['nr_sigma'] = 1
+                    op_dict['ICZs ' + qb.name]['nr_sigma'] = 1
+
+                    op_dict['ICZ ' + qb.name]['sigma'] = \
+                        qbc.get_operation_dict()[
+                            'CZ ' + qbt.name + ' ' + qbc.name]['length']
+                    op_dict['ICZs ' + qb.name]['sigma'] = \
+                        qbc.get_operation_dict()[
+                            'CZ ' + qbt.name + ' ' + qbc.name]['length']
+
+        if qb_nr != 0:
+            for pulse_names in op_dict:
+                    op_dict[pulse_names]['refpoint'] = 'start'
+        pulse_dict.update(op_dict)
 
     if CxC_RB:
         if seq_name is None:
@@ -1067,7 +1117,22 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(pulse_pars_list, RO_pars,
             # pulse0_qb1,...pulse0_qbN,...,pulseN_qb0, pulseN_qb1,...,pulseN_qbN]
             pulse_keys_w_suffix = []
             for k, lst in enumerate(pulse_keys):
-                pulse_keys_w_suffix.append([x+' '+str(k % n) for x in lst])
+                pulse_keys_w_suffix.append([x+' '+qubit_list[k % n].name
+                                            for x in lst])
+
+            if CZ_info_list is not None:
+            # interleaved CZ_qbc and ICZ_qbt; this also changes
+            # pulse_keys_by_qubit
+                for pulse_keys_lst in pulse_keys_w_suffix:
+                    if pulse_keys_lst[0][-3::]==qbc.name:
+                        pulse_keys_lst.extend(['spacer '+qbc.name,
+                                               'CZ ' + qbt.name + ' ' + qbc.name,
+                                               'spacer '+qbc.name])
+                    if pulse_keys_lst[0][-3::]==qbt.name:
+                        pulse_keys_lst.extend(['spacer '+qbt.name,
+                                               'ICZ ' + qbt.name,
+                                               'spacer '+qbt.name])
+
             pulse_keys_by_qubit = []
             for k in range(n):
                 pulse_keys_by_qubit.append([x for l in pulse_keys_w_suffix[k::n]
@@ -1082,8 +1147,8 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(pulse_pars_list, RO_pars,
             # dict of the next qubit which has an SSB pulse
             Zp0_idxs = [] # indices of the Z pulses on qb0
             for w, px in enumerate(pulse_list):
-                if (px['target_qubit']==pulse_pars_list[0]['target_qubit'] and
-                            px['pulse_type']=='Z_pulse'):
+                if (px['target_qubit'] == qubit_list[0].name and
+                            px['pulse_type'] == 'Z_pulse'):
                     Zp0_idxs.append(w)
             if len(Zp0_idxs)>0:
                 for y in Zp0_idxs:
@@ -1129,6 +1194,13 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(pulse_pars_list, RO_pars,
                 print('\nnr_Z_pulses/nr_qubits ', len([x for x in pulse_list
                                                        if 'Z' in x['pulse_type']])/n)
                 print('\n i ', i)
+
+                from pprint import pprint
+                for i,p in enumerate(pulse_list):
+                    print()
+                    print(i%n)
+                    pprint(p)
+
             el = multi_pulse_elt(i, station, pulse_list)
             el_list.append(el)
             seq.append_element(el, trigger_wait=True)
@@ -1151,7 +1223,8 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(pulse_pars_list, RO_pars,
                 cl_seq,
                 gate_decomp=gate_decomposition)
 
-            C_pulse_list_keys = [x+' '+str(idx_for_RB) for x in pulse_keys]
+            C_pulse_list_keys = [x+' '+qubit_list[idx_for_RB].name
+                                 for x in pulse_keys]
             pulse_list_keys = len(C_pulse_list_keys)*n*['']
             pulse_list_keys[idx_for_RB::n] = C_pulse_list_keys
 
@@ -1162,9 +1235,9 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(pulse_pars_list, RO_pars,
                 for j, key in enumerate(pulse_list_keys[index:index+n]):
                     if key=='':
                         if 'Z' in pulse_list_keys[index:index+n][idx_for_RB]:
-                            pulse_list_keys[index+j] = 'Z0 '+ str(j)
+                            pulse_list_keys[index+j] = 'Z0 '+ qubit_list[j].name
                         else:
-                            pulse_list_keys[index+j] = 'I '+ str(j)
+                            pulse_list_keys[index+j] = 'I '+ qubit_list[j].name
 
             # create pulse list to upload
             pulse_list = [pulse_dict[x] for x in pulse_list_keys]
@@ -1173,8 +1246,8 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(pulse_pars_list, RO_pars,
             # pulse dict which is not a Z_pulse
             Zp0_idxs = [] # indices of the Z pulses on qb0
             for w, px in enumerate(pulse_list):
-                if (px['target_qubit']==pulse_pars_list[0]['target_qubit']
-                        and px['pulse_type']=='Z_pulse'):
+                if (px['target_qubit'] == qubit_list[0].name
+                    and px['pulse_type'] == 'Z_pulse'):
                     Zp0_idxs.append(w)
             if len(Zp0_idxs)>0:
                 for y in Zp0_idxs:
@@ -1225,7 +1298,8 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(pulse_pars_list, RO_pars,
             el_list.append(el)
             seq.append_element(el, trigger_wait=True)
 
-    station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
@@ -1426,9 +1500,9 @@ def two_qubit_tomo_bell_qudev(bell_state,
             pulses += [operation_dict[p]]
         # print('pulses ', len(pulses))
         pulses += [RO_pars]
-        # from pprint import pprint
-        # pprint(pulses)
-        # print('\n')
+        from pprint import pprint
+        pprint(pulses)
+        print('\n')
         el = multi_pulse_elt(i, station, pulses, sequencer_config)
         if distortion_dict is not None:
             el = fluxpulse_predistortion.distort_qudev(el,distortion_dict)
