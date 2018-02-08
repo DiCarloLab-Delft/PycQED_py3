@@ -7658,6 +7658,9 @@ def fit_qubit_frequency(sweep_points, data, mode='dac',
         Q_dac_freq_mod.set_param_hint('dac_sweet_spot',
                                       value=dac_sweet_spot,
                                       vary=vary_dac_sweet_spot)
+        Q_dac_freq_mod.set_param_hint('asymmetry',
+                                      value=0,
+                                      vary=False)
 
         fit_res = Q_dac_freq_mod.fit(data=data, dac_voltage=sweep_points)
     elif mode == 'flux':
@@ -9332,16 +9335,21 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
     """
     def __init__(self, X90_separation=None,flux_pulse_length=None,
                  qb_name=None, label='Ramsey_interleaved_flux_pulse',
-                 run_default_super=True, **kw):
+                 # run_default_super=True,
+                 cal_points=False,
+                 reference_measurements=False,
+                 auto=True,
+                 **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
         kw['close_file'] = False
         super(self.__class__, self).__init__(TwoD=True,
                                              start_at_zero=True,
-                                             qb_name=qb_name, **kw)
+                                             qb_name=qb_name,auto=auto,
+                                             **kw)
         self.label = label
         self.get_values('Data')
-        self.get_naming_and_values()
+        self.get_naming_and_values_2D()
         self.fitted_phases = None
         self.fitted_delay = 0
         # self.fig, self.ax = plt.subplots()
@@ -9350,15 +9358,18 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
         self.X90_separation = X90_separation
         self.flux_pulse_length = flux_pulse_length
         self.return_fit = kw.pop('return_fit', False)
-
-        if run_default_super:
-            super(self.__class__, self).run_default_analysis(TwoD=True,
-                                                             close_file=False)
-
-
+        self.cal_points = cal_points
+        self.reference_measurements=reference_measurements
+        # if run_default_super:
+        #     super(self.__class__, self).run_default_analysis(TwoD=True,
+        #                                                      close_file=False)
 
     def fit_single_cos(self, thetas, ampls,
-                       print_fit_results=True,phase_guess=0):
+                       print_fit_results=True, phase_guess=0,
+                       cal_points=False):
+        if cal_points:
+            thetas = thetas[:-4]
+            ampls = ampls[:-4]
         cos_mod = fit_mods.CosModel
         average = np.mean(ampls)
 
@@ -9394,40 +9405,116 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
 
         if fit_res.best_values['amplitude'] < 0.:
             fit_res.best_values['phase'] += np.pi
+            fit_res.best_values['amplitude'] *= -1
 
         return fit_res
 
-    def fit_all(self, plot=False, extrapolate_phase=False, return_ampl=False):
+    def unwrap_phases_extrapolation(self,phases):
+        for i in range(2,len(phases)):
+            phase_diff_extrapolation = (phases[i-1]
+                                        + (phases[i-1] - phases[i-2]) - phases[i])
+            #         print(i,abs(phase_diff_extrapolation)>np.pi)
+            #         print(phase_list[i],phase_diff_extrapolation + phase_list[i])
+            if phase_diff_extrapolation > np.pi:
+                phases[i] += round(phase_diff_extrapolation/(2*np.pi))*2*np.pi
+            #             print('corrected: ',  phase_list[i])
+            elif phase_diff_extrapolation < np.pi:
+                phases[i] += round(phase_diff_extrapolation/(2*np.pi))*2*np.pi
+            #             print('corrected: ',  phase_list[i])
+        return phases
 
-        phase_list = [0,0]
+
+    def fit_all(self, plot=False, extrapolate_phase=False, return_ampl=False,
+                cal_points=None,reference_measurements=None,
+                fit_range=None):
+        if reference_measurements is None:
+            reference_measurements = self.reference_measurements
+        if cal_points is None:
+            cal_points = self.cal_points
+
+        if reference_measurements:
+            phase_list, amplitude_list = self.fit_all_helper(plot=plot,
+                                                             extrapolate_phase=extrapolate_phase,
+                                                             return_ampl=True,
+                                                             cal_points=False,
+                                                             reference_measurement=True,
+                                                             reference_trace=False,
+                                                             fit_range=fit_range)
+            phase_list_ref, amplitude_list_ref = self.fit_all_helper(plot=plot,
+                                                             extrapolate_phase=extrapolate_phase,
+                                                             return_ampl=True,
+                                                             cal_points=cal_points,
+                                                             reference_measurement=True,
+                                                             reference_trace=True,
+                                                             fit_range=fit_range)
+            if return_ampl:
+                return phase_list, amplitude_list, phase_list_ref, amplitude_list_ref
+            else:
+                return phase_list, phase_list_ref
+
+        else:
+            phase_list, amplitude_list = self.fit_all_helper(plot=plot,
+                                                             extrapolate_phase=extrapolate_phase,
+                                                             return_ampl=True,
+                                                             cal_points=cal_points,
+                                                             reference_measurement=False,
+                                                             reference_trace=False,
+                                                             fit_range=fit_range)
+
+            if return_ampl:
+                return phase_list, amplitude_list
+            else:
+                return phase_list
+
+    def fit_all_helper(self, plot=False, extrapolate_phase=False, return_ampl=False,
+                cal_points=None, reference_measurement=False, reference_trace=False,
+                fit_range=None):
+
+        if cal_points is None:
+            cal_points = self.cal_points
+
+        phase_list = [0]
         amplitude_list = []
 
         length_single = len(self.sweep_points)
 
         if plot:
-            self.fig, self.ax = plt.subplots(2,1)
+            self.fig, self.ax = plt.subplots(2, 1)
         else:
-            self.fig,self.ax = (None,None)
+            self.fig, self.ax = (None, None)
 
-        for i in np.arange(0,len(self.sweep_points_2D)*length_single, length_single):
+        data_rotated = a_tools.rotate_and_normalize_data_no_cal_points(
+                                np.array([self.data[2], self.data[3]]))
+        if fit_range is None:
+            i_start = 0
+            i_end = length_single*len(self.sweep_points_2D)
+        else:
+            i_start = length_single*fit_range[0]
+            i_end = length_single*fit_range[1]
+        for i in np.arange(i_start, i_end, length_single):
 
-            data_slice = self.data[:,i:i+length_single-1]
+            if reference_measurement:
+                if reference_trace:
+                    thetas = self.data[0, i+int(length_single/2):i+length_single]
+                    ampls = data_rotated[i+int(length_single/2):i+length_single]
+                else:
+                    thetas = self.data[0, i:i+int(length_single/2)]
+                    ampls = data_rotated[i:i+int(length_single/2)]
 
-            thetas = data_slice[0]
-            # ampls = data_slice[2]
-            ampls = a_tools.rotate_and_normalize_data_no_cal_points(
-                np.array([data_slice[2], data_slice[3]]))
 
-            # ampls = np.abs((data_slice[2]-data_slice[2, 0]) + 1j*(data_slice[3] -
-            #                                                     data_slice[3, 0]))
-
-            if extrapolate_phase:
-                phase_guess = phase_list[-1] + (phase_list[-1] - phase_list[-2])
             else:
-                phase_guess = phase_list[-1]
+                thetas = self.data[0, i:i+length_single]
+                ampls = data_rotated[i:i+length_single]
+
+            # phase_guess = phase_list[-1]
+            phase_guess = 0
+
+
+
             fit_res = self.fit_single_cos(thetas, ampls,
                                           print_fit_results=False,
-                                          phase_guess=phase_guess)
+                                          phase_guess=phase_guess,
+                                          cal_points=cal_points)
 
             phase_list.append(fit_res.best_values['phase'])
             amplitude_list.append(fit_res.best_values['amplitude'])
@@ -9436,12 +9523,13 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
                 self.ax[0].plot(thetas, ampls, 'k.')
                 thetas_fit = np.linspace(thetas[0],thetas[-1],128)
                 ampls_fit = fit_res.eval(t=thetas_fit)
-                print(len(ampls_fit),len(thetas_fit))
                 self.ax[0].plot(thetas_fit, ampls_fit, 'r-')
 
         phase_list.pop(0)
-        phase_list.pop(0)
 
+        phase_list = np.array(phase_list)
+        if extrapolate_phase:
+            phase_list = self.unwrap_phases_extrapolation(phase_list)
 
         if plot:
             self.ax[0].set_title('Cosine fits')
@@ -9449,7 +9537,10 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
             self.ax[0].set_ylabel('|S21| (arb. units)')
             self.ax[0].legend(['data','fits'])
 
-            self.ax[1].plot(self.sweep_points_2D,phase_list)
+            if fit_range is None:
+                self.ax[1].plot(self.sweep_points_2D,phase_list)
+            else:
+                self.ax[1].plot(self.sweep_points_2D[fit_range[0]:fit_range[1]],phase_list)
             self.ax[1].set_title('fitted phases')
             self.ax[1].set_xlabel(self.parameter_names[1]
                                   +' '+self.parameter_units[1])
@@ -9482,7 +9573,7 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
         if flux_pulse_length is None:
             raise ValueError('Must specify the flux pulse length used in the experiment.')
         if self.fitted_phases is None:
-            self.fit_all(plot=False,extrapolate_phase=True)
+            self.fit_all(plot=False,extrapolate_phase=True,cal_points=self.cal_points)
         if return_fit is None:
             return_fit = self.return_fit
 
@@ -9556,7 +9647,7 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
 
 
         #get the fit results (lmfit.ModelResult) and save them
-        self.fit_all(plot=False,extrapolate_phase=False)
+        self.fit_all(plot=False,extrapolate_phase=False,cal_points=self.cal_points)
 
         self.fitted_delay, self.delay_fit_res = self.fit_delay(
             X90_separation=X90_separation,

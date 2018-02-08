@@ -1794,6 +1794,8 @@ def flux_pulse_CPhase_seq(sweep_points,qb_control, qb_target,
                           upload=True, return_seq=False,
                           distorted=False,
                           distortion_dict=None,
+                          measurement_mode='excited_state',
+                          reference_measurements=False
                           ):
 
     '''
@@ -1802,13 +1804,13 @@ def flux_pulse_CPhase_seq(sweep_points,qb_control, qb_target,
     The sequence function is programmed, such that it either can take lengths, amplitudes or phases to sweep.
 
     Timings of sequence
-                                  <-- length -->
-                                    or amplitude
-    qb_control:    |X180|  ---   |  fluxpulse   |
+                                         <-- length -->
+                                          or amplitude
+    qb_control:    |X180|  ----------   |  fluxpulse   |
 
-    qb_target:     |X90|  ------------------------------|X90|--------  |RO|
-                         <------>                       X90_phase
-                         spacing
+    qb_target:     ------- |X90|  ------------------------------|X90|--------  |RO|
+                                <------>                       X90_phase
+                                spacing
     args:
         sweep_points: np.array containing the lengths of the fluxpulses
         qb_control: instance of the qubit class
@@ -1816,7 +1818,12 @@ def flux_pulse_CPhase_seq(sweep_points,qb_control, qb_target,
         sweep_mode: str, either 'length', 'amplitude' or amplitude
         X90_phase: float, phase of the second X90 pulse in rad
         spacing: float
-
+        measurement_mode (str): either 'excited_state', 'ground_state'
+        reference_measurement (bool): if True, a reference measurement with the
+                                      control qubit in ground state is added in the
+                                      same hard sweep. IMPORTANT: you need to double
+                                      the hard sweep points!
+                                      e.g. thetas = np.concatenate((thetas,thetas))
     '''
 
 
@@ -1831,13 +1838,17 @@ def flux_pulse_CPhase_seq(sweep_points,qb_control, qb_target,
     seq = sequence.Sequence(seq_name)
     el_list = []
 
+    if reference_measurements:
+        measurement_mode = 'excited_state'
     pulses_control = get_pulse_dict_from_pars(pulse_pars_control)
     pulses_target = get_pulse_dict_from_pars(pulse_pars_target)
 
-    X180_control = pulses_control['X180']
+    X180_control = deepcopy(pulses_control['X180'])
     X180_control['refpoint'] = 'start'
     X90_target = pulses_target['X90']
-    X90_target['refpoint'] = 'start'
+    X90_target['refpoint'] = 'end'
+    if measurement_mode == 'ground_state':
+        X180_control['amplitude'] = 0.
 
     X90_target_2 = deepcopy(X90_target)
     X90_target_2['phase'] = X90_phase*180/np.pi
@@ -1846,7 +1857,6 @@ def flux_pulse_CPhase_seq(sweep_points,qb_control, qb_target,
     flux_pulse_control = operation_dict_control["flux "+qb_name_control]
     flux_pulse_control['refpoint'] = 'end'
     flux_pulse_control['delay'] = spacing
-
 
     if sweep_mode == 'length':
         max_length = np.max(sweep_points)
@@ -1858,11 +1868,11 @@ def flux_pulse_CPhase_seq(sweep_points,qb_control, qb_target,
 
     RO_pars_target['refpoint'] = 'end'
 
-    if flux_pulse_control['pulse_type'] == 'GaussFluxPulse':
-        flux_pulse_control['pulse_delay'] -= flux_pulse_control['buffer']
-        X90_target_2['pulse_delay'] -= 2* flux_pulse_control['buffer']
-
     for i, sweep_point in enumerate(sweep_points):
+
+        if reference_measurements:
+            if i >= int(len(sweep_points)/2):
+                X180_control['amplitude'] = 0.
         if sweep_mode == 'length':
             flux_pulse_control['length'] = sweep_point
         elif sweep_mode == 'amplitude':
@@ -1878,6 +1888,8 @@ def flux_pulse_CPhase_seq(sweep_points,qb_control, qb_target,
                                               flux_pulse_control, X90_target_2,
                                               RO_pars_target])
         else:
+
+
             el = multi_pulse_elt(i, station, [X180_control,X90_target,
                                               flux_pulse_control,X90_target_2,
                                               RO_pars_target])
@@ -1889,6 +1901,9 @@ def flux_pulse_CPhase_seq(sweep_points,qb_control, qb_target,
                 raise ValueError('Must specify distortion dictionary')
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
+
+
+
     if upload:
         station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
 

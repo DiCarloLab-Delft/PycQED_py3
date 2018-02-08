@@ -1410,6 +1410,8 @@ class QuDev_transmon(Qubit):
                               analyze=True, close_fig=True, upload=True,
                               fluxing_channels=[]):
         """
+        DCL code. Instead use qb.calibrate_flux_pulse_frequency()
+
         Sweep over flux pulse amplitudes; for each, perform a Ramsey to get the
         detuning from qubit parking position.
 
@@ -2784,7 +2786,7 @@ class QuDev_transmon(Qubit):
             ampls: numpy array with amplitudes (in V) swept through
                 as flux pulse amplitudes
             analyze: bool, if True, then the measured data
-                gets analyzed (
+                     gets analyzed ( ma.fit_qubit_frequency() )
 
 
         """
@@ -2805,7 +2807,6 @@ class QuDev_transmon(Qubit):
 
         if thetas is None:
             thetas = np.linspace(0, 2*np.pi, 8, endpoint=False)
-
 
         if ampls is None:
             ampls = np.linspace(0,1,21)
@@ -2850,6 +2851,10 @@ class QuDev_transmon(Qubit):
                 auto=False)
             flux_pulse_ma_1.fit_all(extrapolate_phase=True, plot=True)
 
+            phases = flux_pulse_ma_1.fitted_phases
+            ampls = flux_pulse_ma_1.sweep_points_2D
+
+
             if ampls_bidirectional:
                 flux_pulse_ma_2 = ma.Fluxpulse_Ramsey_2D_Analysis(
                     label=measurement_string_2,
@@ -2859,27 +2864,28 @@ class QuDev_transmon(Qubit):
                     auto=False)
                 flux_pulse_ma_2.fit_all(extrapolate_phase=True, plot=True)
 
-                instrument_settings = flux_pulse_ma_1.data_file['Instrument settings']
-                qubit_attrs = instrument_settings[self.name].attrs
-                E_c = kw.pop('E_c', qubit_attrs.get('E_c', 0.3e9))
-                f_max = kw.pop('f_max', qubit_attrs.get('f_max', self.f_qubit()))
-                V_per_phi0 = kw.pop('V_per_phi0',
-                                    qubit_attrs.get('V_per_phi0', 1.))
-                dac_sweet_spot = kw.pop('dac_sweet_spot',
-                                        qubit_attrs.get('dac_sweet_spot', 0))
-
                 phases = np.concatenate(flux_pulse_ma_2.fitted_phases[-1:0:-1],
                                         flux_pulse_ma_1.fitted_phases)
                 ampls = np.concatenate(flux_pulse_ma_2.sweep_points_2D[-1:0:-1],
-                                       flux_pulse_ma_1.sweep_points_2D)
+                                   flux_pulse_ma_1.sweep_points_2D)
 
-                freqs = f_max - phases/(2*np.pi*pulse_length)
+            instrument_settings = flux_pulse_ma_1.data_file['Instrument settings']
+            qubit_attrs = instrument_settings[self.name].attrs
+            E_c = kw.pop('E_c', qubit_attrs.get('E_c', 0.3e9))
+            f_max = kw.pop('f_max', qubit_attrs.get('f_max', self.f_qubit()))
+            V_per_phi0 = kw.pop('V_per_phi0',
+                                qubit_attrs.get('V_per_phi0', 1.))
+            dac_sweet_spot = kw.pop('dac_sweet_spot',
+                                    qubit_attrs.get('dac_sweet_spot', 0))
 
-                fit_res = ma.fit_qubit_frequency(ampls, freqs, E_c=E_c, f_max=f_max,
-                                                 V_per_phi0=V_per_phi0,
-                                                 dac_sweet_spot=dac_sweet_spot
-                                                 )
-                print(fit_res.fit_report())
+
+            freqs = f_max - phases/(2*np.pi*pulse_length)
+
+            fit_res = ma.fit_qubit_frequency(ampls, freqs, E_c=E_c, f_max=f_max,
+                                             V_per_phi0=V_per_phi0,
+                                             dac_sweet_spot=dac_sweet_spot
+                                             )
+            print(fit_res.fit_report())
 
             if plot and ampls_bidirectional:
                 fit_res.plot()
@@ -3004,6 +3010,69 @@ class QuDev_transmon(Qubit):
                                                                 dynamic_phase))
 
             return dynamic_phase
+
+    def measure_cphase(self,qb_target,amps,lengths,phases=None,
+                       MC=None,cal_points=None,plot=False,
+                       return_population_loss=False):
+
+        if MC is None:
+            MC = self.MC
+        if phases is None:
+            phases = np.linspace(0,2*np.pi,16,endpoint=False)
+
+        cphase_list = []
+        population_loss_list = []
+        for amp,length in zip(amps,lengths):
+
+            self.flux_pulse_amp(amp)
+            self.flux_pulse_amp(length)
+
+            s1 = awg_swf.Flux_pulse_CPhase_meas_hard_swf(qb_control=self,
+                                                         qb_target=qb_target,
+                                                         sweep_mode='phase',
+                                                         cal_points=cal_points,
+                                                         reference_measurements=True,
+                                                        )
+            s2 = awg_swf.Flux_pulse_CPhase_meas_2D(self,qb_target,s1,
+                                                   sweep_mode='amplitude')
+            self.prepare_for_timedomain()
+            MC.set_sweep_function(s1)
+            MC.set_sweep_points(phases)
+            MC.set_sweep_function_2D(s2)
+            MC.set_sweep_points_2D([amp])
+            MC.set_detector_function(self.int_avg_det)
+            MC.run_2D('CPhase_measurement_{}_{}'.format(self.name,qb_target.name))
+
+            flux_pulse_ma = ma.Fluxpulse_Ramsey_2D_Analysis(
+                qb_name=self.name, cal_points=cal_points,
+                reference_measurements=True
+            )
+            fitresults = flux_pulse_ma.fit_all(plot=plot,
+                                               reference_measurements=True,
+                                               cal_points=cal_points,
+                                               return_ampl=True
+                                               )
+            fitted_phases, amplitude_list, fitted_phases_ref, amplitude_list_ref = fitresults
+            cphase = fitted_phases - fitted_phases_ref
+            pop_loss = (amplitude_list - amplitude_list_ref)/amplitude_list
+            cphase_list.append(cphase[0])
+            population_loss_list.append(pop_loss[0])
+        cphases = np.array(cphase_list)
+        pop_losses = np.array(population_loss_list)
+        if return_population_loss:
+            return cphases, pop_losses
+        else:
+            return cphases
+
+
+
+
+
+
+
+
+
+
 
 
 

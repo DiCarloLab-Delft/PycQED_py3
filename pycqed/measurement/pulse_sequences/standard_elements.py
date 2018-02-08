@@ -199,9 +199,10 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
                             pulse_pars_new['pulse_type']))
 
                 try:
-                    print('\nphase offset: ', phase_offset[pulse_pars['target_qubit']])
-                    print('old phase: ', pulse_pars['phase'])
-                    print('new phase: ', pulse_pars_new['phase'])
+                    pass
+                    # print('\nphase offset: ', phase_offset[pulse_pars['target_qubit']])
+                    # print('old phase: ', pulse_pars['phase'])
+                    # print('new phase: ', pulse_pars_new['phase'])
                 except KeyError:
                     pass
 
