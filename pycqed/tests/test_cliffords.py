@@ -17,6 +17,12 @@ from pycqed.measurement.randomized_benchmarking import \
     two_qubit_clifford_group as tqc
 from pycqed.measurement.randomized_benchmarking.generate_clifford_hash_tables import construct_clifford_lookuptable
 
+
+np.random.seed(0)
+test_indices_2Q = np.random.randint(0, high=11520, size=50)
+# To test all elements of the 2 qubit clifford group use:
+# test_indices_2Q = np.arange(11520)
+
 class TestLookuptable(TestCase):
     def test_unique_mapping(self):
         for row in clifford_lookuptable:
@@ -121,7 +127,7 @@ class TestHashedLookuptables(TestCase):
     def test_two_qubit_hashtable_constructed(self):
         hash_table = construct_clifford_lookuptable(tqc.TwoQubitClifford,
                                                     np.arange(11520))
-        for i in range(11520):
+        for i in test_indices_2Q:
             Cl = tqc.TwoQubitClifford(i)
             target_hash = crc32(Cl.pauli_transfer_matrix.round().astype(int))
             table_idx = hash_table.index(target_hash)
@@ -129,7 +135,7 @@ class TestHashedLookuptables(TestCase):
 
     def test_two_qubit_hashtable_file(self):
         hash_table = tqc.get_two_qubit_clifford_hash_table()
-        for i in range(11520):
+        for i in test_indices_2Q:
             Cl = tqc.TwoQubitClifford(i)
             target_hash = crc32(Cl.pauli_transfer_matrix.round().astype(int))
             table_idx = hash_table.index(target_hash)
@@ -141,7 +147,7 @@ class TestHashedLookuptables(TestCase):
             idx = tqc.get_clifford_id(Cl.pauli_transfer_matrix)
             self.assertEqual(idx, Cl.idx)
 
-        for i in range(11520):
+        for i in test_indices_2Q:
             Cl = tqc.TwoQubitClifford(i)
             idx = tqc.get_clifford_id(Cl.pauli_transfer_matrix)
             self.assertEqual(idx, Cl.idx)
@@ -250,22 +256,15 @@ class TestCliffordCalculus(TestCase):
 
     def test_inverse_single_qubit_clifford(self):
         for i in range(24):
-            print(i)
             Cl = tqc.SingleQubitClifford(i)
             Cl_inv = Cl.get_inverse()
-
             self.assertEqual((Cl_inv*Cl).idx, 0)
 
-
-
-
-
-    # def test_inverse_two_qubit_clifford(self):
-    #     for i in range(11520):
-    #         Cl = tqc.TwoQubitClifford(i)
-    #         Cl_inv = Cl.get_inverse()
-
-    #         self.assertEqual((Cl_inv*Cl).idx, 0)
+    def test_inverse_two_qubit_clifford(self):
+        for i in test_indices_2Q:
+            Cl = tqc.TwoQubitClifford(i)
+            Cl_inv = Cl.get_inverse()
+            self.assertEqual((Cl_inv*Cl).idx, 0)
 
 
 
