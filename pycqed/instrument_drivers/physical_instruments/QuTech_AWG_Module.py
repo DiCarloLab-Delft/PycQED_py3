@@ -173,7 +173,7 @@ class QuTech_AWG_Module(SCPI):
                                get_cmd=dac_temperature_cmd + '?',
                                get_parser=float,
                                docstring='Reads the temperature of a DAC.\n' \
-                                 +'Temperature measurement interval is 10 seconds' \
+                                 +'Temperature measurement interval is 10 seconds\n' \
                                  +'Return:\n     float with temperature in Celsius')
 
             self.add_parameter('output{}_voltage'.format(ch),
@@ -182,8 +182,11 @@ class QuTech_AWG_Module(SCPI):
                                get_cmd=output_voltage_cmd + '?',
                                get_parser=float,
                                docstring='Reads the output voltage of a channel.\n' \
-                                 +'Measurement interval is 10 seconds' \
-                                 +'Return:\n     float in voltage')
+                                 +'Notes:\n    Measurement interval is 10 seconds.\n' \
+                                 +'    The output voltage will only be read if the channel is disabled:\n' \
+                                 +'    E.g.: qwg.chX_state(False)\n' \
+                                 +'    If the channel is enabled it will return an low value: >0.1\n' \
+                                 +'Return:\n   float in voltage')
 
         # Waveform parameters
         self.add_parameter('WlistSize',
