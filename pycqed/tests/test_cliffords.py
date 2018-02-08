@@ -254,6 +254,21 @@ class TestCliffordCalculus(TestCase):
         target_hash = crc32(tqc.TwoQubitClifford(0).pauli_transfer_matrix.round().astype(int))
         self.assertEqual(product_hash, target_hash)
 
+    def test_product_order(self):
+        """
+        Tests that the order of multiplying matrices is the same as what is
+        defined in numpy.dot
+        """
+        Cl_528 = tqc.TwoQubitClifford(528)
+        Cl_9230 = tqc.TwoQubitClifford(9230)
+
+        Cliff_prod = Cl_528*Cl_9230
+        dot_prod = np.dot(Cl_528.pauli_transfer_matrix,
+                          Cl_9230.pauli_transfer_matrix)
+        np.testing.assert_array_equal(Cliff_prod.pauli_transfer_matrix,
+                                      dot_prod)
+
+
     def test_inverse_single_qubit_clifford(self):
         for i in range(24):
             Cl = tqc.SingleQubitClifford(i)
@@ -266,6 +281,32 @@ class TestCliffordCalculus(TestCase):
             Cl_inv = Cl.get_inverse()
             self.assertEqual((Cl_inv*Cl).idx, 0)
 
+class TestCliffordClassRBSeqs(TestCase):
+    """
 
+    """
+    def test_single_qubit_randomized_benchmarking_sequence(self):
+        """
+        """
+        seeds = [0, 100, 200, 300, 400]
+        net_cliffs = np.arange(len(seeds))
+        for seed, net_cl in zip(seeds, net_cliffs):
+            cliffords_single_qubit_class = rb.single_qubit_randomized_benchmarking_sequence(
+                n_cl=20, desired_net_cl=0, seed=0)
+            cliffords = rb.randomized_benchmarking_sequence(
+                n_cl=20, desired_net_cl=0, seed=0)
+            np.testing.assert_array_equal(cliffords_single_qubit_class, cliffords)
+
+    def test_two_qubit_randomized_benchmarking_sequence(self):
+        """
+        """
+        seeds = [0, 100, 200, 300, 400]
+        net_cliffs = np.arange(len(seeds))
+        for seed, net_cl in zip(seeds, net_cliffs):
+            rb.Two_qubit_randomized_benchmarking_sequence(
+                n_cl=20, desired_net_cl=0, seed=0)
+            # no test for correctness here. Corectness depend on the fact
+            # that it implements code very similar to the Single qubit version
+            # and has components that are all tested.
 
 
