@@ -291,7 +291,7 @@ class TestCliffordGateDecomposition(TestCase):
                 self.assertIsInstance(g[0], str)
                 self.assertEqual(g[1], 'q0')
 
-    def test_single_qubit_gate_decomposition(self):
+    def test_two_qubit_gate_decomposition(self):
         for idx in (test_indices_2Q):
             CL = tqc.TwoQubitClifford(idx)
             gate_dec = CL.gate_decomposition
@@ -303,6 +303,26 @@ class TestCliffordGateDecomposition(TestCase):
                     self.assertEqual(g[1], ['q0', 'q1'])
                 else:
                     self.assertIn(g[1], ['q0', 'q1'])
+
+    def test_gate_decomposition_unique_single_qubit(self):
+        hash_table = []
+        for i in range(24):
+            CL = tqc.SingleQubitClifford(i)
+            gate_dec = CL.gate_decomposition
+            hash_table.append(crc32(bytes(str(gate_dec), 'utf-8')))
+        self.assertEqual(len(hash_table),24)
+        self.assertEqual(len(np.unique(hash_table)),24)
+
+    def test_gate_decomposition_unique_two_qubit(self):
+        hash_table = []
+        for i in range(11520):
+            CL = tqc.TwoQubitClifford(i)
+            gate_dec = CL.gate_decomposition
+            hash_table.append(crc32(bytes(str(gate_dec), 'utf-8')))
+        self.assertEqual(len(hash_table), 11520)
+        self.assertEqual(len(np.unique(hash_table)), 11520)
+
+
 
 
 class TestCliffordClassRBSeqs(TestCase):
