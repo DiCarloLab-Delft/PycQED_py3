@@ -281,6 +281,30 @@ class TestCliffordCalculus(TestCase):
             Cl_inv = Cl.get_inverse()
             self.assertEqual((Cl_inv*Cl).idx, 0)
 
+class TestCliffordGateDecomposition(TestCase):
+    def test_single_qubit_gate_decomposition(self):
+        for i in range(24):
+            CL = tqc.SingleQubitClifford(i)
+            gate_dec = CL.gate_decomposition
+            self.assertIsInstance(gate_dec, list)
+            for g in gate_dec:
+                self.assertIsInstance(g[0], str)
+                self.assertEqual(g[1], 'q0')
+
+    def test_single_qubit_gate_decomposition(self):
+        for idx in (test_indices_2Q):
+            CL = tqc.TwoQubitClifford(idx)
+            gate_dec = CL.gate_decomposition
+            print(idx, gate_dec)
+            self.assertIsInstance(gate_dec, list)
+            for g in gate_dec:
+                self.assertIsInstance(g[0], str)
+                if g[0] == 'CZ':
+                    self.assertEqual(g[1], ['q0', 'q1'])
+                else:
+                    self.assertIn(g[1], ['q0', 'q1'])
+
+
 class TestCliffordClassRBSeqs(TestCase):
     """
 
