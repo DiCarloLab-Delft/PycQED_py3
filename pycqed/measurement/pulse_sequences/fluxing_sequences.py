@@ -1526,7 +1526,8 @@ def FluxTrack(operation_dict, q0,
 
 def Ramsey_with_flux_pulse_meas_seq(thetas, qb, X90_separation, verbose=False,
                                     upload=True, return_seq=False,
-                                    distorted=False,distortion_dict=None):
+                                    distorted=False,distortion_dict=None,
+                                    cal_points=False):
     '''
     Performs a Ramsey with interleaved Flux pulse
 
@@ -1579,11 +1580,16 @@ def Ramsey_with_flux_pulse_meas_seq(thetas, qb, X90_separation, verbose=False,
     X90_2['refpoint'] = 'start'
 
     for i, theta in enumerate(thetas):
-
         X90_2['phase'] = theta*180/np.pi
-        el = multi_pulse_elt(i, station,
-                             [pulses['X90'], flux_pulse,  X90_2,
-                              RO_pars])
+        if cal_points and (i == (len(thetas)-4) or i == (len(thetas)-3)):
+            el = multi_pulse_elt(i, station, [RO_pars])
+        elif cal_points and (i == (len(thetas)-2) or i == (len(thetas)-1)):
+            flux_pulse['amplitude'] = 0
+            el = multi_pulse_elt(i, station,
+                                 [pulses['X90'], flux_pulse, X90_2, RO_pars])
+        else:
+            el = multi_pulse_elt(i, station,
+                                 [pulses['X90'], flux_pulse, X90_2, RO_pars])
         if distorted is True:
             if distortion_dict is not None:
                 el = fluxpulse_predistortion.distort_qudev(el,distortion_dict)

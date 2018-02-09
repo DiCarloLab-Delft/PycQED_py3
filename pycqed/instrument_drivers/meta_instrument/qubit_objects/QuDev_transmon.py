@@ -3051,7 +3051,7 @@ class QuDev_transmon(Qubit):
         clock_rate = MC.station.pulsar.clock(channel)
         T_sample = 1./clock_rate
 
-        X90_separation = kw.pop('X90_separation', 200e-9)
+        X90_separation = kw.pop('X90_separation', 100e-9)
         distorted = kw.pop('distorted', False)
         distortion_dict = kw.pop('distortion_dict', None)
         pulse_length = kw.pop('pulse_length', 20e-9)
@@ -3135,6 +3135,10 @@ class QuDev_transmon(Qubit):
             thetas: numpy array with angles (in rad) for the Ramsey type
             ampls: numpy array with amplitudes (in V) swept through
                 as flux pulse amplitudes
+            ampls_bidirectional: bool, for use if the qubit is parked at sweetspot.
+                                If true, the flux pulse amplitudes are swept to positive
+                                and negative voltages and the frequency model fit is ]
+                                performed on the combined dataset
             analyze: bool, if True, then the measured data
                      gets analyzed ( ma.fit_qubit_frequency() )
 
