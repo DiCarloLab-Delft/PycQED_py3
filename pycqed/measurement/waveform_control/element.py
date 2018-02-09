@@ -7,7 +7,7 @@ import numpy as np
 import pprint
 from copy import deepcopy
 import logging
-
+import pycqed.measurement.waveform_control.fluxpulse_predistortion as flux_dist
 
 class Element:
     """
@@ -35,12 +35,6 @@ class Element:
         self.pulses = {}
         self._last_added_pulse = None
 
-        self.distorted_wfs = {}
-        self.chan_distorted = {}
-        for c in self.pulsar.channels:
-            self.chan_distorted[c] = False
-
-
     # tools for time calculations
 
     def _time2sample(self, c, t):
@@ -66,12 +60,13 @@ class Element:
             t0s = []
             for p in self.pulses:
                 for c in self.pulses[p].channels:
-                    t0s.append(self.pulses[p].t0() -
-                               self.channel_delay(c))
+                    if self.pulsar.get('{}_active'.format(c)):
+                        t0s.append(self.pulses[p].t0() -
+                                   self.channel_delay(c))
             offset = min(t0s)
             if self.fixed_point_applied:
-                offset += calculate_time_correction(offset,
-                                                    self.readout_fixed_point) -\
+                offset += calculate_time_correction(
+                              offset, self.readout_fixed_point) - \
                           self.readout_fixed_point
             return offset
 
@@ -84,7 +79,9 @@ class Element:
         for p in self.pulses:
             for c in self.pulses[p].channels:
                 ts.append(self.pulse_end_time(p, c))
-        return max(ts)
+
+        return (max(ts) if len(ts) > 0 else 0.) + \
+               self.pulsar.inter_element_spacing()
 
     def length(self, c):
         """
@@ -96,15 +93,18 @@ class Element:
         """
         Returns the number of samples the elements occupies.
         """
+
         ends = []
         for p in self.pulses:
             if c in self.pulses[p].channels:
                 ends.append(self.pulse_end_sample(p, c))
         if len(ends) == 0:
             return 0
-        samples = max(ends)+1
-        if samples < self.pulsar.get('{}_min_samples'.format(c)):
-            samples = self.pulsar.get('{}_min_samples'.format(c))
+        samples = max(ends) + 1
+        samples += int(np.ceil(self.pulsar.inter_element_spacing() /
+                               self._clock(c)))
+        samples = max(samples, self.pulsar.get('{}_min_length'.format(c)) *
+                               self._clock(c))
         while samples % self.pulsar.get('{}_granularity'.format(c)) != 0:
             samples += 1
         return samples
@@ -290,16 +290,21 @@ class Element:
             self.pulses[pname].stop_offset
 
     # computing the numerical waveform
-    def ideal_waveforms(self):
+    def ideal_waveforms(self, channels=None):
         wfs = {}
         tvals = {}
 
         for c in self.pulsar.channels:
+            if channels is not None and c not in channels:
+                continue
             nsamples = self.samples(c)
             wfs[c] = np.zeros(nsamples)
-            tvals[c] = np.arange(nsamples) / self._clock(c)
+            tvals[c] = np.arange(nsamples) / self._clock(c) + self.time_offset
         # we first compute the ideal function values
         for p in self.pulses:
+            if channels is not None and \
+               len(set(self.pulses[p].channels) & set(channels)) == 0:
+                continue
             chan_tvals = {}
             for c in self.pulses[p].channels:
                 if not self.global_time:
@@ -311,20 +316,21 @@ class Element:
                     if idx0 < 0 or idx1 < 0:
                         raise Exception(
                             'Pulse {} on channel {} in element {} starts at a '
-                            'negative time. Please increase the RO_fixpoint.'
-                                .format(p, c, self.name))
+                            'negative time.'.format(p, c, self.name))
                     chan_tvals[c] = tvals[c].copy()[idx0:idx1] + \
-                                    self.channel_delay(c) + self.time_offset
+                                    self.channel_delay(c)
             pulsewfs = self.pulses[p].get_wfs(chan_tvals)
 
             for c in self.pulses[p].channels:
+                if channels is not None and c not in channels:
+                    continue
                 idx0 = self.pulse_start_sample(p, c)
                 idx1 = self.pulse_end_sample(p, c) + 1
                 wfs[c][idx0:idx1] += pulsewfs[c]
 
         return tvals, wfs
 
-    def waveforms(self):
+    def waveforms(self, channels=None):
         """
         return:
             tvals, wfs
@@ -333,49 +339,88 @@ class Element:
         Trunctates/clips (channel-imposed) all values
         that are out of bounds
         """
-        tvals, wfs = self.ideal_waveforms()
-        for wf in wfs:
-            if self.chan_distorted[wf]:
-                wfs[wf] = self.distorted_wfs[wf]
-            if len(wfs[wf]) == 0:
+        tvals, wfs = self.ideal_waveforms(channels)
+
+        # add charge buildup compensation pulse
+        for c in wfs:
+            if self.pulsar.get('{}_type'.format(c)) == 'analog':
+                if self.pulsar.get('{}_charge_buildup_compensation'.format(c)):
+                    tau = self.pulsar.get('{}_discharge_timescale'.format(c))
+                    amp = self.pulsar.get('{}_amp'.format(c))
+                    amp *= self.pulsar.get('{}_compensation_pulse_scale'
+                                           .format(c))
+                    t = tvals[c]
+                    dt = t[1] - t[0]
+                    tend = t[-1] + dt
+                    wf = wfs[c]
+                    if tau is None:
+                        integral = wf.sum()*dt
+                        if integral > 0:
+                            amp = -amp
+                        tcomp = -integral/amp
+                    else:
+                        integral = (wf*np.exp((t-tend)/tau)).sum()*dt
+                        if integral > 0:
+                            amp = -amp
+                        tcomp = tau*np.log(1 - integral/(amp*tau))
+                    textra = np.arange(tend, tend + 3*tcomp, dt)
+                    t = np.append(t, textra)
+                    wf = np.append(wf, amp*((textra < tend + 2*tcomp) *
+                                            (textra >= tend + tcomp)))
+                    tvals[c] = t
+                    wfs[c] = wf
+
+        # do predistortion
+        for c in wfs:
+            if len(wfs[c]) == 0:
                 continue
-            offset = self.pulsar.get('{}_offset'.format(wf))
-            amp = self.pulsar.get('{}_amp'.format(wf))
-            hi = offset + amp
-            lo = offset - amp
+            if self.pulsar.get('{}_type'.format(c)) == 'analog':
+                if self.pulsar.get('{}_distortion'.format(c)) == 'precalculate':
+                    distortion_dictionary = self.pulsar.get(
+                        '{}_distortion_dict'.format(c))
+                    fir_kernels = distortion_dictionary.get('FIR', None)
+                    if fir_kernels is not None:
+                        if hasattr(fir_kernels, '__iter__') and not \
+                           hasattr(fir_kernels[0], '__iter__'): # 1 kernel only
+                            wfs[c] = flux_dist.filter_fir(fir_kernels, wfs[c])
+                        else:
+                            for kernel in fir_kernels:
+                                wfs[c] = flux_dist.filter_fir(kernel, wfs[c])
+                    iir_filters = distortion_dictionary.get('IIR', None)
+                    if iir_filters is not None:
+                        wfs[c] = flux_dist.filter_iir(iir_filters[0],
+                                                      iir_filters[1], wfs[c])
+
             # truncate all values that are out of bounds
-            if self.pulsar.get('{}_type'.format(wf)) == 'analog':
-                if np.max(wfs[wf]) > hi:
+            amp = self.pulsar.get('{}_amp'.format(c))
+            if self.pulsar.get('{}_type'.format(c)) == 'analog':
+                if np.max(wfs[c]) > amp:
                     logging.warning('Clipping waveform {} > {}'.format(
-                                    max(wfs[wf]), hi))
-                if np.min(wfs[wf]) < lo:
+                                    np.max(wfs[c]), amp))
+                if np.min(wfs[c]) < -amp:
                     logging.warning('Clipping waveform {} < {}'.format(
-                                    min(wfs[wf]), lo))
-                wfs[wf][wfs[wf] > hi] = hi
-                wfs[wf][wfs[wf] < lo] = lo
-            elif self.pulsar.get('{}_type'.format(wf)) == 'marker':
-                wfs[wf][wfs[wf] > offset] = hi
-                wfs[wf][wfs[wf] < offset] = offset
+                                    np.min(wfs[c]), -amp))
+                np.clip(wfs[c], -amp, amp, out=wfs[c])
+            elif self.pulsar.get('{}_type'.format(c)) == 'marker':
+                wfs[c][wfs[c] > 0] = amp
+                wfs[c][wfs[c] <= 0] = 0
         return tvals, wfs
 
-    def normalized_waveforms(self):
+    def normalized_waveforms(self, channels=None):
         """
         Returns the final numeric arrays, in which channel-imposed
         restrictions are obeyed (bounds, TTL)
         """
-        tvals, wfs = self.waveforms()
+        tvals, wfs = self.waveforms(channels)
 
         for wf in wfs:
-            offset = self.pulsar.get('{}_offset'.format(wf))
             amp = self.pulsar.get('{}_amp'.format(wf))
-            hi = offset + amp
-            lo = offset - amp
 
             if self.pulsar.get('{}_type'.format(wf)) == 'analog':
-                wfs[wf] = (2.0*wfs[wf] - hi - lo) / (hi - lo)
+                wfs[wf] = wfs[wf] / amp
             if self.pulsar.get('{}_type'.format(wf)) == 'marker':
-                wfs[wf][wfs[wf] > offset] = 1
-                wfs[wf][wfs[wf] <= offset] = 0
+                wfs[wf][wfs[wf] > 0] = 1
+                wfs[wf][wfs[wf] <= 0] = 0
         return tvals, wfs
 
     # testing and inspection
@@ -386,6 +431,8 @@ class Element:
         overview['channels'] = {}
         channels = overview['channels']
         for c in self.pulsar.channels:
+            if not self.pulsar.get('{}_active'.format(c)):
+                continue
             channels[c] = {}
             channels[c]['length'] = self.length(c)
             channels[c]['samples'] = self.samples(c)
@@ -395,6 +442,8 @@ class Element:
             pulses[p] = {}
             pulses[p]['length'] = self.pulse_length(p)
             for c in self.pulses[p].channels:
+                if not self.pulsar.get('{}_active'.format(c)):
+                    continue
                 pulses[p][c] = {}
                 pulses[p][c]['start time'] = self.pulse_start_time(p, c)
                 pulses[p][c]['end time'] = self.pulse_end_time(p, c)
@@ -423,3 +472,24 @@ def is_divisible_by_clock(value, clock=1e9):
         return True
     else:
         return False
+
+def combine_elements(element_list):
+    name = (el.name for el in element_list)
+    element = Element(name, element_list[0].pulsar,
+                      ignore_offset_correction=True,
+                      global_time=True,
+                      time_offset=0,
+                      ignore_delays=True)
+    element.fixed_point_applied = True
+    for originalel in element_list:
+        pulsar = originalel.pulsar
+        originalel.pulsar = None
+        el = deepcopy(originalel)
+        originalel.pulsar = pulsar
+        el.shift_all_pulses(-el.offset() + element.ideal_length())
+        pulses = {el.name + '_' + p: el.pulses[p] for p in el.pulses}
+        for p in pulses:
+            pulses[p].name = p
+        element.pulses.update(pulses)
+    return element
+

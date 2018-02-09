@@ -1656,9 +1656,13 @@ def color_plot(x, y, z, fig, ax, cax=None,
     x_vertices[-1] = x[-1] + (x[-1]-x[-2])/2.
     # y coordinates
     y_vertices = np.zeros(np.array(y.shape)+1)
-    y_vertices[1:-1] = (y[:-1]+y[1:])/2.
-    y_vertices[0] = y[0] - (y[1]-y[0])/2.
-    y_vertices[-1] = y[-1] + (y[-1]-y[-2])/2.
+    if len(y)>1:
+        y_vertices[1:-1] = (y[:-1]+y[1:])/2.
+        y_vertices[0] = y[0] - (y[1]-y[0])/2.
+        y_vertices[-1] = y[-1] + (y[-1]-y[-2])/2.
+    else:
+        y_vertices += y[0]
+        y_vertices[1] *= 1.00001
     cmap_chosen = kw.get('cmap_chosen', 'viridis')
 
     # This version (below) does not plot the last row, but it possibly fixes
@@ -1870,8 +1874,16 @@ def color_plot_interpolated(x, y, z, ax=None,
         return ax, CS, cbar
     return ax, CS
 
+def plot_errorbars(x, y, ax=None, err_bars=None, label=None, **kw):
 
-def plot_errorbars(x, y, ax=None, linewidth=2 ,markersize=2, marker='none'):
+    color = kw.pop('color', 'C0')
+    # see https://matplotlib.org/users/dflt_style_changes.html for details about
+    # the 'C#" color notation
+    marker = kw.pop('marker', 'none')
+    linewidth = kw.pop('linewidth', 2)
+    markersize = kw.pop('markersize', 2)
+    capsize = kw.pop('capsize', 2)
+    capthick = kw.pop('capthick', 2)
 
     if ax is None:
         new_plot_created = True
@@ -1879,15 +1891,26 @@ def plot_errorbars(x, y, ax=None, linewidth=2 ,markersize=2, marker='none'):
     else:
         new_plot_created = False
 
-    standard_error = np.std(y)/np.sqrt(y.size)
+    if err_bars is None:
+        if (len(y.shape))==1:
+            err_bars = np.std(y)/np.sqrt(y.size)
+        else:
+            err_bars = []
+            for data in y:
+                err_bars.append(np.std(data)/np.sqrt(data.size))
+            err_bars = np.asarray(err_bars)
+        if label is None:
+            label = 'stderr'
 
-    ax.errorbar( x, y, yerr=standard_error, ecolor='k', fmt=marker,
-                     linewidth=linewidth, markersize=markersize)
+    ax.errorbar( x, y, yerr=err_bars, label=label,
+                 ecolor=color, fmt=marker,
+                 elinewidth=linewidth, markersize=markersize,
+                 capsize=capsize, capthick=capthick, )
 
     if new_plot_created:
         return f,ax
     else:
-        return
+        return ax
 
 
 ######################################################################

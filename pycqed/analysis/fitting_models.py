@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.special import erfc
+import scipy
 import lmfit
 import logging
 #################################
@@ -357,7 +357,7 @@ def gaussianCDF(x, amplitude, mu, sigma):
     """
     CDF of gaussian is P(X<=x) = .5 erfc((mu-x)/(sqrt(2)sig))
     """
-    return 0.5 * amplitude * erfc((mu - x) / (np.sqrt(2)*sigma))
+    return 0.5 * amplitude * scipy.special.erfc((mu - x) / (np.sqrt(2)*sigma))
 
 
 def double_gaussianCDF(x, A_amplitude, A_mu, A_sigma,
@@ -459,6 +459,21 @@ def avoided_crossing_direct_coupling(flux, f_center1, f_center2,
         frequencies[kk, :] = np.linalg.eigvalsh(matrix)[:2]
     result = np.where(flux_state, frequencies[:, 0], frequencies[:, 1])
     return result
+
+
+def ErfWindow(t, t_start, t_end, t_rise, amplitude, offset):
+    '''
+    parameters:
+        t, time in s
+        t_start, start of window in s
+        t_end, end of window in s
+        amplitude a.u.
+        offset a.u.
+        t_rise in s (rise time)
+    '''
+    return offset + amplitude/2*(scipy.special.erf((t - t_start)/(t_rise/2.6))
+                                 - scipy.special.erf((t - t_end)/(t_rise/2.6)))
+
 
 
 ######################
@@ -701,6 +716,10 @@ def double_gauss_guess(model, data, x=None, **kwargs):
     else:
         return par_dict
 
+
+
+
+
 #################################
 #     User defined Models       #
 #################################
@@ -722,7 +741,7 @@ SlopedHangerAmplitudeModel = lmfit.Model(SlopedHangerFuncAmplitude)
 PolyBgHangerAmplitudeModel = lmfit.Model(PolyBgHangerFuncAmplitude)
 HangerComplexModel = lmfit.Model(HangerFuncComplex)
 SlopedHangerComplexModel = lmfit.Model(SlopedHangerFuncComplex)
-QubitFreqDacModel = lmfit.Model(QubitFreqDac)
+QubitFreqDacModel = lmfit.Model(Qubit_dac_to_freq)
 QubitFreqFluxModel = lmfit.Model(QubitFreqFlux)
 TwinLorentzModel = lmfit.Model(TwinLorentzFunc)
 LorentzianModel = lmfit.Model(Lorentzian)
@@ -730,6 +749,7 @@ RBModel = lmfit.Model(RandomizedBenchmarkingDecay)
 LinOModel = lmfit.Model(linear_with_offset)
 LinBGModel = lmfit.Model(linear_with_background)
 LinBGOModel = lmfit.Model(linear_with_background_and_offset)
+ErfWindowModel = lmfit.Model(ErfWindow)
 
 # 2D models
 Gaus2D_model = lmfit.Model(gaussian_2D, independent_vars=['x', 'y'])

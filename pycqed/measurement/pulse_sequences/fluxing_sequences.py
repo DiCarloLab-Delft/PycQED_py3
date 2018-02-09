@@ -15,6 +15,8 @@ from pycqed.measurement.waveform_control import pulsar
 from pycqed.measurement.waveform_control.element import calculate_time_correction
 from pycqed.measurement.pulse_sequences.standard_elements import multi_pulse_elt
 from pycqed.measurement.pulse_sequences.standard_elements import distort_and_compensate
+import pycqed.measurement.waveform_control.fluxpulse_predistortion as fluxpulse_predistortion
+
 
 from importlib import reload
 reload(pulse)
@@ -1519,3 +1521,446 @@ def FluxTrack(operation_dict, q0,
         station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
 
     return seq, el_list
+
+
+
+def Ramsey_with_flux_pulse_meas_seq(thetas, qb, X90_separation, verbose=False,
+                                    upload=True, return_seq=False,
+                                    distorted=False,distortion_dict=None):
+    '''
+    Performs a Ramsey with interleaved Flux pulse
+
+    Timings of sequence
+           <----- |fluxpulse|
+        |X90|  -------------------     |X90|  ---  |RO|
+                                     sweep phase
+
+    timing of the flux pulse relative to the center of the first X90 pulse
+    args:
+        thetas: numpy array of phase shifts for the second pi/2 pulse
+        qb: qubit object (must have the methods get_operation_dict(),
+        get_drive_pars() etc.
+        X90_separation: float (separation of the two pi/2 pulses for Ramsey
+        verbose: bool
+        upload: bool
+        return_seq: bool
+        distorted: bool
+        distortion_dict: dictionary (passed to the distort_qudev() function.
+                         For details on the
+                         form of the dictionary see in the module
+                         pycqed.measurement.waveform_control\
+                         .fluxpulse_predistortion )
+
+    returns:
+        if return_seq:
+          seq: qcodes sequence
+          el_list: list of pulse elements
+        else:
+            seq_name: string
+    '''
+    qb_name = qb.name
+    print(qb_name)
+    operation_dict = qb.get_operation_dict()
+    pulse_pars = qb.get_drive_pars()
+    RO_pars = qb.get_RO_pars()
+    seq_name = 'Measurement_Ramsey_sequence_with_Flux_pulse'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+
+    pulses = get_pulse_dict_from_pars(pulse_pars)
+    flux_pulse = operation_dict["flux "+qb_name]
+    # if flux_pulse['amplitude'] != 0:
+    #     flux_pulse['basis_rotation'] = {qb_name: -106.87716422562978}
+
+    flux_pulse['refpoint'] = 'end'
+    X90_2 = deepcopy(pulses['X90'])
+    X90_2['pulse_delay'] = X90_separation - flux_pulse['pulse_delay']
+    X90_2['refpoint'] = 'start'
+
+    print('\n',X90_separation)
+    print(flux_pulse['pulse_delay'])
+    print('basis_rotation' in flux_pulse)
+    print(flux_pulse['amplitude'])
+    print('flux pulse delay ', flux_pulse['pulse_delay'])
+    print('CZ corr phase: ', operation_dict['CZ_corr ' + qb.name]['phase'])
+    for i, theta in enumerate(thetas):
+
+        X90_2['phase'] = theta*180/np.pi
+        el = multi_pulse_elt(i, station,
+                             [pulses['X90'], flux_pulse,  X90_2,
+                              RO_pars])
+        if distorted is True:
+            if distortion_dict is not None:
+                el = fluxpulse_predistortion.distort_qudev(el,distortion_dict)
+            else:
+                raise ValueError('Must specify distortion dictionary')
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
+
+def Chevron_flux_pulse_length_seq(lengths, qb_control, qb_target, spacing=50e-9,
+                                  verbose=False,cal_points=False,
+                                  upload=True, return_seq=False,distorted=False,
+                                  distortion_dict=None):
+
+    '''
+    chevron sequence (sweep of the flux pulse length)
+
+    Timings of sequence
+                                  <-- length -->
+    qb_control:    |X180|  ---   |  fluxpulse   |
+
+    qb_target:     |X180|  --------------------------------------  |RO|
+                         <------>
+                         spacing
+    args:
+        lengths: np.array containing the lengths of the fluxpulses
+        qb_control: instance of the qubit class
+        qb_control: instance of the qubit class
+        spacing: float
+
+    '''
+    qb_name_control = qb_control.name
+    qb_name_target = qb_target.name
+    operation_dict_control = qb_control.get_operation_dict()
+    operation_dict_target = qb_target.get_operation_dict()
+    pulse_pars_control = qb_control.get_drive_pars()
+    pulse_pars_target = qb_target.get_drive_pars()
+    RO_pars_target = qb_target.get_RO_pars()
+    seq_name = 'Chevron_sequence_flux_ampl_sweep'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+
+    pulses_control = get_pulse_dict_from_pars(pulse_pars_control)
+    pulses_target = get_pulse_dict_from_pars(pulse_pars_target)
+
+    X180_control = pulses_control['X180']
+    X180_control['refpoint'] = 'start'
+    X180_target = pulses_target['X180']
+    X180_target['refpoint'] = 'start'
+
+    flux_pulse_control = operation_dict_control["flux "+qb_name_control]
+    flux_pulse_control['refpoint'] = 'end'
+    flux_pulse_control['pulse_delay'] = spacing
+
+    max_length = np.max(lengths)
+
+    RO_pars_target['refpoint'] = 'start'
+    RO_pars_target['pulse_delay'] = max_length + spacing
+
+    if flux_pulse_control['pulse_type'] == 'GaussFluxPulse':
+        flux_pulse_control['pulse_delay'] -= flux_pulse_control['buffer']
+        RO_pars_target['pulse_delay'] -= 2* flux_pulse_control['buffer']
+
+
+    for i, length in enumerate(lengths):
+        flux_pulse_control['length'] = length
+
+        if cal_points and (i == (len(lengths)-4) or i == (len(lengths)-3)):
+            el = multi_pulse_elt(i, station, [RO_pars_target])
+        elif cal_points and (i == (len(lengths)-2) or i == (len(lengths)-1)):
+            flux_pulse_control['amplitude'] = 0
+            el = multi_pulse_elt(i, station, [X180_control, X180_target,
+                                              flux_pulse_control,
+                                              RO_pars_target])
+        else:
+            el = multi_pulse_elt(i, station, [X180_control,X180_target,
+                                              flux_pulse_control,
+                                              RO_pars_target])
+
+        if distorted is True:
+            if distortion_dict is not None:
+                el = fluxpulse_predistortion.distort_qudev(el,distortion_dict)
+            else:
+                raise ValueError('Must specify distortion dictionary')
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
+
+
+
+def Chevron_flux_pulse_ampl_seq(ampls, qb_control,
+                                qb_target, spacing=50e-9,
+                                cal_points=False, verbose=False,
+                                upload=True, return_seq=False,
+                                distorted=False,distortion_dict=None
+                                ):
+    '''
+    chevron sequence (sweep of the flux pulse amplitude)
+
+    Timings of sequence
+
+    qb_control:    |X180|  ---   |  fluxpulse   |
+
+    qb_target:     |X180|  -----------------------------  |RO|
+                         <------>               <------>
+                         spacing                 spacing
+    args:
+        lengths: np.array containing the lengths of the fluxpulses
+        qb_control: instance of the qubit class
+        qb_control: instance of the qubit class
+        spacing: float
+
+    '''
+    qb_name_control = qb_control.name
+    qb_name_target = qb_target.name
+    operation_dict_control = qb_control.get_operation_dict()
+    operation_dict_target = qb_target.get_operation_dict()
+    pulse_pars_control = qb_control.get_drive_pars()
+    pulse_pars_target = qb_target.get_drive_pars()
+    RO_pars_target = qb_target.get_RO_pars()
+    seq_name = 'Chevron_sequence_flux_ampl_sweep'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+
+    pulses_control = get_pulse_dict_from_pars(pulse_pars_control)
+    pulses_target = get_pulse_dict_from_pars(pulse_pars_target)
+
+    X180_control = pulses_control['X180']
+    X180_control['refpoint'] = 'start'
+    X180_target = pulses_target['X180']
+    X180_target['refpoint'] = 'start'
+
+
+    flux_pulse_control = operation_dict_control["flux "+qb_name_control]
+    flux_pulse_control['refpoint'] = 'end'
+    flux_pulse_control['pulse_delay'] = spacing
+
+
+    flux_pulse_length = flux_pulse_control['length']
+
+    RO_pars_target['refpoint'] = 'start'
+    RO_pars_target['pulse_delay'] = flux_pulse_length + spacing
+
+    for i, ampl in enumerate(ampls):
+        flux_pulse_control['amplitude'] = ampl
+
+        if cal_points and (i == (len(ampls)-4) or i == (len(ampls)-3)):
+            el = multi_pulse_elt(i, station, [RO_pars_target])
+        elif cal_points and (i == (len(ampls)-2) or i == (len(ampls)-1)):
+            flux_pulse_control['amplitude'] = 0
+            el = multi_pulse_elt(i, station, [X180_control, X180_target,
+                                              flux_pulse_control,
+                                              RO_pars_target])
+        else:
+            el = multi_pulse_elt(i, station, [X180_control,X180_target,
+                                              flux_pulse_control,
+                                              RO_pars_target])
+
+
+        if distorted is True:
+            if distortion_dict is not None:
+                el = fluxpulse_predistortion.distort_qudev(el,distortion_dict)
+            else:
+                raise ValueError('Must specify distortion dictionary')
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
+
+
+def flux_pulse_CPhase_seq(sweep_points,qb_control, qb_target,
+                          sweep_mode='length',
+                          X90_phase=0,
+                          spacing=50e-9,
+                          verbose=False,cal_points=False,
+                          upload=True, return_seq=False,
+                          distorted=False,
+                          distortion_dict=None,
+                          measurement_mode='excited_state',
+                          reference_measurements=False
+                          ):
+
+    '''
+    chevron like sequence (sweep of the flux pulse length)
+    where the phase is measures.
+    The sequence function is programmed, such that it either can take lengths, amplitudes or phases to sweep.
+
+    Timings of sequence
+                                         <-- length -->
+                                          or amplitude
+    qb_control:    |X180|  ----------   |  fluxpulse   |
+
+    qb_target:     ------- |X90|  ------------------------------|X90|--------  |RO|
+                                <------>                       X90_phase
+                                spacing
+    args:
+        sweep_points: np.array containing the lengths of the fluxpulses
+        qb_control: instance of the qubit class
+        qb_control: instance of the qubit class
+        sweep_mode: str, either 'length', 'amplitude' or amplitude
+        X90_phase: float, phase of the second X90 pulse in rad
+        spacing: float
+        measurement_mode (str): either 'excited_state', 'ground_state'
+        reference_measurement (bool): if True, a reference measurement with the
+                                      control qubit in ground state is added in the
+                                      same hard sweep. IMPORTANT: you need to double
+                                      the hard sweep points!
+                                      e.g. thetas = np.concatenate((thetas,thetas))
+    '''
+
+
+    qb_name_control = qb_control.name
+    qb_name_target = qb_target.name
+    operation_dict_control = qb_control.get_operation_dict()
+    operation_dict_target = qb_target.get_operation_dict()
+    pulse_pars_control = qb_control.get_drive_pars()
+    pulse_pars_target = qb_target.get_drive_pars()
+    RO_pars_target = qb_target.get_RO_pars()
+    seq_name = 'Chevron_sequence_flux_{}_sweep_rel_phase_meas'.format(sweep_mode)
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+
+    if reference_measurements:
+        measurement_mode = 'excited_state'
+    pulses_control = get_pulse_dict_from_pars(pulse_pars_control)
+    pulses_target = get_pulse_dict_from_pars(pulse_pars_target)
+
+    X180_control = deepcopy(pulses_control['X180'])
+    X180_control['refpoint'] = 'start'
+    X90_target = pulses_target['X90']
+    X90_target['refpoint'] = 'end'
+    if measurement_mode == 'ground_state':
+        X180_control['amplitude'] = 0.
+
+    X90_target_2 = deepcopy(X90_target)
+    X90_target_2['phase'] = X90_phase*180/np.pi
+    #     X90_target_2['phase'] = 1
+
+    flux_pulse_control = operation_dict_control["flux "+qb_name_control]
+    flux_pulse_control['refpoint'] = 'end'
+    flux_pulse_control['delay'] = spacing
+
+    if sweep_mode == 'length':
+        max_length = np.max(sweep_points)
+    else:
+        max_length = flux_pulse_control['length']
+
+    X90_target_2['refpoint'] = 'start'
+    X90_target_2['pulse_delay'] = max_length + spacing
+
+    RO_pars_target['refpoint'] = 'end'
+
+    for i, sweep_point in enumerate(sweep_points):
+
+        if reference_measurements:
+            if i >= int(len(sweep_points)/2):
+                X180_control['amplitude'] = 0.
+        if sweep_mode == 'length':
+            flux_pulse_control['length'] = sweep_point
+        elif sweep_mode == 'amplitude':
+            flux_pulse_control['amplitude'] = sweep_point
+        elif sweep_mode == 'phase':
+            X90_target_2['phase'] = sweep_point*180/np.pi
+
+        if cal_points and (i == (len(sweep_points)-4) or i == (len(sweep_points)-3)):
+            el = multi_pulse_elt(i, station, [RO_pars_target])
+        elif cal_points and (i == (len(sweep_points)-2) or i == (len(sweep_points)-1)):
+            flux_pulse_control['amplitude'] = 0
+            el = multi_pulse_elt(i, station, [X180_control, X90_target,
+                                              flux_pulse_control, X90_target_2,
+                                              RO_pars_target])
+        else:
+
+
+            el = multi_pulse_elt(i, station, [X180_control,X90_target,
+                                              flux_pulse_control,X90_target_2,
+                                              RO_pars_target])
+
+        if distorted is True:
+            if distortion_dict is not None:
+                el = fluxpulse_predistortion.distort_qudev(el,distortion_dict)
+            else:
+                raise ValueError('Must specify distortion dictionary')
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+
+
+
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
+
+
+def fluxpulse_scope_sequence(delays, qb, verbose=False,
+                             cal_points=False,
+                             upload=True,
+                             return_seq=False,
+                             distorted=False,
+                             distortion_dict=None,
+                             spacing=30e-9):
+    '''
+    Performs X180 pulse on top of a fluxpulse
+
+    Timings of sequence
+
+       |          ---           |X180|  ----------------------------  |RO|
+       |        ---      | --------- fluxpulse ---------- |
+        <-    delay    ->
+
+    args:
+        delays: array of delays of the pi pulse w.r.t the flux pulse
+        qb: qubit object
+        spacing: float, spacing between pulse and RO
+    '''
+    qb_name = qb.name
+    operation_dict = qb.get_operation_dict()
+    pulse_pars = qb.get_drive_pars()
+    RO_pars = qb.get_RO_pars()
+    seq_name = 'Fluxpulse_scope_sequence'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+
+    pulses = get_pulse_dict_from_pars(pulse_pars)
+    flux_pulse = operation_dict["flux "+qb_name]
+
+    X180_2 = deepcopy(pulses['X180'])
+    X180_2['refpoint'] = 'start'
+    pulse_delay_offset = -X180_2['sigma']*X180_2['nr_sigma']/2. - flux_pulse['pulse_delay']
+    RO_pars['pulse_delay'] = flux_pulse['length'] + flux_pulse['pulse_delay'] - delays[0] + spacing
+
+    for i, delay in enumerate(delays):
+        X180_2['pulse_delay'] = delay + pulse_delay_offset
+        if cal_points and (i == (len(delays)-4) or i == (len(delays)-3)):
+            el = multi_pulse_elt(i, station, [RO_pars])
+        elif cal_points and (i == (len(delays)-2) or i == (len(delays)-1)):
+            flux_pulse['amplitude'] = 0
+            el = multi_pulse_elt(i, station, [flux_pulse,X180_2,RO_pars])
+        else:
+            el = multi_pulse_elt(i, station, [flux_pulse,X180_2,RO_pars])
+        if distorted is True and distortion_dict is not None:
+            el = fluxpulse_predistortion.distort_qudev(el,distortion_dict)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
+
+
+
+

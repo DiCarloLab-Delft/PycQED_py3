@@ -517,7 +517,7 @@ class MeasurementControl(Instrument):
     ###################
 
     def run_2D(self, name=None, **kw):
-        self.run(name=name, mode='2D', **kw)
+        return self.run(name=name, mode='2D', **kw)
 
     def tile_sweep_pts_for_2D(self):
         self.xlen = len(self.get_sweep_points())

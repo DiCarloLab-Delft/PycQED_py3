@@ -90,6 +90,15 @@ class Rabi(swf.Hard_Sweep):
         self.return_seq = return_seq
 
     def prepare(self, **kw):
+        # if self.cal_points:
+        #     step = np.abs(self.sweep_points[-1]-self.sweep_points[-2])
+        #     self.sweep_points = np.concatenate(
+        #         [self.sweep_points,
+        #          [self.sweep_points[-1]+step,
+        #           self.sweep_points[-1]+2*step,
+        #           self.sweep_points[-1]+3*step,
+        #           self.sweep_points[-1]+4*step]])
+
         if self.upload:
             sqs.Rabi_seq(amps=self.sweep_points,
                          pulse_pars=self.pulse_pars,
@@ -100,7 +109,7 @@ class Rabi(swf.Hard_Sweep):
 
 class Rabi_2nd_exc(swf.Hard_Sweep):
 
-    def __init__(self, pulse_pars, pulse_pars_2nd, RO_pars, amps=None,
+    def __init__(self, pulse_pars, pulse_pars_2nd, RO_pars,
                  last_ge_pulse=True,
                  n=1, cal_points=True, no_cal_points=4, upload=True,
                  return_seq=False):
@@ -120,7 +129,8 @@ class Rabi_2nd_exc(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         if self.upload:
-            sqs2.Rabi_2nd_exc_seq(amps=self.sweep_points, last_ge_pulse=self.last_ge_pulse,
+            sqs2.Rabi_2nd_exc_seq(amps=self.sweep_points,
+                                  last_ge_pulse=self.last_ge_pulse,
                                   pulse_pars=self.pulse_pars,
                                   pulse_pars_2nd=self.pulse_pars_2nd,
                                   RO_pars=self.RO_pars, upload=self.upload,
@@ -288,6 +298,7 @@ class Rabi_amp90(swf.Hard_Sweep):
 
 #     def set_parameter(self, val, **kw):
 #         pass
+
 
 class chevron_single_element(swf.Soft_Sweep):
 
@@ -933,6 +944,60 @@ class Butterfly(swf.Hard_Sweep):
                               post_msmt_delay=self.post_msmt_delay,
                               RO_pars=self.RO_pars, initialize=self.initialize)
 
+class Randomized_Benchmarking_nr_cliffords(swf.Soft_Sweep):
+
+    def __init__(self, sweep_control='soft',
+                 RB_sweepfunction=None):
+        super().__init__()
+
+        self.sweep_control = sweep_control
+        # self.sweep_points = nr_cliffords
+        self.RB_sweepfunction = RB_sweepfunction
+        self.name = 'Randomized_Benchmarking_nr_cliffords'
+        self.parameter_name = 'Nr of Cliffords'
+        self.unit = '#'
+
+
+    def set_parameter(self, val):
+        self.RB_sweepfunction.nr_cliffords_value = val
+        self.RB_sweepfunction.upload = True
+        self.RB_sweepfunction.prepare()
+
+class Randomized_Benchmarking_one_length(swf.Hard_Sweep):
+
+    def __init__(self, pulse_pars, RO_pars,
+                 nr_cliffords_value, #int
+                 gate_decomposition='HZ',
+                 interleaved_gate=None,
+                 cal_points=True,
+                 seq_name=None,
+                 upload=False):
+
+        super().__init__()
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.upload = upload
+        self.nr_cliffords_value = nr_cliffords_value
+        self.cal_points = cal_points
+        self.seq_name = seq_name
+        self.gate_decomposition = gate_decomposition
+        self.interleaved_gate = interleaved_gate
+
+        self.parameter_name = 'Nr of Seeds'
+        self.unit = '#'
+        self.name = 'Randomized_Benchmarking_one_length'
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.Randomized_Benchmarking_seq_one_length(
+                self.pulse_pars, self.RO_pars,
+                nr_cliffords_value=self.nr_cliffords_value,
+                gate_decomposition=self.gate_decomposition,
+                interleaved_gate=self.interleaved_gate,
+                nr_seeds=self.sweep_points,
+                cal_points=self.cal_points,
+                seq_name=self.seq_name)
+
 
 class Randomized_Benchmarking(swf.Hard_Sweep):
 
@@ -1180,7 +1245,7 @@ class Motzoi_XY(swf.Hard_Sweep):
 
 class QScale(swf.Hard_Sweep):
 
-    def __init__(self, qscales, pulse_pars, RO_pars, upload=True,
+    def __init__(self, pulse_pars, RO_pars, upload=True,
                  cal_points=True):
         '''
         Measures 3 number of points per QScale parameter value specified
@@ -1194,9 +1259,6 @@ class QScale(swf.Hard_Sweep):
         self.parameter_name = 'QScale_factor'
         self.unit = ''
         self.cal_points = cal_points
-        sweep_pts = np.repeat(qscales, 3)
-        # self.sweep_points = np.append(sweep_pts,
-        #                               [qscales[-1]+(qscales[-1]-qscales[-2])]*4)
 
     def prepare(self, **kw):
         if self.upload:
@@ -1777,3 +1839,430 @@ class Load_Sequence_Tek(swf.Hard_Sweep):
         if self.upload:
             self.AWG.set_setup_filename(self.sequence_name)
 
+
+
+
+
+class Ramsey_interleaved_fluxpulse_sweep(swf.Hard_Sweep):
+    '''
+    Ramsey type measurement with interleaved fluxpulse
+    for more detailed description see fsqs.Ramsey_with_flux_pulse_meas_seq(..)
+    sequence function
+
+    inputs:
+        qb: qubit object
+        X90_separation: float (separation of the pi/2 pulses)
+    '''
+    def __init__(self, qb, X90_separation, upload=True,
+                 distorted=False,distortion_dict=None):
+        super().__init__()
+        self.qb = qb
+        self.X90_separation = X90_separation
+        self.upload = upload
+        self.distorted = distorted
+        self.distortion_dict = distortion_dict
+
+
+        self.name = 'Ramsey with interleaved flux pulse'
+        self.parameter_name = 'theta'
+        self.unit = 'rad'
+
+    def prepare(self, **kw):
+        if self.upload:
+            fsqs.Ramsey_with_flux_pulse_meas_seq(
+                thetas=self.sweep_points, qb=self.qb,
+                X90_separation=self.X90_separation,
+                distorted=self.distorted,
+                distortion_dict=self.distortion_dict
+            )
+
+
+class Ramsey_fluxpulse_ampl_sweep(swf.Soft_Sweep):
+    '''
+    flux pulse amplitude sweep for Ramsey type measurement with interleaved
+    fluxpulse; for more detailed description see fsqs.Ramsey_with_flux_pulse_\
+    meas_seq(..)
+    sequence function
+
+    inputs:
+        qb: qubit object
+    '''
+
+    def __init__(self, qb, hard_sweep):
+        super().__init__()
+        self.name = 'Ramsey interleaved fluxpulse amplitude sweep'
+        self.parameter_name = 'Fluxpulse amplitude'
+        self.unit = 'V'
+        self.hard_sweep = hard_sweep
+        self.qb = qb
+
+    def prepare(self):
+        pass
+
+    def set_parameter(self, val, **kw):
+        self.qb.flux_pulse_amp(val)
+        self.hard_sweep.upload = True
+        self.hard_sweep.prepare()
+
+    def finish(self):
+        pass
+
+class Ramsey_fluxpulse_delay_sweep(swf.Soft_Sweep):
+    '''
+    flux pulse delay sweep for Ramsey type measurement with interleaved
+    fluxpulse; for more detailed description see fsqs.Ramsey_with_flux_pulse_\
+    meas_seq(..)
+    sequence function
+
+    inputs:
+        qb: qubit object
+        hard_sweep: hard_sweep object with method prepare()
+    '''
+
+    def __init__(self, qb, hard_sweep):
+        super().__init__()
+        self.name = 'Ramsey interleaved fluxpulse delay sweep'
+        self.parameter_name = 'Fluxpulse delay'
+        self.unit = 'delay (s)'
+        self.hard_sweep = hard_sweep
+        self.qb = qb
+    def prepare(self):
+        pass
+    def set_parameter(self, val, **kw):
+        self.qb.flux_pulse_delay(val)
+        self.hard_sweep.prepare()
+    def finish(self):
+        pass
+
+
+
+class Chevron_length_hard_swf(swf.Hard_Sweep):
+    '''
+    Sweep function class for a single slice of the Chevron experiment where
+    the length of the fluxpulse is swept (hard sweep).
+    For details on the experiment see documentation of
+    'fsqs.Chevron_flux_pulse_length_seq(...)'
+    '''
+    def __init__(self, qb_control, qb_target, spacing=50e-9,
+                 cal_points=False, upload=True,
+                 distorted=False,distortion_dict=None):
+        super().__init__()
+        self.qb_control = qb_control
+        self.qb_target = qb_target
+        self.spacing = spacing
+        self.upload = upload
+        self.cal_points = cal_points
+        self.distorted = distorted
+        self.distortion_dict = distortion_dict
+
+
+        self.name = 'Chevron flux pulse length sweep'
+        self.parameter_name = 'length'
+        self.unit = 's'
+
+    def prepare(self, **kw):
+        if self.upload:
+            fsqs.Chevron_flux_pulse_length_seq(
+                lengths=self.sweep_points, qb_control=self.qb_control,
+                qb_target=self.qb_target, spacing=self.spacing,
+                cal_points=self.cal_points, distorted=self.distorted,
+                distortion_dict=self.distortion_dict
+                )
+
+class Chevron_ampl_hard_swf(swf.Hard_Sweep):
+    '''
+    Sweep function class for a single slice of the Chevron experiment where
+    the amplitude of the fluxpulse is swept (hard sweep).
+    For details on the experiment see documentation of
+    'fsqs.Chevron_flux_pulse_ampl_seq(...)'
+    '''
+    def __init__(self, qb_control, qb_target, spacing=50e-9,cal_points=False,upload=True,
+                 distorted=False,distortion_dict=None):
+        super().__init__()
+        self.qb_control = qb_control
+        self.qb_target = qb_target
+        self.spacing = spacing
+        self.upload = upload
+        self.cal_points = cal_points
+        self.distorted = distorted
+        self.distortion_dict = distortion_dict
+
+
+        self.name = 'Chevron flux pulse amplitude sweep'
+        self.parameter_name = 'amplitude'
+        self.unit = 'V'
+
+    def prepare(self, **kw):
+        if self.upload:
+            fsqs.Chevron_flux_pulse_ampl_seq(
+                ampls=self.sweep_points, qb_control=self.qb_control,
+                qb_target=self.qb_target, spacing=self.spacing,
+                cal_points=self.cal_points,
+                distorted=self.distorted,distortion_dict=self.distortion_dict
+            )
+
+
+class Chevron_ampl_swf(swf.Soft_Sweep):
+    '''
+    Sweep function class (soft sweep) for 2D Chevron experiment where
+    the amplitude of the fluxpulse is swept. Used in combination with
+    the Chevron_length_hard_swf class.
+    '''
+    def __init__(self, qb_control,qb_target, hard_sweep):
+        super().__init__()
+        self.name = 'Chevron flux pulse amplitude sweep'
+        self.parameter_name = 'Fluxpulse amplitude'
+        self.unit = 'V'
+        self.hard_sweep = hard_sweep
+        self.qb_control = qb_control
+        self.qb_target = qb_target
+
+    def prepare(self):
+        pass
+
+    def set_parameter(self, val, **kw):
+        self.qb_control.flux_pulse_amp(val)
+        self.hard_sweep.upload = True
+        self.hard_sweep.prepare()
+
+    def finish(self):
+        pass
+
+
+class Chevron_ampl_fast_swf(swf.Soft_Sweep):
+    '''
+    Sweep function class (soft sweep) for 2D Chevron experiment where
+    the amplitude of the fluxpulse is swept. This 'fast' version uses
+    a trick, that instead of uploading new sequences with different amplitudes,
+    the ouput scaling of the AWG is changed.
+    Used in combination with the Chevron_length_hard_swf class.
+
+    Args:
+        qb_control (qubit): control qubit (qubit with flux pulse)
+        qb_target (qubit): target qubit
+        AWG: AWG used for the flux pulses
+        channel (str): (optional), flux pulse channel of the AWG (e.g. 'ch1')
+    '''
+    def __init__(self, qb_control,qb_target,AWG,channel=None):
+        super().__init__()
+        if channel is None:
+            channel = qb_control.flux_pulse_channel()[-3:]
+        self.channel = channel
+        self.AWG = AWG
+        self.name = 'Chevron flux pulse amplitude sweep'
+        self.parameter_name = 'Fluxpulse amplitude'
+        self.unit = 'V'
+        self.qb_control = qb_control
+        self.qb_target = qb_target
+        self.flux_pulse_ampl_backup = self.qb_control.flux_pulse_amp()
+        self.sign_pulse = 1.
+
+    def prepare(self):
+
+        if np.sign(np.min(self.sweep_points)) != \
+                np.sign(np.max(self.sweep_points)):
+            logging.warning('Please do not use flux pulse'
+                            'amplitudes with different signs!')
+        else:
+            self.sign_pulse = np.sign(self.sweep_points[0])
+
+        if type(self.channel) == int:
+            self.qb_control.flux_pulse_amp(0.25*self.sign_pulse*self.AWG.get(
+                'ch{}_amp'.format(self.channel))) # used for correct amplitude
+        else:
+            self.qb_control.flux_pulse_amp(0.25*self.sign_pulse*self.AWG.get(
+                '{}_amp'.format(self.channel))) # used for correct amplitude
+
+    def set_parameter(self, val, **kw):
+
+        self.AWG.stop()
+        if type(self.channel) == int:
+            exec('self.AWG.ch{}_amp({})'.format(self.channel, 4*val*self.sign_pulse))
+            # factor of 4 for correct amplitude
+        else:
+            exec('self.AWG.{}_amp({})'.format(self.channel, 4*val*self.sign_pulse))
+            # factor of 4 for correct amplitude
+        self.AWG.start()
+
+    def finish(self):
+        self.qb_control.flux_pulse_amp(self.flux_pulse_ampl_backup)
+
+
+class Flux_pulse_CPhase_meas_hard_swf(swf.Hard_Sweep):
+
+    '''
+        Flexible sweep function class for a single slice of the CPhase
+        experiment (hard sweep) that can either sweep the amplitude or
+        length of the flux pulse or the phase of the second X90 pulse.
+        For details on the experiment see documentation of
+        'fsqs.flux_pulse_CPhase_seq(...)'
+
+    args:
+        qb_control: instance of the qubit class (control qubit)
+        qb_target: instance of the qubit class (target qubit)
+        sweep_mode: string, either 'length', 'amplitude' or 'amplitude'
+        X90_phase: float, phase of the second X90 pulse in rad
+        spacing: float, spacing between first and second X90 pulse
+        measurement_mode (str): either 'excited_state', 'ground_state'
+        reference_measurement (bool): if True, appends a reference measurement
+                                      IMPORTANT: you need to double
+                                      the hard sweep points!
+                                      e.g. thetas = np.concatenate((thetas,thetas))
+
+
+    '''
+
+    def __init__(self, qb_control, qb_target, sweep_mode='length' , X90_phase=0,
+                 spacing=50e-9,cal_points=False, upload=True,
+                 distorted=False,distortion_dict=None,
+                 measurement_mode='excited_state',
+                 reference_measurements=False):
+        super().__init__()
+        self.qb_control = qb_control
+        self.qb_target = qb_target
+        self.spacing = spacing
+        self.X90_phase = X90_phase
+        self.upload = upload
+        self.cal_points = cal_points
+        self.distorted = distorted
+        self.distortion_dict = distortion_dict
+        self.sweep_mode = sweep_mode
+        self.measurement_mode = measurement_mode
+        self.reference_measurements = reference_measurements
+
+        self.name = 'flux_pulse_CPhase_measurement_{}_sweep'.format(sweep_mode)
+        self.parameter_name = sweep_mode
+        if sweep_mode == 'length':
+            self.unit = 's'
+        elif sweep_mode == 'amplitude':
+            self.unit = 'V'
+        elif sweep_mode == 'phase':
+            self.unit = 'rad'
+
+    def prepare(self, X90_phase=None, **kw):
+
+        if X90_phase is not None:
+            self.X90_phase = X90_phase
+        if self.upload:
+            fsqs.flux_pulse_CPhase_seq(
+                sweep_points=self.sweep_points, qb_control=self.qb_control,
+                qb_target=self.qb_target,
+                sweep_mode=self.sweep_mode,
+                X90_phase=self.X90_phase, spacing=self.spacing,
+                cal_points=self.cal_points, distorted=self.distorted,
+                distortion_dict=self.distortion_dict,
+                measurement_mode=self.measurement_mode,
+                reference_measurements=self.reference_measurements
+            )
+
+
+class Flux_pulse_CPhase_meas_2D(swf.Soft_Sweep):
+    '''
+        Flexible soft sweep function class for 2D CPhase
+        experiments that can either sweep the amplitude or
+        length of the flux pulse or the phase of the second X90 pulse.
+        For details on the experiment see documentation of
+        'fsqs.flux_pulse_CPhase_seq(...)'
+
+    args:
+        qb_control: instance of the qubit class (control qubit)
+        qb_target: instance of the qubit class (target qubit)
+        hard_sweep: 1D hard sweep
+        sweep_mode: string, either 'length', 'amplitude' or 'amplitude'
+    '''
+
+    def __init__(self, qb_control,qb_target, hard_sweep,sweep_mode='amplitude'):
+        super().__init__()
+        self.name = 'flux_pulse_CPhase_measurement_{}_2D_sweep'.format(sweep_mode)
+        self.parameter_name = sweep_mode
+        self.sweep_mode = sweep_mode
+        if self.sweep_mode == 'length':
+            self.unit = 's'
+        elif self.sweep_mode == 'amplitude':
+            self.unit = 'V'
+        elif self.sweep_mode == 'phase':
+            self.unit = 'rad'
+        # elif self.sweep_mode == 'length_and_amplitude':
+            # self.unit = 'measurement point n'
+        self.hard_sweep = hard_sweep
+        self.qb_control = qb_control
+        self.qb_target = qb_target
+        # self.measurement_mode = measurement_mode
+        # self.measurement_state = None
+
+
+    def prepare(self):
+        pass
+
+    def set_parameter(self, val, **kw):
+        # self.measurement_state = 'excited_state'
+        # if self.measurement_mode == 'ground_state':
+        #     self.measurement_state = 'ground_state'
+        # elif self.measurement_mode == 'alternating':
+        #     if self.measurement_state == 'excited_state':
+        #         self.measurement_state = 'ground_state'
+        #     else:
+        #         self.measurement_state = 'excited_state'
+
+        if self.sweep_mode == 'length':
+            self.qb_control.flux_pulse_length(val)
+            self.hard_sweep.prepare()
+        elif self.sweep_mode == 'amplitude':
+            self.qb_control.flux_pulse_amp(val)
+            self.hard_sweep.prepare()
+        elif self.sweep_mode == 'phase':
+            self.hard_sweep.prepare(X90_phase=val)
+        # elif self.sweep_mode == 'length_and_amplitude':
+        #     self.qb_control.flux_pulse_length(val[0])
+        #     self.qb_control.flux_pulse_amp(val[1])
+
+    def finish(self):
+        pass
+
+
+class Fluxpulse_scope_swf(swf.Hard_Sweep):
+    def __init__(self, qb,cal_points=False, upload=True, distorted=False,
+                 distortion_dict=None,
+                 spacing=30e-9
+                 ):
+        super().__init__()
+        self.qb = qb
+        self.upload = upload
+        self.cal_points = cal_points
+        self.spacing=spacing
+
+        self.name = 'Fluxpulse_scope_{}'.format(self.qb.name)
+        self.parameter_name = 'delay'
+        self.unit = 's'
+        self.distorted = distorted
+        self.distortion_dict = distortion_dict
+
+    def prepare(self, **kw):
+        if self.upload:
+            fsqs.fluxpulse_scope_sequence(delays=self.sweep_points, qb=self.qb,
+                                          cal_points=self.cal_points,
+                                          distorted=self.distorted,
+                                          distortion_dict=self.distortion_dict,
+                                          spacing=self.spacing)
+
+class Fluxpulse_scope_drive_freq_sweep(swf.Soft_Sweep):
+
+    # sweeps the qubit frequency such that the X180 pulses have different frequencies.
+
+    def __init__(self, qb):
+        super().__init__()
+        self.name = 'Fluxpulse scope drive freq sweep'
+        self.parameter_name = 'qubit drive freq.'
+        self.unit = 'Hz'
+        self.qb = qb
+        self.stored_f_qubit = self.qb.f_qubit()
+        self.f_mod = self.qb.f_pulse_mod()
+
+    def prepare(self):
+        pass
+
+    def set_parameter(self, val, **kw):
+        self.qb.cw_source.frequency(val - self.f_mod)
+
+    def finish(self):
+        self.qb.f_qubit(self.stored_f_qubit)

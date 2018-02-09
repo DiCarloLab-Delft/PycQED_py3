@@ -61,3 +61,35 @@ def cos_seq(amplitude, frequency, channels, phases,
     # seq.append_element(el, trigger_wait=False)
     station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     return seq_name
+
+def mixer_calibration_sequence(trigger_separation, amplitude, trigger_channel,
+                               pulse_I_channel, pulse_Q_channel, f_pulse_mod=0,
+                               phi_skew=0, alpha=1):
+    RO_trigger = {'pulse_type': 'SquarePulse',
+                  'channel': trigger_channel,
+                  'length': 20e-9,
+                  'amplitude': 1.,
+                  'pulse_delay': 0}
+    cos_pulse = {'pulse_type': 'CosPulse',
+                 'channel': pulse_I_channel,
+                 'frequency': f_pulse_mod,
+                 'length': trigger_separation,
+                 'phase': phi_skew,
+                 'amplitude': amplitude * alpha,
+                 'pulse_delay': 0,
+                 'refpoint': 'simultaneous'}
+    sin_pulse = {'pulse_type': 'CosPulse',
+                 'channel': pulse_Q_channel,
+                 'frequency': f_pulse_mod,
+                 'length': trigger_separation,
+                 'phase': 90,
+                 'amplitude': amplitude,
+                 'pulse_delay': 0,
+                 'refpoint': 'simultaneous'}
+    el = multi_pulse_elt(0, station, [RO_trigger, cos_pulse, sin_pulse],
+                         trigger=False)
+    seq = sequence.Sequence('Sideband_modulation_seq')
+    seq.append(name='SSB_modulation_el', wfname=el.name, trigger_wait=False)
+    station.pulsar.program_awgs(seq, el, channels=[pulse_I_channel,
+                                                   pulse_Q_channel,
+                                                   trigger_channel])

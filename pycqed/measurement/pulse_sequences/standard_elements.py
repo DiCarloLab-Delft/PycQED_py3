@@ -25,7 +25,7 @@ reload(element)
 
 
 def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
-                    trigger=True):
+                    trigger=True, previous_element=None):
     """
     Input args
         i:          index of the element, ensures unique element name
@@ -41,7 +41,6 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
     # Prevents accidently overwriting pulse pars in this list
     pulse_list = deepcopy(pulse_list)
     last_op_type = 'other'  # used for determining relevant buffers
-    flux_compensation_pulse_list = []
 
     if sequencer_config is None:
         if hasattr(station, 'sequencer_config'):
@@ -85,28 +84,31 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
     if not trigger:
         el.fixed_point_applied = True
         el.ignore_offset_correction = True
+    if previous_element is not None:
+        el.time_offset = previous_element.time_offset + \
+                         previous_element.ideal_length()
 
-    # exists to ensure that channel is not high when waiting for trigger
-    # and to allow negavtive pulse delay of elements up to 300 ns
-    # last_pulse = el.add(
-    #     pulse.SquarePulse(name='refpulse_0', channel='ch1', amplitude=0,
-    #                       length=1e-9,), start=300e-9)
     last_pulse = None
-    # Make sure that there are no empty channels and we can have a negative
-    # pulse delay of up to 400 ns
-    #if trigger:
-    #    for cname in station.pulsar.channels:
-    #        last_pulse = el.add(pulse.SquarePulse(name='refpulse',
-    #                                              channel=cname,
-    #                                              amplitude=0, length=400e-9),
-    #                            refpulse=last_pulse,
-    #                            refpoint='start')
 
     ##############################
     # Add all pulses one by one  #
     ##############################
-
-    phase_offset = 0 # used for software Z-gates
+    # used for software Z-gates
+    if previous_element is None or not hasattr(previous_element,
+                                               'drive_phase_offsets'):
+        phase_offset = {}
+    else:
+        phase_offset = previous_element.drive_phase_offsets.copy()
+    for x in pulse_list:
+        if x.get('operation_type', None) == 'MW':
+            if 'target_qubit' in x.keys():
+                qb_name = x['target_qubit']
+                if qb_name not in phase_offset.keys():
+                    phase_offset[qb_name] = 0
+            if 'qb_target' in x.keys():
+                qb_name = x['qb_target']
+                if qb_name not in phase_offset.keys():
+                    phase_offset[qb_name] = 0
     j = 0
     for i, pulse_pars in enumerate(pulse_list):
         # Default values for backwards compatibility
@@ -139,10 +141,6 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
             pulse_pars['refpoint'] = 'start'
             t0 = 0
 
-        if cur_op_type == 'Flux':
-            # Adds flux pulses to a list for automatic compensation pulses
-            flux_compensation_pulse_list += [deepcopy(pulse_pars)]
-
         ###################################
         #       Pulses get added here     #
         ###################################
@@ -150,125 +148,99 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
         if (pulse_pars['pulse_type'] not in ['MW_IQmod_pulse_tek',
                                              'MW_IQmod_pulse_UHFQC',
                                              'Gated_MW_RO_pulse',
-                                             'Multiplexed_UHFQC_pulse']):
-
-            if pulse_pars['pulse_type'] == 'Z_pulse':
-                # apply software Z-gate (apply phase offset to all
-                # subsequent X and Y pulses)
-                phase_offset = -pulse_pars['phase'] + phase_offset
-            else:
-                pulse_pars_new = deepcopy(pulse_pars)
-                if phase_offset != 0:
-                    try:
-                        total_phase = pulse_pars['phase'] + phase_offset
-                        pulse_pars_new['phase'] = (total_phase%360 if total_phase>=0
-                                                   else total_phase%-360)
-                    except KeyError:
-                        pass
-
-                try:
-                    # Look for the function in pl = pulse_lib
-                    pulse_func = getattr(pl, pulse_pars_new['pulse_type'])
-                except AttributeError:
-                    try:
-                        # Look for the function in bpl = pulse
-                        pulse_func = getattr(bpl, pulse_pars_new['pulse_type'])
-                    except AttributeError:
-                        raise KeyError('pulse_type {} not recognized'.format(
-                            pulse_pars_new['pulse_type']))
-
-                last_pulse = el.add(
-                    pulse_func(name=pulse_pars_new['pulse_type']+'_'+str(j),
-                               **pulse_pars_new),
-                    start=t0, refpulse=last_pulse,
-                    refpoint=pulse_pars_new['refpoint'],
-                    operation_type=pulse_pars_new['operation_type'])
-                j += 1
-
-        else:
-            # Composite "special pulses"
-            # Ideally this should be combined in one function in pulselib
-            # Does more than just call the function as it also adds the
-            # markers.
-            if pulse_pars['pulse_type'] == 'MW_IQmod_pulse_tek':
-                last_pulse = el.add(MW_IQmod_pulse(
-                    name='RO_tone',
-                    I_channel=pulse_pars['I_channel'],
-                    Q_channel=pulse_pars['Q_channel'],
-                    length=pulse_pars['length'],
-                    amplitude=pulse_pars['amplitude'],
-                    mod_frequency=pulse_pars['mod_frequency']),
-                    operation_type=pulse_pars['operation_type'],
-                    start=t0,
-                    refpulse=last_pulse, refpoint=pulse_pars['refpoint'])
-            elif pulse_pars['pulse_type'] == 'Gated_MW_RO_pulse':
-                last_pulse = el.add(pulse.SquarePulse(
-                    name='RO_marker', amplitude=pulse_pars['amplitude'],
-                    length=pulse_pars['length'],
-                    channel=pulse_pars['RO_pulse_marker_channel']),
-                    operation_type=pulse_pars['operation_type'],
-                    start=t0, refpulse=last_pulse,
-                    refpoint=pulse_pars['refpoint'])
-
-            elif (pulse_pars['pulse_type'] == 'MW_IQmod_pulse_UHFQC' or
-                  pulse_pars['pulse_type'] == 'Multiplexed_UHFQC_pulse'):
-                # "adding a 0 amp pulse because the sequencer needs an element
-                # for timing
-                last_pulse = el.add(pulse.SquarePulse(
-                    name='RO_marker', amplitude=0,
-                    length=pulse_pars['length'],
-                    channel=pulse_pars['RO_pulse_marker_channel']),
-                    operation_type=pulse_pars['operation_type'],
-                    start=t0, refpulse=last_pulse,
-                    refpoint=pulse_pars['refpoint'])
-            # Start Acquisition marker
-            if type(pulse_pars['acq_marker_channel']) is str:
-                channels = pulse_pars['acq_marker_channel']
-                channels = list(channels.split(','))
-                for channel in channels:
-                    Acq_marker = pulse.SquarePulse(
-                        name='Acq-trigger', amplitude=1, length=20e-9,
-                        channel=channel)
-                    # Note that refpoint here is an exception because the
-                    # refpulse is always the RO pulse that is added in the
-                    # block just above here.
-                    el.add(
-                        Acq_marker, start=pulse_pars['acq_marker_delay'],
-                        refpulse=last_pulse, refpoint='start')
-
-    ####################################################################
-    # Adding Flux compensation pulses
-    ####################################################################
-    for j, pulse_pars in enumerate(flux_compensation_pulse_list):
-        pulse_pars['amplitude'] *= -1
-        if j == 0:
-            t0 = sequencer_config['Flux_comp_dead_time']
-        else:
-            t0 = sequencer_config['Buffer_Flux_Flux']
-        try:
-            # Look for the function in pl = pulse_lib
-            pulse_func = getattr(pl, pulse_pars['pulse_type'])
-        except AttributeError:
+                                             'Multiplexed_UHFQC_pulse',
+                                             'Z_pulse']):
+            # only add phase_offset if the pulse is a qubit drive pulse
+            if pulse_pars.get('operation_type', None) == 'MW':
+                target_qubit = pulse_pars.get('target_qubit', None)
+                if target_qubit is not None:
+                    if 'phase' in pulse_pars.keys():
+                        pulse_pars['phase'] += phase_offset[target_qubit]
+                        pulse_pars['phase'] %= 360
             try:
-                # Look for the function in bpl = pulse
-                pulse_func = getattr(bpl, pulse_pars['pulse_type'])
+                # Look for the function in pl = pulse_lib
+                pulse_func = getattr(pl, pulse_pars['pulse_type'])
             except AttributeError:
-                raise KeyError('pulse_type {} not recognized'.format(
-                    pulse_pars['pulse_type']))
+                try:
+                    # Look for the function in bpl = pulse
+                    pulse_func = getattr(bpl, pulse_pars['pulse_type'])
+                except AttributeError:
+                    raise KeyError('pulse_type {} not recognized'.format(
+                        pulse_pars['pulse_type']))
 
-        last_pulse = el.add(
-            pulse_func(name=pulse_pars['pulse_type']+'_'+str(i+j),
-                       **pulse_pars),
-            start=t0, refpulse=last_pulse,
-            refpoint=pulse_pars['refpoint'],
-            operation_type=pulse_pars['operation_type'])
+            last_pulse = el.add(
+                pulse_func(name=pulse_pars['pulse_type']+'_'+str(j),
+                           **pulse_pars),
+                start=t0, refpulse=last_pulse,
+                refpoint=pulse_pars['refpoint'],
+                operation_type=pulse_pars['operation_type'])
+            j += 1
+        else:
+            if pulse_pars['pulse_type'] == 'Z_pulse':
+                pass
+            else:
+                # Composite "special pulses"
+                # Ideally this should be combined in one function in pulselib
+                # Does more than just call the function as it also adds the
+                # markers.
+                if pulse_pars['pulse_type'] == 'MW_IQmod_pulse_tek':
+                    last_pulse = el.add(MW_IQmod_pulse(
+                        name='RO_tone',
+                        I_channel=pulse_pars['I_channel'],
+                        Q_channel=pulse_pars['Q_channel'],
+                        length=pulse_pars['length'],
+                        amplitude=pulse_pars['amplitude'],
+                        mod_frequency=pulse_pars['mod_frequency']),
+                        operation_type=pulse_pars['operation_type'],
+                        start=t0,
+                        refpulse=last_pulse, refpoint=pulse_pars['refpoint'])
+                elif pulse_pars['pulse_type'] == 'Gated_MW_RO_pulse':
+                    last_pulse = el.add(pulse.SquarePulse(
+                        name='RO_marker', amplitude=pulse_pars['amplitude'],
+                        length=pulse_pars['length'],
+                        channel=pulse_pars['RO_pulse_marker_channel']),
+                        operation_type=pulse_pars['operation_type'],
+                        start=t0, refpulse=last_pulse,
+                        refpoint=pulse_pars['refpoint'])
+
+                elif (pulse_pars['pulse_type'] == 'MW_IQmod_pulse_UHFQC' or
+                      pulse_pars['pulse_type'] == 'Multiplexed_UHFQC_pulse'):
+                    # "adding a 0 amp pulse because the sequencer needs an element
+                    # for timing
+                    last_pulse = el.add(pulse.SquarePulse(
+                        name='RO_marker', amplitude=0,
+                        length=pulse_pars['length'],
+                        channel=pulse_pars['RO_pulse_marker_channel']),
+                        operation_type=pulse_pars['operation_type'],
+                        start=t0, refpulse=last_pulse,
+                        refpoint=pulse_pars['refpoint'])
+                # Start Acquisition marker
+                if type(pulse_pars['acq_marker_channel']) is str:
+                    channels = pulse_pars['acq_marker_channel']
+                    channels = list(channels.split(','))
+                    for channel in channels:
+                        Acq_marker = pulse.SquarePulse(
+                            name='Acq-trigger', amplitude=1, length=20e-9,
+                            channel=channel)
+                        # Note that refpoint here is an exception because the
+                        # refpulse is always the RO pulse that is added in the
+                        # block just above here.
+                        el.add(
+                            Acq_marker, start=pulse_pars['acq_marker_delay'],
+                            refpulse=last_pulse, refpoint='start')
+        # apply any virtual-z rotations in the pulse
+        basis_rotation = pulse_pars.get('basis_rotation', {})
+        for qubit_name, offset in basis_rotation.items():
+            phase_offset[qubit_name] -= offset
+
+    el.drive_phase_offsets = phase_offset.copy()
 
     # make sure that the waveforms on all the channels end at the same time
     # in case the next element is ran back to back with this one.
-    min_el_len = 300e-9 if trigger else 1e-9
     for cname in station.pulsar.channels:
-        el.add(pulse.SquarePulse(name='empty_pulse', channel=cname,
-                                 amplitude=0, length=min_el_len),
+        el.add(pulse.SquarePulse(name='empty_pulse', channel=cname, amplitude=0,
+                                 length=station.pulsar.get(
+                                     '{}_min_length'.format(cname))),
                refpulse=last_pulse, refpoint='end', refpoint_new='end')
 
     # switch to global timing for adding the trigger pulses.

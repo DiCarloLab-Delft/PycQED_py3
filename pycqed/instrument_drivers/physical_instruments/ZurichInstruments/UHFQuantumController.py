@@ -239,6 +239,12 @@ class UHFQC(Instrument):
             eval('self.quex_rot_{0}_real(1.0)'.format(i))
             eval('self.quex_rot_{0}_imag(0.0)'.format(i))
 
+        # No thresholding or correlation modes
+        for i in range(0, 9):
+            eval('self.quex_thres_{0}_level(0)'.format(i))
+            eval('self.quex_corr_{0}_mode(0)'.format(i))
+            eval('self.quex_corr_{0}_source(0)'.format(i))
+
         # No cross-coupling in the matrix multiplication (identity matrix)
         for i in range(0, 9):
             for j in range(0, 9):
@@ -916,6 +922,67 @@ setTrigger(0);"""
             loop_start+delay_string+end_string
         self.awg_string(string)
 
+    def awg_sequence_acquisition_and_pulse_multi_segment(self, readout_pulses):
+
+        wave_defs = ""
+
+        for i, pulse in enumerate(readout_pulses):
+            Iwave = pulse.real.copy()
+            Qwave = pulse.imag.copy()
+            if np.max(Iwave) > 1.0 or np.min(Iwave) < -1.0:
+                raise KeyError("exceeding AWG range for I channel, all values "
+                               "should be withing +/-1")
+            elif np.max(Qwave) > 1.0 or np.min(Qwave) < -1.0:
+                raise KeyError("exceeding AWG range for Q channel, all values "
+                               "should be withing +/-1")
+            elif len(Iwave) > 16384:
+                raise KeyError("exceeding max AWG wave lenght of 16384 samples "
+                               "for I channel, trying to upload {} samples"
+                                   .format(len(Iwave)))
+            elif len(Qwave) > 16384:
+                raise KeyError("exceeding max AWG wave lenght of 16384 samples "
+                               "for Q channel, trying to upload {} samples"
+                                   .format(len(Qwave)))
+            wave_defs += self.array_to_combined_vector_string(
+                Iwave, "Iwave{}".format(i))
+            wave_defs += self.array_to_combined_vector_string(
+                Qwave, "Qwave{}".format(i))
+
+        preamble = """
+        const TRIGGER1  = 0x000001;
+        const WINT_TRIG = 0x000010;
+        const IAVG_TRIG = 0x000020;
+        const WINT_EN   = 0x1f0000;
+        setTrigger(WINT_EN);
+        var loop_cnt = getUserReg(0)/{};
+        var wait_delay = getUserReg(2);
+        var RO_TRIG;
+        if (getUserReg(1)) {{
+          RO_TRIG = IAVG_TRIG;
+        }} else {{
+          RO_TRIG = WINT_TRIG;
+        }}\n""".format(len(readout_pulses))
+
+        loop = """repeat(loop_cnt) {\n"""
+
+        for i, _ in enumerate(readout_pulses):
+            loop += """
+            \twaitDigTrigger(1, 1);
+            \tplayWave(Iwave{0}, Qwave{0});\n""".format(i)
+            loop += """
+            \tsetTrigger(WINT_EN + RO_TRIG);
+            \tsetTrigger(WINT_EN);
+            \twaitWave();\n"""
+
+        end_string = """
+        }
+        wait(300);
+        setTrigger(0);\n"""
+
+        string = preamble + wave_defs + loop + end_string
+        self.awg_string(string)
+
+
     def array_to_combined_vector_string(self, array, name):
         # this function cuts up arrays into several vectors of maximum length 1024 that are joined.
         # this is to avoid python crashes (was found to crash for vectors of
@@ -942,7 +1009,7 @@ setTrigger(0);"""
             string = 'wave ' + name + ' = ' + string + ';\n'
         return string
 
-    def awg_sequence_acquisition(self):
+    def awg_sequence_acquisition(self, trigger=True):
         string = """
 const TRIGGER1  = 0x000001;
 const WINT_TRIG = 0x000010;
@@ -957,10 +1024,11 @@ if(getUserReg(1)){
   RO_TRIG=WINT_TRIG;
 }
 repeat(loop_cnt) {
-\twaitDigTrigger(1, 1);\n
+""" + ("\twaitDigTrigger(1, 1);" if trigger else "") + """
 \tsetTrigger(WINT_EN + RO_TRIG);
 \twait(5);
 \tsetTrigger(WINT_EN);
+""" + ("\twait(2250);" if not trigger else "") + """
 }
 wait(10);
 setTrigger(0);"""

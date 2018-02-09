@@ -9,12 +9,17 @@ from qcodes.instrument_drivers.tektronix.AWG5014 import Tektronix_AWG5014
 
 class VirtualAWG5014(Tektronix_AWG5014):
 
-    def __init__(self, name):
+    def __init__(self, name, timeout=5, address=''):
         Instrument.__init__(self, name)
+        self._address = address
+        self._terminator = ''
         self.add_parameter('timeout', unit='s', initial_value=5,
                            parameter_class=ManualParameter,
                            vals=vals.MultiType(vals.Numbers(min_value=0),
                                                vals.Enum(None)))
+        self.add_parameter('address', unit='', initial_value='',
+                           parameter_class=ManualParameter,
+                           vals=vals.Strings())
 
         for i in range(1, 5):
             self.add_parameter('ch{}_state'.format(i), initial_value=1,
@@ -131,7 +136,7 @@ class VirtualAWG5014(Tektronix_AWG5014):
     def is_awg_ready(self):
         return True
 
-    def plot_waveforms(self, seg=0, cids='all'):
+    def plot_waveforms(self, seg=0, cids='all',xlim='All',costum_ylabels=None):
         if cids == 'all':
             cids = []
             for i in range(1, 5):
@@ -139,7 +144,9 @@ class VirtualAWG5014(Tektronix_AWG5014):
                 cids.append('ch{}_m1'.format(i))
                 cids.append('ch{}_m2'.format(i))
 
-        fig, axs = plt.subplots(len(cids), 1, sharex=True)
+        #fig, axs = plt.subplots(len(cids), 1, sharex=True)
+        fig, axs = plt.subplots(len(cids), 1, sharex=False)
+        # fig, axs = plt.subplots(len(cids), 1, sharex=False)
 
         i = 0
         for cid in cids:
@@ -147,6 +154,7 @@ class VirtualAWG5014(Tektronix_AWG5014):
             pwfs = self.file['p_wfs'][el_name]
 
             ax = axs[i]
+
             i += 1
 
             if cid[4:] == 'm1':
@@ -157,7 +165,26 @@ class VirtualAWG5014(Tektronix_AWG5014):
                 ydata = (np.float_(np.bitwise_and(pwfs, 16383)) - 8191)/8191
             xdata = np.arange(len(ydata))/self.clock_freq()
 
-            ax.plot(xdata, ydata)
-            ax.set_ylabel(cid)
+            ax.plot(xdata/1e-9, ydata)
+            if costum_ylabels is None:
+                ax.set_ylabel(cid,rotation=0)
+            else:
+                ax.set_ylabel(costum_ylabels[cid],rotation=0)
+            # ax.set_ylabel(cid,rotation=0,fontsize=8)
+            # ax.set_yticklabels(ax.get_yticks(),fontsize=5)
+            ax.yaxis.set_label_coords(-.15, 0.5)
+            if xlim != 'All':
+                ax.set_xlim(xlim)
+            # if costum_ylabels is None:
+            #     ax.set_ylabel(cid,rotation=0)
+            # else:
+            #     ax.set_ylabel(costum_ylabels[cid],rotation=0)
+            # # ax.set_ylabel(cid,rotation=0,fontsize=8)
+            # # ax.set_yticklabels(ax.get_yticks(),fontsize=5)
+            # ax.yaxis.set_label_coords(-.15, 0.5)
+            if xlim != 'All':
+                ax.set_xlim(xlim)
             if i == len(cids):
-                ax.set_xlabel('Time')
+                ax.set_xlabel('Time (ns)')
+        return fig
+

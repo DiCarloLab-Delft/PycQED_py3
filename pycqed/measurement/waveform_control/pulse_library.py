@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.signal as signal
 '''
 Library containing pulse shapes.
 '''
@@ -290,7 +291,10 @@ class Mux_DRAG_pulse(SSB_DRAG_pulse):
 
 # Some simple pulse definitions.
 class SquareFluxPulse(Pulse):
+    '''
+    Square flux pulse
 
+    '''
     def __init__(self, channel=None, channels=None, name='square flux pulse',
                  **kw):
         Pulse.__init__(self, name)

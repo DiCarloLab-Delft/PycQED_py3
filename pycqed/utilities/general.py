@@ -1,5 +1,4 @@
 import os
-import sys
 import numpy as np
 import h5py
 import json
@@ -8,6 +7,7 @@ from pycqed.measurement import hdf5_data as h5d
 from pycqed.analysis import analysis_toolbox as a_tools
 import errno
 import pycqed as pq
+import sys
 import glob
 from os.path import dirname, exists
 from os import makedirs
@@ -15,8 +15,6 @@ import logging
 import subprocess
 from functools import reduce  # forward compatibility for Python 3
 import operator
-
-from contextlib import ContextDecorator
 
 
 def get_git_revision_hash():
@@ -141,7 +139,15 @@ def load_settings_onto_instrument(instrument, load_from_instr=None,
                     try:
                         instrument.set(parameter, False)
                     except:
-                        print('Could not set parameter: "%s" to "%s" for instrument "%s"' % (
+                        print('Could not set parameter: "%s" to "%s" for '
+                              'instrument "%s"' % (
+                            parameter, value, instrument_name))
+                elif value == 'True':
+                    try:
+                        instrument.set(parameter, True)
+                    except:
+                        print('Could not set parameter: "%s" to "%s" for '
+                              'instrument "%s"' % (
                             parameter, value, instrument_name))
                 else:
                     try:
@@ -153,16 +159,137 @@ def load_settings_onto_instrument(instrument, load_from_instr=None,
                             try:
                                 instrument.set(parameter, int(value))
                             except:
-                                print('Could not set parameter: "%s" to "%s" for instrument "%s"' % (
+                                print('Could not set parameter: "%s" to "%s" '
+                                      'for instrument "%s"' % (
                                     parameter, value, instrument_name))
             else:
                 instrument.set(parameter, value)
     f.close()
     return True
 
+def load_settings(instrument,
+                  label: str='', folder: str=None,
+                  timestamp: str=None, **kw):
+    '''
+    Loads settings from an hdf5 file onto the instrument handed to the
+    function. By default uses the last hdf5 file in the datadirectory.
+    By giving a label or timestamp another file can be chosen as the
+    settings file.
+
+    Args:
+        instrument (instrument) : instrument onto which settings
+            should be loaded
+        label (str)           : label used for finding the last datafile
+        folder (str)        : exact filepath of the hdf5 file to load.
+            if filepath is specified, this takes precedence over the file
+            locating options (label, timestamp etc.).
+        timestamp (str)       : timestamp of file in the datadir
+
+    Kwargs:
+        params_to_set (list)    : list of strings referring to the parameters
+            that should be set for the instrument
+    '''
+    if folder is None:
+        folder_specified = False
+    else:
+        folder_specified = True
+
+    instrument_name = instrument.name
+    verbose = kw.pop('verbose', True)
+    older_than = kw.pop('older_than', None)
+    success = False
+    count = 0
+    # Will try multiple times in case the last measurements failed and
+    # created corrupt data files.
+    while success is False and count < 10:
+        if folder is None:
+            folder = a_tools.get_folder(timestamp=timestamp, label=label,
+                                        older_than=older_than)
+        if verbose:
+            print('Folder used: {}'.format(folder))
+
+        try:
+            filepath = a_tools.measurement_filename(folder)
+            f = h5py.File(filepath, 'r')
+            sets_group = f['Instrument settings']
+            ins_group = sets_group[instrument_name]
+
+            if verbose:
+                print('Loaded settings successfully from the HDF file.')
+
+            params_to_set = kw.pop('params_to_set', [])
+            if len(params_to_set)>0:
+                if verbose:
+                    print('Setting parameters {} for {}.'.format(
+                        params_to_set, instrument_name))
+                params_to_set = [(param, val) for (param, val) in
+                                ins_group.attrs.items() if param in
+                                 params_to_set]
+            else:
+                if verbose:
+                    print('Setting parameters for {}.'.format(instrument_name))
+                params_to_set = ins_group.attrs.items()
+
+            for parameter, value in params_to_set:
+                if parameter in instrument.parameters.keys() and \
+                        hasattr(instrument.parameters[parameter], 'set'):
+                    if value == 'None':  # None is saved as string in hdf5
+                        try:
+                            instrument.set(parameter, None)
+                        except:
+                            print('Could not set parameter "%s" to "%s" for '
+                                  'instrument "%s"' % (
+                                      parameter, value, instrument_name))
+                    elif value == 'False':
+                        try:
+                            instrument.set(parameter, False)
+                        except:
+                            print('Could not set parameter "%s" to "%s" for '
+                                  'instrument "%s"' % (
+                                      parameter, value, instrument_name))
+                    elif value == 'True':
+                        try:
+                            instrument.set(parameter, True)
+                        except:
+                            print('Could not set parameter "%s" to "%s" for '
+                                  'instrument "%s"' % (
+                                      parameter, value, instrument_name))
+                    else:
+                        try:
+                            instrument.set(parameter, float(value))
+                        except Exception:
+                            try:
+                                instrument.set(parameter, value)
+                            except:
+                                try:
+                                    instrument.set(parameter, int(value))
+                                except:
+                                    print('Could not set parameter "%s" to "%s"'
+                                          ' for instrument "%s"' % (
+                                              parameter, value, instrument_name))
+            success = True
+            f.close()
+        except Exception as e:
+            logging.warning(e)
+            success = False
+            if timestamp is None and not folder_specified:
+                print('Trying next folder.')
+                older_than = os.path.split(folder)[0][-8:] \
+                             + '_' + os.path.split(folder)[1][:6]
+                folder = None
+            else:
+                break
+        count += 1
+
+    if not success:
+        print('Could not open settings for instrument {}.'.format(
+            instrument_name))
+    print()
+    return
+
 
 def load_settings_onto_instrument_v2(instrument, load_from_instr: str=None,
-                                     label: str='', filepath: str=None,
+                                     label: str='', folder: str=None,
                                      timestamp: str=None):
     '''
     Loads settings from an hdf5 file onto the instrument handed to the
@@ -176,7 +303,7 @@ def load_settings_onto_instrument_v2(instrument, load_from_instr: str=None,
         load_from_instr (str) : optional name of another instrument from
             which to load the settings.
         label (str)           : label used for finding the last datafile
-        filepath (str)        : exact filepath of the hdf5 file to load.
+        folder (str)        : exact filepath of the hdf5 file to load.
             if filepath is specified, this takes precedence over the file
             locating options (label, timestamp etc.).
         timestamp (str)       : timestamp of file in the datadir
@@ -185,18 +312,18 @@ def load_settings_onto_instrument_v2(instrument, load_from_instr: str=None,
     '''
 
     older_than = None
-    folder = None
+    # folder = None
     instrument_name = instrument.name
     success = False
     count = 0
     # Will try multiple times in case the last measurements failed and
     # created corrupt data files.
-    while success is False and count < 3:
-        if filepath is None:
-            folder = a_tools.get_folder(timestamp=timestamp, label=label,
-                                        older_than=older_than)
-            filepath = a_tools.measurement_filename(folder)
+    while success is False and count < 10:
         try:
+            if folder is None:
+                folder = a_tools.get_folder(timestamp=timestamp, label=label,
+                                            older_than=older_than)
+                filepath = a_tools.measurement_filename(folder)
 
             f = h5py.File(filepath, 'r')
             snapshot = {}
@@ -208,16 +335,10 @@ def load_settings_onto_instrument_v2(instrument, load_from_instr: str=None,
                 ins_group = snapshot['instruments'][load_from_instr]
             success = True
         except Exception as e:
-            logging.warning('Exception occured reading from {}'.format(folder))
             logging.warning(e)
-            # This check makes this snippet a bit more robust
-            if folder is not None:
-                older_than = os.path.split(folder)[0][-8:] \
-                    + '_' + os.path.split(folder)[1][:6]
-            # important to set all to None, otherwise the try except loop
-            # will not look for an earlier data file
+            older_than = os.path.split(folder)[0][-8:] \
+                + '_' + os.path.split(folder)[1][:6]
             folder = None
-            filepath = None
             success = False
         count += 1
 
@@ -237,6 +358,7 @@ def load_settings_onto_instrument_v2(instrument, load_from_instr: str=None,
             logging.warning(e)
     f.close()
     return True
+
 
 
 def send_email(subject='PycQED needs your attention!',
@@ -436,7 +558,6 @@ class NumpyJsonEncoder(json.JSONEncoder):
     for saving in JSON files.
     Also converts datetime objects to strings.
     '''
-
     def default(self, o):
         if isinstance(o, np.integer):
             return int(o)
@@ -448,37 +569,3 @@ class NumpyJsonEncoder(json.JSONEncoder):
             return str(o)
         else:
             return super().default(o)
-
-
-class suppress_stdout(ContextDecorator):
-    '''
-    A context manager for doing a "deep suppression" of stdout and stderr in
-    Python, i.e. will suppress all print, even if the print originates in a
-    compiled C/Fortran sub-function.
-       This will not suppress raised exceptions, since exceptions are printed
-    to stderr just before a script exits, and after the context manager has
-    exited (at least, I think that is why it lets exceptions through).
-
-    Source: "https://stackoverflow.com/questions/11130156/
-        suppress-stdout-stderr-print-from-python-functions"
-
-    '''
-
-    def __init__(self):
-        # Open a pair of null files
-        self.null_fds = [os.open(os.devnull, os.O_RDWR) for x in range(2)]
-        # Save the actual stdout (1) and stderr (2) file descriptors.
-        self.save_fds = [os.dup(1), os.dup(2)]
-
-    def __enter__(self):
-        # Assign the null pointers to stdout and stderr.
-        os.dup2(self.null_fds[0], 1)
-        os.dup2(self.null_fds[1], 2)
-
-    def __exit__(self, *_):
-        # Re-assign the real stdout/stderr back to (1) and (2)
-        os.dup2(self.save_fds[0], 1)
-        os.dup2(self.save_fds[1], 2)
-        # Close all file descriptors
-        for fd in self.null_fds + self.save_fds:
-            os.close(fd)

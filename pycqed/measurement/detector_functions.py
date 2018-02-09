@@ -3,6 +3,7 @@ Module containing a collection of detector functions used by the
 Measurement Control.
 '''
 import numpy as np
+from copy import deepcopy
 import logging
 import time
 from string import ascii_uppercase
@@ -13,7 +14,8 @@ from pycqed.measurement.waveform_control import element
 from pycqed.measurement.waveform_control import sequence
 from qcodes.instrument.parameter import _BaseParameter
 from pycqed.instrument_drivers.virtual_instruments.pyqx import qasm_loader as ql
-
+import pycqed.measurement.pulse_sequences.standard_elements as st_elts
+import pycqed.measurement.pulse_sequences.calibration_elements as cal_elts
 
 class Detector_Function(object):
 
@@ -100,6 +102,29 @@ class Multi_Detector(Detector_Function):
     def finish(self):
         for detector in self.detectors:
             detector.finish()
+
+
+class IndexDetector(Detector_Function):
+    def __init__(self, detector, index):
+        super().__init__()
+        self.detector = detector
+        self.index = index
+        self.name = detector.name + '[{}]'.format(index)
+        self.value_names = [detector.value_names[index]]
+        self.value_units = [detector.value_units[index]]
+        self.detector_control = detector.detector_control
+
+    def prepare(self, **kw):
+        self.detector.prepare(**kw)
+
+    def get_values(self):
+        return self.detector.get_values()[self.index]
+
+    def acquire_data_point(self):
+        return self.detector.acquire_data_point()[self.index]
+
+    def finish(self):
+        self.detector.finish()
 
 ###############################################################################
 ###############################################################################
@@ -1447,7 +1472,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         #     raise ValueError
 
         self.name = '{}_UHFQC_integrated_average'.format(result_logging_mode)
-        self.channels = channels
+        self.channels = deepcopy(channels)
         self.value_names = ['']*len(self.channels)
         for i, channel in enumerate(self.channels):
             self.value_names[i] = '{} w{}'.format(result_logging_mode,
@@ -1633,6 +1658,151 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         if self.AWG is not None:
             self.AWG.stop()
 
+class UHFQC_SSRO_detector(Hard_Detector):
+
+    '''
+    Detector used for single-shot acquisition with the UHFQC.
+    '''
+
+    def __init__(self, UHFQC, AWG=None,
+                 integration_length: float=1e-6,
+                 nr_shots: int=4094,
+                 channels: list=(0, 1),
+                 result_logging_mode: str='raw',
+                 operation='average',**kw):
+
+        """
+        Args:
+        UHFQC (instrument) : data acquisition device
+        AWG   (instrument) : device responsible for starting and stopping
+                             the experiment, can also be a central controller.
+        integration_length (float): integration length in seconds
+        nr_shots (int)     : nr of shots (max is 4095)
+        channels (list)    : index (channel) of UHFQC weight functions to use
+
+        result_logging_mode (str):  options are
+            - raw        -> returns raw data in V
+            - lin_trans  -> applies the linear transformation matrix and
+                            subtracts the offsets defined in the UFHQC.
+                            This is typically used for crosstalk suppression
+                            and normalization. Requires optimal weights.
+            - digitized  -> returns fraction of shots based on the threshold
+                            defined in the UFHQC. Requires optimal weights.
+        """
+
+        super().__init__()
+        self.UHFQC = UHFQC
+        self.name = '{}_UHFQC_SSRO_detector'.format(result_logging_mode)
+        self.channels = channels
+        self.value_names = ['']*len(self.channels)
+        for i, channel in enumerate(self.channels):
+            self.value_names[i] = '{} w{}'.format(result_logging_mode,
+                                                  channel)
+        if result_logging_mode == 'raw':
+            self.value_units = ['V']*len(self.channels)
+            self.scaling_factor = 1/(1.8e9*integration_length*nr_shots)
+        elif result_logging_mode == 'lin_trans':
+            self.value_units = ['a.u.']*len(self.channels)
+            self.scaling_factor = 1/nr_shots
+
+        elif result_logging_mode == 'digitized':
+            self.value_units = ['frac']*len(self.channels)
+            self.scaling_factor = 1
+
+        self.AWG = AWG
+        self.nr_shots = nr_shots
+        self._set_operation(operation)
+        self.integration_length = integration_length
+
+        # 0/1/2 crosstalk supressed /digitized/raw
+        res_logging_indices = {'lin_trans': 0, 'digitized': 1, 'raw': 2}
+        self.result_logging_mode_idx = res_logging_indices[result_logging_mode]
+        self.result_logging_mode = result_logging_mode
+
+    def _set_operation(self, operation='average'):
+        """
+        Function so that value names and units can be changed
+        after initialization
+        """
+
+        self.operation = operation
+        if self.result_logging_mode == 'raw':
+            self.value_units = ['V']*len(self.channels)
+        else:
+            self.value_units = ['']*len(self.channels)
+
+        # if not self.operation:
+        #     if len(self.channels) != 2:
+        #         raise ValueError()
+        #     self.value_names[0] = 'Magn'
+        #     self.value_names[1] = 'Phase'
+        #     self.value_units[1] = 'deg'
+
+    def apply_operation(self, data):
+
+        if self.operation is 'average':
+            return np.mean(data)
+        elif self.operation is '<zz>':
+            pass
+        else:
+            raise ValueError('Unknown operation.')
+
+    def get_values(self):
+        if self.AWG is not None:
+            self.AWG.stop()
+        self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
+        self.UHFQC.acquisition_arm()
+        # starting AWG
+        if self.AWG is not None:
+            self.AWG.start()
+
+        data_raw = self.UHFQC.acquisition_poll(
+            samples=self.nr_shots, arm=False, acquisition_time=0.01)
+        data = np.array([data_raw[key]
+                         for key in data_raw.keys()])*self.scaling_factor
+
+        # Corrects offsets after crosstalk suppression matrix in UFHQC
+        if self.result_logging_mode == 'lin_trans':
+            for i, channel in enumerate(self.channels):
+                data[i] = data[i]-self.UHFQC.get(
+                    'quex_trans_offset_weightfunction_{}'.format(channel))
+
+        #data = self.apply_operation(data)
+
+        return data
+
+    def acquire_data_point(self):
+        return self.get_values()
+
+    def prepare(self, sweep_points=None):
+        if self.AWG is not None:
+            self.AWG.stop()
+
+        # Determine the number of sweep points and set them
+        if sweep_points is None:
+            logging.warning('sweep_points is None. Setting nr_sweep_points=1.')
+            self.nr_sweep_points = 1
+        else:
+            self.nr_sweep_points = len(sweep_points)
+
+        self.UHFQC.awgs_0_single(1)
+        self.UHFQC.awgs_0_userregs_0(int(self.nr_shots*self.nr_sweep_points))
+        self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)
+        # The AWG program uses userregs/0 to define the number of iterations in
+        # the loop
+
+        self.UHFQC.quex_rl_length(self.nr_sweep_points)
+        self.UHFQC.quex_rl_avgcnt(int(np.log2(self.nr_shots)))
+        # self.UHFQC.quex_rl_avgcnt(0) #for SS
+        self.UHFQC.quex_wint_length(int(self.integration_length*(1.8e9)))
+
+        self.UHFQC.quex_rl_source(self.result_logging_mode_idx)
+        self.UHFQC.acquisition_initialize(channels=self.channels, mode='rl')
+
+    def finish(self):
+        if self.AWG is not None:
+            self.AWG.stop()
+
 
 class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
     '''
@@ -1712,16 +1882,13 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
 
             # # 4 is the (current) max number of weights in the UHFQC (v5)
             for ch in range(9):
-                if ch in self.channels:
-                    # Disable correlation mode as this is used for normal
-                    # acquisition
-                    self.UHFQC.set('quex_corr_{}_mode'.format(ch), 0)
-
                 # Find the first unused channel to set up as correlation
                 if ch not in self.channels:
                     # selects the lowest available free channel
-                    self.channels += [ch]
                     correlation_channel = ch
+                    self.channels += [ch]
+                    self.correlation_channels += [correlation_channel]
+
                     print('Using channel {} for correlation ({}, {}).'
                           .format(ch, corr[0], corr[1]))
                     # correlation mode is turned on in the
@@ -1732,8 +1899,6 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             if correlation_channel < 0:
                 raise ValueError('No free channel available for correlation.')
 
-            self.correlation_channels += [correlation_channel]
-
     def set_up_correlation_weights(self):
         if self.thresholding:
             # correlations mode after threshold
@@ -1743,6 +1908,12 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             # correlations mode before threshold
             self.UHFQC.quex_rl_source(4)
         # Configure correlation mode
+        for ch in self.channels:
+            if ch not in self.correlation_channels:
+                # Disable correlation mode as this is used for normal
+                # acquisition
+                self.UHFQC.set('quex_corr_{}_mode'.format(ch), 0)
+
         for correlation_channel, corr in zip(self.correlation_channels,
                                              self.correlations):
             # Duplicate source channel to the correlation channel and select
@@ -1753,6 +1924,12 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             copy_int_weights_imag = \
                 self.UHFQC.get('quex_wint_weights_{}_imag'.format(corr[0]))[
                     0]['vector']
+
+            copy_rot_matrix_real = \
+                self.UHFQC.get('quex_rot_{}_real'.format(corr[0]))
+            copy_rot_matrix_imag = \
+                self.UHFQC.get('quex_rot_{}_imag'.format(corr[0]))
+
             self.UHFQC.set(
                 'quex_wint_weights_{}_real'.format(correlation_channel),
                 copy_int_weights_real)
@@ -1760,15 +1937,12 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
                 'quex_wint_weights_{}_imag'.format(correlation_channel),
                 copy_int_weights_imag)
 
-            copy_rot_real = self.UHFQC.get('quex_rot_{}_real'.format(corr[0]))
-            copy_rot_imag = self.UHFQC.get('quex_rot_{}_imag'.format(corr[0]))
-            self.UHFQC.set('quex_rot_{}_real'.format(correlation_channel),
-                           copy_rot_real)
-            self.UHFQC.set('quex_rot_{}_imag'.format(correlation_channel),
-                           copy_rot_imag)
-
-
-
+            self.UHFQC.set(
+                'quex_rot_{}_real'.format(correlation_channel),
+                copy_rot_matrix_real)
+            self.UHFQC.set(
+                'quex_rot_{}_imag'.format(correlation_channel),
+                copy_rot_matrix_imag)
             # Enable correlation mode one the correlation output channel and
             # set the source to the second source channel
             self.UHFQC.set('quex_corr_{}_mode'.format(correlation_channel), 1)
@@ -1799,7 +1973,6 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
         data_raw = self.UHFQC.acquisition_poll(samples=self.nr_sweep_points,
                                                arm=False,
                                                acquisition_time=0.01)
-
         data = []
         if self.thresholding:
             for key in sorted(data_raw.keys()):
@@ -2134,6 +2307,116 @@ class UHFQC_single_qubit_statistics_logging_det(UHFQC_statistics_logging_det):
         # Returns only the data for the relevant channel and then
         # reverts the order to start with the number of flips
         return super().acquire_data_point()[:2][::-1]
+
+class UHFQC_mixer_skewness_det(UHFQC_integrated_average_detector):
+    """
+    Based on the "UHFQC_integrated_average" detector.
+    generates an AWG seq to measure sideband transmission.
+    """
+
+    def __init__(self, UHFQC, station, UHFQC_channels, pulseIch,
+                 pulseQch, alpha, phi_skew, f_mod, RO_trigger_channel,
+                 amplitude=0.1, nr_averages=2**10, RO_trigger_separation=5e-6,
+                 verbose=False):
+        super().__init__(UHFQC, AWG=station.pulsar, integration_length=2.2e-6,
+                         nr_averages=nr_averages, channels=UHFQC_channels,
+                         real_imag=False, single_int_avg=True)
+        self.name = 'UHFQC_mixer_skewness_det'
+        self.station = station
+        self.pulseIch = pulseIch
+        self.pulseQch = pulseQch
+        self.alpha = alpha
+        self.phi_skew = phi_skew
+        self.f_mod = f_mod
+        self.amplitude = amplitude
+        self.verbose = verbose
+        self.RO_trigger_separation = RO_trigger_separation
+        self.RO_trigger_channel = RO_trigger_channel
+
+    def acquire_data_point(self):
+        if self.verbose:
+            print('alpha: {:.3f}'.format(self.alpha()))
+            print('phi_skew: {:.3f}'.format(self.phi_skew()))
+        cal_elts.mixer_calibration_sequence(
+            self.RO_trigger_separation, self.amplitude, self.RO_trigger_channel,
+            self.pulseIch, self.pulseQch, f_pulse_mod=self.f_mod,
+            phi_skew=self.phi_skew(), alpha=self.alpha()
+        )
+
+        return super().acquire_data_point()
+
+    def prepare(self, **kw):
+        super().prepare(**kw)
+
+    def finish(self):
+        super().finish()
+
+
+class UHFQC_single_qubit_statistics_logging_det(UHFQC_statistics_logging_det):
+
+    def __init__(self, UHFQC, AWG, nr_shots: int,
+                 integration_length: float,
+                 channel: int,
+                 statemap: dict,
+                 channel_name: str=None,
+                 normalize_counts: bool=True):
+        """
+        Detector for the statistics logger mode in the UHFQC.
+
+            UHFQC (instrument) : data acquisition device
+            AWG   (instrument) : device responsible for starting and stopping
+                the experiment, can also be a central controller.
+            integration_length (float): integration length in seconds
+            nr_shots (int)     : nr of shots (max is 4095)
+            channel  (int)    : index (channel) of UHFQC weight function
+            statemap (dict) : dictionary specifying the expected output state
+                for each 1 bit input state.
+                e.g.:
+                    statemap ={'0': '0', '1':'1'}
+            channel_name (str) : optional name of the channel
+
+
+        """
+        super(UHFQC_statistics_logging_det, self).__init__()
+        self.UHFQC = UHFQC
+        self.AWG = AWG
+        self.nr_shots = nr_shots
+        self.integration_length = integration_length
+        self.normalize_counts = normalize_counts
+
+        self.channels = [channel, int((channel+1) % 5)]
+
+        if channel_name is None:
+            channel_name = ['ch{}'.format(channel)]
+
+        self.value_names = ['{} counts'.format(channel),
+                            '{} flips'.format(channel),
+                            '{} state errors'.format(channel)]
+        if not self.normalize_counts:
+            self.value_units = '#'*len(self.value_names)
+        else:
+            self.value_units = ['frac']*len(self.value_names)
+        self.statemap = statemap
+
+        self.max_shots = 4095  # hardware limit of UHFQC
+
+        self.statemap = self.statemap_one2two_bit(statemap)
+
+    @staticmethod
+    def statemap_one2two_bit(one_bit_sm: dict):
+        """
+        Converts a one bit statemap to an appropriate dummy 2-bit statemap
+        """
+        sm = one_bit_sm
+        two_bit_sm = {'00': '{}{}'.format(sm['0'], sm['0']),
+                      '10': '{}{}'.format(sm['0'], sm['0']),
+                      '01': '{}{}'.format(sm['1'], sm['1']),
+                      '11': '{}{}'.format(sm['1'], sm['1'])}
+        return two_bit_sm
+
+    def acquire_data_point(self, **kw):
+        # Returns only the data for the relevant channel
+        return super().acquire_data_point()[0:3]
 
 # --------------------------------------------
 # Fake detectors

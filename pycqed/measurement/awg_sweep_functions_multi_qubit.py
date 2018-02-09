@@ -1,14 +1,7 @@
 import numpy as np
 import logging
-from pycqed.measurement import sweep_functions as swf
-from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
-from pycqed.measurement.pulse_sequences import standard_sequences as st_seqs
-from pycqed.measurement.pulse_sequences import single_qubit_tek_seq_elts as sqs
-from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as sqs2
-from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
-default_gauss_width = 10  # magic number should be removed,
-# note magic number only used in old mathematica seqs
-
+import pycqed.measurement.sweep_functions as swf
+import pycqed.measurement.pulse_sequences.multi_qubit_tek_seq_elts as sqs2
 
 class two_qubit_off_on(swf.Hard_Sweep):
 
@@ -177,6 +170,110 @@ class n_qubit_reset(swf.Hard_Sweep):
                                verbose=self.verbose)
 
 
+class two_qubit_Simultaneous_RB_sequence_lengths(swf.Soft_Sweep):
+    def __init__(self, sweep_control='soft',
+                 n_qubit_RB_sweepfunction=None):
+        super().__init__()
+
+        self.sweep_control = sweep_control
+        # self.sweep_points = nr_cliffords
+        self.n_qubit_RB_sweepfunction = n_qubit_RB_sweepfunction
+        self.name = 'two_qubit_Simultaneous_RB_sequence_lengths'
+        self.parameter_name = 'Nr of Cliffords'
+        self.unit = '#'
+
+
+    def set_parameter(self, val):
+        self.n_qubit_RB_sweepfunction.nr_cliffords_value = val
+        self.n_qubit_RB_sweepfunction.upload = True
+        self.n_qubit_RB_sweepfunction.prepare()
+
+
+class two_qubit_Simultaneous_RB_fixed_length(swf.Hard_Sweep):
+
+    def __init__(self, qubit_list, RO_pars, nr_cliffords_value, #int
+                 gate_decomposition='HZ', interleaved_gate=None,
+                 upload=True, return_seq=False, seq_name=None,
+                 CxC_RB=True, idx_for_RB=0, interleave_CZ=True,
+                 verbose=False, CZ_info_list=None):
+
+        super().__init__()
+        self.qubit_list = qubit_list
+        self.RO_pars = RO_pars
+        self.upload = upload
+        self.nr_cliffords_value = nr_cliffords_value
+        self.CxC_RB = CxC_RB
+        self.seq_name = seq_name
+        self.return_seq = return_seq
+        self.gate_decomposition = gate_decomposition
+        self.interleaved_gate = interleaved_gate
+        self.idx_for_RB = idx_for_RB
+        self.verbose = verbose
+        self.CZ_info_list = CZ_info_list
+        self.interleave_CZ = interleave_CZ
+
+        self.parameter_name = 'Nr of Seeds'
+        self.unit = '#'
+        self.name = 'two_qubit_Simultaneous_RB_fixed_length'
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs2.n_qubit_simultaneous_randomized_benchmarking_seq(
+                self.qubit_list, self.RO_pars,
+                nr_cliffords_value=self.nr_cliffords_value,
+                gate_decomposition=self.gate_decomposition,
+                interleaved_gate=self.interleaved_gate,
+                nr_seeds=self.sweep_points,
+                CxC_RB=self.CxC_RB,
+                idx_for_RB=self.idx_for_RB,
+                seq_name=self.seq_name,
+                return_seq=self.return_seq,
+                verbose=self.verbose,
+                upload=self.upload,
+                interleave_CZ=self.interleave_CZ,
+                CZ_info_list=self.CZ_info_list)
+
+
+class n_qubit_Simultaneous_RB_fixed_seeds(swf.Hard_Sweep):
+
+    def __init__(self, pulse_pars_list, RO_pars, nr_cliffords_value,
+                 gate_decomposition='HZ', interleaved_gate=None,
+                 upload=True, return_seq=False, seq_name=None,
+                 CxC_RB=True, idx_for_RB=0,
+                 verbose=False):
+
+        super().__init__()
+        self.pulse_pars_list = pulse_pars_list
+        self.RO_pars = RO_pars
+        self.upload = upload
+        self.nr_cliffords_value = nr_cliffords_value
+        self.CxC_RB = CxC_RB
+        self.seq_name = seq_name
+        self.return_seq = return_seq
+        self.gate_decomposition = gate_decomposition
+        self.interleaved_gate = interleaved_gate
+        self.idx_for_RB = idx_for_RB
+        self.verbose = verbose
+
+        self.parameter_name = 'samples'
+        self.unit = '#'
+        self.name = 'n_qubit_Simultaneous_RB_fixed_seed'
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs2.n_qubit_simultaneous_randomized_benchmarking_seq(
+                self.pulse_pars_list, self.RO_pars,
+                nr_cliffords_value=self.nr_cliffords_value,
+                gate_decomposition=self.gate_decomposition,
+                interleaved_gate=self.interleaved_gate,
+                nr_seeds=np.array([1]),
+                CxC_RB=self.CxC_RB,
+                idx_for_RB=self.idx_for_RB,
+                seq_name=self.seq_name,
+                return_seq=self.return_seq,
+                verbose=self.verbose)
+
+
 class two_qubit_AllXY(swf.Hard_Sweep):
 
     def __init__(self, q0_pulse_pars, q1_pulse_pars, RO_pars, upload=True,
@@ -205,3 +302,62 @@ class two_qubit_AllXY(swf.Hard_Sweep):
                                   verbose=self.verbose,
                                   X_mid=self.X_mid,
                                   simultaneous=self.simultaneous)
+
+
+class tomo_Bell(swf.Hard_Sweep):
+
+    def __init__(self, bell_state, qb_c, qb_t, RO_pars, num_flux_pulses=0, upload=True,
+                 CZ_disabled=False, separation=100e9,
+                 verbose=False, return_seq=False):
+        super().__init__()
+        self.bell_state = bell_state
+        self.qb_c = qb_c
+        self.qb_t = qb_t
+        self.RO_pars = RO_pars
+        self.num_flux_pulses = num_flux_pulses
+        self.upload = upload
+        self.CZ_disabled = CZ_disabled
+        self.parameter_name = 'sample'
+        self.unit = '#'
+        self.verbose = verbose
+        self.separation = separation
+        self.return_seq = return_seq
+        self.name = 'tomo_Bell'
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs2.two_qubit_tomo_bell_qudev(
+                bell_state=self.bell_state,
+                qb_c=self.qb_c, qb_t=self.qb_t,
+                RO_pars=self.RO_pars,
+                num_flux_pulses=self.num_flux_pulses,
+                CZ_disabled=self.CZ_disabled,
+                verbose=self.verbose,
+                upload=self.upload,
+                separation=self.separation)
+
+class two_qubit_parity(swf.Hard_Sweep):
+    def __init__(self, q0, q1, q2, feedback_delay, prep_sequence=None,
+                 tomography_basis=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
+                 upload=True, verbose=False):
+        super().__init__()
+        self.q0 = q0
+        self.q1 = q1
+        self.q2 = q2
+        self.feedback_delay = feedback_delay
+        self.tomography_basis = tomography_basis
+        self.prep_sequence = prep_sequence
+        self.upload = upload
+        self.parameter_name = 'sample'
+        self.unit = '#'
+        self.verbose = verbose
+        self.name = 'two_qubit_parity'
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs2.two_qubit_parity_measurement(
+                self.q0, self.q1, self.q2,
+                feedback_delay=self.feedback_delay,
+                prep_sequence=self.prep_sequence,
+                tomography_basis=self.tomography_basis,
+                verbose=self.verbose)

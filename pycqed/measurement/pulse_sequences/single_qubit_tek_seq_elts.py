@@ -313,6 +313,7 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
         else:
             el = multi_pulse_elt(i, station,
                                  [pulses['X90'], pulse_pars_x2, RO_pars])
+
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:
@@ -719,6 +720,73 @@ def Randomized_Benchmarking_seq(pulse_pars, RO_pars,
     else:
         return seq, el_list
 
+def Randomized_Benchmarking_seq_one_length(pulse_pars, RO_pars,
+                                            nr_cliffords_value, #scalar
+                                            nr_seeds,           #array
+                                            net_clifford=0,
+                                            gate_decomposition='HZ',
+                                            interleaved_gate=None,
+                                            post_msmt_delay=3e-6,
+                                            cal_points=True,
+                                            resetless=False,
+                                            seq_name=None,
+                                            verbose=False, upload=True):
+
+    if seq_name is None:
+        seq_name = 'RandomizedBenchmarking_sequence_one_length'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+    pulses = get_pulse_dict_from_pars(pulse_pars)
+
+    for i in nr_seeds:
+
+        if cal_points and (i == (len(nr_seeds)-4) or
+                                   i == (len(nr_seeds)-3)):
+            el = multi_pulse_elt(i, station,
+                                 [pulses['I'], RO_pars])
+        elif cal_points and (i == (len(nr_seeds)-2) or
+                                     i == (len(nr_seeds)-1)):
+            el = multi_pulse_elt(i, station,
+                                 [pulses['X180'], RO_pars])
+        else:
+            cl_seq = rb.randomized_benchmarking_sequence(
+                nr_cliffords_value, desired_net_cl=net_clifford,
+                interleaved_gate=interleaved_gate)
+            pulse_keys = rb.decompose_clifford_seq(
+                cl_seq,
+                gate_decomp=gate_decomposition)
+            pulse_list = [pulses[x] for x in pulse_keys]
+            # print('\n',pulse_keys)
+            # a = [j for j in pulse_keys if 'Z' not in j]
+            # print(len(pulse_keys))
+            # print(len(a))
+            pulse_list += [RO_pars]
+            # find index of first pulse in pulse_list that is not a Z pulse
+            # copy this pulse and set extra wait
+            try:
+                first_x_pulse = next(j for j in pulse_list if 'Z' not in j['pulse_type'])
+                first_x_pulse_idx = pulse_list.index(first_x_pulse)
+                #print('first_x_pulse_idx = ', first_x_pulse_idx)
+            except:
+                first_x_pulse_idx = 0
+            pulse_list[first_x_pulse_idx] = deepcopy(pulse_list[first_x_pulse_idx])
+            pulse_list[first_x_pulse_idx]['pulse_delay'] += post_msmt_delay
+            el = multi_pulse_elt(i, station, pulse_list)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+
+        # If the element is too long, add in an extra wait elt
+        # to skip a trigger
+        if resetless and nr_cliffords_value*pulse_pars['pulse_delay']*1.875 > 50e-6:
+            el = multi_pulse_elt(i, station, [pulses['I']])
+            el_list.append(el)
+            seq.append_element(el, trigger_wait=True)
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+        return seq, el_list
+    else:
+        return seq, el_list
+
 
 def Freq_XY(freqs, pulse_pars, RO_pars,
             cal_points=True, verbose=False, return_seq=False):
@@ -913,15 +981,6 @@ def get_pulse_dict_from_pars(pulse_pars):
     return:
         pulses: dictionary of pulse_pars dictionaries
     '''
-    pi_amp = pulse_pars['amplitude']
-    pi2_amp = pulse_pars['amplitude']*pulse_pars['amp90_scale']
-
-    # Software Z-gate: apply phase offset to all subsequent X and Y pulses
-    Z180 = deepcopy(pulse_pars)
-    Z180['pulse_type'] = 'Z_pulse'
-    for i in pulse_pars.keys():
-        if i not in ['phase', 'pulse_type', 'pulse_delay','operation_type']:
-            del Z180[i]
 
     pulses = {'I': deepcopy(pulse_pars),
               'X180': deepcopy(pulse_pars),
@@ -931,11 +990,10 @@ def get_pulse_dict_from_pars(pulse_pars):
               'Y180': deepcopy(pulse_pars),
               'mY180': deepcopy(pulse_pars),
               'Y90': deepcopy(pulse_pars),
-              'mY90': deepcopy(pulse_pars),
-              'Z180': Z180,
-              'mZ180': deepcopy(Z180),
-              'Z90': deepcopy(Z180),
-              'mZ90': deepcopy(Z180)}
+              'mY90': deepcopy(pulse_pars)}
+
+    pi_amp = pulse_pars['amplitude']
+    pi2_amp = pulse_pars['amplitude'] * pulse_pars['amp90_scale']
 
     pulses['I']['amplitude'] = 0
     pulses['mX180']['amplitude'] = -pi_amp
@@ -950,10 +1008,28 @@ def get_pulse_dict_from_pars(pulse_pars):
     pulses['mY90']['amplitude'] = -pi2_amp
     pulses['mY90']['phase'] += 90
 
-    pulses['Z180']['phase'] += 180
-    pulses['mZ180']['phase'] += -180
-    pulses['Z90']['phase'] += 90
-    pulses['mZ90']['phase'] += -90
+    pulses_sim = {key + 's': deepcopy(val) for key, val in pulses.items()}
+    for val in pulses_sim.values():
+        val['refpoint'] = 'simultaneous'
+
+    pulses.update(pulses_sim)
+
+    # Software Z-gate: apply phase offset to all subsequent X and Y pulses
+    target_qubit = pulse_pars.get('target_qubit', None)
+    if target_qubit is not None:
+        Z180 = {'pulse_type': 'Z_pulse',
+                'basis_rotation': {target_qubit: 0},
+                'target_qubit': target_qubit,
+                'operation_type': 'Virtual',
+                'pulse_delay': 0}
+        pulses.update({'Z180': Z180,
+                       'mZ180': deepcopy(Z180),
+                       'Z90': deepcopy(Z180),
+                       'mZ90': deepcopy(Z180)})
+        pulses['Z180']['basis_rotation'][target_qubit] += 180
+        pulses['mZ180']['basis_rotation'][target_qubit] += -180
+        pulses['Z90']['basis_rotation'][target_qubit] += 90
+        pulses['mZ90']['basis_rotation'][target_qubit] += -90
 
     return pulses
 

@@ -525,7 +525,7 @@ class Multi_QASM_Sweep(QASM_Sweep_v2):
             detector (obj):
                     An instance of the detector object that is used for the
                     measurement.
-    '''
+        '''
         super().__init__(qasm_fn=None, config=config, CBox=CBox,
                          parameter_name=parameter_name, unit=unit,
                          upload=upload, verbosity_level=verbosity_level)

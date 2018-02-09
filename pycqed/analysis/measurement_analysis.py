@@ -18,9 +18,9 @@ import textwrap
 from scipy.interpolate import interp1d
 import pylab
 from pycqed.analysis.tools import data_manipulation as dm_tools
-import imp
+import importlib
 import math
-import pygsti
+# import pygsti
 from math import erfc
 from scipy.signal import argrelmax, argrelmin
 from copy import deepcopy
@@ -48,7 +48,7 @@ except ImportError as e:
         raise
 
 
-imp.reload(dm_tools)
+importlib.reload(dm_tools)
 
 
 class MeasurementAnalysis(object):
@@ -431,8 +431,11 @@ class MeasurementAnalysis(object):
                     fit_grp.attrs.create(name=par_name, data=par_val)
 
     def run_default_analysis(self, TwoD=False, close_file=True,
-                             show=False, log=False, transpose=False, **kw):
+                             show=False, transpose=False,
+                             plot_args=None, **kw):
 
+        if plot_args is None:
+            plot_args = {}
         if TwoD is False:
             self.get_naming_and_values()
             self.sweep_points = kw.pop('sweep_points', self.sweep_points)
@@ -485,11 +488,12 @@ class MeasurementAnalysis(object):
 
                 self.plot_results_vs_sweepparam(x=self.sweep_points,
                                                 y=self.measured_values[i],
-                                                fig=fig, ax=ax, log=log,
+                                                fig=fig, ax=ax,
                                                 xlabel=self.sweep_name,
                                                 x_unit=self.sweep_unit[0],
                                                 ylabel=self.ylabels[i],
-                                                save=False)
+                                                save=False,
+                                                **plot_args)
                 # fig.suptitle(self.plot_title)
             fig.subplots_adjust(hspace=0.5)
             if show:
@@ -666,16 +670,20 @@ class MeasurementAnalysis(object):
         self.plot_title = kw.get('plot_title',
                                  self.measurementstring + '\n' +
                                  self.timestamp_string)
+        plot_the_title = kw.get('plot_the_title', True)
+        xlabel = kw.get('xlabel', None)
+        ylabel = kw.get('ylabel', None)
 
         # ax.set_title(self.plot_title)
-        fig.text(0.5, 1, self.plot_title, fontsize=self.font_size,
-                 horizontalalignment='center',
-                 verticalalignment='bottom',
-                 transform=ax.transAxes)
+        if plot_the_title:
+            fig.text(0.5, 1, self.plot_title, fontsize=self.font_size,
+                     horizontalalignment='center',
+                     verticalalignment='bottom',
+                     transform=ax.transAxes)
 
         # Plot:
-        ax.plot(x, y, marker, markersize=self.marker_size,
-                linewidth=self.line_width, label=label)
+        line = ax.plot(x, y, marker, markersize=self.marker_size,
+                       linewidth=self.line_width, label=label)
         if log:
             ax.set_yscale('log')
 
@@ -698,6 +706,7 @@ class MeasurementAnalysis(object):
 
         for axis in ['top', 'bottom', 'left', 'right']:
             ax.spines[axis].set_linewidth(self.axes_line_width)
+
 
         # Set axis labels
         xlabel = kw.get('xlabel', None)
@@ -722,7 +731,10 @@ class MeasurementAnalysis(object):
                 self.save_fig(fig, xlabel=xlabel, ylabel=(ylabel+'_log'), **kw)
             else:
                 self.save_fig(fig, xlabel=xlabel, ylabel=ylabel, **kw)
-        return
+        if kw.get('return_line', False):
+            return line
+        else:
+            return
 
     def plot_complex_results(self, cmp_data, fig, ax, show=False, marker='.',
                              **kw):
@@ -1208,6 +1220,8 @@ class TD_Analysis(MeasurementAnalysis):
                 # ylabel = r'$F$ $\left(|e \rangle \right) (arb. units)$'
                 ylabel = r'$F$ $|1 \rangle$'
 
+            plot_title = kw.pop('plot_title', self.measurementstring + '\n' +
+                               self.timestamp_string)
             self.plot_results_vs_sweepparam(x=self.sweep_points,
                                             y=self.normalized_values,
                                             fig=self.fig, ax=self.ax,
@@ -1215,7 +1229,8 @@ class TD_Analysis(MeasurementAnalysis):
                                             x_unit=self.sweep_unit[0],
                                             ylabel=ylabel,
                                             marker='o-',
-                                            save=False)
+                                            save=False,
+                                            plot_title=plot_title)
             if save_fig:
                 if not close_main_fig:
                     # Hacked in here, good idea to only show the main fig but
@@ -1990,12 +2005,21 @@ class Rabi_Analysis(TD_Analysis):
                 piPulse_vals = (n*np.pi+phase_fit)/(2*np.pi*freq_fit)
                 piHalfPulse_vals = (n*np.pi+np.pi/2+phase_fit)/(2*np.pi*freq_fit)
 
+                # find piHalfPulse
                 try:
                     piHalfPulse = np.min(np.take(piHalfPulse_vals,
                                                  np.where(piHalfPulse_vals>=0)))
                 except ValueError:
                     piHalfPulse = np.asarray([])
 
+                if piHalfPulse.size==0 or piHalfPulse>max(self.sweep_points):
+                    i=0
+                    while (piHalfPulse_vals[i]<min(self.sweep_points) and
+                                   i<piHalfPulse_vals.size):
+                        i+=1
+                    piHalfPulse = piHalfPulse_vals[i]
+
+                # fin piPulse
                 try:
                     if piHalfPulse.size != 0:
                         piPulse = np.min(np.take(
@@ -2006,19 +2030,14 @@ class Rabi_Analysis(TD_Analysis):
                 except ValueError:
                     piPulse = np.asarray([])
 
-                if piPulse.size==0 or piPulse>max(self.sweep_points):
+                if piPulse.size==0: #or piPulse>max(self.sweep_points):
                     i=0
                     while (piPulse_vals[i]<min(self.sweep_points) and
                                    i<piPulse_vals.size):
                         i+=1
                     piPulse = piPulse_vals[i]
 
-                if piHalfPulse.size==0 or piHalfPulse>max(self.sweep_points):
-                    i=0
-                    while (piHalfPulse_vals[i]<min(self.sweep_points) and
-                                   i<piHalfPulse_vals.size):
-                        i+=1
-                    piHalfPulse = piHalfPulse_vals[i]
+
                 # piPulse = 1/(2*freq_fit) - phase_fit/(2*np.pi*freq_fit)
                 # piHalfPulse = 1/(4*freq_fit) - phase_fit/(2*np.pi*freq_fit)
 
@@ -4023,7 +4042,7 @@ class T1_Analysis(TD_Analysis):
         super().run_default_analysis(show=show,
                                      close_file=close_file,
                                      close_main_fig=True,
-                                     save_fig=False,**kw)
+                                     save_fig=False, **kw)
 
         show_guess = kw.get('show_guess', False)
        # make_fig = kw.get('make_fig',True)
@@ -4081,7 +4100,7 @@ class T1_Analysis(TD_Analysis):
 
             best_vals = self.fit_res.best_values
             t = np.linspace(self.sweep_points[0],
-                            self.sweep_points[-self.NoCalPoints], 1000)
+                            self.sweep_points[-self.NoCalPoints-1], 1000)
 
             y = fit_mods.ExpDecayFunc(
                 t, tau=best_vals['tau'],
@@ -5001,7 +5020,6 @@ class AllXY_Analysis(TD_Analysis):
             self.save_fig(fig1, ylabel='Amplitude (normalized)', **kw)
         self.save_fig(fig2, ylabel='Amplitude', **kw)
 
-
 class RandomizedBenchmarking_Analysis(TD_Analysis):
 
     '''
@@ -5152,6 +5170,307 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
         params = RBModel.make_params()
         fit_res = RBModel.fit(data, numCliff=numCliff,
                               params=params)
+        if print_fit_results:
+            print(fit_res.fit_report())
+        if plot_results:
+            plt.plot(fit_res.data, 'o-', label='data')
+            plt.plot(fit_res.best_fit, label='best fit')
+            if show_guess:
+                plt.plot(fit_res.init_fit, '--', label='init fit')
+
+        return fit_res
+
+
+class RandomizedBenchmarking_Analysis_new(TD_Analysis):
+
+    '''
+    Rotates and normalizes the data before doing a fit with a decaying
+    exponential to extract the Clifford fidelity.
+    By optionally specifying T1 and the pulse separation (time between start
+    of pulses) the T1 limited fidelity will be given and plotted in the
+    same figure.
+    '''
+
+    def __init__(self, label='RB', T1=None, T2=None, pulse_delay=None,
+                 gate_decomp='HZ', TwoD=True, **kw):
+
+        self.T1 = T1
+        self.T2 = T2
+        if self.T1==0:
+            self.T1=None
+        if self.T2==0:
+            self.T2=None
+
+        self.gate_decomp = gate_decomp
+        self.pulse_delay = pulse_delay
+
+        super().__init__(TwoD=TwoD, **kw)
+
+    def run_default_analysis(self, **kw):
+
+        if not kw.pop('skip', False):
+            close_main_fig = kw.pop('close_main_fig', True)
+            close_file = kw.pop('close_file', True)
+            if self.cal_points is None:
+                self.cal_points = [list(range(-4, -2)), list(range(-2, 0))]
+
+            MeasurementAnalysis.run_default_analysis(self, close_file=False, **kw)
+
+            self.add_analysis_datagroup_to_file()
+
+            self.n_cl = np.unique(self.sweep_points_2D)
+            nr_sweep_pts = self.sweep_points.size #nr_seeds+NoCalPts
+            self.nr_seeds = nr_sweep_pts - 2*len(self.cal_points[0])
+            data = np.zeros(self.n_cl.size)
+
+            data_rearranged = [np.zeros((self.n_cl.size, nr_sweep_pts)),
+                               np.zeros((self.n_cl.size, nr_sweep_pts))]
+            I = self.measured_values[0]
+            Q = self.measured_values[1]
+            for i in range(self.n_cl.size):
+                for j in range(nr_sweep_pts):
+                    data_rearranged[0][i, j] = I[j, i]
+                    data_rearranged[1][i, j] = Q[j, i]
+            self.data_rearranged = data_rearranged
+            a = np.zeros((2, nr_sweep_pts))  #this is an array with the same shape as
+                                         #as measured_values for TwoD==False
+            self.data_calibrated = deepcopy(self.data_rearranged[0])
+            for i in range(self.n_cl.size):
+                a[0] = data_rearranged[0][i]
+                a[1] = data_rearranged[1][i]
+                data_calibrated = a_tools.rotate_and_normalize_data(a,
+                                                            self.cal_points[0],
+                                                            self.cal_points[1])[0]
+                self.data_calibrated[i] = data_calibrated
+                data_calibrated = data_calibrated[:-int(self.NoCalPoints)]
+                data[i] = np.mean(data_calibrated)
+
+            self.calibrated_data_points = np.zeros(shape=(self.data_calibrated.shape[0],
+                                                   self.nr_seeds))
+            for i,d in enumerate(self.data_calibrated):
+                self.calibrated_data_points[i] = d[:-int(2*len(self.cal_points[0]))]
+
+            self.data = data
+            #data = self.corr_data[:-1*(len(self.cal_points[0]*2))]
+            #n_cl = self.sweep_points[:-1*(len(self.cal_points[0]*2))]
+
+            self.add_dataset_to_analysisgroup('Corrected data', self.data)
+            self.analysis_group.attrs.create('corrected data based on',
+                                             'calibration points'.encode('utf-8'))
+
+            self.fit_res = self.fit_data(self.data, self.n_cl, **kw)
+            self.fit_results = [self.fit_res]
+            self.save_fitted_parameters(fit_res=self.fit_res, var_name='F|1>')
+            if self.make_fig:
+                self.make_figures(close_main_fig=close_main_fig, **kw)
+
+            if close_file:
+                self.data_file.close()
+        return
+
+    def calc_T1_limited_fidelity(self, T1, T2, pulse_delay):
+        '''
+        Formula from Asaad et al.
+        pulse separation is time between start of pulses
+        '''
+        #Np = 1.875  # Avg. number of gates per Clifford for XY decomposition
+        #Np = 0.9583  # Avg. number of gates per Clifford for HZ decomposition
+        if self.gate_decomp=='HZ':
+            Np = 1.125
+        elif self.gate_decomp=='XY':
+            Np = 1.875
+        else:
+            raise ValueError('Gate decomposition not recognized.')
+        F_cl = (1/6*(3 + 2*np.exp(-1*pulse_delay/(T2)) +
+                     np.exp(-pulse_delay/T1)))**Np
+        p = 2*F_cl - 1
+
+        return F_cl, p
+
+    def add_textbox(self, ax, F_T1=None, plot_T1_lim=True, **kw):
+
+        textstr = ('$F_{Cl}$'+' = {:.6g} $\pm$ ({:.4g})%'.format(
+            self.fit_res.params['fidelity_per_Clifford'].value*100,
+            self.fit_res.params['fidelity_per_Clifford'].stderr*100) +
+            '\n$1-F_{Cl}$'+'  = {:.4g} $\pm$ ({:.4g})%'.format(
+                (1-self.fit_res.params['fidelity_per_Clifford'].value)*100,
+                (self.fit_res.params['fidelity_per_Clifford'].stderr)*100) +
+            '\nOffset = {:.4g} $\pm$ ({:.3g})'.format(
+                (self.fit_res.params['offset'].value),
+                (self.fit_res.params['offset'].stderr)))
+        if F_T1 is not None and plot_T1_lim:
+            textstr += ('\n$F_{Cl}^{T_1}$  = ' +
+                        '{:.6g}%'.format(F_T1*100))
+
+        horizontal_alignment = kw.pop('horizontal_alignment', 'left')
+        horiz_place = 0.025
+        if horizontal_alignment=='right':
+            horiz_place = 0.975
+
+        ax.text(horiz_place, 0.95, textstr, transform=ax.transAxes,
+                fontsize=self.font_size, verticalalignment='top',
+                horizontalalignment=horizontal_alignment, bbox=self.box_props)
+
+    def make_figures(self, close_main_fig, **kw):
+
+        ylabel = r'$F$ $\left(|1 \rangle \right)$'
+        self.fig, self.ax = self.default_ax()
+
+        self.plot_results_vs_sweepparam(x=self.n_cl,
+                                        y=self.data,
+                                        fig=self.fig, ax=self.ax,
+                                        marker='o',
+                                        xlabel=self.ylabel,
+                                        ylabel=ylabel,
+                                        save=False)
+
+        if kw.pop('plot_errorbars', True):
+            if kw.pop('std_err', False):
+                err_bars = []
+                for data in self.calibrated_data_points:
+                    err_bars.append(np.std(data)/np.sqrt(data.size))
+                err_bars = np.asarray(err_bars)
+                err_label = 'stderr'
+
+            else:
+                err_bars = self.epsilon
+                err_label = str(int(self.conf_level*100)) + '% CI'
+
+            a_tools.plot_errorbars(self.n_cl,
+                                   self.data,
+                                   ax=self.ax,
+                                   err_bars=err_bars,
+                                   label=err_label,
+                                   linewidth=self.line_width//2,
+                                   marker='none',
+                                   markersize=self.marker_size,
+                                   capsize=self.line_width,
+                                   capthick=self.line_width)
+
+        x_fine = np.linspace(0, self.n_cl[-1], 1000)
+        for fit_res in self.fit_results:
+            best_fit = fit_mods.RandomizedBenchmarkingDecay(
+                x_fine, **fit_res.best_values)
+            self.ax.plot(x_fine, best_fit, 'C0', label='Fit')
+        self.ax.set_ylim(min(min(self.data)-.1, -.1),
+                         max(max(self.data)+.1, 1.1))
+
+        # Here we add the line corresponding to T1 limited fidelity
+        plot_T1_lim = kw.pop('plot_T1_lim', True)
+        F_T1 = None
+        if self.pulse_delay is not None:
+            if self.T1 is not None and self.T2 is not None and plot_T1_lim:
+                F_T1, p_T1 = self.calc_T1_limited_fidelity(
+                    self.T1, self.T2, self.pulse_delay)
+                T1_limited_curve = fit_mods.RandomizedBenchmarkingDecay(
+                    x_fine, self.fit_res.best_values['Amplitude'], p_T1,
+                    self.fit_res.best_values['offset'])
+                self.ax.plot(x_fine, T1_limited_curve, '-.', color='C1',
+                             linewidth=self.line_width,
+                             label=r'$T_{1}$-limit')
+
+        self.ax.legend(loc='center left', bbox_to_anchor=(1, 0.5),
+                       fontsize=self.font_size)
+
+        # Add a textbox
+        self.add_textbox(self.ax, F_T1, plot_T1_lim=plot_T1_lim)
+
+        if kw.pop('show',True):
+            plt.show()
+
+        if not close_main_fig:
+            # Hacked in here, good idea to only show the main fig but can
+            # be optimized somehow
+            self.save_fig(self.fig, ylabel='Amplitude (normalized)',
+                          close_fig=False, **kw)
+        else:
+            self.save_fig(self.fig, ylabel='Amplitude (normalized)', **kw)
+
+    def calculate_confidence_intervals(self, nr_seeds, nr_cliffords,
+                                       conf_level=0.68, infidelity=0,
+                                       epsilon_guess=0.1, eta=0):
+
+        # From Helsen et al. (2017)
+        # For each number of cliffords in nr_cliffords (array), finds epsilon
+        # such that with probability greater than conf_level, the true value of
+        # the survival probability, p_N_m, for a given N=nr_seeds and
+        # m=nr_cliffords, is in the interval
+        # [p_N_m_measured-epsilon, p_N_m_measured+epsilon]
+        # See Helsen et al. (2017) for more details.
+
+        # eta is the SPAM-dependent prefactor defined in Helsen et al. (2017)
+
+        epsilon = []
+        delta = 1-conf_level
+        for n_cl in nr_cliffords:
+            if n_cl == 0:
+                epsilon.append(0)
+            else:
+                V = min((13*n_cl*infidelity**2)/2, 7*infidelity/2)
+
+                H = lambda eps: (1/(1-eps))**((1-eps)/(V+1)) * \
+                                (V/(V+eps))**((V+eps)/(V+1)) - \
+                                (delta/2)**(1/nr_seeds)
+                epsilon.append(optimize.fsolve(H, epsilon_guess)[0])
+
+        return np.asarray(epsilon)
+
+    def fit_data(self, data, numCliff,
+                 print_fit_results=False,
+                 show_guess=False,
+                 plot_results=False, **kw):
+
+        RBModel = lmfit.Model(fit_mods.RandomizedBenchmarkingDecay)
+        # RBModel = fit_mods.RBModel
+        RBModel.set_param_hint('Amplitude', value=0)#-0.5)
+        RBModel.set_param_hint('p', value=.99)
+        RBModel.set_param_hint('offset', value=.5)
+        # From Magesan et al., Scalable and Robust Randomized Benchmarking
+        # of Quantum Processes
+        RBModel.set_param_hint('fidelity_per_Clifford',  # vary=False,
+                               expr='(p + (1-p)/2)')
+        RBModel.set_param_hint('error_per_Clifford',  # vary=False,
+                               expr='1-fidelity_per_Clifford')
+        if self.gate_decomp == 'XY':
+            RBModel.set_param_hint('fidelity_per_gate',  # vary=False,
+                                   expr='fidelity_per_Clifford**(1./1.875)')
+        elif self.gate_decomp == 'HZ':
+            RBModel.set_param_hint('fidelity_per_gate',  # vary=False,
+                                   expr='fidelity_per_Clifford**(1./1.125)')
+        else:
+            raise ValueError('Gate decomposition not recognized.')
+        RBModel.set_param_hint('error_per_gate',  # vary=False,
+                               expr='1-fidelity_per_gate')
+
+        params = RBModel.make_params()
+
+        # Run once to get an estimate for the error per Clifford
+        fit_res = RBModel.fit(data, numCliff=numCliff, params=params)
+
+        # Use the found error per Clifford to standard errors for the data
+        # points fro Helsen et al. (2017)
+        self.conf_level = kw.pop('conf_level', 0.68)
+        epsilon_guess = kw.pop('epsilon_guess', 0.1)
+        eta = kw.pop('eta', 0)
+        epsilon = self.calculate_confidence_intervals(
+            nr_seeds=self.nr_seeds,
+            nr_cliffords=self.n_cl,
+            infidelity=fit_res.params['error_per_Clifford'].value,
+            conf_level=self.conf_level,
+            epsilon_guess=epsilon_guess,
+            eta=eta)
+
+        self.epsilon = epsilon
+        # Run fit again with scale_covar=False, and weights = 1/epsilon
+
+        # if an entry in epsilon_sqrd is 0, replace it with half the minimum
+        # value in the epsilon_sqrd array
+        idxs = np.where(epsilon==0)[0]
+        epsilon[idxs] = min([eps for eps in epsilon if eps!=0])/2
+
+        fit_res = RBModel.fit(data, numCliff=numCliff, params=params,
+                              scale_covar=False, weights=1/epsilon)
+
         if print_fit_results:
             print(fit_res.fit_report())
         if plot_results:
@@ -6014,7 +6333,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                                            value=amplitude_guess)  # ,
             # min=4*np.var(self.data_dist))
             LorentzianModel.set_param_hint('offset',
-                                           value=np.mean(self.data_dist),
+                                           value=0,
                                            vary=True)
             LorentzianModel.set_param_hint('kappa',
                                            value=kappa_guess,
@@ -7343,7 +7662,7 @@ class butterfly_analysis(MeasurementAnalysis):
 
 def fit_qubit_frequency(sweep_points, data, mode='dac',
                         vary_E_c=True, vary_f_max=True,
-                        vary_dac_flux_coeff=True,
+                        vary_V_per_phi0=True,
                         vary_dac_sweet_spot=True,
                         data_file=None, **kw):
     '''
@@ -7369,8 +7688,8 @@ def fit_qubit_frequency(sweep_points, data, mode='dac',
     # Extract initial values, first from kw, then data file, then default
     E_c = kw.pop('E_c', qubit_attrs.get('E_c', 0.3e9))
     f_max = kw.pop('f_max', qubit_attrs.get('f_max', np.max(data)))
-    dac_flux_coeff = kw.pop('dac_flux_coefficient',
-                            qubit_attrs.get('dac_flux_coefficient', 1.))
+    V_per_phi0 = kw.pop('V_per_phi0',
+                            qubit_attrs.get('V_per_phi0', 1.))
     dac_sweet_spot = kw.pop('dac_sweet_spot',
                             qubit_attrs.get('dac_sweet_spot', 0))
     flux_zero = kw.pop('flux_zero', qubit_attrs.get('flux_zero', 10))
@@ -7381,12 +7700,15 @@ def fit_qubit_frequency(sweep_points, data, mode='dac',
                                       min=0, max=500e6)
         Q_dac_freq_mod.set_param_hint('f_max', value=f_max,
                                       vary=vary_f_max)
-        Q_dac_freq_mod.set_param_hint('dac_flux_coefficient',
-                                      value=dac_flux_coeff,
-                                      vary=vary_dac_flux_coeff)
+        Q_dac_freq_mod.set_param_hint('V_per_phi0',
+                                      value=V_per_phi0,
+                                      vary=vary_V_per_phi0)
         Q_dac_freq_mod.set_param_hint('dac_sweet_spot',
                                       value=dac_sweet_spot,
                                       vary=vary_dac_sweet_spot)
+        Q_dac_freq_mod.set_param_hint('asymmetry',
+                                      value=0,
+                                      vary=False)
 
         fit_res = Q_dac_freq_mod.fit(data=data, dac_voltage=sweep_points)
     elif mode == 'flux':
@@ -7852,7 +8174,8 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         filter_mask_high = ~dm_tools.get_outliers(peaks_high, filter_threshold)
         filter_mask_high = np.where(
             peaks_high < filter_func(flux), False, filter_mask_high)
-        filter_mask_high[-2] = False  # hand remove 1 datapoint
+        for i in filter_idx_high: filter_mask_high[i] = False
+        # filter_mask_high[-2] = False  # hand remove 1 datapoint
 
         filt_flux_high = flux[filter_mask_high]
         filt_peaks_high = peaks_high[filter_mask_high]
@@ -7861,7 +8184,8 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         filter_mask_low = ~dm_tools.get_outliers(peaks_low, filter_threshold)
         filter_mask_low = np.where(
             peaks_low > filter_func(flux), False, filter_mask_low)
-        filter_mask_low[[0, -1]] = False  # hand remove 2 datapoints
+        for i in filter_idx_low: filter_mask_low[i] = False
+        # filter_mask_low[[0, -1]] = False  # hand remove 2 datapoints
 
         filt_flux_low = flux[filter_mask_low]
         filt_peaks_low = peaks_low[filter_mask_low]
@@ -9073,3 +9397,523 @@ def SSB_demod(Ivals, Qvals, alpha=1, phi=0, I_o=0, Q_o=0, IF=10e6, predistort=Tr
     I = np.multiply(Ivals, cosI)-np.multiply(Qvals, sinI)
     Q = np.multiply(Ivals, sinI)+np.multiply(Qvals, cosI)
     return I, Q
+
+
+class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
+    """
+    Measurement analysis class to analyse Ramsey type measrements
+    with an interleaved flux pulse
+
+    Args:
+        X90_separation (float): separation between the two X90 pulses
+        flux_pulse_length (float): length of the flux pulse in seconds
+                                    (used to calculate freq. shifts)
+        qb_name (str): qubit name
+        label (str): measurement label
+        run_default_super:
+        **kw:
+
+
+    """
+    def __init__(self, X90_separation=None, flux_pulse_length=None,
+                 qb_name=None, label='Ramsey_interleaved_flux_pulse',
+                 # run_default_super=True,
+                 cal_points=False,
+                 reference_measurements=False,
+                 auto=True,
+                 **kw):
+        kw['label'] = label
+        kw['h5mode'] = 'r+'
+        kw['close_file'] = False
+
+        self.label = label
+        self.fitted_phases = None
+        self.fitted_delay = 0
+        # self.fig, self.ax = plt.subplots()
+        # self.fig.canvas.set_window_title(label)
+        self.delay_fit_res = None
+        self.X90_separation = X90_separation
+        self.flux_pulse_length = flux_pulse_length
+        self.return_fit = kw.pop('return_fit', False)
+        self.cal_points = cal_points
+        self.reference_measurements=reference_measurements
+        # if run_default_super:
+        #     super(self.__class__, self).run_default_analysis(TwoD=True,
+        #                                                      close_file=False)
+
+        super(Fluxpulse_Ramsey_2D_Analysis, self).__init__(TwoD=True,
+                                                           start_at_zero=True,
+                                                           qb_name=qb_name, **kw)
+        self.get_values('Data')
+        self.get_naming_and_values()
+
+        if run_default_super:
+            super(self.__class__, self).run_default_analysis(TwoD=True,
+                                                             close_file=False)
+
+
+
+    def fit_single_cos(self, thetas, ampls,
+                       print_fit_results=True, phase_guess=0,
+                       cal_points=False):
+        if cal_points:
+            thetas = thetas[:-4]
+            ampls = ampls[:-4]
+        cos_mod = fit_mods.CosModel
+        average = np.mean(ampls)
+
+        diff = 0.5*(max(ampls) -
+                    min(ampls))
+        amp_guess = -diff
+        # offset guess
+        offset_guess = average
+
+        # Set up fit parameters and perform fit
+        cos_mod.set_param_hint('amplitude',
+                               value=amp_guess,
+                               vary=True)
+        cos_mod.set_param_hint('phase',
+                               value=phase_guess,
+                               vary=True)
+        cos_mod.set_param_hint('frequency',
+                               value=1./(2*np.pi),
+                               vary=False)
+        cos_mod.set_param_hint('offset',
+                               value=offset_guess,
+                               vary=True)
+        self.params = cos_mod.make_params()
+        fit_res = cos_mod.fit(data=ampls,
+                              t=thetas,
+                              params=self.params)
+
+        if fit_res.chisqr > 0.35:
+            logging.warning('Fit did not converge, chi-square > 0.35')
+
+        if print_fit_results:
+            print(fit_res.fit_report())
+
+        if fit_res.best_values['amplitude'] < 0.:
+            fit_res.best_values['phase'] += np.pi
+            fit_res.best_values['amplitude'] *= -1
+
+        return fit_res
+
+    def unwrap_phases_extrapolation(self,phases):
+        for i in range(2,len(phases)):
+            phase_diff_extrapolation = (phases[i-1]
+                                        + (phases[i-1] - phases[i-2]) - phases[i])
+            #         print(i,abs(phase_diff_extrapolation)>np.pi)
+            #         print(phase_list[i],phase_diff_extrapolation + phase_list[i])
+            if phase_diff_extrapolation > np.pi:
+                phases[i] += round(phase_diff_extrapolation/(2*np.pi))*2*np.pi
+            #             print('corrected: ',  phase_list[i])
+            elif phase_diff_extrapolation < np.pi:
+                phases[i] += round(phase_diff_extrapolation/(2*np.pi))*2*np.pi
+            #             print('corrected: ',  phase_list[i])
+        return phases
+
+
+    def fit_all(self, plot=False, extrapolate_phase=False, return_ampl=False,
+                cal_points=None,reference_measurements=None,
+                fit_range=None):
+        if reference_measurements is None:
+            reference_measurements = self.reference_measurements
+        if cal_points is None:
+            cal_points = self.cal_points
+
+        if reference_measurements:
+            phase_list, amplitude_list = self.fit_all_helper(plot=plot,
+                                                             extrapolate_phase=extrapolate_phase,
+                                                             return_ampl=True,
+                                                             cal_points=False,
+                                                             reference_measurement=True,
+                                                             reference_trace=False,
+                                                             fit_range=fit_range)
+            phase_list_ref, amplitude_list_ref = self.fit_all_helper(plot=plot,
+                                                             extrapolate_phase=extrapolate_phase,
+                                                             return_ampl=True,
+                                                             cal_points=cal_points,
+                                                             reference_measurement=True,
+                                                             reference_trace=True,
+                                                             fit_range=fit_range)
+            if return_ampl:
+                return phase_list, amplitude_list, phase_list_ref, amplitude_list_ref
+            else:
+                return phase_list, phase_list_ref
+
+        else:
+            phase_list, amplitude_list = self.fit_all_helper(plot=plot,
+                                                             extrapolate_phase=extrapolate_phase,
+                                                             return_ampl=True,
+                                                             cal_points=cal_points,
+                                                             reference_measurement=False,
+                                                             reference_trace=False,
+                                                             fit_range=fit_range)
+
+            if return_ampl:
+                return phase_list, amplitude_list
+            else:
+                return phase_list
+
+    def fit_all_helper(self, plot=False, extrapolate_phase=False, return_ampl=False,
+                cal_points=None, reference_measurement=False, reference_trace=False,
+                fit_range=None):
+
+        if cal_points is None:
+            cal_points = self.cal_points
+
+        phase_list = [0]
+        amplitude_list = []
+
+        length_single = len(self.sweep_points)
+
+        if plot:
+            self.fig, self.ax = plt.subplots(2, 1)
+        else:
+            self.fig, self.ax = (None, None)
+
+        data_rotated = a_tools.rotate_and_normalize_data_no_cal_points(
+                                np.array([self.data[2], self.data[3]]))
+        if fit_range is None:
+            i_start = 0
+            i_end = length_single*len(self.sweep_points_2D)
+        else:
+            i_start = length_single*fit_range[0]
+            i_end = length_single*fit_range[1]
+        for i in np.arange(i_start, i_end, length_single):
+
+            if reference_measurement:
+                if reference_trace:
+                    thetas = self.data[0, i+int(length_single/2):i+length_single]
+                    ampls = data_rotated[i+int(length_single/2):i+length_single]
+                else:
+                    thetas = self.data[0, i:i+int(length_single/2)]
+                    ampls = data_rotated[i:i+int(length_single/2)]
+
+
+            else:
+                thetas = self.data[0, i:i+length_single]
+                ampls = data_rotated[i:i+length_single]
+
+            # phase_guess = phase_list[-1]
+            phase_guess = 0
+
+
+
+            fit_res = self.fit_single_cos(thetas, ampls,
+                                          print_fit_results=False,
+                                          phase_guess=phase_guess,
+                                          cal_points=cal_points)
+
+            phase_list.append(fit_res.best_values['phase'])
+            amplitude_list.append(fit_res.best_values['amplitude'])
+
+            if plot:
+                self.ax[0].plot(thetas, ampls, 'k.')
+                thetas_fit = np.linspace(thetas[0],thetas[-1],128)
+                ampls_fit = fit_res.eval(t=thetas_fit)
+                self.ax[0].plot(thetas_fit, ampls_fit, 'r-')
+
+        phase_list.pop(0)
+
+        phase_list = np.array(phase_list)
+        if extrapolate_phase:
+            phase_list = self.unwrap_phases_extrapolation(phase_list)
+
+        if plot:
+            self.ax[0].set_title('Cosine fits')
+            self.ax[0].set_xlabel('theta (rad)')
+            self.ax[0].set_ylabel('|S21| (arb. units)')
+            self.ax[0].legend(['data','fits'])
+
+            if fit_range is None:
+                self.ax[1].plot(self.sweep_points_2D,phase_list)
+            else:
+                self.ax[1].plot(self.sweep_points_2D[fit_range[0]:fit_range[1]],phase_list)
+            self.ax[1].set_title('fitted phases')
+            self.ax[1].set_xlabel(self.parameter_names[1]
+                                  +' '+self.parameter_units[1])
+            self.ax[1].set_ylabel('phase (rad)')
+
+            self.fig.subplots_adjust(hspace=0.7)
+
+            plt.show()
+
+        self.fitted_phases = np.array(phase_list)
+
+        if return_ampl:
+            return phase_list, amplitude_list
+        else:
+            return phase_list
+
+
+    def fit_delay(self,X90_separation=None,flux_pulse_length=None, plot=False,
+                  print_fit_results=False,return_fit=None):
+        '''
+        method to fit the relative delay of the flux pulse to the drive pulses
+        '''
+
+        if X90_separation is None:
+            X90_separation = self.X90_separation
+        if X90_separation is None:
+            raise ValueError('Must specify the X90 pulse separation used in the experiment.')
+        if flux_pulse_length is None:
+            flux_pulse_length = self.flux_pulse_length
+        if flux_pulse_length is None:
+            raise ValueError('Must specify the flux pulse length used in the experiment.')
+        if self.fitted_phases is None:
+            self.fit_all(plot=False,extrapolate_phase=True,cal_points=self.cal_points)
+        if return_fit is None:
+            return_fit = self.return_fit
+
+        erf_window_model = fit_mods.ErfWindowModel
+        offset_guess = self.fitted_phases[0]
+
+        i_amplitude_guess = np.abs(offset_guess - self.fitted_phases).argmax()
+        amplitude_guess = self.fitted_phases[i_amplitude_guess] - offset_guess
+
+        i_list_window = np.where(np.abs(self.fitted_phases - offset_guess) >
+                                 np.abs(amplitude_guess/2.))[0]
+
+        t_start_guess = self.sweep_points_2D[i_list_window[0]]
+        t_end_guess = self.sweep_points_2D[i_list_window[-1]]
+
+
+        #Set up fit parameters and perform fit
+        erf_window_model.set_param_hint('offset',
+                                        value=offset_guess,
+                                        vary=True)
+        erf_window_model.set_param_hint('amplitude',
+                                        value=amplitude_guess,
+                                        vary=True)
+        erf_window_model.set_param_hint('t_start',
+                                        value=t_start_guess,
+                                        vary=True)
+        erf_window_model.set_param_hint('t_end',
+                                        value=t_end_guess,
+                                        vary=True)
+        erf_window_model.set_param_hint('t_rise',
+                                        value=(t_end_guess - t_start_guess)/20.,
+                                        vary=True)
+        self.params_delay_fit = erf_window_model.make_params()
+        self.delay_fit_res = erf_window_model.fit(data=self.fitted_phases,
+                              t=self.sweep_points_2D,
+                              params=self.params_delay_fit)
+
+        if self.delay_fit_res.chisqr > 1.:
+            logging.warning('Fit did not converge, chi-square > 1.')
+
+
+
+        self.fitted_delay = (self.delay_fit_res.best_values['t_end'] +
+                             self.delay_fit_res.best_values['t_start']
+                             - X90_separation)/2. + flux_pulse_length/2.
+
+        if print_fit_results:
+            print(self.delay_fit_res.fit_report())
+            print('fitted delay  = {}ns'.format(self.fitted_delay/1e-9))
+
+
+
+        if plot:
+            self.delay_fit_res.plot()
+
+        if return_fit:
+            return self.fitted_delay, self.delay_fit_res
+        else:
+            return self.fitted_delay
+
+    def run_delay_analysis(self, X90_separation=None, show=False,
+                             close_file=True, **kw):
+
+        if X90_separation is None:
+            X90_separation = self.X90_separation
+        self.fig,self.ax = plt.subplots()
+        self.add_analysis_datagroup_to_file()
+
+        show_guess = kw.get('show_guess', False)
+        print_fit_results = kw.get('print_fit_results', True)
+
+
+        #get the fit results (lmfit.ModelResult) and save them
+        self.fit_all(plot=False,extrapolate_phase=False,cal_points=self.cal_points)
+
+        self.fitted_delay, self.delay_fit_res = self.fit_delay(
+            X90_separation=X90_separation,
+            plot=False,
+            print_fit_results=print_fit_results,
+            return_fit=True)
+
+        self.save_fitted_parameters(self.delay_fit_res, var_name=self.value_names[0])
+
+
+
+        #Plot results
+        self.plot_results(show_guess=show_guess)
+
+        #display figure
+        if show:
+            self.fig.show()
+
+        #save figure
+        self.save_fig(self.fig, figname=self.measurementstring+'_delay_fit',
+                      **kw)
+
+        if close_file:
+            self.data_file.close()
+
+        return self.delay_fit_res
+
+
+
+
+
+    def plot_results(self, show_guess=False):
+
+        self.fig, self.ax = plt.subplots()
+
+        self.ax.plot(self.sweep_points_2D/1e-9,self.delay_fit_res.data,'k.',label='data')
+        textstr = ('fitted delay = {:4.3f}ns'.format(self.fitted_delay/1e-9))
+
+
+        self.fig.text(0.5,0,textstr,
+                      transform=self.ax.transAxes, fontsize=self.font_size,
+                      verticalalignment='top',
+                      horizontalalignment='center',bbox=self.box_props)
+
+        #Used for plotting the fit
+        best_vals = self.delay_fit_res.best_values
+        erf_window_fit_func = lambda t: fit_mods.ErfWindow(
+                            t,
+                           t_start=best_vals['t_start'],
+                           t_end=best_vals['t_end'],
+                           t_rise=best_vals['t_rise'],
+                           amplitude=best_vals['amplitude'],
+                           offset=best_vals['offset'])
+
+
+        # plot with initial guess
+        if show_guess:
+            self.ax.plot(self.sweep_points_2D/1e-9,
+                         self.delay_fit_res.init_fit, 'k--',
+                         linewidth=self.line_width,
+                         label='initial guess')
+
+        #plot with best fit results
+        x = np.linspace(self.sweep_points_2D[0],
+                        self.sweep_points_2D[-1],
+                        len(self.sweep_points_2D)*100)
+        y = erf_window_fit_func(x)
+        self.ax.plot(x/1e-9, y, 'r-', linewidth=self.line_width,label='fit')
+        self.ax.set_title(self.label)
+        self.ax.set_xlabel('pulse delay (ns')
+        self.ax.set_ylabel('phase (rad)')
+
+        if show_guess:
+            self.ax.legend(['data','guess','fit'])
+        else:
+            self.ax.legend(['data','fit'])
+
+
+class Dynamic_phase_Analysis(Fluxpulse_Ramsey_2D_Analysis):
+
+    def __init__(self, X90_separation=None, flux_pulse_amp=None,
+                 flux_pulse_length=None,
+                 qb_name=None, label='Dynamic_phase_analysis', **kw):
+
+        kw['label'] = label
+        kw['h5mode'] = 'r+'
+        kw['close_file'] = False
+
+        self.flux_pulse_amp = flux_pulse_amp
+
+        super(self.__class__, self).__init__(qb_name=qb_name,
+                                             X90_separation=X90_separation,
+                                             flux_pulse_length=flux_pulse_length,
+                                             run_default_super=False,
+                                             **kw)
+
+        self.run_default_analysis(**kw)
+
+
+    def run_default_analysis(self, close_file=True, **kw):
+
+        show = kw.pop('show', False)
+        # super().run_default_analysis(show=show,
+        #                              close_file=close_file,
+        #                              close_main_fig=True,
+        #                              save_fig=False, **kw)
+
+        self.get_naming_and_values_2D()
+
+        length_single = len(self.sweep_points)
+        phases = {}
+
+        textstr = ''
+        self.fig = plt.figure()
+        self.ax = self.fig.add_subplot(111)
+
+        for index, i in enumerate(np.arange(0, len(self.sweep_points_2D)* \
+                length_single, length_single)):
+
+            if i==0:
+                label = 'no flux pulse'
+            else:
+                label = 'with flux pulse'
+
+            data_slice = self.data[:, i:i+length_single-1]
+            thetas = data_slice[0]
+
+            ampls = a_tools.rotate_and_normalize_data_no_cal_points(
+                np.array([data_slice[2], data_slice[3]]))
+
+            # fit to cosine
+            fit_res = self.fit_single_cos(thetas, ampls,
+                                        print_fit_results=False,
+                                        phase_guess=0)
+
+            # plot
+            self.ax.plot(thetas, ampls, 'o-', label=label)
+
+            thetas_fine = np.linspace(thetas[0], thetas[-1], len(thetas)*100)
+            if fit_res.best_values['amplitude']>0:
+                data_fit_fine = fit_mods.CosFunc(thetas_fine,
+                                                 **fit_res.best_values)
+            else:
+                fit_res_temp = deepcopy(fit_res)
+                fit_res_temp.best_values['amplitude'] = \
+                    -fit_res_temp.best_values['amplitude']
+                data_fit_fine = fit_mods.CosFunc(thetas_fine,
+                                                 **fit_res_temp.best_values)
+
+            self.ax.plot(thetas_fine, data_fit_fine, 'r')
+
+            self.ax.set_title('dynamic phase msmt {} at {}ns {}mV {}'.format(
+                self.qb_name, self.flux_pulse_length,
+                self.flux_pulse_amp, self.timestamp_string))
+            self.ax.set_xlabel(r'Phase of 2nd pi/2 pulse, $\theta$[rad]')
+            self.ax.set_ylabel('Response (V)')
+
+            self.ax.legend()
+            phases[self.sweep_points_2D[index]] = \
+                fit_res.best_values['phase']*180/np.pi
+            textstr += 'phase_{} = {:0.3f} deg\n'.format(label,
+                          phases[self.sweep_points_2D[index]])
+
+        self.dyn_phase = phases[self.sweep_points_2D[1]] - \
+            phases[self.sweep_points_2D[0]]
+
+        textstr += 'dyn_phase_{} = {:0.3f} deg'.format(self.qb_name, self.dyn_phase)
+        self.fig.text(0.5, -0.05, textstr, transform=self.ax.transAxes,
+                fontsize=self.font_size, verticalalignment='top',
+                horizontalalignment='center', bbox=self.box_props)
+
+        plt.savefig(self.folder+'\\cos_fit.png', dpi=300, bbox_inches='tight')
+
+        if show:
+            plt.show()
+
+        if close_file:
+            self.data_file.close()
+
+        return self.dyn_phase
