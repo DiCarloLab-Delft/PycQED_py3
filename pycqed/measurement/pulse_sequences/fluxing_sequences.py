@@ -1569,6 +1569,7 @@ def Ramsey_with_flux_pulse_meas_seq(thetas, qb, X90_separation, verbose=False,
 
     pulses = get_pulse_dict_from_pars(pulse_pars)
     flux_pulse = operation_dict["flux "+qb_name]
+    # Used for checking dynamic phase compensation
     # if flux_pulse['amplitude'] != 0:
     #     flux_pulse['basis_rotation'] = {qb_name: -106.87716422562978}
 
@@ -1577,12 +1578,6 @@ def Ramsey_with_flux_pulse_meas_seq(thetas, qb, X90_separation, verbose=False,
     X90_2['pulse_delay'] = X90_separation - flux_pulse['pulse_delay']
     X90_2['refpoint'] = 'start'
 
-    print('\n',X90_separation)
-    print(flux_pulse['pulse_delay'])
-    print('basis_rotation' in flux_pulse)
-    print(flux_pulse['amplitude'])
-    print('flux pulse delay ', flux_pulse['pulse_delay'])
-    print('CZ corr phase: ', operation_dict['CZ_corr ' + qb.name]['phase'])
     for i, theta in enumerate(thetas):
 
         X90_2['phase'] = theta*180/np.pi

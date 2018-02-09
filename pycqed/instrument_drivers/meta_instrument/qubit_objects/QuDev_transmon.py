@@ -3404,25 +3404,34 @@ def add_CZ_pulse(qbc, qbt):
         qbt: Target qubit. A QudevTransmon object corresponding to the qubit
              we induce the conditional phase on.
     """
+
     # add flux pulse parameters
     op_name = 'CZ ' + qbt.name
     ps_name = 'CZ_' + qbt.name
-    qbc.add_operation(op_name)
-    qbc.add_pulse_parameter(op_name, ps_name + '_target',  'qb_target',
-                            get_cmd=lambda _=qbc.name + ',' + qbt.name: _)
-    qbc.add_pulse_parameter(op_name, ps_name + '_pulse_type', 'pulse_type',
-                            get_cmd=lambda: 'SquarePulse')
-    qbc.add_pulse_parameter(op_name, ps_name + '_channel', 'channel',
-                            initial_value='', vals=vals.Strings())
-    qbc.add_pulse_parameter(op_name, ps_name + '_amp', 'amplitude',
-                            initial_value=0, vals=vals.Numbers())
-    qbc.add_pulse_parameter(op_name, ps_name + '_length', 'length',
-                            initial_value=0, vals=vals.Numbers(0))
-    qbc.add_pulse_parameter(op_name, ps_name + '_delay', 'pulse_delay',
-                            initial_value=0, vals=vals.Numbers())
-    qbc.add_pulse_parameter(op_name, ps_name + '_dynamic_phases',
-                            'basis_rotation', initial_value={},
-                            vals=vals.Dict())
+
+    if np.any([op_name in i for i in qbc.get_operation_dict().keys()]):
+        # do not try to add it again if operation already exists
+        raise ValueError('Operation {} already exists.'.format(op_name))
+    else:
+        qbc.add_operation(op_name)
+
+        qbc.add_pulse_parameter(op_name, ps_name + '_target',  'qb_target',
+                                initial_value=qbt.name,
+                                vals=vals.Enum(qbt.name))
+        qbc.add_pulse_parameter(op_name, ps_name + '_pulse_type', 'pulse_type',
+                                initial_value='SquarePulse',
+                                vals=vals.Enum('SquarePulse'))
+        qbc.add_pulse_parameter(op_name, ps_name + '_channel', 'channel',
+                                initial_value='', vals=vals.Strings())
+        qbc.add_pulse_parameter(op_name, ps_name + '_amp', 'amplitude',
+                                initial_value=0, vals=vals.Numbers())
+        qbc.add_pulse_parameter(op_name, ps_name + '_length', 'length',
+                                initial_value=0, vals=vals.Numbers(0))
+        qbc.add_pulse_parameter(op_name, ps_name + '_delay', 'pulse_delay',
+                                initial_value=0, vals=vals.Numbers())
+        qbc.add_pulse_parameter(op_name, ps_name + '_dynamic_phases',
+                                'basis_rotation', initial_value={},
+                                vals=vals.Dict())
 
 
 
