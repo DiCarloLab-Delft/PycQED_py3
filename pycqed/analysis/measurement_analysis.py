@@ -2,6 +2,7 @@ import os
 import logging
 import numpy as np
 import pickle
+from collections import OrderedDict
 import h5py
 import matplotlib.lines as mlines
 import matplotlib
@@ -23,6 +24,7 @@ import pygsti
 from math import erfc
 from scipy.signal import argrelmax, argrelmin
 from copy import deepcopy
+from pycqed.analysis.fit_toolbox import functions as func
 from pprint import pprint
 
 import pycqed.analysis.tools.plotting as pl_tools
@@ -53,7 +55,6 @@ class MeasurementAnalysis(object):
 
     def __init__(self, TwoD=False, folder=None, auto=True,
                  cmap_chosen='viridis', no_of_columns=1, qb_name=None, **kw):
-
         if folder is None:
             self.folder = a_tools.get_folder(**kw)
         else:
@@ -93,7 +94,7 @@ class MeasurementAnalysis(object):
         self.box_props = kw.pop('box_props',
                                 dict(boxstyle='Square', facecolor='white',
                                      alpha=0.8, lw=self.axes_line_width) )
-        
+
         self.tick_color = kw.get('tick_color', 'k')
         # tick label color get's updated in savefig
         self.tick_labelcolor = kw.get('tick_labelcolor', 'k')
@@ -103,7 +104,7 @@ class MeasurementAnalysis(object):
                   "xtick.color": self.tick_color,
                   "axes.labelcolor": self.axes_labelcolor, }
         plt.rcParams.update(params)
-        
+
 
     def load_hdf5data(self, folder=None, file_only=False, **kw):
         if folder is None:
@@ -427,7 +428,7 @@ class MeasurementAnalysis(object):
                     par_group.attrs.create(name=par_name, data=par_val)
                     #par_dict = vars(par_val)
                 else:
-                    par_group.attrs.create(name=par_name,data=par_val)
+                    fit_grp.attrs.create(name=par_name, data=par_val)
 
     def run_default_analysis(self, TwoD=False, close_file=True,
                              show=False, log=False, transpose=False, **kw):
@@ -442,13 +443,13 @@ class MeasurementAnalysis(object):
                 if self.no_of_columns == 2:
                     fig, axs = plt.subplots(
                         nrows=int(len(self.value_names)/2), ncols=2,
-                        figsize=(3.375, 2.25*len(self.value_names)), dpi=self.dpi)
+                        figsize=(3.375, 2.25*len(self.value_names)),
+                        dpi=self.dpi)
                 else:
                     fig, axs = plt.subplots(
-                        nrows=max(len(self.value_names)), ncols=1,
+                        nrows=len(self.value_names), ncols=1,
                         figsize=(7, 4*len(self.value_names)), dpi=self.dpi)
-                    # figsize=(min(6*len(self.value_names), 11),
-                    #          1.5*len(self.value_names)))
+
             else:
                 if self.no_of_columns == 2:
                     fig, axs = plt.subplots(max(len(self.value_names), 1), 1,
@@ -465,9 +466,9 @@ class MeasurementAnalysis(object):
             for i in range(len(self.value_names)):
                 if len(self.value_names) == 1:
                     ax = axs
-                elif len(self.value_names) == 2:
-                    ax = axs[i % 2]
-                elif len(self.value_names) == 4:
+                elif self.no_of_columns == 1:
+                    ax = axs[i]
+                elif self.no_of_columns == 2:
                     ax = axs[i//2, i % 2]
                 else:
                     ax = axs[i]  # If not 2 or 4 just gives a list of plots
@@ -476,7 +477,11 @@ class MeasurementAnalysis(object):
                 else:
                     plot_title = kw.pop('plot_title', self.measurementstring +
                                         '\n' + self.timestamp_string)
-                ax.ticklabel_format(useOffset=False)
+                try:
+                    ax.ticklabel_format(useOffset=False)
+                except AttributeError:
+                    # only mpl scalar formatters support this feature
+                    pass
 
                 self.plot_results_vs_sweepparam(x=self.sweep_points,
                                                 y=self.measured_values[i],
@@ -636,6 +641,15 @@ class MeasurementAnalysis(object):
 
             self.ylabels = [a+' (' + b + ')' for a, b in zip(self.value_names,
                                                              self.value_units)]
+
+            if 'optimization_result' in self.g:
+                self.optimization_result = OrderedDict({
+                    'generation': self.g['optimization_result'][:, 0],
+                    'evals':  self.g['optimization_result'][:, 1],
+                    'xfavorite':  self.g['optimization_result'][:, 2:2+len(self.parameter_names)],
+                    'stds':  self.g['optimization_result'][:, 2+len(self.parameter_names):2+2*len(self.parameter_names)],
+                    'fbest':  self.g['optimization_result'][:, -len(self.parameter_names)-1],
+                    'xbest': self.g['optimization_result'][:, -len(self.parameter_names):]})
         else:
             raise ValueError('datasaving_format "%s " not recognized'
                              % datasaving_format)
@@ -662,7 +676,6 @@ class MeasurementAnalysis(object):
         # Plot:
         ax.plot(x, y, marker, markersize=self.marker_size,
                 linewidth=self.line_width, label=label)
-
         if log:
             ax.set_yscale('log')
 
@@ -906,8 +919,6 @@ class OptimizationAnalysis_v2(MeasurementAnalysis):
                     x=self.sweep_points[0], y=self.sweep_points[1],
                     z=self.measured_values[i], ax=ax,
                     zlabel=self.value_names[i])
-                ax.set_xlabel(self.parameter_labels[0])
-                ax.set_ylabel(self.parameter_labels[1])
                 ax.plot(self.sweep_points[0],
                         self.sweep_points[1], '-o', c='grey')
                 ax.plot(self.sweep_points[0][-1], self.sweep_points[1][-1],
@@ -916,7 +927,8 @@ class OptimizationAnalysis_v2(MeasurementAnalysis):
                                     self.timestamp_string + '_' +
                                     self.measurementstring, 40))
                 ax.set_title(plot_title)
-
+                set_xlabel(ax, self.parameter_names[0], self.parameter_units[0])
+                set_ylabel(ax, self.parameter_names[1], self.parameter_units[1])
                 self.save_fig(f, figname=base_figname, **kw)
 
 
@@ -929,10 +941,6 @@ class OptimizationAnalysis(MeasurementAnalysis):
                 ['MC'].attrs['optimization_method']
         except:
             optimization_method = 'Numerical'
-            # This is because the MC is no longer an instrument and thus
-            # does not get saved, I have to re add this (MAR 1/2016)
-            logging.warning('Could not extract optimization method from' +
-                            ' data file')
 
         for i, meas_vals in enumerate(self.measured_values):
             if (not plot_all) & (i >= 1):
@@ -1197,7 +1205,9 @@ class TD_Analysis(MeasurementAnalysis):
             if self.for_ef:
                 ylabel = r'$F$ $\left(|f \rangle \right) (arb. units)$'
             else:
-                ylabel = r'$F$ $\left(|e \rangle \right) (arb. units)$'
+                # ylabel = r'$F$ $\left(|e \rangle \right) (arb. units)$'
+                ylabel = r'$F$ $|1 \rangle$'
+
             self.plot_results_vs_sweepparam(x=self.sweep_points,
                                             y=self.normalized_values,
                                             fig=self.fig, ax=self.ax,
@@ -1206,9 +1216,6 @@ class TD_Analysis(MeasurementAnalysis):
                                             ylabel=ylabel,
                                             marker='o-',
                                             save=False)
-            # self.ax.set_ylim(min(min(self.normalized_values)-.1, -.1),
-            #                   max(max(self.normalized_values)+.1, 1.1))
-
             if save_fig:
                 if not close_main_fig:
                     # Hacked in here, good idea to only show the main fig but
@@ -1588,8 +1595,8 @@ class Rabi_Analysis(TD_Analysis):
         kw['label'] = label
         kw['h5mode'] = 'r+'
 
-        super(self.__class__, self).__init__(qb_name=qb_name,
-                                             NoCalPoints=NoCalPoints, **kw)
+        super().__init__(qb_name=qb_name,
+                         NoCalPoints=NoCalPoints, **kw)
 
     def fit_data(self, print_fit_results=True, verbose=False, separate_fits=False):
 
@@ -2142,21 +2149,25 @@ class Echo_analysis(TD_Analysis):
         self.plot_results_vs_sweepparam(x=self.sweep_points,
                                         y=self.corr_data,
                                         fig=self.fig, ax=self.ax,
-                                        xlabel=self.xlabel,
+                                        xlabel=self.parameter_names[0],
+                                        x_unit=self.parameter_units[0],
                                         ylabel=r'F$|1\rangle$',
                                         save=False,
                                         plot_title=plot_title)
 
         self.ax.plot(x_fine, self.fit_res.eval(t=x_fine), label='fit')
-        textstr = '$T_2$={:.3g}$\pm$({:.3g})s '.format(
-            self.fit_res.params['tau'].value,
-            self.fit_res.params['tau'].stderr)
+
+        scale_factor, unit = SI_prefix_and_scale_factor(
+            self.fit_res.params['tau'].value, self.parameter_units[0])
+        textstr = '$T_2$={:.3g}$\pm$({:.3g}) {} '.format(
+            self.fit_res.params['tau'].value*scale_factor,
+            self.fit_res.params['tau'].stderr*scale_factor,
+            unit)
         if show_guess:
             self.ax.plot(x_fine, self.fit_res.eval(
                 t=x_fine, **self.fit_res.init_values), label='guess')
             self.ax.legend(loc='best')
 
-        self.ax.ticklabel_format(style='sci', scilimits=(0, 0))
         self.ax.text(0.4, 0.95, textstr, transform=self.ax.transAxes,
                      fontsize=11, verticalalignment='top',
                      bbox=self.box_props)
@@ -2189,25 +2200,42 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
         super().__init__(label=label, **kw)
 
     def run_default_analysis(self, close_file=True, **kw):
-        normalize_to_cal_points = kw.pop('normalize_to_cal_points', True)
-        self.get_naming_and_values()
-        print('normalize_to_cal_points', normalize_to_cal_points)
-        if normalize_to_cal_points:
-            cal_0I = np.mean([self.measured_values[0][-4],
-                              self.measured_values[0][-3]])
-            cal_1I = np.mean([self.measured_values[0][-2],
-                              self.measured_values[0][-1]])
+        normalize_to_cal_points = kw.get('normalize_to_cal_points', True)
+        self.normalize_to_cal_points = normalize_to_cal_points
 
-            cal_0Q = np.mean([self.measured_values[1][-4],
-                              self.measured_values[1][-2]])
-            cal_1Q = np.mean([self.measured_values[1][-3],
-                              self.measured_values[1][-1]])
+        self.get_naming_and_values()
+        self.oscillating_qubit = kw.get('oscillating_qubit', 0)
+
+        if normalize_to_cal_points:
+            if self.oscillating_qubit == 0:
+                cal_0I = np.mean([self.measured_values[0][-4],
+                                  self.measured_values[0][-3]])
+
+                cal_1I = np.mean([self.measured_values[0][-2],
+                                  self.measured_values[0][-1]])
+
+                cal_0Q = np.mean([self.measured_values[1][-4],
+                                  self.measured_values[1][-2]])
+
+                cal_1Q = np.mean([self.measured_values[1][-3],
+                                  self.measured_values[1][-1]])
+            else:
+                cal_0I = np.mean([self.measured_values[0][-4],
+                                  self.measured_values[0][-2]])
+
+                cal_1I = np.mean([self.measured_values[0][-3],
+                                  self.measured_values[0][-1]])
+
+                cal_0Q = np.mean([self.measured_values[1][-4],
+                                  self.measured_values[1][-3]])
+
+                cal_1Q = np.mean([self.measured_values[1][-2],
+                                  self.measured_values[1][-1]])
 
             self.measured_values[0][:] = (
                 self.measured_values[0] - cal_0I)/(cal_1I-cal_0I)
             self.measured_values[1][:] = (
                 self.measured_values[1] - cal_0Q)/(cal_1Q-cal_0Q)
-        # self.measured_values = self.measured_values
 
         self.sort_data()
 
@@ -2223,24 +2251,31 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
         self.x_idx = self.sweep_points[::2]
         self.y_exc = ['', '']
         self.y_idx = ['', '']
+
         for i in range(2):
             self.y_exc[i] = self.measured_values[i][1::2]
             self.y_idx[i] = self.measured_values[i][::2]
+            if self.normalize_to_cal_points:
+                self.y_exc[i] = self.y_exc[i][:-2]
+                self.y_idx[i] = self.y_idx[i][:-2]
+        if self.normalize_to_cal_points:
+            self.x_idx = self.x_idx[:-2]
+            self.x_exc = self.x_exc[:-2]
 
-    # def calculate_cost_func(self, **kw):
-    #     num_points = len(self.sweep_points)-4
+    def calculate_cost_func(self, **kw):
+        num_points = len(self.sweep_points)-4
 
-    #     id_dat_swp = self.measured_values[1][:num_points//2]
-    #     ex_dat_swp = self.measured_values[1][num_points//2:-4]
+        id_dat_swp = self.measured_values[1][:num_points//2]
+        ex_dat_swp = self.measured_values[1][num_points//2:-4]
 
-    #     id_dat_cp = self.measured_values[0][:num_points//2]
-    #     ex_dat_cp = self.measured_values[0][num_points//2:-4]
+        id_dat_cp = self.measured_values[0][:num_points//2]
+        ex_dat_cp = self.measured_values[0][num_points//2:-4]
 
-    #     maximum_difference = max((id_dat_cp-ex_dat_cp))
-    #     # I think the labels are wrong in excited and identity but the value
-    #     # we get is correct
-    #     missing_swap_pop = np.mean(ex_dat_swp - id_dat_swp)
-    #     self.cost_func_val = maximum_difference, missing_swap_pop
+        maximum_difference = max((id_dat_cp-ex_dat_cp))
+        # I think the labels are wrong in excited and identity but the value
+        # we get is correct
+        missing_swap_pop = np.mean(ex_dat_swp - id_dat_swp)
+        self.cost_func_val = maximum_difference, missing_swap_pop
 
     def make_figures(self, **kw):
         # calculate fitted curves
@@ -2257,16 +2292,11 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
 
         self.fig, self.axs = plt.subplots(2, 1, figsize=(5, 6))
         for i in [0, 1]:
-            # self.axs[i].ticklabel_format(useOffset=False)
             self.axs[i].plot(self.x_idx, self.y_idx[i], '-o',
                              label='no excitation')
             self.axs[i].plot(self.x_exc, self.y_exc[i], '-o',
                              label='excitation')
-
-            # self.axs[i].set_xlabel(self.xlabel)
-            # self.axs[i].set_ylabel(self.ylabels[i])
-
-            if i == 0:
+            if i == self.oscillating_qubit:
                 plot_title = kw.pop('plot_title', textwrap.fill(
                                     self.timestamp_string + '_' +
                                     self.measurementstring, 40))
@@ -2275,13 +2305,7 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
                 self.axs[i].legend()
             else:
                 plot_title = ''
-
             set_xlabel(self.axs[i], self.sweep_name, self.sweep_unit[0])
-            ymi = min(self.axs[i].get_yticks())
-            yma = max(self.axs[i].get_yticks())
-            # somehow not setting this limit changes the tick locations after
-            # they have been set. Unclear what causes this.
-            self.axs[i].set_ylim(ymi, yma)
             set_ylabel(self.axs[i], self.value_names[i], self.value_units[i])
 
         self.save_fig(self.fig, fig_tight=True, **kw)
@@ -2294,22 +2318,28 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
         self.fit_result = {}
 
         # Fit case with no excitation first
-        guess_params = fit_mods.Cos_amp_phase_guess(model, data=self.y_idx[0],
-                                                    f=1.0/360.0, t=self.x_idx)
-        fit_res = model.fit(data=self.y_idx[0],
-                            t=self.x_idx,
-                            params=guess_params)
+        guess_params = fit_mods.Cos_amp_phase_guess(
+            model,
+            data=self.y_idx[self.oscillating_qubit],
+            f=1.0/360.0, t=self.x_idx)
+        fit_res = model.fit(
+            data=self.y_idx[self.oscillating_qubit],
+            t=self.x_idx,
+            params=guess_params)
         self.fit_result['idx_amp'] = fit_res.values['amplitude']
         self.fit_result['idx_freq'] = 1.0 / 360.0
         self.fit_result['idx_phase'] = fit_res.values['phase']
         self.fit_result['idx_offset'] = fit_res.values['offset']
 
         # Fit case with excitation
-        guess_params = fit_mods.Cos_amp_phase_guess(model, data=self.y_exc[0],
-                                                    f=1.0/360.0, t=self.x_exc)
-        fit_res = model.fit(data=self.y_exc[0],
-                            t=self.x_exc,
-                            params=guess_params)
+        guess_params = fit_mods.Cos_amp_phase_guess(
+            model,
+            data=self.y_exc[self.oscillating_qubit],
+            f=1.0/360.0, t=self.x_exc)
+        fit_res = model.fit(
+            data=self.y_exc[self.oscillating_qubit],
+            t=self.x_exc,
+            params=guess_params)
         self.fit_result['exc_amp'] = fit_res.values['amplitude']
         self.fit_result['exc_freq'] = 1.0/360.0
         self.fit_result['exc_phase'] = fit_res.values['phase']
@@ -2949,6 +2979,9 @@ class SSRO_Analysis(MeasurementAnalysis):
         self.channels = channels
         self.hist_log_scale = hist_log_scale
         self.close_fig = close_fig
+        self.F_a = 0
+        self.F_d = 0  # Placeholder values until analysis completes
+        # this is added to prevent bugs if fits are not run
         super(self.__class__, self).__init__(**kw)
 
     def run_default_analysis(self, rotate=True,
@@ -5032,8 +5065,8 @@ class RandomizedBenchmarking_Analysis(TD_Analysis):
                 (1-self.fit_res.params['fidelity_per_Clifford'].value)*100,
                 (self.fit_res.params['fidelity_per_Clifford'].stderr)*100) +
             '\n\tOffset\t= {:.4g} $\pm$ ({:.4g})'.format(
-                (self.fit_res.params['offset'].value),
-                (self.fit_res.params['offset'].stderr)))
+               (self.fit_res.params['offset'].value),
+               (self.fit_res.params['offset'].stderr)))
         if F_T1 is not None:
             textstr += ('\n\t  $F_{Cl}^{T_1}$  = ' +
                         '{:.6g}%'.format(F_T1*100))
@@ -5397,11 +5430,12 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                 f=data_x, verbose=False)
 
         elif fitting_model == 'complex':
+            # Implement slope fitting with Complex!! Xavi February 2018
             # this is the fit with a complex transmission curve WITHOUT slope
             data_amp = self.measured_values[0]
             data_angle = self.measured_values[1]
-            data_complex = np.add(
-                self.measured_values[2], 1j*self.measured_values[3])
+            data_complex = data_amp*np.cos(data_angle)+1j*data_amp*np.sin(data_angle)
+            #np.add(self.measured_values[2], 1j*self.measured_values[3])
 
             # Initial guesses
             guess_A = max(data_amp)
@@ -5489,8 +5523,11 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                             fig=fig, ax=ax,
                                             xlabel=self.sweep_name,
                                             x_unit=self.sweep_unit[0],
-                                            ylabel=str('S21_mag (arb. units)'),
+                                            ylabel=str('S21_mag'),
+                                            y_unit=self.value_units[0],
                                             save=False)
+            # ensures that amplitude plot starts at zero
+            ax.set_ylim(ymin=0.0)
 
         elif 'complex' in fitting_model:
             self.plot_complex_results(
@@ -5499,7 +5536,10 @@ class Homodyne_Analysis(MeasurementAnalysis):
             fig2, ax2 = self.default_ax()
             self.plot_results_vs_sweepparam(x=self.sweep_points, y=data_amp,
                                             fig=fig2, ax=ax2,
-                                            show=False, save=False)
+                                            show=False,  xlabel=self.sweep_name,
+                                            x_unit=self.sweep_unit[0],
+                                            ylabel=str('S21_mag'),
+                                            y_unit=self.value_units[0])
 
         elif fitting_model == 'lorentzian':
             self.plot_results_vs_sweepparam(x=self.sweep_points,
@@ -7155,10 +7195,10 @@ class butterfly_analysis(MeasurementAnalysis):
         if digitize:
             self.data_exc = dm_tools.digitize(threshold=threshold,
                                               data=self.data_exc,
-                                              positive_case=case)
+                                              one_larger_than_threshold=case)
             self.data_rel = dm_tools.digitize(threshold=threshold,
                                               data=self.data_rel,
-                                              positive_case=case)
+                                              one_larger_than_threshold=case)
         if close_file:
             self.data_file.close()
         if auto is True:
@@ -7536,8 +7576,8 @@ class DoubleFrequency(TD_Analysis):
         ax.set_ylabel(r'$F |1\rangle$')
         ax.set_title('%s: Double Frequency analysis' % self.timestamp)
         ax.set_xlabel(r'Time ($\mu s$)')
-        ax.plot(plot_x*1e6, y, 'bo')
-        ax.plot(plot_x[:-4]*1e6, self.fit_plot, 'r-')
+        ax.plot(plot_x*1e6, y, 'o')
+        ax.plot(plot_x[:-4]*1e6, self.fit_plot, '-')
         fig.tight_layout()
         self.save_fig(fig, **kw)
         self.data_file.close()
@@ -8729,131 +8769,146 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
                            predistort=True, plot=True, timestamp_ground=None,
                            timestamp_excited=None, close_fig=True,
                            optimization_window=None, post_rotation_angle=None):
-    data_file = MeasurementAnalysis(label='_0', auto=True, TwoD=False, close_fig=True, timestamp=timestamp_ground)
+    data_file = MeasurementAnalysis(
+        label='_0', auto=True, TwoD=False, close_fig=True, timestamp=timestamp_ground)
     temp = data_file.load_hdf5data()
     data_file.get_naming_and_values()
 
-    offset_calibration_samples=720 #using the last x samples for offset subtraction 720 is multiples of 2.5 MHz modulation
+    # using the last x samples for offset subtraction 720 is multiples of 2.5
+    # MHz modulation
+    offset_calibration_samples = 720
 
     x = data_file.sweep_points/1.8
-    offset_I = np.mean(data_file.measured_values[0][-offset_calibration_samples:])
-    offset_Q = np.mean(data_file.measured_values[1][-offset_calibration_samples:])
+    offset_I = np.mean(data_file.measured_values[
+                       0][-offset_calibration_samples:])
+    offset_Q = np.mean(data_file.measured_values[
+                       1][-offset_calibration_samples:])
     print('offset I {}, offset Q {}'.format(offset_I, offset_Q))
     y1 = data_file.measured_values[0]-offset_I
     y2 = data_file.measured_values[1]-offset_Q
-    I0,Q0=SSB_demod(y1,y2, alpha=alpha, phi=phi, I_o=I_o, Q_o=Q_o, IF=IF, predistort=predistort)
-    power0=(I0**2+Q0**2)/50
+    I0, Q0 = SSB_demod(y1, y2, alpha=alpha, phi=phi, I_o=I_o,
+                       Q_o=Q_o, IF=IF, predistort=predistort)
+    power0 = (I0**2+Q0**2)/50
 
-    data_file = MeasurementAnalysis(label='_1', auto=True, TwoD=False, close_fig=True, plot=True, timestamp=timestamp_excited)
+    data_file = MeasurementAnalysis(
+        label='_1', auto=True, TwoD=False, close_fig=True, plot=True, timestamp=timestamp_excited)
     temp = data_file.load_hdf5data()
     data_file.get_naming_and_values()
 
     x = data_file.sweep_points/1.8
-    offset_I = np.mean(data_file.measured_values[0][-offset_calibration_samples:])
-    offset_Q = np.mean(data_file.measured_values[1][-offset_calibration_samples:])
+    offset_I = np.mean(data_file.measured_values[
+                       0][-offset_calibration_samples:])
+    offset_Q = np.mean(data_file.measured_values[
+                       1][-offset_calibration_samples:])
     y1 = data_file.measured_values[0]-offset_I
     y2 = data_file.measured_values[1]-offset_Q
-    I1,Q1=SSB_demod(y1,y2,  alpha=alpha, phi=phi, I_o=I_o, Q_o=Q_o,  IF=IF, predistort=predistort)
-    power1=(I1**2+Q1**2)/50
+    I1, Q1 = SSB_demod(y1, y2,  alpha=alpha, phi=phi, I_o=I_o,
+                       Q_o=Q_o,  IF=IF, predistort=predistort)
+    power1 = (I1**2+Q1**2)/50
 
-    amps=np.sqrt((I1-I0)**2+(Q1-Q0)**2)
-    amp_max=np.max(amps)
-    #defining weight functions for postrotation
-    weight_I=(I1-I0)/amp_max
-    weight_Q=(Q1-Q0)/amp_max
+    amps = np.sqrt((I1-I0)**2+(Q1-Q0)**2)
+    amp_max = np.max(amps)
+    # defining weight functions for postrotation
+    weight_I = (I1-I0)/amp_max
+    weight_Q = (Q1-Q0)/amp_max
 
-    if post_rotation_angle==None:
-        arg_max=np.argmax(amps)
-        post_rotation_angle=np.arctan2(weight_I[arg_max],weight_Q[arg_max])-np.pi/2
+    if post_rotation_angle == None:
+        arg_max = np.argmax(amps)
+        post_rotation_angle = np.arctan2(
+            weight_I[arg_max], weight_Q[arg_max])-np.pi/2
         #print('found post_rotation angle {}'.format(post_rotation_angle))
     else:
-        post_rotation_angle=2*np.pi*post_rotation_angle/360
+        post_rotation_angle = 2*np.pi*post_rotation_angle/360
     I0rot = np.cos(post_rotation_angle)*I0 - np.sin(post_rotation_angle)*Q0
     Q0rot = np.sin(post_rotation_angle)*I0 + np.cos(post_rotation_angle)*Q0
     I1rot = np.cos(post_rotation_angle)*I1 - np.sin(post_rotation_angle)*Q1
     Q1rot = np.sin(post_rotation_angle)*I1 + np.cos(post_rotation_angle)*Q1
-    I0=I0rot
-    Q0=Q0rot
-    I1=I1rot
-    Q1=Q1rot
+    I0 = I0rot
+    Q0 = Q0rot
+    I1 = I1rot
+    Q1 = Q1rot
 
-    #redefining weight functions after rotation
-    weight_I=(I1-I0)/amp_max
-    weight_Q=(Q1-Q0)/amp_max
-
+    # redefining weight functions after rotation
+    weight_I = (I1-I0)/amp_max
+    weight_Q = (Q1-Q0)/amp_max
 
     edge = 1.05*max(max(np.sqrt(I0**2+Q0**2)), max(np.sqrt(I1**2+Q1**2)))
 
     def rms(x):
         return np.sqrt(x.dot(x)/x.size)
 
-    if optimization_window!=None:
-        optimization_start=optimization_window[0]
-        optimization_stop=optimization_window[-1]
-        start_sample=int(optimization_start*1.8e9)
-        stop_sample=int(optimization_stop*1.8e9)
-        shift_w=80e-9
-        start_sample_w=int((optimization_start-shift_w)*1.8e9)
-        stop_sample_w=int((optimization_stop-shift_w)*1.8e9)
-        depletion_cost_d=np.mean(rms(I0[start_sample:stop_sample])+
-                                 rms(Q0[start_sample:stop_sample])+
-                                 rms(I1[start_sample:stop_sample])+
-                                 rms(Q1[start_sample:stop_sample]))
-        depletion_cost_w=10*np.mean(rms(I0[start_sample_w:stop_sample_w]-I1[start_sample_w:stop_sample_w])+
-                                    rms(Q0[start_sample_w:stop_sample_w]-Q1[start_sample_w:stop_sample_w]))#+abs(np.mean(Q0[start_sample:stop_sample]))+abs(np.mean(I1[start_sample:stop_sample]))+abs(np.mean(Q1[start_sample:stop_sample]))
-        depletion_cost=depletion_cost_d+depletion_cost_w
+    if optimization_window != None:
+        optimization_start = optimization_window[0]
+        optimization_stop = optimization_window[-1]
+        start_sample = int(optimization_start*1.8e9)
+        stop_sample = int(optimization_stop*1.8e9)
+        shift_w = 0e-9
+        start_sample_w = int((optimization_start-shift_w)*1.8e9)
+        stop_sample_w = int((optimization_stop-shift_w)*1.8e9)
+        depletion_cost_d = np.mean(rms(I0[start_sample:stop_sample]) +
+                                   rms(Q0[start_sample:stop_sample]) +
+                                   rms(I1[start_sample:stop_sample]) +
+                                   rms(Q1[start_sample:stop_sample]))
+        depletion_cost_w = 10*np.mean(rms(I0[start_sample_w:stop_sample_w]-I1[start_sample_w:stop_sample_w]) +
+                                      rms(Q0[start_sample_w:stop_sample_w]-Q1[start_sample_w:stop_sample_w]))  # +abs(np.mean(Q0[start_sample:stop_sample]))+abs(np.mean(I1[start_sample:stop_sample]))+abs(np.mean(Q1[start_sample:stop_sample]))
+        depletion_cost = depletion_cost_d+depletion_cost_w
         #print('total {} direct {} weights {}'.format(1000*depletion_cost, 1000*depletion_cost_d, 1000*depletion_cost_w))
     else:
-        depletion_cost=0
+        depletion_cost = 0
 
     if plot:
         fig, ax = plt.subplots()
-        plt.plot(x,I0, label='I ground')
-        plt.plot(x,I1, label='I excited')
+        plt.plot(x, I0, label='I ground')
+        plt.plot(x, I1, label='I excited')
         ax.set_ylim(-edge, edge)
 
         plt.title('Demodulated I')
         plt.xlabel('time (ns)')
         plt.ylabel('Demodulated voltage (V)')
 
-        if optimization_window!=None:
-            plt.axvline(optimization_start*1e9, linestyle='--', color='k', label='depletion optimization window')
+        if optimization_window != None:
+            plt.axvline(optimization_start*1e9, linestyle='--',
+                        color='k', label='depletion optimization window')
             plt.axvline(optimization_stop*1e9, linestyle='--', color='k')
-        ax.set_xlim(0,1500)
+        ax.set_xlim(0, 1500)
         plt.legend()
 
-        plt.savefig(data_file.folder+'\\'+'transients_I_demodulated.'+fig_format,format=fig_format)
+        plt.savefig(data_file.folder+'\\' +
+                    'transients_I_demodulated.'+fig_format, format=fig_format)
         plt.close()
 
         fig, ax = plt.subplots()
-        plt.plot(x,Q0, label='Q ground')
-        plt.plot(x,Q1, label='Q excited')
+        plt.plot(x, Q0, label='Q ground')
+        plt.plot(x, Q1, label='Q excited')
         ax.set_ylim(-edge, edge)
         plt.title('Demodulated Q')
         plt.xlabel('time (ns)')
         plt.ylabel('Demodulated Q')
-        if optimization_window!=None:
-            plt.axvline(optimization_start*1e9, linestyle='--', color='k', label='depletion optimization window')
+        if optimization_window != None:
+            plt.axvline(optimization_start*1e9, linestyle='--',
+                        color='k', label='depletion optimization window')
             plt.axvline(optimization_stop*1e9, linestyle='--', color='k')
-        ax.set_xlim(0,1500)
+        ax.set_xlim(0, 1500)
         plt.legend()
 
-        plt.savefig(data_file.folder+'\\'+'transients_Q_demodulated.'+fig_format,format=fig_format)
+        plt.savefig(data_file.folder+'\\' +
+                    'transients_Q_demodulated.'+fig_format, format=fig_format)
         plt.close()
 
         fig, ax = plt.subplots()
-        plt.plot(x,power0*1e6, label='ground' , lw=4)
-        plt.plot(x,power1*1e6, label='excited', lw=4)
-        if optimization_window!=None:
-            plt.axvline(optimization_start*1e9, linestyle='--', color='k', label='depletion optimization window')
+        plt.plot(x, power0*1e6, label='ground', lw=4)
+        plt.plot(x, power1*1e6, label='excited', lw=4)
+        if optimization_window != None:
+            plt.axvline(optimization_start*1e9, linestyle='--',
+                        color='k', label='depletion optimization window')
             plt.axvline(optimization_stop*1e9, linestyle='--', color='k')
-        ax.set_xlim(0,1500)
+        ax.set_xlim(0, 1500)
         plt.title('Signal power (uW)')
         plt.ylabel('Signal power (uW)')
 
-        plt.savefig(data_file.folder+'\\'+'transients_power.'+fig_format,format=fig_format)
+        plt.savefig(data_file.folder+'\\'+'transients_power.' +
+                    fig_format, format=fig_format)
         plt.close()
-
 
     # sampling rate GHz
     A0I = I0
@@ -8881,27 +8936,35 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     #print('f_offset', f_offset)
     #print(len(A0I), len(A0I[-1024:]))
 
-    samples=7
-    cost_skew=0
+    samples = 7
+    cost_skew = 0
     cost_offset = 0
 
     for i in range(samples):
-        n_s=int(n_spurious-samples/2+i)
-        n_o=int(n_offset-samples/2+i)
+        n_s = int(n_spurious-samples/2+i)
+        n_o = int(n_offset-samples/2+i)
 
-        cost_skew=cost_skew+np.abs(PSD0I[n_s])+np.abs(PSD1I[n_s])+np.abs(PSD0Q[n_s])+np.abs(PSD1Q[n_s])
-        cost_offset=cost_offset+np.abs(PSD0I_o[n_o])+np.abs(PSD1I_o[n_o])+np.abs(PSD0Q_o[n_o])+np.abs(PSD1Q_o[n_o])
+        cost_skew = cost_skew + \
+            np.abs(PSD0I[n_s])+np.abs(PSD1I[n_s]) + \
+            np.abs(PSD0Q[n_s])+np.abs(PSD1Q[n_s])
+        cost_offset = cost_offset + \
+            np.abs(PSD0I_o[n_o])+np.abs(PSD1I_o[n_o]) + \
+            np.abs(PSD0Q_o[n_o])+np.abs(PSD1Q_o[n_o])
 
 #         print('freq',f_axis[n])
 #         print('cost_skew', cost_skew)
     if plot:
         fig, ax = plt.subplots(2)
-        ax[0].set_xlim(0,0.4)
-        ax[0].plot(f_axis*1e-9, abs(PSD0I), label='ground I') # plotting the spectrum
-        ax[0].plot(f_axis*1e-9, abs(PSD1I), label='excited I') # plotting the spectrum
-        ax[1].set_xlim(0,0.4)
-        ax[1].plot(f_axis*1e-9, abs(PSD0Q), label='ground Q') # plotting the spectrum
-        ax[1].plot(f_axis*1e-9, abs(PSD1Q), label='excited Q') # plotting the spectrum
+        ax[0].set_xlim(0, 0.4)
+        # plotting the spectrum
+        ax[0].plot(f_axis*1e-9, abs(PSD0I), label='ground I')
+        # plotting the spectrum
+        ax[0].plot(f_axis*1e-9, abs(PSD1I), label='excited I')
+        ax[1].set_xlim(0, 0.4)
+        # plotting the spectrum
+        ax[1].plot(f_axis*1e-9, abs(PSD0Q), label='ground Q')
+        # plotting the spectrum
+        ax[1].plot(f_axis*1e-9, abs(PSD1Q), label='excited Q')
         ax[1].set_xlabel('Freq (GHz)')
         ax[0].set_ylabel('|PSD|')
         ax[0].set_yscale('log')
@@ -8911,16 +8974,20 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
         ax[1].legend()
         ax[0].set_title('PSD')
 
-        plt.savefig(data_file.folder+'\\'+'PSD.'+fig_format,format=fig_format)
+        plt.savefig(data_file.folder+'\\'+'PSD.'+fig_format, format=fig_format)
         plt.close()
 
         fig, ax = plt.subplots(2)
-        ax[0].set_xlim(0,0.4)
-        ax[0].plot(f_axis_o*1e-9, abs(PSD0I_o), label='ground I') # plotting the spectrum
-        ax[0].plot(f_axis_o*1e-9, abs(PSD1I_o), label='excited I') # plotting the spectrum
-        ax[1].set_xlim(0,0.4)
-        ax[1].plot(f_axis_o*1e-9, abs(PSD0Q_o), label='ground Q') # plotting the spectrum
-        ax[1].plot(f_axis_o*1e-9, abs(PSD1Q_o), label='excited Q') # plotting the spectrum
+        ax[0].set_xlim(0, 0.4)
+        # plotting the spectrum
+        ax[0].plot(f_axis_o*1e-9, abs(PSD0I_o), label='ground I')
+        # plotting the spectrum
+        ax[0].plot(f_axis_o*1e-9, abs(PSD1I_o), label='excited I')
+        ax[1].set_xlim(0, 0.4)
+        # plotting the spectrum
+        ax[1].plot(f_axis_o*1e-9, abs(PSD0Q_o), label='ground Q')
+        # plotting the spectrum
+        ax[1].plot(f_axis_o*1e-9, abs(PSD1Q_o), label='excited Q')
         ax[1].set_xlabel('Freq (GHz)')
         ax[0].set_ylabel('|PSD|')
         ax[0].set_yscale('log')
@@ -8930,24 +8997,26 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
         ax[1].legend()
         ax[0].set_title('PSD last quarter')
 
-        plt.savefig(data_file.folder+'\\'+'PSD_last_quarter.'+fig_format,format=fig_format)
+        plt.savefig(data_file.folder+'\\'+'PSD_last_quarter.' +
+                    fig_format, format=fig_format)
         plt.close()
 
-        fig, ax = plt.subplots(figsize=[8,7])
-        plt.plot(I0,Q0, label='ground', lw=1)
-        plt.plot(I1,Q1, label='excited', lw=1)
+        fig, ax = plt.subplots(figsize=[8, 7])
+        plt.plot(I0, Q0, label='ground', lw=1)
+        plt.plot(I1, Q1, label='excited', lw=1)
         ax.set_ylim(-edge, edge)
         ax.set_xlim(-edge, edge)
         plt.legend(frameon=False)
-        plt.title('IQ trajectory alpha{} phi{}_'.format(alpha, phi)+data_file.timestamp_string)
+        plt.title('IQ trajectory alpha{} phi{}_'.format(
+            alpha, phi)+data_file.timestamp_string)
         plt.xlabel('I (V)')
         plt.ylabel('Q (V)')
-        plt.savefig(data_file.folder+'\\'+'IQ_trajectory.'+fig_format,format=fig_format)
+        plt.savefig(data_file.folder+'\\'+'IQ_trajectory.' +
+                    fig_format, format=fig_format)
         plt.close()
 
-
-    fig, ax = plt.subplots(figsize=[8,7])
-    plt.plot(weight_I,weight_Q, label='weights', lw=1)
+    fig, ax = plt.subplots(figsize=[8, 7])
+    plt.plot(weight_I, weight_Q, label='weights', lw=1)
     ax.set_ylim(-1.1, 1.1)
     ax.set_xlim(-1.1, 1.1)
     plt.legend(frameon=False)
@@ -8957,12 +9026,13 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     plt.savefig(data_file.folder+'\\'+'IQ_trajectory_weights')
     plt.close()
 
-    time=np.linspace(0,len(weight_I)/1.8, len(weight_I))
+    time = np.linspace(0, len(weight_I)/1.8, len(weight_I))
     fig, ax = plt.subplots()
     plt.plot(time, weight_I, label='weight I')
     plt.plot(time, weight_Q, label='weight Q')
-    if optimization_window!=None:
-        plt.axvline((optimization_start-shift_w)*1e9, linestyle='--', color='k', label='depletion optimization window')
+    if optimization_window != None:
+        plt.axvline((optimization_start-shift_w)*1e9, linestyle='--',
+                    color='k', label='depletion optimization window')
         plt.axvline((optimization_stop-shift_w)*1e9, linestyle='--', color='k')
     plt.legend()
     plt.xlabel('time (ns)')
@@ -8971,16 +9041,19 @@ def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
     plt.axhline(0, linestyle='--')
     edge = 1.05*max(max(abs(weight_I)), max(abs(weight_Q)))
 
-    plt.savefig(data_file.folder+'\\'+'weight_functions.'+fig_format,format=fig_format)
+    plt.savefig(data_file.folder+'\\'+'weight_functions.' +
+                fig_format, format=fig_format)
     plt.close()
 
     # should return a dict for the function detector
     # return cost_skew, cost_offset, depletion_cost, x, y1, y2, I0, Q0, I1, Q1
-    return {'cost_skew':cost_skew, 'cost_offset':cost_offset,
-            'depletion_cost':depletion_cost, 'x':x, 'y1':y1, 'y2':y2,
-            'I0':I0, 'Q0':Q0, 'I1':I1, 'Q1':Q1}
+    return {'cost_skew': cost_skew, 'cost_offset': cost_offset,
+            'depletion_cost': depletion_cost, 'x': x, 'y1': y1, 'y2': y2,
+            'I0': I0, 'Q0': Q0, 'I1': I1, 'Q1': Q1}
 
-#analysis functions
+# analysis functions
+
+
 def SSB_demod(Ivals, Qvals, alpha=1, phi=0, I_o=0, Q_o=0, IF=10e6, predistort=True):
     # predistortion_matrix = np.array(
     #     ((1,  np.tan(phi*2*np.pi/360)),
@@ -8992,11 +9065,11 @@ def SSB_demod(Ivals, Qvals, alpha=1, phi=0, I_o=0, Q_o=0, IF=10e6, predistort=Tr
     trace_length = len(Ivals)
     tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
     if predistort:
-        Ivals=Ivals-I_o
-        Qvals=Qvals-Q_o
+        Ivals = Ivals-I_o
+        Qvals = Qvals-Q_o
         [Ivals, Qvals] = np.dot(predistortion_matrix, [Ivals, Qvals])
     cosI = np.array(np.cos(2*np.pi*IF*tbase))
     sinI = np.array(np.sin(2*np.pi*IF*tbase))
-    I=np.multiply(Ivals,cosI)-np.multiply(Qvals, sinI)
-    Q=np.multiply(Ivals,sinI)+np.multiply(Qvals, cosI)
+    I = np.multiply(Ivals, cosI)-np.multiply(Qvals, sinI)
+    Q = np.multiply(Ivals, sinI)+np.multiply(Qvals, cosI)
     return I, Q

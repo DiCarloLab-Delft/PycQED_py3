@@ -1,4 +1,5 @@
 import os
+import sys
 import numpy as np
 import h5py
 import json
@@ -7,7 +8,6 @@ from pycqed.measurement import hdf5_data as h5d
 from pycqed.analysis import analysis_toolbox as a_tools
 import errno
 import pycqed as pq
-import sys
 import glob
 from os.path import dirname, exists
 from os import makedirs
@@ -15,6 +15,8 @@ import logging
 import subprocess
 from functools import reduce  # forward compatibility for Python 3
 import operator
+
+from contextlib import ContextDecorator
 
 
 def get_git_revision_hash():
@@ -189,12 +191,12 @@ def load_settings_onto_instrument_v2(instrument, load_from_instr: str=None,
     count = 0
     # Will try multiple times in case the last measurements failed and
     # created corrupt data files.
-    while success is False and count < 10:
+    while success is False and count < 3:
+        if filepath is None:
+            folder = a_tools.get_folder(timestamp=timestamp, label=label,
+                                        older_than=older_than)
+            filepath = a_tools.measurement_filename(folder)
         try:
-            if filepath is None:
-                folder = a_tools.get_folder(timestamp=timestamp, label=label,
-                                            older_than=older_than)
-                filepath = a_tools.measurement_filename(folder)
 
             f = h5py.File(filepath, 'r')
             snapshot = {}
@@ -206,10 +208,16 @@ def load_settings_onto_instrument_v2(instrument, load_from_instr: str=None,
                 ins_group = snapshot['instruments'][load_from_instr]
             success = True
         except Exception as e:
+            logging.warning('Exception occured reading from {}'.format(folder))
             logging.warning(e)
-            older_than = os.path.split(folder)[0][-8:] \
-                + '_' + os.path.split(folder)[1][:6]
+            # This check makes this snippet a bit more robust
+            if folder is not None:
+                older_than = os.path.split(folder)[0][-8:] \
+                    + '_' + os.path.split(folder)[1][:6]
+            # important to set all to None, otherwise the try except loop
+            # will not look for an earlier data file
             folder = None
+            filepath = None
             success = False
         count += 1
 
@@ -229,7 +237,6 @@ def load_settings_onto_instrument_v2(instrument, load_from_instr: str=None,
             logging.warning(e)
     f.close()
     return True
-
 
 
 def send_email(subject='PycQED needs your attention!',
@@ -429,6 +436,7 @@ class NumpyJsonEncoder(json.JSONEncoder):
     for saving in JSON files.
     Also converts datetime objects to strings.
     '''
+
     def default(self, o):
         if isinstance(o, np.integer):
             return int(o)
@@ -440,3 +448,37 @@ class NumpyJsonEncoder(json.JSONEncoder):
             return str(o)
         else:
             return super().default(o)
+
+
+class suppress_stdout(ContextDecorator):
+    '''
+    A context manager for doing a "deep suppression" of stdout and stderr in
+    Python, i.e. will suppress all print, even if the print originates in a
+    compiled C/Fortran sub-function.
+       This will not suppress raised exceptions, since exceptions are printed
+    to stderr just before a script exits, and after the context manager has
+    exited (at least, I think that is why it lets exceptions through).
+
+    Source: "https://stackoverflow.com/questions/11130156/
+        suppress-stdout-stderr-print-from-python-functions"
+
+    '''
+
+    def __init__(self):
+        # Open a pair of null files
+        self.null_fds = [os.open(os.devnull, os.O_RDWR) for x in range(2)]
+        # Save the actual stdout (1) and stderr (2) file descriptors.
+        self.save_fds = [os.dup(1), os.dup(2)]
+
+    def __enter__(self):
+        # Assign the null pointers to stdout and stderr.
+        os.dup2(self.null_fds[0], 1)
+        os.dup2(self.null_fds[1], 2)
+
+    def __exit__(self, *_):
+        # Re-assign the real stdout/stderr back to (1) and (2)
+        os.dup2(self.save_fds[0], 1)
+        os.dup2(self.save_fds[1], 2)
+        # Close all file descriptors
+        for fd in self.null_fds + self.save_fds:
+            os.close(fd)
