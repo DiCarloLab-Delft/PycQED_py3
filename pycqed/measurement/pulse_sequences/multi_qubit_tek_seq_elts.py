@@ -1476,9 +1476,9 @@ def two_qubit_tomo_bell_qudev(bell_state,
             #     pprint(operation_dict[p])
         # print('pulses ', len(pulses))
         pulses += [RO_pars]
-        # from pprint import pprint
-        # pprint(pulses)
-        # print('\n')
+        from pprint import pprint
+        pprint(pulses)
+        print('\n')
         el = multi_pulse_elt(i, station, pulses, sequencer_config)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)

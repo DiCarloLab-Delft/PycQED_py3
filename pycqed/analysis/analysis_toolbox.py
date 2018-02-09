@@ -1656,9 +1656,13 @@ def color_plot(x, y, z, fig, ax, cax=None,
     x_vertices[-1] = x[-1] + (x[-1]-x[-2])/2.
     # y coordinates
     y_vertices = np.zeros(np.array(y.shape)+1)
-    y_vertices[1:-1] = (y[:-1]+y[1:])/2.
-    y_vertices[0] = y[0] - (y[1]-y[0])/2.
-    y_vertices[-1] = y[-1] + (y[-1]-y[-2])/2.
+    if len(y)>1:
+        y_vertices[1:-1] = (y[:-1]+y[1:])/2.
+        y_vertices[0] = y[0] - (y[1]-y[0])/2.
+        y_vertices[-1] = y[-1] + (y[-1]-y[-2])/2.
+    else:
+        y_vertices += y[0]
+        y_vertices[1] *= 1.00001
     cmap_chosen = kw.get('cmap_chosen', 'viridis')
 
     # This version (below) does not plot the last row, but it possibly fixes

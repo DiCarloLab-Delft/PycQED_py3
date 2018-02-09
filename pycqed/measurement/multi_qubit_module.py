@@ -8,8 +8,10 @@ import pycqed.measurement.awg_sweep_functions_multi_qubit as awg_swf2
 import pycqed.measurement.pulse_sequences.multi_qubit_tek_seq_elts as mqs
 import pycqed.measurement.pulse_sequences.fluxing_sequences as fsqs
 import pycqed.measurement.detector_functions as det
+import pycqed.measurement.composite_detector_functions as cdet
 import pycqed.analysis.measurement_analysis as ma
 import pycqed.analysis.tomography as tomo
+from pycqed.measurement.optimization import nelder_mead
 import pycqed.instrument_drivers.meta_instrument.device_object as device
 
 import qcodes as qc
@@ -815,3 +817,91 @@ def measure_two_qubit_tomo_Bell(bell_state, qb_c, qb_t, f_LO, num_flux_pulses=0,
     MC.set_detector_function(corr_det)
     if run:
         MC.run(label)
+
+
+def cphase_gate_tuneup(qb_control, qb_target,
+                       initial_values_dict=None,
+                       initial_step_dict=None,
+                       MC_optimization=None,
+                       MC_detector=None,
+                       maxiter=50,
+                       name='cphase_tuneup',
+                       cal_points=False,
+                       spacing=10e-9,
+                       ramsey_phases=None,
+                       distorted=False,
+                       distortion_dict=None):
+
+    '''
+    function that runs the nelder mead algorithm to optimize the CPhase gate
+    parameters (pulse lengths and pulse amplitude)
+
+    Args:
+        qb_control: control qubit (with flux pulses)
+        qb_target: target qubit
+        initial_values_dict:
+        initial_step_dict:
+        MC_optimization:
+        MC_detector:
+        name:
+
+
+    Returns:
+
+    '''
+    if MC_optimization is None:
+        MC_optimization = station.MC
+
+    if initial_values_dict is None:
+        pulse_length_init = qb_control.CZ_pulse_length()
+        pulse_amplitude_init = qb_control.CZ_pulse_amp()
+    else:
+        pulse_length_init = initial_values_dict['length']
+        pulse_amplitude_init = initial_values_dict['amplitude']
+
+    if initial_step_dict is None:
+        init_step_length = 1.0e-9
+        init_step_amplitude = 1.0e-3
+    else:
+        init_step_length = initial_step_dict['step_length']
+        init_step_amplitude = initial_step_dict['step_length']
+
+    d = cdet.CPhase_optimization(qb_control=qb_control,qb_target=qb_target,
+                                 MC=MC_detector,
+                                 ramsey_phases=ramsey_phases)
+
+
+    S1 = d.flux_pulse_length
+    S2 = d.flux_pulse_amp
+
+    # S1_dummy = awg_swf.Flux_pulse_CPhase_meas_hard_swf(qb_control,qb_target,
+    #                                              sweep_mode='length',
+    #                                              spacing=spacing,
+    #                                              cal_points=False,
+    #                                              distorted=False,
+    #                                              distortion_dict=None,
+    #                                              upload=False)
+    #
+    # S1 = awg_swf.Flux_pulse_CPhase_meas_2D(qb_control,qb_target, S1_dummy,
+    #                                        sweep_mode='length',
+    #                                        measurement_mode='excited_state')
+    # S2 = awg_swf.Flux_pulse_CPhase_meas_2D(qb_control,qb_target, S1_dummy,
+    #                                        sweep_mode='amplitude',
+    #                                        measurement_mode='excited_state')
+
+    ad_func_pars = {'adaptive_function': nelder_mead,
+                    'x0': [pulse_length_init,pulse_amplitude_init],
+                    'initial_step': [init_step_length, init_step_amplitude],
+                    'no_improv_break': 12,
+                    'minimize': True,
+                    'maxiter': maxiter}
+
+    MC_optimization.set_sweep_functions([S2, S1])
+    MC_optimization.set_detector_function(d)
+    MC_optimization.set_adaptive_function_parameters(ad_func_pars)
+    MC_optimization.run(name=name, mode='adaptive')
+    a = ma.OptimizationAnalysis_v2()
+    pulse_length_best_value = a.a.optimization_result[0][0]
+    pulse_amplitude_best_value = a.a.optimization_result[0][1]
+
+    return pulse_length_best_value, pulse_amplitude_best_value

@@ -1590,3 +1590,67 @@ class purityN_CZ_detector(purity_CZ_detector):
 
         sigma_i2 = (2*(frac - 0.5))**2
         return sigma_i2
+
+
+
+class CPhase_optimization(det.Soft_Detector):
+
+    '''
+    CZ gate conditional phase optimization.
+    '''
+
+    def __init__(self, qb_control, qb_target, MC,
+                 ramsey_phases=None,
+                 distorted=False,distortion_dict=None,
+                 cost_function_opt=0, **kw):
+        super().__init__()
+
+        self.flux_pulse_length = ManualParameter(name='flux_pulse_length',
+                                            unit='s',
+                                            label='Flux pulse length')
+        self.flux_pulse_amp = ManualParameter(name='flux_pulse_amp',
+                                            unit='V',
+                                            label='Flux pulse amplitude')
+
+        self.name = 'CZ_cond_phase_optimization'
+        self.value_names = ['Cost function']
+        self.value_units = ['a.u.']
+        self.MC = MC
+        self.qb_control = qb_control
+        self.qb_target = qb_target
+        self.distortion_dict = distortion_dict
+        self.distorted = distorted
+
+        self.cost_function_opt = cost_function_opt
+        self.nr_averages = kw.get('nr_averages', 1024)
+
+        if ramsey_phases is None:
+            self.ramsey_phases = np.linspace(0, 2*np.pi, 16, endpoint=False)
+            self.ramsey_phases = np.concatenate((self.phases,self.phases))
+        else:
+            self.ramsey_phases = ramsey_phases
+
+
+
+    def acquire_data_point(self, **kw):
+
+        cphases, population_losses = self.qb_control.measure_cphase(
+                                        qb_target=self.qb_target,
+                                        amps=[self.flux_pulse_amp()],
+                                        lengths=[self.flux_pulse_length()],
+                                        phases=self.ramsey_phases,
+                                        return_population_loss=True,
+
+                                        )
+
+        cost_val = np.abs(cphases[0] - np.pi)/np.pi + population_losses[0]
+
+        # # Return the cost function
+        return cost_val
+
+    def prepare(self):
+        pass
+
+    def finish(self):
+        pass
+

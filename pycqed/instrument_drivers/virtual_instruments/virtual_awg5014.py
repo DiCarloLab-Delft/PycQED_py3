@@ -9,12 +9,17 @@ from qcodes.instrument_drivers.tektronix.AWG5014 import Tektronix_AWG5014
 
 class VirtualAWG5014(Tektronix_AWG5014):
 
-    def __init__(self, name):
+    def __init__(self, name, timeout=5, address=''):
         Instrument.__init__(self, name)
+        self._address = address
+        self._terminator = ''
         self.add_parameter('timeout', unit='s', initial_value=5,
                            parameter_class=ManualParameter,
                            vals=vals.MultiType(vals.Numbers(min_value=0),
                                                vals.Enum(None)))
+        self.add_parameter('address', unit='', initial_value='',
+                           parameter_class=ManualParameter,
+                           vals=vals.Strings())
 
         for i in range(1, 5):
             self.add_parameter('ch{}_state'.format(i), initial_value=1,

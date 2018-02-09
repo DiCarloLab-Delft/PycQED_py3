@@ -1245,7 +1245,7 @@ class Motzoi_XY(swf.Hard_Sweep):
 
 class QScale(swf.Hard_Sweep):
 
-    def __init__(self, qscales, pulse_pars, RO_pars, upload=True,
+    def __init__(self, pulse_pars, RO_pars, upload=True,
                  cal_points=True):
         '''
         Measures 3 number of points per QScale parameter value specified
@@ -2032,11 +2032,18 @@ class Chevron_ampl_swf(swf.Soft_Sweep):
 class Chevron_ampl_fast_swf(swf.Soft_Sweep):
     '''
     Sweep function class (soft sweep) for 2D Chevron experiment where
-    the amplitude of the fluxpulse is swept. Used in combination with
-    the Chevron_length_hard_swf class.
+    the amplitude of the fluxpulse is swept. This 'fast' version uses
+    a trick, that instead of uploading new sequences with different amplitudes,
+    the ouput scaling of the AWG is changed.
+    Used in combination with the Chevron_length_hard_swf class.
+
+    Args:
+        qb_control (qubit): control qubit (qubit with flux pulse)
+        qb_target (qubit): target qubit
+        AWG: AWG used for the flux pulses
+        channel (str): (optional), flux pulse channel of the AWG (e.g. 'ch1')
     '''
     def __init__(self, qb_control,qb_target,AWG,channel=None):
-
         super().__init__()
         if channel is None:
             channel = qb_control.flux_pulse_channel()[-3:]
@@ -2096,13 +2103,20 @@ class Flux_pulse_CPhase_meas_hard_swf(swf.Hard_Sweep):
         sweep_mode: string, either 'length', 'amplitude' or 'amplitude'
         X90_phase: float, phase of the second X90 pulse in rad
         spacing: float, spacing between first and second X90 pulse
-        ...
+        measurement_mode (str): either 'excited_state', 'ground_state'
+        reference_measurement (bool): if True, appends a reference measurement
+                                      IMPORTANT: you need to double
+                                      the hard sweep points!
+                                      e.g. thetas = np.concatenate((thetas,thetas))
+
 
     '''
 
     def __init__(self, qb_control, qb_target, sweep_mode='length' , X90_phase=0,
                  spacing=50e-9,cal_points=False, upload=True,
-                 distorted=False,distortion_dict=None):
+                 distorted=False,distortion_dict=None,
+                 measurement_mode='excited_state',
+                 reference_measurements=False):
         super().__init__()
         self.qb_control = qb_control
         self.qb_target = qb_target
@@ -2113,6 +2127,8 @@ class Flux_pulse_CPhase_meas_hard_swf(swf.Hard_Sweep):
         self.distorted = distorted
         self.distortion_dict = distortion_dict
         self.sweep_mode = sweep_mode
+        self.measurement_mode = measurement_mode
+        self.reference_measurements = reference_measurements
 
         self.name = 'flux_pulse_CPhase_measurement_{}_sweep'.format(sweep_mode)
         self.parameter_name = sweep_mode
@@ -2134,7 +2150,9 @@ class Flux_pulse_CPhase_meas_hard_swf(swf.Hard_Sweep):
                 sweep_mode=self.sweep_mode,
                 X90_phase=self.X90_phase, spacing=self.spacing,
                 cal_points=self.cal_points, distorted=self.distorted,
-                distortion_dict=self.distortion_dict
+                distortion_dict=self.distortion_dict,
+                measurement_mode=self.measurement_mode,
+                reference_measurements=self.reference_measurements
             )
 
 
@@ -2164,15 +2182,28 @@ class Flux_pulse_CPhase_meas_2D(swf.Soft_Sweep):
             self.unit = 'V'
         elif self.sweep_mode == 'phase':
             self.unit = 'rad'
+        # elif self.sweep_mode == 'length_and_amplitude':
+            # self.unit = 'measurement point n'
         self.hard_sweep = hard_sweep
         self.qb_control = qb_control
         self.qb_target = qb_target
+        # self.measurement_mode = measurement_mode
+        # self.measurement_state = None
 
 
     def prepare(self):
         pass
 
     def set_parameter(self, val, **kw):
+        # self.measurement_state = 'excited_state'
+        # if self.measurement_mode == 'ground_state':
+        #     self.measurement_state = 'ground_state'
+        # elif self.measurement_mode == 'alternating':
+        #     if self.measurement_state == 'excited_state':
+        #         self.measurement_state = 'ground_state'
+        #     else:
+        #         self.measurement_state = 'excited_state'
+
         if self.sweep_mode == 'length':
             self.qb_control.flux_pulse_length(val)
             self.hard_sweep.prepare()
@@ -2181,13 +2212,16 @@ class Flux_pulse_CPhase_meas_2D(swf.Soft_Sweep):
             self.hard_sweep.prepare()
         elif self.sweep_mode == 'phase':
             self.hard_sweep.prepare(X90_phase=val)
+        # elif self.sweep_mode == 'length_and_amplitude':
+        #     self.qb_control.flux_pulse_length(val[0])
+        #     self.qb_control.flux_pulse_amp(val[1])
 
     def finish(self):
         pass
 
 
 class Fluxpulse_scope_swf(swf.Hard_Sweep):
-    def __init__(self, qb,cal_points=False, upload=True,distorted=False,
+    def __init__(self, qb,cal_points=False, upload=True, distorted=False,
                  distortion_dict=None,
                  spacing=30e-9
                  ):
@@ -2232,4 +2266,3 @@ class Fluxpulse_scope_drive_freq_sweep(swf.Soft_Sweep):
 
     def finish(self):
         self.qb.f_qubit(self.stored_f_qubit)
-        pass
