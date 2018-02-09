@@ -98,8 +98,8 @@ def decompose_clifford_seq_n_qubits(clifford_sequence_list, gate_decomp='HZ'):
         nr_finite_duration_pulses = [len([y for y in x if 'Z' not in y]) for
                                      x in decomposed_seq_temp]
         for i, pulse_list in enumerate(decomposed_seq_temp):
-            if nr_finite_duration_pulses[i]<max(nr_finite_duration_pulses):
-                diff_finite_duration_pulses = max(nr_finite_duration_pulses)-\
+            if nr_finite_duration_pulses[i] < max(nr_finite_duration_pulses):
+                diff_finite_duration_pulses = max(nr_finite_duration_pulses) - \
                                               nr_finite_duration_pulses[i]
                 pulse_list = pulse_list + ['I']*diff_finite_duration_pulses
             decomposed_seq_temp[i] = pulse_list
@@ -166,7 +166,7 @@ def randomized_benchmarking_sequence(n_cl, desired_net_cl=0,
         rb_cliffords = rng_seed.randint(0, 24, int(n_cl))
 
     if interleaved_gate is not None:
-        rb_cliffords = np.repeat(rb_cliffords,2)
+        rb_cliffords = np.repeat(rb_cliffords, 2)
         try:
             gate_idx = HZ_gate_decomposition.index([interleaved_gate])
         except ValueError:

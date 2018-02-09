@@ -9,7 +9,6 @@ from copy import deepcopy
 import logging
 import pycqed.measurement.waveform_control.fluxpulse_predistortion as flux_dist
 
-
 class Element:
     """
     Implementation of a sequence element.
@@ -94,6 +93,7 @@ class Element:
         """
         Returns the number of samples the elements occupies.
         """
+
         ends = []
         for p in self.pulses:
             if c in self.pulses[p].channels:
@@ -363,9 +363,10 @@ class Element:
                         if integral > 0:
                             amp = -amp
                         tcomp = tau*np.log(1 - integral/(amp*tau))
-                    textra = np.arange(tend, tend + 2*tcomp, dt)
+                    textra = np.arange(tend, tend + 3*tcomp, dt)
                     t = np.append(t, textra)
-                    wf = np.append(wf, amp*(textra < tend + tcomp))
+                    wf = np.append(wf, amp*((textra < tend + 2*tcomp) *
+                                            (textra >= tend + tcomp)))
                     tvals[c] = t
                     wfs[c] = wf
 

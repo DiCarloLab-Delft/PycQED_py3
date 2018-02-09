@@ -17,6 +17,7 @@ from pycqed.measurement.pulse_sequences.standard_elements import multi_pulse_elt
 from pycqed.measurement.pulse_sequences.standard_elements import distort_and_compensate
 import pycqed.measurement.waveform_control.fluxpulse_predistortion as fluxpulse_predistortion
 
+
 from importlib import reload
 reload(pulse)
 from pycqed.measurement.waveform_control import pulse_library
@@ -1558,6 +1559,7 @@ def Ramsey_with_flux_pulse_meas_seq(thetas, qb, X90_separation, verbose=False,
             seq_name: string
     '''
     qb_name = qb.name
+    print(qb_name)
     operation_dict = qb.get_operation_dict()
     pulse_pars = qb.get_drive_pars()
     RO_pars = qb.get_RO_pars()
@@ -1567,28 +1569,23 @@ def Ramsey_with_flux_pulse_meas_seq(thetas, qb, X90_separation, verbose=False,
 
     pulses = get_pulse_dict_from_pars(pulse_pars)
     flux_pulse = operation_dict["flux "+qb_name]
-    flux_pulse['refpoint'] = 'center'
+    # if flux_pulse['amplitude'] != 0:
+    #     flux_pulse['basis_rotation'] = {qb_name: -106.87716422562978}
+
+    flux_pulse['refpoint'] = 'end'
     X90_2 = deepcopy(pulses['X90'])
     X90_2['pulse_delay'] = X90_separation - flux_pulse['pulse_delay']
     X90_2['refpoint'] = 'start'
 
-    #
-    # if ('CZ_corr ' + qb.name) not in operation_dict.keys():
-    #     operation_dict['CZ_corr ' + qb.name] = deepcopy(operation_dict['Z180 ' + qb.name])
-    #     operation_dict['CZ_corr ' + qb.name]['refpoint'] = 'end'
-    #
-    # if flux_pulse['amplitude'] != 0:
-    #     operation_dict['CZ_corr ' + qb.name]['phase'] = operation_dict['CZ ' + qb.name]['dynamic_phase']
-    # else:
-    #     operation_dict['CZ_corr ' + qb.name]['phase'] = 0
-
+    print('\n',X90_separation)
+    print(flux_pulse['pulse_delay'])
+    print('basis_rotation' in flux_pulse)
+    print(flux_pulse['amplitude'])
     for i, theta in enumerate(thetas):
 
         X90_2['phase'] = theta*180/np.pi
-        # incomplete fix later!!!
         el = multi_pulse_elt(i, station,
                              [pulses['X90'], flux_pulse,  X90_2,
-                             # [pulses['X90'], operation_dict['CZ_corr ' + qb.name], X90_2,
                               RO_pars])
         if distorted is True:
             if distortion_dict is not None:
@@ -1930,7 +1927,7 @@ def fluxpulse_scope_sequence(delays, qb, verbose=False,
 
     X180_2 = deepcopy(pulses['X180'])
     X180_2['refpoint'] = 'start'
-    pulse_delay_offset =  -X180_2['sigma']*X180_2['nr_sigma']/2. - flux_pulse['pulse_delay']
+    pulse_delay_offset = -X180_2['sigma']*X180_2['nr_sigma']/2. - flux_pulse['pulse_delay']
     RO_pars['pulse_delay'] = flux_pulse['length'] + flux_pulse['pulse_delay'] - delays[0] + spacing
 
     for i, delay in enumerate(delays):

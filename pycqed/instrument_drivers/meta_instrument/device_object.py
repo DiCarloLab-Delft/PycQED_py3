@@ -1007,6 +1007,9 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
             if qb.RO_acq_weight_function_Q() is not None:
                 channels += [qb.RO_acq_weight_function_Q()]
 
+    if correlations is None:
+        correlations = []
+
     for qb in qubits:
         if UHFQC is None:
             UHFQC = qb.UHFQC
@@ -1080,9 +1083,12 @@ def multiplexed_pulse(readouts, f_LO, upload=True, plot_filename=False):
 
     if upload:
         UHFQC = readouts[0][0].UHFQC
-        UHFQC.awg_sequence_acquisition_and_pulse(np.real(pulse).copy(),
-                                                 np.imag(pulse).copy())
-        UHFQC.awg_sequence_acquisition_and_pulse_multi_segment(readout_pulses)
+        if len(readout_pulses) == 1:
+            UHFQC.awg_sequence_acquisition_and_pulse(Iwave=np.real(pulse).copy(),
+                                                     Qwave=np.imag(pulse).copy(),
+                                                     acquisition_delay=0)
+        else:
+            UHFQC.awg_sequence_acquisition_and_pulse_multi_segment(readout_pulses)
         DC_LO = readouts[0][0].readout_DC_LO
         UC_LO = readouts[0][0].readout_UC_LO
         DC_LO.frequency(f_LO)

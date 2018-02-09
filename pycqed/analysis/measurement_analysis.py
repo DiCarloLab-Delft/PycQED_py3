@@ -432,6 +432,7 @@ class MeasurementAnalysis(object):
     def run_default_analysis(self, TwoD=False, close_file=True,
                              show=False, transpose=False,
                              plot_args=None, **kw):
+
         if plot_args is None:
             plot_args = {}
         if TwoD is False:
@@ -4008,7 +4009,7 @@ class T1_Analysis(TD_Analysis):
         super().run_default_analysis(show=show,
                                      close_file=close_file,
                                      close_main_fig=True,
-                                     save_fig=False,**kw)
+                                     save_fig=False, **kw)
 
         show_guess = kw.get('show_guess', False)
        # make_fig = kw.get('make_fig',True)
@@ -4066,7 +4067,7 @@ class T1_Analysis(TD_Analysis):
 
             best_vals = self.fit_res.best_values
             t = np.linspace(self.sweep_points[0],
-                            self.sweep_points[-self.NoCalPoints], 1000)
+                            self.sweep_points[-self.NoCalPoints-1], 1000)
 
             y = fit_mods.ExpDecayFunc(
                 t, tau=best_vals['tau'],
@@ -9327,18 +9328,14 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
 
 
     """
-    def __init__(self, X90_separation=None,flux_pulse_length=None,
+    def __init__(self, X90_separation=None, flux_pulse_length=None,
                  qb_name=None, label='Ramsey_interleaved_flux_pulse',
                  run_default_super=True, **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
         kw['close_file'] = False
-        super(self.__class__, self).__init__(TwoD=True,
-                                             start_at_zero=True,
-                                             qb_name=qb_name, **kw)
+
         self.label = label
-        self.get_values('Data')
-        self.get_naming_and_values()
         self.fitted_phases = None
         self.fitted_delay = 0
         # self.fig, self.ax = plt.subplots()
@@ -9348,6 +9345,12 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
         self.flux_pulse_length = flux_pulse_length
         self.return_fit = kw.pop('return_fit', False)
         self.cal_points = kw.pop('cal_points', False)
+
+        super(Fluxpulse_Ramsey_2D_Analysis, self).__init__(TwoD=True,
+                                                           start_at_zero=True,
+                                                           qb_name=qb_name, **kw)
+        self.get_values('Data')
+        self.get_naming_and_values()
 
         if run_default_super:
             super(self.__class__, self).run_default_analysis(TwoD=True,
@@ -9637,19 +9640,32 @@ class Dynamic_phase_Analysis(Fluxpulse_Ramsey_2D_Analysis):
 
     def __init__(self, X90_separation=None, flux_pulse_amp=None,
                  flux_pulse_length=None,
-                 qb_name=None, label='Dynamic_phase_analysis',
-                 run_default_super=True, **kw):
+                 qb_name=None, label='Dynamic_phase_analysis', **kw):
 
         kw['label'] = label
         kw['h5mode'] = 'r+'
         kw['close_file'] = False
-        super(self.__class__, self).__init__(TwoD=True,
-                                             start_at_zero=True,
-                                             qb_name=qb_name, **kw)
 
         self.flux_pulse_amp = flux_pulse_amp
 
+        super(self.__class__, self).__init__(qb_name=qb_name,
+                                             X90_separation=X90_separation,
+                                             flux_pulse_length=flux_pulse_length,
+                                             run_default_super=False,
+                                             **kw)
+
+        self.run_default_analysis(**kw)
+
+
     def run_default_analysis(self, close_file=True, **kw):
+
+        show = kw.pop('show', False)
+        # super().run_default_analysis(show=show,
+        #                              close_file=close_file,
+        #                              close_main_fig=True,
+        #                              save_fig=False, **kw)
+
+        self.get_naming_and_values_2D()
 
         length_single = len(self.sweep_points)
         phases = {}
@@ -9695,29 +9711,30 @@ class Dynamic_phase_Analysis(Fluxpulse_Ramsey_2D_Analysis):
 
             self.ax.set_title('dynamic phase msmt {} at {}ns {}mV {}'.format(
                 self.qb_name, self.flux_pulse_length,
-                self.flux_pulse_amp,self.timestamp_string))
-            self.ax.set_xlabel(r'Phase of 2nd pi/2 pulse, $\phi$[rad]')
+                self.flux_pulse_amp, self.timestamp_string))
+            self.ax.set_xlabel(r'Phase of 2nd pi/2 pulse, $\theta$[rad]')
             self.ax.set_ylabel('Response (V)')
 
             self.ax.legend()
             phases[self.sweep_points_2D[index]] = \
                 fit_res.best_values['phase']*180/np.pi
-            textstr += 'phase_{} =\n{:0.3f}\n'.format(label,
+            textstr += 'phase_{} = {:0.3f} deg\n'.format(label,
                           phases[self.sweep_points_2D[index]])
 
-        dyn_phase = phases[self.sweep_points_2D[1]] - \
+        self.dyn_phase = phases[self.sweep_points_2D[1]] - \
             phases[self.sweep_points_2D[0]]
-        textstr += 'dyn_phase_{} =\n{:0.3f}'.format(self.qb_name, dyn_phase)
-        self.ax.text(1.05, 0.5, textstr, transform=self.ax.transAxes,
-                fontsize=self.font_size, verticalalignment='center',
-                horizontalalignment='left', bbox=self.box_props)
+
+        textstr += 'dyn_phase_{} = {:0.3f} deg'.format(self.qb_name, self.dyn_phase)
+        self.fig.text(0.5, -0.05, textstr, transform=self.ax.transAxes,
+                fontsize=self.font_size, verticalalignment='top',
+                horizontalalignment='center', bbox=self.box_props)
 
         plt.savefig(self.folder+'\\cos_fit.png', dpi=300, bbox_inches='tight')
 
-        if kw.pop('show'):
+        if show:
             plt.show()
 
         if close_file:
             self.data_file.close()
 
-        return dyn_phase
+        return self.dyn_phase

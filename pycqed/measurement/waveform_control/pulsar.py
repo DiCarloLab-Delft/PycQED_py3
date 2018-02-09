@@ -491,9 +491,6 @@ class AWG5014Pulsar:
         grps = list(grps)
         grps.sort()
 
-        prev_offsets = {ch: obj.get('{}_DC_out'.format(ch)) for ch in
-                        ['ch1', 'ch2', 'ch3', 'ch4']}
-
         # create a packed waveform for each element for each channel group
         # in the sequence0
         packed_waveforms = {}
@@ -588,6 +585,9 @@ class AWG5014Pulsar:
         if loop and len(goto_l) > 0:
             goto_l[-1] = 1
 
+        prev_offsets = {ch: obj.get('{}_offset'.format(ch)) for ch in
+                        ['ch1', 'ch2', 'ch3', 'ch4']}
+
         if len(wfname_l) > 0:
             filename = sequence.name + '_FILE.AWG'
             awg_file = obj.generate_awg_file(packed_waveforms,
@@ -598,6 +598,9 @@ class AWG5014Pulsar:
             obj.load_awg_file(filename)
         else:
             awg_file = None
+
+        for ch, off in prev_offsets.items():
+            obj.set(ch + '_offset', off)
 
         obj.timeout(old_timeout)
         for par in pars:

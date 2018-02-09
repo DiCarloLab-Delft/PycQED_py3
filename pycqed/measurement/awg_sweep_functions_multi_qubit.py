@@ -191,14 +191,14 @@ class two_qubit_Simultaneous_RB_sequence_lengths(swf.Soft_Sweep):
 
 class two_qubit_Simultaneous_RB_fixed_length(swf.Hard_Sweep):
 
-    def __init__(self, pulse_pars_list, RO_pars, nr_cliffords_value, #int
+    def __init__(self, qubit_list, RO_pars, nr_cliffords_value, #int
                  gate_decomposition='HZ', interleaved_gate=None,
                  upload=True, return_seq=False, seq_name=None,
-                 CxC_RB=True, idx_for_RB=0,
-                 verbose=False):
+                 CxC_RB=True, idx_for_RB=0, interleave_CZ=True,
+                 verbose=False, CZ_info_list=None):
 
         super().__init__()
-        self.pulse_pars_list = pulse_pars_list
+        self.qubit_list = qubit_list
         self.RO_pars = RO_pars
         self.upload = upload
         self.nr_cliffords_value = nr_cliffords_value
@@ -209,6 +209,8 @@ class two_qubit_Simultaneous_RB_fixed_length(swf.Hard_Sweep):
         self.interleaved_gate = interleaved_gate
         self.idx_for_RB = idx_for_RB
         self.verbose = verbose
+        self.CZ_info_list = CZ_info_list
+        self.interleave_CZ = interleave_CZ
 
         self.parameter_name = 'Nr of Seeds'
         self.unit = '#'
@@ -217,7 +219,7 @@ class two_qubit_Simultaneous_RB_fixed_length(swf.Hard_Sweep):
     def prepare(self, **kw):
         if self.upload:
             sqs2.n_qubit_simultaneous_randomized_benchmarking_seq(
-                self.pulse_pars_list, self.RO_pars,
+                self.qubit_list, self.RO_pars,
                 nr_cliffords_value=self.nr_cliffords_value,
                 gate_decomposition=self.gate_decomposition,
                 interleaved_gate=self.interleaved_gate,
@@ -226,7 +228,10 @@ class two_qubit_Simultaneous_RB_fixed_length(swf.Hard_Sweep):
                 idx_for_RB=self.idx_for_RB,
                 seq_name=self.seq_name,
                 return_seq=self.return_seq,
-                verbose=self.verbose)
+                verbose=self.verbose,
+                upload=self.upload,
+                interleave_CZ=self.interleave_CZ,
+                CZ_info_list=self.CZ_info_list)
 
 
 class n_qubit_Simultaneous_RB_fixed_seeds(swf.Hard_Sweep):
@@ -302,7 +307,7 @@ class two_qubit_AllXY(swf.Hard_Sweep):
 class tomo_Bell(swf.Hard_Sweep):
 
     def __init__(self, bell_state, qb_c, qb_t, RO_pars, num_flux_pulses=0, upload=True,
-                 distortion_dict=None, CZ_disabled=False,  cal_points_with_flux_pulses=True,
+                 CZ_disabled=False, separation=100e9,
                  verbose=False, return_seq=False):
         super().__init__()
         self.bell_state = bell_state
@@ -311,12 +316,11 @@ class tomo_Bell(swf.Hard_Sweep):
         self.RO_pars = RO_pars
         self.num_flux_pulses = num_flux_pulses
         self.upload = upload
-        self.distortion_dict = distortion_dict
         self.CZ_disabled = CZ_disabled
-        self.cal_points_with_flux_pulses = cal_points_with_flux_pulses
         self.parameter_name = 'sample'
         self.unit = '#'
         self.verbose = verbose
+        self.separation = separation
         self.return_seq = return_seq
         self.name = 'tomo_Bell'
 
@@ -327,11 +331,10 @@ class tomo_Bell(swf.Hard_Sweep):
                 qb_c=self.qb_c, qb_t=self.qb_t,
                 RO_pars=self.RO_pars,
                 num_flux_pulses=self.num_flux_pulses,
-                distortion_dict=self.distortion_dict,
                 CZ_disabled=self.CZ_disabled,
-                cal_points_with_flux_pulses=self.cal_points_with_flux_pulses,
                 verbose=self.verbose,
-                upload=self.upload)
+                upload=self.upload,
+                separation=self.separation)
 
 class two_qubit_parity(swf.Hard_Sweep):
     def __init__(self, q0, q1, q2, feedback_delay, prep_sequence=None,

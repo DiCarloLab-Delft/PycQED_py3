@@ -927,8 +927,8 @@ setTrigger(0);"""
         wave_defs = ""
 
         for i, pulse in enumerate(readout_pulses):
-            Iwave = pulse.real().copy()
-            Qwave = pulse.imag().copy()
+            Iwave = pulse.real.copy()
+            Qwave = pulse.imag.copy()
             if np.max(Iwave) > 1.0 or np.min(Iwave) < -1.0:
                 raise KeyError("exceeding AWG range for I channel, all values "
                                "should be withing +/-1")

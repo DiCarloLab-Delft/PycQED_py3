@@ -1009,7 +1009,7 @@ def get_pulse_dict_from_pars(pulse_pars):
     pulses['mY90']['phase'] += 90
 
     pulses_sim = {key + 's': deepcopy(val) for key, val in pulses.items()}
-    for val in pulses.values():
+    for val in pulses_sim.values():
         val['refpoint'] = 'simultaneous'
 
     pulses.update(pulses_sim)
@@ -1020,7 +1020,8 @@ def get_pulse_dict_from_pars(pulse_pars):
         Z180 = {'pulse_type': 'Z_pulse',
                 'basis_rotation': {target_qubit: 0},
                 'target_qubit': target_qubit,
-                'operation_type': 'Virtual'}
+                'operation_type': 'Virtual',
+                'pulse_delay': 0}
         pulses.update({'Z180': Z180,
                        'mZ180': deepcopy(Z180),
                        'Z90': deepcopy(Z180),
