@@ -521,7 +521,6 @@ class DeviceCCL(Instrument):
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr(),
                              parameter_name='Phase', unit='deg')
-        d = self.get_correlation_detector()
         MC.set_sweep_function(s)
         MC.set_sweep_points(p.sweep_points)
         MC.set_detector_function(self.get_correlation_detector())
@@ -532,8 +531,6 @@ class DeviceCCL(Instrument):
                           'ch_idx_spec': self.qubits().index(q1)})
 
         if verbose:
-            # also here to quickly see what dict entries of the
-            # analysis are important.
             info_msg = (print(a.plot_dicts['phase_message']['text_string']))
             print(info_msg)
 

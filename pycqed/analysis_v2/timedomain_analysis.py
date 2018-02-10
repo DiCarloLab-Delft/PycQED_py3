@@ -54,6 +54,104 @@ class Single_Qubit_TimeDomainAnalysis(ba.BaseDataAnalysis):
         #                                   self.proc_data_dict['corr_data'])
 
 
+class Idling_Error_Rate_Analyisis(ba.BaseDataAnalysis):
+
+    def __init__(self, t_start: str=None, t_stop: str=None,
+                 label: str='', data_file_path: str=None,
+                 options_dict: dict=None, extract_only: bool=False,
+                 do_fitting: bool=True, auto=True):
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         extract_only=extract_only, do_fitting=do_fitting)
+        # self.single_timestamp = False
+        self.params_dict = {'xlabel': 'sweep_name',
+                            'xunit': 'sweep_unit',
+                            'xvals': 'sweep_points',
+                            'measurementstring': 'measurementstring',
+                            'value_names': 'value_names',
+                            'value_units': 'value_units',
+                            'measured_values': 'measured_values'}
+        self.numeric_params = []
+        if auto:
+            self.run_analysis()
+
+    def prepare_plots(self):
+        # assumes that value names are unique in an experiment
+
+        for i, val_name in enumerate(self.raw_data_dict['value_names'][0]):
+            yvals = self.raw_data_dict['measured_values_ord_dict'][val_name]
+            xvals =  self.raw_data_dict['xvals'][0]
+
+            self.plot_dicts[val_name] = {
+                'ax_id': 'main',
+                'plotfn': self.plot_line,
+                'xvals': xvals,
+                'xlabel': self.raw_data_dict['xlabel'][0],
+                'xunit': self.raw_data_dict['xunit'][0][0],
+                'yvals': yvals[0],
+                'ylabel': 'Counts',
+                'yrange': [0, 1],
+                'xrange': self.options_dict.get('xrange', None),
+                'yunit': self.raw_data_dict['value_units'][0][i],
+                'setlabel': val_name,
+                'do_legend':True,
+                'title': (self.raw_data_dict['timestamps'][0]+' - ' +
+                          self.raw_data_dict['timestamps'][-1] + '\n' +
+                          self.raw_data_dict['measurementstring'][0]),
+                'legend_pos': 'upper right'}
+        if self.do_fitting:
+            for state in ['0', '1', '+']:
+                self.plot_dicts['fit_{}'.format(state)] = {
+                    'ax_id': 'main',
+                    'plotfn': self.plot_fit,
+                    'fit_res': self.fit_dicts['fit {}'.format(state)]['fit_res'],
+                    'plot_init': self.options_dict['plot_init'],
+                    'setlabel': 'fit |{}>'.format(state),
+                    'do_legend': True,
+                    'legend_pos': 'upper right'}
+
+                self.plot_dicts['fit_text']={
+                    'ax_id':'main',
+                    'box_props': 'fancy',
+                    'xpos':1.05,
+                    'horizontalalignment':'left',
+                    'plotfn': self.plot_text,
+                    'text_string': self.proc_data_dict['fit_msg']}
+
+
+
+    def analyze_fit_results(self):
+        fit_msg =''
+        states = ['0', '1', '+']
+        for state in states:
+            fr = self.fit_res['fit {}'.format(state)]
+            N1 = fr.params['N1'].value, fr.params['N1'].stderr
+            N2 = fr.params['N2'].value, fr.params['N2'].stderr
+            fit_msg += ('Prep |{}> : \n\tN_1 = {:.2g} $\pm$ {:.2g}'
+                    '\n\tN_2 = {:.2g} $\pm$ {:.2g}\n').format(
+                state, N1[0], N1[1], N2[0], N2[1])
+
+        self.proc_data_dict['fit_msg'] = fit_msg
+
+    def prepare_fitting(self):
+        self.fit_dicts = OrderedDict()
+        states = ['0', '1', '+']
+        for i, val_name in enumerate(self.raw_data_dict['value_names'][0]):
+            yvals = self.raw_data_dict['measured_values_ord_dict'][val_name]
+            xvals =  self.raw_data_dict['xvals'][0]
+
+            mod = lmfit.Model(fit_mods.idle_error_rate_exp_decay)
+            mod.guess = fit_mods.idle_err_rate_guess.__get__(mod, mod.__class__)
+
+            self.fit_dicts['fit {}'.format(states[i])] = {
+                'model': mod,
+                'fit_xvals': {'N': xvals},
+                'fit_yvals': {'data': yvals}}
+
+
+
 class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
 
     def __init__(self, t_start: str=None, t_stop: str=None,
