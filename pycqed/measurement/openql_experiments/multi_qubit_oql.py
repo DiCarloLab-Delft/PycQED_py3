@@ -141,7 +141,6 @@ def two_qubit_AllXY(q0: int, q1: int, platf_cfg: str,
 
     Args:
         q0, q1         (str) : target qubits for the sequence
-        RO_target      (str) : target for the RO, can be a qubit name or 'all'
         sequence_type  (str) : Describes the timing/order of the pulses.
             options are: sequential | interleaved | simultaneous | sandwiched
                        q0|q0|q1|q1   q0|q1|q0|q1     q01|q01       q1|q0|q0|q1
@@ -237,6 +236,55 @@ def two_qubit_AllXY(q0: int, q1: int, platf_cfg: str,
     with suppress_stdout():
         p.compile()
     # attribute is added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
+
+def residual_coupling_sequence(times, q0: int, q1:int, platf_cfg: str):
+    """
+    Sequence to measure the residual (ZZ) interaction between two qubits.
+    Procedure is described in M18TR.
+
+        (q0) --X90--(tau/2)-Y180-(tau/2)-Xm90--RO
+        (q1) --X180-(tau/2)-X180-(tau/2)-------RO
+
+    Input pars:
+        times:          the list of waiting times for each Echo element
+        q0              Phase measurement is performed on q0
+        q1              Excitation is put in and removed on q1
+        platf_cfg:      filename of the platform config file
+    Returns:
+        p:              OpenQL Program object containing
+
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="residual_coupling_sequence", nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    for i, time in enumerate(times[:-4]):
+        k = Kernel("residual_coupling_seq_"+str(i), p=platf)
+        k.prepz(q0)
+        k.prepz(q1)
+        wait_nanoseconds = int(round(time/1e-9/2))
+        k.gate('rx90', q0)
+        k.gate('rx180', q1)
+        k.gate("wait", [q0, q1], wait_nanoseconds)
+        k.gate('ry180', q0)
+        k.gate('rx180', q1)
+        k.gate("wait", [q0, q1], wait_nanoseconds)
+        k.gate('rxm90', q0)
+        k.measure(q0)
+        k.measure(q1)
+        k.gate("wait", [q0, q1], 0)
+        p.add_kernel(k)
+
+    # adding the calibration points
+    p = add_two_q_cal_points(p, platf=platf, q0=q0, q1=q1)
+
+    with suppress_stdout():
+        p.compile(verbose=False)
+    # attribute get's added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
