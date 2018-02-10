@@ -65,7 +65,7 @@ class Idling_Error_Rate_Analyisis(ba.BaseDataAnalysis):
                          data_file_path=data_file_path,
                          options_dict=options_dict,
                          extract_only=extract_only, do_fitting=do_fitting)
-        # self.single_timestamp = False
+
         self.params_dict = {'xlabel': 'sweep_name',
                             'xunit': 'sweep_unit',
                             'xvals': 'sweep_points',
@@ -77,25 +77,43 @@ class Idling_Error_Rate_Analyisis(ba.BaseDataAnalysis):
         if auto:
             self.run_analysis()
 
+    def process_data(self):
+        post_sel_th = self.options_dict.get('post_sel_th', 0.5)
+        raw_shots = self.raw_data_dict['measured_values'][0][0]
+        post_sel_shots = raw_shots[::2]
+        data_shots = raw_shots[1::2]
+        data_shots[np.where(post_sel_shots > post_sel_th)] = np.nan
+
+        states = ['0', '1', '+']
+        self.proc_data_dict['xvals'] = np.unique(self.raw_data_dict['xvals'])
+        for i, state in enumerate(states):
+            self.proc_data_dict['shots_{}'.format(state)] =data_shots[i::3]
+
+            self.proc_data_dict['yvals_{}'.format(state)] = \
+                np.nanmean(np.reshape(self.proc_data_dict['shots_{}'.format(state)],
+                               (len(self.proc_data_dict['xvals']), -1),
+                               order='F'), axis=1)
+
+
     def prepare_plots(self):
         # assumes that value names are unique in an experiment
+        states = ['0', '1', '+']
+        for i, state in enumerate(states):
+            yvals = self.proc_data_dict['yvals_{}'.format(state)]
+            xvals =  self.proc_data_dict['xvals']
 
-        for i, val_name in enumerate(self.raw_data_dict['value_names'][0]):
-            yvals = self.raw_data_dict['measured_values_ord_dict'][val_name]
-            xvals =  self.raw_data_dict['xvals'][0]
-
-            self.plot_dicts[val_name] = {
+            self.plot_dicts['Prepare in {}'.format(state)] = {
                 'ax_id': 'main',
                 'plotfn': self.plot_line,
                 'xvals': xvals,
                 'xlabel': self.raw_data_dict['xlabel'][0],
                 'xunit': self.raw_data_dict['xunit'][0][0],
-                'yvals': yvals[0],
+                'yvals': yvals,
                 'ylabel': 'Counts',
                 'yrange': [0, 1],
                 'xrange': self.options_dict.get('xrange', None),
-                'yunit': self.raw_data_dict['value_units'][0][i],
-                'setlabel': val_name,
+                'yunit': 'frac',
+                'setlabel': 'Prepare in {}'.format(state),
                 'do_legend':True,
                 'title': (self.raw_data_dict['timestamps'][0]+' - ' +
                           self.raw_data_dict['timestamps'][-1] + '\n' +
@@ -138,9 +156,9 @@ class Idling_Error_Rate_Analyisis(ba.BaseDataAnalysis):
     def prepare_fitting(self):
         self.fit_dicts = OrderedDict()
         states = ['0', '1', '+']
-        for i, val_name in enumerate(self.raw_data_dict['value_names'][0]):
-            yvals = self.raw_data_dict['measured_values_ord_dict'][val_name]
-            xvals =  self.raw_data_dict['xvals'][0]
+        for i, state in enumerate(states):
+            yvals = self.proc_data_dict['yvals_{}'.format(state)]
+            xvals =  self.proc_data_dict['xvals']
 
             mod = lmfit.Model(fit_mods.idle_error_rate_exp_decay)
             mod.guess = fit_mods.idle_err_rate_guess.__get__(mod, mod.__class__)

@@ -320,7 +320,8 @@ def idle_error_rate_seq(nr_of_idle_gates,
                         states: list,
                         gate_duration_ns: int,
                         echo: bool,
-                        qubit_idx: int, platf_cfg: str):
+                        qubit_idx: int, platf_cfg: str,
+                        post_select=True):
     """
     Sequence to perform the idle_error_rate_sequence.
     Virtually identical to a T1 experiment (Z-basis)
@@ -350,6 +351,9 @@ def idle_error_rate_seq(nr_of_idle_gates,
             k = Kernel("idle_prep{}_N{}".format(state, N), p=platf)
             # 1. Preparing in the right basis
             k.prepz(qubit_idx)
+            if post_select:
+                # adds an initialization measurement used to post-select
+                k.measure(qubit_idx)
             if state =='1':
                 k.gate('rx180', qubit_idx)
             elif state == '+':
