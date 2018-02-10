@@ -1029,7 +1029,7 @@ class BaseDataAnalysis(object):
         plot_xpos = pdict.get('xpos', .98)
         plot_ypos = pdict.get('ypos', .98)
         verticalalignment = pdict.get('verticalalignment', 'top')
-        horizontalalignment = pdict.get('verticalalignment', 'right')
+        horizontalalignment = pdict.get('horizontalalignment', 'right')
 
         # fancy box props is based on the matplotlib legend
         box_props = pdict.get('box_props', 'fancy')
