@@ -63,26 +63,6 @@ class MeasurementAnalysis(object):
         self.fit_results = []
         self.cmap_chosen = cmap_chosen
         self.no_of_columns = no_of_columns
-<<<<<<< HEAD
-        self.dpi = kw.get('dpi', 300)  # dpi for plots
-        # 300 dpi is a good balance between resolution and speed of analysis
-        self.axes_line_width = kw.get('axes_line_width', 0.5)
-        # lw of axes and text boxes
-        self.font_size = kw.get('font_size', 11)  # font sizes
-        self.tick_length = kw.get('tick_length', 4)  # tick lengths
-        self.tick_width = kw.get('tick_width', 0.5)  # tick line widths
-        self.marker_size = kw.get('marker_size', 4)
-        # marker size for data points
-        self.line_width = kw.get('line_width', 2)
-        # line widths connecting data points
-        self.marker_size_special = kw.get('marker_size_special', 8)
-        # marker size for special points like peak freq.,
-        # Rabi pi and pi/2 amplitudes etc.
-        self.box_props = dict(boxstyle='Square', facecolor='white',
-                              alpha=0.8, lw=self.axes_line_width)
-        self.qb_name = qb_name  # for retrieving values of qubit
-        # parameters from data file
-=======
 
         # for retrieving correct values of qubit parameters from data file
         self.qb_name = qb_name
@@ -114,7 +94,6 @@ class MeasurementAnalysis(object):
         self.box_props = kw.pop('box_props',
                                 dict(boxstyle='Square', facecolor='white',
                                      alpha=0.8, lw=self.axes_line_width) )
->>>>>>> master
 
         self.tick_color = kw.get('tick_color', 'k')
         # tick label color get's updated in savefig
@@ -1643,40 +1622,6 @@ class Rabi_Analysis(TD_Analysis):
                           'is between one half and one period of the cosine.')
                 freq_guess = 1.0/(2.0*np.abs(bottom_x_val-top_x_val))
             else:
-<<<<<<< HEAD
-                plot_title = ''
-            self.axs[i].ticklabel_format(useOffset=False)
-            self.plot_results_vs_sweepparam(x=self.sweep_points,
-                                            y=self.measured_values[i],
-                                            fig=self.fig, ax=self.axs[i],
-                                            xlabel=self.xlabel,
-                                            ylabel=self.ylabels[i],
-                                            save=False,
-                                            plot_title=plot_title)
-
-            fine_fit = self.fit_res[i].model.func(
-                x_fine, **self.fit_res[i].best_values)
-            # adding the fitted amp180
-            if 'period' in self.fit_res[i].params.keys():
-                label = 'amp180 = {:.3e}'.format(
-                    abs(self.fit_res[i].params['period'].value)/2)
-            else:
-                label = 'amp180 = {:.3e}'.format(
-                    abs(self.fit_res[i].params['x0'].value))
-            self.axs[i].plot(x_fine, fine_fit, label=label)
-            ymin = min(self.measured_values[i])
-            ymax = max(self.measured_values[i])
-            yspan = ymax-ymin
-            self.axs[i].set_ylim(ymin-0.23*yspan, 0.05*yspan+ymax)
-            self.axs[i].legend(frameon=False, loc='lower left')
-
-            if show_guess:
-                fine_fit = self.fit_res[i].model.func(
-                    x_fine, **self.fit_res[i].init_values)
-                self.axs[i].plot(x_fine, fine_fit, label='guess')
-                self.axs[i].legend(loc='best')
-        self.save_fig(self.fig, fig_tight=False, **kw)
-=======
                 if verbose:
                     print('Initial guesses obtained from fft of data.')
                 fft_scale = 1.0/(self.sweep_points[-1]-
@@ -1752,7 +1697,6 @@ class Rabi_Analysis(TD_Analysis):
 
             for i in range(self.nr_quadratures):    #for legacy reasons
                 self.fit_res[i] = self.fit_result
->>>>>>> master
 
             try:
                 self.add_analysis_datagroup_to_file()
@@ -6097,10 +6041,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
         super(self.__class__, self).__init__(**kw)
 
     def fit_data(self, analyze_ef=False, **kw):
-<<<<<<< HEAD
 
-=======
->>>>>>> master
 
         percentile = kw.get('percentile', 20)
         num_sigma_threshold = kw.get('num_sigma_threshold', 5)
