@@ -1,5 +1,6 @@
 import unittest
 import pycqed as pq
+import numpy as np
 import os
 from pycqed.analysis_v2 import measurement_analysis as ma
 
@@ -50,7 +51,7 @@ class Test_flipping_analysis(unittest.TestCase):
             s, known_detuning))
 
 
-class CZ_1QPhaseCal_Analysis(unittest.TestCase):
+class Test_CZ_1QPhaseCal_Analysis(unittest.TestCase):
 
     @classmethod
     def setUpClass(self):
@@ -68,3 +69,72 @@ class CZ_1QPhaseCal_Analysis(unittest.TestCase):
                                       options_dict={'ch_idx':0})
         self.assertAlmostEqual(a.get_zero_phase_diff_intersect(),
                                .1218, places=3)
+
+class Test_Idling_Error_Rate_Analyisis(unittest.TestCase):
+    @classmethod
+    def setUpClass(self):
+        self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
+        ma.a_tools.datadir = self.datadir
+
+    def test_error_rates_vary_N2(self):
+        a=ma.Idling_Error_Rate_Analyisis(
+            t_start ='20180210_181633',
+            options_dict={'close_figs':True, 'vary_N2': True})
+
+
+        expected_dict = {'A': 0.41685563870942149,
+             'N1': 1064.7100611208791,
+             'N2': 3644.550952436859,
+             'offset': 0.52121402524448934}
+        for key, value in expected_dict.items():
+            np.testing.assert_almost_equal(
+                a.fit_res['fit +'].best_values[key], value)
+
+        expected_dict = {'A': -0.13013605060732808,
+             'N1': 1138.3896224910052,
+             'N2': 998125.16401733132,
+             'offset': 0.14572817207876956}
+        for key, value in expected_dict.items():
+            np.testing.assert_almost_equal(
+                a.fit_res['fit 0'].best_values[key], value)
+
+        expected_dict = {'A': 0.74324542978037866,
+             'N1': 939.61974108722052,
+             'N2': 4160676.4693556926,
+             'offset': 0.18301612323869529}
+        for key, value in expected_dict.items():
+            np.testing.assert_almost_equal(
+                a.fit_res['fit 1'].best_values[key], value)
+
+
+
+    def test_error_rates_fixed_N2(self):
+        a=ma.Idling_Error_Rate_Analyisis(
+            t_start ='20180210_181633',
+            options_dict={'close_figs':True, 'vary_N2': False})
+
+
+        expected_dict = {'A': 0.43481425072120633,
+            'N1': 1034.9644095297574,
+            'N2': 1e+21,
+            'offset': 0.50671519356947314}
+        for key, value in expected_dict.items():
+            np.testing.assert_almost_equal(
+                a.fit_res['fit +'].best_values[key], value)
+
+        expected_dict = {'A': -0.13013614484482647,
+            'N1': 1138.3896694924019,
+            'N2': 1e+21,
+            'offset': 0.1457282565842071}
+        for key, value in expected_dict.items():
+            np.testing.assert_almost_equal(
+                a.fit_res['fit 0'].best_values[key], value)
+
+        expected_dict = {'A': 0.7432454022744126,
+            'N1': 939.61870748568992,
+            'N2': 1e+21,
+            'offset': 0.18301632862249007}
+        for key, value in expected_dict.items():
+            np.testing.assert_almost_equal(
+                a.fit_res['fit 1'].best_values[key], value)
+

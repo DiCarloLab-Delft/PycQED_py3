@@ -163,10 +163,21 @@ class Idling_Error_Rate_Analyisis(ba.BaseDataAnalysis):
             mod = lmfit.Model(fit_mods.idle_error_rate_exp_decay)
             mod.guess = fit_mods.idle_err_rate_guess.__get__(mod, mod.__class__)
 
+            # Done here explicitly so that I can overwrite a specific guess
+            guess_pars = mod.guess(N=xvals, data=yvals)
+            vary_N2 = self.options_dict.get('vary_N2', True)
+
+            if not vary_N2:
+                guess_pars['N2'].value = 1e21
+                guess_pars['N2'].vary = False
+            # print(guess_pars)
             self.fit_dicts['fit {}'.format(states[i])] = {
                 'model': mod,
                 'fit_xvals': {'N': xvals},
-                'fit_yvals': {'data': yvals}}
+                'fit_yvals': {'data': yvals},
+                'guess_pars': guess_pars}
+            # Allows fixing the double exponential coefficient
+
 
 
 
