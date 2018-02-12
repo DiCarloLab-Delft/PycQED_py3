@@ -927,12 +927,9 @@ class Function_Detector(Soft_Detector):
             if len(results) == 1:
                 return results[0]  # for a single entry we don't want a list
             return results
-<<<<<<< HEAD
-=======
 
     def get_values(self):
         return self.acquire_data_point()
->>>>>>> master
 
 
 class Detect_simulated_hanger_Soft(Soft_Detector):
@@ -1410,13 +1407,6 @@ class UHFQC_integrated_average_detector(Hard_Detector):
     '''
 
     def __init__(self, UHFQC, AWG=None,
-<<<<<<< HEAD
-                 integration_length=1e-6, nr_averages=1024,
-                 channels=(0, 1, 2, 3), result_logging_mode='raw',
-                 real_imag=True,
-                 seg_per_point=1, single_int_avg=False,
-                 chunk_size=None,
-=======
                  integration_length: float=1e-6, nr_averages: int=1024,
                  channels: list=(0, 1, 2, 3), result_logging_mode: str='raw',
                  real_imag: bool=True,
@@ -1425,7 +1415,6 @@ class UHFQC_integrated_average_detector(Hard_Detector):
                  values_per_point: int=1, values_per_point_suffex:list=None,
                  always_prepare:bool=False,
                  prepare_function=None, prepare_function_kwargs: dict=None,
->>>>>>> master
                  **kw):
         """
         Args:
@@ -1509,10 +1498,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         #replaces this functionality -MAR Dec 2017
         self.seg_per_point = max(seg_per_point, values_per_point)
 
-<<<<<<< HEAD
-        self.seg_per_point = seg_per_point
-=======
->>>>>>> master
+
 
         self.AWG = AWG
         self.nr_averages = nr_averages
@@ -1526,8 +1512,6 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.prepare_function = prepare_function
         self.prepare_function_kwargs = prepare_function_kwargs
         self._set_real_imag(real_imag)
-<<<<<<< HEAD
-=======
 
     def _add_value_name_suffex(self, value_names: list, value_units:list,
                                values_per_point:int,
@@ -1548,7 +1532,6 @@ class UHFQC_integrated_average_detector(Hard_Detector):
                     new_value_names.append('{} {}'.format(vn, val_suffix))
                     new_value_units.append(vu)
             return new_value_names, new_value_units
->>>>>>> master
 
     def _set_real_imag(self, real_imag=False):
         """
@@ -1556,18 +1539,11 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         """
 
         self.real_imag = real_imag
-<<<<<<< HEAD
-        if self.result_logging_mode == 'raw':
-            self.value_units = ['V']*len(self.channels)
-        else:
-            self.value_units = ['']*len(self.channels)
-=======
         # Commented this out as it is already done in the init -MAR Dec 2017
         # if self.result_logging_mode == 'raw':
         #     self.value_units = ['V']*len(self.channels)
         # else:
         #     self.value_units = ['']*len(self.channels)
->>>>>>> master
 
         if not self.real_imag:
             if len(self.channels) != 2:
@@ -1578,11 +1554,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             self.value_units[1] = 'deg'
 
     def get_values(self):
-<<<<<<< HEAD
-=======
         if self.always_prepare:
             self.prepare()
->>>>>>> master
         if self.AWG is not None:
             self.AWG.stop()
         self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
@@ -2497,7 +2470,6 @@ class DDM_integration_logging_det(Hard_Detector):
         if self.AWG is not None:
             self.AWG.stop()
 
-<<<<<<< HEAD
 class Function_Detector_list(Soft_Detector):
     """
     Defines a detector function that wraps around an user-defined function.
@@ -2527,5 +2499,3 @@ class Function_Detector_list(Soft_Detector):
 
     def acquire_data_point(self, **kw):
         return self.sweep_function(**self.msmt_kw)
-=======
->>>>>>> master
