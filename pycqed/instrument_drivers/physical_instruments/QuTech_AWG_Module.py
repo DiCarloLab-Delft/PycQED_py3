@@ -202,7 +202,23 @@ class QuTech_AWG_Module(SCPI):
                                  +'Get Return:\n   Setting of the gain in interger\n'\
                                  +'Set paramater:\n   Interger: Gain of the DAC in , min: 0, max: 4095')
 
+        self.add_parameter('status_frontIO_temperature',
+                           unit='C',
+                           label=('FrontIO temperature'.format(ch)),
+                           get_cmd='STATus:FrontIO:TEMperature?',
+                           get_parser=float,
+                           docstring='Reads the temperature of the frontIO.\n' \
+                             +'Temperature measurement interval is 10 seconds\n' \
+                             +'Return:\n     float with temperature in Celsius')
 
+        self.add_parameter('status_fpga_temperature',
+                           unit='C',
+                           label=('FPGA temperature'.format(ch)),
+                           get_cmd='STATus:FPGA:TEMperature?',
+                           get_parser=float,
+                           docstring='Reads the temperature of the FPGA.\n' \
+                             +'Temperature measurement interval is 10 seconds\n' \
+                             +'Return:\n     float with temperature in Celsius')
         # Waveform parameters
         self.add_parameter('WlistSize',
                            label='Waveform list size',
@@ -379,6 +395,8 @@ class QuTech_AWG_Module(SCPI):
         result = str(msg)[1:-1]
         result = result.replace('\"\"', '\"') # SCPI/visa adds additional quotes
         return json.loads(result)
+
+
 
     ##########################################################################
     # AWG5014 functions: SEQUENCE
