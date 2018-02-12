@@ -50,21 +50,16 @@ class BaseDataAnalysis(object):
             self.plot(key_list='auto')  # make the plots
     """
 
-<<<<<<< HEAD
-    def __init__(self, t_start: str=None, 
+
+    def __init__(self, t_start: str=None,
                 t_stop: str=None,
-                TwoD: bool=False, 
+                TwoD: bool=False,
+                label: str='',
                 options_dict: dict=None,
                 data_file_path: str=None,
                 extract_only: bool=False,
                 do_fitting: bool=False):
-=======
-    def __init__(self, t_start: str=None, t_stop: str=None,
-                 label: str='',
-                 data_file_path: str=None,
-                 options_dict: dict=None, extract_only: bool=False,
-                 do_fitting: bool=False):
->>>>>>> master
+
         '''
         This is the __init__ of the abstract base class.
         It is intended to be called at the start of the init of the child
@@ -147,12 +142,8 @@ class BaseDataAnalysis(object):
         else:
             self.t_stop = t_stop
         self.do_timestamp_blocks = self.options_dict.get('do_blocks', False)
-<<<<<<< HEAD
-        self.do_individual_traces = self.options_dict.get('do_individual_traces', False)
-=======
         self.do_individual_traces = self.options_dict.get(
             'do_individual_traces', False)
->>>>>>> master
         self.filter_no_analysis = self.options_dict.get(
             'filter_no_analysis', False)
         self.exact_label_match = self.options_dict.get(
@@ -161,15 +152,10 @@ class BaseDataAnalysis(object):
         ########################################
         # These options relate to the plotting #
         ########################################
-<<<<<<< HEAD
-        # def_fig.apply_default_figure_settings()
+
         self.fit_dicts = dict()
         self.processed_data_dict = dict()
 
-        # if self.options_dict.get('apply_default_fig_settings', True):
-        #     def_fig.apply_default_figure_settings()
-=======
->>>>>>> master
         self.plot_dicts = OrderedDict()
         self.axs = OrderedDict()
         self.figs = OrderedDict()
@@ -534,16 +520,6 @@ class BaseDataAnalysis(object):
                                   **fit_yvals[tt]))
             else:
                 if guess_pars is None:
-<<<<<<< HEAD
-                    if guess_dict is None:
-                        guess_dict = fit_guess_fn(**fit_yvals, **fit_xvals)
-
-                        if isinstance(guess_dict, lmfit.Parameters):
-                            guess_pars = guess_dict
-                        else:
-                            for key, val in list(guess_dict.items()):
-                                model.set_param_hint(key, **val)
-=======
                     if fit_guess_fn is not None:
                         # a fit function should return lmfit parameter objects
                         # but can also work by returning a dictionary of guesses
@@ -551,7 +527,6 @@ class BaseDataAnalysis(object):
                         if not isinstance(guess_pars, lmfit.Parameters):
                             for gd_key, val in list(guess_pars.items()):
                                 model.set_param_hint(gd_key, **val)
->>>>>>> master
                             guess_pars = model.make_params()
 
                         if guess_dict is not None:
@@ -980,10 +955,6 @@ class BaseDataAnalysis(object):
         else:
             fig_clim = [None, None]
 
-<<<<<<< HEAD
-
-=======
->>>>>>> master
         trace = {}
         block = {}
         if self.do_individual_traces:
@@ -995,10 +966,7 @@ class BaseDataAnalysis(object):
             trace['xvals'] = [plot_xvals]
             trace['zvals'] = [plot_zvals]
 
-<<<<<<< HEAD
-=======
         # FIXME: we should get rid of do_timestamps_blocks
->>>>>>> master
         if self.do_timestamp_blocks:
             block['xvals'] = trace['xvals']
             block['yvals'] = trace['yvals']
@@ -1010,20 +978,11 @@ class BaseDataAnalysis(object):
 
         for ii in range(len(block['zvals'])):
             traces = {}
-<<<<<<< HEAD
-            for key,vals in block.items():
-                traces[key] = vals[ii]
-            # print(traces)
-            for tt in range(len(traces['zvals'])):
-                if self.verbose:
-                    (print(t_vals[tt].shape) for key,t_vals in traces.items())
-=======
             for key, vals in block.items():
                 traces[key] = vals[ii]
             for tt in range(len(traces['zvals'])):
                 if self.verbose:
                     (print(t_vals[tt].shape) for key, t_vals in traces.items())
->>>>>>> master
                 if plot_xwidth is not None:
                     xwidth = plot_xwidth[tt]
                 else:
@@ -1031,15 +990,9 @@ class BaseDataAnalysis(object):
                 out = pfunc(ax=axs,
                             xwidth=xwidth,
                             clim=fig_clim, cmap=plot_cmap,
-<<<<<<< HEAD
                             xvals=[traces['xvals'][tt]],
                             yvals=[traces['yvals'][tt]],
                             zvals=[traces['zvals'][tt].transpose()],
-=======
-                            xvals=traces['xvals'][tt],
-                            yvals=traces['yvals'][tt],
-                            zvals=traces['zvals'][tt],  # .transpose(),
->>>>>>> master
                             transpose=plot_transpose,
                             normalize=plot_normalize)
 
@@ -1069,8 +1022,6 @@ class BaseDataAnalysis(object):
 
         if plot_yrange is None:
             if plot_xwidth is not None:
-<<<<<<< HEAD
-
                 ymin, ymax = [], []
                 for ytraces in block['yvals']:
                     ymin_trace, ymax_trace = [], []
@@ -1089,12 +1040,6 @@ class BaseDataAnalysis(object):
                 #     max([max(yvals[0])
                 #          for tt, yvals in enumerate(plot_yvals)])
 
-=======
-                ymin, ymax = min([min(yvals[0])
-                                  for tt, yvals in enumerate(plot_yvals)]), \
-                    max([max(yvals[0])
-                         for tt, yvals in enumerate(plot_yvals)])
->>>>>>> master
             else:
                 ymin = np.min(plot_yvals) - plot_yvals_step / 2.
                 ymax = np.max(plot_yvals) + plot_yvals_step/2.
