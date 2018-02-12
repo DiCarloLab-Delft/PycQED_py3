@@ -131,8 +131,9 @@ class QuTech_AWG_Module(SCPI):
             offset_cmd = 'SOUR{}:VOLT:LEV:IMM:OFFS'.format(ch)
             state_cmd = 'OUTPUT{}:STATE'.format(ch)
             waveform_cmd = 'SOUR{}:WAV'.format(ch)
-            dac_temperature_cmd = 'STATus:DAC{}:TEMprature'.format(ch)
             output_voltage_cmd = 'QUTEch:OUTPut{}:Voltage'.format(ch)
+            dac_temperature_cmd = 'STATus:DAC{}:TEMprature'.format(ch)
+            gain_adjust_cmd = 'STATus:DAC{}:GAInvoltage'.format(ch, gain)
             # Set channel first to ensure sensible sorting of pars
             # Compatibility: 5014, QWG
             self.add_parameter('ch{}_state'.format(ch),
@@ -187,6 +188,19 @@ class QuTech_AWG_Module(SCPI):
                                  +'    E.g.: qwg.chX_state(False)\n' \
                                  +'    If the channel is enabled it will return an low value: >0.1\n' \
                                  +'Return:\n   float in voltage')
+
+            self.add_parameter('dac{}_gain'.format(ch),
+                               unit='V',
+                               label=('Dac {} set gain of the DAC').format(ch),
+                               get_cmd=gain_adjust_cmd + '?',
+                               set_cmd=gain_adjust_cmd + ' {:.3f}',
+                               vals=vals.Numbers(0, 3.3),
+                               get_parser=int,
+                               docstring='Gain setting of the DAC in channel.\n' \
+                                 +'Notes:\n    \n' \
+                                 +'Get Return:\n   Setting of the gain in interger'\
+                                 +'Set paramater:\n   Gain of the DAC in voltage')
+
 
         # Waveform parameters
         self.add_parameter('WlistSize',
