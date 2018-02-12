@@ -133,7 +133,7 @@ class QuTech_AWG_Module(SCPI):
             waveform_cmd = 'SOUR{}:WAV'.format(ch)
             output_voltage_cmd = 'QUTEch:OUTPut{}:Voltage'.format(ch)
             dac_temperature_cmd = 'STATus:DAC{}:TEMprature'.format(ch)
-            gain_adjust_cmd = 'STATus:DAC{}:GAInvoltage'.format(ch, gain)
+            gain_adjust_cmd = 'STATus:DAC{}:GAIn'.format(ch)
             # Set channel first to ensure sensible sorting of pars
             # Compatibility: 5014, QWG
             self.add_parameter('ch{}_state'.format(ch),
@@ -190,16 +190,17 @@ class QuTech_AWG_Module(SCPI):
                                  +'Return:\n   float in voltage')
 
             self.add_parameter('dac{}_gain'.format(ch),
-                               unit='V',
-                               label=('Dac {} set gain of the DAC').format(ch),
+                               unit='',
+                               label=('DAC {}, set gain').format(ch),
                                get_cmd=gain_adjust_cmd + '?',
-                               set_cmd=gain_adjust_cmd + ' {:.3f}',
-                               vals=vals.Numbers(0, 3.3),
+                               set_cmd=gain_adjust_cmd + ' {}',
+                               vals=vals.Ints(0, 4095),
                                get_parser=int,
-                               docstring='Gain setting of the DAC in channel.\n' \
-                                 +'Notes:\n    \n' \
-                                 +'Get Return:\n   Setting of the gain in interger'\
-                                 +'Set paramater:\n   Gain of the DAC in voltage')
+                               docstring='Gain setting of the DAC in a channel.\n' \
+                                 +'Notes:\n    The gain setting is from 0 to 4095 \n' \
+                                 +'    Where 0 is 0 V and 4095 is 3.3V \n' \
+                                 +'Get Return:\n   Setting of the gain in interger\n'\
+                                 +'Set paramater:\n   Interger: Gain of the DAC in , min: 0, max: 4095')
 
 
         # Waveform parameters
