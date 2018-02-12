@@ -114,6 +114,7 @@ class Lutman_par_with_reload_single_pulse(Soft_Sweep):
         self.parameter_name = parameter.label
         self.unit = parameter.unit
         self.pulse_names = pulse_names
+        self.label = parameter.label
 
     def set_parameter(self, val):
         self.parameter.set(val)

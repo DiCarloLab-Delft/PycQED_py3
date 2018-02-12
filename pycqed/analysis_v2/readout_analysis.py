@@ -14,15 +14,18 @@ import pycqed.analysis.analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
 from scipy.optimize import minimize
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str
+import pycqed.analysis.tools.data_manipulation as dm_tools
 
 
 class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
     def __init__(self, t_start: str=None, t_stop: str=None,
+                 label: str='',
                  data_file_path: str=None,
                  options_dict: dict=None, extract_only: bool=False,
                  do_fitting: bool=True, auto=True):
         super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
                          data_file_path=data_file_path,
                          options_dict=options_dict,
                          extract_only=extract_only, do_fitting=do_fitting)
@@ -42,7 +45,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         Responsible for creating the histograms based on the raw data
         """
         # Determine the shape of the data to extract wheter to rotate or not
-        preselect = self.options_dict.get('preselect', False)
+        post_select = self.options_dict.get('post_select', False)
+        post_select_threshold = self.options_dict.get('post_select_threshold', 0)
         nr_samples = self.options_dict.get('nr_samples', 2)
         sample_0 = self.options_dict.get('sample_0', 0)
         sample_1 = self.options_dict.get('sample_1', 1)
@@ -60,7 +64,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         for i, meas_val in enumerate(self.raw_data_dict['measured_values']):
             dat = meas_val[0]  # hardcoded for 1 channel for now
             sh_0, sh_1 = get_shots_zero_one(
-                dat, preselect=preselect, nr_samples=nr_samples,
+                dat, post_select=post_select, nr_samples=nr_samples,
+                post_select_threshold=post_select_threshold,
                 sample_0=sample_0, sample_1=sample_1)
             min_sh = np.min(sh_0)
             max_sh = np.max(sh_1)
@@ -204,7 +209,13 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         self._infid_vs_th = infid_vs_th
 
         opt_fid = minimize(infid_vs_th, (bv0['A_center']+bv0['B_center'])/2)
-        self.proc_data_dict['F_assignment_fit'] = 1-opt_fid['fun']
+
+        # for some reason the fit sometimes returns a list of values
+        if isinstance(opt_fid['fun'], float):
+            self.proc_data_dict['F_assignment_fit'] = (1-opt_fid['fun'])
+        else:
+            self.proc_data_dict['F_assignment_fit'] = (1-opt_fid['fun'])[0]
+
         self.proc_data_dict['threshold_fit'] = opt_fid['x'][0]
 
         # Calculate the fidelity of both
@@ -253,7 +264,13 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         self._disc_infid_vs_th = disc_infid_vs_th
 
         opt_fid = minimize(disc_infid_vs_th, (mu_0 + mu_1)/2)
-        self.proc_data_dict['F_discr'] = 1-opt_fid['fun']
+
+        # for some reason the fit sometimes returns a list of values
+        if isinstance(opt_fid['fun'], float):
+            self.proc_data_dict['F_discr'] = (1-opt_fid['fun'])
+        else:
+            self.proc_data_dict['F_discr'] = (1-opt_fid['fun'])[0]
+
         self.proc_data_dict['threshold_discr'] = opt_fid['x'][0]
 
     def prepare_plots(self):
@@ -273,7 +290,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             'xlabel': self.proc_data_dict['shots_xlabel'],
             'xunit': self.proc_data_dict['shots_xunit'],
             'ylabel': 'Counts',
-            'title': '1D Histograms'}
+            'title': (self.timestamps[0] + ' \n' +
+                      self.raw_data_dict['measurementstring'][0])}
         self.plot_dicts['hist_1'] = {
             'ax_id': '1D_histogram',
             'plotfn': self.plot_bar,
@@ -297,7 +315,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             'xlabel': self.proc_data_dict['shots_xlabel'],
             'xunit': self.proc_data_dict['shots_xunit'],
             'ylabel': 'Counts',
-            'title': 'Cumulative Histograms'}
+            'title': 'Cumulative Histograms' + '\n'+self.timestamps[0]}
         self.plot_dicts['cumhist_1'] = {
             'ax_id': 'cum_histogram',
             'plotfn': self.plot_bar,
@@ -356,104 +374,127 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         # Thresholds and fidelity information     #
         ###########################################
 
-        max_cnts = np.max([np.max(self.proc_data_dict['hist_0'][0]),
-                           np.max(self.proc_data_dict['hist_1'][0])])
-
-        thr, th_unit = SI_val_to_msg_str(
-            self.proc_data_dict['threshold_raw'],
-            self.proc_data_dict['shots_xunit'], return_type=float)
-        raw_th_msg = (
-            'Raw threshold: {:.2f} {}\n'.format(
-                thr, th_unit) +
-            r'$F_{A}$-raw: ' +
-            r'{:.3f}'.format(
-                self.proc_data_dict['F_assignment_raw']))
-        self.plot_dicts['cumhist_threshold'] = {
-            'ax_id': '1D_histogram',
-            'plotfn': self.plot_vlines,
-            'x': self.proc_data_dict['threshold_raw'],
-            'ymin': 0,
-            'ymax': max_cnts*1.05,
-            'colors': '.3',
-            'linestyles': 'dashed',
-            'line_kws': {'linewidth': .8},
-            'setlabel': raw_th_msg,
-            'do_legend': True}
-        if self.do_fitting:
-            thr, th_unit = SI_val_to_msg_str(
-                self.proc_data_dict['threshold_fit'],
-                self.proc_data_dict['shots_xunit'], return_type=float)
-            fit_th_msg = (
-                'Fit threshold: {:.2f} {}\n'.format(
-                    thr, th_unit) +
-                r'$F_{A}$-fit: ' +
-                r'{:.3f}'.format(
-                    self.proc_data_dict['F_assignment_fit']))
-            self.plot_dicts['fit_threshold'] = {
-                'ax_id': '1D_histogram',
-                'plotfn': self.plot_vlines,
-                'x': self.proc_data_dict['threshold_fit'],
-                'ymin': 0,
-                'ymax': max_cnts*1.05,
-                'colors': '.4',
-                'linestyles': 'dotted',
-                'line_kws': {'linewidth': .8},
-                'setlabel': fit_th_msg,
-                'do_legend': True}
+        if not self.presentation_mode:
+            max_cnts = np.max([np.max(self.proc_data_dict['hist_0'][0]),
+                               np.max(self.proc_data_dict['hist_1'][0])])
 
             thr, th_unit = SI_val_to_msg_str(
-                self.proc_data_dict['threshold_discr'],
+                self.proc_data_dict['threshold_raw'],
                 self.proc_data_dict['shots_xunit'], return_type=float)
-            fit_th_msg = (
-                'Discr. threshold: {:.2f} {}\n'.format(
+
+            raw_th_msg = (
+                'Raw threshold: {:.2f} {}\n'.format(
                     thr, th_unit) +
-                r'$F_{D}$: ' +
+                r'$F_{A}$-raw: ' +
                 r'{:.3f}'.format(
-                    self.proc_data_dict['F_discr']))
-            self.plot_dicts['discr_threshold'] = {
+                    self.proc_data_dict['F_assignment_raw']))
+            self.plot_dicts['cumhist_threshold'] = {
                 'ax_id': '1D_histogram',
                 'plotfn': self.plot_vlines,
-                'x': self.proc_data_dict['threshold_discr'],
+                'x': self.proc_data_dict['threshold_raw'],
                 'ymin': 0,
                 'ymax': max_cnts*1.05,
                 'colors': '.3',
-                'linestyles': '-.',
+                'linestyles': 'dashed',
                 'line_kws': {'linewidth': .8},
-                'setlabel': fit_th_msg,
+                'setlabel': raw_th_msg,
                 'do_legend': True}
+            if self.do_fitting:
+                thr, th_unit = SI_val_to_msg_str(
+                    self.proc_data_dict['threshold_fit'],
+                    self.proc_data_dict['shots_xunit'], return_type=float)
+                fit_th_msg = (
+                    'Fit threshold: {:.2f} {}\n'.format(
+                        thr, th_unit) +
+                     r'$F_{A}$-fit: '+
+                     r'{:.3f}'.format(self.proc_data_dict['F_assignment_fit']))
 
-            # To add text only to the legend I create some "fake" data
-            rel_exc_str = ('Mmt. Ind. Rel.: {:.1f}%\n'.format(
-                self.proc_data_dict['measurement_induced_relaxation']*100) +
-                'Residual Exc.: {:.1f}%'.format(
-                    self.proc_data_dict['residual_excitation']*100))
-            self.plot_dicts['rel_exc_msg'] = {
-                'ax_id': '1D_histogram',
-                'plotfn': self.plot_line,
-                'xvals': [self.proc_data_dict['threshold_discr']],
-                'yvals': [max_cnts/2],
-                'line_kws': {'alpha': 0},
-                'setlabel': rel_exc_str,
-                'do_legend': True}
+
+                self.plot_dicts['fit_threshold'] = {
+                    'ax_id': '1D_histogram',
+                    'plotfn': self.plot_vlines,
+                    'x': self.proc_data_dict['threshold_fit'],
+                    'ymin': 0,
+                    'ymax': max_cnts*1.05,
+                    'colors': '.4',
+                    'linestyles': 'dotted',
+                    'line_kws': {'linewidth': .8},
+                    'setlabel': fit_th_msg,
+                    'do_legend': True}
+
+                thr, th_unit = SI_val_to_msg_str(
+                    self.proc_data_dict['threshold_discr'],
+                    self.proc_data_dict['shots_xunit'], return_type=float)
+                fit_th_msg = (
+                    'Discr. threshold: {:.2f} {}\n'.format(
+                        thr, th_unit) +
+                    r'$F_{D}$: ' +
+                    ' {:.3f}'.format(self.proc_data_dict['F_discr']))
+                self.plot_dicts['discr_threshold'] = {
+                    'ax_id': '1D_histogram',
+                    'plotfn': self.plot_vlines,
+                    'x': self.proc_data_dict['threshold_discr'],
+                    'ymin': 0,
+                    'ymax': max_cnts*1.05,
+                    'colors': '.3',
+                    'linestyles': '-.',
+                    'line_kws': {'linewidth': .8},
+                    'setlabel': fit_th_msg,
+                    'do_legend': True}
+
+                # To add text only to the legend I create some "fake" data
+                rel_exc_str = ('Mmt. Ind. Rel.: {:.1f}%\n'.format(
+                    self.proc_data_dict['measurement_induced_relaxation']*100) +
+                    'Residual Exc.: {:.1f}%'.format(
+                        self.proc_data_dict['residual_excitation']*100))
+                self.plot_dicts['rel_exc_msg'] = {
+                    'ax_id': '1D_histogram',
+                    'plotfn': self.plot_line,
+                    'xvals': [self.proc_data_dict['threshold_discr']],
+                    'yvals': [max_cnts/2],
+                    'line_kws': {'alpha': 0},
+                    'setlabel': rel_exc_str,
+                    'do_legend': True}
 
 
 class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
     pass
 
 
-def get_shots_zero_one(data, preselect: bool=False,
-                       nr_samples: int=2, sample_0: int=0, sample_1: int=1):
-    if not preselect:
-        data_0, data_1 = a_tools.zigzag(
+def get_shots_zero_one(data, post_select: bool=False,
+                       nr_samples: int=2, sample_0: int=0, sample_1: int=1,
+                       post_select_threshold: float = None):
+    if not post_select:
+        shots_0, shots_1 = a_tools.zigzag(
             data, sample_0, sample_1, nr_samples)
     else:
         presel_0, presel_1 = a_tools.zigzag(
             data, sample_0, sample_1, nr_samples)
 
-        data_0, data_1 = a_tools.zigzag(
+        shots_0, shots_1 = a_tools.zigzag(
             data, sample_0+1, sample_1+1, nr_samples)
-    if preselect:
-        raise NotImplementedError()
-        presel_0 = presel_0*0
-        presel_1 = presel_1*0
-    return data_0, data_1
+
+
+    if post_select:
+        post_select_shots_0 = data[0::nr_samples]
+        shots_0 = data[1::nr_samples]
+
+        post_select_shots_1 = data[nr_samples//2::nr_samples]
+        shots_1 = data[nr_samples//2+1::nr_samples]
+
+        # Determine shots to remove
+        post_select_indices_0 = dm_tools.get_post_select_indices(
+            thresholds=[post_select_threshold],
+            init_measurements=[post_select_shots_0])
+
+        post_select_indices_1 = dm_tools.get_post_select_indices(
+            thresholds=[post_select_threshold],
+            init_measurements=[post_select_shots_1])
+
+        shots_0[post_select_indices_0] = np.nan
+        shots_0 = shots_0[~np.isnan(shots_0)]
+
+        shots_1[post_select_indices_1] = np.nan
+        shots_1 = shots_1[~np.isnan(shots_1)]
+
+    return shots_0, shots_1

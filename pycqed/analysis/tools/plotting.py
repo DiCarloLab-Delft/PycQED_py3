@@ -3,12 +3,12 @@ Currently empty should contain the plotting tools portion of the
 analysis toolbox
 '''
 import matplotlib.pyplot as plt
+import matplotlib
 from matplotlib import cm
-import colorsys as colors
 import numpy as np
 
 SI_PREFIXES = 'yzafpnμm kMGTPEZY'
-SI_UNITS = 'm,s,g,W,J,V,A,F,T,Hz,Ohm,S,N,C,px,b,B,K,Bar'.split(',')
+SI_UNITS = 'm,s,g,W,J,V,A,F,T,Hz,Ohm,S,N,C,px,b,B,K,Bar,Vpeak,Vpp,Vp,Vrms'.split(',')
 
 
 def set_xlabel(axis, label, unit=None, **kw):
@@ -26,7 +26,10 @@ def set_xlabel(axis, label, unit=None, **kw):
         xticks = axis.get_xticks()
         scale_factor, unit = SI_prefix_and_scale_factor(
             val=max(abs(xticks)), unit=unit)
-        axis.set_xticklabels(xticks*scale_factor)
+        formatter = matplotlib.ticker.FuncFormatter(lambda x, pos:
+                                                    x*scale_factor)
+        axis.xaxis.set_major_formatter(formatter)
+
         axis.set_xlabel(label+' ({})'.format(unit), **kw)
     else:
         axis.set_xlabel(label, **kw)
@@ -48,7 +51,10 @@ def set_ylabel(axis, label, unit=None, **kw):
         yticks = axis.get_yticks()
         scale_factor, unit = SI_prefix_and_scale_factor(
             val=max(abs(yticks)), unit=unit)
-        axis.set_yticklabels(yticks*scale_factor)
+        formatter = matplotlib.ticker.FuncFormatter(lambda x, pos:
+                                                    x*scale_factor)
+        axis.yaxis.set_major_formatter(formatter)
+
         axis.set_ylabel(label+' ({})'.format(unit), **kw)
     else:
         axis.set_ylabel(label, **kw)
@@ -83,7 +89,7 @@ def SI_prefix_and_scale_factor(val, unit=None):
     else:
         scale_factor = 1
 
-    if unit == None:
+    if unit is None:
         unit = ''  # to ensure proper return value
     return scale_factor, unit
 
@@ -112,7 +118,7 @@ def SI_val_to_msg_str(val: float, unit: str=None, return_type=str):
 
     value_str = return_type(val)
     # To ensure right type of return value
-    if unit == None:
+    if unit is None:
         unit = ''
     return value_str, unit
 
@@ -219,9 +225,11 @@ def flex_color_plot_vs_x(xvals, yvals, zvals, ax=None,
     if xwidth is None:
         xvals = np.array(xvals)
         xvertices = np.zeros(np.array(xvals.shape)+1)
+
+        dx = abs(np.max(xvals)-np.min(xvals))/len(xvals)
         xvertices[1:-1] = (xvals[:-1]+xvals[1:])/2.
-        xvertices[0] = xvals[0] - (xvals[1]-xvals[0])/2
-        xvertices[-1] = xvals[-1] + (xvals[-1]-xvals[-2])/2
+        xvertices[0] = xvals[0] - dx/2
+        xvertices[-1] = xvals[-1] + dx/2
     else:
         xvertices = []
         for xval in xvals:
@@ -229,18 +237,21 @@ def flex_color_plot_vs_x(xvals, yvals, zvals, ax=None,
     # y coordinates
     yvertices = []
     for xx in range(len(xvals)):
+        # Important to sort arguments in case unsorted (e.g., FFT freqs)
+        sorted_yarguments = yvals[xx].argsort()
+        yvals[xx] = yvals[xx][sorted_yarguments]
+        zvals[xx] = zvals[xx][sorted_yarguments]
+
         yvertices.append(np.zeros(np.array(yvals[xx].shape)+1))
         yvertices[xx][1:-1] = (yvals[xx][:-1]+yvals[xx][1:])/2.
         yvertices[xx][0] = yvals[xx][0] - (yvals[xx][1]-yvals[xx][0])/2
         yvertices[xx][-1] = yvals[xx][-1] + (yvals[xx][-1]-yvals[xx][-2])/2
 
-    # normalized plot
-    if normalize:
-        for xx in range(len(xvals)):
+        # normalized plot
+        if normalize:
             zvals[xx] /= np.mean(zvals[xx])
-    # logarithmic plot
-    if log:
-        for xx in range(len(xvals)):
+        # logarithmic plot
+        if log:
             zvals[xx] = np.log(zvals[xx])/np.log(10)
 
     # add blocks to plot
@@ -274,6 +285,16 @@ def flex_colormesh_plot_vs_xy(xvals, yvals, zvals, ax=None,
     zvals should be a list of arrays with the measured values with shape
     (len(yvals), len(xvals)).
     """
+
+    # First, we need to sort the data as otherwise we get odd plotting
+    # artefacts. An example is e.g., plotting a fourier transform
+    sorted_x_arguments = xvals.argsort()
+    xvals = xvals[sorted_x_arguments]
+    sorted_y_arguments = yvals.argsort()
+    yvals = yvals[sorted_y_arguments]
+    zvals = zvals[:,  sorted_x_arguments]
+    zvals = zvals[sorted_y_arguments, :]
+
     # create a figure and set of axes
     if ax is None:
         fig = plt.figure(figsize=(12, 7))
@@ -304,14 +325,12 @@ def flex_colormesh_plot_vs_xy(xvals, yvals, zvals, ax=None,
     # normalized plot
     if normalize:
         zvals /= np.mean(zvals, axis=0)
-# logarithmic plot
+    # logarithmic plot
     if log:
-
         for xx in range(len(xvals)):
             zvals[xx] = np.log(zvals[xx])/np.log(10)
 
     # add blocks to plot
-    # hold = kw.pop('hold',False)
     do_transpose = kw.pop('transpose', False)
     if do_transpose:
         colormap = ax.pcolormesh(ygrid.transpose(),

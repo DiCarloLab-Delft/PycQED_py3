@@ -9,7 +9,8 @@ VNA_instr = None
 
 def acquire_single_linear_frequency_span(file_name, start_freq=None,
                                          stop_freq=None, center_freq=None,
-                                         span=None, nbr_points=101, power=-20,
+                                         span=None, nr_avg=1, sweep_mode='auto',
+                                         nbr_points=101, power=-20,
                                          bandwidth=100, measure='S21'):
     """
     Acquires a single trace from the VNA.
@@ -47,13 +48,17 @@ def acquire_single_linear_frequency_span(file_name, start_freq=None,
     MC_instr.set_detector_function(det.ZNB_VNA_detector(VNA_instr))
 
     # VNA settings
-    VNA_instr.average_state('off')
+    # VNA_instr.average_state('off')
     VNA_instr.bandwidth(bandwidth)
 
     # hack to measure S parameters different from S21
     str_to_write = "calc:par:meas 'trc1', '%s'" % measure
     print(str_to_write)
     VNA_instr.visa_handle.write(str_to_write)
+
+    VNA_instr.avg(nr_avg)
+    VNA_instr.number_sweeps_all(nr_avg)
+    VNA_instr.average_mode(sweep_mode)
 
     VNA_instr.power(power)
     VNA_instr.timeout(600)

@@ -8,7 +8,7 @@ station = qc.station
 def show_analysis_values_pyqt(a_obj, QtPlot_win):
 
     if QtPlot_win is None:
-        QtPlot_win = QtPlot(windowTitle='Analysis viewer',
+        QtPlot_win = QtPlot(window_title='Analysis viewer',
                             figsize=(600, 400))
     for i, y in enumerate(a_obj.measured_values):
         if i+1 > len(QtPlot_win.subplots):

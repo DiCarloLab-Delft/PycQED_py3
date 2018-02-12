@@ -1434,39 +1434,144 @@ def rotate_and_normalize_data(data, cal_zero_points=None, cal_one_points=None,
     Inputs:
         data (numpy array) : 2D dataset that has to be rotated and normalized
         zero_coord (tuple) : coordinates of reference zero
-                one_coord (tuple) : coordinates of reference one
+        one_coord (tuple) : coordinates of reference one
         cal_zero_points (range) : range specifying what indices in 'data'
                                   correspond to zero
         cal_one_points (range) : range specifying what indices in 'data'
                                  correspond to one
     '''
     # Extract zero and one coordinates
-    if zero_coord is not None:
-        I_zero = zero_coord[0]
-        Q_zero = zero_coord[1]
-    else:
+
+    if np.all([cal_zero_points==None, cal_one_points==None,
+               zero_coord==None, one_coord==None]):
+        # no cal points were used
+        normalized_data = rotate_and_normalize_data_no_cal_points(data=data,
+                                                                  **kw)
+    elif np.all([cal_one_points==None, one_coord==None]) and \
+        (not np.all([cal_zero_points==None, zero_coord==None])):
+        # only 2 cal points used; both are I pulses
         I_zero = np.mean(data[0][cal_zero_points])
         Q_zero = np.mean(data[1][cal_zero_points])
-        zero_coord = (I_zero, Q_zero)
-    if one_coord is not None:
-        I_one = one_coord[0]
-        Q_one = one_coord[1]
+
+        # Translate the data
+        trans_data = [data[0] - I_zero, data[1] - Q_zero]
+
+        # Least squares fitting to the line through the data, that also
+        # intercepts the calibration point
+
+        from lmfit.models import LinearModel
+
+        x = trans_data[0]
+        y = trans_data[1]
+
+        linear_model = LinearModel()
+        linear_model.set_param_hint('intercept',
+                                    value=0,
+                                    vary=False)
+        linear_model.set_param_hint('slope')
+        params = linear_model.make_params()
+        fit_res = linear_model.fit(data=y,
+                                   x=x,
+                                   params=params)
+
+        line_slope = fit_res.params['slope'].value
+        line_intercept = fit_res.params['intercept'].value
+        #finx the x, y coordinates of the projected points
+        x_proj=(x+line_slope*y-line_slope*line_intercept)/(line_slope**2+1)
+        y_proj= line_slope*(x_proj)+line_intercept
+
+        #find the minimum (on th ey axis) point on the line
+        y_min_line = min(fit_res.best_fit)
+        x_min_line = x[np.argmin(fit_res.best_fit)]
+
+        #find x,y coordinates with respect to end of line
+        x_data = np.abs(x_min_line - x_proj)
+        y_data = y_proj-y_min_line
+
+        #find distance from points on line to end of line
+        rotated_data = np.sqrt(x_data**2+y_data**2)
+
+        normalized_data = rotated_data
+
+        # #normalize data
+        # max_min_distance = max(rotated_data) - min(rotated_data)
+        # normalized_data = (rotated_data - min(rotated_data))/max_min_distance
+
     else:
-        I_one = np.mean(data[0][cal_one_points])
-        Q_one = np.mean(data[1][cal_one_points])
-        one_coord = (I_one, Q_one)
-    # Translate the date
-    trans_data = [data[0] - I_zero, data[1] - Q_zero]
-    # Rotate the data
-    M = calculate_rotation_matrix(I_one-I_zero, Q_one-Q_zero)
-    outp = [np.asarray(elem)[0] for elem in M * trans_data]
-    [rotated_data_ch1, rotated_data_ch2] = outp
-    # Normalize the data
-    one_zero_dist = np.sqrt((I_one-I_zero)**2 + (Q_one-Q_zero)**2)
-    normalized_data = rotated_data_ch1/one_zero_dist
+        # for 4
+        if zero_coord is not None:
+            I_zero = zero_coord[0]
+            Q_zero = zero_coord[1]
+        else:
+            I_zero = np.mean(data[0][cal_zero_points])
+            Q_zero = np.mean(data[1][cal_zero_points])
+            zero_coord = (I_zero, Q_zero)
+
+        if one_coord is not None:
+            I_one = one_coord[0]
+            Q_one = one_coord[1]
+        else:
+            I_one = np.mean(data[0][cal_one_points])
+            Q_one = np.mean(data[1][cal_one_points])
+            one_coord = (I_one, Q_one)
+
+        # Translate the data
+        trans_data = [data[0] - I_zero, data[1] - Q_zero]
+
+        # Rotate the data
+        M = calculate_rotation_matrix(I_one-I_zero, Q_one-Q_zero)
+        outp = [np.asarray(elem)[0] for elem in M * trans_data]
+        rotated_data_ch1 = outp[0]
+
+        # Normalize the data
+        one_zero_dist = np.sqrt((I_one-I_zero)**2 + (Q_one-Q_zero)**2)
+        normalized_data = rotated_data_ch1/one_zero_dist
 
     return [normalized_data, zero_coord, one_coord]
 
+def rotate_and_normalize_data_no_cal_points(data, **kw):
+
+    """
+    Rotates and projects data based on principal component analysis.
+    (Source: http://www.cs.otago.ac.nz/cosc453/student_tutorials/
+    principal_components.pdf)
+    Assumes data has shape (2, nr_sweep_pts), ie the shape of
+    MeasurementAnalysis.measured_values.
+    """
+
+    #translate each column in the data by its mean
+    mean_x = np.mean(data[0])
+    mean_y = np.mean(data[1])
+    trans_x = data[0] - mean_x
+    trans_y = data[1] - mean_y
+
+    #compute the covariance 2x2 matrix
+    cov_matrix = np.cov(np.array([trans_x,trans_y]))
+
+    #find eigenvalues and eigenvectors of the covariance matrix
+    [eigvals, eigvecs] = np.linalg.eig(cov_matrix)
+
+    #compute the transposed feature vector
+    row_feature_vector = np.array([(eigvecs[0,np.argmin(eigvals)],
+                                    eigvecs[1,np.argmin(eigvals)]),
+                                   (eigvecs[0,np.argmax(eigvals)],
+                                    eigvecs[1,np.argmax(eigvals)])])
+    #compute the row_data_trans matrix with (x,y) pairs in each column. Each
+    #row is a dimension (row1 = x_data, row2 = y_data)
+    row_data_trans = np.array([trans_x,trans_y])
+    #compute final, projected data; only the first row is of interest (it is the
+    #principal axis
+    final_data = np.dot(row_feature_vector, row_data_trans)
+    normalized_data = final_data[1,:]
+
+    #normalize data
+    # max_min_distance = np.sqrt(max(final_data[1,:])**2 +
+    #                            min(final_data[1,:])**2)
+    # normalized_data = final_data[1,:]/max_min_distance
+    # max_min_difference = max(normalized_data -  min(normalized_data))
+    # normalized_data = (normalized_data-min(normalized_data))/max_min_difference
+
+    return normalized_data
 
 def normalize_data_v3(data, cal_zero_points=np.arange(-4, -2, 1),
                       cal_one_points=np.arange(-2, 0, 1), **kw):
@@ -1765,6 +1870,7 @@ def color_plot_interpolated(x, y, z, ax=None,
         return ax, CS, cbar
     return ax, CS
 
+
 def plot_errorbars(x, y, ax=None, linewidth=2 ,markersize=2, marker='none'):
 
     if ax is None:
@@ -1927,16 +2033,67 @@ def find_min(x, y, return_fit=False, perc=30):
 def get_color_order(i, max_num, cmap='viridis'):
     # take a blue to red scale from 0 to max_num
     # uses HSV system, H_red = 0, H_green = 1/3 H_blue=2/3
-    # return colors.hsv_to_rgb(2.*float(i)/(float(max_num)*3.), 1., 1.)
     print('It is recommended to use the updated function "get_color_cycle".')
     if isinstance(cmap, str):
         cmap = cm.get_cmap(cmap)
     return cmap((i/max_num) % 1)
 
 
+def get_color_order_hsv(i, max_num):
+    # take a blue to red scale from 0 to max_num
+    # uses HSV system, H_red = 0, H_green = 1/3 H_blue=2/3
+    return colors.hsv_to_rgb(2.*float(i)/(float(max_num)*3.), 1., 1.)
+
+
 def get_color_list(max_num, cmap='viridis'):
-    '''Return an array of max_num colors take in even spacing from the
-    color map cmap.'''
+    '''
+    Return an array of max_num colors take in even spacing from the
+    color map cmap.
+    '''
+    # Default matplotlib colormaps have a discrete set of colors
+    if cmap == 'tab10':
+        max_num = 10
+    if cmap == 'tab20':
+        max_num = 20
+
     if isinstance(cmap, str):
-        cmap = cm.get_cmap(cmap)
-    return [cmap(cmap)(i) for i in np.linspace(0.0, 1.0, max_num)]
+        try:
+            cmap = cm.get_cmap(cmap)
+        except ValueError:
+            logging.warning('Using Vega10 as a fallback, upgrade matplotlib')
+            cmap = cm.get_cmap('Vega10')
+    return [cmap(i) for i in np.linspace(0.0, 1.0, max_num)]
+
+
+def print_pars_table(n_ts=10, pars=None):
+    '''
+    Prints out a table containing the value for the indicated parameters from the last N timestamps.
+    Input:
+        n_ts (int), number of time-stamps to include in the table (rows).
+        pars (list), list spanning the parameters of interest (columns).
+
+    Every element on the list pars need to correspond to a parameter stored in the Instrument settings of the HDF5 data-files.
+    Examples:
+        pars = ['IVVI.dac1', 'IVVI.dac2', 'IVVI.dac3']
+        pars = ['Qubit.f_RO', 'Qubit.RO_acq_integration_length', 'Qubit.RO_pulse_power']
+        pars = ['Qubit.spec_pow', 'Qubit.RO_power_cw']
+    '''
+    ts_list = return_last_n_timestamps(n_ts)
+    pdict = {}
+    nparams = []
+    for i,p in enumerate(pars):
+        pdict.update({p:p})
+    opt_dict = {'scan_label':'','exact_label_match':True}
+    # print(ts_list)
+    scans = RA.quick_analysis(t_start=ts_list[-1],t_stop=ts_list[0], options_dict=opt_dict,
+                      params_dict_TD=pdict,numeric_params=nparams)
+
+    pars_line = 'timestamp \t'
+    for p in pars:
+        pars_line = pars_line + p + '\t'
+    print(pars_line)
+    for i,ts in enumerate(scans.TD_timestamps):
+        i_line = '%s \t'%ts
+        for p in pars:
+            i_line = i_line + scans.TD_dict[p][i]+'\t'
+        print(i_line)

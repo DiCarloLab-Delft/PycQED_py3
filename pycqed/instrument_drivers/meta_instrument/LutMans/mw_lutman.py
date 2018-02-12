@@ -8,6 +8,22 @@ from pycqed.measurement.waveform_control_CC import waveform as wf
 class Base_MW_LutMan(Base_LutMan):
     _def_lm = ['I', 'rX180',  'rY180', 'rX90',  'rY90',
                'rXm90',  'rYm90', 'rPhi90', 'spec']
+    # use remaining codewords to set pi/2 gates for various angles
+    for i in range(18):
+        angle = i * 20
+        _def_lm.append('r{}_90'.format(angle))
+
+    def set_default_lutmap(self):
+        """
+        Set's the default lutmap for standard microwave drive pulses.
+        """
+        def_lm = self._def_lm
+        LutMap = {}
+        for cw_idx, cw_key in enumerate(def_lm):
+            LutMap[cw_key] = (
+                'wave_ch{}_cw{:03}'.format(self.channel_I(), cw_idx),
+                'wave_ch{}_cw{:03}'.format(self.channel_Q(), cw_idx))
+        self.LutMap(LutMap)
 
     def _add_waveform_parameters(self):
         # defined here so that the VSM based LutMan can overwrite this
@@ -15,7 +31,11 @@ class Base_MW_LutMan(Base_LutMan):
         self.spec_func = wf.block_pulse
 
         self._add_channel_params()
-        self.add_parameter('mw_amp180', unit='V', vals=vals.Numbers(-1, 1),
+        self.add_parameter('cfg_sideband_mode',
+                           vals=vals.Enum('real-time', 'static'),
+                           initial_value='static',
+                           parameter_class=ManualParameter)
+        self.add_parameter('mw_amp180', unit='frac', vals=vals.Numbers(-1, 1),
                            parameter_class=ManualParameter,
                            initial_value=0.1)
         self.add_parameter('mw_amp90_scale',
@@ -39,7 +59,7 @@ class Base_MW_LutMan(Base_LutMan):
                            parameter_class=ManualParameter,
                            initial_value=20e-9)
         self.add_parameter('spec_amp',
-                           vals=vals.Numbers(), unit='V',
+                           vals=vals.Numbers(), unit='frac',
                            parameter_class=ManualParameter,
                            initial_value=1)
 
@@ -75,62 +95,66 @@ class Base_MW_LutMan(Base_LutMan):
 
     def generate_standard_waveforms(self):
         self._wave_dict = {}
+        if self.cfg_sideband_mode() == 'static':
+            f_modulation = self.mw_modulation()
+        else:
+            f_modulation = 0
 
         self._wave_dict['I'] = self.wf_func(
             amp=0, sigma_length=self.mw_gauss_width(),
-            f_modulation=self.mw_modulation(),
+            f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=0,
             motzoi=0)
         self._wave_dict['rX180'] = self.wf_func(
             amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
-            f_modulation=self.mw_modulation(),
+            f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=0,
             motzoi=self.mw_motzoi())
         self._wave_dict['rY180'] = self.wf_func(
             amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
-            f_modulation=self.mw_modulation(),
+            f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=90,
             motzoi=self.mw_motzoi())
         self._wave_dict['rX90'] = self.wf_func(
             amp=self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
-            f_modulation=self.mw_modulation(),
+            f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=0,
             motzoi=self.mw_motzoi())
         self._wave_dict['rY90'] = self.wf_func(
             amp=self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
-            f_modulation=self.mw_modulation(),
+            f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=90,
             motzoi=self.mw_motzoi())
         self._wave_dict['rXm90'] = self.wf_func(
             amp=-1*self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
-            f_modulation=self.mw_modulation(),
+            f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=0,
             motzoi=self.mw_motzoi())
         self._wave_dict['rYm90'] = self.wf_func(
             amp=-1*self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
-            f_modulation=self.mw_modulation(),
+            f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=90,
             motzoi=self.mw_motzoi())
 
         self._wave_dict['rPhi180'] = self.wf_func(
             amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
-            f_modulation=self.mw_modulation(),
+            f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=self.mw_phi(),
             motzoi=self.mw_motzoi())
         self._wave_dict['rPhi90'] = self.wf_func(
             amp=self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
-            f_modulation=self.mw_modulation(),
+            f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=self.mw_phi(),
             motzoi=self.mw_motzoi())
         self._wave_dict['rPhim90'] = self.wf_func(
             amp=-1*self.mw_amp180()*self.mw_amp90_scale(),
             sigma_length=self.mw_gauss_width(),
-            f_modulation=self.mw_modulation(),
+            f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=self.mw_phi(),
             motzoi=self.mw_motzoi())
         self._wave_dict['spec'] = self.spec_func(
@@ -139,6 +163,15 @@ class Base_MW_LutMan(Base_LutMan):
             sampling_rate=self.sampling_rate(),
             delay=0,
             phase=0)
+
+        for i in range(18):
+            angle = i * 20
+            self._wave_dict['r{}_90'.format(angle)] = self.wf_func(
+                amp=self.mw_amp180()*self.mw_amp90_scale(),
+                sigma_length=self.mw_gauss_width(),
+                f_modulation=f_modulation,
+                sampling_rate=self.sampling_rate(), phase=angle,
+                motzoi=self.mw_motzoi())
 
         if self.mixer_apply_predistortion_matrix():
             self._wave_dict = self.apply_mixer_predistortion_corrections(
@@ -191,7 +224,9 @@ class CBox_MW_LutMan(Base_MW_LutMan):
         def_lm = self._def_lm
         LutMap = {}
         for cw_idx, cw_key in enumerate(def_lm):
-            LutMap[cw_key] = cw_idx
+            max_cw_cbox = 8
+            if cw_idx < max_cw_cbox:
+                LutMap[cw_key] = cw_idx
         self.LutMap(LutMap)
 
 
@@ -201,42 +236,12 @@ class QWG_MW_LutMan(Base_MW_LutMan):
         self._num_channels = 4
         super().__init__(name, **kw)
 
-    def set_default_lutmap(self):
-        """
-        Set's the default lutmap for standard microwave drive pulses.
-        """
-        def_lm = self._def_lm
-        LutMap = {}
-        # N.B. The main difference between the AWG8 and QWG in the lutmap
-        # is the naming of the codeword params.
-        for cw_idx, cw_key in enumerate(def_lm):
-            LutMap[cw_key] = (
-                'codeword_{}_ch{}_waveform'.format(cw_idx, self.channel_I()),
-                'codeword_{}_ch{}_waveform'.format(cw_idx, self.channel_Q()))
-        self.LutMap(LutMap)
-
-    def load_waveform_onto_AWG_lookuptable(self, waveform_name: str,
-                                           regenerate_waveforms: bool=False):
-        raise NotImplementedError('Awaits resolution of issue #322')
-
 
 class AWG8_MW_LutMan(Base_MW_LutMan):
 
     def __init__(self, name, **kw):
         self._num_channels = 8
         super().__init__(name, **kw)
-
-    def set_default_lutmap(self):
-        """
-        Set's the default lutmap for standard microwave drive pulses.
-        """
-        def_lm = self._def_lm
-        LutMap = {}
-        for cw_idx, cw_key in enumerate(def_lm):
-            LutMap[cw_key] = (
-                'wave_ch{}_cw{:03}'.format(self.channel_I(), cw_idx),
-                'wave_ch{}_cw{:03}'.format(self.channel_Q(), cw_idx))
-        self.LutMap(LutMap)
 
     def load_waveforms_onto_AWG_lookuptable(
             self, regenerate_waveforms: bool=True, stop_start: bool = True):
@@ -326,3 +331,42 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
             DI, DQ = np.dot(M_D, val[2:4])  # Mixer correction Derivative comp.
             wave_dict[key] = GI, GQ, DI, DQ
         return wave_dict
+
+
+# Not the cleanest inheritance but whatever - MAR Nov 2017
+class QWG_VSM_MW_LutMan(AWG8_VSM_MW_LutMan):
+
+    def load_waveforms_onto_AWG_lookuptable(
+            self, regenerate_waveforms: bool=True,  stop_start: bool = True):
+        AWG = self.AWG.get_instr()
+        if self.cfg_sideband_mode() == 'real-time':
+            AWG.ch_pair1_sideband_frequency(self.mw_modulation())
+            AWG.ch_pair3_sideband_frequency(self.mw_modulation())
+        else:
+            AWG.ch_pair1_sideband_frequency(0)
+            AWG.ch_pair3_sideband_frequency(0)
+
+        for ch in range(1, 5):
+            # ensures amplitude specified is in
+            AWG.set('ch{}_amp'.format(ch), 1)
+        return Base_MW_LutMan.load_waveforms_onto_AWG_lookuptable(
+            self=self,
+            regenerate_waveforms=regenerate_waveforms, stop_start=stop_start)
+
+    def _add_channel_params(self):
+        # all channels are used and hardcoded in functionality
+        pass
+
+    def set_default_lutmap(self):
+        """
+        Set's the default lutmap for standard microwave drive pulses.
+        """
+        def_lm = self._def_lm
+        LutMap = {}
+        for cw_idx, cw_key in enumerate(def_lm):
+            LutMap[cw_key] = (
+                'wave_ch1_cw{:03}'.format(cw_idx),
+                'wave_ch2_cw{:03}'.format(cw_idx),
+                'wave_ch3_cw{:03}'.format(cw_idx),
+                'wave_ch4_cw{:03}'.format(cw_idx))
+        self.LutMap(LutMap)
