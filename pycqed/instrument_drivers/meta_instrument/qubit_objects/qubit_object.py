@@ -266,11 +266,8 @@ class Qubit(Instrument):
         try:
             freq_res_par = self.freq_res
             freq_RO_par = self.ro_freq
-<<<<<<< HEAD
         except AttributeError:
-=======
-        except:
->>>>>>> master
+
             logging.warning('Rename the f_res parameter to freq_res')
             freq_res_par = self.f_res
             freq_RO_par = self.f_RO
