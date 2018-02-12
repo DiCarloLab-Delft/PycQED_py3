@@ -2433,3 +2433,33 @@ class DDM_integration_logging_det(Hard_Detector):
     def finish(self):
         if self.AWG is not None:
             self.AWG.stop()
+
+class Function_Detector_list(Soft_Detector):
+    """
+    Defines a detector function that wraps around an user-defined function.
+    Inputs are:
+        sweep_function, function that is going to be wrapped around
+        result_keys, keys of the dictionary returned by the function
+        value_names, names of the elements returned by the function
+        value_units, units of the elements returned by the function
+        msmt_kw, kw arguments for the function
+    The input function sweep_function must return a dictionary.
+    The contents(keys) of this dictionary are going to be the measured
+    values to be plotted and stored by PycQED
+    """
+
+    def __init__(self, sweep_function, result_keys, value_names=None,
+                 value_unit=None, msmt_kw={}, **kw):
+        super(Function_Detector_list, self).__init__()
+        self.sweep_function = sweep_function
+        self.result_keys = result_keys
+        self.value_names = value_names
+        self.value_units = value_unit
+        self.msmt_kw = msmt_kw
+        if self.value_names is None:
+            self.value_names = result_keys
+        if self.value_units is None:
+            self.value_units = [""] * len(result_keys)
+
+    def acquire_data_point(self, **kw):
+        return self.sweep_function(**self.msmt_kw)
