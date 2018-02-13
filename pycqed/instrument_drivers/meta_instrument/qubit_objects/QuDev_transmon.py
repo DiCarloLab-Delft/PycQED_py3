@@ -300,7 +300,7 @@ class QuDev_transmon(Qubit):
 
         self.inp_avg_det = det.UHFQC_input_average_detector(
             UHFQC=self.UHFQC, AWG=self.AWG, nr_averages=self.RO_acq_averages(),
-            nr_samples=4096)
+            nr_samples=int(self.ro_acq_input_average_length()*1.8e9))
 
         self.dig_log_det = det.UHFQC_integration_logging_det(
             UHFQC=self.UHFQC, AWG=self.AWG, channels=channels,
@@ -348,8 +348,7 @@ class QuDev_transmon(Qubit):
             self.RO_Q_channel(), self.RO_Q_offset()))
         self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(
             f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
-            RO_pulse_length=self.RO_pulse_length(),
-            acquisition_delay=0)
+            RO_pulse_length=self.RO_pulse_length())
         self.readout_UC_LO.pulsemod_state('Off')
         self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
         self.readout_UC_LO.on()
@@ -395,8 +394,7 @@ class QuDev_transmon(Qubit):
                     self.RO_Q_channel(), self.RO_Q_offset()))
                 self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(
                     f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
-                    RO_pulse_length=self.RO_pulse_length(),
-                    acquisition_delay=0)
+                    RO_pulse_length=self.RO_pulse_length())
                 self.readout_UC_LO.pulsemod_state('Off')
                 self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
                 self.readout_UC_LO.on()
@@ -405,7 +403,7 @@ class QuDev_transmon(Qubit):
                 self.readout_RF.frequency(f_RO)
                 self.readout_RF.power(self.RO_pulse_power())
                 self.readout_RF.on()
-                self.UHFQC.awg_sequence_acquisition(acquisition_delay=0)
+                self.UHFQC.awg_sequence_acquisition()
         else:
             # setting up the UHFQC awg sequence must be done externally by a
             # readout manager
@@ -566,17 +564,18 @@ class QuDev_transmon(Qubit):
                              qb_name=self.name)
             # ma.MeasurementAnalysis(TwoD=True, close_fig=close_fig)
 
-    def measure_resonator_spectroscopy_flux_sweep(self, freqs, voltages,
+    def measure_qubit_spectroscopy_flux_sweep(self, freqs, voltages,
             flux_channel=None, pulsed=True, MC=None, analyze=True,
                                                   close_fig=True):
         if MC is None:
-            MC == self.MC
+            MC = self.MC
         if flux_channel is None:
             flux_channel = self.dc_source_channel()
         if pulsed:
             self.prepare_for_pulsed_spec()
             spec_pars = self.get_spec_pars()
             RO_pars = self.get_RO_pars()
+            self.cw_source.on()
             sq.Pulsed_spec_seq(spec_pars, RO_pars)
             MC.set_sweep_function(self.cw_source.frequency)
             MC.set_sweep_points(freqs)
@@ -1345,7 +1344,7 @@ class QuDev_transmon(Qubit):
             MC = self.MC
 
         self.prepare_for_timedomain()
-        npoints = int(self.ro_acq_input_average_length()*1.8e9)
+        npoints = self.inp_avg_det.nr_samples
         if 'off' in cases:
             MC.set_sweep_function(awg_swf.OffOn(
                 pulse_pars=self.get_drive_pars(),
@@ -2147,7 +2146,7 @@ class QuDev_transmon(Qubit):
             no_cal_points = 0
 
         #how many times to apply the Rabi pulse
-        n = kw.get('n',1)
+        n = kw.get('n', 1)
 
         if rabi_amps is None:
             amps_span = kw.get('amps_span', 1.)

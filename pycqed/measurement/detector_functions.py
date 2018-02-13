@@ -1338,7 +1338,7 @@ class UHFQC_input_average_detector(Hard_Detector):
             # UHFQC returned data is in Volts
             # January 2018 verified by Xavi
         self.AWG = AWG
-        self.nr_samples = nr_samples
+        self.nr_samples = nr_samples - nr_samples % 4
         self.nr_averages = nr_averages
 
     def get_values(self):
@@ -1566,8 +1566,9 @@ class UHFQC_integrated_average_detector(Hard_Detector):
             self.AWG.stop()
         self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
         self.UHFQC.acquisition_arm()
+        while not self.UHFQC.awgs_0_enable():
+            time.sleep(0.05)
         # starting AWG
-
         if self.AWG is not None:
             self.AWG.start()
 

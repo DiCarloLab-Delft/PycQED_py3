@@ -869,7 +869,7 @@ class UHFQC(Instrument):
                     'setTrigger(0);\n')
         self.awg_string(sequence, timeout=timeout)
 
-    def awg_sequence_acquisition_and_pulse(self, Iwave, Qwave, acquisition_delay):
+    def awg_sequence_acquisition_and_pulse(self, Iwave, Qwave, trigger=True):
         if np.max(Iwave) > 1.0 or np.min(Iwave) < -1.0:
             raise KeyError(
                 "exceeding AWG range for I channel, all values should be withing +/-1")
@@ -885,11 +885,6 @@ class UHFQC(Instrument):
 
         wave_I_string = self.array_to_combined_vector_string(Iwave, "Iwave")
         wave_Q_string = self.array_to_combined_vector_string(Qwave, "Qwave")
-        delay_samples = int(acquisition_delay*1.8e9/8)
-        #delay_string = '\twait(wait_delay);\n'
-        delay_string = ''
-        self.awgs_0_userregs_2(delay_samples)
-
         preamble = """
 const TRIGGER1  = 0x000001;
 const WINT_TRIG = 0x000010;
@@ -907,7 +902,7 @@ if(getUserReg(1)){
 
         loop_start = """
 repeat(loop_cnt) {
-\twaitDigTrigger(1, 1);
+""" + ("\twaitDigTrigger(1, 1);" if trigger else "") + """
 \tplayWave(Iwave, Qwave);\n"""
 
         end_string = """
@@ -919,7 +914,7 @@ wait(300);
 setTrigger(0);"""
 
         string = preamble+wave_I_string+wave_Q_string + \
-            loop_start+delay_string+end_string
+            loop_start+end_string
         self.awg_string(string)
 
     def awg_sequence_acquisition_and_pulse_multi_segment(self, readout_pulses):
@@ -1064,7 +1059,7 @@ setTrigger(0);"""
         self._daq.sync()
 
     def awg_sequence_acquisition_and_pulse_SSB(
-            self, f_RO_mod, RO_amp, RO_pulse_length, acquisition_delay):
+            self, f_RO_mod, RO_amp, RO_pulse_length):
         f_sampling = 1.8e9
         samples = RO_pulse_length*f_sampling
         array = np.arange(int(samples))
@@ -1073,7 +1068,7 @@ setTrigger(0);"""
         Iwave = (coswave+sinwave)/np.sqrt(2)
         Qwave = (coswave-sinwave)/np.sqrt(2)
         self.awg_sequence_acquisition_and_pulse(
-            Iwave, Qwave, acquisition_delay)
+            Iwave, Qwave)
 
     def upload_transformation_matrix(self, matrix):
         for i in range(np.shape(matrix)[0]):  # looping over the rows

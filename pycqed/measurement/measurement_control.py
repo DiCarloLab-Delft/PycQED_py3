@@ -183,7 +183,7 @@ class MeasurementControl(Instrument):
         self.finish(result)
         return return_dict
 
-    def measure(self, *kw):
+    def measure(self):
         if self.live_plot_enabled():
             self.initialize_plot_monitor()
 
