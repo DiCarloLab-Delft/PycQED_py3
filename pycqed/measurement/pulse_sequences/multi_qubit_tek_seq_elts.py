@@ -1009,38 +1009,81 @@ def n_qubit_off_on(pulse_pars_list, RO_pars, return_seq=False, verbose=False,
 def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_list, RO_pars,
                                                      nr_cliffords_value, #scalar
                                                      nr_seeds,           #array
-                                                     idx_for_RB=0,
-                                                     return_seq=False,
                                                      CxC_RB=True,
+                                                     idx_for_RB=0,
                                                      net_clifford=0,
                                                      gate_decomposition='HZ',
                                                      interleaved_gate=None,
+                                                     CZ_info_dict=None,
+                                                     interleave_CZ=False,
                                                      post_msmt_delay=3e-6,
+                                                     upload=True,
                                                      seq_name=None,
                                                      verbose=False,
-                                                     interleave_CZ=False,
-                                                     CZ_info_list=None,
-                                                     upload=True):
+                                                     return_seq=False):
 
-    # Here RO_pars must contain the RO pulse for multiplexed RO on the
-    # relevant qubits.
-    # idx_for_RB refers to the index of the pulse_pars in pulse_pars_list
-    # which will undergo the RB protocol in the case CxC_RB==False (i.e. the
-    # position of the Z operator when we measure ZIII..I, IZII..I, IIZI..I etc.
-
-    # TODO: add support for more than one CZ in the CZ_info_list -> make
-    # TODO: qbc, qbt into list, now they are variables.
-
+    """
+    Args:
+        qubit_list (list): list of qubit objects to perfomr RB on
+        RO_pars (dict): RO pulse pars for multiplexed RO on the qubits in
+            qubit_list
+        nr_cliffords_value (int): number of Cliffords in the sequence
+        nr_seeds (numpy.ndarray): numpy.arange(nr_seeds_int) where nr_seeds_int
+            is the number of times to repeat each Clifford sequence of
+            length nr_cliffords_value
+        CxC_RB (bool): whether to perform CxCxCx..xC RB or
+            (CxIx..xI, IxCx..XI, ..., IxIx..xC) RB
+        idx_for_RB (int): if CxC_RB==False, refers to the index of the
+            pulse_pars in pulse_pars_list which will undergo the RB protocol
+            (i.e. the position of the Z operator when we measure
+            ZIII..I, IZII..I, IIZI..I etc.)
+        net_clifford (int): 0 or 1; refers to the final state after the recovery
+            Clifford has been applied. 0->gnd state, 1->exc state.
+        gate_decomposition (str): 'HZ' or 'XY'
+        interleaved_gate (str): used for regular single qubit Clifford IRB
+            string referring to one of the gates in the single qubit
+            Clifford group
+        CZ_info_dict (dict): dict indicating which qbs in the CZ gates are the
+            control and the target. Can have the following forms:
+            either:    {'qbc': qb_control_name_CZ,
+                        'qbt': qb_target_name_CZ}
+            if only one CZ gate is interleaved;
+            or:       {'CZi': {'qbc': qb_control_name_CZ,
+                               'qbt': qb_target_name_CZ}}
+            if multiple CZ gates are interleaved; CZi = [CZ0, CZ1, ...] where
+            CZi is the c-phase gate between qbc->qbt.
+            (We start counting from zero because we are programmers.)
+        interleave_CZ (bool): Only used if CZ_info_dict != None
+            True -> interleave the CZ gate
+            False -> interleave the ICZ gate
+        post_msmt_delay (float): wait time between susequent RB sequences
+        upload (bool): upload sequence to AWG or not
+        seq_name (str): name of this sequence
+        verbose (bool): print runtime info
+        return_seq (bool): if True, returns seq, element list;
+            if False, returns only seq_name
+    """
     # get number of qubits
     n = len(qubit_list)
 
-    # Create a dict with the parameters for all the pulses
-    if CZ_info_list is not None:
-        CZ_info_list = [(qubit_list.index(qb_pairs[0]),
-                         qubit_list.index(qb_pairs[1])) for
-                        qb_pairs in CZ_info_list]
+    # Get indices of qbc and qbt in the qubits_list and store them as
+    # a list of tuples in CZ_info_list
+    if CZ_info_dict is not None:
+        qubit_names = [qb.name for qb in qubit_list]
+        if type(list(CZ_info_dict.values())[0]) != dict:
+            # if CZ_info_dict is not of the form
+            # {'CZi': {'qbc': qbc_name, 'qbt': qbt_name}}
+            CZ_info_list = [(qubit_names.index(CZ_info_dict['qbc']),
+                             qubit_names.index(CZ_info_dict['qbt']))]
+        else:
+            # CZ_info_dict is of the form {'qbc': qbc_name, 'qbt': qbt_name}
+            CZ_info_list = []
+            for CZ_info in CZ_info_dict.values():
+                CZ_info_list.append((qubit_names.index(CZ_info['qbc']),
+                                     qubit_names.index(CZ_info['qbt'])))
         print('(qbc_idx, qbt_idx) = ', CZ_info_list)
 
+    # Create a dict with the parameters for all the pulses
     pulse_dict = {'RO': RO_pars}
 
     for qb_nr, qb in enumerate(qubit_list):
@@ -1055,9 +1098,9 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_list, RO_pars,
                        'length': 30e-9,
                        'pulse_delay': 0,
                        'target_qubit': qb.name}
-        op_dict.update({'spacer '+qb.name: spacerpulse})
+        op_dict.update({'spacer ' + qb.name: spacerpulse})
 
-        if CZ_info_list is not None:
+        if CZ_info_dict is not None:
             for CZ_idxs in CZ_info_list:
                 qbc = qubit_list[CZ_idxs[0]]
                 qbt = qubit_list[CZ_idxs[1]]
@@ -1068,21 +1111,11 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_list, RO_pars,
                                          format(qbt.name, qbc.name))
                 # if qb.name == qubit_list[CZ_idxs[1]].name:
 
-                op_dict['ICZ ' + qb.name] = \
-                    deepcopy(op_dict['I ' + qb.name])
-                op_dict['ICZs ' + qb.name] = \
-                    deepcopy(op_dict['Is ' + qb.name])
-
+                op_dict['ICZ ' + qb.name] = deepcopy(op_dict['I ' + qb.name])
                 op_dict['ICZ ' + qb.name]['nr_sigma'] = 1
-                op_dict['ICZs ' + qb.name]['nr_sigma'] = 1
-
                 op_dict['ICZ ' + qb.name]['sigma'] = \
                     qbc.get_operation_dict()[
                         'CZ ' + qbt.name + ' ' + qbc.name]['length']
-                op_dict['ICZs ' + qb.name]['sigma'] = \
-                    qbc.get_operation_dict()[
-                        'CZ ' + qbt.name + ' ' + qbc.name]['length']
-
         if qb_nr != 0:
             for pulse_names in op_dict:
                 op_dict[pulse_names]['refpoint'] = 'start'
@@ -1097,7 +1130,8 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_list, RO_pars,
         for i in nr_seeds:
             clifford_sequence_list = []
             for index in range(n):
-                clifford_sequence_list.append(rb.randomized_benchmarking_sequence(
+                clifford_sequence_list.append(
+                    rb.randomized_benchmarking_sequence(
                     nr_cliffords_value, desired_net_cl=net_clifford,
                     interleaved_gate=interleaved_gate))
 
@@ -1106,7 +1140,7 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_list, RO_pars,
                 gate_decomp=gate_decomposition)
 
             # interleave pulses for each qubit to obtain [pulse0_qb0,
-            # pulse0_qb1,...pulse0_qbN,...,pulseN_qb0, pulseN_qb1,...,pulseN_qbN]
+            # pulse0_qb1,..pulse0_qbN,..,pulseN_qb0, pulseN_qb1,..,pulseN_qbN]
             pulse_keys_w_suffix = []
             for k, lst in enumerate(pulse_keys):
                 pulse_keys_w_suffix.append([x+' '+qubit_list[k % n].name
@@ -1119,14 +1153,14 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_list, RO_pars,
                     if pulse_keys_lst[0][-3::] == qbc.name:
                         if interleave_CZ:
                             pulse_keys_lst.extend([
-                                'spacer '+qbc.name,
+                                'spacer '+ qbc.name,
                                 'CZ ' + qbt.name + ' ' + qbc.name,
-                                'spacer '+qbc.name])
+                                'spacer '+ qbc.name])
                         else:
                             pulse_keys_lst.extend([
-                                'spacer '+qbc.name,
+                                'spacer '+ qbc.name,
                                 'ICZ ' + qbc.name,
-                                'spacer '+qbc.name])
+                                'spacer '+ qbc.name])
                     if pulse_keys_lst[0][-3::] == qbt.name:
                         pulse_keys_lst.extend(['spacer '+qbt.name,
                                                'ICZ ' + qbt.name,
@@ -1306,126 +1340,143 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_list, RO_pars,
 
 
 
-def two_qubit_tomo_bell_qudev(bell_state,
-                              qb_c,
-                              qb_t,
-                              RO_pars,
-                              num_flux_pulses=0,
-                              CZ_disabled=False,
-                              verbose=False,
-                              separation=100e-9,
-                              upload=True
-                              ):
+def two_qubit_tomo_bell_qudev_seq(bell_state,
+                                  qb_c,
+                                  qb_t,
+                                  RO_pars,
+                                  basis_pulses=None,
+                                  cal_state_repeats=7,
+                                  spacing=100e-9,
+                                  CZ_disabled=False,
+                                  num_flux_pulses=0,
+                                  verbose=False,
+                                  # separation=100e-9,
+                                  upload=True):
     '''
-                 |  spacing  |
-    |qCZ> --gate1------*------after_pulse-----| tomo |
-                       |
-    |qS > --gate2------*----------------------| tomo |
+                 |spacing|spacing|
+    |qCZ> --gate1--------*--------after_pulse-----| tomo |
+                         |
+    |qS > --gate2--------*------------------------| tomo |
 
         qb_c (qCZ) is the control qubit (pulsed)
         qb_t (qS) is the target qubit
+
+    Args:
+        bell_state (int): which Bell state to prepare according to:
+            0 -> phi_Minus
+            1 -> phi_Plus
+            2 -> psi_Minus
+            3 -> psi_Plus
+        qb_c (qubit object): control qubit
+        qb_t (qubit object): target qubit
+        RO_pars (dict): RO pulse pars for multiplexed RO on the qb_c, qb_t
+        basis_pulses (tuple): tomo pulses to be applied on each qubit
+            default: ('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90')
+        cal_state_repeats (int): number of times to repeat each cal state
+        spacing (float): spacing before and after CZ pulse; see diagram above
+        CZ_disabled (bool): True -> same bell state preparation but without
+            the CZ pulse; False -> normal bell state preparation
+        num_flux_pulses (int): number of times to apply a flux pulse with the
+            same length as the one used in the CZ gate before the entire
+            sequence (before bell state prep).
+            CURRENTLY NOT USED!
+        verbose (bool): print runtime info
+        upload (bool): whether to upload sequence to AWG or not
+    Returns:
+        seq: Sequence object
+        el_list: list of elements
     '''
 
 
     if station is None:
         logging.warning('No station specified.')
+    if basis_pulses is None:
+        basis_pulses = ('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90')
+        logging.warning('basis_pulses not specified. Using the'
+                        'following basis:\n{}'.format(basis_pulses))
 
+    sequencer_config = station.sequencer_config
+    seq_name = '2_qubit_Bell_Tomo_%d_seq' % bell_state
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+
+    operation_dict = {'RO': RO_pars}
+    operation_dict.update(qb_c.get_operation_dict())
+    operation_dict.update(qb_t.get_operation_dict())
 
     qCZ = qb_c.name
     qS = qb_t.name
 
-    sequencer_config = station.sequencer_config
-    operation_dict = qb_c.get_operation_dict()
-    operation_dict.update(qb_t.get_operation_dict())
+    # add spacer pulses and ICZ pulses
+    ##### very specific to GHZ preparation! #####
+    for qb_name in [qCZ, qS]:
+        spacerpulse = {'pulse_type': 'SquarePulse',
+                       'channel': RO_pars['acq_marker_channel'],
+                       'amplitude': 0.0,
+                       'length': spacing,
+                       'pulse_delay': 0,
+                       'target_qubit': qb_name}
+        operation_dict.update({'spacer ' + qb_name: spacerpulse})
 
+        if not CZ_disabled:
+            # create I_CZ as a a copy of the I pulse but with the same length
+            # as the CZ pulse
+            for i, CZ_op in enumerate(['CZ ' + qS + ' ' + qCZ,
+                                       'CZ ' + qS + ' ' + qCZ]):
+                operation_dict['ICZ ' + qb_name] = \
+                    deepcopy(operation_dict['I ' + qb_name])
+                operation_dict['ICZ ' + qb_name]['sigma'] = \
+                    operation_dict[CZ_op]['length']
+                operation_dict['ICZ ' + qb_name]['nr_sigma'] = 1
 
-    seq_name = '2_qubit_Bell_Tomo_%d_seq' % bell_state
-    seq = sequence.Sequence(seq_name)
-    el_list = []
-    tomo_list_qS = []
-    tomo_list_qCZ = []
-    # Tomo pulses span a basis covering all the cardinal points
-    # tomo_pulses = ['I ', 'X180 ', 'X90 ', 'Y90 ', 'mX90 ', 'mY90 ']
-    tomo_pulses = ['I', 'X180', 'Y90', 'mY90', 'X90', 'mX90']
-    for tp in tomo_pulses:
-        tomo_list_qCZ += [tp + ' ' + qCZ]
-        tomo_list_qS += [tp + 's ' + qS]
+    # make all pulses for qubit1 and qubit2 be simultaneous with qubit0
+    for pulse_names in operation_dict:
+        if operation_dict[pulse_names]['target_qubit'] == qS:
+            operation_dict[pulse_names]['refpoint'] = 'start'
 
-    ###########################
-    # Defining sub sequences #
-    ###########################
-    # This forms the base sequence, note that gate1, gate2 and after_pulse will
-    # be replaced to prepare the desired state and tomo1 and tomo2 will be
-    # replaced with tomography pulses
+    # This forms the base sequences, note that gate1, gate2 and after_pulse will
+    # be replaced to prepare the desired state.
     if not CZ_disabled:
         base_sequence = ['gate2 ' + qCZ, 'gate1 ' + qS,
-                         'CZ ' + qS + ' ' + qCZ, 'I_CZs ' + qS,
-                         'after_pulse', 'Is ' + qS,
-                         'tomo1 '+ qCZ, 'tomo2 '+ qS]
+                         'spacer ' + qCZ, 'spacer ' + qS,
+                         'CZ ' + qS + ' ' + qCZ, 'I_CZ ' + qS,
+                         'spacer ' + qCZ, 'spacer ' + qS,
+                         'after_pulse', 'I ' + qS]
         # base_sequence = num_flux_pulses*['flux ' + qCZ]
         # base_sequence.extend(
         #     ['gate1 ' + qS, 'gate2 ' + qCZ, 'CZ_corr ' + qS, 'CZ_corr ' + qCZ,
         #      'CZ ' + qCZ, 'after_pulse',
         #      'tomo1 '+qCZ, 'tomo2 '+qS])#, 'RO '+RO_target])
-
-        # Calibration points
-        # every calibration point is repeated 7 times to have 64 elts in totalb
-
-        # create I_CZ as a a copy of the I pulse but with the same length as
-        # the CZ pulse
-        for qb_name in [qCZ, qS]:
-            operation_dict['I_CZ ' + qb_name] = \
-                deepcopy(operation_dict['I ' + qb_name])
-            operation_dict['I_CZs ' + qb_name] = \
-                deepcopy(operation_dict['Is ' + qb_name])
-
-            operation_dict['I_CZ ' + qb_name]['sigma'] = \
-                operation_dict['CZ ' + qS + ' ' + qCZ]['length']
-            operation_dict['I_CZ ' + qb_name]['nr_sigma'] = 1
-            operation_dict['I_CZs ' + qb_name]['sigma'] = \
-                operation_dict['CZ ' + qS + ' ' + qCZ]['length']
-            operation_dict['I_CZs ' + qb_name]['nr_sigma'] = 1
-        cal_points = \
-            [['I '+qCZ, 'Is '+qS,  'I_CZ ' + qCZ, 'I_CZs '+qS, 'I '+qCZ, 'Is '+qS,
-              'I '+qCZ, 'Is '+qS]]*7 + \
-            [['I '+qCZ, 'Is '+qS,  'I_CZ ' + qCZ, 'I_CZs '+qS, 'I '+qCZ, 'Is '+qS,
-              'I '+qCZ, 'X180 '+qS]]*7 + \
-            [['I '+qCZ, 'Is '+qS,  'I_CZ ' + qCZ, 'I_CZs '+qS, 'I '+qCZ, 'Is '+qS,
-              'X180 '+qCZ, 'I '+qS]]*7 + \
-            [['I '+qCZ, 'Is '+qS,  'I_CZ ' + qCZ, 'I_CZs '+qS, 'I '+qCZ, 'Is '+qS,
-              'X180 '+qCZ, 'X180 '+qS]]*7
+        cal_base_sequence = \
+            ['I '+qCZ, 'I '+qS,
+              'spacer ' + qCZ, 'spacer ' + qS,
+              'I_CZ ' + qCZ, 'I_CZ '+qS,
+              'spacer ' + qCZ, 'spacer ' + qS,
+              'I '+qCZ, 'I '+qS]
     else:
         base_sequence = ['gate2 ' + qCZ, 'gate1 ' + qS,
-                         'after_pulse', 'Is ' + qS,
-                         'tomo1 '+qCZ, 'tomo2 '+qS]
-        # Calibration points
-        # every calibration point is repeated 7 times to have 64 elts in totalb
-        cal_points = \
-            [['I '+qCZ, 'Is '+qS, 'I '+qCZ, 'Is '+qS, 'I '+qCZ, 'Is '+qS]]*7 + \
-            [['I '+qCZ, 'Is '+qS, 'I '+qCZ, 'Is '+qS, 'I '+qCZ, 'X180s '+qS]]*7 + \
-            [['I '+qCZ, 'Is '+qS, 'I '+qCZ, 'Is '+qS, 'X180 '+qCZ, 'Is '+qS]]*7 + \
-            [['I '+qCZ, 'Is '+qS, 'I '+qCZ, 'Is '+qS, 'X180 '+qCZ, 'X180s '+qS]]*7
-
+                         'after_pulse', 'I ' + qS]
+        cal_base_sequence = ['I '+qCZ, 'I '+qS, 'I '+qCZ, 'I '+qS]
 
     ################
     # Bell states  #
     ################
     if bell_state == 0:  # |Phi_m>=|00>-|11>
         gate2 = 'Y90 ' + qCZ
-        gate1 = 'Y90s ' + qS
-        after_pulse = 'mY90afs ' + qCZ
+        gate1 = 'Y90 ' + qS
+        after_pulse = 'mY90 ' + qCZ
     elif bell_state == 1:  # |Phi_p>=|00>+|11>
         gate2 = 'Y90 ' + qCZ
-        gate1 = 'mY90s ' + qS
-        after_pulse = 'mY90afs ' + qCZ
+        gate1 = 'mY90 ' + qS
+        after_pulse = 'mY90 ' + qCZ
     elif bell_state == 2:  # |Psi_m>=|01> - |10>
         gate2 = 'mY90 ' + qCZ
-        gate1 = 'Y90s ' + qS
-        after_pulse = 'mY90afs ' + qCZ
+        gate1 = 'Y90 ' + qS
+        after_pulse = 'mY90 ' + qCZ
     elif bell_state == 3:  # |Psi_p>=|01> + |10>
         gate2 = 'Y90 ' + qCZ
-        gate1 = 'Y90s ' + qS
-        after_pulse = 'Y90afs ' + qCZ
+        gate1 = 'Y90 ' + qS
+        after_pulse = 'Y90 ' + qCZ
 
     ########################################################
     #  Here the actual pulses of all elements get defined  #
@@ -1435,36 +1486,40 @@ def two_qubit_tomo_bell_qudev(bell_state,
     base_sequence[base_sequence.index('gate2 ' + qCZ)] = gate2
     base_sequence[base_sequence.index('after_pulse')] = after_pulse
 
-    seq_pulse_list = []
+    # Tomo pulses
+    tomo_pulses = get_tomography_pulses(*[qCZ, qS],
+                                        basis_pulses=basis_pulses)
 
-    for i in range(36):
-        tomo_idx_qS = int(i % 6)
-        tomo_idx_qCZ = int(((i - tomo_idx_qS)/6) % 6)
-        base_sequence[-2] = tomo_list_qCZ[tomo_idx_qCZ]
-        base_sequence[-1] = tomo_list_qS[tomo_idx_qS]
-        seq_pulse_list += [deepcopy(base_sequence)]
+    seq_pulse_list = len(tomo_pulses)*['']
+    for i, t in enumerate(tomo_pulses):
+        seq_pulse_list[i] = base_sequence + t
 
-    # print(len(cal_points))
-    for cal_pulses in cal_points:
-        seq_pulse_list += [cal_pulses]
+    # Calibration points
+    # every calibration point is repeated 7 times to have 64 elts in totalb
+    cal_pulses = get_tomography_pulses(*[qCZ, qS],
+                                       basis_pulses=('I', 'X180'))
+    for i, cal_p in enumerate(cal_pulses):
+        cal_pulses[i] = cal_base_sequence + cal_p
+    cal_pulses= [list(i) for i in np.repeat(np.asarray(cal_pulses),
+                                            cal_state_repeats, axis=0)]
+    for cal_p in cal_pulses:
+        seq_pulse_list += [cal_p]
 
-    # set correct timing before making the pulse list
-    flux_pulse = operation_dict['CZ ' + qS + ' ' + qCZ]
-    flux_pulse['refpoint'] = 'end'
-    print('\n',separation)
-    print(flux_pulse['pulse_delay'])
-
-    operation_dict['mY90afs ' + qCZ] = operation_dict['mY90s ' + qCZ]
-    operation_dict['mY90afs ' + qCZ]['pulse_delay'] = \
-        separation - flux_pulse['pulse_delay']
-    operation_dict['mY90afs ' + qCZ]['refpoint'] = 'start'
-    if bell_state==3:
-        operation_dict['Y90afs ' + qCZ] = operation_dict['Y90s ' + qCZ]
-        operation_dict['Y90afs ' + qCZ]['pulse_delay'] = \
-            separation - flux_pulse['pulse_delay']
-        operation_dict['Y90afs ' + qCZ]['refpoint'] = 'start'
-
-
+    # # set correct timing before making the pulse list
+    # flux_pulse = operation_dict['CZ ' + qS + ' ' + qCZ]
+    # flux_pulse['refpoint'] = 'end'
+    # print('\n',separation)
+    # print(flux_pulse['pulse_delay'])
+    #
+    # operation_dict['mY90afs ' + qCZ] = operation_dict['mY90s ' + qCZ]
+    # operation_dict['mY90afs ' + qCZ]['pulse_delay'] = \
+    #     separation - flux_pulse['pulse_delay']
+    # operation_dict['mY90afs ' + qCZ]['refpoint'] = 'start'
+    # if bell_state==3:
+    #     operation_dict['Y90afs ' + qCZ] = operation_dict['Y90s ' + qCZ]
+    #     operation_dict['Y90afs ' + qCZ]['pulse_delay'] = \
+    #         separation - flux_pulse['pulse_delay']
+    #     operation_dict['Y90afs ' + qCZ]['refpoint'] = 'start'
 
     for i, pulse_list in enumerate(seq_pulse_list):
         # print('pulse_list ', pulse_list)
@@ -1475,7 +1530,6 @@ def two_qubit_tomo_bell_qudev(bell_state,
             #     from pprint import pprint
             #     pprint(operation_dict[p])
         # print('pulses ', len(pulses))
-        pulses += [RO_pars]
         from pprint import pprint
         pprint(pulses)
         print('\n')
@@ -1490,63 +1544,140 @@ def two_qubit_tomo_bell_qudev(bell_state,
     return seq, el_list
 
 
-def three_qubit_GHZ_state(qubits,
-                          idxs_ctrl_qubits,
-                          RO_pars,
-                          basis_pulses=None,
-                          distortion_dict=None,
-                          verbose=False,
-                          upload=True):
+def three_qubit_GHZ_tomo_seq(qubits,
+                             RO_pars,
+                             CZ_qubit_dict,
+                             basis_pulses=None,
+                             cal_state_repeats=2,
+                             spacing=100e-9,
+                             verbose=False,
+                             upload=True):
     '''
-    |q0> --Y90----*------------------------|======|
-                  |
-    |q1> --Y90s---*----mY90---*------------| tomo |
-                              |
-    |q2> --Y90s---------------*---mY90-----|======|
+              |spacing|spacing|
+    |q0> --Y90--------*--------------------------------------|======|
+                      |
+    |q1> --Y90s-------*--------mY90--------*-----------------| tomo |
+                                           |
+    |q2> --Y90s----------------------------*--------mY90-----|======|
+                                   |spacing|spacing|
+    Args:
+        qubits (list or tuple): list of 3 qubits
+        RO_pars (dict): RO pulse pars for multiplexed RO on the qubits
+        CZ_qubit_dict(dict):  dict of the following form:
+            {'qbc0': qb_control_name_CZ0,
+             'qbt0': qb_target_name_CZ0,
+             'qbc1': qb_control_name_CZ1,
+             'qbt1': qb_target_name_CZ1}
+            where CZ0, and CZ1 refer to the first and second CZ applied.
+            (We start counting from zero because we are programmers.)
+        basis_pulses (tuple): tomo pulses to be applied on each qubit
+            default: ('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90')
+        cal_state_repeats (int): number of times to repeat each cal state
+        spacing (float): spacing before and after CZ pulse; see diagram above
+        verbose (bool): print runtime info
+        upload (bool): whether to upload sequence to AWG or not
+    Returns:
+        seq: Sequence object
+        el_list: list of elements
 
-    idxs_ctrl_qubits: list indicating which of the 3 qubits is the control in
-    the 2 CZ gates present. For example idxs_ctrl_qubits = [0,2] indicates
-    that qb0 is the control qubits in the CZ between qb0-qb1, and that qb2 is
-    the control qubit in the CZ between qb1-qb2
+    OLD concept:
+    idxs_CZ_qubits: list of tuples indicating the qbc, qbt for the 2 CZ gates.
+    For example idxs_CZ_qubits = [(0,1), (1,2)] indicates that qb0 is the
+    control qubit and qb1 is the target in the CZ between qb0-qb1, and that qb1
+    is the control qubit and qb2 is the target in the CZ between qb1-qb2.
     '''
 
     if station is None:
         logging.warning('No station specified.')
-
-    qb0 = qubits[0]
-    qb1 = qubits[1]
-    qb2 = qubits[2]
-    qb_ctrl0 = qubits[idxs_ctrl_qubits[0]]
-    qb_ctrl1 = qubits[idxs_ctrl_qubits[1]]
+    if basis_pulses is None:
+        basis_pulses = ('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90')
+        logging.warning('basis_pulses not specified. Using the'
+                        'following basis:\n{}'.format(basis_pulses))
 
     sequencer_config = station.sequencer_config
-    operation_dict = qb0.get_operation_dict()
-    operation_dict.update(qb1.get_operation_dict())
-    operation_dict.update(qb2.get_operation_dict())
-
     seq_name = 'three_qubit_GHZ_state_seq'
     seq = sequence.Sequence(seq_name)
     el_list = []
 
-    base_pulse_list = ['Y90 ' + qb0.name, 'Y90s ' + qb1.name,
-                       'Y90s ' + qb2.name, 'CZ ' + qb_ctrl0.name,
-                       'mY90 ' + qb1.name, 'CZ ' + qb_ctrl1.name,
-                       'mY90 ' + qb2.name]
+    qubit0 = qubits[0]
+    qubit1 = qubits[1]
+    qubit2 = qubits[2]
 
-    tomo_pulses = get_tomography_pulses(*[qb0.name, qb1.name, qb2.name],
+    qubit_names = [qb.name for qb in qubits]
+    qbc0 = qubits[qubit_names.index(CZ_qubit_dict['qbc0'])]
+    qbt0 = qubits[qubit_names.index(CZ_qubit_dict['qbt0'])]
+    qbc1 = qubits[qubit_names.index(CZ_qubit_dict['qbc1'])]
+    qbt1 = qubits[qubit_names.index(CZ_qubit_dict['qbt1'])]
+
+    operation_dict = {'RO': RO_pars}
+    operation_dict.update(qubit0.get_operation_dict())
+    operation_dict.update(qubit1.get_operation_dict())
+    operation_dict.update(qubit2.get_operation_dict())
+
+    # add spacer pulses and ICZ pulses
+    ##### very specific to GHZ preparation! #####
+    for qb in qubits:
+        spacerpulse = {'pulse_type': 'SquarePulse',
+                       'channel': RO_pars['acq_marker_channel'],
+                       'amplitude': 0.0,
+                       'length': spacing,
+                       'pulse_delay': 0,
+                       'target_qubit': qb.name}
+        operation_dict.update({'spacer ' + qb.name: spacerpulse})
+
+        for i, CZ_op in enumerate(['CZ ' + qbt0.name + ' ' + qbc0.name,
+                                   'CZ ' + qbt1.name + ' ' + qbc1.name]):
+            operation_dict['ICZ' + str(i) + ' ' + qb.name] = \
+                deepcopy(operation_dict['I ' + qb.name])
+            operation_dict['ICZ' + str(i) + ' ' + qb.name]['sigma'] = \
+                operation_dict[CZ_op]['length']
+            operation_dict['ICZ' + str(i) + ' ' + qb.name]['nr_sigma'] = 1
+
+    # make all pulses for qubit1 and qubit2 be simultaneous with qubit0
+    for pulse_names in operation_dict:
+        if operation_dict[pulse_names]['target_qubit'] != qubit0.name:
+            operation_dict[pulse_names]['refpoint'] = 'start'
+
+    base_pulse_list = \
+        ['Y90 ' + qubit0.name, 'Y90 ' + qubit1.name, 'Y90 ' + qubit2.name,
+         'spacer '+qbc0.name, 'spacer ' + qbt0.name, 'spacer ' + qubit2.name,
+         'CZ '+qbt0.name+' '+qbc0.name, 'ICZ0 '+qbt0.name, 'ICZ0 '+qubit2.name,
+         'spacer '+qbc0.name, 'spacer ' + qbt0.name, 'spacer '+ qubit2.name,
+         'I ' + qubit0.name, 'mY90 ' + qubit1.name, 'I ' + qubit2.name,
+         'spacer ' + qubit0.name, 'spacer '+qbc1.name, 'spacer '+ qbt1.name,
+         'ICZ1 '+qubit0.name, 'CZ '+qbt1.name+' '+qbc1.name, 'ICZ1 '+qbt1.name,
+         'spacer ' + qubit0.name, 'spacer '+qbc1.name, 'spacer '+ qbt1.name,
+         'I ' + qubit0.name, 'I ' + qubit1.name, 'mY90 ' + qubit2.name]
+
+    tomo_pulses = get_tomography_pulses(*[qubit0.name, qubit1.name, qubit2.name],
                                         basis_pulses=basis_pulses)
 
     pulse_list = len(tomo_pulses)*['']
     for i, t in enumerate(tomo_pulses):
         pulse_list[i] = base_pulse_list + t
 
-    # TODO: add cal points!
+    # Add cal points
+    cal_base_pulse_list = \
+        ['I ' + qubit0.name, 'I ' + qubit1.name, 'I ' + qubit2.name,
+         'spacer ' + qbc0.name, 'spacer ' + qbt0.name, 'spacer ' + qubit2.name,
+         'ICZ0 ' + qbc0.name, 'ICZ0 ' + qbt0.name, 'ICZ0 ' + qubit2.name,
+         'spacer ' + qbc0.name, 'spacer ' + qbt0.name, 'spacer ' + qubit2.name,
+         'I ' + qubit0.name, 'I ' + qubit1.name, 'I ' + qubit2.name,
+         'spacer ' + qubit0.name, 'spacer ' + qbc1.name, 'spacer '+ qbt1.name,
+         'ICZ1 ' + qubit0.name, 'ICZ1 ' + qbc1.name, 'ICZ1 ' + qbt1.name,
+         'spacer ' + qubit0.name, 'spacer ' + qbc1.name, 'spacer '+ qbt1.name,
+         'I ' + qubit0.name, 'I ' + qubit1.name, 'I ' + qubit2.name]
     # use get_tomography_pulses with basis_pulses = (I, X180) to get
     # all combinations of cal points
-    cal_pulses = get_tomography_pulses(*[qb0.name, qb1.name, qb2.name],
+    cal_pulses = get_tomography_pulses(*[qubit0.name, qubit1.name, qubit2.name],
                                        basis_pulses=('I', 'X180'))
-    # duplicate each cal point measurement
-    cal_pulses= [list(i) for i in np.repeat(np.asarray(cal_pulses), 2, axis=0)]
+
+    for i, cal_p in enumerate(cal_pulses):
+        cal_pulses[i] = cal_base_pulse_list + cal_p
+
+    # Repeat each cal point measurement cal_state_repeats times
+    cal_pulses= [list(i) for i in np.repeat(np.asarray(cal_pulses),
+                                            cal_state_repeats, axis=0)]
     for cal_p in cal_pulses:
         pulse_list += [cal_p]
 
@@ -1554,14 +1685,7 @@ def three_qubit_GHZ_state(qubits,
         pulses = []
         for p in pulse_list:
             pulses += [operation_dict[p]]
-
-        pulses += [RO_pars]
-
         el = multi_pulse_elt(i, station, pulses, sequencer_config)
-
-        if distortion_dict is not None:
-            el = fluxpulse_predistortion.distort_qudev(el, distortion_dict)
-
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
 

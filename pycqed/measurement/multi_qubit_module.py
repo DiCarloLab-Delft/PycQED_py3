@@ -646,18 +646,62 @@ def measure_two_qubit_parity(qb0, qb1, qb2, feedback_delay, f_LO, upload=True,
 
 def measure_n_qubit_simultaneous_randomized_benchmarking(
         qubits, f_LO,
-        CxC_RB=True, idx_for_RB=0, nr_seeds=50, nr_cliffords=None,
-        nr_averages=1024, thresholding=True,  CZ_info_list=None,
-        V_th_a=None, #list with SCALED thresh level for each qubit
-        interleave_CZ=True,
+        nr_cliffords=None, nr_seeds=50,
+        CxC_RB=True, idx_for_RB=0,
         gate_decomp='HZ', interleaved_gate=None,
-        MC=None, UHFQC=None, pulsar=None, soft_avgs=1,
+        CZ_info_dict=None, interleave_CZ=True,
+        thresholding=True,  V_th_a=None,
+        nr_averages=1024, soft_avgs=1,
+        MC=None, UHFQC=None, pulsar=None,
         label=None, verbose=False):
 
     '''
     Performs a simultaneous randomized benchmarking experiment on n qubits.
     type(nr_cliffords) == array
     type(nr_seeds) == int
+
+    Args:
+        qubit_list (list): list of qubit objects to perfomr RB on
+        f_LO (float): readout LO frequency
+        nr_cliffords (numpy.ndarray): numpy.arange(max_nr_cliffords), where
+            max_nr_cliffords is the number of Cliffords in the longest seqeunce
+            in the RB experiment
+        nr_seeds (int): the number of times to repeat each Clifford sequence of
+            length nr_cliffords[i]
+        CxC_RB (bool): whether to perform CxCxCx..xC RB or
+            (CxIx..xI, IxCx..XI, ..., IxIx..xC) RB
+        idx_for_RB (int): if CxC_RB==False, refers to the index of the
+            pulse_pars in pulse_pars_list which will undergo the RB protocol
+            (i.e. the position of the Z operator when we measure
+            ZIII..I, IZII..I, IIZI..I etc.)
+        gate_decomposition (str): 'HZ' or 'XY'
+        interleaved_gate (str): used for regular single qubit Clifford IRB
+            string referring to one of the gates in the single qubit
+            Clifford group
+        CZ_info_dict (dict): dict indicating which qbs in the CZ gates are the
+            control and the target. Can have the following forms:
+            either:    {'qbc': qb_control_name_CZ,
+                        'qbt': qb_target_name_CZ}
+            if only one CZ gate is interleaved;
+            or:       {'CZi': {'qbc': qb_control_name_CZ,
+                               'qbt': qb_target_name_CZ}}
+            if multiple CZ gates are interleaved; CZi = [CZ0, CZ1, ...] where
+            CZi is the c-phase gate between qbc->qbt.
+            (We start counting from zero because we are programmers.)
+        interleave_CZ (bool): Only used if CZ_info_dict != None
+            True -> interleave the CZ gate
+            False -> interleave the ICZ gate
+        thresholding (bool): whether to use the thresholding feature
+            of the UHFQC
+        V_th_a (list or tuple): contains the SSRO assignment thresholds for
+            each qubit in qubits. These values must be correctly scaled!
+        nr_averages (float): number of averages to use
+        soft_avgs (int): number of soft averages to use
+        MC: MeasurementControl object
+        UHFQC: UHFQC object
+        pulsar: pulsar object or AWG object
+        label (str): measurement label
+        verbose (bool): print runtime info
     '''
 
     if nr_cliffords is None:
@@ -666,7 +710,6 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
         UHFQC = qubits[0].UHFQC
         logging.warning("Unspecified UHFQC instrument. Using qubits[0].UHFQC.")
     if pulsar is None:
-        # CHECK THIS!!!!
         pulsar = qubits[0].AWG
         logging.warning("Unspecified pulsar instrument. Using qubits[0].AWG.")
     if MC is None:
@@ -682,7 +725,7 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
                 len(qubits), idx_for_RB, gate_decomp,
                 nr_seeds, nr_cliffords[-1])
 
-    if CZ_info_list is not None:
+    if CZ_info_dict is not None:
         if interleave_CZ:
             label += '_CZ'
         else:
@@ -723,7 +766,7 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
                 qubit_list=qubits, RO_pars=RO_pars,
                 nr_cliffords_value=nr_cliffords[0], CxC_RB=CxC_RB,
                 idx_for_RB=idx_for_RB, upload=False,
-                gate_decomposition=gate_decomp,  CZ_info_list=CZ_info_list,
+                gate_decomposition=gate_decomp,  CZ_info_dict=CZ_info_dict,
                 interleaved_gate=interleaved_gate,
                 verbose=verbose, interleave_CZ=interleave_CZ)
 
@@ -750,7 +793,7 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
                 idx_for_RB=idx_for_RB, upload=True,
                 gate_decomposition=gate_decomp,
                 interleaved_gate=interleaved_gate, interleave_CZ=interleave_CZ,
-                verbose=verbose, CZ_info_list=CZ_info_list)
+                verbose=verbose, CZ_info_dict=CZ_info_dict)
 
         soft_sweep_points = np.arange(nr_seeds)
         soft_sweep_func = swf.None_Sweep()
@@ -766,11 +809,56 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
     MC.run_2D(label)
 
 
-def measure_two_qubit_tomo_Bell(bell_state, qb_c, qb_t, f_LO, num_flux_pulses=0,
-                                nr_averages=1024, CZ_disabled=False,
-                                upload=True, label=None, run=True, soft_avgs=1,
+def measure_two_qubit_tomo_Bell(bell_state, qb_c, qb_t, f_LO,
+                                basis_pulses=None,
+                                cal_state_repeats=7, spacing=100e-9,
+                                CZ_disabled=False,
+                                num_flux_pulses=0, verbose=False,
+                                nr_averages=1024, soft_avgs=1,
                                 MC=None, UHFQC=None, pulsar=None,
-                                separation=100e-9):
+                                upload=True, label=None, run=True):
+    """
+                     |spacing|spacing|
+    |qCZ> --gate1--------*--------after_pulse-----| tomo |
+                         |
+    |qS > --gate2--------*------------------------| tomo |
+
+        qb_c (qCZ) is the control qubit (pulsed)
+        qb_t (qS) is the target qubit
+
+    Args:
+        bell_state (int): which Bell state to prepare according to:
+            0 -> phi_Minus
+            1 -> phi_Plus
+            2 -> psi_Minus
+            3 -> psi_Plus
+        qb_c (qubit object): control qubit
+        qb_t (qubit object): target qubit
+        f_LO (float): RO LO frequency
+        basis_pulses (tuple): tomo pulses to be applied on each qubit
+            default: ('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90')
+        cal_state_repeats (int): number of times to repeat each cal state
+        spacing (float): spacing before and after CZ pulse; see diagram above
+        CZ_disabled (bool): True -> same bell state preparation but without
+            the CZ pulse; False -> normal bell state preparation
+        num_flux_pulses (int): number of times to apply a flux pulse with the
+            same length as the one used in the CZ gate before the entire
+            sequence (before bell state prep).
+            CURRENTLY NOT USED!
+        verbose (bool): print runtime info
+        nr_averages (float): number of averages to use
+        soft_avgs (int): number of soft averages to use
+        MC: MeasurementControl object
+        UHFQC: UHFQC object
+        pulsar: pulsar object or AWG object
+        upload (bool): whether to upload sequence to AWG or not
+        label (str): measurement label
+        run (bool): whether to execute MC.run() or not
+    """
+    if basis_pulses is None:
+        basis_pulses = ('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90')
+        logging.warning('basis_pulses not specified. Using the'
+                        'following basis:\n{}'.format(basis_pulses))
 
     qubits = [qb_c, qb_t]
     for qb in qubits:
@@ -780,7 +868,6 @@ def measure_two_qubit_tomo_Bell(bell_state, qb_c, qb_t, f_LO, num_flux_pulses=0,
         UHFQC = qb_c.UHFQC
         logging.warning("Unspecified UHFQC instrument. Using qb_c.UHFQC.")
     if pulsar is None:
-        # CHECK THIS!!!!
         pulsar = qb_c.AWG
         logging.warning("Unspecified pulsar instrument. Using qb_c.AWG.")
     if MC is None:
@@ -808,8 +895,9 @@ def measure_two_qubit_tomo_Bell(bell_state, qb_c, qb_t, f_LO, num_flux_pulses=0,
 
     tomo_Bell_swf_func = awg_swf2.tomo_Bell(
         bell_state=bell_state, qb_c=qb_c, qb_t=qb_t,
-        RO_pars=RO_pars, num_flux_pulses=num_flux_pulses,
-        upload=upload, CZ_disabled=CZ_disabled, separation=separation)
+        RO_pars=RO_pars, num_flux_pulses=num_flux_pulses, spacing=spacing,
+        basis_pulses=basis_pulses, cal_state_repeats=cal_state_repeats,
+        verbose=verbose, upload=upload, CZ_disabled=CZ_disabled)
 
     MC.soft_avg(soft_avgs)
     MC.set_sweep_function(tomo_Bell_swf_func)
@@ -818,6 +906,121 @@ def measure_two_qubit_tomo_Bell(bell_state, qb_c, qb_t, f_LO, num_flux_pulses=0,
     if run:
         MC.run(label)
 
+
+def measure_three_qubit_tomo_GHZ(qubits, f_LO,
+                                 basis_pulses=None,
+                                 CZ_qubit_dict=None,
+                                 cal_state_repeats=2,
+                                 spacing=100e-9,
+                                 thresholding=True, V_th_a=None,
+                                 verbose=False,
+                                 nr_averages=1024, soft_avgs=1,
+                                 MC=None, UHFQC=None, pulsar=None,
+                                 upload=True, label=None, run=True):
+    """
+              |spacing|spacing|
+    |q0> --Y90--------*--------------------------------------|======|
+                      |
+    |q1> --Y90s-------*--------mY90--------*-----------------| tomo |
+                                           |
+    |q2> --Y90s----------------------------*--------mY90-----|======|
+                                   |spacing|spacing|
+    Args:
+        qubits (list or tuple): list of 3 qubits
+        f_LO (float): RO LO frequency
+        CZ_qubit_dict(dict):  dict of the following form:
+            {'qbc0': qb_control_name_CZ0,
+             'qbt0': qb_target_name_CZ0,
+             'qbc1': qb_control_name_CZ1,
+             'qbt1': qb_target_name_CZ1}
+            where CZ0, and CZ1 refer to the first and second CZ applied.
+            (We start counting from zero because we are programmers.)
+        basis_pulses (tuple): tomo pulses to be applied on each qubit
+            default: ('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90')
+        cal_state_repeats (int): number of times to repeat each cal state
+        spacing (float): spacing before and after CZ pulse; see diagram above
+        thresholding (bool): whether to use the thresholding feature
+            of the UHFQC
+        V_th_a (list or tuple): contains the SSRO assignment thresholds for
+            each qubit in qubits. These values must be correctly scaled!
+        verbose (bool): print runtime info
+        nr_averages (float): number of averages to use
+        soft_avgs (int): number of soft averages to use
+        MC: MeasurementControl object
+        UHFQC: UHFQC object
+        pulsar: pulsar object or AWG object
+        upload (bool): whether to upload sequence to AWG or not
+        label (str): measurement label
+        run (bool): whether to execute MC.run() or not
+    """
+    if CZ_qubit_dict is None:
+        raise ValueError('CZ_qubit_dict is None.')
+    if basis_pulses is None:
+        basis_pulses = ('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90')
+        logging.warning('basis_pulses not specified. Using the'
+                        'following basis:\n{}'.format(basis_pulses))
+    if UHFQC is None:
+        UHFQC = qubits[0].UHFQC
+        logging.warning("Unspecified UHFQC instrument. Using {}.UHFQC.".format(
+            qubits[0].name))
+    if pulsar is None:
+        pulsar = qubits[0].AWG
+        logging.warning("Unspecified pulsar instrument. Using {}.AWG.".format(
+            qubits[0].name))
+    if MC is None:
+        MC = qubits[0].MC
+        logging.warning("Unspecified MC object. Using {}.MC.".format(
+            qubits[0].name))
+
+    if label is None:
+        label = '{}-{}-{}_GHZ_tomo'.format(*[qb.name for qb in qubits])
+
+    key = 'int'
+    if thresholding:
+        if V_th_a is None:
+            raise ValueError('Unknown threshold values.')
+        else:
+            label += '_thresh'
+            key = 'dig'
+            for thresh_level, qb in zip(V_th_a, qubits):
+                UHFQC.set('quex_thres_{}_level'.format(
+                    qb.RO_acq_weight_function_I()), thresh_level)
+
+    for qb in qubits:
+        qb.prepare_for_timedomain(multiplexed=True)
+
+    multiplexed_pulse(qubits, f_LO, upload=True, plot_filename=True)
+    RO_pars = get_multiplexed_readout_pulse_dictionary(qubits)
+
+    det_func = get_multiplexed_readout_detector_functions(
+        qubits, UHFQC=UHFQC, pulsar=pulsar,
+        nr_shots=nr_averages)[key+'_log_det']
+
+    hard_sweep_points = np.arange(nr_averages)
+    hard_sweep_func = \
+        awg_swf2.three_qubit_GHZ_tomo(qubits=qubits, RO_pars=RO_pars,
+                                      CZ_qubit_dict=CZ_qubit_dict,
+                                      basis_pulses=basis_pulses,
+                                      cal_state_repeats=cal_state_repeats,
+                                      spacing=spacing,
+                                      verbose=verbose,
+                                      upload=upload)
+
+    total_nr_segments = len(basis_pulses)**len(qubits) + \
+                        cal_state_repeats*2**len(qubits)
+    soft_sweep_points = np.arange(total_nr_segments)
+    soft_sweep_func = swf.None_Sweep()
+
+    MC.soft_avg(soft_avgs)
+    MC.set_sweep_function(hard_sweep_func)
+    MC.set_sweep_points(hard_sweep_points)
+
+    MC.set_sweep_function_2D(soft_sweep_func)
+    MC.set_sweep_points_2D(soft_sweep_points)
+
+    MC.set_detector_function(det_func)
+    if run:
+        MC.run_2D(label)
 
 def cphase_gate_tuneup(qb_control, qb_target,
                        initial_values_dict=None,

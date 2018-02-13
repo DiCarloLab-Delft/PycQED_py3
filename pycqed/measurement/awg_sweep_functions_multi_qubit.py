@@ -195,7 +195,7 @@ class two_qubit_Simultaneous_RB_fixed_length(swf.Hard_Sweep):
                  gate_decomposition='HZ', interleaved_gate=None,
                  upload=True, return_seq=False, seq_name=None,
                  CxC_RB=True, idx_for_RB=0, interleave_CZ=True,
-                 verbose=False, CZ_info_list=None):
+                 verbose=False, CZ_info_dict=None):
 
         super().__init__()
         self.qubit_list = qubit_list
@@ -209,7 +209,7 @@ class two_qubit_Simultaneous_RB_fixed_length(swf.Hard_Sweep):
         self.interleaved_gate = interleaved_gate
         self.idx_for_RB = idx_for_RB
         self.verbose = verbose
-        self.CZ_info_list = CZ_info_list
+        self.CZ_info_dict = CZ_info_dict
         self.interleave_CZ = interleave_CZ
 
         self.parameter_name = 'Nr of Seeds'
@@ -231,7 +231,7 @@ class two_qubit_Simultaneous_RB_fixed_length(swf.Hard_Sweep):
                 verbose=self.verbose,
                 upload=self.upload,
                 interleave_CZ=self.interleave_CZ,
-                CZ_info_list=self.CZ_info_list)
+                CZ_info_dict=self.CZ_info_dict)
 
 
 class n_qubit_Simultaneous_RB_fixed_seeds(swf.Hard_Sweep):
@@ -306,35 +306,77 @@ class two_qubit_AllXY(swf.Hard_Sweep):
 
 class tomo_Bell(swf.Hard_Sweep):
 
-    def __init__(self, bell_state, qb_c, qb_t, RO_pars, num_flux_pulses=0, upload=True,
-                 CZ_disabled=False, separation=100e9,
-                 verbose=False, return_seq=False):
+    def __init__(self, bell_state, qb_c, qb_t, RO_pars,
+                 num_flux_pulses=0, basis_pulses=None,
+                 cal_state_repeats=7,
+                 CZ_disabled=False, spacing=100e9,
+                 verbose=False, upload=True, return_seq=False):
         super().__init__()
         self.bell_state = bell_state
         self.qb_c = qb_c
         self.qb_t = qb_t
         self.RO_pars = RO_pars
         self.num_flux_pulses = num_flux_pulses
+        self.cal_state_repeats = cal_state_repeats
+        self.basis_pulses = basis_pulses
         self.upload = upload
         self.CZ_disabled = CZ_disabled
         self.parameter_name = 'sample'
         self.unit = '#'
         self.verbose = verbose
-        self.separation = separation
+        self.spacing = spacing
         self.return_seq = return_seq
         self.name = 'tomo_Bell'
 
     def prepare(self, **kw):
         if self.upload:
-            sqs2.two_qubit_tomo_bell_qudev(
+            sqs2.two_qubit_tomo_bell_qudev_seq(
                 bell_state=self.bell_state,
                 qb_c=self.qb_c, qb_t=self.qb_t,
                 RO_pars=self.RO_pars,
+                basis_pulses=self.basis_pulses,
                 num_flux_pulses=self.num_flux_pulses,
+                cal_state_repeats=self.cal_state_repeats,
                 CZ_disabled=self.CZ_disabled,
                 verbose=self.verbose,
                 upload=self.upload,
-                separation=self.separation)
+                spacing=self.spacing)
+
+
+class three_qubit_GHZ_tomo(swf.Hard_Sweep):
+
+    def __init__(self, qubits, RO_pars,
+                 CZ_qubit_dict,
+                 basis_pulses=None,
+                 cal_state_repeats=2,
+                 spacing=100e-9,
+                 verbose=False, upload=True, return_seq=False):
+        super().__init__()
+        self.qubits = qubits
+        self.RO_pars = RO_pars
+        self.CZ_qubit_dict = CZ_qubit_dict
+        self.basis_pulses = basis_pulses
+        self.cal_state_repeats = cal_state_repeats
+        self.upload = upload
+        self.parameter_name = 'sample'
+        self.unit = '#'
+        self.verbose = verbose
+        self.spacing = spacing
+        self.return_seq = return_seq
+        self.name = 'tomo_3_qubit_GHZ'
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs2.three_qubit_GHZ_tomo_seq(
+                qubits=self.qubits,
+                RO_pars=self.RO_pars,
+                CZ_qubit_dict=self.CZ_qubit_dict,
+                basis_pulses=self.basis_pulses,
+                cal_state_repeats=self.cal_state_repeats,
+                spacing=self.spacing,
+                verbose=self.verbose,
+                upload=self.upload)
+
 
 class two_qubit_parity(swf.Hard_Sweep):
     def __init__(self, q0, q1, q2, feedback_delay, prep_sequence=None,
