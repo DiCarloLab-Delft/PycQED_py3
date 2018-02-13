@@ -808,6 +808,7 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
     MC.set_detector_function(det_func)
     MC.run_2D(label)
 
+    ma.TwoD_Analysis(close_file=True)
 
 def measure_two_qubit_tomo_Bell(bell_state, qb_c, qb_t, f_LO,
                                 basis_pulses=None,
@@ -906,6 +907,7 @@ def measure_two_qubit_tomo_Bell(bell_state, qb_c, qb_t, f_LO,
     if run:
         MC.run(label)
 
+    ma.MeasurementAnalysis(close_file=True)
 
 def measure_three_qubit_tomo_GHZ(qubits, f_LO,
                                  basis_pulses=None,
@@ -1021,6 +1023,8 @@ def measure_three_qubit_tomo_GHZ(qubits, f_LO,
     MC.set_detector_function(det_func)
     if run:
         MC.run_2D(label)
+
+    ma.TwoD_Analysis(close_file=True)
 
 def cphase_gate_tuneup(qb_control, qb_target,
                        initial_values_dict=None,

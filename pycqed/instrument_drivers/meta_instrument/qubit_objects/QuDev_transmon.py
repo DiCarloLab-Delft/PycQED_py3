@@ -562,7 +562,9 @@ class QuDev_transmon(Qubit):
             demod_mode=demod_mode))
         MC.run_2D(name='resonator_spectoscopy_flux_sweep' + self.msmt_suffix)
         if analyze:
-            ma.MeasurementAnalysis(TwoD=True, close_fig=close_fig)
+            ma.TwoD_Analysis(close_fig=close_fig, close_file=True,
+                             qb_name=self.name)
+            # ma.MeasurementAnalysis(TwoD=True, close_fig=close_fig)
 
     def measure_resonator_spectroscopy_flux_sweep(self, freqs, voltages,
             flux_channel=None, pulsed=True, MC=None, analyze=True,
@@ -593,7 +595,9 @@ class QuDev_transmon(Qubit):
         else:
             raise NotImplementedError()
         if analyze:
-            ma.MeasurementAnalysis(TwoD=True, close_fig=close_fig)
+            ma.TwoD_Analysis(close_fig=close_fig, close_file=True,
+                             qb_name=self.name)
+            # ma.MeasurementAnalysis(TwoD=True, close_fig=close_fig)
 
 
     def measure_homodyne_acqusition_delay(self, delays=None, MC=None,
@@ -1324,8 +1328,10 @@ class QuDev_transmon(Qubit):
         MC.run(label, mode='2D')
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
-                                   qb_name=self.name, TwoD=True)
+            ma.TwoD_Analysis(close_fig=close_fig,
+                             qb_name=self.name,)
+            # ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
+            #                        qb_name=self.name, TwoD=True)
 
     def measure_transients(self, MC=None, cases=('off', 'on'), upload=True,
                            analyze=True, **kw):
@@ -1728,7 +1734,7 @@ class QuDev_transmon(Qubit):
         MC.set_detector_function(self.int_avg_det)
         MC.run_2D(name=label)
 
-        MA = ma.MeasurementAnalysis(TwoD=True)
+        MA = ma.TwoD_Analysis(close_file=True, qb_name=self.name)
 
         self.flux_pulse_length(flux_pulse_length_backup)
         self.flux_pulse_amp(flux_pulse_amp_backup)
@@ -3091,6 +3097,7 @@ class QuDev_transmon(Qubit):
         MC.run_2D(measurement_string)
 
         if analyze:
+            ma.TwoD_Analysis(close_file=True, qb_name=self.name)
             flux_pulse_ma = ma.Fluxpulse_Ramsey_2D_Analysis(
                         label=measurement_string,
                         X90_separation=X90_separation,
@@ -3373,6 +3380,7 @@ class QuDev_transmon(Qubit):
             MC.run_2D('CPhase_measurement_{}_{}'.format(self.name,
                                                         qb_target.name))
 
+            ma.TwoD_Analysis(close_file=True)
             flux_pulse_ma = ma.Fluxpulse_Ramsey_2D_Analysis(
                 qb_name=self.name, cal_points=cal_points,
                 reference_measurements=True

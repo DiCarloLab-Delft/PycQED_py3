@@ -6831,6 +6831,8 @@ class TwoD_Analysis(MeasurementAnalysis):
     '''
     Analysis for 2D measurements.
     '''
+    def __init__(self, TwoD=True, **kw):
+        super().__init__(TwoD=TwoD, **kw)
 
     def run_default_analysis(self, normalize=False, plot_linecuts=True,
                              linecut_log=False, colorplot_log=False,
@@ -6839,7 +6841,11 @@ class TwoD_Analysis(MeasurementAnalysis):
                              **kw):
         close_file = kw.pop('close_file', True)
 
-        self.get_naming_and_values_2D()
+        super().run_default_analysis(show=False,
+                                     close_file=close_file,
+                                     close_main_fig=True,
+                                     save_fig=True, **kw)
+        # self.get_naming_and_values_2D()
         self.fig_array = []
         self.ax_array = []
 
