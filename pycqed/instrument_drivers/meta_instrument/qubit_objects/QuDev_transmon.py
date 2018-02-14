@@ -362,8 +362,6 @@ class QuDev_transmon(Qubit):
         if self.cw_source is not None:
             self.cw_source.off()
 
-        self.update_detector_functions()
-
         # drive LO
         self.drive_LO.pulsemod_state('Off')
         self.drive_LO.frequency(self.f_qubit() - self.f_pulse_mod())
@@ -411,6 +409,7 @@ class QuDev_transmon(Qubit):
             self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
             self.readout_UC_LO.on()
 
+        self.update_detector_functions()
         self.set_readout_weights()
 
     def prepare_for_mixer_calibration(self, suppress):
@@ -3042,8 +3041,8 @@ class QuDev_transmon(Qubit):
                 as flux pulse delay
             analyze: bool, if True, then the measured data
                 gets analyzed (for detailed documentation of the analysis see in
-                the Fluxpulse_Ramsey_2D_Analysis class update: bool, if True, the
-                AWG channel delay gets corrected, such that single qubit
+                the Fluxpulse_Ramsey_2D_Analysis class update: bool, if True,
+                the AWG channel delay gets corrected, such that single qubit
                 gates and flux pulses have no relative delay
 
         Returns:
@@ -3056,7 +3055,7 @@ class QuDev_transmon(Qubit):
         clock_rate = MC.station.pulsar.clock(channel)
         T_sample = 1./clock_rate
 
-        X90_separation = kw.pop('X90_separation', 200e-9)
+        X90_separation = kw.pop('X90_separation', 100e-9)
         distorted = kw.pop('distorted', False)
         distortion_dict = kw.pop('distortion_dict', None)
         pulse_length = kw.pop('pulse_length', 20e-9)
@@ -3064,6 +3063,7 @@ class QuDev_transmon(Qubit):
         amplitude = kw.pop('amplitude', 0.1)
         self.flux_pulse_amp(amplitude)
 
+        drive_pulse_length = self.gauss_sigma()*self.nr_sigma()
 
         measurement_string = 'Flux_pulse_delay_calibration_{}'.format(self.name)
 
@@ -3074,7 +3074,8 @@ class QuDev_transmon(Qubit):
             total_time = X90_separation + buffer_factor*self.flux_pulse_length()
             res = int(total_time/T_sample/30)
             delays = np.arange(-0.5*buffer_factor*self.flux_pulse_length(),
-                               X90_separation + 0.5*buffer_factor*self.flux_pulse_length(),
+                               X90_separation +
+                               0.5*buffer_factor*self.flux_pulse_length(),
                                res*T_sample)
 
         self.prepare_for_timedomain()
@@ -3096,11 +3097,12 @@ class QuDev_transmon(Qubit):
         MC.run_2D(measurement_string)
 
         if analyze:
-            ma.TwoD_Analysis(close_file=True, qb_name=self.name)
+            # ma.TwoD_Analysis(close_file=True, qb_name=self.name)
             flux_pulse_ma = ma.Fluxpulse_Ramsey_2D_Analysis(
                         label=measurement_string,
                         X90_separation=X90_separation,
                         flux_pulse_length=pulse_length,
+                        drive_pulse_length=drive_pulse_length,
                         qb_name=self.name,
                         auto=False)
             flux_pulse_ma.run_delay_analysis(show=True)

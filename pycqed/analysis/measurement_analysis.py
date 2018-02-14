@@ -9422,6 +9422,7 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
 
     """
     def __init__(self, X90_separation=None, flux_pulse_length=None,
+                 drive_pulse_length=None,
                  qb_name=None, label='Ramsey_interleaved_flux_pulse',
                  # run_default_super=True,
                  cal_points=False,
@@ -9440,22 +9441,20 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
         self.delay_fit_res = None
         self.X90_separation = X90_separation
         self.flux_pulse_length = flux_pulse_length
+        self.drive_pulse_length = drive_pulse_length
         self.return_fit = kw.pop('return_fit', False)
         self.cal_points = cal_points
         self.reference_measurements=reference_measurements
-        # if run_default_super:
-        #     super(self.__class__, self).run_default_analysis(TwoD=True,
-        #                                                      close_file=False)
 
         super(Fluxpulse_Ramsey_2D_Analysis, self).__init__(TwoD=True,
                                                            start_at_zero=True,
                                                            qb_name=qb_name, **kw)
         self.get_values('Data')
-        self.get_naming_and_values()
+        self.get_naming_and_values_2D()
 
-        if run_default_super:
-            super(self.__class__, self).run_default_analysis(TwoD=True,
-                                                             close_file=False)
+        # if run_default_super:
+        #     super(self.__class__, self).run_default_analysis(TwoD=True,
+        #                                                      close_file=False)
 
 
 
@@ -9654,7 +9653,7 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
 
 
     def fit_delay(self,X90_separation=None,flux_pulse_length=None, plot=False,
-                  print_fit_results=False,return_fit=None):
+                  print_fit_results=False,return_fit=None,drive_pulse_length=None):
         '''
         method to fit the relative delay of the flux pulse to the drive pulses
         '''
@@ -9662,11 +9661,16 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
         if X90_separation is None:
             X90_separation = self.X90_separation
         if X90_separation is None:
-            raise ValueError('Must specify the X90 pulse separation used in the experiment.')
+            raise ValueError('Must specify the X90 pulse'
+                             ' separation used in the experiment.')
         if flux_pulse_length is None:
             flux_pulse_length = self.flux_pulse_length
         if flux_pulse_length is None:
-            raise ValueError('Must specify the flux pulse length used in the experiment.')
+            raise ValueError('Must specify the flux pulse '
+                             'length used in the experiment.')
+        if drive_pulse_length is None:
+            raise ValueError('Must specify the drive pulse '
+                             'length used in the experiment.')
         if self.fitted_phases is None:
             self.fit_all(plot=False,extrapolate_phase=True,cal_points=self.cal_points)
         if return_fit is None:
@@ -9711,9 +9715,11 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
 
 
 
+
         self.fitted_delay = (self.delay_fit_res.best_values['t_end'] +
                              self.delay_fit_res.best_values['t_start']
-                             - X90_separation)/2. + flux_pulse_length/2.
+                             - X90_separation)/2. + flux_pulse_length/2. \
+                                + drive_pulse_length/2.
 
         if print_fit_results:
             print(self.delay_fit_res.fit_report())
@@ -9729,11 +9735,14 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
         else:
             return self.fitted_delay
 
-    def run_delay_analysis(self, X90_separation=None, show=False,
-                             close_file=True, **kw):
+    def run_delay_analysis(self, X90_separation=None, drive_pulse_length=None,
+                           show=False,
+                            close_file=True, **kw):
 
         if X90_separation is None:
             X90_separation = self.X90_separation
+        if drive_pulse_length is None:
+            drive_pulse_length = self.drive_pulse_length
         self.fig,self.ax = plt.subplots()
         self.add_analysis_datagroup_to_file()
 
@@ -9748,7 +9757,8 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
             X90_separation=X90_separation,
             plot=False,
             print_fit_results=print_fit_results,
-            return_fit=True)
+            return_fit=True,
+            drive_pulse_length=drive_pulse_length)
 
         self.save_fitted_parameters(self.delay_fit_res, var_name=self.value_names[0])
 

@@ -1559,7 +1559,6 @@ def Ramsey_with_flux_pulse_meas_seq(thetas, qb, X90_separation, verbose=False,
             seq_name: string
     '''
     qb_name = qb.name
-    print(qb_name)
     operation_dict = qb.get_operation_dict()
     pulse_pars = qb.get_drive_pars()
     RO_pars = qb.get_RO_pars()
