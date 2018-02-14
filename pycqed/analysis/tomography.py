@@ -1140,21 +1140,21 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
             txt_x_pos = 10
 
         purity = (self.rho_2*self.rho_2).tr()
-
-        msg = 'Purity: {:.3f}\nFidelity to target {:.3f}'.format(
-            purity, self.fidelity_mle)
-        if self.target_bell is not None:
-            theta_vec = np.linspace(0., 2*np.pi, 1001)
-            fid_vec = np.zeros(theta_vec.shape)
-            for i, theta in enumerate(theta_vec):
-                fid_vec[i] = calc_fid2_bell(self.operators_mle,
-                                            self.target_bell, theta)
-            msg += str('\nMAX Fidelity {:.3f} at \n  ' + self.q0_label
-                    + '={:.1f} deg and\n  ' + self.q1_label
-                    + '={:.1f} deg').format(self.best_fidelity,
-                           self.fit_res.best_values['angle_LSQ']*180./np.pi,
-                           self.fit_res.best_values['angle_MSQ']*180./np.pi)
-        ax.text(txt_x_pos, .6, msg)
+        if self.target_bell is not None or self.target_cardinal is not None:
+            msg = 'Purity: {:.3f}\nFidelity to target {:.3f}'.format(
+                purity, self.fidelity_mle)
+            if self.target_bell is not None:
+                theta_vec = np.linspace(0., 2*np.pi, 1001)
+                fid_vec = np.zeros(theta_vec.shape)
+                for i, theta in enumerate(theta_vec):
+                    fid_vec[i] = calc_fid2_bell(self.operators_mle,
+                                                self.target_bell, theta)
+                msg += str('\nMAX Fidelity {:.3f} at \n  ' + self.q0_label
+                        + '={:.1f} deg and\n  ' + self.q1_label
+                        + '={:.1f} deg').format(self.best_fidelity,
+                               self.fit_res.best_values['angle_LSQ']*180./np.pi,
+                               self.fit_res.best_values['angle_MSQ']*180./np.pi)
+            ax.text(txt_x_pos, .6, msg)
 
         plot_operators(self.operators_mle, ax, labels=self.meas_op_labels)
         ax.set_title('Max likelihood estimation tomography')

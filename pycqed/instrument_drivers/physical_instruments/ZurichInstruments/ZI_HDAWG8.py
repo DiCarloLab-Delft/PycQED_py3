@@ -414,6 +414,11 @@ class ZI_HDAWG8(ZI_base_instrument):
         - loading speed depends on the size of w0 and w1 and is ~80ms for 20us.
 
         """
+        # these two attributes are added for debugging purposes.
+        # they allow checking what the realtime loaded waveforms are.
+        self._realtime_w0 = w0
+        self._realtime_w1 = w1
+
         c = np.vstack((w0, w1)).reshape((-2,), order='F')
         self._dev.seti('awgs/{}/waveform/index'.format(awg_nr), wf_nr)
         self._dev.setv('awgs/{}/waveform/data'.format(awg_nr), c)

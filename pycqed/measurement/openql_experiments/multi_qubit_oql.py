@@ -819,6 +819,9 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
 
 def grovers_two_qubit_all_inputs(q0: int, q1: int, platf_cfg: str,
                                  precompiled_flux: bool=True,
+                                 second_CZ_delay: int=0,
+                                 CZ_duration: int=260,
+                                 add_echo_pulses: bool=False,
                                  cal_points: bool=True):
     """
     Writes the QASM sequence for Grover's algorithm on two qubits.
@@ -838,6 +841,8 @@ def grovers_two_qubit_all_inputs(q0: int, q1: int, platf_cfg: str,
                 Determies if the full waveform for the flux pulses is
                 precompiled, thus only needing one trigger at the start,
                 or if every flux pulse should be triggered individually.
+        add_echo_pulses (bool): if True add's echo pulses before the
+            second CZ gate.
         cal_points (bool):
                 Whether to add calibration points.
 
@@ -864,7 +869,17 @@ def grovers_two_qubit_all_inputs(q0: int, q1: int, platf_cfg: str,
             k.gate('ry90', q0)
             k.gate('ry90', q1)
             # k.gate('fl_cw_00', 2,0)
-            k.gate('wait', [2, 0], 260)
+            k.gate('wait', [2, 0], second_CZ_delay//2)
+            if add_echo_pulses:
+                k.gate('rx180', q0)
+                k.gate('rx180', q1)
+            k.gate('wait', [2, 0], second_CZ_delay//2)
+            if add_echo_pulses:
+                k.gate('rx180', q0)
+                k.gate('rx180', q1)
+
+            k.gate('wait', [2, 0], CZ_duration)
+
             k.gate('ry90', q0)
             k.gate('ry90', q1)
             k.measure(q0)
@@ -883,7 +898,14 @@ def grovers_two_qubit_all_inputs(q0: int, q1: int, platf_cfg: str,
 
 def grovers_tomography(q0: int, q1: int, omega:int, platf_cfg: str,
                        precompiled_flux: bool=True,
-                       cal_points: bool=True):
+                       cal_points: bool=True, second_CZ_delay: int=260,
+                        CZ_duration: int=260,
+                        add_echo_pulses: bool=False):
+    """
+    Tomography sequence for Grover's algorithm.
+
+        omega: int denoting state that the oracle prepares.
+    """
 
     if not precompiled_flux:
         raise NotImplementedError('Currently only precompiled flux pulses '
@@ -916,15 +938,28 @@ def grovers_tomography(q0: int, q1: int, omega:int, platf_cfg: str,
         for p_q0 in tomo_gates:
             k = Kernel('Gr{}_{}_tomo_{}_{}'.format(G0, G1, p_q0, p_q1),
                        p=platf)
+
             k.prepz(q0)
             k.prepz(q1)
+
+            # Oracle
             k.gate(G0, q0)
             k.gate(G1, q1)
             k.gate('fl_cw_03', 2,0) # flux cw03 is the multi_cz pulse
+            # Grover's search
             k.gate('ry90', q0)
             k.gate('ry90', q1)
             # k.gate('fl_cw_00', 2,0)
-            k.gate('wait', [2, 0], 260)
+            k.gate('wait', [2, 0], second_CZ_delay//2)
+            if add_echo_pulses:
+                k.gate('rx180', q0)
+                k.gate('rx180', q1)
+            k.gate('wait', [2, 0], second_CZ_delay//2)
+            if add_echo_pulses:
+                k.gate('rx180', q0)
+                k.gate('rx180', q1)
+            k.gate('wait', [2, 0], CZ_duration)
+
             k.gate('ry90', q0)
             k.gate('ry90', q1)
 

@@ -53,7 +53,7 @@ from init.your_initscript import *
 
 You are now ready to start your experiment.
 
-If you use this software in any of your publications we would appreciate it if you cite this repository using the [![DOI](https://zenodo.org/badge/49057179.svg)](https://zenodo.org/badge/latestdoi/49057179). 
+If you use this software in any of your publications we would appreciate it if you cite this repository using the [![DOI](https://zenodo.org/badge/49057179.svg)](https://zenodo.org/badge/latestdoi/49057179).
 
 ## Overview of the main modules
 Below follows an overview of the main structure of the code. It makes sense to take a look around here if your are new to get a feeling where to find things.
@@ -73,7 +73,7 @@ Mind however that the code is continuously under development so if you think som
 
 
 ### The init folder
-Contains script that are to be used when seting up an experiment. Used to store configuration info and create instruments.
+Contains script that are to be used when setting up an experiment. Used to store configuration info and create instruments.
 
 ###The instruments folder
 

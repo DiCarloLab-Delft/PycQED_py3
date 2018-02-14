@@ -179,6 +179,95 @@ class Idling_Error_Rate_Analyisis(ba.BaseDataAnalysis):
             # Allows fixing the double exponential coefficient
 
 
+class Grovers_TwoQubitAllStates_Analysis(ba.BaseDataAnalysis):
+
+    def __init__(self, t_start: str=None, t_stop: str=None,
+                 label: str='', data_file_path: str=None,
+                 options_dict: dict=None, extract_only: bool=False,
+                 do_fitting: bool=True, auto=True):
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         extract_only=extract_only, do_fitting=do_fitting)
+
+        self.params_dict = {'xlabel': 'sweep_name',
+                            'xunit': 'sweep_unit',
+                            'xvals': 'sweep_points',
+                            'measurementstring': 'measurementstring',
+                            'value_names': 'value_names',
+                            'value_units': 'value_units',
+                            'measured_values': 'measured_values'}
+        self.numeric_params = []
+        if auto:
+            self.run_analysis()
+
+    def process_data(self):
+        self.proc_data_dict = OrderedDict()
+        normalize_to_cal_points = self.options_dict.get('normalize_to_cal_points', True)
+        cal_points = [
+                        [[-4, -3], [-2, -1]],
+                        [[-4, -2], [-3, -1]],
+                       ]
+        for idx in [0,1]:
+            yvals = list(self.raw_data_dict['measured_values_ord_dict'].values())[idx][0]
+
+            self.proc_data_dict['ylabel_{}'.format(idx)] = \
+                self.raw_data_dict['value_names'][0][idx]
+            self.proc_data_dict['yunit'] = self.raw_data_dict['value_units'][0][idx]
+
+            if normalize_to_cal_points:
+                yvals = a_tools.normalize_data_v3(yvals,
+                    cal_zero_points=cal_points[idx][0],
+                    cal_one_points=cal_points[idx][1])
+            self.proc_data_dict['yvals_{}'.format(idx)] = yvals
+
+        y0 = self.proc_data_dict['yvals_0']
+        y1 = self.proc_data_dict['yvals_1']
+        p_success = ((y0[0]*y1[0]) +
+                     (1-y0[1])*y1[1] +
+                     (y0[2])*(1-y1[2]) +
+                     (1-y0[3])*(1-y1[3]) )/4
+        print(y0[0]*y1[0])
+        print((1-y0[1])*y1[1])
+        print((y0[2])*(1-y1[2]))
+        print((1-y0[3])*(1-y1[3]))
+        self.proc_data_dict['p_success'] = p_success
+
+
+    def prepare_plots(self):
+        # assumes that value names are unique in an experiment
+        for i in [0, 1]:
+            yvals = self.proc_data_dict['yvals_{}'.format(i)]
+            xvals =  self.raw_data_dict['xvals'][0]
+            ylabel = self.proc_data_dict['ylabel_{}'.format(i)]
+            self.plot_dicts['main_{}'.format(ylabel)] = {
+                'plotfn': self.plot_line,
+                'xvals': self.raw_data_dict['xvals'][0],
+                'xlabel': self.raw_data_dict['xlabel'][0],
+                'xunit': self.raw_data_dict['xunit'][0][0],
+                'yvals': self.proc_data_dict['yvals_{}'.format(i)],
+                'ylabel': ylabel,
+                'yunit': self.proc_data_dict['yunit'],
+                'title': (self.raw_data_dict['timestamps'][0] + ' \n' +
+                          self.raw_data_dict['measurementstring'][0]),
+                'do_legend': False,
+                'legend_pos': 'upper right'}
+
+
+        self.plot_dicts['limit_text']={
+            'ax_id':'main_{}'.format(ylabel),
+            'box_props': 'fancy',
+            'xpos':1.05,
+            'horizontalalignment':'left',
+            'plotfn': self.plot_text,
+            'text_string': 'P succes = {:.3f}'.format(self.proc_data_dict['p_success'])}
+
+
+
+
+
+
 
 
 class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
