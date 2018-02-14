@@ -22,6 +22,7 @@ from pycqed.utilities.general import add_suffix_to_dict_keys
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.qubit_object \
     import Qubit
 from pycqed.measurement import optimization as opti
+from pycqed.measurement import mc_parameter_wrapper
 
 
 class QuDev_transmon(Qubit):
@@ -1369,6 +1370,83 @@ class QuDev_transmon(Qubit):
             MC.run(name='timetrace_on' + self.msmt_suffix)
             if analyze:
                 ma.MeasurementAnalysis(auto=True, qb_name=self.name, **kw)
+
+    def measure_readout_pulse_scope(self, delays, freqs, RO_separation=None,
+                                    comm_freq=225e6, analyze=True, label=None,
+                                    close_fig=True, upload=True, verbose=False,
+                                    cal_points=((-4, -3), (-2, -1)), MC=None):
+        """
+        From the documentation of the used sequence function:
+
+        Prepares the AWGs for a readout pulse shape and timing measurement.
+
+        The sequence consists of two readout pulses where the drive pulse start
+        time is swept through the first readout pulse. Because the photons in
+        the readout resonator induce an ac-Stark shift of the qubit frequency,
+        we can determine the readout pulse shape by sweeping the drive frequency
+        in an outer loop to determine the qubit frequency.
+
+        Important: This sequence includes two readouts per segment. For this
+        reason the calibration points are also duplicated.
+
+        Args:
+            delays: A list of delays between the start of the first readout pulse
+                    and the center of the drive pulse.
+            RO_separation: Separation between the starts of the two readout pulses.
+                           If the comm_freq parameter is not None, the used value
+                           is increased to satisfy the commensurability constraint.
+            cal_points: True for default calibration points, False for no
+                        calibration points or a list of two lists, containing
+                        the indices of the calibration segments for the ground
+                        and excited state.
+            comm_freq: The readout pulse separation will be a multiple of
+                       1/comm_freq
+        """
+
+        if delays is None:
+            raise ValueError("Unspecified amplitudes for "
+                             "measure_readout_pulse_scope")
+        if label is None:
+            label = 'Readout_pulse_scope' + self.msmt_suffix
+        if MC is None:
+            MC = self.MC
+        if freqs is None:
+            freqs = self.f_qubit() + np.linspace(-50e6, 50e6, 201)
+        if RO_separation is None:
+            RO_separation = np.abs(self.RO_acq_marker_delay())
+            RO_separation += 2 * self.RO_pulse_length()
+            RO_separation += np.max(delays)
+            RO_separation += 200e-9  # for slack
+
+        self.prepare_for_timedomain()
+        MC.set_sweep_function(awg_swf.Readout_pulse_scope_swf(
+            delays=delays,
+            pulse_pars=self.get_drive_pars(),
+            RO_pars=self.get_RO_pars(),
+            RO_separation=RO_separation,
+            cal_points=cal_points,
+            comm_freq=comm_freq,
+            verbose=verbose,
+            upload=upload))
+        MC.set_sweep_points(delays)
+        MC.set_sweep_function_2D(swf.Offset_Sweep(
+            mc_parameter_wrapper.wrap_par_to_swf(self.drive_LO.frequency),
+            -self.f_pulse_mod(),
+            parameter_name=self.name + ' drive frequency'))
+        MC.set_sweep_points_2D(freqs)
+
+        d = det.UHFQC_integrated_average_detector(
+            self.UHFQC, self.AWG, nr_averages=self.RO_acq_averages(),
+            channels=self.int_avg_det.channels,
+            integration_length=self.RO_acq_integration_length(),
+            values_per_point=2, values_per_point_suffex=['_probe', '_measure'])
+        MC.set_detector_function(d)
+        MC.run(label)
+
+        # Create a MeasurementAnalysis object for this measurement
+        if analyze:
+            ma.MeasurementAnalysis(TwoD=True, auto=True, close_fig=close_fig,
+                                   qb_name=self.name)
 
     def calibrate_drive_mixer_carrier(self, MC=None, update=True, x0=(0., 0.),
                                       initial_stepsize=0.01, trigger_sep=5e-6):
@@ -3017,6 +3095,8 @@ class QuDev_transmon(Qubit):
             '_ef ' + self.name))
 
         return operation_dict
+
+
 
     def calibrate_flux_pulse_timing(self,MC=None, thetas=None, delays=None,
                                     analyze=False, update=False,**kw):
