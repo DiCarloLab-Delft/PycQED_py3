@@ -3143,6 +3143,10 @@ class QuDev_transmon(Qubit):
             thetas: numpy array with angles (in rad) for the Ramsey type
             ampls: numpy array with amplitudes (in V) swept through
                 as flux pulse amplitudes
+            ampls_bidirectional: bool, for use if the qubit is parked at sweetspot.
+                                If true, the flux pulse amplitudes are swept to positive
+                                and negative voltages and the frequency model fit is ]
+                                performed on the combined dataset
             analyze: bool, if True, then the measured data
                      gets analyzed ( ma.fit_qubit_frequency() )
 
@@ -3381,7 +3385,7 @@ class QuDev_transmon(Qubit):
             MC.run_2D('CPhase_measurement_{}_{}'.format(self.name,
                                                         qb_target.name))
 
-            ma.TwoD_Analysis(close_file=True)
+            # ma.TwoD_Analysis(close_file=True)
             flux_pulse_ma = ma.Fluxpulse_Ramsey_2D_Analysis(
                 qb_name=self.name, cal_points=cal_points,
                 reference_measurements=True

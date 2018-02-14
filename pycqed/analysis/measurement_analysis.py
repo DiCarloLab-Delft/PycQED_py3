@@ -9448,7 +9448,9 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
 
         super(Fluxpulse_Ramsey_2D_Analysis, self).__init__(TwoD=True,
                                                            start_at_zero=True,
-                                                           qb_name=qb_name, **kw)
+                                                           qb_name=qb_name,
+                                                           auto=auto,
+                                                           **kw)
         self.get_values('Data')
         self.get_naming_and_values_2D()
 
@@ -9520,7 +9522,8 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
 
     def fit_all(self, plot=False, extrapolate_phase=False, return_ampl=False,
                 cal_points=None,reference_measurements=None,
-                fit_range=None):
+                fit_range=None,
+                predict_phase=True):
         if reference_measurements is None:
             reference_measurements = self.reference_measurements
         if cal_points is None:
@@ -9533,14 +9536,16 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
                                                              cal_points=False,
                                                              reference_measurement=True,
                                                              reference_trace=False,
-                                                             fit_range=fit_range)
+                                                             fit_range=fit_range,
+                                                             predict_phase=predict_phase)
             phase_list_ref, amplitude_list_ref = self.fit_all_helper(plot=plot,
                                                              extrapolate_phase=extrapolate_phase,
                                                              return_ampl=True,
                                                              cal_points=cal_points,
                                                              reference_measurement=True,
                                                              reference_trace=True,
-                                                             fit_range=fit_range)
+                                                             fit_range=fit_range,
+                                                             predict_phase=predict_phase)
             if return_ampl:
                 return phase_list, amplitude_list, phase_list_ref, amplitude_list_ref
             else:
@@ -9553,7 +9558,8 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
                                                              cal_points=cal_points,
                                                              reference_measurement=False,
                                                              reference_trace=False,
-                                                             fit_range=fit_range)
+                                                             fit_range=fit_range,
+                                                             predict_phase=predict_phase)
 
             if return_ampl:
                 return phase_list, amplitude_list
@@ -9562,7 +9568,8 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
 
     def fit_all_helper(self, plot=False, extrapolate_phase=False, return_ampl=False,
                 cal_points=None, reference_measurement=False, reference_trace=False,
-                fit_range=None):
+                fit_range=None,
+                predict_phase=True):
 
         if cal_points is None:
             cal_points = self.cal_points
@@ -9600,8 +9607,10 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
                 thetas = self.data[0, i:i+length_single]
                 ampls = data_rotated[i:i+length_single]
 
-            # phase_guess = phase_list[-1]
-            phase_guess = 0
+            if predict_phase:
+                phase_guess = phase_list[-1]
+            else:
+                phase_guess = 0
 
 
 
@@ -9736,7 +9745,7 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
             return self.fitted_delay
 
     def run_delay_analysis(self, X90_separation=None, drive_pulse_length=None,
-                           show=False,
+                           plot=False,
                             close_file=True, **kw):
 
         if X90_separation is None:
@@ -9751,7 +9760,8 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
 
 
         #get the fit results (lmfit.ModelResult) and save them
-        self.fit_all(plot=False,extrapolate_phase=False,cal_points=self.cal_points)
+        self.fit_all(plot=False, extrapolate_phase=False, cal_points=self.cal_points,
+                     predict_phase=False)
 
         self.fitted_delay, self.delay_fit_res = self.fit_delay(
             X90_separation=X90_separation,
@@ -9765,11 +9775,11 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
 
 
         #Plot results
-        self.plot_results(show_guess=show_guess)
+        self.plot_delay_fit(show_guess=show_guess)
 
         #display figure
-        if show:
-            self.fig.show()
+        if plot:
+            plt.show()
 
         #save figure
         self.save_fig(self.fig, figname=self.measurementstring+'_delay_fit',
@@ -9784,7 +9794,7 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
 
 
 
-    def plot_results(self, show_guess=False):
+    def plot_delay_fit(self, show_guess=False):
 
         self.fig, self.ax = plt.subplots()
 
