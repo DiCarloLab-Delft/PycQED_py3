@@ -209,34 +209,7 @@ class Test_CliffordGroupProperties(TestCase):
         self.assertEqual(len(hash_table), 11520)
         self.assertEqual(len(np.unique(hash_table)), 11520)
 
-class TestPauliTransferProps(TestCase):
-    """
-    Only the most basic test for the transfer matrices.
-    Intended to catch silly things like typos
-    """
 
-    def test_single_qubit_Paulis(self):
-        for pauli in [X, Y, Z]:
-            pauli2 = np.dot(pauli,pauli)
-            np.testing.assert_array_equal(pauli2,
-                                          np.eye(4, dtype=int))
-    def test_Hadamard(self):
-        np.testing.assert_array_equal(np.dot(H, H),
-                                      np.eye(4, dtype=int))
-    def test_S_gate(self):
-        np.testing.assert_array_equal(np.dot(S, S), S2)
-        np.testing.assert_array_equal(np.dot(S, S2), np.eye(4,dtype=int))
-
-    def test_cphase(self):
-            CZ2 = np.linalg.multi_dot([CZ, CZ])
-            CZ2 = np.dot(CZ, CZ)
-            np.testing.assert_array_equal(CZ2, np.eye(16, dtype=int))
-
-
-    def test_cphase(self):
-        CZ2 = np.linalg.multi_dot([CZ, CZ])
-        CZ2 = np.dot(CZ, CZ)
-        np.testing.assert_array_equal(CZ2, np.eye(16, dtype=int))
 
 
 class TestCliffordCalculus(TestCase):
