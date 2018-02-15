@@ -18,7 +18,7 @@ def construct_clifford_lookuptable(generator, indices):
     for idx in indices:
         clifford = generator(idx=idx)
         # important to use crc32 hashing as this is a non-random hash
-        hash_val = crc32(clifford.pauli_transfer_matrix.tobytes())
+        hash_val = crc32(clifford.pauli_transfer_matrix.round().astype(int))
         lookuptable.append(hash_val)
     return lookuptable
 
@@ -31,5 +31,9 @@ if __name__ == '__main__':
             f.write(str(h)+'\n')
 
 
-    # two_qubit_hash_lut = construct_clifford_lookuptable(
-    #     TwoQubitClifford, np.arange(11520))
+    two_qubit_hash_lut = construct_clifford_lookuptable(
+        TwoQubitClifford, np.arange(11520))
+    with open(join(output_dir, 'two_qubit_hash_lut.txt'), 'w') as f:
+        for h in two_qubit_hash_lut:
+            f.write(str(h)+'\n')
+

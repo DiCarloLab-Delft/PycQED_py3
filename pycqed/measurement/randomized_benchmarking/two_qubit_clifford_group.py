@@ -1,7 +1,11 @@
+import numpy as np
+from zlib import crc32
 from os.path import join, dirname, abspath
-from pycqed.measurement.randomized_benchmarking.clifford_group import clifford_group_single_qubit
+from pycqed.measurement.randomized_benchmarking.clifford_group import clifford_group_single_qubit as C1, CZ, S1
 from pycqed.measurement.randomized_benchmarking.clifford_decompositions \
     import(gate_decomposition)
+
+
 """
 This file contains Clifford decompositions for the two qubit Clifford group.
 
@@ -60,79 +64,294 @@ S1[2] = rXm90, rYm90
 
 """
 
-###################################
-# The single qubit Clifford group #
-###################################
-
-# S1 Clifford subgroup
-# S1 = [C1[0], C1[8], C1[7]]
-# S1_rX90 = [C1[12], C1[22], C1[15]]
-# S1_rY90 = [C1[14], C1[20], C1[17]]
-
-# 1. encoding gates/paulis
-# 2. How to multiply operators
-# 3. How to go from operator to Clifford decomposed into gates (11520 lookuptable)
-    # Lookuptable for inversion using hashes
-
-
-"""
-Encoding into the extended Pauli set
-We encode very Clifford into 3 2 bit integers
-    P = {phase_bit , \sigma_i, \sigma_j | i,j element {0, X, Y, Z}}
-    Encoding:
-        sign_bit:
-             1 + 0i -> 00
-             1j -> 01
-            -1 + 0i -> 10
-            -1j -> 11
-
-
-
-Example: rZ90 -> {
-"""
-
-
-
+# used to transform the S1 subgroup
+X90 = C1[16]
+Y90 = C1[21]
+mY90 = C1[15]
 
 
 class Clifford(object):
-    # def __init__(self):
-    #     self.operator = operator
-    #     self.idx = None # int denoting the id of the Clifford
-    #     self.gate_decomposition = None
 
     def __mul__(self, other):
         """
         Product of two clifford gates.
-        returns a Clifford gate with
+        returns a new Clifford object that performs the net operation
+        that is the product of both operations.
         """
-        # FIXME: Puali multiplication must be implemented here
-        net_op = self.operator*other.operator
-        return Clifford(net_op)
+        net_op = np.dot(self.pauli_transfer_matrix,
+                        other.pauli_transfer_matrix)
+        idx = get_clifford_id(net_op)
+        return self.__class__(idx)
 
     def __repr__(self):
         return '{}(idx={})'.format(self.__class__.__name__, self.idx)
 
     def __str__(self):
-        return str(self.gate_decomposition)
+        return '{} idx {}\n Gates: {}\n'.format(self.__class__.__name__, self.idx,
+                                                self.gate_decomposition.__str__(),
+                                                )
+
+    def get_inverse(self):
+        inverse_ptm = np.linalg.inv(self.pauli_transfer_matrix).astype(int)
+        idx = get_clifford_id(inverse_ptm)
+        return self.__class__(idx)
+
 
 class SingleQubitClifford(Clifford):
-    def __init__(self, idx: int, decomposition: str='Epstein'):
-        assert(idx<24)
+
+    def __init__(self, idx: int):
+        assert(idx < 24)
         self.idx = idx
-        self.pauli_transfer_matrix = clifford_group_single_qubit[idx]
-        if decomposition =='Epstein':
-            self.gate_decomposition  = gate_decomposition[idx]
+        self.pauli_transfer_matrix = C1[idx]
+
+    @property
+    def gate_decomposition(self):
+        """
+        Returns the gate decomposition of the single qubit Clifford group
+        according to the decomposition by Epstein et al.
+        """
+        if not hasattr(self, '_gate_decomposition'):
+            self._gate_decomposition = [(g, 'q0') for g in
+                                        gate_decomposition[self.idx]]
+        return self._gate_decomposition
 
 
 class TwoQubitClifford(Clifford):
-    def __init__(self, idx: int, decomposition: str='Epstein'):
-        assert(idx<11520)
+
+    def __init__(self, idx: int):
+        assert(idx < 11520)
         self.idx = idx
-        raise NotImplemented()
-        # self.pauli_transfer_matrix = clifford_group_single_qubit[idx]
-        # if decomposition =='Epstein':
-        #     self.gate_decomposition  = gate_decomposition[idx]
+
+        if idx < 576:
+            self.pauli_transfer_matrix = single_qubit_like_PTM(idx)
+        elif idx < 576 + 5184:
+            self.pauli_transfer_matrix = CNOT_like_PTM(idx-576)
+        elif idx < 576 + 2*5184:
+            self.pauli_transfer_matrix = iSWAP_like_PTM(idx-(576+5184))
+        elif idx < 11520:
+            self.pauli_transfer_matrix = SWAP_like_PTM(idx-(576+2*5184))
+
+    @property
+    def gate_decomposition(self):
+        """
+        Returns the gate decomposition of the two qubit Clifford group.
+
+        Single qubit Cliffords are decompesed according to Epstein et al.
+
+        Using the method to get this avoids expensive function calls
+        whenever the Clifford is instantiated
+        """
+        if not hasattr(self, '_gate_decomposition'):
+            if self.idx < 576:
+                self._gate_decomposition = single_qubit_like_gates(self.idx)
+            elif self.idx < 576 + 5184:
+                self._gate_decomposition = CNOT_like_gates(self.idx-576)
+            elif self.idx < 576 + 2*5184:
+                self._gate_decomposition = iSWAP_like_gates(
+                    self.idx-(576+5184))
+            elif self.idx < 11520:
+                self._gate_decomposition = SWAP_like_gates(
+                    self.idx-(576+2*5184))
+
+        return self._gate_decomposition
+
+
+def single_qubit_like_PTM(idx):
+    """
+    Returns the pauli transfer matrix for gates of the single qubit like class
+        (q0)  -- C1 --
+        (q1)  -- C1 --
+    """
+    assert(idx < 24**2)
+    idx_q0 = idx % 24
+    idx_q1 = idx//24
+    pauli_transfer_matrix = np.kron(C1[idx_q1], C1[idx_q0])
+    return pauli_transfer_matrix
+
+
+def single_qubit_like_gates(idx):
+    """
+    Returns the gates for Cliffords of the single qubit like class
+        (q0)  -- C1 --
+        (q1)  -- C1 --
+    """
+    assert(idx < 24**2)
+    idx_q0 = idx % 24
+    idx_q1 = idx//24
+
+    g_q0 = [(g, 'q0') for g in gate_decomposition[idx_q0]]
+    g_q1 = [(g, 'q1') for g in gate_decomposition[idx_q1]]
+    gates = g_q0 + g_q1
+    return gates
+
+
+def CNOT_like_PTM(idx):
+    """
+    Returns the pauli transfer matrix for gates of the cnot like class
+        (q0)  --C1--•--S1--      --C1--•--S1------
+                    |        ->        |
+        (q1)  --C1--⊕--S1--      --C1--•--S1^Y90--
+    """
+    assert(idx < 5184)
+    idx_0 = idx % 24
+    idx_1 = (idx // 24) % 24
+    idx_2 = (idx // 576) % 3
+    idx_3 = (idx // 1728)
+
+    C1_q0 = np.kron(np.eye(4), C1[idx_0])
+    C1_q1 = np.kron(C1[idx_1], np.eye(4))
+    CZ
+    S1_q0 = np.kron(np.eye(4), S1[idx_2])
+    S1y_q1 = np.kron(np.dot(C1[idx_3], Y90), np.eye(4))
+    return np.linalg.multi_dot([C1_q0, C1_q1, CZ, S1_q0, S1y_q1])
+
+
+def CNOT_like_gates(idx):
+    """
+    Returns the gates for Cliffords of the cnot like class
+        (q0)  --C1--•--S1--      --C1--•--S1------
+                    |        ->        |
+        (q1)  --C1--⊕--S1--      --C1--•--S1^Y90--
+    """
+    assert(idx < 5184)
+    idx_0 = idx % 24
+    idx_1 = (idx // 24) % 24
+    idx_2 = (idx // 576) % 3
+    idx_3 = (idx // 1728)
+
+    C1_q0 = [(g, 'q0') for g in gate_decomposition[idx_0]]
+    C1_q1 = [(g, 'q1') for g in gate_decomposition[idx_1]]
+    CZ = [('CZ', ['q0', 'q1'])]
+
+    idx_2s = get_clifford_id(S1[idx_2])
+    S1_q0 = [(g, 'q0') for g in gate_decomposition[idx_2s]]
+    idx_3s = get_clifford_id(np.dot(C1[idx_3], Y90))
+    S1_yq1 = [(g, 'q1') for g in gate_decomposition[idx_3s]]
+
+    gates = C1_q0 + C1_q1 + CZ + S1_q0 + S1_yq1
+    return gates
+
+
+def iSWAP_like_PTM(idx):
+    """
+    Returns the pauli transfer matrix for gates of the iSWAP like class
+        (q0)  --C1--*--S1--     --C1--•---Y90--•--S1^Y90--
+                    |       ->        |        |
+        (q1)  --C1--*--S1--     --C1--•--mY90--•--S1^X90--
+    """
+    assert(idx < 5184)
+    idx_0 = idx % 24
+    idx_1 = (idx // 24) % 24
+    idx_2 = (idx // 576) % 3
+    idx_3 = (idx // 1728)
+
+    C1_q0 = np.kron(np.eye(4), C1[idx_0])
+    C1_q1 = np.kron(C1[idx_1], np.eye(4))
+    CZ
+    sq_swap_gates = np.kron(mY90, Y90)
+    CZ
+    S1_q0 = np.kron(np.eye(4), np.dot(S1[idx_2], Y90))
+    S1y_q1 = np.kron(np.dot(C1[idx_3], X90), np.eye(4))
+
+    return np.linalg.multi_dot([C1_q0, C1_q1,
+                                CZ, sq_swap_gates, CZ,
+                                S1_q0, S1y_q1])
+
+
+def iSWAP_like_gates(idx):
+    """
+    Returns the gates for Cliffords of the iSWAP like class
+        (q0)  --C1--*--S1--     --C1--•---Y90--•--S1^Y90--
+                    |       ->        |        |
+        (q1)  --C1--*--S1--     --C1--•--mY90--•--S1^X90--
+    """
+    assert(idx < 5184)
+    idx_0 = idx % 24
+    idx_1 = (idx // 24) % 24
+    idx_2 = (idx // 576) % 3
+    idx_3 = (idx // 1728)
+
+    C1_q0 = [(g, 'q0') for g in gate_decomposition[idx_0]]
+    C1_q1 = [(g, 'q1') for g in gate_decomposition[idx_1]]
+    CZ = [('CZ', ['q0', 'q1'])]
+
+    sqs_idx_q0 = get_clifford_id(Y90)
+    sqs_idx_q1 = get_clifford_id(mY90)
+    sq_swap_gates_q0 = [(g, 'q0') for g in gate_decomposition[sqs_idx_q0]]
+    sq_swap_gates_q1 = [(g, 'q1') for g in gate_decomposition[sqs_idx_q1]]
+
+    S1_q0 = np.kron(np.eye(4), np.dot(S1[idx_2], Y90))
+    S1y_q1 = np.kron(np.dot(C1[idx_3], X90), np.eye(4))
+
+    idx_2s = get_clifford_id(S1[idx_2])
+    S1_q0 = [(g, 'q0') for g in gate_decomposition[idx_2s]]
+    idx_3s = get_clifford_id(np.dot(C1[idx_3], Y90))
+    S1y_q1 = [(g, 'q1') for g in gate_decomposition[idx_3s]]
+
+    gates = (C1_q0 + C1_q1 + CZ +
+             sq_swap_gates_q0 + sq_swap_gates_q1 + CZ +
+             S1_q0 + S1y_q1)
+    return gates
+
+
+def SWAP_like_PTM(idx):
+    """
+    Returns the pauli transfer matrix for gates of the SWAP like class
+
+    (q0)  --C1--x--     --C1--•-mY90--•--Y90--•-------
+                |   ->        |       |       |
+    (q1)  --C1--x--     --C1--•--Y90--•-mY90--•--Y90--
+    """
+    assert(idx < 24**2)
+    idx_q0 = idx % 24
+    idx_q1 = idx//24
+    sq_like_cliff = np.kron(C1[idx_q1], C1[idx_q0])
+    sq_swap_gates_0 = np.kron(Y90, mY90)
+    sq_swap_gates_1 = np.kron(mY90, Y90)
+    sq_swap_gates_2 = np.kron(Y90, np.eye(4))
+
+    return np.linalg.multi_dot([sq_like_cliff, CZ,
+                                sq_swap_gates_0, CZ,
+                                sq_swap_gates_1, CZ,
+                                sq_swap_gates_2])
+
+
+def SWAP_like_gates(idx):
+    """
+    Returns the gates for Cliffords of the SWAP like class
+
+    (q0)  --C1--x--     --C1--•-mY90--•--Y90--•-------
+                |   ->        |       |       |
+    (q1)  --C1--x--     --C1--•--Y90--•-mY90--•--Y90--
+    """
+    assert(idx < 24**2)
+    idx_q0 = idx % 24
+    idx_q1 = idx//24
+    C1_q0 = [(g, 'q0') for g in gate_decomposition[idx_q0]]
+    C1_q1 = [(g, 'q1') for g in gate_decomposition[idx_q1]]
+    CZ = [('CZ', ['q0', 'q1'])]
+
+    sq_swap_gates_0 = np.kron(Y90, mY90)
+
+    sqs_idx_q0 = get_clifford_id(Y90)
+    sqs_idx_q1 = get_clifford_id(mY90)
+    sq_swap_gates_0_q0 = [(g, 'q0') for g in gate_decomposition[sqs_idx_q0]]
+    sq_swap_gates_0_q1 = [(g, 'q1') for g in gate_decomposition[sqs_idx_q1]]
+
+    sqs_idx_q0 = get_clifford_id(mY90)
+    sqs_idx_q1 = get_clifford_id(Y90)
+    sq_swap_gates_1_q0 = [(g, 'q0') for g in gate_decomposition[sqs_idx_q0]]
+    sq_swap_gates_1_q1 = [(g, 'q1') for g in gate_decomposition[sqs_idx_q1]]
+
+    sqs_idx_q1 = get_clifford_id(Y90)
+    sq_swap_gates_2_q0 = [(g, 'q0') for g in gate_decomposition[0]]
+    sq_swap_gates_2_q1 = [(g, 'q1') for g in gate_decomposition[sqs_idx_q1]]
+
+    gates = (C1_q0 + C1_q1 + CZ +
+             sq_swap_gates_0_q0 + sq_swap_gates_0_q1 + CZ +
+             sq_swap_gates_1_q0 + sq_swap_gates_1_q1 + CZ +
+             sq_swap_gates_2_q0 + sq_swap_gates_2_q1)
+    return gates
 
 
 def get_single_qubit_clifford_hash_table():
@@ -148,60 +367,29 @@ def get_single_qubit_clifford_hash_table():
     return hash_table
 
 
+def get_two_qubit_clifford_hash_table():
+    """
+    Get's the two qubit clifford hash table. Requires this to be generated
+    first. To generate, execute "generate_clifford_hash_tables.py".
+    """
+    hash_dir = join(abspath(dirname(__file__)), 'clifford_hash_tables')
 
-# class Single_qubit_like(Clifford):
-#     def __init__(self, idx: int):
-#         assert(idx<24**2)
-#         self.idx = idx
-#         idx_q0 = idx%24
-#         idx_q1 = idx//24
-#         # FIXME: proper way of defining the operator
-#         self.operator = C1_op[idx_q0], C1_op[idx_q1]
-#         self.gates = C1[idx_q0], C1[idx_q1]
-
-# class CNOT_like(Clifford):
-#     def __init__(self, j:int):
-#         assert(j<5184)
-#         j1 = j % 24
-#         j2 = (j // 24) % 24
-#         j3 = S1_convert[(j // 576) % 3]
-#         j4 = S1Y_convert[(j // 1728)]
-#         self.operator = Pauli_prod([sqc1[j1],sqc2[j2],CX,sqc1[j3],sqc2[j4]])
-
-# class iSWAP_like(Cliffordt):
-#     def __init__(self, j:int):
-#         assert(j<5184)
-#         j1 = j % 24
-#         j2 = (j // 24) % 24
-#         j3 = S1Y_convert[(j // 576) % 3]
-#         j4 = S1X_convert[(j // 1728)]
-#         self.operator = Pauli_prod([sqc1[j1],sqc2[j2],iSWAP,sqc1[j3],sqc2[j4]])
-
-# class SWAP_like(Clifford):
-#     def __init__(self, j:int):
-#         assert(j<576)
-#         j1 = j % 24
-#         j2 = j // 24
-#         self.operator = Pauli_prod([sqc1[j1],sqc2[j2],SWAP])
+    with open(join(hash_dir, 'two_qubit_hash_lut.txt'),
+              'r') as f:
+        hash_table = [int(line.rstrip('\n')) for line in f]
+    return hash_table
 
 
-
-
-
-# def C2_operator(j: int):
-#     """
-#     Returns the pauli operator for element j of the two qubit
-#     Clifford group C2.
-
-
-#     """
-#     if j < 576:
-#         return SQ_class_operator(j)
-#     elif j < 576 + 5184:
-#         return CNOT_class_operator(j-576)
-#     elif j< 576 + 2*5184:
-#         return iSWAP_class_operator(j-576+5184)
-#     elif j<11520:
-#         return SWAP_class_operator(j-576+2*5184)
-#     else:
-#         raise ValueError('j ({}) must be smaller than {}')
+def get_clifford_id(pauli_transfer_matrix):
+    """
+    returns the unique Id of a Clifford.
+    """
+    unique_hash = crc32(pauli_transfer_matrix.astype(int))
+    if np.array_equal(np.shape(pauli_transfer_matrix), (4, 4)):
+        hash_table = get_single_qubit_clifford_hash_table()
+    elif np.array_equal(np.shape(pauli_transfer_matrix), (16, 16)):
+        hash_table = get_two_qubit_clifford_hash_table()
+    else:
+        raise NotImplementedError()
+    idx = hash_table.index(unique_hash)
+    return idx
