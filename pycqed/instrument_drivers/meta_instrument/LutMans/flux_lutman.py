@@ -196,6 +196,8 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         self._wave_dict['cz_z'] = self._gen_cz_z(regenerate_cz=False)
         self._wave_dict['idle_z'] = self._gen_idle_z()
 
+        self._wave_dict['multi_square'] = self._gen_multi_square(
+            regenerate_square=False)
         # multi_cz is used because there is no real-time flux correction yet
         self._wave_dict['multi_cz'] = self._gen_multi_cz(regenerate_cz=False)
         self._wave_dict['multi_idle_z'] = self._gen_multi_idle_z(
@@ -237,6 +239,23 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         phase_corr = self._gen_phase_corr()
         # CZ with phase correction
         return np.concatenate([self._wave_dict['cz'], phase_corr])
+
+    def _gen_multi_square(self, regenerate_square=True):
+        """
+        Composite waveform containing multiple cz gates
+        """
+        if regenerate_square:
+            self._wave_dict['square'] = self._gen_square()
+
+        max_nr_samples = int(self.cfg_max_wf_length()*self.sampling_rate())
+
+        waveform = np.zeros(max_nr_samples)
+        for i in range(self.mcz_nr_of_repeated_gates()):
+            sample_start_idx = int(self.mcz_gate_separation() *
+                                   self.sampling_rate())*i
+            sq = self._wave_dict['square']
+            waveform[sample_start_idx:sample_start_idx+len(sq)] += sq
+        return waveform
 
     def _gen_multi_cz(self, regenerate_cz=True):
         """
