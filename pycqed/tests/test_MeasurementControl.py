@@ -365,8 +365,8 @@ class Test_MeasurementControl(unittest.TestCase):
         x_mean = self.MC.adaptive_result[5]
 
         for i in range(3):
-            self.assertLess(x_opt[i], 0.15)
-            self.assertLess(x_mean[i], 0.15)
+            self.assertLess(x_opt[i], 0.5)
+            self.assertLess(x_mean[i], 0.5)
 
     def test_adaptive_measurement_SPSA(self):
         self.MC.soft_avg(1)
