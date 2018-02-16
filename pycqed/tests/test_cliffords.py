@@ -308,11 +308,45 @@ class TestCliffordClassRBSeqs(TestCase):
         seeds = [0, 100, 200, 300, 400]
         net_cliffs = np.arange(len(seeds))
         for seed, net_cl in zip(seeds, net_cliffs):
-            cliffords_single_qubit_class = rb.single_qubit_randomized_benchmarking_sequence(
-                n_cl=20, desired_net_cl=0, seed=0)
-            cliffords = rb.randomized_benchmarking_sequence(
+            cliffords_single_qubit_class = rb.randomized_benchmarking_sequence(
+                n_cl=20, desired_net_cl=0,  number_of_qubits=1, seed=0)
+            cliffords = rb.randomized_benchmarking_sequence_old(
                 n_cl=20, desired_net_cl=0, seed=0)
             np.testing.assert_array_equal(cliffords_single_qubit_class, cliffords)
+
+    def test_interleaved_randomized_benchmarking_sequence_1Q(self):
+        seeds = [0, 100, 200, 300, 400]
+        net_cliffs = np.arange(len(seeds))
+        for seed, net_cl in zip(seeds, net_cliffs):
+            intl_cliffords = rb.interleaved_randomized_benchmarking_sequence(
+                n_cl=20, desired_net_cl=0, number_of_qubits=1, seed=0,
+                inter_cl=0)
+            cliffords = rb.randomized_benchmarking_sequence(
+                n_cl=20, desired_net_cl=0, seed=0)
+
+            new_cliff = np.empty(cliffords.size*2-1, dtype=int)
+            new_cliff[0::2] = cliffords
+            new_cliff[1::2] = 0
+            np.testing.assert_array_equal(intl_cliffords,
+                                          new_cliff)
+
+
+    def test_interleaved_randomized_benchmarking_sequence_2Q(self):
+        seeds = [0, 100, 200, 300, 400]
+        net_cliffs = np.arange(len(seeds))
+        for seed, net_cl in zip(seeds, net_cliffs):
+            intl_cliffords = rb.interleaved_randomized_benchmarking_sequence(
+                n_cl=20, desired_net_cl=0, number_of_qubits=2, seed=0,
+                inter_cl=0)
+            cliffords = rb.randomized_benchmarking_sequence(
+                n_cl=20, number_of_qubits=2, desired_net_cl=0, seed=0)
+
+            new_cliff = np.empty(cliffords.size*2-1, dtype=int)
+            new_cliff[0::2] = cliffords
+            new_cliff[1::2] = 0
+            np.testing.assert_array_equal(intl_cliffords,
+                                          new_cliff)
+
 
     def test_two_qubit_randomized_benchmarking_sequence(self):
         """
@@ -320,8 +354,12 @@ class TestCliffordClassRBSeqs(TestCase):
         seeds = [0, 100, 200, 300, 400]
         net_cliffs = np.arange(len(seeds))
         for seed, net_cl in zip(seeds, net_cliffs):
-            rb.Two_qubit_randomized_benchmarking_sequence(
-                n_cl=20, desired_net_cl=0, seed=0)
+            rb.randomized_benchmarking_sequence(
+                n_cl=20, desired_net_cl=0, number_of_qubits=2, seed=0)
+
+
+            # rb.two_qubit_randomized_benchmarking_sequence(
+            #     n_cl=20, desired_net_cl=0, seed=0)
             # no test for correctness here. Corectness depend on the fact
             # that it implements code very similar to the Single qubit version
             # and has components that are all tested.
