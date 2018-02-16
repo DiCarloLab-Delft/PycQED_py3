@@ -3,7 +3,8 @@ from unittest import expectedFailure
 from unittest import TestCase
 
 from pycqed.simulations.pauli_transfer_matrices import(
-    X,Y,Z, H, S, S2, CZ, X_theta, Y_theta, Z_theta)
+    X,Y,Z, H, S, S2, CZ, X_theta, Y_theta, Z_theta,
+    process_fidelity, average_gate_fidelity)
 
 
 class TestPauliTransferProps(TestCase):
@@ -46,17 +47,17 @@ class TestPauliTransferProps(TestCase):
 
 
     def test_angle_rotation_static(self):
-        np.testing.assert_array_equal(X_theta(180), X)
-        np.testing.assert_array_equal(Y_theta(180), Y)
-        np.testing.assert_array_equal(Z_theta(180), Z)
+        np.testing.assert_array_almost_equal(X_theta(180), X)
+        np.testing.assert_array_almost_equal(Y_theta(180), Y)
+        np.testing.assert_array_almost_equal(Z_theta(180), Z)
 
 
     def test_angle_rotation_unit(self):
-        np.testing.assert_array_equal(X_theta(32, unit='deg'),
+        np.testing.assert_array_almost_equal(X_theta(32, unit='deg'),
                                       X_theta(np.deg2rad(32), unit='rad'))
-        np.testing.assert_array_equal(Y_theta(18, unit='deg'),
+        np.testing.assert_array_almost_equal(Y_theta(18, unit='deg'),
                                       Y_theta(np.deg2rad(18), unit='rad'))
-        np.testing.assert_array_equal(Z_theta(180, unit='deg'),
+        np.testing.assert_array_almost_equal(Z_theta(180, unit='deg'),
                                       Z_theta(np.deg2rad(180), unit='rad'))
 
 
@@ -75,3 +76,11 @@ class TestPauliTransferProps(TestCase):
         np.testing.assert_array_almost_equal(np.dot(X_theta(90), Y_state), Z_state)
         np.testing.assert_array_almost_equal(np.dot(X_theta(-90), Y_state), -Z_state)
 
+    def test_fidelity_calculation(self):
+
+        Z_160 = Z_theta(160)
+        F_pro = process_fidelity(Z_160, Z)
+        self.assertAlmostEqual(F_pro, 0.9698463)
+
+        F_avg = average_gate_fidelity(Z_160, Z)
+        self.assertAlmostEqual(F_avg, 0.979897540)
