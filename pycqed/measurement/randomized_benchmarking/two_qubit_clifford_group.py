@@ -5,12 +5,19 @@ from pycqed.measurement.randomized_benchmarking.clifford_group import clifford_g
 from pycqed.measurement.randomized_benchmarking.clifford_decompositions \
     import(gate_decomposition)
 
+hash_dir = join(abspath(dirname(__file__)), 'clifford_hash_tables')
+try:
+    open(join(hash_dir, 'single_qubit_hash_lut.txt'), 'r')
+except FileNotFoundError:
+    print("Clifford group hash tables not detected.")
+    from pycqed.measurement.randomized_benchmarking.generate_clifford_hash_tables import generate_hash_tables
+    generate_hash_tables()
 
 """
 This file contains Clifford decompositions for the two qubit Clifford group.
 
-The Clifford decomposition follows closely two papers:
-Corcoles et al. Process verification .... Phys. Rev. A. 2013
+The Clifford decomposition closely follows two papers:
+Corcoles et al. Process verification ... Phys. Rev. A. 2013
     http://journals.aps.org/pra/pdf/10.1103/PhysRevA.87.030301
 for the different classes of two-qubit Cliffords.
 
@@ -60,7 +67,6 @@ S1: element of the S1 group, a subgroup of the single qubit Clifford group
 S1[0] = I
 S1[1] = rY90, rX90
 S1[2] = rXm90, rYm90
-
 
 """
 
@@ -359,8 +365,6 @@ def get_single_qubit_clifford_hash_table():
     Get's the single qubit clifford hash table. Requires this to be generated
     first. To generate, execute "generate_clifford_hash_tables.py".
     """
-    hash_dir = join(abspath(dirname(__file__)), 'clifford_hash_tables')
-
     with open(join(hash_dir, 'single_qubit_hash_lut.txt'),
               'r') as f:
         hash_table = [int(line.rstrip('\n')) for line in f]
@@ -372,8 +376,6 @@ def get_two_qubit_clifford_hash_table():
     Get's the two qubit clifford hash table. Requires this to be generated
     first. To generate, execute "generate_clifford_hash_tables.py".
     """
-    hash_dir = join(abspath(dirname(__file__)), 'clifford_hash_tables')
-
     with open(join(hash_dir, 'two_qubit_hash_lut.txt'),
               'r') as f:
         hash_table = [int(line.rstrip('\n')) for line in f]
