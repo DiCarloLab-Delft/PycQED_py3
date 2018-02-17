@@ -23,7 +23,7 @@ def construct_clifford_lookuptable(generator, indices):
     return lookuptable
 
 def generate_hash_tables():
-    print("Generating Clifford hash tables")
+    print("Generating Clifford hash tables.")
     single_qubit_hash_lut = construct_clifford_lookuptable(
         SingleQubitClifford, np.arange(24))
     with open(join(output_dir, 'single_qubit_hash_lut.txt'), 'w') as f:
@@ -34,6 +34,7 @@ def generate_hash_tables():
     with open(join(output_dir, 'two_qubit_hash_lut.txt'), 'w') as f:
         for h in two_qubit_hash_lut:
             f.write(str(h)+'\n')
+    print("Successfully generated Clifford hash tables.")
 
 if __name__ == '__main__':
     generate_hash_tables()

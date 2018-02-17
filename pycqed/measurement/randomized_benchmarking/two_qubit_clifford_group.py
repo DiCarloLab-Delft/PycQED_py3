@@ -6,12 +6,6 @@ from pycqed.measurement.randomized_benchmarking.clifford_decompositions \
     import(gate_decomposition)
 
 hash_dir = join(abspath(dirname(__file__)), 'clifford_hash_tables')
-try:
-    open(join(hash_dir, 'single_qubit_hash_lut.txt'), 'r')
-except FileNotFoundError:
-    print("Clifford group hash tables not detected.")
-    from pycqed.measurement.randomized_benchmarking.generate_clifford_hash_tables import generate_hash_tables
-    generate_hash_tables()
 
 """
 This file contains Clifford decompositions for the two qubit Clifford group.
@@ -358,6 +352,17 @@ def SWAP_like_gates(idx):
              sq_swap_gates_1_q0 + sq_swap_gates_1_q1 + CZ +
              sq_swap_gates_2_q0 + sq_swap_gates_2_q1)
     return gates
+
+##############################################################################
+# It is important that this check is after the Clifford objects as otherwise
+# it is impossible to generate the hash tables
+##############################################################################
+try:
+    open(join(hash_dir, 'single_qubit_hash_lut.txt'), 'r')
+except FileNotFoundError:
+    print("Clifford group hash tables not detected.")
+    from pycqed.measurement.randomized_benchmarking.generate_clifford_hash_tables import generate_hash_tables
+    generate_hash_tables()
 
 
 def get_single_qubit_clifford_hash_table():
