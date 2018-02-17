@@ -30,11 +30,12 @@ Go to the directory where you cloned the repository (in the shell) and run
 For more details see the [installation instructions](docs/install.md).
 
 Test your installation using
-* `python pycqed/test.py`
+* `py.test pycqed/tests -v`
+(be sure that you are in the PycQED_py3 root folder)
 
 Or run a specific test using e.g.
-* `python pycqed/test.py -t test_cliffords.py`
-
+* `py.test pycqed/tests/test_cliffords.py -v`
+(be sure that you are in the PycQED_py3 root folder)
 
 ## Usage
 
@@ -53,7 +54,7 @@ from init.your_initscript import *
 
 You are now ready to start your experiment.
 
-If you use this software in any of your publications we would appreciate it if you cite this repository using the [![DOI](https://zenodo.org/badge/49057179.svg)](https://zenodo.org/badge/latestdoi/49057179). 
+If you use this software in any of your publications we would appreciate it if you cite this repository using the [![DOI](https://zenodo.org/badge/49057179.svg)](https://zenodo.org/badge/latestdoi/49057179).
 
 ## Overview of the main modules
 Below follows an overview of the main structure of the code. It makes sense to take a look around here if your are new to get a feeling where to find things.
