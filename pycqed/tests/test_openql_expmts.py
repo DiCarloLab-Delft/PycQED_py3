@@ -5,6 +5,7 @@ import numpy as np
 try:
     from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
     from pycqed.measurement.openql_experiments import multi_qubit_oql as mqo
+    from pycqed.measurement.openql_experiments import cliford_rb_ql as rb_oql
     from pycqed.measurement.openql_experiments.generate_CCL_cfg import  \
         generate_config
     from pycqed.measurement.openql_experiments.pygsti_oql import poor_mans_2q_gst
@@ -119,6 +120,15 @@ try:
         def test_poor_mans_2q_gst(self):
             p = poor_mans_2q_gst(q0=0, q1=2, platf_cfg=config_fn)
             self.assertEqual(len(p.sweep_points), 731)
+
+    class Test_cliff_rb_oql(unittest.TestCase):
+        def test_single_qubit_rb_seq(self):
+            p = rb_oql.randomized_benchmarking([0], platf_cfg=config_fn,
+                                       nr_cliffords=[1, 5], nr_seeds=1, cal_points=False)
+
+        def test_two_qubit_rb_seq(self):
+            p = rb_oql.randomized_benchmarking([2, 0], platf_cfg=config_fn,
+                                       nr_cliffords=[1, 5], nr_seeds=1, cal_points=False)
 
 
 except ImportError as e:

@@ -129,6 +129,15 @@ def generate_config(filename: str,
             "y %0": ["ry180 %0"],
             "roty90 %0": ["ry90 %0"],
             "cnot %0,%1": ["ry90 %1", "cz %0,%1", "ry90 %1"],
+
+            # To support other forms of writing the same gates
+            "x180 %0": ["rx180 %0"],
+            "y180 %0": ["ry180 %0"],
+            "y90 %0": ["ry90 %0"],
+            "x90 %0": ["rx90 %0"],
+            "my90 %0": ["rym90 %0"],
+            "mx90 %0": ["rxm90 %0"],
+
             # Clifford decomposition per Eptstein et al. Phys. Rev. A 89, 062321
             # (2014)
             "cl_0 %0": ['i %0'],
