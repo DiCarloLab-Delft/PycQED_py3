@@ -90,18 +90,18 @@ class Test_Idling_Error_Rate_Analyisis(unittest.TestCase):
             np.testing.assert_almost_equal(
                 a.fit_res['fit +'].best_values[key], value, decimal=2)
 
-        expected_dict = {'A': -0.13013605060732808,
-             'N1': 1138.3896224910052,
-             'N2': 998125.16401733132,
-             'offset': 0.14572817207876956}
+        expected_dict = {'A': -0.13013585779457398,
+             'N1': 1138.3895116903586,
+             'N2': 601415.64642756886,
+             'offset': 0.14572799876310505}
         for key, value in expected_dict.items():
             np.testing.assert_almost_equal(
                 a.fit_res['fit 0'].best_values[key], value, decimal=2)
 
-        expected_dict = {'A': 0.74324542978037866,
-             'N1': 939.61974108722052,
-             'N2': 4160676.4693556926,
-             'offset': 0.18301612323869529}
+        expected_dict = {'A': 0.74324542246644376,
+             'N1': 939.61974247762646,
+             'N2': 3566698.2870284803,
+             'offset': 0.18301612896797623}
         for key, value in expected_dict.items():
             np.testing.assert_almost_equal(
                 a.fit_res['fit 1'].best_values[key], value, decimal=2)
