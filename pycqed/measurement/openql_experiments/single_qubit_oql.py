@@ -680,6 +680,7 @@ def add_single_qubit_cal_points(p, platf, qubit_idx):
         k.gate('rx180', qubit_idx)
         k.measure(qubit_idx)
         p.add_kernel(k)
+    return p
 
 
 def FluxTimingCalibration(qubit_idx: int, buffer_time1, times, platf_cfg: str,

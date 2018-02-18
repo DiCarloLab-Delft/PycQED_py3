@@ -738,12 +738,13 @@ class CCLight_Transmon(Qubit):
             result_logging_mode = 'raw'
 
         int_avg_det= det.UHFQC_integrated_average_detector(
-        UHFQC=self.instr_acquisition.get_instr(),
-        AWG=self.instr_CC.get_instr(),
-        channels=ro_channels,
-        result_logging_mode=result_logging_mode,
-        nr_averages=self.ro_acq_averages(),
-        integration_length=self.ro_acq_integration_length(), **kw)
+            UHFQC=self.instr_acquisition.get_instr(),
+            AWG=self.instr_CC.get_instr(),
+            channels=ro_channels,
+            result_logging_mode=result_logging_mode,
+            nr_averages=self.ro_acq_averages(),
+            integration_length=self.ro_acq_integration_length(), **kw)
+
 
         return int_avg_det
 

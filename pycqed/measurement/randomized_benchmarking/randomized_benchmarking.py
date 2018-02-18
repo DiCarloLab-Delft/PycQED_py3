@@ -109,16 +109,25 @@ def randomized_benchmarking_sequence_old(n_cl:int,
 
 def randomized_benchmarking_sequence(
         n_cl: int,
-        desired_net_cl:int =0,
-        number_of_qubits:int =1,
+        desired_net_cl:int = 0,
+        number_of_qubits:int = 1,
+        max_clifford_idx: int = 11520,
+        interleaving_cl: int = None,
         seed: int=None):
     """
-
+    Generates a randomized benchmarking sequence for the one or two qubit
+    clifford group.
 
     Args:
         n_cl           (int) : number of Cliffords
         desired_net_cl (int) : idx of the desired net clifford
-        number_of_qubits(int):
+        number_of_qubits(int): used to determine if Cliffords are drawn
+            from the single qubit or two qubit clifford group.
+        max_clifford_idx (int): used to set the index of the highest random
+            clifford generated. Useful to generate e.g., simultaneous two
+            qubit RB sequences.
+        interleaving_cl (int): interleaves the sequence with a specific
+            clifford if desired
         seed           (int) : seed used to initialize the random number
             generator.
     Returns:
@@ -130,22 +139,32 @@ def randomized_benchmarking_sequence(
     net clifford. It instead uses the "Clifford" objects used in
     constructing the two qubit Clifford classes.
     The old method exists to establish the equivalence between the two methods.
+
     """
     if number_of_qubits == 1:
         Cl = SingleQubitClifford
-        group_size = 24
+        group_size = np.min([24, max_clifford_idx])
     elif number_of_qubits ==2:
         Cl = TwoQubitClifford
-        group_size = 11520
+        group_size = np.min([11520, max_clifford_idx])
     else:
         raise NotImplementedError()
 
+    # Generate a random sequence of Cliffords
     if seed is None:
         rb_clifford_indices = np.random.randint(0, group_size, int(n_cl))
     if seed is not None:
         rng_seed = np.random.RandomState(seed)
         rb_clifford_indices = rng_seed.randint(0, group_size, int(n_cl))
 
+    # Add interleaving cliffords if applicable
+    if interleaving_cl is not None:
+        rb_clif_ind_intl = np.empty(rb_clifford_indices.size*2, dtype=int)
+        rb_clif_ind_intl[0::2] = rb_clifford_indices
+        rb_clif_ind_intl[1::2] = interleaving_cl
+        rb_clifford_indices = rb_clif_ind_intl
+
+    # Calculate the net clifford
     net_clifford = Cl(0)
     for idx in rb_clifford_indices:
         cliff = Cl(idx)
@@ -153,86 +172,11 @@ def randomized_benchmarking_sequence(
         # the new operator is applied on the left side.
         net_clifford = cliff*net_clifford
 
+    # determine the inverse of the sequence
     recovery_to_idx_clifford = net_clifford.get_inverse()
-    recovery_clifford = recovery_to_idx_clifford*Cl(
-        desired_net_cl)
-    recovery_clifford = Cl(
-        desired_net_cl)*recovery_to_idx_clifford
+    recovery_clifford = Cl(desired_net_cl)*recovery_to_idx_clifford
     rb_clifford_indices = np.append(rb_clifford_indices,
                                     recovery_clifford.idx)
     return rb_clifford_indices
 
 
-def interleaved_randomized_benchmarking_sequence(
-        n_cl: int, inter_cl: int,
-        desired_net_cl:int,
-        number_of_qubits:int,
-        seed: int=None):
-    """
-    Single qubit interleaved randomized benchmarking sequence.
-    Generates a single qubit RB sequence, interleaving the
-    "interleaving clifford" between each randomly generated clifford.
-
-    Args:
-        n_cl           (int) : number of Cliffords
-        inter_cl       (int) : idx of the interleaving clifford
-        desired_net_cl (int) : idx of the desired net clifford
-        number_of_qubits(int):
-        seed           (int) : seed used to initialize the random number
-            generator.
-    Returns:
-        list of clifford indices (ints)
-    """
-    if number_of_qubits == 1:
-        Cl = SingleQubitClifford
-        group_size = 24
-    elif number_of_qubits ==2:
-        Cl = TwoQubitClifford
-        group_size = 11520
-    else:
-        raise NotImplementedError()
-
-    if seed is not None:
-        rng_seed = np.random.RandomState(seed)
-    rb_clif_ind = rng_seed.randint(0, group_size, int(n_cl))
-    rb_clif_ind_intl = np.empty(rb_clif_ind.size*2, dtype=int)
-    rb_clif_ind_intl[0::2] = rb_clif_ind
-    rb_clif_ind_intl[1::2] = inter_cl
-
-    net_clifford = Cl(0)
-    for idx in rb_clif_ind_intl:
-        cliff = Cl(idx)
-        # order of operators applied in is right to left, therefore
-        # the new operator is applied on the left side.
-        net_clifford = cliff*net_clifford
-
-    recovery_to_idx_clifford = net_clifford.get_inverse()
-    recovery_clifford = recovery_to_idx_clifford*Cl(
-        desired_net_cl)
-    rb_clif_ind_intl = np.append(rb_clif_ind_intl,
-                                    recovery_clifford.idx)
-    return rb_clif_ind_intl
-
-
-def two_qubit_randomized_benchmarking_sequence(
-        n_cl: int, desired_net_cl:int =0, seed: int=None):
-    """
-
-    """
-    if seed is not None:
-        rng_seed = np.random.RandomState(seed)
-    rb_clifford_indices = rng_seed.randint(0, 11520, int(n_cl))
-
-    net_clifford = TwoQubitClifford(0)
-    for idx in rb_clifford_indices:
-        cliff = TwoQubitClifford(idx)
-        # order of operators applied in is right to left, therefore
-        # the new operator is applied on the left side.
-        net_clifford = cliff*net_clifford
-
-    recovery_to_idx_clifford = net_clifford.get_inverse()
-    recovery_clifford = recovery_to_idx_clifford*TwoQubitClifford(
-        desired_net_cl)
-    rb_clifford_indices = np.append(rb_clifford_indices,
-                                    recovery_clifford.idx)
-    return rb_clifford_indices
