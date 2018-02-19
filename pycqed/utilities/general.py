@@ -430,6 +430,14 @@ def setInDict(dataDict: dict, mapList: list, value):
     getFromDict(dataDict, mapList[:-1])[mapList[-1]] = value
 
 
+def is_more_rencent(filename: str, comparison_filename: str):
+    """
+    Returns True if the contents of "filename" has changed more recently
+    than the contents of "comparison_filename".
+    """
+    return os.path.getmtime(filename) > os.path.getmtime(comparison_filename)
+
+
 class NumpyJsonEncoder(json.JSONEncoder):
     '''
     JSON encoder subclass that converts Numpy types to native python types

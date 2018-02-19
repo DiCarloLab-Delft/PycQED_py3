@@ -8,7 +8,7 @@ import numpy as np
 import pygsti
 from os.path import join, dirname
 import openql.openql as ql
-from pycqed.utilities.general import suppress_stdout
+from pycqed.utilities.general import suppress_stdout, is_more_rencent
 import pycqed as pq
 from openql.openql import Program, Kernel, Platform
 from pycqed.measurement.openql_experiments.single_qubit_oql import \
@@ -33,7 +33,7 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                             initialize: bool=True,
                             interleaving_cliffords = [None],
                             program_name: str='randomized_benchmarking',
-                            cal_points: bool=True):
+                            cal_points: bool=True, recompile: bool=True):
     '''
     Input pars:
         qubits:         list of ints specifying qubit indices.
@@ -55,6 +55,12 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                         calibration points, set to False if you want
                         to measure a single element (for e.g. optimization)
 
+        recompile:      if True compiles the program, if False compares
+                        the last modified time of the config and the program
+                        filename. If the program is more recent than the config
+                        it returns an empty OpenQL program object with
+                        the intended filename that can be used to upload the
+                        previously compiled file.
 
     Returns:
         p:              OpenQL Program object
@@ -83,13 +89,31 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                 program_name='RB_{}'.format(i))
 
         3. Single qubit interleaved randomized benchmarking:
+            p = cl_oql.randomized_benchmarking(
+                qubits=[0],
+                interleaving_cliffords=[None, 0, 16, 3],
+                cal_points=False # relevant here because of data binning
 
-
+                nr_cliffords=[2, 4, 8, 16, 32, 128, 512, 1024],
+                nr_seeds=1,
+                platf_cfg=qubit.cfg_openql_platform_fn(),
+                program_name='Interleaved_RB_s{}_int{}_ncl{}_{}'.format(i))
 
     '''
     platf = Platform('OpenQL_Platform', platf_cfg)
     p = Program(pname=program_name, nqubits=platf.get_qubit_number(),
                 p=platf)
+
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+
+    if not recompile:
+        if is_more_rencent(p.filename, platf_cfg):
+            return p
+        else:
+            raise ValueError('OpenQL config has changed more recently '
+                             'than program.')
 
     if len(qubits) ==1:
         qubit_map = {'q0': qubits[0]}
@@ -139,7 +163,5 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
     with suppress_stdout():
         p.compile(verbose=False)
 
-    # attribute get's added to program to help finding the output files
-    p.output_dir = ql.get_output_dir()
-    p.filename = join(p.output_dir, p.name + '.qisa')
+
     return p
