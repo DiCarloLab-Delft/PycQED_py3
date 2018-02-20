@@ -1626,24 +1626,31 @@ class CPhase_optimization(det.Soft_Detector):
 
         if ramsey_phases is None:
             self.ramsey_phases = np.linspace(0, 2*np.pi, 16, endpoint=False)
-            self.ramsey_phases = np.concatenate((self.phases,self.phases))
+            self.ramsey_phases = np.concatenate((self.ramsey_phases,
+                                                 self.ramsey_phases))
         else:
             self.ramsey_phases = ramsey_phases
 
-
-
     def acquire_data_point(self, **kw):
 
+        print(self.flux_pulse_amp.name, ' set to ',
+              self.flux_pulse_amp(), self.flux_pulse_amp.unit)
+        print(self.flux_pulse_length.name, ' set to ',
+              self.flux_pulse_length(), self.flux_pulse_length.unit)
+
         cphases, population_losses = self.qb_control.measure_cphase(
-                                        qb_target=self.qb_target,
-                                        amps=[self.flux_pulse_amp()],
-                                        lengths=[self.flux_pulse_length()],
-                                        phases=self.ramsey_phases,
-                                        return_population_loss=True,
+                    MC=self.MC,
+                    qb_target=self.qb_target,
+                    amps=[self.flux_pulse_amp()],
+                    lengths=[self.flux_pulse_length()],
+                    phases=self.ramsey_phases,
+                    return_population_loss=True,
+                    auto=False
+                    )
+        print('measured conditional phase: ', cphases[0]/np.pi*180)
 
-                                        )
-
-        cost_val = np.abs(cphases[0] - np.pi)/np.pi + population_losses[0]
+        cost_val = np.abs(cphases[0]%(2*np.pi) - np.pi)/np.pi \
+                   + population_losses[0]
 
         # # Return the cost function
         return cost_val

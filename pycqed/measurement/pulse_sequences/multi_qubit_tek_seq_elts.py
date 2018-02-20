@@ -1146,7 +1146,7 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_list, RO_pars,
                 pulse_keys_w_suffix.append([x+' '+qubit_list[k % n].name
                                             for x in lst])
 
-            if CZ_info_list is not None:
+            if CZ_info_dict is not None:
                 # interleaved CZ_qbc and ICZ_qbt; this also changes
                 # pulse_keys_by_qubit
                 for pulse_keys_lst in pulse_keys_w_suffix[0:-2]:
@@ -1419,7 +1419,7 @@ def two_qubit_tomo_bell_qudev_seq(bell_state,
         operation_dict.update({'spacer ' + qb_name: spacerpulse})
 
         if not CZ_disabled:
-            # create I_CZ as a a copy of the I pulse but with the same length
+            # create ICZ as a a copy of the I pulse but with the same length
             # as the CZ pulse
             for i, CZ_op in enumerate(['CZ ' + qS + ' ' + qCZ,
                                        'CZ ' + qS + ' ' + qCZ]):
@@ -1439,7 +1439,7 @@ def two_qubit_tomo_bell_qudev_seq(bell_state,
     if not CZ_disabled:
         base_sequence = ['gate2 ' + qCZ, 'gate1 ' + qS,
                          'spacer ' + qCZ, 'spacer ' + qS,
-                         'CZ ' + qS + ' ' + qCZ, 'I_CZ ' + qS,
+                         'CZ ' + qS + ' ' + qCZ, 'ICZ ' + qS,
                          'spacer ' + qCZ, 'spacer ' + qS,
                          'after_pulse', 'I ' + qS]
         # base_sequence = num_flux_pulses*['flux ' + qCZ]
@@ -1450,7 +1450,7 @@ def two_qubit_tomo_bell_qudev_seq(bell_state,
         cal_base_sequence = \
             ['I '+qCZ, 'I '+qS,
               'spacer ' + qCZ, 'spacer ' + qS,
-              'I_CZ ' + qCZ, 'I_CZ '+qS,
+              'ICZ ' + qCZ, 'ICZ '+qS,
               'spacer ' + qCZ, 'spacer ' + qS,
               'I '+qCZ, 'I '+qS]
     else:
@@ -1500,7 +1500,7 @@ def two_qubit_tomo_bell_qudev_seq(bell_state,
                                        basis_pulses=('I', 'X180'))
     for i, cal_p in enumerate(cal_pulses):
         cal_pulses[i] = cal_base_sequence + cal_p
-    cal_pulses= [list(i) for i in np.repeat(np.asarray(cal_pulses),
+    cal_pulses = [list(i) for i in np.repeat(np.asarray(cal_pulses),
                                             cal_state_repeats, axis=0)]
     for cal_p in cal_pulses:
         seq_pulse_list += [cal_p]
@@ -1530,9 +1530,10 @@ def two_qubit_tomo_bell_qudev_seq(bell_state,
             #     from pprint import pprint
             #     pprint(operation_dict[p])
         # print('pulses ', len(pulses))
-        from pprint import pprint
-        pprint(pulses)
-        print('\n')
+        # from pprint import pprint
+        # pprint(pulses)
+        # print('\n')
+        pulses += [RO_pars]
         el = multi_pulse_elt(i, station, pulses, sequencer_config)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
@@ -1685,6 +1686,7 @@ def three_qubit_GHZ_tomo_seq(qubits,
         pulses = []
         for p in pulse_list:
             pulses += [operation_dict[p]]
+        pulses += [RO_pars]
         el = multi_pulse_elt(i, station, pulses, sequencer_config)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)

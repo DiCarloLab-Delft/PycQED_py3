@@ -429,6 +429,7 @@ class MeasurementControl(Instrument):
 
         vals = self.detector_function.acquire_data_point()
         # Resizing dataset and saving
+
         new_datasetshape = (np.max([datasetshape[0], stop_idx]),
                             datasetshape[1])
         self.dset.resize(new_datasetshape)

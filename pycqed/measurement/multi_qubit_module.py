@@ -417,8 +417,7 @@ def multiplexed_pulse(qubits, f_LO, upload=True, plot_filename=None):
     if upload:
         UHFQC = qubits[0].UHFQC
         UHFQC.awg_sequence_acquisition_and_pulse(np.real(pulse).copy(),
-                                                 np.imag(pulse).copy(),
-                                                 acquisition_delay=0)
+                                                 np.imag(pulse).copy())
         LO = qubits[0].readout_DC_LO
         LO.frequency(f_LO)
 
@@ -515,7 +514,8 @@ def calculate_minimal_readout_spacing(qubits, ro_slack=10e-9, drive_pulses=0):
 
 def measure_multiplexed_readout(qubits, f_LO, nreps=4, liveplot=False,
                                 ro_spacing=None, preselection=True, MC=None,
-                                plot_filename=False, ro_slack=10e-9):
+                                plot_filename=False, ro_slack=10e-9,
+                                thresholded=False):
 
     device.multiplexed_pulse(qubits, f_LO, upload=True,
                               plot_filename=plot_filename)
@@ -541,8 +541,12 @@ def measure_multiplexed_readout(qubits, f_LO, nreps=4, liveplot=False,
     if preselection:
         m *= 2
     shots = 4094 - 4094 % m
-    df = device.get_multiplexed_readout_detector_functions(qubits,
-             nr_shots=shots)['int_log_det']
+    if thresholded:
+        df = device.get_multiplexed_readout_detector_functions(qubits,
+                 nr_shots=shots)['dig_log_det']
+    else:
+        df = device.get_multiplexed_readout_detector_functions(qubits,
+                 nr_shots=shots)['int_log_det']
 
     for qb in qubits:
         qb.prepare_for_timedomain(multiplexed=True)
@@ -719,11 +723,11 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
     if label is None:
         if CxC_RB:
             label = '{}-qubit_CxC_RB_{}_{}_seeds_{}_cliffords'.format(
-                len(qubits), gate_decomp, nr_seeds, nr_cliffords[-1])
+                len(qubits), gate_decomp, nr_seeds, nr_cliffords)
         else:
             label = '{}-qubit_CxI_IxC_{}_RB_{}_{}_seeds_{}_cliffords'.format(
                 len(qubits), idx_for_RB, gate_decomp,
-                nr_seeds, nr_cliffords[-1])
+                nr_seeds, nr_cliffords)
 
     if CZ_info_dict is not None:
         if interleave_CZ:
@@ -738,15 +742,15 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
         else:
             label += '_thresh'
             key = 'dig'
-            for thresh_level, qb in zip(V_th_a, qubits):
+            for qb in qubits:
                 UHFQC.set('quex_thres_{}_level'.format(
-                    qb.RO_acq_weight_function_I()), thresh_level)
+                    qb.RO_acq_weight_function_I()), V_th_a[qb.name])
 
     for qb in qubits:
         qb.prepare_for_timedomain(multiplexed=True)
 
-    multiplexed_pulse(qubits, f_LO, upload=True, plot_filename=True)
-    RO_pars = get_multiplexed_readout_pulse_dictionary(qubits)
+    device.multiplexed_pulse(qubits, f_LO, upload=True, plot_filename=True)
+    RO_pars = device.get_multiplexed_readout_pulse_dictionary(qubits)
 
     if len(qubits) == 2:
         if len(nr_cliffords)==1:
@@ -756,7 +760,7 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
         correlations = [(qubits[0].RO_acq_weight_function_I(),
                          qubits[1].RO_acq_weight_function_I())]
 
-        det_func = get_multiplexed_readout_detector_functions(
+        det_func = device.get_multiplexed_readout_detector_functions(
             qubits, nr_averages=nr_averages, UHFQC=UHFQC,
             pulsar=pulsar, correlations=correlations)[key+'_corr_det']
 
@@ -776,16 +780,18 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
             n_qubit_RB_sweepfunction=hard_sweep_func)
 
     else:
-        if not isinstance(nr_cliffords, float) or \
-                not isinstance(nr_cliffords, int):
+        if not (isinstance(nr_cliffords, float) or
+                 isinstance(nr_cliffords, int)):
                     raise ValueError('For an experiment with more than two '
                                      'qubits, nr_cliffords must int or float.')
 
-        det_func = get_multiplexed_readout_detector_functions(
-            qubits, UHFQC=UHFQC, pulsar=pulsar,
-            nr_shots=nr_averages)[key+'_log_det']
+        k = 4095//nr_seeds
 
-        hard_sweep_points = np.arange(nr_averages)
+        det_func = device.get_multiplexed_readout_detector_functions(
+            qubits, UHFQC=UHFQC, pulsar=pulsar,
+            nr_shots=nr_seeds*k)[key+'_log_det']
+
+        hard_sweep_points = np.tile(np.arange(nr_seeds), k)
         hard_sweep_func = \
             awg_swf2.two_qubit_Simultaneous_RB_fixed_length(
                 qubit_list=qubits, RO_pars=RO_pars,
@@ -795,7 +801,7 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
                 interleaved_gate=interleaved_gate, interleave_CZ=interleave_CZ,
                 verbose=verbose, CZ_info_dict=CZ_info_dict)
 
-        soft_sweep_points = np.arange(nr_seeds)
+        soft_sweep_points = np.arange(nr_averages//k)
         soft_sweep_func = swf.None_Sweep()
 
     MC.soft_avg(soft_avgs)
@@ -808,7 +814,7 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
     MC.set_detector_function(det_func)
     MC.run_2D(label)
 
-    ma.TwoD_Analysis(close_file=True)
+    ma.TwoD_Analysis(label=label, close_file=True)
 
 def measure_two_qubit_tomo_Bell(bell_state, qb_c, qb_t, f_LO,
                                 basis_pulses=None,
@@ -819,7 +825,7 @@ def measure_two_qubit_tomo_Bell(bell_state, qb_c, qb_t, f_LO,
                                 MC=None, UHFQC=None, pulsar=None,
                                 upload=True, label=None, run=True):
     """
-                     |spacing|spacing|
+                 |spacing|spacing|
     |qCZ> --gate1--------*--------after_pulse-----| tomo |
                          |
     |qS > --gate2--------*------------------------| tomo |
@@ -875,13 +881,13 @@ def measure_two_qubit_tomo_Bell(bell_state, qb_c, qb_t, f_LO,
         MC = qb_c.MC
         logging.warning("Unspecified MC object. Using qb_c.MC.")
 
-    Bell_state_dict = {'0':'phiMinus', '1':'phiPlus',
-                       '2':'psiMinus', '3':'psiPlus'}
+    Bell_state_dict = {'0': 'phiMinus', '1': 'phiPlus',
+                       '2': 'psiMinus', '3': 'psiPlus'}
     if label is None:
         label = '{}_tomo_Bell_{}_{}'.format(
             Bell_state_dict[str(bell_state)], qb_c.name, qb_t.name)
 
-    if num_flux_pulses!=0:
+    if num_flux_pulses != 0:
         label += '_' + str(num_flux_pulses) + 'preFluxPulses'
 
     multiplexed_pulse(qubits, f_LO, upload=True, plot_filename=True)
@@ -1024,7 +1030,7 @@ def measure_three_qubit_tomo_GHZ(qubits, f_LO,
     if run:
         MC.run_2D(label)
 
-    ma.TwoD_Analysis(close_file=True)
+    ma.TwoD_Analysis(label=label, close_file=True)
 
 def cphase_gate_tuneup(qb_control, qb_target,
                        initial_values_dict=None,
@@ -1060,8 +1066,8 @@ def cphase_gate_tuneup(qb_control, qb_target,
         MC_optimization = station.MC
 
     if initial_values_dict is None:
-        pulse_length_init = qb_control.CZ_pulse_length()
-        pulse_amplitude_init = qb_control.CZ_pulse_amp()
+        pulse_length_init = qb_control.flux_pulse_length()
+        pulse_amplitude_init = qb_control.flux_pulse_amp()
     else:
         pulse_length_init = initial_values_dict['length']
         pulse_amplitude_init = initial_values_dict['amplitude']
@@ -1071,12 +1077,11 @@ def cphase_gate_tuneup(qb_control, qb_target,
         init_step_amplitude = 1.0e-3
     else:
         init_step_length = initial_step_dict['step_length']
-        init_step_amplitude = initial_step_dict['step_length']
+        init_step_amplitude = initial_step_dict['step_amplitude']
 
     d = cdet.CPhase_optimization(qb_control=qb_control,qb_target=qb_target,
                                  MC=MC_detector,
                                  ramsey_phases=ramsey_phases)
-
 
     S1 = d.flux_pulse_length
     S2 = d.flux_pulse_amp
@@ -1097,18 +1102,21 @@ def cphase_gate_tuneup(qb_control, qb_target,
     #                                        measurement_mode='excited_state')
 
     ad_func_pars = {'adaptive_function': nelder_mead,
-                    'x0': [pulse_length_init,pulse_amplitude_init],
+                    'x0': [pulse_length_init, pulse_amplitude_init],
                     'initial_step': [init_step_length, init_step_amplitude],
                     'no_improv_break': 12,
                     'minimize': True,
                     'maxiter': maxiter}
-
-    MC_optimization.set_sweep_functions([S2, S1])
+    # MC_optimization.set_optimization_method('nelder_mead')
+    MC_optimization.set_sweep_functions([S1, S2])
     MC_optimization.set_detector_function(d)
     MC_optimization.set_adaptive_function_parameters(ad_func_pars)
     MC_optimization.run(name=name, mode='adaptive')
-    a = ma.OptimizationAnalysis_v2()
-    pulse_length_best_value = a.a.optimization_result[0][0]
-    pulse_amplitude_best_value = a.a.optimization_result[0][1]
+    a1 = ma.OptimizationAnalysis(label=name)
+    a2 = ma.OptimizationAnalysis_v2(label=name)
+    pulse_length_best_value = a1.optimization_result[0][0]
+    pulse_amplitude_best_value = a1.optimization_result[0][1]
+
 
     return pulse_length_best_value, pulse_amplitude_best_value
+    # return 'passed..'

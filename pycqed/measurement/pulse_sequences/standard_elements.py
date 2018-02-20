@@ -99,16 +99,6 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
         phase_offset = {}
     else:
         phase_offset = previous_element.drive_phase_offsets.copy()
-    for x in pulse_list:
-        if x.get('operation_type', None) == 'MW':
-            if 'target_qubit' in x.keys():
-                qb_name = x['target_qubit']
-                if qb_name not in phase_offset.keys():
-                    phase_offset[qb_name] = 0
-            if 'qb_target' in x.keys():
-                qb_name = x['qb_target']
-                if qb_name not in phase_offset.keys():
-                    phase_offset[qb_name] = 0
     j = 0
     for i, pulse_pars in enumerate(pulse_list):
         # Default values for backwards compatibility
@@ -155,8 +145,9 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
                 target_qubit = pulse_pars.get('target_qubit', None)
                 if target_qubit is not None:
                     if 'phase' in pulse_pars.keys():
-                        pulse_pars['phase'] += phase_offset[target_qubit]
-                        pulse_pars['phase'] %= 360
+                        if target_qubit in phase_offset:
+                            pulse_pars['phase'] += phase_offset[target_qubit]
+                            pulse_pars['phase'] %= 360
             try:
                 # Look for the function in pl = pulse_lib
                 pulse_func = getattr(pl, pulse_pars['pulse_type'])
@@ -231,6 +222,8 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
         # apply any virtual-z rotations in the pulse
         basis_rotation = pulse_pars.get('basis_rotation', {})
         for qubit_name, offset in basis_rotation.items():
+            if qubit_name not in phase_offset:
+                phase_offset[qubit_name] = 0
             phase_offset[qubit_name] -= offset
 
     el.drive_phase_offsets = phase_offset.copy()

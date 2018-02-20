@@ -2205,6 +2205,8 @@ class Flux_pulse_CPhase_meas_2D(swf.Soft_Sweep):
         #     else:
         #         self.measurement_state = 'excited_state'
 
+        self.hard_sweep.upload = True
+
         if self.sweep_mode == 'length':
             self.qb_control.flux_pulse_length(val)
             self.hard_sweep.prepare()
