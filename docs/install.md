@@ -9,7 +9,7 @@ We recommend using [anaconda python](https://www.continuum.io/downloads) (3.5+) 
 ## Dependencies
 Besides the standard scientific python packages we require the following packages.
 
-* qcodes
+* qcodes (see note below)
 * numpy
 * scipy
 * matplotlib
@@ -27,10 +27,8 @@ These can be installed by typing (on the command line)
 or in some cases
 ``` conda install 'package name' ```
 
-Note that qcodes is not yet (Jul 29 2016) publicly released so has to be installed by hand. See the qcodes repository for instructions.
+Note: currently (15 feb 2018) in DiCarlo lab a specific fork of qcodes is used. Use that fork (https://github.com/DiCarloLab-Delft/Qcodes) instead of the version available on pip.
 
 ## Setting up PycQED
 After cloning PycQED go to the directory where you cloned PycQED and enter: `python setup.py develop`.
 You can start a session by `import pycqed as pq`.
-
-

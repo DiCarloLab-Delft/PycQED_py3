@@ -1,4 +1,4 @@
-# PycQED [![Build Status](https://travis-ci.org/DiCarloLab-Delft/PycQED_py3.svg?branch=master)](https://travis-ci.org/DiCarloLab-Delft/PycQED_py3) [![DOI](https://zenodo.org/badge/49057179.svg)](https://zenodo.org/badge/latestdoi/49057179) [![Codacy](https://api.codacy.com/project/badge/Grade/1266308dd9b84d7b933c2b46804aeb12)](https://www.codacy.com/app/AdriaanOrganization/PycQED_py3?utm_source=github.com&utm_medium=referral&utm_content=DiCarloLab-Delft/PycQED_py3&utm_campaign=badger) [![Coverage](https://api.codacy.com/project/badge/Coverage/1266308dd9b84d7b933c2b46804aeb12)](https://www.codacy.com/app/AdriaanOrganization/PycQED_py3?utm_source=github.com&utm_medium=referral&utm_content=DiCarloLab-Delft/PycQED_py3&utm_campaign=Badge_Coverage)
+# PycQED [![Build Status](https://travis-ci.org/DiCarloLab-Delft/PycQED_py3.svg?branch=master)](https://travis-ci.org/DiCarloLab-Delft/PycQED_py3) [![DOI](https://zenodo.org/badge/49057179.svg)](https://zenodo.org/badge/latestdoi/49057179) [![Codacy](https://api.codacy.com/project/badge/Grade/1266308dd9b84d7b933c2b46804aeb12)](https://www.codacy.com/app/AdriaanOrganization/PycQED_py3?utm_source=github.com&utm_medium=referral&utm_content=DiCarloLab-Delft/PycQED_py3&utm_campaign=badger) [![Coverage Status](https://coveralls.io/repos/github/DiCarloLab-Delft/PycQED_py3/badge.svg?branch=coveralls)](https://coveralls.io/github/DiCarloLab-Delft/PycQED_py3?branch=coveralls)
 
 A python based measurement environment for circuit-QED experiments by the [DiCarlo group](http://dicarlolab.tudelft.nl/) at [QuTech](http://qutech.nl/), Delft University of Technology.
 This module is build on top of qcodes and is not intended as a stand-alone package.
@@ -30,11 +30,12 @@ Go to the directory where you cloned the repository (in the shell) and run
 For more details see the [installation instructions](docs/install.md).
 
 Test your installation using
-* `python pycqed/test.py`
+* `py.test pycqed/tests -v`
+(be sure that you are in the PycQED_py3 root folder)
 
 Or run a specific test using e.g.
-* `python pycqed/test.py -t test_cliffords.py`
-
+* `py.test pycqed/tests/test_cliffords.py -v`
+(be sure that you are in the PycQED_py3 root folder)
 
 ## Usage
 
