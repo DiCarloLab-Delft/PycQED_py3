@@ -722,12 +722,14 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
 
     if label is None:
         if CxC_RB:
-            label = '{}-qubit_CxC_RB_{}_{}_seeds_{}_cliffords'.format(
-                len(qubits), gate_decomp, nr_seeds, nr_cliffords)
+            label = 'qubits{}_CxC_RB_{}_{}_seeds_{}_cliffords'.format(
+                ''.join([qb.name[-1] for qb in qubits]),
+                gate_decomp, nr_seeds, nr_cliffords[-1])
         else:
-            label = '{}-qubit_CxI_IxC_{}_RB_{}_{}_seeds_{}_cliffords'.format(
-                len(qubits), idx_for_RB, gate_decomp,
-                nr_seeds, nr_cliffords)
+            label = 'qubits{}_CxI_IxC_{}_RB_{}_{}_seeds_{}_cliffords'.format(
+                ''.join([qb.name[-1] for qb in qubits]),
+                idx_for_RB, gate_decomp,
+                nr_seeds, nr_cliffords[-1])
 
     if CZ_info_dict is not None:
         if interleave_CZ:
@@ -780,8 +782,7 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
             n_qubit_RB_sweepfunction=hard_sweep_func)
 
     else:
-        if not (isinstance(nr_cliffords, float) or
-                 isinstance(nr_cliffords, int)):
+        if hasattr(nr_cliffords, '__iter__'):
                     raise ValueError('For an experiment with more than two '
                                      'qubits, nr_cliffords must int or float.')
 

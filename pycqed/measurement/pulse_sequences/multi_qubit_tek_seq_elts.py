@@ -1016,7 +1016,7 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_list, RO_pars,
                                                      interleaved_gate=None,
                                                      CZ_info_dict=None,
                                                      interleave_CZ=False,
-                                                     post_msmt_delay=3e-6,
+                                                     post_msmt_delay=1e-6,
                                                      upload=True,
                                                      seq_name=None,
                                                      verbose=False,
@@ -1056,9 +1056,10 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_list, RO_pars,
         interleave_CZ (bool): Only used if CZ_info_dict != None
             True -> interleave the CZ gate
             False -> interleave the ICZ gate
-        post_msmt_delay (float): wait time between susequent RB sequences
+        post_msmt_delay (float): NOT USED. Wait time between susequent RB
+            sequences
         upload (bool): upload sequence to AWG or not
-        seq_name (str): name of this sequence
+        seq_name (str): name of this sequences
         verbose (bool): print runtime info
         return_seq (bool): if True, returns seq, element list;
             if False, returns only seq_name
@@ -1206,16 +1207,16 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_list, RO_pars,
             # add RO pulse pars at the end
             pulse_list += [RO_pars]
 
-            # find index of first pulse in pulse_list that is not a Z pulse
-            # copy this pulse and set extra wait
-            try:
-                first_x_pulse = next(j for j in pulse_list
-                                     if 'Z' not in j['pulse_type'])
-                first_x_pulse_idx = pulse_list.index(first_x_pulse)
-            except:
-                first_x_pulse_idx = 0
-            pulse_list[first_x_pulse_idx] = deepcopy(pulse_list[first_x_pulse_idx])
-            pulse_list[first_x_pulse_idx]['pulse_delay'] += post_msmt_delay
+            # # find index of first pulse in pulse_list that is not a Z pulse
+            # # copy this pulse and set extra wait
+            # try:
+            #     first_x_pulse = next(j for j in pulse_list
+            #                          if 'Z' not in j['pulse_type'])
+            #     first_x_pulse_idx = pulse_list.index(first_x_pulse)
+            # except:
+            #     first_x_pulse_idx = 0
+            # pulse_list[first_x_pulse_idx] = deepcopy(pulse_list[first_x_pulse_idx])
+            # pulse_list[first_x_pulse_idx]['pulse_delay'] += post_msmt_delay
 
             if verbose:
                 print('pulse_keys_by_qubit ', pulse_keys_by_qubit)
@@ -1305,17 +1306,17 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_list, RO_pars,
             # add RO pars
             pulse_list += [RO_pars]
 
-            # find first_x_pulse = first pulse in pulse_list that is not a Z pulse
-            # Copy this pulse and the next first_x_pulse_idx*n-first_x_pulse_idx,
-            # and set extra wait
-            try:
-                first_x_pulse = next(j for j in pulse_list
-                                     if 'Z' not in j['pulse_type'])
-                first_x_pulse_idx = pulse_list.index(first_x_pulse)
-            except:
-                first_x_pulse_idx = 0
-            pulse_list[first_x_pulse_idx] = deepcopy(pulse_list[first_x_pulse_idx])
-            pulse_list[first_x_pulse_idx]['pulse_delay'] += post_msmt_delay
+            # # find first_x_pulse = first pulse in pulse_list that is not a Z pulse
+            # # Copy this pulse and the next first_x_pulse_idx*n-first_x_pulse_idx,
+            # # and set extra wait
+            # try:
+            #     first_x_pulse = next(j for j in pulse_list
+            #                          if 'Z' not in j['pulse_type'])
+            #     first_x_pulse_idx = pulse_list.index(first_x_pulse)
+            # except:
+            #     first_x_pulse_idx = 0
+            # pulse_list[first_x_pulse_idx] = deepcopy(pulse_list[first_x_pulse_idx])
+            # pulse_list[first_x_pulse_idx]['pulse_delay'] += post_msmt_delay
 
             if verbose:
                 print('pulse_list_keys ', pulse_list_keys)
