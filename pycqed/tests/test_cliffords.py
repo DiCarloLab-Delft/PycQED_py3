@@ -11,7 +11,7 @@ import pycqed.measurement.randomized_benchmarking.randomized_benchmarking \
     as rb
 
 from pycqed.measurement.randomized_benchmarking.clifford_decompositions \
-    import(gate_decomposition)
+    import(gate_decomposition, epstein_fixed_length_decomposition)
 
 from pycqed.measurement.randomized_benchmarking import \
     two_qubit_clifford_group as tqc
@@ -95,10 +95,15 @@ class TestGateDecomposition(TestCase):
         for gate in gate_decomposition:
             self.assertEqual(gate_decomposition.count(gate), 1)
 
-    def test_average_number_of_gates(self):
+    def test_average_number_of_gates_epst_efficient(self):
         from itertools import chain
         avg_nr_gates = len(list(chain(*gate_decomposition)))/24
         self.assertEqual(avg_nr_gates, 1.875)
+
+    def test_average_number_of_gates_epst_fixed_length(self):
+        from itertools import chain
+        avg_nr_gates = len(list(chain(*epstein_fixed_length_decomposition)))/24
+        self.assertEqual(avg_nr_gates, 3)
 
 
 ######################################################################
@@ -318,9 +323,9 @@ class TestCliffordClassRBSeqs(TestCase):
         seeds = [0, 100, 200, 300, 400]
         net_cliffs = np.arange(len(seeds))
         for seed, net_cl in zip(seeds, net_cliffs):
-            intl_cliffords = rb.interleaved_randomized_benchmarking_sequence(
+            intl_cliffords = rb.randomized_benchmarking_sequence(
                 n_cl=20, desired_net_cl=0, number_of_qubits=1, seed=0,
-                inter_cl=0)
+                interleaving_cl=0)
             cliffords = rb.randomized_benchmarking_sequence(
                 n_cl=20, desired_net_cl=0, seed=0)
 
@@ -335,9 +340,9 @@ class TestCliffordClassRBSeqs(TestCase):
         seeds = [0, 100, 200, 300, 400]
         net_cliffs = np.arange(len(seeds))
         for seed, net_cl in zip(seeds, net_cliffs):
-            intl_cliffords = rb.interleaved_randomized_benchmarking_sequence(
+            intl_cliffords = rb.randomized_benchmarking_sequence(
                 n_cl=20, desired_net_cl=0, number_of_qubits=2, seed=0,
-                inter_cl=0)
+                interleaving_cl=0)
             cliffords = rb.randomized_benchmarking_sequence(
                 n_cl=20, number_of_qubits=2, desired_net_cl=0, seed=0)
 

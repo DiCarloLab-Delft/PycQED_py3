@@ -2,8 +2,7 @@ import logging
 import numpy as np
 from pycqed.measurement.randomized_benchmarking.clifford_group import(
     clifford_lookuptable)
-from pycqed.measurement.randomized_benchmarking.two_qubit_clifford_group \
-    import TwoQubitClifford, SingleQubitClifford
+import pycqed.measurement.randomized_benchmarking.two_qubit_clifford_group as tqc
 
 from pycqed.measurement.randomized_benchmarking.clifford_decompositions \
     import(gate_decomposition)
@@ -142,10 +141,10 @@ def randomized_benchmarking_sequence(
 
     """
     if number_of_qubits == 1:
-        Cl = SingleQubitClifford
+        Cl = tqc.SingleQubitClifford
         group_size = np.min([24, max_clifford_idx])
     elif number_of_qubits ==2:
-        Cl = TwoQubitClifford
+        Cl = tqc.TwoQubitClifford
         group_size = np.min([11520, max_clifford_idx])
     else:
         raise NotImplementedError()

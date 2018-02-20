@@ -1,26 +1,22 @@
 import re
 import json
-"""
-This file fixes issue 380 of https://github.com/DiCarloLab-Delft/PycQED_py3/issues/380
-These are the assumptions I am making:
-    1) Each kernel starts with the first prepz
-    2) Other prepz within kernel is always within the first prepz and first measz
-    3) CZ gate is always mapped to fl_cw_01
-    4) The time tuples only show the time and gate cz
-    5) Each instruction line starts with 'bs' string
-Using the lazy way by separating the two files. 
-In principle, we could do just regex on just the tqisa file,
-but I am just not in the mood anymore to check for more regex...
 
--KKL 23/11/2017
-"""
+def get_qisa_tqisa_timing_tuples( qisa_file_path, tqisa_file_path,
+                                  output_path:str = None ) :
+    """
+    This file fixes issue 380 of https://github.com/DiCarloLab-Delft/PycQED_py3/issues/380
+    These are the assumptions I am making:
+        1) Each kernel starts with the first prepz
+        2) Other prepz within kernel is always within the first prepz and first measz
+        3) CZ gate is always mapped to fl_cw_01
+        4) The time tuples only show the time and gate cz
+        5) Each instruction line starts with 'bs' string
+    Using the lazy way by separating the two files.
+    In principle, we could do just regex on just the tqisa file,
+    but I am just not in the mood anymore to check for more regex...
 
-def get_qisa_tqisa_timing_tuples( qisa_file_path, tqisa_file_path, 
-                                  CCL_json_config, output_path:str = None ) :
-    # Load the hardware config json file
-    # The idea is then to search for the codewords and then map it back to the gates
-    with open(CCL_json_config,'r') as file_json:
-        config_map = json.load(file_json)
+    -KKL 23/11/2017
+    """
 
     # Set the counter for number of kernels encountered
     kernel_idx = 0
@@ -89,12 +85,12 @@ def get_qisa_tqisa_timing_tuples( qisa_file_path, tqisa_file_path,
 
                     codewords2 = re.split(r'\s\|\s', codewords[1])
 
-                    result = ( int(timing_num.group(0)), 
-                               [ codewords2[0].strip() , codewords2[1].strip() ] 
+                    result = ( int(timing_num.group(0)),
+                               [ codewords2[0].strip() , codewords2[1].strip() ]
                              )
                 except:
                     result = ( int(timing_num.group(0)), codewords[1].strip() )
-                
+
                 time_tuples.append(result)
 
     return time_tuples

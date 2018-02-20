@@ -151,8 +151,11 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                                 # proper codeword
                                 k.gate(g, [qubit_map[q[0]], qubit_map[q[1]]])
 
+                    # This hack is required to align multiplexed RO in openQL..
+                    k.gate("wait",  list(qubit_map.values()), 0)
                     for qubit_idx in qubit_map.values():
                         k.measure(qubit_idx)
+                    k.gate("wait",  list(qubit_map.values()), 0)
                     p.add_kernel(k)
 
         if cal_points:
