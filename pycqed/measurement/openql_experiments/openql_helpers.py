@@ -4,6 +4,7 @@
 import re
 import numpy as np
 import json
+from shutil import copyfile
 import matplotlib.pyplot as plt
 from pycqed.measurement.openql_experiments.get_qisa_tqisa_timing_tuples import (
     get_qisa_tqisa_timing_tuples
@@ -76,19 +77,15 @@ def split_instr_to_op_targ(instr: str, reg_map: dict):
 
 def get_timetuples(qisa_fn: str):
     """
-
-
     Returns time tuples of the form
-        (start_time, operation, target_qubits)
+        (start_time, operation, target_qubits, line_nr)
     """
     reg_map = get_register_map(qisa_fn)
 
     tqisa_fn = infer_tqisa_filename(qisa_fn)
     time_tuples = []
     with open(tqisa_fn, 'r') as tq_file:
-        linenum = 0
-        for line in tq_file:
-            linenum += 1
+        for i, line in enumerate(tq_file):
             # Get instruction line
             if re.search(r"bs", line):
                 # Get the timing number
@@ -103,7 +100,7 @@ def get_timetuples(qisa_fn: str):
                 for instr in multi_instr:
                     instr = instr.strip()
                     op, targ = split_instr_to_op_targ(instr, reg_map)
-                    result = (start_time, op, targ)
+                    result = (start_time, op, targ, i)
                     time_tuples.append(result)
 
     return time_tuples
@@ -112,10 +109,29 @@ def get_timetuples(qisa_fn: str):
 def find_operation_idx_in_time_tuples(time_tuples, target_op: str):
     target_indices = []
     for i, tt in enumerate(time_tuples):
-        t_start, cw, targets = tt
+        t_start, cw, targets, linenum = tt
         if target_op in cw:
             target_indices.append(i)
     return (target_indices)
+
+def get_operation_tuples(time_tuples: list, target_op:str):
+    """
+    Returns a list of tuples that perform a specific operation
+
+    args:
+        time_tuples             : list of time tuples
+        target_op               : operation to searc for
+    returns
+        time_tuples_op          : time_tuples containing target_op
+    """
+    op_indices = find_operation_idx_in_time_tuples(time_tuples,
+                                               target_op=target_op)
+
+    time_tuples_op = []
+    for op_idx in op_indices:
+        time_tuples_op.append(time_tuples[op_idx])
+    return time_tuples_op
+
 
 
 def split_time_tuples_on_operation(time_tuples, split_op: str):
@@ -133,16 +149,20 @@ def substract_time_offset(time_tuples, op_str: str='cw'):
     """
     """
     for tt in time_tuples:
-        t_start, cw, targets = tt
+        t_start, cw, targets, linenum = tt
         if op_str in cw:
             t_ref = t_start
             break
     corr_time_tuples = []
     for tt in time_tuples:
-        t_start, cw, targets = tt
-        corr_time_tuples.append((t_start-t_ref, cw, targets))
+        t_start, cw, targets, linenum = tt
+        corr_time_tuples.append((t_start-t_ref, cw, targets, linenum))
     return corr_time_tuples
 
+
+#############################################################################
+# Plotting
+#############################################################################
 
 def plot_time_tuples(time_tuples, ax=None, time_unit='s',
                      mw_duration=20e-9, fl_duration=240e-9,
@@ -162,7 +182,7 @@ def plot_time_tuples(time_tuples, ax=None, time_unit='s',
         raise ValueError()
 
     for i, tt in enumerate(time_tuples):
-        t_start, cw, targets = tt
+        t_start, cw, targets, linenum = tt
 
         if 'meas' in cw:
             c = 'C4'
@@ -181,14 +201,14 @@ def plot_time_tuples(time_tuples, ax=None, time_unit='s',
             for q in targets:
                 if isinstance(q, tuple):
                     for qi in q:
-                        ypos = qi if ypos is None else ypos
-                        ax.barh(ypos, width=width, left=t_start*clock_cycle,
+                        ypos_i = qi if ypos is None else ypos
+                        ax.barh(ypos_i, width=width, left=t_start*clock_cycle,
                                 height=0.6, align='center', color=c, alpha=.8)
                 else:
                     # N.B. alpha is not 1 so that overlapping operations are easily
                     # spotted.
-                    ypos = qi if ypos is None else ypos
-                    ax.barh(ypos, width=width, left=t_start*clock_cycle,
+                    ypos_i = q if ypos is None else ypos
+                    ax.barh(ypos_i, width=width, left=t_start*clock_cycle,
                             height=0.6, align='center', color=c, alpha=.8)
 
     ax.legend(handles=[mw_patch, fl_patch, ro_patch], loc=(1.05, 0.5))
@@ -216,3 +236,66 @@ def plot_time_tuples_split(time_tuples, ax=None, time_unit='s',
                          ro_duration=ro_duration, ypos=i)
     ax.invert_yaxis()
     set_ylabel(ax, "Kernel idx", "#")
+
+    return ax
+
+
+
+#############################################################################
+# File modifications
+#############################################################################
+
+def flux_pulse_replacement(qisa_fn: str):
+    """
+    args:
+        qisa_fn : file in which to replace flux pulses
+
+    returns:
+        mod_qisa_fn : filename of the modified qisa file
+        grouped_flux_tuples: : time tuples of the flux pulses grouped
+
+    Modifies a file for use with non-codeword based flux pulses.
+    Does this in the following steps
+
+        1. create a copy of the file
+        2. extract locations of pulses from source file
+        3. replace content of files
+        4. return new
+
+    """
+
+
+    ttuple = get_timetuples(qisa_fn)
+    grouped_timetuples = split_time_tuples_on_operation(ttuple, 'meas')
+
+    grouped_fl_tuples = []
+    for i, tt in enumerate(grouped_timetuples):
+        fl_time_tuples = substract_time_offset(get_operation_tuples(tt, 'fl'))
+        grouped_fl_tuples.append(fl_time_tuples)
+
+
+
+    with open(qisa_fn, 'r') as source_qisa_file:
+        lines = source_qisa_file.readlines()
+
+    for k_idx, fl_time_tuples in enumerate(grouped_fl_tuples):
+        for i, time_tuple in enumerate(fl_time_tuples):
+            time, cw, target, line_nr = time_tuple
+
+            l = lines[line_nr]
+            if i == 0:
+                new_l = l.replace(cw, 'fl_cw_{:02d}'.format(k_idx+1))
+            else:
+                # cw 00 is a dummy pulse that should not trigger the AWG8
+                new_l = l.replace(cw, 'fl_cw_00')
+            lines[line_nr] = new_l
+
+
+
+
+    mod_qisa_fn = qisa_fn[:-5]+'_mod.qisa'
+    with open(mod_qisa_fn, 'w') as mod_qisa_file:
+        for l in lines:
+            mod_qisa_file.write(l)
+
+    return mod_qisa_fn, grouped_fl_tuples
