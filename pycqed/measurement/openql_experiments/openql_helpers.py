@@ -6,15 +6,16 @@ import numpy as np
 import json
 from shutil import copyfile
 import matplotlib.pyplot as plt
-from pycqed.measurement.openql_experiments.get_qisa_tqisa_timing_tuples import (
-    get_qisa_tqisa_timing_tuples
-)
-
-
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 from matplotlib.ticker import MaxNLocator
 import matplotlib.patches as mpatches
 
+
+def clocks_to_s(time, clock_cycle=20e-9):
+    """
+    Converts a time in clocks to a time in s
+    """
+    return time*clock_cycle
 
 def infer_tqisa_filename(qisa_fn: str):
     """
