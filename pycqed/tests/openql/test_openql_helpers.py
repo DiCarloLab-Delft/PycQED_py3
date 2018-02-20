@@ -44,3 +44,11 @@ class Test_openql_helpers(unittest.TestCase):
         extr_time_tuples = oqh.get_timetuples(qisa_fn)
 
         self.assertEqual(extr_time_tuples[0:28], exp_time_tuples)
+
+    def test_plot_tuples(self):
+
+        qisa_fn = os.path.join(file_paths_root, 'TwoQ_RB.qisa')
+        ttuple = oqh.get_timetuples(qisa_fn)
+
+        # Test only checks if the plotting does not crash
+        oqh.plot_time_tuples_split(ttuple)
