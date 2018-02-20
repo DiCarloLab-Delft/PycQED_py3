@@ -40,6 +40,7 @@ install:
     - pip install -r requirements.txt
     - pip install git+git://github.com/DiCarloLab-Delft/Qcodes.git
     - pip install coverage pytest-cov pytest --upgrade
+    - pip install coveralls
     - pip install codacy-coverage
     - echo ${QT}
     - echo ${TEST}
@@ -58,3 +59,4 @@ script:
 after_success:
     - pip install codacy-coverage
     - python-codacy-coverage -r coverage.xml
+    - coveralls
