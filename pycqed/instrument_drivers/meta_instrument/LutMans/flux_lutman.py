@@ -4,6 +4,7 @@ import logging
 from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter
 from qcodes.utils import validators as vals
 from pycqed.measurement.waveform_control_CC import waveform as wf
+from pycqed.measurement.openql_experiments.openql_helpers import clocks_to_s
 from qcodes.plots.pyqtgraph import QtPlot
 
 
@@ -279,6 +280,40 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         # CZ with phase correction
         return waveform
 
+    def _gen_composite_wf(self, primitive_waveform_name: str,
+                          time_tuples: list):
+        """
+        Generates a composite waveform based on a timetuple.
+        Only relies on the first element of the timetuple which is expected
+        to be the starting time of the pulse in clock cycles.
+
+
+        N.B. No waveforms are regenerated here!
+        This relies on the base waveforms being up to date in self._wave_dict
+
+        """
+
+        max_nr_samples = int(self.cfg_max_wf_length()*self.sampling_rate())
+        waveform = np.zeros(max_nr_samples)
+
+        for i, tt in enumerate(time_tuples):
+            t_start = clocks_to_s(tt[0])
+            sample = self.time_to_sample(t_start)
+            if sample > max_nr_samples:
+                raise ValueError('Waveform longer than max wf lenght')
+
+            if primitive_waveform_name == 'cz_z':
+                phase_corr = wf.single_channel_block(
+                    amp=self.get('mcz_phase_corr_amp_{}'.format(i+1)),
+                    length=self.cz_phase_corr_length(),
+                    sampling_rate=self.sampling_rate(), delay=0)
+                prim_wf = np.concatenate([self._wave_dict['cz'], phase_corr])
+            else:
+                prim_wf = self._wave_dict[prim_wf]
+            waveform[sample:sample+len(prim_wf)] += prim_wf
+
+        return waveform
+
     def _gen_idle_z(self, regenerate_cz=True):
         if regenerate_cz:
             self._wave_dict['cz'] = self._gen_cz()
@@ -322,6 +357,33 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         waveform = self._wave_dict[waveform_name]
         codeword = self.LutMap()[waveform_name]
+
+        if self.cfg_append_compensation():
+            waveform = self.add_compensation_pulses(waveform)
+
+        if self.cfg_distort():
+            waveform = self.distort_waveform(waveform)
+            self._wave_dict_dist[waveform_name] = waveform
+        self.AWG.get_instr().set(codeword, waveform)
+
+    def load_composite_waveform_onto_AWG_lookuptable(self,
+                                                     primitive_waveform_name: str,
+                                                     time_tuples: list,
+                                                     codeword: int):
+        """
+        Creates a composite waveform based on time_tuples extracted from a qisa
+        file.
+        """
+        waveform_name = 'comp_{}_cw{:03}'.format(primitive_waveform_name,
+                                                 codeword)
+
+        # assigning for post loading rendering purposes
+        self._wave_dict[waveform_name] = self._gen_composite_wf(
+            primitive_waveform_name,  time_tuples)
+        waveform = self._wave_dict[waveform_name]
+
+        codeword = 'wave_ch{}_cw{:03}'.format(self.cfg_awg_channel(),
+                                              codeword)
 
         if self.cfg_append_compensation():
             waveform = self.add_compensation_pulses(waveform)

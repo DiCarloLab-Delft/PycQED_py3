@@ -173,6 +173,9 @@ class Test_Flux_LutMan(unittest.TestCase):
         self.AWG8_Flux_LutMan.cz_J2(4.1e6)
         self.AWG8_Flux_LutMan.cz_E_c(250e6)
         self.AWG8_Flux_LutMan.cz_freq_interaction(5.1e9)
+        self.AWG8_Flux_LutMan.cfg_max_wf_length(5e-6)
+        for i in range(10):
+            self.AWG8_Flux_LutMan.set('mcz_phase_corr_amp_{}'.format(i+1), i/10)
 
     def test_generate_standard_flux_waveforms(self):
         self.AWG8_Flux_LutMan.generate_standard_waveforms()
@@ -183,6 +186,58 @@ class Test_Flux_LutMan(unittest.TestCase):
 
     def test_upload_and_distort(self):
         self.AWG8_Flux_LutMan.load_waveforms_onto_AWG_lookuptable()
+
+    def test_generate_composite(self):
+        self.AWG8_Flux_LutMan.generate_standard_waveforms()
+        empty_flux_tuples = []
+        gen_wf = self.AWG8_Flux_LutMan._gen_composite_wf('cz_z', time_tuples=[])
+        exp_wf = np.zeros(12000) # 5us *2.4GSps
+        np.testing.assert_array_almost_equal(gen_wf, exp_wf)
+
+        flux_tuples = [(0, 'fl_cw_01', {(2, 0)}, 323),
+             (14, 'fl_cw_01', {(2, 0)}, 326),
+             (28, 'fl_cw_01', {(2, 0)}, 329),
+             (50, 'fl_cw_01', {(2, 0)}, 340),
+             (64, 'fl_cw_01', {(2, 0)}, 343),
+             (82, 'fl_cw_01', {(2, 0)}, 350),
+             (98, 'fl_cw_01', {(2, 0)}, 355),
+             (116, 'fl_cw_01', {(2, 0)}, 362),
+             (136, 'fl_cw_01', {(2, 0)}, 371),
+             (155, 'fl_cw_01', {(2, 0)}, 379),
+             (174, 'fl_cw_01', {(2, 0)}, 387)]
+
+        gen_wf = self.AWG8_Flux_LutMan._gen_composite_wf(
+            'cz_z', time_tuples=flux_tuples)
+        # not testing for equality to some expected stuff here, prolly better
+
+    def test_uploading_composite_waveform(self):
+
+        self.AWG8_Flux_LutMan.generate_standard_waveforms()
+
+        flux_tuples = [(0, 'fl_cw_01', {(2, 0)}, 323),
+             (14, 'fl_cw_01', {(2, 0)}, 326),
+             (28, 'fl_cw_01', {(2, 0)}, 329),
+             (50, 'fl_cw_01', {(2, 0)}, 340),
+             (64, 'fl_cw_01', {(2, 0)}, 343),
+             (82, 'fl_cw_01', {(2, 0)}, 350),
+             (98, 'fl_cw_01', {(2, 0)}, 355),
+             (116, 'fl_cw_01', {(2, 0)}, 362),
+             (136, 'fl_cw_01', {(2, 0)}, 371),
+             (155, 'fl_cw_01', {(2, 0)}, 379),
+             (174, 'fl_cw_01', {(2, 0)}, 387)]
+
+
+        self.AWG8_Flux_LutMan.load_composite_waveform_onto_AWG_lookuptable(
+            'cz_z', time_tuples=flux_tuples, codeword=3)
+        direct_gen_wf = self.AWG8_Flux_LutMan._gen_composite_wf(
+            'cz_z', time_tuples=flux_tuples)
+        wave_dict_wf = self.AWG8_Flux_LutMan._wave_dict['comp_cz_z_cw003']
+        np.testing.assert_array_almost_equal(direct_gen_wf, wave_dict_wf)
+
+        uploaded_wf_lutman = self.AWG8_Flux_LutMan._wave_dict_dist['comp_cz_z_cw003']
+        uploaded_wf_instr = self.AWG.wave_ch1_cw003()
+        np.testing.assert_array_almost_equal(uploaded_wf_lutman,
+                                             uploaded_wf_instr)
 
     @classmethod
     def tearDownClass(self):
