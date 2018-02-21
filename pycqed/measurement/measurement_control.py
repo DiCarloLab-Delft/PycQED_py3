@@ -138,7 +138,11 @@ class MeasurementControl(Instrument):
         self.print_measurement_start_msg()
 
         self.mode = mode
-        self.iteration = 0  # used in determining data writing indices
+        self.iteration = 0  # used in determining data writing indices (deprecated?)
+
+        # used for determining data writing indices and soft averages
+        self.total_nr_acquired_values = 0
+
         # needs to be defined here because of the with statement below
         return_dict = {}
         self.last_sweep_pts = None  # used to prevent resetting same value
@@ -197,49 +201,24 @@ class MeasurementControl(Instrument):
             self.measure_soft_static()
 
         elif self.detector_function.detector_control == 'hard':
+            self.get_measurement_preparetime()
             sweep_points = self.get_sweep_points()
-            if len(self.sweep_functions) == 1:
-                self.get_measurement_preparetime()
-                self.sweep_functions[0].set_parameter(sweep_points[0])
-                self.detector_function.prepare(
-                    sweep_points=self.get_sweep_points())
-                self.measure_hard()
-            else:
-                # Do one iteration to see how many points per data point we get
-                self.get_measurement_preparetime()
-                for i, sweep_function in enumerate(self.sweep_functions):
-                    swf_sweep_points = sweep_points[:, i]
-                    val = swf_sweep_points[0]
-                    sweep_function.set_parameter(val)
-                self.detector_function.prepare(
-                    sweep_points=sweep_points[:self.xlen, 0])
-                self.measure_hard()
 
-            # will not be complete if it is a 2D loop, soft avg or many shots
-            if not self.is_complete():
-                pts_per_iter = self.dset.shape[0]
-                swp_len = np.shape(sweep_points)[0]
-                req_nr_iterations = int(swp_len/pts_per_iter)
-                total_iterations = req_nr_iterations * self.soft_avg()
-
-                for i in range(total_iterations-1):
-                    start_idx, stop_idx = self.get_datawriting_indices(
-                        pts_per_iter=pts_per_iter)
-                    if start_idx == 0:
-                        self.soft_iteration += 1
-                    for i, sweep_function in enumerate(self.sweep_functions):
-                        if len(self.sweep_functions) != 1:
-                            swf_sweep_points = sweep_points[:, i]
-                            sweep_points_0 = sweep_points[:, 0]
-                        else:
-                            swf_sweep_points = sweep_points
-                            sweep_points_0 = sweep_points
-                        val = swf_sweep_points[start_idx]
-
-                        if sweep_function.sweep_control is 'soft':
-                            sweep_function.set_parameter(val)
+            while self.get_percdone() < 100:
+                start_idx = self.get_datawriting_start_idx()
+                if len(self.sweep_functions) == 1:
+                    self.sweep_functions[0].set_parameter(sweep_points[0])
                     self.detector_function.prepare(
-                        sweep_points=sweep_points_0[start_idx:stop_idx])
+                        sweep_points=self.get_sweep_points())
+                    self.measure_hard()
+                else: # If mode is 2D
+                    for i, sweep_function in enumerate(self.sweep_functions):
+                        swf_sweep_points = sweep_points[:, i]
+                        val = swf_sweep_points[start_idx]
+                        sweep_function.set_parameter(val)
+                    self.detector_function.prepare(
+                        sweep_points=sweep_points[
+                            start_idx:start_idx+self.xlen, 0])
                     self.measure_hard()
         else:
             raise Exception('Sweep and Detector functions not '
@@ -315,7 +294,7 @@ class MeasurementControl(Instrument):
         ###########################
 
         datasetshape = self.dset.shape
-        start_idx, stop_idx = self.get_datawriting_indices(new_data)
+        start_idx, stop_idx = self.get_datawriting_indices_update_ctr(new_data)
 
         new_datasetshape = (np.max([datasetshape[0], stop_idx]),
                             datasetshape[1])
@@ -372,8 +351,6 @@ class MeasurementControl(Instrument):
         '''
         Core measurement function used for soft sweeps
         '''
-        start_idx, stop_idx = self.get_datawriting_indices(pts_per_iter=1)
-
         if np.size(x) == 1:
             x = [x]
         if np.size(x) != len(self.sweep_functions):
@@ -427,6 +404,7 @@ class MeasurementControl(Instrument):
         # self.iteration = datasetshape[0] + 1
 
         vals = self.detector_function.acquire_data_point()
+        start_idx, stop_idx = self.get_datawriting_indices_update_ctr(vals)
         # Resizing dataset and saving
         new_datasetshape = (np.max([datasetshape[0], stop_idx]),
                             datasetshape[1])
@@ -1209,15 +1187,16 @@ class MeasurementControl(Instrument):
 
         h5d.write_dict_to_hdf5(metadata, entry_point=metadata_group)
 
+    def get_percdone(self):
+        percdone = (self.total_nr_acquired_values)/(
+            np.shape(self.get_sweep_points())[0]*self.soft_avg())*100
+        return percdone
+
     def print_progress(self, stop_idx=None):
         if self.verbose():
             acquired_points = self.dset.shape[0]
             total_nr_pts = len(self.get_sweep_points())
-            if self.soft_avg() != 1:
-                progr = 1 if stop_idx == None else stop_idx/total_nr_pts
-                percdone = (self.soft_iteration+progr)/self.soft_avg()*100
-            else:
-                percdone = acquired_points*1./total_nr_pts*100
+            percdone = self.get_percdone()
             elapsed_time = time.time() - self.begintime
             progress_message = "\r {percdone}% completed \telapsed time: "\
                 "{t_elapsed}s \ttime left: {t_left}s".format(
@@ -1266,30 +1245,46 @@ class MeasurementControl(Instrument):
     def get_datetimestamp(self):
         return time.strftime('%Y%m%d_%H%M%S', time.localtime())
 
-    def get_datawriting_indices(self, new_data=None, pts_per_iter=None):
-        """
-        Calculates the start and stop indices required for
-        storing a hard measurement.
-        """
-        if new_data is None and pts_per_iter is None:
-            raise(ValueError())
-        elif new_data is not None:
-            if len(np.shape(new_data)) == 1:
-                shape_new_data = (len(new_data), 1)
-            else:
-                shape_new_data = np.shape(new_data)
-            shape_new_data = (shape_new_data[0], shape_new_data[1]+1)
-            xlen = shape_new_data[0]
-        else:
-            xlen = pts_per_iter
+
+    def get_datawriting_start_idx(self):
         if self.mode == 'adaptive':
             max_sweep_points = np.inf
         else:
             max_sweep_points = np.shape(self.get_sweep_points())[0]
-        start_idx = int(
-            (xlen*(self.iteration)) % max_sweep_points)
 
+        start_idx = int(self.total_nr_acquired_values % max_sweep_points)
+
+        self.soft_iteration =int(self.total_nr_acquired_values//max_sweep_points)
+
+        return start_idx
+
+
+    def get_datawriting_indices_update_ctr(self, new_data,
+                                           update: bool=True):
+        """
+        Calculates the start and stop indices required for
+        storing a hard measurement.
+
+        N.B. this also updates the "total_nr_acquired_values" counter.
+        """
+
+        # This is the case for a 1D hard detector or an N-D soft detector
+        if len(np.shape(new_data)) == 1:
+            # Soft detector (returns values 1 by 1)
+            if len(self.detector_function.value_names) == np.shape(new_data)[0]:
+                xlen = 1
+            else: # 1D Hard detector (returns values in chunks)
+                xlen = len(new_data)
+        else:
+            # in case of an N-D Hard detector dataset
+            xlen = np.shape(new_data)[0]
+
+        start_idx = self.get_datawriting_start_idx()
         stop_idx = start_idx + xlen
+
+        if update:
+            # Sometimes one wants to know the start/stop idx without
+            self.total_nr_acquired_values += xlen
 
         return start_idx, stop_idx
 

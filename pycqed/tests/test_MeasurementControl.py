@@ -12,7 +12,7 @@ from pycqed.measurement.optimization import nelder_mead, SPSA
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.utilities.get_default_datadir import get_default_datadir
 from pycqed.measurement.hdf5_data import read_dict_from_hdf5
-
+from qcodes.instrument.parameter import ManualParameter
 from qcodes import station
 
 
@@ -202,6 +202,81 @@ class Test_MeasurementControl(unittest.TestCase):
 
         d = self.MC.detector_function
         self.assertEqual(d.times_called, 10)
+
+    def test_variable_sized_return_values_hard_sweep(self):
+        """
+        Tests a detector that acquires data in chunks of varying sizes
+        """
+        self.MC.soft_avg(1)
+        counter_param = ManualParameter('counter', initial_value=0)
+
+        def return_variable_size_values():
+            idx = counter_param()%3
+            counter_param(counter_param()+1)
+
+            if idx == 0:
+                return np.arange(0, 7)
+            elif idx == 1:
+                return np.arange(7, 11)
+            elif idx == 2:
+                return np.arange(11, 30)
+
+        sweep_pts = np.arange(30)
+
+        d=det.Function_Detector(get_function=return_variable_size_values,
+                                value_names=['Variable size counter'],
+                               detector_control='hard')
+        self.MC.set_sweep_function(None_Sweep(sweep_control='hard'))
+        self.MC.set_sweep_points(sweep_pts)
+        self.MC.set_detector_function(d)
+        dat = self.MC.run('varying_chunk_size')
+        dset = dat["dset"]
+        x = dset[:, 0]
+        y = dset[:, 1]
+
+        self.assertEqual(np.shape(dset), (len(sweep_pts), 2))
+        np.testing.assert_array_almost_equal(x, sweep_pts)
+        np.testing.assert_array_almost_equal(y, sweep_pts)
+
+        self.assertEqual(self.MC.total_nr_acquired_values, 1*30)
+
+
+
+    def test_variable_sized_return_values_hard_sweep_soft_avg(self):
+        """
+        Tests a detector that acquires data in chunks of varying sizes
+        """
+        self.MC.soft_avg(10)
+        counter_param = ManualParameter('counter', initial_value=0)
+        def return_variable_size_values():
+            idx = counter_param()%3
+            counter_param(counter_param()+1)
+
+            if idx == 0:
+                return np.arange(0, 7)
+            elif idx == 1:
+                return np.arange(7, 11)
+            elif idx == 2:
+                return np.arange(11, 30)
+
+        sweep_pts = np.arange(30)
+
+        d=det.Function_Detector(get_function=return_variable_size_values,
+                                value_names=['Variable size counter'],
+                               detector_control='hard')
+        self.MC.set_sweep_function(None_Sweep(sweep_control='hard'))
+        self.MC.set_sweep_points(sweep_pts)
+        self.MC.set_detector_function(d)
+        dat = self.MC.run('varying_chunk_size')
+        dset = dat["dset"]
+        x = dset[:, 0]
+        y = dset[:, 1]
+
+        self.assertEqual(np.shape(dset), (len(sweep_pts), 2))
+        np.testing.assert_array_almost_equal(x, sweep_pts)
+        np.testing.assert_array_almost_equal(y, sweep_pts)
+        self.assertEqual(self.MC.total_nr_acquired_values, 10*30)
+
 
     def test_soft_averages_hard_sweep_1D(self):
         sweep_pts = np.arange(50)
