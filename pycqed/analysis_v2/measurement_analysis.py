@@ -37,7 +37,7 @@ from pycqed.analysis_v2.syndrome_analysis import (
     Single_Qubit_RoundsToEvent_Analysis, One_Qubit_Paritycheck_Analysis)
 
 
-from pycqed.analysis_v2.cryo_scope_analysis import RamZFluxArc
+from pycqed.analysis_v2.cryo_scope_analysis import RamZFluxArc, SlidingPulses_Analysis
 from pycqed.analysis_v2.distortions_analysis import Scope_Trace_analysis
 
 from pycqed.analysis_v2.optimization_analysis import OptimizationAnalysis
