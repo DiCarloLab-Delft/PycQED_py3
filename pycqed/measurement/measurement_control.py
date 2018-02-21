@@ -1268,8 +1268,11 @@ class MeasurementControl(Instrument):
         N.B. this also updates the "total_nr_acquired_values" counter.
         """
 
+        # This is the case if the detector returns a simple float or int
+        if len(np.shape(new_data)) == 0:
+            xlen = 1
         # This is the case for a 1D hard detector or an N-D soft detector
-        if len(np.shape(new_data)) == 1:
+        elif len(np.shape(new_data)) == 1:
             # Soft detector (returns values 1 by 1)
             if len(self.detector_function.value_names) == np.shape(new_data)[0]:
                 xlen = 1
