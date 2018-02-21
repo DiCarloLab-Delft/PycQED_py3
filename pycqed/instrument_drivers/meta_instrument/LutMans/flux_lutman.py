@@ -302,14 +302,20 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             if sample > max_nr_samples:
                 raise ValueError('Waveform longer than max wf lenght')
 
-            if primitive_waveform_name == 'cz_z':
+            if (primitive_waveform_name == 'cz_z' or
+                    primitive_waveform_name =='idle_z'):
                 phase_corr = wf.single_channel_block(
                     amp=self.get('mcz_phase_corr_amp_{}'.format(i+1)),
                     length=self.cz_phase_corr_length(),
                     sampling_rate=self.sampling_rate(), delay=0)
-                prim_wf = np.concatenate([self._wave_dict['cz'], phase_corr])
+                if primitive_waveform_name == 'cz_z':
+                    prim_wf = np.concatenate(
+                        [self._wave_dict['cz'], phase_corr])
+                elif primitive_waveform_name == 'idle_z':
+                    prim_wf = np.concatenate(
+                        [np.zeros(len(self._wave_dict['cz'])), phase_corr])
             else:
-                prim_wf = self._wave_dict[prim_wf]
+                prim_wf = self._wave_dict[primitive_waveform_name]
             waveform[sample:sample+len(prim_wf)] += prim_wf
 
         return waveform

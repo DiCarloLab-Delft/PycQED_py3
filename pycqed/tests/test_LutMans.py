@@ -226,18 +226,21 @@ class Test_Flux_LutMan(unittest.TestCase):
              (155, 'fl_cw_01', {(2, 0)}, 379),
              (174, 'fl_cw_01', {(2, 0)}, 387)]
 
+        # Testing several different base waveforms
+        for prim_wf in ['cz_z', 'square', 'idle_z']:
+            self.AWG8_Flux_LutMan.load_composite_waveform_onto_AWG_lookuptable(
+                prim_wf, time_tuples=flux_tuples, codeword=3)
+            direct_gen_wf = self.AWG8_Flux_LutMan._gen_composite_wf(
+                prim_wf, time_tuples=flux_tuples)
+            wave_dict_wf = self.AWG8_Flux_LutMan._wave_dict[
+                'comp_{}_cw003'.format(prim_wf)]
+            np.testing.assert_array_almost_equal(direct_gen_wf, wave_dict_wf)
 
-        self.AWG8_Flux_LutMan.load_composite_waveform_onto_AWG_lookuptable(
-            'cz_z', time_tuples=flux_tuples, codeword=3)
-        direct_gen_wf = self.AWG8_Flux_LutMan._gen_composite_wf(
-            'cz_z', time_tuples=flux_tuples)
-        wave_dict_wf = self.AWG8_Flux_LutMan._wave_dict['comp_cz_z_cw003']
-        np.testing.assert_array_almost_equal(direct_gen_wf, wave_dict_wf)
-
-        uploaded_wf_lutman = self.AWG8_Flux_LutMan._wave_dict_dist['comp_cz_z_cw003']
-        uploaded_wf_instr = self.AWG.wave_ch1_cw003()
-        np.testing.assert_array_almost_equal(uploaded_wf_lutman,
-                                             uploaded_wf_instr)
+            uploaded_wf_lutman = self.AWG8_Flux_LutMan._wave_dict_dist[
+                'comp_{}_cw003'.format(prim_wf)]
+            uploaded_wf_instr = self.AWG.wave_ch1_cw003()
+            np.testing.assert_array_almost_equal(uploaded_wf_lutman,
+                                                 uploaded_wf_instr)
 
     @classmethod
     def tearDownClass(self):

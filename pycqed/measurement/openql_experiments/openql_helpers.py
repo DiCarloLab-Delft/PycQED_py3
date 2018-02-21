@@ -255,13 +255,15 @@ def flux_pulse_replacement(qisa_fn: str):
         mod_qisa_fn : filename of the modified qisa file
         grouped_flux_tuples: : time tuples of the flux pulses grouped
 
+    ---------------------------------------------------------------------------
     Modifies a file for use with non-codeword based flux pulses.
     Does this in the following steps
 
         1. create a copy of the file
         2. extract locations of pulses from source file
         3. replace content of files
-        4. return new
+        4. return filename of modified qisa file and time tuples
+            grouped per kernel.
 
     """
 
