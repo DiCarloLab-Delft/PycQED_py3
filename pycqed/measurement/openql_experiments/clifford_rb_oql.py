@@ -55,9 +55,13 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                         calibration points, set to False if you want
                         to measure a single element (for e.g. optimization)
 
-        recompile:      if True compiles the program, if False compares
-                        the last modified time of the config and the program
-                        filename. If the program is more recent than the config
+        recompile:      True -> compiles the program,
+                        'as needed' -> compares program to timestamp of config
+                            and existence, if required recompile.
+                        False -> compares program to timestamp of config.
+                            if compilation is required raises a ValueError
+
+                        If the program is more recent than the config
                         it returns an empty OpenQL program object with
                         the intended filename that can be used to upload the
                         previously compiled file.
@@ -108,7 +112,19 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
 
-    if not recompile:
+    if recompile == True:
+        pass
+    elif recompile == 'as needed':
+        try:
+            if is_more_rencent(p.filename, platf_cfg):
+                return p
+            else:
+                pass # compilation is required
+        except FileNotFoundError:
+            # File doesn't exist means compilation is required
+            pass
+
+    else: # if False
         if is_more_rencent(p.filename, platf_cfg):
             return p
         else:

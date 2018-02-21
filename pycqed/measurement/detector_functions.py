@@ -1646,6 +1646,18 @@ class UHFQC_integrated_average_detector(Hard_Detector):
                 # points -> only acquire one chunk
                 self.nr_sweep_points = self.chunk_size * self.seg_per_point
 
+
+        # Optionally perform extra actions on prepare
+        # This snippet is placed here so that it has a chance to modify the
+        # nr_sweep_points in a UHFQC detector
+        if self.prepare_function_kwargs is not None:
+            if self.prepare_function is not None:
+                self.prepare_function(**self.prepare_function_kwargs)
+        else:
+            if self.prepare_function is not None:
+                self.prepare_function()
+
+
         self.UHFQC.awgs_0_userregs_0(
             int(self.nr_averages*self.nr_sweep_points))
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)
@@ -1659,13 +1671,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.UHFQC.quex_rl_source(self.result_logging_mode_idx)
         self.UHFQC.acquisition_initialize(channels=self.channels, mode='rl')
 
-        # Optionally perform extra actions on prepare
-        if self.prepare_function_kwargs is not None:
-            if self.prepare_function is not None:
-                self.prepare_function(**self.prepare_function_kwargs)
-        else:
-            if self.prepare_function is not None:
-                self.prepare_function()
+
 
     def finish(self):
         if self.AWG is not None:
