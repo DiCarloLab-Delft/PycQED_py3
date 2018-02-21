@@ -526,7 +526,14 @@ class BaseDataAnalysis(object):
                     plotfn = getattr(self, pdict['plotfn'])
                 else:
                     plotfn = pdict['plotfn']
-                plotfn(pdict, axs=self.axs[pdict['ax_id']])
+                # ensures the argument convention is preserved
+                if hasattr(self, plotfn.__name__):
+                    plotfn(pdict, axs=self.axs[pdict['ax_id']])
+                else:
+                    # Calling the function passing along anything
+                    # defined in the specific plot dict as kwargs
+                    plotfn(ax=self.axs[pdict['ax_id']], **pdict)
+
             self.format_datetime_xaxes(key_list)
             self.add_to_plots(key_list=key_list)
 

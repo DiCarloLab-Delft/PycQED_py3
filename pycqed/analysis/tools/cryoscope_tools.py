@@ -428,28 +428,27 @@ class DacArchAnalysis:
 
         return roots[real_mask][np.argmin(dist_from_range)].real
 
-    def plot_freqs(self):
-        plt.plot(self.amps, self.freqs, ".-")
-        ax = plt.gca()
-        formatter = matplotlib.ticker.EngFormatter(unit='Hz')
-        ax.yaxis.set_major_formatter(formatter)
-        plt.xlabel("Amplitude")
-        plt.ylabel("Detuning")
+    def plot_freqs(self, ax=None, title='', **kw):
+        if ax is None:
+            ax = plt.gca()
+        ax.set_title(title)
+        ax.plot(self.amps, self.freqs, ".-")
+        set_xlabel(ax, "Amplitude") #a.u.
+        set_ylabel(ax, 'Detuning', 'Hz')
 
         aa = np.linspace(min(self.amps), max(self.amps), 50)
 
-        plt.plot(aa, np.polyval(self.poly_fit, aa))
+        ax.plot(aa, np.polyval(self.poly_fit, aa))
 
-    def plot_ffts(self, nyquist_unwrap=False):
-
+    def plot_ffts(self, ax=None, title='', nyquist_unwrap=False, **kw):
+        if ax is None:
+            ax = plt.gca()
         if nyquist_unwrap:
             raise NotImplementedError
-
+        ax.set_title(title)
         ffts = np.fft.fft(self.norm_data)
 
         freqs = np.arange(len(ffts[0])) * self.sampling_rate / len(ffts[0])
-
-        print("shape freqs", freqs.shape)
 
         def shift_helper(x):
             diff = np.diff(x) / 2
@@ -457,19 +456,14 @@ class DacArchAnalysis:
             xshift = np.hstack((x, x[-1])) - diff
             return xshift
 
-        print(np.diff(shift_helper(self.amps)))
-
         aa, ff = np.meshgrid(shift_helper(self.amps), shift_helper(freqs))
 
         plt.pcolormesh(aa, ff, np.abs(ffts).T)
-        plt.xlabel("Amplitude")
-        plt.ylabel("Frequency")
-        ax = plt.gca()
-        formatter = matplotlib.ticker.EngFormatter(unit='Hz')
-        ax.yaxis.set_major_formatter(formatter)
+        set_xlabel(ax, "Amplitude") #a.u.
+        set_ylabel(ax, 'Detuning', 'Hz')
 
-        plt.scatter(self.amps, self.freqs % self.sampling_rate, color="C1")
+        ax.scatter(self.amps, self.freqs % self.sampling_rate, color="C1")
 
         aa = np.linspace(min(self.amps), max(self.amps), 300)
 
-        plt.plot(aa, np.polyval(self.poly_fit, aa) % self.sampling_rate, ".r")
+        ax.plot(aa, np.polyval(self.poly_fit, aa) % self.sampling_rate, ".r")
