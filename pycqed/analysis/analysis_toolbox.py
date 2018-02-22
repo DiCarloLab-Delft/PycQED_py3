@@ -1682,7 +1682,10 @@ def color_plot(x, y, z, fig, ax, cax=None,
     cmap = plt.get_cmap(kw.pop('cmap', cmap_chosen))
     # CMRmap is our old default
 
-    clim = kw.get('clim', [None, None])
+    # Empty values in the array are filled with np.nan, this ensures
+    # the plot limits are set correctly.
+    clim = kw.get('clim', [np.nanmin(z), np.nanmax(z)])
+
     if log:
         norm = colors.LogNorm()
     else:

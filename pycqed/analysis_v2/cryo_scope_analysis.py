@@ -131,8 +131,10 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
                 label=self.labels)
 
         self.raw_data_dict = OrderedDict()
-
-        a=ma_old.TwoD_Analysis(timestamp=self.timestamps[0], auto=False)
+        # auto is True for the TwoD analysis as the heatmap can be useful
+        # for debugging the data
+        a=ma_old.TwoD_Analysis(timestamp=self.timestamps[0], auto=True,
+                               close_file=False)
         a.get_naming_and_values_2D()
         # FIXME: this is hardcoded and should be an argument in options dict
         amp_key = 'Snapshot/instruments/AWG8_8005/parameters/awgs_0_outputs_1_amplitude'
@@ -149,7 +151,7 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
 
 
     def process_data(self):
-        phase = np.mean(np.unwrap(self.raw_data_dict['phases'][::-1],
+        phase = np.nanmean(np.unwrap(self.raw_data_dict['phases'][::-1],
                                   discont=180, axis=1)[::-1], axis=1)
         phase_err = sem(np.unwrap(self.raw_data_dict['phases'],
                                   discont=180, axis=1), axis=1)
@@ -160,8 +162,8 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['t'] = self.raw_data_dict['times']
 
         if self.amp_to_freq is not None and self.freq_to_amp is not None:
-            mean_phase = np.mean(phase[len(phase)//2:])
-            # mean_phase = np.mean(phase[:])
+            mean_phase = np.nanmean(phase[len(phase)//2:])
+            # mean_phase = np.nanmean(phase[:])
 
             detuning_rad_s = (np.deg2rad(phase-mean_phase)/
                               self.sliding_pulse_duration)
@@ -181,7 +183,7 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
             'phase_err': self.proc_data_dict['phase_err'],
             'title':"Sliding pulses\n"+self.timestamps[0]}
         if self.amp_to_freq is not None and self.freq_to_amp is not None:
-            self.plot_dicts['FluxArc'] = {
+            self.plot_dicts['normalized_amp_plot'] = {
                 'plotfn': make_amp_err_plot,
                 't': self.proc_data_dict['t'],
                 'amp': self.proc_data_dict['amp'],
@@ -199,7 +201,7 @@ def make_phase_plot(t, phase, phase_err, title,  ylim=None, ax=None, **kw):
     set_xlabel(ax, 'Gate separtion', 's')
     set_ylabel(ax, 'Phase', 'deg')
 
-    mean_phase_tail = np.mean(phase[10:])
+    mean_phase_tail = np.nanmean(phase[10:])
 
     ax.axhline(mean_phase_tail, ls='-', c='grey', linewidth=.5)
     ax.axhline(mean_phase_tail+10, ls=':', c='grey', label=r'$\pm$10 deg', linewidth=0.5)
@@ -217,7 +219,7 @@ def make_amp_err_plot(t, amp, timestamp, ax=None, **kw):
     if ax ==None:
         f, ax =plt.subplots()
 
-    mean_amp = np.mean(amp[len(amp)//2])
+    mean_amp = np.nanmean(amp[len(amp)//2])
     ax.plot(t, amp/mean_amp, marker='.')
 
     ax.axhline(1.001, ls='--', c='grey', label=r'$\pm$0.1%')

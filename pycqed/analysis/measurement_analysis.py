@@ -828,6 +828,14 @@ class MeasurementAnalysis(object):
             x = self.data[0]
             y = self.data[1]
             cols = np.unique(x).shape[0]
+
+            # Adding np.nan for prematurely interupted experiments
+            nr_missing_values = 0
+            if len(x)%cols != 0:
+                nr_missing_values = cols -  len(x)%cols
+            x = np.append(x, np.zeros(nr_missing_values)+np.nan)
+            y = np.append(y, np.zeros(nr_missing_values)+np.nan)
+
             # X,Y,Z can be put in colormap directly
             self.X = x.reshape(-1, cols)
             self.Y = y.reshape(-1, cols)
@@ -836,6 +844,7 @@ class MeasurementAnalysis(object):
 
             if len(self.value_names) == 1:
                 z = self.data[2]
+                z = np.append(z, np.zeros(nr_missing_values)+np.nan)
                 self.Z = z.reshape(-1, cols)
                 self.measured_values = [self.Z.T]
             else:
@@ -843,6 +852,7 @@ class MeasurementAnalysis(object):
                 self.measured_values = []
                 for i in range(len(self.value_names)):
                     z = self.data[2+i]
+                    z = np.append(z, np.zeros(nr_missing_values)+np.nan)
                     Z = z.reshape(-1, cols)
                     self.Z.append(Z)
                     self.measured_values.append(Z.T)
