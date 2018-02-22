@@ -240,6 +240,32 @@ class Test_MeasurementControl(unittest.TestCase):
 
         self.assertEqual(self.MC.total_nr_acquired_values, 1*30)
 
+    def test_soft_sweep_hard_det_1D(self):
+
+        def mock_func():
+            # to also test if the values are set correctly in the sweep
+            arr= np.zeros([2,2])
+            arr[0, :] =  np.array([self.mock_parabola.x()]*2)
+            arr[1, :] = np.array([self.mock_parabola.x()+2]*2)
+            return arr
+
+        d=det.Function_Detector(get_function=mock_func,
+                              value_names=['x', 'x+2'],
+                              detector_control='hard')
+        sweep_pts = np.repeat(np.arange(5), 2)
+        self.MC.set_sweep_function(self.mock_parabola.x)
+        self.MC.set_sweep_points(sweep_pts)
+        self.MC.set_detector_function(d)
+        dat = self.MC.run('soft_sweep_hard_det')
+        dset = dat["dset"]
+
+        x = dset[:, 0]
+        y0 = dset[:, 1]
+        y1 = dset[:, 2]
+        np.testing.assert_array_almost_equal(x, sweep_pts)
+        np.testing.assert_array_almost_equal(y0, sweep_pts)
+        np.testing.assert_array_almost_equal(y1, sweep_pts+2)
+
 
 
     def test_variable_sized_return_values_hard_sweep_soft_avg(self):

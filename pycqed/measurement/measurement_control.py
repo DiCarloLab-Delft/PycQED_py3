@@ -207,7 +207,7 @@ class MeasurementControl(Instrument):
             while self.get_percdone() < 100:
                 start_idx = self.get_datawriting_start_idx()
                 if len(self.sweep_functions) == 1:
-                    self.sweep_functions[0].set_parameter(sweep_points[0])
+                    self.sweep_functions[0].set_parameter(sweep_points[start_idx])
                     self.detector_function.prepare(
                         sweep_points=self.get_sweep_points())
                     self.measure_hard()
