@@ -15,7 +15,7 @@ def single_flux_pulse_seq(qubit_indices: tuple,
     p = Program(pname="single_flux_pulse_seq",
                 nqubits=platf.get_qubit_number(),
                 p=platf)
-    print(platf_cfg)
+
     k = Kernel("main", p=platf)
     for idx in qubit_indices:
         k.prepz(idx)  # to ensure enough separation in timing
@@ -39,7 +39,7 @@ def flux_staircase_seq(platf_cfg: str):
     p = Program(pname="flux_staircase_seq",
                 nqubits=platf.get_qubit_number(),
                 p=platf)
-    print(platf_cfg)
+
     k = Kernel("main", p=platf)
     for i in range(1):
         k.prepz(i)  # to ensure enough separation in timing
@@ -744,6 +744,7 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
                                 angles=np.arange(0, 360, 20),
                                 wait_time: int=0,
                                 add_cal_points: bool=True,
+                                CZ_duration: int=260,
                                 cases: list=('no_excitation', 'excitation'),
                                 flux_codeword:str='fl_cw_01' ):
     '''
@@ -761,7 +762,7 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
         RO_target   (str): can be q0, q1, or 'all'
         CZ_disabled (bool): disable CZ gate
         angles      (array): angles of the recovery pulse
-        wait_time   (int): wait time in seconds after triggering the flux
+        wait_time   (int): wait time in ns after triggering the flux
     '''
     platf = Platform('OpenQL_Platform', platf_cfg)
     p = Program(pname="conditional_oscillation_seq",
@@ -781,6 +782,8 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
             k.gate('rx90', q0)
             if not CZ_disabled:
                 k.gate(flux_codeword, 2, 0)
+            else:
+                k.gate('wait', [2, 0], CZ_duration) # in ns
             k.gate('wait', [2, 0], wait_time)
             # hardcoded angles, must be uploaded to AWG
             if angle == 90:
