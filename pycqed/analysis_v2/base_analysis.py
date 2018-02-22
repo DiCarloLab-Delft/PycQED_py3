@@ -310,6 +310,7 @@ class BaseDataAnalysis(object):
                     self.raw_data_dict['temperatures'][ii] = temp
 
         else:
+            print(self.params_dict)
             self.raw_data_dict = a_tools.get_data_from_timestamp_list(
                 self.timestamps, param_names=self.params_dict,
                 ma_type=self.ma_type,
@@ -398,9 +399,9 @@ class BaseDataAnalysis(object):
             key_list = self.figs.keys()
         for key in key_list:
             savename = os.path.join(savedir, savebase+key+tstag+'.'+fmt)
-            self.axs[key].figure.savefig(savename, fmt=fmt)
+            self.figs[key].savefig(savename, fmt=fmt)
             if close_figs:
-                plt.close(self.axs[key].figure)
+                plt.close(self.figs[key])
 
     def save_data(self, savedir: str=None, savebase: str=None,
                   tag_tstamp: bool=True,
@@ -511,6 +512,7 @@ class BaseDataAnalysis(object):
         Goes over the plots defined in the plot_dicts and creates the
         desired figures.
         """
+
         if presentation_mode is None:
             presentation_mode = self.presentation_mode
         if axs_dict is not None:
@@ -535,22 +537,34 @@ class BaseDataAnalysis(object):
                 # This fig variable should perhaps be a different
                 # variable for each plot!!
                 # This might fix a bug.
-                self.figs[key], self.axs[key] = plt.subplots(
+                self.figs[pdict['ax_id']], self.axs[pdict['ax_id']] = plt.subplots(
                     pdict.get('numplotsy', 1), pdict.get('numplotsx', 1),
                     sharex=pdict.get('sharex', False),
                     sharey=pdict.get('sharey', False),
                     figsize=pdict.get('plotsize', (8, 6)))
+                
 
         if presentation_mode:
             self.plot_for_presentation(key_list=key_list, no_label=no_label)
         else:
+            print(key_list)
             for key in key_list:
                 pdict = self.plot_dicts[key]
+                plot_id_y = pdict.get('plot_id_y', None)
+                plot_id_x = pdict.get('plot_id_x', None)
+                plot_touching = pdict.get('touching',False)
                 if type(pdict['plotfn']) is str:
                     plotfn = getattr(self, pdict['plotfn'])
                 else:
                     plotfn = pdict['plotfn']
-                plotfn(pdict, axs=self.axs[pdict['ax_id']])
+                if plot_id_y is not None:
+                    plotfn(pdict, axs=self.axs[pdict['ax_id']][plot_id_y])
+                else:
+                    plotfn(pdict, axs=self.axs[pdict['ax_id']])
+
+                if plot_touching:
+                    self.figs[pdict['ax_id']].subplots_adjust(wspace=0, hspace=0)
+        
             self.format_datetime_xaxes(key_list)
             self.add_to_plots(key_list=key_list)
 
@@ -602,12 +616,12 @@ class BaseDataAnalysis(object):
                 p_out.append(pfunc(plot_xleft, this_yvals, width=plot_xwidth,
                                    color=gco(ii, len(plot_yvals)-1),
                                    label='%s%s' % (
-                                       dataset_desc, dataset_label[ii]),
+                                       dataset_desc),
                                    **plot_barkws))
 
         else:
             p_out = pfunc(plot_xleft, plot_yvals, width=plot_xwidth,
-                          label='%s%s' % (dataset_desc, dataset_label),
+                          label='%s%s' % (dataset_desc),
                           **plot_barkws)
         if plot_xrange is None:
             xmin, xmax = plot_xedges.min(), plot_xedges.max()
@@ -638,6 +652,9 @@ class BaseDataAnalysis(object):
         pdict['handles'] = p_out
 
     def plot_line(self, pdict, axs):
+        # if type(axs) == np.ndarray:
+        #     pfunc = getattr(axs[0], pdict.get('func', 'plot'))
+        # else:
         pfunc = getattr(axs, pdict.get('func', 'plot'))
         plot_xvals = pdict['xvals']
         plot_yvals = pdict['yvals']
@@ -653,6 +670,7 @@ class BaseDataAnalysis(object):
         plot_linestyle = pdict.get('linestyle', '-')
         plot_marker = pdict.get('marker', 'o')
         dataset_desc = pdict.get('setdesc', '')
+        plot_touching = pdict.get('touching',False)
         # Fixme, this default creates a nasty bug when not plotting a set of
         # lines.
         dataset_label = pdict.get('setlabel', list(range(len(plot_yvals))))
@@ -708,6 +726,10 @@ class BaseDataAnalysis(object):
             legend_title = pdict.get('legend_title', None)
             legend_pos = pdict.get('legend_pos', 'best')
             axs.legend(title=legend_title, loc=legend_pos, ncol=legend_ncol)
+
+        if plot_touching:
+            print('True')
+            axs.figure.subplots_adjust(wspace=0, hspace=0)
 
         if self.tight_fig:
             axs.figure.tight_layout()
