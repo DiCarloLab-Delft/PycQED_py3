@@ -261,9 +261,17 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
 
     def _gen_phase_corr(self):
-        return wf.single_channel_block(
-            amp=self.cz_phase_corr_amp(), length=self.cz_phase_corr_length(),
-            sampling_rate=self.sampling_rate(), delay=0)
+        if not self.czd_double_sided():
+            return wf.single_channel_block(
+                amp=self.cz_phase_corr_amp(), length=self.cz_phase_corr_length(),
+                sampling_rate=self.sampling_rate(), delay=0)
+        else:
+            block =  wf.single_channel_block(
+                amp=self.cz_phase_corr_amp(),
+                length=self.cz_phase_corr_length()/2,
+                sampling_rate=self.sampling_rate(), delay=0)
+            return np.concatenate([block, -1*block])
+
 
     def _gen_cz_z(self, regenerate_cz=True):
         if regenerate_cz:
