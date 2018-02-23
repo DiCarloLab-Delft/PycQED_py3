@@ -46,3 +46,7 @@ class Test_LinDistortionKernelObject(unittest.TestCase):
         self.k0.reset_kernels()
         read_back = self.k0.filter_model_00()
         self.assertEqual({}, read_back)
+
+    @classmethod
+    def tearDownClass(self):
+        self.k0.close()
