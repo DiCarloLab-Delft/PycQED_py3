@@ -167,6 +167,17 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                            initial_value=0, vals=vals.Numbers(),
                            parameter_class=ManualParameter)
 
+        self.add_parameter('czd_amp_ratio',
+                           docstring='Amplitude ratio for double sided CZ gate',
+                           initial_value=-1,
+                           vals=vals.Numbers(),
+                           parameter_class=ManualParameter)
+
+        self.add_parameter('czd_double_sided',
+                           initial_value=False,
+                           vals=vals.Bool(),
+                           parameter_class=ManualParameter)
+
         for i in range(40):
             self.add_parameter('mcz_phase_corr_amp_{}'.format(i+1), unit='V',
                                label='Phase correction amplitude {}'.format(
@@ -216,18 +227,38 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         return np.zeros(42)
 
     def _gen_cz(self):
-        return wf.martinis_flux_pulse(
-            length=self.cz_length(),
-            lambda_2=self.cz_lambda_2(),
-            lambda_3=self.cz_lambda_3(),
-            theta_f=self.cz_theta_f(),
-            f_01_max=self.cz_freq_01_max(),
-            V_per_phi0=self.cz_V_per_phi0(),
-            J2=self.cz_J2(),
-            E_c=self.cz_E_c(),
-            f_interaction=self.cz_freq_interaction(),
-            sampling_rate=self.sampling_rate(),
-            return_unit='V')
+        if not self.czd_double_sided():
+            return wf.martinis_flux_pulse(
+                length=self.cz_length(),
+                lambda_2=self.cz_lambda_2(),
+                lambda_3=self.cz_lambda_3(),
+                theta_f=self.cz_theta_f(),
+                f_01_max=self.cz_freq_01_max(),
+                V_per_phi0=self.cz_V_per_phi0(),
+                J2=self.cz_J2(),
+                E_c=self.cz_E_c(),
+                f_interaction=self.cz_freq_interaction(),
+                sampling_rate=self.sampling_rate(),
+                return_unit='V')
+        else:
+            # Simple double sided CZ pulse implemented in most basic form.
+            # repeats the same CZ gate twice and sticks it together.
+            half_CZ = wf.martinis_flux_pulse(
+                length=self.cz_length()/2,
+                lambda_2=self.cz_lambda_2(),
+                lambda_3=self.cz_lambda_3(),
+                theta_f=self.cz_theta_f(),
+                f_01_max=self.cz_freq_01_max(),
+                V_per_phi0=self.cz_V_per_phi0(),
+                J2=self.cz_J2(),
+                E_c=self.cz_E_c(),
+                f_interaction=self.cz_freq_interaction(),
+                sampling_rate=self.sampling_rate(),
+                return_unit='V')
+            amp_rat = self.czd_amp_ratio()
+            waveform = np.concatenate([half_CZ, amp_rat*half_CZ])
+            return waveform
+
 
     def _gen_phase_corr(self):
         return wf.single_channel_block(
