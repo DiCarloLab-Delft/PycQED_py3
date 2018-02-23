@@ -931,6 +931,16 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['osc_amp_1'] = (fr_1['amplitude'].value,
                                             fr_1['amplitude'].stderr)
 
+        self.proc_data_dict['osc_offs_0'] = (fr_0['offset'].value,
+                                            fr_0['offset'].stderr)
+        self.proc_data_dict['osc_offs_1'] = (fr_1['offset'].value,
+                                            fr_1['offset'].stderr)
+
+
+        offs_stderr = (fr_0['offset'].stderr**2+fr_1['offset'].stderr**2)**.5
+        self.proc_data_dict['offs_diff'] = (
+            fr_1['offset'].value - fr_0['offset'].value, offs_stderr)
+
         # self.proc_data_dict['osc_amp'] = (osc_amp, osc_amp_stderr)
         self.proc_data_dict['missing_fraction'] = (
             np.mean(self.proc_data_dict['yvals_spec_on'][:-2]) -
@@ -1001,7 +1011,10 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                 'Phase off: {:.1f} $\pm$ {:.1f}deg\n'
                 'Phase on: {:.1f} $\pm$ {:.1f}deg\n'
                 'Osc. amp. off: {:.4f} $\pm$ {:.4f}\n'
-                'Osc. amp. on: {:.4f} $\pm$ {:.4f}'.format(
+                'Osc. amp. on: {:.4f} $\pm$ {:.4f}\n'
+                'Offs. diff.: {:.4f} $\pm$ {:.4f}\n'
+                'Osc. offs. off: {:.4f} $\pm$ {:.4f}\n'
+                'Osc. offs. on: {:.4f} $\pm$ {:.4f}'.format(
                     self.proc_data_dict['phi_cond'][0],
                     self.proc_data_dict['phi_cond'][1],
                     self.proc_data_dict['phi_0'][0],
@@ -1011,7 +1024,13 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                     self.proc_data_dict['osc_amp_0'][0],
                     self.proc_data_dict['osc_amp_0'][1],
                     self.proc_data_dict['osc_amp_1'][0],
-                    self.proc_data_dict['osc_amp_1'][1]))
+                    self.proc_data_dict['osc_amp_1'][1],
+                    self.proc_data_dict['offs_diff'][0],
+                    self.proc_data_dict['offs_diff'][1],
+                    self.proc_data_dict['osc_offs_0'][0],
+                    self.proc_data_dict['osc_offs_0'][1],
+                    self.proc_data_dict['osc_offs_1'][0],
+                    self.proc_data_dict['osc_offs_1'][1]))
             self.plot_dicts['phase_message'] = {
                 'ax_id': 'main',
                 'ypos': 0.9,

@@ -139,3 +139,49 @@ class Test_Idling_Error_Rate_Analyisis(unittest.TestCase):
             np.testing.assert_almost_equal(
                 a.fit_res['fit 1'].best_values[key], value, decimal=2)
 
+
+class Test_Conditional_Oscillation_Analysis(unittest.TestCase):
+    @classmethod
+    def setUpClass(self):
+        self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
+        ma.a_tools.datadir = self.datadir
+
+    def test_condition_oscillation_extracted_pars(self):
+
+        a=ma.Conditional_Oscillation_Analysis(t_start='20180130_191229')
+
+
+        extracted = np.array([a.proc_data_dict['phi_cond'][0],
+            a.proc_data_dict['phi_cond'][1],
+            a.proc_data_dict['phi_0'][0],
+            a.proc_data_dict['phi_0'][1],
+            a.proc_data_dict['phi_1'][0],
+            a.proc_data_dict['phi_1'][1],
+            a.proc_data_dict['osc_amp_0'][0],
+            a.proc_data_dict['osc_amp_0'][1],
+            a.proc_data_dict['osc_amp_1'][0],
+            a.proc_data_dict['osc_amp_1'][1],
+            a.proc_data_dict['offs_diff'][0],
+            a.proc_data_dict['offs_diff'][1],
+            a.proc_data_dict['osc_offs_0'][0],
+            a.proc_data_dict['osc_offs_0'][1],
+            a.proc_data_dict['osc_offs_1'][0],
+            a.proc_data_dict['osc_offs_1'][1]])
+        expected = np.array([178.48651885251698,
+             2.9898741913646272,
+             3.3113606223925696,
+             1.691099641377918,
+             181.79787947490954,
+             2.4656702300023334,
+             0.3236975712917689,
+             0.009554015995104392,
+             0.27746120839251875,
+             0.011940273429767528,
+             0.00150761346297007,
+             0.010813168390439071,
+             0.4868083822944365,
+             0.0067557093031373455,
+             0.4883159957574066,
+             0.0084430446197739737])
+
+        np.testing.assert_almost_equal(extracted, expected)
