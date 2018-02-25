@@ -117,7 +117,7 @@ class MeasurementControl(Instrument):
     ##############################################
 
     def run(self, name: str=None, exp_metadata: dict=None,
-            mode: str='1D', **kw):
+            mode: str='1D', disable_snapshot_metadata: bool=False, **kw):
         '''
         Core of the Measurement control.
 
@@ -131,6 +131,16 @@ class MeasurementControl(Instrument):
                         file['Experimental Data']['Experimental Metadata']
             mode (str):
                     Measurement mode. Can '1D', '2D', or 'adaptive'.
+            disable_snapshot_metadata (bool):
+                    Disables metadata saving of the instrument snapshot.
+                    This can be useful for performance reasons.
+                    N.B. Do not use this unless you know what you are doing!
+                    Except for special cases instrument settings should always
+                    be saved in the datafile.
+                    This is an argument instead of a parameter because this
+                    should always be explicitly diabled in order to prevent
+                    accidentally leaving it off.
+
         '''
         # Setting to zero at the start of every run, used in soft avg
         self.soft_iteration = 0
@@ -152,11 +162,8 @@ class MeasurementControl(Instrument):
             try:
                 self.check_keyboard_interrupt()
                 self.get_measurement_begintime()
-                # Commented out because requires git shell interaction from python
-                # self.get_git_hash()
-                # Such that it is also saved if the measurement fails
-                # (might want to overwrite again at the end)
-                self.save_instrument_settings(self.data_object)
+                if not disable_snapshot_metadata:
+                    self.save_instrument_settings(self.data_object)
                 self.create_experimentaldata_dataset()
                 if mode is not 'adaptive':
                     try:
