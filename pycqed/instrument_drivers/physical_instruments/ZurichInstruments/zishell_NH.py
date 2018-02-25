@@ -1025,6 +1025,9 @@ class ziShellDevice:
 
         This function is tested to work and give the correct error messages
         when compilation fails.
+
+        N.B. the uploaded program will not work unless the
+        "configure_codeword_protocol" method is called on the HDAWG
         """
         t0 = time.time()
         success_and_ready = False

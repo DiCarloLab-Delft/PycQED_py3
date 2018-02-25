@@ -17,7 +17,7 @@ from pycqed.analysis_v2 import measurement_analysis as ma2
 from pycqed.measurement.calibration_toolbox import (
     mixer_carrier_cancellation, multi_channel_mixer_carrier_cancellation)
 from pycqed.measurement.calibration_toolbox import mixer_skewness_cal_UHFQC_adaptive
-
+from pycqed.measurement.openql_experiments.openql_helpers import load_range_of_oql_programs
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import detector_functions as det
 
@@ -2091,11 +2091,4 @@ class CCLight_Transmon(Qubit):
         return a.fit_res.params['fidelity_per_Clifford'].value
 
 
-def load_range_of_oql_programs(programs, counter_param, CC):
-    """
-    This is a helper function for running an experiment that is spread over
-    multiple OpenQL programs such as RB.
-    """
-    program = programs[counter_param()]
-    counter_param((counter_param()+1) % len(programs))
-    CC.eqasm_program(program.filename)
+

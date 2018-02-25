@@ -302,3 +302,13 @@ def flux_pulse_replacement(qisa_fn: str):
             mod_qisa_file.write(l)
 
     return mod_qisa_fn, grouped_fl_tuples
+
+
+def load_range_of_oql_programs(programs, counter_param, CC):
+    """
+    This is a helper function for running an experiment that is spread over
+    multiple OpenQL programs such as RB.
+    """
+    program = programs[counter_param()]
+    counter_param((counter_param()+1) % len(programs))
+    CC.eqasm_program(program.filename)

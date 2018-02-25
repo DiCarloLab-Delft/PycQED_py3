@@ -745,6 +745,7 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
                                 wait_time: int=0,
                                 add_cal_points: bool=True,
                                 CZ_duration: int=260,
+                                nr_of_repeated_gates:int =1,
                                 cases: list=('no_excitation', 'excitation'),
                                 flux_codeword:str='fl_cw_01' ):
     '''
@@ -781,9 +782,11 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
                 k.gate('rx180', q1)
             k.gate('rx90', q0)
             if not CZ_disabled:
-                k.gate(flux_codeword, 2, 0)
+                for j in range(nr_of_repeated_gates):
+                    k.gate(flux_codeword, 2, 0)
             else:
-                k.gate('wait', [2, 0], CZ_duration) # in ns
+                for j in range(nr_of_repeated_gates):
+                    k.gate('wait', [2, 0], CZ_duration) # in ns
             k.gate('wait', [2, 0], wait_time)
             # hardcoded angles, must be uploaded to AWG
             if angle == 90:

@@ -136,6 +136,7 @@ class DeviceCCL(Instrument):
         # prepares by loading the awg_hack_program
         q0 = self.qubits()[0]
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
+        fl_lutman.load_waveforms_onto_awg_lookuptable()
         awg = fl_lutman.AWG.get_instr()
 
         awg_hack_program_cz = """
