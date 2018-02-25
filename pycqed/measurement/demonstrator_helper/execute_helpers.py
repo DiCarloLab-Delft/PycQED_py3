@@ -9,16 +9,18 @@ import qcodes as qc
 
 from pycqed.measurement import measurement_control
 from qcodes.instrument.base import Instrument
+from pycqed.measurement.demonstrator_helper.detectors import \
+    Quantumsim_Two_QB_Hard_Detector
 from pycqed.measurement import sweep_functions as swf
 from tess.TessConnect import TessConnection
 import logging
 
 
-defualt_execute_options = {}
+default_execute_options = {}
 
 tc = TessConnection()
-tc.connect("execute")
-defualt_simulate_options = {
+tc.connect("execute_Starmon")
+default_simulate_options = {
     "num_avg": 10000,
     "iterations": 1
 }
@@ -70,6 +72,13 @@ def execute_qasm_file(file_url: str,  config_json: str,
     MC.set_detector_function(d)
     data = MC.run('demonstrator')  # FIXME <- add the proper name
 
+    return _MC_result_to_chart_dict(data)
+
+def execute_qumis_file(file_url: str,  config_json: str,
+                      verbosity_level: int=0):
+    file_path = _retrieve_file_from_url(file_url)
+    options = json.loads(config_json)
+    data = _simulate_quantumsim(file_path,options)
     return _MC_result_to_chart_dict(data)
 
 
@@ -160,6 +169,39 @@ def _MC_result_to_chart_dict(result):
         "data-type": "chart",
         "data": result
     }]
+
+def _simulate_quantumsim(file_path, options):
+    st = station.Station()
+    # Connect to the qx simulator
+    MC_sim = measurement_control.MeasurementControl(
+        'MC_sim', live_plot_enabled=False, verbose=True)
+
+    datadir = os.path.abspath(os.path.join(
+        os.path.dirname(pq.__file__), os.pardir, 'execute_data'))
+    MC_sim.datadir(datadir)
+    MC_sim.station = st
+
+    st.add_component(MC_sim)
+    quantumsim_sweep = swf.None_Sweep()
+    quantumsim_sweep.parameter_name = 'Circuit number '
+    quantumsim_sweep.unit = '#'
+
+    qubit_parameters = {
+        'Q0': {'T1': 30e3, 'T2': 17e3, 'frac1_0': 0.0189, 'frac1_1': 0.918},
+        'Q1': {'T1': 30e3, 'T2': 17e3, 'frac1_0': 0.068, 'frac1_1': 0.949},
+        'q0': {'T1': 30e3, 'T2': 17e3, 'frac1_0': 0.0189, 'frac1_1': 0.918},
+        'q1': {'T1': 30e3, 'T2': 17e3, 'frac1_0': 0.068, 'frac1_1': 0.949}}
+
+    quantumsim_det = Quantumsim_Two_QB_Hard_Detector(
+        file_path, dt=(40, 280), qubit_parameters=qubit_parameters)
+    sweep_points = range(len(quantumsim_det.parser.circuits))
+
+    MC_sim.set_detector_function(quantumsim_det)
+    MC_sim.set_sweep_function(quantumsim_sweep)
+    MC_sim.set_sweep_points(sweep_points)
+    dat = MC_sim.run("run QASM")
+    print('simulation finished')
+    return dat
 
 
 # Send the callibration of the machine every 10 minutes

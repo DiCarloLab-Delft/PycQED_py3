@@ -360,7 +360,7 @@ class QWG_FluxLookuptableManager(Instrument):
                                         subtract_offset='first')
 
         # New version of fast adiabatic pulse
-        martinis_pulse_v2 = wf.martinis_flux_pulse_v2(
+        martinis_pulse_v2 = wf.martinis_flux_pulse(
             length=self.F_length(),
             lambda_2=self.F_lambda_2(),
             lambda_3=self.F_lambda_3(),

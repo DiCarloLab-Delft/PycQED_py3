@@ -1,0 +1,87 @@
+smis s0, {0} 
+smis s1, {1} 
+smis s2, {2} 
+smis s3, {3} 
+smis s4, {4} 
+smis s5, {5} 
+smis s6, {6} 
+smis s7, {0, 1, 2, 3, 4, 5, 6} 
+smis s8, {0, 1, 5, 6} 
+smis s9, {2, 3, 4} 
+smis s10, {1, 0} 
+smis s11, {0, 1} 
+smit t0, {(2, 0)} 
+
+start:
+    bs 1    prepz s0
+    qwait 9999
+    bs 1    prepz s10
+    qwait 9999
+    bs 1    cw_03 s0
+    bs 1    fl_cw_01 t0 | cw_00 s1
+    qwait 14
+    bs 1    cw_03 s0
+    bs 1    cw_00 s1
+    bs 1    prepz s1 | cw_00 s0
+    qwait 9999
+    bs 1    cw_03 s1
+    bs 1    cw_00 s0
+    bs 1    fl_cw_01 t0 | cw_03 s1
+    qwait 14
+    bs 1    measz s0
+    qwait 39
+    bs 1    measz s1 | prepz s0
+    qwait 9999
+    bs 1    prepz s10
+    qwait 9999
+    bs 1    cw_03 s0
+    bs 1    fl_cw_01 t0 | cw_00 s1
+    qwait 14
+    bs 1    cw_03 s0
+    bs 1    cw_00 s1
+    bs 1    prepz s1 | cw_00 s0
+    qwait 9999
+    bs 1    cw_04 s1
+    bs 1    cw_00 s0
+    bs 1    fl_cw_01 t0 | cw_04 s1
+    qwait 14
+    bs 1    measz s0
+    qwait 39
+    bs 1    measz s1 | prepz s0
+    qwait 9999
+    bs 1    prepz s10
+    qwait 9999
+    bs 1    cw_04 s0
+    bs 1    fl_cw_01 t0 | cw_00 s1
+    qwait 14
+    bs 1    cw_04 s0
+    bs 1    cw_00 s1
+    bs 1    prepz s1 | cw_00 s0
+    qwait 9999
+    bs 1    cw_03 s1
+    bs 1    cw_00 s0
+    bs 1    fl_cw_01 t0 | cw_03 s1
+    qwait 14
+    bs 1    measz s0
+    qwait 39
+    bs 1    measz s1 | prepz s0
+    qwait 9999
+    bs 1    prepz s10
+    qwait 9999
+    bs 1    cw_04 s0
+    bs 1    fl_cw_01 t0 | cw_00 s1
+    qwait 14
+    bs 1    cw_04 s0
+    bs 1    cw_00 s1
+    bs 1    prepz s1 | cw_00 s0
+    qwait 9999
+    bs 1    cw_04 s1
+    bs 1    cw_00 s0
+    bs 1    fl_cw_01 t0 | cw_04 s1
+    qwait 14
+    bs 1    measz s11
+    qwait 40
+    br always, start
+    nop 
+    nop
+

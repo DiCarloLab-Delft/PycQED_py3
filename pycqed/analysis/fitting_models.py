@@ -183,6 +183,7 @@ def Qubit_dac_sensitivity(dac_voltage, f_max: float, E_c: float,
                           asymmetry: float=0):
     '''
     Derivative of the qubit detuning vs dac at dac_voltage.
+    The returned quantity is "dfreq/dPhi (dac_voltage)"
     '''
     cos_term = np.cos(np.pi / V_per_phi0 * (dac_voltage - dac_sweet_spot))
     sin_term = np.sin(np.pi / V_per_phi0 * (dac_voltage - dac_sweet_spot))
@@ -220,6 +221,28 @@ def CosFunc(t, amplitude, frequency, phase, offset):
 
 def ExpDecayFunc(t, tau, amplitude, offset, n):
     return amplitude*np.exp(-(t/tau)**n)+offset
+
+
+def gain_corr_ExpDecayFunc(t, tau, amp, gc):
+    """
+    Specific form of an exponential decay used for flux corrections.
+    Includes a "gain correction" parameter that is ignored when correcting
+    the distortions.
+    """
+
+    y = gc*(1+amp*np.exp(-t/tau))
+    return y
+
+
+def gain_corr_double_ExpDecayFunc(t, tau_A, tau_B, amp_A, amp_B, gc):
+    """
+    Specific form of an exponential decay used for flux corrections.
+    Includes a "gain correction" parameter that is ignored when correcting
+    the distortions.
+    """
+    y = gc*(1+amp_A*np.exp(-t/tau_A)+ amp_B*np.exp(-t/tau_B))
+    return y
+
 
 
 def ExpDampOscFunc(t, tau, n, frequency, phase, amplitude,
@@ -565,7 +588,13 @@ def fft_freq_phase_guess(data, t):
     return freq_guess, ph_guess
 
 
-def Cos_guess(model, data, t):
+def Cos_guess(model, data, t, **kwargs):
+    """
+    Tip: to use this assign this guess function as a method to a model use:
+    model.guess = Cos_guess.__get__(
+        model, model.__class__)
+    """
+
     amp_guess = abs(max(data)-min(data))/2  # amp is positive by convention
     offs_guess = np.mean(data)
 

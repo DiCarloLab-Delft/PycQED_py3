@@ -26,17 +26,25 @@ class Base_RO_LutMan(Base_LutMan):
         self.add_parameter('mixer_phi', vals=vals.Numbers(), unit='deg',
                            parameter_class=ManualParameter,
                            initial_value=0.0)
+        self.add_parameter('mixer_offs_I', unit='V',
+                           parameter_class=ManualParameter, initial_value=0)
+        self.add_parameter('mixer_offs_Q', unit='V',
+                           parameter_class=ManualParameter, initial_value=0)
         comb_msg = (
-            'Resonator combinations specifies blablab needs to be format like bla example ablabj ')
+            'Resonator combinations specifies which pulses are uploaded to'
+            'the device. Given as a list of lists:'
+            'e.g. [[0], [1], [0, 1]] specifies that pulses for readout'
+            'of resonator 0, 1, and a pulse for mux readout on both should be'
+            'uploaded.')
         self.add_parameter('resonator_combinations', vals=vals.Lists(),
                            parameter_class=ManualParameter,
                            docstring=comb_msg,
                            initial_value=[[0]])
         self.add_parameter('pulse_type', vals=vals.Enum(
-                                'M_up_down_down', 'M_square'),
-                           parameter_class=ManualParameter,
-                           docstring=comb_msg,
-                           initial_value='M_square')
+            'M_up_down_down', 'M_square'),
+            parameter_class=ManualParameter,
+            docstring=comb_msg,
+            initial_value='M_square')
         for res in range(self._num_res):
             self.add_parameter('M_modulation_R{}'.format(res),
                                vals=vals.Numbers(), unit='Hz',
@@ -140,6 +148,11 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
         self._voltage_max = 1.0-1.0/2**13
         self.sampling_rate(1.8e9)
 
+        self.add_parameter('hardcode_cases', vals=vals.Lists(),
+                           parameter_class=ManualParameter,
+                           initial_value=[])
+
+
     def set_default_lutmap(self):
         """
         The LutMap parameter is not used for the UHFQC. Instead this is
@@ -167,10 +180,17 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
             I_wave, Q_wave, self.acquisition_delay())
 
     def load_DIO_triggered_sequence_onto_UHFQC(self,
-                                               regenerate_waveforms=True, timeout=5):
+                                               regenerate_waveforms=True,
+                                               hardcode_cases=None,
+                                               timeout=5):
         '''
         Load a single pulse to the lookuptable, it uses the lut_mapping to
             determine which lookuptable to load to.
+
+        hardcode_case_0 is a workaround as long as it's not clear how
+        to make the qisa assembler output the codeword mask on DIO.
+        The first element of self.resonator_combinations is linked
+        to codeword 0, the others are not uploaded.
         '''
         resonator_combinations = self.resonator_combinations()
 
@@ -188,7 +208,7 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
             wave_dict = self._wave_dict
         I_waves = []
         Q_waves = []
-        cases=np.zeros([len(resonator_combinations)])
+        cases = np.zeros([len(resonator_combinations)])
 
         for i, resonator_combination in enumerate(resonator_combinations):
             if not resonator_combination:
@@ -205,19 +225,30 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
                         I_waves.append(Icopy)
                         Q_waves.append(Qcopy)
                     else:
-                        # adding new wave (not necessarily same length
-                        # (have to be same length for now)
-                        I_waves[i] += wave_dict[wavename][0]
-                        Q_waves[i] += wave_dict[wavename][1]
-                    cases[i]+=2**resonator
+                        # adding new wave (not necessarily same length)
+                        I_waves[i] = add_waves_different_length(
+                            I_waves[i], wave_dict[wavename][0])
+                        Q_waves[i] = add_waves_different_length(
+                            Q_waves[i], wave_dict[wavename][1])
+
+                    cases[i] += 2**resonator
 
             # clipping the waveform
             I_waves[i] = np.clip(I_waves[i],
                                  self._voltage_min, self._voltage_max)
             Q_waves[i] = np.clip(Q_waves[i], self._voltage_min,
                                  self._voltage_max)
+
+        if self.hardcode_cases() != []:
+            cases = self.hardcode_cases()
+
         self.AWG.get_instr().awg_sequence_acquisition_and_DIO_triggered_pulse(
-            I_waves, Q_waves, cases, self.acquisition_delay(),timeout=timeout)
+            I_waves, Q_waves, cases, self.acquisition_delay(), timeout=timeout)
+
+    def set_mixer_offsets(self):
+        UHFQC = self.AWG.get_instr()
+        UHFQC.sigouts_0_offset(self.mixer_offs_I())
+        UHFQC.sigouts_1_offset(self.mixer_offs_Q())
 
     def load_waveforms_onto_AWG_lookuptable(
             self, regenerate_waveforms: bool=True,
@@ -225,3 +256,16 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
         raise NotImplementedError(
             'UHFQC needs a full sequence, use '
             '"load_DIO_triggered_sequence_onto_UHFQC"')
+
+
+def add_waves_different_length(a, b):
+    """
+    Helper method used to add two arrays of different lengths.
+    """
+    if len(a) < len(b):
+        c = b.copy()
+        c[:len(a)] += a
+    else:
+        c = a.copy()
+        c[:len(b)] += b
+    return c

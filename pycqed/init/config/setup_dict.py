@@ -23,7 +23,8 @@ mac_dict = {'203178706891063': 'CDickel_Desktop',
             '26830024075025': 'Qudev_testbench',
             '167746770147462':'Luthi_Desktop',
             '17912121714974': 'Thijs_laptop',
-            '238177194084913': 'Thijs_Desktop'
+            '238177194084913': 'Thijs_Desktop',
+            '88623634748008':'LaAprilia_1'
             }
 
 data_dir_dict = {'tud276606_FPGA_PC': 'D:\Experiments/CBox_Testing/Data',
@@ -54,5 +55,7 @@ data_dir_dict = {'tud276606_FPGA_PC': 'D:\Experiments/CBox_Testing/Data',
                  # 'Luthi_Desktop': r'\\TUD277620\\Experiments\\1607_NWv7A4_Magnet\\Data' # To Ducati Old
                  'Luthi_Desktop': r'\\TUD277620\Experiments\1711_NWv7A4_PCS_Magnet\Data',
                  'Thijs_laptop' : 'C:\\Users\\Thijs\\Documents\\TUDelft\\PhD\\Data',
-                 'Thijs_Desktop': r'\\TUD277620\Experiments\\1711_NWv7A4_PCS_Magnet\Data'
+                 'Thijs_Desktop': r'\\TUD277620\Experiments\\1711_NWv7A4_PCS_Magnet\Data',
+                 'LaAprilia_1' : r'D:\Experiments\1802_IntelS7Airbridges'
+                 #'LaAprilia_1' : r'D:\Experiments\1802_Argon\Data'
                  }

@@ -86,15 +86,31 @@ def wrap_pars_to_swf(parameters, retrieve_value=False):
 
 def wrap_par_to_det(parameter, control='soft'):
     '''
-    Todo:
-     - only soft detector_functions
-     - only single parameter
+    Takes in a QCoDeS Parameter instance and returns a PycQED DetectorFunction
+    that wraps around the Parameter.
+
+    The following attributes of the QCoDes parameter are used
+        par.name    -> detector.name
+        par.label   -> detector.value_names (either string or list of strings)
+        par.unit    ->  detector.value_units
+        par.get     -> detector.acquire_data_point
+                    -> detector.get_values
+
+    The following attributes are not taken from the parameter
+        det.prepare             <- pass_function
+        det.finish              <- pass_function
+        det.detector_control    <- input argument of this function
+
     '''
     detector_function = det.Detector_Function()
     detector_function.detector_control = control
     detector_function.name = parameter.name
-    detector_function.value_names = [parameter.label]
-    detector_function.value_units = [parameter.unit]
+    if isinstance(parameter.label, list):
+        detector_function.value_names = parameter.label
+        detector_function.value_units = parameter.unit
+    else:
+        detector_function.value_names = [parameter.label]
+        detector_function.value_units = [parameter.unit]
 
     detector_function.prepare = pass_function
     detector_function.finish = pass_function

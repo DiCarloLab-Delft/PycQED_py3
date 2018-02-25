@@ -176,7 +176,7 @@ class Test_QWG_flux_seqs(unittest.TestCase):
         self.QWG_flux_lutman.Z_length(corr_len*1e-9)
 
         CZ = self.QWG_flux_lutman.standard_waveforms()['adiabatic']
-        CZ_expected = wf.martinis_flux_pulse_v2(
+        CZ_expected = wf.martinis_flux_pulse(
             length=self.QWG_flux_lutman.F_length(),
             lambda_2=self.QWG_flux_lutman.F_lambda_2(),
             lambda_3=self.QWG_flux_lutman.F_lambda_3(),

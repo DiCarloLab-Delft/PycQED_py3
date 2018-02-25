@@ -13,7 +13,7 @@ CCL = station.components['CCL']
 example_fp = os.path.abspath(os.path.join(
     pq.__path__[0], '..', 'examples',
     'CCLight_example', 'qisa_test_assembly', 'UHFQC_ro_example.qisa'))
-CCL.upload_instructions(example_fp)
+CCL.eqasm_program(example_fp)
 CCL.start()
 
 amps = [0.1, 0.2, 0.3, 0.4, 0.5]

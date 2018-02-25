@@ -60,8 +60,9 @@ class CCLightMicrocode():
 
     def __init__(self):
         self.microcode = [0]*256
-        self.CS_header = "Condition  OpTypeLeft  CW_Left  OpTypeRight  CW_Right"
-        self.CS_format = "{:5d}      {:5d}       {:3d}      {:6d}       {:6d}"
+        self.CS_header = "OpTypeLeft  CW_Left  OpTypeRight  CW_Right  Condition"
+        self.CS_format = "{:5d}       {:3d}      {:6d}     {:6d}     {:5d} "
+        self.type_dict = ["None", "Mw", "Flux", "Meas"]
         print("initialization finished.")
 
     def gen_control_store_line(self, condition, op_type_left, cw_left,
@@ -138,31 +139,30 @@ class CCLightMicrocode():
     def print_pure_cs_line(self, cs_line):
         (condition, op_type_left, cw_left, op_type_right, cw_right) = \
             self.disa_cs_line(cs_line)
-        print(self.CS_format.format(condition, op_type_left, cw_left,
-                                    op_type_right, cw_right))
+        print(self.CS_format.format(op_type_left, cw_left,
+                                    op_type_right, cw_right,
+                                    condition))
+
+    def print_compact_cs_line(self, cs_line):
+        (condition, op_type_left, cw_left, op_type_right, cw_right) = \
+            self.disa_cs_line(cs_line)
+
+        print("{:3d} {:6s} ".format(cw_left, "(" +
+                self.type_dict[op_type_left] + ")"),
+                end = '')
+        if op_type_right != 0:
+            print("{:3d} {:6s}  ".format(cw_right, "(" +
+                self.type_dict[op_type_right] + ")"),
+                end = '')
+        if condition != 0:
+            print("condition: {}".format(condition), end='')
 
     def print_cs_line(self, line_number):
         print(self.CS_header)
         self.print_pure_cs_line(self.microcode[line_number])
 
-    # def print_microcode(self, microcode, binFormat=False, line=-1):
-    #     cs_line_array = []
-    #     if binFormat:
-    #         cs_line_array = self.disa_bin_microcode(microcode)
-    #     else:
-    #         cs_line_array = microcode
-
-    #     if len(cs_line_array) > 256:
-    #         raise ValueError("The number of cs lines in the microcode ({})"
-    #             " exceeds the maximum (255).".format(len(cs_line_array)))
-
-    #     if line == -1:
-    #         print("     ", self.CS_header)
-    #         for idx, cs_line in enumerate(cs_line_array):
-    #             sys.stdout.write('{:>3d}: '.format(idx))
-    #             self.print_pure_cs_line(cs_line)
-    #     else:
-    #         self.print_pure_cs_line(cs_line_array[line])
+    def print_cs_line_no_header(self, line_number):
+        self.print_compact_cs_line(self.microcode[line_number])
 
     def dump_microcode(self, filename=None):
         if filename is not None:
