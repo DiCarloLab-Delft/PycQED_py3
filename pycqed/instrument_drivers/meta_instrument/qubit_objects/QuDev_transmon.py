@@ -310,8 +310,8 @@ class QuDev_transmon(Qubit):
 
         self.int_avg_det_spec = det.UHFQC_integrated_average_detector(
             UHFQC=self.UHFQC, result_logging_mode='raw',
-            channels=(self.RO_acq_weight_function_I(),
-                      self.RO_acq_weight_function_Q()),
+            channels=[self.RO_acq_weight_function_I(),
+                      self.RO_acq_weight_function_Q()],
             nr_averages=self.RO_acq_averages(),
             real_imag=False, single_int_avg=True,
             integration_length=self.RO_acq_integration_length())
@@ -1541,7 +1541,7 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_points(DC_LO_freqs)
         MC.set_detector_function(self.int_avg_det_spec)
         self.AWG.start()
-        MC.run('UC_spectrum' + self.msmt_suffix)
+        MC.run('mw_uc_spectrum' + self.msmt_suffix)
         ma.MeasurementAnalysis(plot_args=dict(log=True, marker=''))
 
     def find_optimized_weights(self, MC=None, update=True, measure=True, **kw):
@@ -3441,14 +3441,17 @@ class QuDev_transmon(Qubit):
                        phases=None, spacing=100e-9,
                        MC=None, cal_points=None, plot=False,
                        return_population_loss=False,
-                       auto=True
+                       auto=True,
+                       upload_AWGs='all',
+                       upload_channels='all',
+                       prepare_for_timedomain=True
                        ):
         '''
 
         '''
         if len(amps) != len(lengths):
             logging.warning('amps and lengths must have the same '
-                            'number of entries.')
+                            'dimension.')
 
         if MC is None:
             MC = self.MC
@@ -3460,7 +3463,7 @@ class QuDev_transmon(Qubit):
         population_loss_all = []
         for amp, length in zip(amps, lengths):
             self.flux_pulse_amp(amp)
-            self.flux_pulse_amp(length)
+            self.flux_pulse_length(length)
 
             s1 = awg_swf.Flux_pulse_CPhase_meas_hard_swf(
                 qb_control=self,
@@ -3470,11 +3473,13 @@ class QuDev_transmon(Qubit):
                 reference_measurements=True,
                 spacing=spacing,
                 upload=False,
+                upload_AWGs=upload_AWGs,
+                upload_channels=upload_channels
             )
             s2 = awg_swf.Flux_pulse_CPhase_meas_2D(self, qb_target, s1,
                                                    sweep_mode='amplitude')
-
-            qb_target.prepare_for_timedomain()
+            if prepare_for_timedomain:
+                qb_target.prepare_for_timedomain()
 
             MC.set_sweep_function(s1)
             MC.set_sweep_points(phases)

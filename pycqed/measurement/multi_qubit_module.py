@@ -1033,6 +1033,7 @@ def measure_three_qubit_tomo_GHZ(qubits, f_LO,
 
     ma.TwoD_Analysis(label=label, close_file=True)
 
+
 def cphase_gate_tuneup(qb_control, qb_target,
                        initial_values_dict=None,
                        initial_step_dict=None,
@@ -1041,10 +1042,8 @@ def cphase_gate_tuneup(qb_control, qb_target,
                        maxiter=50,
                        name='cphase_tuneup',
                        cal_points=False,
-                       spacing=10e-9,
-                       ramsey_phases=None,
-                       distorted=False,
-                       distortion_dict=None):
+                       spacing=20e-9,
+                       ramsey_phases=None):
 
     '''
     function that runs the nelder mead algorithm to optimize the CPhase gate
@@ -1080,27 +1079,21 @@ def cphase_gate_tuneup(qb_control, qb_target,
         init_step_length = initial_step_dict['step_length']
         init_step_amplitude = initial_step_dict['step_amplitude']
 
-    d = cdet.CPhase_optimization(qb_control=qb_control,qb_target=qb_target,
+    # initial measurement so set up all instruments
+    qb_control.measure_cphase(qb_target,
+                              amps=[pulse_amplitude_init],
+                              lengths=[pulse_length_init],
+                              cal_points=False, plot=False,
+                              phases=ramsey_phases, spacing=spacing
+                              )
+
+    d = cdet.CPhase_optimization(qb_control=qb_control, qb_target=qb_target,
                                  MC=MC_detector,
-                                 ramsey_phases=ramsey_phases)
+                                 ramsey_phases=ramsey_phases,
+                                 spacing=spacing)
 
     S1 = d.flux_pulse_length
     S2 = d.flux_pulse_amp
-
-    # S1_dummy = awg_swf.Flux_pulse_CPhase_meas_hard_swf(qb_control,qb_target,
-    #                                              sweep_mode='length',
-    #                                              spacing=spacing,
-    #                                              cal_points=False,
-    #                                              distorted=False,
-    #                                              distortion_dict=None,
-    #                                              upload=False)
-    #
-    # S1 = awg_swf.Flux_pulse_CPhase_meas_2D(qb_control,qb_target, S1_dummy,
-    #                                        sweep_mode='length',
-    #                                        measurement_mode='excited_state')
-    # S2 = awg_swf.Flux_pulse_CPhase_meas_2D(qb_control,qb_target, S1_dummy,
-    #                                        sweep_mode='amplitude',
-    #                                        measurement_mode='excited_state')
 
     ad_func_pars = {'adaptive_function': nelder_mead,
                     'x0': [pulse_length_init, pulse_amplitude_init],
@@ -1117,7 +1110,6 @@ def cphase_gate_tuneup(qb_control, qb_target,
     a2 = ma.OptimizationAnalysis_v2(label=name)
     pulse_length_best_value = a1.optimization_result[0][0]
     pulse_amplitude_best_value = a1.optimization_result[0][1]
-
 
     return pulse_length_best_value, pulse_amplitude_best_value
     # return 'passed..'

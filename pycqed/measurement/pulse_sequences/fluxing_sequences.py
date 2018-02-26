@@ -1782,7 +1782,9 @@ def flux_pulse_CPhase_seq(sweep_points,qb_control, qb_target,
                           distorted=False,
                           distortion_dict=None,
                           measurement_mode='excited_state',
-                          reference_measurements=False
+                          reference_measurements=False,
+                          upload_AWGs='all',
+                          upload_channels='all'
                           ):
 
     '''
@@ -1892,7 +1894,9 @@ def flux_pulse_CPhase_seq(sweep_points,qb_control, qb_target,
 
 
     if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose,
+                                    AWGs=upload_AWGs,
+                                    channels=upload_channels)
 
     if return_seq:
         return seq, el_list

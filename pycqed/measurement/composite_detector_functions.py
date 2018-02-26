@@ -1602,7 +1602,9 @@ class CPhase_optimization(det.Soft_Detector):
     def __init__(self, qb_control, qb_target, MC,
                  ramsey_phases=None,
                  distorted=False,distortion_dict=None,
-                 cost_function_opt=0, **kw):
+                 cost_function_opt=0,
+                 spacing=10e-9,
+                 **kw):
         super().__init__()
 
         self.flux_pulse_length = ManualParameter(name='flux_pulse_length',
@@ -1618,8 +1620,8 @@ class CPhase_optimization(det.Soft_Detector):
         self.MC = MC
         self.qb_control = qb_control
         self.qb_target = qb_target
-        self.distortion_dict = distortion_dict
-        self.distorted = distorted
+        self.spacing = spacing
+
 
         self.cost_function_opt = cost_function_opt
         self.nr_averages = kw.get('nr_averages', 1024)
@@ -1645,7 +1647,11 @@ class CPhase_optimization(det.Soft_Detector):
                     lengths=[self.flux_pulse_length()],
                     phases=self.ramsey_phases,
                     return_population_loss=True,
-                    auto=False
+                    # upload_AWGs=[self.qb_control.flux_pulse_channel()[:4]],
+                    upload_channels=[self.qb_control.flux_pulse_channel()],
+                    auto=False,
+                    prepare_for_timedomain=False,
+                    spacing=self.spacing
                     )
         print('measured conditional phase: ', cphases[0]/np.pi*180)
 

@@ -2117,7 +2117,9 @@ class Flux_pulse_CPhase_meas_hard_swf(swf.Hard_Sweep):
                  spacing=50e-9,cal_points=False, upload=True,
                  distorted=False,distortion_dict=None,
                  measurement_mode='excited_state',
-                 reference_measurements=False):
+                 reference_measurements=False,
+                 upload_AWGs='all',
+                 upload_channels='all'):
         super().__init__()
         self.qb_control = qb_control
         self.qb_target = qb_target
@@ -2130,6 +2132,8 @@ class Flux_pulse_CPhase_meas_hard_swf(swf.Hard_Sweep):
         self.sweep_mode = sweep_mode
         self.measurement_mode = measurement_mode
         self.reference_measurements = reference_measurements
+        self.upload_AWGs = upload_AWGs
+        self.upload_channels = upload_channels
 
         self.name = 'flux_pulse_CPhase_measurement_{}_sweep'.format(sweep_mode)
         self.parameter_name = sweep_mode
@@ -2153,7 +2157,9 @@ class Flux_pulse_CPhase_meas_hard_swf(swf.Hard_Sweep):
                 cal_points=self.cal_points, distorted=self.distorted,
                 distortion_dict=self.distortion_dict,
                 measurement_mode=self.measurement_mode,
-                reference_measurements=self.reference_measurements
+                reference_measurements=self.reference_measurements,
+                upload_AWGs=self.upload_AWGs,
+                upload_channels=self.upload_channels
             )
 
 
