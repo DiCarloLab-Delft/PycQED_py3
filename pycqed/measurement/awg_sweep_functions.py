@@ -6,6 +6,7 @@ from pycqed.measurement.pulse_sequences import standard_sequences as st_seqs
 from pycqed.measurement.pulse_sequences import single_qubit_tek_seq_elts as sqs
 from pycqed.measurement.pulse_sequences import single_qubit_2nd_exc_seqs as sqs2
 from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
+from pycqed.measurement.pulse_sequences import calibration_elements as csqs
 from pycqed.measurement.pulse_sequences import multi_qubit_tek_seq_elts as mq_sqs
 import time
 
@@ -2116,7 +2117,9 @@ class Flux_pulse_CPhase_meas_hard_swf(swf.Hard_Sweep):
                  spacing=50e-9,cal_points=False, upload=True,
                  distorted=False,distortion_dict=None,
                  measurement_mode='excited_state',
-                 reference_measurements=False):
+                 reference_measurements=False,
+                 upload_AWGs='all',
+                 upload_channels='all'):
         super().__init__()
         self.qb_control = qb_control
         self.qb_target = qb_target
@@ -2129,6 +2132,8 @@ class Flux_pulse_CPhase_meas_hard_swf(swf.Hard_Sweep):
         self.sweep_mode = sweep_mode
         self.measurement_mode = measurement_mode
         self.reference_measurements = reference_measurements
+        self.upload_AWGs = upload_AWGs
+        self.upload_channels = upload_channels
 
         self.name = 'flux_pulse_CPhase_measurement_{}_sweep'.format(sweep_mode)
         self.parameter_name = sweep_mode
@@ -2152,7 +2157,9 @@ class Flux_pulse_CPhase_meas_hard_swf(swf.Hard_Sweep):
                 cal_points=self.cal_points, distorted=self.distorted,
                 distortion_dict=self.distortion_dict,
                 measurement_mode=self.measurement_mode,
-                reference_measurements=self.reference_measurements
+                reference_measurements=self.reference_measurements,
+                upload_AWGs=self.upload_AWGs,
+                upload_channels=self.upload_channels
             )
 
 
@@ -2204,6 +2211,8 @@ class Flux_pulse_CPhase_meas_2D(swf.Soft_Sweep):
         #     else:
         #         self.measurement_state = 'excited_state'
 
+        self.hard_sweep.upload = True
+
         if self.sweep_mode == 'length':
             self.qb_control.flux_pulse_length(val)
             self.hard_sweep.prepare()
@@ -2245,6 +2254,7 @@ class Fluxpulse_scope_swf(swf.Hard_Sweep):
                                           distortion_dict=self.distortion_dict,
                                           spacing=self.spacing)
 
+
 class Fluxpulse_scope_drive_freq_sweep(swf.Soft_Sweep):
 
     # sweeps the qubit frequency such that the X180 pulses have different frequencies.
@@ -2266,3 +2276,33 @@ class Fluxpulse_scope_drive_freq_sweep(swf.Soft_Sweep):
 
     def finish(self):
         self.qb.f_qubit(self.stored_f_qubit)
+
+
+class Readout_pulse_scope_swf(swf.Hard_Sweep):
+    def __init__(self, delays, pulse_pars, RO_pars, RO_separation,
+                 cal_points=((-4, -3), (-2, -1)), comm_freq=225e6,
+                 verbose=False, upload=True):
+        super().__init__()
+        self.delays = delays
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.RO_separation = RO_separation
+        self.cal_points = cal_points
+        self.comm_freq = comm_freq
+        self.verbose = verbose
+        self.upload = upload
+
+        self.name = 'Readout pulse scope'
+        self.parameter_name = 'delay'
+        self.unit = 's'
+
+    def prepare(self, **kw):
+        if self.upload:
+            csqs.readout_pulse_scope_seq(
+                delays=self.delays,
+                pulse_pars=self.pulse_pars,
+                RO_pars=self.RO_pars,
+                RO_separation=self.RO_separation,
+                cal_points=self.cal_points,
+                comm_freq=self.comm_freq,
+                verbose=self.verbose)

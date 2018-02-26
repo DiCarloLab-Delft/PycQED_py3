@@ -236,34 +236,34 @@ def load_settings(instrument,
                     if value == 'None':  # None is saved as string in hdf5
                         try:
                             instrument.set(parameter, None)
-                        except:
+                        except Exception:
                             print('Could not set parameter "%s" to "%s" for '
                                   'instrument "%s"' % (
                                       parameter, value, instrument_name))
                     elif value == 'False':
                         try:
                             instrument.set(parameter, False)
-                        except:
+                        except Exception:
                             print('Could not set parameter "%s" to "%s" for '
                                   'instrument "%s"' % (
                                       parameter, value, instrument_name))
                     elif value == 'True':
                         try:
                             instrument.set(parameter, True)
-                        except:
+                        except Exception:
                             print('Could not set parameter "%s" to "%s" for '
                                   'instrument "%s"' % (
                                       parameter, value, instrument_name))
                     else:
                         try:
-                            instrument.set(parameter, float(value))
+                            instrument.set(parameter, int(value))
                         except Exception:
                             try:
-                                instrument.set(parameter, value)
-                            except:
+                                instrument.set(parameter, float(value))
+                            except Exception:
                                 try:
-                                    instrument.set(parameter, int(value))
-                                except:
+                                    instrument.set(parameter, value)
+                                except Exception:
                                     print('Could not set parameter "%s" to "%s"'
                                           ' for instrument "%s"' % (
                                               parameter, value, instrument_name))

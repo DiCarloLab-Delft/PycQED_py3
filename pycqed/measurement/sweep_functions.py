@@ -1039,3 +1039,37 @@ class FLsweep(Soft_Sweep):
                 awg.configure_awg_from_string(0, awg_hack_program)
             awg.configure_codeword_protocol()
             awg.start()
+
+class Offset_Sweep(Soft_Sweep):
+    """A sweep soft sweep function that calls an other sweep function with
+    an offset."""
+    def __init__(self, sweep_function, offset,
+                 name=None, parameter_name=None, unit=None):
+        super().__init__()
+        if sweep_function.sweep_control != 'soft':
+            raise ValueError('Offset_Sweep: Only software sweeps supported')
+        self.sweep_function = sweep_function
+        self.offset = offset
+        self.sweep_control = sweep_function.sweep_control
+        if parameter_name is None:
+            self.parameter_name = sweep_function.parameter_name + \
+                ' {:+} {}'.format(-offset, sweep_function.unit)
+        else:
+            self.parameter_name = parameter_name
+        if name is None:
+            self.name = sweep_function.name
+        else:
+            self.name = name
+        if unit is None:
+            self.unit = sweep_function.unit
+        else:
+            self.unit = unit
+
+    def prepare(self, *args, **kwargs):
+        self.sweep_function.prepare(*args, **kwargs)
+
+    def finish(self, *args, **kwargs):
+        self.sweep_function.finish(*args, **kwargs)
+
+    def set_parameter(self, val):
+        self.sweep_function.set_parameter(val + self.offset)

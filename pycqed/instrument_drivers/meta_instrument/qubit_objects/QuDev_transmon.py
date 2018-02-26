@@ -22,6 +22,7 @@ from pycqed.utilities.general import add_suffix_to_dict_keys
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.qubit_object \
     import Qubit
 from pycqed.measurement import optimization as opti
+from pycqed.measurement import mc_parameter_wrapper
 
 
 class QuDev_transmon(Qubit):
@@ -300,7 +301,7 @@ class QuDev_transmon(Qubit):
 
         self.inp_avg_det = det.UHFQC_input_average_detector(
             UHFQC=self.UHFQC, AWG=self.AWG, nr_averages=self.RO_acq_averages(),
-            nr_samples=4096)
+            nr_samples=int(self.ro_acq_input_average_length()*1.8e9))
 
         self.dig_log_det = det.UHFQC_integration_logging_det(
             UHFQC=self.UHFQC, AWG=self.AWG, channels=channels,
@@ -309,8 +310,8 @@ class QuDev_transmon(Qubit):
 
         self.int_avg_det_spec = det.UHFQC_integrated_average_detector(
             UHFQC=self.UHFQC, result_logging_mode='raw',
-            channels=(self.RO_acq_weight_function_I(),
-                      self.RO_acq_weight_function_Q()),
+            channels=[self.RO_acq_weight_function_I(),
+                      self.RO_acq_weight_function_Q()],
             nr_averages=self.RO_acq_averages(),
             real_imag=False, single_int_avg=True,
             integration_length=self.RO_acq_integration_length())
@@ -348,8 +349,7 @@ class QuDev_transmon(Qubit):
             self.RO_Q_channel(), self.RO_Q_offset()))
         self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(
             f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
-            RO_pulse_length=self.RO_pulse_length(),
-            acquisition_delay=0)
+            RO_pulse_length=self.RO_pulse_length())
         self.readout_UC_LO.pulsemod_state('Off')
         self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
         self.readout_UC_LO.on()
@@ -362,8 +362,6 @@ class QuDev_transmon(Qubit):
         # cw source
         if self.cw_source is not None:
             self.cw_source.off()
-
-        self.update_detector_functions()
 
         # drive LO
         self.drive_LO.pulsemod_state('Off')
@@ -395,8 +393,7 @@ class QuDev_transmon(Qubit):
                     self.RO_Q_channel(), self.RO_Q_offset()))
                 self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(
                     f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
-                    RO_pulse_length=self.RO_pulse_length(),
-                    acquisition_delay=0)
+                    RO_pulse_length=self.RO_pulse_length())
                 self.readout_UC_LO.pulsemod_state('Off')
                 self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
                 self.readout_UC_LO.on()
@@ -405,7 +402,7 @@ class QuDev_transmon(Qubit):
                 self.readout_RF.frequency(f_RO)
                 self.readout_RF.power(self.RO_pulse_power())
                 self.readout_RF.on()
-                self.UHFQC.awg_sequence_acquisition(acquisition_delay=0)
+                self.UHFQC.awg_sequence_acquisition()
         else:
             # setting up the UHFQC awg sequence must be done externally by a
             # readout manager
@@ -413,6 +410,7 @@ class QuDev_transmon(Qubit):
             self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
             self.readout_UC_LO.on()
 
+        self.update_detector_functions()
         self.set_readout_weights()
 
     def prepare_for_mixer_calibration(self, suppress):
@@ -562,19 +560,23 @@ class QuDev_transmon(Qubit):
             demod_mode=demod_mode))
         MC.run_2D(name='resonator_spectoscopy_flux_sweep' + self.msmt_suffix)
         if analyze:
-            ma.MeasurementAnalysis(TwoD=True, close_fig=close_fig)
+            ma.TwoD_Analysis(label='resonator_spectoscopy_flux_sweep',
+                             close_fig=close_fig, close_file=True,
+                             qb_name=self.name)
+            # ma.MeasurementAnalysis(TwoD=True, close_fig=close_fig)
 
-    def measure_resonator_spectroscopy_flux_sweep(self, freqs, voltages,
+    def measure_qubit_spectroscopy_flux_sweep(self, freqs, voltages,
             flux_channel=None, pulsed=True, MC=None, analyze=True,
                                                   close_fig=True):
         if MC is None:
-            MC == self.MC
+            MC = self.MC
         if flux_channel is None:
             flux_channel = self.dc_source_channel()
         if pulsed:
             self.prepare_for_pulsed_spec()
             spec_pars = self.get_spec_pars()
             RO_pars = self.get_RO_pars()
+            self.cw_source.on()
             sq.Pulsed_spec_seq(spec_pars, RO_pars)
             MC.set_sweep_function(self.cw_source.frequency)
             MC.set_sweep_points(freqs)
@@ -593,7 +595,10 @@ class QuDev_transmon(Qubit):
         else:
             raise NotImplementedError()
         if analyze:
-            ma.MeasurementAnalysis(TwoD=True, close_fig=close_fig)
+            ma.TwoD_Analysis(label='qubit_spectroscopy_flux_sweep',
+                             close_fig=close_fig, close_file=True,
+                             qb_name=self.name)
+            # ma.MeasurementAnalysis(TwoD=True, close_fig=close_fig)
 
 
     def measure_homodyne_acqusition_delay(self, delays=None, MC=None,
@@ -1324,8 +1329,11 @@ class QuDev_transmon(Qubit):
         MC.run(label, mode='2D')
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
-                                   qb_name=self.name, TwoD=True)
+            ma.TwoD_Analysis(label=label,
+                             close_fig=close_fig,
+                             qb_name=self.name,)
+            # ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
+            #                        qb_name=self.name, TwoD=True)
 
     def measure_transients(self, MC=None, cases=('off', 'on'), upload=True,
                            analyze=True, **kw):
@@ -1339,7 +1347,7 @@ class QuDev_transmon(Qubit):
             MC = self.MC
 
         self.prepare_for_timedomain()
-        npoints = int(self.ro_acq_input_average_length()*1.8e9)
+        npoints = self.inp_avg_det.nr_samples
         if 'off' in cases:
             MC.set_sweep_function(awg_swf.OffOn(
                 pulse_pars=self.get_drive_pars(),
@@ -1365,6 +1373,83 @@ class QuDev_transmon(Qubit):
             MC.run(name='timetrace_on' + self.msmt_suffix)
             if analyze:
                 ma.MeasurementAnalysis(auto=True, qb_name=self.name, **kw)
+
+    def measure_readout_pulse_scope(self, delays, freqs, RO_separation=None,
+                                    comm_freq=225e6, analyze=True, label=None,
+                                    close_fig=True, upload=True, verbose=False,
+                                    cal_points=((-4, -3), (-2, -1)), MC=None):
+        """
+        From the documentation of the used sequence function:
+
+        Prepares the AWGs for a readout pulse shape and timing measurement.
+
+        The sequence consists of two readout pulses where the drive pulse start
+        time is swept through the first readout pulse. Because the photons in
+        the readout resonator induce an ac-Stark shift of the qubit frequency,
+        we can determine the readout pulse shape by sweeping the drive frequency
+        in an outer loop to determine the qubit frequency.
+
+        Important: This sequence includes two readouts per segment. For this
+        reason the calibration points are also duplicated.
+
+        Args:
+            delays: A list of delays between the start of the first readout pulse
+                    and the center of the drive pulse.
+            RO_separation: Separation between the starts of the two readout pulses.
+                           If the comm_freq parameter is not None, the used value
+                           is increased to satisfy the commensurability constraint.
+            cal_points: True for default calibration points, False for no
+                        calibration points or a list of two lists, containing
+                        the indices of the calibration segments for the ground
+                        and excited state.
+            comm_freq: The readout pulse separation will be a multiple of
+                       1/comm_freq
+        """
+
+        if delays is None:
+            raise ValueError("Unspecified amplitudes for "
+                             "measure_readout_pulse_scope")
+        if label is None:
+            label = 'Readout_pulse_scope' + self.msmt_suffix
+        if MC is None:
+            MC = self.MC
+        if freqs is None:
+            freqs = self.f_qubit() + np.linspace(-50e6, 50e6, 201)
+        if RO_separation is None:
+            RO_separation = np.abs(self.RO_acq_marker_delay())
+            RO_separation += 2 * self.RO_pulse_length()
+            RO_separation += np.max(delays)
+            RO_separation += 200e-9  # for slack
+
+        self.prepare_for_timedomain()
+        MC.set_sweep_function(awg_swf.Readout_pulse_scope_swf(
+            delays=delays,
+            pulse_pars=self.get_drive_pars(),
+            RO_pars=self.get_RO_pars(),
+            RO_separation=RO_separation,
+            cal_points=cal_points,
+            comm_freq=comm_freq,
+            verbose=verbose,
+            upload=upload))
+        MC.set_sweep_points(delays)
+        MC.set_sweep_function_2D(swf.Offset_Sweep(
+            mc_parameter_wrapper.wrap_par_to_swf(self.drive_LO.frequency),
+            -self.f_pulse_mod(),
+            parameter_name=self.name + ' drive frequency'))
+        MC.set_sweep_points_2D(freqs)
+
+        d = det.UHFQC_integrated_average_detector(
+            self.UHFQC, self.AWG, nr_averages=self.RO_acq_averages(),
+            channels=self.int_avg_det.channels,
+            integration_length=self.RO_acq_integration_length(),
+            values_per_point=2, values_per_point_suffex=['_probe', '_measure'])
+        MC.set_detector_function(d)
+        MC.run(label)
+
+        # Create a MeasurementAnalysis object for this measurement
+        if analyze:
+            ma.MeasurementAnalysis(TwoD=True, auto=True, close_fig=close_fig,
+                                   qb_name=self.name)
 
     def calibrate_drive_mixer_carrier(self, MC=None, update=True, x0=(0., 0.),
                                       initial_stepsize=0.01, trigger_sep=5e-6):
@@ -1456,7 +1541,7 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_points(DC_LO_freqs)
         MC.set_detector_function(self.int_avg_det_spec)
         self.AWG.start()
-        MC.run('UC_spectrum' + self.msmt_suffix)
+        MC.run('mw_uc_spectrum' + self.msmt_suffix)
         ma.MeasurementAnalysis(plot_args=dict(log=True, marker=''))
 
     def find_optimized_weights(self, MC=None, update=True, measure=True, **kw):
@@ -1728,7 +1813,7 @@ class QuDev_transmon(Qubit):
         MC.set_detector_function(self.int_avg_det)
         MC.run_2D(name=label)
 
-        MA = ma.MeasurementAnalysis(TwoD=True)
+        MA = ma.TwoD_Analysis(label=label, qb_name=self.name)
 
         self.flux_pulse_length(flux_pulse_length_backup)
         self.flux_pulse_amp(flux_pulse_amp_backup)
@@ -2141,7 +2226,7 @@ class QuDev_transmon(Qubit):
             no_cal_points = 0
 
         #how many times to apply the Rabi pulse
-        n = kw.get('n',1)
+        n = kw.get('n', 1)
 
         if rabi_amps is None:
             amps_span = kw.get('amps_span', 1.)
@@ -3014,6 +3099,8 @@ class QuDev_transmon(Qubit):
 
         return operation_dict
 
+
+
     def calibrate_flux_pulse_timing(self,MC=None, thetas=None, delays=None,
                                     analyze=False, update=False,**kw):
         """
@@ -3037,8 +3124,8 @@ class QuDev_transmon(Qubit):
                 as flux pulse delay
             analyze: bool, if True, then the measured data
                 gets analyzed (for detailed documentation of the analysis see in
-                the Fluxpulse_Ramsey_2D_Analysis class update: bool, if True, the
-                AWG channel delay gets corrected, such that single qubit
+                the Fluxpulse_Ramsey_2D_Analysis class update: bool, if True,
+                the AWG channel delay gets corrected, such that single qubit
                 gates and flux pulses have no relative delay
 
         Returns:
@@ -3056,9 +3143,10 @@ class QuDev_transmon(Qubit):
         distortion_dict = kw.pop('distortion_dict', None)
         pulse_length = kw.pop('pulse_length', 20e-9)
         self.flux_pulse_length(pulse_length)
-        amplitude = kw.pop('amplitude', 0.1)
+        amplitude = kw.pop('amplitude', 0.05)
         self.flux_pulse_amp(amplitude)
 
+        drive_pulse_length = self.gauss_sigma()*self.nr_sigma()
 
         measurement_string = 'Flux_pulse_delay_calibration_{}'.format(self.name)
 
@@ -3068,8 +3156,11 @@ class QuDev_transmon(Qubit):
             buffer_factor = int(X90_separation/self.flux_pulse_length())
             total_time = X90_separation + buffer_factor*self.flux_pulse_length()
             res = int(total_time/T_sample/30)
-            delays = np.arange(-0.5*buffer_factor*self.flux_pulse_length(),
-                               X90_separation + 0.5*buffer_factor*self.flux_pulse_length(),
+            delays = np.arange(-0.5*buffer_factor*self.flux_pulse_length()
+                               -0.5*drive_pulse_length,
+                               X90_separation +
+                               0.5*buffer_factor*self.flux_pulse_length()
+                               -0.5*drive_pulse_length,
                                res*T_sample)
 
         self.prepare_for_timedomain()
@@ -3091,10 +3182,12 @@ class QuDev_transmon(Qubit):
         MC.run_2D(measurement_string)
 
         if analyze:
+            # ma.TwoD_Analysis(close_file=True, qb_name=self.name)
             flux_pulse_ma = ma.Fluxpulse_Ramsey_2D_Analysis(
                         label=measurement_string,
                         X90_separation=X90_separation,
                         flux_pulse_length=pulse_length,
+                        drive_pulse_length=drive_pulse_length,
                         qb_name=self.name,
                         auto=False)
             flux_pulse_ma.run_delay_analysis(show=True)
@@ -3286,8 +3379,6 @@ class QuDev_transmon(Qubit):
         if MC is None:
             MC = self.MC
 
-        X90_separation = kw.pop('X90_separation', None) #there is a default value in measure
-
         if flux_pulse_amp is None:
             flux_pulse_amp = self.flux_pulse_amp()
             logging.warning('flux_pulse_amp is not specified. Using the value'
@@ -3316,6 +3407,7 @@ class QuDev_transmon(Qubit):
                                    flux_pulse_amp=flux_pulse_amp,
                                    flux_pulse_channel=flux_pulse_channel,
                                    flux_pulse_delay=flux_pulse_delay,
+                                   X90_separation=X90_separation,
                                    thetas=thetas,
                                    MC=MC,
                                    label=label)
@@ -3332,7 +3424,7 @@ class QuDev_transmon(Qubit):
                     auto=False, **kw)
 
             dynamic_phase = MA.dyn_phase
-            print('fitted dynamic phase on {}: {:0.3f} [rad]'.format(self.name,
+            print('fitted dynamic phase on {}: {:0.3f} [deg]'.format(self.name,
                                                                 dynamic_phase))
             if update:
                 try:
@@ -3345,19 +3437,33 @@ class QuDev_transmon(Qubit):
         else:
             return
 
-    def measure_cphase(self, qb_target, amps, lengths, phases=None,
+    def measure_cphase(self, qb_target, amps, lengths,
+                       phases=None, spacing=100e-9,
                        MC=None, cal_points=None, plot=False,
-                       return_population_loss=False):
+                       return_population_loss=False,
+                       auto=True,
+                       upload_AWGs='all',
+                       upload_channels='all',
+                       prepare_for_timedomain=True
+                       ):
+        '''
+
+        '''
+        if len(amps) != len(lengths):
+            logging.warning('amps and lengths must have the same '
+                            'dimension.')
+
         if MC is None:
             MC = self.MC
         if phases is None:
             phases = np.linspace(0, 2*np.pi, 16, endpoint=False)
+            phases = np.concatenate((phases,phases))
 
-        cphase_list = []
-        population_loss_list = []
+        cphase_all = []
+        population_loss_all = []
         for amp, length in zip(amps, lengths):
             self.flux_pulse_amp(amp)
-            self.flux_pulse_amp(length)
+            self.flux_pulse_length(length)
 
             s1 = awg_swf.Flux_pulse_CPhase_meas_hard_swf(
                 qb_control=self,
@@ -3365,10 +3471,16 @@ class QuDev_transmon(Qubit):
                 sweep_mode='phase',
                 cal_points=cal_points,
                 reference_measurements=True,
+                spacing=spacing,
+                upload=False,
+                upload_AWGs=upload_AWGs,
+                upload_channels=upload_channels
             )
             s2 = awg_swf.Flux_pulse_CPhase_meas_2D(self, qb_target, s1,
                                                    sweep_mode='amplitude')
-            self.prepare_for_timedomain()
+            if prepare_for_timedomain:
+                qb_target.prepare_for_timedomain()
+
             MC.set_sweep_function(s1)
             MC.set_sweep_points(phases)
             MC.set_sweep_function_2D(s2)
@@ -3377,27 +3489,50 @@ class QuDev_transmon(Qubit):
             MC.run_2D('CPhase_measurement_{}_{}'.format(self.name,
                                                         qb_target.name))
 
+            # ma.TwoD_Analysis(close_file=True)
             flux_pulse_ma = ma.Fluxpulse_Ramsey_2D_Analysis(
+                label='CPhase_measurement_{}_{}'.format(self.name,
+                                                        qb_target.name),
                 qb_name=self.name, cal_points=cal_points,
-                reference_measurements=True
+                reference_measurements=True,
+                auto=auto
             )
-            fitresults = flux_pulse_ma.fit_all(plot=plot,
-                                               reference_measurements=True,
-                                               cal_points=cal_points,
-                                               return_ampl=True
-                                               )
-            fitted_phases, amplitude_list, fitted_phases_ref, \
-                amplitude_list_ref = fitresults
-            cphase = fitted_phases - fitted_phases_ref
-            pop_loss = (amplitude_list - amplitude_list_ref)/amplitude_list
-            cphase_list.append(cphase[0])
-            population_loss_list.append(pop_loss[0])
-        cphases = np.array(cphase_list)
-        pop_losses = np.array(population_loss_list)
+            fitted_phases, fitted_amps = \
+                flux_pulse_ma.fit_all(plot=False,
+                                      cal_points=cal_points,
+                                      return_ampl=True,
+                                      )
+
+            fitted_phases_exited = fitted_phases[:: 2]
+            fitted_phases_ground = fitted_phases[1:: 2]
+
+            cphases = fitted_phases_exited - fitted_phases_ground
+
+            fitted_amps_exited = fitted_amps[:: 2]
+            fitted_amps_ground = fitted_amps[1:: 2]
+
+            pop_loss = np.abs(fitted_amps_ground - fitted_amps_exited) \
+                       /fitted_amps_ground
+
+            cphase_all.append(cphases[0])
+            population_loss_all.append(pop_loss[0])
+
+        plot_title = 'fitted CPhase: {:.3f} deg at' \
+                     ' amp={:.2f}mV,' \
+                     ' length={:.3f}ns'.format(cphases[0]/np.pi*180,
+                                                amps[0]/1e-3, lengths[0]/1e-9)
+        flux_pulse_ma.fit_all(plot=plot,
+                              cal_points=cal_points,
+                              return_ampl=True,
+                              save_plot=True,
+                              plot_title=plot_title
+                              )
+        cphase_all = np.array(cphase_all)
+        population_loss_all = np.array(population_loss_all)
         if return_population_loss:
-            return cphases, pop_losses
+            return cphase_all, population_loss_all
         else:
-            return cphases
+            return cphase_all
 
 
 def add_CZ_pulse(qbc, qbt):

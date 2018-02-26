@@ -463,10 +463,6 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
                            unit='V', vals=vals.Numbers(0, 1),
                            set_cmd=self._set_mod_amp,
                            get_cmd=self._get_mod_amp)
-        self.add_parameter('acquisition_delay', label='Acquisition delay',
-                           unit='s', vals=vals.Numbers(0, 1e-3),
-                           set_cmd=self._set_acquisition_delay,
-                           get_cmd=self._get_acquisition_delay)
         self.add_parameter('I_channel', vals=vals.Strings(),
                            label='I channel',
                            set_cmd=self._set_I_channel,
@@ -482,8 +478,6 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         self.frequency(5e9)
         self._mod_amp = 0
         self.mod_amp(.5)
-        self._acquisition_delay = 0
-        self.acquisition_delay(200e-9)
         self._I_channel = 'ch3'
         self._Q_channel = 'ch4'
 
@@ -566,8 +560,7 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         if self._UHFQC_awg_parameters_changed and self.auto_seq_loading():
             self._acquisition_instr.awg_sequence_acquisition_and_pulse_SSB(
                 self.f_RO_mod.get(), self.mod_amp(),
-                RO_pulse_length=self.RO_length(),
-                acquisition_delay=self.acquisition_delay())
+                RO_pulse_length=self.RO_length())
             self._UHFQC_awg_parameters_changed = False
 
         # this sets the result to integration and rotation outcome
@@ -583,8 +576,6 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         self._acquisition_instr.awgs_0_userregs_0(
             int(self.nr_averages()))
         self._acquisition_instr.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg
-        self._acquisition_instr.awgs_0_userregs_2(
-            int(self.acquisition_delay()*1.8e9/8))
         self._acquisition_instr.acquisition_initialize([0, 1], 'rl')
         self.scale_factor_UHFQC = 1/(1.8e9*self.RO_length() *
                                      int(self.nr_averages()))
@@ -644,17 +635,6 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
 
     def _get_mod_amp(self):
         return self._mod_amp
-
-    def _set_acquisition_delay(self, val):
-        if 'UHFQC' in self.acquisition_instr():
-            self._acquisition_instr.awgs_0_userregs_2(int(val*1.8e9/8))
-        else:
-            raise NotImplementedError("CBox heterodyne driver does not "
-                                      "implement acquisition delay")
-        self._acquisition_delay = val
-
-    def _get_acquisition_delay(self):
-        return self._acquisition_delay
 
     def on(self):
         if self.LO.status().startswith('Off'):

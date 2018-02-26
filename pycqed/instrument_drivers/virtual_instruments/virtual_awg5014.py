@@ -20,6 +20,10 @@ class VirtualAWG5014(Tektronix_AWG5014):
         self.add_parameter('address', unit='', initial_value='',
                            parameter_class=ManualParameter,
                            vals=vals.Strings())
+        self.add_parameter('DC_output',
+                           label='DC Output (ON/OFF)',
+                           parameter_class=ManualParameter,
+                           vals=vals.Ints(0, 1))
 
         for i in range(1, 5):
             self.add_parameter('ch{}_state'.format(i), initial_value=1,
@@ -186,5 +190,6 @@ class VirtualAWG5014(Tektronix_AWG5014):
                 ax.set_xlim(xlim)
             if i == len(cids):
                 ax.set_xlabel('Time (ns)')
+
         return fig
 

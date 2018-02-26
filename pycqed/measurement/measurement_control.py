@@ -183,7 +183,7 @@ class MeasurementControl(Instrument):
         self.finish(result)
         return return_dict
 
-    def measure(self, *kw):
+    def measure(self):
         if self.live_plot_enabled():
             self.initialize_plot_monitor()
 
@@ -429,6 +429,7 @@ class MeasurementControl(Instrument):
 
         vals = self.detector_function.acquire_data_point()
         # Resizing dataset and saving
+
         new_datasetshape = (np.max([datasetshape[0], stop_idx]),
                             datasetshape[1])
         self.dset.resize(new_datasetshape)

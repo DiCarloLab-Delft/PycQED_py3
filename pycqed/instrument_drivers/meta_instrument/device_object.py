@@ -1086,9 +1086,8 @@ def multiplexed_pulse(readouts, f_LO, upload=True, plot_filename=False):
     if upload:
         UHFQC = readouts[0][0].UHFQC
         if len(readout_pulses) == 1:
-            UHFQC.awg_sequence_acquisition_and_pulse(Iwave=np.real(pulse).copy(),
-                                                     Qwave=np.imag(pulse).copy(),
-                                                     acquisition_delay=0)
+            UHFQC.awg_sequence_acquisition_and_pulse(
+                Iwave=np.real(pulse).copy(), Qwave=np.imag(pulse).copy())
         else:
             UHFQC.awg_sequence_acquisition_and_pulse_multi_segment(readout_pulses)
         DC_LO = readouts[0][0].readout_DC_LO

@@ -1559,8 +1559,8 @@ def Ramsey_with_flux_pulse_meas_seq(thetas, qb, X90_separation, verbose=False,
         else:
             seq_name: string
     '''
+
     qb_name = qb.name
-    print(qb_name)
     operation_dict = qb.get_operation_dict()
     pulse_pars = qb.get_drive_pars()
     RO_pars = qb.get_RO_pars()
@@ -1572,11 +1572,12 @@ def Ramsey_with_flux_pulse_meas_seq(thetas, qb, X90_separation, verbose=False,
     flux_pulse = operation_dict["flux "+qb_name]
     # Used for checking dynamic phase compensation
     # if flux_pulse['amplitude'] != 0:
-    #     flux_pulse['basis_rotation'] = {qb_name: -106.87716422562978}
+    #     flux_pulse['basis_rotation'] = {qb_name: -18.456437118885873}
 
     flux_pulse['refpoint'] = 'end'
     X90_2 = deepcopy(pulses['X90'])
-    X90_2['pulse_delay'] = X90_separation - flux_pulse['pulse_delay']
+    X90_2['pulse_delay'] = X90_separation - flux_pulse['pulse_delay'] \
+                            - X90_2['nr_sigma']*X90_2['sigma']
     X90_2['refpoint'] = 'start'
 
     for i, theta in enumerate(thetas):
@@ -1787,7 +1788,9 @@ def flux_pulse_CPhase_seq(sweep_points,qb_control, qb_target,
                           distorted=False,
                           distortion_dict=None,
                           measurement_mode='excited_state',
-                          reference_measurements=False
+                          reference_measurements=False,
+                          upload_AWGs='all',
+                          upload_channels='all'
                           ):
 
     '''
@@ -1897,7 +1900,9 @@ def flux_pulse_CPhase_seq(sweep_points,qb_control, qb_target,
 
 
     if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose,
+                                    AWGs=upload_AWGs,
+                                    channels=upload_channels)
 
     if return_seq:
         return seq, el_list
