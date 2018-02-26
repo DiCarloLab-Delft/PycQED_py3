@@ -18,7 +18,6 @@ from pycqed.measurement.openql_experiments.multi_qubit_oql import \
 
 from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
 
-reload(rb)
 from pycqed.measurement.randomized_benchmarking.two_qubit_clifford_group \
     import SingleQubitClifford, TwoQubitClifford
 base_qasm_path = join(dirname(__file__), 'qasm_files')
@@ -124,12 +123,14 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
             # File doesn't exist means compilation is required
             pass
 
-    else: # if False
+    elif recompile == False: # if False
         if is_more_rencent(p.filename, platf_cfg):
             return p
         else:
             raise ValueError('OpenQL config has changed more recently '
                              'than program.')
+    else:
+        raise NotImplementedError('recompile should be True, False or "as needed"')
 
     if len(qubits) ==1:
         qubit_map = {'q0': qubits[0]}

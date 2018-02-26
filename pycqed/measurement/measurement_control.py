@@ -1426,7 +1426,7 @@ class MeasurementControl(Instrument):
                 adaptive function, defaults to None (no rescaling).
                 Each sweep_function/parameter is rescaled by dividing by
                 the respective component of x_scale.
-            "minimize": False       Bool, inverts value to allow minimizing
+            "minimize": True        Bool, inverts value to allow minimizing
                                     or maximizing
             "f_termination" None    terminates the loop if the measured value
                                     is smaller than this value
