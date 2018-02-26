@@ -404,6 +404,7 @@ class HeterodyneInstrument(Instrument):
     def finish(self):
         if 'UHFQC' in self.acquisition_instr():
             self._acquisition_instr.acquisition_finalize()
+        self.off()
 
     def get_demod_array(self):
         return self.cosI, self.sinI

@@ -689,7 +689,7 @@ class ZNB_VNA_sweep(Hard_Sweep):
         self.VNA.trigger_source('immediate')
         # trigger signal is generated with the command:
         # VNA.start_sweep_all()
-
+        self.VNA.rf_on()
         if self.segment_list == None:
             self.VNA.sweep_type('linear')  # set a linear sweep
             if self.start_freq != None and self.stop_freq != None:
@@ -716,6 +716,8 @@ class ZNB_VNA_sweep(Hard_Sweep):
         # get the list of frequency used in the span from the VNA
         self.sweep_points = self.VNA.get_stimulus()
 
+    def finish(self):
+        self.VNA.rf_off()
 
 class QWG_lutman_par(Soft_Sweep):
 

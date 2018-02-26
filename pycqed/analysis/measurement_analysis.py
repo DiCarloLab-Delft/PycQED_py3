@@ -349,6 +349,7 @@ class MeasurementAnalysis(object):
             '\n'+'*'*80 + '\n\n'
 
         fit_grp.attrs.create(name='chisqr', data=fit_res.chisqr)
+        fit_grp.attrs.create(name='redchi', data=fit_res.redchi)
         fit_grp.attrs.create(name='var_name', data=var_name.encode('utf-8'))
         if fit_res.covar is not None:
             if 'covar' in list(fit_grp.keys()):
