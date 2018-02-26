@@ -215,7 +215,7 @@ def CNOT_like_PTM(idx):
     CZ
     S1_q0 = np.kron(np.eye(4), S1[idx_2])
     S1y_q1 = np.kron(np.dot(C1[idx_3], Y90), np.eye(4))
-    return np.linalg.multi_dot([C1_q0, C1_q1, CZ, S1_q0, S1y_q1])
+    return np.linalg.multi_dot(list(reversed([C1_q0, C1_q1, CZ, S1_q0, S1y_q1])))
 
 
 def CNOT_like_gates(idx):
@@ -265,9 +265,9 @@ def iSWAP_like_PTM(idx):
     S1_q0 = np.kron(np.eye(4), np.dot(S1[idx_2], Y90))
     S1y_q1 = np.kron(np.dot(C1[idx_3], X90), np.eye(4))
 
-    return np.linalg.multi_dot([C1_q0, C1_q1,
+    return np.linalg.multi_dot(list(reversed([C1_q0, C1_q1,
                                 CZ, sq_swap_gates, CZ,
-                                S1_q0, S1y_q1])
+                                S1_q0, S1y_q1])))
 
 
 def iSWAP_like_gates(idx):
@@ -292,12 +292,12 @@ def iSWAP_like_gates(idx):
     sq_swap_gates_q0 = [(g, 'q0') for g in gate_decomposition[sqs_idx_q0]]
     sq_swap_gates_q1 = [(g, 'q1') for g in gate_decomposition[sqs_idx_q1]]
 
-    S1_q0 = np.kron(np.eye(4), np.dot(S1[idx_2], Y90))
-    S1y_q1 = np.kron(np.dot(C1[idx_3], X90), np.eye(4))
+    # S1_q0 = np.kron(np.eye(4), np.dot(S1[idx_2], Y90))
+    # S1y_q1 = np.kron(np.dot(C1[idx_3], X90), np.eye(4))
 
-    idx_2s = get_clifford_id(S1[idx_2])
+    idx_2s = get_clifford_id(np.dot(S1[idx_2], Y90))
     S1_q0 = [(g, 'q0') for g in gate_decomposition[idx_2s]]
-    idx_3s = get_clifford_id(np.dot(C1[idx_3], Y90))
+    idx_3s = get_clifford_id(np.dot(C1[idx_3], X90))
     S1y_q1 = [(g, 'q1') for g in gate_decomposition[idx_3s]]
 
     gates = (C1_q0 + C1_q1 + CZ +
@@ -322,10 +322,10 @@ def SWAP_like_PTM(idx):
     sq_swap_gates_1 = np.kron(mY90, Y90)
     sq_swap_gates_2 = np.kron(Y90, np.eye(4))
 
-    return np.linalg.multi_dot([sq_like_cliff, CZ,
+    return np.linalg.multi_dot(list(reversed([sq_like_cliff, CZ,
                                 sq_swap_gates_0, CZ,
                                 sq_swap_gates_1, CZ,
-                                sq_swap_gates_2])
+                                sq_swap_gates_2])))
 
 
 def SWAP_like_gates(idx):
@@ -345,13 +345,13 @@ def SWAP_like_gates(idx):
 
     sq_swap_gates_0 = np.kron(Y90, mY90)
 
-    sqs_idx_q0 = get_clifford_id(Y90)
-    sqs_idx_q1 = get_clifford_id(mY90)
+    sqs_idx_q0 = get_clifford_id(mY90)
+    sqs_idx_q1 = get_clifford_id(Y90)
     sq_swap_gates_0_q0 = [(g, 'q0') for g in gate_decomposition[sqs_idx_q0]]
     sq_swap_gates_0_q1 = [(g, 'q1') for g in gate_decomposition[sqs_idx_q1]]
 
-    sqs_idx_q0 = get_clifford_id(mY90)
-    sqs_idx_q1 = get_clifford_id(Y90)
+    sqs_idx_q0 = get_clifford_id(Y90)
+    sqs_idx_q1 = get_clifford_id(mY90)
     sq_swap_gates_1_q0 = [(g, 'q0') for g in gate_decomposition[sqs_idx_q0]]
     sq_swap_gates_1_q1 = [(g, 'q1') for g in gate_decomposition[sqs_idx_q1]]
 
