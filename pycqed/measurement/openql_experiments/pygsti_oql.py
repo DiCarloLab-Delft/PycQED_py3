@@ -118,5 +118,42 @@ def poor_mans_2q_gst(q0: int, q1: int, platf_cfg: str,):
         expList, 'PoorMans_GST', [2, 0], platf_cfg=platf_cfg)
     return p
 
+def full_2q_gst():
+    """
+    Generates the QISA and QASM programs for full 2Q GST.
+    """
 
+    MAX_EXPLIST_SIZE = 4096 # CCLITE shot limit
+    DBG = True # debugging
 
+    # grab the experiment list file
+    fp = join(gst_exp_filepath, 'Explist_2Q_XYCphase.txt')
+    # parse the file into expList object
+    expList = pygsti_expList_from_dataset(fp)
+    # divide into smaller experiment lists
+    ps = [] # initialize empty list of openql programs. todo more efficient
+    exp_num = int(np.ceil(len(expList)/MAX_EXPLIST_SIZE))# amount of experiments
+    for exp_i in range(exp_num-1): # loop over the experiments except the last one
+        # make smaller experiment list
+        el = expList[exp_i*MAX_EXPLIST_SIZE:(exp_i+1)*MAX_EXPLIST_SIZE]
+        if DBG: print('dbg {}, {}'.format(exp_i*MAX_EXPLIST_SIZE,(exp_i+1)*MAX_EXPLIST_SIZE)) # dbg
+
+        # turn into openql program
+        p = openql_program_from_pygsti_expList(
+            el, 'full 2Q GST index {}'.format(exp_i),
+            [2, 0], platf_cfg=platf_cfg) # todo what is second and third parameter
+
+        # append to list of programs
+        ps.append(p)
+
+    # last experiment
+    el = expList[(exp_num-1)*MAX_EXPLIST_SIZE:] # grab experiment list
+    if DBG: print('dbg {}, end'.format((exp_num-1)*MAX_EXPLIST_SIZE)) # dbg
+    # turn into openql program
+    p = openql_program_from_pygsti_expList(
+        el, 'full 2Q GST index {}'.format(exp_num-1),
+        [2, 0], platf_cfg=platf_cfg) # todo what is second and third parameter
+    # append to list of programs
+    ps.append(p)
+
+    return ps
