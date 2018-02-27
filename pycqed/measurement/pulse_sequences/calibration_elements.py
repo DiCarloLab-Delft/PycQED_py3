@@ -62,36 +62,44 @@ def cos_seq(amplitude, frequency, channels, phases,
     return seq_name
 
 def mixer_calibration_sequence(trigger_separation, amplitude, trigger_channel,
-                               pulse_I_channel, pulse_Q_channel, f_pulse_mod=0,
-                               phi_skew=0, alpha=1):
+                               pulse_I_channel=None, pulse_Q_channel=None,
+                               f_pulse_mod=0, phi_skew=0, alpha=1):
     RO_trigger = {'pulse_type': 'SquarePulse',
                   'channel': trigger_channel,
                   'length': 20e-9,
                   'amplitude': 1.,
                   'pulse_delay': 0}
-    cos_pulse = {'pulse_type': 'CosPulse',
-                 'channel': pulse_I_channel,
-                 'frequency': f_pulse_mod,
-                 'length': trigger_separation,
-                 'phase': phi_skew,
-                 'amplitude': amplitude * alpha,
-                 'pulse_delay': 0,
-                 'refpoint': 'simultaneous'}
-    sin_pulse = {'pulse_type': 'CosPulse',
-                 'channel': pulse_Q_channel,
-                 'frequency': f_pulse_mod,
-                 'length': trigger_separation,
-                 'phase': 90,
-                 'amplitude': amplitude,
-                 'pulse_delay': 0,
-                 'refpoint': 'simultaneous'}
-    el = multi_pulse_elt(0, station, [RO_trigger, cos_pulse, sin_pulse],
-                         trigger=False)
+    pulses = [RO_trigger]
+    channels = station.sequencer_config['slave_AWG_trig_channels'].copy()
+    channels.append(trigger_channel)
+    if pulse_I_channel is not None:
+        cos_pulse = {'pulse_type': 'CosPulse',
+                     'channel': pulse_I_channel,
+                     'frequency': f_pulse_mod,
+                     'length': trigger_separation -
+                               station.pulsar.inter_element_spacing(),
+                     'phase': phi_skew,
+                     'amplitude': amplitude * alpha,
+                     'pulse_delay': 0,
+                     'refpoint': 'simultaneous'}
+        pulses.append(cos_pulse)
+        channels.append(pulse_I_channel)
+    if pulse_Q_channel is not None:
+        sin_pulse = {'pulse_type': 'CosPulse',
+                     'channel': pulse_Q_channel,
+                     'frequency': f_pulse_mod,
+                     'length': trigger_separation -
+                               station.pulsar.inter_element_spacing(),
+                     'phase': 90,
+                     'amplitude': amplitude,
+                     'pulse_delay': 0,
+                     'refpoint': 'simultaneous'}
+        pulses.append(sin_pulse)
+        channels.append(pulse_Q_channel)
+    el = multi_pulse_elt(0, station, pulses, trigger=False)
     seq = sequence.Sequence('Sideband_modulation_seq')
     seq.append(name='SSB_modulation_el', wfname=el.name, trigger_wait=False)
-    station.pulsar.program_awgs(seq, el, channels=[pulse_I_channel,
-                                                   pulse_Q_channel,
-                                                   trigger_channel])
+    station.pulsar.program_awgs(seq, el, channels=channels)
 
 
 def readout_pulse_scope_seq(delays, pulse_pars, RO_pars, RO_separation,

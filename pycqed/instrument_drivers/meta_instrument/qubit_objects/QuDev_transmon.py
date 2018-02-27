@@ -170,6 +170,15 @@ class QuDev_transmon(Qubit):
                                'weights'),
                            parameter_class=ManualParameter)
 
+        self.add_parameter('ro_alpha', initial_value=1,
+                           vals=vals.Numbers(),
+                           parameter_class=ManualParameter)
+        self.add_parameter('ro_phi_skew', initial_value=0, unit='deg',
+                           docstring='Readout upconversion mixer phase '
+                                     'imbalance',
+                           vals=vals.Numbers(),
+                           parameter_class=ManualParameter)
+
         # add pulsed spectroscopy pulse parameters
         self.add_operation('Spec')
         self.add_pulse_parameter('Spec', 'spec_pulse_type', 'pulse_type',
@@ -349,7 +358,8 @@ class QuDev_transmon(Qubit):
             self.RO_Q_channel(), self.RO_Q_offset()))
         self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(
             f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
-            RO_pulse_length=self.RO_pulse_length())
+            RO_pulse_length=self.RO_pulse_length(),
+            alpha=self.ro_alpha(), phi_skew=self.ro_phi_skew())
         self.readout_UC_LO.pulsemod_state('Off')
         self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
         self.readout_UC_LO.on()
@@ -393,7 +403,8 @@ class QuDev_transmon(Qubit):
                     self.RO_Q_channel(), self.RO_Q_offset()))
                 self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(
                     f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
-                    RO_pulse_length=self.RO_pulse_length())
+                    RO_pulse_length=self.RO_pulse_length(),
+                    alpha=self.ro_alpha(), phi_skew=self.ro_phi_skew())
                 self.readout_UC_LO.pulsemod_state('Off')
                 self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
                 self.readout_UC_LO.on()
@@ -413,7 +424,7 @@ class QuDev_transmon(Qubit):
         self.update_detector_functions()
         self.set_readout_weights()
 
-    def prepare_for_mixer_calibration(self, suppress):
+    def prepare_for_mixer_calibration(self, suppress, dc_if=None):
         """
         Sets up MWG and UHFQC settings for mixer calibration. It is up to the
         user to set the switch configuration to the correct position.
@@ -427,10 +438,13 @@ class QuDev_transmon(Qubit):
         self.update_detector_functions()
 
         # drive LO
-        self.drive_LO.pulsemod_state('Off')
-        self.drive_LO.frequency(self.f_qubit() - self.f_pulse_mod())
-        self.drive_LO.power(self.drive_LO_pow())
-        self.drive_LO.on()
+        if 'drive' in suppress:
+            self.drive_LO.pulsemod_state('Off')
+            self.drive_LO.frequency(self.f_qubit() - self.f_pulse_mod())
+            self.drive_LO.power(self.drive_LO_pow())
+            self.drive_LO.on()
+        else:
+            self.drive_LO.off()
 
         # drive offsets
         self.AWG.set(self.pulse_I_channel() + '_offset',
@@ -441,20 +455,38 @@ class QuDev_transmon(Qubit):
         # readout LO
         if suppress == 'drive LO':
             f_RO = self.drive_LO.frequency()
-        elif suppress == 'sideband':
+        elif suppress == 'drive sideband':
             f_RO = self.drive_LO.frequency() - self.f_pulse_mod()
 
         self.readout_DC_LO.pulsemod_state('Off')
-        self.readout_DC_LO.frequency(f_RO - self.f_RO_mod())
+        if 'drive' in suppress:
+            self.readout_DC_LO.frequency(f_RO - self.f_RO_mod())
+        else:
+            self.readout_DC_LO.frequency(self.f_RO() - dc_if)
+            self.readout_UC_LO.pulsemod_state('Off')
+            self.readout_UC_LO.frequency(self.f_RO() - self.f_RO_mod())
+            self.readout_UC_LO.on()
         self.readout_DC_LO.on()
 
         # UHFQC settings
-        self.UHFQC.awg_sequence_acquisition(trigger=True)
-        self.set_readout_weights('SSB')
+        if 'drive' in suppress:
+            self.UHFQC.awg_sequence_acquisition(trigger=True)
+            self.set_readout_weights('SSB')
+        else:
+            self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(
+                f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
+                RO_pulse_length=self.RO_pulse_length(),
+                alpha=self.ro_alpha(), phi_skew=self.ro_phi_skew())
+            self.set_readout_weights('SSB', f_mod=dc_if)
 
-    def set_readout_weights(self, type=None):
+
+
+
+    def set_readout_weights(self, type=None, f_mod=None):
         if type is None:
             type = self.ro_acq_weight_type()
+        if f_mod is None:
+            f_mod = self.f_RO_mod()
 
         if type == 'manual':
             pass
@@ -480,8 +512,8 @@ class QuDev_transmon(Qubit):
         else:
             tbase = np.arange(0, 4096 / 1.8e9, 1 / 1.8e9)
             theta = self.RO_IQ_angle()
-            cosI = np.array(np.cos(2 * np.pi * self.f_RO_mod() * tbase + theta))
-            sinI = np.array(np.sin(2 * np.pi * self.f_RO_mod() * tbase + theta))
+            cosI = np.array(np.cos(2 * np.pi * f_mod * tbase + theta))
+            sinI = np.array(np.sin(2 * np.pi * f_mod * tbase + theta))
             c1 = self.RO_acq_weight_function_I()
             c2 = self.RO_acq_weight_function_Q()
             if type == 'SSB':
@@ -1494,12 +1526,12 @@ class QuDev_transmon(Qubit):
             initial_stepsize = [0.15, 10]
         if MC is None:
             MC = self.MC
-        self.prepare_for_mixer_calibration(suppress='sideband')
-        detector = det.UHFQC_mixer_skewness_det(
+        self.prepare_for_mixer_calibration(suppress='drive sideband')
+        detector = det.UHFQC_readout_mixer_skewness_det(
             self.UHFQC, qc.station, [self.RO_acq_weight_function_I(),
                                      self.RO_acq_weight_function_Q()],
-            self.pulse_I_channel(), self.pulse_Q_channel(), self.alpha,
-            self.phi_skew, self.f_pulse_mod(), self.RO_acq_marker_channel(),
+            self.ro_alpha, self.ro_phi_skew, self.f_RO_mod(),
+            self.RO_acq_marker_channel(),
             amplitude=amplitude, nr_averages=self.RO_acq_averages(),
             RO_trigger_separation=trigger_sep, verbose=False)
         ad_func_pars = {'adaptive_function': opti.nelder_mead,
@@ -1523,7 +1555,46 @@ class QuDev_transmon(Qubit):
         if update:
             self.alpha(alpha)
             self.phi_skew(phi)
-        return phi, alpha
+        return alpha, phi
+
+    def calibrate_readout_mixer_skewness(self, dc_if=50e6, MC=None, update=True,
+                                         trigger_sep=5e-6,
+                                         initial_stepsize=(0.15, 10)):
+        initial_stepsize = list(initial_stepsize)
+        if MC is None:
+            MC = self.MC
+        self.prepare_for_mixer_calibration('readout sideband', dc_if=dc_if)
+        detector = det.UHFQC_readout_mixer_skewness_det(
+            self.UHFQC, self.AWG, [self.RO_acq_weight_function_I(),
+                         self.RO_acq_weight_function_Q()],
+            self.ro_alpha, self.ro_phi_skew, self.f_RO_mod(), self.RO_amp(),
+            self.RO_acq_averages(), verbose=False)
+        ad_func_pars = {'adaptive_function': opti.nelder_mead,
+                        'x0': [self.ro_alpha(), self.ro_phi_skew()],
+                        'initial_step': initial_stepsize,
+                        'no_improv_break': 12,
+                        'minimize': True,
+                        'maxiter': 500}
+        MC.set_sweep_functions([self.ro_alpha, self.ro_phi_skew])
+        MC.set_detector_function(det.IndexDetector(detector, 0))
+        MC.set_adaptive_function_parameters(ad_func_pars)
+        cal_elts.mixer_calibration_sequence(
+            trigger_sep, 0, self.RO_acq_marker_channel())
+        self.AWG.start()
+        MC.run(name='readout_skewness_calibration' + self.msmt_suffix,
+               mode='adaptive')
+        self.AWG.stop()
+        a = ma.OptimizationAnalysis(label='readout_skewness_calibration')
+        # v2 creates a pretty picture of the optimizations
+        ma.OptimizationAnalysis_v2(label='readout_skewness_calibration')
+
+        # phi and alpha are the coefficients that go in the predistortion matrix
+        ro_alpha = a.optimization_result[0][0]
+        ro_phi = a.optimization_result[0][1]
+        if update:
+            self.ro_alpha(ro_alpha)
+            self.ro_phi_skew(ro_phi)
+        return ro_alpha, ro_phi
 
     def measure_drive_mixer_spectrum(self, if_freqs, MC=None, amplitude=0.1,
                                      trigger_sep=5e-6):
