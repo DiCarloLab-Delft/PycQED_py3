@@ -118,5 +118,10 @@ def poor_mans_2q_gst(q0: int, q1: int, platf_cfg: str,):
         expList, 'PoorMans_GST', [2, 0], platf_cfg=platf_cfg)
     return p
 
+def full_2q_gst()
+    """
+    Generates the QISA and QASM programs for full 2Q GST.
+    """
 
-
+    # grab the experiment list file
+    fp = join(gst_exp_filepath, 'Explist_2Q_XYCphase.txt')
