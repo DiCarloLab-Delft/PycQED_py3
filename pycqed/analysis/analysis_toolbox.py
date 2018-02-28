@@ -2033,11 +2033,16 @@ def find_min(x, y, return_fit=False, perc=30):
 def get_color_order(i, max_num, cmap='viridis'):
     # take a blue to red scale from 0 to max_num
     # uses HSV system, H_red = 0, H_green = 1/3 H_blue=2/3
-    # return colors.hsv_to_rgb(2.*float(i)/(float(max_num)*3.), 1., 1.)
     print('It is recommended to use the updated function "get_color_cycle".')
     if isinstance(cmap, str):
         cmap = cm.get_cmap(cmap)
     return cmap((i/max_num) % 1)
+
+
+def get_color_order_hsv(i, max_num):
+    # take a blue to red scale from 0 to max_num
+    # uses HSV system, H_red = 0, H_green = 1/3 H_blue=2/3
+    return colors.hsv_to_rgb(2.*float(i)/(float(max_num)*3.), 1., 1.)
 
 
 def get_color_list(max_num, cmap='viridis'):
@@ -2058,3 +2063,37 @@ def get_color_list(max_num, cmap='viridis'):
             logging.warning('Using Vega10 as a fallback, upgrade matplotlib')
             cmap = cm.get_cmap('Vega10')
     return [cmap(i) for i in np.linspace(0.0, 1.0, max_num)]
+
+
+def print_pars_table(n_ts=10, pars=None):
+    '''
+    Prints out a table containing the value for the indicated parameters from the last N timestamps.
+    Input:
+        n_ts (int), number of time-stamps to include in the table (rows).
+        pars (list), list spanning the parameters of interest (columns).
+
+    Every element on the list pars need to correspond to a parameter stored in the Instrument settings of the HDF5 data-files.
+    Examples:
+        pars = ['IVVI.dac1', 'IVVI.dac2', 'IVVI.dac3']
+        pars = ['Qubit.f_RO', 'Qubit.RO_acq_integration_length', 'Qubit.RO_pulse_power']
+        pars = ['Qubit.spec_pow', 'Qubit.RO_power_cw']
+    '''
+    ts_list = return_last_n_timestamps(n_ts)
+    pdict = {}
+    nparams = []
+    for i,p in enumerate(pars):
+        pdict.update({p:p})
+    opt_dict = {'scan_label':'','exact_label_match':True}
+    # print(ts_list)
+    scans = RA.quick_analysis(t_start=ts_list[-1],t_stop=ts_list[0], options_dict=opt_dict,
+                      params_dict_TD=pdict,numeric_params=nparams)
+
+    pars_line = 'timestamp \t'
+    for p in pars:
+        pars_line = pars_line + p + '\t'
+    print(pars_line)
+    for i,ts in enumerate(scans.TD_timestamps):
+        i_line = '%s \t'%ts
+        for p in pars:
+            i_line = i_line + scans.TD_dict[p][i]+'\t'
+        print(i_line)
