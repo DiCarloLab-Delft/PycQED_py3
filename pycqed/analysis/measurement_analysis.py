@@ -9615,182 +9615,6 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
         else:
             return phase_list
 
-    def fit_delay(self,X90_separation=None,flux_pulse_length=None, plot=False,
-                  print_fit_results=False,return_fit=None,drive_pulse_length=None):
-        '''
-        method to fit the relative delay of the flux pulse to the drive pulses
-        '''
-
-        if X90_separation is None:
-            X90_separation = self.X90_separation
-        if X90_separation is None:
-            raise ValueError('Must specify the X90 pulse'
-                             ' separation used in the experiment.')
-        if flux_pulse_length is None:
-            flux_pulse_length = self.flux_pulse_length
-        if flux_pulse_length is None:
-            raise ValueError('Must specify the flux pulse '
-                             'length used in the experiment.')
-        if drive_pulse_length is None:
-            raise ValueError('Must specify the drive pulse '
-                             'length used in the experiment.')
-        if self.fitted_phases is None:
-            self.fit_all(plot=False,extrapolate_phase=True,cal_points=self.cal_points)
-        if return_fit is None:
-            return_fit = self.return_fit
-
-        erf_window_model = fit_mods.ErfWindowModel
-        offset_guess = self.fitted_phases[0]
-
-        i_amplitude_guess = np.abs(offset_guess - self.fitted_phases).argmax()
-        amplitude_guess = self.fitted_phases[i_amplitude_guess] - offset_guess
-
-        i_list_window = np.where(np.abs(self.fitted_phases - offset_guess) >
-                                 np.abs(amplitude_guess/2.))[0]
-
-        t_start_guess = self.sweep_points_2D[i_list_window[0]]
-        t_end_guess = self.sweep_points_2D[i_list_window[-1]]
-
-
-        #Set up fit parameters and perform fit
-        erf_window_model.set_param_hint('offset',
-                                        value=offset_guess,
-                                        vary=True)
-        erf_window_model.set_param_hint('amplitude',
-                                        value=amplitude_guess,
-                                        vary=True)
-        erf_window_model.set_param_hint('t_start',
-                                        value=t_start_guess,
-                                        vary=True)
-        erf_window_model.set_param_hint('t_end',
-                                        value=t_end_guess,
-                                        vary=True)
-        erf_window_model.set_param_hint('t_rise',
-                                        value=(t_end_guess - t_start_guess)/20.,
-                                        vary=True)
-        self.params_delay_fit = erf_window_model.make_params()
-        self.delay_fit_res = erf_window_model.fit(data=self.fitted_phases,
-                              t=self.sweep_points_2D,
-                              params=self.params_delay_fit)
-
-        if self.delay_fit_res.chisqr > 1.:
-            logging.warning('Fit did not converge, chi-square > 1.')
-
-
-        self.fitted_delay = (self.delay_fit_res.best_values['t_end'] +
-                             self.delay_fit_res.best_values['t_start']
-                             - X90_separation)/2. + flux_pulse_length/2. \
-                                + drive_pulse_length/2.
-
-        if print_fit_results:
-            print(self.delay_fit_res.fit_report())
-            print('fitted delay  = {}ns'.format(self.fitted_delay/1e-9))
-
-
-
-        if plot:
-            self.delay_fit_res.plot()
-
-        if return_fit:
-            return self.fitted_delay, self.delay_fit_res
-        else:
-            return self.fitted_delay
-
-    def run_delay_analysis(self, X90_separation=None, drive_pulse_length=None,
-                           plot=False,
-                            close_file=True, **kw):
-
-        if X90_separation is None:
-            X90_separation = self.X90_separation
-        if drive_pulse_length is None:
-            drive_pulse_length = self.drive_pulse_length
-        self.fig,self.ax = plt.subplots()
-        self.add_analysis_datagroup_to_file()
-
-        show_guess = kw.get('show_guess', False)
-        print_fit_results = kw.get('print_fit_results', True)
-
-
-        #get the fit results (lmfit.ModelResult) and save them
-        self.fit_all(plot=False, extrapolate_phase=False, cal_points=self.cal_points,
-                     predict_phase=True)
-
-        self.fitted_delay, self.delay_fit_res = self.fit_delay(
-            X90_separation=X90_separation,
-            plot=False,
-            print_fit_results=print_fit_results,
-            return_fit=True,
-            drive_pulse_length=drive_pulse_length)
-
-        self.save_fitted_parameters(self.delay_fit_res, var_name=self.value_names[0])
-
-
-
-        #Plot results
-        self.plot_delay_fit(show_guess=show_guess)
-
-        #display figure
-        if plot:
-            plt.show()
-
-        #save figure
-        self.save_fig(self.fig, figname=self.measurementstring+'_delay_fit',
-                      **kw)
-
-        if close_file:
-            self.data_file.close()
-
-        return self.delay_fit_res
-
-
-
-
-
-    def plot_delay_fit(self, show_guess=False):
-
-        self.fig, self.ax = plt.subplots()
-
-        self.ax.plot(self.sweep_points_2D/1e-9,self.delay_fit_res.data,'k.',label='data')
-        textstr = ('fitted delay = {:4.3f}ns'.format(self.fitted_delay/1e-9))
-
-
-        self.fig.text(0.5,0,textstr,
-                      transform=self.ax.transAxes, fontsize=self.font_size,
-                      verticalalignment='top',
-                      horizontalalignment='center',bbox=self.box_props)
-
-        #Used for plotting the fit
-        best_vals = self.delay_fit_res.best_values
-        erf_window_fit_func = lambda t: fit_mods.ErfWindow(
-                            t,
-                           t_start=best_vals['t_start'],
-                           t_end=best_vals['t_end'],
-                           t_rise=best_vals['t_rise'],
-                           amplitude=best_vals['amplitude'],
-                           offset=best_vals['offset'])
-
-
-        # plot with initial guess
-        if show_guess:
-            self.ax.plot(self.sweep_points_2D/1e-9,
-                         self.delay_fit_res.init_fit, 'k--',
-                         linewidth=self.line_width,
-                         label='initial guess')
-
-        #plot with best fit results
-        x = np.linspace(self.sweep_points_2D[0],
-                        self.sweep_points_2D[-1],
-                        len(self.sweep_points_2D)*100)
-        y = erf_window_fit_func(x)
-        self.ax.plot(x/1e-9, y, 'r-', linewidth=self.line_width,label='fit')
-        self.ax.set_title(self.label)
-        self.ax.set_xlabel('pulse delay (ns')
-        self.ax.set_ylabel('phase (rad)')
-
-        if show_guess:
-            self.ax.legend(['data','guess','fit'])
-        else:
-            self.ax.legend(['data','fit'])
 
 
 class Dynamic_phase_Analysis(Fluxpulse_Ramsey_2D_Analysis):
@@ -9900,17 +9724,344 @@ class Dynamic_phase_Analysis(Fluxpulse_Ramsey_2D_Analysis):
 class FluxPulse_Scope_Analysis(MeasurementAnalysis):
 
     def __init__(self, qb_name=None,
-                 sign_of_peaks=1,
-                 label=None,
+                 sign_of_peaks=None,
+                 label='',
                  auto=True,
+                 plot=True,
                   **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
-        # kw['close_file'] = False
         self.sign_of_peaks = sign_of_peaks
+        self.plot = plot
+        self.qb_name = qb_name
+        self.data_rotated = np.array([])
+        self.fitted_volts = np.array([])
 
-        super().__init__(auto=False, **kw)
-        # self.run_default_analysis()
+        super().__init__(TwoD=True, auto=False,qb_name=self.qb_name, **kw)
+        if auto:
+            self.run_default_analysis()
 
-    def run_default_analysis(self):
-        pass
+
+    def run_default_analysis(self, plot=None, **kw):
+
+        if plot is None:
+            plot = self.plot
+        self.get_naming_and_values_2D()
+
+        delays = self.sweep_points
+        freqs = self.sweep_points_2D
+        data_rotated = a_tools.rotate_and_normalize_data_no_cal_points(self.data[2:, :])
+
+        data_rotated = data_rotated.reshape(len(freqs), len(delays))
+
+        fig, ax = plt.subplots()
+        im = ax.pcolormesh(delays/1e-9, freqs/1e9, data_rotated/1e-3, cmap='viridis')
+        ax.autoscale(tight=True)
+
+        axc = plt.colorbar(im)
+        axc.set_label('transmission, $|S_{21}|$ (mV)')
+
+        ax.set_xlabel(r'delay, $\tau$ (ns)')
+        ax.set_ylabel(r'drive frequency, $f_d$ (GHz)')
+        ax.set_title('{} {}'.format(self.timestamp_string, self.measurementstring))
+        plt.savefig('{}//{}_flux_pulse_scope_{}.png'.format(self.folder,
+                                                            self.timestamp_string,
+                                                            self.qb_name))
+        if plot:
+            plt.show()
+        else:
+            plt.close()
+
+        self.data_rotated = data_rotated
+
+        if self.sign_of_peaks is None:
+            self.sign_of_peaks = np.sign(
+                self.data_rotated[np.argmax(np.abs(
+                    self.data_rotated[:, 0] - self.data_rotated[0, 0])), 0]
+                - self.data_rotated[0, 0])
+
+        self.fit_all()
+
+    def fit_single_slice(self, data_slice, sigma_guess=10e6,
+                         sign_of_peaks=None,
+                         plot=False, print_res=False):
+
+        GaussianModel = fit_mods.GaussianModel
+
+        mu_guess = self.sweep_points_2D[np.argmax(data_slice*sign_of_peaks)]
+        ampl_guess = (data_slice.max() - data_slice.min())/0.4*sign_of_peaks*sigma_guess
+        offset_guess = data_slice[0]
+
+        GaussianModel.set_param_hint('sigma',value=sigma_guess,vary=True)
+        GaussianModel.set_param_hint('mu',value=mu_guess,vary=True)
+        GaussianModel.set_param_hint('ampl',value=ampl_guess,vary=True)
+        GaussianModel.set_param_hint('offset',value=offset_guess,vary=True)
+
+        fit_res = GaussianModel.fit(data_slice, freq=self.sweep_points_2D)
+        if plot:
+            fit_res.plot()
+        if print_res:
+            print(fit_res.fit_report())
+
+        return fit_res
+
+    def fit_all(self, plot=False, return_stds=False, sign_of_peaks=None):
+
+        if sign_of_peaks is None:
+            sign_of_peaks = self.sign_of_peaks
+
+        delays = self.sweep_points
+
+        fitted_freqs = np.zeros(len(delays))
+        fitted_stds = np.zeros(len(delays))
+
+        for i,delay in enumerate(delays):
+            data_slice = self.data_rotated[:,i]
+            fit_res = self.fit_single_slice(data_slice,
+                                            sign_of_peaks=sign_of_peaks,
+                                            plot=False, print_res=False)
+            fitted_freqs[i] = fit_res.best_values['mu']
+            fitted_stds[i] = np.sqrt(fit_res.covar[2, 2])
+
+        if plot:
+            fig, ax = plt.subplots()
+            if return_stds:
+                ax.errorbar(delays/1e-9, fitted_freqs/1e6, yerr=fitted_stds/1e6)
+            else:
+                ax.plot(delays/1e-9, fitted_freqs/1e6)
+            ax.set_xlabel(r'delay, $\tau$ (ns)')
+            ax.set_ylabel(r'fitted qubit frequency, $f_q$ (MHz)')
+            plt.show()
+
+        self.fitted_freqs = fitted_freqs
+        self.fitted_stds = fitted_stds
+
+        if return_stds:
+            return fitted_freqs, fitted_stds
+        else:
+            return fitted_freqs
+
+    def freq_to_volt(self, freq, f_sweet_spot, f_parking, f_pulsed, pulse_amp):
+        '''
+        frequency to voltage conversion (based an the sqrt(cos(...)) model)
+
+        Args:
+            freq: frequency in Hz
+            f_sweet_spot: sweet spot frequency in Hz
+            f_parking: parking frequency in Hz
+            f_pulsed: steady state pulsed frequency in Hz (at the end of the pulse)
+            pulse_amp: flux pulse amplitude in volt
+
+        Returns:
+            flux pulse voltage
+        '''
+
+        phi0 = np.arccos(f_parking**2/f_sweet_spot**2)
+        dphi_dV = (phi0 - np.arccos(f_pulsed**2/f_sweet_spot**2))/pulse_amp
+
+        voltage = (phi0 - np.arccos((freq/f_sweet_spot)**2))/dphi_dV
+        return voltage
+
+    def convert_freqs_to_volts(self,  f_sweet_spot, f_parking,
+                               f_pulsed, pulse_amp, plot=False):
+
+        self.fitted_volts = self.freq_to_volt(self.fitted_freqs,
+                                              f_sweet_spot=f_sweet_spot,
+                                              f_parking=f_parking,
+                                              f_pulsed=f_pulsed,
+                                              pulse_amp=pulse_amp)
+
+        if plot:
+            fig, ax = plt.subplots()
+            ax.plot(self.sweep_points/1e-9, self.fitted_volts)
+            ax.set_xlabel(r'delay, $\tau$ (ns)')
+            ax.set_ylabel(r'fitted voltage, $U$ (V)')
+            plt.show()
+
+        return self.fitted_volts
+
+
+class FluxPulse_timing_calibration(FluxPulse_Scope_Analysis):
+
+    def __init__(self, qb_name=None, sign_of_peaks=None, flux_pulse_length=None,
+                 return_fit=False,
+                 label='',
+                 auto=True, plot=True,
+                 **kw
+                 ):
+        self.qb_name = qb_name
+        self.sign_of_peaks = sign_of_peaks
+        self.flux_pulse_length = flux_pulse_length
+        self.return_fit = return_fit
+
+        self.label = label
+        self.plot = plot
+
+        self.delay_fit_res = None
+        self.fitted_delay = None
+        self.fig = None
+        self.ax = None
+
+        print(self.qb_name)
+        super().__init__(qb_name=self.qb_name,
+                         sign_of_peaks=self.sign_of_peaks,
+                         label=self.label,
+                         auto=True,
+                         plot=self.plot,
+                         **kw)
+        if auto:
+            self.run_delay_analysis()
+
+    def run_delay_analysis(self,
+                          plot=None,
+                          close_file=True, **kw):
+
+        if plot is None:
+            plot = self.plot
+
+        self.add_analysis_datagroup_to_file()
+
+        show_guess = kw.get('show_guess', False)
+        print_fit_results = kw.get('print_fit_results', True)
+
+        #get the fit results (lmfit.ModelResult) and save them
+        self.fitted_delay, self.delay_fit_res = self.fit_delay(
+           plot=False,
+           print_fit_results=print_fit_results,
+           return_fit=True)
+
+        self.save_fitted_parameters(self.delay_fit_res, var_name=self.value_names[0])
+
+        #Plot results
+        self.plot_delay_fit(plot=plot, show_guess=show_guess)
+
+        if close_file:
+           self.data_file.close()
+
+        return self.delay_fit_res
+
+    def fit_delay(self, flux_pulse_length=None, plot=False,
+                  print_fit_results=False, return_fit=None):
+        '''
+        method to fit the relative delay of the flux pulse to the drive pulses
+        '''
+
+        if flux_pulse_length is None:
+            flux_pulse_length = self.flux_pulse_length
+        if flux_pulse_length is None:
+            raise ValueError('Must specify the flux pulse '
+                             'length used in the experiment.')
+        if return_fit is None:
+            return_fit = self.return_fit
+
+        erf_window_model = fit_mods.ErfWindowModel
+
+        offset_guess = self.fitted_freqs[0]
+
+        i_amplitude_guess = np.abs(offset_guess - self.fitted_freqs).argmax()
+        amplitude_guess = self.fitted_freqs[i_amplitude_guess] - offset_guess
+
+        i_list_window = np.where(np.abs(self.fitted_freqs - offset_guess) >
+                                 np.abs(amplitude_guess/2.))[0]
+
+        t_start_guess = self.sweep_points[i_list_window[0]]
+        t_end_guess = self.sweep_points[i_list_window[-1]]
+
+
+        #Set up fit parameters and perform fit
+        erf_window_model.set_param_hint('offset',
+                                        value=offset_guess,
+                                        vary=True)
+        erf_window_model.set_param_hint('amplitude',
+                                        value=amplitude_guess,
+                                        vary=True)
+        erf_window_model.set_param_hint('t_start',
+                                        value=t_start_guess,
+                                        vary=True)
+        erf_window_model.set_param_hint('t_end',
+                                        value=t_end_guess,
+                                        vary=True)
+        erf_window_model.set_param_hint('t_rise',
+                                        value=(t_end_guess - t_start_guess)/20.,
+                                        vary=True)
+
+        params_delay_fit = erf_window_model.make_params()
+        self.delay_fit_res = erf_window_model.fit(data=self.fitted_freqs,
+                                                  t=self.sweep_points,
+                                                  params=params_delay_fit)
+
+        if self.delay_fit_res.chisqr > 1.:
+            logging.warning('Fit did not converge, chi-square > 1.')
+
+        self.fitted_delay = (self.delay_fit_res.best_values['t_end'] +
+                             self.delay_fit_res.best_values['t_start'])/2. - flux_pulse_length/2.
+
+        if print_fit_results:
+            print(self.delay_fit_res.fit_report())
+            print('fitted delay  = {}ns'.format(self.fitted_delay/1e-9))
+
+
+
+        if plot:
+            self.delay_fit_res.plot()
+
+        if return_fit:
+            return self.fitted_delay, self.delay_fit_res
+        else:
+            return self.fitted_delay
+
+    def plot_delay_fit(self, plot=True, show_guess=False):
+
+        self.fig, self.ax = plt.subplots()
+
+        self.ax.plot(self.sweep_points/1e-9,self.delay_fit_res.data/1e6,'k.',label='data')
+        textstr = ('fitted delay = {:4.3f}ns'.format(self.fitted_delay/1e-9))
+
+        self.fig.text(0.5,0,textstr,
+                      transform=self.ax.transAxes, fontsize=self.font_size,
+                      verticalalignment='top',
+                      horizontalalignment='center',bbox=self.box_props)
+
+        #Used for plotting the fit
+        best_vals = self.delay_fit_res.best_values
+        erf_window_fit_func = lambda t: fit_mods.ErfWindow(
+            t,
+            t_start=best_vals['t_start'],
+            t_end=best_vals['t_end'],
+            t_rise=best_vals['t_rise'],
+            amplitude=best_vals['amplitude'],
+            offset=best_vals['offset'])
+
+
+        # plot with initial guess
+        if show_guess:
+            self.ax.plot(self.sweep_points/1e-9,
+                         self.delay_fit_res.init_fit/1e6, 'k--',
+                         linewidth=self.line_width,
+                         label='initial guess')
+
+        #plot with best fit results
+        x = np.linspace(self.sweep_points[0],
+                        self.sweep_points[-1],
+                        len(self.sweep_points)*100)
+        y = erf_window_fit_func(x)
+        self.ax.plot(x/1e-9, y/1e6, 'r-', linewidth=self.line_width,label='fit')
+        self.ax.set_title(self.label)
+        self.ax.set_xlabel(r'pulse delay, $\tau$ (ns)')
+        self.ax.set_ylabel(r'fitted frequency, $f$ (MHz)')
+
+        if show_guess:
+            self.ax.legend(['data','guess','fit'])
+        else:
+            self.ax.legend(['data','fit'])
+        print(self.qb_name)
+        print('{}//{}_timing_calibration_fit_{}.png'.format(self.folder,
+                                                            self.timestamp_string,
+                                                            self.qb_name))
+        plt.savefig('{}//{}_timing_calibration_fit_{}.png'.format(self.folder,
+                                                            self.timestamp_string,
+                                                            self.qb_name))
+        if plot:
+            plt.show()
+        else:
+            plt.close()

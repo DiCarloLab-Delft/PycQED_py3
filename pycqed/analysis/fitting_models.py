@@ -717,6 +717,11 @@ def double_gauss_guess(model, data, x=None, **kwargs):
         return par_dict
 
 
+def Gaussian(freq,sigma,mu,ampl,offset):
+    '''
+    Gaussian function
+    '''
+    return ampl/(sigma*np.sqrt(2*np.pi))*np.exp(-0.5*((freq - mu)/sigma)**2) + offset
 
 
 
@@ -750,6 +755,7 @@ LinOModel = lmfit.Model(linear_with_offset)
 LinBGModel = lmfit.Model(linear_with_background)
 LinBGOModel = lmfit.Model(linear_with_background_and_offset)
 ErfWindowModel = lmfit.Model(ErfWindow)
+GaussianModel = lmfit.Model(Gaussian)
 
 # 2D models
 Gaus2D_model = lmfit.Model(gaussian_2D, independent_vars=['x', 'y'])

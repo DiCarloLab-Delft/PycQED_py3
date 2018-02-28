@@ -1922,9 +1922,9 @@ def fluxpulse_scope_sequence(delays, qb, verbose=False,
 
     Timings of sequence
 
-       |          ---           |X180|  ----------------------------  |RO|
+       |          ----------           |X180|  ----------------------------  |RO|
        |        ---      | --------- fluxpulse ---------- |
-        <-    delay    ->
+                         <-  delay  ->
 
     args:
         delays: array of delays of the pi pulse w.r.t the flux pulse

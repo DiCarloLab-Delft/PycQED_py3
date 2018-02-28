@@ -3101,32 +3101,30 @@ class QuDev_transmon(Qubit):
 
 
 
-    def calibrate_flux_pulse_timing(self,MC=None, thetas=None, delays=None,
+    def calibrate_flux_pulse_timing(self, MC=None, freqs=None, delays=None,
                                     analyze=False, update=False,**kw):
         """
         flux pulse timing calibration
 
         does a 2D measuement of the type:
 
-                      X90_separation
-                < -- ---- ----------- --->
-                |X90|  --------------     |X90|  ---  |RO|
+                -------|X180|  ----------------  |RO|
                    <----->
-                          | fluxpulse |
+                   | fluxpulse |
 
-        where the flux pulse delay and the angle of the second X90 pulse
-         are swept.
+        where the flux pulse delay and the drive pulse frequency of the X180 pulse
+        are swept.
 
         Args:
             MC: measurement control object
-            thetas: numpy array with angles (in rad) for the Ramsey type
-            measurement delays: numpy array with delays (in s) swept through
-                as flux pulse delay
+            freqs: numpy array frequencies in Hz for the flux pulse scope type experiment
+            delays: numpy array with delays (in s) swept through
+                    as delay of the drive pulse
             analyze: bool, if True, then the measured data
-                gets analyzed (for detailed documentation of the analysis see in
-                the Fluxpulse_Ramsey_2D_Analysis class update: bool, if True,
-                the AWG channel delay gets corrected, such that single qubit
-                gates and flux pulses have no relative delay
+                        gets analyzed (for detailed documentation of the analysis see in
+                        the FluxPulse_timing_calibration class update: bool, if True,
+                        the AWG channel delay gets corrected, such that single qubit
+                        gates and flux pulses have no relative delay
 
         Returns:
             fitted_delay: float, only returned, if analyze is True.
@@ -3138,68 +3136,50 @@ class QuDev_transmon(Qubit):
         clock_rate = MC.station.pulsar.clock(channel)
         T_sample = 1./clock_rate
 
-        X90_separation = kw.pop('X90_separation', 100e-9)
-        distorted = kw.pop('distorted', False)
-        distortion_dict = kw.pop('distortion_dict', None)
-        pulse_length = kw.pop('pulse_length', 20e-9)
+        pulse_length = kw.pop('pulse_length', 100e-9)
         self.flux_pulse_length(pulse_length)
-        amplitude = kw.pop('amplitude', 0.05)
+        amplitude = kw.pop('amplitude', 0.3)
         self.flux_pulse_amp(amplitude)
-
-        drive_pulse_length = self.gauss_sigma()*self.nr_sigma()
 
         measurement_string = 'Flux_pulse_delay_calibration_{}'.format(self.name)
 
-        if thetas is None:
-            thetas = np.linspace(0, 2*np.pi, 8, endpoint=False)
+        if freqs is None:
+            freqs = self.f_qubit() + np.linspace(-200e6, 200e6, 30, endpoint=False)
         if delays is None:
-            buffer_factor = int(X90_separation/self.flux_pulse_length())
-            total_time = X90_separation + buffer_factor*self.flux_pulse_length()
-            res = int(total_time/T_sample/30)
-            delays = np.arange(-0.5*buffer_factor*self.flux_pulse_length()
-                               -0.5*drive_pulse_length,
-                               X90_separation +
-                               0.5*buffer_factor*self.flux_pulse_length()
-                               -0.5*drive_pulse_length,
+            res = int((pulse_length + 200e-9)/T_sample/50)
+            delays = np.arange(-100e-9,pulse_length + 100e-9,
                                res*T_sample)
 
         self.prepare_for_timedomain()
 
         detector_fun = self.int_avg_det
 
-        s1 = awg_swf.Ramsey_interleaved_fluxpulse_sweep(
-                        self,
-                        X90_separation=X90_separation,
-                        distorted=distorted,
-                        distortion_dict=distortion_dict)
-        s2 = awg_swf.Ramsey_fluxpulse_delay_sweep(self, s1)
+        s1 = awg_swf.Fluxpulse_scope_swf(self)
+        s2 = awg_swf.Fluxpulse_scope_drive_freq_sweep(self)
 
         MC.set_sweep_function(s1)
-        MC.set_sweep_points(thetas)
+        MC.set_sweep_points(delays)
         MC.set_sweep_function_2D(s2)
-        MC.set_sweep_points_2D(delays)
+        MC.set_sweep_points_2D(freqs)
         MC.set_detector_function(detector_fun)
         MC.run_2D(measurement_string)
 
         if analyze:
-            # ma.TwoD_Analysis(close_file=True, qb_name=self.name)
-            flux_pulse_ma = ma.Fluxpulse_Ramsey_2D_Analysis(
+            flux_pulse_timing_ma = ma.FluxPulse_timing_calibration(
                         label=measurement_string,
-                        X90_separation=X90_separation,
                         flux_pulse_length=pulse_length,
-                        drive_pulse_length=drive_pulse_length,
                         qb_name=self.name,
-                        auto=False)
-            flux_pulse_ma.run_delay_analysis(show=True)
+                        auto=True,
+                        plot=True)
 
             if update:
                 new_delay = self.AWG.get('{}_delay'.format(channel)) - \
-                            flux_pulse_ma.fitted_delay
+                            flux_pulse_timing_ma.fitted_delay
                 self.AWG.set('{}_delay'.format(channel), new_delay)
                 print('updated delay of channel {}.'.format(channel))
             else:
                 logging.warning('Not updated, since update was disabled.')
-            return flux_pulse_ma.fitted_delay
+            return flux_pulse_timing_ma.fitted_delay
         else:
             return
 
