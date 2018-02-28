@@ -9908,7 +9908,6 @@ class FluxPulse_timing_calibration(FluxPulse_Scope_Analysis):
         self.fig = None
         self.ax = None
 
-        print(self.qb_name)
         super().__init__(qb_name=self.qb_name,
                          sign_of_peaks=self.sign_of_peaks,
                          label=self.label,
@@ -10020,13 +10019,8 @@ class FluxPulse_timing_calibration(FluxPulse_Scope_Analysis):
 
         self.fig, self.ax = plt.subplots()
 
-        self.ax.plot(self.sweep_points/1e-9,self.delay_fit_res.data/1e6,'k.',label='data')
-        textstr = ('fitted delay = {:4.3f}ns'.format(self.fitted_delay/1e-9))
-
-        self.fig.text(0.5,0,textstr,
-                      transform=self.ax.transAxes, fontsize=self.font_size,
-                      verticalalignment='top',
-                      horizontalalignment='center',bbox=self.box_props)
+        self.ax.plot(self.sweep_points/1e-9, self.delay_fit_res.data/1e6, 'k.',
+                     label='data')
 
         #Used for plotting the fit
         best_vals = self.delay_fit_res.best_values
@@ -10052,18 +10046,16 @@ class FluxPulse_timing_calibration(FluxPulse_Scope_Analysis):
                         len(self.sweep_points)*100)
         y = erf_window_fit_func(x)
         self.ax.plot(x/1e-9, y/1e6, 'r-', linewidth=self.line_width,label='fit')
-        self.ax.set_title(self.label)
+        self.ax.set_title('fitted delay = {:4.3f}ns'.format(self.fitted_delay/1e-9))
         self.ax.set_xlabel(r'pulse delay, $\tau$ (ns)')
         self.ax.set_ylabel(r'fitted frequency, $f$ (MHz)')
 
         if show_guess:
-            self.ax.legend(['data','guess','fit'])
+            self.ax.legend(['data', 'guess', 'fit'])
         else:
-            self.ax.legend(['data','fit'])
-        print(self.qb_name)
-        print('{}//{}_timing_calibration_fit_{}.png'.format(self.folder,
-                                                            self.timestamp_string,
-                                                            self.qb_name))
+            self.ax.legend(['data', 'fit'])
+
+        plt.tight_layout()
         plt.savefig('{}//{}_timing_calibration_fit_{}.png'.format(self.folder,
                                                             self.timestamp_string,
                                                             self.qb_name))

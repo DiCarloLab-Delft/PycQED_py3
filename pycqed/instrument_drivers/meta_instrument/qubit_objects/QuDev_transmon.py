@@ -3421,13 +3421,38 @@ class QuDev_transmon(Qubit):
                        phases=None, spacing=100e-9,
                        MC=None, cal_points=None, plot=False,
                        return_population_loss=False,
-                       auto=True,
                        upload_AWGs='all',
                        upload_channels='all',
                        prepare_for_timedomain=True
                        ):
         '''
+        method to measure the phase acquired during a flux pulse conditioned on the state
+        of the control qubit (self).
+        In this measurement, the phase from two Ramsey type measurements
+        on qb_target is measured, once with the control qubit in the excited state and once
+        in the ground state. The conditional phase is calculated as the difference.
 
+
+        Args:
+            qb_target (QuDev_transmon): target qubit / non-fluxed qubit
+            amps (list): list or array of flux pulse amplitudes
+            lengths (list):  list or array of flux pulse lengths (must have same dimension as
+                             amps)
+            phases (array): phases used for the Ramsey type phase sweep
+            spacing (float): spacing between flux pulse and Ramsey pulses in s
+            MC (optional): measurement control
+            cal_points (bool): if True, calibration points are measured
+            plot (bool): if true, the phase fit is shown
+            return_population_loss: if true, the population loss (loss of contrast when having
+                                    the control qubit in the excited state is returned)
+            upload_AWGs (list): list of the AWGs to be uploaded
+            upload_channels (list): list of channels to be uploaded
+            prepare_for_timedomain (bool): if False, the self.prepare_for_timedomain()
+                                           is NOT called
+
+        Returns:
+            cphases (numpy array): array of the conditional phases measured at
+                                    (amps[i], lengths[i])
         '''
         if len(amps) != len(lengths):
             logging.warning('amps and lengths must have the same '
@@ -3475,7 +3500,7 @@ class QuDev_transmon(Qubit):
                                                         qb_target.name),
                 qb_name=self.name, cal_points=cal_points,
                 reference_measurements=True,
-                auto=auto
+                auto=True
             )
             fitted_phases, fitted_amps = \
                 flux_pulse_ma.fit_all(plot=False,
