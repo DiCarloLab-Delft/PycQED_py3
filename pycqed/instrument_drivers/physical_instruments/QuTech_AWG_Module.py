@@ -215,7 +215,7 @@ class QuTech_AWG_Module(SCPI):
                            unit='C',
                            label=('FPGA temperature'.format(ch)),
                            get_cmd='STATus:FPGA:TEMperature?',
-                           get_parser=float,
+                           get_parser=int,
                            docstring='Reads the temperature of the FPGA.\n' \
                              +'Temperature measurement interval is 10 seconds\n' \
                              +'Return:\n     float with temperature in Celsius')
