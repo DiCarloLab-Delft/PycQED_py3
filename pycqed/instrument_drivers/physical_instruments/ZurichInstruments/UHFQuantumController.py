@@ -1059,16 +1059,15 @@ setTrigger(0);"""
         self._daq.sync()
 
     def awg_sequence_acquisition_and_pulse_SSB(
-            self, f_RO_mod, RO_amp, RO_pulse_length):
+            self, f_RO_mod, RO_amp, RO_pulse_length,
+            alpha=1, phi_skew=0):
         f_sampling = 1.8e9
         samples = RO_pulse_length*f_sampling
         array = np.arange(int(samples))
-        sinwave = RO_amp*np.sin(2*np.pi*array*f_RO_mod/f_sampling)
-        coswave = RO_amp*np.cos(2*np.pi*array*f_RO_mod/f_sampling)
-        Iwave = (coswave+sinwave)/np.sqrt(2)
-        Qwave = (coswave-sinwave)/np.sqrt(2)
-        self.awg_sequence_acquisition_and_pulse(
-            Iwave, Qwave)
+        Iwave = RO_amp * alpha * np.cos(
+            2 * np.pi * array * f_RO_mod / f_sampling + phi_skew * np.pi / 180)
+        Qwave = - RO_amp * np.sin(2 * np.pi * array * f_RO_mod / f_sampling)
+        self.awg_sequence_acquisition_and_pulse(Iwave, Qwave)
 
     def upload_transformation_matrix(self, matrix):
         for i in range(np.shape(matrix)[0]):  # looping over the rows
