@@ -1114,7 +1114,7 @@ class TD_Analysis(MeasurementAnalysis):
         self.plot_cal_points = plot_cal_points
         self.for_ef = for_ef
 
-        super(TD_Analysis, self).__init__(qb_name=qb_name, **kw)
+        super().__init__(qb_name=qb_name, **kw)
 
     # def run_default_analysis(self, close_file=True, **kw):
     #     self.get_naming_and_values()
