@@ -9767,10 +9767,7 @@ class FluxPulse_Scope_Analysis(MeasurementAnalysis):
         plt.savefig('{}//{}_flux_pulse_scope_{}.png'.format(self.folder,
                                                             self.timestamp_string,
                                                             self.qb_name))
-        if plot:
-            plt.show()
-        else:
-            plt.close()
+
 
         self.data_rotated = data_rotated
 
@@ -9781,6 +9778,15 @@ class FluxPulse_Scope_Analysis(MeasurementAnalysis):
                 - self.data_rotated[0, 0])
 
         self.fit_all()
+
+        ax.plot(delays/1e-9,self.fitted_freqs/1e9,'r',label='fitted freq.')
+
+        ax.legend()
+
+        if plot:
+            plt.show()
+        else:
+            plt.close()
 
     def fit_single_slice(self, data_slice, sigma_guess=10e6,
                          sign_of_peaks=None,

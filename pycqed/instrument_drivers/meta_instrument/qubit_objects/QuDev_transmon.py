@@ -3138,15 +3138,15 @@ class QuDev_transmon(Qubit):
 
         pulse_length = kw.pop('pulse_length', 100e-9)
         self.flux_pulse_length(pulse_length)
-        amplitude = kw.pop('amplitude', 0.3)
+        amplitude = kw.pop('amplitude', 0.5)
         self.flux_pulse_amp(amplitude)
 
         measurement_string = 'Flux_pulse_delay_calibration_{}'.format(self.name)
 
         if freqs is None:
-            freqs = self.f_qubit() + np.linspace(-200e6, 200e6, 30, endpoint=False)
+            freqs = self.f_qubit() + np.linspace(-50e6, 50e6, 20, endpoint=False)
         if delays is None:
-            res = int((pulse_length + 200e-9)/T_sample/50)
+            res = int((pulse_length + 200e-9)/T_sample/40)
             delays = np.arange(-100e-9,pulse_length + 100e-9,
                                res*T_sample)
 
@@ -3173,7 +3173,7 @@ class QuDev_transmon(Qubit):
                         plot=True)
 
             if update:
-                new_delay = self.AWG.get('{}_delay'.format(channel)) - \
+                new_delay = self.AWG.get('{}_delay'.format(channel)) + \
                             flux_pulse_timing_ma.fitted_delay
                 self.AWG.set('{}_delay'.format(channel), new_delay)
                 print('updated delay of channel {}.'.format(channel))
