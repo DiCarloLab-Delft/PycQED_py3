@@ -1845,24 +1845,22 @@ class Load_Sequence_Tek(swf.Hard_Sweep):
 
 
 class Ramsey_interleaved_fluxpulse_sweep(swf.Hard_Sweep):
-    '''
-    Ramsey type measurement with interleaved fluxpulse
-    for more detailed description see fsqs.Ramsey_with_flux_pulse_meas_seq(..)
-    sequence function
 
-    inputs:
-        qb: qubit object
-        X90_separation: float (separation of the pi/2 pulses)
-    '''
-    def __init__(self, qb, X90_separation, upload=True,
-                 distorted=False,distortion_dict=None):
+    def __init__(self, qb, X90_separation, upload=True):
+        '''
+        Ramsey type measurement with interleaved fluxpulse
+        for more detailed description see fsqs.Ramsey_with_flux_pulse_meas_seq(..)
+        sequence function
+
+        inputs:
+            qb: qubit object
+            X90_separation (float): separation of the pi/2 pulses
+            upload (bool): if False, sequences are NOT uploaded onto the AWGs
+        '''
         super().__init__()
         self.qb = qb
         self.X90_separation = X90_separation
         self.upload = upload
-        self.distorted = distorted
-        self.distortion_dict = distortion_dict
-
 
         self.name = 'Ramsey with interleaved flux pulse'
         self.parameter_name = 'theta'
@@ -1872,24 +1870,22 @@ class Ramsey_interleaved_fluxpulse_sweep(swf.Hard_Sweep):
         if self.upload:
             fsqs.Ramsey_with_flux_pulse_meas_seq(
                 thetas=self.sweep_points, qb=self.qb,
-                X90_separation=self.X90_separation,
-                distorted=self.distorted,
-                distortion_dict=self.distortion_dict
+                X90_separation=self.X90_separation
             )
 
 
 class Ramsey_fluxpulse_ampl_sweep(swf.Soft_Sweep):
-    '''
-    flux pulse amplitude sweep for Ramsey type measurement with interleaved
-    fluxpulse; for more detailed description see fsqs.Ramsey_with_flux_pulse_\
-    meas_seq(..)
-    sequence function
-
-    inputs:
-        qb: qubit object
-    '''
 
     def __init__(self, qb, hard_sweep):
+        '''
+        flux pulse amplitude sweep for Ramsey type measurement with interleaved
+        fluxpulse; for more detailed description see
+        the fsqs.Ramsey_with_flux_pulse_meas_seq(..) sequence function
+
+        Args:
+            qb: qubit object
+            hard_sweep: hard sweep function
+        '''
         super().__init__()
         self.name = 'Ramsey interleaved fluxpulse amplitude sweep'
         self.parameter_name = 'Fluxpulse amplitude'
@@ -1909,18 +1905,18 @@ class Ramsey_fluxpulse_ampl_sweep(swf.Soft_Sweep):
         pass
 
 class Ramsey_fluxpulse_delay_sweep(swf.Soft_Sweep):
-    '''
-    flux pulse delay sweep for Ramsey type measurement with interleaved
-    fluxpulse; for more detailed description see fsqs.Ramsey_with_flux_pulse_\
-    meas_seq(..)
-    sequence function
-
-    inputs:
-        qb: qubit object
-        hard_sweep: hard_sweep object with method prepare()
-    '''
 
     def __init__(self, qb, hard_sweep):
+        '''
+        flux pulse delay sweep for Ramsey type measurement with interleaved
+        fluxpulse; for more detailed description see fsqs.Ramsey_with_flux_pulse_\
+        meas_seq(..)
+        sequence function
+
+        Args:
+            qb: qubit object
+            hard_sweep: hard_sweep object with method prepare()
+        '''
         super().__init__()
         self.name = 'Ramsey interleaved fluxpulse delay sweep'
         self.parameter_name = 'Fluxpulse delay'
@@ -1936,26 +1932,29 @@ class Ramsey_fluxpulse_delay_sweep(swf.Soft_Sweep):
         pass
 
 
-
 class Chevron_length_hard_swf(swf.Hard_Sweep):
-    '''
-    Sweep function class for a single slice of the Chevron experiment where
-    the length of the fluxpulse is swept (hard sweep).
-    For details on the experiment see documentation of
-    'fsqs.Chevron_flux_pulse_length_seq(...)'
-    '''
+
     def __init__(self, qb_control, qb_target, spacing=50e-9,
-                 cal_points=False, upload=True,
-                 distorted=False,distortion_dict=None):
+                 cal_points=False, upload=True):
+        '''
+        Sweep function class for a single slice of the Chevron experiment where
+        the length of the fluxpulse is swept (hard sweep).
+        For details on the experiment see documentation of
+        'fsqs.Chevron_flux_pulse_length_seq(...)'
+
+        Args:
+            qb_control (QuDev_Transmon): control qubit (fluxed qubit)
+            qb_target (QuDev_Transmon): target qubit (non-fluxed qubit)
+            spacing (float): safety spacing between drive pulses and flux pulse
+            cal_points (bool): if True, calibration points are measured
+            upload (bool): if False, the sequences are NOT uploaded onto the AWGs
+        '''
         super().__init__()
         self.qb_control = qb_control
         self.qb_target = qb_target
         self.spacing = spacing
         self.upload = upload
         self.cal_points = cal_points
-        self.distorted = distorted
-        self.distortion_dict = distortion_dict
-
 
         self.name = 'Chevron flux pulse length sweep'
         self.parameter_name = 'length'
@@ -1966,28 +1965,33 @@ class Chevron_length_hard_swf(swf.Hard_Sweep):
             fsqs.Chevron_flux_pulse_length_seq(
                 lengths=self.sweep_points, qb_control=self.qb_control,
                 qb_target=self.qb_target, spacing=self.spacing,
-                cal_points=self.cal_points, distorted=self.distorted,
-                distortion_dict=self.distortion_dict
+                cal_points=self.cal_points
                 )
 
+
 class Chevron_ampl_hard_swf(swf.Hard_Sweep):
-    '''
-    Sweep function class for a single slice of the Chevron experiment where
-    the amplitude of the fluxpulse is swept (hard sweep).
-    For details on the experiment see documentation of
-    'fsqs.Chevron_flux_pulse_ampl_seq(...)'
-    '''
-    def __init__(self, qb_control, qb_target, spacing=50e-9,cal_points=False,upload=True,
-                 distorted=False,distortion_dict=None):
+
+    def __init__(self, qb_control, qb_target, spacing=50e-9,
+                 cal_points=False, upload=True):
+        '''
+        Sweep function class for a single slice of the Chevron experiment where
+        the amplitude of the fluxpulse is swept (hard sweep).
+        For details on the experiment see documentation of
+        'fsqs.Chevron_flux_pulse_ampl_seq(...)'
+
+        Args:
+            qb_control (QuDev_Transmon): control qubit (fluxed qubit)
+            qb_target (QuDev_Transmon): target qubit (non-fluxed qubit)
+            spacing (float): safety spacing between drive pulses and flux pulse
+            cal_points (bool): if True, calibration points are measured
+            upload (bool): if False, the sequences are NOT uploaded onto the AWGs
+        '''
         super().__init__()
         self.qb_control = qb_control
         self.qb_target = qb_target
         self.spacing = spacing
         self.upload = upload
         self.cal_points = cal_points
-        self.distorted = distorted
-        self.distortion_dict = distortion_dict
-
 
         self.name = 'Chevron flux pulse amplitude sweep'
         self.parameter_name = 'amplitude'
@@ -1999,17 +2003,22 @@ class Chevron_ampl_hard_swf(swf.Hard_Sweep):
                 ampls=self.sweep_points, qb_control=self.qb_control,
                 qb_target=self.qb_target, spacing=self.spacing,
                 cal_points=self.cal_points,
-                distorted=self.distorted,distortion_dict=self.distortion_dict
             )
 
 
 class Chevron_ampl_swf(swf.Soft_Sweep):
-    '''
-    Sweep function class (soft sweep) for 2D Chevron experiment where
-    the amplitude of the fluxpulse is swept. Used in combination with
-    the Chevron_length_hard_swf class.
-    '''
-    def __init__(self, qb_control,qb_target, hard_sweep):
+
+    def __init__(self, qb_control, qb_target, hard_sweep):
+        '''
+        Sweep function class (soft sweep) for 2D Chevron experiment where
+        the amplitude of the fluxpulse is swept. Used in combination with
+        the Chevron_length_hard_swf class.
+
+        Args:
+           qb_control (QuDev_Transmon): control qubit (fluxed qubit)
+           qb_target (QuDev_Transmon): target qubit (non-fluxed qubit)
+           hard_sweep: hard sweep function (fast axis sweep function)
+        '''
         super().__init__()
         self.name = 'Chevron flux pulse amplitude sweep'
         self.parameter_name = 'Fluxpulse amplitude'
@@ -2031,20 +2040,21 @@ class Chevron_ampl_swf(swf.Soft_Sweep):
 
 
 class Chevron_ampl_fast_swf(swf.Soft_Sweep):
-    '''
-    Sweep function class (soft sweep) for 2D Chevron experiment where
-    the amplitude of the fluxpulse is swept. This 'fast' version uses
-    a trick, that instead of uploading new sequences with different amplitudes,
-    the ouput scaling of the AWG is changed.
-    Used in combination with the Chevron_length_hard_swf class.
 
-    Args:
-        qb_control (qubit): control qubit (qubit with flux pulse)
-        qb_target (qubit): target qubit
-        AWG: AWG used for the flux pulses
-        channel (str): (optional), flux pulse channel of the AWG (e.g. 'ch1')
-    '''
-    def __init__(self, qb_control,qb_target,AWG,channel=None):
+    def __init__(self, qb_control, qb_target, AWG, channel=None):
+        '''
+        Sweep function class (soft sweep) for 2D Chevron experiment where
+        the amplitude of the fluxpulse is swept. This 'fast' version uses
+        a trick, that instead of uploading new sequences with different amplitudes,
+        the ouput scaling of the AWG is changed.
+        Used in combination with the Chevron_length_hard_swf class.
+
+        Args:
+            qb_control (qubit): control qubit (qubit with flux pulse)
+            qb_target (qubit): target qubit
+            AWG: AWG used for the flux pulses
+            channel (str): (optional), flux pulse channel of the AWG (e.g. 'ch1')
+        '''
         super().__init__()
         if channel is None:
             channel = qb_control.flux_pulse_channel()[-3:]
@@ -2091,35 +2101,31 @@ class Chevron_ampl_fast_swf(swf.Soft_Sweep):
 
 class Flux_pulse_CPhase_meas_hard_swf(swf.Hard_Sweep):
 
-    '''
-        Flexible sweep function class for a single slice of the CPhase
-        experiment (hard sweep) that can either sweep the amplitude or
-        length of the flux pulse or the phase of the second X90 pulse.
-        For details on the experiment see documentation of
-        'fsqs.flux_pulse_CPhase_seq(...)'
-
-    args:
-        qb_control: instance of the qubit class (control qubit)
-        qb_target: instance of the qubit class (target qubit)
-        sweep_mode: string, either 'length', 'amplitude' or 'amplitude'
-        X90_phase: float, phase of the second X90 pulse in rad
-        spacing: float, spacing between first and second X90 pulse
-        measurement_mode (str): either 'excited_state', 'ground_state'
-        reference_measurement (bool): if True, appends a reference measurement
-                                      IMPORTANT: you need to double
-                                      the hard sweep points!
-                                      e.g. thetas = np.concatenate((thetas,thetas))
-
-
-    '''
-
-    def __init__(self, qb_control, qb_target, sweep_mode='length' , X90_phase=0,
-                 spacing=50e-9,cal_points=False, upload=True,
-                 distorted=False,distortion_dict=None,
+    def __init__(self, qb_control, qb_target, sweep_mode='length', X90_phase=0,
+                 spacing=50e-9, cal_points=False, upload=True,
                  measurement_mode='excited_state',
                  reference_measurements=False,
                  upload_AWGs='all',
                  upload_channels='all'):
+        '''
+            Flexible sweep function class for a single slice of the CPhase
+            experiment (hard sweep) that can either sweep the amplitude or
+            length of the flux pulse or the phase of the second X90 pulse.
+            For details on the experiment see documentation of
+            'fsqs.flux_pulse_CPhase_seq(...)'
+
+        Args:
+            qb_control: instance of the qubit class (control qubit)
+            qb_target: instance of the qubit class (target qubit)
+            sweep_mode: string, either 'length', 'amplitude' or 'amplitude'
+            X90_phase: float, phase of the second X90 pulse in rad
+            spacing: float, spacing between first and second X90 pulse
+            measurement_mode (str): either 'excited_state', 'ground_state'
+            reference_measurement (bool): if True, appends a reference measurement
+                                          IMPORTANT: you need to double
+                                          the hard sweep points!
+                                          e.g. thetas = np.concatenate((thetas,thetas))
+        '''
         super().__init__()
         self.qb_control = qb_control
         self.qb_target = qb_target
@@ -2127,8 +2133,6 @@ class Flux_pulse_CPhase_meas_hard_swf(swf.Hard_Sweep):
         self.X90_phase = X90_phase
         self.upload = upload
         self.cal_points = cal_points
-        self.distorted = distorted
-        self.distortion_dict = distortion_dict
         self.sweep_mode = sweep_mode
         self.measurement_mode = measurement_mode
         self.reference_measurements = reference_measurements
@@ -2154,8 +2158,7 @@ class Flux_pulse_CPhase_meas_hard_swf(swf.Hard_Sweep):
                 qb_target=self.qb_target,
                 sweep_mode=self.sweep_mode,
                 X90_phase=self.X90_phase, spacing=self.spacing,
-                cal_points=self.cal_points, distorted=self.distorted,
-                distortion_dict=self.distortion_dict,
+                cal_points=self.cal_points,
                 measurement_mode=self.measurement_mode,
                 reference_measurements=self.reference_measurements,
                 upload_AWGs=self.upload_AWGs,
@@ -2164,21 +2167,21 @@ class Flux_pulse_CPhase_meas_hard_swf(swf.Hard_Sweep):
 
 
 class Flux_pulse_CPhase_meas_2D(swf.Soft_Sweep):
-    '''
-        Flexible soft sweep function class for 2D CPhase
-        experiments that can either sweep the amplitude or
-        length of the flux pulse or the phase of the second X90 pulse.
-        For details on the experiment see documentation of
-        'fsqs.flux_pulse_CPhase_seq(...)'
 
-    args:
-        qb_control: instance of the qubit class (control qubit)
-        qb_target: instance of the qubit class (target qubit)
-        hard_sweep: 1D hard sweep
-        sweep_mode: string, either 'length', 'amplitude' or 'amplitude'
-    '''
+    def __init__(self, qb_control, qb_target, hard_sweep, sweep_mode='amplitude'):
+        '''
+            Flexible soft sweep function class for 2D CPhase
+            experiments that can either sweep the amplitude or
+            length of the flux pulse or the phase of the second X90 pulse.
+            For details on the experiment see documentation of
+            'fsqs.flux_pulse_CPhase_seq(...)'
 
-    def __init__(self, qb_control,qb_target, hard_sweep,sweep_mode='amplitude'):
+        Args:
+            qb_control: instance of the qubit class (control qubit)
+            qb_target: instance of the qubit class (target qubit)
+            hard_sweep: 1D hard sweep
+            sweep_mode: string, either 'length', 'amplitude' or 'amplitude'
+        '''
         super().__init__()
         self.name = 'flux_pulse_CPhase_measurement_{}_2D_sweep'.format(sweep_mode)
         self.parameter_name = sweep_mode
@@ -2189,27 +2192,14 @@ class Flux_pulse_CPhase_meas_2D(swf.Soft_Sweep):
             self.unit = 'V'
         elif self.sweep_mode == 'phase':
             self.unit = 'rad'
-        # elif self.sweep_mode == 'length_and_amplitude':
-            # self.unit = 'measurement point n'
         self.hard_sweep = hard_sweep
         self.qb_control = qb_control
         self.qb_target = qb_target
-        # self.measurement_mode = measurement_mode
-        # self.measurement_state = None
-
 
     def prepare(self):
         pass
 
     def set_parameter(self, val, **kw):
-        # self.measurement_state = 'excited_state'
-        # if self.measurement_mode == 'ground_state':
-        #     self.measurement_state = 'ground_state'
-        # elif self.measurement_mode == 'alternating':
-        #     if self.measurement_state == 'excited_state':
-        #         self.measurement_state = 'ground_state'
-        #     else:
-        #         self.measurement_state = 'excited_state'
 
         self.hard_sweep.upload = True
 
@@ -2221,19 +2211,26 @@ class Flux_pulse_CPhase_meas_2D(swf.Soft_Sweep):
             self.hard_sweep.prepare()
         elif self.sweep_mode == 'phase':
             self.hard_sweep.prepare(X90_phase=val)
-        # elif self.sweep_mode == 'length_and_amplitude':
-        #     self.qb_control.flux_pulse_length(val[0])
-        #     self.qb_control.flux_pulse_amp(val[1])
 
     def finish(self):
         pass
 
 
 class Fluxpulse_scope_swf(swf.Hard_Sweep):
-    def __init__(self, qb,cal_points=False, upload=True, distorted=False,
-                 distortion_dict=None,
+
+    def __init__(self, qb, cal_points=False, upload=True,
                  spacing=30e-9
                  ):
+        '''
+        Flux pulse scope hard sweep (sweeps the relative delay of drive pulse and
+        flux pulse)
+
+        Args:
+            qb (QuDev_Transmon): qubit
+            cal_points (bool): if True, the measurement is done with calibration points
+            upload (bool): if False, the sequences are NOT uploaded to the AWGs
+            spacing (float): safety spacing between flux pulse and RO pulse
+        '''
         super().__init__()
         self.qb = qb
         self.upload = upload
@@ -2243,23 +2240,21 @@ class Fluxpulse_scope_swf(swf.Hard_Sweep):
         self.name = 'Fluxpulse_scope_{}'.format(self.qb.name)
         self.parameter_name = 'delay'
         self.unit = 's'
-        self.distorted = distorted
-        self.distortion_dict = distortion_dict
 
     def prepare(self, **kw):
         if self.upload:
             fsqs.fluxpulse_scope_sequence(delays=self.sweep_points, qb=self.qb,
                                           cal_points=self.cal_points,
-                                          distorted=self.distorted,
-                                          distortion_dict=self.distortion_dict,
                                           spacing=self.spacing)
-
 
 class Fluxpulse_scope_drive_freq_sweep(swf.Soft_Sweep):
 
-    # sweeps the qubit frequency such that the X180 pulses have different frequencies.
-
     def __init__(self, qb):
+        '''
+        soft sweep function that sweeps the frequency of the drive LO
+        Args:
+            qb (QuDev_Transmon): qubit
+        '''
         super().__init__()
         self.name = 'Fluxpulse scope drive freq sweep'
         self.parameter_name = 'qubit drive freq.'

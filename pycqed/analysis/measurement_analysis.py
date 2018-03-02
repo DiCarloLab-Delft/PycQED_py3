@@ -9406,29 +9406,27 @@ def SSB_demod(Ivals, Qvals, alpha=1, phi=0, I_o=0, Q_o=0, IF=10e6, predistort=Tr
 
 
 class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
-    """
-    Measurement analysis class to analyse Ramsey type measrements
-    with an interleaved flux pulse
 
-    Args:
-        X90_separation (float): separation between the two X90 pulses
-        flux_pulse_length (float): length of the flux pulse in seconds
-                                    (used to calculate freq. shifts)
-        qb_name (str): qubit name
-        label (str): measurement label
-        run_default_super:
-        **kw:
-
-
-    """
     def __init__(self, X90_separation=None, flux_pulse_length=None,
                  drive_pulse_length=None,
                  qb_name=None, label=None,
-
                  cal_points=False,
                  reference_measurements=False,
                  auto=True,
                  **kw):
+        """
+        Measurement analysis class to analyse Ramsey type measrements
+        with an interleaved flux pulse
+
+        Args:
+            X90_separation (float): separation between the two X90 pulses
+            flux_pulse_length (float): length of the flux pulse in seconds
+                                        (used to calculate freq. shifts)
+            qb_name (str): qubit name
+            label (str): measurement label
+            **kw:
+        """
+
         kw['label'] = label
         kw['h5mode'] = 'r+'
         kw['close_file'] = False
@@ -9729,6 +9727,18 @@ class FluxPulse_Scope_Analysis(MeasurementAnalysis):
                  auto=True,
                  plot=True,
                   **kw):
+        '''
+        analysis class to analyse data taken in flux pulse scope measurements
+
+        Args:
+            qb_name (str): qubit name
+            sign_of_peaks (+1 or -1): optional, +1 if the qubit resonance is a peak and -1 if
+                                        it is a dip
+            label (str): measurement string
+            auto (bool): run default analysis if true
+            plot (bool): show plot if true
+            **kw (dict): keywords passed to the init of the base class
+        '''
         kw['label'] = label
         kw['h5mode'] = 'r+'
         self.sign_of_peaks = sign_of_peaks
@@ -9740,7 +9750,6 @@ class FluxPulse_Scope_Analysis(MeasurementAnalysis):
         super().__init__(TwoD=True, auto=False,qb_name=self.qb_name, **kw)
         if auto:
             self.run_default_analysis()
-
 
     def run_default_analysis(self, plot=None, **kw):
 
@@ -9895,6 +9904,21 @@ class FluxPulse_timing_calibration(FluxPulse_Scope_Analysis):
                  auto=True, plot=True,
                  **kw
                  ):
+        '''
+        analysis class for the flux pulse timing calibration
+
+        Args:
+
+            qb_name (str): qubit name
+            sign_of_peaks (+1 or -1): optional, +1 if the qubit resonance is a peak and -1 if
+                                        it is a dip
+            flux_pulse_length (float): length of the flux pulse
+            return_fit (bool): fit results returned if true
+            label (str): measurement string
+            auto (bool): run default analysis if true
+            plot (bool): show plot if true
+            **kw (dict): keywords passed to the init of the base class
+        '''
         self.qb_name = qb_name
         self.sign_of_peaks = sign_of_peaks
         self.flux_pulse_length = flux_pulse_length

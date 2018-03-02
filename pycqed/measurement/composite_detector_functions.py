@@ -1595,24 +1595,31 @@ class purityN_CZ_detector(purity_CZ_detector):
 
 class CPhase_optimization(det.Soft_Detector):
 
-    '''
-    CZ gate conditional phase optimization.
-    '''
-
     def __init__(self, qb_control, qb_target, MC,
                  ramsey_phases=None,
-                 distorted=False,distortion_dict=None,
-                 cost_function_opt=0,
                  spacing=10e-9,
                  **kw):
+        '''
+        soft detector function used in the CZ gate tuneup optimization
+
+        Args:
+            qb_control (QuDev_Transmon): control qubit (with flux pulses)
+            qb_target (QuDev_Transmon): target qubit
+            MC(MeasurementControl): measurement control used in the detector
+                                     function to run the actual experiment
+            maxiter (int): maximum optimization steps passed to the nelder mead function
+            name (str): measurement name
+            spacing (float): safety spacing between drive pulses and flux pulse
+
+        '''
         super().__init__()
 
         self.flux_pulse_length = ManualParameter(name='flux_pulse_length',
-                                            unit='s',
-                                            label='Flux pulse length')
+                                                 unit='s',
+                                                 label='Flux pulse length')
         self.flux_pulse_amp = ManualParameter(name='flux_pulse_amp',
-                                            unit='V',
-                                            label='Flux pulse amplitude')
+                                              unit='V',
+                                              label='Flux pulse amplitude')
 
         self.name = 'CZ_cond_phase_optimization'
         self.value_names = ['Cost function']
@@ -1622,8 +1629,6 @@ class CPhase_optimization(det.Soft_Detector):
         self.qb_target = qb_target
         self.spacing = spacing
 
-
-        self.cost_function_opt = cost_function_opt
         self.nr_averages = kw.get('nr_averages', 1024)
 
         if ramsey_phases is None:
@@ -1647,7 +1652,6 @@ class CPhase_optimization(det.Soft_Detector):
                     lengths=[self.flux_pulse_length()],
                     phases=self.ramsey_phases,
                     return_population_loss=True,
-                    # upload_AWGs=[self.qb_control.flux_pulse_channel()[:4]],
                     upload_channels=[self.qb_control.flux_pulse_channel()],
                     auto=False,
                     prepare_for_timedomain=False,
@@ -1655,8 +1659,8 @@ class CPhase_optimization(det.Soft_Detector):
                     )
         print('measured conditional phase: ', cphases[0]/np.pi*180)
 
-        cost_val = np.abs(cphases[0]%(2*np.pi) - np.pi)/np.pi \
-                   + population_losses[0]
+        cost_val = np.abs(cphases[0] % (2*np.pi) - np.pi)/np.pi \
+                    + population_losses[0]
 
         # # Return the cost function
         return cost_val

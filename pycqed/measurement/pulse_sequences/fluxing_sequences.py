@@ -1526,7 +1526,6 @@ def FluxTrack(operation_dict, q0,
 
 def Ramsey_with_flux_pulse_meas_seq(thetas, qb, X90_separation, verbose=False,
                                     upload=True, return_seq=False,
-                                    distorted=False,distortion_dict=None,
                                     cal_points=False):
     '''
     Performs a Ramsey with interleaved Flux pulse
@@ -1537,7 +1536,8 @@ def Ramsey_with_flux_pulse_meas_seq(thetas, qb, X90_separation, verbose=False,
                                      sweep phase
 
     timing of the flux pulse relative to the center of the first X90 pulse
-    args:
+
+    Args:
         thetas: numpy array of phase shifts for the second pi/2 pulse
         qb: qubit object (must have the methods get_operation_dict(),
         get_drive_pars() etc.
@@ -1545,14 +1545,8 @@ def Ramsey_with_flux_pulse_meas_seq(thetas, qb, X90_separation, verbose=False,
         verbose: bool
         upload: bool
         return_seq: bool
-        distorted: bool
-        distortion_dict: dictionary (passed to the distort_qudev() function.
-                         For details on the
-                         form of the dictionary see in the module
-                         pycqed.measurement.waveform_control\
-                         .fluxpulse_predistortion )
 
-    returns:
+    Returns:
         if return_seq:
           seq: qcodes sequence
           el_list: list of pulse elements
@@ -1591,11 +1585,6 @@ def Ramsey_with_flux_pulse_meas_seq(thetas, qb, X90_separation, verbose=False,
         else:
             el = multi_pulse_elt(i, station,
                                  [pulses['X90'], flux_pulse, X90_2, RO_pars])
-        if distorted is True:
-            if distortion_dict is not None:
-                el = fluxpulse_predistortion.distort_qudev(el,distortion_dict)
-            else:
-                raise ValueError('Must specify distortion dictionary')
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:
@@ -1606,10 +1595,10 @@ def Ramsey_with_flux_pulse_meas_seq(thetas, qb, X90_separation, verbose=False,
     else:
         return seq_name
 
+
 def Chevron_flux_pulse_length_seq(lengths, qb_control, qb_target, spacing=50e-9,
-                                  verbose=False,cal_points=False,
-                                  upload=True, return_seq=False,distorted=False,
-                                  distortion_dict=None):
+                                  verbose=False, cal_points=False,
+                                  upload=True, return_seq=False):
 
     '''
     chevron sequence (sweep of the flux pulse length)
@@ -1629,9 +1618,7 @@ def Chevron_flux_pulse_length_seq(lengths, qb_control, qb_target, spacing=50e-9,
 
     '''
     qb_name_control = qb_control.name
-    qb_name_target = qb_target.name
     operation_dict_control = qb_control.get_operation_dict()
-    operation_dict_target = qb_target.get_operation_dict()
     pulse_pars_control = qb_control.get_drive_pars()
     pulse_pars_target = qb_target.get_drive_pars()
     RO_pars_target = qb_target.get_RO_pars()
@@ -1676,11 +1663,6 @@ def Chevron_flux_pulse_length_seq(lengths, qb_control, qb_target, spacing=50e-9,
                                               flux_pulse_control,
                                               RO_pars_target])
 
-        if distorted is True:
-            if distortion_dict is not None:
-                el = fluxpulse_predistortion.distort_qudev(el,distortion_dict)
-            else:
-                raise ValueError('Must specify distortion dictionary')
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:
@@ -1697,7 +1679,6 @@ def Chevron_flux_pulse_ampl_seq(ampls, qb_control,
                                 qb_target, spacing=50e-9,
                                 cal_points=False, verbose=False,
                                 upload=True, return_seq=False,
-                                distorted=False,distortion_dict=None
                                 ):
     '''
     chevron sequence (sweep of the flux pulse amplitude)
@@ -1761,12 +1742,6 @@ def Chevron_flux_pulse_ampl_seq(ampls, qb_control,
                                               flux_pulse_control,
                                               RO_pars_target])
 
-
-        if distorted is True:
-            if distortion_dict is not None:
-                el = fluxpulse_predistortion.distort_qudev(el,distortion_dict)
-            else:
-                raise ValueError('Must specify distortion dictionary')
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
 
@@ -1779,14 +1754,12 @@ def Chevron_flux_pulse_ampl_seq(ampls, qb_control,
         return seq_name
 
 
-def flux_pulse_CPhase_seq(sweep_points,qb_control, qb_target,
+def flux_pulse_CPhase_seq(sweep_points, qb_control, qb_target,
                           sweep_mode='length',
                           X90_phase=0,
                           spacing=50e-9,
                           verbose=False,cal_points=False,
                           upload=True, return_seq=False,
-                          distorted=False,
-                          distortion_dict=None,
                           measurement_mode='excited_state',
                           reference_measurements=False,
                           upload_AWGs='all',
@@ -1821,11 +1794,8 @@ def flux_pulse_CPhase_seq(sweep_points,qb_control, qb_target,
                                       e.g. thetas = np.concatenate((thetas,thetas))
     '''
 
-
     qb_name_control = qb_control.name
-    qb_name_target = qb_target.name
     operation_dict_control = qb_control.get_operation_dict()
-    operation_dict_target = qb_target.get_operation_dict()
     pulse_pars_control = qb_control.get_drive_pars()
     pulse_pars_target = qb_target.get_drive_pars()
     RO_pars_target = qb_target.get_RO_pars()
@@ -1883,17 +1853,10 @@ def flux_pulse_CPhase_seq(sweep_points,qb_control, qb_target,
                                               flux_pulse_control, X90_target_2,
                                               RO_pars_target])
         else:
-
-
-            el = multi_pulse_elt(i, station, [X180_control,X90_target,
-                                              flux_pulse_control,X90_target_2,
+            el = multi_pulse_elt(i, station, [X180_control, X90_target,
+                                              flux_pulse_control, X90_target_2,
                                               RO_pars_target])
 
-        if distorted is True:
-            if distortion_dict is not None:
-                el = fluxpulse_predistortion.distort_qudev(el,distortion_dict)
-            else:
-                raise ValueError('Must specify distortion dictionary')
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
 
@@ -1914,8 +1877,6 @@ def fluxpulse_scope_sequence(delays, qb, verbose=False,
                              cal_points=False,
                              upload=True,
                              return_seq=False,
-                             distorted=False,
-                             distortion_dict=None,
                              spacing=30e-9):
     '''
     Performs X180 pulse on top of a fluxpulse
@@ -1953,11 +1914,9 @@ def fluxpulse_scope_sequence(delays, qb, verbose=False,
             el = multi_pulse_elt(i, station, [RO_pars])
         elif cal_points and (i == (len(delays)-2) or i == (len(delays)-1)):
             flux_pulse['amplitude'] = 0
-            el = multi_pulse_elt(i, station, [flux_pulse,X180_2,RO_pars])
+            el = multi_pulse_elt(i, station, [flux_pulse, X180_2, RO_pars])
         else:
-            el = multi_pulse_elt(i, station, [flux_pulse,X180_2,RO_pars])
-        if distorted is True and distortion_dict is not None:
-            el = fluxpulse_predistortion.distort_qudev(el,distortion_dict)
+            el = multi_pulse_elt(i, station, [flux_pulse, X180_2, RO_pars])
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:

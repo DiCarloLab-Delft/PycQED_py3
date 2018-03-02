@@ -3133,8 +3133,6 @@ class QuDev_transmon(Qubit):
             MC = self.MC
 
         channel = self.flux_pulse_channel()
-        clock_rate = MC.station.pulsar.clock(channel)
-        T_sample = 1./clock_rate
 
         pulse_length = kw.pop('pulse_length', 100e-9)
         self.flux_pulse_length(pulse_length)
@@ -3146,9 +3144,7 @@ class QuDev_transmon(Qubit):
         if freqs is None:
             freqs = self.f_qubit() + np.linspace(-50e6, 50e6, 20, endpoint=False)
         if delays is None:
-            res = int((pulse_length + 200e-9)/T_sample/40)
-            delays = np.arange(-100e-9,pulse_length + 100e-9,
-                               res*T_sample)
+            delays = np.linspace(-100e-9, pulse_length + 100e-9, 40, endpoint=False)
 
         self.prepare_for_timedomain()
 
@@ -3538,6 +3534,54 @@ class QuDev_transmon(Qubit):
             return cphase_all, population_loss_all
         else:
             return cphase_all
+
+
+    def measure_flux_pulse_scope(self, freqs, delays, pulse_length=None, pulse_amp=None,
+                                 pulse_delay=None,
+                                 MC=None,
+                                 ):
+        '''
+        flux pulse scope measurement used to determine the shape of flux pulses
+        set up as a 2D measurement (delay and drive pulse frequecy are being swept)
+        pulse sequence:
+                      <- delay ->
+           |    -------------    |X180|  ---------------------  |RO|
+           |    ---   | ---- fluxpulse ----- |
+
+
+        Args:
+            freqs (numpy array): array of drive frequencies
+            delays (numpy array): array of delays of the drive pulse w.r.t the flux pulse
+            pulse_length (float): flux pulse length (if not specified, the
+                                    self.flux_pulse_length() is taken)
+            pulse_amp (float): flux pulse amplitude  (if not specified, the
+                                    self.flux_pulse_amp() is taken)
+            pulse_delay (float): flux pulse delay
+            MC (MeasurementControl): if None, then the self.MC is taken
+
+        Returns: None
+
+        '''
+        if pulse_length is not None:
+            self.flux_pulse_length(pulse_length)
+        if pulse_amp is not None:
+            self.flux_pulse_amp(pulse_amp)
+        if pulse_delay is not None:
+            self.flux_pulse_delay(pulse_delay)
+
+        if MC is None:
+            MC = self.MC
+
+        s1 = awg_swf.Fluxpulse_scope_swf(self)
+        s2 = awg_swf.Fluxpulse_scope_drive_freq_sweep(self)
+
+        MC.set_sweep_function(s1)
+        MC.set_sweep_points(delays)
+        MC.set_sweep_function_2D(s2)
+        MC.set_sweep_points_2D(freqs)
+        MC.set_detector_function(self.int_avg_det)
+        MC.run_2D('Flux_scope_{}'.format(self.name))
+
 
 
 def add_CZ_pulse(qbc, qbt):

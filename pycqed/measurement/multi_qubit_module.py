@@ -1041,7 +1041,6 @@ def cphase_gate_tuneup(qb_control, qb_target,
                        MC_detector=None,
                        maxiter=50,
                        name='cphase_tuneup',
-                       cal_points=False,
                        spacing=20e-9,
                        ramsey_phases=None):
 
@@ -1050,18 +1049,26 @@ def cphase_gate_tuneup(qb_control, qb_target,
     parameters (pulse lengths and pulse amplitude)
 
     Args:
-        qb_control: control qubit (with flux pulses)
-        qb_target: target qubit
-        initial_values_dict:
-        initial_step_dict:
-        MC_optimization:
-        MC_detector:
-        name:
-
+        qb_control (QuDev_Transmon): control qubit (with flux pulses)
+        qb_target (QuDev_Transmon): target qubit
+        initial_values_dict (dict): dictionary containing the initial flux pulse amp
+                                    and length
+        initial_step_dict (dict): dictionary containing the initial step size of the
+                                  flux pulse amp and length
+        MC_optimization (MeasurementControl): measurement control for the adaptive
+                                                optimization sweep
+        MC_detector (MeasurementControl): measurement control used in the detector
+                                            function to run the actual experiment
+        maxiter (int): maximum optimization steps passed to the nelder mead function
+        name (str): measurement name
+        spacing (float): safety spacing between drive pulses and flux pulse
+        ramsey_phases (numpy array): phases used in the Ramsey measurement
 
     Returns:
+        pulse_length_best_value, pulse_amplitude_best_value
 
     '''
+
     if MC_optimization is None:
         MC_optimization = station.MC
 
@@ -1101,7 +1108,6 @@ def cphase_gate_tuneup(qb_control, qb_target,
                     'no_improv_break': 12,
                     'minimize': True,
                     'maxiter': maxiter}
-    # MC_optimization.set_optimization_method('nelder_mead')
     MC_optimization.set_sweep_functions([S1, S2])
     MC_optimization.set_detector_function(d)
     MC_optimization.set_adaptive_function_parameters(ad_func_pars)
@@ -1112,4 +1118,3 @@ def cphase_gate_tuneup(qb_control, qb_target,
     pulse_amplitude_best_value = a1.optimization_result[0][1]
 
     return pulse_length_best_value, pulse_amplitude_best_value
-    # return 'passed..'
