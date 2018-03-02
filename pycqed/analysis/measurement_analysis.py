@@ -9762,6 +9762,15 @@ class FluxPulse_Scope_Analysis(MeasurementAnalysis):
         data_rotated = a_tools.rotate_and_normalize_data_no_cal_points(self.data[2:, :])
 
         data_rotated = data_rotated.reshape(len(freqs), len(delays))
+        self.data_rotated = data_rotated
+
+        if self.sign_of_peaks is None:
+            self.sign_of_peaks = np.sign(
+                self.data_rotated[np.argmax(np.abs(
+                    self.data_rotated[:, 0] - self.data_rotated[0, 0])), 0]
+                - self.data_rotated[0, 0])
+
+        self.fit_all()
 
         fig, ax = plt.subplots()
         im = ax.pcolormesh(delays/1e-9, freqs/1e9, data_rotated/1e-3, cmap='viridis')
@@ -9773,24 +9782,13 @@ class FluxPulse_Scope_Analysis(MeasurementAnalysis):
         ax.set_xlabel(r'delay, $\tau$ (ns)')
         ax.set_ylabel(r'drive frequency, $f_d$ (GHz)')
         ax.set_title('{} {}'.format(self.timestamp_string, self.measurementstring))
+
+        ax.plot(delays/1e-9,self.fitted_freqs/1e9,'r',label='fitted freq.')
+        ax.legend()
+
         plt.savefig('{}//{}_flux_pulse_scope_{}.png'.format(self.folder,
                                                             self.timestamp_string,
                                                             self.qb_name))
-
-
-        self.data_rotated = data_rotated
-
-        if self.sign_of_peaks is None:
-            self.sign_of_peaks = np.sign(
-                self.data_rotated[np.argmax(np.abs(
-                    self.data_rotated[:, 0] - self.data_rotated[0, 0])), 0]
-                - self.data_rotated[0, 0])
-
-        self.fit_all()
-
-        ax.plot(delays/1e-9,self.fitted_freqs/1e9,'r',label='fitted freq.')
-
-        ax.legend()
 
         if plot:
             plt.show()
