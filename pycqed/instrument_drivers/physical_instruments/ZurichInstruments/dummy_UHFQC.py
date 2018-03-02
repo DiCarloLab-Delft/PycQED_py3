@@ -596,7 +596,8 @@ setTrigger(0);"""
         self.awg_string(string)
 
     def array_to_combined_vector_string(self, array, name):
-        # this function cuts up arrays into several vectors of maximum length 1024 that are joined.
+        # this function cuts up arrays into several vectors of maximum length
+        # 1024 that are joined.
         # this is to avoid python crashes (was found to crash for vectors of
         # lenght> 1490)
         string = 'vect('
@@ -652,7 +653,7 @@ setTrigger(0);"""
         self._daq.sync()
 
     def awg_sequence_acquisition_and_pulse_SSB(
-            self, f_RO_mod, RO_amp, RO_pulse_length, acquisition_delay):
+            self, f_RO_mod, RO_amp, RO_pulse_length):
         f_sampling = 1.8e9
         samples = RO_pulse_length*f_sampling
         array = np.arange(int(samples))
@@ -660,9 +661,8 @@ setTrigger(0);"""
         coswave = RO_amp*np.cos(2*np.pi*array*f_RO_mod/f_sampling)
         Iwave = (coswave+sinwave)/np.sqrt(2)
         Qwave = (coswave-sinwave)/np.sqrt(2)
-        # Iwave, Qwave = PG.mod_pulse(np.ones(samples), np.zeros(samples), f=f_RO_mod, phase=0, sampling_rate=f_sampling)
         self.awg_sequence_acquisition_and_pulse(
-            Iwave, Qwave, acquisition_delay)
+            Iwave, Qwave)
 
     def upload_transformation_matrix(self, matrix):
         for i in range(np.shape(matrix)[0]):  # looping over the rows

@@ -2352,6 +2352,35 @@ class UHFQC_mixer_skewness_det(UHFQC_integrated_average_detector):
     def finish(self):
         super().finish()
 
+class UHFQC_readout_mixer_skewness_det(UHFQC_integrated_average_detector):
+    def __init__(self, UHFQC, AWG, channels, alpha, phi_skew, f_RO_mod, RO_amp,
+                 RO_pulse_length, nr_averages, integration_length=2.2e-6,
+                 verbose=False):
+        super().__init__(UHFQC, AWG=AWG, integration_length=integration_length,
+                         nr_averages=nr_averages, channels=channels,
+                         real_imag=False, single_int_avg=True, verbose=verbose)
+        self.name = 'UHFQC_readout_mixer_skewness_det'
+        self.alpha = alpha
+        self.phi_skew = phi_skew
+        self.f_RO_mod = f_RO_mod
+        self.RO_amp = RO_amp
+        self.RO_pulse_length = RO_pulse_length
+        self.verbose = verbose
+
+    def acquire_data_point(self):
+        if self.verbose:
+            print('alpha: {:.3f}'.format(self.alpha()))
+            print('phi_skew: {:.3f}'.format(self.phi_skew()))
+        self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(
+            self.f_RO_mod, self.RO_amp, self.RO_pulse_length,
+            alpha=self.alpha(), phi_skew=self.phi_skew())
+        return super().acquire_data_point()
+
+    def prepare(self, **kw):
+        super().prepare(**kw)
+
+    def finish(self):
+        super().finish()
 
 class UHFQC_single_qubit_statistics_logging_det(UHFQC_statistics_logging_det):
 

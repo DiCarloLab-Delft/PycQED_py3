@@ -471,6 +471,10 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
                            label='Q channel',
                            set_cmd=self._set_Q_channel,
                            get_cmd=self._get_Q_channel)
+        self.add_parameter('alpha', vals=vals.Numbers(), initial_value=1,
+                           parameter_class=ManualParameter)
+        self.add_parameter('phi_skew', vals=vals.Numbers(), initial_value=0,
+                           parameter_class=ManualParameter, unit='deg')
 
         self._f_RO_mod = 10e6
         self._frequency = 5e9
@@ -560,7 +564,8 @@ class LO_modulated_Heterodyne(HeterodyneInstrument):
         if self._UHFQC_awg_parameters_changed and self.auto_seq_loading():
             self._acquisition_instr.awg_sequence_acquisition_and_pulse_SSB(
                 self.f_RO_mod.get(), self.mod_amp(),
-                RO_pulse_length=self.RO_length())
+                RO_pulse_length=self.RO_length(),
+                alpha=self.alpha(), phi_skew=self.phi_skew())
             self._UHFQC_awg_parameters_changed = False
 
         # this sets the result to integration and rotation outcome
