@@ -375,7 +375,7 @@ def multiplexed_pulse(qubits, f_LO, upload=True, plot_filename=None):
         samples = int(qb.RO_pulse_length() * fs)
         tbase = np.linspace(0, samples / fs, samples, endpoint=False)
         pulse = qb.RO_amp() * np.exp(
-            -2j * np.pi * qb.f_RO_mod() * tbase + 0.25j * np.pi)
+            -2j * np.pi * qb.f_RO_mod() * tbase)
         pulses[qb.name] = pulse
         if pulse.size > maxlen:
             maxlen = pulse.size
@@ -452,6 +452,9 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
         if qb.ro_acq_weight_type() in ['SSB', 'DSB']:
             if qb.RO_acq_weight_function_Q() is not None:
                 channels += [qb.RO_acq_weight_function_Q()]
+
+    if correlations is None:
+        correlations = []
 
     for qb in qubits:
         if UHFQC is None:
@@ -655,9 +658,10 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
         gate_decomp='HZ', interleaved_gate=None,
         CZ_info_dict=None, interleave_CZ=True,
         thresholding=True,  V_th_a=None,
+        experiment_channels=None,
         nr_averages=1024, soft_avgs=1,
         MC=None, UHFQC=None, pulsar=None,
-        label=None, verbose=False):
+        label=None, verbose=False, run=True):
 
     '''
     Performs a simultaneous randomized benchmarking experiment on n qubits.
@@ -699,6 +703,12 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
             of the UHFQC
         V_th_a (list or tuple): contains the SSRO assignment thresholds for
             each qubit in qubits. These values must be correctly scaled!
+        experiment_channels (list or tuple): all the qb UHFQC RO channels used
+            in the experiment. Not always just the RO channels for the qubits
+            passed in to this function. The user might be running an n qubit
+            experiment but is now only measuring a subset of them. This function
+            should not use the channels for the unused qubits as correlation
+            channels because this will change the settings of that channel.
         nr_averages (float): number of averages to use
         soft_avgs (int): number of soft averages to use
         MC: MeasurementControl object
@@ -719,17 +729,25 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
     if MC is None:
         MC = qubits[0].MC
         logging.warning("Unspecified MC object. Using qubits[0].MC.")
-
+    if experiment_channels is None:
+        experiment_channels = []
+        for qb in qubits:
+            experiment_channels += [qb.RO_acq_weight_function_I()]
+        logging.warning('experiment_channels is None. Using only the channels '
+                        'in the qubits RO_acq_weight_function_I parameters.')
+    print(experiment_channels)
     if label is None:
         if CxC_RB:
             label = 'qubits{}_CxC_RB_{}_{}_seeds_{}_cliffords'.format(
                 ''.join([qb.name[-1] for qb in qubits]),
-                gate_decomp, nr_seeds, nr_cliffords[-1])
+                gate_decomp, nr_seeds, nr_cliffords[-1] if
+                hasattr(nr_cliffords, '__iter__') else nr_cliffords)
         else:
             label = 'qubits{}_CxI_IxC_{}_RB_{}_{}_seeds_{}_cliffords'.format(
                 ''.join([qb.name[-1] for qb in qubits]),
                 idx_for_RB, gate_decomp,
-                nr_seeds, nr_cliffords[-1])
+                nr_seeds, nr_cliffords[-1] if
+                hasattr(nr_cliffords, '__iter__') else nr_cliffords)
 
     if CZ_info_dict is not None:
         if interleave_CZ:
@@ -739,23 +757,29 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
 
     key = 'int'
     if thresholding:
+        key = 'dig'
+        print(V_th_a)
         if V_th_a is None:
-            raise ValueError('Unknown threshold values.')
+            logging.warning('Threshold values were not specified. Make sure '
+                            'you have set the them!.')
         else:
-            label += '_thresh'
-            key = 'dig'
+            th_vals = {}
             for qb in qubits:
                 UHFQC.set('quex_thres_{}_level'.format(
                     qb.RO_acq_weight_function_I()), V_th_a[qb.name])
+                th_vals[qb.name] = UHFQC.get('quex_thres_{}_level'.format(
+                    qb.RO_acq_weight_function_I()))
+            print(th_vals)
+            label += '_thresh'
 
     for qb in qubits:
         qb.prepare_for_timedomain(multiplexed=True)
 
-    device.multiplexed_pulse(qubits, f_LO, upload=True, plot_filename=True)
+    multiplexed_pulse(qubits, f_LO, upload=True, plot_filename=True)
     RO_pars = device.get_multiplexed_readout_pulse_dictionary(qubits)
 
     if len(qubits) == 2:
-        if len(nr_cliffords)==1:
+        if not hasattr(nr_cliffords, '__iter__'):
             raise ValueError('For a two qubit experiment, nr_cliffords must '
                              'be an array of sequence lengths.')
 
@@ -764,7 +788,8 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
 
         det_func = device.get_multiplexed_readout_detector_functions(
             qubits, nr_averages=nr_averages, UHFQC=UHFQC,
-            pulsar=pulsar, correlations=correlations)[key+'_corr_det']
+            pulsar=pulsar, used_channels=experiment_channels,
+            correlations=correlations)[key+'_corr_det']
 
         hard_sweep_points = np.arange(nr_seeds)
         hard_sweep_func = \
@@ -786,13 +811,15 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
                     raise ValueError('For an experiment with more than two '
                                      'qubits, nr_cliffords must int or float.')
 
-        k = 4095//nr_seeds
+        # k = 4095//nr_seeds
 
         det_func = device.get_multiplexed_readout_detector_functions(
             qubits, UHFQC=UHFQC, pulsar=pulsar,
-            nr_shots=nr_seeds*k)[key+'_log_det']
+            nr_shots=nr_seeds)[key+'_log_det']
 
-        hard_sweep_points = np.tile(np.arange(nr_seeds), k)
+        #
+        #  hard_sweep_points = np.tile(np.arange(nr_seeds), k)
+        hard_sweep_points = np.arange(nr_seeds)
         hard_sweep_func = \
             awg_swf2.two_qubit_Simultaneous_RB_fixed_length(
                 qubit_list=qubits, RO_pars=RO_pars,
@@ -802,7 +829,8 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
                 interleaved_gate=interleaved_gate, interleave_CZ=interleave_CZ,
                 verbose=verbose, CZ_info_dict=CZ_info_dict)
 
-        soft_sweep_points = np.arange(nr_averages//k)
+        # soft_sweep_points = np.arange(nr_averages//k)
+        soft_sweep_points = np.arange(nr_averages)
         soft_sweep_func = swf.None_Sweep()
 
     MC.soft_avg(soft_avgs)
@@ -813,9 +841,25 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
     MC.set_sweep_points_2D(soft_sweep_points)
 
     MC.set_detector_function(det_func)
-    MC.run_2D(label)
+    if run:
+        MC.run_2D(label)
 
-    ma.TwoD_Analysis(label=label, close_file=True)
+    if len(qubits) == 2:
+        ma.MeasurementAnalysis(label=label, TwoD=True, close_file=True)
+
+    # # reset all correlation channels in the UHFQC
+    # for ch in range(5):
+    #     UHFQC.set('quex_corr_{}_mode'.format(ch), 0)
+    #     UHFQC.set('quex_corr_{}_source'.format(ch), 0)
+    #
+    # for qb in qubits:
+    #     if thresholding and V_th_a is not None:
+    #         # set back the original threshold values
+    #         UHFQC.set('quex_thres_{}_level'.format(
+    #             qb.RO_acq_weight_function_I()), th_vals[qb.name])
+
+
+    return MC
 
 def measure_two_qubit_tomo_Bell(bell_state, qb_c, qb_t, f_LO,
                                 basis_pulses=None,

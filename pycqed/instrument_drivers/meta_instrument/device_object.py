@@ -997,11 +997,14 @@ def get_multiplexed_readout_pulse_dictionary(qubits):
 
 def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
                                                nr_shots=4095, UHFQC=None,
-                                               pulsar=None, correlations=None):
+                                               pulsar=None,
+                                               used_channels=None,
+                                               correlations=None):
     max_int_len = 0
     for qb in qubits:
         if qb.RO_acq_integration_length() > max_int_len:
             max_int_len = qb.RO_acq_integration_length()
+
     channels = []
     for qb in qubits:
         channels += [qb.RO_acq_weight_function_I()]
@@ -1011,6 +1014,8 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
 
     if correlations is None:
         correlations = []
+    if used_channels is None:
+        used_channels = channels
 
     for qb in qubits:
         if UHFQC is None:
@@ -1030,14 +1035,20 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
         'int_avg_det': det.UHFQC_integrated_average_detector(
             UHFQC=UHFQC, AWG=pulsar, channels=channels,
             integration_length=max_int_len, nr_averages=nr_averages),
+        'dig_avg_det': det.UHFQC_integrated_average_detector(
+            UHFQC=UHFQC, AWG=pulsar, channels=channels,
+            integration_length=max_int_len, nr_averages=nr_averages,
+            result_logging_mode='digitized'),
         'inp_avg_det': det.UHFQC_input_average_detector(
             UHFQC=UHFQC, AWG=pulsar, nr_averages=nr_averages, nr_samples=4096),
         'int_corr_det': det.UHFQC_correlation_detector(
             UHFQC=UHFQC, AWG=pulsar, channels=channels,
+            used_channels=used_channels,
             integration_length=max_int_len, nr_averages=nr_averages,
             correlations=correlations),
         'dig_corr_det': det.UHFQC_correlation_detector(
             UHFQC=UHFQC, AWG=pulsar, channels=channels,
+            used_channels=used_channels,
             integration_length=max_int_len, nr_averages=nr_averages,
             correlations=correlations, thresholding=True),
     }
@@ -1072,7 +1083,7 @@ def multiplexed_pulse(readouts, f_LO, upload=True, plot_filename=False):
             samples = int(qb.RO_pulse_length() * fs)
             tbase = np.linspace(0, samples / fs, samples, endpoint=False)
             pulse = qb.RO_amp() * np.exp(
-                -2j * np.pi * qb.f_RO_mod() * tbase + 0.25j * np.pi)
+                -2j * np.pi * qb.f_RO_mod() * tbase)
             qb_pulses[qb.name] = pulse
             if pulse.size > maxlen:
                 maxlen = pulse.size

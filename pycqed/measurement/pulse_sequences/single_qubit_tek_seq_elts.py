@@ -738,6 +738,7 @@ def Randomized_Benchmarking_seq_one_length(pulse_pars, RO_pars,
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
 
+    # pulse_keys_list = []
     for i in nr_seeds:
 
         if cal_points and (i == (len(nr_seeds)-4) or
@@ -752,9 +753,13 @@ def Randomized_Benchmarking_seq_one_length(pulse_pars, RO_pars,
             cl_seq = rb.randomized_benchmarking_sequence(
                 nr_cliffords_value, desired_net_cl=net_clifford,
                 interleaved_gate=interleaved_gate)
+
             pulse_keys = rb.decompose_clifford_seq(
                 cl_seq,
                 gate_decomp=gate_decomposition)
+
+            # pulse_keys_list.append(pulse_keys)
+
             pulse_list = [pulses[x] for x in pulse_keys]
             # print('\n',pulse_keys)
             # a = [j for j in pulse_keys if 'Z' not in j]
@@ -763,17 +768,20 @@ def Randomized_Benchmarking_seq_one_length(pulse_pars, RO_pars,
             pulse_list += [RO_pars]
             # find index of first pulse in pulse_list that is not a Z pulse
             # copy this pulse and set extra wait
-            try:
-                first_x_pulse = next(j for j in pulse_list if 'Z' not in j['pulse_type'])
-                first_x_pulse_idx = pulse_list.index(first_x_pulse)
-                #print('first_x_pulse_idx = ', first_x_pulse_idx)
-            except:
-                first_x_pulse_idx = 0
-            pulse_list[first_x_pulse_idx] = deepcopy(pulse_list[first_x_pulse_idx])
-            pulse_list[first_x_pulse_idx]['pulse_delay'] += post_msmt_delay
+
+            # try:
+            #     first_x_pulse = next(j for j in pulse_list if 'Z' not in j['pulse_type'])
+            #     first_x_pulse_idx = pulse_list.index(first_x_pulse)
+            #     #print('first_x_pulse_idx = ', first_x_pulse_idx)
+            # except:
+            #     first_x_pulse_idx = 0
+            # pulse_list[first_x_pulse_idx] = deepcopy(pulse_list[first_x_pulse_idx])
+            # pulse_list[first_x_pulse_idx]['pulse_delay'] += post_msmt_delay
             el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
+
+        # print(pulse_keys)
 
         # If the element is too long, add in an extra wait elt
         # to skip a trigger
@@ -786,6 +794,7 @@ def Randomized_Benchmarking_seq_one_length(pulse_pars, RO_pars,
         return seq, el_list
     else:
         return seq, el_list
+        # return pulse_keys_list
 
 
 def Freq_XY(freqs, pulse_pars, RO_pars,
@@ -961,6 +970,31 @@ def Rising_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
     seq.append_element(el, trigger_wait=True)
     if upload:
         station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq
+
+
+def custom_seq(seq_func, sweep_points, pulse_pars, RO_pars,
+               upload=True, return_seq=False):
+
+    seq_name = 'Custom_sequence'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+    pulses = get_pulse_dict_from_pars(pulse_pars)
+
+    for i in sweep_points:
+        pulse_keys_list = seq_func(i, sweep_points)
+        pulse_list = [pulses[key] for key in pulse_keys_list]
+        pulse_list += [RO_pars]
+
+        el = multi_pulse_elt(i, station, pulse_list)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, verbose=False)
+
     if return_seq:
         return seq, el_list
     else:

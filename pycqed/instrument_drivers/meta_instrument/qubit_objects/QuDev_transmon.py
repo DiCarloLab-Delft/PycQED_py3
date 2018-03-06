@@ -17,6 +17,7 @@ from pycqed.measurement.pulse_sequences import single_qubit_tek_seq_elts as sq
 from pycqed.measurement.pulse_sequences import fluxing_sequences as fsqs
 from pycqed.measurement.pulse_sequences import calibration_elements as cal_elts
 from pycqed.analysis import measurement_analysis as ma
+import pycqed.analysis.randomized_benchmarking_analysis as rbma
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.utilities.general import add_suffix_to_dict_keys
 from pycqed.instrument_drivers.meta_instrument.qubit_objects.qubit_object \
@@ -308,6 +309,12 @@ class QuDev_transmon(Qubit):
             channels=channels,
             integration_length=self.RO_acq_integration_length())
 
+        self.dig_avg_det = det.UHFQC_integrated_average_detector(
+            self.UHFQC, self.AWG, nr_averages=self.RO_acq_averages(),
+            channels=channels,
+            integration_length=self.RO_acq_integration_length(),
+            result_logging_mode='digitized')
+
         self.inp_avg_det = det.UHFQC_input_average_detector(
             UHFQC=self.UHFQC, AWG=self.AWG, nr_averages=self.RO_acq_averages(),
             nr_samples=int(self.ro_acq_input_average_length()*1.8e9))
@@ -470,7 +477,7 @@ class QuDev_transmon(Qubit):
 
         # UHFQC settings
         if 'drive' in suppress:
-            self.UHFQC.awg_sequence_acquisition(trigger=True)
+            self.UHFQC.awg_sequence_acquisition()
             self.set_readout_weights('SSB')
         else:
             self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(
@@ -478,9 +485,6 @@ class QuDev_transmon(Qubit):
                 RO_pulse_length=self.RO_pulse_length(),
                 alpha=self.ro_alpha(), phi_skew=self.ro_phi_skew())
             self.set_readout_weights('SSB', f_mod=dc_if)
-
-
-
 
     def set_readout_weights(self, type=None, f_mod=None):
         if type is None:
@@ -1306,6 +1310,7 @@ class QuDev_transmon(Qubit):
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
     def measure_randomized_benchmarking(self, nr_cliffords=None, nr_seeds=50,
+                                        thresholded=False, RO_pars=None,
                                         MC=None, close_fig=True,
                                         upload=False, analyze=True,
                                         gate_decomp='HZ', label=None,
@@ -1326,9 +1331,23 @@ class QuDev_transmon(Qubit):
         if MC is None:
             MC = self.MC
 
+        if RO_pars is None:
+            RO_pars = self.get_RO_pars()
+
         if label is None:
-            label = 'RB_{}_{}_seeds_{}_cliffords'.format(
-                gate_decomp, nr_seeds, nr_cliffords[-1]) + self.msmt_suffix
+            if interleaved_gate is None:
+                label = 'RB_{}_{}_seeds_{}_cliffords'.format(
+                    gate_decomp, nr_seeds, nr_cliffords[-1]) + self.msmt_suffix
+            else:
+                label = 'IRB_{}_{}_{}_seeds_{}_cliffords'.format(
+                    interleaved_gate, gate_decomp,
+                    nr_seeds, nr_cliffords[-1]) \
+                        + self.msmt_suffix
+
+        if thresholded:
+            if int(self.UHFQC.get('quex_thres_{}_level'.format(
+                    self.RO_acq_weight_function_I()))) == 0:
+                raise ValueError('The threshold value is not set.')
 
         nr_seeds_arr = np.arange(nr_seeds)
         if cal_points:
@@ -1341,7 +1360,7 @@ class QuDev_transmon(Qubit):
             sweep_points1D = nr_seeds_arr
 
         RB_sweepfunction = awg_swf.Randomized_Benchmarking_one_length(
-            pulse_pars=self.get_drive_pars(), RO_pars=self.get_RO_pars(),
+            pulse_pars=self.get_drive_pars(), RO_pars=RO_pars,
             cal_points=cal_points, gate_decomposition=gate_decomp,
             nr_cliffords_value=nr_cliffords[0], upload=upload,
             interleaved_gate=interleaved_gate)
@@ -1354,18 +1373,22 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_function_2D(RB_sweepfunction_2D)
         MC.set_sweep_points_2D(nr_cliffords)
         if det_func is None:
-            MC.set_detector_function(self.int_avg_det)
+            if thresholded:
+                MC.set_detector_function(self.dig_avg_det)
+            else:
+                MC.set_detector_function(self.int_avg_det)
         else:
             MC.set_detector_function(det_func)
 
         MC.run(label, mode='2D')
 
         if analyze:
-            ma.TwoD_Analysis(label=label,
-                             close_fig=close_fig,
-                             qb_name=self.name,)
-            # ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
-            #                        qb_name=self.name, TwoD=True)
+            # ma.TwoD_Analysis(label=label,
+            #                  close_fig=close_fig,
+            #                  qb_name=self.name,)
+            ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
+                                   qb_name=self.name, TwoD=True)
+        return MC
 
     def measure_transients(self, MC=None, cases=('off', 'on'), upload=True,
                            analyze=True, **kw):
@@ -1527,13 +1550,22 @@ class QuDev_transmon(Qubit):
         if MC is None:
             MC = self.MC
         self.prepare_for_mixer_calibration(suppress='drive sideband')
-        detector = det.UHFQC_readout_mixer_skewness_det(
+        detector = det.UHFQC_mixer_skewness_det(
             self.UHFQC, qc.station, [self.RO_acq_weight_function_I(),
                                      self.RO_acq_weight_function_Q()],
-            self.ro_alpha, self.ro_phi_skew, self.f_RO_mod(),
+            self.pulse_I_channel(), self.pulse_Q_channel(),
+            self.alpha, self.phi_skew, self.f_pulse_mod(),
             self.RO_acq_marker_channel(),
             amplitude=amplitude, nr_averages=self.RO_acq_averages(),
             RO_trigger_separation=trigger_sep, verbose=False)
+        # detector = det.UHFQC_readout_mixer_skewness_det(
+        #     self.UHFQC, qc.station, [self.RO_acq_weight_function_I(),
+        #                              self.RO_acq_weight_function_Q()],
+        #     self.ro_alpha, self.ro_phi_skew, self.f_RO_mod(),
+        #     self.RO_acq_marker_channel(),
+        #     nr_averages=self.RO_acq_averages(),
+        #     RO_pulse_length=self.RO_pulse_length(),
+        #     verbose=False)
         ad_func_pars = {'adaptive_function': opti.nelder_mead,
                         'x0': [self.alpha(), self.phi_skew()],
                         'initial_step': initial_stepsize,
@@ -2492,6 +2524,7 @@ class QuDev_transmon(Qubit):
 
     def find_RB_gate_fidelity(self, nr_cliffords, label=None, nr_seeds=10,
                               MC=None, cal_points=True, gate_decomposition='HZ',
+                              thresholded=False,
                               no_cal_points=None, close_fig=True,
                               upload=True, det_func=None, **kw):
 
@@ -2546,29 +2579,36 @@ class QuDev_transmon(Qubit):
             if interleaved_gate is None:
                 if for_ef:
                     label = 'RB_2nd_{}_{}_seeds_{}_cliffords'.format(
-                        gate_decomposition, nr_seeds-no_cal_points,
+                        gate_decomposition, nr_seeds,
                         nr_cliffords[-1]) + self.msmt_suffix
                 else:
                     label = 'RB_{}_{}_seeds_{}_cliffords'.format(
-                        gate_decomposition, nr_seeds-no_cal_points,
+                        gate_decomposition, nr_seeds,
                         nr_cliffords[-1]) + self.msmt_suffix
             else:
                 if for_ef:
                     label = 'IRB_2nd_{}_{}_{}_seeds_{}_cliffords'.format(
                         interleaved_gate, gate_decomposition,
-                        nr_seeds-no_cal_points, nr_cliffords[-1]) \
+                        nr_seeds, nr_cliffords[-1]) \
                             + self.msmt_suffix
                 else:
                     label = 'IRB_{}_{}_{}_seeds_{}_cliffords'.format(
                         interleaved_gate, gate_decomposition,
-                        nr_seeds-no_cal_points, nr_cliffords[-1]) \
+                        nr_seeds, nr_cliffords[-1]) \
                             + self.msmt_suffix
+
+        if thresholded:
+            label += '_thresh'
+            if int(self.UHFQC.get('quex_thres_{}_level'.format(
+                    self.RO_acq_weight_function_I()))) == 0:
+                raise ValueError('The threshold value is not set.')
 
         #Perform measurement
         self.measure_randomized_benchmarking(nr_cliffords=nr_cliffords,
                                              nr_seeds=nr_seeds, MC=MC,
                                              close_fig=close_fig,
                                              gate_decomp=gate_decomposition,
+                                             thresholded=thresholded,
                                              cal_points=cal_points,
                                              label=label,
                                              analyze=analyze,
@@ -2579,7 +2619,7 @@ class QuDev_transmon(Qubit):
         #Analysis
         if analyze:
             pulse_delay = self.gauss_sigma() * self.nr_sigma()
-            RB_Analysis = ma.RandomizedBenchmarking_Analysis_new(label=label,
+            RB_Analysis = rbma.RandomizedBenchmarking_Analysis(label=label,
                                          qb_name=self.name,
                                          T1=T1, T2=T2, pulse_delay=pulse_delay,
                                          NoCalPoints=no_cal_points,

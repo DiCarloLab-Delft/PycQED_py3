@@ -23,7 +23,6 @@ reload(pulse_library)
 
 reload(element)
 
-
 def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
                     trigger=True, previous_element=None):
     """
@@ -39,7 +38,7 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
     Note: this function is used to generate most standard elements we use.
     """
     # Prevents accidently overwriting pulse pars in this list
-    pulse_list = deepcopy(pulse_list)
+    pulse_list = [deepcopy(pulse) for pulse in pulse_list]
     last_op_type = 'other'  # used for determining relevant buffers
 
     if sequencer_config is None:
@@ -101,6 +100,7 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
         phase_offset = previous_element.drive_phase_offsets.copy()
     j = 0
     for i, pulse_pars in enumerate(pulse_list):
+
         # Default values for backwards compatibility
         if 'refpoint' not in pulse_pars.keys():
             # default refpoint for backwards compatibility
@@ -225,7 +225,6 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
             if qubit_name not in phase_offset:
                 phase_offset[qubit_name] = 0
             phase_offset[qubit_name] -= offset
-
     el.drive_phase_offsets = phase_offset.copy()
 
     # make sure that the waveforms on all the channels end at the same time

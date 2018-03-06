@@ -102,6 +102,34 @@ HZ_gate_decomposition[20] = ['mX90', 'Z180', 'X90', 'Z90']
 HZ_gate_decomposition[21] = ['mZ90', 'X90', 'Z90']
 HZ_gate_decomposition[22] = ['mX90', 'mZ90', 'X180', 'Z90']
 HZ_gate_decomposition[23] = ['mZ90']
+# HZ_gate_decomposition = [[]]*(24)
+# # explictly reversing order because order of operators is order in time
+# HZ_gate_decomposition[0] = ['I']
+# HZ_gate_decomposition[1] = ['X90', 'Z90']
+# HZ_gate_decomposition[2] = ['mZ90', 'mX90']
+# HZ_gate_decomposition[3] = ['X180']
+# HZ_gate_decomposition[4] = ['mZ90', 'mX90', 'Z90', 'mX90']
+# HZ_gate_decomposition[5] = ['mZ90', 'mX90', 'Z180']
+# HZ_gate_decomposition[6] = ['mZ90', 'X180', 'Z90']
+# HZ_gate_decomposition[7] = ['mZ90', 'mX90', 'Z90', 'X90']
+# HZ_gate_decomposition[8] = ['X90', 'mZ90', 'X90', 'Z90']
+# HZ_gate_decomposition[9] = ['mZ180']
+# HZ_gate_decomposition[10] = ['mZ180', 'X90', 'Z90']
+# HZ_gate_decomposition[11] = ['Z90', 'mX90']
+#
+# HZ_gate_decomposition[12] = ['Z90', 'X90', 'Z90']
+# HZ_gate_decomposition[13] = ['mX90']
+# HZ_gate_decomposition[14] = ['Z90']
+# HZ_gate_decomposition[15] = ['mZ90', 'mX90', 'Z90']
+# HZ_gate_decomposition[16] = ['X90']
+# HZ_gate_decomposition[17] = ['X180', 'Z90']
+# HZ_gate_decomposition[18] = ['mZ90', 'mX90', 'Z90', 'X180']
+# HZ_gate_decomposition[19] = ['X90', 'mZ90', 'X180', 'Z90']
+# HZ_gate_decomposition[20] = ['mX90', 'Z180', 'X90', 'Z90']
+# HZ_gate_decomposition[21] = ['mZ90', 'X90', 'Z90']
+# HZ_gate_decomposition[22] = ['mX90', 'mZ90', 'X180', 'Z90']
+# HZ_gate_decomposition[23] = ['mZ90']
+
 
 
 

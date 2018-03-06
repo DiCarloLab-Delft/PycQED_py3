@@ -1817,6 +1817,7 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
     def __init__(self, UHFQC, AWG=None, integration_length=1e-6,
                  nr_averages=1024, rotate=False, real_imag=True,
                  channels: list = [0, 1], correlations: list=[(0, 1)],
+                 used_channels=None,
                  value_names=None,
                  seg_per_point=1, single_int_avg=False, thresholding=False,
                  **kw):
@@ -1829,6 +1830,10 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             **kw)
         self.correlations = correlations
         self.thresholding = thresholding
+
+        self.used_channels = used_channels
+        if self.used_channels is None:
+            self.used_channels = self.channels
 
         if value_names is None:
             self.value_names = []
@@ -1876,15 +1881,16 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
         self.correlation_channels = []
         for corr in self.correlations:
             # Start by assigning channels
-            if corr[0] not in self.channels or corr[1] not in self.channels:
-                raise ValueError('Correlations should be in channels')
+            if corr[0] not in self.used_channels or \
+                            corr[1] not in self.used_channels:
+                raise ValueError('Correlations should be in used channels')
 
             correlation_channel = -1
 
             # # 4 is the (current) max number of weights in the UHFQC (v5)
-            for ch in range(9):
+            for ch in range(5):
                 # Find the first unused channel to set up as correlation
-                if ch not in self.channels:
+                if ch not in self.used_channels:
                     # selects the lowest available free channel
                     correlation_channel = ch
                     self.channels += [ch]
@@ -2033,7 +2039,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
                                                   channel)
         if result_logging_mode == 'raw':
             self.value_units = ['V']*len(self.channels)
-            self.scaling_factor = 1/(1.8e9*integration_length)
+            self.scaling_factor = 1#/(1.8e9*integration_length)
         else:
             self.value_units = ['']*len(self.channels)
             self.scaling_factor = 1

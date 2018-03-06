@@ -2301,3 +2301,24 @@ class Readout_pulse_scope_swf(swf.Hard_Sweep):
                 cal_points=self.cal_points,
                 comm_freq=self.comm_freq,
                 verbose=self.verbose)
+
+
+class Custom_single_qubit_swf(swf.Hard_Sweep):
+
+    def __init__(self, seq_func, pulse_pars, RO_pars, upload=True):
+        super().__init__()
+        self.seq_func = seq_func
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.upload = upload
+
+        self.name = 'Custom_swf'
+        self.parameter_name = 'seg_num'
+        self.unit = '#'
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs.custom_seq(seq_func = self.seq_func,
+                           sweep_points=self.sweep_points,
+                           pulse_pars=self.pulse_pars,
+                           RO_pars=self.RO_pars, upload=True)

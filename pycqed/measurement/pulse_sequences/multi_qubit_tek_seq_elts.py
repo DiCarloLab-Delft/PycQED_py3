@@ -1128,7 +1128,7 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_list, RO_pars,
         seq = sequence.Sequence(seq_name)
         el_list = []
 
-        for i in nr_seeds:
+        for elt_idx, i in enumerate(nr_seeds):
             clifford_sequence_list = []
             for index in range(n):
                 clifford_sequence_list.append(
@@ -1154,14 +1154,14 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_list, RO_pars,
                     if pulse_keys_lst[0][-3::] == qbc.name:
                         if interleave_CZ:
                             pulse_keys_lst.extend([
-                                'spacer '+ qbc.name,
+                                'spacer ' + qbc.name,
                                 'CZ ' + qbt.name + ' ' + qbc.name,
-                                'spacer '+ qbc.name])
+                                'spacer ' + qbc.name])
                         else:
                             pulse_keys_lst.extend([
-                                'spacer '+ qbc.name,
+                                'spacer ' + qbc.name,
                                 'ICZ ' + qbc.name,
-                                'spacer '+ qbc.name])
+                                'spacer ' + qbc.name])
                     if pulse_keys_lst[0][-3::] == qbt.name:
                         pulse_keys_lst.extend(['spacer '+qbt.name,
                                                'ICZ ' + qbt.name,
@@ -1193,13 +1193,13 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_list, RO_pars,
                     # of all SSB pulse parameters
                     SSB_after_Z_on_qb0 = [y+1+qubit_length_pulse_list.index(j)
                                           for j in qubit_length_pulse_list
-                                          if j['pulse_type']!='Z_pulse']
+                                          if j['pulse_type'] != 'Z_pulse']
                     if len(SSB_after_Z_on_qb0)>0:
                         # if SSB pulses were found, delete the 'refpoint' entry
                         # in the first qb after qb0 that has an SSB pulse
                         first_SSB = next(y+1+qubit_length_pulse_list.index(j)
                                          for j in qubit_length_pulse_list
-                                         if j['pulse_type']!='Z_pulse')
+                                         if j['pulse_type'] != 'Z_pulse')
                         temp_SSB_pulse = deepcopy(pulse_list[first_SSB])
                         temp_SSB_pulse.pop('refpoint')
                         pulse_list[first_SSB] = temp_SSB_pulse
@@ -1219,7 +1219,12 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_list, RO_pars,
             # pulse_list[first_x_pulse_idx]['pulse_delay'] += post_msmt_delay
 
             if verbose:
-                print('pulse_keys_by_qubit ', pulse_keys_by_qubit)
+                print('clifford_sequence_list')
+                for cl_l in clifford_sequence_list:
+                    print(cl_l)
+                print('pulse_keys_by_qubit')
+                for p_l in pulse_keys_by_qubit:
+                    print(p_l)
                 # print('\nfinal pulse_list ', pulse_list)
                 print('\nlen_pulse_list/nr_qubits ',(len(pulse_list)-1)/n)
                 print('\nnr_finite_duration_pulses/nr_qubits ',
@@ -1227,15 +1232,17 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_list, RO_pars,
                            if 'Z' not in x['pulse_type']])/n)
                 print('\nnr_Z_pulses/nr_qubits ', len([x for x in pulse_list
                                                        if 'Z' in x['pulse_type']])/n)
-                print('\n i ', i)
+                print('\nelt_idx ', elt_idx)
+                print('\ni ', i)
 
+                # print('pulse_list')
                 # from pprint import pprint
                 # for i,p in enumerate(pulse_list):
                 #     print()
                 #     print(i%n)
                 #     pprint(p)
 
-            el = multi_pulse_elt(i, station, pulse_list)
+            el = multi_pulse_elt(elt_idx, station, pulse_list)
             el_list.append(el)
             seq.append_element(el, trigger_wait=True)
 
@@ -1249,7 +1256,7 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_list, RO_pars,
         seq = sequence.Sequence(seq_name)
         el_list = []
 
-        for i in nr_seeds:
+        for elt_idx, i in enumerate(nr_seeds):
             cl_seq = rb.randomized_benchmarking_sequence(
                 nr_cliffords_value, desired_net_cl=net_clifford,
                 interleaved_gate=interleaved_gate)
@@ -1328,7 +1335,7 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_list, RO_pars,
                 print('\nnr_Z_pulses/nr_qubits ', len([x for x in pulse_list
                                                        if 'Z' in x['pulse_type']])/n)
                 print('\n i ', i)
-            el = multi_pulse_elt(i, station, pulse_list)
+            el = multi_pulse_elt(elt_idx, station, pulse_list)
             el_list.append(el)
             seq.append_element(el, trigger_wait=True)
 

@@ -109,6 +109,7 @@ class MeasurementAnalysis(object):
     def load_hdf5data(self, folder=None, file_only=False, **kw):
         if folder is None:
             folder = self.folder
+
         self.h5filepath = a_tools.measurement_filename(folder)
         h5mode = kw.pop('h5mode', 'r+')
         self.data_file = h5py.File(self.h5filepath, h5mode)
@@ -1195,7 +1196,7 @@ class TD_Analysis(MeasurementAnalysis):
         close_file = kw.pop('close_file',True)
 
         super().run_default_analysis(show=show,
-            close_file=close_file, **kw)
+            close_file=False, **kw)
 
         self.add_analysis_datagroup_to_file()
 
@@ -5214,41 +5215,57 @@ class RandomizedBenchmarking_Analysis_new(TD_Analysis):
             if self.cal_points is None:
                 self.cal_points = [list(range(-4, -2)), list(range(-2, 0))]
 
-            MeasurementAnalysis.run_default_analysis(self, close_file=False, **kw)
-
+            MeasurementAnalysis.run_default_analysis(self,
+                                                     close_file=False, **kw)
             self.add_analysis_datagroup_to_file()
 
-            self.n_cl = np.unique(self.sweep_points_2D)
-            nr_sweep_pts = self.sweep_points.size #nr_seeds+NoCalPts
-            self.nr_seeds = nr_sweep_pts - 2*len(self.cal_points[0])
-            data = np.zeros(self.n_cl.size)
+            if len(self.measured_values) == 1:
+                logging.warning('Data is assumed to be thresholded!')
+                logging.warning('Data is assumed to be thresholded!')
+                self.n_cl = np.unique(self.sweep_points_2D)
+                self.nr_seeds = self.sweep_points.size
 
-            data_rearranged = [np.zeros((self.n_cl.size, nr_sweep_pts)),
-                               np.zeros((self.n_cl.size, nr_sweep_pts))]
-            I = self.measured_values[0]
-            Q = self.measured_values[1]
-            for i in range(self.n_cl.size):
-                for j in range(nr_sweep_pts):
-                    data_rearranged[0][i, j] = I[j, i]
-                    data_rearranged[1][i, j] = Q[j, i]
-            self.data_rearranged = data_rearranged
-            a = np.zeros((2, nr_sweep_pts))  #this is an array with the same shape as
-                                         #as measured_values for TwoD==False
-            self.data_calibrated = deepcopy(self.data_rearranged[0])
-            for i in range(self.n_cl.size):
-                a[0] = data_rearranged[0][i]
-                a[1] = data_rearranged[1][i]
-                data_calibrated = a_tools.rotate_and_normalize_data(a,
-                                                            self.cal_points[0],
-                                                            self.cal_points[1])[0]
-                self.data_calibrated[i] = data_calibrated
-                data_calibrated = data_calibrated[:-int(self.NoCalPoints)]
-                data[i] = np.mean(data_calibrated)
+                data_raw = self.measured_values[0]
 
-            self.calibrated_data_points = np.zeros(shape=(self.data_calibrated.shape[0],
-                                                   self.nr_seeds))
-            for i,d in enumerate(self.data_calibrated):
-                self.calibrated_data_points[i] = d[:-int(2*len(self.cal_points[0]))]
+                data = np.zeros((self.n_cl.size))
+                for i in range(self.n_cl.size):
+                    data[i] = np.mean([data_raw[j][i] for j in
+                                       range(self.nr_seeds)])
+
+                data = 1 - data
+
+            else:
+                self.n_cl = np.unique(self.sweep_points_2D)
+                nr_sweep_pts = self.sweep_points.size #nr_seeds+NoCalPts
+                self.nr_seeds = nr_sweep_pts - 2*len(self.cal_points[0])
+                data = np.zeros(self.n_cl.size)
+
+                data_rearranged = [np.zeros((self.n_cl.size, nr_sweep_pts)),
+                                   np.zeros((self.n_cl.size, nr_sweep_pts))]
+                I = self.measured_values[0]
+                Q = self.measured_values[1]
+                for i in range(self.n_cl.size):
+                    for j in range(nr_sweep_pts):
+                        data_rearranged[0][i, j] = I[j, i]
+                        data_rearranged[1][i, j] = Q[j, i]
+                self.data_rearranged = data_rearranged
+                a = np.zeros((2, nr_sweep_pts))  #this is an array with the same shape as
+                                             #as measured_values for TwoD==False
+                self.data_calibrated = deepcopy(self.data_rearranged[0])
+                for i in range(self.n_cl.size):
+                    a[0] = data_rearranged[0][i]
+                    a[1] = data_rearranged[1][i]
+                    data_calibrated = a_tools.rotate_and_normalize_data(a,
+                                                                self.cal_points[0],
+                                                                self.cal_points[1])[0]
+                    self.data_calibrated[i] = data_calibrated
+                    data_calibrated = data_calibrated[:-int(self.NoCalPoints)]
+                    data[i] = np.mean(data_calibrated)
+
+                self.calibrated_data_points = np.zeros(shape=(self.data_calibrated.shape[0],
+                                                       self.nr_seeds))
+                for i,d in enumerate(self.data_calibrated):
+                    self.calibrated_data_points[i] = d[:-int(2*len(self.cal_points[0]))]
 
             self.data = data
             #data = self.corr_data[:-1*(len(self.cal_points[0]*2))]
