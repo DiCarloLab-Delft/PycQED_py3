@@ -436,9 +436,12 @@ class QuDev_transmon(Qubit):
         Sets up MWG and UHFQC settings for mixer calibration. It is up to the
         user to set the switch configuration to the correct position.
         Args:
-            suppress: 'drive LO' or 'sideband'. Determines the readout
+            suppress: 'drive/readout LO/sideband'. Determines the readout
                       demodulation frequency.
         """
+        if dc_if is None or 'drive' in suppress:
+            dc_if=self.f_RO_mod()
+
         if self.cw_source is not None:
             self.cw_source.off()
 
@@ -459,21 +462,23 @@ class QuDev_transmon(Qubit):
         self.AWG.set(self.pulse_Q_channel() + '_offset',
                      self.pulse_Q_offset())
 
-        # readout LO
+        # readout frequency
         if suppress == 'drive LO':
             f_RO = self.drive_LO.frequency()
         elif suppress == 'drive sideband':
             f_RO = self.drive_LO.frequency() - self.f_pulse_mod()
-
+        elif suppress == 'readout LO':
+            f_RO = self.f_RO() - self.f_RO_mod()
+        elif suppress == 'readout sideband':
+            f_RO = self.f_RO() - 2*self.f_RO_mod()
+        self.readout_DC_LO.frequency(f_RO - dc_if)
         self.readout_DC_LO.pulsemod_state('Off')
-        if 'drive' in suppress:
-            self.readout_DC_LO.frequency(f_RO - self.f_RO_mod())
-        else:
-            self.readout_DC_LO.frequency(self.f_RO() - dc_if)
+        self.readout_DC_LO.on()
+
+        if 'readout' in suppress:
             self.readout_UC_LO.pulsemod_state('Off')
             self.readout_UC_LO.frequency(self.f_RO() - self.f_RO_mod())
             self.readout_UC_LO.on()
-        self.readout_DC_LO.on()
 
         # UHFQC settings
         if 'drive' in suppress:
@@ -1597,10 +1602,10 @@ class QuDev_transmon(Qubit):
             MC = self.MC
         self.prepare_for_mixer_calibration('readout sideband', dc_if=dc_if)
         detector = det.UHFQC_readout_mixer_skewness_det(
-            self.UHFQC, self.AWG, [self.RO_acq_weight_function_I(),
-                         self.RO_acq_weight_function_Q()],
+            self.UHFQC, None, [self.RO_acq_weight_function_I(),
+                                   self.RO_acq_weight_function_Q()],
             self.ro_alpha, self.ro_phi_skew, self.f_RO_mod(), self.RO_amp(),
-            self.RO_acq_averages(), verbose=False)
+            self.RO_pulse_length(), self.RO_acq_averages(), verbose=False)
         ad_func_pars = {'adaptive_function': opti.nelder_mead,
                         'x0': [self.ro_alpha(), self.ro_phi_skew()],
                         'initial_step': initial_stepsize,
@@ -1645,6 +1650,21 @@ class QuDev_transmon(Qubit):
         MC.set_detector_function(self.int_avg_det_spec)
         self.AWG.start()
         MC.run('mw_uc_spectrum' + self.msmt_suffix)
+        ma.MeasurementAnalysis(plot_args=dict(log=True, marker=''))
+
+    def measure_readout_mixer_spectrum(self, if_freqs, dc_if=50e6, MC=None,
+                                       amplitude=0.1, trigger_sep=5e-6):
+        if MC is None:
+            MC = self.MC
+        self.prepare_for_mixer_calibration('readout LO', dc_if=dc_if)
+        cal_elts.mixer_calibration_sequence(
+            trigger_sep, 0, self.RO_acq_marker_channel())
+        DC_LO_freqs = if_freqs + self.readout_UC_LO.frequency() - dc_if
+        MC.set_sweep_function(self.readout_DC_LO.frequency)
+        MC.set_sweep_points(DC_LO_freqs)
+        MC.set_detector_function(self.int_avg_det_spec)
+        self.AWG.start()
+        MC.run('ro_uc_spectrum' + self.msmt_suffix)
         ma.MeasurementAnalysis(plot_args=dict(log=True, marker=''))
 
     def find_optimized_weights(self, MC=None, update=True, measure=True, **kw):
@@ -1782,7 +1802,7 @@ class QuDev_transmon(Qubit):
         self.RO_acq_shots(prev_shots)
 
         if analyze:
-            rotate = self.RO_acq_weight_function_Q() is not None
+            rotate = self.ro_acq_weight_type() in {'SSB', 'DSB'}
             if thresholded:
                 channels = self.dig_log_det.value_names
             else:
@@ -1868,7 +1888,7 @@ class QuDev_transmon(Qubit):
                               flux_pulse_length=None, flux_pulse_amp=None,
                               flux_pulse_delay=None, flux_pulse_channel=None,
                               thetas=None, X90_separation=None,
-                              MC=None, label=None):
+                              MC=None, label=None, analyze=True):
 
         if flux_pulse_amp is None:
             raise ValueError('Unspecified flux_pulse_amp.')
@@ -1916,7 +1936,8 @@ class QuDev_transmon(Qubit):
         MC.set_detector_function(self.int_avg_det)
         MC.run_2D(name=label)
 
-        MA = ma.TwoD_Analysis(label=label, qb_name=self.name)
+        if analyze:
+            MA = ma.TwoD_Analysis(label=label, qb_name=self.name)
 
         self.flux_pulse_length(flux_pulse_length_backup)
         self.flux_pulse_amp(flux_pulse_amp_backup)
@@ -3607,10 +3628,10 @@ class QuDev_transmon(Qubit):
                                                         qb_target.name),
                 qb_name=self.name, cal_points=cal_points,
                 reference_measurements=True,
-                auto=True
+                plot=plot
             )
             fitted_phases, fitted_amps = \
-                flux_pulse_ma.fit_all(plot=False,
+                flux_pulse_ma.fit_all(plot=plot,
                                       cal_points=cal_points,
                                       return_ampl=True,
                                       )
@@ -3683,6 +3704,8 @@ class QuDev_transmon(Qubit):
         if MC is None:
             MC = self.MC
 
+        self.prepare_for_timedomain()
+
         s1 = awg_swf.Fluxpulse_scope_swf(self)
         s2 = awg_swf.Fluxpulse_scope_drive_freq_sweep(self)
 
@@ -3693,6 +3716,7 @@ class QuDev_transmon(Qubit):
         MC.set_detector_function(self.int_avg_det)
         MC.run_2D('Flux_scope_{}'.format(self.name))
 
+        ma.MeasurementAnalysis(TwoD=True)
 
 
 def add_CZ_pulse(qbc, qbt):
