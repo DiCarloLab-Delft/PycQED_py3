@@ -548,7 +548,7 @@ class QuDev_transmon(Qubit):
                 self.UHFQC.set('quex_rot_{}_imag'.format(c1), 1)
 
     def measure_resonator_spectroscopy(self, freqs=None, MC=None,
-                                        analyze=True, close_fig=True):
+                                       analyze=True, close_fig=True):
         """ Varies the frequency of the microwave source to the resonator and
         measures the transmittance """
         if freqs is None:
