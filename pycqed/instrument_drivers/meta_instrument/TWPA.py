@@ -5,6 +5,8 @@ from qcodes.utils import validators as vals
 from pycqed.measurement import detector_functions as det
 from pycqed.measurement.pulse_sequences import calibration_elements as cal_elts
 from pycqed.analysis import measurement_analysis as ma
+from pycqed.analysis import analysis_toolbox as a_tools
+from pycqed.analysis_v2 import amplifier_characterization as ca
 
 class TWPAObject(qc.Instrument):
     """
@@ -168,52 +170,83 @@ class TWPAObject(qc.Instrument):
         parameter2(initial_value2)
 
     def measure_vs_pump_freq(self, pump_freqs, analyze=True):
+        timestamp_start = a_tools.current_timestamp()
         self.on()
         self._measure_1D(self.pump_freq, pump_freqs, 'pump_freq_scan_on',
                          analyze)
         self.off()
         self._measure_1D(self.pump_freq, pump_freqs[:1], 'pump_freq_scan_off',
                          analyze)
+        if analyze:
+            timestamps = a_tools.get_timestamps_in_range(
+                timestamp_start, label='pump_freq_scan')
+            ca.Amplifier_Characterization_Analysis(timestamps)
 
     def measure_vs_signal_freq(self, signal_freqs, analyze=True):
+        timestamp_start = a_tools.current_timestamp()
         self.on()
         self._measure_1D(self.signal_freq, signal_freqs, 'signal_freq_scan_on',
                          analyze)
         self.off()
         self._measure_1D(self.signal_freq, signal_freqs, 'signal_freq_scan_off',
                          analyze)
+        if analyze:
+            timestamps = a_tools.get_timestamps_in_range(
+                timestamp_start, label='signal_freq_scan')
+            ca.Amplifier_Characterization_Analysis(timestamps)
 
     def measure_vs_pump_power(self, pump_powers, analyze=True):
+        timestamp_start = a_tools.current_timestamp()
         self.on()
         self._measure_1D(self.pump_power, pump_powers, 'pump_power_scan_on',
                          analyze)
         self.off()
         self._measure_1D(self.pump_power, pump_powers[:1],
                          'pump_power_scan_off', analyze)
+        if analyze:
+            timestamps = a_tools.get_timestamps_in_range(
+                timestamp_start, label='pump_power_scan')
+            ca.Amplifier_Characterization_Analysis(timestamps)
+
 
     def measure_vs_signal_freq_pump_freq(self, signal_freqs, pump_freqs,
                                          analyze=True):
+        timestamp_start = a_tools.current_timestamp()
         self.on()
         self._measure_2D(self.signal_freq, self.pump_freq, signal_freqs,
                          pump_freqs, 'signal_freq_pump_freq_scan_on', analyze)
         self.off()
         self._measure_1D(self.signal_freq, signal_freqs,
                          'signal_freq_pump_freq_scan_off', analyze)
+        if analyze:
+            timestamps = a_tools.get_timestamps_in_range(
+                timestamp_start, label='signal_freq_pump_freq_scan')
+            ca.Amplifier_Characterization_Analysis(timestamps)
 
     def measure_vs_signal_freq_pump_power(self, signal_freqs, pump_powers,
                                          analyze=True):
+        timestamp_start = a_tools.current_timestamp()
         self.on()
         self._measure_2D(self.signal_freq, self.pump_power, signal_freqs,
                          pump_powers, 'signal_freq_pump_power_scan_on', analyze)
         self.off()
         self._measure_1D(self.signal_freq, signal_freqs,
                          'signal_freq_pump_power_scan_off', analyze)
+        if analyze:
+            timestamps = a_tools.get_timestamps_in_range(
+                timestamp_start, label='signal_freq_pump_power_scan')
+            ca.Amplifier_Characterization_Analysis(timestamps)
 
     def measure_vs_pump_freq_pump_power(self, pump_freqs, pump_powers,
                                         analyze=True):
+        timestamp_start = a_tools.current_timestamp()
         self.on()
         self._measure_2D(self.pump_freq, self.pump_power, pump_freqs,
                          pump_powers, 'pump_freq_pump_power_scan_on', analyze)
         self.off()
         self._measure_1D(self.pump_freq, pump_freqs[:1],
                          'pump_freq_pump_power_scan_off', analyze)
+        if analyze:
+            timestamps = a_tools.get_timestamps_in_range(
+                timestamp_start, label='pump_freq_pump_power_scan')
+            ca.Amplifier_Characterization_Analysis(timestamps)
