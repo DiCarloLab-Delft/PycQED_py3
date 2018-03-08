@@ -136,7 +136,6 @@ class TWPAObject(qc.Instrument):
 
         initial_value = parameter()
 
-        self.on()
         MC.set_sweep_function(parameter)
         MC.set_sweep_points(values)
         MC.set_detector_function(detector)
@@ -216,6 +215,5 @@ class TWPAObject(qc.Instrument):
         self._measure_2D(self.pump_freq, self.pump_power, pump_freqs,
                          pump_powers, 'pump_freq_pump_power_scan_on', analyze)
         self.off()
-        self._measure_2D(self.pump_freq, self.pump_power, pump_freqs[:1],
-                         pump_powers[:1], 'pump_freq_pump_power_scan_off',
-                         analyze)
+        self._measure_1D(self.pump_freq, pump_freqs[:1],
+                         'pump_freq_pump_power_scan_off', analyze)
