@@ -140,15 +140,7 @@ class TWPAObject(qc.Instrument):
         MC.set_sweep_function(parameter)
         MC.set_sweep_points(values)
         MC.set_detector_function(detector)
-        MC.run(name=label + '_on' + self.msmt_suffix)
-        if analyze:
-            ma.MeasurementAnalysis(auto=True)
-
-        self.off()
-        MC.set_sweep_function(parameter)
-        MC.set_sweep_points(values)
-        MC.set_detector_function(detector)
-        MC.run(name=label + '_off' + self.msmt_suffix)
+        MC.run(name=label + self.msmt_suffix)
         if analyze:
             ma.MeasurementAnalysis(auto=True)
 
@@ -164,23 +156,12 @@ class TWPAObject(qc.Instrument):
         initial_value1 = parameter1()
         initial_value2 = parameter2()
 
-        self.on()
         MC.set_sweep_function(parameter1)
         MC.set_sweep_function_2D(parameter2)
         MC.set_sweep_points(values1)
         MC.set_sweep_points_2D(values2)
         MC.set_detector_function(detector)
-        MC.run(name=label + '_on' + self.msmt_suffix)
-        if analyze:
-            ma.MeasurementAnalysis(TwoD=True, auto=True)
-
-        self.off()
-        MC.set_sweep_function(parameter1)
-        MC.set_sweep_function_2D(parameter2)
-        MC.set_sweep_points(values1)
-        MC.set_sweep_points_2D(values2)
-        MC.set_detector_function(detector)
-        MC.run(name=label + '_off' + self.msmt_suffix)
+        MC.run_2D(name=label + self.msmt_suffix)
         if analyze:
             ma.MeasurementAnalysis(TwoD=True, auto=True)
 
@@ -188,27 +169,53 @@ class TWPAObject(qc.Instrument):
         parameter2(initial_value2)
 
     def measure_vs_pump_freq(self, pump_freqs, analyze=True):
-        self._measure_1D(self.pump_freq, pump_freqs, 'pump_freq_scan', analyze)
+        self.on()
+        self._measure_1D(self.pump_freq, pump_freqs, 'pump_freq_scan_on',
+                         analyze)
+        self.off()
+        self._measure_1D(self.pump_freq, pump_freqs[:1], 'pump_freq_scan_off',
+                         analyze)
 
     def measure_vs_signal_freq(self, signal_freqs, analyze=True):
-        self._measure_1D(self.signal_freq, signal_freqs, 'signal_freq_scan',
+        self.on()
+        self._measure_1D(self.signal_freq, signal_freqs, 'signal_freq_scan_on',
+                         analyze)
+        self.off()
+        self._measure_1D(self.signal_freq, signal_freqs, 'signal_freq_scan_off',
                          analyze)
 
     def measure_vs_pump_power(self, pump_powers, analyze=True):
-        self._measure_1D(self.pump_power, pump_powers, 'pump_power_scan',
+        self.on()
+        self._measure_1D(self.pump_power, pump_powers, 'pump_power_scan_on',
                          analyze)
+        self.off()
+        self._measure_1D(self.pump_power, pump_powers[:1],
+                         'pump_power_scan_off', analyze)
 
     def measure_vs_signal_freq_pump_freq(self, signal_freqs, pump_freqs,
                                          analyze=True):
+        self.on()
         self._measure_2D(self.signal_freq, self.pump_freq, signal_freqs,
-                         pump_freqs, 'signal_freq_pump_freq_scan', analyze)
+                         pump_freqs, 'signal_freq_pump_freq_scan_on', analyze)
+        self.off()
+        self._measure_1D(self.signal_freq, signal_freqs,
+                         'signal_freq_pump_freq_scan_off', analyze)
 
     def measure_vs_signal_freq_pump_power(self, signal_freqs, pump_powers,
                                          analyze=True):
+        self.on()
         self._measure_2D(self.signal_freq, self.pump_power, signal_freqs,
-                         pump_powers, 'signal_freq_pump_power_scan', analyze)
+                         pump_powers, 'signal_freq_pump_power_scan_on', analyze)
+        self.off()
+        self._measure_1D(self.signal_freq, signal_freqs,
+                         'signal_freq_pump_power_scan_off', analyze)
 
     def measure_vs_pump_freq_pump_power(self, pump_freqs, pump_powers,
                                         analyze=True):
+        self.on()
         self._measure_2D(self.pump_freq, self.pump_power, pump_freqs,
-                         pump_powers, 'pump_freq_pump_power_scan', analyze)
+                         pump_powers, 'pump_freq_pump_power_scan_on', analyze)
+        self.off()
+        self._measure_2D(self.pump_freq, self.pump_power, pump_freqs[:1],
+                         pump_powers[:1], 'pump_freq_pump_power_scan_off',
+                         analyze)
