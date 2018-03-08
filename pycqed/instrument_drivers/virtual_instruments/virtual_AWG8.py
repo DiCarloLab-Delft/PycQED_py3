@@ -52,6 +52,7 @@ class VirtualAWG8(Instrument):
             parnames.append('sigouts_{}_offset'.format(i))
             parnames.append('sigouts_{}_on'.format(i))
             parnames.append('sigouts_{}_direct'.format(i))
+            parnames.append('sigouts_{}_range'.format(i))
             parnames.append('triggers_in_{}_imp50'.format(i))
             parnames.append('triggers_in_{}_level'.format(i))
         for i in range(4):
