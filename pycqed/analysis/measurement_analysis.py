@@ -513,7 +513,7 @@ class MeasurementAnalysis(object):
                                                      2.25*len(self.value_names)),
                                             dpi=self.dpi)
                 else:
-                    fig, axs = plt.subplots(max(len(self.value_names)), 1,
+                    fig, axs = plt.subplots(max(len(self.value_names), 1), 1,
                                             figsize=(7,
                                                      4*len(self.value_names)),
                                             dpi=self.dpi)
@@ -534,7 +534,7 @@ class MeasurementAnalysis(object):
                     ax = axs
                 elif len(self.value_names) == 2:
                     ax = axs[i % 2]
-                elif len(self.value_names) == 4:
+                elif len(self.value_names) == 4 and self.no_of_columns == 2:
                     ax = axs[i//2, i % 2]
                 else:
                     ax = axs[i]  # If not 2 or 4 just gives a list of plots
