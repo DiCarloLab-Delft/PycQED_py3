@@ -317,7 +317,6 @@ class BaseDataAnalysis(object):
                     self.raw_data_dict['temperatures'][ii] = temp
 
         else:
-            print(self.params_dict)
             self.raw_data_dict = a_tools.get_data_from_timestamp_list(
                 self.timestamps, param_names=self.params_dict,
                 ma_type=self.ma_type,
@@ -422,6 +421,9 @@ class BaseDataAnalysis(object):
         if key_list == 'auto' or key_list is None:
             key_list = self.figs.keys()
         for key in key_list:
+            pdict = self.plot_dicts[key]
+            plot_id_y = pdict.get('plot_id_y', None)
+            plot_id_x = pdict.get('plot_id_x', None)
             if self.presentation_mode:
                 savename = os.path.join(savedir, savebase+key+tstag+'presentation'+'.'+fmt)
                 self.axs[key].figure.savefig(savename, bbox_inches='tight', fmt=fmt)
@@ -429,9 +431,19 @@ class BaseDataAnalysis(object):
                 self.axs[key].figure.savefig(savename, bbox_inches='tight', fmt='svg')
             else:
                 savename = os.path.join(savedir, savebase+key+tstag+'.'+fmt)
-                self.axs[key].figure.savefig(savename, bbox_inches='tight', fmt=fmt)
+                if plot_id_y is not None:
+                    # plt.close(self.figs[pdict['ax_id']][plot_id_y])
+                    self.axs[pdict['ax_id']].figure.savefig(savename, bbox_inches='tight', fmt=fmt)
+                else:
+                    # plt.close(self.figs[pdict['ax_id']])
+                    self.axs[pdict['ax_id']].figure.savefig(savename, bbox_inches='tight', fmt=fmt)
             if close_figs:
-                plt.close(self.figs[key])
+
+                if plot_id_y is not None:
+                    plt.close(self.figs[pdict['ax_id']][plot_id_y])
+                else:
+                    plt.close(self.figs[pdict['ax_id']])
+
 
     def save_data(self, savedir: str=None, savebase: str=None,
                   tag_tstamp: bool=True,
@@ -606,7 +618,7 @@ class BaseDataAnalysis(object):
                     sharex=pdict.get('sharex', False),
                     sharey=pdict.get('sharey', False),
                     figsize=pdict.get('plotsize', (8, 6)))
-                
+
 
                 # transparent background around axes for presenting data
                 self.figs[pdict['ax_id']].patch.set_alpha(0)
@@ -614,7 +626,6 @@ class BaseDataAnalysis(object):
         if presentation_mode:
             self.plot_for_presentation(key_list=key_list, no_label=no_label)
         else:
-            print(key_list)
             for key in key_list:
                 pdict = self.plot_dicts[key]
                 plot_id_y = pdict.get('plot_id_y', None)
@@ -631,7 +642,7 @@ class BaseDataAnalysis(object):
 
                 if plot_touching:
                     self.figs[pdict['ax_id']].subplots_adjust(wspace=0, hspace=0)
-        
+
             self.format_datetime_xaxes(key_list)
             self.add_to_plots(key_list=key_list)
 

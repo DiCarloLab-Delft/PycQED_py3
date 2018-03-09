@@ -40,7 +40,7 @@ data_dir_dict = {'tud276606_FPGA_PC': 'D:\Experiments/CBox_Testing/Data',
                  'La_Vespa': 'D:\\Experiments\\161111_LaVespa_Intel_HR\\Data',
                  'Xiang_PC': 'D:\\data\\IntelDemo',
                  'Serwans_Laptop': 'W:/tnw/NS/qt/Serwan/MuxMon/',
-                 'La_Ducati': 'D:\\Experiments\\1801_Holy_Chip\\Data',
+                 'La_Ducati': 'D:\\Experiments\\1803_NWv7A2\\Data',
                  'La_Ducati_Jr': 'D:\Experiments/1611_Starmon/Data',
                  'Simulation_PC': 'D:\Experiments/testSingleShotFidelityAnalysis/Data',
                  'Ramiro_Desktop': r'D:\\Repositories\\PhD_RS\\data_local',
@@ -53,9 +53,9 @@ data_dir_dict = {'tud276606_FPGA_PC': 'D:\Experiments/CBox_Testing/Data',
                 # 'Florian_Desktop': r'\\131.180.82.190\\Experiments\\1605_NWv7A2\\Data' # To Maserati
                  # 'Florian_Desktop': r'\\TUD277620\\Experiments\\1704_NWv74_Magnet\\Data' # To Ducati
                  # 'Luthi_Desktop': r'\\TUD277620\\Experiments\\1607_NWv7A4_Magnet\\Data' # To Ducati Old
-                 'Luthi_Desktop': r'\\TUD277620\Experiments\1711_NWv7A4_PCS_Magnet\Data',
+                 'Luthi_Desktop': r'\\TUD277620\Experiments\mag_niet\Data',
                  'Thijs_laptop' : 'C:\\Users\\Thijs\\Documents\\TUDelft\\PhD\\Data',
-                 'Thijs_Desktop': r'\\TUD277620\Experiments\\1711_NWv7A4_PCS_Magnet\Data',
-                 'LaAprilia_1' : r'D:\Experiments\1802_IntelS7Airbridges'
+                 'Thijs_Desktop': r'\\TUD277620\Experiments\\1803_NWv7A2\Data',
+                 'LaAprilia_1' : r'D:\Experiments\\1802_IntelS7Airbridges'
                  #'LaAprilia_1' : r'D:\Experiments\1802_Argon\Data'
                  }
