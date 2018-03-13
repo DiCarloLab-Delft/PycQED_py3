@@ -133,7 +133,7 @@ class QuTech_AWG_Module(SCPI):
             waveform_cmd = 'SOUR{}:WAV'.format(ch)
             output_voltage_cmd = 'QUTEch:OUTPut{}:Voltage'.format(ch)
             dac_temperature_cmd = 'STATus:DAC{}:TEMperature'.format(ch)
-            gain_adjust_cmd = 'STATus:DAC{}:GAIn'.format(ch)
+            gain_adjust_cmd = 'DAC{}:GAIn:DRIFt:ADJust'.format(ch)
             # Set channel first to ensure sensible sorting of pars
             # Compatibility: 5014, QWG
             self.add_parameter('ch{}_state'.format(ch),
@@ -189,17 +189,18 @@ class QuTech_AWG_Module(SCPI):
                                  +'    If the channel is enabled it will return an low value: >0.1\n' \
                                  +'Return:\n   float in voltage')
 
-            self.add_parameter('dac{}_gain'.format(ch),
+            self.add_parameter('dac{}_gain_drift_adjust'.format(ch),
                                unit='',
-                               label=('DAC {}, set gain').format(ch),
+                               label=('DAC {}, gain drift adjust').format(ch),
                                get_cmd=gain_adjust_cmd + '?',
                                set_cmd=gain_adjust_cmd + ' {}',
                                vals=vals.Ints(0, 4095),
                                get_parser=int,
-                               docstring='Gain setting of the DAC in a channel.\n' \
-                                 +'Notes:\n    The gain setting is from 0 to 4095 \n' \
+                               docstring='Gain drift adjust setting of the DAC of a channel.\n' \
+                                 +'Used for calibration of the DAC. Do not use to set the gain of a channel!\n' \
+                                 +'Notes:\n  The gain setting is from 0 to 4095 \n' \
                                  +'    Where 0 is 0 V and 4095 is 3.3V \n' \
-                                 +'Get Return:\n   Setting of the gain in interger\n'\
+                                 +'Get Return:\n   Setting of the gain in interger (0 - 4095)\n'\
                                  +'Set paramater:\n   Interger: Gain of the DAC in , min: 0, max: 4095')
 
         self.add_parameter('status_frontIO_temperature',
