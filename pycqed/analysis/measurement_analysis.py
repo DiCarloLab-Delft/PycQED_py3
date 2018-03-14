@@ -9467,6 +9467,14 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
         self.get_values('Data')
         self.get_naming_and_values_2D()
 
+    def run_default_analysis(self, TwoD=False, close_file=True,
+                             show=False, transpose=False,
+                             plot_args=None, **kw):
+        super().run_default_analysis(TwoD, close_file, show, transpose,
+                                     plot_args, **kw)
+
+        self.fit_all(self, **kw)
+
     def fit_single_cos(self, thetas, ampls,
                        print_fit_results=True, phase_guess=0,
                        cal_points=False):
@@ -9782,11 +9790,8 @@ class FluxPulse_Scope_Analysis(MeasurementAnalysis):
         self.data_rotated = data_rotated
 
         if self.sign_of_peaks is None:
-            self.sign_of_peaks = np.sign(
-                self.data_rotated[np.argmax(np.abs(
-                    self.data_rotated[:, 0] - self.data_rotated[0, 0])), 0]
-                - self.data_rotated[0, 0])
-
+            self.sign_of_peaks = np.sign(np.mean(self.data_rotated[:, 0]) -
+                                         np.median(self.data_rotated[:, 0]))
         self.fit_all()
 
         fig, ax = plt.subplots()

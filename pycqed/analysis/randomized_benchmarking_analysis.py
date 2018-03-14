@@ -669,7 +669,7 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
 
         try:
             self.folders_dict = \
-                {msmt_name:measurement_dict[msmt_name]['file']
+                {msmt_name: measurement_dict[msmt_name]['file']
                  for msmt_name in measurement_dict}
         except Exception:
             self.folders_dict = None
@@ -748,8 +748,9 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
             # print(msmt_name)
             # print(self.folders_dict[msmt_name])
 
+        self.clifford_qbs = {}
         if not np.any(['CZ' in msmt_name for msmt_name in self.folders_dict]):
-            self.clifford_qbs = {}
+
             try:
                 for msmt_name in self.measurement_dict:
                     if 'clifford_qb_idx' in self.measurement_dict[msmt_name]:
@@ -762,6 +763,7 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                                      ' measurement_dict.')
             except ValueError:
                 pass
+
 
         folder = list(self.folders_dict.values())[0]
         # print(folder)
@@ -1051,6 +1053,8 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
     def extract_data(self, **kw):
 
         two_qubits = kw.pop('two_qubits', True)
+        if self.cal_points is None:
+            self.cal_points = [[-2], [-1]]
 
         # ma.MeasurementAnalysis.run_default_analysis(
         #     self, close_file=False, **kw)

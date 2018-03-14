@@ -566,7 +566,7 @@ def fidelity_from_standard_formula(bell_state, rho, state_rotation=None):
         state = qtp.bell_state(state=qtp_bell_state)
     else:
         state = state_rotation*qtp.bell_state(state=qtp_bell_state)
-    return float(np.real((state.dag()*rho*state).data[0,0]))
+    return float(np.real((state.dag()*rho*state).data[0, 0]))
 
 def plot_target_pauli_set(pauli_set, ax):
     width = 0.6

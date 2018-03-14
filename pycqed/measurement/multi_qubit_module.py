@@ -657,6 +657,7 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
         CxC_RB=True, idx_for_RB=0,
         gate_decomp='HZ', interleaved_gate=None,
         CZ_info_dict=None, interleave_CZ=True,
+        spacing=30e-9, cal_points=False,
         thresholding=True,  V_th_a=None,
         experiment_channels=None,
         nr_averages=1024, soft_avgs=1,
@@ -699,6 +700,7 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
         interleave_CZ (bool): Only used if CZ_info_dict != None
             True -> interleave the CZ gate
             False -> interleave the ICZ gate
+        spacing (float): length of spacer pulse before and after CZ's
         thresholding (bool): whether to use the thresholding feature
             of the UHFQC
         V_th_a (list or tuple): contains the SSRO assignment thresholds for
@@ -773,6 +775,7 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
             label += '_thresh'
 
     for qb in qubits:
+        qb.RO_acq_averages(nr_averages)
         qb.prepare_for_timedomain(multiplexed=True)
 
     multiplexed_pulse(qubits, f_LO, upload=True, plot_filename=True)
@@ -799,7 +802,8 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
                 idx_for_RB=idx_for_RB, upload=False,
                 gate_decomposition=gate_decomp,  CZ_info_dict=CZ_info_dict,
                 interleaved_gate=interleaved_gate,
-                verbose=verbose, interleave_CZ=interleave_CZ)
+                verbose=verbose, interleave_CZ=interleave_CZ,
+                spacing=spacing, cal_points=cal_points)
 
         soft_sweep_points = nr_cliffords
         soft_sweep_func = \
@@ -827,15 +831,24 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
                 idx_for_RB=idx_for_RB, upload=True,
                 gate_decomposition=gate_decomp,
                 interleaved_gate=interleaved_gate, interleave_CZ=interleave_CZ,
-                verbose=verbose, CZ_info_dict=CZ_info_dict)
+                verbose=verbose, CZ_info_dict=CZ_info_dict,
+                cal_points=cal_points)
 
         # soft_sweep_points = np.arange(nr_averages//k)
         soft_sweep_points = np.arange(nr_averages)
         soft_sweep_func = swf.None_Sweep()
 
+    if cal_points:
+        step = np.abs(hard_sweep_points[-1] - hard_sweep_points[-2])
+        hard_sweep_points_to_use = np.concatenate(
+            [hard_sweep_points,
+             [hard_sweep_points[-1]+step, hard_sweep_points[-1]+2*step]])
+    else:
+        hard_sweep_points_to_use = hard_sweep_points
+
     MC.soft_avg(soft_avgs)
     MC.set_sweep_function(hard_sweep_func)
-    MC.set_sweep_points(hard_sweep_points)
+    MC.set_sweep_points(hard_sweep_points_to_use)
 
     MC.set_sweep_function_2D(soft_sweep_func)
     MC.set_sweep_points_2D(soft_sweep_points)
@@ -1095,12 +1108,14 @@ def cphase_gate_tuneup(qb_control, qb_target,
     Args:
         qb_control (QuDev_Transmon): control qubit (with flux pulses)
         qb_target (QuDev_Transmon): target qubit
-        initial_values_dict (dict): dictionary containing the initial flux pulse amp
-                                    and length
-        initial_step_dict (dict): dictionary containing the initial step size of the
-                                  flux pulse amp and length
-        MC_optimization (MeasurementControl): measurement control for the adaptive
-                                                optimization sweep
+        initial_values_dict (dict): dictionary containing the initial flux
+                                    pulse amp and length (keys are 'amplitude'
+                                    and 'length')
+        initial_step_dict (dict): dictionary containing the initial step size
+                                  of the flux pulse amp and length (keys are
+                                  'step_amplitude' and 'step_length')
+        MC_optimization (MeasurementControl): measurement control for the
+                                              adaptive optimization sweep
         MC_detector (MeasurementControl): measurement control used in the detector
                                             function to run the actual experiment
         maxiter (int): maximum optimization steps passed to the nelder mead function
@@ -1114,7 +1129,7 @@ def cphase_gate_tuneup(qb_control, qb_target,
     '''
 
     if MC_optimization is None:
-        MC_optimization = station.MC
+        MC_optimization = qb_control.MC
 
     if initial_values_dict is None:
         pulse_length_init = qb_control.flux_pulse_length()
