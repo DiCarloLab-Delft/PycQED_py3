@@ -239,21 +239,16 @@ class CryoscopeAnalyzer:
             plt.plot(self.time, self.phase % (2 * np.pi), ".", color="C0")
         else:
             plt.plot(self.time, self.phase, ".", label="Im", color="C0")
-        plt.xlabel("Time")
-        plt.ylabel("Phase")
-        formatter = matplotlib.ticker.EngFormatter(unit='s')
-        ax.xaxis.set_major_formatter(formatter)
+        set_xlabel(ax, 'Time', 's')
+        set_ylabel(ax, 'Phase', 'deg')
+
 
     def plot_detuning(self):
         ax = plt.gca()
         plt.title("Detuning from demodulation frequency")
         plt.plot(self.time, self.detuning, ".-", color="C0")
-        plt.xlabel("Time")
-        plt.ylabel("Frequency")
-        formatter = matplotlib.ticker.EngFormatter(unit='s')
-        ax.xaxis.set_major_formatter(formatter)
-        formatter = matplotlib.ticker.EngFormatter(unit='Hz')
-        ax.yaxis.set_major_formatter(formatter)
+        set_xlabel(ax, 'Time', 's')
+        set_ylabel(ax, 'Frequency', 'Hz')
 
     def plot_frequency(self, nyquists=None, style=".-", show_demod_freq=True):
         ax = plt.gca()
@@ -263,7 +258,7 @@ class CryoscopeAnalyzer:
             nyquists = [self.nyquist_order]
         for n in nyquists:
             if show_demod_freq:
-                plt.axhline(-self.demod_freq + self.sampling_rate*n)
+                plt.axhline(-self.demod_freq + self.sampling_rate*n, linestyle='--', c='grey')
             real_detuning = self.get_real_detuning(n)
             ax.plot(self.time, real_detuning, style)
         set_xlabel(ax, 'Time', 's')
@@ -459,7 +454,7 @@ class DacArchAnalysis:
         aa, ff = np.meshgrid(shift_helper(self.amps), shift_helper(freqs))
 
         plt.pcolormesh(aa, ff, np.abs(ffts).T)
-        set_xlabel(ax, "Amplitude") #a.u.
+        set_xlabel(ax, "Amplitude", 'V') #a.u.
         set_ylabel(ax, 'Detuning', 'Hz')
 
         ax.scatter(self.amps, self.freqs % self.sampling_rate, color="C1")

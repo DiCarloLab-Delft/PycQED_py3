@@ -72,7 +72,7 @@ class RamZFluxArc(ba.BaseDataAnalysis):
             self.raw_data_dict['times'],
             self.raw_data_dict['amps'],
             self.raw_data_dict['data'],
-            poly_fit_order=2, plot_fits=False)
+            poly_fit_order=3, plot_fits=False)
         self.proc_data_dict['dac_arc_ana'] = self.dac_arc_ana
 
         # this is the infamous dac arc conversion method
