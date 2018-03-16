@@ -532,7 +532,7 @@ class DeviceCCL(Instrument):
         MC.set_sweep_function(s)
         MC.set_sweep_points(p.sweep_points)
         MC.set_detector_function(self.get_correlation_detector())
-        MC.run('conditional_oscillation{}'.format(self.msmt_suffix, label),
+        MC.run('conditional_oscillation{}{}'.format(self.msmt_suffix, label),
                disable_snapshot_metadata=disable_metadata)
 
         a = ma2.Conditional_Oscillation_Analysis(

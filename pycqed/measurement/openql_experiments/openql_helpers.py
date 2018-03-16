@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 from matplotlib.ticker import MaxNLocator
 import matplotlib.patches as mpatches
-
+from pycqed.utilities.general import is_more_rencent
 
 def clocks_to_s(time, clock_cycle=20e-9):
     """
@@ -304,6 +304,46 @@ def flux_pulse_replacement(qisa_fn: str):
     return mod_qisa_fn, grouped_fl_tuples
 
 
+def check_recompilation_needed(program_fn: str, platf_cfg: str,
+                               recompile=True):
+    """
+    determines if compilation of a file is needed based on it's timestamp
+    and an optional recompile option.
+
+    The behaviour of this function depends on the recompile argument.
+
+    recompile:
+        True -> True, the program should be compiled
+
+        'as needed' -> compares filename to timestamp of config
+            and checks if the file exists, if required recompile.
+        False -> compares program to timestamp of config.
+            if compilation is required raises a ValueError
+    """
+    if recompile == True:
+        return True
+    elif recompile == 'as needed':
+        try:
+            if is_more_rencent(program_fn, platf_cfg):
+                return False
+            else:
+                return True # compilation is required
+        except FileNotFoundError:
+            # File doesn't exist means compilation is required
+            return True
+
+    elif recompile == False: # if False
+        if is_more_rencent(program_fn, platf_cfg):
+            return False
+        else:
+            raise ValueError('OpenQL config has changed more recently '
+                             'than program.')
+    else:
+        raise NotImplementedError('recompile should be True, False or "as needed"')
+
+
+
+
 def load_range_of_oql_programs(programs, counter_param, CC):
     """
     This is a helper function for running an experiment that is spread over
@@ -312,3 +352,18 @@ def load_range_of_oql_programs(programs, counter_param, CC):
     program = programs[counter_param()]
     counter_param((counter_param()+1) % len(programs))
     CC.eqasm_program(program.filename)
+
+def load_range_of_oql_programs_varying_nr_shots(programs, counter_param, CC,
+                                                detector):
+    """
+    This is a helper function for running an experiment that is spread over
+    multiple OpenQL programs of varying length such as GST.
+
+    Everytime the detector is called it will also modify the number of sweep
+    points in the detector.
+    """
+    program = programs[counter_param()]
+    counter_param((counter_param()+1) % len(programs))
+    CC.eqasm_program(program.filename)
+
+    detector.nr_shots = len(program.sweep_points)

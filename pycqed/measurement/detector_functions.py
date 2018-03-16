@@ -1871,7 +1871,11 @@ class UHFQC_integration_logging_det(Hard_Detector):
                  integration_length: float=1e-6,
                  nr_shots: int=4094,
                  channels: list=(0, 1),
-                 result_logging_mode: str='raw', **kw):
+                 result_logging_mode: str='raw',
+                 always_prepare:bool=False,
+                 prepare_function=None,
+                 prepare_function_kwargs: dict=None,
+                 **kw):
         """
         Args:
         UHFQC (instrument) : data acquisition device
@@ -1889,6 +1893,10 @@ class UHFQC_integration_logging_det(Hard_Detector):
                             and normalization. Requires optimal weights.
             - digitized  -> returns fraction of shots based on the threshold
                             defined in the UFHQC. Requires optimal weights.
+        always_prepare (bool) : when True the acquire/get_values method will
+            first call the prepare statement. This is particularly important
+            when it is both a single_int_avg detector and acquires multiple
+            segments per point.
         """
         super().__init__()
 
@@ -1919,7 +1927,13 @@ class UHFQC_integration_logging_det(Hard_Detector):
         self.result_logging_mode_idx = res_logging_indices[result_logging_mode]
         self.result_logging_mode = result_logging_mode
 
+        self.always_prepare = always_prepare
+        self.prepare_function = prepare_function
+        self.prepare_function_kwargs = prepare_function_kwargs
+
     def get_values(self):
+        if self.always_prepare:
+            self.prepare()
         if self.AWG is not None:
             self.AWG.stop()
         self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
@@ -1944,9 +1958,15 @@ class UHFQC_integration_logging_det(Hard_Detector):
         if self.AWG is not None:
             self.AWG.stop()
 
+        if self.prepare_function_kwargs is not None:
+            if self.prepare_function is not None:
+                self.prepare_function(**self.prepare_function_kwargs)
+        else:
+            if self.prepare_function is not None:
+                self.prepare_function()
+
         # The averaging-count is used to specify how many times the AWG program
         # should run
-
         self.UHFQC.awgs_0_single(1)
         self.UHFQC.awgs_0_userregs_0(self.nr_shots)
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)

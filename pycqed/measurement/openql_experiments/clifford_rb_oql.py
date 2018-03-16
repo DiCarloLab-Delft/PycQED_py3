@@ -17,7 +17,7 @@ from pycqed.measurement.openql_experiments.multi_qubit_oql import \
     add_two_q_cal_points
 
 from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
-
+from pycqed.measurement.openql_experiments import openql_experiments as oqh
 from pycqed.measurement.randomized_benchmarking.two_qubit_clifford_group \
     import SingleQubitClifford, TwoQubitClifford
 base_qasm_path = join(dirname(__file__), 'qasm_files')
@@ -111,26 +111,30 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
 
-    if recompile == True:
-        pass
-    elif recompile == 'as needed':
-        try:
-            if is_more_rencent(p.filename, platf_cfg):
-                return p
-            else:
-                pass # compilation is required
-        except FileNotFoundError:
-            # File doesn't exist means compilation is required
-            pass
+    if not oqh.check_recompilation_needed(
+        program_fn = p.filename, platf_cfg=platf_cfg, recompile=recompile):
+        return p
 
-    elif recompile == False: # if False
-        if is_more_rencent(p.filename, platf_cfg):
-            return p
-        else:
-            raise ValueError('OpenQL config has changed more recently '
-                             'than program.')
-    else:
-        raise NotImplementedError('recompile should be True, False or "as needed"')
+    # if recompile == True:
+    #     pass
+    # elif recompile == 'as needed':
+    #     try:
+    #         if is_more_rencent(p.filename, platf_cfg):
+    #             return p
+    #         else:
+    #             pass # compilation is required
+    #     except FileNotFoundError:
+    #         # File doesn't exist means compilation is required
+    #         pass
+
+    # elif recompile == False: # if False
+    #     if is_more_rencent(p.filename, platf_cfg):
+    #         return p
+    #     else:
+    #         raise ValueError('OpenQL config has changed more recently '
+    #                          'than program.')
+    # else:
+    #     raise NotImplementedError('recompile should be True, False or "as needed"')
 
     if len(qubits) ==1:
         qubit_map = {'q0': qubits[0]}
