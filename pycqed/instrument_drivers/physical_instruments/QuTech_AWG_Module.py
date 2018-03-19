@@ -205,7 +205,7 @@ class QuTech_AWG_Module(SCPI):
 
         self.add_parameter('status_frontIO_temperature',
                            unit='C',
-                           label=('FrontIO temperature'.format(ch)),
+                           label=('FrontIO temperature'),
                            get_cmd='STATus:FrontIO:TEMperature?',
                            get_parser=float,
                            docstring='Reads the temperature of the frontIO.\n' \
@@ -214,7 +214,7 @@ class QuTech_AWG_Module(SCPI):
 
         self.add_parameter('status_fpga_temperature',
                            unit='C',
-                           label=('FPGA temperature'.format(ch)),
+                           label=('FPGA temperature'),
                            get_cmd='STATus:FPGA:TEMperature?',
                            get_parser=int,
                            docstring='Reads the temperature of the FPGA.\n' \
