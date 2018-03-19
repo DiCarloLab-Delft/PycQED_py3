@@ -763,3 +763,51 @@ def FluxTimingCalibration_2q(q0, q1, buffer_time1, times, platf_cfg: str):
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
+
+
+def FastFeedbackControl(time, feedback: bool, qubit_idx: int,
+                             platf_cfg: str):
+    """
+    Single qubit sequence to test fast feedback control (fast conditional
+    execution).
+    Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
+
+    Input pars:
+        time:           the waiting time, which should be longer than the
+                          feedback latency.
+        feedback:       if apply
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+    Returns:
+        p:              OpenQL Program object containing
+
+
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="FastFdbkCtrl", nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    k = Kernel("FastFdbkCtrl", p=platf)
+    k.prepz(qubit_idx)
+    k.gate('rx90', qubit_idx)
+    k.measure(qubit_idx)
+    wait_nanoseconds = int(round(time/1e-9))
+    k.gate("wait", [qubit_idx], wait_nanoseconds)
+    if feedback:
+        k.gate('Crx180', qubit_idx) # fast feedback control here
+    else:
+        k.gate("i", qubit_idx)
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+
+    # adding the calibration points
+    add_single_qubit_cal_points(p, platf=platf, qubit_idx=qubit_idx)
+
+    with suppress_stdout():
+        p.compile(verbose=False)
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+

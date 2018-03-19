@@ -87,6 +87,12 @@ try:
             sqo.randomized_benchmarking(0, platf_cfg=config_fn,
                                         nr_cliffords=nr_cliffords, nr_seeds=3)
 
+        def test_fast_feedback_control(self):
+            sqo.FastFeedbackControl(time=200e-9, feedback=False,
+                                    qubit_idx=0, platf_cfg=config_fn)
+            sqo.FastFeedbackControl(time=200e-9, feedback=True,
+                                    qubit_idx=0, platf_cfg=config_fn)
+
     class Test_multi_qubit_seqs_CCL(unittest.TestCase):
 
         def test_single_flux_pulse_seq(self):
