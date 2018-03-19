@@ -835,6 +835,30 @@ class Dummy_Detector_Soft(Soft_Detector):
         return np.array([np.sin(x/np.pi), np.cos(x/np.pi)])
 
 
+
+class Dummy_Detector_Soft_diff_shape(Soft_Detector):
+    # For testing purpose, returns data in a slightly different shape
+
+    def __init__(self, delay=0, **kw):
+        self.set_kw()
+        self.delay = delay
+        self.detector_control = 'soft'
+        self.name = 'Dummy_Detector_Soft'
+        self.value_names = ['I', 'Q']
+        self.value_units = ['V', 'V']
+        self.i = 0
+        # self.x can be used to set x value externally
+        self.x = None
+
+    def acquire_data_point(self, **kw):
+        if self.x is None:
+            x = self.i/15.
+        self.i += 1
+        time.sleep(self.delay)
+        # This is the format an N-D detector returns data in.
+        return np.array([[np.sin(x/np.pi), np.cos(x/np.pi)]]).reshape(2, -1)
+
+
 class QX_Detector(Soft_Detector):
 
     def __init__(self, qxc, delay=0, **kw):
