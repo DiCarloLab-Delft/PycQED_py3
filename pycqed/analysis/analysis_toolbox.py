@@ -1397,7 +1397,8 @@ def normalize_TD_data(data, data_zero, data_one):
 
 def normalize_data(data):
     print(
-        'a_tools.normalize_data is deprecated, recommend using a_tools.normalize_data_v2()')
+        'a_tools.normalize_data is deprecated, recommend using '
+        'a_tools.normalize_data_v2()')
     return data / np.mean(data)
 
 
