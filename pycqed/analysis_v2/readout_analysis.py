@@ -456,9 +456,103 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                     'setlabel': rel_exc_str,
                     'do_legend': True}
 
+import itertools
+
 
 class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
-    pass
+
+    def __init__(self, t_start: str=None, t_stop: str=None,
+                 label: str='', data_file_path: str=None,
+                 options_dict: dict=None, extract_only: bool=False,
+                 do_fitting: bool=True, auto=True, n_segments=None,
+                 channel_map=None):
+
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         extract_only=extract_only, do_fitting=do_fitting)
+
+        self.n_segments = n_segments
+
+        # TODO check, if it is None
+        self.channel_map = channel_map
+        qubits = list(channel_map.keys())
+
+        # TODO Should by default come from come from MC parameters
+        for i in range(self.n_segments):
+            # TODO These could come from from the MC parameters
+            self.segment_names[i] = i
+
+        # TODO make an override option
+        combination_list = list(itertools.product([False, True], repeat=len(qubits)))
+        # TODO make an override option
+        self.states_to_be_counted = {}
+        for i, states in enumerate(combination_list):
+            self.result_names[i] = '$\| ' + ''.join(['e' if s else 'g' for s in states]) + '\\rangle$'
+            self.states_to_be_counted.append(dict(zip(qubits, states)) )
+
+        self.single_timestamp = False
+
+        self.params_dict = {
+            'measurementstring': 'measurementstring',
+            'measured_values': 'measured_values',
+            'value_names': 'value_names',
+            'value_units': 'value_units'}
+
+        self.numeric_params = []
+        if auto:
+            self.run_analysis()
+
+    def process_data(self):
+        shots_thresh = {}
+        for qubit, channel in self.channel_map.items():
+            shots_cont = np.array(ba.raw_data_dict['measured_values_ord_dict'][0][channel])
+            shots_thresh[qubit] = shots_cont < self.threshold[qubit]
+
+
+        self.proc_data_dict['probability_table'] = \
+            self.probability_table(shots_thresh, self.states_to_be_counted, len(self.segment_names))
+
+    @staticmethod
+    def probability_table(shots_of_qubits, states_to_be_counted, n_segments):
+        """
+        Creates a general table of counts averaging out all but specified set of correlations
+
+        :param shots_of_qubits: Dictionary of np.arrays of thresholded shots for each qubit.
+        :param states_to_be_counted: List of dictionaries specificing states for qubits.
+            If the qubit is missing from the list of states it is averaged out.
+        :param n_segments: Assumed to be the period in the list of shots between experiments
+            with the same prepared state.
+        :return: np.array with counts with dimensions (n_segments, len(states_to_be_counted))
+        """
+
+        res_e = {}
+        res_g = {}
+
+        n_shots = next(iter(shots_of_qubits.values())).shape[1]
+
+        table = np.zeros((n_segments, len(states_to_be_counted)))
+
+        for segment_n in range(n_segments):
+
+            for qubit, results in shots_of_qubits.items():
+                res_e[qubit] = np.array(results[0, segment_n::n_segments])
+                # This makes copy, but allows faster AND later
+                res_g[qubit] = np.logical_not(np.array(results[0, segment_n::n_segments]))
+
+            # todo mask with preselection
+            for state_n, states_of_qubits in enumerate(states_to_be_counted): # first result all ground
+                mask = np.ones((int(n_shots/n_segments)), dtype=bool)
+                for qubit, state in states_of_qubits.items(): # slow qubit is the first in channel_map list
+                    # mask all with qubit k in state r
+                    if state:
+                        mask = np.logical_and(mask, res_e[qubit])
+                    else:
+                        mask = np.logical_and(mask, res_g[qubit])
+                table[segment_n, state_n] = np.count_nonzero(mask)
+
+        return table
 
 
 def get_shots_zero_one(data, post_select: bool=False,
