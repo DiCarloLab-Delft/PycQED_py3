@@ -557,9 +557,11 @@ class CCLight_Transmon(Qubit):
                            initial_value=True,
                            parameter_class=ManualParameter)
         self.add_parameter(
-            'cfg_dac_ch', label='Flux DAC channel',
+            'cfg_dc_flux_ch', label='Flux DAC channel',
             docstring=('Used to determine the DAC channel used for DC '
-                       'flux biasing.'), initial_value=1,
+                       'flux biasing. Should be an int when using an IVVI rack'
+                       'or a str (channel name) when using an SPI rack.'),
+            initial_value=1,
             parameter_class=ManualParameter)
 
     def add_generic_qubit_parameters(self):
@@ -1249,8 +1251,13 @@ class CCLight_Transmon(Qubit):
 
         if 'ivvi' in self.instr_FluxCtrl().lower():
             IVVI = self.instr_FluxCtrl.get_instr()
-            dac_par = IVVI.parameters['dac{}'.format(self.cfg_dac_ch())]
+            dac_par = IVVI.parameters['dac{}'.format(self.cfg_dc_flux_ch())]
         else:
+            # Assume the flux is controlled using an SPI rack
+            fluxcontrol = self.instr_FluxCtrl.get_instr()
+            dac_par = fluxcontrol.parameters[(self.cfg_dc_flux_ch())]
+
+
             # TODO: extract proper param from flux control using the right idx
             raise NotImplementedError('for Flux control instrument')
 
