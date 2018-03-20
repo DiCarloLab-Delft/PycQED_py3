@@ -1231,7 +1231,7 @@ class CCLight_Transmon(Qubit):
         if analyze:
             ma.TwoD_Analysis(label='Resonator_power_scan', close_fig=close_fig)
 
-    def measure_resonator_dac(self, freqs, dac_voltages, MC=None,
+    def measure_resonator_dac(self, freqs, dac_values, MC=None,
                               analyze: bool =True, close_fig: bool=True):
         self.prepare_for_continuous_wave()
         if MC is None:
@@ -1257,12 +1257,8 @@ class CCLight_Transmon(Qubit):
             fluxcontrol = self.instr_FluxCtrl.get_instr()
             dac_par = fluxcontrol.parameters[(self.cfg_dc_flux_ch())]
 
-
-            # TODO: extract proper param from flux control using the right idx
-            raise NotImplementedError('for Flux control instrument')
-
         MC.set_sweep_function_2D(dac_par)
-        MC.set_sweep_points_2D(dac_voltages)
+        MC.set_sweep_points_2D(dac_values)
         self.int_avg_det_single._set_real_imag(False)
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='Resonator_dac_scan'+self.msmt_suffix, mode='2D')
