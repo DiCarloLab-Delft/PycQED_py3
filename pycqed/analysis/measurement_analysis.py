@@ -4992,6 +4992,95 @@ class AllXY_Analysis(TD_Analysis):
             self.save_fig(fig1, ylabel='Amplitude (normalized)', **kw)
         self.save_fig(fig2, ylabel='Amplitude', **kw)
 
+class FFC_Analysis(TD_Analysis):
+
+    '''
+    Performs a rotation and normalization on the data and calculates a
+    deviation from the expected ideal data.
+
+    Automatically works for the standard AllXY sequences of 42 and 21 points.
+    Optional keyword arguments can be used to specify
+    'ideal_data': np.array equal in lenght to the data
+    '''
+
+    def __init__(self, label='FFC', zero_coord=None, one_coord=None,
+                 make_fig=True, **kw):
+        kw['label'] = label
+        kw['h5mode'] = 'r+'  # Read write mode, file must exist
+        self.zero_coord = zero_coord
+        self.one_coord = one_coord
+        self.make_fig = make_fig
+
+        super(self.__class__, self).__init__(**kw)
+
+    def run_default_analysis(self, print_fit_results=False,
+                             close_main_fig=True, flip_axis=False, **kw):
+        close_file = kw.pop('close_file', True)
+        self.flip_axis = flip_axis
+        self.cal_points = kw.pop('cal_points', None)
+        self.add_analysis_datagroup_to_file()
+        self.get_naming_and_values()
+
+        ideal_data = np.concatenate((0.5*np.ones(1), 1*np.ones(1)))
+        self.rotate_and_normalize_data()
+        self.add_dataset_to_analysisgroup('Corrected data',
+                                          self.corr_data)
+        self.analysis_group.attrs.create('corrected data based on',
+                                         'calibration points'.encode('utf-8'))
+        data_error = self.corr_data - ideal_data
+        self.deviation_total = np.mean(abs(data_error))
+        # Plotting
+        if self.make_fig:
+            self.make_figures(ideal_data=ideal_data,
+                              close_main_fig=close_main_fig, **kw)
+        if close_file:
+            self.data_file.close()
+        return self.deviation_total
+
+    def make_figures(self, ideal_data, close_main_fig, **kw):
+        fig1, fig2, ax1, axarray = self.setup_figures_and_axes()
+        for i in range(len(self.value_names)):
+            if len(self.value_names) == 2:
+                ax = axarray[i]
+            else:
+                ax = axarray
+            self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                            y=self.measured_values[i],
+                                            fig=fig2, ax=ax,
+                                            xlabel=self.xlabel,
+                                            ylabel=str(
+                                                self.value_names[i]),
+                                            save=False)
+        ax1.set_ylim(min(self.corr_data)-.1, max(self.corr_data)+.1)
+        if self.flip_axis:
+            ylabel = r'$F$ $|0 \rangle$'
+        else:
+            ylabel = r'$F$ $|1 \rangle$'
+        self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                        y=self.corr_data,
+                                        fig=fig1, ax=ax1,
+                                        xlabel='',
+                                        ylabel=ylabel,
+                                        save=False)
+        ax1.plot(self.sweep_points, ideal_data)
+        labels = [item.get_text() for item in ax1.get_xticklabels()]
+        locs = np.arange(0, 2)
+        labels = ['NoFB', 'FB']
+
+        ax1.xaxis.set_ticks(locs)
+        ax1.set_xticklabels(labels, rotation=60)
+
+        deviation_text = r'Deviation: %.5f' % self.deviation_total
+        ax1.text(1, 1.05, deviation_text, fontsize=11,
+                 bbox=self.box_props)
+        if not close_main_fig:
+            # Hacked in here, good idea to only show the main fig but can
+            # be optimized somehow
+            self.save_fig(fig1, ylabel='Amplitude (normalized)',
+                          close_fig=False, **kw)
+        else:
+            self.save_fig(fig1, ylabel='Amplitude (normalized)', **kw)
+        self.save_fig(fig2, ylabel='Amplitude', **kw)
 
 class RandomizedBenchmarking_Analysis(TD_Analysis):
 

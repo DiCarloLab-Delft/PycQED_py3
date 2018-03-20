@@ -765,8 +765,7 @@ def FluxTimingCalibration_2q(q0, q1, buffer_time1, times, platf_cfg: str):
     return p
 
 
-def FastFeedbackControl(time, feedback: bool, qubit_idx: int,
-                             platf_cfg: str):
+def FastFeedbackControl(lantecy, qubit_idx: int, platf_cfg: str):
     """
     Single qubit sequence to test fast feedback control (fast conditional
     execution).
@@ -774,8 +773,9 @@ def FastFeedbackControl(time, feedback: bool, qubit_idx: int,
     Output directory is set as an attribute to the program for convenience.
 
     Input pars:
-        time:           the waiting time, which should be longer than the
-                          feedback latency.
+        lantecy:        the waiting time between measurement and the feedback
+                          pulse, which should be longer than the feedback
+                          latency.
         feedback:       if apply
         qubit_idx:      int specifying the target qubit (starting at 0)
         platf_cfg:      filename of the platform config file
@@ -788,16 +788,23 @@ def FastFeedbackControl(time, feedback: bool, qubit_idx: int,
     p = Program(pname="FastFdbkCtrl", nqubits=platf.get_qubit_number(),
                 p=platf)
 
-    k = Kernel("FastFdbkCtrl", p=platf)
+    k = Kernel("FastFdbkCtrl_nofb", p=platf)
     k.prepz(qubit_idx)
     k.gate('rx90', qubit_idx)
     k.measure(qubit_idx)
-    wait_nanoseconds = int(round(time/1e-9))
+    wait_nanoseconds = int(round(lantecy/1e-9))
     k.gate("wait", [qubit_idx], wait_nanoseconds)
-    if feedback:
-        k.gate('Crx180', qubit_idx) # fast feedback control here
-    else:
-        k.gate("i", qubit_idx)
+    k.gate("i", qubit_idx)
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+
+    k = Kernel("FastFdbkCtrl_fb", p=platf)
+    k.prepz(qubit_idx)
+    k.gate('rx90', qubit_idx)
+    k.measure(qubit_idx)
+    wait_nanoseconds = int(round(lantecy/1e-9))
+    k.gate("wait", [qubit_idx], wait_nanoseconds)
+    k.gate('Crx180', qubit_idx) # fast feedback control here
     k.measure(qubit_idx)
     p.add_kernel(k)
 

@@ -5,7 +5,7 @@ import numpy as np
 try:
     from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
     from pycqed.measurement.openql_experiments import multi_qubit_oql as mqo
-    from pycqed.measurement.openql_experiments import cliford_rb_ql as rb_oql
+    from pycqed.measurement.openql_experiments import clifford_rb_oql as rb_oql
     from pycqed.measurement.openql_experiments.generate_CCL_cfg import  \
         generate_config
     from pycqed.measurement.openql_experiments.pygsti_oql import poor_mans_2q_gst
