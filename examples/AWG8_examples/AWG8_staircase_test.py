@@ -31,8 +31,8 @@ from pycqed.instrument_drivers.physical_instruments import QuTech_CCL
 reload(QuTech_CCL)
 
 CCL = QuTech_CCL.CCL('CCL', address='192.168.0.11', port=5025)
-cs_filepath = os.path.join(pq.__path__[0], 'measurement','openql_experiments',
-                           'output','cs.txt')
+cs_filepath = os.path.join(pq.__path__[0], 'measurement', 'openql_experiments',
+                           'output', 'cs.txt')
 
 CCL.control_store(cs_filepath)
 
@@ -52,12 +52,12 @@ AWG_type = 'microwave'
 
 if AWG_type == 'microwave':
     example_fp = os.path.abspath(
-        os.path.join(pq.__path__[0], '..','examples','CCLight_example',
-                     'qisa_test_assembly','consecutive_cws_double.qisa'))
+        os.path.join(pq.__path__[0], '..', 'examples', 'CCLight_example',
+                     'qisa_test_assembly', 'consecutive_cws_double.qisa'))
 elif AWG_type == 'flux':
     example_fp = os.path.abspath(os.path.join(pq.__path__[0], '..',
-        'examples','CCLight_example',
-        'qisa_test_assembly','consecutive_cws_flux.qisa'))
+                                              'examples', 'CCLight_example',
+                                              'qisa_test_assembly', 'consecutive_cws_flux.qisa'))
 
 print(example_fp)
 CCL.eqasm_program(example_fp)
@@ -74,14 +74,15 @@ import numpy as np
 waveform_type = 'square'
 # waveform_type = 'cos'
 
-if waveform_type =='square':
+if waveform_type == 'square':
     for ch in range(8):
         for i in range(32):
             AWG8.set('wave_ch{}_cw{:03}'.format(ch+1, i), (np.ones(48)*i/32))
 elif waveform_type == 'cos':
     for ch in range(8):
         for i in range(32):
-            AWG8.set('wave_ch{}_cw{:03}'.format(ch+1, i), (np.cos(np.arange(48)/2)*i/32))
+            AWG8.set('wave_ch{}_cw{:03}'.format(ch+1, i),
+                     (np.cos(np.arange(48)/2)*i/32))
 else:
     raise KeyError()
 
@@ -91,11 +92,10 @@ AWG8.cfg_num_codewords(32)
 AWG8.upload_codeword_program()
 
 
-
 ##########################################
 #  4. Configuring the DIO protocol       #
 ##########################################
-AWG8.cfg_codeword_protocol('microwave') # <- ensures all bits are uploaded
+AWG8.cfg_codeword_protocol('microwave')  # <- ensures all bits are uploaded
 AWG8.configure_codeword_protocol()
 AWG8.upload_codeword_program()
 AWG8.calibrate_dio_protocol()
