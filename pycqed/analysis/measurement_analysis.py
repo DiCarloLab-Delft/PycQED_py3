@@ -5003,8 +5003,7 @@ class FFC_Analysis(TD_Analysis):
     'ideal_data': np.array equal in lenght to the data
     '''
 
-    def __init__(self, label='FFC', zero_coord=None, one_coord=None,
-                 make_fig=True, **kw):
+    def __init__(self, label='FFC', make_fig=True, **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'  # Read write mode, file must exist
         self.zero_coord = zero_coord
