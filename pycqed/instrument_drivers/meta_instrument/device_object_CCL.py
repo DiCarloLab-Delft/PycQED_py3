@@ -8,6 +8,7 @@ from pycqed.measurement import detector_functions as det
 from pycqed.measurement import sweep_functions as swf
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import measurement_analysis as ma2
+import networkx as nx
 
 try:
     from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
@@ -33,6 +34,13 @@ class DeviceCCL(Instrument):
                            parameter_class=ManualParameter,
                            initial_value=[],
                            vals=vals.Lists(elt_validator=vals.Strings()))
+
+        self.add_parameter('qubit_edges',
+                           parameter_class=ManualParameter,
+                           docstring="Denotes edges that connect qubits. "
+                           "Used to define the device topology.",
+                           initial_value=[[]],
+                           vals=vals.Lists(elt_validator=vals.Lists()))
 
         self.add_parameter(
             'ro_lo_freq', unit='Hz',
@@ -523,9 +531,9 @@ class DeviceCCL(Instrument):
         angles = np.arange(0, 341, 20)
         p = mqo.conditional_oscillation_seq(q0idx, q1idx,
                                             platf_cfg=self.cfg_openql_platform_fn(),
-                                   angles=angles, wait_time=wait_time_ns,
-                                   flux_codeword=flux_codeword,
-                                   CZ_disabled=False)
+                                            angles=angles, wait_time=wait_time_ns,
+                                            flux_codeword=flux_codeword,
+                                            CZ_disabled=False)
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr(),
                              parameter_name='Phase', unit='deg')
@@ -822,9 +830,9 @@ class DeviceCCL(Instrument):
         fl_lutman_q1 = self.find_instrument(q1).instr_LutMan_Flux.get_instr()
 
         p = mqo.conditional_oscillation_seq(q0idx, q1idx,
-                                   platf_cfg=self.cfg_openql_platform_fn(),
-                                   CZ_disabled=False, add_cal_points=False,
-                                   angles=[90])
+                                            platf_cfg=self.cfg_openql_platform_fn(),
+                                            CZ_disabled=False, add_cal_points=False,
+                                            angles=[90])
 
         CC = self.instr_CC.get_instr()
         CC.eqasm_program(p.filename)
@@ -854,7 +862,7 @@ class DeviceCCL(Instrument):
         MC.run('{}_CZphase'.format(q0))
 
         a = ma2.Intersect_Analysis(options_dict={'ch_idx_A': ch_idx,
-                                       'ch_idx_B': ch_idx})
+                                                 'ch_idx_B': ch_idx})
 
         phase_corr_amp = a.get_intersect()[0]
         if phase_corr_amp > np.max(amps) or phase_corr_amp < np.min(amps):
@@ -881,9 +889,9 @@ class DeviceCCL(Instrument):
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
 
         p = mqo.conditional_oscillation_seq(q0idx, q1idx,
-                                   platf_cfg=self.cfg_openql_platform_fn(),
-                                   CZ_disabled=False, add_cal_points=False,
-                                   angles=[90])
+                                            platf_cfg=self.cfg_openql_platform_fn(),
+                                            CZ_disabled=False, add_cal_points=False,
+                                            angles=[90])
 
         CC = self.instr_CC.get_instr()
         CC.eqasm_program(p.filename)
@@ -913,3 +921,59 @@ class DeviceCCL(Instrument):
             if update:
                 self.find_instrument(q0).fl_cz_phase_corr_amp(phase_corr_amp)
             return True
+
+    def create_dep_graph(self):
+        dags = []
+        for qi in self.qubits():
+            q_obj = self.find_instrument(qi)
+            if hasattr(q_obj, '_dag'):
+                dag = q_obj._dag
+            else:
+                dag = q_obj.create_dep_graph()
+            dags.append(dag)
+
+        dag = nx.compose_all(dags)
+
+        dag.add_node(self.name+' multiplexed readout')
+        dag.add_node(self.name+' resonator frequencies coarse')
+        dag.add_node('AWG8 MW-staircase')
+        dag.add_node('AWG8 Flux-staircase')
+        for edge_L, edge_R in self.qubit_edges():
+            dag.add_node('Chevron {}-{}'.format(edge_L, edge_R))
+            dag.add_node('CZ {}-{}'.format(edge_L, edge_R))
+
+            dag.add_edge('CZ {}-{}'.format(edge_L, edge_R),
+                         'Chevron {}-{}'.format(edge_L, edge_R))
+            dag.add_edge('CZ {}-{}'.format(edge_L, edge_R),
+                         '{} cryo dist. corr.'.format(edge_L))
+            dag.add_edge('CZ {}-{}'.format(edge_L, edge_R),
+                         '{} cryo dist. corr.'.format(edge_R))
+
+
+            dag.add_edge('Chevron {}-{}'.format(edge_L, edge_R),
+                         '{} gates restless'.format(edge_L))
+            dag.add_edge('Chevron {}-{}'.format(edge_L, edge_R),
+                         '{} gates restless'.format(edge_R))
+            dag.add_edge('Chevron {}-{}'.format(edge_L, edge_R),
+                         'AWG8 Flux-staircase')
+            dag.add_edge('Chevron {}-{}'.format(edge_L, edge_R),
+                         self.name+' multiplexed readout')
+
+
+        for qubit in self.qubits():
+            dag.add_edge(qubit+' room temp. dist. corr.',
+                         'AWG8 Flux-staircase')
+            dag.add_edge(self.name+' multiplexed readout',
+                         qubit+' optimal weights')
+
+            dag.add_edge(qubit+' resonator frequency',
+                         self.name+' resonator frequencies coarse')
+            dag.add_edge(qubit+' pulse amplitude coarse', 'AWG8 MW-staircase')
+
+        for qi in self.qubits():
+            q_obj = self.find_instrument(qi)
+            # ensures all references are to the main dag
+            q_obj._dag = dag
+
+        self._dag = dag
+        return dag
