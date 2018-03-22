@@ -536,6 +536,11 @@ class CCLight_Transmon(Qubit):
                            initial_value='latest',
                            parameter_class=ManualParameter,
                            vals=vals.Enum('latest', 'flux'))
+        self.add_parameter('cfg_rb_calibrate_method',
+                           initial_value='restless',
+                           parameter_class=ManualParameter,
+                           vals=vals.Enum('restless', 'ORBIT'))
+
         self.add_parameter('cfg_cycle_time',
                            initial_value=20e-9,
                            unit='s',
@@ -1535,6 +1540,37 @@ class CCLight_Transmon(Qubit):
             verbose: bool = True, update: bool=True,
             prepare_for_timedomain: bool=True):
 
+        return self.calibrate_mw_gates_rb(
+            MC=None,
+            parameter_list=parameter_list,
+            initial_values=initial_values,
+            initial_steps=initial_steps,
+            nr_cliffords=nr_cliffords, nr_seeds=nr_seeds,
+            verbose=verbose, update=update,
+            prepare_for_timedomain=prepare_for_timedomain,
+            method='restless')
+
+
+    def calibrate_mw_gates_rb(
+            self, MC=None,
+            parameter_list: list = ['G_att', 'D_att', 'freq'],
+            initial_values: list =None,
+            initial_steps: list= [2e3, 3e3, 1e6],
+            nr_cliffords: int=80, nr_seeds: int=200,
+            verbose: bool = True, update: bool=True,
+            prepare_for_timedomain: bool=True,
+            method: bool=None):
+        """
+        Calibrates microwave pulses using a randomized benchmarking based
+        cost-function.
+        """
+        if method is None:
+            method = self.cfg_rb_calibrate_method()
+        if method == 'restless':
+            restless = True
+        else: # ORBIT
+            restless = False
+
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -1575,21 +1611,34 @@ class CCLight_Transmon(Qubit):
             initial_values = [p.get() for p in sweep_pars]
 
         # Preparing the sequence
+        if restless:
+            net_clifford = 3
+            d = det.UHFQC_single_qubit_statistics_logging_det(
+                self.instr_acquisition.get_instr(),
+                self.instr_CC.get_instr(), nr_shots=4*4095,
+                integration_length=self.ro_acq_integration_length(),
+                channel=self.ro_acq_weight_chI(),
+                statemap={'0': '1', '1': '0'})
+            minimize = False
+            msmt_string = 'Restless_tuneup_{}Cl_{}seeds'.format(
+                nr_cliffords, nr_seeds) + self.msmt_suffix
+
+        else:
+            net_clifford = 0
+            d = self.int_avg_det_single
+            minimize = True
+            msmt_string = 'ORBIT_tuneup_{}Cl_{}seeds'.format(
+                nr_cliffords, nr_seeds) + self.msmt_suffix
+
         p = sqo.randomized_benchmarking(
             self.cfg_qubit_nr(), self.cfg_openql_platform_fn(),
             nr_cliffords=[nr_cliffords],
-            net_clifford=3, nr_seeds=nr_seeds, restless=True, cal_points=False)
+            net_clifford=net_clifford, nr_seeds=nr_seeds,
+            restless=restless, cal_points=False)
         self.instr_CC.get_instr().eqasm_program(p.filename)
         self.instr_CC.get_instr().start()
 
         MC.set_sweep_functions(sweep_pars)
-
-        d = det.UHFQC_single_qubit_statistics_logging_det(
-            self.instr_acquisition.get_instr(),
-            self.instr_CC.get_instr(), nr_shots=4*4095,
-            integration_length=self.ro_acq_integration_length(),
-            channel=self.ro_acq_weight_chI(),
-            statemap={'0': '1', '1': '0'})
 
         MC.set_detector_function(d)
 
@@ -1597,14 +1646,13 @@ class CCLight_Transmon(Qubit):
                         'x0': initial_values,
                         'sigma0': 1,
                         # 'noise_handler': cma.NoiseHandler(len(initial_values)),
-                        'minimize': False,
+                        'minimize': minimize,
                         'options': {'cma_stds': initial_steps}}
 
         MC.set_adaptive_function_parameters(ad_func_pars)
-        MC.run(name='Restless_tuneup_{}Cl_{}seeds'.format(
-            nr_cliffords, nr_seeds) + self.msmt_suffix,
-            mode='adaptive')
-        a = ma.OptimizationAnalysis(label='Restless_tuneup')
+        MC.run(name=msmt_string,
+               mode='adaptive')
+        a = ma.OptimizationAnalysis(label=msmt_string)
 
         if update:
             if verbose:
@@ -1626,6 +1674,8 @@ class CCLight_Transmon(Qubit):
                     # We are varying the LO frequency in the opt, not the q freq.
                     self.freq_qubit(opt_par_values[freq_idx] +
                                     self.mw_freq_mod.get())
+
+        return True
 
     def calibrate_mw_gates_allxy(self, nested_MC=None,
                                  start_values=None,
@@ -2152,7 +2202,7 @@ class CCLight_Transmon(Qubit):
                      self.name+' pulse amplitude coarse')
 
         dag.add_edge(self.name + ' frequency fine',
-                      self.name + ' readout coarse')
+                     self.name + ' readout coarse')
 
         dag.add_node(self.name + ' pulse amplitude med',
                      calibrate_function=self.name + '.measure_rabi')
@@ -2165,9 +2215,9 @@ class CCLight_Transmon(Qubit):
                      self.name+' pulse amplitude med')
 
         dag.add_node(
-            self.name+' gates restless',
-            calibrate_function=self.name + '.calibrate_mw_gates_restless')
-        dag.add_edge(self.name + ' gates restless',
+            self.name+' single qubit gates fine',
+            calibrate_function=self.name + '.calibrate_mw_gates_rb')
+        dag.add_edge(self.name + ' single qubit gates fine',
                      self.name+' optimal weights')
 
         # easy to implement a check
@@ -2180,6 +2230,6 @@ class CCLight_Transmon(Qubit):
                      self.name+' room temp. dist. corr.')
 
         dag.add_edge(self.name+' cryo dist. corr.',
-                     self.name+' gates restless')
+                     self.name+' single qubit gates fine')
         self._dag = dag
         return dag

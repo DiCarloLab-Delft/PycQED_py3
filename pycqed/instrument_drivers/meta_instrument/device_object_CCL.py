@@ -938,6 +938,12 @@ class DeviceCCL(Instrument):
         dag.add_node(self.name+' resonator frequencies coarse')
         dag.add_node('AWG8 MW-staircase')
         dag.add_node('AWG8 Flux-staircase')
+
+        # Timing of channels can be done independent of the qubits
+        # it is on a per frequency per feedline basis so not qubit specific
+        dag.add_node(self.name + ' mw-ro timing')
+        dag.add_edge(self.name + ' mw-ro timing', 'AWG8 MW-staircase')
+
         for edge_L, edge_R in self.qubit_edges():
             dag.add_node('Chevron {}-{}'.format(edge_L, edge_R))
             dag.add_node('CZ {}-{}'.format(edge_L, edge_R))
@@ -951,13 +957,27 @@ class DeviceCCL(Instrument):
 
 
             dag.add_edge('Chevron {}-{}'.format(edge_L, edge_R),
-                         '{} gates restless'.format(edge_L))
+                         '{} single qubit gates fine'.format(edge_L))
             dag.add_edge('Chevron {}-{}'.format(edge_L, edge_R),
-                         '{} gates restless'.format(edge_R))
+                         '{} single qubit gates fine'.format(edge_R))
             dag.add_edge('Chevron {}-{}'.format(edge_L, edge_R),
                          'AWG8 Flux-staircase')
             dag.add_edge('Chevron {}-{}'.format(edge_L, edge_R),
                          self.name+' multiplexed readout')
+
+
+            dag.add_node('{}-{} mw-flux timing'.format(edge_L, edge_R))
+
+            dag.add_edge(edge_L+' cryo dist. corr.',
+                         '{}-{} mw-flux timing'.format(edge_L, edge_R))
+            dag.add_edge(edge_R+' cryo dist. corr.',
+                         '{}-{} mw-flux timing'.format(edge_L, edge_R))
+
+
+            dag.add_edge('Chevron {}-{}'.format(edge_L, edge_R),
+                         '{}-{} mw-flux timing'.format(edge_L, edge_R))
+            dag.add_edge('{}-{} mw-flux timing'.format(edge_L, edge_R),
+                         'AWG8 Flux-staircase')
 
 
         for qubit in self.qubits():
