@@ -7,6 +7,7 @@ This includes
 """
 
 import lmfit
+import logging
 from collections import OrderedDict
 import numpy as np
 import pycqed.analysis.fitting_models as fit_mods
@@ -465,7 +466,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                  label: str='', data_file_path: str=None,
                  options_dict: dict=None, extract_only: bool=False,
                  do_fitting: bool=True, auto=True, n_segments=None,
-                 channel_map=None):
+                 channel_map=None, thresholds=None):
 
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
@@ -480,16 +481,18 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
         qubits = list(channel_map.keys())
 
         # TODO Should by default come from come from MC parameters
+        self.segment_names = []
         for i in range(self.n_segments):
             # TODO These could come from from the MC parameters
-            self.segment_names[i] = i
+            self.segment_names.append(i)
 
         # TODO make an override option
         combination_list = list(itertools.product([False, True], repeat=len(qubits)))
         # TODO make an override option
-        self.states_to_be_counted = {}
+        self.states_to_be_counted = []
+        self.obs_names = []
         for i, states in enumerate(combination_list):
-            self.result_names[i] = '$\| ' + ''.join(['e' if s else 'g' for s in states]) + '\\rangle$'
+            self.obs_names.append('$\| ' + ''.join(['e' if s else 'g' for s in states]) + '\\rangle$')
             self.states_to_be_counted.append(dict(zip(qubits, states)) )
 
         self.single_timestamp = False
@@ -500,31 +503,37 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
             'value_names': 'value_names',
             'value_units': 'value_units'}
 
+        self.thresholds = thresholds
         self.numeric_params = []
         if auto:
             self.run_analysis()
 
     def process_data(self):
         shots_thresh = {}
+        logging.info("Loading from file")
+
         for qubit, channel in self.channel_map.items():
-            shots_cont = np.array(ba.raw_data_dict['measured_values_ord_dict'][0][channel])
-            shots_thresh[qubit] = shots_cont < self.threshold[qubit]
+            shots_cont = np.array(self.raw_data_dict['measured_values_ord_dict'][channel])
+            shots_thresh[qubit] = shots_cont > self.thresholds[qubit]
 
-
+        logging.info("Calculating observables")
         self.proc_data_dict['probability_table'] = \
-            self.probability_table(shots_thresh, self.states_to_be_counted, len(self.segment_names))
+            self.probability_table(shots_thresh, self.states_to_be_counted, self.n_segments)
 
     @staticmethod
     def probability_table(shots_of_qubits, states_to_be_counted, n_segments):
         """
-        Creates a general table of counts averaging out all but specified set of correlations
+        Creates a general table of counts averaging out all but specified set of correlations.
 
-        :param shots_of_qubits: Dictionary of np.arrays of thresholded shots for each qubit.
-        :param states_to_be_counted: List of dictionaries specificing states for qubits.
-            If the qubit is missing from the list of states it is averaged out.
-        :param n_segments: Assumed to be the period in the list of shots between experiments
-            with the same prepared state.
-        :return: np.array with counts with dimensions (n_segments, len(states_to_be_counted))
+        Args:
+            shots_of_qubits: Dictionary of np.arrays of thresholded shots for each qubit.
+            states_to_be_counted: List of dictionaries specificing states for qubits as bools.
+                If the qubit is missing from the list of states it is averaged out.
+            n_segments: Assumed to be the period in the list of shots between experiments
+                with the same prepared state. If shots_of_qubits includes preselection readout results
+                or if there was several readouts for a single segment then n_segments has to include them.
+        Returns:
+            np.array: counts with dimensions (n_segments, len(states_to_be_counted))
         """
 
         res_e = {}
@@ -541,7 +550,6 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                 # This makes copy, but allows faster AND later
                 res_g[qubit] = np.logical_not(np.array(results[0, segment_n::n_segments]))
 
-            # todo mask with preselection
             for state_n, states_of_qubits in enumerate(states_to_be_counted): # first result all ground
                 mask = np.ones((int(n_shots/n_segments)), dtype=bool)
                 for qubit, state in states_of_qubits.items(): # slow qubit is the first in channel_map list
@@ -553,6 +561,28 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                 table[segment_n, state_n] = np.count_nonzero(mask)
 
         return table
+
+    def prepare_plots(self):
+        ylist = list(range(self.n_segments))
+        self.plot_dicts['counts_table'] = {
+            'axid': "ptable",
+            'plotfn': self.plot_colorx,
+            'xvals': np.arange(len(self.states_to_be_counted)),
+            'yvals': np.array(len(self.states_to_be_counted)*[ylist]),
+            'zvals': self.proc_data_dict['probability_table'].T,
+            'xlabel': "Channels",
+            'ylabel': "Segments",
+            'zlabel': "Counts",
+            'title': (self.timestamps[0] + ' \n' +
+                      self.raw_data_dict['measurementstring'][0]),
+            'xunit': None,
+            'yunit': None,
+            'xtick_loc': np.arange(len(self.states_to_be_counted)),
+            'xtick_labels': self.obs_names,
+            'origin': 'upper'
+        }
+
+
 
 
 def get_shots_zero_one(data, post_select: bool=False,

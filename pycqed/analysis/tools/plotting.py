@@ -215,6 +215,7 @@ def flex_color_plot_vs_x(xvals, yvals, zvals, ax=None,
     yvals and zvals should be a list of arrays with the sweep points and
     measured values.
     """
+
     # create a figure and set of axes
     if ax is None:
         fig = plt.figure(figsize=(12, 7))
@@ -254,6 +255,11 @@ def flex_color_plot_vs_x(xvals, yvals, zvals, ax=None,
         if log:
             zvals[xx] = np.log(zvals[xx])/np.log(10)
 
+    if kw.pop('origin', 'lower') == 'upper':
+        lower, higher = ax.get_ylim()
+        ax.set_ylim(higher, lower)
+        print("Test")
+
     # add blocks to plot
     colormaps = []
     for xx in range(len(xvals)):
@@ -263,7 +269,7 @@ def flex_color_plot_vs_x(xvals, yvals, zvals, ax=None,
         if xwidth is None:
             colormaps.append(ax.pcolor(xvertices[xx:xx+2],
                                        yvertices[xx],
-                                       tempzvals,
+                                       tempzvals, #origin=kw.pop('origin', 'lower'),
                                        cmap=cmap, vmin=clim[0], vmax=clim[1],
                                        alpha=alpha))
         else:
