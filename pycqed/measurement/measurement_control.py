@@ -453,8 +453,13 @@ class MeasurementControl(Instrument):
             for i in range(len(x)):
                 x[i] = float(x[i])/float(self.x_scale[i])
 
+        vals = self.measurement_function(x)
+        # This takes care of data that comes from a "single" segment of a
+        # detector for a larger shape such as the UFHQC single int avg detector
+        # that gives back data in the shape [[I_val_seg0, Q_val_seg0]]
+        if len(np.shape(vals)) == 2:
+            vals = np.array(vals)[:, 0]
         if self.minimize_optimization:
-            vals = self.measurement_function(x)
             if (self.f_termination is not None):
                 if (vals < self.f_termination):
                     raise StopIteration()
@@ -471,6 +476,7 @@ class MeasurementControl(Instrument):
         if hasattr(vals, '__iter__'):
             if len(vals) > 1:
                 vals = vals[self.par_idx]
+
         return vals
 
     def finish(self, result):

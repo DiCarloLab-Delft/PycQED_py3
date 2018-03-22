@@ -498,9 +498,42 @@ class Test_MeasurementControl(unittest.TestCase):
             self.assertLess(x_opt[i], 0.5)
             self.assertLess(x_mean[i], 0.5)
 
+    def test_adaptive_cma_list_of_vals(self):
+        """
+        This tests
+        """
+        # import included in the test to avoid whole suite failing if missing
+        import cma
+
+        self.mock_parabola.noise(.01)
+        self.MC.set_sweep_functions(
+            [self.mock_parabola.x, self.mock_parabola.y,
+             self.mock_parabola.z])
+        self.MC.set_adaptive_function_parameters(
+            {'adaptive_function': cma.fmin,
+             'x0': [-5, 5, 5], 'sigma0': 1,
+             # options for the CMA algorithm can be found using
+             # "cma.CMAOptions()"
+             'options': {'maxfevals': 5000,    # maximum function cals
+                         # Scaling for individual sigma's
+                         'cma_stds': [5, 6, 3],
+                         'ftarget': 0.005},     # Target function value
+             })
+        self.mock_parabola.noise(.5)
+        self.MC.set_detector_function(self.mock_parabola.parabola_list)
+        dat = self.MC.run('CMA test', mode='adaptive')
+        x_opt = self.MC.adaptive_result[0]
+        x_mean = self.MC.adaptive_result[5]
+
+        for i in range(3):
+            self.assertLess(x_opt[i], 0.5)
+            self.assertLess(x_mean[i], 0.5)
+
+
     def test_adaptive_measurement_SPSA(self):
         self.MC.soft_avg(1)
         self.mock_parabola.noise(0)
+        self.mock_parabola.z(0)
         self.MC.set_sweep_functions(
             [self.mock_parabola.x, self.mock_parabola.y])
         self.MC.set_adaptive_function_parameters(
