@@ -41,6 +41,7 @@ install:
     - pip install ply # a requirement for pygsti
     - pip install plotly # a requirement for pygsti
     - pip install git+git://github.com/DiCarloLab-Delft/Qcodes.git
+    - pip install git+git://github.com/AdriaanRol/AutoDepGraph.git@v02_networkx_rewrite
     - pip install coverage pytest-cov pytest --upgrade
     - pip install coveralls
     - pip install codacy-coverage
