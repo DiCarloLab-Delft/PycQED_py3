@@ -1174,8 +1174,11 @@ def add_two_q_cal_points(p, platf, q0: int, q1: int,
             k.gate('rx180', q1)
         else:
             k.gate('i', q1)
+        # Used to ensure timing is aligned
+        k.gate('wait', [q0, q1], 0)
         k.measure(q0)
         k.measure(q1)
+        k.gate('wait', [q0, q1], 0)
         kernel_list.append(k)
         p.add_kernel(k)
 

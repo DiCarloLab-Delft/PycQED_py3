@@ -101,13 +101,6 @@ class DeviceCCL(Instrument):
                            initial_value=False,
                            parameter_class=ManualParameter)
 
-        self.add_parameter('ro_qubits_list',
-                           vals=vals.Lists(elt_validator=vals.Strings()),
-                           parameter_class=ManualParameter,
-                           docstring="Select which qubits to readout \
-                                by default detector. Empty list means all.",
-                           initial_value=[])
-
         self.add_parameter('cfg_openql_platform_fn',
                            label='OpenQL platform configuration filename',
                            parameter_class=ManualParameter,
@@ -165,10 +158,6 @@ class DeviceCCL(Instrument):
         set the parameters of the individual qubits to be compatible
         with multiplexed readout.
         """
-
-        ro_qb_list = self.ro_qubits_list()
-        if ro_qb_list == []:
-            ro_qb_list = self.qubits()
 
         if self.ro_acq_weight_type() == 'optimal':
             nr_of_acquisition_channels_per_qubit = 1
@@ -271,26 +260,26 @@ class DeviceCCL(Instrument):
             value_names         : convenient labels
         """
         if qubits is None:
-            qubits = self.ro_qubits_list()
+            qubits = self.qubits()
 
         channels_list = []  # tuples (instrumentname, channel, description)
 
-        for qb_name in self.qubits():
-            if self.ro_qubits_list() and qb_name not in self.ro_qubits_list():
-                continue
-
+        for qb_name in qubits:
             qb = self.find_instrument(qb_name)
             acq_instr_name = qb.instr_acquisition()
 
             # one channel per qb
             if self.ro_acq_weight_type() == 'optimal':
                 ch_idx = qb.ro_acq_weight_chI()
-                channels_list.append((acq_instr_name, ch_idx, qb_name))
+                channels_list.append((acq_instr_name, ch_idx,
+                                      'w{} {}'.format(ch_idx, qb_name)))
             else:
                 ch_idx = qb.ro_acq_weight_chI()
-                channels_list.append((acq_instr_name, ch_idx, qb_name + " I"))
+                channels_list.append((acq_instr_name, ch_idx,
+                                      'w{} {} I'.format(ch_idx, qb_name)))
                 ch_idx = qb.ro_acq_weight_chQ()
-                channels_list.append((acq_instr_name, ch_idx, qb_name + " Q"))
+                channels_list.append((acq_instr_name, ch_idx,
+                                      'w{} {} Q'.format(ch_idx, qb_name)))
 
         # for now, implement only working with one UHFLI
         acq_instruments = list(set([inst for inst, _, _ in channels_list]))
@@ -309,7 +298,7 @@ class DeviceCCL(Instrument):
         detectors.
         """
         acq_instruments, ro_ch_idx, value_names = \
-            self._get_ro_channels_and_labels(self.ro_qubits_list())
+            self._get_ro_channels_and_labels(self.qubits())
 
         if self.ro_acq_weight_type() == 'optimal':
             # todo: digitized mode
@@ -356,7 +345,7 @@ class DeviceCCL(Instrument):
             result_logging_mode = 'raw'
 
         acq_instruments, ro_ch_idx, value_names = \
-            self._get_ro_channels_and_labels(self.ro_qubits_list())
+            self._get_ro_channels_and_labels()
 
         int_avg_det = det.UHFQC_integrated_average_detector(
             channels=ro_ch_idx,
@@ -372,9 +361,8 @@ class DeviceCCL(Instrument):
         """
         turn on and configure the RO LO's of all qubits to be measured.
         """
-        ro_qb_list = self.ro_qubits_list()
-        if ro_qb_list == []:
-            ro_qb_list = self.qubits()
+
+        ro_qb_list = self.qubits()
 
         for qb_name in ro_qb_list:
             LO = self.find_instrument(qb_name).instr_LO_ro.get_instr()
@@ -388,7 +376,7 @@ class DeviceCCL(Instrument):
         let the lutman configure the readout AWGs.
         """
         # these are the qubits that should be possible to read out
-        ro_qb_list = self.ro_qubits_list()
+        ro_qb_list = self.qubits()
         if ro_qb_list == []:
             ro_qb_list = self.qubits()
 
@@ -622,7 +610,7 @@ class DeviceCCL(Instrument):
 
     def measure_two_qubit_SSRO(self, q0: str, q1: str,
                                detector=None,
-                               nr_shots: int=4092*4,
+                               nr_shots: int=4088*4,
                                prepare_for_timedomain: bool =True,
                                result_logging_mode='lin_trans',
                                analyze=True,
@@ -643,8 +631,10 @@ class DeviceCCL(Instrument):
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr())
         if detector is None:
-            d = self.get_int_logging_detector([q0, q1],
+            # right is LSQ
+            d = self.get_int_logging_detector([q1, q0],
                                               result_logging_mode='lin_trans')
+            d.nr_shots = 4088  # To ensure proper data binning
         else:
             d = detector
 
