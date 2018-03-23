@@ -8,6 +8,7 @@ This includes
 
 import lmfit
 import logging
+import itertools
 from collections import OrderedDict
 import numpy as np
 import pycqed.analysis.fitting_models as fit_mods
@@ -459,34 +460,30 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                     'setlabel': rel_exc_str,
                     'do_legend': True}
 
-import itertools
 
-
-class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
+class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
     """
     Extracts table of counts from multiplexed single shot readout experiment.
     Intended to be the bases class for more complex multi qubit experiment analysis.
+
+
+    Required options in the options_dict:
+        n_segments: Assumed to be the period in the list of shots between experiments
+            with the same prepared state. If shots_of_qubits includes preselection readout results
+            or if there was several readouts for a single segment then n_segments has to include them.
+        channel_map: dictionary with qubit names as keys and channel channel names as values.
+        thresholds: dictionary with qubit names as keys and threshold values as values.
+    Optional options in the options_dict:
+        observables: Dictionary with observable names as a key and observable as a value. Observable is a
+            dictionary with name of the qubit as key and boolean value indicating if it is selecting
+            exited states. If the qubit is missing from the list of states it is averaged out.
+        segment_names: used as y-axis labels for the default figure
     """
 
     def __init__(self, t_start: str=None, t_stop: str=None,
                  label: str='', data_file_path: str=None,
                  options_dict: dict=None, extract_only: bool=False,
                  do_fitting: bool=True, auto=True):
-        """
-
-        Required options in the options_dict:
-            n_segments: Assumed to be the period in the list of shots between experiments
-                with the same prepared state. If shots_of_qubits includes preselection readout results
-                or if there was several readouts for a single segment then n_segments has to include them.
-            channel_map: dictionary with qubit names as keys and channel channel names as values.
-            thresholds: dictionary with qubit names as keys and threshold values as values.
-        Optional options in the options_dict:
-            observables: Dictionary with observable names as a key and observable as a value. Observable is a
-                dictionary with name of the qubit as key and boolean value indicating if it is selecting
-                exited states. If the qubit is missing from the list of states it is averaged out.
-            segment_names: used as y-axis labels for the default figure
-
-        """
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
                          data_file_path=data_file_path,
@@ -503,7 +500,6 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
             # TODO Default values should come from the MC parameters
             None
 
-
         self.observables = options_dict.get('observables', None)
         if self.observables is None:
             combination_list = list(itertools.product([False, True], repeat=len(qubits)))
@@ -511,7 +507,6 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
             for i, states in enumerate(combination_list):
                 obs_name = '$\| ' + ''.join(['e' if s else 'g' for s in states]) + '\\rangle$'
                 self.observables[obs_name] = dict(zip(qubits, states))
-        print(self.observables)
         self.single_timestamp = False
 
         self.params_dict = {
@@ -594,7 +589,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
         cm = lscmap('customcmap', cdict)
 
         ylist = list(range(self.n_segments))
-        self.plot_dicts['counts_table'] = {
+        plot_dict = {
             'axid': "ptable",
             'plotfn': self.plot_colorx,
             'xvals': np.arange(len(self.observables)),
@@ -616,8 +611,10 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
         }
 
         if self.segment_names is not None:
-            self.plot_dicts['counts_table']['']
+            plot_dict['ytick_loc'] = np.arange(len(self.segment_names))
+            plot_dict['ytick_labels'] = self.segment_names
 
+        self.plot_dicts['counts_table'] = plot_dict
 
 def get_shots_zero_one(data, post_select: bool=False,
                        nr_samples: int=2, sample_0: int=0, sample_1: int=1,
@@ -656,3 +653,29 @@ def get_shots_zero_one(data, post_select: bool=False,
         shots_1 = shots_1[~np.isnan(shots_1)]
 
     return shots_0, shots_1
+
+
+class Multiplexed_Readout_Analysis(MultiQubit_SingleShot_Analysis):
+    """
+    Analysis results of an experiment meant for characterization of multiplexed readout.
+    """
+    def __init__(self, t_start: str=None, t_stop: str=None,
+                 label: str='', data_file_path: str=None,
+                 options_dict: dict=None, extract_only: bool=False,
+                 do_fitting: bool=True, auto=True):
+
+        def_seg_names_prep = ["".join(l) for l in list(itertools.product(["$0$", "$\pi$"], repeat=5))]
+        def_seg_names = [x for t in zip(*[["sel"]*len(def_seg_names_prep),def_seg_names_prep]) for x in t]
+
+        options_dict['segment_names'] = options_dict.get('segment_names',def_seg_names)
+
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         extract_only=extract_only, do_fitting=do_fitting, auto=False)
+
+        # here we can do more stuff before analysis runs
+
+        if auto:
+            self.run_analysis()
