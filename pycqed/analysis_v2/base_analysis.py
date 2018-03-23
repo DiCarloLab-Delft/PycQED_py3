@@ -901,6 +901,7 @@ class BaseDataAnalysis(object):
         plot_yvals = pdict['yvals']
         plot_cbar = pdict.get('plotcbar', True)
         plot_cmap = pdict.get('cmap', 'YlGn')
+        plot_aspect = pdict.get('aspect', None)
         plot_zrange = pdict.get('zrange', None)
         plot_yrange = pdict.get('yrange', None)
         plot_xrange = pdict.get('xrange', None)
@@ -974,8 +975,7 @@ class BaseDataAnalysis(object):
                             yvals=traces['yvals'][tt],
                             zvals=traces['zvals'][tt],  # .transpose(),
                             transpose=plot_transpose,
-                            normalize=plot_normalize,
-                            origin=plot_origin)
+                            normalize=plot_normalize)
 
         # else:
         #     out = pfunc(ax=axs, clim=fig_clim, cmap=plot_cmap,
@@ -1026,6 +1026,12 @@ class BaseDataAnalysis(object):
             axs.xaxis.set_ticks(plot_xtick_loc)
         if plot_ytick_loc is not None:
             axs.yaxis.set_ticks(plot_ytick_loc)
+        if plot_origin == 'upper':
+            axs.invert_yaxis()
+            print("Test 3")
+
+        if plot_aspect is not None:
+            axs.set_aspect(plot_aspect)
 
         if not plot_nolabel:
             self.label_color2D(pdict, axs)

@@ -17,6 +17,8 @@ from scipy.optimize import minimize
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str
 import pycqed.analysis.tools.data_manipulation as dm_tools
 
+from matplotlib.colors import LinearSegmentedColormap as lscmap
+
 
 class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
@@ -563,6 +565,19 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
         return table
 
     def prepare_plots(self):
+
+        # colormap which has a lot of contrast for small and large values
+        values = [0, 0.1, 0.2, 0.8, 1]
+        colors = [(1, 1, 1),
+              (191/255, 38/255, 11/255),
+              (155/255, 10/255, 106/255),
+              (55/255, 129/255, 214/255),
+              (0, 0, 0)]
+        cdict = {'red':   [(values[i], colors[i][0], colors[i][0]) for i in range(len(values))],
+                 'green': [(values[i], colors[i][1], colors[i][1]) for i in range(len(values))],
+                 'blue':  [(values[i], colors[i][2], colors[i][2]) for i in range(len(values))]}
+        cm = lscmap('customcmap', cdict)
+
         ylist = list(range(self.n_segments))
         self.plot_dicts['counts_table'] = {
             'axid': "ptable",
@@ -579,10 +594,11 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
             'yunit': None,
             'xtick_loc': np.arange(len(self.states_to_be_counted)),
             'xtick_labels': self.obs_names,
-            'origin': 'upper'
+            'origin': 'upper',
+            'cmap': cm,
+            'aspect': 'equal',
+            'plotsize': (8, 8)
         }
-
-
 
 
 def get_shots_zero_one(data, post_select: bool=False,

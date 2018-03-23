@@ -255,10 +255,7 @@ def flex_color_plot_vs_x(xvals, yvals, zvals, ax=None,
         if log:
             zvals[xx] = np.log(zvals[xx])/np.log(10)
 
-    if kw.pop('origin', 'lower') == 'upper':
-        lower, higher = ax.get_ylim()
-        ax.set_ylim(higher, lower)
-        print("Test")
+
 
     # add blocks to plot
     colormaps = []
@@ -266,12 +263,13 @@ def flex_color_plot_vs_x(xvals, yvals, zvals, ax=None,
         tempzvals = np.array(
             [np.append(zvals[xx], np.array(0)),
              np.append(zvals[xx], np.array(0))]).transpose()
+
         if xwidth is None:
             colormaps.append(ax.pcolor(xvertices[xx:xx+2],
-                                       yvertices[xx],
-                                       tempzvals, #origin=kw.pop('origin', 'lower'),
-                                       cmap=cmap, vmin=clim[0], vmax=clim[1],
-                                       alpha=alpha))
+                                        yvertices[xx],
+                                        tempzvals,
+                                        cmap=cmap, vmin=clim[0], vmax=clim[1],
+                                        alpha=alpha))
         else:
             colormaps.append(
                 ax.pcolor(xvertices[xx], yvertices[xx], tempzvals, cmap=cmap,
