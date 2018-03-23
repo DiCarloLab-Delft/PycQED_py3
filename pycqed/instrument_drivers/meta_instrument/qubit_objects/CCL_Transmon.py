@@ -1092,7 +1092,8 @@ class CCLight_Transmon(Qubit):
         VSM.set('mod8_ch{}_gaussian_att_raw'.format(ch_in), 50000)
         VSM.set('mod8_ch{}_derivative_att_raw'.format(ch_in), 0)
         offset_I, offset_Q = mixer_carrier_cancellation(
-            SH=self.instr_SH.get_instr(), source=self.instr_LO_mw.get_instr(),
+            SH=self.instr_SH.get_instr(), 
+            source=self.instr_LO_mw.get_instr(),
             MC=self.instr_MC.get_instr(),
             chI_par=chGI_par, chQ_par=chGQ_par)
         if update:
@@ -1104,9 +1105,11 @@ class CCLight_Transmon(Qubit):
         VSM.set('mod8_ch{}_derivative_att_raw'.format(ch_in), 50000)
 
         offset_I, offset_Q = mixer_carrier_cancellation(
-            SH=self.instr_SH.get_instr(), source=self.instr_LO_mw.get_instr(),
+            SH=self.instr_SH.get_instr(), 
+            source=self.instr_LO_mw.get_instr(),
             MC=self.instr_MC.get_instr(),
-            chI_par=chDI_par, chQ_par=chDQ_par)
+            chI_par=chDI_par, 
+            chQ_par=chDQ_par)
         if update:
             self.mw_mixer_offs_DI(offset_I)
             self.mw_mixer_offs_DQ(offset_Q)
@@ -1477,7 +1480,7 @@ class CCLight_Transmon(Qubit):
 
     def measure_rabi_vsm(self, MC=None, atts=np.linspace(0, 65535, 31),
                          analyze=True, close_fig=True, real_imag=True,
-                         prepare_for_timedomain=True):
+                         prepare_for_timedomain=True, all_modules=False):
         if MC is None:
             MC = self.instr_MC.get_instr()
         if prepare_for_timedomain:
@@ -1492,11 +1495,21 @@ class CCLight_Transmon(Qubit):
         # Gin = self.mw_vsm_ch_Gin()
         mod_out = self.mw_vsm_mod_out()
         ch_in = self.mw_vsm_ch_in()
-        G_par = VSM.parameters['mod{}_ch{}_gaussian_att_raw'.format(
-            mod_out, ch_in)]
-        D_par = VSM.parameters['mod{}_ch{}_derivative_att_raw'.format(
-            mod_out, ch_in)]
-        s = swf.two_par_joint_sweep(G_par, D_par, preserve_ratio=True)
+        if all_modules:
+          mod_sweep=[]
+          for i in range(8):
+            G_par=VSM.parameters['mod{}_ch{}_gaussian_att_raw'.format(
+                i+1, ch_in)]
+            D_par=VSM.parameters['mod{}_ch{}_derivative_att_raw'.format(
+                i+1, ch_in)]
+            mod_sweep.append(swf.two_par_joint_sweep(G_par, D_par, preserve_ratio=False))
+          s=swf.multi_sweep_function(sweep_functions=mod_sweep)
+        else:  
+          G_par = VSM.parameters['mod{}_ch{}_gaussian_att_raw'.format(
+              mod_out, ch_in)]
+          D_par = VSM.parameters['mod{}_ch{}_derivative_att_raw'.format(
+              mod_out, ch_in)]
+          s = swf.two_par_joint_sweep(G_par, D_par, preserve_ratio=True)
         self.instr_CC.get_instr().eqasm_program(p.filename)
         MC.set_sweep_function(s)
         MC.set_sweep_points(atts)
