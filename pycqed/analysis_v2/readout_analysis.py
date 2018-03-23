@@ -5,7 +5,8 @@ This includes
     - single shot readout analysis
     - multiplexed readout analysis
 """
-
+import itertools
+import matplotlib.pyplot as plt
 import lmfit
 from collections import OrderedDict
 import numpy as np
@@ -15,6 +16,7 @@ import pycqed.analysis_v2.base_analysis as ba
 from scipy.optimize import minimize
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str
 import pycqed.analysis.tools.data_manipulation as dm_tools
+from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 
 
 class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
@@ -46,7 +48,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         """
         # Determine the shape of the data to extract wheter to rotate or not
         post_select = self.options_dict.get('post_select', False)
-        post_select_threshold = self.options_dict.get('post_select_threshold', 0)
+        post_select_threshold = self.options_dict.get(
+            'post_select_threshold', 0)
         nr_samples = self.options_dict.get('nr_samples', 2)
         sample_0 = self.options_dict.get('sample_0', 0)
         sample_1 = self.options_dict.get('sample_1', 1)
@@ -406,9 +409,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 fit_th_msg = (
                     'Fit threshold: {:.2f} {}\n'.format(
                         thr, th_unit) +
-                     r'$F_{A}$-fit: '+
-                     r'{:.3f}'.format(self.proc_data_dict['F_assignment_fit']))
-
+                    r'$F_{A}$-fit: ' +
+                    r'{:.3f}'.format(self.proc_data_dict['F_assignment_fit']))
 
                 self.plot_dicts['fit_threshold'] = {
                     'ax_id': '1D_histogram',
@@ -458,7 +460,133 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
 
 class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
-    pass
+    """
+    For two qubits, to make an n-qubit mux readout experiment.
+    we should vectorize this analysis
+    """
+
+    def __init__(self, t_start: str=None, t_stop: str=None,
+                 label: str='',
+                 data_file_path: str=None,
+                 options_dict: dict=None, extract_only: bool=False,
+                 do_fitting: bool=True, auto=True):
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         extract_only=extract_only, do_fitting=do_fitting)
+        self.single_timestamp = False
+        self.params_dict = {
+            'measurementstring': 'measurementstring',
+            'measured_values': 'measured_values',
+            'value_names': 'value_names',
+            'value_units': 'value_units'}
+
+        self.numeric_params = []
+        if auto:
+            self.run_analysis()
+
+    def process_data(self):
+        """
+        Responsible for creating the histograms based on the raw data
+        """
+        # Determine the shape of the data to extract wheter to rotate or not
+        post_select = self.options_dict.get('post_select', False)
+        post_select_threshold = self.options_dict.get(
+            'post_select_threshold', 0)
+        nr_samples = self.options_dict.get('nr_samples', 2)
+        sample_0 = self.options_dict.get('sample_0', 0)
+        sample_1 = self.options_dict.get('sample_1', 1)
+        nr_bins = self.options_dict.get('nr_bins', 100)
+
+        nr_expts = self.raw_data_dict['nr_experiments']
+        # self.proc_data_dict['shots_0'] = [''] * nr_expts
+        # self.proc_data_dict['shots_1'] = [''] * nr_expts
+        self.proc_data_dict['nr_shots'] = [0] * nr_expts
+
+        #################################################################
+        #  Separating data into shots for the different prepared states #
+        #################################################################
+
+        nr_of_qubits = 2
+        self.proc_data_dict['nr_of_qubits'] = nr_of_qubits
+        self.proc_data_dict['ch_names'] = self.raw_data_dict['value_names'][0]
+
+        for ch_name, shots in self.raw_data_dict['measured_values_ord_dict'].items():
+            # print(ch_name)
+            self.proc_data_dict[ch_name] = shots[0]  # only 1 dataset
+            self.proc_data_dict[ch_name +
+                                ' all'] = self.proc_data_dict[ch_name]
+            min_sh = np.min(self.proc_data_dict[ch_name])
+            max_sh = np.max(self.proc_data_dict[ch_name])
+
+            number_of_experiments = 2**nr_of_qubits
+            for i in range(2**nr_of_qubits):
+                format_str = '{'+'0:0{}b'.format(nr_of_qubits) + '}'
+                binning_string = format_str.format(i)
+                # No post selection implemented yet
+                self.proc_data_dict['{} {}'.format(ch_name, binning_string)] = \
+                    self.proc_data_dict[ch_name][i::number_of_experiments]
+                ##################################
+                #  Binning data into histograms  #
+                ##################################
+                hist_name = 'hist {} {}'.format(
+                    ch_name, binning_string)
+                self.proc_data_dict[hist_name] = np.histogram(
+                    self.proc_data_dict['{} {}'.format(
+                        ch_name, binning_string)],
+                    bins=nr_bins, range=(min_sh, max_sh))
+            self.proc_data_dict['bin_centers {}'.format(ch_name)] = (
+                self.proc_data_dict[hist_name][1][:-1] +
+                self.proc_data_dict[hist_name][1][1:]) / 2
+
+            self.proc_data_dict['binsize {}'.format(ch_name)] = (
+                self.proc_data_dict[hist_name][1][1] -
+                self.proc_data_dict[hist_name][1][0])
+
+        # ##########################
+        # #  Cumulative histograms #
+        # ##########################
+
+        # # the cumulative histograms are normalized to ensure the right
+        # # fidelities can be calculated
+        # self.proc_data_dict['cumhist_0'] = np.cumsum(
+        #     self.proc_data_dict['hist_0'][0])/(
+        #         self.proc_data_dict['nr_shots'][0])
+        # self.proc_data_dict['cumhist_1'] = np.cumsum(
+        #     self.proc_data_dict['hist_1'][0])/(
+        #         self.proc_data_dict['nr_shots'][0])
+
+        # self.proc_data_dict['shots_xlabel'] = \
+        #     self.raw_data_dict['value_names'][0][0]
+        # self.proc_data_dict['shots_xunit'] = \
+        #     self.raw_data_dict['value_units'][0][0]
+
+        # ###########################################################
+        # #  Threshold and fidelity based on cumulative histograms  #
+        # ###########################################################
+        # # Average assignment fidelity: F_ass = (P01 - P10 )/2
+        # # where Pxy equals probability to measure x when starting in y
+        # F_vs_th = (1-(1-abs(self.proc_data_dict['cumhist_1'] -
+        #                     self.proc_data_dict['cumhist_0']))/2)
+        # opt_idx = np.argmax(F_vs_th)
+        # self.proc_data_dict['F_assignment_raw'] = F_vs_th[opt_idx]
+        # self.proc_data_dict['threshold_raw'] = \
+        #     self.proc_data_dict['bin_centers'][opt_idx]
+
+    def prepare_plots(self):
+        # N.B. If the log option is used we should manually set the
+        # yscale to go from .5 to the current max as otherwise the fits
+        # mess up the log plots.
+        # log_hist = self.options_dict.get('log_hist', False)
+
+        for ch in self.proc_data_dict['ch_names']:
+            self.plot_dicts['histogram_{}'.format(ch)] = {
+                'plotfn': make_mux_ssro_histogram,
+                'data_dict': self.proc_data_dict,
+                'ch_name': ch,
+                'title': (self.timestamps[0] + ' \n' +
+                          self.raw_data_dict['measurementstring'][0])}
 
 
 def get_shots_zero_one(data, post_select: bool=False,
@@ -473,7 +601,6 @@ def get_shots_zero_one(data, post_select: bool=False,
 
         shots_0, shots_1 = a_tools.zigzag(
             data, sample_0+1, sample_1+1, nr_samples)
-
 
     if post_select:
         post_select_shots_0 = data[0::nr_samples]
@@ -498,3 +625,27 @@ def get_shots_zero_one(data, post_select: bool=False,
         shots_1 = shots_1[~np.isnan(shots_1)]
 
     return shots_0, shots_1
+
+
+def make_mux_ssro_histogram(data_dict, ch_name, title=None, ax=None, **kw):
+
+    if ax is None:
+        f, ax = plt.subplots()
+
+    nr_of_qubits = data_dict['nr_of_qubits']
+    markers = itertools.cycle(('v', '<', '>', '^', 'd', 'o', 's', '*'))
+    for i in range(2**nr_of_qubits):
+        format_str = '{'+'0:0{}b'.format(nr_of_qubits) + '}'
+        binning_string = format_str.format(i)
+        ax.plot(data_dict['bin_centers {}'.format(ch_name)],
+                data_dict['hist {} {}'.format(ch_name, binning_string)][0],
+                linestyle='',
+                marker=next(markers), alpha=.7, label=binning_string)
+
+    ax.legend(title=ch_name)
+    ax.set_ylabel('Counts')
+    # arbitrary units as we use optimal weights
+    set_xlabel(ax, ch_name, 'a.u.')
+    ax.legend(title=ch_name)
+    if title is not None:
+        ax.set_title(title)

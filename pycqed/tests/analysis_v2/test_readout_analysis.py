@@ -74,3 +74,12 @@ class Test_SSRO_discrimination_analysis(unittest.TestCase):
         np.testing.assert_almost_equal(
             a.proc_data_dict['measurement_induced_relaxation'], 0.1,
             decimal=1)
+
+
+class Test_multiplexed_readout_analysis(unittest.TestCase):
+
+    def test_multiplexed_readout_analysis(self):
+        t_start = '20180323_150203'
+        t_stop = t_start
+        a = ma.Multiplexed_Readout_Analysis(t_start=t_start, t_stop=t_stop)
+        # self.assert_almost_equal(as;lgkhl;gsaf)
