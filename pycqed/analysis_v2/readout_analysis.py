@@ -502,7 +502,6 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
         nr_expts = self.raw_data_dict['nr_experiments']
         # self.proc_data_dict['shots_0'] = [''] * nr_expts
         # self.proc_data_dict['shots_1'] = [''] * nr_expts
-        self.proc_data_dict['nr_shots'] = [0] * nr_expts
 
         #################################################################
         #  Separating data into shots for the different prepared states #
@@ -519,6 +518,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                                 ' all'] = self.proc_data_dict[ch_name]
             min_sh = np.min(self.proc_data_dict[ch_name])
             max_sh = np.max(self.proc_data_dict[ch_name])
+            self.proc_data_dict['nr_shots'] = len(self.proc_data_dict[ch_name])
 
             number_of_experiments = 2**nr_of_qubits
             for i in range(2**nr_of_qubits):
@@ -536,6 +536,14 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                     self.proc_data_dict['{} {}'.format(
                         ch_name, binning_string)],
                     bins=nr_bins, range=(min_sh, max_sh))
+                #  Cumulative histograms #
+                chist_name = 'c'+hist_name
+                # the cumulative histograms are normalized to ensure the right
+                # fidelities can be calculated
+                self.proc_data_dict[chist_name] = np.cumsum(
+                    self.proc_data_dict[hist_name][0])/(
+                    self.proc_data_dict['nr_shots'])
+
             self.proc_data_dict['bin_centers {}'.format(ch_name)] = (
                 self.proc_data_dict[hist_name][1][:-1] +
                 self.proc_data_dict[hist_name][1][1:]) / 2
@@ -544,29 +552,13 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                 self.proc_data_dict[hist_name][1][1] -
                 self.proc_data_dict[hist_name][1][0])
 
-        # ##########################
-        # #  Cumulative histograms #
-        # ##########################
+        ###########################################################
+        #  Threshold and fidelity based on cumulative histograms  #
+        ###########################################################
+        # Average assignment fidelity: F_ass = (P01 - P10 )/2
+        # where Pxy equals probability to measure x when starting in y
 
-        # # the cumulative histograms are normalized to ensure the right
-        # # fidelities can be calculated
-        # self.proc_data_dict['cumhist_0'] = np.cumsum(
-        #     self.proc_data_dict['hist_0'][0])/(
-        #         self.proc_data_dict['nr_shots'][0])
-        # self.proc_data_dict['cumhist_1'] = np.cumsum(
-        #     self.proc_data_dict['hist_1'][0])/(
-        #         self.proc_data_dict['nr_shots'][0])
 
-        # self.proc_data_dict['shots_xlabel'] = \
-        #     self.raw_data_dict['value_names'][0][0]
-        # self.proc_data_dict['shots_xunit'] = \
-        #     self.raw_data_dict['value_units'][0][0]
-
-        # ###########################################################
-        # #  Threshold and fidelity based on cumulative histograms  #
-        # ###########################################################
-        # # Average assignment fidelity: F_ass = (P01 - P10 )/2
-        # # where Pxy equals probability to measure x when starting in y
         # F_vs_th = (1-(1-abs(self.proc_data_dict['cumhist_1'] -
         #                     self.proc_data_dict['cumhist_0']))/2)
         # opt_idx = np.argmax(F_vs_th)
