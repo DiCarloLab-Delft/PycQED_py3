@@ -463,40 +463,55 @@ import itertools
 
 
 class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
+    """
+    Extracts table of counts from multiplexed single shot readout experiment.
+    Intended to be the bases class for more complex multi qubit experiment analysis.
+    """
 
     def __init__(self, t_start: str=None, t_stop: str=None,
                  label: str='', data_file_path: str=None,
                  options_dict: dict=None, extract_only: bool=False,
-                 do_fitting: bool=True, auto=True, n_segments=None,
-                 channel_map=None, thresholds=None):
+                 do_fitting: bool=True, auto=True):
+        """
 
+        Required options in the options_dict:
+            n_segments: Assumed to be the period in the list of shots between experiments
+                with the same prepared state. If shots_of_qubits includes preselection readout results
+                or if there was several readouts for a single segment then n_segments has to include them.
+            channel_map: dictionary with qubit names as keys and channel channel names as values.
+            thresholds: dictionary with qubit names as keys and threshold values as values.
+        Optional options in the options_dict:
+            observables: Dictionary with observable names as a key and observable as a value. Observable is a
+                dictionary with name of the qubit as key and boolean value indicating if it is selecting
+                exited states. If the qubit is missing from the list of states it is averaged out.
+            segment_names: used as y-axis labels for the default figure
+
+        """
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
                          data_file_path=data_file_path,
                          options_dict=options_dict,
                          extract_only=extract_only, do_fitting=do_fitting)
 
-        self.n_segments = n_segments
+        self.n_segments = options_dict['n_segments']
+        self.thresholds = options_dict['thresholds']
+        self.channel_map = options_dict['channel_map']
+        qubits = list(self.channel_map.keys())
 
-        # TODO check, if it is None
-        self.channel_map = channel_map
-        qubits = list(channel_map.keys())
+        self.segment_names = options_dict.get('segment_names', None)
+        if self.segment_names is None:
+            # TODO Default values should come from the MC parameters
+            None
 
-        # TODO Should by default come from come from MC parameters
-        self.segment_names = []
-        for i in range(self.n_segments):
-            # TODO These could come from from the MC parameters
-            self.segment_names.append(i)
 
-        # TODO make an override option
-        combination_list = list(itertools.product([False, True], repeat=len(qubits)))
-        # TODO make an override option
-        self.states_to_be_counted = []
-        self.obs_names = []
-        for i, states in enumerate(combination_list):
-            self.obs_names.append('$\| ' + ''.join(['e' if s else 'g' for s in states]) + '\\rangle$')
-            self.states_to_be_counted.append(dict(zip(qubits, states)) )
-
+        self.observables = options_dict.get('observables', None)
+        if self.observables is None:
+            combination_list = list(itertools.product([False, True], repeat=len(qubits)))
+            self.observables = {}
+            for i, states in enumerate(combination_list):
+                obs_name = '$\| ' + ''.join(['e' if s else 'g' for s in states]) + '\\rangle$'
+                self.observables[obs_name] = dict(zip(qubits, states))
+        print(self.observables)
         self.single_timestamp = False
 
         self.params_dict = {
@@ -505,7 +520,6 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
             'value_names': 'value_names',
             'value_units': 'value_units'}
 
-        self.thresholds = thresholds
         self.numeric_params = []
         if auto:
             self.run_analysis()
@@ -520,17 +534,18 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
 
         logging.info("Calculating observables")
         self.proc_data_dict['probability_table'] = \
-            self.probability_table(shots_thresh, self.states_to_be_counted, self.n_segments)
+            self.probability_table(shots_thresh, list(self.observables.values()), self.n_segments)
 
     @staticmethod
-    def probability_table(shots_of_qubits, states_to_be_counted, n_segments):
+    def probability_table(shots_of_qubits, observables, n_segments):
         """
         Creates a general table of counts averaging out all but specified set of correlations.
 
         Args:
             shots_of_qubits: Dictionary of np.arrays of thresholded shots for each qubit.
-            states_to_be_counted: List of dictionaries specificing states for qubits as bools.
-                If the qubit is missing from the list of states it is averaged out.
+            observables: List of observables. Observable is a dictionary with name of the qubit as key and boolean
+                value indicating if it is selecting exited states. If the qubit is missing from the list of states
+                it is averaged out.
             n_segments: Assumed to be the period in the list of shots between experiments
                 with the same prepared state. If shots_of_qubits includes preselection readout results
                 or if there was several readouts for a single segment then n_segments has to include them.
@@ -543,7 +558,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
 
         n_shots = next(iter(shots_of_qubits.values())).shape[1]
 
-        table = np.zeros((n_segments, len(states_to_be_counted)))
+        table = np.zeros((n_segments, len(observables)))
 
         for segment_n in range(n_segments):
 
@@ -552,7 +567,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                 # This makes copy, but allows faster AND later
                 res_g[qubit] = np.logical_not(np.array(results[0, segment_n::n_segments]))
 
-            for state_n, states_of_qubits in enumerate(states_to_be_counted): # first result all ground
+            for state_n, states_of_qubits in enumerate(observables): # first result all ground
                 mask = np.ones((int(n_shots/n_segments)), dtype=bool)
                 for qubit, state in states_of_qubits.items(): # slow qubit is the first in channel_map list
                     # mask all with qubit k in state r
@@ -582,8 +597,8 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
         self.plot_dicts['counts_table'] = {
             'axid': "ptable",
             'plotfn': self.plot_colorx,
-            'xvals': np.arange(len(self.states_to_be_counted)),
-            'yvals': np.array(len(self.states_to_be_counted)*[ylist]),
+            'xvals': np.arange(len(self.observables)),
+            'yvals': np.array(len(self.observables)*[ylist]),
             'zvals': self.proc_data_dict['probability_table'].T,
             'xlabel': "Channels",
             'ylabel': "Segments",
@@ -592,13 +607,16 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                       self.raw_data_dict['measurementstring'][0]),
             'xunit': None,
             'yunit': None,
-            'xtick_loc': np.arange(len(self.states_to_be_counted)),
-            'xtick_labels': self.obs_names,
+            'xtick_loc': np.arange(len(self.observables)),
+            'xtick_labels': list(self.observables.keys()),
             'origin': 'upper',
             'cmap': cm,
             'aspect': 'equal',
             'plotsize': (8, 8)
         }
+
+        if self.segment_names is not None:
+            self.plot_dicts['counts_table']['']
 
 
 def get_shots_zero_one(data, post_select: bool=False,

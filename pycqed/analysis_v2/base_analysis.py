@@ -647,7 +647,6 @@ class BaseDataAnalysis(object):
                                    **plot_barkws))
 
         else:
-            print(plot_barkws)
             p_out = pfunc(plot_centers, plot_yvals, #width=plot_xwidth,
                           label='%s%s' % (dataset_desc, dataset_label),
                           **plot_barkws)
@@ -1028,7 +1027,6 @@ class BaseDataAnalysis(object):
             axs.yaxis.set_ticks(plot_ytick_loc)
         if plot_origin == 'upper':
             axs.invert_yaxis()
-            print("Test 3")
 
         if plot_aspect is not None:
             axs.set_aspect(plot_aspect)
