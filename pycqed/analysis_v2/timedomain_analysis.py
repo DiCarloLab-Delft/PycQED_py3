@@ -1,11 +1,90 @@
 import lmfit
 import numpy as np
+from numpy.linalg import inv
 from collections import OrderedDict
 from pycqed.analysis import fitting_models as fit_mods
 from pycqed.analysis import analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str
 from copy import deepcopy
+
+
+class AveragedTimedomainAnalysis(ba.BaseDataAnalysis):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.single_timestamp = True
+        self.params_dict = {
+            'value_names': 'value_names',
+            'measured_values': 'measured_values'}
+        self.numeric_params = []
+        if kwargs.get('auto', True):
+            self.run_analysis()
+
+    def process_data(self):
+        self._convert_channel_names_to_index()
+        cal_points_list = self.proc_data_dict['cal_points_list']
+        measured_values = self.raw_data_dict['measured_values']
+        cal_idxs = self._find_calibration_indices()
+        scales = [np.std(x[cal_idxs]) for x in measured_values]
+        observable_vectors = np.zeros((len(cal_points_list),
+                                       len(measured_values)))
+        observable_vector_stds = np.ones_like(observable_vectors)
+        for i, observable in enumerate(cal_points_list):
+            for ch_idx, seg_idxs in enumerate(observable):
+                x = measured_values[ch_idx][seg_idxs] / scales[ch_idx]
+                if len(x) > 0:
+                    observable_vectors[i][ch_idx] = np.mean(x)
+                if len(x) > 1:
+                    observable_vector_stds[i][ch_idx] = np.std(x)
+        Omtx = (observable_vectors[1:] - observable_vectors[0]).T
+        d0 = observable_vectors[0]
+        corr_values = np.zeros(
+            (len(cal_points_list) - 1, len(measured_values[0])))
+        for i in range(len(measured_values[0])):
+            d = np.array([x[i] / scale for x, scale in zip(measured_values,
+                                                           scales)])
+            corr_values[:, i] = inv(Omtx.T.dot(Omtx)).dot(Omtx.T).dot(d - d0)
+        self.proc_data_dict['corr_values'] = corr_values
+
+    def _convert_channel_names_to_index(self):
+        """
+        Converts the calibration points list from the format
+        cal_points = [{'ch1': [-4, -3], 'ch2': [-4, -3]},
+                      {0: [-2, -1], 1: [-2, -1]}]
+        to the format
+        cal_points_list = [[[-4, -3], [-4, -3]],
+                           [[-2, -1], [-2, -1]]]
+        """
+        cal_points = self.options_dict.get('cal_points')
+        value_names = self.raw_data_dict.get('value_names')
+        cal_points_list = []
+        for observable in cal_points:
+            if isinstance(observable, (list, np.ndarray)):
+                cal_points_list.append(observable)
+            else:
+                observable_list = [[]] * len(value_names)
+                for channel, idxs in observable.items():
+                    if isinstance(channel, int):
+                        observable_list[channel] = idxs
+                    else:  # assume str
+                        ch_idx = value_names.index(channel)
+                        observable_list[ch_idx] = idxs
+                cal_points_list.append(observable_list)
+        self.proc_data_dict['cal_points_list'] = cal_points_list
+
+    def _find_calibration_indices(self):
+        cal_indices = set()
+        cal_points = self.options_dict['cal_points']
+        nr_segments = self.raw_data_dict['measured_values'].shape[-1]
+        for observable in cal_points:
+            if isinstance(observable, (list, np.ndarray)):
+                for idxs in observable:
+                    cal_indices.update({idx % nr_segments for idx in idxs})
+            else:  # assume dictionaries
+                for idxs in observable.values():
+                    cal_indices.update({idx % nr_segments for idx in idxs})
+        return list(cal_indices)
+
 
 class Single_Qubit_TimeDomainAnalysis(ba.BaseDataAnalysis):
 
