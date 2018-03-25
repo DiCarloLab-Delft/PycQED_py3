@@ -469,7 +469,25 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                  label: str='',
                  data_file_path: str=None,
                  options_dict: dict=None, extract_only: bool=False,
+                 nr_of_qubits: int = 2,
+                 qubit_names: list=None,
                  do_fitting: bool=True, auto=True):
+        """
+        Inherits from BaseDataAnalysis.
+        Extra arguments of interest
+            qubit_names (list) : used to label the experiments, names of the
+                qubits. LSQ is last name in the list. If not specified will
+                set qubit_names to [qN, ..., q1, q0]
+
+
+        """
+        self.nr_of_qubits = nr_of_qubits
+        if qubit_names is None:
+            self.qubit_names = list(reversed(['q{}'.format(i)
+                                             for i in range(nr_of_qubits)]))
+        else:
+            self.qubit_names = qubit_names
+
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
                          data_file_path=data_file_path,
@@ -491,24 +509,17 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
         Responsible for creating the histograms based on the raw data
         """
         # Determine the shape of the data to extract wheter to rotate or not
-        post_select = self.options_dict.get('post_select', False)
-        post_select_threshold = self.options_dict.get(
-            'post_select_threshold', 0)
-        nr_samples = self.options_dict.get('nr_samples', 2)
-        sample_0 = self.options_dict.get('sample_0', 0)
-        sample_1 = self.options_dict.get('sample_1', 1)
         nr_bins = self.options_dict.get('nr_bins', 100)
 
-        nr_expts = self.raw_data_dict['nr_experiments']
         # self.proc_data_dict['shots_0'] = [''] * nr_expts
         # self.proc_data_dict['shots_1'] = [''] * nr_expts
 
         #################################################################
         #  Separating data into shots for the different prepared states #
         #################################################################
+        self.proc_data_dict['nr_of_qubits'] = self.nr_of_qubits
+        self.proc_data_dict['qubit_names'] = self.qubit_names
 
-        nr_of_qubits = 2
-        self.proc_data_dict['nr_of_qubits'] = nr_of_qubits
         self.proc_data_dict['ch_names'] = self.raw_data_dict['value_names'][0]
 
         for ch_name, shots in self.raw_data_dict['measured_values_ord_dict'].items():
@@ -520,9 +531,9 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
             max_sh = np.max(self.proc_data_dict[ch_name])
             self.proc_data_dict['nr_shots'] = len(self.proc_data_dict[ch_name])
 
-            number_of_experiments = 2**nr_of_qubits
-            for i in range(2**nr_of_qubits):
-                format_str = '{'+'0:0{}b'.format(nr_of_qubits) + '}'
+            number_of_experiments = 2**self.nr_of_qubits
+            for i in range(2**self.nr_of_qubits):
+                format_str = '{'+'0:0{}b'.format(self.nr_of_qubits) + '}'
                 binning_string = format_str.format(i)
                 # No post selection implemented yet
                 self.proc_data_dict['{} {}'.format(ch_name, binning_string)] = \
@@ -566,6 +577,9 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
         # self.proc_data_dict['threshold_raw'] = \
         #     self.proc_data_dict['bin_centers'][opt_idx]
 
+
+
+
     def prepare_plots(self):
         # N.B. If the log option is used we should manually set the
         # yscale to go from .5 to the current max as otherwise the fits
@@ -579,6 +593,11 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                 'ch_name': ch,
                 'title': (self.timestamps[0] + ' \n' +
                           self.raw_data_dict['measurementstring'][0])}
+
+
+
+def raw_assignement_fid_from_chist(data_dict, channel_name, qubit_name):
+    qubit_idx = 0
 
 
 def get_shots_zero_one(data, post_select: bool=False,
@@ -634,10 +653,11 @@ def make_mux_ssro_histogram(data_dict, ch_name, title=None, ax=None, **kw):
                 linestyle='',
                 marker=next(markers), alpha=.7, label=binning_string)
 
-    ax.legend(title=ch_name)
+    legend_title = "Prep. state \n[%s]" % ', '.join(data_dict['qubit_names'])
+    ax.legend(title=legend_title)
     ax.set_ylabel('Counts')
     # arbitrary units as we use optimal weights
     set_xlabel(ax, ch_name, 'a.u.')
-    ax.legend(title=ch_name)
+
     if title is not None:
         ax.set_title(title)

@@ -83,3 +83,14 @@ class Test_multiplexed_readout_analysis(unittest.TestCase):
         t_stop = t_start
         a = ma.Multiplexed_Readout_Analysis(t_start=t_start, t_stop=t_stop)
         # self.assert_almost_equal(as;lgkhl;gsaf)
+
+
+    def test_name_assignement(self):
+        t_start = '20180323_150203'
+        t_stop = t_start
+        a = ma.Multiplexed_Readout_Analysis(t_start=t_start, t_stop=t_stop)
+        self.assert_equal(a.proc_data_dict['qubit_names'], ['q1', 'q0'])
+
+        a = ma.Multiplexed_Readout_Analysis(t_start=t_start, t_stop=t_stop,
+                                            qubit_names=['QR', 'QL'])
+        self.assert_equal(a.proc_data_dict['qubit_names'], ['QR', 'QL'])
