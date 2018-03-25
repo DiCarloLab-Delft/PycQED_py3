@@ -206,13 +206,13 @@ class CCLight_Transmon(Qubit):
         self.add_parameter(
             'ro_acq_input_average_length',  unit='s',
             label='Readout acquisition delay',
-            vals=vals.Numbers(min_value=0, max_value=2.27e-6),
-            initial_value=0,
+            vals=vals.Numbers(min_value=0, max_value=4096/1.8e9),
+            initial_value=4096/1.8e9,
             parameter_class=ManualParameter,
             docstring=('The measurement time in input averaging.'))
 
         self.add_parameter('ro_acq_integration_length', initial_value=500e-9,
-                           vals=vals.Numbers(min_value=0, max_value=20e6),
+                           vals=vals.Numbers(min_value=0, max_value=4096/1.8e9),
                            parameter_class=ManualParameter)
 
         self.add_parameter('ro_acq_averages', initial_value=1024,
@@ -1092,7 +1092,7 @@ class CCLight_Transmon(Qubit):
         VSM.set('mod8_ch{}_gaussian_att_raw'.format(ch_in), 50000)
         VSM.set('mod8_ch{}_derivative_att_raw'.format(ch_in), 0)
         offset_I, offset_Q = mixer_carrier_cancellation(
-            SH=self.instr_SH.get_instr(), 
+            SH=self.instr_SH.get_instr(),
             source=self.instr_LO_mw.get_instr(),
             MC=self.instr_MC.get_instr(),
             chI_par=chGI_par, chQ_par=chGQ_par)
@@ -1105,10 +1105,10 @@ class CCLight_Transmon(Qubit):
         VSM.set('mod8_ch{}_derivative_att_raw'.format(ch_in), 50000)
 
         offset_I, offset_Q = mixer_carrier_cancellation(
-            SH=self.instr_SH.get_instr(), 
+            SH=self.instr_SH.get_instr(),
             source=self.instr_LO_mw.get_instr(),
             MC=self.instr_MC.get_instr(),
-            chI_par=chDI_par, 
+            chI_par=chDI_par,
             chQ_par=chDQ_par)
         if update:
             self.mw_mixer_offs_DI(offset_I)
@@ -1504,7 +1504,7 @@ class CCLight_Transmon(Qubit):
                 i+1, ch_in)]
             mod_sweep.append(swf.two_par_joint_sweep(G_par, D_par, preserve_ratio=False))
           s=swf.multi_sweep_function(sweep_functions=mod_sweep)
-        else:  
+        else:
           G_par = VSM.parameters['mod{}_ch{}_gaussian_att_raw'.format(
               mod_out, ch_in)]
           D_par = VSM.parameters['mod{}_ch{}_derivative_att_raw'.format(

@@ -264,7 +264,8 @@ class DeviceCCL(Instrument):
 
         channels_list = []  # tuples (instrumentname, channel, description)
 
-        for qb_name in qubits:
+        for qb_name in reversed(qubits):
+            # ensures that the LSQ (last one) get's assigned the lowest ch_idx
             qb = self.find_instrument(qb_name)
             acq_instr_name = qb.instr_acquisition()
 
@@ -608,11 +609,13 @@ class DeviceCCL(Instrument):
             a = ma.MeasurementAnalysis(close_main_fig=close_fig)
         return a
 
-    def measure_two_qubit_SSRO(self, q0: str, q1: str,
+    def measure_two_qubit_SSRO(self,
+                               qubits: list,
                                detector=None,
                                nr_shots: int=4088*4,
                                prepare_for_timedomain: bool =True,
                                result_logging_mode='lin_trans',
+                               initialize: bool=True,
                                analyze=True,
                                MC=None):
         if prepare_for_timedomain:
@@ -620,14 +623,23 @@ class DeviceCCL(Instrument):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
+        # count from back because q0 is the least significant qubit
+        q0 = qubits[-1]
+        q1 = qubits[-2]
+
         assert q0 in self.qubits()
         assert q1 in self.qubits()
 
         q0idx = self.find_instrument(q0).cfg_qubit_nr()
         q1idx = self.find_instrument(q1).cfg_qubit_nr()
 
-        p = mqo.two_qubit_off_on(q0idx, q1idx,
-                                 platf_cfg=self.cfg_openql_platform_fn())
+        # p = mqo.two_qubit_off_on(q0idx, q1idx,
+        #                          platf_cfg=self.cfg_openql_platform_fn())
+
+        p = mqo.multi_qubit_off_on([q1idx, q0idx],
+                                   initialize=initialize,
+                                   second_excited_state=False,
+                                   platf_cfg=self.cfg_openql_platform_fn())
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr())
         if detector is None:
@@ -646,12 +658,13 @@ class DeviceCCL(Instrument):
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
         MC.set_detector_function(d)
-        MC.run('SSRO_{}_{}_{}'.format(q0, q1, self.msmt_suffix))
+        MC.run('SSRO_{}_{}_{}'.format(q1, q0, self.msmt_suffix))
 
         MC.soft_avg(old_soft_avg)
         MC.live_plot_enabled(old_live_plot_enabled)
         if analyze:
-            a = mra.two_qubit_ssro_fidelity('SSRO_{}_{}'.format(q0, q1))
+            a = mra.two_qubit_ssro_fidelity('SSRO_{}_{}'.format(q1, q0))
+            a = ma2.Multiplexed_Readout_Analysis()
         return a
 
     def measure_chevron(self, q0: str, q_spec: str,
@@ -945,7 +958,6 @@ class DeviceCCL(Instrument):
             dag.add_edge('CZ {}-{}'.format(edge_L, edge_R),
                          '{} cryo dist. corr.'.format(edge_R))
 
-
             dag.add_edge('Chevron {}-{}'.format(edge_L, edge_R),
                          '{} single qubit gates fine'.format(edge_L))
             dag.add_edge('Chevron {}-{}'.format(edge_L, edge_R),
@@ -955,7 +967,6 @@ class DeviceCCL(Instrument):
             dag.add_edge('Chevron {}-{}'.format(edge_L, edge_R),
                          self.name+' multiplexed readout')
 
-
             dag.add_node('{}-{} mw-flux timing'.format(edge_L, edge_R))
 
             dag.add_edge(edge_L+' cryo dist. corr.',
@@ -963,12 +974,10 @@ class DeviceCCL(Instrument):
             dag.add_edge(edge_R+' cryo dist. corr.',
                          '{}-{} mw-flux timing'.format(edge_L, edge_R))
 
-
             dag.add_edge('Chevron {}-{}'.format(edge_L, edge_R),
                          '{}-{} mw-flux timing'.format(edge_L, edge_R))
             dag.add_edge('{}-{} mw-flux timing'.format(edge_L, edge_R),
                          'AWG8 Flux-staircase')
-
 
         for qubit in self.qubits():
             dag.add_edge(qubit+' room temp. dist. corr.',
