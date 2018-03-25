@@ -79,7 +79,12 @@ def int2base(x: int, base: int, fixed_length: int=None):
     if x < 0:
         sign = -1
     elif x == 0:
-        return digs[0]
+        string_repr = digs[0]
+        if fixed_length is None:
+            return string_repr
+        else:
+            return string_repr.zfill(fixed_length)
+
     else:
         sign = 1
 
