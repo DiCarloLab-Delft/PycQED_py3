@@ -47,6 +47,7 @@ class UHFQC(Instrument):
 
         self.DIO=DIO
         self._daq = zi.ziDAQServer(address, int(port), 5)
+        # self._daq.setDebugLevel(5)
         if device.lower() == 'auto':
             self._device = zi_utils.autoDetect(self._daq)
         else:
