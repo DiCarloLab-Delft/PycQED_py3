@@ -207,7 +207,7 @@ def standard_qubit_pulses_to_rotations(pulse_list: List[Tuple]) \
     return rotations
 
 
-def fidelity(rho1: qtp.Qobj, rho2: qtp.Qobj):
+def fidelity(rho1: qtp.Qobj, rho2: qtp.Qobj) -> float:
     """ Returns the fidelity between the two quantum states rho1 and rho2. """
     if rho1.type == 'ket':
         rho1 = rho1 * rho1.dag()
@@ -217,10 +217,11 @@ def fidelity(rho1: qtp.Qobj, rho2: qtp.Qobj):
         rho2 = rho2 * rho2.dag()
     elif rho2.type == 'bra':
         rho2 = rho2.dag() * rho2
+    rho1.dims = rho2.dims
     return (rho1.sqrtm()*rho2*rho1.sqrtm()).sqrtm().tr().real ** 2
 
 
-def purity(rho: qtp.Qobj):
+def purity(rho: qtp.Qobj) -> float:
     if rho.type == 'ket' or rho.type == 'bra':
         return 1
     else:

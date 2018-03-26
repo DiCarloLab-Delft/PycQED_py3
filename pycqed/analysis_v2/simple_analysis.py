@@ -136,7 +136,7 @@ class Basic2DAnalysis(Basic1DAnalysis):
 
                 'zvals': self.raw_data_dict['measured_values_ord_dict']
                 [val_name],
-                'zlabel': val_name,
+                'clabel': val_name,
                 'zunit': self.raw_data_dict['value_units'][0][i],
 
                 'cmap': 'viridis',

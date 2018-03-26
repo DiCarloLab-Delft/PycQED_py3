@@ -1,13 +1,21 @@
+import logging
 import lmfit
 import numpy as np
 from numpy.linalg import inv
+import scipy as sp
+import itertools
+import matplotlib as mpl
 from collections import OrderedDict
 from pycqed.analysis import fitting_models as fit_mods
 from pycqed.analysis import analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
+import pycqed.analysis_v2.tomography_qudev as tomo
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str
 from copy import deepcopy
-
+try:
+    import qutip as qtp
+except ImportError as e:
+    logging.warning('Could not import qutip, tomo code will not work')
 
 class AveragedTimedomainAnalysis(ba.BaseDataAnalysis):
     def __init__(self, *args, **kwargs):
@@ -15,7 +23,8 @@ class AveragedTimedomainAnalysis(ba.BaseDataAnalysis):
         self.single_timestamp = True
         self.params_dict = {
             'value_names': 'value_names',
-            'measured_values': 'measured_values'}
+            'measured_values': 'measured_values',
+            'measurementstring': 'measurementstring'}
         self.numeric_params = []
         if kwargs.get('auto', True):
             self.run_analysis()
@@ -46,6 +55,43 @@ class AveragedTimedomainAnalysis(ba.BaseDataAnalysis):
             corr_values[:, i] = inv(Omtx.T.dot(Omtx)).dot(Omtx.T).dot(d - d0)
         self.proc_data_dict['corr_values'] = corr_values
 
+    def measurement_operators_and_results(self):
+        """
+        Converts the calibration points to measurement operators. Assumes that
+        the calibration points are ordered the same as the basis states for
+        the tomography calculation (e.g. for two qubits |gg>, |ge>, |eg>, |ee>).
+        Also assumes that each calibration in the passed cal_points uses
+        different segments.
+
+        Returns:
+            A tuple of
+                the measured values with out the calibration points;
+                the measurement operators corresponding to each channel;
+                and the expected covariation matrix between the operators.
+        """
+        d = len(self.proc_data_dict['cal_points_list'])
+        cal_point_idxs = [set() for _ in range(d)]
+        for i, idxs_lists in enumerate(self.proc_data_dict['cal_points_list']):
+            for idxs in idxs_lists:
+                cal_point_idxs[i].update(idxs)
+        cal_point_idxs = [sorted(list(idxs)) for idxs in cal_point_idxs]
+        cal_point_idxs = np.array(cal_point_idxs)
+        raw_data = self.raw_data_dict['measured_values']
+        means = [None] * d
+        residuals = [list() for _ in raw_data]
+        for i, cal_point_idx in enumerate(cal_point_idxs):
+            means[i] = [np.mean(ch_data[cal_point_idx]) for ch_data in raw_data]
+            for j, ch_residuals in enumerate(residuals):
+                ch_residuals += list(raw_data[j][cal_point_idx] - means[i][j])
+        means = np.array(means)
+        residuals = np.array(residuals)
+        Fs = [np.diag(ms) for ms in means.T]
+        Omega = residuals.dot(residuals.T) / len(residuals.T)
+        data_idxs = np.setdiff1d(np.arange(len(raw_data[0])),
+                                 cal_point_idxs.flatten())
+        data = np.array([ch_data[data_idxs] for ch_data in raw_data])
+        return data, Fs, Omega
+
     def _convert_channel_names_to_index(self):
         """
         Converts the calibration points list from the format
@@ -56,19 +102,26 @@ class AveragedTimedomainAnalysis(ba.BaseDataAnalysis):
                            [[-2, -1], [-2, -1]]]
         """
         cal_points = self.options_dict.get('cal_points')
+        nr_segments = self.raw_data_dict['measured_values'].shape[-1]
         value_names = self.raw_data_dict.get('value_names')
         cal_points_list = []
         for observable in cal_points:
             if isinstance(observable, (list, np.ndarray)):
-                cal_points_list.append(observable)
+                observable_list = [[]] * len(value_names)
+                for i, idxs in enumerate(observable):
+                    observable_list[i] = \
+                        [idx % nr_segments for idx in idxs]
+                cal_points_list.append(observable_list)
             else:
                 observable_list = [[]] * len(value_names)
                 for channel, idxs in observable.items():
                     if isinstance(channel, int):
-                        observable_list[channel] = idxs
+                        observable_list[channel] = \
+                            [idx % nr_segments for idx in idxs]
                     else:  # assume str
                         ch_idx = value_names.index(channel)
-                        observable_list[ch_idx] = idxs
+                        observable_list[ch_idx] = \
+                            [idx % nr_segments for idx in idxs]
                 cal_points_list.append(observable_list)
         self.proc_data_dict['cal_points_list'] = cal_points_list
 
@@ -85,6 +138,12 @@ class AveragedTimedomainAnalysis(ba.BaseDataAnalysis):
                     cal_indices.update({idx % nr_segments for idx in idxs})
         return list(cal_indices)
 
+def all_cal_points(d, nr_ch, reps=1):
+    """
+    Generates a list of calibration points for a Hilbert space of dimension d,
+    with nr_ch channels and reps reprtitions of each calibration point.
+    """
+    return [[list(range(-reps*i, -reps*(i-1)))]*nr_ch for i in range(d, 0, -1)]
 
 class Single_Qubit_TimeDomainAnalysis(ba.BaseDataAnalysis):
 
@@ -934,3 +993,136 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                 'plot_kws': {
                     'y': y, 'color': 'C1', 'linestyle': 'dotted'}
                     }
+
+
+class TomographyAnalysis(ba.BaseDataAnalysis):
+    """
+    Options:
+        cal_points: see AveragedTimedomainAnalysis for format.
+        data_type: 'averaged' or 'singleshot'
+        meas_operators (optional): override the measurement operators
+        covar_matrix (optional): override the covariance matrix
+        single_qubit_pulses: A list of standard PycQED pulse names that were
+                             applied to qubits before measurement
+        basis_rotations: As an alternative, the basis rotations applied to the
+                         system as qutip operators can be given.
+        mle: True/False, whether to do maximum likelihood fit.
+        rho_target (optional): A qutip density matrix that the result will be
+                                 compared to when calculating fidelity.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.single_timestamp = True
+        self.params_dict = {}
+        self.numeric_params = []
+        self.data_type = self.options_dict['data_type']
+        if self.data_type == 'averaged':
+            self.base_analysis = AveragedTimedomainAnalysis(*args, **kwargs)
+        elif self.data_type == 'singleshot':
+            raise NotImplementedError('Single shot tomography is not yet '
+                                      'implemented')
+        else:
+            raise KeyError("Invalid tomography data mode: '" + self.data_type +
+                           "'. Valid modes are 'averaged' and 'singleshot'.")
+
+        if kwargs.get('auto', True):
+            self.run_analysis()
+
+    def process_data(self):
+        data, Fs, Omega = self.base_analysis.measurement_operators_and_results()
+        Fs = self.options_dict.get('meas_operators', Fs)
+        Fs = [qtp.Qobj(F) for F in Fs]
+        d = Fs[0].shape[0]
+        self.proc_data_dict['d'] = d
+        Omega = self.options_dict.get('covar_matrix', Omega)
+        if Omega is None:
+            Omega = np.diag(np.ones(len(Fs)))
+        elif len(Omega.shape) == 1:
+            Omega = np.diag(Omega)
+        if 'single_qubit_pulses' in self.options_dict:
+            single_qubit_pulses = self.options_dict['single_qubit_pulses']
+            nr_qubits = int(np.round(np.log2(d)))
+            pulse_list = list(itertools.product(single_qubit_pulses,
+                                                repeat=nr_qubits))
+            rotations = tomo.standard_qubit_pulses_to_rotations(pulse_list)
+        else:
+            rotations = self.options_dict['basis_rotations']
+
+        all_Fs = tomo.rotated_measurement_operators(rotations, Fs)
+        all_Fs = list(itertools.chain(*np.array(all_Fs).T))
+        all_mus = np.array(list(itertools.chain(*data.T)))
+        all_Omegas = sp.linalg.block_diag(*[Omega] * len(data[0]))
+
+        self.proc_data_dict['meas_operators'] = all_Fs
+        self.proc_data_dict['covar_matrix'] = all_Omegas
+
+        rho_ls = tomo.least_squares_tomography(all_mus, all_Fs, all_Omegas)
+        self.proc_data_dict['rho_ls'] = rho_ls
+        self.proc_data_dict['rho'] = rho_ls
+        if self.options_dict.get('mle', False):
+            rho_mle = tomo.mle_tomography(all_mus, all_Fs, all_Omegas,
+                                          rho_guess=rho_ls)
+            self.proc_data_dict['rho_mle'] = rho_mle
+            self.proc_data_dict['rho'] = rho_mle
+        rho = self.proc_data_dict['rho']
+
+        self.proc_data_dict['purity'] = (rho * rho).tr().real
+
+        rho_target = self.options_dict.get('rho_target', None)
+        if rho_target is not None:
+            self.proc_data_dict['fidelity'] = tomo.fidelity(rho, rho_target)
+
+    def prepare_plots(self):
+        self.tight_fig = self.options_dict.get('tight_fig', False)
+        d = self.proc_data_dict['d']
+        xtick_labels = self.options_dict.get('rho_ticklabels', None)
+        ytick_labels = self.options_dict.get('rho_ticklabels', None)
+        if 2**(d.bit_length() - 1) == d:
+            nr_qubits = d.bit_length() - 1
+            fmt_string = '{{:0{}b}}'.format(nr_qubits)
+            labels = [fmt_string.format(i) for i in range(2**nr_qubits)]
+            if xtick_labels is None:
+                xtick_labels = ['$|' + lbl + r'\rangle$' for lbl in labels]
+            if ytick_labels is None:
+                ytick_labels = [r'$\langle' + lbl + '|$' for lbl in labels]
+        color = (0.5*np.angle(self.proc_data_dict['rho'].full())/np.pi) % 1.
+        cmap = self.options_dict.get('rho_colormap', self.default_phase_cmap())
+        self.plot_dicts['density_matrix'] = {
+            'plotfn': self.plot_bar3D,
+            '3d': True,
+            '3d_azim': -35,
+            '3d_elev': 35,
+            'xvals': np.arange(d),
+            'yvals': np.arange(d),
+            'zvals': np.abs(self.proc_data_dict['rho'].full()),
+            'zrange': (0, 1),
+            'color': color,
+            'colormap': cmap,
+            'bar_widthx': 0.5,
+            'bar_widthy': 0.5,
+            'xtick_loc': np.arange(d),
+            'xtick_labels': xtick_labels,
+            'ytick_loc': np.arange(d),
+            'ytick_labels': ytick_labels,
+            'ctick_loc': np.linspace(0, 1, 5),
+            'ctick_labels': ['$0$', r'$\frac{1}{2}\pi$', r'$\pi$',
+                             r'$\frac{3}{2}\pi$', r'$2\pi$'],
+            'clabel': 'Phase (rad)',
+            'title': (self.raw_data_dict['timestamp'] + ' ' +
+                      self.base_analysis.raw_data_dict['measurementstring'])
+        }
+
+    def default_phase_cmap(self):
+        cols = np.array(((41, 39, 231), (61, 130, 163), (208, 170, 39),
+                         (209, 126, 4), (181, 28, 20), (238, 76, 152),
+                         (251, 130, 242), (162, 112, 251))) / 255
+        n = len(cols)
+        cdict = {
+            'red': [[i/n, cols[i%n][0], cols[i%n][0]] for i in range(n+1)],
+            'green': [[i/n, cols[i%n][1], cols[i%n][1]] for i in range(n+1)],
+            'blue': [[i/n, cols[i%n][2], cols[i%n][2]] for i in range(n+1)]
+        }
+        return mpl.colors.LinearSegmentedColormap('DMDefault', cdict)
+
+
+

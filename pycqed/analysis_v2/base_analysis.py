@@ -8,16 +8,15 @@ from collections import OrderedDict
 
 import numbers
 from matplotlib import pyplot as plt
-from matplotlib import cm
+import matplotlib as mpl
+from mpl_toolkits.mplot3d import Axes3D
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.utilities.general import NumpyJsonEncoder
 from pycqed.analysis.analysis_toolbox import get_color_order as gco
 from pycqed.analysis.analysis_toolbox import get_color_list
-from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 from pycqed.analysis.tools.plotting import (
-    flex_colormesh_plot_vs_xy, flex_color_plot_vs_x)
-# import pycqed.analysis_v2.default_figure_settings_analysis as def_fig
-from . import default_figure_settings_analysis as def_fig
+    set_axis_label, flex_colormesh_plot_vs_xy, flex_color_plot_vs_x)
+import pycqed.analysis_v2.default_figure_settings_analysis as def_fig
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import datetime
 import json
@@ -577,6 +576,13 @@ class BaseDataAnalysis(object):
                     sharex=pdict.get('sharex', False),
                     sharey=pdict.get('sharey', False),
                     figsize=pdict.get('plotsize', None))  # (8, 6)))
+                if pdict.get('3d', False):
+                    self.axs[pdict['ax_id']].remove()
+                    self.axs[pdict['ax_id']] = Axes3D(
+                        self.figs[pdict['ax_id']],
+                        azim=pdict.get('3d_azim', -35),
+                        elev=pdict.get('3d_elev', 35))
+                    self.axs[pdict['ax_id']].patch.set_alpha(0)
 
                 # transparent background around axes for presenting data
                 self.figs[pdict['ax_id']].patch.set_alpha(0)
@@ -655,9 +661,9 @@ class BaseDataAnalysis(object):
         else:
             xmin, xmax = plot_xrange
         if plot_xlabel is not None:
-            set_xlabel(axs, plot_xlabel, plot_xunit)
+            set_axis_label('x', axs, plot_xlabel, plot_xunit)
         if plot_ylabel is not None:
-            set_ylabel(axs, plot_ylabel, plot_yunit)
+            set_axis_label('y', axs, plot_ylabel, plot_yunit)
         axs.set_xlim(xmin, xmax)
         if plot_yrange is not None:
             ymin, ymax = plot_yrange
@@ -674,6 +680,96 @@ class BaseDataAnalysis(object):
 
         if self.tight_fig:
             axs.figure.tight_layout()
+
+        pdict['handles'] = p_out
+
+    def plot_bar3D(self, pdict, axs):
+        pfunc = axs.bar3d
+        plot_xvals = pdict['xvals']
+        plot_yvals = pdict['yvals']
+        plot_zvals = pdict['zvals']
+        plot_xlabel = pdict.get('xlabel', None)
+        plot_ylabel = pdict.get('ylabel', None)
+        plot_zlabel = pdict.get('zlabel', None)
+        plot_xunit = pdict.get('xunit', None)
+        plot_yunit = pdict.get('yunit', None)
+        plot_zunit = pdict.get('zunit', None)
+        plot_color = pdict.get('color', None)
+        plot_title = pdict.get('title', None)
+        plot_xrange = pdict.get('xrange', None)
+        plot_yrange = pdict.get('yrange', None)
+        plot_zrange = pdict.get('zrange', None)
+        plot_barkws = pdict.get('bar_kws', {})
+        plot_barwidthx = pdict.get('bar_widthx', None)
+        plot_barwidthy = pdict.get('bar_widthy', None)
+        plot_xtick_loc = pdict.get('xtick_loc', None)
+        plot_ytick_loc = pdict.get('ytick_loc', None)
+        plot_xtick_labels = pdict.get('xtick_labels', None)
+        plot_ytick_labels = pdict.get('ytick_labels', None)
+        do_legend = pdict.get('do_legend', False)
+
+        xpos, ypos = np.meshgrid(plot_xvals, plot_yvals)
+        xpos = xpos.T.flatten()
+        ypos = ypos.T.flatten()
+        zpos = np.zeros_like(xpos)
+        if plot_barwidthx is None:
+            plot_barwidthx = plot_xvals[1] - plot_xvals[0]
+        if not hasattr(plot_barwidthx, '__iter__'):
+            plot_barwidthx = np.ones_like(zpos)*plot_barwidthx
+        if plot_barwidthy is None:
+            plot_barwidthy = plot_yvals[1] - plot_yvals[0]
+        if not hasattr(plot_barwidthy, '__iter__'):
+            plot_barwidthy = np.ones_like(zpos) * plot_barwidthy
+        plot_barheight = plot_zvals.flatten()
+
+        if hasattr(plot_color, '__iter__') and \
+                hasattr(plot_color[0], '__iter__'):
+            plot_color = np.array(plot_color).flatten()
+        if hasattr(plot_color, '__iter__') and \
+            isinstance(plot_color[0], numbers.Number):
+            plot_colormap = pdict.get('colormap', mpl.cm.hsv)
+            plot_color = plot_colormap(plot_color)
+
+        zsort = plot_barkws.pop('zsort', 'max')
+        p_out = pfunc(xpos - plot_barwidthx/2, ypos - plot_barwidthy/2, zpos,
+                      plot_barwidthx, plot_barwidthy, plot_barheight,
+                      color=plot_color, zsort=zsort, **plot_barkws)
+
+        if plot_xtick_labels is not None:
+            axs.xaxis.set_ticklabels(plot_xtick_labels)
+        if plot_ytick_labels is not None:
+            axs.yaxis.set_ticklabels(plot_ytick_labels)
+        if plot_xtick_loc is not None:
+            axs.xaxis.set_ticks(plot_xtick_loc)
+        if plot_ytick_loc is not None:
+            axs.yaxis.set_ticks(plot_ytick_loc)
+
+        if plot_xrange is not None:
+            axs.set_xlim(*plot_xrange)
+        if plot_yrange is not None:
+            axs.set_ylim(*plot_yrange)
+        if plot_zrange is not None:
+            axs.set_zlim3d(*plot_zrange)
+        if plot_xlabel is not None:
+            set_axis_label('x', axs, plot_xlabel, plot_xunit)
+        if plot_ylabel is not None:
+            set_axis_label('y', axs, plot_ylabel, plot_yunit)
+        if plot_zlabel is not None:
+            set_axis_label('z', axs, plot_zlabel, plot_zunit)
+        if plot_title is not None:
+            axs.set_title(plot_title)
+
+        if do_legend:
+            legend_ncol = pdict.get('legend_ncol', 1)
+            legend_title = pdict.get('legend_title', None)
+            legend_pos = pdict.get('legend_pos', 'best')
+            axs.legend(title=legend_title, loc=legend_pos, ncol=legend_ncol)
+
+        if self.tight_fig:
+            axs.figure.tight_layout()
+
+        if pdict.get('colorbar', True):
+            self.plot_colorbar(axs=axs, pdict=pdict)
 
         pdict['handles'] = p_out
 
@@ -746,9 +842,9 @@ class BaseDataAnalysis(object):
             axs.set_xlim(xmin, xmax)
 
         if plot_xlabel is not None:
-            set_xlabel(axs, plot_xlabel, plot_xunit)
+            set_axis_label('x', axs, plot_xlabel, plot_xunit)
         if plot_ylabel is not None:
-            set_ylabel(axs, plot_ylabel, plot_yunit)
+            set_axis_label('y', axs, plot_ylabel, plot_yunit)
         if plot_yrange is not None:
             ymin, ymax = plot_yrange
             axs.set_ylim(ymin, ymax)
@@ -767,9 +863,9 @@ class BaseDataAnalysis(object):
 
             # Need to set labels again, because tight_layout can screw them up
             if plot_xlabel is not None:
-                set_xlabel(axs, plot_xlabel, plot_xunit)
+                set_axis_label('x', axs, plot_xlabel, plot_xunit)
             if plot_ylabel is not None:
-                set_ylabel(axs, plot_ylabel, plot_yunit)
+                set_axis_label('y', axs, plot_ylabel, plot_yunit)
 
         pdict['handles'] = p_out
 
@@ -813,8 +909,8 @@ class BaseDataAnalysis(object):
         axs.set_xlim(xmin, xmax)
 
         if not plot_nolabel:
-            axs.set_xlabel(plot_xlabel)
-            axs.set_ylabel(plot_ylabel)
+            axs.set_axis_label('x', plot_xlabel)
+            axs.set_axis_label('y', plot_ylabel)
 
         if plot_yrange is not None:
             ymin, ymax = plot_yrange
@@ -887,10 +983,10 @@ class BaseDataAnalysis(object):
                     bbox=box_props)
         if pdict.get('sharex', False):
             for ax in axs[-1]:
-                ax.set_xlabel(pdict['xlabel'])
+                ax.set_axis_label('x', pdict['xlabel'])
         if pdict.get('sharey', False):
             for ax in axs:
-                ax[0].set_ylabel(pdict['ylabel'])
+                ax[0].set_axis_label('y', pdict['ylabel'])
 
     def plot_color2D(self, pfunc, pdict, axs):
         """
@@ -1025,11 +1121,11 @@ class BaseDataAnalysis(object):
         plot_title = pdict['title']
         if plot_transpose:
             # transpose switches X and Y
-            set_xlabel(axs, plot_ylabel, plot_yunit)
-            set_ylabel(axs, plot_xlabel, plot_xunit)
+            set_axis_label('x', axs, plot_ylabel, plot_yunit)
+            set_axis_label('y', axs, plot_xlabel, plot_xunit)
         else:
-            set_xlabel(axs, plot_xlabel, plot_xunit)
-            set_ylabel(axs, plot_ylabel, plot_yunit)
+            set_axis_label('x', axs, plot_xlabel, plot_xunit)
+            set_axis_label('y', axs, plot_ylabel, plot_yunit)
         if plot_title is not None:
             axs.set_title(plot_title)
 
@@ -1044,23 +1140,37 @@ class BaseDataAnalysis(object):
                     'pdict and axs must be specified'
                     ' when no key is specified.')
         plot_nolabel = pdict.get('no_label', False)
-        plot_zlabel = pdict['zlabel']
+        plot_clabel = pdict.get('clabel', None)
         plot_cbarwidth = pdict.get('cbarwidth', '10%')
         plot_cbarpad = pdict.get('cbarpad', '5%')
-        plot_numcticks = pdict.get('numcticks', 5.)
+        plot_ctick_loc = pdict.get('ctick_loc', None)
+        plot_ctick_labels = pdict.get('ctick_labels', None)
         if cax is None:
-            axs.ax_divider = make_axes_locatable(axs)
-            axs.cax = axs.ax_divider.append_axes(
-                'right', size=plot_cbarwidth, pad=plot_cbarpad)
+            if not isinstance(axs, Axes3D):
+                axs.ax_divider = make_axes_locatable(axs)
+                axs.cax = axs.ax_divider.append_axes(
+                    'right', size=plot_cbarwidth, pad=plot_cbarpad)
+                cmap = axs.cmap
+            else:
+                plot_cbarwidth = str_to_float(plot_cbarwidth)
+                plot_cbarpad = str_to_float(plot_cbarpad)
+                axs.cax, _ = mpl.colorbar.make_axes(
+                    axs, shrink=1-plot_cbarwidth-plot_cbarpad, pad=plot_cbarpad,
+                    orientation=orientation)
+                cmap = pdict.get('colormap')
         else:
             axs.cax = cax
-        axs.cbar = plt.colorbar(axs.cmap, cax=axs.cax, orientation=orientation)
-        # cmin, cmax = axs.cbar.get_clim()
-        # cbarticks = np.arange(cmin,1.01*cmax,(cmax-cmin)/plot_numcticks)
-        # cbar.set_ticks(cbarticks)
-        # cbar.set_ticklabels(['%.0f'%(val) for val in cbarticks])
-        if not plot_nolabel and plot_zlabel is not None:
-            axs.cbar.set_label(plot_zlabel)
+        if hasattr(cmap, 'autoscale_None'):
+            axs.cbar = plt.colorbar(cmap, cax=axs.cax, orientation=orientation)
+        else:
+            norm = mpl.colors.Normalize(0, 1)
+            axs.cbar = mpl.colorbar.ColorbarBase(axs.cax, cmap=cmap, norm=norm)
+        if plot_ctick_loc is not None:
+            axs.cbar.set_ticks(plot_ctick_loc)
+        if plot_ctick_labels is not None:
+            axs.cbar.set_ticklabels(plot_ctick_labels)
+        if not plot_nolabel and plot_clabel is not None:
+            axs.cbar.set_label(plot_clabel)
 
         if self.tight_fig:
             axs.figure.tight_layout()
@@ -1152,3 +1262,9 @@ class BaseDataAnalysis(object):
         """
         pfunc = getattr(axs, pdict.get('func'))
         pfunc(**pdict['plot_kws'])
+
+def str_to_float(s):
+    if s[-1] == '%':
+        return float(s.strip('%'))/100
+    else:
+        return float(s)

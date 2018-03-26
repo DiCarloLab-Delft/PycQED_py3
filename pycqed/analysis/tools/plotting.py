@@ -11,54 +11,55 @@ SI_PREFIXES = 'yzafpnμm kMGTPEZY'
 SI_UNITS = 'm,s,g,W,J,V,A,F,T,Hz,Ohm,S,N,C,px,b,B,K,Bar,Vpeak,Vpp,Vp,Vrms'.split(',')
 
 
-def set_xlabel(axis, label, unit=None, **kw):
+def set_axis_label(axis_type, axes, label, unit=None, **kw):
     """
-    Takes in an axis object and add a unit aware label to it.
+        Takes in an axis object and add a unit aware label to it.
 
-    Args:
-        axis: matplotlib axis object to set label on
-        label: the desired label
-        unit:  the unit
-        **kw : keyword argument to be passed to matplotlib.set_xlabel
+        Args:
+            axis_type: a string, 'x', 'y' or 'z' specifying the axis
+            axes: matplotlib axes object to set label on
+            label: the desired label
+            unit:  the unit
+            **kw : keyword argument to be passed to matplotlib.set_xlabel
 
-    """
+        """
+    if axis_type.lower() == 'x':
+        get_ticks = axes.get_xticks
+        axis = axes.xaxis
+        set_label = axes.set_xlabel
+    elif axis_type.lower() == 'y':
+        get_ticks = axes.get_yticks
+        axis = axes.yaxis
+        set_label = axes.set_ylabel
+    elif axis_type.lower() == 'z':
+        get_ticks = axes.get_zticks
+        axis = axes.zaxis
+        set_label = axes.set_zlabel
+    else:
+        raise KeyError('No axis named' + str(axis_type))
     if unit is not None and unit != '':
-        xticks = axis.get_xticks()
+        ticks = get_ticks()
         scale_factor, unit = SI_prefix_and_scale_factor(
-            val=max(abs(xticks)), unit=unit)
+            val=max(abs(ticks)), unit=unit)
         formatter = matplotlib.ticker.FuncFormatter(lambda x, pos:
                                                     x*scale_factor)
-        axis.xaxis.set_major_formatter(formatter)
-
-        axis.set_xlabel(label+' ({})'.format(unit), **kw)
+        axis.set_major_formatter(formatter)
+        set_label(label+' ({})'.format(unit), **kw)
     else:
-        axis.set_xlabel(label, **kw)
-    return axis
+        set_label(label, **kw)
+    return axes
 
 
-def set_ylabel(axis, label, unit=None, **kw):
-    """
-    Takes in an axis object and add a unit aware label to it.
+def set_xlabel(axes, label, unit=None, **kw):
+    set_axis_label('x', axes, label, unit=unit, **kw)
 
-    Args:
-        axis: matplotlib axis object to set label on
-        label: the desired label
-        unit:  the unit
-        **kw : keyword argument to be passed to matplotlib.set_ylabel
 
-    """
-    if unit is not None and unit != '':
-        yticks = axis.get_yticks()
-        scale_factor, unit = SI_prefix_and_scale_factor(
-            val=max(abs(yticks)), unit=unit)
-        formatter = matplotlib.ticker.FuncFormatter(lambda x, pos:
-                                                    x*scale_factor)
-        axis.yaxis.set_major_formatter(formatter)
+def set_ylabel(axes, label, unit=None, **kw):
+    set_axis_label('y', axes, label, unit=unit, **kw)
 
-        axis.set_ylabel(label+' ({})'.format(unit), **kw)
-    else:
-        axis.set_ylabel(label, **kw)
-    return axis
+
+def set_zlabel(axes, label, unit=None, **kw):
+    set_axis_label('z', axes, label, unit=unit, **kw)
 
 
 def SI_prefix_and_scale_factor(val, unit=None):

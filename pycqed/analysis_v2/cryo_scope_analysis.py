@@ -101,7 +101,7 @@ class RamZFluxArc(ba.BaseDataAnalysis):
             'ylabel': self.raw_data_dict['ylabel'],
             'yunit': self.raw_data_dict['yunit'],
             'zvals': self.raw_data_dict['measured_values'][0],
-            'zlabel': self.raw_data_dict['value_names'][0],
+            'clabel': self.raw_data_dict['value_names'][0],
             'zunit': self.raw_data_dict['value_units'][0],
             'do_legend': True, }
 
@@ -116,7 +116,7 @@ class RamZFluxArc(ba.BaseDataAnalysis):
             'ylabel': self.proc_data_dict['FFT_ylabel'],
             'yunit': self.proc_data_dict['FFT_yunit'],
             'zvals': self.proc_data_dict['FFT'],
-            'zlabel': self.proc_data_dict['FFT_zlabel'],
+            'clabel': self.proc_data_dict['FFT_zlabel'],
             'zunit': self.proc_data_dict['FFT_zunit'],
             'do_legend': True, }
 
