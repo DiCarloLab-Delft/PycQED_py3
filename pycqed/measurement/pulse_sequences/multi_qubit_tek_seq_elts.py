@@ -1828,7 +1828,6 @@ def n_qubit_reset(pulse_pars_list, RO_pars, feedback_delay, nr_resets=1,
     else:
         return seq_name
 
-
 def two_qubit_parity_measurement(
         q0, q1, q2, feedback_delay=900e-9, prep_sequence=None,
         tomography_basis=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
@@ -1930,9 +1929,65 @@ def two_qubit_parity_measurement(
         return seq_name
 
 
+def n_qubit_tomo(
+        qubits, prep_sequence=None,
+        prep_name=None,
+        tomography_basis=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
+        upload=True, verbose=False, return_seq=False):
+    """
+
+    """
+
+    qubit_names = [qubit.name for qubit in qubits]
+
+    print(qubits[0].name)
+
+    operation_dict = {
+        'RO mux': device.get_multiplexed_readout_pulse_dictionary(qubits)
+    }
+
+    for qb in qubits:
+        operation_dict.update(qb.get_operation_dict())
+
+    if prep_sequence is None:
+        prep_sequence = ['Y90 ' + qubit_names[0]]
+
+    # create the elements
+    el_list = []
+
+    # tomography elements
+    tomography_sequences = get_tomography_pulses(*qubit_names,
+                                                 basis_pulses=tomography_basis)
+    for i, tomography_sequence in enumerate(tomography_sequences):
+        pulse_list = [operation_dict[pulse] for pulse in prep_sequence]
+        tomography_sequence.append('RO mux')
+        pulse_list.extend([operation_dict[pulse] for pulse in tomography_sequence])
+        print(pulse_list)
+        el_list.append(multi_pulse_elt(i, station, pulse_list, trigger=True,
+                                       name='tomography_{}'.format(i)))
+
+    # create the sequence
+    if prep_name is None:
+        seq_name = 'N-qubit tomography'
+    else:
+        seq_name = prep_name + ' tomography'
+    seq = sequence.Sequence(seq_name)
+    for i, tomography_sequence in enumerate(tomography_sequences):
+        seq.append('tomography_{}'.format(i), 'tomography_{}'.format(i), trigger_wait=True)
+
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
+
+
 def get_tomography_pulses(*qubit_names, basis_pulses=('I', 'X180', 'Y90',
                                                       'mY90', 'X90', 'mX90')):
     tomo_sequences = [[]]
+    print(qubit_names)
     for i, qb in enumerate(qubit_names):
         if i == 0:
             qb = ' ' + qb
