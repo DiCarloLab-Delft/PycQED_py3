@@ -195,7 +195,8 @@ class two_qubit_Simultaneous_RB_fixed_length(swf.Hard_Sweep):
                  gate_decomposition='HZ', interleaved_gate=None,
                  upload=True, return_seq=False, seq_name=None,
                  CxC_RB=True, idx_for_RB=0, interleave_CZ=True,
-                 verbose=False, CZ_info_dict=None):
+                 verbose=False, CZ_info_dict=None, spacing=30e-9,
+                 cal_points=False):
 
         super().__init__()
         self.qubit_list = qubit_list
@@ -211,6 +212,8 @@ class two_qubit_Simultaneous_RB_fixed_length(swf.Hard_Sweep):
         self.verbose = verbose
         self.CZ_info_dict = CZ_info_dict
         self.interleave_CZ = interleave_CZ
+        self.spacing = spacing
+        self.cal_points=cal_points
 
         self.parameter_name = 'Nr of Seeds'
         self.unit = '#'
@@ -231,7 +234,9 @@ class two_qubit_Simultaneous_RB_fixed_length(swf.Hard_Sweep):
                 verbose=self.verbose,
                 upload=self.upload,
                 interleave_CZ=self.interleave_CZ,
-                CZ_info_dict=self.CZ_info_dict)
+                CZ_info_dict=self.CZ_info_dict,
+                spacing=self.spacing,
+                cal_points=self.cal_points)
 
 
 class n_qubit_Simultaneous_RB_fixed_seeds(swf.Hard_Sweep):
