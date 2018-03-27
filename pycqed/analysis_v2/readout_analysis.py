@@ -101,10 +101,10 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         # fidelities can be calculated
         self.proc_data_dict['cumhist_0'] = np.cumsum(
             self.proc_data_dict['hist_0'][0])/(
-                self.proc_data_dict['nr_shots'][0])
+            np.sum(self.proc_data_dict['hist_0'][0]))
         self.proc_data_dict['cumhist_1'] = np.cumsum(
             self.proc_data_dict['hist_1'][0])/(
-                self.proc_data_dict['nr_shots'][0])
+            np.sum(self.proc_data_dict['hist_1'][0]))
 
         self.proc_data_dict['shots_xlabel'] = \
             self.raw_data_dict['value_names'][0][0]
@@ -485,7 +485,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
         self.nr_of_qubits = nr_of_qubits
         if qubit_names is None:
             self.qubit_names = list(reversed(['q{}'.format(i)
-                                             for i in range(nr_of_qubits)]))
+                                              for i in range(nr_of_qubits)]))
         else:
             self.qubit_names = qubit_names
 
@@ -559,7 +559,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                 # fidelities can be calculated
                 self.proc_data_dict[chist_name] = np.cumsum(
                     self.proc_data_dict[hist_name][0])/(
-                    self.proc_data_dict['nr_shots'])
+                    np.sum(self.proc_data_dict[hist_name][0]))
 
             self.proc_data_dict['bin_centers {}'.format(ch_name)] = (
                 self.proc_data_dict[hist_name][1][:-1] +
@@ -569,20 +569,13 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                 self.proc_data_dict[hist_name][1][1] -
                 self.proc_data_dict[hist_name][1][0])
 
-        ###########################################################
-        # Combining histograms of all different combinations
-        ###########################################################
+        #####################################################################
+        # Combining histograms of all different combinations and calc Fid.
+        ######################################################################
         for ch_idx, ch_name in enumerate(self.proc_data_dict['ch_names']):
-            # Create a label for the specific combination
-            # These labels should be e.g., xx1x and xx0x in a 4 qubit exprmt
-            # comb_str_0 = list('x'*self.proc_data_dict['nr_of_qubits'])
-            # comb_str_0[-ch_idx+1] = '0'
-            # comb_str_0 = "".join(comb_str_0)
-            # comb_str_1 = list('x'*self.proc_data_dict['nr_of_qubits'])
-            # comb_str_1[-ch_idx+1] = '1'
-            # comb_str_1 = "".join(comb_str_1)
-            comb_str_0, comb_str_1, comb_st = get_arb_comb_xx_label(
-                self.proc_data_dict['nr_of_qubits'], ch_idx=ch_idx, base=3)
+            # Create labels for the specific combinations
+            comb_str_0, comb_str_1, comb_str_2 = get_arb_comb_xx_label(
+                self.proc_data_dict['nr_of_qubits'], qubit_idx=ch_idx)
 
             # Initialize the arrays
             self.proc_data_dict['hist {} {}'.format(ch_name, comb_str_0)] = \
@@ -596,47 +589,36 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
 
             # Fill them with data from the relevant combinations
             for i, comb in enumerate(self.proc_data_dict['combinations']):
-                print(comb)
-                if comb[-ch_idx+1] == '0':
+                if comb[-(ch_idx+1)] == '0':
                     zero_hist[0] += self.proc_data_dict[
                         'hist {} {}'.format(ch_name, comb)][0]
                     zero_hist[1] = self.proc_data_dict[
                         'hist {} {}'.format(ch_name, comb)][1]
-                elif comb[-ch_idx+1] == '1':
+                elif comb[-(ch_idx+1)] == '1':
                     one_hist[0] += self.proc_data_dict[
                         'hist {} {}'.format(ch_name, comb)][0]
                     one_hist[1] = self.proc_data_dict[
                         'hist {} {}'.format(ch_name, comb)][1]
-                elif comb[-ch_idx+1] == '2':
+                elif comb[-(ch_idx+1)] == '2':
                     # Fixme add two state binning
                     raise NotImplementedError()
-            self.proc_data_dict['chist {} {}'.format(ch_name, comb_str_0)] = \
-                np.cumsum(zero_hist[0])/(self.proc_data_dict['nr_shots'])
-            self.proc_data_dict['chist {} {}'.format(ch_name, comb_str_1)] = \
-                np.cumsum(one_hist[0])/(self.proc_data_dict['nr_shots'])
 
+            chist_0 = np.cumsum(zero_hist[0])/(np.sum(zero_hist[0]))
+            chist_1 = np.cumsum(one_hist[0])/(np.sum(one_hist[0]))
 
+            self.proc_data_dict['chist {} {}'.format(ch_name, comb_str_0)] \
+                = chist_0
+            self.proc_data_dict['chist {} {}'.format(ch_name, comb_str_1)] \
+                = chist_1
+            ###########################################################
+            #  Threshold and fidelity based on cumulative histograms  #
 
-
-
-        ###########################################################
-        #  Threshold and fidelity based on cumulative histograms  #
-        ###########################################################
-
-
-        # Average assignment fidelity: F_ass = (P01 - P10 )/2
-        # where Pxy equals probability to measure x when starting in y
-
-
-        # F_vs_th = (1-(1-abs(self.proc_data_dict['cumhist_1'] -
-        #                     self.proc_data_dict['cumhist_0']))/2)
-        # opt_idx = np.argmax(F_vs_th)
-        # self.proc_data_dict['F_assignment_raw'] = F_vs_th[opt_idx]
-        # self.proc_data_dict['threshold_raw'] = \
-        #     self.proc_data_dict['bin_centers'][opt_idx]
-
-
-
+            qubit_name = self.proc_data_dict['qubit_names'][-(ch_idx+1)]
+            centers = self.proc_data_dict['bin_centers {}'.format(ch_name)]
+            fid, th = get_assignement_fid_from_cumhist(chist_0, chist_1,
+                                                       centers)
+            self.proc_data_dict['F_ass_raw {}'.format(qubit_name)] = fid
+            self.proc_data_dict['threshold_raw {}'.format(qubit_name)] = th
 
     def prepare_plots(self):
         # N.B. If the log option is used we should manually set the
@@ -644,18 +626,42 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
         # mess up the log plots.
         # log_hist = self.options_dict.get('log_hist', False)
 
-        for ch in self.proc_data_dict['ch_names']:
-            self.plot_dicts['histogram_{}'.format(ch)] = {
+        for ch_idx, ch_name in enumerate(self.proc_data_dict['ch_names']):
+            q_name = self.proc_data_dict['qubit_names'][-(ch_idx+1)]
+            th_raw = self.proc_data_dict['threshold_raw {}'.format(q_name)]
+            F_raw = self.proc_data_dict['F_ass_raw {}'.format(q_name)]
+
+            self.plot_dicts['histogram_{}'.format(ch_name)] = {
                 'plotfn': make_mux_ssro_histogram,
                 'data_dict': self.proc_data_dict,
-                'ch_name': ch,
+                'ch_name': ch_name,
                 'title': (self.timestamps[0] + ' \n' +
-                          self.raw_data_dict['measurementstring'][0])}
+                          'SSRO histograms {}'.format(ch_name))}
 
+            thresholds = [th_raw]
+            threshold_labels = ['thresh. raw']
 
+            self.plot_dicts['comb_histogram_{}'.format(q_name)] = {
+                'plotfn': make_mux_ssro_histogram_combined,
+                'data_dict': self.proc_data_dict,
+                'ch_name': ch_name,
+                'thresholds': thresholds,
+                'threshold_labels': threshold_labels,
+                'qubit_idx': ch_idx,
+                'title': (self.timestamps[0] + ' \n' +
+                          'Combined SSRO histograms {}'.format(q_name))}
 
-def raw_assignement_fid_from_chist(data_dict, channel_name, qubit_name):
-    qubit_idx = 0
+            fid_threshold_msg = 'Summary {}\n'.format(q_name)
+            fid_threshold_msg += r'$F_{A}$-raw: ' + '{:.3f} \n'.format(F_raw)
+            fid_threshold_msg += r'thresh. raw: ' + '{:.3f} \n'.format(th_raw)
+
+            self.plot_dicts['fid_threshold_msg_{}'.format(q_name)] = {
+                'plotfn': self.plot_text,
+                'xpos': 1.05,
+                'ypos': .9,
+                'horizontalalignment': 'left',
+                'text_string': fid_threshold_msg,
+                'ax_id': 'comb_histogram_{}'.format(q_name)}
 
 
 def get_shots_zero_one(data, post_select: bool=False,
@@ -696,34 +702,71 @@ def get_shots_zero_one(data, post_select: bool=False,
     return shots_0, shots_1
 
 
-
-def get_arb_comb_xx_label(nr_of_qubits, ch_idx: int, base: int=2):
+def get_arb_comb_xx_label(nr_of_qubits, qubit_idx: int):
+    """
+    Returns labels of the form "xx0xxx", "xx1xxx", "xx2xxx"
+    Length of the label is equal to the number of qubits
+    """
     comb_str_0 = list('x'*nr_of_qubits)
-    comb_str_0[-ch_idx+1] = '0'
+    comb_str_0[-(qubit_idx+1)] = '0'
     comb_str_0 = "".join(comb_str_0)
+
     comb_str_1 = list('x'*nr_of_qubits)
-    comb_str_1[-ch_idx+1] = '1'
+    comb_str_1[-(qubit_idx+1)] = '1'
     comb_str_1 = "".join(comb_str_1)
 
-    return comb_str_0, comb_str_1
+    comb_str_2 = list('x'*nr_of_qubits)
+    comb_str_2[-(qubit_idx+1)] = '2'
+    comb_str_2 = "".join(comb_str_2)
+
+    return comb_str_0, comb_str_1, comb_str_2
+
+
+def get_assignement_fid_from_cumhist(chist_0, chist_1, bin_centers=None):
+    """
+    Returns the average assignment fidelity and threshold
+        F_assignment_raw = (P01 - P10 )/2
+            where Pxy equals probability to measure x when starting in y
+    """
+    F_vs_th = (1-(1-abs(chist_1 - chist_0))/2)
+    opt_idx = np.argmax(F_vs_th)
+    F_assignment_raw = F_vs_th[opt_idx]
+
+    if bin_centers is None:
+        bin_centers = np.arange(len(chist_0))
+    threshold = bin_centers[opt_idx]
+
+    return F_assignment_raw, threshold
 
 
 def make_mux_ssro_histogram_combined(data_dict, ch_name, qubit_idx,
+                                     thresholds=None, threshold_labels=None,
                                      title=None, ax=None, **kw):
     if ax is None:
         f, ax = plt.subplots()
-    nr_of_qubits = data_dict['nr_of_qubits']
     markers = itertools.cycle(('v', '^', 'd'))
-    for i in range(2**nr_of_qubits):
-        format_str = '{'+'0:0{}b'.format(nr_of_qubits) + '}'
-        binning_string = format_str.format(i)
-        ax.plot(data_dict['bin_centers {}'.format(ch_name)],
-                data_dict['hist {} {}'.format(ch_name, binning_string)][0],
-                linestyle='',
-                marker=next(markers), alpha=.7, label=binning_string)
 
-    legend_title = "Prep. state \n[%s]" % ', '.join(data_dict['qubit_names'])
-    ax.legend(title=legend_title)
+    comb_str_0, comb_str_1, comb_str_2 = get_arb_comb_xx_label(
+        data_dict['nr_of_qubits'], qubit_idx=qubit_idx)
+
+    ax.plot(data_dict['bin_centers {}'.format(ch_name)],
+            data_dict['hist {} {}'.format(ch_name, comb_str_0)][0],
+            linestyle='',
+            marker=next(markers), alpha=.7, label=comb_str_0)
+    ax.plot(data_dict['bin_centers {}'.format(ch_name)],
+            data_dict['hist {} {}'.format(ch_name, comb_str_1)][0],
+            linestyle='',
+            marker=next(markers), alpha=.7, label=comb_str_1)
+
+    if thresholds is not None:
+        # this is to support multiple threshold types such as raw, fitted etc.
+        th_styles = itertools.cycle(('--', '-.', '..'))
+        for threshold, label in zip(thresholds, threshold_labels):
+            ax.axvline(threshold, linestyle=next(th_styles), color='grey',
+                       label=label)
+
+    legend_title = "Prep. state [%s]" % ', '.join(data_dict['qubit_names'])
+    ax.legend(title=legend_title, loc=1)  # top right corner
     ax.set_ylabel('Counts')
     # arbitrary units as we use optimal weights
     set_xlabel(ax, ch_name, 'a.u.')
@@ -746,7 +789,7 @@ def make_mux_ssro_histogram(data_dict, ch_name, title=None, ax=None, **kw):
                 marker=next(markers), alpha=.7, label=binning_string)
 
     legend_title = "Prep. state \n[%s]" % ', '.join(data_dict['qubit_names'])
-    ax.legend(title=legend_title)
+    ax.legend(title=legend_title, loc=1)
     ax.set_ylabel('Counts')
     # arbitrary units as we use optimal weights
     set_xlabel(ax, ch_name, 'a.u.')

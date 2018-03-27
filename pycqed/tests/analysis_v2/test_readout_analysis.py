@@ -3,6 +3,7 @@ import numpy as np
 import pycqed as pq
 import os
 from pycqed.analysis_v2 import measurement_analysis as ma
+from pycqed.analysis_v2 import readout_analysis as ra
 
 
 class Test_SSRO_discrimination_analysis(unittest.TestCase):
@@ -76,21 +77,78 @@ class Test_SSRO_discrimination_analysis(unittest.TestCase):
             decimal=1)
 
 
+class Test_readout_analysis_functions(unittest.TestCase):
+    def test_get_arb_comb_xx_label(self):
+
+        labels = ra.get_arb_comb_xx_label(2, qubit_idx=0)
+        np.testing.assert_equal(labels[0], 'x0')
+        np.testing.assert_equal(labels[1], 'x1')
+        np.testing.assert_equal(labels[2], 'x2')
+
+        labels = ra.get_arb_comb_xx_label(2, qubit_idx=1)
+        np.testing.assert_equal(labels[0], '0x')
+        np.testing.assert_equal(labels[1], '1x')
+        np.testing.assert_equal(labels[2], '2x')
+
+        labels = ra.get_arb_comb_xx_label(nr_of_qubits=4, qubit_idx=1)
+        np.testing.assert_equal(labels[0], 'xx0x')
+        np.testing.assert_equal(labels[1], 'xx1x')
+        np.testing.assert_equal(labels[2], 'xx2x')
+
+        labels = ra.get_arb_comb_xx_label(nr_of_qubits=4, qubit_idx=3)
+
+        np.testing.assert_equal(labels[0], '0xxx')
+        np.testing.assert_equal(labels[1], '1xxx')
+        np.testing.assert_equal(labels[2], '2xxx')
+
+    def test_get_assignment_fid_from_cumhist(self):
+        chist_0 = np.array([0, 0, 0, 0, 0, .012,
+                            .068, .22, .43, .59, .78, 1, 1])
+        chist_1 = np.array([0, 0.01, .05, .16, .21,
+                            .24, .38, .62, .81, 1, 1, 1, 1])
+        centers = np.linspace(0, 1, len(chist_0))
+
+        # Fidelity for identical distributions should be 0.5 (0.5 is random)
+        fid, th = ra.get_assignement_fid_from_cumhist(
+            chist_0, chist_0, centers)
+        self.assertEqual(fid, 0.5)
+
+        # Test on the fake distribution
+        fid, threshold = ra.get_assignement_fid_from_cumhist(
+            chist_0, chist_1)
+        np.testing.assert_almost_equal(fid, 0.705)
+        np.testing.assert_almost_equal(threshold, 9)
+        # Test on the fake distribution
+        fid, threshold = ra.get_assignement_fid_from_cumhist(
+            chist_0, chist_1, centers)
+        np.testing.assert_almost_equal(fid, 0.705)
+        np.testing.assert_almost_equal(threshold, 0.75)
+
+
 class Test_multiplexed_readout_analysis(unittest.TestCase):
 
     def test_multiplexed_readout_analysis(self):
         t_start = '20180323_150203'
         t_stop = t_start
-        a = ma.Multiplexed_Readout_Analysis(t_start=t_start, t_stop=t_stop)
-        # self.assert_almost_equal(as;lgkhl;gsaf)
+        a = ma.Multiplexed_Readout_Analysis(t_start=t_start, t_stop=t_stop,
+                                            qubit_names=['QR', 'QL'])
+        np.testing.assert_almost_equal(a.proc_data_dict['F_ass_raw QL'],
+                                       0.72235812133072408)
 
+        np.testing.assert_almost_equal(a.proc_data_dict['F_ass_raw QR'],
+                                       0.81329500978473579)
+
+        np.testing.assert_almost_equal(a.proc_data_dict['threshold_raw QL'],
+                                       1.9708007812500004)
+        np.testing.assert_almost_equal(a.proc_data_dict['threshold_raw QR'],
+                                       -7.1367667055130006)
 
     def test_name_assignement(self):
         t_start = '20180323_150203'
         t_stop = t_start
         a = ma.Multiplexed_Readout_Analysis(t_start=t_start, t_stop=t_stop)
-        self.assert_equal(a.proc_data_dict['qubit_names'], ['q1', 'q0'])
+        np.testing.assert_equal(a.proc_data_dict['qubit_names'], ['q1', 'q0'])
 
         a = ma.Multiplexed_Readout_Analysis(t_start=t_start, t_stop=t_stop,
                                             qubit_names=['QR', 'QL'])
-        self.assert_equal(a.proc_data_dict['qubit_names'], ['QR', 'QL'])
+        np.testing.assert_equal(a.proc_data_dict['qubit_names'], ['QR', 'QL'])
