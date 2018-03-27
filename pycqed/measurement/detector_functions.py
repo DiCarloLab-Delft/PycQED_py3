@@ -1967,7 +1967,7 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
 
     def get_values(self):
         # Slightly different way to deal with scaling factor
-        self.scaling_factor = 1 #/ (1.8e9*self.integration_length)
+        self.scaling_factor = 1 / (1.8e9*self.integration_length)
 
         if self.AWG is not None:
             self.AWG.stop()
@@ -1985,6 +1985,8 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             for key in sorted(data_raw.keys()):
                 data.append(np.array(data_raw[key]))
         else:
+            #print(self.scaling_factor)
+            #print(self.nr_averages)
             for key in sorted(data_raw.keys()):
                 if key in self.correlation_channels:
                     data.append(np.array(data_raw[key]) *

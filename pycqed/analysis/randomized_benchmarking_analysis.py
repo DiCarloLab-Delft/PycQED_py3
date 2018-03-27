@@ -2,6 +2,7 @@ import os
 import h5py
 import lmfit
 import logging
+import itertools
 import numpy as np
 import scipy.optimize as optimize
 
@@ -65,6 +66,7 @@ class RandomizedBenchmarking_Analysis(ma.TD_Analysis):
 
     def run_default_analysis(self, **kw):
 
+        make_fig_RB = kw.pop('make_fig_RB', False)
         if not kw.pop('skip', False):
             close_main_fig = kw.pop('close_main_fig', True)
             close_file = kw.pop('close_file', True)
@@ -81,7 +83,7 @@ class RandomizedBenchmarking_Analysis(ma.TD_Analysis):
             self.fit_results = [self.fit_res]
 
             self.save_fitted_parameters(fit_res=self.fit_res, var_name='F|1>')
-            if self.make_fig:
+            if make_fig_RB:
                 self.make_figures(close_main_fig=close_main_fig, **kw)
 
             if close_file:
@@ -119,7 +121,7 @@ class RandomizedBenchmarking_Analysis(ma.TD_Analysis):
                 data[i] = np.mean([data_raw[j][i] for j in
                                    range(self.nr_seeds)])
 
-            data = 1 - data
+            data = 2*(1 - data) - 1
             # data = np.mean(self.measured_values)
 
         else:
@@ -157,7 +159,7 @@ class RandomizedBenchmarking_Analysis(ma.TD_Analysis):
                     d[:-int(2*len(self.cal_points[0]))]
 
             # we want prob to be in gnd state
-            data = 1 - data
+            data = 2*(1 - data) - 1
 
         return data
 
@@ -198,7 +200,8 @@ class RandomizedBenchmarking_Analysis(ma.TD_Analysis):
     def make_figures(self, close_main_fig, **kw):
 
         xlabel = 'Number of Cliffords, m'
-        ylabel = r'Probability, $P$ $\left(|g \rangle \right)$'
+        # ylabel = r'Probability, $P$ $\left(|g \rangle \right)$'
+        ylabel = r'Expectation value $\langle \sigma_z \rangle$'
         self.fig, self.ax = self.default_ax()
 
         self.plot_results_vs_sweepparam(x=self.n_cl,
@@ -236,11 +239,11 @@ class RandomizedBenchmarking_Analysis(ma.TD_Analysis):
         for fit_res in self.fit_results:
             best_fit = fit_mods.RandomizedBenchmarkingDecay(
                 x_fine, **fit_res.best_values)
-            self.ax.plot(x_fine, best_fit, 'C0', label='Fit')
+            self.ax.plot(x_fine, best_fit, 'C0')
         # self.ax.set_ylim(min(min(self.data_RB)-.1, -.1),
         #                  max(max(self.dadata_RBta)+.1, 1.1))
         # self.ax.set_ylim(0.4, max(max(self.data_RB)+.1, 1.1))
-
+        self.ax.set_ylim([0, 1])
         # Here we add the line corresponding to T1 limited fidelity
         plot_T1_lim = kw.pop('plot_T1_lim', True)
         F_T1 = None
@@ -256,22 +259,24 @@ class RandomizedBenchmarking_Analysis(ma.TD_Analysis):
                              linewidth=self.line_width,
                              label='decoherence-limit')
 
-        self.ax.legend(loc='center left', bbox_to_anchor=(1, 0.5),
-                       fontsize=self.font_size)
+        # self.ax.legend(loc='center left', bbox_to_anchor=(1, 0.5),
+        #                fontsize=self.font_size)
 
         # Add a textbox
-        self.add_textbox(self.ax, F_T1, plot_T1_lim=plot_T1_lim)
+        if kw.pop('add_textbox_RB', True):
+            self.add_textbox(self.ax, F_T1, plot_T1_lim=plot_T1_lim)
 
         if kw.pop('show_RB', False):
             plt.show()
 
-        if not close_main_fig:
-            # Hacked in here, good idea to only show the main fig but can
-            # be optimized somehow
-            self.save_fig(self.fig, ylabel='Amplitude (normalized)',
-                          close_fig=False, **kw)
-        else:
-            self.save_fig(self.fig, ylabel='Amplitude (normalized)', **kw)
+        if kw.pop('save_fig', True):
+            if not close_main_fig:
+                # Hacked in here, good idea to only show the main fig but can
+                # be optimized somehow
+                self.save_fig(self.fig, ylabel='Amplitude (normalized)',
+                              close_fig=False, **kw)
+            else:
+                self.save_fig(self.fig, ylabel='Amplitude (normalized)', **kw)
 
     def fit_data(self, data, numCliff,
                  print_fit_results=False,
@@ -308,24 +313,22 @@ class RandomizedBenchmarking_Analysis(ma.TD_Analysis):
         # Use the found error per Clifford to standard errors for the data
         # points fro Helsen et al. (2017)
         self.conf_level = kw.pop('conf_level', 0.68)
-        epsilon_guess = kw.pop('epsilon_guess', 0.1)
-        eta = kw.pop('eta', 0)
+        epsilon_guess = kw.pop('epsilon_guess', 0.01)
         epsilon = calculate_confidence_intervals(
             nr_seeds=self.nr_seeds,
             nr_cliffords=self.n_cl,
-            infidelity=fit_res.params['error_per_Clifford'].value,
+            depolariz_param=fit_res.best_values['p'],
             conf_level=self.conf_level,
-            epsilon_guess=epsilon_guess,
-            eta=eta)
+            epsilon_guess=epsilon_guess, d=2)
 
         self.epsilon = epsilon
+        print('epsilon ', self.epsilon)
         # Run fit again with scale_covar=False, and weights = 1/epsilon
 
         # if an entry in epsilon_sqrd is 0, replace it with half the minimum
         # value in the epsilon_sqrd array
         idxs = np.where(epsilon==0)[0]
         epsilon[idxs] = min([eps for eps in epsilon if eps!=0])/2
-
         fit_res = RBModel.fit(data, numCliff=numCliff, params=params,
                               scale_covar=False, weights=1/epsilon)
 
@@ -552,7 +555,7 @@ class Interleaved_RB_Analysis(RandomizedBenchmarking_Analysis):
                                        capsize=line_width,
                                        capthick=line_width)
 
-            self.ax.set_ylim(0.4,
+            self.ax.set_ylim(0,
                              max(max(self.data_dict[msmt_name])+.1, 1.1))
 
             textstr += \
@@ -560,7 +563,7 @@ class Interleaved_RB_Analysis(RandomizedBenchmarking_Analysis):
                     '{:.6g} $\pm$ ({:.4g})% \n'.format(
                     (1-self.fit_res_dict[msmt_name].params[
                     'fidelity_per_Clifford'].value)*100,
-                    (1-self.fit_res_dict[msmt_name].params[
+                    (self.fit_res_dict[msmt_name].params[
                         'fidelity_per_Clifford'].stderr)*100))
 
             # Here we get the line corresponding to T1 limited fidelity
@@ -642,7 +645,8 @@ class Interleaved_RB_Analysis(RandomizedBenchmarking_Analysis):
 
 class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
 
-    def __init__(self, measurement_dict=None, qb_names=None, **kw):
+    def __init__(self, measurement_dict=None, qb_names=None,
+                 use_cal_points=False, **kw):
         """
         folders_dict (dict): of the form {msmt_name: folder} if experiment was
             done for 2 qubits (used correlation mode o UHFQC), or of the form
@@ -656,6 +660,7 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
         corresponding to msmt_name = ['CxC', 'IxC', 'CxI'].
         For 2 qubits and CZ interleaved, msmt_name = ['CZ', 'ICZ']
         """
+        self.use_cal_points = use_cal_points
 
         self.qb_names = qb_names
         if self.qb_names is None:
@@ -669,7 +674,7 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
 
         try:
             self.folders_dict = \
-                {msmt_name:measurement_dict[msmt_name]['file']
+                {msmt_name: measurement_dict[msmt_name]['file']
                  for msmt_name in measurement_dict}
         except Exception:
             self.folders_dict = None
@@ -748,8 +753,9 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
             # print(msmt_name)
             # print(self.folders_dict[msmt_name])
 
+        self.clifford_qbs = {}
         if not np.any(['CZ' in msmt_name for msmt_name in self.folders_dict]):
-            self.clifford_qbs = {}
+
             try:
                 for msmt_name in self.measurement_dict:
                     if 'clifford_qb_idx' in self.measurement_dict[msmt_name]:
@@ -762,6 +768,7 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                                      ' measurement_dict.')
             except ValueError:
                 pass
+
 
         folder = list(self.folders_dict.values())[0]
         # print(folder)
@@ -777,24 +784,42 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
         make_fig_SRB_base = kw.pop('make_fig_SRB_base', True)
         make_fig_cross_talk = kw.pop('make_fig_cross_talk', True)
         make_fig_addressab = kw.pop('make_fig_addressab', True)
+        msmt_to_not_fit = kw.pop('msmt_to_not_fit', [])
+        add_correction = kw.pop('add_correction', False)
 
         self.T1s, self.T2s, self.pulse_lengths = \
             load_T1_T2_pulse_length(self.folders_dict, self.qb_names)
 
         if len(self.qb_names) == 2:
-            self.correlator_analysis(**kw)
-            self.ylabel_RB = r'Probability, $P$ $\left(|g \rangle \right)$'
-            self.ylabel_corr = (r'Probability, '
-                                r'$P$ $\left(|{n}\rangle \right)$ + '.
-                                format(n='g'*len(self.qb_names)) +
-                                r'$P$ $\left(|{n}\rangle '
-                                r'\right)$'.format(n='e'*len(self.qb_names)))
+            self.correlator_analysis(msmt_to_not_fit=msmt_to_not_fit, **kw)
+            # self.ylabel_RB = r'Probability, $P$ $\left(|g \rangle \right)$'
+            # self.ylabel_corr = (r'Probability, '
+            #                     r'$P$ $\left(|{n}\rangle \right)$ + '.
+            #                     format(n='g'*len(self.qb_names)) +
+            #                     r'$P$ $\left(|{n}\rangle '
+            #                     r'\right)$'.format(n='e'*len(self.qb_names)))
         else:
-            self.single_shot_analysis(**kw)
-            self.ylabel_RB = r'Expectation value $\langle \sigma_z \rangle$'
-            self.ylabel_corr = (r'Expectation value $\langle '
-                                r'\sigma_z^{{\otimes {{{n}}} }} '
-                                r'\rangle$'.format(n=len(self.qb_names)))
+            self.single_shot_analysis(msmt_to_not_fit=msmt_to_not_fit, **kw)
+
+        self.data_dict = deepcopy(self.data_dict_raw)
+        self.fit_res_dict = deepcopy(self.fit_res_dict_raw)
+        if add_correction:
+            for msmt_name in self.data_dict:
+                d_dict = self.data_dict[msmt_name]['data']
+                for var_name in d_dict:
+                    fit_res = self.fit_res_dict_raw[msmt_name][var_name]
+                    A = fit_res.best_values['Amplitude']
+                    B = fit_res.best_values['offset']
+                    A_scaled = A+B
+                    # overwrite the values of the Amplitude and offset
+                    self.fit_res_dict[msmt_name][var_name].best_values[
+                        'Amplitude'] = A_scaled
+                    self.fit_res_dict[msmt_name][var_name].best_values[
+                        'offset'] = 0
+
+                    self.data_dict[msmt_name]['data'][var_name] = \
+                        (A_scaled/A)*(self.data_dict_raw[msmt_name][
+                                          'data'][var_name] - B)
 
         # Save fitted params
         for msmt_name, data_file in self.data_files_dict.items():
@@ -813,40 +838,42 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
             self.depolariz_params[msmt_name] = {}
             self.infidelities[msmt_name] = {}
             for var_name, fit_res in fit_params_dict.items():
-                try:
+                if fit_res is not None:
                     self.depolariz_params[msmt_name][var_name] = \
                         {'val': fit_res.best_values['p'],
                          'stderr': fit_res.params['p'].stderr}
+                    if var_name == 'corr':
+                        d = 2**len(self.qb_names)
+                    else:
+                        d = 2
                     self.infidelities[msmt_name][var_name] = \
-                        {'val': 1-fit_res.params[
-                            'fidelity_per_Clifford'].value,
-                         'stderr': fit_res.params[
-                             'fidelity_per_Clifford'].stderr}
-                except Exception:
-                    pass
+                        {'val': (d-1)*(1-fit_res.best_values['p'])/d,
+                         'stderr': np.abs((1-d)*fit_res.params['p'].stderr)}
+                else:
+                    self.depolariz_params[msmt_name][var_name] = None
+                    self.infidelities[msmt_name][var_name] = None
 
-        if 'CxC' in self.data_dict:
-            fit_res_dict_CxC = self.fit_res_dict['CxC']
+        if 'CxC' in self.data_dict and not ('CxC' in msmt_to_not_fit):
+            depolariz_params_dict = self.depolariz_params['CxC']
             # get delta_alpha (delta depolarization params)
             # delta_alpha_stderr^2 = stderr_corr^2 - (stderr_qb0^2 * p_qb0^2 +
             #   stderr_qb1^2 * p_qb1^2 + ... + stderr_qbN^2 * p_qbN^2)
             product = 1
             std_err_product_squared = 1
             for qb_name in self.qb_names:
-                product *= fit_res_dict_CxC[qb_name].best_values['p']
+                product *= depolariz_params_dict[qb_name]['val']
 
                 std_err_product_squared *= \
-                    (fit_res_dict_CxC[qb_name].params['p'].stderr)**2
+                    (depolariz_params_dict[qb_name]['stderr'])**2
                 for other_qb_names in self.qb_names:
                     if other_qb_names != qb_name:
                         std_err_product_squared *= \
-                            (fit_res_dict_CxC[
-                                 other_qb_names].best_values['p'])**2
+                            (depolariz_params_dict[ other_qb_names]['val'])**2
 
             delta_alpha = \
-                np.abs(fit_res_dict_CxC['corr'].best_values['p'] - product)
+                depolariz_params_dict['corr']['val'] - product
             delta_alpha_stderr = np.sqrt(
-                (fit_res_dict_CxC['corr'].params['p'].stderr)**2 -
+                (depolariz_params_dict['corr']['stderr'])**2 -
                 std_err_product_squared)
 
             self.delta_alpha = {'val': delta_alpha,
@@ -865,6 +892,13 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                 self.save_folder = self.save_folder[0]
 
         self.xlabel_RB = 'Number of Cliffords, m'
+        self.ylabel_RB = r'Expectation value $\langle \sigma_z \rangle$'
+        self.ylabel_corr = (r'Expectation value $\langle '
+                            r'\sigma_z^{{\otimes {{{n}}} }} '
+                            r'\rangle$'.format(n=len(self.qb_names)))
+        default_color_cycle = plt.rcParams['axes.prop_cycle'].by_key()['color']
+        self.line_colors = [i for i in default_color_cycle if
+                            ('#2ca02c' not in i) and ('#d62728' not in i)]
 
         if make_fig_SRB_base:
             self.plot_SRB(
@@ -927,45 +961,74 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
 
         msmt_to_not_fit = kw.get('msmt_to_not_fit', [])
 
-        self.fit_res_dict = {}
-        self.data_dict = {}
+        self.fit_res_dict_raw = {}
+        self.data_dict_raw = {}
         self.msmt_strings = {}
         self.data_files_dict = {}
         self.epsilon_dict = {}
+        # needed for consistent colors for each qubit
+        self.RO_channels = {}
         for msmt_name in self.folders_dict:
             self.folder = self.folders_dict[msmt_name]
             self.load_hdf5data(folder=self.folder, **kw)
 
-            self.data_dict[msmt_name] = self.extract_data(two_qubits=True, **kw)
+            self.data_dict_raw[msmt_name] = self.extract_data(
+                two_qubits=True, **kw)
             self.add_analysis_datagroup_to_file()
 
             self.msmt_strings[msmt_name] = self.measurementstring
             self.data_files_dict[msmt_name] = self.data_file
 
-            self.fit_res_dict[msmt_name] = {}
+            self.fit_res_dict_raw[msmt_name] = {}
             self.epsilon_dict[msmt_name] = {}
-            self.n_cl = self.data_dict[msmt_name]['n_cl']
-            self.nr_seeds = self.data_dict[msmt_name]['nr_seeds']
+            self.n_cl = self.data_dict_raw[msmt_name]['n_cl']
+            self.nr_seeds = self.data_dict_raw[msmt_name]['nr_seeds']
 
-            # fit data
-            for var_name, dset in self.data_dict[msmt_name]['data'].items():
+            # get RO channels and fit data
+            for var_name, dset in self.data_dict_raw[msmt_name]['data'].items():
+                if var_name != 'corr':
+                    instr_set = self.data_files_dict[msmt_name][
+                        'Instrument settings']
+                    self.RO_channels[var_name] = int(instr_set[var_name].attrs[
+                        'RO_acq_weight_function_I'])
+
                 if msmt_name in msmt_to_not_fit:
-                    self.fit_res_dict[msmt_name][var_name] = None
+                    self.fit_res_dict_raw[msmt_name][var_name] = None
+                    self.epsilon_dict[msmt_name][var_name] = None
                 else:
+                    if var_name == 'corr':
+                        d = 2**(len(self.qb_names))
+                    else:
+                        d = 2
                     if msmt_name in self.clifford_qbs:
                         if var_name == self.clifford_qbs[msmt_name] or \
-                                var_name == 'corr':
-                            self.fit_res_dict[msmt_name][var_name] = \
-                                self.fit_data(dset, self.n_cl, **kw)
+                                        var_name == 'corr':
+                            self.fit_res_dict_raw[msmt_name][var_name] = \
+                                self.fit_data(dset, self.n_cl, d=d, **kw)
                             self.epsilon_dict[msmt_name][var_name] = \
                                 self.epsilon
                         else:
-                            self.fit_res_dict[msmt_name][var_name] = None
+                            self.fit_res_dict_raw[msmt_name][var_name] = None
                             self.epsilon_dict[msmt_name][var_name] = None
                     else:
-                        self.fit_res_dict[msmt_name][var_name] = \
-                            self.fit_data(dset, self.n_cl, **kw)
-                        self.epsilon_dict[msmt_name][var_name] = self.epsilon
+                        self.fit_res_dict_raw[msmt_name][var_name] = \
+                            self.fit_data(dset, self.n_cl, d=d, **kw)
+                        self.epsilon_dict[msmt_name][var_name] = \
+                            self.epsilon
+
+                # if var_name == 'corr' and \
+                #         self.fit_res_dict_raw[msmt_name]['corr'] is not None:
+                #     d = 2**(len(self.qb_names))
+                #     corr_fit_res = self.fit_res_dict_raw[msmt_name]['corr']
+                #     depolariz_param = corr_fit_res.best_values['p']
+                #     epsilon = calculate_confidence_intervals(
+                #         nr_seeds=self.nr_seeds,
+                #         nr_cliffords=self.n_cl,
+                #         depolariz_param=depolariz_param,
+                #         conf_level=self.conf_level,
+                #         epsilon_guess=0.1,
+                #         d=d)
+                #     self.epsilon_dict[msmt_name]['corr'] = epsilon
 
     def single_shot_analysis(self, **kw):
 
@@ -973,16 +1036,18 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
 
         self.msmt_strings = {}
         self.data_files_dict = {}
-        self.fit_res_dict = {}
+        self.fit_res_dict_raw = {}
         self.epsilon_dict = {}
+        # needed for consistent colors for each qubit
+        self.RO_channels = {}
 
-        self.data_dict = {}
+        self.data_dict_raw = {}
         for msmt_name in self.folders_dict:
-            self.data_dict[msmt_name] = {}
-            self.data_dict[msmt_name]['n_cl'] = np.array([], dtype=int)
-            self.data_dict[msmt_name]['data'] = {}
+            self.data_dict_raw[msmt_name] = {}
+            self.data_dict_raw[msmt_name]['n_cl'] = np.array([], dtype=int)
+            self.data_dict_raw[msmt_name]['data'] = {}
             for var_name in self.qb_names+['corr']:
-                self.data_dict[msmt_name]['data'][var_name] = np.array([])
+                self.data_dict_raw[msmt_name]['data'][var_name] = np.array([])
 
             for i, folder in enumerate(self.folders_dict[msmt_name]):
                 self.folder = folder
@@ -992,7 +1057,7 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                 self.extract_data(two_qubits=False, msmt_name=msmt_name, **kw)
 
                 if i == 0:
-                    self.data_dict[msmt_name]['nr_seeds'] = self.nr_seeds
+                    self.data_dict_raw[msmt_name]['nr_seeds'] = self.nr_seeds
                 # get the nr_cliffords for the sequence from the
                 # measurementstring
                 try:
@@ -1011,46 +1076,71 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                     raise ValueError('Could not find the underscore in '
                                      'the nr_cliffs substring.')
 
-                self.data_dict[msmt_name]['n_cl'] = np.append(
-                    self.data_dict[msmt_name]['n_cl'],
+                self.data_dict_raw[msmt_name]['n_cl'] = np.append(
+                    self.data_dict_raw[msmt_name]['n_cl'],
                     int(float(nr_cliffs_string[idx_underscore+1::])))
                 self.add_analysis_datagroup_to_file()
 
             self.msmt_strings[msmt_name] = self.measurementstring
             self.data_files_dict[msmt_name] = self.data_file
 
-            # fit data
-            self.fit_res_dict[msmt_name] = {}
+            # get RO channels and fit data
+            self.fit_res_dict_raw[msmt_name] = {}
             self.epsilon_dict[msmt_name] = {}
-            self.n_cl = self.data_dict[msmt_name]['n_cl']
-            for var_name, dset in self.data_dict[msmt_name]['data'].items():
+            self.n_cl = self.data_dict_raw[msmt_name]['n_cl']
+            for var_name, dset in self.data_dict_raw[msmt_name]['data'].items():
+                if var_name != 'corr':
+                    instr_set = self.data_files_dict[msmt_name][
+                        'Instrument settings']
+                    self.RO_channels[var_name] = int(instr_set[var_name].attrs[
+                                            'RO_acq_weight_function_I'])
+
                 if msmt_name in msmt_to_not_fit:
-                    self.fit_res_dict[msmt_name][var_name] = None
+                    self.fit_res_dict_raw[msmt_name][var_name] = None
                 else:
-                    print(self.clifford_qbs)
+                    if var_name == 'corr':
+                        d = 2**(len(self.qb_names))
+                    else:
+                        d = 2
+                    # print(self.clifford_qbs)
                     if msmt_name in self.clifford_qbs:
                         if var_name == self.clifford_qbs[msmt_name] or \
                                         var_name == 'corr':
-                            print('notNone ', msmt_name, var_name)
-                            self.fit_res_dict[msmt_name][var_name] = \
-                                self.fit_data(dset, self.n_cl, **kw)
+                            # print('notNone ', msmt_name, var_name)
+                            self.fit_res_dict_raw[msmt_name][var_name] = \
+                                self.fit_data(dset, self.n_cl, d=d, **kw)
                             self.epsilon_dict[msmt_name][var_name] = \
                                 self.epsilon
                         else:
-                            print('None ', msmt_name, var_name)
-                            self.fit_res_dict[msmt_name][var_name] = None
+                            # print('None ', msmt_name, var_name)
+                            self.fit_res_dict_raw[msmt_name][var_name] = None
                             self.epsilon_dict[msmt_name][var_name] = None
                     else:
-                        print('notNone ', msmt_name, var_name)
-                        self.fit_res_dict[msmt_name][var_name] = \
-                            self.fit_data(dset, self.n_cl, **kw)
+                        # print('notNone ', msmt_name, var_name)
+                        self.fit_res_dict_raw[msmt_name][var_name] = \
+                            self.fit_data(dset, self.n_cl, d=d, **kw)
                         self.epsilon_dict[msmt_name][var_name] = \
                             self.epsilon
 
+                # if var_name == 'corr' and not \
+                #         (self.fit_res_dict_raw[msmt_name]['corr'] is None):
+                #     d = 2**(len(self.qb_names))
+                #     corr_fit_res = self.fit_res_dict_raw[msmt_name]['corr']
+                #     depolariz_param = corr_fit_res.best_values['p']
+                #     epsilon = calculate_confidence_intervals(
+                #         nr_seeds=self.nr_seeds,
+                #         nr_cliffords=self.n_cl,
+                #         depolariz_param=depolariz_param,
+                #         conf_level=self.conf_level,
+                #         epsilon_guess=0.1,
+                #         d=d)
+                #     self.epsilon_dict[msmt_name]['corr'] = epsilon
 
     def extract_data(self, **kw):
 
         two_qubits = kw.pop('two_qubits', True)
+        if self.cal_points is None:
+            self.cal_points = [[-2], [-1]]
 
         # ma.MeasurementAnalysis.run_default_analysis(
         #     self, close_file=False, **kw)
@@ -1058,30 +1148,61 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
 
         if two_qubits:
             n_cl = np.unique(self.sweep_points_2D)
-            nr_seeds = self.sweep_points.size
             data = {'n_cl': n_cl,
-                    'nr_seeds': nr_seeds,
+                    'nr_seeds': 0,
                     'data': {}}
 
-            qb0_raw = self.measured_values[0]
-            qb1_raw = self.measured_values[1]
-            corr_raw = self.measured_values[2]
+            if self.use_cal_points:
+                self.cal_points = [[-2], [-1]]
 
-            qb0 = np.zeros(n_cl.size)
-            qb1 = np.zeros(n_cl.size)
-            corr = np.zeros(n_cl.size)
-            for i in range(n_cl.size):
-                qb0[i] = np.mean([qb0_raw[j][i] for j in range(nr_seeds)])
-                qb1[i] = np.mean([qb1_raw[j][i] for j in range(nr_seeds)])
-                corr[i] = np.mean([corr_raw[j][i] for j in range(nr_seeds)])
+                nr_sweep_pts = self.sweep_points.size #nr_seeds+NoCalPts
+                nr_seeds = nr_sweep_pts - 2*len(self.cal_points[0])
+                data['nr_seeds'] = nr_seeds
 
-            data['data'][self.qb_names[0]] = 1 - qb0
-            data['data'][self.qb_names[1]] = 1 - qb1
-            data['data']['corr'] = corr
+                data_temp = np.zeros(n_cl.size)
+
+                for idx, qb_data in enumerate(self.data[2::]):
+                    for i in range(len(n_cl)):
+                        qb_data_rearranged = \
+                            qb_data[i*nr_sweep_pts:i*nr_sweep_pts+nr_sweep_pts]
+
+                        corr_data = a_tools.normalize_data_v3(
+                            qb_data_rearranged,
+                            self.cal_points[0],
+                            self.cal_points[1])[0:self.cal_points[0][0]]
+
+                        data_temp[i] = np.mean(corr_data)
+
+                    if idx == len(self.data[2::])-1:
+                        data['data']['corr'] = deepcopy(data_temp)
+                    else:
+                        data['data'][self.qb_names[idx]] = deepcopy(data_temp)
+
+            else:
+                nr_seeds = self.sweep_points.size
+                data['nr_seeds'] = nr_seeds
+
+                qb0_raw = self.measured_values[0]
+                qb1_raw = self.measured_values[1]
+                corr_raw = self.measured_values[2]
+
+                qb0 = np.zeros(n_cl.size)
+                qb1 = np.zeros(n_cl.size)
+                corr = np.zeros(n_cl.size)
+                for i in range(n_cl.size):
+                    qb0[i] = np.mean([qb0_raw[j][i] for j in range(nr_seeds)])
+                    qb1[i] = np.mean([qb1_raw[j][i] for j in range(nr_seeds)])
+                    corr[i] = np.mean([corr_raw[j][i] for j in range(nr_seeds)])
+
+                data['data'][self.qb_names[0]] = 2*(1 - qb0) - 1
+                data['data'][self.qb_names[1]] = 2*(1 - qb1) - 1
+                data['data']['corr'] = 2*corr - 1
 
             return data
         else:
             msmt_name = kw.pop('msmt_name', None)
+            # use_qb5_correction = kw.pop('use_qb5_correction', False)
+
             if msmt_name is None:
                 raise ValueError('extract_data needs msmt_name when '
                                  'nr_qubits>2.')
@@ -1093,28 +1214,184 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
 
             measurement_data = deepcopy(self.data[2::])
             # rescale data to be between [-1, 1]
-            for dim in range(len(self.qb_names)):
-                measurement_data[dim] = -2*measurement_data[dim] + 1
+            # for dim in range(len(self.qb_names)):
+            #     measurement_data[dim] = -2*measurement_data[dim] + 1
 
             raw_correl_data = deepcopy(measurement_data[0])
-            for i in np.arange(1, len(self.qb_names)):
-                raw_correl_data = \
-                    np.multiply(raw_correl_data,
-                                measurement_data[i])
+
+            # for i in np.arange(1, len(self.qb_names)):
+                # raw_correl_data = \
+                #     np.multiply(raw_correl_data,
+                #                 measurement_data[i])
+            #     raw_correl_data = np.bitwise_not(np.bitwise_xor(
+            #         raw_correl_data.astype(int),
+            #         measurement_data[i].astype(int)))
+            # if np.any(raw_correl_data == -2):
+            #     raw_correl_data += 2
+
+            for col in range(measurement_data.shape[1]):
+                raw_correl_data[col] = 1 - np.count_nonzero(
+                    measurement_data[:, col]) % 2
+
             mean_data_array[-1] = np.mean(raw_correl_data)
 
             # get averaged results for each qubit measurement
             for i in np.arange(len(self.qb_names)):
-                mean_data_array[i] = np.mean(measurement_data[i])
+                mean_data_array[i] = 1 - np.mean(measurement_data[i])
 
             for var_name, data_point in zip(self.qb_names+['corr'],
                                             mean_data_array):
+                # if use_qb5_correction:
+                #     if var_name is 'qb5':
+                #         pe_g = 0.0243
+                #         pg_e = 0.1036
+                #         prob_matrix = np.array([[1-pg_e, pg_e], [pe_g, 1-pe_g]])
+                #         d = np.asarray(([1-data_point, data_point]))
+                #         data_point = np.dot(prob_matrix, d.transpose())[1]
 
-                self.data_dict[msmt_name]['data'][var_name] = np.append(
-                    self.data_dict[msmt_name]['data'][var_name], data_point)
+                self.data_dict_raw[msmt_name]['data'][var_name] = np.append(
+                    self.data_dict_raw[msmt_name]['data'][var_name],
+                    2*data_point-1)
                     # 0.5*data_point+0.5) #put data between [0.5, 1]
-
             return
+
+    def fit_data(self, data, numCliff,
+                 print_fit_results=False,
+                 show_guess=False,
+                 plot_results=False, **kw):
+
+        d = kw.pop('d', 2)
+        print('d in fit_data ', d)
+        RBModel = lmfit.Model(fit_mods.RandomizedBenchmarkingDecay)
+        RBModel.set_param_hint('Amplitude', value=0)
+        RBModel.set_param_hint('p', value=.99)
+        RBModel.set_param_hint('offset', value=.5)
+        # From Magesan et al., Scalable and Robust Randomized Benchmarking
+        # of Quantum Processes
+        RBModel.set_param_hint('fidelity_per_Clifford',  # vary=False,
+                               expr='1-(({}-1)*(1-p)/{})'.format(d, d))
+        RBModel.set_param_hint('error_per_Clifford',  # vary=False,
+                               expr='1-fidelity_per_Clifford')
+        if self.gate_decomp == 'XY':
+            RBModel.set_param_hint('fidelity_per_gate',  # vary=False,
+                                   expr='fidelity_per_Clifford**(1./1.875)')
+        elif self.gate_decomp == 'HZ':
+            RBModel.set_param_hint('fidelity_per_gate',  # vary=False,
+                                   expr='fidelity_per_Clifford**(1./1.125)')
+        else:
+            raise ValueError('Gate decomposition not recognized.')
+        RBModel.set_param_hint('error_per_gate',  # vary=False,
+                               expr='1-fidelity_per_gate')
+
+        params = RBModel.make_params()
+
+        # Run once to get an estimate for the error per Clifford
+        fit_res = RBModel.fit(data, numCliff=numCliff, params=params)
+
+        # Use the found error per Clifford to standard errors for the data
+        # points fro Helsen et al. (2017)
+        self.conf_level = kw.pop('conf_level', 0.68)
+        epsilon_guess = kw.pop('epsilon_guess', 0.01)
+        epsilon = calculate_confidence_intervals(
+            nr_seeds=self.nr_seeds,
+            nr_cliffords=self.n_cl,
+            depolariz_param=fit_res.best_values['p'],
+            conf_level=self.conf_level,
+            epsilon_guess=epsilon_guess, d=d)
+
+        self.epsilon = epsilon
+        # Run fit again with scale_covar=False, and weights = 1/epsilon
+
+        # if an entry in epsilon_sqrd is 0, replace it with half the minimum
+        # value in the epsilon_sqrd array
+        idxs = np.where(epsilon==0)[0]
+        epsilon[idxs] = min([eps for eps in epsilon if eps!=0])/2
+
+        fit_res = RBModel.fit(data, numCliff=numCliff, params=params,
+                              scale_covar=False, weights=1/epsilon)
+
+        return fit_res
+
+    def find_multi_qubit_error(self, fit_results_dict=None, **kw):
+        print('in multi qubit error')
+        if fit_results_dict is None:
+            fit_results_dict = self.fit_res_dict['CxC']
+
+        n = kw.pop('n', None)
+        assume_uncorrelated = kw.pop('assume_uncorrelated', False)
+        if n is None:
+            n = len(self.qb_names)
+
+        # dimension of full n qubit Hilbert space
+        d = 2**n
+
+        self.total_error = {}
+
+        if assume_uncorrelated:
+            total_depolariz_param = get_total_uncorr_depolariz_param(
+                qb_names=self.qb_names, fit_results_dict=fit_results_dict)
+        else:
+            if n == 2:
+                total_depolariz_param = get_total_corr_depolariz_param(
+                    qb_names=self.qb_names, fit_results_dict=fit_results_dict)
+            else:
+                correl_data_dict = {}
+                # find depolarization params from all possible combinations of
+                # qubit pairs/triplets from the single shots
+                for folder in self.folders_dict['CxC']:
+                    self.load_hdf5data(folder=folder, **kw)
+                    self.get_naming_and_values_2D()
+                    measurement_data = deepcopy(self.data[2::])
+                    for qb_combs in np.arange(2, n):
+                        # get list of tuples representing all combinations of
+                        # qb idxs
+                        idxs_list = list(itertools.combinations(range(n),
+                                                                qb_combs))
+                        raw_correl_data = np.zeros(len(measurement_data[0]))
+
+                        for idxs_combs in idxs_list:
+                            subspace_data = measurement_data[
+                                            np.asarray(idxs_combs), :]
+                            key = ''.join([str(i) for i in idxs_combs])
+                            if key not in correl_data_dict:
+                                correl_data_dict[key] = np.array([])
+
+                            for col in range(subspace_data.shape[1]):
+                                raw_correl_data[col] = 1 - np.count_nonzero(
+                                    subspace_data[:, col]) % 2
+
+                            #get <sigma_z>
+                            mean_correl_data = 2*np.mean(raw_correl_data) - 1
+                            correl_data_dict[key] = np.append(
+                                correl_data_dict[key],
+                                deepcopy(mean_correl_data))
+
+                # fit each data set and get depolarization params
+                depolariz_params_dict = {}
+                for key, dset in correl_data_dict.items():
+                    d_subspace = 2**(len(key))
+                    depolariz_params_dict[key] = {}
+                    fit_res = self.fit_data(dset,
+                                            self.data_dict['CxC']['n_cl'],
+                                            d=d_subspace)
+                    depolariz_params_dict[key]['val'] = \
+                        fit_res.best_values['p']
+                    depolariz_params_dict[key]['stderr'] = \
+                        fit_res.params['p'].stderr
+
+                # calculate total depolarization param
+                from pprint import pprint
+                pprint(depolariz_params_dict)
+                total_depolariz_param = get_total_corr_depolariz_param(
+                    qb_names=self.qb_names, fit_results_dict=fit_results_dict,
+                    subspace_depolariz_params_dict=depolariz_params_dict, **kw)
+
+        print('d in multi-qubit error ', d)
+        self.total_error['val'] = (d-1) * \
+                                  (1-total_depolariz_param['val'])/d
+        self.total_error['stderr'] = np.abs((1-d) * \
+                                            total_depolariz_param[
+                                                'stderr']/d)
 
     def plot_SRB(self, save_fig=True, **kw):
 
@@ -1197,11 +1474,11 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                         horizontal_alignment=horizontal_alignment, **kw)
 
                 ax.set_title(subplot_title)
-                if len(self.qb_names) == 2:
-                    ax.set_ylim(
-                        [0.3,
-                         max(max(self.data_dict[msmt_name]['data'][
-                                     var_name])+.1, 1.1)])
+                # if len(self.qb_names) == 2:
+                #     ax.set_ylim(
+                #         [0.3,
+                #          max(max(self.data_dict[msmt_name]['data'][
+                #                      var_name])+.1, 1.1)])
 
                 # fig.subplots_adjust(hspace=0.2)
                 # set fig title
@@ -1409,39 +1686,36 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
 
         # make legend labels
         legend_labels = []
-        if n == 2:
-            for qb_name in self.qb_names:
-                legend_labels.extend(
-                    [r'C$\otimes$C f($\langle \sigma_{{z,{qb}}} \rangle$)'.format(
-                        qb=qb_name)])
+        # if n == 2:
+        #     for qb_name in self.qb_names:
+        #         legend_labels.extend(
+        #             [r'C$\otimes$C f($\langle \sigma_{{z,{qb}}} \rangle$)'.format(
+        #                 qb=qb_name)])
+        #     legend_labels.extend(
+        #         [r'C$\otimes$C f($\langle \sigma_z \sigma_z \rangle$)',
+        #          r'f($\langle \sigma_z \rangle \langle \sigma_z \rangle$)'])
+        # else:
+        for qb_name in self.qb_names:
             legend_labels.extend(
-                [r'C$\otimes$C f($\langle \sigma_z \sigma_z \rangle$)',
-                 r'f($\langle \sigma_z \rangle \langle \sigma_z \rangle$)'])
-        else:
-            for qb_name in self.qb_names:
-                legend_labels.extend(
-                    [r'$\langle \sigma_{{z,{qb}}} \rangle$'.format(
-                qb=qb_name)])
-            legend_labels.extend(
-                [r'$\langle '
-                 r'\sigma_z^{{\otimes {{{n}}} }} \rangle$'.format(n=n),
-                 r'$\langle \sigma_z '
-                 r'\rangle ^{{\otimes {{{n}}} }}$'.format(n=n)])
+                [r'$\langle \sigma_{{z,{qb}}} \rangle$'.format(
+            qb=qb_name)])
+        legend_labels.extend(
+            [r'$\langle '
+             r'\sigma_z^{{\otimes {{{n}}} }} \rangle$'.format(n=n),
+             r'$\langle \sigma_z '
+             r'\rangle ^{{\otimes {{{n}}} }}$'.format(n=n)])
 
         msmt_name = [msmt_name for msmt_name in
                      self.folders_dict if msmt_name not in
                      self.clifford_qbs][0]
 
-        default_color_cycle = plt.rcParams['axes.prop_cycle'].by_key()['color']
-        line_colors = [i for i in default_color_cycle if ('#2ca02c' not in i)
-                       and ('#d62728' not in i)]
         for var_idx, var_name in enumerate(self.data_dict[msmt_name]['data']):
 
             if var_name=='corr':
                 #set color of the corr line to a darker green
                 line_color = 'g'
             else:
-                line_color = line_colors[var_idx]
+                line_color = self.line_colors[self.RO_channels[var_name]]
 
             line = plotting_function(x=self.data_dict[msmt_name]['n_cl'],
                                      y=self.data_dict[msmt_name]['data'][
@@ -1508,8 +1782,7 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                        labelright='off')
 
         if add_textbox_cross_talk:
-            self.add_textbox_cross_talk(
-                fit_res_dict_CxC=self.fit_res_dict[msmt_name], ax=ax, **kw)
+            self.add_textbox_cross_talk(msmt_name=msmt_name, ax=ax, **kw)
 
         # show figure
         if show_SRB_cross_talk:
@@ -1538,49 +1811,50 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
         if n is None:
             n = len(self.qb_names)
 
-        if n == 2:
-            self.alpha_product = \
-                1 + 2*self.data_dict[msmt_name]['data'][self.qb_names[0]] * \
-                    self.data_dict[msmt_name]['data'][self.qb_names[1]] - \
-                self.data_dict[msmt_name]['data'][self.qb_names[0]] - \
-                self.data_dict[msmt_name]['data'][self.qb_names[1]]
-        else:
-            self.alpha_product = 1
-            for qb_name in self.qb_names:
-                self.alpha_product *= self.data_dict[msmt_name]['data'][qb_name]
+        # if n == 2:
+        #     self.alpha_product = \
+        #         1 + 2*self.data_dict[msmt_name]['data'][self.qb_names[0]] * \
+        #             self.data_dict[msmt_name]['data'][self.qb_names[1]] - \
+        #         self.data_dict[msmt_name]['data'][self.qb_names[0]] - \
+        #         self.data_dict[msmt_name]['data'][self.qb_names[1]]
+        # else:
+        self.alpha_product = np.ones(len(self.data_dict[
+                                             msmt_name]['data'][
+                                             self.qb_names[0]]))
+        for qb_name in self.qb_names:
+            self.alpha_product *= self.data_dict[msmt_name]['data'][qb_name]
 
-        alpha_fit_res = self.fit_data(self.alpha_product,
-                                      self.data_dict[msmt_name]['n_cl'])
+        self.alpha_fit_res = self.fit_data(self.alpha_product,
+                                      self.data_dict[msmt_name]['n_cl'],
+                                      d=2**n)
         x_fine = np.linspace(self.data_dict[msmt_name]['n_cl'][0],
                              self.data_dict[msmt_name]['n_cl'][-1], 100)
         alpha_data_fine = fit_mods.RandomizedBenchmarkingDecay(
-            x_fine, **alpha_fit_res.best_values)
+            x_fine, **self.alpha_fit_res.best_values)
         ax.plot(x_fine, alpha_data_fine, 'm--',
                 label=legend_labels[-1], linewidth=line_width+2, dashes=(2, 2))
         ax.plot(self.data_dict[msmt_name]['n_cl'], self.alpha_product, 'mo')
 
-    def add_textbox_cross_talk(self, fit_res_dict_CxC, ax, **kw):
+    def add_textbox_cross_talk(self, msmt_name, ax, **kw):
         # pring infidelities
         textstr = ''
         for qb_name in self.qb_names:
             textstr += ('$r_{{{qb}}}$'.format(qb=qb_name) +
                             ' = {:.3g} $\pm$ ({:.3g})%'.format(
-                        (1-fit_res_dict_CxC[qb_name].params[
-                            'fidelity_per_Clifford'].value)*100,
-                        fit_res_dict_CxC[qb_name].params[
-                            'fidelity_per_Clifford'].stderr*100) + '\n')
+                        self.infidelities[msmt_name][qb_name]['val']*100,
+                        self.infidelities[msmt_name][qb_name]['stderr']*100)
+                        + '\n')
 
         textstr += ('$r_{corr}$' + ' = {:.3g} $\pm$ ({:.3g})%'.format(
-                (1-fit_res_dict_CxC['corr'].params[
-                    'fidelity_per_Clifford'].value)*100,
-                fit_res_dict_CxC['corr'].params[
-                    'fidelity_per_Clifford'].stderr*100))
+                self.infidelities[msmt_name]['corr']['val']*100,
+                self.infidelities[msmt_name]['corr']['stderr']*100))
 
         ax.text(0.27, 0.975, textstr, transform=ax.transAxes,
                 verticalalignment='top', horizontalalignment='left',
                 fontsize=font_size)
 
         # Print alphas
+        fit_res_dict_CxC = self.fit_res_dict[msmt_name]
         textstr = ''
         for qb_name in self.qb_names:
             textstr += (r'$\alpha_{{{qb}}}$'.format(qb=qb_name) +
@@ -1836,10 +2110,8 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
         textstr = \
             ('$r_{perCl,' + var_name + '}$'+' = '
                     '{:.6g} $\pm$ ({:.4g})% \n'.format(
-                (1-fit_res.params[
-                    'fidelity_per_Clifford'].value)*100,
-                (1-fit_res.params[
-                    'fidelity_per_Clifford'].stderr)*100))
+                self.infidelities[msmt_name][var_name]['val']*100,
+                self.infidelities[msmt_name][var_name]['stderr']*100))
 
         # Here we add the line corresponding to T1 limited fidelity
         F_T1 = None
@@ -2161,8 +2433,8 @@ def calc_T1_limited_fidelity(T1, T2, pulse_length, gate_decomp='HZ'):
         return F_cl, p
 
 def calculate_confidence_intervals(nr_seeds, nr_cliffords,
-                                   conf_level=0.68, infidelity=0,
-                                   epsilon_guess=0.1, eta=0):
+                                   conf_level=0.68, depolariz_param=1,
+                                   epsilon_guess=0.01, d=2):
 
     # From Helsen et al. (2017)
     # For each number of cliffords in nr_cliffords (array), finds epsilon
@@ -2175,11 +2447,35 @@ def calculate_confidence_intervals(nr_seeds, nr_cliffords,
     # eta is the SPAM-dependent prefactor defined in Helsen et al. (2017)
     epsilon = []
     delta = 1-conf_level
+    infidelity = (d-1)*(1-depolariz_param)/d
+
     for n_cl in nr_cliffords:
         if n_cl == 0:
             epsilon.append(0)
         else:
-            V = min((13*n_cl*infidelity**2)/2, 7*infidelity/2)
+            if np.abs(n_cl*infidelity - 1) < 1:
+                epsilon_guess = 0.01
+            else:
+                epsilon_guess = 0.1
+
+            if d==2:
+                # print('1 qubit')
+                # print('n_cl ', n_cl)
+                # V_long_n_cl = 7*infidelity/2
+                # V_short_n_cl = (13*n_cl*infidelity**2)/2
+
+                V = (6 + 0.25*
+                     ((1-depolariz_param**(2*n_cl))/
+                      (1-depolariz_param**2)))*infidelity**2
+            else:
+                # print('n qubits')
+                # print('n_cl ', n_cl)
+                # V_short_n_cl = (2*(d+1)/(d-1) + 0.25*(-2+d**2)/((d-1)**2))\
+                #                *n_cl*(infidelity**2)
+                V = 2*((d+1)/(d-1))*(infidelity**2) + \
+                    0.25*((1-depolariz_param**(2*n_cl))/
+                          (1-depolariz_param**2))*((-2+d**2)/((d-1)**2))*\
+                    infidelity**2
 
             H = lambda eps: (1/(1-eps))**((1-eps)/(V+1)) * \
                             (V/(V+eps))**((V+eps)/(V+1)) - \
@@ -2302,3 +2598,248 @@ def plotting_function(x, y, fig, ax, marker='-o',
     else:
         return
 
+def get_total_uncorr_depolariz_param(qb_names, fit_results_dict,
+                                     total_uncorr_depolariz_param=None):
+
+    if total_uncorr_depolariz_param is None:
+        total_uncorr_depolariz_param = {}
+        total_uncorr_depolariz_param['val'] = 0
+        total_uncorr_depolariz_param['stderr'] = 0
+
+    n = len(qb_names)
+
+    prefactors = []
+    for i in range(n+1)[1::]:
+        k = len(list(itertools.combinations(n*[''], i)))
+        prefactors += k*[3**i]
+
+    if n == 2:
+        for idx, var_name in enumerate((qb_names+['corr'])):
+            # print(var_name)
+            if var_name == 'corr':
+                val = 1
+                stderr = 0
+                for qb_name in qb_names:
+                    val *= fit_results_dict[qb_name].best_values['p']
+                    # calculate stderr using propagation of errors
+                    std_err_product_squared = 1
+                    std_err_product_squared *= \
+                        (fit_results_dict[qb_name].params[
+                             'p'].stderr)**2
+                    for other_qb_names in qb_names:
+                        if other_qb_names != qb_name:
+                            std_err_product_squared *= \
+                                (fit_results_dict[
+                                     other_qb_names].best_values[
+                                     'p'])**2
+                    stderr += std_err_product_squared
+                stderr = np.sqrt(stderr)
+            else:
+                val = fit_results_dict[var_name].best_values['p']
+                stderr = fit_results_dict[var_name].params['p'].stderr
+
+            total_uncorr_depolariz_param['val'] += prefactors[idx] * val
+            total_uncorr_depolariz_param['stderr'] += prefactors[idx] * stderr
+
+        total_uncorr_depolariz_param['val'] /= np.sum(prefactors)
+        total_uncorr_depolariz_param['stderr'] /= np.sum(prefactors)
+
+    else:
+        idxs_list = list(range(n))
+        for qb_combs in np.arange(2, n+1):
+            # get list of tuples representing all combinations of qb idxs
+            idxs_list += list(itertools.combinations(range(n),
+                                                     qb_combs))
+
+        for idx, qb_idxs in enumerate(idxs_list):
+            if not isinstance(qb_idxs, tuple):
+                # single qb RB fits
+                qb_name = qb_names[qb_idxs]
+                total_uncorr_depolariz_param['val'] += \
+                    prefactors[idx] * fit_results_dict[
+                        qb_name].best_values['p']
+                total_uncorr_depolariz_param['stderr'] += \
+                    prefactors[idx] * fit_results_dict[
+                        qb_name].params['p'].stderr
+            else:
+                # multi qb RB fits
+                val = 1
+                stderr = 0
+                for qb_idx in qb_idxs:
+                    qb_name = qb_names[qb_idx]
+                    val *= fit_results_dict[qb_name].best_values['p']
+                    # calculate stderr using propagation of errors
+                    std_err_product_squared = 1
+                    std_err_product_squared *= \
+                        (fit_results_dict[qb_name].params[
+                             'p'].stderr)**2
+                    for other_qb_names in [qb_names[g] for
+                                           g in qb_idxs]:
+                        if other_qb_names != qb_name:
+                            std_err_product_squared *= \
+                                (fit_results_dict[
+                                     other_qb_names].best_values[
+                                     'p'])**2
+
+                    stderr += std_err_product_squared
+
+                total_uncorr_depolariz_param['val'] += prefactors[idx] * val
+                total_uncorr_depolariz_param['stderr'] += \
+                    prefactors[idx] * np.sqrt(stderr)
+
+        total_uncorr_depolariz_param['val'] /= np.sum(prefactors)
+        total_uncorr_depolariz_param['stderr'] /= np.sum(prefactors)
+
+    return total_uncorr_depolariz_param
+
+def get_multi_qb_error_from_single_qb_RB(qb_names, d,
+                                         single_qb_RB_fit_results_dict):
+
+    total_error = {}
+    total_depolariz_param = get_total_uncorr_depolariz_param(
+        qb_names=qb_names, fit_results_dict=single_qb_RB_fit_results_dict)
+
+    total_error['val'] = (d-1) * (1-total_depolariz_param['val'])/d
+    total_error['stderr'] = np.abs((1-d) * total_depolariz_param['stderr']/d)
+
+    return total_error
+
+def get_total_corr_depolariz_param(qb_names, fit_results_dict,
+                                   total_corr_depolariz_param=None,
+                                   # correl_subspace_keys=None,
+                                   subspace_depolariz_params_dict=None, **kw):
+
+    if total_corr_depolariz_param is None:
+        total_corr_depolariz_param  = {}
+        total_corr_depolariz_param ['val'] = 0
+        total_corr_depolariz_param ['stderr'] = 0
+
+    n = len(qb_names)
+
+    prefactors = []
+    for i in range(n+1)[1::]:
+        k = len(list(itertools.combinations(n*[''], i)))
+        prefactors += k*[3**i]
+
+    if n == 2:
+        for idx, var_name in enumerate((qb_names+['corr'])):
+            total_corr_depolariz_param ['val'] += \
+                prefactors[idx] * fit_results_dict[
+                    var_name].best_values['p']
+            total_corr_depolariz_param ['stderr'] += \
+                prefactors[idx] * fit_results_dict[
+                    var_name].params['p'].stderr
+        total_corr_depolariz_param ['val'] /= np.sum(prefactors)
+        total_corr_depolariz_param ['stderr'] /= np.sum(prefactors)
+
+    else:
+        if subspace_depolariz_params_dict is None:
+            correl_subspace_keys = []
+        else:
+            correl_subspace_keys = list(subspace_depolariz_params_dict)
+
+        correlated_subspace = kw.pop('correlated_subspace', 1)
+        print('correlated_subspace ', correlated_subspace)
+        single_qb_idxs = [str(i) for i in range(n)]
+        for idx, var_name in enumerate((
+                        single_qb_idxs + correl_subspace_keys + ['corr'])):
+            if correlated_subspace == 1 or len(var_name) <= correlated_subspace:
+
+                # if correlated_subspace == 1, do not decompose anything -> look
+                # at all correlators
+                try:
+                    if len(var_name) == 1:
+                        var_name = qb_names[int(var_name)]
+                    print('if try: ', var_name)
+                    # take the depolarization params from the single qb RB
+                    print(fit_results_dict[var_name].best_values['p'])
+                    total_corr_depolariz_param['val'] += prefactors[idx] * \
+                                                    fit_results_dict[
+                                                        var_name]. \
+                                                        best_values['p']
+                    total_corr_depolariz_param['stderr'] += \
+                        prefactors[idx] * fit_results_dict[
+                            var_name].params['p'].stderr
+                except KeyError:
+                    # additionally:
+                    # if correlated_subspace == 2, do not decompose the
+                    # depolarization params of the 2 qb subspace;
+                    # if correlated_subspace == 3, do not decompose the
+                    # depolarization params of the 3 qb subspace; etc.
+                    print('if except: ', var_name)
+                    print(subspace_depolariz_params_dict[var_name]['val'])
+                    total_corr_depolariz_param['val'] += \
+                        prefactors[idx] * subspace_depolariz_params_dict[
+                            var_name]['val']
+                    total_corr_depolariz_param['stderr'] += \
+                        prefactors[idx] * subspace_depolariz_params_dict[
+                            var_name]['stderr']
+            else:
+                if var_name == 'corr':
+                    var_name = ''.join([str(i) for i in range(n)])
+
+                print('else: ', var_name)
+
+                corr_qbs_idxs = \
+                    list(itertools.combinations(var_name, correlated_subspace))
+                print('corr_qbs_idxs ', corr_qbs_idxs)
+
+                # get indices of results that must be summed to get one term
+                # in the total_corr_depolariz_param dict
+                keys = []
+                corr_keys = []
+                for idx_tuple in corr_qbs_idxs:
+                    corr_key = ''.join(idx_tuple)
+                    corr_keys += [corr_key]
+                    other_qb_keys = \
+                        ''.join([c for c in var_name if c not in corr_key])
+                    if other_qb_keys in corr_keys:
+                        pass
+                    else:
+                        keys += [(corr_key, other_qb_keys)]
+                print('keys ', keys)
+
+                depolariz_param_term = 0
+                depolariz_param_term_stderr = 0
+                for keys_tuple in keys:
+                    alpha_temp = []
+                    alpha_temp_stderr = []
+                    for k in keys_tuple:
+                        if len(k) == 1:
+                            alpha_temp += [fit_results_dict[
+                                qb_names[int(k)]].best_values['p']]
+                            alpha_temp_stderr += [fit_results_dict[
+                                       qb_names[int(k)]].params['p'].stderr]
+                        else:
+                            alpha_temp += \
+                                [subspace_depolariz_params_dict[k]['val']]
+                            alpha_temp_stderr += \
+                                [subspace_depolariz_params_dict[k]['stderr']]
+                    # print(alpha_temp)
+                    # print(alpha_temp_stderr)
+                    depolariz_param_term += np.product(np.asarray(alpha_temp))
+                    # FIXME: make the calculation of stderr general
+                    depolariz_param_term_stderr += \
+                        np.sqrt((alpha_temp[0]*alpha_temp_stderr[1])**2 +
+                                (alpha_temp[1]*alpha_temp_stderr[0])**2)
+
+                depolariz_param_term /= len(keys)
+                depolariz_param_term_stderr /= len(keys)
+
+                # print(depolariz_param_term)
+                # print(depolariz_param_term_stderr)
+
+                total_corr_depolariz_param['val'] += \
+                    prefactors[idx] * depolariz_param_term
+                total_corr_depolariz_param['stderr'] += \
+                    prefactors[idx] * depolariz_param_term_stderr
+
+                # from pprint import pprint
+                # pprint(total_corr_depolariz_param)
+
+        total_corr_depolariz_param['val'] /= np.sum(prefactors)
+        total_corr_depolariz_param['stderr'] /= np.sum(prefactors)
+
+        # pprint(total_corr_depolariz_param)
+
+    return total_corr_depolariz_param

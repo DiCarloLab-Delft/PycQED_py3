@@ -7,6 +7,8 @@ This includes
 """
 
 import lmfit
+import logging
+import itertools
 from collections import OrderedDict
 import numpy as np
 import pycqed.analysis.fitting_models as fit_mods
@@ -15,6 +17,8 @@ import pycqed.analysis_v2.base_analysis as ba
 from scipy.optimize import minimize
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str
 import pycqed.analysis.tools.data_manipulation as dm_tools
+
+from matplotlib.colors import LinearSegmentedColormap as lscmap
 
 
 class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
@@ -457,9 +461,160 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                     'do_legend': True}
 
 
-class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
-    pass
+class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
+    """
+    Extracts table of counts from multiplexed single shot readout experiment.
+    Intended to be the bases class for more complex multi qubit experiment analysis.
 
+
+    Required options in the options_dict:
+        n_segments: Assumed to be the period in the list of shots between experiments
+            with the same prepared state. If shots_of_qubits includes preselection readout results
+            or if there was several readouts for a single segment then n_segments has to include them.
+        channel_map: dictionary with qubit names as keys and channel channel names as values.
+        thresholds: dictionary with qubit names as keys and threshold values as values.
+    Optional options in the options_dict:
+        observables: Dictionary with observable names as a key and observable as a value. Observable is a
+            dictionary with name of the qubit as key and boolean value indicating if it is selecting
+            exited states. If the qubit is missing from the list of states it is averaged out.
+        segment_names: used as y-axis labels for the default figure
+    """
+
+    def __init__(self, t_start: str=None, t_stop: str=None,
+                 label: str='', data_file_path: str=None,
+                 options_dict: dict=None, extract_only: bool=False,
+                 do_fitting: bool=True, auto=True):
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         extract_only=extract_only, do_fitting=do_fitting)
+
+        self.n_segments = options_dict['n_segments']
+        self.thresholds = options_dict['thresholds']
+        self.channel_map = options_dict['channel_map']
+        qubits = list(self.channel_map.keys())
+
+        self.segment_names = options_dict.get('segment_names', None)
+        if self.segment_names is None:
+            # TODO Default values should come from the MC parameters
+            None
+
+        self.observables = options_dict.get('observables', None)
+        if self.observables is None:
+            combination_list = list(itertools.product([False, True], repeat=len(qubits)))
+            self.observables = {}
+            for i, states in enumerate(combination_list):
+                obs_name = '$\| ' + ''.join(['e' if s else 'g' for s in states]) + '\\rangle$'
+                self.observables[obs_name] = dict(zip(qubits, states))
+        self.single_timestamp = False
+
+        self.params_dict = {
+            'measurementstring': 'measurementstring',
+            'measured_values': 'measured_values',
+            'value_names': 'value_names',
+            'value_units': 'value_units'}
+
+        self.numeric_params = []
+        if auto:
+            self.run_analysis()
+
+    def process_data(self):
+        shots_thresh = {}
+        logging.info("Loading from file")
+
+        for qubit, channel in self.channel_map.items():
+            shots_cont = np.array(self.raw_data_dict['measured_values_ord_dict'][channel])
+            shots_thresh[qubit] = shots_cont > self.thresholds[qubit]
+
+        logging.info("Calculating observables")
+        self.proc_data_dict['probability_table'] = \
+            self.probability_table(shots_thresh, list(self.observables.values()), self.n_segments)
+
+    @staticmethod
+    def probability_table(shots_of_qubits, observables, n_segments):
+        """
+        Creates a general table of counts averaging out all but specified set of correlations.
+
+        Args:
+            shots_of_qubits: Dictionary of np.arrays of thresholded shots for each qubit.
+            observables: List of observables. Observable is a dictionary with name of the qubit as key and boolean
+                value indicating if it is selecting exited states. If the qubit is missing from the list of states
+                it is averaged out.
+            n_segments: Assumed to be the period in the list of shots between experiments
+                with the same prepared state. If shots_of_qubits includes preselection readout results
+                or if there was several readouts for a single segment then n_segments has to include them.
+        Returns:
+            np.array: counts with dimensions (n_segments, len(states_to_be_counted))
+        """
+
+        res_e = {}
+        res_g = {}
+
+        n_shots = next(iter(shots_of_qubits.values())).shape[1]
+
+        table = np.zeros((n_segments, len(observables)))
+
+        for segment_n in range(n_segments):
+
+            for qubit, results in shots_of_qubits.items():
+                res_e[qubit] = np.array(results[0, segment_n::n_segments])
+                # This makes copy, but allows faster AND later
+                res_g[qubit] = np.logical_not(np.array(results[0, segment_n::n_segments]))
+
+            for state_n, states_of_qubits in enumerate(observables): # first result all ground
+                mask = np.ones((int(n_shots/n_segments)), dtype=bool)
+                for qubit, state in states_of_qubits.items(): # slow qubit is the first in channel_map list
+                    # mask all with qubit k in state r
+                    if state:
+                        mask = np.logical_and(mask, res_e[qubit])
+                    else:
+                        mask = np.logical_and(mask, res_g[qubit])
+                table[segment_n, state_n] = np.count_nonzero(mask)
+
+        return table
+
+    def prepare_plots(self):
+
+        # colormap which has a lot of contrast for small and large values
+        values = [0, 0.1, 0.2, 0.8, 1]
+        colors = [(1, 1, 1),
+              (191/255, 38/255, 11/255),
+              (155/255, 10/255, 106/255),
+              (55/255, 129/255, 214/255),
+              (0, 0, 0)]
+        cdict = {'red':   [(values[i], colors[i][0], colors[i][0]) for i in range(len(values))],
+                 'green': [(values[i], colors[i][1], colors[i][1]) for i in range(len(values))],
+                 'blue':  [(values[i], colors[i][2], colors[i][2]) for i in range(len(values))]}
+        cm = lscmap('customcmap', cdict)
+
+        ylist = list(range(self.n_segments))
+        plot_dict = {
+            'axid': "ptable",
+            'plotfn': self.plot_colorx,
+            'xvals': np.arange(len(self.observables)),
+            'yvals': np.array(len(self.observables)*[ylist]),
+            'zvals': self.proc_data_dict['probability_table'].T,
+            'xlabel': "Channels",
+            'ylabel': "Segments",
+            'zlabel': "Counts",
+            'title': (self.timestamps[0] + ' \n' +
+                      self.raw_data_dict['measurementstring'][0]),
+            'xunit': None,
+            'yunit': None,
+            'xtick_loc': np.arange(len(self.observables)),
+            'xtick_labels': list(self.observables.keys()),
+            'origin': 'upper',
+            'cmap': cm,
+            'aspect': 'equal',
+            'plotsize': (8, 8)
+        }
+
+        if self.segment_names is not None:
+            plot_dict['ytick_loc'] = np.arange(len(self.segment_names))
+            plot_dict['ytick_labels'] = self.segment_names
+
+        self.plot_dicts['counts_table'] = plot_dict
 
 def get_shots_zero_one(data, post_select: bool=False,
                        nr_samples: int=2, sample_0: int=0, sample_1: int=1,
@@ -498,3 +653,36 @@ def get_shots_zero_one(data, post_select: bool=False,
         shots_1 = shots_1[~np.isnan(shots_1)]
 
     return shots_0, shots_1
+
+
+class Multiplexed_Readout_Analysis(MultiQubit_SingleShot_Analysis):
+    """
+    Analysis results of an experiment meant for characterization of multiplexed readout.
+    """
+    def __init__(self, t_start: str=None, t_stop: str=None,
+                 label: str='', data_file_path: str=None,
+                 options_dict: dict=None, extract_only: bool=False,
+                 do_fitting: bool=True, auto=True):
+
+        self.n_segments = options_dict['n_segments']
+        self.channel_map = options_dict['channel_map']
+
+        def_seg_names_prep = ["".join(l) for l in list(itertools.product(["$0$", "$\pi$"],
+                                                                         repeat=len(self.channel_map)))]
+        if self.n_segments == len(def_seg_names_prep):
+            def_seg_names = def_seg_names_prep
+        elif self.n_segments == 2*len(def_seg_names_prep):
+            def_seg_names = [x for t in zip(*[["sel"]*len(def_seg_names_prep), def_seg_names_prep]) for x in t]
+
+        options_dict['segment_names'] = options_dict.get('segment_names', def_seg_names)
+
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         extract_only=extract_only, do_fitting=do_fitting, auto=False)
+
+        # here we can do more stuff before analysis runs
+
+        if auto:
+            self.run_analysis()

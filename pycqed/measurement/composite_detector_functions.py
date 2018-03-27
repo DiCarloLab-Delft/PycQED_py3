@@ -1653,7 +1653,6 @@ class CPhase_optimization(det.Soft_Detector):
                     phases=self.ramsey_phases,
                     return_population_loss=True,
                     upload_channels=[self.qb_control.flux_pulse_channel()],
-                    auto=False,
                     prepare_for_timedomain=False,
                     spacing=self.spacing
                     )

@@ -660,7 +660,7 @@ class BaseDataAnalysis(object):
                                    **plot_barkws))
 
         else:
-            p_out = pfunc(plot_centers, plot_yvals, width=plot_xwidth,
+            p_out = pfunc(plot_centers, plot_yvals, #width=plot_xwidth,
                           label='%s%s' % (dataset_desc, dataset_label),
                           **plot_barkws)
 
@@ -1019,14 +1019,21 @@ class BaseDataAnalysis(object):
         plot_yvals = pdict['yvals']
         plot_cbar = pdict.get('plotcbar', True)
         plot_cmap = pdict.get('cmap', 'YlGn')
+        plot_aspect = pdict.get('aspect', None)
         plot_zrange = pdict.get('zrange', None)
         plot_yrange = pdict.get('yrange', None)
         plot_xrange = pdict.get('xrange', None)
         plot_xwidth = pdict.get('xwidth', None)
+        plot_xtick_labels = pdict.get('xtick_labels', None)
+        plot_ytick_labels = pdict.get('ytick_labels', None)
+        plot_xtick_loc = pdict.get('xtick_loc', None)
+        plot_ytick_loc = pdict.get('ytick_loc', None)
         plot_transpose = pdict.get('transpose', False)
         plot_nolabel = pdict.get('no_label', False)
         plot_normalize = pdict.get('normalize', False)
         plot_logzscale = pdict.get('logzscale', False)
+        plot_origin = pdict.get('origin', 'lower')
+
         if plot_logzscale:
             plot_zvals = np.log10(pdict['zvals']/plot_logzscale)
         else:
@@ -1127,6 +1134,21 @@ class BaseDataAnalysis(object):
             axs.set_xlim(ymin, ymax)
         else:
             axs.set_ylim(ymin, ymax)
+
+        # FIXME Ignores thranspose option. Is it ok?
+        if plot_xtick_labels is not None:
+            axs.xaxis.set_ticklabels(plot_xtick_labels, rotation=90)
+        if plot_ytick_labels is not None:
+            axs.yaxis.set_ticklabels(plot_ytick_labels)
+        if plot_xtick_loc is not None:
+            axs.xaxis.set_ticks(plot_xtick_loc)
+        if plot_ytick_loc is not None:
+            axs.yaxis.set_ticks(plot_ytick_loc)
+        if plot_origin == 'upper':
+            axs.invert_yaxis()
+
+        if plot_aspect is not None:
+            axs.set_aspect(plot_aspect)
 
         if not plot_nolabel:
             self.label_color2D(pdict, axs)
