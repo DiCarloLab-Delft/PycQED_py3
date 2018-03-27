@@ -995,20 +995,35 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                     }
 
 
-class TomographyAnalysis(ba.BaseDataAnalysis):
+class StateTomographyAnalysis(ba.BaseDataAnalysis):
     """
-    Options:
-        cal_points: see AveragedTimedomainAnalysis for format.
-        data_type: 'averaged' or 'singleshot'
-        meas_operators (optional): override the measurement operators
-        covar_matrix (optional): override the covariance matrix
+    Analyses the results of the state tomography experiment and calculates
+    the corresponding quantum state.
+
+    Possible options that can be passed in the options_dict parameter:
+        cal_points: A data structure specifying the indices of the calibration
+                    points. See the AveragedTimedomainAnalysis for format.
+                    The calibration points need to be in the same order as the
+                    used basis for the result.
+        data_type: 'averaged' or 'singleshot'. For singleshot data each
+                   measurement outcome is saved and arbitrary order correlations
+                   between the states can be calculated.
+        meas_operators: (optional) A list of qutip operators or numpy 2d arrays.
+                        This overrides the measurement operators otherwise
+                        found from the calibration points.
+        covar_matrix: (optional) The covariance matrix of the measurement
+                      operators as a 2d numpy array. Overrides the one found
+                      from the calibration points.
         single_qubit_pulses: A list of standard PycQED pulse names that were
                              applied to qubits before measurement
-        basis_rotations: As an alternative, the basis rotations applied to the
-                         system as qutip operators can be given.
-        mle: True/False, whether to do maximum likelihood fit.
+        basis_rotations: As an alternative to single_qubit_pulses, the basis
+                         rotations applied to the system as qutip operators can
+                         be given.
+        mle: True/False, whether to do maximum likelihood fit. If False, only
+             least squares fit will be done, which could give negative
+             eigenvalues for the density matrix.
         rho_target (optional): A qutip density matrix that the result will be
-                                 compared to when calculating fidelity.
+                               compared to when calculating fidelity.
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1073,20 +1088,40 @@ class TomographyAnalysis(ba.BaseDataAnalysis):
             self.proc_data_dict['fidelity'] = tomo.fidelity(rho, rho_target)
 
     def prepare_plots(self):
+        self.prepare_density_matrix_plot()
+        d = self.proc_data_dict['d']
+        if 2 ** (d.bit_length() - 1) == d:
+            # dimension is power of two, plot expectation values of pauli
+            # operators
+            self.prepare_pauli_basis_plot()
+
+    def prepare_density_matrix_plot(self):
         self.tight_fig = self.options_dict.get('tight_fig', False)
+        rho_target = self.options_dict.get('rho_target', None)
         d = self.proc_data_dict['d']
         xtick_labels = self.options_dict.get('rho_ticklabels', None)
         ytick_labels = self.options_dict.get('rho_ticklabels', None)
-        if 2**(d.bit_length() - 1) == d:
+        if 2 ** (d.bit_length() - 1) == d:
             nr_qubits = d.bit_length() - 1
             fmt_string = '{{:0{}b}}'.format(nr_qubits)
-            labels = [fmt_string.format(i) for i in range(2**nr_qubits)]
+            labels = [fmt_string.format(i) for i in range(2 ** nr_qubits)]
             if xtick_labels is None:
                 xtick_labels = ['$|' + lbl + r'\rangle$' for lbl in labels]
             if ytick_labels is None:
                 ytick_labels = [r'$\langle' + lbl + '|$' for lbl in labels]
-        color = (0.5*np.angle(self.proc_data_dict['rho'].full())/np.pi) % 1.
+        color = (0.5 * np.angle(self.proc_data_dict['rho'].full()) / np.pi) % 1.
         cmap = self.options_dict.get('rho_colormap', self.default_phase_cmap())
+        if self.options_dict.get('mle', False):
+            title = 'Maximum likelihood fit of the density matrix\n'
+        else:
+            title = 'Least squares fit of the density matrix\n'
+        empty_artist = mpl.patches.Rectangle((0, 0), 0, 0, visible=False)
+        legend_entries = [(empty_artist, r'Purity, $\rho^2 = {:.1f}\%$'.format(
+            100 * self.proc_data_dict['purity']))]
+        if rho_target is not None:
+            legend_entries += [
+                (empty_artist, r'Fidelity, $F = {:.1f}\%$'.format(
+                    100 * self.proc_data_dict['fidelity']))]
         self.plot_dicts['density_matrix'] = {
             'plotfn': self.plot_bar3D,
             '3d': True,
@@ -1108,9 +1143,122 @@ class TomographyAnalysis(ba.BaseDataAnalysis):
             'ctick_labels': ['$0$', r'$\frac{1}{2}\pi$', r'$\pi$',
                              r'$\frac{3}{2}\pi$', r'$2\pi$'],
             'clabel': 'Phase (rad)',
-            'title': (self.raw_data_dict['timestamp'] + ' ' +
-                      self.base_analysis.raw_data_dict['measurementstring'])
+            'title': (title + self.raw_data_dict['timestamp'] + ' ' +
+                      self.base_analysis.raw_data_dict['measurementstring']),
+            'do_legend': True,
+            'legend_entries': legend_entries,
+            'legend_kws': dict(loc='upper left', bbox_to_anchor=(0, 0.94))
         }
+
+        if rho_target is not None:
+            if rho_target.type == 'ket':
+                rho_target = rho_target * rho_target.dag()
+            elif rho_target.type == 'bra':
+                rho_target = rho_target.dag() * rho_target
+            self.plot_dicts['density_matrix_target'] = {
+                'plotfn': self.plot_bar3D,
+                '3d': True,
+                '3d_azim': -35,
+                '3d_elev': 35,
+                'xvals': np.arange(d),
+                'yvals': np.arange(d),
+                'zvals': np.abs(rho_target.full()),
+                'zrange': (0, 1),
+                'color': (0.5 * np.angle(rho_target.full()) / np.pi) % 1.,
+                'colormap': cmap,
+                'bar_widthx': 0.5,
+                'bar_widthy': 0.5,
+                'xtick_loc': np.arange(d),
+                'xtick_labels': xtick_labels,
+                'ytick_loc': np.arange(d),
+                'ytick_labels': ytick_labels,
+                'ctick_loc': np.linspace(0, 1, 5),
+                'ctick_labels': ['$0$', r'$\frac{1}{2}\pi$', r'$\pi$',
+                                 r'$\frac{3}{2}\pi$', r'$2\pi$'],
+                'clabel': 'Phase (rad)',
+                'title': ('Target density matrix\n' +
+                          self.raw_data_dict['timestamp'] + ' ' +
+                          self.base_analysis.raw_data_dict[
+                              'measurementstring']),
+                'bar_kws': dict(zorder=1),
+            }
+    def prepare_pauli_basis_plot(self):
+        yexp = tomo.density_matrix_to_pauli_basis(self.proc_data_dict['rho'])
+        nr_qubits = self.proc_data_dict['d'].bit_length() - 1
+        labels = list(itertools.product(*[['I', 'X', 'Y', 'Z']]*nr_qubits))
+        labels = [''.join(label_list) for label_list in labels]
+        if nr_qubits == 1:
+            order = [1, 2, 3]
+        elif nr_qubits == 2:
+            order = [1, 2, 3, 4, 8, 12, 5, 6, 7, 9, 10, 11, 13, 14, 15]
+        elif nr_qubits == 4:
+            order = [1, 2, 3, 4, 8, 12, 16, 32, 48] + \
+                    [5, 6, 7, 9, 10, 11, 13, 14, 15] + \
+                    [17, 18, 19, 33, 34, 35, 49, 50, 51] + \
+                    [20, 24, 28, 36, 40, 44, 52, 56, 60] + \
+                    [21, 22, 23, 25, 26, 27, 29, 30, 31] + \
+                    [37, 38, 39, 41, 42, 43, 45, 46, 47] + \
+                    [53, 54, 55, 57, 58, 59, 61, 62, 63]
+        else:
+            order = np.arange(4**nr_qubits)[1:]
+        if self.options_dict.get('mle', False):
+            fit_type = 'maximum likelihood estimation'
+        else:
+            fit_type = 'least squares fit'
+        self.plot_dicts['pauli_basis'] = {
+            'plotfn': self.plot_bar,
+            'xcenters': np.arange(4**nr_qubits - 1),
+            'xwidth': 0.4,
+            'xrange': (-1, len(order)),
+            'yvals': np.array(yexp)[order],
+            'xlabel': r'Pauli operator, $\hat{O}$',
+            'ylabel': r'Expectation value, $\mathrm{Tr}(\hat{O} \hat{\rho})$',
+            'title': 'Pauli operators, ' + fit_type + '\n' +
+                      self.raw_data_dict['timestamp'] + ' ' +
+                      self.base_analysis.raw_data_dict[
+                          'measurementstring'],
+            'yrange': (-1.1, 1.1),
+            'xtick_loc': np.arange(4**nr_qubits - 1),
+            'xtick_labels': np.array(labels)[order],
+            'bar_kws': dict(zorder=10),
+            'setlabel': 'Fit to experiment',
+            'do_legend': True
+        }
+
+        rho_target = self.options_dict.get('rho_target', None)
+        if rho_target is not None:
+            ytar = tomo.density_matrix_to_pauli_basis(rho_target)
+            self.plot_dicts['pauli_basis_target'] = {
+                'plotfn': self.plot_bar,
+                'ax_id': 'pauli_basis',
+                'xcenters': np.arange(len(order)),
+                'xwidth': 0.8,
+                'yvals': np.array(ytar)[order],
+                'xtick_loc': np.arange(len(order)),
+                'xtick_labels': np.array(labels)[order],
+                'bar_kws': dict(color='0.8', zorder=0),
+                'setlabel': 'Target values',
+                'do_legend': True
+            }
+
+        purity_str = r'Purity, $\rho^2 = {:.1f}\%$'.format(
+            100 * self.proc_data_dict['purity'])
+        if rho_target is not None:
+            fidelity_str = '\n' + r'Fidelity, $F = {:.1f}\%$'.format(
+                100 * self.proc_data_dict['fidelity'])
+        else:
+            fidelity_str = ''
+        self.plot_dicts['pauli_info_labels'] = {
+            'ax_id': 'pauli_basis',
+            'plotfn': self.plot_line,
+            'xvals': [0],
+            'yvals': [0],
+            'line_kws': {'alpha': 0},
+            'setlabel': purity_str + fidelity_str,
+            'do_legend': True
+        }
+
+
 
     def default_phase_cmap(self):
         cols = np.array(((41, 39, 231), (61, 130, 163), (208, 170, 39),
@@ -1120,7 +1268,7 @@ class TomographyAnalysis(ba.BaseDataAnalysis):
         cdict = {
             'red': [[i/n, cols[i%n][0], cols[i%n][0]] for i in range(n+1)],
             'green': [[i/n, cols[i%n][1], cols[i%n][1]] for i in range(n+1)],
-            'blue': [[i/n, cols[i%n][2], cols[i%n][2]] for i in range(n+1)]
+            'blue': [[i/n, cols[i%n][2], cols[i%n][2]] for i in range(n+1)],
         }
         return mpl.colors.LinearSegmentedColormap('DMDefault', cdict)
 

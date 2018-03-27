@@ -1,4 +1,5 @@
 import logging
+import itertools
 import numpy as np
 from numpy.linalg import inv
 from typing import List, Optional, Tuple
@@ -89,7 +90,7 @@ def mle_tomography(mus: np.ndarray, Fs: List[qtp.Qobj],
                    rho_guess: Optional[qtp.Qobj]=None) -> qtp.Qobj:
     """
     Executes a maximum likelihood fit to the measured observables, respecting
-    the physicality constraint of the density matrix.
+    the physicality constraints of the density matrix.
 
     Args:
         mus: 1-dimensional numpy ndarray containing the measured expectation
@@ -102,7 +103,8 @@ def mle_tomography(mus: np.ndarray, Fs: List[qtp.Qobj],
                be zero.
                If `None` is passed, then all measurements are assumed to have
                equal variances.
-        rho_guess: The initial value for the density matrix.
+        rho_guess: The initial value of the density matrix for the iterative
+                   optimization algorithm.
     Returns: The found density matrix as a qutip operator.
     """
     d = Fs[0].shape[0]
@@ -124,7 +126,9 @@ def mle_tomography(mus: np.ndarray, Fs: List[qtp.Qobj],
     def min_func(params, mus, Fs, OmegaInv, d):
         T = ltriag_matrix(params, d)
         rho = T * T.dag()
-        dmus = mus - np.array([(rho * F).tr().real for F in Fs])
+        dmus = mus.copy()
+        for i, F in enumerate(Fs):
+            dmus[i] -= (rho * F).tr().real
         return (dmus.T.dot(OmegaInv).dot(dmus)).real
 
     def constr_func(params, d):
@@ -141,9 +145,9 @@ def mle_tomography(mus: np.ndarray, Fs: List[qtp.Qobj],
 
 def ltriag_matrix(params: np.ndarray, d: int):
     """
-    Creates a lower-triangular matrix of dimension `d` from an array of d**2
-    real numbers with the elements on the diagonal being real and complex on
-    the off-diagonal.
+    Creates a lower-triangular matrix of dimension d from an array of d**2
+    real numbers. The elements on the diagonal of the resulting matrix
+    are real and on the off-2diagonal they can be complex.
 
     The Cholesky decomposition of a positive-definite matrix is of this form.
     """
@@ -151,6 +155,58 @@ def ltriag_matrix(params: np.ndarray, d: int):
     T[np.tril_indices(d)] += params[:((d * d + d) // 2)]
     T[np.tril_indices(d, -1)] += 1j * params[((d * d + d) // 2):]
     return qtp.Qobj(T)
+
+
+def fidelity(rho1: qtp.Qobj, rho2: qtp.Qobj) -> float:
+    """
+    Returns the fidelity between the two quantum states rho1 and rho2.
+    Uses the Jozsa definition (the smaller of the two), not the Nielsen-Chuang
+    definition.
+
+    F = Tr(√((√rho1) rho2 √(rho1)))^2
+    """
+    if rho1.type == 'ket':
+        rho1 = rho1 * rho1.dag()
+    elif rho1.type == 'bra':
+        rho1 = rho1.dag() * rho1
+    if rho2.type == 'ket':
+        rho2 = rho2 * rho2.dag()
+    elif rho2.type == 'bra':
+        rho2 = rho2.dag() * rho2
+    rho1.dims = rho2.dims
+    return (rho1.sqrtm()*rho2*rho1.sqrtm()).sqrtm().tr().real ** 2
+
+
+def purity(rho: qtp.Qobj) -> float:
+    if rho.type == 'ket' or rho.type == 'bra':
+        return 1
+    else:
+        return (rho*rho).tr().real
+
+
+def density_matrix_to_pauli_basis(rho):
+    """
+    Returns the expectation values for all combinations of Pauli operator
+    products. The dimension of the density matrix must be a power of two.
+    """
+    if rho.type == 'ket':
+        rho = rho * rho.dag()
+    elif rho.type == 'bra':
+        rho = rho.dag() * rho
+    rho = qtp.Qobj(rho.full())
+    d = rho.shape[0]
+    if 2 ** (d.bit_length() - 1) == d:
+        nr_qubits = d.bit_length() - 1
+    else:
+        raise ValueError(
+            'Dimension of the density matrix is not a power of '
+            'two.')
+
+    O1 = [qtp.qeye(2), qtp.sigmax(), qtp.sigmay(), qtp.sigmaz()]
+    Os = [qtp.Qobj(qtp.tensor(*O1s).full()) for O1s in
+          itertools.product(*[O1] * nr_qubits)]
+    return np.array([(rho * O).tr().real for O in Os])
+
 
 # PycQED specific functions
 
@@ -205,24 +261,3 @@ def standard_qubit_pulses_to_rotations(pulse_list: List[Tuple]) \
     for i in range(len(rotations)):
         rotations[i].dims = [[d] for d in rotations[i].shape]
     return rotations
-
-
-def fidelity(rho1: qtp.Qobj, rho2: qtp.Qobj) -> float:
-    """ Returns the fidelity between the two quantum states rho1 and rho2. """
-    if rho1.type == 'ket':
-        rho1 = rho1 * rho1.dag()
-    elif rho1.type == 'bra':
-        rho1 = rho1.dag() * rho1
-    if rho2.type == 'ket':
-        rho2 = rho2 * rho2.dag()
-    elif rho2.type == 'bra':
-        rho2 = rho2.dag() * rho2
-    rho1.dims = rho2.dims
-    return (rho1.sqrtm()*rho2*rho1.sqrtm()).sqrtm().tr().real ** 2
-
-
-def purity(rho: qtp.Qobj) -> float:
-    if rho.type == 'ket' or rho.type == 'bra':
-        return 1
-    else:
-        return (rho*rho).tr().real

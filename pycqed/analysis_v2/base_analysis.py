@@ -624,12 +624,23 @@ class BaseDataAnalysis(object):
     def plot_bar(self, pdict, axs):
         pfunc = getattr(axs, pdict.get('func', 'bar'))
         # xvals interpreted as edges for a bar plot
-        plot_xedges = pdict['xvals']
+        plot_xedges = pdict.get('xvals', None)
+        if plot_xedges is None:
+            plot_centers = pdict['xcenters']
+            plot_xwidth = pdict['xwidth']
+        else:
+            plot_xwidth = (plot_xedges[1:] - plot_xedges[:-1])
+            # center is left edge + width/2
+            plot_centers = plot_xedges[:-1] + plot_xwidth / 2
         plot_yvals = pdict['yvals']
         plot_xlabel = pdict.get('xlabel', None)
         plot_ylabel = pdict.get('ylabel', None)
         plot_xunit = pdict.get('xunit', None)
         plot_yunit = pdict.get('yunit', None)
+        plot_xtick_loc = pdict.get('xtick_loc', None)
+        plot_ytick_loc = pdict.get('ytick_loc', None)
+        plot_xtick_labels = pdict.get('xtick_labels', None)
+        plot_ytick_labels = pdict.get('ytick_labels', None)
         plot_title = pdict.get('title', None)
         plot_xrange = pdict.get('xrange', None)
         plot_yrange = pdict.get('yrange', None)
@@ -638,10 +649,6 @@ class BaseDataAnalysis(object):
         dataset_desc = pdict.get('setdesc', '')
         dataset_label = pdict.get('setlabel', list(range(len(plot_yvals))))
         do_legend = pdict.get('do_legend', False)
-
-        plot_xwidth = (plot_xedges[1:]-plot_xedges[:-1])
-        # center is left edge + widht /2
-        plot_centers = plot_xedges[:-1] + plot_xwidth/2
 
         if plot_multiple:
             p_out = []
@@ -656,18 +663,23 @@ class BaseDataAnalysis(object):
             p_out = pfunc(plot_centers, plot_yvals, width=plot_xwidth,
                           label='%s%s' % (dataset_desc, dataset_label),
                           **plot_barkws)
-        if plot_xrange is None:
-            xmin, xmax = plot_xedges.min(), plot_xedges.max()
-        else:
-            xmin, xmax = plot_xrange
+
+        if plot_xrange is not None:
+            axs.set_xlim(*plot_xrange)
+        if plot_yrange is not None:
+            axs.set_ylim(*plot_yrange)
         if plot_xlabel is not None:
             set_axis_label('x', axs, plot_xlabel, plot_xunit)
         if plot_ylabel is not None:
             set_axis_label('y', axs, plot_ylabel, plot_yunit)
-        axs.set_xlim(xmin, xmax)
-        if plot_yrange is not None:
-            ymin, ymax = plot_yrange
-            axs.set_ylim(ymin, ymax)
+        if plot_xtick_labels is not None:
+            axs.xaxis.set_ticklabels(plot_xtick_labels)
+        if plot_ytick_labels is not None:
+            axs.yaxis.set_ticklabels(plot_ytick_labels)
+        if plot_xtick_loc is not None:
+            axs.xaxis.set_ticks(plot_xtick_loc)
+        if plot_ytick_loc is not None:
+            axs.yaxis.set_ticks(plot_ytick_loc)
 
         if plot_title is not None:
             axs.set_title(plot_title)
@@ -695,6 +707,7 @@ class BaseDataAnalysis(object):
         plot_yunit = pdict.get('yunit', None)
         plot_zunit = pdict.get('zunit', None)
         plot_color = pdict.get('color', None)
+        plot_colormap = pdict.get('colormap', None)
         plot_title = pdict.get('title', None)
         plot_xrange = pdict.get('xrange', None)
         plot_yrange = pdict.get('yrange', None)
@@ -722,13 +735,22 @@ class BaseDataAnalysis(object):
             plot_barwidthy = np.ones_like(zpos) * plot_barwidthy
         plot_barheight = plot_zvals.flatten()
 
-        if hasattr(plot_color, '__iter__') and \
-                hasattr(plot_color[0], '__iter__'):
-            plot_color = np.array(plot_color).flatten()
-        if hasattr(plot_color, '__iter__') and \
-            isinstance(plot_color[0], numbers.Number):
-            plot_colormap = pdict.get('colormap', mpl.cm.hsv)
+        if plot_colormap is not None:
+            # plot_color assumed to be floats
+            if hasattr(plot_color, '__iter__') and \
+                    hasattr(plot_color[0], '__iter__'):
+                plot_color = np.array(plot_color).flatten()
             plot_color = plot_colormap(plot_color)
+        else:
+            # plot_color assumed to be RGBA tuple(s)
+            if hasattr(plot_color[0], '__iter__') and \
+                    hasattr(plot_color[0][0], '__iter__'):
+                plot_color = np.array(plot_color)
+                plot_color = plot_color.reshape((-1, plot_color.shape[-1]))
+            elif not hasattr(plot_color[0], '__iter__'):
+                plot_color = np.array(plot_color)
+                n = plot_zvals.size
+                plot_color = np.repeat(plot_color, n).reshape(-1, n).T
 
         zsort = plot_barkws.pop('zsort', 'max')
         p_out = pfunc(xpos - plot_barwidthx/2, ypos - plot_barwidthy/2, zpos,
@@ -760,15 +782,16 @@ class BaseDataAnalysis(object):
             axs.set_title(plot_title)
 
         if do_legend:
-            legend_ncol = pdict.get('legend_ncol', 1)
-            legend_title = pdict.get('legend_title', None)
-            legend_pos = pdict.get('legend_pos', 'best')
-            axs.legend(title=legend_title, loc=legend_pos, ncol=legend_ncol)
+            legend_kws = pdict.get('legend_kws', {})
+            legend_entries = pdict.get('legend_entries', [])
+            legend_artists = [entry[0] for entry in legend_entries]
+            legend_labels = [entry[1] for entry in legend_entries]
+            axs.legend(legend_artists, legend_labels, **legend_kws)
 
         if self.tight_fig:
             axs.figure.tight_layout()
 
-        if pdict.get('colorbar', True):
+        if pdict.get('colorbar', True) and plot_colormap is not None:
             self.plot_colorbar(axs=axs, pdict=pdict)
 
         pdict['handles'] = p_out
