@@ -88,7 +88,6 @@ def multi_qubit_off_on(qubits: list,  initialize: bool,
         base = 2
     combinations = [int2base(i, base=base, fixed_length=len(qubits)) for
                     i in range(base**len(qubits))]
-    print(combinations)
 
     platf = Platform('OpenQL_Platform', platf_cfg)
     p = Program(pname="multi_qubit_off_on",
