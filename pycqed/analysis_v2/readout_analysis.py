@@ -17,6 +17,7 @@ from scipy.optimize import minimize
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str
 import pycqed.analysis.tools.data_manipulation as dm_tools
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
+from pycqed.utilities.general import int2base
 
 
 class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
@@ -531,21 +532,26 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
             max_sh = np.max(self.proc_data_dict[ch_name])
             self.proc_data_dict['nr_shots'] = len(self.proc_data_dict[ch_name])
 
-            number_of_experiments = 2**self.nr_of_qubits
-            for i in range(2**self.nr_of_qubits):
-                format_str = '{'+'0:0{}b'.format(self.nr_of_qubits) + '}'
-                binning_string = format_str.format(i)
+            base = 2
+            number_of_experiments = base ** self.nr_of_qubits
+
+            combinations = [int2base(
+                i, base=base, fixed_length=self.nr_of_qubits) for i in
+                range(number_of_experiments)]
+            self.proc_data_dict['combinations'] = combinations
+
+            for i, comb in enumerate(combinations):
                 # No post selection implemented yet
-                self.proc_data_dict['{} {}'.format(ch_name, binning_string)] = \
+                self.proc_data_dict['{} {}'.format(ch_name, comb)] = \
                     self.proc_data_dict[ch_name][i::number_of_experiments]
                 ##################################
                 #  Binning data into histograms  #
                 ##################################
                 hist_name = 'hist {} {}'.format(
-                    ch_name, binning_string)
+                    ch_name, comb)
                 self.proc_data_dict[hist_name] = np.histogram(
                     self.proc_data_dict['{} {}'.format(
-                        ch_name, binning_string)],
+                        ch_name, comb)],
                     bins=nr_bins, range=(min_sh, max_sh))
                 #  Cumulative histograms #
                 chist_name = 'c'+hist_name
@@ -564,8 +570,60 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                 self.proc_data_dict[hist_name][1][0])
 
         ###########################################################
+        # Combining histograms of all different combinations
+        ###########################################################
+        for ch_idx, ch_name in enumerate(self.proc_data_dict['ch_names']):
+            # Create a label for the specific combination
+            # These labels should be e.g., xx1x and xx0x in a 4 qubit exprmt
+            # comb_str_0 = list('x'*self.proc_data_dict['nr_of_qubits'])
+            # comb_str_0[-ch_idx+1] = '0'
+            # comb_str_0 = "".join(comb_str_0)
+            # comb_str_1 = list('x'*self.proc_data_dict['nr_of_qubits'])
+            # comb_str_1[-ch_idx+1] = '1'
+            # comb_str_1 = "".join(comb_str_1)
+            comb_str_0, comb_str_1, comb_st = get_arb_comb_xx_label(
+                self.proc_data_dict['nr_of_qubits'], ch_idx=ch_idx, base=3)
+
+            # Initialize the arrays
+            self.proc_data_dict['hist {} {}'.format(ch_name, comb_str_0)] = \
+                [np.zeros(nr_bins), np.zeros(nr_bins+1)]
+            self.proc_data_dict['hist {} {}'.format(ch_name, comb_str_1)] = \
+                [np.zeros(nr_bins), np.zeros(nr_bins+1)]
+            zero_hist = self.proc_data_dict['hist {} {}'.format(
+                ch_name, comb_str_0)]
+            one_hist = self.proc_data_dict['hist {} {}'.format(
+                ch_name, comb_str_1)]
+
+            # Fill them with data from the relevant combinations
+            for i, comb in enumerate(self.proc_data_dict['combinations']):
+                print(comb)
+                if comb[-ch_idx+1] == '0':
+                    zero_hist[0] += self.proc_data_dict[
+                        'hist {} {}'.format(ch_name, comb)][0]
+                    zero_hist[1] = self.proc_data_dict[
+                        'hist {} {}'.format(ch_name, comb)][1]
+                elif comb[-ch_idx+1] == '1':
+                    one_hist[0] += self.proc_data_dict[
+                        'hist {} {}'.format(ch_name, comb)][0]
+                    one_hist[1] = self.proc_data_dict[
+                        'hist {} {}'.format(ch_name, comb)][1]
+                elif comb[-ch_idx+1] == '2':
+                    # Fixme add two state binning
+                    raise NotImplementedError()
+            self.proc_data_dict['chist {} {}'.format(ch_name, comb_str_0)] = \
+                np.cumsum(zero_hist[0])/(self.proc_data_dict['nr_shots'])
+            self.proc_data_dict['chist {} {}'.format(ch_name, comb_str_1)] = \
+                np.cumsum(one_hist[0])/(self.proc_data_dict['nr_shots'])
+
+
+
+
+
+        ###########################################################
         #  Threshold and fidelity based on cumulative histograms  #
         ###########################################################
+
+
         # Average assignment fidelity: F_ass = (P01 - P10 )/2
         # where Pxy equals probability to measure x when starting in y
 
@@ -638,11 +696,45 @@ def get_shots_zero_one(data, post_select: bool=False,
     return shots_0, shots_1
 
 
-def make_mux_ssro_histogram(data_dict, ch_name, title=None, ax=None, **kw):
 
+def get_arb_comb_xx_label(nr_of_qubits, ch_idx: int, base: int=2):
+    comb_str_0 = list('x'*nr_of_qubits)
+    comb_str_0[-ch_idx+1] = '0'
+    comb_str_0 = "".join(comb_str_0)
+    comb_str_1 = list('x'*nr_of_qubits)
+    comb_str_1[-ch_idx+1] = '1'
+    comb_str_1 = "".join(comb_str_1)
+
+    return comb_str_0, comb_str_1
+
+
+def make_mux_ssro_histogram_combined(data_dict, ch_name, qubit_idx,
+                                     title=None, ax=None, **kw):
     if ax is None:
         f, ax = plt.subplots()
+    nr_of_qubits = data_dict['nr_of_qubits']
+    markers = itertools.cycle(('v', '^', 'd'))
+    for i in range(2**nr_of_qubits):
+        format_str = '{'+'0:0{}b'.format(nr_of_qubits) + '}'
+        binning_string = format_str.format(i)
+        ax.plot(data_dict['bin_centers {}'.format(ch_name)],
+                data_dict['hist {} {}'.format(ch_name, binning_string)][0],
+                linestyle='',
+                marker=next(markers), alpha=.7, label=binning_string)
 
+    legend_title = "Prep. state \n[%s]" % ', '.join(data_dict['qubit_names'])
+    ax.legend(title=legend_title)
+    ax.set_ylabel('Counts')
+    # arbitrary units as we use optimal weights
+    set_xlabel(ax, ch_name, 'a.u.')
+
+    if title is not None:
+        ax.set_title(title)
+
+
+def make_mux_ssro_histogram(data_dict, ch_name, title=None, ax=None, **kw):
+    if ax is None:
+        f, ax = plt.subplots()
     nr_of_qubits = data_dict['nr_of_qubits']
     markers = itertools.cycle(('v', '<', '>', '^', 'd', 'o', 's', '*'))
     for i in range(2**nr_of_qubits):
