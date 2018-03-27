@@ -115,6 +115,26 @@ class five_qubit_off_on(swf.Hard_Sweep):
                                    return_seq=self.return_seq,
                                    verbose=self.verbose)
 
+
+class n_qubit_seq_sweep(swf.Hard_Sweep):
+    """
+    Allows an arbitrary sequence.
+    """
+
+    def __init__(self, seq_len, #upload=True,
+                 verbose=False, sweep_name=""):
+        super().__init__()
+        self.upload = upload
+        self.parameter_name = 'segment'
+        self.unit = '#'
+        self.sweep_points = np.arange(seq_len)
+        self.verbose = verbose
+        self.name = sweep_name
+
+    def prepare(self, **kw):
+        pass
+
+
 class n_qubit_off_on(swf.Hard_Sweep):
 
     def __init__(self, pulse_pars_list, RO_pars, upload=True,

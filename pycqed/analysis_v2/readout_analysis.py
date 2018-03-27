@@ -664,11 +664,15 @@ class Multiplexed_Readout_Analysis(MultiQubit_SingleShot_Analysis):
                  options_dict: dict=None, extract_only: bool=False,
                  do_fitting: bool=True, auto=True):
 
+        self.n_segments = options_dict['n_segments']
         self.channel_map = options_dict['channel_map']
 
         def_seg_names_prep = ["".join(l) for l in list(itertools.product(["$0$", "$\pi$"],
                                                                          repeat=len(self.channel_map)))]
-        def_seg_names = [x for t in zip(*[["sel"]*len(def_seg_names_prep), def_seg_names_prep]) for x in t]
+        if self.n_segments == len(def_seg_names_prep):
+            def_seg_names = def_seg_names_prep
+        elif self.n_segments == 2*len(def_seg_names_prep):
+            def_seg_names = [x for t in zip(*[["sel"]*len(def_seg_names_prep), def_seg_names_prep]) for x in t]
 
         options_dict['segment_names'] = options_dict.get('segment_names', def_seg_names)
 
