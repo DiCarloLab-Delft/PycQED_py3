@@ -643,6 +643,7 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
                 F = np.array([[1]])
                 for qb in qubits:
                     Fqb = Fsingle[obs.get(qb, None)]
+                    # Kronecker product convention - assumed the same as QuTiP
                     F = np.kron(F, Fqb)
                 Fs.append(F)
             # Should the variations of the measurement operators depend on the
