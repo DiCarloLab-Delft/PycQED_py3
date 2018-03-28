@@ -1117,8 +1117,9 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
         else:
             title = 'Least squares fit of the density matrix\n'
         empty_artist = mpl.patches.Rectangle((0, 0), 0, 0, visible=False)
-        legend_entries = [(empty_artist, r'Purity, $\rho^2 = {:.1f}\%$'.format(
-            100 * self.proc_data_dict['purity']))]
+        legend_entries = [(empty_artist,
+                           r'Purity, $Tr(\rho^2) = {:.1f}\%$'.format(
+                               100 * self.proc_data_dict['purity']))]
         if rho_target is not None:
             legend_entries += [
                 (empty_artist, r'Fidelity, $F = {:.1f}\%$'.format(
@@ -1221,7 +1222,7 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
                 meas_string = meas_string[0]
         self.plot_dicts['pauli_basis'] = {
             'plotfn': self.plot_bar,
-            'xcenters': np.arange(4**nr_qubits - 1),
+            'xcenters': np.arange(len(order)),
             'xwidth': 0.4,
             'xrange': (-1, len(order)),
             'yvals': np.array(yexp)[order],
@@ -1253,7 +1254,7 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
                 'do_legend': True
             }
 
-        purity_str = r'Purity, $\rho^2 = {:.1f}\%$'.format(
+        purity_str = r'Purity, $Tr(\rho^2) = {:.1f}\%$'.format(
             100 * self.proc_data_dict['purity'])
         if rho_target is not None:
             fidelity_str = '\n' + r'Fidelity, $F = {:.1f}\%$'.format(
