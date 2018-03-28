@@ -2039,7 +2039,7 @@ def n_qubit_ref_seq(qubits, ref_desc,
     # create the sequence
     seq_name = 'Calibration'
     seq = sequence.Sequence(seq_name)
-    for i, tomography_sequence in enumerate(calibration_sequence):
+    for i, calibration_sequence in enumerate(calibration_sequences):
         seq.append('Cal_{}'.format(i), 'Cal_{}'.format(i), trigger_wait=True)
 
     if upload:
@@ -2058,7 +2058,8 @@ def n_qubit_ref_all_seq(qubits,
     """
 
     return n_qubit_ref_seq(qubits,
-                           ref_desc=itertools.product(["X180", "I"], repeat=len(qubits)),
+                           ref_desc=itertools.product(["I", "X180"],
+                                                      repeat=len(qubits)),
                            upload=upload, verbose=verbose,
                            return_seq=return_seq)
 
