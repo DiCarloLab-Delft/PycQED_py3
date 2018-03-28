@@ -193,9 +193,9 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         #                        parameter_class=ManualParameter)
 
 
-        self.add_parameter('mcz_identical_phase_corr',
-                           initial_value=True, vals=vals.Bool(),
-                           parameter_class=ManualParameter)
+        # self.add_parameter('mcz_identical_phase_corr',
+        #                    initial_value=True, vals=vals.Bool(),
+        #                    parameter_class=ManualParameter)
 
         self.add_parameter('mcz_nr_of_repeated_gates',
                            initial_value=1, vals=vals.PermissiveInts(1, 40),
@@ -322,8 +322,8 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         # CZ with phase correction
         cz_z =  np.concatenate([self._wave_dict['cz'], phase_corr])
 
-        if self.cz_zero_net_flux():
-            cz_z = self._modify_wf_net_zero_flux(base_wf = cz_z)
+        # if self.cz_zero_net_flux():
+        #     cz_z = self._modify_wf_net_zero_flux(base_wf = cz_z)
         return cz_z
 
 
@@ -356,16 +356,16 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         waveform = np.zeros(max_nr_samples)
         for i in range(self.mcz_nr_of_repeated_gates()):
-            if self.mcz_identical_phase_corr():
-                cz_z = self._wave_dict['cz_z']
+            # if self.mcz_identical_phase_corr():
+            cz_z = self._wave_dict['cz_z']
 
-            else:
-                phase_corr = self._gen_phase_corr(
-                    phase_corr_amp=self.get('mcz_phase_corr_amp_{}'.format(i+1)),
-                    cz_offset_comp=True)
-                cz_z = np.concatenate([self._wave_dict['cz'], phase_corr])
-                if self.cz_zero_net_flux():
-                    cz_z = self._modify_wf_net_zero_flux(base_wf = cz_z)
+            # else:
+            #     phase_corr = self._gen_phase_corr(
+            #         phase_corr_amp=self.get('mcz_phase_corr_amp_{}'.format(i+1)),
+            #         cz_offset_comp=True)
+            #     cz_z = np.concatenate([self._wave_dict['cz'], phase_corr])
+            #     if self.cz_zero_net_flux():
+            #         cz_z = self._modify_wf_net_zero_flux(base_wf = cz_z)
 
             sample_start_idx = int(self.mcz_gate_separation() *
                                    self.sampling_rate())*i
@@ -398,9 +398,13 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             if (primitive_waveform_name == 'cz_z' or
                     primitive_waveform_name =='idle_z'):
                 phase_corr = wf.single_channel_block(
-                    amp=self.get('mcz_phase_corr_amp_{}'.format(i+1)),
+                    amp=self.get('cz_phase_corr_amp'),
                     length=self.cz_phase_corr_length(),
                     sampling_rate=self.sampling_rate(), delay=0)
+                # phase_corr = wf.single_channel_block(
+                #     amp=self.get('mcz_phase_corr_amp_{}'.format(i+1)),
+                #     length=self.cz_phase_corr_length(),
+                #     sampling_rate=self.sampling_rate(), delay=0)
                 if primitive_waveform_name == 'cz_z':
                     prim_wf = np.concatenate(
                         [self._wave_dict['cz'], phase_corr])
@@ -432,13 +436,13 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         waveform = np.zeros(max_nr_samples)
         for i in range(self.mcz_nr_of_repeated_gates()):
-            if self.mcz_identical_phase_corr():
-                phase_corr = self._gen_phase_corr(cz_offset_comp=True)
-            else:
-                phase_corr = wf.single_channel_block(
-                    amp=self.get('mcz_phase_corr_amp_{}'.format(i+1)),
-                    length=self.cz_phase_corr_length(),
-                    sampling_rate=self.sampling_rate(), delay=0)
+            # if self.mcz_identical_phase_corr():
+            phase_corr = self._gen_phase_corr(cz_offset_comp=True)
+            # else:
+            #     phase_corr = wf.single_channel_block(
+            #         amp=self.get('mcz_phase_corr_amp_{}'.format(i+1)),
+            #         length=self.cz_phase_corr_length(),
+            #         sampling_rate=self.sampling_rate(), delay=0)
             cz_z = np.concatenate([np.zeros(len(self._wave_dict['cz'])),
                                    phase_corr])
             sample_start_idx = int(self.mcz_gate_separation() *
@@ -456,7 +460,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         It should be noted that this is a simple numerical optimization and not the
         proper analytic inverse.
         """
-        k0 = self.instr_distortion_kernel.get_instr()
+        # k0 = self.instr_distortion_kernel.get_instr()
         corr_samples = int(self.cz_phase_corr_length()*self.sampling_rate())//2
 
         def modify_wf(wf, corr_amp, tau_corr, offset):
@@ -466,7 +470,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         def cost_func(corr_amp, tau_corr, offset, base_wf):
             cz_z = modify_wf(base_wf, corr_amp, tau_corr, offset)
-            wf = k0.distort_waveform(cz_z, len(cz_z)+40)
+            wf = self.distort_waveform(cz_z, len(cz_z)+40)
             cost_val = abs(np.sum(wf[-40:]))
             return cost_val
 
