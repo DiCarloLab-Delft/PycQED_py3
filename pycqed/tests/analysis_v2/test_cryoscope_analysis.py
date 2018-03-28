@@ -19,7 +19,7 @@ class Test_Cryoscope_analysis(unittest.TestCase):
         # For this to work all other parts have to work
         amps = a.freq_to_amp([.5e9, .6e9, .8e9])
         exp_amps = np.array([0.5357841,  0.58333725,  0.66727005])
-        np.testing.assert_array_almost_equal(amps, exp_amps)
+        np.testing.assert_array_almost_equal(amps, exp_amps, decimal=2)
 
         freqs = a.amp_to_freq([.3, .4, .5])
         exp_freqs = np.array(
@@ -54,4 +54,5 @@ class Test_Cryoscope_analysis(unittest.TestCase):
              0.69996618,  0.69998333,  0.69999917,  0.70000408,  0.69999778,
              0.7000019,  0.7000063,  0.70002296,  0.70002149,  0.70000829,
              0.69999469,  0.69997825,  0.6999882,  0.6999884,  0.69998851])
-        np.testing.assert_array_almost_equal(a.proc_data_dict['amp'], exp_amps)
+        np.testing.assert_array_almost_equal(a.proc_data_dict['amp'], exp_amps,
+                                             decimal=2)
