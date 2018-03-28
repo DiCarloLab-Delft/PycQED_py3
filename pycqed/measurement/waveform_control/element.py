@@ -424,8 +424,9 @@ class Element:
         return tvals, wfs
 
     # testing and inspection
-    def print_overview(self):
+    def print_overview(self, pulses=True):
         overview = {}
+        overview['name'] = self.name
         overview['offset'] = self.offset()
         overview['ideal length'] = self.ideal_length()
         overview['channels'] = {}
@@ -437,19 +438,20 @@ class Element:
             channels[c]['length'] = self.length(c)
             channels[c]['samples'] = self.samples(c)
         overview['pulses'] = {}
-        pulses = overview['pulses']
-        for p in self.pulses:
-            pulses[p] = {}
-            pulses[p]['length'] = self.pulse_length(p)
-            for c in self.pulses[p].channels:
-                if not self.pulsar.get('{}_active'.format(c)):
-                    continue
-                pulses[p][c] = {}
-                pulses[p][c]['start time'] = self.pulse_start_time(p, c)
-                pulses[p][c]['end time'] = self.pulse_end_time(p, c)
-                pulses[p][c]['start sample'] = self.pulse_start_sample(p, c)
-                pulses[p][c]['end sample'] = self.pulse_end_sample(p, c)
-                pulses[p][c]['samples'] = self.pulse_samples(p, c)
+        if pulses:
+            pulses = overview['pulses']
+            for p in self.pulses:
+                pulses[p] = {}
+                pulses[p]['length'] = self.pulse_length(p)
+                for c in self.pulses[p].channels:
+                    if not self.pulsar.get('{}_active'.format(c)):
+                        continue
+                    pulses[p][c] = {}
+                    pulses[p][c]['start time'] = self.pulse_start_time(p, c)
+                    pulses[p][c]['end time'] = self.pulse_end_time(p, c)
+                    pulses[p][c]['start sample'] = self.pulse_start_sample(p, c)
+                    pulses[p][c]['end sample'] = self.pulse_end_sample(p, c)
+                    pulses[p][c]['samples'] = self.pulse_samples(p, c)
         pprint.pprint(overview)
 
 # Helper functions, previously part of the element object but moved outside

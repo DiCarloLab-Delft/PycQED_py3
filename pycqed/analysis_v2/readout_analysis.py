@@ -572,7 +572,7 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
                         mask = np.logical_and(mask, res_g[qubit])
                 table[segment_n, state_n] = np.count_nonzero(mask)
 
-        return table
+        return table*n_segments/n_shots
 
     def prepare_plots(self):
 
@@ -673,6 +673,8 @@ class Multiplexed_Readout_Analysis(MultiQubit_SingleShot_Analysis):
             def_seg_names = def_seg_names_prep
         elif self.n_segments == 2*len(def_seg_names_prep):
             def_seg_names = [x for t in zip(*[["sel"]*len(def_seg_names_prep), def_seg_names_prep]) for x in t]
+        else:
+            def_seg_names = list(range(len(def_seg_names_prep)))
 
         options_dict['segment_names'] = options_dict.get('segment_names', def_seg_names)
 

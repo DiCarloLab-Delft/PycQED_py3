@@ -1932,15 +1932,13 @@ def two_qubit_parity_measurement(
 def n_qubit_tomo(
         qubits, prep_sequence=None,
         prep_name=None,
-        tomography_basis=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
+        rot_bases=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
         upload=True, verbose=False, return_seq=False):
     """
 
     """
 
     qubit_names = [qubit.name for qubit in qubits]
-
-    print(qubits[0].name)
 
     operation_dict = {
         'RO mux': device.get_multiplexed_readout_pulse_dictionary(qubits)
@@ -1957,12 +1955,12 @@ def n_qubit_tomo(
 
     # tomography elements
     tomography_sequences = get_tomography_pulses(*qubit_names,
-                                                 basis_pulses=tomography_basis)
+                                                 basis_pulses=rot_bases)
     for i, tomography_sequence in enumerate(tomography_sequences):
         pulse_list = [operation_dict[pulse] for pulse in prep_sequence]
         tomography_sequence.append('RO mux')
-        pulse_list.extend([operation_dict[pulse] for pulse in tomography_sequence])
-        print(pulse_list)
+        pulse_list.extend([operation_dict[pulse] for pulse in
+                           tomography_sequence])
         el_list.append(multi_pulse_elt(i, station, pulse_list, trigger=True,
                                        name='tomography_{}'.format(i)))
 
@@ -1973,7 +1971,8 @@ def n_qubit_tomo(
         seq_name = prep_name + ' tomography'
     seq = sequence.Sequence(seq_name)
     for i, tomography_sequence in enumerate(tomography_sequences):
-        seq.append('tomography_{}'.format(i), 'tomography_{}'.format(i), trigger_wait=True)
+        seq.append('tomography_{}'.format(i), 'tomography_{}'.format(i),
+                   trigger_wait=True)
 
     if upload:
         station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
@@ -1982,7 +1981,6 @@ def n_qubit_tomo(
         return seq, el_list
     else:
         return seq_name
-
 
 def get_tomography_pulses(*qubit_names, basis_pulses=('I', 'X180', 'Y90',
                                                       'mY90', 'X90', 'mX90')):
@@ -2000,6 +1998,69 @@ def get_tomography_pulses(*qubit_names, basis_pulses=('I', 'X180', 'Y90',
         tomo_sequences = tomo_sequences_new
     return tomo_sequences
 
+def n_qubit_ref_seq(qubits, ref_desc,
+        upload=True, verbose=False, return_seq=False):
+    """
+        Calibration points for arbitrary combinations
+
+        Arguments:
+            qubits: List of calibrated qubits for obtaining the pulse
+                dictionaries.
+            ref_desc: Description of the calibration sequence. Dictionary
+                name of the state as key, and list of pulses names as values.
+    """
+
+    qubit_names = [qubit.name for qubit in qubits]
+
+    operation_dict = {
+        'RO mux': device.get_multiplexed_readout_pulse_dictionary(qubits)
+    }
+
+    for qb in qubits:
+        operation_dict.update(qb.get_operation_dict())
+
+    # create the elements
+    el_list = []
+
+    # calibration elements
+    calibration_sequences = []
+    for pulses in ref_desc:
+        calibration_sequences.append(
+            [pulse+' '+qb for qb, pulse in zip(qubit_names, pulses)])
+
+    for i, calibration_sequence in enumerate(calibration_sequences):
+        pulse_list = []
+        calibration_sequence.append('RO mux')
+        pulse_list.extend(
+            [operation_dict[pulse] for pulse in calibration_sequence])
+        el_list.append(multi_pulse_elt(i, station, pulse_list, trigger=True,
+                                       name='Cal_{}'.format(i)))
+
+    # create the sequence
+    seq_name = 'Calibration'
+    seq = sequence.Sequence(seq_name)
+    for i, tomography_sequence in enumerate(calibration_sequence):
+        seq.append('Cal_{}'.format(i), 'Cal_{}'.format(i), trigger_wait=True)
+
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
+
+
+def n_qubit_ref_all_seq(qubits,
+                          upload=True, verbose=False, return_seq=False):
+    """
+        Calibration points for all combinations
+    """
+
+    return n_qubit_ref_seq(qubits,
+                           ref_desc=itertools.product(["X180", "I"], repeat=len(qubits)),
+                           upload=upload, verbose=verbose,
+                           return_seq=return_seq)
 
 
 

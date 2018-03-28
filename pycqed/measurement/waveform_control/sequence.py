@@ -1,3 +1,5 @@
+from copy import copy
+
 class Sequence:
     """
     Class that contains a sequence.
@@ -75,6 +77,18 @@ class Sequence:
     def element_index(self, name, start_idx=1):
         names = [elt['name'] for elt in self.elements]
         return names.index(name) + start_idx
+
+    def join(self, sequence_b):
+        # todo Implement checking of identical codewords and element names
+        sequence_new = copy(self)
+        sequence_new.elements = self.elements + sequence_b.elements
+        # join dictionaries
+        sequence_new.codewords = {**self.codewords, **sequence_b.codewords}
+        sequence_new.name = self.name + "+" + sequence_b.name
+        return sequence_new
+
+    def __add__(self, sequence_b):
+        return self.join(sequence_b)
 
     def set_codeword(self, codeword, wfname):
         """

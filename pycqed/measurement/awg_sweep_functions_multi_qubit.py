@@ -124,7 +124,6 @@ class n_qubit_seq_sweep(swf.Hard_Sweep):
     def __init__(self, seq_len, #upload=True,
                  verbose=False, sweep_name=""):
         super().__init__()
-        self.upload = upload
         self.parameter_name = 'segment'
         self.unit = '#'
         self.sweep_points = np.arange(seq_len)
