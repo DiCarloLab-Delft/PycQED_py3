@@ -1,5 +1,6 @@
 from os.path import join, dirname
 import numpy as np
+from pycqed.utilities.general import int2base
 import openql.openql as ql
 from pycqed.utilities.general import suppress_stdout
 from openql.openql import Program, Kernel, Platform
@@ -15,7 +16,7 @@ def single_flux_pulse_seq(qubit_indices: tuple,
     p = Program(pname="single_flux_pulse_seq",
                 nqubits=platf.get_qubit_number(),
                 p=platf)
-    print(platf_cfg)
+
     k = Kernel("main", p=platf)
     for idx in qubit_indices:
         k.prepz(idx)  # to ensure enough separation in timing
@@ -39,7 +40,7 @@ def flux_staircase_seq(platf_cfg: str):
     p = Program(pname="flux_staircase_seq",
                 nqubits=platf.get_qubit_number(),
                 p=platf)
-    print(platf_cfg)
+
     k = Kernel("main", p=platf)
     for i in range(1):
         k.prepz(i)  # to ensure enough separation in timing
@@ -57,6 +58,78 @@ def flux_staircase_seq(platf_cfg: str):
     # attribute is added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
+
+def multi_qubit_off_on(qubits: list,  initialize: bool,
+                       second_excited_state: bool, platf_cfg: str):
+    """
+    Performs an 'off_on' sequence on the qubits specified.
+        off: (RO) - prepz -      - RO
+        on:  (RO) - prepz - x180 - RO
+    Will cycle through all combinations of off and on. Last qubit in the list
+    is considered the Least Significant Qubit (LSQ).
+
+    Args:
+        qubits (list) : list of integers denoting the qubits to use
+        initialize (bool): if True does an extra initial measurement to
+            allow post selecting data.
+        second_excited_state (bool): if True includes the 2-state in the
+            combinations.
+        platf_cfg (str) : filepath of OpenQL platform config file
+    """
+
+    if second_excited_state:
+        raise NotImplementedError()
+
+    if second_excited_state:
+        base = 3
+    else:
+        base = 2
+    combinations = [int2base(i, base=base, fixed_length=len(qubits)) for
+                    i in range(base**len(qubits))]
+
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="multi_qubit_off_on",
+                nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    for i, comb in enumerate(combinations):
+        k = Kernel('Prep_{}'.format(comb), p=platf)
+        # 1. Prepare qubits in 0
+        for q in qubits:
+            k.prepz(q)
+
+        # 2. post-selection extra init readout
+        if initialize:
+            for q in qubits:
+                k.measure(q)
+            k.gate('wait', qubits, 0)
+
+        # 3. prepare desired state
+        for state, target_qubit in zip(comb, qubits):  # N.B. last is LSQ
+            if state == '0':
+                pass
+            elif state == '1':
+                k.gate('rx180', target_qubit)
+            elif state == '2':
+                k.gate('rx180', target_qubit)
+                raise NotImplementedError()  # 2nd excited state pulse
+        # 4. measurement of all qubits
+        k.gate('wait', qubits, 0)
+        # Used to ensure timing is aligned
+        for q in qubits:
+            k.measure(q)
+        k.gate('wait', qubits, 0)
+        p.add_kernel(k)
+
+    with suppress_stdout():
+        p.compile()
+    # attribute is added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
     return p
 
 
@@ -141,7 +214,6 @@ def two_qubit_AllXY(q0: int, q1: int, platf_cfg: str,
 
     Args:
         q0, q1         (str) : target qubits for the sequence
-        RO_target      (str) : target for the RO, can be a qubit name or 'all'
         sequence_type  (str) : Describes the timing/order of the pulses.
             options are: sequential | interleaved | simultaneous | sandwiched
                        q0|q0|q1|q1   q0|q1|q0|q1     q01|q01       q1|q0|q0|q1
@@ -237,6 +309,55 @@ def two_qubit_AllXY(q0: int, q1: int, platf_cfg: str,
     with suppress_stdout():
         p.compile()
     # attribute is added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
+
+def residual_coupling_sequence(times, q0: int, q1: int, platf_cfg: str):
+    """
+    Sequence to measure the residual (ZZ) interaction between two qubits.
+    Procedure is described in M18TR.
+
+        (q0) --X90--(tau/2)-Y180-(tau/2)-Xm90--RO
+        (q1) --X180-(tau/2)-X180-(tau/2)-------RO
+
+    Input pars:
+        times:          the list of waiting times for each Echo element
+        q0              Phase measurement is performed on q0
+        q1              Excitation is put in and removed on q1
+        platf_cfg:      filename of the platform config file
+    Returns:
+        p:              OpenQL Program object containing
+
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="residual_coupling_sequence", nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    for i, time in enumerate(times[:-4]):
+        k = Kernel("residual_coupling_seq_"+str(i), p=platf)
+        k.prepz(q0)
+        k.prepz(q1)
+        wait_nanoseconds = int(round(time/1e-9/2))
+        k.gate('rx90', q0)
+        k.gate('rx180', q1)
+        k.gate("wait", [q0, q1], wait_nanoseconds)
+        k.gate('ry180', q0)
+        k.gate('rx180', q1)
+        k.gate("wait", [q0, q1], wait_nanoseconds)
+        k.gate('rxm90', q0)
+        k.measure(q0)
+        k.measure(q1)
+        k.gate("wait", [q0, q1], 0)
+        p.add_kernel(k)
+
+    # adding the calibration points
+    p = add_two_q_cal_points(p, platf=platf, q0=q0, q1=q1)
+
+    with suppress_stdout():
+        p.compile(verbose=False)
+    # attribute get's added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
@@ -649,7 +770,6 @@ def two_qubit_repeated_parity_check(qD: int, qA: int, platf_cfg: str,
     p = Program(pname="repeated_parity_check",
                 nqubits=platf.get_qubit_number(), p=platf)
 
-
     for initial_state in initial_states:
         k = Kernel('repeated_parity_check_{}'.format(initial_state), p=platf)
         k.prepz(qD)
@@ -659,7 +779,7 @@ def two_qubit_repeated_parity_check(qD: int, qA: int, platf_cfg: str,
             k.measure(qA)
             k.measure(qD)
             k.gate('wait', [2, 0], 500)
-        if initial_state== 1:
+        if initial_state == 1:
             k.gate('rx180', qD)
         for i in range(number_of_repetitions):
             # hardcoded barrier because of openQL #104
@@ -696,8 +816,10 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
                                 angles=np.arange(0, 360, 20),
                                 wait_time: int=0,
                                 add_cal_points: bool=True,
+                                CZ_duration: int=260,
+                                nr_of_repeated_gates: int =1,
                                 cases: list=('no_excitation', 'excitation'),
-                                flux_codeword:str='fl_cw_01' ):
+                                flux_codeword: str='fl_cw_01'):
     '''
     Sequence used to calibrate flux pulses for CZ gates.
 
@@ -713,7 +835,7 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
         RO_target   (str): can be q0, q1, or 'all'
         CZ_disabled (bool): disable CZ gate
         angles      (array): angles of the recovery pulse
-        wait_time   (int): wait time in seconds after triggering the flux
+        wait_time   (int): wait time in ns after triggering the flux
     '''
     platf = Platform('OpenQL_Platform', platf_cfg)
     p = Program(pname="conditional_oscillation_seq",
@@ -732,7 +854,11 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
                 k.gate('rx180', q1)
             k.gate('rx90', q0)
             if not CZ_disabled:
-                k.gate(flux_codeword, 2, 0)
+                for j in range(nr_of_repeated_gates):
+                    k.gate(flux_codeword, 2, 0)
+            else:
+                for j in range(nr_of_repeated_gates):
+                    k.gate('wait', [2, 0], CZ_duration)  # in ns
             k.gate('wait', [2, 0], wait_time)
             # hardcoded angles, must be uploaded to AWG
             if angle == 90:
@@ -764,13 +890,17 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
     else:
         cal_pts_idx = []
 
-    p.sweep_points = np.concatenate([np.repeat(angles, len(cases)), cal_pts_idx])
+    p.sweep_points = np.concatenate(
+        [np.repeat(angles, len(cases)), cal_pts_idx])
     p.set_sweep_points(p.sweep_points, len(p.sweep_points))
     return p
 
 
 def grovers_two_qubit_all_inputs(q0: int, q1: int, platf_cfg: str,
                                  precompiled_flux: bool=True,
+                                 second_CZ_delay: int=0,
+                                 CZ_duration: int=260,
+                                 add_echo_pulses: bool=False,
                                  cal_points: bool=True):
     """
     Writes the QASM sequence for Grover's algorithm on two qubits.
@@ -790,6 +920,8 @@ def grovers_two_qubit_all_inputs(q0: int, q1: int, platf_cfg: str,
                 Determies if the full waveform for the flux pulses is
                 precompiled, thus only needing one trigger at the start,
                 or if every flux pulse should be triggered individually.
+        add_echo_pulses (bool): if True add's echo pulses before the
+            second CZ gate.
         cal_points (bool):
                 Whether to add calibration points.
 
@@ -812,11 +944,21 @@ def grovers_two_qubit_all_inputs(q0: int, q1: int, platf_cfg: str,
             k.prepz(q1)
             k.gate(G0, q0)
             k.gate(G1, q1)
-            k.gate('fl_cw_03', 2,0) # flux cw03 is the multi_cz pulse
+            k.gate('fl_cw_03', 2, 0)  # flux cw03 is the multi_cz pulse
             k.gate('ry90', q0)
             k.gate('ry90', q1)
             # k.gate('fl_cw_00', 2,0)
-            k.gate('wait', [2, 0], 260)
+            k.gate('wait', [2, 0], second_CZ_delay//2)
+            if add_echo_pulses:
+                k.gate('rx180', q0)
+                k.gate('rx180', q1)
+            k.gate('wait', [2, 0], second_CZ_delay//2)
+            if add_echo_pulses:
+                k.gate('rx180', q0)
+                k.gate('rx180', q1)
+
+            k.gate('wait', [2, 0], CZ_duration)
+
             k.gate('ry90', q0)
             k.gate('ry90', q1)
             k.measure(q0)
@@ -833,9 +975,17 @@ def grovers_two_qubit_all_inputs(q0: int, q1: int, platf_cfg: str,
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
 
-def grovers_tomography(q0: int, q1: int, omega:int, platf_cfg: str,
+
+def grovers_tomography(q0: int, q1: int, omega: int, platf_cfg: str,
                        precompiled_flux: bool=True,
-                       cal_points: bool=True):
+                       cal_points: bool=True, second_CZ_delay: int=260,
+                       CZ_duration: int=260,
+                       add_echo_pulses: bool=False):
+    """
+    Tomography sequence for Grover's algorithm.
+
+        omega: int denoting state that the oracle prepares.
+    """
 
     if not precompiled_flux:
         raise NotImplementedError('Currently only precompiled flux pulses '
@@ -846,7 +996,6 @@ def grovers_tomography(q0: int, q1: int, omega:int, platf_cfg: str,
                 nqubits=platf.get_qubit_number(), p=platf)
 
     tomo_gates = ['i', 'rx180', 'ry90', 'rym90', 'rx90', 'rxm90']
-
 
     if omega == 0:
         G0 = 'ry90'
@@ -863,20 +1012,32 @@ def grovers_tomography(q0: int, q1: int, omega:int, platf_cfg: str,
     else:
         raise ValueError('omega must be in [0, 3]')
 
-
     for p_q1 in tomo_gates:
         for p_q0 in tomo_gates:
             k = Kernel('Gr{}_{}_tomo_{}_{}'.format(G0, G1, p_q0, p_q1),
                        p=platf)
+
             k.prepz(q0)
             k.prepz(q1)
+
+            # Oracle
             k.gate(G0, q0)
             k.gate(G1, q1)
-            k.gate('fl_cw_03', 2,0) # flux cw03 is the multi_cz pulse
+            k.gate('fl_cw_03', 2, 0)  # flux cw03 is the multi_cz pulse
+            # Grover's search
             k.gate('ry90', q0)
             k.gate('ry90', q1)
             # k.gate('fl_cw_00', 2,0)
-            k.gate('wait', [2, 0], 260)
+            k.gate('wait', [2, 0], second_CZ_delay//2)
+            if add_echo_pulses:
+                k.gate('rx180', q0)
+                k.gate('rx180', q1)
+            k.gate('wait', [2, 0], second_CZ_delay//2)
+            if add_echo_pulses:
+                k.gate('rx180', q0)
+                k.gate('rx180', q1)
+            k.gate('wait', [2, 0], CZ_duration)
+
             k.gate('ry90', q0)
             k.gate('ry90', q1)
 
@@ -948,7 +1109,6 @@ def CZ_poisoned_purity_seq(q0, q1, platf_cfg: str, cal_points: bool=True):
         k.measure(q1)
         k.gate('wait', [2, 0], 0)
         p.add_kernel(k)
-
 
     with suppress_stdout():
         p.compile()
@@ -1085,8 +1245,11 @@ def add_two_q_cal_points(p, platf, q0: int, q1: int,
             k.gate('rx180', q1)
         else:
             k.gate('i', q1)
+        # Used to ensure timing is aligned
+        k.gate('wait', [q0, q1], 0)
         k.measure(q0)
         k.measure(q1)
+        k.gate('wait', [q0, q1], 0)
         kernel_list.append(k)
         p.add_kernel(k)
 

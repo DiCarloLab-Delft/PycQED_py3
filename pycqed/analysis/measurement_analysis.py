@@ -20,9 +20,17 @@ import pylab
 from pycqed.analysis.tools import data_manipulation as dm_tools
 import imp
 import math
-import pygsti
+try:
+    import pygsti
+except ImportError as e:
+    if str(e).find('pygsti') >= 0:
+        logging.warning('Could not import pygsti')
+    else:
+        raise
+
 from math import erfc
 from scipy.signal import argrelmax, argrelmin
+from scipy.constants import *
 from copy import deepcopy
 from pycqed.analysis.fit_toolbox import functions as func
 from pprint import pprint
@@ -201,7 +209,8 @@ class MeasurementAnalysis(object):
                 fig.savefig(
                     self.savename, dpi=self.dpi, format=plot_format,
                     bbox_inches='tight')
-            except:
+            except Exception as e:
+                print(e)
                 fail_counter = True
         if fail_counter:
             logging.warning('Figure "%s" has not been saved.' % self.savename)
@@ -828,6 +837,14 @@ class MeasurementAnalysis(object):
             x = self.data[0]
             y = self.data[1]
             cols = np.unique(x).shape[0]
+
+            # Adding np.nan for prematurely interupted experiments
+            nr_missing_values = 0
+            if len(x)%cols != 0:
+                nr_missing_values = cols -  len(x)%cols
+            x = np.append(x, np.zeros(nr_missing_values)+np.nan)
+            y = np.append(y, np.zeros(nr_missing_values)+np.nan)
+
             # X,Y,Z can be put in colormap directly
             self.X = x.reshape(-1, cols)
             self.Y = y.reshape(-1, cols)
@@ -836,6 +853,7 @@ class MeasurementAnalysis(object):
 
             if len(self.value_names) == 1:
                 z = self.data[2]
+                z = np.append(z, np.zeros(nr_missing_values)+np.nan)
                 self.Z = z.reshape(-1, cols)
                 self.measured_values = [self.Z.T]
             else:
@@ -843,6 +861,7 @@ class MeasurementAnalysis(object):
                 self.measured_values = []
                 for i in range(len(self.value_names)):
                     z = self.data[2+i]
+                    z = np.append(z, np.zeros(nr_missing_values)+np.nan)
                     Z = z.reshape(-1, cols)
                     self.Z.append(Z)
                     self.measured_values.append(Z.T)
@@ -3494,8 +3513,8 @@ class SSRO_Analysis(MeasurementAnalysis):
             # n1, bins1 = np.histogram(shots_I_1_rot, bins=int(min_len/50),
             #                          normed=1)
 
-            edat, = pylab.plot(bins1[:-1]+0.5*(bins1[1]-bins1[0]), n1, 'bo')
-            gdat, = pylab.plot(bins0[:-1]+0.5*(bins0[1]-bins0[0]), n0, 'ro')
+            gdat, = pylab.plot(bins0[:-1]+0.5*(bins0[1]-bins0[0]), n0, 'C0o')
+            edat, = pylab.plot(bins1[:-1]+0.5*(bins1[1]-bins1[0]), n1, 'C3o')
 
             # n, bins1, patches = np.hist(shots_I_1_rot, bins=int(min_len/50),
             #                               label = '1 I',histtype='step',
@@ -3521,13 +3540,13 @@ class SSRO_Analysis(MeasurementAnalysis):
             y1_1 = norm1*frac1_1*pylab.normpdf(bins1, mu1_1, sigma1_1)
             y0_1 = norm1*(1-frac1_1)*pylab.normpdf(bins1, mu0_1, sigma0_1)
 
-            pylab.semilogy(bins0, y0, 'r', linewidth=1.5)
-            pylab.semilogy(bins0, y1_0, 'r--', linewidth=3.5)
-            pylab.semilogy(bins0, y0_0, 'r--', linewidth=3.5)
+            pylab.semilogy(bins0, y0, 'C0', linewidth=1.5)
+            pylab.semilogy(bins0, y1_0, 'C0--', linewidth=3.5)
+            pylab.semilogy(bins0, y0_0, 'C0--', linewidth=3.5)
 
-            pylab.semilogy(bins1, y1, 'b', linewidth=1.5)
-            pylab.semilogy(bins1, y0_1, 'b--', linewidth=3.5)
-            pylab.semilogy(bins1, y1_1, 'b--', linewidth=3.5)
+            pylab.semilogy(bins1, y1, 'C3', linewidth=1.5)
+            pylab.semilogy(bins1, y0_1, 'C3--', linewidth=3.5)
+            pylab.semilogy(bins1, y1_1, 'C3--', linewidth=3.5)
             pdf_max = (max(max(y0), max(y1)))
             (pylab.gca()).set_ylim(pdf_max/1000, 2*pdf_max)
 
@@ -5291,9 +5310,13 @@ class RandomizedBench_2D_flat_Analysis(RandomizedBenchmarking_Analysis):
 
 class Homodyne_Analysis(MeasurementAnalysis):
 
-    def __init__(self, label='HM', **kw):
+    def __init__(self, label='HM', custom_power_message: dict=None, **kw):
+        # Custome power message is used to create a message in resonator measurements
+        # dict must be custom_power_message={'Power': -15, 'Atten': 86, 'res_len':3e-6}
+        # Power in dBm, Atten in dB and resonator length in m
         kw['label'] = label
         kw['h5mode'] = 'r+'
+        kw['custom_power_message']=custom_power_message
         super().__init__(**kw)
 
     def run_default_analysis(self, print_fit_results=False,
@@ -5387,6 +5410,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
             Model.set_param_hint('theta', value=0, min=-np.pi/2,
                                  max=np.pi/2)
             Model.set_param_hint('slope', value=0, vary=True)
+            
             self.params = Model.make_params()
 
             if fit_window == None:
@@ -5501,7 +5525,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                             y_unit=self.value_units[0],
                                             save=False)
             # ensures that amplitude plot starts at zero
-            ax.set_ylim(ymin=0.0)
+            ax.set_ylim(ymin=-0.001)
 
         elif 'complex' in fitting_model:
             self.plot_complex_results(
@@ -5537,15 +5561,42 @@ class Homodyne_Analysis(MeasurementAnalysis):
             old_vals = ''
 
         if ('hanger' in fitting_model) or ('complex' in fitting_model):
-            textstr = '$f_{\mathrm{center}}$ = %.5f GHz $\pm$ (%.3g) GHz' % (
-                fit_res.params['f0'].value,
-                fit_res.params['f0'].stderr) + '\n' \
-                '$Qc$ = %.1f $\pm$ (%.1f)' % (
-                fit_res.params['Qc'].value,
-                fit_res.params['Qc'].stderr) + '\n' \
-                '$Qi$ = %.1f $\pm$ (%.1f)' % (
-                fit_res.params['Qi'].value, fit_res.params['Qi'].stderr) + \
-                old_vals
+            if kw['custom_power_message'] is None:
+                textstr = '$f_{\mathrm{center}}$ = %.5f GHz $\pm$ (%.3g) GHz' % (
+                    fit_res.params['f0'].value,
+                    fit_res.params['f0'].stderr) + '\n' \
+                    '$Qc$ = %.1f $\pm$ (%.1f)' % (
+                    fit_res.params['Qc'].value,
+                    fit_res.params['Qc'].stderr) + '\n' \
+                    '$Qi$ = %.1f $\pm$ (%.1f)' % (
+                    fit_res.params['Qi'].value, fit_res.params['Qi'].stderr) + \
+                    old_vals
+            else:
+                ###############################################################################
+                # Custom must be a dictionary                                                #
+                # custom_power = {'Power':-15, 'Atten':30, 'res_len':3.6e-6}                   #
+                # Power is power at source in dBm                                             #
+                # Atten is attenuation at sample, including sources attenuation in dB         #
+                # res_len is the lenght of the resonator in m                                 #
+                # All of this is needed to calculate mean photon number and phase velocity    #
+                ###############################################################################
+
+                custom_power = kw['custom_power_message']
+                power_in_w = 10**((custom_power['Power']-custom_power['Atten'])/10)*1e-3
+                mean_ph = (2*(fit_res.params['Q'].value**2)/(fit_res.params['Qc'].value*hbar*(2*pi*fit_res.params['f0'].value*1e9)**2))*power_in_w
+                phase_vel = 4*custom_power['res_len']*fit_res.params['f0'].value*1e9
+                
+                textstr = '$f_{\mathrm{center}}$ = %.5f GHz $\pm$ (%.3g) GHz' % (
+                    fit_res.params['f0'].value,
+                    fit_res.params['f0'].stderr) + '\n' \
+                    '$Qc$ = %.1f $\pm$ (%.1f)' % (
+                    fit_res.params['Qc'].value,
+                    fit_res.params['Qc'].stderr) + '\n' \
+                    '$Qi$ = %.1f $\pm$ (%.1f)' % (
+                    fit_res.params['Qi'].value, fit_res.params['Qi'].stderr) + \
+                    old_vals + '\n' \
+                    '$< n_{\mathrm{ph} }>$ = %.1f' %(mean_ph)   + '\n' \
+                    '$v_{\mathrm{phase}}$ = %.3e m/s' %(phase_vel)
 
         elif fitting_model == 'lorentzian':
             textstr = '$f_{{\mathrm{{center}}}}$ = %.5f GHz ' \

@@ -33,7 +33,7 @@ class UHFQC(Instrument):
     """
 
     def __init__(self, name, device='auto', interface='USB',
-                 address='127.0.0.1', port=8004, **kw):
+                 address='127.0.0.1', port=8004, DIO=True,**kw):
         '''
         Input arguments:
             name:           (str) name of the instrument
@@ -45,7 +45,9 @@ class UHFQC(Instrument):
         t0 = time.time()
         super().__init__(name, **kw)
 
+        self.DIO=DIO
         self._daq = zi.ziDAQServer(address, int(port), 5)
+        # self._daq.setDebugLevel(5)
         if device.lower() == 'auto':
             self._device = zi_utils.autoDetect(self._daq)
         else:
@@ -223,10 +225,11 @@ class UHFQC(Instrument):
         self.system_extclk(1)
 
         # Configure the codeword protocol
-        self.awgs_0_dio_strobe_index(31)
-        self.awgs_0_dio_strobe_slope(1) # rising edge
-        self.awgs_0_dio_valid_index(16)
-        self.awgs_0_dio_valid_polarity(2) # high polarity
+        if self.DIO:
+            self.awgs_0_dio_strobe_index(31)
+            self.awgs_0_dio_strobe_slope(1) # rising edge
+            self.awgs_0_dio_valid_index(16)
+            self.awgs_0_dio_valid_polarity(2) # high polarity
 
 
 
@@ -862,7 +865,7 @@ class UHFQC(Instrument):
                     'setTrigger(0);\n')
         self.awg_string(sequence, timeout=timeout)
 
-    def awg_sequence_acquisition_and_pulse(self, Iwave, Qwave, acquisition_delay):
+    def awg_sequence_acquisition_and_pulse(self, Iwave, Qwave, acquisition_delay, dig_trigger=True):
         if np.max(Iwave) > 1.0 or np.min(Iwave) < -1.0:
             raise KeyError(
                 "exceeding AWG range for I channel, all values should be withing +/-1")
@@ -896,16 +899,21 @@ if(getUserReg(1)){
 }else{
   RO_TRIG=WINT_TRIG;
 }\n"""
-
-        loop_start = """
+        if dig_trigger:
+            loop_start = """
 repeat(loop_cnt) {
 \twaitDigTrigger(1, 1);
+\tplayWave(Iwave, Qwave);\n"""
+        else:
+            loop_start = """
+repeat(loop_cnt) {
 \tplayWave(Iwave, Qwave);\n"""
 
         end_string = """
 \tsetTrigger(WINT_EN + RO_TRIG);
 \tsetTrigger(WINT_EN);
 \twaitWave();
+\twait(4000);
 }
 wait(300);
 setTrigger(0);"""
@@ -913,6 +921,7 @@ setTrigger(0);"""
         string = preamble+wave_I_string+wave_Q_string + \
             loop_start+delay_string+end_string
         self.awg_string(string)
+
 
     def array_to_combined_vector_string(self, array, name):
         # this function cuts up arrays into several vectors of maximum length 1024 that are joined.
@@ -971,7 +980,7 @@ setTrigger(0);"""
         self._daq.sync()
 
     def awg_sequence_acquisition_and_pulse_SSB(
-            self, f_RO_mod, RO_amp, RO_pulse_length, acquisition_delay):
+            self, f_RO_mod, RO_amp, RO_pulse_length, acquisition_delay, dig_trigger=True):
         f_sampling = 1.8e9
         samples = RO_pulse_length*f_sampling
         array = np.arange(int(samples))
@@ -981,7 +990,7 @@ setTrigger(0);"""
         Qwave = (coswave-sinwave)/np.sqrt(2)
         # Iwave, Qwave = PG.mod_pulse(np.ones(samples), np.zeros(samples), f=f_RO_mod, phase=0, sampling_rate=f_sampling)
         self.awg_sequence_acquisition_and_pulse(
-            Iwave, Qwave, acquisition_delay)
+            Iwave, Qwave, acquisition_delay, dig_trigger=dig_trigger)
 
     def upload_transformation_matrix(self, matrix):
         for i in range(np.shape(matrix)[0]):  # looping over the rows

@@ -61,11 +61,11 @@ def acquire_single_linear_frequency_span(file_name, start_freq=None,
     VNA_instr.average_mode(sweep_mode)
 
     VNA_instr.power(power)
-    VNA_instr.timeout(600)
+    VNA_instr.timeout(10**4)
 
     MC_instr.run(name=file_name)
 #     ma.Homodyne_Analysis(auto=True, label=file_name, fitting_model='hanger')
-    ma.VNA_Analysis(auto=True, label=file_name)
+    ma.VNA_Analysis(auto=True, label=file_name, linestyle="-")
 
 
 def acquire_current_trace(file_name):

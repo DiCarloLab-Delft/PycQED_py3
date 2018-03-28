@@ -220,6 +220,11 @@ def CosFunc(t, amplitude, frequency, phase, offset):
 def ExpDecayFunc(t, tau, amplitude, offset, n):
     return amplitude*np.exp(-(t/tau)**n)+offset
 
+def idle_error_rate_exp_decay(N, N1, N2, A, offset):
+    """
+    exponential decay consisting of two components
+    """
+    return A *np.exp(-N/N1-(N/N2)**2) + offset
 
 def gain_corr_ExpDecayFunc(t, tau, amp, gc):
     """
@@ -502,6 +507,22 @@ def exp_dec_guess(model, data, t):
                                n=1,
                                offset=offs_guess)
     return params
+
+
+def idle_err_rate_guess(model, data, N):
+    '''
+    Assumes exponential decay in estimating the parameters
+    '''
+    amp_guess = 0.5
+    offset = np.mean(data)
+    N1 = np.mean(N)
+    N2= np.mean(N)
+    params = model.make_params(A=amp_guess,
+                               N1 = N1,
+                               N2 = N2,
+                               offset=offset)
+    return params
+
 
 
 def fft_freq_phase_guess(data, t):

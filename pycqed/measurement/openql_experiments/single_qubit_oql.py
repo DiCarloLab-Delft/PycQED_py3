@@ -316,6 +316,75 @@ def echo(times, qubit_idx: int, platf_cfg: str):
     return p
 
 
+def idle_error_rate_seq(nr_of_idle_gates,
+                        states: list,
+                        gate_duration_ns: int,
+                        echo: bool,
+                        qubit_idx: int, platf_cfg: str,
+                        post_select=True):
+    """
+    Sequence to perform the idle_error_rate_sequence.
+    Virtually identical to a T1 experiment (Z-basis)
+                        or a ramsey/echo experiment (X-basis)
+
+    Input pars:
+        nr_of_idle_gates : list of integers specifying the number of idle gates
+            corresponding to each data point.
+        gate_duration_ns : integer specifying the duration of the wait gate.
+        states  :       list of states to prepare
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+    Returns:
+        p:              OpenQL Program object containing
+
+
+    """
+    allowed_states = ['0', '1', '+']
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="idle_error_rate", nqubits=platf.get_qubit_number(),
+                p=platf)
+    sweep_points = []
+    for N in nr_of_idle_gates:
+        for state in states:
+            if state not in allowed_states:
+                raise ValueError('State must be in {}'.format(allowed_states))
+            k = Kernel("idle_prep{}_N{}".format(state, N), p=platf)
+            # 1. Preparing in the right basis
+            k.prepz(qubit_idx)
+            if post_select:
+                # adds an initialization measurement used to post-select
+                k.measure(qubit_idx)
+            if state =='1':
+                k.gate('rx180', qubit_idx)
+            elif state == '+':
+                k.gate('rym90', qubit_idx)
+            # 2. The "waiting" gates
+            wait_nanoseconds = N*gate_duration_ns
+            if state == '+' and echo:
+                k.gate("wait", [qubit_idx], wait_nanoseconds//2)
+                k.gate('rx180', qubit_idx)
+                k.gate("wait", [qubit_idx], wait_nanoseconds//2)
+            else:
+                k.gate("wait", [qubit_idx], wait_nanoseconds)
+            # 3. Reading out in the proper basis
+            if state == '+' and echo:
+                k.gate('rym90', qubit_idx)
+            elif state =='+':
+                k.gate('ry90', qubit_idx)
+            k.measure(qubit_idx)
+            p.add_kernel(k)
+        sweep_points.append(N)
+
+    p.set_sweep_points(sweep_points, num_sweep_points=len(sweep_points))
+    p.sweep_points = sweep_points
+    with suppress_stdout():
+        p.compile(verbose=False)
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
+
 def single_elt_on(qubit_idx: int, platf_cfg: str):
     platf = Platform('OpenQL_Platform', platf_cfg)
     p = Program(pname="Single_elt_on", nqubits=platf.get_qubit_number(),
@@ -611,6 +680,7 @@ def add_single_qubit_cal_points(p, platf, qubit_idx):
         k.gate('rx180', qubit_idx)
         k.measure(qubit_idx)
         p.add_kernel(k)
+    return p
 
 
 def FluxTimingCalibration(qubit_idx: int, buffer_time1, times, platf_cfg: str,

@@ -54,6 +54,222 @@ class Single_Qubit_TimeDomainAnalysis(ba.BaseDataAnalysis):
         #                                   self.proc_data_dict['corr_data'])
 
 
+class Idling_Error_Rate_Analyisis(ba.BaseDataAnalysis):
+
+    def __init__(self, t_start: str=None, t_stop: str=None,
+                 label: str='', data_file_path: str=None,
+                 options_dict: dict=None, extract_only: bool=False,
+                 do_fitting: bool=True, auto=True):
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         extract_only=extract_only, do_fitting=do_fitting)
+
+        self.params_dict = {'xlabel': 'sweep_name',
+                            'xunit': 'sweep_unit',
+                            'xvals': 'sweep_points',
+                            'measurementstring': 'measurementstring',
+                            'value_names': 'value_names',
+                            'value_units': 'value_units',
+                            'measured_values': 'measured_values'}
+        self.numeric_params = []
+        if auto:
+            self.run_analysis()
+
+    def process_data(self):
+        post_sel_th = self.options_dict.get('post_sel_th', 0.5)
+        raw_shots = self.raw_data_dict['measured_values'][0][0]
+        post_sel_shots = raw_shots[::2]
+        data_shots = raw_shots[1::2]
+        data_shots[np.where(post_sel_shots > post_sel_th)] = np.nan
+
+        states = ['0', '1', '+']
+        self.proc_data_dict['xvals'] = np.unique(self.raw_data_dict['xvals'])
+        for i, state in enumerate(states):
+            self.proc_data_dict['shots_{}'.format(state)] =data_shots[i::3]
+
+            self.proc_data_dict['yvals_{}'.format(state)] = \
+                np.nanmean(np.reshape(self.proc_data_dict['shots_{}'.format(state)],
+                               (len(self.proc_data_dict['xvals']), -1),
+                               order='F'), axis=1)
+
+
+    def prepare_plots(self):
+        # assumes that value names are unique in an experiment
+        states = ['0', '1', '+']
+        for i, state in enumerate(states):
+            yvals = self.proc_data_dict['yvals_{}'.format(state)]
+            xvals =  self.proc_data_dict['xvals']
+
+            self.plot_dicts['Prepare in {}'.format(state)] = {
+                'ax_id': 'main',
+                'plotfn': self.plot_line,
+                'xvals': xvals,
+                'xlabel': self.raw_data_dict['xlabel'][0],
+                'xunit': self.raw_data_dict['xunit'][0][0],
+                'yvals': yvals,
+                'ylabel': 'Counts',
+                'yrange': [0, 1],
+                'xrange': self.options_dict.get('xrange', None),
+                'yunit': 'frac',
+                'setlabel': 'Prepare in {}'.format(state),
+                'do_legend':True,
+                'title': (self.raw_data_dict['timestamps'][0]+' - ' +
+                          self.raw_data_dict['timestamps'][-1] + '\n' +
+                          self.raw_data_dict['measurementstring'][0]),
+                'legend_pos': 'upper right'}
+        if self.do_fitting:
+            for state in ['0', '1', '+']:
+                self.plot_dicts['fit_{}'.format(state)] = {
+                    'ax_id': 'main',
+                    'plotfn': self.plot_fit,
+                    'fit_res': self.fit_dicts['fit {}'.format(state)]['fit_res'],
+                    'plot_init': self.options_dict['plot_init'],
+                    'setlabel': 'fit |{}>'.format(state),
+                    'do_legend': True,
+                    'legend_pos': 'upper right'}
+
+                self.plot_dicts['fit_text']={
+                    'ax_id':'main',
+                    'box_props': 'fancy',
+                    'xpos':1.05,
+                    'horizontalalignment':'left',
+                    'plotfn': self.plot_text,
+                    'text_string': self.proc_data_dict['fit_msg']}
+
+
+
+    def analyze_fit_results(self):
+        fit_msg =''
+        states = ['0', '1', '+']
+        for state in states:
+            fr = self.fit_res['fit {}'.format(state)]
+            N1 = fr.params['N1'].value, fr.params['N1'].stderr
+            N2 = fr.params['N2'].value, fr.params['N2'].stderr
+            fit_msg += ('Prep |{}> : \n\tN_1 = {:.2g} $\pm$ {:.2g}'
+                    '\n\tN_2 = {:.2g} $\pm$ {:.2g}\n').format(
+                state, N1[0], N1[1], N2[0], N2[1])
+
+        self.proc_data_dict['fit_msg'] = fit_msg
+
+    def prepare_fitting(self):
+        self.fit_dicts = OrderedDict()
+        states = ['0', '1', '+']
+        for i, state in enumerate(states):
+            yvals = self.proc_data_dict['yvals_{}'.format(state)]
+            xvals =  self.proc_data_dict['xvals']
+
+            mod = lmfit.Model(fit_mods.idle_error_rate_exp_decay)
+            mod.guess = fit_mods.idle_err_rate_guess.__get__(mod, mod.__class__)
+
+            # Done here explicitly so that I can overwrite a specific guess
+            guess_pars = mod.guess(N=xvals, data=yvals)
+            vary_N2 = self.options_dict.get('vary_N2', True)
+
+            if not vary_N2:
+                guess_pars['N2'].value = 1e21
+                guess_pars['N2'].vary = False
+            # print(guess_pars)
+            self.fit_dicts['fit {}'.format(states[i])] = {
+                'model': mod,
+                'fit_xvals': {'N': xvals},
+                'fit_yvals': {'data': yvals},
+                'guess_pars': guess_pars}
+            # Allows fixing the double exponential coefficient
+
+
+class Grovers_TwoQubitAllStates_Analysis(ba.BaseDataAnalysis):
+
+    def __init__(self, t_start: str=None, t_stop: str=None,
+                 label: str='', data_file_path: str=None,
+                 options_dict: dict=None, extract_only: bool=False,
+                 do_fitting: bool=True, auto=True):
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         extract_only=extract_only, do_fitting=do_fitting)
+
+        self.params_dict = {'xlabel': 'sweep_name',
+                            'xunit': 'sweep_unit',
+                            'xvals': 'sweep_points',
+                            'measurementstring': 'measurementstring',
+                            'value_names': 'value_names',
+                            'value_units': 'value_units',
+                            'measured_values': 'measured_values'}
+        self.numeric_params = []
+        if auto:
+            self.run_analysis()
+
+    def process_data(self):
+        self.proc_data_dict = OrderedDict()
+        normalize_to_cal_points = self.options_dict.get('normalize_to_cal_points', True)
+        cal_points = [
+                        [[-4, -3], [-2, -1]],
+                        [[-4, -2], [-3, -1]],
+                       ]
+        for idx in [0,1]:
+            yvals = list(self.raw_data_dict['measured_values_ord_dict'].values())[idx][0]
+
+            self.proc_data_dict['ylabel_{}'.format(idx)] = \
+                self.raw_data_dict['value_names'][0][idx]
+            self.proc_data_dict['yunit'] = self.raw_data_dict['value_units'][0][idx]
+
+            if normalize_to_cal_points:
+                yvals = a_tools.normalize_data_v3(yvals,
+                    cal_zero_points=cal_points[idx][0],
+                    cal_one_points=cal_points[idx][1])
+            self.proc_data_dict['yvals_{}'.format(idx)] = yvals
+
+        y0 = self.proc_data_dict['yvals_0']
+        y1 = self.proc_data_dict['yvals_1']
+        p_success = ((y0[0]*y1[0]) +
+                     (1-y0[1])*y1[1] +
+                     (y0[2])*(1-y1[2]) +
+                     (1-y0[3])*(1-y1[3]) )/4
+        print(y0[0]*y1[0])
+        print((1-y0[1])*y1[1])
+        print((y0[2])*(1-y1[2]))
+        print((1-y0[3])*(1-y1[3]))
+        self.proc_data_dict['p_success'] = p_success
+
+
+    def prepare_plots(self):
+        # assumes that value names are unique in an experiment
+        for i in [0, 1]:
+            yvals = self.proc_data_dict['yvals_{}'.format(i)]
+            xvals =  self.raw_data_dict['xvals'][0]
+            ylabel = self.proc_data_dict['ylabel_{}'.format(i)]
+            self.plot_dicts['main_{}'.format(ylabel)] = {
+                'plotfn': self.plot_line,
+                'xvals': self.raw_data_dict['xvals'][0],
+                'xlabel': self.raw_data_dict['xlabel'][0],
+                'xunit': self.raw_data_dict['xunit'][0][0],
+                'yvals': self.proc_data_dict['yvals_{}'.format(i)],
+                'ylabel': ylabel,
+                'yunit': self.proc_data_dict['yunit'],
+                'title': (self.raw_data_dict['timestamps'][0] + ' \n' +
+                          self.raw_data_dict['measurementstring'][0]),
+                'do_legend': False,
+                'legend_pos': 'upper right'}
+
+
+        self.plot_dicts['limit_text']={
+            'ax_id':'main_{}'.format(ylabel),
+            'box_props': 'fancy',
+            'xpos':1.05,
+            'horizontalalignment':'left',
+            'plotfn': self.plot_text,
+            'text_string': 'P succes = {:.3f}'.format(self.proc_data_dict['p_success'])}
+
+
+
+
+
+
+
+
 class FlippingAnalysis(Single_Qubit_TimeDomainAnalysis):
 
     def __init__(self, t_start: str=None, t_stop: str=None,
@@ -715,6 +931,16 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['osc_amp_1'] = (fr_1['amplitude'].value,
                                             fr_1['amplitude'].stderr)
 
+        self.proc_data_dict['osc_offs_0'] = (fr_0['offset'].value,
+                                            fr_0['offset'].stderr)
+        self.proc_data_dict['osc_offs_1'] = (fr_1['offset'].value,
+                                            fr_1['offset'].stderr)
+
+
+        offs_stderr = (fr_0['offset'].stderr**2+fr_1['offset'].stderr**2)**.5
+        self.proc_data_dict['offs_diff'] = (
+            fr_1['offset'].value - fr_0['offset'].value, offs_stderr)
+
         # self.proc_data_dict['osc_amp'] = (osc_amp, osc_amp_stderr)
         self.proc_data_dict['missing_fraction'] = (
             np.mean(self.proc_data_dict['yvals_spec_on'][:-2]) -
@@ -785,7 +1011,10 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                 'Phase off: {:.1f} $\pm$ {:.1f}deg\n'
                 'Phase on: {:.1f} $\pm$ {:.1f}deg\n'
                 'Osc. amp. off: {:.4f} $\pm$ {:.4f}\n'
-                'Osc. amp. on: {:.4f} $\pm$ {:.4f}'.format(
+                'Osc. amp. on: {:.4f} $\pm$ {:.4f}\n'
+                'Offs. diff.: {:.4f} $\pm$ {:.4f}\n'
+                'Osc. offs. off: {:.4f} $\pm$ {:.4f}\n'
+                'Osc. offs. on: {:.4f} $\pm$ {:.4f}'.format(
                     self.proc_data_dict['phi_cond'][0],
                     self.proc_data_dict['phi_cond'][1],
                     self.proc_data_dict['phi_0'][0],
@@ -795,7 +1024,13 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                     self.proc_data_dict['osc_amp_0'][0],
                     self.proc_data_dict['osc_amp_0'][1],
                     self.proc_data_dict['osc_amp_1'][0],
-                    self.proc_data_dict['osc_amp_1'][1]))
+                    self.proc_data_dict['osc_amp_1'][1],
+                    self.proc_data_dict['offs_diff'][0],
+                    self.proc_data_dict['offs_diff'][1],
+                    self.proc_data_dict['osc_offs_0'][0],
+                    self.proc_data_dict['osc_offs_0'][1],
+                    self.proc_data_dict['osc_offs_1'][0],
+                    self.proc_data_dict['osc_offs_1'][1]))
             self.plot_dicts['phase_message'] = {
                 'ax_id': 'main',
                 'ypos': 0.9,

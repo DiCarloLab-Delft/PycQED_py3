@@ -61,6 +61,12 @@ class Base_LutMan(Instrument):
         self._wave_dict = {}
         self.set_default_lutmap()
 
+    def time_to_sample(self, time):
+        """
+        Takes a time in seconds and returns the corresponding sample
+        """
+        return int(time*self.sampling_rate())
+
     def set_default_lutmap(self):
         """
         Sets the "LutMap" parameter to

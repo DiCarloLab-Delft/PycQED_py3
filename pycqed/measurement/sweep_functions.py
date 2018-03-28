@@ -926,25 +926,43 @@ class lutman_par_dB_attenuation_UHFQC_dig_trig(Soft_Sweep):
         if self.run:
             self.LutMan.AWG.get_instr().acquisition_arm(single=self.single)
 
+class multi_sweep_function(Soft_Sweep):
+    '''
+    cascades several sweep functions into a single joint sweep functions.
+    '''
+    def __init__(self, sweep_functions: list, parameter_name=None,name=None,**kw):
+        self.set_kw()
+        self.sweep_functions = sweep_functions
+        self.sweep_control = 'soft'
+        self.name = name or 'multi_sweep'
+        self.unit = sweep_functions[0].unit
+        self.parameter_name = parameter_name or 'multiple_parameters'
+        for i, sweep_function in enumerate(sweep_functions):
+            if self.unit.lower() != sweep_function.unit.lower():
+                raise ValueError('units of the sweepfunctions are not equal')
+
+    def set_parameter(self, val):
+        for sweep_function in self.sweep_functions:
+            sweep_function.set_parameter(val)
 
 class two_par_joint_sweep(Soft_Sweep):
     """
     Allows jointly sweeping two parameters while preserving their
     respective ratios.
+    Allows par_A and par_B to be arrays of parameters
     """
     def __init__(self, par_A, par_B, preserve_ratio: bool=True, **kw):
         self.set_kw()
-        self.name = par_A.name
-        self.parameter_name = par_A.name
         self.unit = par_A.unit
         self.sweep_control = 'soft'
-
         self.par_A = par_A
         self.par_B = par_B
+        self.name = par_A.name
+        self.parameter_name = par_A.name
         if preserve_ratio:
             try:
                 self.par_ratio = self.par_B.get()/self.par_A.get()
-            except NotImplementedError:
+            except:
                 self.par_ratio = (self.par_B.get_latest()/
                                   self.par_A.get_latest())
         else:
