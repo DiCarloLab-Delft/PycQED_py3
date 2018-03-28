@@ -20,7 +20,6 @@ from qcodes.utils import validators as vals
 from qcodes.plots.colors import color_cycle
 
 
-
 try:
     import msvcrt  # used on windows to catch keyboard input
 except:
@@ -148,7 +147,8 @@ class MeasurementControl(Instrument):
         self.print_measurement_start_msg()
 
         self.mode = mode
-        self.iteration = 0  # used in determining data writing indices (deprecated?)
+        # used in determining data writing indices (deprecated?)
+        self.iteration = 0
 
         # used for determining data writing indices and soft averages
         self.total_nr_acquired_values = 0
@@ -214,11 +214,12 @@ class MeasurementControl(Instrument):
             while self.get_percdone() < 100:
                 start_idx = self.get_datawriting_start_idx()
                 if len(self.sweep_functions) == 1:
-                    self.sweep_functions[0].set_parameter(sweep_points[start_idx])
+                    self.sweep_functions[0].set_parameter(
+                        sweep_points[start_idx])
                     self.detector_function.prepare(
                         sweep_points=self.get_sweep_points())
                     self.measure_hard()
-                else: # If mode is 2D
+                else:  # If mode is 2D
                     for i, sweep_function in enumerate(self.sweep_functions):
                         swf_sweep_points = sweep_points[:, i]
                         val = swf_sweep_points[start_idx]
@@ -275,7 +276,7 @@ class MeasurementControl(Instrument):
                 # of an optimization post experiment
                 self.adaptive_result = \
                     self.adaptive_function(self.optimization_function,
-                                      **self.af_pars)
+                                           **self.af_pars)
             except StopIteration:
                 print('Reached f_termination: %s' % (self.f_termination))
         else:
@@ -370,7 +371,6 @@ class MeasurementControl(Instrument):
             # is either expensive (e.g., loading a waveform) or has adverse
             # effects (e.g., phase scrambling when setting a MW frequency.
 
-
             # x[::-1] changes the order in which the parameters are set, so
             # it is first the outer sweep point and then the inner.This
             # is generally not important except for specifics: f.i. the phase
@@ -453,8 +453,13 @@ class MeasurementControl(Instrument):
             for i in range(len(x)):
                 x[i] = float(x[i])/float(self.x_scale[i])
 
+        vals = self.measurement_function(x)
+        # This takes care of data that comes from a "single" segment of a
+        # detector for a larger shape such as the UFHQC single int avg detector
+        # that gives back data in the shape [[I_val_seg0, Q_val_seg0]]
+        if len(np.shape(vals)) == 2:
+            vals = np.array(vals)[:, 0]
         if self.minimize_optimization:
-            vals = self.measurement_function(x)
             if (self.f_termination is not None):
                 if (vals < self.f_termination):
                     raise StopIteration()
@@ -471,6 +476,7 @@ class MeasurementControl(Instrument):
         if hasattr(vals, '__iter__'):
             if len(vals) > 1:
                 vals = vals[self.par_idx]
+
         return vals
 
     def finish(self, result):
@@ -720,7 +726,6 @@ class MeasurementControl(Instrument):
             except Exception as e:
                 logging.warning(e)
 
-
     def initialize_plot_monitor_adaptive_cma(self):
         '''
         Uses the Qcodes plotting windows for plotting adaptive plot updates
@@ -732,7 +737,6 @@ class MeasurementControl(Instrument):
         self.curves = []
         self.curves_best_ever = []
         self.curves_distr_mean = []
-
 
         xlabels = self.sweep_par_names
         xunits = self.sweep_par_units
@@ -760,7 +764,7 @@ class MeasurementControl(Instrument):
                                              subplot=j+1,
                                              color=0.75,  # a grayscale value
                                              symbol='o',
-                                             pen=None, # makes it a scatter
+                                             pen=None,  # makes it a scatter
                                              symbolSize=5)
 
                 self.main_QtPlot.add(x=[0], y=[0],
@@ -773,7 +777,6 @@ class MeasurementControl(Instrument):
                                      color=color_cycle[0],
                                      symbol='o', symbolSize=5)
                 self.curves.append(self.main_QtPlot.traces[-1])
-
 
                 self.main_QtPlot.add(x=[0], y=[0],
                                      xlabel=xlab,
@@ -796,7 +799,6 @@ class MeasurementControl(Instrument):
                                      symbol='star',  symbolSize=10)
                 self.curves_best_ever.append(self.main_QtPlot.traces[-1])
 
-
                 j += 1
             self.main_QtPlot.win.nextRow()
 
@@ -805,7 +807,7 @@ class MeasurementControl(Instrument):
         ##########################################
 
         self.secondary_QtPlot.clear()
-        self.iter_traces=[]
+        self.iter_traces = []
         self.iter_bever_traces = []
         self.iter_mean_traces = []
         for j in range(len(self.detector_function.value_names)):
@@ -844,7 +846,6 @@ class MeasurementControl(Instrument):
 
         # required for the first update call to work
         self.time_last_ad_plot_update = time.time()
-
 
     def update_plotmon_adaptive_cma(self, force_update=False):
         """
@@ -888,7 +889,8 @@ class MeasurementControl(Instrument):
                             # std_x = self.opt_res_dset[:, 2+nr_sweep_funcs+x_ind]
                             # to be replaced with an actual mean
                             mean_y = self.opt_res_dset[:, 2+2*nr_sweep_funcs]
-                            mean_y = get_generation_means(self.opt_res_dset[:, 1] , y)
+                            mean_y = get_generation_means(
+                                self.opt_res_dset[:, 1], y)
                             # TODO: turn into errorbars
                             self.curves_distr_mean[i]['config']['x'] = mean_x
                             self.curves_distr_mean[i]['config']['y'] = mean_y
@@ -907,11 +909,10 @@ class MeasurementControl(Instrument):
                         self.iter_mean_traces[j]['config']['x'] = gen_idx
                         self.iter_mean_traces[j]['config']['y'] = mean_y
 
-
-
                         # This plots the best ever measured value vs iteration
                         # number of evals column
-                        best_evals_idx = (self.opt_res_dset[:, -1] - 1).astype(int)
+                        best_evals_idx = (
+                            self.opt_res_dset[:, -1] - 1).astype(int)
                         best_func_val = y[best_evals_idx]
                         self.iter_bever_traces[j]['config']['x'] = best_evals_idx
                         self.iter_bever_traces[j]['config']['y'] = best_func_val
@@ -920,7 +921,6 @@ class MeasurementControl(Instrument):
                     self.secondary_QtPlot.update_plot()
 
                     self.time_last_ad_plot_update = time.time()
-
 
             except Exception as e:
                 logging.warning(e)
@@ -1020,9 +1020,8 @@ class MeasurementControl(Instrument):
         data_group.attrs['value_units'] = h5d.encode_to_utf8(
             self.detector_function.value_units)
 
-
     def create_experiment_result_dict(self):
-        try :
+        try:
             # only exists as an open dataset when running an
             # optimization
             opt_res_dset = self.opt_res_dset[()]
@@ -1057,12 +1056,12 @@ class MeasurementControl(Instrument):
         """
         # code extra verbose to understand what is going on
         generation = es.result.iterations
-        evals = es.result.evaluations # number of evals at start of each gen
+        evals = es.result.evaluations  # number of evals at start of each gen
         xfavorite = es.result.xfavorite  # center of distribution, best est
         stds = es.result.stds   # stds of distribution, stds of xfavorite
         fbest = es.result.fbest  # best ever measured
         xbest = es.result.xbest  # coordinates of best ever measured
-        evals_best = es.result.evals_best # index of best measurement
+        evals_best = es.result.evals_best  # index of best measurement
 
         if not self.minimize_optimization:
             fbest = -fbest
@@ -1083,7 +1082,7 @@ class MeasurementControl(Instrument):
                 'generation, ' + 'evaluations, ' +
                 'xfavorite, ' * len(xfavorite) +
                 'stds, '*len(stds) +
-                'fbest, ' + 'xbest, '*len(xbest)+
+                'fbest, ' + 'xbest, '*len(xbest) +
                 'best evaluation,')
 
         old_shape = self.opt_res_dset.shape
@@ -1252,7 +1251,6 @@ class MeasurementControl(Instrument):
     def get_datetimestamp(self):
         return time.strftime('%Y%m%d_%H%M%S', time.localtime())
 
-
     def get_datawriting_start_idx(self):
         if self.mode == 'adaptive':
             max_sweep_points = np.inf
@@ -1261,10 +1259,10 @@ class MeasurementControl(Instrument):
 
         start_idx = int(self.total_nr_acquired_values % max_sweep_points)
 
-        self.soft_iteration =int(self.total_nr_acquired_values//max_sweep_points)
+        self.soft_iteration = int(
+            self.total_nr_acquired_values//max_sweep_points)
 
         return start_idx
-
 
     def get_datawriting_indices_update_ctr(self, new_data,
                                            update: bool=True):
@@ -1283,11 +1281,15 @@ class MeasurementControl(Instrument):
             # Soft detector (returns values 1 by 1)
             if len(self.detector_function.value_names) == np.shape(new_data)[0]:
                 xlen = 1
-            else: # 1D Hard detector (returns values in chunks)
+            else:  # 1D Hard detector (returns values in chunks)
                 xlen = len(new_data)
         else:
-            # in case of an N-D Hard detector dataset
-            xlen = np.shape(new_data)[0]
+            if self.detector_function.detector_control == 'soft':
+                # FIXME: this is an inconsistency that should not be there.
+                xlen = np.shape(new_data)[1]
+            else:
+                # in case of an N-D Hard detector dataset
+                xlen = np.shape(new_data)[0]
 
         start_idx = self.get_datawriting_start_idx()
         stop_idx = start_idx + xlen

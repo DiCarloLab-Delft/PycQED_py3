@@ -118,7 +118,7 @@ class ziShellEnvironment:
         print("Connecting to server on host {0}:{1} using API level {2}".format(
             host, port, api_level))
         self.daq = zi.ziDAQServer(host, port, api_level)
-        self.daq.setDebugLevel(0)
+        # self.daq.setDebugLevel(5)
 
     def autoconnect(self):
         if not self.daq:
@@ -745,7 +745,7 @@ class ziShellDevice:
         if not self.daq:
             raise(ziShellDAQError())
 
-        self.daq.setDebugLevel(0)
+        # self.daq.setDebugLevel(5)
         self.connected = False
 
         if self.device and self.interface:

@@ -610,7 +610,7 @@ class ZI_HDAWG8(ZI_base_instrument):
                 # FIXME: this is a protocol that does identical flux pulses
                 # on each channel.
                 self.set('awgs_{}_dio_mask_value'.format(awg_nr), 2**3-1)
-                self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
+                self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 3)
 
         ####################################################
         # Turn on device

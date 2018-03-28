@@ -1,7 +1,33 @@
 import os
 import pycqed as pq
 import qcodes as qc
-station = qc.station
+
+station = qc.Station()
+
+
+from pycqed.instrument_drivers.physical_instruments.ZurichInstruments import UHFQuantumController as ZI_UHFQC
+
+UHFQC = ZI_UHFQC.UHFQC('UHFQC', device='dev2320', server_name=None)
+station.add_component(UHFQC)
+UHFQC.timeout(60)
+
+from pycqed.instrument_drivers.physical_instruments import QuTech_CCL
+
+CCL = QuTech_CCL.CCL('CCL', address='192.168.0.11', port=5025)
+cs_filepath = os.path.join(pq.__path__[0], 'measurement', 'openql_experiments',
+                           'output', 'cs.txt')
+print("cs_file_path",cs_filepath)
+opc_filepath = os.path.join(pq.__path__[0], 'measurement', 'openql_experiments',
+                           'output', 'qisa_opcodes.qmap')
+CCL.control_store(cs_filepath)
+CCL.qisa_opcode(opc_filepath)
+CCL.num_append_pts(2)
+station.add_component(CCL)
+
+from pycqed.instrument_drivers.meta_instrument.LutMans.ro_lutman import UHFQC_RO_LutMan
+RO_lutman = UHFQC_RO_LutMan('RO_lutman', num_res=7)
+RO_lutman.AWG(UHFQC.name)
+station.add_component(RO_lutman)
 
 
 # making full DIO triggered lookuptable
@@ -16,7 +42,7 @@ example_fp = os.path.abspath(os.path.join(
 CCL.eqasm_program(example_fp)
 CCL.start()
 
-amps = [0.1, 0.2, 0.3, 0.4, 0.5]
+amps = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]
 rolut.sampling_rate(1.8e9)
 # testing single pulse sequence
 for i in range(5):
@@ -34,13 +60,16 @@ for i in range(5):
     rolut.set('M_modulation_R{}'.format(i), 0)
 
 rolut.acquisition_delay(200e-9)
+
+    
 UHFQC.quex_rl_length(1)
 UHFQC.quex_wint_length(int(600e-9*1.8e9))
-UHFQC.awgs_0_enable(1)
 rolut.AWG('UHFQC')
 rolut.generate_standard_waveforms()
 rolut.pulse_type('M_up_down_down')
-rolut.resonator_combinations([[0], [1], [2], [3], [4]])
-rolut.load_DIO_triggered_sequence_onto_UHFQC()
+rolut.resonator_combinations([[0],[1],[2],[3],[4],[5],[6]])
 UHFQC.awgs_0_userregs_0(1024)
+
+UHFQC.awgs_0_enable(0)
+rolut.load_DIO_triggered_sequence_onto_UHFQC()
 UHFQC.awgs_0_enable(1)

@@ -3513,8 +3513,8 @@ class SSRO_Analysis(MeasurementAnalysis):
             # n1, bins1 = np.histogram(shots_I_1_rot, bins=int(min_len/50),
             #                          normed=1)
 
-            edat, = pylab.plot(bins1[:-1]+0.5*(bins1[1]-bins1[0]), n1, 'bo')
-            gdat, = pylab.plot(bins0[:-1]+0.5*(bins0[1]-bins0[0]), n0, 'ro')
+            gdat, = pylab.plot(bins0[:-1]+0.5*(bins0[1]-bins0[0]), n0, 'C0o')
+            edat, = pylab.plot(bins1[:-1]+0.5*(bins1[1]-bins1[0]), n1, 'C3o')
 
             # n, bins1, patches = np.hist(shots_I_1_rot, bins=int(min_len/50),
             #                               label = '1 I',histtype='step',
@@ -3540,13 +3540,13 @@ class SSRO_Analysis(MeasurementAnalysis):
             y1_1 = norm1*frac1_1*pylab.normpdf(bins1, mu1_1, sigma1_1)
             y0_1 = norm1*(1-frac1_1)*pylab.normpdf(bins1, mu0_1, sigma0_1)
 
-            pylab.semilogy(bins0, y0, 'r', linewidth=1.5)
-            pylab.semilogy(bins0, y1_0, 'r--', linewidth=3.5)
-            pylab.semilogy(bins0, y0_0, 'r--', linewidth=3.5)
+            pylab.semilogy(bins0, y0, 'C0', linewidth=1.5)
+            pylab.semilogy(bins0, y1_0, 'C0--', linewidth=3.5)
+            pylab.semilogy(bins0, y0_0, 'C0--', linewidth=3.5)
 
-            pylab.semilogy(bins1, y1, 'b', linewidth=1.5)
-            pylab.semilogy(bins1, y0_1, 'b--', linewidth=3.5)
-            pylab.semilogy(bins1, y1_1, 'b--', linewidth=3.5)
+            pylab.semilogy(bins1, y1, 'C3', linewidth=1.5)
+            pylab.semilogy(bins1, y0_1, 'C3--', linewidth=3.5)
+            pylab.semilogy(bins1, y1_1, 'C3--', linewidth=3.5)
             pdf_max = (max(max(y0), max(y1)))
             (pylab.gca()).set_ylim(pdf_max/1000, 2*pdf_max)
 

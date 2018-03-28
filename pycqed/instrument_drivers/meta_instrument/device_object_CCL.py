@@ -8,6 +8,7 @@ from pycqed.measurement import detector_functions as det
 from pycqed.measurement import sweep_functions as swf
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import measurement_analysis as ma2
+import networkx as nx
 
 try:
     from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
@@ -33,6 +34,13 @@ class DeviceCCL(Instrument):
                            parameter_class=ManualParameter,
                            initial_value=[],
                            vals=vals.Lists(elt_validator=vals.Strings()))
+
+        self.add_parameter('qubit_edges',
+                           parameter_class=ManualParameter,
+                           docstring="Denotes edges that connect qubits. "
+                           "Used to define the device topology.",
+                           initial_value=[[]],
+                           vals=vals.Lists(elt_validator=vals.Lists()))
 
         self.add_parameter(
             'ro_lo_freq', unit='Hz',
@@ -93,13 +101,6 @@ class DeviceCCL(Instrument):
                            initial_value=False,
                            parameter_class=ManualParameter)
 
-        self.add_parameter('ro_qubits_list',
-                           vals=vals.Lists(elt_validator=vals.Strings()),
-                           parameter_class=ManualParameter,
-                           docstring="Select which qubits to readout \
-                                by default detector. Empty list means all.",
-                           initial_value=[])
-
         self.add_parameter('cfg_openql_platform_fn',
                            label='OpenQL platform configuration filename',
                            parameter_class=ManualParameter,
@@ -157,10 +158,6 @@ class DeviceCCL(Instrument):
         set the parameters of the individual qubits to be compatible
         with multiplexed readout.
         """
-
-        ro_qb_list = self.ro_qubits_list()
-        if ro_qb_list == []:
-            ro_qb_list = self.qubits()
 
         if self.ro_acq_weight_type() == 'optimal':
             nr_of_acquisition_channels_per_qubit = 1
@@ -263,26 +260,27 @@ class DeviceCCL(Instrument):
             value_names         : convenient labels
         """
         if qubits is None:
-            qubits = self.ro_qubits_list()
+            qubits = self.qubits()
 
         channels_list = []  # tuples (instrumentname, channel, description)
 
-        for qb_name in self.qubits():
-            if self.ro_qubits_list() and qb_name not in self.ro_qubits_list():
-                continue
-
+        for qb_name in reversed(qubits):
+            # ensures that the LSQ (last one) get's assigned the lowest ch_idx
             qb = self.find_instrument(qb_name)
             acq_instr_name = qb.instr_acquisition()
 
             # one channel per qb
             if self.ro_acq_weight_type() == 'optimal':
                 ch_idx = qb.ro_acq_weight_chI()
-                channels_list.append((acq_instr_name, ch_idx, qb_name))
+                channels_list.append((acq_instr_name, ch_idx,
+                                      'w{} {}'.format(ch_idx, qb_name)))
             else:
                 ch_idx = qb.ro_acq_weight_chI()
-                channels_list.append((acq_instr_name, ch_idx, qb_name + " I"))
+                channels_list.append((acq_instr_name, ch_idx,
+                                      'w{} {} I'.format(ch_idx, qb_name)))
                 ch_idx = qb.ro_acq_weight_chQ()
-                channels_list.append((acq_instr_name, ch_idx, qb_name + " Q"))
+                channels_list.append((acq_instr_name, ch_idx,
+                                      'w{} {} Q'.format(ch_idx, qb_name)))
 
         # for now, implement only working with one UHFLI
         acq_instruments = list(set([inst for inst, _, _ in channels_list]))
@@ -301,7 +299,7 @@ class DeviceCCL(Instrument):
         detectors.
         """
         acq_instruments, ro_ch_idx, value_names = \
-            self._get_ro_channels_and_labels(self.ro_qubits_list())
+            self._get_ro_channels_and_labels(self.qubits())
 
         if self.ro_acq_weight_type() == 'optimal':
             # todo: digitized mode
@@ -348,7 +346,7 @@ class DeviceCCL(Instrument):
             result_logging_mode = 'raw'
 
         acq_instruments, ro_ch_idx, value_names = \
-            self._get_ro_channels_and_labels(self.ro_qubits_list())
+            self._get_ro_channels_and_labels()
 
         int_avg_det = det.UHFQC_integrated_average_detector(
             channels=ro_ch_idx,
@@ -364,9 +362,8 @@ class DeviceCCL(Instrument):
         """
         turn on and configure the RO LO's of all qubits to be measured.
         """
-        ro_qb_list = self.ro_qubits_list()
-        if ro_qb_list == []:
-            ro_qb_list = self.qubits()
+
+        ro_qb_list = self.qubits()
 
         for qb_name in ro_qb_list:
             LO = self.find_instrument(qb_name).instr_LO_ro.get_instr()
@@ -380,7 +377,7 @@ class DeviceCCL(Instrument):
         let the lutman configure the readout AWGs.
         """
         # these are the qubits that should be possible to read out
-        ro_qb_list = self.ro_qubits_list()
+        ro_qb_list = self.qubits()
         if ro_qb_list == []:
             ro_qb_list = self.qubits()
 
@@ -523,16 +520,16 @@ class DeviceCCL(Instrument):
         angles = np.arange(0, 341, 20)
         p = mqo.conditional_oscillation_seq(q0idx, q1idx,
                                             platf_cfg=self.cfg_openql_platform_fn(),
-                                   angles=angles, wait_time=wait_time_ns,
-                                   flux_codeword=flux_codeword,
-                                   CZ_disabled=False)
+                                            angles=angles, wait_time=wait_time_ns,
+                                            flux_codeword=flux_codeword,
+                                            CZ_disabled=False)
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr(),
                              parameter_name='Phase', unit='deg')
         MC.set_sweep_function(s)
         MC.set_sweep_points(p.sweep_points)
         MC.set_detector_function(self.get_correlation_detector())
-        MC.run('conditional_oscillation{}'.format(self.msmt_suffix, label),
+        MC.run('conditional_oscillation{}{}'.format(self.msmt_suffix, label),
                disable_snapshot_metadata=disable_metadata)
 
         a = ma2.Conditional_Oscillation_Analysis(
@@ -612,11 +609,13 @@ class DeviceCCL(Instrument):
             a = ma.MeasurementAnalysis(close_main_fig=close_fig)
         return a
 
-    def measure_two_qubit_SSRO(self, q0: str, q1: str,
+    def measure_two_qubit_SSRO(self,
+                               qubits: list,
                                detector=None,
-                               nr_shots: int=4092*4,
+                               nr_shots: int=4088*4,
                                prepare_for_timedomain: bool =True,
                                result_logging_mode='lin_trans',
+                               initialize: bool=True,
                                analyze=True,
                                MC=None):
         if prepare_for_timedomain:
@@ -624,19 +623,30 @@ class DeviceCCL(Instrument):
         if MC is None:
             MC = self.instr_MC.get_instr()
 
+        # count from back because q0 is the least significant qubit
+        q0 = qubits[-1]
+        q1 = qubits[-2]
+
         assert q0 in self.qubits()
         assert q1 in self.qubits()
 
         q0idx = self.find_instrument(q0).cfg_qubit_nr()
         q1idx = self.find_instrument(q1).cfg_qubit_nr()
 
-        p = mqo.two_qubit_off_on(q0idx, q1idx,
-                                 platf_cfg=self.cfg_openql_platform_fn())
+        # p = mqo.two_qubit_off_on(q0idx, q1idx,
+        #                          platf_cfg=self.cfg_openql_platform_fn())
+
+        p = mqo.multi_qubit_off_on([q1idx, q0idx],
+                                   initialize=initialize,
+                                   second_excited_state=False,
+                                   platf_cfg=self.cfg_openql_platform_fn())
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr())
         if detector is None:
-            d = self.get_int_logging_detector([q0, q1],
+            # right is LSQ
+            d = self.get_int_logging_detector([q1, q0],
                                               result_logging_mode='lin_trans')
+            d.nr_shots = 4088  # To ensure proper data binning
         else:
             d = detector
 
@@ -648,12 +658,13 @@ class DeviceCCL(Instrument):
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
         MC.set_detector_function(d)
-        MC.run('SSRO_{}_{}_{}'.format(q0, q1, self.msmt_suffix))
+        MC.run('SSRO_{}_{}_{}'.format(q1, q0, self.msmt_suffix))
 
         MC.soft_avg(old_soft_avg)
         MC.live_plot_enabled(old_live_plot_enabled)
         if analyze:
-            a = mra.two_qubit_ssro_fidelity('SSRO_{}_{}'.format(q0, q1))
+            a = mra.two_qubit_ssro_fidelity('SSRO_{}_{}'.format(q1, q0))
+            a = ma2.Multiplexed_Readout_Analysis()
         return a
 
     def measure_chevron(self, q0: str, q_spec: str,
@@ -822,9 +833,9 @@ class DeviceCCL(Instrument):
         fl_lutman_q1 = self.find_instrument(q1).instr_LutMan_Flux.get_instr()
 
         p = mqo.conditional_oscillation_seq(q0idx, q1idx,
-                                   platf_cfg=self.cfg_openql_platform_fn(),
-                                   CZ_disabled=False, add_cal_points=False,
-                                   angles=[90])
+                                            platf_cfg=self.cfg_openql_platform_fn(),
+                                            CZ_disabled=False, add_cal_points=False,
+                                            angles=[90])
 
         CC = self.instr_CC.get_instr()
         CC.eqasm_program(p.filename)
@@ -854,7 +865,7 @@ class DeviceCCL(Instrument):
         MC.run('{}_CZphase'.format(q0))
 
         a = ma2.Intersect_Analysis(options_dict={'ch_idx_A': ch_idx,
-                                       'ch_idx_B': ch_idx})
+                                                 'ch_idx_B': ch_idx})
 
         phase_corr_amp = a.get_intersect()[0]
         if phase_corr_amp > np.max(amps) or phase_corr_amp < np.min(amps):
@@ -881,9 +892,9 @@ class DeviceCCL(Instrument):
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
 
         p = mqo.conditional_oscillation_seq(q0idx, q1idx,
-                                   platf_cfg=self.cfg_openql_platform_fn(),
-                                   CZ_disabled=False, add_cal_points=False,
-                                   angles=[90])
+                                            platf_cfg=self.cfg_openql_platform_fn(),
+                                            CZ_disabled=False, add_cal_points=False,
+                                            angles=[90])
 
         CC = self.instr_CC.get_instr()
         CC.eqasm_program(p.filename)
@@ -913,3 +924,75 @@ class DeviceCCL(Instrument):
             if update:
                 self.find_instrument(q0).fl_cz_phase_corr_amp(phase_corr_amp)
             return True
+
+    def create_dep_graph(self):
+        dags = []
+        for qi in self.qubits():
+            q_obj = self.find_instrument(qi)
+            if hasattr(q_obj, '_dag'):
+                dag = q_obj._dag
+            else:
+                dag = q_obj.create_dep_graph()
+            dags.append(dag)
+
+        dag = nx.compose_all(dags)
+
+        dag.add_node(self.name+' multiplexed readout')
+        dag.add_node(self.name+' resonator frequencies coarse')
+        dag.add_node('AWG8 MW-staircase')
+        dag.add_node('AWG8 Flux-staircase')
+
+        # Timing of channels can be done independent of the qubits
+        # it is on a per frequency per feedline basis so not qubit specific
+        dag.add_node(self.name + ' mw-ro timing')
+        dag.add_edge(self.name + ' mw-ro timing', 'AWG8 MW-staircase')
+
+        for edge_L, edge_R in self.qubit_edges():
+            dag.add_node('Chevron {}-{}'.format(edge_L, edge_R))
+            dag.add_node('CZ {}-{}'.format(edge_L, edge_R))
+
+            dag.add_edge('CZ {}-{}'.format(edge_L, edge_R),
+                         'Chevron {}-{}'.format(edge_L, edge_R))
+            dag.add_edge('CZ {}-{}'.format(edge_L, edge_R),
+                         '{} cryo dist. corr.'.format(edge_L))
+            dag.add_edge('CZ {}-{}'.format(edge_L, edge_R),
+                         '{} cryo dist. corr.'.format(edge_R))
+
+            dag.add_edge('Chevron {}-{}'.format(edge_L, edge_R),
+                         '{} single qubit gates fine'.format(edge_L))
+            dag.add_edge('Chevron {}-{}'.format(edge_L, edge_R),
+                         '{} single qubit gates fine'.format(edge_R))
+            dag.add_edge('Chevron {}-{}'.format(edge_L, edge_R),
+                         'AWG8 Flux-staircase')
+            dag.add_edge('Chevron {}-{}'.format(edge_L, edge_R),
+                         self.name+' multiplexed readout')
+
+            dag.add_node('{}-{} mw-flux timing'.format(edge_L, edge_R))
+
+            dag.add_edge(edge_L+' cryo dist. corr.',
+                         '{}-{} mw-flux timing'.format(edge_L, edge_R))
+            dag.add_edge(edge_R+' cryo dist. corr.',
+                         '{}-{} mw-flux timing'.format(edge_L, edge_R))
+
+            dag.add_edge('Chevron {}-{}'.format(edge_L, edge_R),
+                         '{}-{} mw-flux timing'.format(edge_L, edge_R))
+            dag.add_edge('{}-{} mw-flux timing'.format(edge_L, edge_R),
+                         'AWG8 Flux-staircase')
+
+        for qubit in self.qubits():
+            dag.add_edge(qubit+' room temp. dist. corr.',
+                         'AWG8 Flux-staircase')
+            dag.add_edge(self.name+' multiplexed readout',
+                         qubit+' optimal weights')
+
+            dag.add_edge(qubit+' resonator frequency',
+                         self.name+' resonator frequencies coarse')
+            dag.add_edge(qubit+' pulse amplitude coarse', 'AWG8 MW-staircase')
+
+        for qi in self.qubits():
+            q_obj = self.find_instrument(qi)
+            # ensures all references are to the main dag
+            q_obj._dag = dag
+
+        self._dag = dag
+        return dag

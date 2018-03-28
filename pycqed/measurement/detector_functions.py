@@ -269,7 +269,7 @@ class Dummy_Shots_Detector(Hard_Detector):
     def get_values(self):
         x = self.sweep_points
 
-        start_idx = self.times_called*self.max_shots%len(x)
+        start_idx = self.times_called*self.max_shots % len(x)
 
         dat = x[start_idx:start_idx+self.max_shots]
         self.times_called += 1
@@ -835,6 +835,29 @@ class Dummy_Detector_Soft(Soft_Detector):
         return np.array([np.sin(x/np.pi), np.cos(x/np.pi)])
 
 
+class Dummy_Detector_Soft_diff_shape(Soft_Detector):
+    # For testing purpose, returns data in a slightly different shape
+
+    def __init__(self, delay=0, **kw):
+        self.set_kw()
+        self.delay = delay
+        self.detector_control = 'soft'
+        self.name = 'Dummy_Detector_Soft'
+        self.value_names = ['I', 'Q']
+        self.value_units = ['V', 'V']
+        self.i = 0
+        # self.x can be used to set x value externally
+        self.x = None
+
+    def acquire_data_point(self, **kw):
+        if self.x is None:
+            x = self.i/15.
+        self.i += 1
+        time.sleep(self.delay)
+        # This is the format an N-D detector returns data in.
+        return np.array([[np.sin(x/np.pi), np.cos(x/np.pi)]]).reshape(2, -1)
+
+
 class QX_Detector(Soft_Detector):
 
     def __init__(self, qxc, delay=0, **kw):
@@ -902,7 +925,7 @@ class Function_Detector(Soft_Detector):
 
     def __init__(self, get_function, value_names=None,
                  detector_control: str='soft',
-                 value_units: list=None, msmt_kw:dict ={},
+                 value_units: list=None, msmt_kw: dict ={},
                  result_keys: list=None,
                  prepare_function=None, prepare_function_kw: dict={},
                  always_prepare: bool=False, **kw):
@@ -925,7 +948,6 @@ class Function_Detector(Soft_Detector):
     def prepare(self, **kw):
         if self.prepare_function is not None:
             self.prepare_function(**self.prepare_function_kwargs)
-
 
     def acquire_data_point(self, **kw):
         measurement_kwargs = {}
@@ -1432,8 +1454,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
                  real_imag: bool=True,
                  seg_per_point: int =1, single_int_avg: bool =False,
                  chunk_size: int=None,
-                 values_per_point: int=1, values_per_point_suffex:list=None,
-                 always_prepare:bool=False,
+                 values_per_point: int=1, values_per_point_suffex: list=None,
+                 always_prepare: bool=False,
                  prepare_function=None, prepare_function_kwargs: dict=None,
                  **kw):
         """
@@ -1478,7 +1500,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         """
         super().__init__()
         self.UHFQC = UHFQC
-        #if nr_averages # is not a powe of 2:
+        # if nr_averages # is not a powe of 2:
 
         #    raise ValueError('Some descriptive message {}'.format(nr_averages))
         # if integration_length > some value:
@@ -1515,9 +1537,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         # useful in combination with single int_avg
         self.always_prepare = always_prepare
         # Directly specifying seg_per_point is deprecated. values_per_point
-        #replaces this functionality -MAR Dec 2017
+        # replaces this functionality -MAR Dec 2017
         self.seg_per_point = max(seg_per_point, values_per_point)
-
 
         self.AWG = AWG
         self.nr_averages = nr_averages
@@ -1532,9 +1553,9 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.prepare_function_kwargs = prepare_function_kwargs
         self._set_real_imag(real_imag)
 
-    def _add_value_name_suffex(self, value_names: list, value_units:list,
-                               values_per_point:int,
-                               values_per_point_suffex:list):
+    def _add_value_name_suffex(self, value_names: list, value_units: list,
+                               values_per_point: int,
+                               values_per_point_suffex: list):
         """
         For use with multiple values_per_point. Adds
         """
@@ -1646,7 +1667,6 @@ class UHFQC_integrated_average_detector(Hard_Detector):
                 # points -> only acquire one chunk
                 self.nr_sweep_points = self.chunk_size * self.seg_per_point
 
-
         # Optionally perform extra actions on prepare
         # This snippet is placed here so that it has a chance to modify the
         # nr_sweep_points in a UHFQC detector
@@ -1656,7 +1676,6 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         else:
             if self.prepare_function is not None:
                 self.prepare_function()
-
 
         self.UHFQC.awgs_0_userregs_0(
             int(self.nr_averages*self.nr_sweep_points))
@@ -1670,8 +1689,6 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
         self.UHFQC.quex_rl_source(self.result_logging_mode_idx)
         self.UHFQC.acquisition_initialize(channels=self.channels, mode='rl')
-
-
 
     def finish(self):
         if self.AWG is not None:
@@ -1811,8 +1828,6 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
             self.UHFQC.set('quex_rot_{}_imag'.format(correlation_channel),
                            copy_rot_imag)
 
-
-
             # Enable correlation mode one the correlation output channel and
             # set the source to the second source channel
             self.UHFQC.set('quex_corr_{}_mode'.format(correlation_channel), 1)
@@ -1830,7 +1845,7 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
 
     def get_values(self):
         # Slightly different way to deal with scaling factor
-        self.scaling_factor = 1 #/ (1.8e9*self.integration_length)
+        self.scaling_factor = 1  # / (1.8e9*self.integration_length)
 
         if self.AWG is not None:
             self.AWG.stop()
@@ -1871,7 +1886,11 @@ class UHFQC_integration_logging_det(Hard_Detector):
                  integration_length: float=1e-6,
                  nr_shots: int=4094,
                  channels: list=(0, 1),
-                 result_logging_mode: str='raw', **kw):
+                 result_logging_mode: str='raw',
+                 always_prepare: bool=False,
+                 prepare_function=None,
+                 prepare_function_kwargs: dict=None,
+                 **kw):
         """
         Args:
         UHFQC (instrument) : data acquisition device
@@ -1889,6 +1908,10 @@ class UHFQC_integration_logging_det(Hard_Detector):
                             and normalization. Requires optimal weights.
             - digitized  -> returns fraction of shots based on the threshold
                             defined in the UFHQC. Requires optimal weights.
+        always_prepare (bool) : when True the acquire/get_values method will
+            first call the prepare statement. This is particularly important
+            when it is both a single_int_avg detector and acquires multiple
+            segments per point.
         """
         super().__init__()
 
@@ -1903,7 +1926,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
                                                   channel)
         if result_logging_mode == 'raw':
             self.value_units = ['V']*len(self.channels)
-            self.scaling_factor = 1#/(1.8e9*integration_length)
+            self.scaling_factor = 1  # /(1.8e9*integration_length)
         else:
             self.value_units = ['']*len(self.channels)
             self.scaling_factor = 1
@@ -1919,7 +1942,13 @@ class UHFQC_integration_logging_det(Hard_Detector):
         self.result_logging_mode_idx = res_logging_indices[result_logging_mode]
         self.result_logging_mode = result_logging_mode
 
+        self.always_prepare = always_prepare
+        self.prepare_function = prepare_function
+        self.prepare_function_kwargs = prepare_function_kwargs
+
     def get_values(self):
+        if self.always_prepare:
+            self.prepare()
         if self.AWG is not None:
             self.AWG.stop()
         self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
@@ -1944,9 +1973,15 @@ class UHFQC_integration_logging_det(Hard_Detector):
         if self.AWG is not None:
             self.AWG.stop()
 
+        if self.prepare_function_kwargs is not None:
+            if self.prepare_function is not None:
+                self.prepare_function(**self.prepare_function_kwargs)
+        else:
+            if self.prepare_function is not None:
+                self.prepare_function()
+
         # The averaging-count is used to specify how many times the AWG program
         # should run
-
         self.UHFQC.awgs_0_single(1)
         self.UHFQC.awgs_0_userregs_0(self.nr_shots)
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)
@@ -2494,4 +2529,3 @@ class DDM_integration_logging_det(Hard_Detector):
     def finish(self):
         if self.AWG is not None:
             self.AWG.stop()
-
