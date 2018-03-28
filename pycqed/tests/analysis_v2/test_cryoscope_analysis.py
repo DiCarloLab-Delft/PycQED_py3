@@ -24,7 +24,7 @@ class Test_Cryoscope_analysis(unittest.TestCase):
         freqs = a.amp_to_freq([.3, .4, .5])
         exp_freqs = np.array(
             [1.46405902e+08,   2.67461142e+08,   4.31098670e+08])
-        np.testing.assert_array_almost_equal(freqs, exp_freqs, decimal=-4)
+        np.testing.assert_array_almost_equal(freqs, exp_freqs, decimal=-7)
 
     def test_sliding_pulses_analysis(self):
 
