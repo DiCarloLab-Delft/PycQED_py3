@@ -616,6 +616,45 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
 
         self.plot_dicts['counts_table'] = plot_dict
 
+    def measurement_operators_and_results(self):
+        """
+        Calculates and returns:
+            A tuple of
+                count tables for each data segment for the observables;
+                the measurement operators corresponding to each observable;
+                and the expected covariation matrix between the operators.
+
+        If the calibration segments are passed, there must be a calibration
+        segments for each of the computational basis states of the Hilber space.
+        If there are no calibration segments, perfect readout is assumed.
+        """
+        qubits = list(self.channel_map.keys())
+        d = 2**len(qubits)
+        cal_points = self.options_dict.get('cal_points', None)
+        if cal_points is None:
+            data = self.proc_data_dict['probability_table']
+            data /= data[0].sum()
+            data = data.T
+            Fsingle = {None: np.array([[1, 0], [0, 1]]),
+                       True: np.array([[0, 0], [0, 1]]),
+                       False: np.array([[1, 0], [0, 0]])}
+            Fs = []
+            for obs in self.observables.values():
+                F = np.array([[1]])
+                for qb in qubits:
+                    Fqb = Fsingle[obs.get(qb, None)]
+                    # Kronecker product convention - assumed the same as QuTiP
+                    F = np.kron(F, Fqb)
+                Fs.append(F)
+            # Should the variations of the measurement operators depend on the
+            # number of measured qubits?
+            Omega = np.ones(len(Fs))
+            return data, Fs, Omega
+        else:
+            raise NotImplementedError('Calibration segments for single shots '
+                                      'not yet implemented.')
+
+
 def get_shots_zero_one(data, post_select: bool=False,
                        nr_samples: int=2, sample_0: int=0, sample_1: int=1,
                        post_select_threshold: float = None):

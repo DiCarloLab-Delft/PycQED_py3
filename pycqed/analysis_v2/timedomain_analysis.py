@@ -9,6 +9,7 @@ from collections import OrderedDict
 from pycqed.analysis import fitting_models as fit_mods
 from pycqed.analysis import analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
+import pycqed.analysis_v2.readout_analysis as roa
 import pycqed.analysis_v2.tomography_qudev as tomo
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str
 from copy import deepcopy
@@ -65,7 +66,7 @@ class AveragedTimedomainAnalysis(ba.BaseDataAnalysis):
 
         Returns:
             A tuple of
-                the measured values with out the calibration points;
+                the measured values with outthe calibration points;
                 the measurement operators corresponding to each channel;
                 and the expected covariation matrix between the operators.
         """
@@ -1034,8 +1035,8 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
         if self.data_type == 'averaged':
             self.base_analysis = AveragedTimedomainAnalysis(*args, **kwargs)
         elif self.data_type == 'singleshot':
-            raise NotImplementedError('Single shot tomography is not yet '
-                                      'implemented')
+            self.base_analysis = roa.MultiQubit_SingleShot_Analysis(
+                *args, **kwargs)
         else:
             raise KeyError("Invalid tomography data mode: '" + self.data_type +
                            "'. Valid modes are 'averaged' and 'singleshot'.")
@@ -1116,12 +1117,20 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
         else:
             title = 'Least squares fit of the density matrix\n'
         empty_artist = mpl.patches.Rectangle((0, 0), 0, 0, visible=False)
-        legend_entries = [(empty_artist, r'Purity, $\rho^2 = {:.1f}\%$'.format(
-            100 * self.proc_data_dict['purity']))]
+        legend_entries = [(empty_artist,
+                           r'Purity, $Tr(\rho^2) = {:.1f}\%$'.format(
+                               100 * self.proc_data_dict['purity']))]
         if rho_target is not None:
             legend_entries += [
                 (empty_artist, r'Fidelity, $F = {:.1f}\%$'.format(
                     100 * self.proc_data_dict['fidelity']))]
+        meas_string = self.base_analysis.\
+            raw_data_dict['measurementstring']
+        if hasattr(meas_string, '__iter__'):
+            if len(meas_string) > 1:
+                meas_string = meas_string[0] + ' to ' + meas_string[-1]
+            else:
+                meas_string = meas_string[0]
         self.plot_dicts['density_matrix'] = {
             'plotfn': self.plot_bar3D,
             '3d': True,
@@ -1144,7 +1153,7 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
                              r'$\frac{3}{2}\pi$', r'$2\pi$'],
             'clabel': 'Phase (rad)',
             'title': (title + self.raw_data_dict['timestamp'] + ' ' +
-                      self.base_analysis.raw_data_dict['measurementstring']),
+                      meas_string),
             'do_legend': True,
             'legend_entries': legend_entries,
             'legend_kws': dict(loc='upper left', bbox_to_anchor=(0, 0.94))
@@ -1178,8 +1187,7 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
                 'clabel': 'Phase (rad)',
                 'title': ('Target density matrix\n' +
                           self.raw_data_dict['timestamp'] + ' ' +
-                          self.base_analysis.raw_data_dict[
-                              'measurementstring']),
+                          meas_string),
                 'bar_kws': dict(zorder=1),
             }
     def prepare_pauli_basis_plot(self):
@@ -1205,18 +1213,23 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
             fit_type = 'maximum likelihood estimation'
         else:
             fit_type = 'least squares fit'
+        meas_string = self.base_analysis. \
+            raw_data_dict['measurementstring']
+        if hasattr(meas_string, '__iter__'):
+            if len(meas_string) > 1:
+                meas_string = meas_string[0] + ' to ' + meas_string[-1]
+            else:
+                meas_string = meas_string[0]
         self.plot_dicts['pauli_basis'] = {
             'plotfn': self.plot_bar,
-            'xcenters': np.arange(4**nr_qubits - 1),
+            'xcenters': np.arange(len(order)),
             'xwidth': 0.4,
             'xrange': (-1, len(order)),
             'yvals': np.array(yexp)[order],
             'xlabel': r'Pauli operator, $\hat{O}$',
             'ylabel': r'Expectation value, $\mathrm{Tr}(\hat{O} \hat{\rho})$',
             'title': 'Pauli operators, ' + fit_type + '\n' +
-                      self.raw_data_dict['timestamp'] + ' ' +
-                      self.base_analysis.raw_data_dict[
-                          'measurementstring'],
+                      self.raw_data_dict['timestamp'] + ' ' + meas_string,
             'yrange': (-1.1, 1.1),
             'xtick_loc': np.arange(4**nr_qubits - 1),
             'xtick_labels': np.array(labels)[order],
@@ -1241,7 +1254,7 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
                 'do_legend': True
             }
 
-        purity_str = r'Purity, $\rho^2 = {:.1f}\%$'.format(
+        purity_str = r'Purity, $Tr(\rho^2) = {:.1f}\%$'.format(
             100 * self.proc_data_dict['purity'])
         if rho_target is not None:
             fidelity_str = '\n' + r'Fidelity, $F = {:.1f}\%$'.format(

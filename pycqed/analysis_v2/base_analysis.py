@@ -660,7 +660,7 @@ class BaseDataAnalysis(object):
                                    **plot_barkws))
 
         else:
-            p_out = pfunc(plot_centers, plot_yvals, #width=plot_xwidth,
+            p_out = pfunc(plot_centers, plot_yvals, width=plot_xwidth,
                           label='%s%s' % (dataset_desc, dataset_label),
                           **plot_barkws)
 
