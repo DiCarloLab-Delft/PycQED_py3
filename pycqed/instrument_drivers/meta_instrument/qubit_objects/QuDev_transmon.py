@@ -3732,7 +3732,7 @@ def add_CZ_pulse(qbc, qbt):
     op_name = 'CZ ' + qbt.name
     ps_name = 'CZ_' + qbt.name
 
-    if np.any([op_name in i for i in qbc.get_operation_dict().keys()]):
+    if np.any([op_name == i for i in qbc.get_operation_dict().keys()]):
         # do not try to add it again if operation already exists
         raise ValueError('Operation {} already exists.'.format(op_name))
     else:
@@ -3742,14 +3742,20 @@ def add_CZ_pulse(qbc, qbt):
                                 initial_value=qbt.name,
                                 vals=vals.Enum(qbt.name))
         qbc.add_pulse_parameter(op_name, ps_name + '_pulse_type', 'pulse_type',
-                                initial_value='SquarePulse',
-                                vals=vals.Enum('SquarePulse'))
+                                initial_value='BufferedSquarePulse',
+                                vals=vals.Enum('BufferedSquarePulse'))
         qbc.add_pulse_parameter(op_name, ps_name + '_channel', 'channel',
                                 initial_value='', vals=vals.Strings())
         qbc.add_pulse_parameter(op_name, ps_name + '_amp', 'amplitude',
                                 initial_value=0, vals=vals.Numbers())
-        qbc.add_pulse_parameter(op_name, ps_name + '_length', 'length',
+        qbc.add_pulse_parameter(op_name, ps_name + '_length', 'pulse_length',
                                 initial_value=0, vals=vals.Numbers(0))
+        qbc.add_pulse_parameter(op_name, ps_name + '_buf_start',
+                                'buffer_length_start', initial_value=0,
+                                vals=vals.Numbers(0))
+        qbc.add_pulse_parameter(op_name, ps_name + '_buf_end',
+                                'buffer_length_end', initial_value=0,
+                                vals=vals.Numbers(0))
         qbc.add_pulse_parameter(op_name, ps_name + '_delay', 'pulse_delay',
                                 initial_value=0, vals=vals.Numbers())
         qbc.add_pulse_parameter(op_name, ps_name + '_dynamic_phases',
