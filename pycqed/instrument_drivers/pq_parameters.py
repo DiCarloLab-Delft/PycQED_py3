@@ -7,7 +7,7 @@ class NP_NANs(Validator):
     is_numeric = True
 
     def __init__(self):
-        pass
+        self._valid_values = [np.nan]
 
     def __repr__(self):
         return '<nan>'
