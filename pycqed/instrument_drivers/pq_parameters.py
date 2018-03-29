@@ -1,6 +1,26 @@
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils.validators import Validator, Strings
 
+import numpy as np
+
+class NP_NANs(Validator):
+    is_numeric = True
+
+    def __init__(self):
+        pass
+
+    def __repr__(self):
+        return '<nan>'
+
+    def validate(self, value, context=''):
+        try:
+            if not np.isnan(value):
+                raise ValueError('{} is not nan; {}'.format(
+                    repr(value), context))
+        except:
+            raise ValueError('{} is not nan; {}'.format(
+                repr(value), context))
+
 
 class InstrumentParameter(ManualParameter):
     """
