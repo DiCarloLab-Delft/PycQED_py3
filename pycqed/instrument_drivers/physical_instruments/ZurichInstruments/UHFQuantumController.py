@@ -341,6 +341,11 @@ class UHFQC(Instrument):
                 success = False
                 print('Timeout encountered during compilation.')
                 break
+            time.sleep(0.01)
+
+        comp_msg = (self._awgModule.get(
+                'awgModule/compiler/statusstring')['compiler']
+                ['statusstring'][0])
 
         if not comp_msg.endswith(succes_msg):
             success = False
@@ -352,7 +357,9 @@ class UHFQC(Instrument):
             # for i, line in enumerate(program_string.splitlines()):
             #     print(i+1, '\t', line)
             # print('\n')
-            raise ziShellCompilationError(comp_msg)
+            #raise ziShellCompilationError(comp_msg)
+            #print("Possible error:", comp)
+            pass
         # If succesful the comipilation success message is printed
         t1 = time.time()
         print(self._awgModule.get('awgModule/compiler/statusstring')
