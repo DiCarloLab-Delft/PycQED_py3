@@ -944,10 +944,10 @@ setTrigger(0);"""
                 Qwave, "Qwave{}".format(i))
 
         preamble = """
-        const TRIGGER1  = 0x000001;
-        const WINT_TRIG = 0x000010;
-        const IAVG_TRIG = 0x000020;
-        const WINT_EN   = 0x1f0000;
+        const TRIGGER1  = 0x0000001;
+        const WINT_TRIG = 0x0000010;
+        const IAVG_TRIG = 0x0000020;
+        const WINT_EN   = 0x1ff0000;
         setTrigger(WINT_EN);
         var loop_cnt = getUserReg(0)/{};
         var wait_delay = getUserReg(2);
@@ -1006,10 +1006,10 @@ setTrigger(0);"""
 
     def awg_sequence_acquisition(self, trigger=True):
         string = """
-const TRIGGER1  = 0x000001;
-const WINT_TRIG = 0x000010;
-const IAVG_TRIG = 0x000020;
-const WINT_EN   = 0x1f0000;
+const TRIGGER1  = 0x0000001;
+const WINT_TRIG = 0x0000010;
+const IAVG_TRIG = 0x0000020;
+const WINT_EN   = 0x1ff0000;
 setTrigger(WINT_EN);
 var loop_cnt = getUserReg(0);
 var RO_TRIG;
