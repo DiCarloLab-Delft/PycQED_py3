@@ -11,6 +11,7 @@ from pycqed.instrument_drivers.pq_parameters import InstrumentParameter
 import pycqed.measurement.waveform_control.element as element
 import string
 import time
+import pprint
 
 from pycqed.instrument_drivers.virtual_instruments.virtual_awg5014 import \
     VirtualAWG5014
@@ -243,8 +244,6 @@ class HDAWG8Pulsar:
         if id not in {'ch{}'.format(i) for i in range(1, 9)}:
             raise KeyError('Invalid HDAWG8 channel id: {}'.format(id))
 
-        # FIXME: Make these parameters change the correct values
-
         self.add_parameter('{}_id'.format(name),
                            get_cmd=lambda _=id: _)
         self.add_parameter('{}_AWG'.format(name),
@@ -268,12 +267,16 @@ class HDAWG8Pulsar:
                            docstring="Global delay applied to this channel. "
                                      "Positive values move pulses on this "
                                      "channel forward in time")
-        self.add_parameter('{}_offset'.format(name), initial_value=0,
+        self.add_parameter('{}_offset'.format(name),
                            label='{} offset'.format(name), unit='V',
-                           parameter_class=ManualParameter)
-        self.add_parameter('{}_amp'.format(name), initial_value=1,
+                           set_cmd=self._HDAWG8_setter(obj, id, 'offset'),
+                           get_cmd=self._HDAWG8_getter(obj, id, 'offset'),
+                           vals=vals.Numbers())
+        self.add_parameter('{}_amp'.format(name),
                            label='{} amplitude'.format(name), unit='V',
-                           parameter_class=ManualParameter)
+                           set_cmd=self._HDAWG8_setter(obj, id, 'amp'),
+                           get_cmd=self._HDAWG8_getter(obj, id, 'amp'),
+                           vals=vals.Numbers(0.01, 5.0))
         self.add_parameter('{}_active'.format(name), initial_value=True,
                            label='{} active'.format(name), vals=vals.Bool(),
                            parameter_class=ManualParameter)
@@ -298,6 +301,33 @@ class HDAWG8Pulsar:
                            parameter_class=ManualParameter,
                            vals=vals.Numbers(0., 1.), initial_value=0.5)
 
+    @staticmethod
+    def _HDAWG8_setter(obj, id, par):
+        if par == 'offset':
+            def s(val):
+                obj.set('sigouts_{}_offset'.format(int(id[2])-1), val)
+        elif par == 'amp':
+            def s(val):
+                obj.set('sigouts_{}_range'.format(int(id[2])-1), val/2)
+        else:
+            raise NotImplementedError('Unknown parameter {}'.format(par))
+        return s
+
+    def _HDAWG8_getter(self, obj, id, par):
+        if par == 'offset':
+            def g():
+                return obj.get('sigouts_{}_offset'.format(int(id[2])-1))
+        elif par == 'amp':
+            def g():
+                if self._AWGs_prequeried_state:
+                    return obj.parameters['sigouts_{}_range'
+                        .format(int(id[2])-1)].get_latest()/2
+                else:
+                    return obj.get('sigouts_{}_range'.format(int(id[2])-1))/2
+        else:
+            raise NotImplementedError('Unknown parameter {}'.format(par))
+        return g
+
     def _program_awg(self, obj, sequence, el_wfs, loop=True):
         if not isinstance(obj, HDAWG8Pulsar._supportedAWGtypes):
             return super()._program_awg(obj, sequence, el_wfs, loop)
@@ -317,7 +347,7 @@ class HDAWG8Pulsar:
             for (_, el), cid_wfs in sorted(el_wfs.items()):
                 for cid in [ch1id, ch2id]:
                     if cid in cid_wfs:
-                        wfname = el + '_' + cid
+                        wfname = str(el) + '_' + cid
                         cid_wf = cid_wfs[cid]
                         wfnames[cid].append(wfname)
                         wfdata[cid].append(cid_wf)
@@ -437,8 +467,8 @@ class HDAWG8Pulsar:
         """
         repeat_open_str = '\trepeat ({}) {{\n'.format(
             reps) if reps != 1 else ''
-        wait_wave_str = '\t\twaitWave();\n'
-        trigger_str = '\t\twaitDigTrigger(1);\n' if wait else ''
+        trigger_str = '\t\twaitWave();\n\t\twaitDigTrigger(1);\n' if wait \
+            else '\t\twaitWave();\n'
         if name1 is None and name2 is None:
             play_str = '\t\tplayWaveDIO();\n'
         elif name1 is None:
@@ -448,8 +478,7 @@ class HDAWG8Pulsar:
         else:
             play_str = '\t\tplayWave({}, {});\n'.format(name1, name2)
         repeat_close_str = '\t}\n' if reps != 1 else ''
-        return repeat_open_str + wait_wave_str + trigger_str + play_str + \
-               repeat_close_str
+        return repeat_open_str + trigger_str + play_str + repeat_close_str
 
     def _HDAWG8_active_AWGs(self, obj):
         result = set()
@@ -512,7 +541,7 @@ class AWG5014Pulsar:
 
                     if grp_wfs[cid][0] != 0.:
                         elements_with_non_zero_first_points.add(el)
-                wfname = el + '_' + grp
+                wfname = str(el) + '_' + grp
 
                 packed_waveforms[wfname] = obj.pack_waveform(
                     grp_wfs[grp],
@@ -553,10 +582,10 @@ class AWG5014Pulsar:
                     # pick a random codeword element.
                     # all of them should be 0.
                     for elwfname in sequence.codewords.values():
-                        wfname = elwfname + '_' + grp
+                        wfname = str(elwfname) + '_' + grp
                         break
                 else:
-                    wfname = el['wfname'] + '_' + grp
+                    wfname = str(el['wfname']) + '_' + grp
                 grp_wfnames.append(wfname)
             wfname_l.append(grp_wfnames)
 
@@ -758,8 +787,7 @@ class AWG5014Pulsar:
                 raise NotImplementedError('Unknown parameter {}'.format(par))
         return s
 
-    @staticmethod
-    def _AWG5014_getter(obj, id, par, offset_mode=None):
+    def _AWG5014_getter(self, obj, id, par, offset_mode=None):
         if id in ['ch1', 'ch2', 'ch3', 'ch4']:
             if par == 'offset':
                 if offset_mode == 'software':
@@ -773,7 +801,11 @@ class AWG5014Pulsar:
                                      '{}'.format(offset_mode))
             elif par == 'amp':
                 def g():
-                    return obj.get('{}_amp'.format(id))/2
+                    if self._AWGs_prequeried_state:
+                        return obj.parameters['{}_amp'.format(id)] \
+                                   .get_latest()/2
+                    else:
+                        return obj.get('{}_amp'.format(id))/2
             else:
                 raise NotImplementedError('Unknown parameter {}'.format(par))
         else:
@@ -782,8 +814,12 @@ class AWG5014Pulsar:
                     return obj.get('{}_low'.format(id))
             elif par == 'amp':
                 def g():
-                    h = obj.get('{}_high'.format(id))
-                    l = obj.get('{}_low'.format(id))
+                    if self._AWGs_prequeried_state:
+                        h = obj.get('{}_high'.format(id))
+                        l = obj.get('{}_low'.format(id))
+                    else:
+                        h = obj.parameters['{}_high'.format(id)].get_latest()
+                        l = obj.parameters['{}_low'.format(id)].get_latest()
                     return h - l
             else:
                 raise NotImplementedError('Unknown parameter {}'.format(par))
@@ -895,7 +931,7 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
         self.last_sequence = None
         self.last_elements = None
 
-        self._clock_prequeried_state = False
+        self._AWGs_prequeried_state = False
 
     # channel handling
     def define_channel(self, name, id, AWG=None, options=None):
@@ -971,7 +1007,7 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
             channel: name of the channel
         Returns: clock rate in samples per second
         """
-        if self._clock_prequeried_state:
+        if self._AWGs_prequeried_state:
             return self._clocks[channel]
         else:
             fail = None
@@ -1083,8 +1119,8 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
                 normal_awgs.add(awg)
                 normal_channels.add(c)
 
-        # prequery all AWG clock values
-        self._clock_prequeried(True)
+        # prequery all AWG clock values and AWG amplitudes
+        self.AWGs_prequeried(True)
 
         # create the precompiled elements
         elements = {el.name: el for el in elements}
@@ -1136,7 +1172,7 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
                                   loop=loop)
 
 
-        self._clock_prequeried(False)
+        self.AWGs_prequeried(False)
 
     def _program_awg(self, obj, sequence, el_wfs, loop=True):
         """
@@ -1203,15 +1239,18 @@ class Pulsar(AWG5014Pulsar, HDAWG8Pulsar, UHFQCPulsar, Instrument):
                     '{}_inter_element_deadtime'.format(c)))
             return max_spacing
 
-    def _clock_prequeried(self, status):
-        if status:
-            self._clock_prequeried_state = False
+    def AWGs_prequeried(self, status=None):
+        if status is None:
+            return self._AWGs_prequeried_state
+        elif status:
+            self._AWGs_prequeried_state = False
             self._clocks = {}
             for c in self.channels:
                 self._clocks[c] = self.clock(c)
-            self._clock_prequeried_state = True
+                self.get(c + '_amp')
+            self._AWGs_prequeried_state = True
         else:
-            self._clock_prequeried_state = False
+            self._AWGs_prequeried_state = False
 
     def _id_channel(self, cid, AWG):
         """

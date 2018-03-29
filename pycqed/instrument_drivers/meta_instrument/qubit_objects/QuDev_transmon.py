@@ -1846,8 +1846,8 @@ class QuDev_transmon(Qubit):
         label = 'RO_theta'
         if self.RO_acq_weight_function_Q() is None:
             self.RO_acq_weight_function_Q(
-                (self.RO_acq_weight_function_I() + 1)%9)
-        self.set_readout_weights(theta=0)
+                (self.RO_acq_weight_function_I() + 1) % 9)
+        self.set_readout_weights(type='SSB')
         prev_shots = self.RO_acq_shots()
         self.RO_acq_shots(2*(self.RO_acq_shots()//2))
         self.prepare_for_timedomain()
@@ -1880,8 +1880,7 @@ class QuDev_transmon(Qubit):
                                channels=channels,
                                preselection=False)
         if update:
-            self.RO_IQ_angle(ana.theta)
-            self.set_readout_weights(theta=ana.theta)
+            self.RO_IQ_angle(self.RO_IQ_angle() + ana.theta)
         return ana.theta
 
     def measure_dynamic_phase(self,
@@ -2525,7 +2524,7 @@ class QuDev_transmon(Qubit):
                             upload=upload)
 
         #Extract T1 and T1_stddev from ma.T1_Analysis
-        if kw.pop('analyze',True):
+        if kw.pop('analyze', True):
             T1_Analysis = ma.T1_Analysis(label=label, qb_name=self.name,
                                          NoCalPoints=no_cal_points,
                                          for_ef=for_ef,
@@ -3627,8 +3626,7 @@ class QuDev_transmon(Qubit):
                 label='CPhase_measurement_{}_{}'.format(self.name,
                                                         qb_target.name),
                 qb_name=self.name, cal_points=cal_points,
-                reference_measurements=True,
-                plot=plot
+                reference_measurements=True
             )
             fitted_phases, fitted_amps = \
                 flux_pulse_ma.fit_all(plot=plot,
@@ -3732,7 +3730,7 @@ def add_CZ_pulse(qbc, qbt):
     op_name = 'CZ ' + qbt.name
     ps_name = 'CZ_' + qbt.name
 
-    if np.any([op_name in i for i in qbc.get_operation_dict().keys()]):
+    if np.any([op_name == i for i in qbc.get_operation_dict().keys()]):
         # do not try to add it again if operation already exists
         raise ValueError('Operation {} already exists.'.format(op_name))
     else:
@@ -3742,14 +3740,20 @@ def add_CZ_pulse(qbc, qbt):
                                 initial_value=qbt.name,
                                 vals=vals.Enum(qbt.name))
         qbc.add_pulse_parameter(op_name, ps_name + '_pulse_type', 'pulse_type',
-                                initial_value='SquarePulse',
-                                vals=vals.Enum('SquarePulse'))
+                                initial_value='BufferedSquarePulse',
+                                vals=vals.Enum('BufferedSquarePulse'))
         qbc.add_pulse_parameter(op_name, ps_name + '_channel', 'channel',
                                 initial_value='', vals=vals.Strings())
         qbc.add_pulse_parameter(op_name, ps_name + '_amp', 'amplitude',
                                 initial_value=0, vals=vals.Numbers())
-        qbc.add_pulse_parameter(op_name, ps_name + '_length', 'length',
+        qbc.add_pulse_parameter(op_name, ps_name + '_length', 'pulse_length',
                                 initial_value=0, vals=vals.Numbers(0))
+        qbc.add_pulse_parameter(op_name, ps_name + '_buf_start',
+                                'buffer_length_start', initial_value=0,
+                                vals=vals.Numbers(0))
+        qbc.add_pulse_parameter(op_name, ps_name + '_buf_end',
+                                'buffer_length_end', initial_value=0,
+                                vals=vals.Numbers(0))
         qbc.add_pulse_parameter(op_name, ps_name + '_delay', 'pulse_delay',
                                 initial_value=0, vals=vals.Numbers())
         qbc.add_pulse_parameter(op_name, ps_name + '_dynamic_phases',

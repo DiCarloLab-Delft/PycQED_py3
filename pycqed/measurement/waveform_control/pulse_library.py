@@ -343,10 +343,11 @@ class SquareFluxPulse(Pulse):
             round((self.length-self.square_pulse_length)*1e9)))
         return np.concatenate([sq_pulse, buff_pulse])
 
+
 class BufferedSquarePulse(Pulse):
     def __init__(self, channel=None, channels=None,
                  name='buffered square pulse', **kw):
-        Pulse.__init__(self, name)
+        super().__init__(name)
         if channel is None and channels is None:
             raise ValueError('Must specify either channel or channels')
         elif channels is None:
