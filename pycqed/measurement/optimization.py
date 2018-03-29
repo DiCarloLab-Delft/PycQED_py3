@@ -1,6 +1,7 @@
 import copy
 import numpy as np
-
+from sklearn.model_selection import GridSearchCV as gcv
+from sklearn.neural_network import MLPRegressor as mlpr
 
 def nelder_mead(fun, x0,
                 initial_step=0.1,
@@ -236,3 +237,152 @@ def SPSA(fun, x0,
     # verification
     fun(res[0][0])
     return res[0]
+
+
+def neural_network_opt(fun,training_grid, hidden_layer_sizes = [(5,)],
+                   alphas= 0.0001, solver='adam'):
+    """
+    parameters:
+        fun: Function to be optimized. So far this is only an optimization for
+             multivariable functions with scalar return value due to gradient
+             descent implementation
+
+        training_grid: The values on which to train the Neural Network. It
+                       contains features as column vectors of length as the
+                       number of datapoints in the training set.
+
+        hidden_layer_sizes: List of tuples containing the number of units for every
+                            hidden layer of the network. E.g (5,5) would be a
+                            network with two hidden layers with 5 units each.
+                            Crossvalidation is used to determine the best
+                            network architecture within this list.
+
+        alphas: List of values for the learning parameter alpha (learning rate)
+
+        solver: optimization function used for the gradient descent during the
+                learning process. 'adam' is the default solver of MLPRegressor
+
+    output: returns the optimized feature vector X, minimizing fun(X).
+    """
+    ###############################################################
+    ###          create measurement data from test_grid         ###
+    ###############################################################
+    if not isinstance(hidden_layer_sizes,list):
+        hidden_layer_sizes = [hidden_layer_sizes]
+
+    if not isinstance(alphas,list):
+        alphas = [alphas]
+    #transform input into array
+    training_grid = np.array(training_grid)
+
+    #get input dimension, training grid contains parameters as column vectors
+    inputsize = np.size(training_grid,1)
+    datasize = np.size(training_grid,0)
+
+    #Acquire first data point for output dim information of fun()
+    fun_val = fun(training_grid[0,:])
+    output_dim = len(fun_val)
+    target_values = np.zeros((datasize,output_dim))
+    target_values[0,:] = fun_val
+
+    #consequetly, start iteration at 2nd input value
+    for iter in range(1,datasize):
+        target_values[iter,:] = fun(training_grid[iter,:])
+
+    ##################################################################
+    ### initialize grid search cross val with hyperparameter dict. ###
+    ###    and MLPR instance and fit a model function to fun()     ###
+    ##################################################################
+
+    parameter_dict = {'hidden_layer_sizes': hidden_layer_sizes,
+                      'alpha': alphas,
+                      'activation':['relu']}
+    #initilize the neural network. the scikit learn method MLPRegressor uses a
+    #squared loss as a loss function and 'adam' as solver.
+    nn = mlpr()
+    gridCV = gcv(nn,parameter_dict,cv=5)
+    gridCV.fit(training_grid,target_values)
+    score = gridCV.best_score_
+    bestParams = gridCV.best_params_
+    print("Best parameters: "+str(bestParams))
+    print("Best CV score of ANN: "+str(score))
+
+    ###################################################################
+    ###     perform gradient descent to minimize modeled landscape  ###
+    ###################################################################
+
+    h = []
+    for iter in range(inputsize):
+        feature = training_grid[:,iter]
+        #select the grid size for every feature as 5% of the average distance
+        # between traning points. (Could be adaptive)
+        h.append(1e-6*(max(feature)-min(feature))/datasize)
+    x_ini = [np.mean(training_grid[:,0]),np.mean(training_grid[:,1])]
+
+    return gradient_descent(gridCV.predict,x_ini,h)[0]
+    #mght want to adapt alpha,ect.i
+
+
+def gradient(fun,x,grid_spacing):
+    """
+    this computes the gradient of fun() using finite differences
+    :param fun: function of which to compute the gradient
+    :param x: evaluation point for the gradient
+    :param grid_spacing: displacement in forward finite difference, has to be
+                         provided for every feature in x
+    :return: returns gradient value grad(fun)(x) computed by finite differences
+    """
+
+    grad = np.zeros(len(x))
+    for iter in range(len(x)):
+        x_h = np.array(x)
+        #using forward difference here
+        x_h[iter] += grid_spacing[iter]
+        #compute finite difference
+        grad[iter]=(fun(x_h)-fun(x))/grid_spacing[iter]
+    return grad
+
+
+def gradient_descent(fun, x_ini,grid_spacing,lamb_ini=1, max_iter=500 ):
+    """
+    :param fun: function to be minimized
+    :param x_ini: initial point for the iteration 
+    :param grid_spacing: spacing between points on the discretized evaluation 
+                         grid. has to provide a spacing for every feature in x_ini.
+    :param lamb_ini: initial learning rate. 
+    :param tol: tolerance to determine convergence. 
+    :param max_iter: maximum iterations permitted until gradient descent fails
+    
+    :return: input values that minimizes fun()
+
+    Note: using Barzilai-Borwein adaptive step lengths for second derivative approx.
+    """
+    iter = 0
+    #determine the tolerance as 1e-4 times the norm of the step size vector
+    tol = np.linalg.norm(grid_spacing)*1e-4
+    #perform first step
+    x = np.array(x_ini)
+    grad = gradient(fun,x,grid_spacing)
+    s = -grad/lamb_ini         #go downhill
+    diff = np.linalg.norm(s)   #defines the stepsize taken. If < tol, extremum was found
+    x_new = np.array(x+s)
+
+    while diff > tol and iter < max_iter:
+        #central loop, makes gradient update and performs step with adaptive
+        #learning rate.
+        grad_new = gradient(fun,x_new,grid_spacing)
+        y = grad_new - grad
+        grad = np.array(grad_new)
+        lamb = np.linalg.norm(y)**2/np.dot(y,s)
+        s = -grad_new/lamb
+        x = np.array(x_new)
+        x_new = np.array(x+s)
+        diff = np.linalg.norm(s)
+        iter += 1
+        if(diff <= tol and iter < max_iter):
+            print("gradient descent finished after "+str(iter)+"iterations")
+            print("minimum found at: "+str(x_new))
+        elif(iter>=max_iter):
+            print("Warning: gradient descent did not finish within \
+                       max iterations!")
+    return x_new,[diff,iter]

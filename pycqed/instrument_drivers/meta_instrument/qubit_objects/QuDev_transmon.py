@@ -450,6 +450,7 @@ class QuDev_transmon(Qubit):
         # drive LO
         if 'drive' in suppress:
             self.drive_LO.pulsemod_state('Off')
+            print(self.f_pulse_mod())
             self.drive_LO.frequency(self.f_qubit() - self.f_pulse_mod())
             self.drive_LO.power(self.drive_LO_pow())
             self.drive_LO.on()
@@ -1511,6 +1512,45 @@ class QuDev_transmon(Qubit):
             ma.MeasurementAnalysis(TwoD=True, auto=True, close_fig=close_fig,
                                    qb_name=self.name)
 
+    def calibrate_drive_mixer_carrier_NN(self, MC=None, update=True, x0=(0., 0.),
+                                      initial_stepsize=0.01, trigger_sep=5e-6):
+        if MC is None:
+            MC = self.MC
+        self.prepare_for_mixer_calibration(suppress='drive LO')
+        cal_elts.mixer_calibration_sequence(
+              trigger_sep, 0, self.RO_acq_marker_channel(),
+              self.pulse_I_channel(), self.pulse_Q_channel())
+        detector = self.int_avg_det_spec
+        meas_grid = [x0[0]+np.random.normal(0.,0.1,100),
+                     x0[1]+np.random.normal(0.,0.1,100)]
+        meas_grid = list(map(list, zip(*meas_grid)))
+        ad_func_pars = {'adaptive_function': opti.neural_network_opt,
+                        'training_grid': meas_grid,
+                        'hidden_layer_sizes': [(h, h, h, h, h) for h in range(2,16,2)],
+                        'minimize': True,
+                        #Probably some additional params for the NN go here
+                        }
+        chI_par = self.AWG.parameters['{}_offset'.format(
+            self.pulse_I_channel())]
+        chQ_par = self.AWG.parameters['{}_offset'.format(
+            self.pulse_Q_channel())]
+        MC.set_sweep_functions([chI_par, chQ_par])
+        MC.set_detector_function(det.IndexDetector(detector, 0))
+        MC.set_adaptive_function_parameters(ad_func_pars)
+        self.AWG.start()
+        MC.run(name='drive_carrier_calibration' + self.msmt_suffix,
+               mode='adaptive')
+        a = ma.OptimizationAnalysis(label='drive_carrier_calibration')
+        # v2 creates a pretty picture of the optimizations
+        ma.OptimizationAnalysis_v2(label='drive_carrier_calibration')
+
+        ch_1_min = a.optimization_result[0][0]
+        ch_2_min = a.optimization_result[0][1]
+        if update:
+            self.pulse_I_offset(ch_1_min)
+            self.pulse_Q_offset(ch_2_min)
+        return ch_1_min, ch_2_min
+
     def calibrate_drive_mixer_carrier(self, MC=None, update=True, x0=(0., 0.),
                                       initial_stepsize=0.01, trigger_sep=5e-6):
         if MC is None:
@@ -1546,53 +1586,6 @@ class QuDev_transmon(Qubit):
             self.pulse_I_offset(ch_1_min)
             self.pulse_Q_offset(ch_2_min)
         return ch_1_min, ch_2_min
-
-    def calibrate_drive_mixer_skewness(self, MC=None, update=True,
-                                       amplitude=0.1, trigger_sep=5e-6,
-                                       initial_stepsize=None):
-        if initial_stepsize is None:
-            initial_stepsize = [0.15, 10]
-        if MC is None:
-            MC = self.MC
-        self.prepare_for_mixer_calibration(suppress='drive sideband')
-        detector = det.UHFQC_mixer_skewness_det(
-            self.UHFQC, qc.station, [self.RO_acq_weight_function_I(),
-                                     self.RO_acq_weight_function_Q()],
-            self.pulse_I_channel(), self.pulse_Q_channel(),
-            self.alpha, self.phi_skew, self.f_pulse_mod(),
-            self.RO_acq_marker_channel(),
-            amplitude=amplitude, nr_averages=self.RO_acq_averages(),
-            RO_trigger_separation=trigger_sep, verbose=False)
-        # detector = det.UHFQC_readout_mixer_skewness_det(
-        #     self.UHFQC, qc.station, [self.RO_acq_weight_function_I(),
-        #                              self.RO_acq_weight_function_Q()],
-        #     self.ro_alpha, self.ro_phi_skew, self.f_RO_mod(),
-        #     self.RO_acq_marker_channel(),
-        #     nr_averages=self.RO_acq_averages(),
-        #     RO_pulse_length=self.RO_pulse_length(),
-        #     verbose=False)
-        ad_func_pars = {'adaptive_function': opti.nelder_mead,
-                        'x0': [self.alpha(), self.phi_skew()],
-                        'initial_step': initial_stepsize,
-                        'no_improv_break': 12,
-                        'minimize': True,
-                        'maxiter': 500}
-        MC.set_sweep_functions([self.alpha, self.phi_skew])
-        MC.set_detector_function(det.IndexDetector(detector, 0))
-        MC.set_adaptive_function_parameters(ad_func_pars)
-        MC.run(name='drive_skewness_calibration' + self.msmt_suffix,
-               mode='adaptive')
-        a = ma.OptimizationAnalysis(label='drive_skewness_calibration')
-        # v2 creates a pretty picture of the optimizations
-        ma.OptimizationAnalysis_v2(label='drive_skewness_calibration')
-
-        # phi and alpha are the coefficients that go in the predistortion matrix
-        alpha = a.optimization_result[0][0]
-        phi = a.optimization_result[0][1]
-        if update:
-            self.alpha(alpha)
-            self.phi_skew(phi)
-        return alpha, phi
 
     def calibrate_readout_mixer_skewness(self, dc_if=50e6, MC=None, update=True,
                                          trigger_sep=5e-6,
@@ -1651,6 +1644,106 @@ class QuDev_transmon(Qubit):
         self.AWG.start()
         MC.run('mw_uc_spectrum' + self.msmt_suffix)
         ma.MeasurementAnalysis(plot_args=dict(log=True, marker=''))
+
+    def calibrate_drive_mixer_skewness_NN(self, MC=None, update=True,
+                                           amplitude=0.1, trigger_sep=5e-6,
+                                           initial_stepsize=None):
+        if initial_stepsize is None:
+            initial_stepsize = [0.15, 10]
+        if MC is None:
+            MC = self.MC
+        self.prepare_for_mixer_calibration(suppress='drive sideband')
+        detector = det.UHFQC_mixer_skewness_det(
+            self.UHFQC, qc.station, [self.RO_acq_weight_function_I(),
+                                     self.RO_acq_weight_function_Q()],
+            self.pulse_I_channel(), self.pulse_Q_channel(),
+            self.alpha, self.phali_skew, self.f_pulse_mod(),
+            self.RO_acq_marker_channel(),
+            amplitude=amplitude, nr_averages=self.RO_acq_averages(),
+            RO_trigger_separation=trigger_sep, verbose=False)
+        # detector = det.UHFQC_readout_mixer_skewness_det(
+        #     self.UHFQC, qc.station, [self.RO_acq_weight_function_I(),
+        #                              self.RO_acq_weight_function_Q()],
+        #     self.ro_alpha, self.ro_phi_skew, self.f_RO_mod(),
+        #     self.RO_acq_marker_channel(),
+        #     nr_averages=self.RO_acq_averages(),
+        #     RO_pulse_length=self.RO_pulse_length(),
+        #     verbose=False)
+
+        #Could make sample size variable (maxiter) for better adapting)
+        meas_grid = [np.random.normal(self.alpha(),0.5,100),
+                     np.random.normal(self.phi_skew(),15,100)]
+        meas_grid = list(map(list, zip(*meas_grid)))
+        ad_func_pars = {'adaptive_function': opti.neural_network_opt,
+                        'training_grid': meas_grid,
+                        'hidden_layer_sizes': [(h, h, h, h, h) for h in range(2,10,2)],
+                        'minimize': True,
+                        #Probably some additional params for the NN go here
+                        }
+        MC.set_sweep_functions([self.alpha, self.phi_skew]) #not sure if has to be changed. Seems ok
+        MC.set_detector_function(det.IndexDetector(detector, 0))
+        MC.set_adaptive_function_parameters(ad_func_pars)
+        MC.run(name='drive_skewness_calibration' + self.msmt_suffix,
+               mode='adaptive')
+        a = ma.OptimizationAnalysis(label='drive_skewness_calibration')
+        # v2 creates a pretty picture of the optimizations
+        ma.OptimizationAnalysis_v2(label='drive_skewness_calibration')
+
+        # phi and alpha are the coefficients that go in the predistortion matrix
+        alpha = a.optimization_result[0][0]
+        phi = a.optimization_result[0][1]
+        if update:
+            self.alpha(alpha)
+            self.phi_skew(phi)
+        return alpha, phi
+
+
+    def calibrate_drive_mixer_skewness(self, MC=None, update=True,
+                                       amplitude=0.1, trigger_sep=5e-6,
+                                       initial_stepsize=None):
+        if initial_stepsize is None:
+            initial_stepsize = [0.15, 10]
+        if MC is None:
+            MC = self.MC
+        self.prepare_for_mixer_calibration(suppress='drive sideband')
+        detector = det.UHFQC_mixer_skewness_det(
+            self.UHFQC, qc.station, [self.RO_acq_weight_function_I(),
+                                     self.RO_acq_weight_function_Q()],
+            self.pulse_I_channel(), self.pulse_Q_channel(),
+            self.alpha, self.phi_skew, self.f_pulse_mod(),
+            self.RO_acq_marker_channel(),
+            amplitude=amplitude, nr_averages=self.RO_acq_averages(),
+            RO_trigger_separation=trigger_sep, verbose=False)
+        # detector = det.UHFQC_readout_mixer_skewness_det(
+        #     self.UHFQC, qc.station, [self.RO_acq_weight_function_I(),
+        #                              self.RO_acq_weight_function_Q()],
+        #     self.ro_alpha, self.ro_phi_skew, self.f_RO_mod(),
+        #     self.RO_acq_marker_channel(),
+        #     nr_averages=self.RO_acq_averages(),
+        #     RO_pulse_length=self.RO_pulse_length(),
+        #     verbose=False)
+        ad_func_pars = {'adaptive_function': opti.nelder_mead,
+                        'x0': [self.alpha(), self.phi_skew()],
+                        'initial_step': initial_stepsize,
+                        'no_improv_break': 12,
+                        'minimize': True,
+                        'maxiter': 500}
+        MC.set_sweep_functions([self.alpha, self.phi_skew])
+        MC.set_detector_function(det.IndexDetector(detector, 0))
+        MC.set_adaptive_function_parameters(ad_func_pars)
+        MC.run(name='drive_skewness_calibration' + self.msmt_suffix,
+               mode='adaptive')
+        a = ma.OptimizationAnalysis(label='drive_skewness_calibration')
+        # v2 creates a pretty picture of the optimizations
+        ma.OptimizationAnalysis_v2(label='drive_skewness_calibration')
+
+        # phi and alpha are the coefficients that go in the predistortion matrix
+        alpha = a.optimization_result[0][0]
+        phi = a.optimization_result[0][1]
+        if update:
+            self.alpha(alpha)
+            self.phi_skew(phi)
+        return alpha, phi
 
     def measure_readout_mixer_spectrum(self, if_freqs, dc_if=50e6, MC=None,
                                        amplitude=0.1, trigger_sep=5e-6):
@@ -1846,8 +1939,8 @@ class QuDev_transmon(Qubit):
         label = 'RO_theta'
         if self.RO_acq_weight_function_Q() is None:
             self.RO_acq_weight_function_Q(
-                (self.RO_acq_weight_function_I() + 1)%9)
-        self.set_readout_weights(theta=0)
+                (self.RO_acq_weight_function_I() + 1) % 9)
+        self.set_readout_weights(type='SSB')
         prev_shots = self.RO_acq_shots()
         self.RO_acq_shots(2*(self.RO_acq_shots()//2))
         self.prepare_for_timedomain()
@@ -1880,8 +1973,7 @@ class QuDev_transmon(Qubit):
                                channels=channels,
                                preselection=False)
         if update:
-            self.RO_IQ_angle(ana.theta)
-            self.set_readout_weights(theta=ana.theta)
+            self.RO_IQ_angle(self.RO_IQ_angle() + ana.theta)
         return ana.theta
 
     def measure_dynamic_phase(self,
@@ -2525,7 +2617,7 @@ class QuDev_transmon(Qubit):
                             upload=upload)
 
         #Extract T1 and T1_stddev from ma.T1_Analysis
-        if kw.pop('analyze',True):
+        if kw.pop('analyze', True):
             T1_Analysis = ma.T1_Analysis(label=label, qb_name=self.name,
                                          NoCalPoints=no_cal_points,
                                          for_ef=for_ef,
@@ -3613,6 +3705,7 @@ class QuDev_transmon(Qubit):
                                                    sweep_mode='amplitude')
             if prepare_for_timedomain:
                 qb_target.prepare_for_timedomain()
+                self.prepare_for_timedomain()
 
             MC.set_sweep_function(s1)
             MC.set_sweep_points(phases)
@@ -3627,8 +3720,7 @@ class QuDev_transmon(Qubit):
                 label='CPhase_measurement_{}_{}'.format(self.name,
                                                         qb_target.name),
                 qb_name=self.name, cal_points=cal_points,
-                reference_measurements=True,
-                plot=plot
+                reference_measurements=True
             )
             fitted_phases, fitted_amps = \
                 flux_pulse_ma.fit_all(plot=plot,
