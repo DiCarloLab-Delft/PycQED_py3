@@ -174,8 +174,8 @@ class Test_Flux_LutMan(unittest.TestCase):
         self.AWG8_Flux_LutMan.cz_E_c(250e6)
         self.AWG8_Flux_LutMan.cz_freq_interaction(5.1e9)
         self.AWG8_Flux_LutMan.cfg_max_wf_length(5e-6)
-        for i in range(10):
-            self.AWG8_Flux_LutMan.set('mcz_phase_corr_amp_{}'.format(i+1), i/10)
+        # for i in range(10):
+        #     self.AWG8_Flux_LutMan.set('mcz_phase_corr_amp_{}'.format(i+1), i/10)
 
     def test_generate_standard_flux_waveforms(self):
         self.AWG8_Flux_LutMan.generate_standard_waveforms()
