@@ -525,7 +525,8 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
 
         for qubit, channel in self.channel_map.items():
             shots_cont = np.array(self.raw_data_dict['measured_values_ord_dict'][channel])
-            shots_thresh[qubit] = shots_cont > self.thresholds[qubit]
+            shots_thresh[qubit] = (shots_cont > self.thresholds[qubit])[0]
+        self.proc_data_dict['shots_thresholded'] = shots_thresh
 
         logging.info("Calculating observables")
         self.proc_data_dict['probability_table'] = \
@@ -560,7 +561,7 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
             for qubit, results in shots_of_qubits.items():
                 res_e[qubit] = np.array(results[0, segment_n::n_segments])
                 # This makes copy, but allows faster AND later
-                res_g[qubit] = np.logical_not(np.array(results[0, segment_n::n_segments]))
+                res_g[qubit] = np.logical_not(np.array(results[segment_n::n_segments]))
 
             for state_n, states_of_qubits in enumerate(observables): # first result all ground
                 mask = np.ones((int(n_shots/n_segments)), dtype=bool)
@@ -630,29 +631,79 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
         """
         qubits = list(self.channel_map.keys())
         d = 2**len(qubits)
-        cal_points = self.options_dict.get('cal_points', None)
-        if cal_points is None:
-            data = self.proc_data_dict['probability_table']
-            data /= data[0].sum()
-            data = data.T
+        data = self.proc_data_dict['probability_table']
+        data = data / data[0].sum()
+        data = data.T
+        if not 'cal_points' in self.options_dict:
             Fsingle = {None: np.array([[1, 0], [0, 1]]),
                        True: np.array([[0, 0], [0, 1]]),
                        False: np.array([[1, 0], [0, 0]])}
             Fs = []
+            Omega = []
             for obs in self.observables.values():
                 F = np.array([[1]])
+                nr_meas = 0
                 for qb in qubits:
                     Fqb = Fsingle[obs.get(qb, None)]
                     # Kronecker product convention - assumed the same as QuTiP
                     F = np.kron(F, Fqb)
+                    if qb in obs:
+                        nr_meas += 1
                 Fs.append(F)
-            # Should the variations of the measurement operators depend on the
-            # number of measured qubits?
-            Omega = np.ones(len(Fs))
+                # The variation is proportional to the number of qubits we have
+                # a condition on, assuming that all readout errors are small
+                # and equal.
+                Omega.append(nr_meas)
+            Omega = np.array(Omega)
             return data, Fs, Omega
         else:
-            raise NotImplementedError('Calibration segments for single shots '
-                                      'not yet implemented.')
+            means, covars = \
+                self.calibration_point_means_and_channel_covariations()
+            cal_points_list = self.proc_data_dict['cal_points_list']
+            data_idx = np.arange(data.shape[1])
+            data_idx = np.setdiff1d(data_idx,
+                                    np.array(cal_points_list).flatten())
+            data = data[:, data_idx]
+            Fs = [np.diag(ms) for ms in means.T]
+            return data, Fs, covars
+
+    def calibration_point_means_and_channel_covariations(self):
+        shots_of_qubits = self.proc_data_dict['shots_thresholded']
+        observables = list(self.observables.values())
+        cal_points = self.options_dict.get('cal_points')
+        n_segments = self.n_segments
+        value_names = list(self.observables.keys())
+        cal_points_list = convert_channel_names_to_index(
+            cal_points, n_segments, value_names
+        )
+        self.proc_data_dict['cal_points_list'] = cal_points_list
+
+        n_shots = next(iter(shots_of_qubits.values())).shape[1]
+
+        means = np.zeros((len(cal_points_list), len(observables)))
+        counts = np.zeros_like(means)
+        residuals = [np.array([]) for _ in observables]
+
+        for cal_point_idx, observable_lists in enumerate(cal_points_list):
+            for observable_idx, segments_list in enumerate(observable_lists):
+                for segment_n in segments_list:
+                    states_of_qubits = observables[observable_idx]
+                    mask = np.ones((int(n_shots / n_segments)), dtype=np.bool)
+                    for qubit, state in states_of_qubits.items():
+                        res_e = shots_of_qubits[qubit][segment_n::n_segments]
+                        if state:
+                            mask = np.logical_and(mask, res_e)
+                        else:
+                            mask = np.logical_and(mask, np.logical_not(res_e))
+                    summ = np.count_nonzero(mask)
+                    means[cal_point_idx, observable_idx] += summ
+                    counts[cal_point_idx, observable_idx] += len(mask)
+                    residuals[observable_idx] = np.append(
+                        residuals[observable_idx], mask - summ/len(mask))
+        means /= counts
+        covars = [[res1.dot(res2) for res1 in residuals] for res2 in residuals]
+        covars = np.array(covars)/(len(residuals[0]) - 1)
+        return means, covars
 
 
 def get_shots_zero_one(data, post_select: bool=False,
@@ -727,3 +778,43 @@ class Multiplexed_Readout_Analysis(MultiQubit_SingleShot_Analysis):
 
         if auto:
             self.run_analysis()
+
+
+def convert_channel_names_to_index(cal_points, nr_segments, value_names):
+    """
+    Converts the calibration points list from the format
+    cal_points = [{'ch1': [-4, -3], 'ch2': [-4, -3]},
+                  {0: [-2, -1], 1: [-2, -1]}]
+    to the format (for a 100-segment dataset)
+    cal_points_list = [[[96, 97], [96, 97]],
+                       [[98, 99], [98, 99]]]
+
+    Args:
+        cal_points: the list of calibration points to convert
+        nr_segments: number of segments in the dataset to convert negative
+                     indices to positive indices.
+        value_names: a list of channel names that is used to determine the
+                     index of the channels
+    Returns:
+        cal_points_list in the converted format
+    """
+    cal_points_list = []
+    for observable in cal_points:
+        if isinstance(observable, (list, np.ndarray)):
+            observable_list = [[]] * len(value_names)
+            for i, idxs in enumerate(observable):
+                observable_list[i] = \
+                    [idx % nr_segments for idx in idxs]
+            cal_points_list.append(observable_list)
+        else:
+            observable_list = [[]] * len(value_names)
+            for channel, idxs in observable.items():
+                if isinstance(channel, int):
+                    observable_list[channel] = \
+                        [idx % nr_segments for idx in idxs]
+                else:  # assume str
+                    ch_idx = value_names.index(channel)
+                    observable_list[ch_idx] = \
+                        [idx % nr_segments for idx in idxs]
+            cal_points_list.append(observable_list)
+    return cal_points_list

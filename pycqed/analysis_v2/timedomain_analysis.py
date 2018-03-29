@@ -18,6 +18,7 @@ try:
 except ImportError as e:
     logging.warning('Could not import qutip, tomo code will not work')
 
+
 class AveragedTimedomainAnalysis(ba.BaseDataAnalysis):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -31,8 +32,11 @@ class AveragedTimedomainAnalysis(ba.BaseDataAnalysis):
             self.run_analysis()
 
     def process_data(self):
-        self._convert_channel_names_to_index()
-        cal_points_list = self.proc_data_dict['cal_points_list']
+        cal_points_list = roa.convert_channel_names_to_index(
+            self.options_dict['cal_points'],
+            len(self.raw_data_dict['measured_values'][0]),
+            self.raw_data_dict['value_names'])
+        self.proc_data_dict['cal_points_list'] = cal_points_list
         measured_values = self.raw_data_dict['measured_values']
         cal_idxs = self._find_calibration_indices()
         scales = [np.std(x[cal_idxs]) for x in measured_values]
@@ -93,39 +97,6 @@ class AveragedTimedomainAnalysis(ba.BaseDataAnalysis):
         data = np.array([ch_data[data_idxs] for ch_data in raw_data])
         return data, Fs, Omega
 
-    def _convert_channel_names_to_index(self):
-        """
-        Converts the calibration points list from the format
-        cal_points = [{'ch1': [-4, -3], 'ch2': [-4, -3]},
-                      {0: [-2, -1], 1: [-2, -1]}]
-        to the format
-        cal_points_list = [[[-4, -3], [-4, -3]],
-                           [[-2, -1], [-2, -1]]]
-        """
-        cal_points = self.options_dict.get('cal_points')
-        nr_segments = self.raw_data_dict['measured_values'].shape[-1]
-        value_names = self.raw_data_dict.get('value_names')
-        cal_points_list = []
-        for observable in cal_points:
-            if isinstance(observable, (list, np.ndarray)):
-                observable_list = [[]] * len(value_names)
-                for i, idxs in enumerate(observable):
-                    observable_list[i] = \
-                        [idx % nr_segments for idx in idxs]
-                cal_points_list.append(observable_list)
-            else:
-                observable_list = [[]] * len(value_names)
-                for channel, idxs in observable.items():
-                    if isinstance(channel, int):
-                        observable_list[channel] = \
-                            [idx % nr_segments for idx in idxs]
-                    else:  # assume str
-                        ch_idx = value_names.index(channel)
-                        observable_list[ch_idx] = \
-                            [idx % nr_segments for idx in idxs]
-                cal_points_list.append(observable_list)
-        self.proc_data_dict['cal_points_list'] = cal_points_list
-
     def _find_calibration_indices(self):
         cal_indices = set()
         cal_points = self.options_dict['cal_points']
@@ -139,12 +110,14 @@ class AveragedTimedomainAnalysis(ba.BaseDataAnalysis):
                     cal_indices.update({idx % nr_segments for idx in idxs})
         return list(cal_indices)
 
+
 def all_cal_points(d, nr_ch, reps=1):
     """
     Generates a list of calibration points for a Hilbert space of dimension d,
     with nr_ch channels and reps reprtitions of each calibration point.
     """
     return [[list(range(-reps*i, -reps*(i-1)))]*nr_ch for i in range(d, 0, -1)]
+
 
 class Single_Qubit_TimeDomainAnalysis(ba.BaseDataAnalysis):
 
@@ -1190,6 +1163,7 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
                           meas_string),
                 'bar_kws': dict(zorder=1),
             }
+
     def prepare_pauli_basis_plot(self):
         yexp = tomo.density_matrix_to_pauli_basis(self.proc_data_dict['rho'])
         nr_qubits = self.proc_data_dict['d'].bit_length() - 1
@@ -1271,8 +1245,6 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
             'do_legend': True
         }
 
-
-
     def default_phase_cmap(self):
         cols = np.array(((41, 39, 231), (61, 130, 163), (208, 170, 39),
                          (209, 126, 4), (181, 28, 20), (238, 76, 152),
@@ -1284,6 +1256,3 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
             'blue': [[i/n, cols[i%n][2], cols[i%n][2]] for i in range(n+1)],
         }
         return mpl.colors.LinearSegmentedColormap('DMDefault', cdict)
-
-
-
