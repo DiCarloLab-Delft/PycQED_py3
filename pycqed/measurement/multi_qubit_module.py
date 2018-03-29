@@ -723,21 +723,21 @@ def measure_tomography(qubits, prep_sequence, state_name, f_LO,
     #   but where?
     if use_cal_points:
         # calibration definition for all combinations
-        cal_defs = {}
+        cal_defs = []
         for i, name in enumerate(itertools.product("ge", repeat=len(qubits))):
-            name = "".join(name)  # tuple to string
-            cal_defs[name] = {}
+            name = ''.join(name)  # tuple to string
+            cal_defs.append({})
             for qb in qubits:
-                cal_defs[name][channel_map[qb.name]] = \
+                cal_defs[i][channel_map[qb.name]] = \
                     [len(seq_tomo.elements) + i]
     else:
         cal_defs = None
 
     exp_metadata["n_segments"] = n_segments
-    exp_metadata["rot_bases"] = rot_bases
+    exp_metadata["basis_rots_str"] = rot_bases
     if rho_target is not None:
         exp_metadata["rho_target"] = rho_target
-    exp_metadata["cal_def"] = cal_defs
+    exp_metadata["cal_points"] = cal_defs
     exp_metadata["channel_map"] = channel_map
 
     station.pulsar.program_awgs(seq, *elts)
