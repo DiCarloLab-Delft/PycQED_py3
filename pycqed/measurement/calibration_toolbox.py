@@ -1,5 +1,6 @@
 import numpy as np
 import logging
+import cma
 from qcodes.instrument.parameter import ManualParameter
 from pycqed.measurement import CBox_sweep_functions as cbs
 from pycqed.measurement import detector_functions as det
@@ -68,12 +69,14 @@ def mixer_carrier_cancellation(SH, source, MC,
         SH, frequency=(source.frequency()),
         Navg=5, delay=0.0, prepare_each_point=False)
 
-    ad_func_pars = {'adaptive_function': nelder_mead,
+    ad_func_pars = {'adaptive_function': cma.fmin,
                     'x0': x0,
-                    'initial_step': [init_stepsize, init_stepsize],
-                    'no_improv_break': 15,
-                    'minimize': True,
-                    'maxiter': 500}
+                    'sigma0':1,
+                    'options': {'maxiter': 500,    # maximum function cals
+                                # Scaling for individual sigma's
+                                'cma_stds': [init_stepsize]*2
+                                },
+                    'minimize': True}
     MC.set_sweep_functions([chI_par, chQ_par])
     MC.set_detector_function(detector)  # sets test_detector
     MC.set_adaptive_function_parameters(ad_func_pars)

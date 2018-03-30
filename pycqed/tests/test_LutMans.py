@@ -163,37 +163,113 @@ class Test_Flux_LutMan(unittest.TestCase):
     def setUpClass(self):
         self.AWG = v8.VirtualAWG8('DummyAWG8')
 
-        self.AWG8_Flux_LutMan = flm.AWG8_Flux_LutMan('Flux_LutMan')
+        self.fluxlutman = flm.AWG8_Flux_LutMan('Flux_LutMan')
         self.k0 = ko.DistortionKernel('k0')
-        self.AWG8_Flux_LutMan.instr_distortion_kernel(self.k0.name)
-        self.AWG8_Flux_LutMan.AWG(self.AWG.name)
-        self.AWG8_Flux_LutMan.sampling_rate(2.4e9)
-        self.AWG8_Flux_LutMan.cz_theta_f(80)
-        self.AWG8_Flux_LutMan.cz_freq_01_max(6.8e9)
-        self.AWG8_Flux_LutMan.cz_J2(4.1e6)
-        self.AWG8_Flux_LutMan.cz_E_c(250e6)
-        self.AWG8_Flux_LutMan.cz_freq_interaction(5.1e9)
-        self.AWG8_Flux_LutMan.cfg_max_wf_length(5e-6)
-        for i in range(10):
-            self.AWG8_Flux_LutMan.set('mcz_phase_corr_amp_{}'.format(i+1), i/10)
+        self.fluxlutman.instr_distortion_kernel(self.k0.name)
+        self.fluxlutman.AWG(self.AWG.name)
+        self.fluxlutman.sampling_rate(2.4e9)
+        self.fluxlutman.cz_theta_f(80)
+        self.fluxlutman.cz_freq_01_max(6.8e9)
+        self.fluxlutman.cz_J2(4.1e6)
+        self.fluxlutman.cz_E_c(250e6)
+        self.fluxlutman.cz_freq_interaction(5.1e9)
+        self.fluxlutman.cfg_max_wf_length(5e-6)
+        # for i in range(10):
+        #     self.fluxlutman.set('mcz_phase_corr_amp_{}'.format(i+1), i/10)
 
     def test_generate_standard_flux_waveforms(self):
-        self.AWG8_Flux_LutMan.generate_standard_waveforms()
+        self.fluxlutman.generate_standard_waveforms()
+
+
+    def test_standard_cz_waveform(self):
+        self.fluxlutman.cz_double_sided(False)
+        self.fluxlutman.generate_standard_waveforms()
+
+    def test_double_sided_cz_waveform(self):
+        """
+        This test mostly tests if the parameters have some effect.
+        They do not test the generated output.
+        """
+        self.fluxlutman.cz_double_sided(True)
+        self.fluxlutman.generate_standard_waveforms()
+
+        czA = self.fluxlutman._wave_dict['cz_z']
+        self.fluxlutman.czd_amp_ratio(1.1)
+        self.fluxlutman.generate_standard_waveforms()
+        czB = self.fluxlutman._wave_dict['cz_z']
+        np.testing.assert_raises(AssertionError, np.testing.assert_array_equal,
+                                 czA, czB)
+        self.fluxlutman.czd_amp_ratio(1.)
+
+        czA = self.fluxlutman._wave_dict['cz_z']
+        self.fluxlutman.czd_length_ratio(.6)
+        self.fluxlutman.generate_standard_waveforms()
+        czB = self.fluxlutman._wave_dict['cz_z']
+        np.testing.assert_raises(AssertionError, np.testing.assert_array_equal,
+                                 czA, czB)
+
+        self.fluxlutman.czd_lambda_2(np.nan)
+        self.fluxlutman.generate_standard_waveforms()
+        czA = self.fluxlutman._wave_dict['cz_z']
+
+        self.fluxlutman.czd_lambda_2(self.fluxlutman.cz_lambda_2())
+        self.fluxlutman.generate_standard_waveforms()
+        czB = self.fluxlutman._wave_dict['cz_z']
+        np.testing.assert_array_equal(czA, czB)
+
+        self.fluxlutman.czd_lambda_2(self.fluxlutman.cz_lambda_2()+.05)
+        self.fluxlutman.generate_standard_waveforms()
+        czC = self.fluxlutman._wave_dict['cz_z']
+        np.testing.assert_raises(AssertionError, np.testing.assert_array_equal,
+                                 czA, czC)
+
+
+        self.fluxlutman.czd_lambda_3(np.nan)
+        self.fluxlutman.generate_standard_waveforms()
+        czA = self.fluxlutman._wave_dict['cz_z']
+
+        self.fluxlutman.czd_lambda_3(self.fluxlutman.cz_lambda_3())
+        self.fluxlutman.generate_standard_waveforms()
+        czB = self.fluxlutman._wave_dict['cz_z']
+        np.testing.assert_array_equal(czA, czB)
+
+        self.fluxlutman.czd_lambda_3(self.fluxlutman.cz_lambda_3()+0.05)
+        self.fluxlutman.generate_standard_waveforms()
+        czC = self.fluxlutman._wave_dict['cz_z']
+        np.testing.assert_raises(AssertionError, np.testing.assert_array_equal,
+                                 czA, czC)
+
+        self.fluxlutman.czd_theta_f(np.nan)
+        self.fluxlutman.generate_standard_waveforms()
+        czA = self.fluxlutman._wave_dict['cz_z']
+
+        self.fluxlutman.czd_theta_f(self.fluxlutman.czd_theta_f())
+        self.fluxlutman.generate_standard_waveforms()
+        czB = self.fluxlutman._wave_dict['cz_z']
+        np.testing.assert_array_equal(czA, czB)
+
+        self.fluxlutman.czd_theta_f(self.fluxlutman.cz_theta_f()+15)
+        self.fluxlutman.generate_standard_waveforms()
+        czC = self.fluxlutman._wave_dict['cz_z']
+        np.testing.assert_raises(AssertionError, np.testing.assert_array_equal,
+                                 czA, czC)
+
+
+
 
     def test_generate_standard_flux_waveforms(self):
-        self.AWG8_Flux_LutMan.generate_standard_waveforms()
-        self.AWG8_Flux_LutMan.render_wave('cz')
+        self.fluxlutman.generate_standard_waveforms()
+        self.fluxlutman.render_wave('cz')
 
     def test_upload_and_distort(self):
-        self.AWG8_Flux_LutMan.load_waveforms_onto_AWG_lookuptable()
+        self.fluxlutman.load_waveforms_onto_AWG_lookuptable()
 
     def test_generate_composite(self):
-        self.AWG8_Flux_LutMan.generate_standard_waveforms()
+        self.fluxlutman.generate_standard_waveforms()
         empty_flux_tuples = []
-        gen_wf = self.AWG8_Flux_LutMan._gen_composite_wf('cz_z', time_tuples=[])
+        gen_wf = self.fluxlutman._gen_composite_wf('cz_z', time_tuples=[])
         exp_wf = np.zeros(12000) # 5us *2.4GSps
         np.testing.assert_array_almost_equal(gen_wf, exp_wf)
-
         flux_tuples = [(0, 'fl_cw_01', {(2, 0)}, 323),
              (14, 'fl_cw_01', {(2, 0)}, 326),
              (28, 'fl_cw_01', {(2, 0)}, 329),
@@ -206,14 +282,12 @@ class Test_Flux_LutMan(unittest.TestCase):
              (155, 'fl_cw_01', {(2, 0)}, 379),
              (174, 'fl_cw_01', {(2, 0)}, 387)]
 
-        gen_wf = self.AWG8_Flux_LutMan._gen_composite_wf(
+        gen_wf = self.fluxlutman._gen_composite_wf(
             'cz_z', time_tuples=flux_tuples)
         # not testing for equality to some expected stuff here, prolly better
 
     def test_uploading_composite_waveform(self):
-
-        self.AWG8_Flux_LutMan.generate_standard_waveforms()
-
+        self.fluxlutman.generate_standard_waveforms()
         flux_tuples = [(0, 'fl_cw_01', {(2, 0)}, 323),
              (14, 'fl_cw_01', {(2, 0)}, 326),
              (28, 'fl_cw_01', {(2, 0)}, 329),
@@ -228,15 +302,15 @@ class Test_Flux_LutMan(unittest.TestCase):
 
         # Testing several different base waveforms
         for prim_wf in ['cz_z', 'square', 'idle_z']:
-            self.AWG8_Flux_LutMan.load_composite_waveform_onto_AWG_lookuptable(
+            self.fluxlutman.load_composite_waveform_onto_AWG_lookuptable(
                 prim_wf, time_tuples=flux_tuples, codeword=3)
-            direct_gen_wf = self.AWG8_Flux_LutMan._gen_composite_wf(
+            direct_gen_wf = self.fluxlutman._gen_composite_wf(
                 prim_wf, time_tuples=flux_tuples)
-            wave_dict_wf = self.AWG8_Flux_LutMan._wave_dict[
+            wave_dict_wf = self.fluxlutman._wave_dict[
                 'comp_{}_cw003'.format(prim_wf)]
             np.testing.assert_array_almost_equal(direct_gen_wf, wave_dict_wf)
 
-            uploaded_wf_lutman = self.AWG8_Flux_LutMan._wave_dict_dist[
+            uploaded_wf_lutman = self.fluxlutman._wave_dict_dist[
                 'comp_{}_cw003'.format(prim_wf)]
             uploaded_wf_instr = self.AWG.wave_ch1_cw003()
             np.testing.assert_array_almost_equal(uploaded_wf_lutman,

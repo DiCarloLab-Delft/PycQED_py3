@@ -26,7 +26,7 @@ class QuTech_SPI_S4g_FluxCurrent(Instrument):
         t0 = time.time()
         super().__init__(name)
         self.channel_map = channel_map
-        self.spi_rack = SPI_rack(address, 9600, 1)
+        self.spi_rack = SPI_rack(address, 9600, timeout=1)
         self.spi_rack.unlock()
 
         # Determine the set of modules required from the channel map

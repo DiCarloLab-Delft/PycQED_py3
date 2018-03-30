@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import lmfit
 from pycqed.analysis import analysis_toolbox as a_tools
 from collections import OrderedDict
@@ -41,8 +42,8 @@ class RamZFluxArc(ba.BaseDataAnalysis):
 
         """
         self.timestamps = a_tools.get_timestamps_in_range(
-                self.t_start, self.t_stop,
-                label=self.labels)
+            self.t_start, self.t_stop,
+            label=self.labels)
 
         self.raw_data_dict = OrderedDict()
 
@@ -53,10 +54,11 @@ class RamZFluxArc(ba.BaseDataAnalysis):
         self.raw_data_dict['data'] = []
 
         for t in self.timestamps:
-            a = ma_old.MeasurementAnalysis(timestamp=t, auto=False, close_file=False)
+            a = ma_old.MeasurementAnalysis(
+                timestamp=t, auto=False, close_file=False)
             a.get_naming_and_values()
             amp = a.data_file[amp_key].attrs['value']
-            data = a.measured_values[2] +1j* a.measured_values[3]
+            data = a.measured_values[2] + 1j * a.measured_values[3]
             # hacky but required for data saving
             self.raw_data_dict['folder'] = a.folder
             self.raw_data_dict['amps'].append(amp)
@@ -65,7 +67,6 @@ class RamZFluxArc(ba.BaseDataAnalysis):
 
         self.raw_data_dict['times'] = a.sweep_points
         self.raw_data_dict['timestamps'] = self.timestamps
-
 
     def process_data(self):
         self.dac_arc_ana = ct.DacArchAnalysis(
@@ -80,17 +81,14 @@ class RamZFluxArc(ba.BaseDataAnalysis):
         self.freq_to_amp = self.dac_arc_ana.freq_to_amp
         self.amp_to_freq = self.dac_arc_ana.amp_to_freq
 
-
-
     def prepare_plots(self):
         self.plot_dicts['freqs'] = {
             'plotfn': self.dac_arc_ana.plot_freqs,
-            'title':"Cryoscope arc \n"+self.timestamps[0]+' - '+self.timestamps[-1]}
+            'title': "Cryoscope arc \n"+self.timestamps[0]+' - '+self.timestamps[-1]}
 
         self.plot_dicts['FluxArc'] = {
             'plotfn': self.dac_arc_ana.plot_ffts,
-            'title':"Cryoscope arc \n"+self.timestamps[0]+' - '+self.timestamps[-1]}
-
+            'title': "Cryoscope arc \n"+self.timestamps[0]+' - '+self.timestamps[-1]}
 
 
 class SlidingPulses_Analysis(ba.BaseDataAnalysis):
@@ -104,6 +102,7 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
 
     This analysis only implements the second variant (as of Feb 2018)
     """
+
     def __init__(self, t_start: str=None, t_stop: str=None, label='',
                  options_dict: dict=None,
                  sliding_pulse_duration=220e-9,
@@ -121,20 +120,19 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
         if auto:
             self.run_analysis()
 
-
     def extract_data(self):
         """
         Custom data extraction for this specific experiment.
         """
         self.timestamps = a_tools.get_timestamps_in_range(
-                self.t_start, self.t_stop,
-                label=self.labels)
+            self.t_start, self.t_stop,
+            label=self.labels)
 
         self.raw_data_dict = OrderedDict()
         # auto is True for the TwoD analysis as the heatmap can be useful
         # for debugging the data
-        a=ma_old.TwoD_Analysis(timestamp=self.timestamps[0], auto=True,
-                               close_file=False)
+        a = ma_old.TwoD_Analysis(timestamp=self.timestamps[0], auto=True,
+                                 close_file=False)
         a.get_naming_and_values_2D()
         # FIXME: this is hardcoded and should be an argument in options dict
         amp_key = 'Snapshot/instruments/AWG8_8005/parameters/awgs_0_outputs_1_amplitude'
@@ -149,10 +147,9 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
         self.raw_data_dict['timestamps'] = self.timestamps
         a.finish()
 
-
     def process_data(self):
         phase = np.nanmean(np.unwrap(self.raw_data_dict['phases'][::-1],
-                                  discont=180, axis=1)[::-1], axis=1)
+                                     discont=180, axis=1)[::-1], axis=1)
         phase_err = sem(np.unwrap(self.raw_data_dict['phases'],
                                   discont=180, axis=1), axis=1)
 
@@ -165,9 +162,9 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
             mean_phase = np.nanmean(phase[len(phase)//2:])
             # mean_phase = np.nanmean(phase[:])
 
-            detuning_rad_s = (np.deg2rad(phase-mean_phase)/
+            detuning_rad_s = (np.deg2rad(phase-mean_phase) /
                               self.sliding_pulse_duration)
-            detuning =  detuning_rad_s/(2*np.pi)
+            detuning = detuning_rad_s/(2*np.pi)
 
             mod_frequency = self.amp_to_freq(self.raw_data_dict['amp'])
             real_detuning = mod_frequency + detuning
@@ -178,18 +175,16 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
     def prepare_plots(self):
         self.plot_dicts['phase_plot'] = {
             'plotfn': make_phase_plot,
-            't':self.proc_data_dict['t'],
+            't': self.proc_data_dict['t'],
             'phase': self.proc_data_dict['phase'],
             'phase_err': self.proc_data_dict['phase_err'],
-            'title':"Sliding pulses\n"+self.timestamps[0]}
+            'title': "Sliding pulses\n"+self.timestamps[0]}
         if self.amp_to_freq is not None and self.freq_to_amp is not None:
             self.plot_dicts['normalized_amp_plot'] = {
                 'plotfn': make_amp_err_plot,
                 't': self.proc_data_dict['t'],
                 'amp': self.proc_data_dict['amp'],
-                'timestamp':self.timestamps[0]}
-
-
+                'timestamp': self.timestamps[0]}
 
 
 def make_phase_plot(t, phase, phase_err, title,  ylim=None, ax=None, **kw):
@@ -204,9 +199,11 @@ def make_phase_plot(t, phase, phase_err, title,  ylim=None, ax=None, **kw):
     mean_phase_tail = np.nanmean(phase[10:])
 
     ax.axhline(mean_phase_tail, ls='-', c='grey', linewidth=.5)
-    ax.axhline(mean_phase_tail+10, ls=':', c='grey', label=r'$\pm$10 deg', linewidth=0.5)
+    ax.axhline(mean_phase_tail+10, ls=':', c='grey',
+               label=r'$\pm$10 deg', linewidth=0.5)
     ax.axhline(mean_phase_tail-10, ls=':', c='grey', linewidth=0.5)
-    ax.axhline(mean_phase_tail+5, ls='--', c='grey', label=r'$\pm$5 deg', linewidth=0.5)
+    ax.axhline(mean_phase_tail+5, ls='--', c='grey',
+               label=r'$\pm$5 deg', linewidth=0.5)
     ax.axhline(mean_phase_tail-5, ls='--', c='grey', linewidth=0.5)
     ax.legend()
     if ylim == None:
@@ -216,8 +213,8 @@ def make_phase_plot(t, phase, phase_err, title,  ylim=None, ax=None, **kw):
 
 
 def make_amp_err_plot(t, amp, timestamp, ax=None, **kw):
-    if ax ==None:
-        f, ax =plt.subplots()
+    if ax == None:
+        f, ax = plt.subplots()
 
     mean_amp = np.nanmean(amp[len(amp)//2])
     ax.plot(t, amp/mean_amp, marker='.')
@@ -232,5 +229,3 @@ def make_amp_err_plot(t, amp, timestamp, ax=None, **kw):
     ax.set_title('Normalized to {:.2f}\n {}'.format(mean_amp, timestamp))
     set_xlabel(ax, 'Time', 's')
     set_ylabel(ax, 'Normalized Amplitude')
-
-
