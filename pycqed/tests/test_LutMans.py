@@ -174,12 +174,16 @@ class Test_Flux_LutMan(unittest.TestCase):
         self.fluxlutman.cz_E_c(250e6)
         self.fluxlutman.cz_freq_interaction(5.1e9)
         self.fluxlutman.cfg_max_wf_length(5e-6)
+
+        poly_coeffs = np.array([1.95027142e+09,  -3.22560292e+08,
+                                5.25834946e+07])
+        self.fluxlutman.polycoeffs_freq_conv(poly_coeffs)
+
         # for i in range(10):
         #     self.fluxlutman.set('mcz_phase_corr_amp_{}'.format(i+1), i/10)
 
     def test_generate_standard_flux_waveforms(self):
         self.fluxlutman.generate_standard_waveforms()
-
 
     def test_standard_cz_waveform(self):
         self.fluxlutman.cz_double_sided(False)
@@ -223,7 +227,6 @@ class Test_Flux_LutMan(unittest.TestCase):
         np.testing.assert_raises(AssertionError, np.testing.assert_array_equal,
                                  czA, czC)
 
-
         self.fluxlutman.czd_lambda_3(np.nan)
         self.fluxlutman.generate_standard_waveforms()
         czA = self.fluxlutman._wave_dict['cz_z']
@@ -254,6 +257,28 @@ class Test_Flux_LutMan(unittest.TestCase):
         np.testing.assert_raises(AssertionError, np.testing.assert_array_equal,
                                  czA, czC)
 
+    def test_freq_amp_conversions(self):
+
+        # Test the basic inversion
+        test_amps = np.linspace(0.1, .5, 11)
+        freqs = self.fluxlutman.amp_to_detuning(test_amps)
+        recovered_amps = self.fluxlutman.detuning_to_amp(freqs)
+        np.testing.assert_array_almost_equal(test_amps, recovered_amps)
+
+        # Test that the top of the parabola is given if asked for "impossible"
+        # solutions
+        recovered_amp = self.fluxlutman.detuning_to_amp(0)
+        self.assertAlmostEqual(recovered_amp, 0.082696256708720065)
+        recovered_amp = self.fluxlutman.detuning_to_amp(-5e9)
+        self.assertAlmostEqual(recovered_amp, 0.082696256708720065)
+
+
+        # Test negative branch of parabola
+        test_amps = np.linspace(-0.1, -.5, 11)
+        freqs = self.fluxlutman.amp_to_detuning(test_amps)
+        recovered_amps = self.fluxlutman.detuning_to_amp(
+            freqs, positive_branch=False)
+        np.testing.assert_array_almost_equal(test_amps, recovered_amps)
 
 
 
@@ -268,19 +293,19 @@ class Test_Flux_LutMan(unittest.TestCase):
         self.fluxlutman.generate_standard_waveforms()
         empty_flux_tuples = []
         gen_wf = self.fluxlutman._gen_composite_wf('cz_z', time_tuples=[])
-        exp_wf = np.zeros(12000) # 5us *2.4GSps
+        exp_wf = np.zeros(12000)  # 5us *2.4GSps
         np.testing.assert_array_almost_equal(gen_wf, exp_wf)
         flux_tuples = [(0, 'fl_cw_01', {(2, 0)}, 323),
-             (14, 'fl_cw_01', {(2, 0)}, 326),
-             (28, 'fl_cw_01', {(2, 0)}, 329),
-             (50, 'fl_cw_01', {(2, 0)}, 340),
-             (64, 'fl_cw_01', {(2, 0)}, 343),
-             (82, 'fl_cw_01', {(2, 0)}, 350),
-             (98, 'fl_cw_01', {(2, 0)}, 355),
-             (116, 'fl_cw_01', {(2, 0)}, 362),
-             (136, 'fl_cw_01', {(2, 0)}, 371),
-             (155, 'fl_cw_01', {(2, 0)}, 379),
-             (174, 'fl_cw_01', {(2, 0)}, 387)]
+                       (14, 'fl_cw_01', {(2, 0)}, 326),
+                       (28, 'fl_cw_01', {(2, 0)}, 329),
+                       (50, 'fl_cw_01', {(2, 0)}, 340),
+                       (64, 'fl_cw_01', {(2, 0)}, 343),
+                       (82, 'fl_cw_01', {(2, 0)}, 350),
+                       (98, 'fl_cw_01', {(2, 0)}, 355),
+                       (116, 'fl_cw_01', {(2, 0)}, 362),
+                       (136, 'fl_cw_01', {(2, 0)}, 371),
+                       (155, 'fl_cw_01', {(2, 0)}, 379),
+                       (174, 'fl_cw_01', {(2, 0)}, 387)]
 
         gen_wf = self.fluxlutman._gen_composite_wf(
             'cz_z', time_tuples=flux_tuples)
@@ -289,16 +314,16 @@ class Test_Flux_LutMan(unittest.TestCase):
     def test_uploading_composite_waveform(self):
         self.fluxlutman.generate_standard_waveforms()
         flux_tuples = [(0, 'fl_cw_01', {(2, 0)}, 323),
-             (14, 'fl_cw_01', {(2, 0)}, 326),
-             (28, 'fl_cw_01', {(2, 0)}, 329),
-             (50, 'fl_cw_01', {(2, 0)}, 340),
-             (64, 'fl_cw_01', {(2, 0)}, 343),
-             (82, 'fl_cw_01', {(2, 0)}, 350),
-             (98, 'fl_cw_01', {(2, 0)}, 355),
-             (116, 'fl_cw_01', {(2, 0)}, 362),
-             (136, 'fl_cw_01', {(2, 0)}, 371),
-             (155, 'fl_cw_01', {(2, 0)}, 379),
-             (174, 'fl_cw_01', {(2, 0)}, 387)]
+                       (14, 'fl_cw_01', {(2, 0)}, 326),
+                       (28, 'fl_cw_01', {(2, 0)}, 329),
+                       (50, 'fl_cw_01', {(2, 0)}, 340),
+                       (64, 'fl_cw_01', {(2, 0)}, 343),
+                       (82, 'fl_cw_01', {(2, 0)}, 350),
+                       (98, 'fl_cw_01', {(2, 0)}, 355),
+                       (116, 'fl_cw_01', {(2, 0)}, 362),
+                       (136, 'fl_cw_01', {(2, 0)}, 371),
+                       (155, 'fl_cw_01', {(2, 0)}, 379),
+                       (174, 'fl_cw_01', {(2, 0)}, 387)]
 
         # Testing several different base waveforms
         for prim_wf in ['cz_z', 'square', 'idle_z']:

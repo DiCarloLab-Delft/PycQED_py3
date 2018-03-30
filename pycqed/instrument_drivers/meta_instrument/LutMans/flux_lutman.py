@@ -70,6 +70,15 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         self.sampling_rate(2.4e9)
 
     def _add_cfg_parameters(self):
+
+        self.add_parameter(
+            'polycoeffs_freq_conv',
+            docstring='coefficients of the polynomial used to convert amplitude '
+            'to detuning. ',
+            vals=vals.Arrays(),
+            initial_value=np.array([0, 0, 0]),
+            parameter_class=ManualParameter)
+
         self.add_parameter('cfg_operating_mode',
                            initial_value='Codeword',
                            vals=vals.Enum('Codeword', 'LongSeq'),
@@ -110,6 +119,41 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                            initial_value=100e-6,
                            unit='s', vals=vals.Numbers(0, 100e-6))
 
+    def amp_to_detuning(self, amp):
+        """
+        Converts amplitude to detuning in Hz.
+
+        Requires "polycoeffs_freq_conv" to be set to the polynomial values
+        extracted from the cryoscope flux arc.
+        """
+        return np.polyval(self.polycoeffs_freq_conv(), amp)
+
+    def detuning_to_amp(self, freq, positive_branch=True):
+        """
+        Converts detuning in Hz to amplitude.
+
+        Requires "polycoeffs_freq_conv" to be set to the polynomial values
+        extracted from the cryoscope flux arc.
+
+        """
+        # recursive allows dealing with an array of freqs
+        if isinstance(freq, (list, np.ndarray)):
+            return np.array([self.detuning_to_amp(
+                f, positive_branch=positive_branch) for f in freq])
+        p = np.poly1d(self.polycoeffs_freq_conv())
+        sols = (p-freq).roots
+
+        # sols returns 2 solutions (for a 2nd order polynomial)
+        if positive_branch:
+            sol = np.max(sols)
+        else:
+            sol = np.min(sols)
+
+        # imaginary part is ignored, instead sticking to closest real value
+        return np.real(sol)
+
+
+
     def set_default_lutmap(self):
         """
         Set's the default lutmap for standard microwave drive pulses.
@@ -149,7 +193,6 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                            unit='deg',
                            initial_value=80,
                            parameter_class=ManualParameter)
-
 
         self.add_parameter('czd_length_ratio', vals=vals.Numbers(0, 1),
                            initial_value=0.5,
@@ -224,17 +267,6 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                            vals=vals.Bool(),
                            parameter_class=ManualParameter)
 
-        # for i in range(40):
-        #     self.add_parameter('mcz_phase_corr_amp_{}'.format(i+1), unit='V',
-        #                        label='Phase correction amplitude {}'.format(
-        #                        i+1),
-        #                        initial_value=0, vals=vals.Numbers(),
-        #                        parameter_class=ManualParameter)
-
-        # self.add_parameter('mcz_identical_phase_corr',
-        #                    initial_value=True, vals=vals.Bool(),
-        #                    parameter_class=ManualParameter)
-
         self.add_parameter('mcz_nr_of_repeated_gates',
                            initial_value=1, vals=vals.PermissiveInts(1, 40),
                            parameter_class=ManualParameter)
@@ -279,6 +311,10 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
     def _gen_cz(self):
         if not self.cz_double_sided():
+
+            # FIXME MAR detunig_to_amp frequency conversion and return unit
+            # the detuning.
+
             return wf.martinis_flux_pulse(
                 length=self.cz_length(),
                 lambda_2=self.cz_lambda_2(),
@@ -336,9 +372,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                 sampling_rate=self.sampling_rate(),
                 return_unit='V')
 
-
             amp_rat = self.czd_amp_ratio()
-            amp_offset = self.czd_amp_offset()
             waveform = np.concatenate(
                 [half_CZ_A, amp_rat*half_CZ_B + self.czd_amp_offset()])
             return waveform
