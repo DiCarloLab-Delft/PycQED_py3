@@ -490,6 +490,16 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
 
 
 def calculate_minimal_readout_spacing(qubits, ro_slack=10e-9, drive_pulses=0):
+    """
+
+    Args:
+        qubits:
+        ro_slack: minimal time needed between end of wint and next RO trigger
+        drive_pulses:
+
+    Returns:
+
+    """
     UHFQC = None
     for qb in qubits:
         UHFQC = qb.UHFQC
@@ -520,8 +530,8 @@ def calculate_minimal_readout_spacing(qubits, ro_slack=10e-9, drive_pulses=0):
 
 
 def measure_multiplexed_readout(qubits, f_LO, nreps=4, liveplot=False,
-                                ro_spacing=None, preselection=True, MC=None,
-                                plot_filename=False, ro_slack=10e-9,
+                                RO_spacing=1e-6, preselection=True, MC=None,
+                                plot_filename=False,
                                 thresholded=False):
 
     device.multiplexed_pulse(qubits, f_LO, upload=True,
@@ -533,16 +543,16 @@ def measure_multiplexed_readout(qubits, f_LO, nreps=4, liveplot=False,
         else:
             break
 
-    if ro_spacing is None:
-        ro_spacing = calculate_minimal_readout_spacing(qubits, ro_slack,
-                                                       drive_pulses=1)
+    #if ro_spacing is None:
+    #    ro_spacing = calculate_minimal_readout_spacing(qubits, ro_slack,
+    #                                                   drive_pulses=1)
 
     sf = awg_swf2.n_qubit_off_on(
         [qb.get_drive_pars() for qb in qubits],
         device.get_multiplexed_readout_pulse_dictionary(qubits),
         preselection=preselection,
         parallel_pulses=True,
-        RO_spacing=ro_spacing)
+        RO_spacing=RO_spacing)
 
     m = 2 ** (len(qubits))
     if preselection:

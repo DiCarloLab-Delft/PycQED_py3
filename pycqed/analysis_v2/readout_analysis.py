@@ -552,25 +552,33 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
         res_e = {}
         res_g = {}
 
-        n_shots = next(iter(shots_of_qubits.values())).shape[1]
+        n_shots = next(iter(shots_of_qubits.values())).shape[0]
 
         table = np.zeros((n_segments, len(observables)))
 
         for segment_n in range(n_segments):
 
             for qubit, results in shots_of_qubits.items():
-                res_e[qubit] = np.array(results[0, segment_n::n_segments])
+                res_e[qubit] = np.array(
+                    results[segment_n::n_segments])
                 # This makes copy, but allows faster AND later
-                res_g[qubit] = np.logical_not(np.array(results[segment_n::n_segments]))
+                res_g[qubit] = np.logical_not(np.array(
+                    results[segment_n::n_segments]))
 
-            for state_n, states_of_qubits in enumerate(observables): # first result all ground
+            # first result all ground
+            for state_n, states_of_qubits in enumerate(observables):
                 mask = np.ones((int(n_shots/n_segments)), dtype=bool)
-                for qubit, state in states_of_qubits.items(): # slow qubit is the first in channel_map list
-                    # mask all with qubit k in state r
-                    if state:
-                        mask = np.logical_and(mask, res_e[qubit])
+                # slow qubit is the first in channel_map list
+                for qubit, state in states_of_qubits.items():
+                    if type(qubit) == tuple:
+                        shift = qubit[1]
+                        qubit = qubit[0]
                     else:
-                        mask = np.logical_and(mask, res_g[qubit])
+                        shift = 0
+                    if state:
+                        mask = np.logical_and(mask, np.roll(res_e[qubit], shift))
+                    else:
+                        mask = np.logical_and(mask, np.roll(res_g[qubit], shift))
                 table[segment_n, state_n] = np.count_nonzero(mask)
 
         return table*n_segments/n_shots
@@ -578,15 +586,15 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
     def prepare_plots(self):
 
         # colormap which has a lot of contrast for small and large values
-        values = [0, 0.1, 0.2, 0.8, 1]
-        colors = [(1, 1, 1),
+        v = [0, 0.1, 0.2, 0.8, 1]
+        c = [(1, 1, 1),
               (191/255, 38/255, 11/255),
               (155/255, 10/255, 106/255),
               (55/255, 129/255, 214/255),
               (0, 0, 0)]
-        cdict = {'red':   [(values[i], colors[i][0], colors[i][0]) for i in range(len(values))],
-                 'green': [(values[i], colors[i][1], colors[i][1]) for i in range(len(values))],
-                 'blue':  [(values[i], colors[i][2], colors[i][2]) for i in range(len(values))]}
+        cdict = {'red':   [(v[i], c[i][0], c[i][0]) for i in range(len(v))],
+                 'green': [(v[i], c[i][1], c[i][1]) for i in range(len(v))],
+                 'blue':  [(v[i], c[i][2], c[i][2]) for i in range(len(v))]}
         cm = lscmap('customcmap', cdict)
 
         ylist = list(range(self.n_segments))
@@ -747,7 +755,8 @@ def get_shots_zero_one(data, post_select: bool=False,
 
 class Multiplexed_Readout_Analysis(MultiQubit_SingleShot_Analysis):
     """
-    Analysis results of an experiment meant for characterization of multiplexed readout.
+    Analysis results of an experiment meant for characterization of multiplexed
+    readout.
     """
     def __init__(self, t_start: str=None, t_stop: str=None,
                  label: str='', data_file_path: str=None,
@@ -756,23 +765,55 @@ class Multiplexed_Readout_Analysis(MultiQubit_SingleShot_Analysis):
 
         self.n_segments = options_dict['n_segments']
         self.channel_map = options_dict['channel_map']
+        qubits = list(self.channel_map.keys())
 
-        def_seg_names_prep = ["".join(l) for l in list(itertools.product(["$0$", "$\pi$"],
-                                                                         repeat=len(self.channel_map)))]
+        def_seg_names_prep = ["".join(l) for l in list(
+            itertools.product(["$0$", "$\pi$"],
+                              repeat=len(self.channel_map)))]
+        preselection = False
         if self.n_segments == len(def_seg_names_prep):
             def_seg_names = def_seg_names_prep
         elif self.n_segments == 2*len(def_seg_names_prep):
-            def_seg_names = [x for t in zip(*[["sel"]*len(def_seg_names_prep), def_seg_names_prep]) for x in t]
+            preselection = True
+            def_seg_names = [x for t in zip(*[
+                ["sel"]*len(def_seg_names_prep),
+                def_seg_names_prep]) for x in t]
         else:
             def_seg_names = list(range(len(def_seg_names_prep)))
 
-        options_dict['segment_names'] = options_dict.get('segment_names', def_seg_names)
+        # User can override the automatic value determined from the
+        #   number of segments
+        preselection = options_dict.get('preselection', preselection)
+
+        self.observables = options_dict.get('observables', None)
+        if self.observables is None:
+            combination_list = list(itertools.product([False, True],
+                                                      repeat=len(qubits)))
+            self.observables = {}
+            for i, states in enumerate(combination_list):
+                obs_name = '$\| ' + \
+                           ''.join(['e' if s else 'g' for s in states]) + \
+                           '\\rangle$'
+                self.observables[obs_name] = dict(zip(qubits, states))
+                if preselection:
+                    self.observables[obs_name] = {
+                        ** self.observables[obs_name],
+                        ** dict(zip(
+                            [(qb, 1) for qb in qubits],  # keys contain shift
+                            combination_list[0]  # first comb has all ground
+                        ))
+                    }
+
+        options_dict['observables'] = self.observables
+        options_dict['segment_names'] = options_dict.get('segment_names',
+                                                         def_seg_names)
 
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
                          data_file_path=data_file_path,
                          options_dict=options_dict,
-                         extract_only=extract_only, do_fitting=do_fitting, auto=False)
+                         extract_only=extract_only, do_fitting=do_fitting,
+                         auto=False)
 
         # here we can do more stuff before analysis runs
 

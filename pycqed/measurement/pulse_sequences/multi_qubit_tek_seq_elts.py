@@ -965,7 +965,9 @@ def n_qubit_off_on(pulse_pars_list, RO_pars, return_seq=False, verbose=False,
     el_list = []
 
     # Create a dict with the parameters for all the pulses
-    pulse_dict = {'RO': RO_pars}
+    pulse_dict = {'RO': RO_pars, 'RO presel': RO_pars.copy()}
+    pulse_dict['RO presel']['refpoint'] = 'start'
+    pulse_dict['RO presel']['pulse_delay'] = -RO_spacing
     for i, pulse_pars in enumerate(pulse_pars_list):
         pars = pulse_pars.copy()
         if i != 0 and parallel_pulses:
@@ -973,11 +975,15 @@ def n_qubit_off_on(pulse_pars_list, RO_pars, return_seq=False, verbose=False,
         pulses = add_suffix_to_dict_keys(
             get_pulse_dict_from_pars(pars), ' {}'.format(i))
         pulse_dict.update(pulses)
+
+    # spacer to shift the reference point from the end of preselection RO
+    # to end of the second RO
     spacerpulse = {'pulse_type': 'SquarePulse',
-                   'channel': RO_pars['acq_marker_channel'],
-                   'amplitude': 0.0,
-                   'length': RO_spacing,
-                   'pulse_delay': 0}
+                    'channel': RO_pars['acq_marker_channel'],
+                    'amplitude': 0.0,
+                    'length': RO_spacing,
+                    'refpoint': 'simultaneous',
+                    'pulse_delay': 0}
     pulse_dict.update({'spacer': spacerpulse})
 
     # Create a list of required pulses
@@ -988,7 +994,7 @@ def n_qubit_off_on(pulse_pars_list, RO_pars, return_seq=False, verbose=False,
             pulse_comb[i] = pulse + ' {}'.format(i)
         pulse_comb[-1] = 'RO'
         if preselection:
-            pulse_comb = ['RO', 'spacer'] + pulse_comb
+            pulse_comb = pulse_comb + ['RO presel', 'spacer']
         pulse_combinations.append(pulse_comb)
 
     for i, pulse_comb in enumerate(pulse_combinations):
