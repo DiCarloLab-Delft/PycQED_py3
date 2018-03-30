@@ -171,7 +171,7 @@ class Test_Flux_LutMan(unittest.TestCase):
         self.fluxlutman.cz_theta_f(80)
         self.fluxlutman.cz_freq_01_max(6.8e9)
         self.fluxlutman.cz_J2(4.1e6)
-        self.fluxlutman.cz_E_c(250e6)
+        # self.fluxlutman.cz_E_c(250e6)
         self.fluxlutman.cz_freq_interaction(5.1e9)
         self.fluxlutman.cfg_max_wf_length(5e-6)
 
@@ -182,11 +182,36 @@ class Test_Flux_LutMan(unittest.TestCase):
         # for i in range(10):
         #     self.fluxlutman.set('mcz_phase_corr_amp_{}'.format(i+1), i/10)
 
+    def test_amp_to_dac_val_conversions(self):
+        self.fluxlutman.cfg_awg_channel(1)
+
+        self.AWG.awgs_0_outputs_0_amplitude(.5)
+        self.AWG.sigouts_0_range(5)
+        sf = self.fluxlutman.get_dac_val_to_amp_scalefactor()
+        self.assertEqual(sf, 0.5*5/2)
+
+        self.AWG.sigouts_0_range(.8)
+        sf = self.fluxlutman.get_dac_val_to_amp_scalefactor()
+        self.assertEqual(sf, 0.5*0.8/2)
+
+        self.fluxlutman.cfg_awg_channel(2)
+        self.AWG.awgs_0_outputs_1_amplitude(.2)
+        self.AWG.sigouts_1_range(.8)
+        sf = self.fluxlutman.get_dac_val_to_amp_scalefactor()
+        self.assertEqual(sf, 0.2*0.8/2)
+
+        sc_inv = self.fluxlutman.get_amp_to_dac_val_scale_factor()
+        self.assertEqual(sc_inv, 1/sf)
+
+        self.fluxlutman.cfg_awg_channel(1)
+
+
+
     def test_generate_standard_flux_waveforms(self):
         self.fluxlutman.generate_standard_waveforms()
 
     def test_standard_cz_waveform(self):
-        self.fluxlutman.cz_double_sided(False)
+        self.fluxlutman.czd_double_sided(False)
         self.fluxlutman.generate_standard_waveforms()
 
     def test_double_sided_cz_waveform(self):
@@ -194,7 +219,7 @@ class Test_Flux_LutMan(unittest.TestCase):
         This test mostly tests if the parameters have some effect.
         They do not test the generated output.
         """
-        self.fluxlutman.cz_double_sided(True)
+        self.fluxlutman.czd_double_sided(True)
         self.fluxlutman.generate_standard_waveforms()
 
         czA = self.fluxlutman._wave_dict['cz_z']

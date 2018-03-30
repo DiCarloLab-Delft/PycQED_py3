@@ -7,8 +7,6 @@ from pycqed.instrument_drivers.pq_parameters import NP_NANs
 from pycqed.measurement.waveform_control_CC import waveform as wf
 from pycqed.measurement.openql_experiments.openql_helpers import clocks_to_s
 from qcodes.plots.pyqtgraph import QtPlot
-from scipy.optimize import minimize
-from copy import copy
 
 
 class Base_Flux_LutMan(Base_LutMan):
@@ -50,7 +48,7 @@ class Base_Flux_LutMan(Base_LutMan):
                     x=x2, y=y2, name=wave_name+' distorted',
                     symbol='o', symbolSize=5,
                     xlabel=xlab[0], xunit=xlab[1], ylabel='Amplitude',
-                    yunit='V')
+                    yunit='dac val.')
             else:
                 logging.warning('Wave not in distorted wave dict')
         # Plotting the normal one second ensures it is on top.
@@ -73,8 +71,9 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         self.add_parameter(
             'polycoeffs_freq_conv',
-            docstring='coefficients of the polynomial used to convert amplitude '
-            'to detuning. ',
+            docstring='coefficients of the polynomial used to convert '
+            'amplitude in V to detuning in Hz. N.B. it is important to '
+            'include both the AWG range and channel amplitude in the params.',
             vals=vals.Arrays(),
             initial_value=np.array([0, 0, 0]),
             parameter_class=ManualParameter)
@@ -125,6 +124,12 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         Requires "polycoeffs_freq_conv" to be set to the polynomial values
         extracted from the cryoscope flux arc.
+
+        N.B. this method assumes that the polycoeffs are the effective amp,
+            currently that does not include the scaling due to the mode
+            used in the AWG8.
+
+                eff_amp = amp_dac_val * channel_amp
         """
         return np.polyval(self.polycoeffs_freq_conv(), amp)
 
@@ -135,6 +140,12 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         Requires "polycoeffs_freq_conv" to be set to the polynomial values
         extracted from the cryoscope flux arc.
 
+
+        N.B. this method assumes that the polycoeffs are the effective amp,
+            currently that does not include the scaling due to the mode
+            used in the AWG8.
+
+                eff_amp = amp_dac_val * channel_amp
         """
         # recursive allows dealing with an array of freqs
         if isinstance(freq, (list, np.ndarray)):
@@ -152,7 +163,27 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         # imaginary part is ignored, instead sticking to closest real value
         return np.real(sol)
 
+    def get_dac_val_to_amp_scalefactor(self):
+        """
+        Returns the scale factor to transform an amplitude in 'dac value' to an
+        amplitude in 'V'.
+        """
+        AWG = self.AWG.get_instr()
 
+        awg_ch = self.cfg_awg_channel()-1  # -1 is to account for starting at 1
+        awg_nr = awg_ch//2
+        ch_pair = awg_ch % 2
+
+        channel_amp = AWG.get('awgs_{}_outputs_{}_amplitude'.format(
+            awg_nr, ch_pair))
+
+        channel_range_pp = AWG.get('sigouts_{}_range'.format(awg_ch))
+        # direct_mode = AWG.get('sigouts_{}_direct'.format(awg_ch))
+        scale_factor = channel_amp*(channel_range_pp/2)
+        return scale_factor
+
+    def get_amp_to_dac_val_scale_factor(self):
+        return 1/self.get_dac_val_to_amp_scalefactor()
 
     def set_default_lutmap(self):
         """
@@ -221,19 +252,19 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             initial_value=np.nan,
             parameter_class=ManualParameter)
 
-        self.add_parameter('cz_V_per_phi0', vals=vals.Numbers(),
-                           unit='V', initial_value=1,
-                           parameter_class=ManualParameter)
         self.add_parameter('cz_freq_01_max', vals=vals.Numbers(),
                            unit='Hz', parameter_class=ManualParameter)
         self.add_parameter('cz_J2', vals=vals.Numbers(), unit='Hz',
                            parameter_class=ManualParameter)
-        self.add_parameter('cz_E_c', vals=vals.Numbers(), unit='Hz',
-                           parameter_class=ManualParameter)
-
         self.add_parameter('cz_freq_interaction', vals=vals.Numbers(),
                            unit='Hz',
                            parameter_class=ManualParameter)
+
+        # self.add_parameter('cz_V_per_phi0', vals=vals.Numbers(),
+        #                    unit='V', initial_value=1,
+        #                    parameter_class=ManualParameter)
+        # self.add_parameter('cz_E_c', vals=vals.Numbers(), unit='Hz',
+        #                    parameter_class=ManualParameter)
 
         self.add_parameter('cz_phase_corr_length', unit='s',
                            initial_value=5e-9, vals=vals.Numbers(),
@@ -257,13 +288,8 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                            vals=vals.Numbers(),
                            parameter_class=ManualParameter)
 
-        self.add_parameter('cz_double_sided',
+        self.add_parameter('czd_double_sided',
                            initial_value=False,
-                           vals=vals.Bool(),
-                           parameter_class=ManualParameter)
-
-        self.add_parameter('cz_net_zero',
-                           initial_value=True,
                            vals=vals.Bool(),
                            parameter_class=ManualParameter)
 
@@ -310,23 +336,22 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         return np.zeros(42)
 
     def _gen_cz(self):
-        if not self.cz_double_sided():
 
-            # FIXME MAR detunig_to_amp frequency conversion and return unit
-            # the detuning.
+        dac_scale_factor = self.get_amp_to_dac_val_scale_factor()
 
-            return wf.martinis_flux_pulse(
+        if not self.czd_double_sided():
+            CZ = wf.martinis_flux_pulse(
                 length=self.cz_length(),
                 lambda_2=self.cz_lambda_2(),
                 lambda_3=self.cz_lambda_3(),
                 theta_f=self.cz_theta_f(),
                 f_01_max=self.cz_freq_01_max(),
-                V_per_phi0=self.cz_V_per_phi0(),
                 J2=self.cz_J2(),
-                E_c=self.cz_E_c(),
                 f_interaction=self.cz_freq_interaction(),
                 sampling_rate=self.sampling_rate(),
-                return_unit='V')
+                return_unit='f01')
+            return dac_scale_factor*self.detuning_to_amp(
+                self.cz_freq_01_max() - CZ)
         else:
             # Simple double sided CZ pulse implemented in most basic form.
             # repeats the same CZ gate twice and sticks it together.
@@ -336,12 +361,14 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                 lambda_3=self.cz_lambda_3(),
                 theta_f=self.cz_theta_f(),
                 f_01_max=self.cz_freq_01_max(),
-                V_per_phi0=self.cz_V_per_phi0(),
+                # V_per_phi0=self.cz_V_per_phi0(),
                 J2=self.cz_J2(),
-                E_c=self.cz_E_c(),
+                # E_c=self.cz_E_c(),
                 f_interaction=self.cz_freq_interaction(),
                 sampling_rate=self.sampling_rate(),
-                return_unit='V')
+                return_unit='f01')
+            half_CZ_A = dac_scale_factor*self.detuning_to_amp(
+                self.cz_freq_01_max() - half_CZ_A)
 
             # Generate the second CZ pulse. If the params are np.nan, default
             # to the main parameter
@@ -365,16 +392,19 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                 lambda_3=d_lambda_3,
                 theta_f=d_theta_f,
                 f_01_max=self.cz_freq_01_max(),
-                V_per_phi0=self.cz_V_per_phi0(),
+                # V_per_phi0=self.cz_V_per_phi0(),
                 J2=self.cz_J2(),
-                E_c=self.cz_E_c(),
+                # E_c=self.cz_E_c(),
                 f_interaction=self.cz_freq_interaction(),
                 sampling_rate=self.sampling_rate(),
-                return_unit='V')
+                return_unit='f01')
+            half_CZ_B = dac_scale_factor*self.detuning_to_amp(
+                self.cz_freq_01_max() - half_CZ_B)
 
             amp_rat = self.czd_amp_ratio()
             waveform = np.concatenate(
                 [half_CZ_A, amp_rat*half_CZ_B + self.czd_amp_offset()])
+
             return waveform
 
     def _get_phase_corr_offset(self):
@@ -398,7 +428,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         if phase_corr_amp is None:
             phase_corr_amp = self.cz_phase_corr_amp()
 
-        if not self.cz_double_sided():
+        if not self.czd_double_sided():
             phase_corr_wf = wf.single_channel_block(
                 amp=phase_corr_amp, length=self.cz_phase_corr_length(),
                 sampling_rate=self.sampling_rate(), delay=0)
@@ -426,8 +456,6 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         # CZ with phase correction
         cz_z = np.concatenate([self._wave_dict['cz'], phase_corr])
 
-        # if self.cz_net_zero():
-        #     cz_z = self._modify_wf_net_zero_flux(base_wf = cz_z)
         return cz_z
 
     def _gen_multi_square(self, regenerate_square=True):
@@ -459,17 +487,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         waveform = np.zeros(max_nr_samples)
         for i in range(self.mcz_nr_of_repeated_gates()):
-            # if self.mcz_identical_phase_corr():
             cz_z = self._wave_dict['cz_z']
-
-            # else:
-            #     phase_corr = self._gen_phase_corr(
-            #         phase_corr_amp=self.get('mcz_phase_corr_amp_{}'.format(i+1)),
-            #         cz_offset_comp=True)
-            #     cz_z = np.concatenate([self._wave_dict['cz'], phase_corr])
-            #     if self.cz_net_zero():
-            #         cz_z = self._modify_wf_net_zero_flux(base_wf = cz_z)
-
             sample_start_idx = int(self.mcz_gate_separation() *
                                    self.sampling_rate())*i
             waveform[sample_start_idx:sample_start_idx+len(cz_z)] += cz_z
@@ -553,37 +571,6 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             waveform[sample_start_idx:sample_start_idx+len(cz_z)] += cz_z
         # CZ with phase correction
         return waveform
-
-    def _modify_wf_net_zero_flux(self, base_wf):
-        """
-        Takes the second part of the phase correction pulse and modifies it such
-        that the pulse is optimally canceled.
-
-        It should be noted that this is a simple numerical optimization and not the
-        proper analytic inverse.
-        """
-        # k0 = self.instr_distortion_kernel.get_instr()
-        corr_samples = int(self.cz_phase_corr_length()*self.sampling_rate())//2
-
-        def modify_wf(wf, corr_amp, tau_corr, offset):
-            wf = copy(wf)
-            wf[-corr_samples:] += corr_amp * \
-                np.exp(-np.arange(corr_samples)/tau_corr) + offset
-            return wf
-
-        def cost_func(corr_amp, tau_corr, offset, base_wf):
-            cz_z = modify_wf(base_wf, corr_amp, tau_corr, offset)
-            wf = self.distort_waveform(cz_z, len(cz_z)+40)
-            cost_val = abs(np.sum(wf[-40:]))
-            return cost_val
-
-        res_obj = minimize(lambda x: cost_func(x[0], x[1], x[2], base_wf),
-                           [0, 1, self.cz_phase_corr_amp()/2],
-                           bounds=[(-.5, .5), (0.000001, 100), (-.4, .5)])
-
-        modified_wf = modify_wf(
-            base_wf, res_obj.x[0], res_obj.x[1], res_obj.x[2])
-        return modified_wf
 
     def load_waveform_onto_AWG_lookuptable(self, waveform_name: str,
                                            regenerate_waveforms: bool=False):
