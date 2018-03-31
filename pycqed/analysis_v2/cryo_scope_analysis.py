@@ -13,6 +13,7 @@ from scipy.stats import sem
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 
 
+
 class RamZFluxArc(ba.BaseDataAnalysis):
     """
     Analysis for the 2D scan that is used to calibrate the FluxArc.
@@ -89,6 +90,95 @@ class RamZFluxArc(ba.BaseDataAnalysis):
         self.plot_dicts['FluxArc'] = {
             'plotfn': self.dac_arc_ana.plot_ffts,
             'title': "Cryoscope arc \n"+self.timestamps[0]+' - '+self.timestamps[-1]}
+
+
+class Cryoscope_Analysis(ba.BaseDataAnalysis):
+    """
+    Cryoscope analysis. Requires a function to convert frequency to amp
+    for the final step of the analysis.
+    """
+    def __init__(self, t_start: str, t_stop: str,
+                 freq_to_amp,
+                 label='cryoscope',
+                 derivative_window_length: float=15e-9,
+                 norm_window_size: int=31,
+                 nyquist_order: int =0,
+                 options_dict: dict=None,
+                 auto=True):
+        if options_dict is None:
+            options_dict = dict()
+        super().__init__(t_start=t_start, t_stop=t_stop, label=label,
+                         options_dict=options_dict)
+        if auto:
+            self.run_analysis()
+
+        self.freq_to_amp = freq_to_amp
+        self.derivative_window_length = derivative_window_length
+        self.norm_window_size = norm_window_size
+        self.nyquist_order = nyquist_order
+
+    def extract_data(self):
+        """
+        Custom data extraction for this specific experiment.
+
+        """
+        # timestamps in range so that multiple datasets can be averaged together
+        self.timestamps = a_tools.get_timestamps_in_range(
+            self.t_start, self.t_stop,
+            label=self.labels)
+
+        self.raw_data_dict = OrderedDict()
+
+        # FIXME: this is hardcoded and should be an argument in options dict
+        amp_key = 'Snapshot/instruments/AWG8_8005/parameters/awgs_0_outputs_1_amplitude'
+
+        data = []
+        for t in self.timestamps:
+            a = ma_old.MeasurementAnalysis(
+                timestamp=t, auto=False, close_file=False)
+            a.get_naming_and_values()
+            amp = a.data_file[amp_key].attrs['value']
+            data = a.measured_values[0] + 1j * a.measured_values[1]
+            # hacky but required for data saving
+            self.raw_data_dict['folder'] = a.folder
+            self.raw_data_dict['amp'] = amp  # Should be the same for all
+            data.append(data)
+            a.finish()
+
+        self.raw_data_dict['data'] = np.mean(data)  # axis= 0 or 1?
+        self.raw_data_dict['times'] = a.sweep_points
+        self.raw_data_dict['timestamps'] = self.timestamps
+
+    def process_data(self):
+        self.proc_data_dict['derivative_window_length'] = self.derivative_window_length
+        self.proc_data_dict['norm_window_size'] = self.norm_window_size
+        self.proc_data_dict['nyquist_order'] = self.nyquist_order
+
+        self.ca = ct.CryoscopeAnalyzer(
+            self.proc_data_dict['times'], self.proc_data_dict['data'],
+            derivative_window_length=self.proc_data_dict['derivative_window_length'],
+            norm_window_size=self.proc_data_dict['norm_window_size'],
+            demod_smooth=None)
+
+        self.ca.freq_to_amp = self.freq_to_amp
+        self.ca.nyquist_order = self.nyquist_order
+
+
+    def prepare_plots(self):
+        self.plot_dicts['freqs'] = {
+            'plotfn': self.dac_arc_ana.plot_freqs,
+            'title': "Cryoscope arc \n"+self.timestamps[0]+' - '+self.timestamps[-1]}
+
+
+        # self.plot_dicts['freqs'] = {
+        #     'plotfn': self.dac_arc_ana.plot_freqs,
+        #     'title': "Cryoscope arc \n"+self.timestamps[0]+' - '+self.timestamps[-1]}
+
+        # self.plot_dicts['FluxArc'] = {
+        #     'plotfn': self.dac_arc_ana.plot_ffts,
+        #     'title': "Cryoscope arc \n"+self.timestamps[0]+' - '+self.timestamps[-1]}
+
+
 
 
 class SlidingPulses_Analysis(ba.BaseDataAnalysis):

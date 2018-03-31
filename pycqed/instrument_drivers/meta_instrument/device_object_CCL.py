@@ -225,7 +225,7 @@ class DeviceCCL(Instrument):
 
         d = det.UHFQC_correlation_detector(
             UHFQC=q0.instr_acquisition.get_instr(),  # <- hack line
-            thresholding=True,
+            thresholding=self.ro_acq_digitized(),
             AWG=self.instr_CC.get_instr(),
             channels=[w0, w1], correlations=[(w0, w1)],
             nr_averages=self.ro_acq_averages(),

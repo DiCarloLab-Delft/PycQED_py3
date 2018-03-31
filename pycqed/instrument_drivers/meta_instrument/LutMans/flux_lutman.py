@@ -73,8 +73,12 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             'polycoeffs_freq_conv',
             docstring='coefficients of the polynomial used to convert '
             'amplitude in V to detuning in Hz. N.B. it is important to '
-            'include both the AWG range and channel amplitude in the params.',
-            vals=vals.Arrays(),
+            'include both the AWG range and channel amplitude in the params.\n'
+            'In order to convert a set of cryoscope flux arc coefficients to '
+            ' units of Volts they can be rescaled using [c0*sc**2, c1*sc, c2]'
+            ' where sc is the desired scaling factor that includes the sq_amp '
+            'used and the range of the AWG (5 in amp mode).',
+            vals=vals.Arrays() ,
             initial_value=np.array([0, 0, 0]),
             parameter_class=ManualParameter)
 
@@ -125,11 +129,12 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         Requires "polycoeffs_freq_conv" to be set to the polynomial values
         extracted from the cryoscope flux arc.
 
-        N.B. this method assumes that the polycoeffs are the effective amp,
-            currently that does not include the scaling due to the mode
-            used in the AWG8.
+        N.B. this method assumes that the polycoeffs are with respect to the
+            amplitude in units of V, including rescaling due to the channel
+            amplitude and range settings of the AWG8.
+            See also `self.get_dac_val_to_amp_scalefactor`.
 
-                eff_amp = amp_dac_val * channel_amp
+                amp_Volts = amp_dac_val * channel_amp * channel_range
         """
         return np.polyval(self.polycoeffs_freq_conv(), amp)
 
@@ -141,11 +146,12 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         extracted from the cryoscope flux arc.
 
 
-        N.B. this method assumes that the polycoeffs are the effective amp,
-            currently that does not include the scaling due to the mode
-            used in the AWG8.
+        N.B. this method assumes that the polycoeffs are with respect to the
+            amplitude in units of V, including rescaling due to the channel
+            amplitude and range settings of the AWG8.
+            See also `self.get_dac_val_to_amp_scalefactor`.
 
-                eff_amp = amp_dac_val * channel_amp
+                amp_Volts = amp_dac_val * channel_amp * channel_range
         """
         # recursive allows dealing with an array of freqs
         if isinstance(freq, (list, np.ndarray)):
@@ -203,7 +209,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         self.add_parameter('sq_amp', initial_value=.5,
                            # units is part of the total range of AWG8
                            label='Square pulse amplitude',
-                           unit='a.u.', vals=vals.Numbers(),
+                           unit='dac value', vals=vals.Numbers(),
                            parameter_class=ManualParameter)
         self.add_parameter('sq_length', unit='s',
                            label='Square pulse length',
@@ -260,18 +266,11 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                            unit='Hz',
                            parameter_class=ManualParameter)
 
-        # self.add_parameter('cz_V_per_phi0', vals=vals.Numbers(),
-        #                    unit='V', initial_value=1,
-        #                    parameter_class=ManualParameter)
-        # self.add_parameter('cz_E_c', vals=vals.Numbers(), unit='Hz',
-        #                    parameter_class=ManualParameter)
-
         self.add_parameter('cz_phase_corr_length', unit='s',
                            initial_value=5e-9, vals=vals.Numbers(),
                            parameter_class=ManualParameter)
-
         self.add_parameter('cz_phase_corr_amp',
-                           unit='V',
+                           unit='dac value',
                            initial_value=0, vals=vals.Numbers(),
                            parameter_class=ManualParameter)
 
@@ -285,6 +284,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                            docstring='used to add an offset to the negative '
                            ' pulse that is used in the net-zero cz gate',
                            initial_value=0,
+                           unit='dac value',
                            vals=vals.Numbers(),
                            parameter_class=ManualParameter)
 

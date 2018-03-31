@@ -2,6 +2,7 @@
 Tools to for cryoscope analysis
 Brian Tarasinski
 Dec 2017
+Edited by Adriaan Rol
 """
 
 import numpy as np
