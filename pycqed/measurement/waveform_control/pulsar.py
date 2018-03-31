@@ -341,25 +341,36 @@ class HDAWG8Pulsar:
             # Create waveform definitions
             header = ""
             elements_with_non_zero_first_points = []
-            wfnames = {ch1id: [], ch2id: []}
-            wfdata = {ch1id: [], ch2id: []}
-            #i = 1
+
+            unique_waveforms = {} # maps list hashes to waveform names
+            wf_name_map = {} # maps waveform name from element to an older copy
+            # i = 0
             for (_, el), cid_wfs in sorted(el_wfs.items()):
                 for cid in [ch1id, ch2id]:
                     if cid in cid_wfs:
                         wfname = str(el) + '_' + cid
                         cid_wf = cid_wfs[cid]
-                        wfnames[cid].append(wfname)
-                        wfdata[cid].append(cid_wf)
+
+                        # TODO - Restructure for hashing without data copy
+                        # hashing list using tuple makes a copy of the data
+                        # and also __eq__ is expansive
+                        # thus it would be better to restructure the code
+                        # and hash before evaluating numerically - JH
+                        wfhashable = tuple(cid_wf)
+                        if wfhashable in unique_waveforms:
+                            # we already have such a waveform
+                            wf_name_map[wfname] = \
+                                unique_waveforms[wfhashable]
+                        else:
+                            # new waveform for this subAWG
+                            unique_waveforms[wfhashable] = wfname
+
                         if len(cid_wf) > 0 and cid_wf[0] != 0.:
                             elements_with_non_zero_first_points.append(el)
                         #header += 'wave {} = ramp({}, 0, {});\n'.format(
                         #    simplify_name(wfname), len(cid_wf), 1 / i
                         #)
                         #i += 1
-                    else:
-                        wfnames[cid].append(None)
-                        wfdata[cid].append(None)
 
             # Create waveform table
             waveform_table = ""
@@ -367,21 +378,25 @@ class HDAWG8Pulsar:
                 for (_, el), cid_wfs in sorted(el_wfs.items()):
                     if el == wfname:
                         if ch1id in cid_wfs and ch2id in cid_wfs:
+                            wfname1 = wf_name_map[wfname + '_' + ch1id]
+                            wfname2 = wf_name_map[wfname + '_' + ch2id]
                             waveform_table += \
                                 'setWaveDIO({0}, "{1}_{2}", "{1}_{3}");\n' \
                                 .format(cw, obj._devname,
-                                        simplify_name(wfname + '_' + ch1id),
-                                        simplify_name(wfname + '_' + ch2id))
+                                        simplify_name(wfname1),
+                                        simplify_name(wfname2))
                         elif ch1id in cid_wfs and ch2id not in cid_wfs:
+                            wfname1 = wf_name_map[wfname + '_' + ch1id]
                             waveform_table += \
                                 'setWaveDIO({}, 1, "{}_{}");\n' \
                                 .format(cw, obj._devname,
-                                        simplify_name(wfname + '_' + ch1id))
+                                        simplify_name(wfname1))
                         elif ch1id not in cid_wfs and ch2id in cid_wfs:
+                            wfname2 = wf_name_map[wfname + '_' + ch2id]
                             waveform_table += \
                                 'setWaveDIO({}, 2, "{}_{}");\n' \
-                                    .format(cw, obj._devname,
-                                            simplify_name(wfname + '_' + ch2id))
+                                .format(cw, obj._devname,
+                                        simplify_name(wfname2))
 
             # Create main loop and footer
             if loop:
@@ -405,12 +420,23 @@ class HDAWG8Pulsar:
                             log.warning('Pulsar: Trigger wait set for element '
                                         '{} with a non-zero first '
                                         'point'.format(el['wfname']))
+
+                    # Expected element names
                     name_ch1 = el['wfname'] + '_' + ch1id
                     name_ch2 = el['wfname'] + '_' + ch2id
-                    if name_ch1 not in wfnames[ch1id] or wfnames[ch1id] is None:
+
+                    # Check if element with such a name exists
+                    # Ch1
+                    if name_ch1 in wf_name_map:
+                        name_ch1 = wf_name_map[name_ch1]
+                    else:
                         name_ch1 = None
-                    if name_ch2 not in wfnames[ch2id] or wfnames[ch1id] is None:
+                    # Ch2
+                    if name_ch2 in wf_name_map:
+                        name_ch2 = wf_name_map[name_ch2]
+                    else:
                         name_ch2 = None
+
                     if name_ch1 is not None:
                         name_ch1 = '"{}_{}"'.format(obj._devname,
                                                     simplify_name(name_ch1))
@@ -424,12 +450,8 @@ class HDAWG8Pulsar:
             awg_str = header + waveform_table + main_loop + footer
 
             # write the waveforms to csv files
-            for data, wfname in zip(wfdata[ch1id], wfnames[ch1id]):
-                if data is not None:
-                    obj._write_csv_waveform(simplify_name(wfname), data)
-            for data, wfname in zip(wfdata[ch2id], wfnames[ch2id]):
-                if data is not None:
-                    obj._write_csv_waveform(simplify_name(wfname), data)
+            for data, wfname in unique_waveforms:
+                obj._write_csv_waveform(simplify_name(wfname), np.array(data))
 
             # here we want to use a timeout value longer than the obj.timeout()
             # as programming the AWGs takes more time than normal communications
