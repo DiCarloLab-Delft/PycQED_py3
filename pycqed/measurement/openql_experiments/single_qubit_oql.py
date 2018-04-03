@@ -791,20 +791,34 @@ def FastFeedbackControl(lantecy, qubit_idx: int, platf_cfg: str):
     k = Kernel("FastFdbkCtrl_nofb", p=platf)
     k.prepz(qubit_idx)
     k.gate('rx90', qubit_idx)
+    # k.gate('rx180', qubit_idx)
     k.measure(qubit_idx)
     wait_nanoseconds = int(round(lantecy/1e-9))
     k.gate("wait", [qubit_idx], wait_nanoseconds)
     k.gate("i", qubit_idx)
     k.measure(qubit_idx)
+
     p.add_kernel(k)
 
-    k = Kernel("FastFdbkCtrl_fb", p=platf)
+    k = Kernel("FastFdbkCtrl_fb0", p=platf)
     k.prepz(qubit_idx)
     k.gate('rx90', qubit_idx)
+    # k.gate('rx180', qubit_idx)
     k.measure(qubit_idx)
     wait_nanoseconds = int(round(lantecy/1e-9))
     k.gate("wait", [qubit_idx], wait_nanoseconds)
-    k.gate('Crx180', qubit_idx) # fast feedback control here
+    k.gate('C0rx180', qubit_idx)  # fast feedback control here
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+
+    k = Kernel("FastFdbkCtrl_fb1", p=platf)
+    k.prepz(qubit_idx)
+    k.gate('rx90', qubit_idx)
+    # k.gate('rx180', qubit_idx)
+    k.measure(qubit_idx)
+    wait_nanoseconds = int(round(lantecy/1e-9))
+    k.gate("wait", [qubit_idx], wait_nanoseconds)
+    k.gate('C1rx180', qubit_idx)  # fast feedback control here
     k.measure(qubit_idx)
     p.add_kernel(k)
 

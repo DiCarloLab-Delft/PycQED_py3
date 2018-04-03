@@ -210,7 +210,7 @@ def generate_config(filename: str,
                 "cc_light_codeword": CW,
                 "cc_light_opcode": 8+CW}
 
-            cfg["instructions"]['C'+lut_map[CW].format(q)] = {
+            cfg["instructions"]['C1'+lut_map[CW].format(q)] = {
                 "duration": mw_pulse_duration,
                 "latency": mw_latency,
                 "qubits": [q],
@@ -218,10 +218,25 @@ def generate_config(filename: str,
                 "disable_optimization": False,
                 "type": "mw",
                 "cc_light_instr_type": "single_qubit_gate",
-                "cc_light_instr": "C_cw_{:02}".format(CW),
+                "cc_light_instr": "C1_cw_{:02}".format(CW),
                 "cc_light_codeword": CW,
                 "cc_light_opcode": 32+8+CW,
-                "cc_light_cond": 1}
+                "cc_light_cond": 1}  # 1 means : do if last meas. == 1
+
+
+            cfg["instructions"]['C0'+lut_map[CW].format(q)] = {
+                "duration": mw_pulse_duration,
+                "latency": mw_latency,
+                "qubits": [q],
+                "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
+                "disable_optimization": False,
+                "type": "mw",
+                "cc_light_instr_type": "single_qubit_gate",
+                "cc_light_instr": "C0_cw_{:02}".format(CW),
+                "cc_light_codeword": CW,
+                "cc_light_opcode": 32+16+CW,
+                "cc_light_cond": 2}  # 2 means : do if last meas. == 0
+
 
     for CW in range(32):
         for q in qubits:

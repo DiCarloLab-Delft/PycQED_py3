@@ -5012,7 +5012,7 @@ class FFC_Analysis(TD_Analysis):
     'ideal_data': np.array equal in lenght to the data
     '''
 
-    def __init__(self, label='FFC', make_fig=True, **kw):
+    def __init__(self, label='FFC', make_fig=True,zero_coord=None, one_coord=None, **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'  # Read write mode, file must exist
         self.zero_coord = zero_coord
@@ -5498,7 +5498,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
             Model.set_param_hint('theta', value=0, min=-np.pi/2,
                                  max=np.pi/2)
             Model.set_param_hint('slope', value=0, vary=True)
-            
+
             self.params = Model.make_params()
 
             if fit_window == None:
@@ -5673,7 +5673,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
                 power_in_w = 10**((custom_power['Power']-custom_power['Atten'])/10)*1e-3
                 mean_ph = (2*(fit_res.params['Q'].value**2)/(fit_res.params['Qc'].value*hbar*(2*pi*fit_res.params['f0'].value*1e9)**2))*power_in_w
                 phase_vel = 4*custom_power['res_len']*fit_res.params['f0'].value*1e9
-                
+
                 textstr = '$f_{\mathrm{center}}$ = %.5f GHz $\pm$ (%.3g) GHz' % (
                     fit_res.params['f0'].value,
                     fit_res.params['f0'].stderr) + '\n' \

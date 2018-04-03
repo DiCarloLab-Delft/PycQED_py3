@@ -1544,28 +1544,7 @@ class CCLight_Transmon(Qubit):
             a = ma.AllXY_Analysis(close_main_fig=close_fig)
             return a.deviation_total
 
-    def measure_ffc(self, MC=None,
-                      label: str ='',
-                      analyze=True, close_fig=True,
-                      prepare_for_timedomain=True):
-        if MC is None:
-            MC = self.instr_MC.get_instr()
-        if prepare_for_timedomain:
-            self.prepare_for_timedomain()
-        p = sqo.FastFeedbackControl(lantecy=300e-9,
-                      qubit_idx=self.cfg_qubit_nr(),
-                      platf_cfg=self.cfg_openql_platform_fn())
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             CCL=self.instr_CC.get_instr())
-        d = self.int_avg_det
-        MC.set_sweep_function(s)
-        sweep_points = np.arange(6) # two data points + 4 calibration points
-        MC.set_sweep_points(sweep_points)
-        MC.set_detector_function(d)
-        MC.run('ffc'+label+self.msmt_suffix)
-        if analyze:
-            a = ma.FFC_Analysis(close_main_fig=close_fig)
-            return a.deviation_total
+
 
     def calibrate_mw_gates_restless(
             self, MC=None,
