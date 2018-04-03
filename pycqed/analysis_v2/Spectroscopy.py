@@ -300,6 +300,7 @@ class VNA_analysis(complex_spectroscopy):
             fitting_model = 'hanger'
         else:
             fitting_model = fit_options['model']
+        print(fitting_model)
         if subtract_background:
             self.do_subtract_background(thres=self.options_dict['background_thres'],
                                         back_dict=self.options_dict['background_dict'])
@@ -315,8 +316,14 @@ class VNA_analysis(complex_spectroscopy):
             fit_fn = fit_mods.Lorentzian
             #TODO LorentzianGuess
         elif fitting_model == 'complex':
-            raise NotImplementedError('This functions guess function is not coded up yet')
+            self.fit_dicts['hanger_guess_fit'] = {'fit_fn': fit_mods.SlopedHangerFuncAmplitude,
+                             'fit_guess_fn': fit_mods.SlopedHangerFuncAmplitudeGuess,
+                             'fit_yvals': {'data': self.proc_data_dict['plot_amp']},
+                             'fit_xvals': {'f': self.proc_data_dict['plot_frequency']}
+                             }
+            self.run_fitting()
             fit_fn = fit_mods.HangerFuncComplex
+            fit_guess_fn = fit_mods.HangerFuncComplexGuess
             #TODO HangerFuncComplexGuess
 
         if len(self.raw_data_dict['timestamps']) == 1:

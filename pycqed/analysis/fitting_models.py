@@ -312,6 +312,8 @@ def HangerFuncComplex(f, pars):
 
     return S21
 
+def HangerFuncComplexGuess(data, f):
+    pass
 
 def PolyBgHangerFuncAmplitude(f, f0, Q, Qe, A, theta, poly_coeffs):
     # This is the function for a hanger (lambda/4 resonator) which takes into
@@ -342,17 +344,12 @@ def SlopedHangerFuncAmplitudeGuess(data, f, fit_window=None):
     else:                                 # Otherwise take center of range
         f0 = np.median(xvals)
         amplitude_factor = -1.
-        # logging.error('No peaks or dips in range')
-        # If this error is raised, it should continue the analysis but
-        # not use it to update the qubit object
+
     min_index = np.argmin(data)
     max_index = np.argmax(data)
     min_frequency = xvals[min_index]
     max_frequency = xvals[max_index]
-    # Fit data according to the model required
-    # added reject outliers to be robust agains CBox data acq bug.
-    # this should have no effect on regular data acquisition and is
-    # only used in the guess.
+
     amplitude_guess = max(dm_tools.reject_outliers(data))
 
     # Creating parameters and estimations
