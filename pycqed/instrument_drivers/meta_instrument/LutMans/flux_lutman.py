@@ -7,6 +7,8 @@ from pycqed.instrument_drivers.pq_parameters import NP_NANs
 from pycqed.measurement.waveform_control_CC import waveform as wf
 from pycqed.measurement.openql_experiments.openql_helpers import clocks_to_s
 from qcodes.plots.pyqtgraph import QtPlot
+import matplotlib.pyplot as plt
+from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 
 
 class Base_Flux_LutMan(Base_LutMan):
@@ -78,7 +80,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             ' units of Volts they can be rescaled using [c0*sc**2, c1*sc, c2]'
             ' where sc is the desired scaling factor that includes the sq_amp '
             'used and the range of the AWG (5 in amp mode).',
-            vals=vals.Arrays() ,
+            vals=vals.Arrays(),
             initial_value=np.array([0, 0, 0]),
             parameter_class=ManualParameter)
 
@@ -173,6 +175,8 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         """
         Returns the scale factor to transform an amplitude in 'dac value' to an
         amplitude in 'V'.
+
+        N.B. the implementation is specific to this type of AWG
         """
         AWG = self.AWG.get_instr()
 
@@ -696,3 +700,38 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                 length_samples=int(self.cfg_max_wf_length() *
                                    self.sampling_rate()))
         return distorted_waveform
+
+    def plot_flux_arc(self, ax=None, show=True):
+        """
+        Plots the flux arc as used in the lutman based on the polynomial
+        coefficients
+        """
+        if ax is None:
+            f, ax = plt.subplots()
+        amps = np.linspace(-2.5, 2.5, 101)  # maximum voltage of AWG amp mode
+        deltas = self.amp_to_detuning(amps)
+        freqs = self.cz_freq_01_max()-deltas
+
+        ax.plot(amps, freqs, label='$f_{01}$')
+        ax.axhline(self.cz_freq_interaction(), -5, 5,
+                   label='$f_{\mathrm{int.}}$:'+' {:.3f} GHz'.format(
+            self.cz_freq_interaction()*1e-9),
+            c='C1')
+        ax.legend(loc=(1.05, .7))
+        set_xlabel(ax, 'AWG amplitude', 'V')
+        set_ylabel(ax, 'Frequency', 'Hz')
+        ax.set_xlim(-2.5, 2.5)
+        ax.set_ylim(3e9, np.max(freqs)+500e6)
+
+        dac_val_axis = ax.twiny()
+        dac_ax_lims = np.array(ax.get_xlim()) * \
+            self.get_amp_to_dac_val_scale_factor()
+        dac_val_axis.set_xlim(dac_ax_lims)
+        set_xlabel(dac_val_axis, 'AWG amplitude', 'dac')
+
+        dac_val_axis.axvspan(1, 1000, facecolor='.5', alpha=0.5)
+        dac_val_axis.axvspan(-1000, -1, facecolor='.5', alpha=0.5)
+
+        if show:
+            plt.show()
+        return ax
