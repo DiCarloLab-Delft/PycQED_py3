@@ -33,7 +33,7 @@ class UHFQC(Instrument):
     """
 
     def __init__(self, name, device='auto', interface='USB',
-                 address='127.0.0.1', port=8004, **kw):
+                 address='127.0.0.1', port=8004, init=True,**kw):
         '''
         Input arguments:
             name:           (str) name of the instrument
@@ -68,7 +68,6 @@ class UHFQC(Instrument):
         self._d_file_name = os.path.join(
             dir_path, 'zi_parameter_files', 'd_node_pars.txt')
 
-        init = True
         try:
             f = open(self._s_file_name).read()
             s_node_pars = json.loads(f)
