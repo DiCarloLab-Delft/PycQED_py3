@@ -583,7 +583,7 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
     def prepare_plots(self):
         self.prepare_plot_prob_table()
 
-    def prepare_plot_prob_table(self, only_odd=True):
+    def prepare_plot_prob_table(self, only_odd=False):
         # colormap which has a lot of contrast for small and large values
         v = [0, 0.1, 0.2, 0.8, 1]
         c = [(1, 1, 1),
@@ -793,26 +793,30 @@ class Multiplexed_Readout_Analysis(MultiQubit_SingleShot_Analysis):
 
         # User can override the automatic value determined from the
         #   number of segments
-        preselection = options_dict.get('preselection', preselection)
+        self.preselection = options_dict.get('preselection', preselection)
 
         self.observables = options_dict.get('observables', None)
         if self.observables is None:
             combination_list = list(itertools.product([False, True],
                                                       repeat=len(qubits)))
-            self.observables = {}
+            preselection_condition = dict(zip(
+                [(qb, 1) for qb in qubits],  # keys contain shift
+                combination_list[0]  # first comb has all ground
+            ))
+
+            self.observables = OrderedDict([])
+            # add preselection condition also as an observable
+            if self.preselection:
+                self.observables["pre"] = preselection_condition
+            # add all combinations
             for i, states in enumerate(combination_list):
                 obs_name = '$\| ' + \
                            ''.join(['e' if s else 'g' for s in states]) + \
                            '\\rangle$'
                 self.observables[obs_name] = dict(zip(qubits, states))
-                if preselection:
-                    self.observables[obs_name] = {
-                        ** self.observables[obs_name],
-                        ** dict(zip(
-                            [(qb, 1) for qb in qubits],  # keys contain shift
-                            combination_list[0]  # first comb has all ground
-                        ))
-                    }
+                # add preselection condition
+                if self.preselection:
+                    self.observables[obs_name].update(preselection_condition)
 
         options_dict['observables'] = self.observables
         options_dict['segment_names'] = options_dict.get('segment_names',
@@ -830,6 +834,8 @@ class Multiplexed_Readout_Analysis(MultiQubit_SingleShot_Analysis):
         if auto:
             self.run_analysis()
 
+    def prepare_plots(self):
+        super().prepare_plot_prob_table(only_odd=self.preselection)
 
 def convert_channel_names_to_index(cal_points, nr_segments, value_names):
     """
