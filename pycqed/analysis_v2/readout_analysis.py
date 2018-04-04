@@ -556,57 +556,63 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
 
         table = np.zeros((n_segments, len(observables)))
 
+        for qubit, results in shots_of_qubits.items():
+            res_e[qubit] = np.array(results).reshape((n_segments,-1),order='F')
+            # This makes copy, but allows faster AND later
+            res_g[qubit] = np.logical_not(np.array(results)).reshape((n_segments,-1),order='F')
+
         for segment_n in range(n_segments):
-
-            for qubit, results in shots_of_qubits.items():
-                res_e[qubit] = np.array(
-                    results[segment_n::n_segments])
-                # This makes copy, but allows faster AND later
-                res_g[qubit] = np.logical_not(np.array(
-                    results[segment_n::n_segments]))
-
             # first result all ground
             for state_n, states_of_qubits in enumerate(observables):
-                mask = np.ones((int(n_shots/n_segments)), dtype=bool)
+                mask = np.ones((n_shots//n_segments), dtype=np.bool)
                 # slow qubit is the first in channel_map list
                 for qubit, state in states_of_qubits.items():
-                    if type(qubit) == tuple:
-                        shift = qubit[1]
+                    if isinstance(qubit, tuple):
+                        seg = (segment_n+qubit[1])%n_segments
                         qubit = qubit[0]
                     else:
-                        shift = 0
+                        seg = segment_n
                     if state:
-                        mask = np.logical_and(mask, np.roll(res_e[qubit], shift))
+                        mask = np.logical_and(mask, res_e[qubit][seg])
                     else:
-                        mask = np.logical_and(mask, np.roll(res_g[qubit], shift))
+                        mask = np.logical_and(mask, res_g[qubit][seg])
                 table[segment_n, state_n] = np.count_nonzero(mask)
 
         return table*n_segments/n_shots
 
     def prepare_plots(self):
+        self.prepare_plot_prob_table()
 
+    def prepare_plot_prob_table(self, only_odd=True):
         # colormap which has a lot of contrast for small and large values
         v = [0, 0.1, 0.2, 0.8, 1]
         c = [(1, 1, 1),
-              (191/255, 38/255, 11/255),
-              (155/255, 10/255, 106/255),
-              (55/255, 129/255, 214/255),
-              (0, 0, 0)]
+             (191/255, 38/255, 11/255),
+             (155/255, 10/255, 106/255),
+             (55/255, 129/255, 214/255),
+             (0, 0, 0)]
         cdict = {'red':   [(v[i], c[i][0], c[i][0]) for i in range(len(v))],
                  'green': [(v[i], c[i][1], c[i][1]) for i in range(len(v))],
                  'blue':  [(v[i], c[i][2], c[i][2]) for i in range(len(v))]}
         cm = lscmap('customcmap', cdict)
 
-        ylist = list(range(self.n_segments))
+        if only_odd:
+            ylist = list(range(int(self.n_segments/2)))
+            plt_data = self.proc_data_dict['probability_table'][1::2].T
+        else:
+            ylist = list(range(self.n_segments))
+            plt_data = self.proc_data_dict['probability_table'].T
+
         plot_dict = {
             'axid': "ptable",
             'plotfn': self.plot_colorx,
             'xvals': np.arange(len(self.observables)),
             'yvals': np.array(len(self.observables)*[ylist]),
-            'zvals': self.proc_data_dict['probability_table'].T,
+            'zvals': plt_data,
             'xlabel': "Channels",
             'ylabel': "Segments",
             'zlabel': "Counts",
+            'zrange': [0,1],
             'title': (self.timestamps[0] + ' \n' +
                       self.raw_data_dict['measurementstring'][0]),
             'xunit': None,
@@ -620,8 +626,12 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
         }
 
         if self.segment_names is not None:
-            plot_dict['ytick_loc'] = np.arange(len(self.segment_names))
-            plot_dict['ytick_labels'] = self.segment_names
+            if only_odd:
+                plot_dict['ytick_loc'] = np.arange(len(self.segment_names[1::2]))
+                plot_dict['ytick_labels'] = self.segment_names[1::2]
+            else:
+                plot_dict['ytick_loc'] = np.arange(len(self.segment_names))
+                plot_dict['ytick_labels'] = self.segment_names
 
         self.plot_dicts['counts_table'] = plot_dict
 
