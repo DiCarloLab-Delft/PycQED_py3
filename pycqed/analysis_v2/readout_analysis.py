@@ -50,7 +50,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         """
         # Determine the shape of the data to extract wheter to rotate or not
         post_select = self.options_dict.get('post_select', False)
-        post_select_threshold = self.options_dict.get('post_select_threshold', 0)
+        post_select_threshold = \
+            self.options_dict.get('post_select_threshold', 0)
         nr_samples = self.options_dict.get('nr_samples', 2)
         sample_0 = self.options_dict.get('sample_0', 0)
         sample_1 = self.options_dict.get('sample_1', 1)
@@ -464,20 +465,25 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
     """
     Extracts table of counts from multiplexed single shot readout experiment.
-    Intended to be the bases class for more complex multi qubit experiment analysis.
+    Intended to be the bases class for more complex multi qubit experiment
+    analysis.
 
 
     Required options in the options_dict:
-        n_segments: Assumed to be the period in the list of shots between experiments
-            with the same prepared state. If shots_of_qubits includes preselection readout results
-            or if there was several readouts for a single segment then n_segments has to include them.
-        channel_map: dictionary with qubit names as keys and channel channel names as values.
-        thresholds: dictionary with qubit names as keys and threshold values as values.
+        n_readouts: Assumed to be the period in the list of shots between
+            experiments with the same prepared state. If shots_of_qubits
+            includes preselection readout results or if there was several
+            readouts for a single readout then n_readouts has to include them.
+        channel_map: dictionary with qubit names as keys and channel channel
+            names as values.
+        thresholds: dictionary with qubit names as keys and threshold values as
+            values.
     Optional options in the options_dict:
-        observables: Dictionary with observable names as a key and observable as a value. Observable is a
-            dictionary with name of the qubit as key and boolean value indicating if it is selecting
-            exited states. If the qubit is missing from the list of states it is averaged out.
-        segment_names: used as y-axis labels for the default figure
+        observables: Dictionary with observable names as a key and observable
+            as a value. Observable is a dictionary with name of the qubit as
+            key and boolean value indicating if it is selecting exited states.
+            If the qubit is missing from the list of states it is averaged out.
+        readout_names: used as y-axis labels for the default figure
     """
 
     def __init__(self, t_start: str=None, t_stop: str=None,
@@ -490,22 +496,24 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
                          options_dict=options_dict,
                          extract_only=extract_only, do_fitting=do_fitting)
 
-        self.n_segments = options_dict['n_segments']
+        self.n_readouts = options_dict['n_readouts']
         self.thresholds = options_dict['thresholds']
         self.channel_map = options_dict['channel_map']
         qubits = list(self.channel_map.keys())
 
-        self.segment_names = options_dict.get('segment_names', None)
-        if self.segment_names is None:
+        self.readout_names = options_dict.get('readout_names', None)
+        if self.readout_names is None:
             # TODO Default values should come from the MC parameters
             None
 
         self.observables = options_dict.get('observables', None)
         if self.observables is None:
-            combination_list = list(itertools.product([False, True], repeat=len(qubits)))
+            combination_list = list(itertools.product([False, True],
+                                                      repeat=len(qubits)))
             self.observables = {}
             for i, states in enumerate(combination_list):
-                obs_name = '$\| ' + ''.join(['e' if s else 'g' for s in states]) + '\\rangle$'
+                name = ''.join(['e' if s else 'g' for s in states])
+                obs_name = '$\| ' + name + '\\rangle$'
                 self.observables[obs_name] = dict(zip(qubits, states))
         self.single_timestamp = False
 
@@ -524,29 +532,39 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
         logging.info("Loading from file")
 
         for qubit, channel in self.channel_map.items():
-            shots_cont = np.array(self.raw_data_dict['measured_values_ord_dict'][channel])
+            shots_cont = np.array(
+                self.raw_data_dict['measured_values_ord_dict'][channel])
             shots_thresh[qubit] = (shots_cont > self.thresholds[qubit])[0]
         self.proc_data_dict['shots_thresholded'] = shots_thresh
 
         logging.info("Calculating observables")
-        self.proc_data_dict['probability_table'] = \
-            self.probability_table(shots_thresh, list(self.observables.values()), self.n_segments)
+        self.proc_data_dict['probability_table'] = self.probability_table(
+                shots_thresh,
+                list(self.observables.values()),
+                self.n_readouts
+        )
 
     @staticmethod
-    def probability_table(shots_of_qubits, observables, n_segments):
+    def probability_table(shots_of_qubits, observables, n_readouts):
         """
-        Creates a general table of counts averaging out all but specified set of correlations.
+        Creates a general table of counts averaging out all but specified set of
+        correlations.
 
         Args:
-            shots_of_qubits: Dictionary of np.arrays of thresholded shots for each qubit.
-            observables: List of observables. Observable is a dictionary with name of the qubit as key and boolean
-                value indicating if it is selecting exited states. If the qubit is missing from the list of states
-                it is averaged out.
-            n_segments: Assumed to be the period in the list of shots between experiments
-                with the same prepared state. If shots_of_qubits includes preselection readout results
-                or if there was several readouts for a single segment then n_segments has to include them.
+            shots_of_qubits: Dictionary of np.arrays of thresholded shots for
+                each qubit.
+            observables: List of observables. Observable is a dictionary with
+                name of the qubit as key and boolean value indicating if it is
+                selecting exited states. If the qubit is missing from the list
+                of states it is averaged out.
+            n_readouts: Assumed to be the period in the list of shots between
+                experiments with the same prepared state. If shots_of_qubits
+                includes preselection readout results or if there was several
+                readouts for a single readout then n_readouts has to include
+                them.
         Returns:
-            np.array: counts with dimensions (n_segments, len(states_to_be_counted))
+            np.array: counts with
+                dimensions (n_readouts, len(states_to_be_counted))
         """
 
         res_e = {}
@@ -554,31 +572,32 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
 
         n_shots = next(iter(shots_of_qubits.values())).shape[0]
 
-        table = np.zeros((n_segments, len(observables)))
+        table = np.zeros((n_readouts, len(observables)))
 
         for qubit, results in shots_of_qubits.items():
-            res_e[qubit] = np.array(results).reshape((n_segments,-1),order='F')
+            res_e[qubit] = np.array(results).reshape((n_readouts,-1),order='F')
             # This makes copy, but allows faster AND later
-            res_g[qubit] = np.logical_not(np.array(results)).reshape((n_segments,-1),order='F')
+            res_g[qubit] = np.logical_not(
+                np.array(results)).reshape((n_readouts,-1),order='F')
 
-        for segment_n in range(n_segments):
+        for readout_n in range(n_readouts):
             # first result all ground
             for state_n, states_of_qubits in enumerate(observables):
-                mask = np.ones((n_shots//n_segments), dtype=np.bool)
+                mask = np.ones((n_shots//n_readouts), dtype=np.bool)
                 # slow qubit is the first in channel_map list
                 for qubit, state in states_of_qubits.items():
                     if isinstance(qubit, tuple):
-                        seg = (segment_n+qubit[1])%n_segments
+                        seg = (readout_n+qubit[1])%n_readouts
                         qubit = qubit[0]
                     else:
-                        seg = segment_n
+                        seg = readout_n
                     if state:
                         mask = np.logical_and(mask, res_e[qubit][seg])
                     else:
                         mask = np.logical_and(mask, res_g[qubit][seg])
-                table[segment_n, state_n] = np.count_nonzero(mask)
+                table[readout_n, state_n] = np.count_nonzero(mask)
 
-        return table*n_segments/n_shots
+        return table*n_readouts/n_shots
 
     def prepare_plots(self):
         self.prepare_plot_prob_table()
@@ -597,10 +616,10 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
         cm = lscmap('customcmap', cdict)
 
         if only_odd:
-            ylist = list(range(int(self.n_segments/2)))
+            ylist = list(range(int(self.n_readouts/2)))
             plt_data = self.proc_data_dict['probability_table'][1::2].T
         else:
-            ylist = list(range(self.n_segments))
+            ylist = list(range(self.n_readouts))
             plt_data = self.proc_data_dict['probability_table'].T
 
         plot_dict = {
@@ -625,13 +644,15 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
             'plotsize': (8, 8)
         }
 
-        if self.segment_names is not None:
+        # todo to not rely on readout names
+        if self.readout_names is not None:
             if only_odd:
-                plot_dict['ytick_loc'] = np.arange(len(self.segment_names[1::2]))
-                plot_dict['ytick_labels'] = self.segment_names[1::2]
+                plot_dict['ytick_loc'] = \
+                    np.arange(len(self.readout_names[1::2]))
+                plot_dict['ytick_labels'] = self.readout_names[1::2]
             else:
-                plot_dict['ytick_loc'] = np.arange(len(self.segment_names))
-                plot_dict['ytick_labels'] = self.segment_names
+                plot_dict['ytick_loc'] = np.arange(len(self.readout_names))
+                plot_dict['ytick_labels'] = self.readout_names
 
         self.plot_dicts['counts_table'] = plot_dict
 
@@ -689,10 +710,10 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
         shots_of_qubits = self.proc_data_dict['shots_thresholded']
         observables = list(self.observables.values())
         cal_points = self.options_dict.get('cal_points')
-        n_segments = self.n_segments
+        n_readouts = self.n_readouts
         value_names = list(self.observables.keys())
         cal_points_list = convert_channel_names_to_index(
-            cal_points, n_segments, value_names
+            cal_points, n_readouts, value_names
         )
         self.proc_data_dict['cal_points_list'] = cal_points_list
 
@@ -706,9 +727,9 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
             for observable_idx, segments_list in enumerate(observable_lists):
                 for segment_n in segments_list:
                     states_of_qubits = observables[observable_idx]
-                    mask = np.ones((int(n_shots / n_segments)), dtype=np.bool)
+                    mask = np.ones((int(n_shots / n_readouts)), dtype=np.bool)
                     for qubit, state in states_of_qubits.items():
-                        res_e = shots_of_qubits[qubit][segment_n::n_segments]
+                        res_e = shots_of_qubits[qubit][segment_n::n_readouts]
                         if state:
                             mask = np.logical_and(mask, res_e)
                         else:
@@ -773,7 +794,7 @@ class Multiplexed_Readout_Analysis(MultiQubit_SingleShot_Analysis):
                  options_dict: dict=None, extract_only: bool=False,
                  do_fitting: bool=True, auto=True):
 
-        self.n_segments = options_dict['n_segments']
+        self.n_readouts = options_dict['n_readouts']
         self.channel_map = options_dict['channel_map']
         qubits = list(self.channel_map.keys())
 
@@ -781,9 +802,9 @@ class Multiplexed_Readout_Analysis(MultiQubit_SingleShot_Analysis):
             itertools.product(["$0$", "$\pi$"],
                               repeat=len(self.channel_map)))]
         preselection = False
-        if self.n_segments == len(def_seg_names_prep):
+        if self.n_readouts == len(def_seg_names_prep):
             def_seg_names = def_seg_names_prep
-        elif self.n_segments == 2*len(def_seg_names_prep):
+        elif self.n_readouts == 2*len(def_seg_names_prep):
             preselection = True
             def_seg_names = [x for t in zip(*[
                 ["sel"]*len(def_seg_names_prep),
@@ -792,7 +813,7 @@ class Multiplexed_Readout_Analysis(MultiQubit_SingleShot_Analysis):
             def_seg_names = list(range(len(def_seg_names_prep)))
 
         # User can override the automatic value determined from the
-        #   number of segments
+        #   number of readouts
         self.preselection = options_dict.get('preselection', preselection)
 
         self.observables = options_dict.get('observables', None)
@@ -819,7 +840,7 @@ class Multiplexed_Readout_Analysis(MultiQubit_SingleShot_Analysis):
                     self.observables[obs_name].update(preselection_condition)
 
         options_dict['observables'] = self.observables
-        options_dict['segment_names'] = options_dict.get('segment_names',
+        options_dict['readout_names'] = options_dict.get('readout_names',
                                                          def_seg_names)
 
         super().__init__(t_start=t_start, t_stop=t_stop,
