@@ -550,6 +550,10 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
         Creates a general table of counts averaging out all but specified set of
         correlations.
 
+        This function has been check with a profiler and 85% of the time is
+        spent on comparison with the mask. Thus there is no trivial optimization
+        possible.
+
         Args:
             shots_of_qubits: Dictionary of np.arrays of thresholded shots for
                 each qubit.
