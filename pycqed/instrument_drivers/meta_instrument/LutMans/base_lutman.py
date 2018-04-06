@@ -189,3 +189,43 @@ class Base_LutMan(Instrument):
         if show:
             plt.show()
         return fig, ax
+
+
+
+def get_redundant_codewords(codeword: int, bit_width: int=4, bit_shift: int=0):
+    """
+    Takes in a desired codeword and generates the redundant codewords.
+
+    Example A:
+        Codeword = 5   -> '101'
+        bit_width = 4  -> '0101'
+        bit_shift = 0  -> xxxx0101
+    The function should return all combinations for all
+        xxxx0101
+
+    Example B:
+        Codeword = 5   -> '101'
+        bit_width = 4  -> '0101'
+        bit_shift = 4  -> 0101xxxx
+    The function should return all combinations for all
+        0101xxxx
+
+    Args:
+        codeword (int) : the desired codeword
+        bit_width (int): the number of bits in the codeword, determines
+            how many redundant combinations are generated.
+        bit_shift (int): determines how many bits the codeword is shifted.
+
+    returns:
+        redundant_codewords (list): all redundant combinations of the codeword
+            see example above.
+    """
+    codeword_shifted = codeword<<bit_shift
+    redundant_codewords = []
+    for i in range(2**bit_width):
+        if bit_shift == 0: #assumes the higher bits are used
+            redundant_codewords.append(codeword_shifted+(i<<bit_width))
+        else: # assumes the lower bits are used
+            redundant_codewords.append(codeword_shifted+i)
+    return redundant_codewords
+

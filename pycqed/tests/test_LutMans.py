@@ -5,7 +5,8 @@ from pycqed.instrument_drivers.meta_instrument import kernel_object as ko
 from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman as mwl
 from pycqed.instrument_drivers.meta_instrument.LutMans import flux_lutman as flm
 from pycqed.measurement.waveform_control_CC import waveform as wf
-
+from pycqed.instrument_drivers.meta_instrument.LutMans.base_lutman import \
+    get_redundant_codewords
 
 class Test_MW_LutMan(unittest.TestCase):
 
@@ -376,6 +377,21 @@ class Test_Flux_LutMan(unittest.TestCase):
             except KeyError:
                 pass
 
+class Test_LutMan_Utils(unittest.TestCase):
+    def test_get_redundant_codewords(self):
+        target_cw = 5
+        red_cws_A = get_redundant_codewords(target_cw, 4, 0)
+        for cw in red_cws_A:
+            print(bin(cw))
+            self.assertEqual(cw&15, target_cw)
+        self.assertEqual(len(red_cws_A), 2**4)
+
+
+        red_cws_B = get_redundant_codewords(target_cw, 4, 4)
+        for cw in red_cws_B:
+            print(bin(cw))
+            self.assertEqual((cw&(256-16))>>4, target_cw)
+        self.assertEqual(len(red_cws_B), 2**4)
 
 def dict_contained_in(subset, superset):
     if subset.items() <= superset.items():
