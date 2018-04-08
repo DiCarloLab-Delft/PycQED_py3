@@ -333,6 +333,202 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
         return wave_dict
 
 
+class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
+    """
+    WORK ONGOING:
+
+    BUNCH OF PARAMETERS THEY DEFINE WV.
+
+
+    TASKS TO-DO:
+
+    1. redefine default_lutmap to VQE needs
+                NO!ACTUALLY JUST SET IT AT INIT.
+
+    2. add phi parameter for virtual compilation of last pulse
+    3. add mixer parameters for the two mixers possible instead of one
+          (check _add_mixer_corr_pars for that. )
+                lutman per qubit
+    4. define the standard waveforms accordingly to the VQE lutmap. 
+          (use paramters from _add_waveform_parameters.)
+
+    5. rewrite the load_waveform for the redudant case
+
+    """
+    def __init__(self, name, **kw):
+
+        """
+        Waveform allocation strategy for VQE.
+
+        |q0> ---- Y ----x---- T1' --- M
+                        |    
+        |q1> -----------x---- T2 ---- M
+
+
+        Waveform table for |q0>
+        +------+------+---------------+-------------+--------------------+
+        | Wave | Gate | Amp,phase     | Used in VQE | Used for full-tomo |
+        +------+------+---------------+-------------+--------------------+
+        | 0    |  I   | 0,0           |      X      |                    |
+        | 1    |  X'  | pi,phi        |      X      |                    |
+        | 2    |  Y'  | pi,phi        |             |          X         |
+        | 3    |  x'  | pi/2,phi      |      X      |                    |
+        | 4    | -x'  | -pi/2,phi     |      X      |                    |
+        | 5    |  y'  | pi/2,phi+90   |      X      |                    |
+        | 6    | -y'  | -pi/2,phi+90  |      X      |                    |
+        | 7    |  Y   | pi,90         |      X      |                    |
+        | 8    |      |               |             |                    |
+        +------+------+---------------+-------------+--------------------+
+
+        # NOTE: prime stands for gate compiled along with Z(phi).
+
+        Waveform table for |q1>
+        +------+------+---------------+-------------+--------------------+
+        | Wave | Gate | Amp,phase     | Used in VQE | Used for full-tomo |
+        +------+------+---------------+-------------+--------------------+
+        | 0    |  I   | 0,0           |      X      |                    |
+        | 1    |  X   | pi,0          |      X      |                    |
+        | 2    |  Y   | pi,0          |             |          X         |
+        | 3    |  x   | pi/2,0        |      X      |                    |
+        | 4    | -x   | -pi/2,0       |      X      |                    |
+        | 5    |  y   | pi/2,90       |      X      |                    |
+        | 6    | -y   | -pi/2,90      |      X      |                    |
+        | 7    |      |               |             |                    |
+        | 8    |      |               |             |                    |
+        +------+------+---------------+-------------+--------------------+
+        """
+        self._num_channels = 4
+        super().__init__(name, **kw)
+
+        self._vqe_lm = ['I', 'X180t',  'Y180t', 'X90t',  'Xm90t',
+                        'Y90t',  'Y90t', 'Y180']
+
+    def set_VQE_lutmap(self):
+        """
+        Set's the default lutmap for standard microwave drive pulses.
+        """
+        vqe_lm = self._vqe_lm
+        LutMap = {}
+        for cw_idx, cw_key in enumerate(vqe_lm):
+            LutMap[cw_key] = (
+                'wave_ch{}_cw{:03}'.format(self.channel_I(), r_cw_idx),
+                'wave_ch{}_cw{:03}'.format(self.channel_Q(), r_cw_idx))
+        self.LutMap(LutMap)
+
+    def _add_mixer_corr_pars(self):
+        self.add_parameter('mixer_alpha', vals=vals.Numbers(),
+                           parameter_class=ManualParameter,
+                           initial_value=1.0)
+        self.add_parameter('mixer_phi', vals=vals.Numbers(), unit='deg',
+                           parameter_class=ManualParameter,
+                           initial_value=0.0)
+        self.add_parameter(
+            'mixer_apply_predistortion_matrix', vals=vals.Bool(), docstring=(
+                'If True applies a mixer correction using mixer_phi and '
+                'mixer_alpha to all microwave pulses using.'),
+            parameter_class=ManualParameter, initial_value=True)
+
+
+
+    def _add_waveform_parameters(self):
+        # defined here so that the VSM based LutMan can overwrite this
+        self.wf_func = wf.mod_gauss
+        self.spec_func = wf.block_pulse
+
+        self._add_channel_params()
+        self.add_parameter('cfg_sideband_mode',
+                           vals=vals.Enum('real-time', 'static'),
+                           initial_value='static',
+                           parameter_class=ManualParameter)
+        self.add_parameter('mw_amp180', unit='frac', vals=vals.Numbers(-1, 1),
+                           parameter_class=ManualParameter,
+                           initial_value=0.1)
+
+    def generate_standard_waveforms(self):
+        old_mixer_setting = self.mixer_apply_predistortion_matrix()
+        self.mixer_apply_predistortion_matrix(False)
+        super().generate_standard_waveforms(self, **kw)
+        self.mixer_apply_predistortion_matrix(old_mixer_setting)
+
+        if self.cfg_sideband_mode() == 'static':
+            f_modulation = self.mw_modulation()
+        else:
+            f_modulation = 0
+
+        """
+        This pulses still need to be cross-checked.
+        """
+        self._wave_dict['cX180_phi'] = self.wf_func(
+            amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
+            f_modulation=f_modulation,
+            sampling_rate=self.sampling_rate(), phase=0,
+            motzoi=self.mw_motzoi())
+        self._wave_dict['cY90_phi'] = self.wf_func(
+            amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
+            f_modulation=f_modulation,
+            sampling_rate=self.sampling_rate(), phase=90,
+            motzoi=self.mw_motzoi())
+        self._wave_dict['rX90'] = self.wf_func(
+            amp=self.mw_amp180()*self.mw_amp90_scale(),
+            sigma_length=self.mw_gauss_width(),
+            f_modulation=f_modulation,
+            sampling_rate=self.sampling_rate(), phase=0,
+            motzoi=self.mw_motzoi())
+        self._wave_dict['rY90'] = self.wf_func(
+            amp=self.mw_amp180()*self.mw_amp90_scale(),
+            sigma_length=self.mw_gauss_width(),
+            f_modulation=f_modulation,
+            sampling_rate=self.sampling_rate(), phase=90,
+            motzoi=self.mw_motzoi())
+        self._wave_dict['rXm90'] = self.wf_func(
+            amp=-1*self.mw_amp180()*self.mw_amp90_scale(),
+            sigma_length=self.mw_gauss_width(),
+            f_modulation=f_modulation,
+            sampling_rate=self.sampling_rate(), phase=0,
+            motzoi=self.mw_motzoi())
+        self._wave_dict['rYm90'] = self.wf_func(
+            amp=-1*self.mw_amp180()*self.mw_amp90_scale(),
+            sigma_length=self.mw_gauss_width(),
+            f_modulation=f_modulation,
+            sampling_rate=self.sampling_rate(), phase=90,
+            motzoi=self.mw_motzoi())
+
+        self._wave_dict['rPhi180'] = self.wf_func(
+            amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
+            f_modulation=f_modulation,
+            sampling_rate=self.sampling_rate(), phase=self.mw_phi(),
+            motzoi=self.mw_motzoi())
+        self._wave_dict['rPhi90'] = self.wf_func(
+            amp=self.mw_amp180()*self.mw_amp90_scale(),
+            sigma_length=self.mw_gauss_width(),
+            f_modulation=f_modulation,
+            sampling_rate=self.sampling_rate(), phase=self.mw_phi(),
+            motzoi=self.mw_motzoi())
+        self._wave_dict['rPhim90'] = self.wf_func(
+            amp=-1*self.mw_amp180()*self.mw_amp90_scale(),
+            sigma_length=self.mw_gauss_width(),
+            f_modulation=f_modulation,
+            sampling_rate=self.sampling_rate(), phase=self.mw_phi(),
+            motzoi=self.mw_motzoi())
+
+        if self.mixer_apply_predistortion_matrix():
+            self._wave_dict = self.apply_mixer_predistortion_corrections(
+                self._wave_dict)
+        return self._wave_dict
+
+    def load_waveform_onto_AWG_lookuptable(self, waveform_name: str,
+                                           regenerate_waveforms: bool=False):
+        if regenerate_waveforms:
+            self.generate_standard_waveforms()
+        waveforms = self._wave_dict[waveform_name]
+        codewords = self.LutMap()[waveform_name]
+        for waveform, cw in zip(waveforms, codewords):
+            # get redundant codewords as a list
+            redundant_cw_list = blah
+            for redundant_cw in redundant_cw_list:
+                self.AWG.get_instr().set(redundant_cw, waveform)
+
+
 # Not the cleanest inheritance but whatever - MAR Nov 2017
 class QWG_VSM_MW_LutMan(AWG8_VSM_MW_LutMan):
 
