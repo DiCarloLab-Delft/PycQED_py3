@@ -34,6 +34,7 @@ from scipy.constants import *
 from copy import deepcopy
 from pycqed.analysis.fit_toolbox import functions as func
 from pprint import pprint
+from math import floor
 
 import pycqed.analysis.tools.plotting as pl_tools
 from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel,
@@ -6629,6 +6630,17 @@ class TwoD_Analysis(MeasurementAnalysis):
                              plot_all=True, save_fig=True,
                              transpose=False, figsize=None,
                              **kw):
+        '''
+        Args:
+            linecut_log (bool):
+                log scale for the line cut?
+                Remember to set the labels correctly.
+            colorplot_log (string/bool):
+                True/False for z axis scaling, or any string containing any
+                combination of letters x, y, z for scaling of the according axis.
+                Remember to set the labels correctly.
+
+        '''
         close_file = kw.pop('close_file', True)
 
         self.get_naming_and_values_2D()
@@ -6680,6 +6692,15 @@ class TwoD_Analysis(MeasurementAnalysis):
                 self.timestamp_string, self.measurementstring,
                 self.value_names[i])
 
+            if "xlabel" not in kw:
+                kw["xlabel"]=self.parameter_names[0]
+            if "ylabel" not in kw:
+                kw["ylabel"]=self.parameter_names[1]
+            if "xunit" not in kw:
+                kw["xunit"]=self.parameter_units[0]
+            if "yunit" not in kw:
+                kw["yunit"]=self.parameter_units[1]
+                
             a_tools.color_plot(x=self.sweep_points,
                                y=self.sweep_points_2D,
                                z=meas_vals.transpose(),
@@ -6690,8 +6711,8 @@ class TwoD_Analysis(MeasurementAnalysis):
                                normalize=normalize,
                                **kw)
             ax.set_title(fig_title)
-            set_xlabel(ax, self.parameter_names[0], self.parameter_units[0])
-            set_ylabel(ax, self.parameter_names[1], self.parameter_units[1])
+            #set_xlabel(ax, self.parameter_names[0], self.parameter_units[0])
+            #set_ylabel(ax, self.parameter_names[1], self.parameter_units[1])
 
             if save_fig:
                 self.save_fig(fig, figname=savename, **kw)
@@ -6824,8 +6845,8 @@ class Three_Tone_Spectroscopy_Analysis(MeasurementAnalysis):
 
             textstr = 'f01 = {:.4g} GHz'.format(f01*1e-9) + '\n' + \
                 'f12 = {:.4g} GHz'.format(f12*1e-9) + '\n' + \
-                'anharm ~= {:.4g} MHz'.format(anharm*1e-6) + '\n' + \
-                'EC = {:.4g} MHz'.format(EC*1e-6) + '\n' + \
+                'anharm = {:.4g} MHz'.format(anharm*1e-6) + '\n' + \
+                'EC ~= {:.4g} MHz'.format(EC*1e-6) + '\n' + \
                 'EJ = {:.4g} GHz'.format(EJ*1e-9)
             ax1.text(0.95, 0.95, textstr, transform=ax1.transAxes,
                      fontsize=11,
@@ -8875,6 +8896,152 @@ class CZ_1Q_phase_analysis(TD_Analysis):
         plt.tight_layout()
         self.save_fig(fig, **kw)
 
+
+def DAC_scan_analysis_and_plot(scan_start, scan_stop, dac, feed, dac_prefix='',perc=99.6, factor=1, smooth_window_len=31,smoothing=True,
+    overwrite_old=False, fig_format='png', verbose=False, peak_fitting_sample_n=0, plotsize=None, temperature_plots=True):
+    plotsize = plotsize or (4,10)
+    date_folder = scan_stop.split('_')[0]
+    time_folder = scan_stop.split('_')[1]
+    out_path = a_tools.datadir+"/%s/%s_analysis_2D_Plots"%(date_folder,time_folder)
+    try:
+        os.mkdir(out_path)
+    except:
+        if not overwrite_old:
+            raise FileExistsError("Output folder exists. Either move old folder or pass option overwrite_old=True")
+
+    pdict={'amp':'all_data',
+                 'frequencies':'sweep_points',
+                 'dac':'fluxcurrent.'+dac,
+                 'T_mc':'Fridge monitor.T_MClo',
+                 'T_cp':'Fridge monitor.T_CP',
+                  }
+
+    opt_dict = {'scan_label':dac_prefix+dac,
+           'exact_label_match':True}
+
+    nparams = ['amp', 
+                'frequencies', 
+                'dac', 
+                'T_mc', 
+                'T_cp']
+
+
+    #retrieve data
+    spec_scans = ca.quick_analysis(t_start=scan_start, t_stop=scan_stop, options_dict=opt_dict,
+                      params_dict_TD=pdict, numeric_params=nparams)
+    #sort data
+    dac_values_unsorted = spec_scans.TD_dict['dac']
+    sorted_indices = dac_values_unsorted.argsort()
+    dac_values=np.array(dac_values_unsorted[sorted_indices], dtype=float)
+    T_mc=np.array(spec_scans.TD_dict['T_mc'][sorted_indices], dtype=float)
+    T_cp=np.array(spec_scans.TD_dict['T_cp'][sorted_indices], dtype=float)
+    amplitude_values=np.array(spec_scans.TD_dict['amp'][sorted_indices,feed], dtype=float)
+    frequency_values=np.array(spec_scans.TD_dict['frequencies'][sorted_indices], dtype=float)
+    del dac_values_unsorted
+    del sorted_indices
+
+    if temperature_plots:
+        #Plot the smoothed and fitted data
+        p = dac_values>=0
+        n = dac_values<=0
+        scale = floor(2*max(T_cp)/max(T_mc))/2
+        plt.title('Temperatures, feedline %d, %s %s'%(feed,dac_prefix, dac))
+        if n is not None and len(n) > 0:
+            plt.plot(-dac_values[n]*1e3, T_mc[n]*1e3, label='Mixing Chamber (negative current)')
+            plt.plot(-dac_values[n]*1e3, T_cp[n]*1e3/10, label='Cold Plate/%d (negative)'%scale)
+        if p is not None and len(p) > 0:
+            plt.plot(dac_values[p]*1e3, T_mc[p]*1e3, label='Mixing Chamber (positive)')
+            plt.plot(dac_values[p]*1e3, T_cp[p]*1e3/10, label='Cold Plate/10 (positive)')
+        plt.xlabel(r'Flux bias current, I (mA)')
+        plt.ylabel('Temperature (mK)')
+        plt.legend()
+        plt.ylim(0,40)
+        plt.savefig(out_path+"/temperatures-feed_%d_%s%s.%s"%(feed,dac_prefix,dac,fig_format))
+        if verbose:
+            plt.show()
+        plt.close()
+
+    smoothed_amplitude_values = np.zeros_like(amplitude_values)
+    peak_frequencies = np.zeros_like(amplitude_values[:,0], dtype=object)
+    peak_amplitudes = np.zeros_like(amplitude_values[:,0], dtype=object)
+    Qis = np.zeros_like(amplitude_values[:,0], dtype=float)
+
+    #Smooth data and find peeks
+    for i, dac_value in enumerate(dac_values):
+        # try:
+        #     a = Homodyne_Analysis(label='-D4_dac_channel_%s_%.3f'%(dac, dac_value), close_fig=True, show=False)
+        #     Qis[i] = a.fit_results.params['Qi']
+        # except:
+        #     pass
+        peaks_x, peaks_z,smoothed_z=a_tools.peak_finder_v3(frequency_values[i], amplitude_values[i], smoothing=smoothing, perc=perc,  window_len=smooth_window_len,factor=factor)
+        #save peaks and smoothed data
+        smoothed_amplitude_values[i,:] = smoothed_z
+        peak_frequencies[i] = peaks_x
+        peak_amplitudes[i] = peaks_z
+
+    # plt.title('Qi, feedline %d, %s %s'%(feed,dac_prefix, dac))
+    # plt.plot(dac_values*1e3, Qis)
+    # plt.xlabel(r'Flux bias current, I (mA)')
+    # plt.ylabel('Quality Factor (-)')
+    # plt.savefig(out_path+"/Qis-feed_%d_%s%s.%s"%(feed,dac_prefix,dac,fig_format))
+    # if verbose:
+    #     plt.show()
+    # plt.close()
+
+    #Plot parameters
+    spec_scans.plot_dicts['arches'] = {'plotfn': spec_scans.plot_colorx,
+                    'xvals': dac_values*1e3,
+                    'yvals': frequency_values*1e-9,
+                    'zvals': smoothed_amplitude_values.transpose(),
+                    'title': 'transmission, feedline {} '.format(feed)+dac_prefix+dac+'_'+scan_stop,
+                    'xlabel': r'Flux bias current, I (mA)',
+                    'ylabel': r'Frequency (GHz)',
+                    'zlabel': 'Homodyne amplitude (mV)',
+                    'zrange': [smoothed_amplitude_values.min(), smoothed_amplitude_values.max()],
+                    'plotsize': (8,8),
+                    'cmap':'YlGn_r',
+                    }
+
+    #Plot the smoothed and fitted data
+    plt.title('Peak finder sample, feedline %d, %s %s'%(feed, dac_prefix, dac))
+    plt.plot(frequency_values[peak_fitting_sample_n]*1e-9, amplitude_values[peak_fitting_sample_n], label='Raw Data')
+    plt.plot(frequency_values[peak_fitting_sample_n]*1e-9, smoothed_amplitude_values[peak_fitting_sample_n], label='Smoothed Data')
+    for i,peak in enumerate(peak_frequencies[peak_fitting_sample_n]):
+        if verbose:
+            print("%.6f GHz" % (peak*1e-9))
+        plt.scatter(peak*1e-9,peak_amplitudes[peak_fitting_sample_n][i])
+    plt.xlabel('Frequency (GHz)')
+    plt.ylabel('Homodyne amplitude (mV)')
+    plt.legend()
+    plt.savefig(out_path+"/peaks-feed_%d_%s%s.%s"%(feed,dac_prefix,dac,fig_format))
+    if verbose:
+        plt.show()
+    plt.close()
+
+    fig = plt.figure(figsize=plotsize)
+    ax = fig.add_subplot(111)
+    spec_scans.axs['arches'] = ax
+    spec_scans.plot()
+    peaks_container=[]
+
+    txt_file = out_path+'/peaks-feed_%d_%s%s.txt'%(feed,dac_prefix, dac)
+    f=open(txt_file, 'w+')
+
+    for i, dac_value in enumerate(dac_values):
+        line = ','.join(str(x) for x in peak_frequencies[i])
+        f.write('['+line + ']\n')
+        #print(dac_value,line)
+        for peak in peak_frequencies[i]:
+            ax.scatter(dac_value*1e3, peak*1e-9, color='b', s=9)
+    f.close()
+  
+    ax.xaxis.label.set_fontsize(10)
+    ax.yaxis.label.set_fontsize(10)
+    ax.title.set_fontsize(10)
+    if verbose:
+        plt.show()
+    fig.savefig(out_path+"/2D_plot-feed_%d_%s%s.%s"%(feed,dac_prefix,dac,fig_format))
+    plt.close()
 
 def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
                            predistort=True, plot=True, timestamp_ground=None,
