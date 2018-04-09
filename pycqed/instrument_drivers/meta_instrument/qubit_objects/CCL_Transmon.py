@@ -1164,7 +1164,7 @@ class CCLight_Transmon(Qubit):
         if analyze:
             ma.TwoD_Analysis(label='Resonator_power_scan', close_fig=close_fig)
 
-    def measure_resonator_dac(self, freqs, dac_values, MC=None,
+    def measure_resonator_frequency_dac_scan(self, freqs, dac_values, MC=None,
                               analyze: bool =True, close_fig: bool=True):
         self.prepare_for_continuous_wave()
         if MC is None:
@@ -1197,6 +1197,44 @@ class CCLight_Transmon(Qubit):
         MC.run(name='Resonator_dac_scan'+self.msmt_suffix, mode='2D')
         if analyze:
             ma.TwoD_Analysis(label='Resonator_dac_scan', close_fig=close_fig)
+
+    def measure_qubit_frequency_dac_scan(self, freqs, dac_values, 
+                              pulsed=True, MC=None,
+                             analyze=True, close_fig=True):
+        if not pulsed:
+            logging.warning('CCL transmon can only perform '
+                            'pulsed spectrocsopy')
+        self.prepare_for_continuous_wave()
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        # Snippet here to create and upload the CCL instructions
+        CCL = self.instr_CC.get_instr()
+        p = sqo.pulsed_spec_seq(
+            qubit_idx=self.cfg_qubit_nr(),
+            spec_pulse_length=self.spec_pulse_length(),
+            platf_cfg=self.cfg_openql_platform_fn())
+        CCL.eqasm_program(p.filename)
+        # CCL gets started in the int_avg detector
+        if 'ivvi' in self.instr_FluxCtrl().lower():
+            IVVI = self.instr_FluxCtrl.get_instr()
+            dac_par = IVVI.parameters['dac{}'.format(self.cfg_dc_flux_ch())]
+        else:
+            # Assume the flux is controlled using an SPI rack
+            fluxcontrol = self.instr_FluxCtrl.get_instr()
+            dac_par = fluxcontrol.parameters[(self.cfg_dc_flux_ch())]
+        
+        spec_source = self.instr_spec_source.get_instr()
+        spec_source.on()
+        MC.set_sweep_function(spec_source.frequency)
+        MC.set_sweep_points(freqs)
+        MC.set_sweep_function_2D(dac_par)
+        MC.set_sweep_points_2D(dac_values)
+        self.int_avg_det_single._set_real_imag(False)
+        MC.set_detector_function(self.int_avg_det_single)
+        MC.run(name='Qubit_dac_scan'+self.msmt_suffix, mode='2D')
+        if analyze:
+            ma.TwoD_Analysis(label='Qubit_dac_scan', close_fig=close_fig)
 
     def measure_spectroscopy(self, freqs, pulsed=True, MC=None,
                              analyze=True, close_fig=True):
@@ -1422,6 +1460,7 @@ class CCLight_Transmon(Qubit):
         if all_modules:
           mod_sweep=[]
           for i in range(8):
+            VSM.set('mod{}_ch{}_marker_state'.format(i+1, ch_in),'on')
             G_par=VSM.parameters['mod{}_ch{}_gaussian_att_raw'.format(
                 i+1, ch_in)]
             D_par=VSM.parameters['mod{}_ch{}_derivative_att_raw'.format(
