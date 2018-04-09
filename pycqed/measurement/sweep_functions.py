@@ -926,6 +926,43 @@ class lutman_par_dB_attenuation_UHFQC_dig_trig(Soft_Sweep):
         if self.run:
             self.LutMan.AWG.get_instr().acquisition_arm(single=self.single)
 
+
+class dB_attenuation_UHFQC_dig_trig(Soft_Sweep):
+    def __init__(self, LutMan, LutMan_parameter, run=False, **kw):
+        self.set_kw()
+        self.name = LutMan_parameter.name
+        self.parameter_name = LutMan_parameter.label
+        self.unit = 'dB'
+        self.sweep_control = 'soft'
+        self.LutMan = LutMan
+        self.LutMan_parameter = LutMan_parameter
+        self.run = run
+
+    def set_parameter(self, val):
+        self.LutMan_parameter.set(10**(val/20))
+        if self.run:
+            self.LutMan.AWG.get_instr().awgs_0_enable(False)
+        self.LutMan.load_DIO_triggered_sequence_onto_UHFQC()
+        if self.run:
+            self.LutMan.AWG.get_instr().acquisition_arm(single=self.single)
+class UHFQC_pulse_dB_attenuation(Soft_Sweep):
+
+    def __init__(self, UHFQC, IF, dig_trigger=True,**kw):
+        self.set_kw()
+        self.name = 'UHFQC pulse attenuation'
+        self.parameter_name = 'pulse attenuation'
+        self.unit = 'dB'
+        self.sweep_control = 'soft'
+        self.UHFQC = UHFQC
+        self.dig_trigger = dig_trigger
+        self.IF = IF
+
+
+    def set_parameter(self, val):
+        self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(f_RO_mod=self.IF,RO_amp=10**(val/20),RO_pulse_length=2e-6,acquisition_delay=200e-9,dig_trigger=self.dig_trigger)
+        time.sleep(1)
+        #print('refreshed UHFQC')
+
 class multi_sweep_function(Soft_Sweep):
     '''
     cascades several sweep functions into a single joint sweep functions.
