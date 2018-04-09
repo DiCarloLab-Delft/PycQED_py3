@@ -134,6 +134,7 @@ class QuTech_AWG_Module(SCPI):
             output_voltage_cmd = 'QUTEch:OUTPut{}:Voltage'.format(ch)
             dac_temperature_cmd = 'STATus:DAC{}:TEMperature'.format(ch)
             gain_adjust_cmd = 'DAC{}:GAIn:DRIFt:ADJust'.format(ch)
+            dac_digital_value_cmd = 'DAC{}:DIGitalvalue'.format(ch)
             # Set channel first to ensure sensible sorting of pars
             # Compatibility: 5014, QWG
             self.add_parameter('ch{}_state'.format(ch),
@@ -201,7 +202,21 @@ class QuTech_AWG_Module(SCPI):
                                  +'Notes:\n  The gain setting is from 0 to 4095 \n' \
                                  +'    Where 0 is 0 V and 4095 is 3.3V \n' \
                                  +'Get Return:\n   Setting of the gain in interger (0 - 4095)\n'\
-                                 +'Set paramater:\n   Interger: Gain of the DAC in , min: 0, max: 4095')
+                                 +'Set parameter:\n   Integer: Gain of the DAC in , min: 0, max: 4095')
+
+            self.add_parameter('_dac{}_digital_value'.format(ch),
+                               unit='',
+                               label=('DAC {}, set digital value').format(ch),
+                               set_cmd=dac_digital_value_cmd + ' {}',
+                               vals=vals.Ints(0, 4095),
+                               docstring='FOR DEVELOPMENT ONLY: Set a digital value directly into the DAC\n' \
+                                 +'Used for testing the DACs.\n' \
+                                 +'Notes:\n\tThis command will also set the ' \
+                                 +'\tinternal correction matrix (Phase and amplitude) of the channel pair to [0,0,0,0], ' \
+                                 +'disabling any influence from the wave memory.' \
+                                 +'This will also stop the wave the other channel of the pair!\n\n' \
+                                 +'Set parameter:\n\tInteger: Value to write to the DAC, min: 0, max: 4095\n' \
+                                 +'\tWhere 0 is minimal DAC scale and 4095 is maximal DAC scale \n')
 
         self.add_parameter('status_frontIO_temperature',
                            unit='C',
