@@ -14,7 +14,8 @@ dcl = 'http://dicarlolab.tudelft.nl//wp-content/uploads/'
 address_dict = {'LaMaserati': dcl + 'LaMaseratiMonitor/',
                 'LaDucati': dcl + 'LaDucatiMonitor/',
                 'LaFerrari': dcl + 'LaFerrariMonitor/',
-                'LaAprilia': dcl + 'LaApriliaMonitor/'}
+                'LaAprilia': dcl + 'LaApriliaMonitor/',
+                'Bluefors': dcl + 'BlueforsMonitor/'}
 
 monitored_pars_dict = \
     {'LaMaserati': {'temp': ['T_CP', 'T_CP (P)', 'T_3K', 'T_3K (P)',
@@ -35,6 +36,11 @@ monitored_pars_dict = \
      'LaFerrari': {'temp': ['T_Sorb', 'T_Still', 'T_MChi', 'T_MCmid',
                             'T_MClo', 'T_MCStage'],
                    'press': ['P_5', 'P_Still', 'P_IVC', 'P_OVC', 'P_4He',
+                             'P_3He']},
+
+     'Bluefors': {'temp': ['T_Sorb', 'T_Still', 'T_MChi', 'T_MCmid',
+                            'T_MClo', 'T_MCStage'],
+                   'press': ['P_5', 'P_Still', 'P_IVC', 'P_OVC', 'P_4He',
                              'P_3He']}}
 
 
@@ -49,7 +55,7 @@ class Fridge_Monitor(Instrument):
 
         self.add_parameter(
             'fridge_name', initial_value=fridge_name,
-            vals=vals.Enum('LaMaserati', 'LaDucati', 'LaFerrari', 'LaAprilia'),
+            vals=vals.Enum('LaMaserati', 'LaDucati', 'LaFerrari', 'LaAprilia', 'Bluefors'),
             parameter_class=ManualParameter)
 
         self.add_parameter('last_mon_update',
