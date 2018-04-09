@@ -1,5 +1,7 @@
 import numpy as np
 import logging
+
+from collections import OrderedDict
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter
@@ -112,6 +114,38 @@ class DeviceCCL(Instrument):
                            parameter_class=ManualParameter,
                            vals=vals.Bool())
 
+        # Timing related parameters
+        self.add_parameter('tim_ro_latency_0',
+                           unit='s',
+                           label='readout latency DIO 1',
+                           parameter_class=ManualParameter,
+                           initial_value=0,
+                           vals=vals.Numbers())
+        self.add_parameter('tim_ro_latency_1',
+                           unit='s',
+                           label='readout latency DIO 2',
+                           parameter_class=ManualParameter,
+                           initial_value=0,
+                           vals=vals.Numbers())
+        self.add_parameter('tim_flux_latency',
+                           unit='s',
+                           label='flux latency DIO 3',
+                           parameter_class=ManualParameter,
+                           initial_value=0,
+                           vals=vals.Numbers())
+        self.add_parameter('tim_mw_latency_0',
+                           unit='s',
+                           label='microwave latency DIO 4',
+                           parameter_class=ManualParameter,
+                           initial_value=0,
+                           vals=vals.Numbers())
+        self.add_parameter('tim_mw_latency_1',
+                           unit='s',
+                           label='microwave latency DIO 5',
+                           parameter_class=ManualParameter,
+                           initial_value=0,
+                           vals=vals.Numbers())
+
     def _grab_instruments_from_qb(self):
         """
         initialize instruments that should only exist once from the first
@@ -124,6 +158,36 @@ class DeviceCCL(Instrument):
         self.instr_VSM(qb.instr_VSM())
         self.instr_CC(qb.instr_CC())
         self.cfg_openql_platform_fn(qb.cfg_openql_platform_fn())
+
+    def prepare_timing(self):
+        """
+        Responsible for ensuring timing is configured correctly.
+
+        Takes parameters starting with `tim_` and uses them to set the correct
+        latencies on the DIO ports of the CCL.
+
+        N.B. As latencies here are controlled through the DIO delays it can
+        only be controlled in multiples of 20 ns.
+        """
+        # 2. Setting the latencies
+        latencies = OrderedDict([('ro_latency_0', self.tim_ro_latency_0()),
+                                 ('ro_latency_1', self.tim_ro_latency_1()),
+                                 ('flux_latency_0', self.tim_flux_latency()),
+                                 ('mw_latency_0', self.tim_mw_latency_0()),
+                                 ('mw_latency_1', self.time_mw_latency_1())])
+
+        # Substract lowest value to ensure minimal latency is used.
+        # note that this also supports negative delays (which is useful for
+        # calibrating)
+        lowest_value = min(latencies.values())
+        for key, val in latencies.items():
+            latencies[key] = val - lowest_value
+
+        # Setting the latencies in the CCL
+        CCL = self.instr_CC.get_instr()
+        for i, val in enumerate(latencies.values()):
+            CCL.set('dio{}_out_delay'.format(i+1), val //
+                    20e-9)  # Convert to CCL dio value
 
     def prepare_readout(self):
         self._prep_ro_setup_qubits()
@@ -140,16 +204,16 @@ class DeviceCCL(Instrument):
         # fl_lutman.load_waveforms_onto_awg_lookuptable()
         fl_lutman.load_waveforms_onto_AWG_lookuptable()
         awg = fl_lutman.AWG.get_instr()
-        awg.upload_codeword_program(awgs=[0])
+        # awg.upload_codeword_program(awgs=[0])
 
-        # awg_hack_program_cz = """
-        # while (1) {
-        #   waitDIOTrigger();
-        #   playWave("dev8005_wave_ch1_cw001", "dev8005_wave_ch2_cw001");
-        # }
-        # """
-        # awg.configure_awg_from_string(0, awg_hack_program_cz)
-        # awg.configure_codeword_protocol()
+        awg_hack_program_cz = """
+        while (1) {
+          waitDIOTrigger();
+          playWave("dev8005_wave_ch1_cw001", "dev8005_wave_ch2_cw001");
+        }
+        """
+        awg.configure_awg_from_string(0, awg_hack_program_cz)
+        awg.configure_codeword_protocol()
 
         awg.start()
 
@@ -485,6 +549,7 @@ class DeviceCCL(Instrument):
     def prepare_for_timedomain(self):
         self.prepare_readout()
         self.prepare_fluxing()
+        self.prepare_timing()
 
         for qb_name in self.qubits():
             qb = self.find_instrument(qb_name)
@@ -947,6 +1012,9 @@ class DeviceCCL(Instrument):
         dag.add_node(self.name + ' mw-ro timing')
         dag.add_edge(self.name + ' mw-ro timing', 'AWG8 MW-staircase')
 
+        dag.add_node(self.name + ' mw-vsm timing')
+        dag.add_edge(self.name + ' mw-vsm timing', self.name + ' mw-ro timing')
+
         for edge_L, edge_R in self.qubit_edges():
             dag.add_node('Chevron {}-{}'.format(edge_L, edge_R))
             dag.add_node('CZ {}-{}'.format(edge_L, edge_R))
@@ -978,6 +1046,9 @@ class DeviceCCL(Instrument):
                          '{}-{} mw-flux timing'.format(edge_L, edge_R))
             dag.add_edge('{}-{} mw-flux timing'.format(edge_L, edge_R),
                          'AWG8 Flux-staircase')
+
+            dag.add_edge('{}-{} mw-flux timing'.format(edge_L, edge_R),
+                         self.name + ' mw-ro timing')
 
         for qubit in self.qubits():
             dag.add_edge(qubit+' room temp. dist. corr.',

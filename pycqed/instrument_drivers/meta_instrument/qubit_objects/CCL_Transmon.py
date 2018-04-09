@@ -1244,7 +1244,6 @@ class CCLight_Transmon(Qubit):
         # plotting really slows down SSRO (16k shots plotting is slow)
         old_plot_setting = MC.live_plot_enabled()
         MC.live_plot_enabled(False)
-        MC.soft_avg(1)  # don't want to average single shots
         if prepare:
             self.prepare_for_timedomain()
             p = sqo.off_on(
@@ -1263,6 +1262,7 @@ class CCLight_Transmon(Qubit):
                              CCL=self.instr_CC.get_instr(),
                              parameter_name='Shot', unit='#',
                              upload=prepare)
+        MC.soft_avg(1)  # don't want to average single shots
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
         d = self.int_log_det
@@ -1303,7 +1303,7 @@ class CCLight_Transmon(Qubit):
 
                 a = ma.SSRO_Analysis(label='SSRO',
                                      channels=d.value_names,
-                                     no_fits=no_figs, rotate=False)
+                                     no_fits=no_figs, rotate=True)
                 return a.F_a, a.F_d
 
     def measure_transients(self, MC=None, analyze: bool=True,
@@ -2164,9 +2164,14 @@ class CCLight_Transmon(Qubit):
             self.name+' frequency fine',
             calibrate_function=self.name + '.calibrate_frequency_ramsey')
         dag.add_node(self.name+' room temp. dist. corr.')
+        dag.add_node(self.name+' pulsed flux arc')
         dag.add_node(self.name+' cryo dist. corr.')
-        dag.add_edge(self.name+' cryo dist. corr.',
+
+        dag.add_edge(self.name+' pulsed flux arc',
                      self.name+' room temp. dist. corr.')
+
+        dag.add_edge(self.name+' cryo dist. corr.',
+                     self.name+' pulsed flux arc')
 
         dag.add_edge(self.name+' cryo dist. corr.',
                      self.name+' single qubit gates fine')
