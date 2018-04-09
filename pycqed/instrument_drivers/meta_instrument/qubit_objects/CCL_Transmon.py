@@ -103,7 +103,7 @@ class CCLight_Transmon(Qubit):
                            parameter_class=ManualParameter)
         self.add_parameter('ro_freq_mod',
                            label='Readout-modulation frequency', unit='Hz',
-                           initial_value=-2e6,
+                           initial_value=-20e6,
                            parameter_class=ManualParameter)
         self.add_parameter('ro_pow_LO', label='RO power LO',
                            unit='dBm', initial_value=20,
@@ -282,7 +282,7 @@ class CCLight_Transmon(Qubit):
                            parameter_class=ManualParameter)
 
         self.add_parameter('mw_freq_mod',
-                           initial_value=-2e6,
+                           initial_value=-100e6,
                            label='pulse-modulation frequency', unit='Hz',
                            parameter_class=ManualParameter)
 
