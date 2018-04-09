@@ -44,6 +44,7 @@
             "label": "Number Append Points",
             "name": "num_append_pts",
             "set_cmd": "QUTech:NumAppendPts {}",
+            "unit": "2.5 ns per point",
             "vals": {
                 "range": [
                     0,
@@ -53,9 +54,9 @@
             }
         },
         {
-            "docstring": "This parameter determines the extra output delay introduced for the DIO1 channel. The unit is 20ns.",
+            "docstring": "This parameter determines the extra output delay introduced for the DIO1 channel. It controls UHFQC1 to perform measurements on qubits 0, 2, 3, 5, and 6. The unit is 20ns.",
             "get_cmd": "QUTech:DioDelayONE?",
-            "label": "Output Delay of DIO1",
+            "label": "Output Delay of DIO1, measuring qubit 0, 2, 3, 5 6",
             "name": "dio1_out_delay",
             "set_cmd": "QUTech:DioDelayONE {}",
             "unit": "20 ns",
@@ -68,9 +69,9 @@
             }
         },
         {
-            "docstring": "This parameter determines the extra output delay introduced for the DIO2 channel. The unit is 20ns.",
+            "docstring": "This parameter determines the extra output delay introduced for the DIO1 channel. It controls UHFQC1 to perform measurements on qubits 1 and 4. The unit is 20ns.",
             "get_cmd": "QUTech:DioDelayTWO?",
-            "label": "Output Delay of DIO2",
+            "label": "Output Delay of DIO2, measuring qubit 1, 4",
             "name": "dio2_out_delay",
             "set_cmd": "QUTech:DioDelayTWO {}",
             "unit": "20 ns",
@@ -83,9 +84,9 @@
             }
         },
         {
-            "docstring": "This parameter determines the extra output delay introduced for the DIO3 channel. The unit is 20ns.",
+            "docstring": "This parameter determines the extra output delay introduced for the DIO3 channel. It controls AWG8 to perform flux control on all 7 qubits. The unit is 20ns.",
             "get_cmd": "QUTech:DioDelayTHRee?",
-            "label": "Output Delay of DIO3",
+            "label": "Output Delay of DIO3, flux control all 7 qubits",
             "name": "dio3_out_delay",
             "set_cmd": "QUTech:DioDelayTHRee {}",
             "unit": "20 ns",
@@ -98,9 +99,9 @@
             }
         },
         {
-            "docstring": "This parameter determines the extra output delay introduced for the DIO4 channel. The unit is 20ns.",
+            "docstring": "This parameter determines the extra output delay introduced for the DIO4 channel. It contains two microwave channels, which control qubits (0, 1) and (2, 3, 4), respectively. The unit is 20ns.",
             "get_cmd": "QUTech:DioDelayFOUr?",
-            "label": "Output Delay of DIO4",
+            "label": "Output Delay of DIO4, microwave 1 (qubit 0, 1) and microwave 2 (qubit 2, 3, 4)",
             "name": "dio4_out_delay",
             "set_cmd": "QUTech:DioDelayFOUr {}",
             "unit": "20 ns",
@@ -133,6 +134,7 @@
             "label": "VSM Channel 0 delay",
             "name": "vsm_channel_delay0",
             "set_cmd": "QUTech:VSMChannelDelay0 {}",
+            "unit": "2.5 ns",
             "vals": {
                 "range": [
                     0,
@@ -147,6 +149,7 @@
             "label": "VSM Channel 1 delay",
             "name": "vsm_channel_delay1",
             "set_cmd": "QUTech:VSMChannelDelay1 {}",
+            "unit": "2.5 ns",
             "vals": {
                 "range": [
                     0,
@@ -161,6 +164,7 @@
             "label": "VSM Channel 2 delay",
             "name": "vsm_channel_delay2",
             "set_cmd": "QUTech:VSMChannelDelay2 {}",
+            "unit": "2.5 ns",
             "vals": {
                 "range": [
                     0,
@@ -175,6 +179,7 @@
             "label": "VSM Channel 3 delay",
             "name": "vsm_channel_delay3",
             "set_cmd": "QUTech:VSMChannelDelay3 {}",
+            "unit": "2.5 ns",
             "vals": {
                 "range": [
                     0,
@@ -189,6 +194,7 @@
             "label": "VSM Channel 4 delay",
             "name": "vsm_channel_delay4",
             "set_cmd": "QUTech:VSMChannelDelay4 {}",
+            "unit": "2.5 ns",
             "vals": {
                 "range": [
                     0,
@@ -203,6 +209,7 @@
             "label": "VSM Channel 5 delay",
             "name": "vsm_channel_delay5",
             "set_cmd": "QUTech:VSMChannelDelay5 {}",
+            "unit": "2.5 ns",
             "vals": {
                 "range": [
                     0,
@@ -217,6 +224,7 @@
             "label": "VSM Channel 6 delay",
             "name": "vsm_channel_delay6",
             "set_cmd": "QUTech:VSMChannelDelay6 {}",
+            "unit": "2.5 ns",
             "vals": {
                 "range": [
                     0,
@@ -231,6 +239,7 @@
             "label": "VSM Channel 7 delay",
             "name": "vsm_channel_delay7",
             "set_cmd": "QUTech:VSMChannelDelay7 {}",
+            "unit": "2.5 ns",
             "vals": {
                 "range": [
                     0,
@@ -245,6 +254,7 @@
             "label": "VSM Channel 8 delay",
             "name": "vsm_channel_delay8",
             "set_cmd": "QUTech:VSMChannelDelay8 {}",
+            "unit": "2.5 ns",
             "vals": {
                 "range": [
                     0,
@@ -259,6 +269,7 @@
             "label": "VSM Channel 9 delay",
             "name": "vsm_channel_delay9",
             "set_cmd": "QUTech:VSMChannelDelay9 {}",
+            "unit": "2.5 ns",
             "vals": {
                 "range": [
                     0,
@@ -273,6 +284,7 @@
             "label": "VSM Channel 10 delay",
             "name": "vsm_channel_delay10",
             "set_cmd": "QUTech:VSMChannelDelay10 {}",
+            "unit": "2.5 ns",
             "vals": {
                 "range": [
                     0,
@@ -287,6 +299,7 @@
             "label": "VSM Channel 11 delay",
             "name": "vsm_channel_delay11",
             "set_cmd": "QUTech:VSMChannelDelay11 {}",
+            "unit": "2.5 ns",
             "vals": {
                 "range": [
                     0,
@@ -301,6 +314,7 @@
             "label": "VSM Channel 12 delay",
             "name": "vsm_channel_delay12",
             "set_cmd": "QUTech:VSMChannelDelay12 {}",
+            "unit": "2.5 ns",
             "vals": {
                 "range": [
                     0,
@@ -315,6 +329,7 @@
             "label": "VSM Channel 13 delay",
             "name": "vsm_channel_delay13",
             "set_cmd": "QUTech:VSMChannelDelay13 {}",
+            "unit": "2.5 ns",
             "vals": {
                 "range": [
                     0,
@@ -329,6 +344,7 @@
             "label": "VSM Channel 14 delay",
             "name": "vsm_channel_delay14",
             "set_cmd": "QUTech:VSMChannelDelay14 {}",
+            "unit": "2.5 ns",
             "vals": {
                 "range": [
                     0,
@@ -343,6 +359,7 @@
             "label": "VSM Channel 15 delay",
             "name": "vsm_channel_delay15",
             "set_cmd": "QUTech:VSMChannelDelay15 {}",
+            "unit": "2.5 ns",
             "vals": {
                 "range": [
                     0,
@@ -353,14 +370,14 @@
         }
     ],
     "version": {
-        "Embedded Software Build Time": "18/12/2017-09:12:28",
-        "Embedded Software Version": "0.2.0",
-        "Firmware Build Time": "17/12/2017-23:05:41",
+        "Embedded Software Build Time": "19/03/2018-12:05:58",
+        "Embedded Software Version": "0.2.2",
+        "Firmware Build Time": "23/01/2018-16:25:20",
         "Kernel Module Build Time": "18/12/2017-00:56:35",
         "Kernel Module Version": "0.2.0",
-        "firmware": "99.5.0",
+        "firmware": "0.5.2",
         "model": "CCL1",
-        "serial": "00000001",
+        "serial": "CCLight2",
         "vendor": "QuTech"
     }
 }
