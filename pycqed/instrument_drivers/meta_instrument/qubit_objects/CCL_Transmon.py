@@ -305,12 +305,6 @@ class CCLight_Transmon(Qubit):
         self.add_parameter('mw_motzoi', label='Motzoi parameter', unit='',
                            initial_value=0,
                            parameter_class=ManualParameter)
-
-        # self.add_parameter('mw_vsm_switch',
-        #                    label='VSM switch state',
-        #                    initial_value='EXT',
-        #                    vals=vals.Enum('ON', 'OFF', 'EXT'),
-        #                    parameter_class=ManualParameter)
         self.add_parameter('mw_vsm_marker_source',
                            label='VSM switch state',
                            initial_value='ext',
@@ -327,29 +321,11 @@ class CCLight_Transmon(Qubit):
             set_cmd=self._set_mw_vsm_delay,
             get_cmd=self._get_mw_vsm_delay)
 
-        # self.add_parameter('mw_vsm_ch_Gin',
-        #                    label='VSM input channel Gaussian component',
-        #                    vals=vals.Ints(1, 4),
-        #                    initial_value=1,
-        #                    parameter_class=ManualParameter)
-        # self.add_parameter('mw_vsm_ch_Din',
-        #                    label='VSM input channel Derivative component',
-        #                    vals=vals.Ints(1, 4),
-        #                    initial_value=2,
-        #                    parameter_class=ManualParameter)
         self.add_parameter('mw_vsm_ch_in',
                            label='VSM input channel Gaussian component',
                            vals=vals.Ints(1, 4),
                            initial_value=1,
                            parameter_class=ManualParameter)
-        # self.add_parameter('mw_vsm_ch_out',
-        #                    label='VSM output channel for microwave pulses',
-        #                    docstring=('Selects the VSM output channel for MW'
-        #                               ' pulses. N.B. for spec the '
-        #                               'spec_vsm_ch_out parameter is used.'),
-        #                    vals=vals.Ints(1, 2),
-        #                    initial_value=1,
-        #                    parameter_class=ManualParameter)
         self.add_parameter('mw_vsm_mod_out',
                            label='VSM output module for microwave pulses',
                            docstring=('Selects the VSM output module for MW'
@@ -393,14 +369,6 @@ class CCLight_Transmon(Qubit):
                            vals=vals.Numbers(0, 65536),
                            initial_value=65536/2,
                            parameter_class=ManualParameter)
-        # self.add_parameter('spec_vsm_ch_out',
-        #                    label='VSM output channel for spectroscopy pulses',
-        #                    docstring=('Selects the VSM output channel for spec'
-        #                               ' pulses. N.B. for mw pulses the '
-        #                               'spec_mw_ch_out parameter is used.'),
-        #                    vals=vals.Ints(1, 2),
-        #                    initial_value=1,
-        #                    parameter_class=ManualParameter)
 
         self.add_parameter('spec_vsm_mod_out',
                            label='VSM output module for spectroscopy pulses',
@@ -636,23 +604,6 @@ class CCLight_Transmon(Qubit):
         else:
             #mode = 'EXT'
             marker_source = 'ext'
-
-        # VSM.set('in{}_out{}_switch'.format(self.spec_vsm_ch_in(),
-        #                                   self.spec_vsm_ch_out()), mode)
-        # VSM.set('in{}_out{}_att'.format(
-        #         self.spec_vsm_ch_in(), self.spec_vsm_ch_out()),
-        #         self.spec_vsm_att())
-        #         VSM.set('in{}_out{}_switch'.format(self.spec_vsm_ch_in(),
-        #                                    self.spec_vsm_ch_out()), mode)
-        # VSM.set('mod{}_ch{}_gaussian_att_raw'.format(
-        #         self.spec_vsm_ch_out(),self.spec_vsm_ch_in()),
-        #         self.spec_vsm_att())
-        # VSM.set('mod{}_ch{}_marker_state'.format(
-        #         self.spec_vsm_ch_out(),self.spec_vsm_ch_in()),'on')
-        # VSM.set('mod{}_ch{}_marker_state'.format(
-        #         self.mw_vsm_ch_out(),self.mw_vsm_ch_in()),'off')
-        # VSM.set('mod{}_marker_source'.format(
-        #         self.spec_vsm_ch_in()),marker_source)
 
         self.instr_spec_source.get_instr().power(self.spec_pow())
 
@@ -941,22 +892,7 @@ class CCLight_Transmon(Qubit):
 
     def _prep_td_configure_VSM(self):
         # Configure VSM
-        # N.B. This configure VSM block is geared specifically to the
-        # Duplexer/BlueBox VSM
         VSM = self.instr_VSM.get_instr()
-        # Gin = self.mw_vsm_ch_Gin()
-        # Din = self.mw_vsm_ch_Din()
-        # ch_out = self.mw_vsm_ch_out()
-        # spec_in = self.spec_vsm_ch_in()
-
-        # VSM.set('in{}_out{}_switch'.format(spec_in, out), 'OFF')
-        # VSM.set('in{}_out{}_switch'.format(Gin, out), self.mw_vsm_switch())
-        # VSM.set('in{}_out{}_switch'.format(Din, out), self.mw_vsm_switch())
-
-        # VSM.set('in{}_out{}_att'.format(Gin, out), self.mw_vsm_G_att())
-        # VSM.set('in{}_out{}_att'.format(Din, out), self.mw_vsm_D_att())
-        # VSM.set('in{}_out{}_phase'.format(Gin, out), self.mw_vsm_G_phase())
-        # VSM.set('in{}_out{}_phase'.format(Din, out), self.mw_vsm_D_phase())
 
         VSM.set('mod{}_ch{}_marker_state'.format(
             self.mw_vsm_mod_out(), self.mw_vsm_ch_in()), 'on')
@@ -1073,22 +1009,11 @@ class CCLight_Transmon(Qubit):
         #####
         # This snippet is the 4 parameter joint optimization
         #####
-        # VSM.set('mod8_ch{}_gaussian_att_raw'.format(ch_in), 50000)
-        # VSM.set('mod8_ch{}_derivative_att_raw'.format(ch_in), 50000)
-        # # offsets = multi_channel_mixer_carrier_cancellation(
-        #     SH=self.instr_SH.get_instr(), source=self.instr_LO_mw.get_instr(),
-        #     MC=self.instr_MC.get_instr(),
-        #     channel_pars=offset_pars)
-
-        # if update:
-        #     self.mw_mixer_offs_GI(offsets[0])
-        #     self.mw_mixer_offs_GQ(offsets[1])
-        #     self.mw_mixer_offs_DI(offsets[2])
-        #     self.mw_mixer_offs_DQ(offsets[3])
 
         # return True
 
         # Calibrate Gaussian component mixer
+        #the use of modula 8 for mixer calibrations is hardcoded.
         VSM.set('mod8_ch{}_gaussian_att_raw'.format(ch_in), 50000)
         VSM.set('mod8_ch{}_derivative_att_raw'.format(ch_in), 0)
         offset_I, offset_Q = mixer_carrier_cancellation(
@@ -1491,8 +1416,7 @@ class CCLight_Transmon(Qubit):
             platf_cfg=self.cfg_openql_platform_fn())
 
         VSM = self.instr_VSM.get_instr()
-        # out = self.mw_vsm_ch_out()
-        # Gin = self.mw_vsm_ch_Gin()
+
         mod_out = self.mw_vsm_mod_out()
         ch_in = self.mw_vsm_ch_in()
         if all_modules:
