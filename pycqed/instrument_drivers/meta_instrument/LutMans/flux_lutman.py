@@ -280,7 +280,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         self.add_parameter('czd_amp_ratio',
                            docstring='Amplitude ratio for double sided CZ gate',
-                           initial_value=-1,
+                           initial_value=1,
                            vals=vals.Numbers(),
                            parameter_class=ManualParameter)
 
@@ -403,7 +403,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                 sampling_rate=self.sampling_rate(),
                 return_unit='f01')
             half_CZ_B = dac_scale_factor*self.detuning_to_amp(
-                self.cz_freq_01_max() - half_CZ_B)
+                self.cz_freq_01_max() - half_CZ_B, positive_branch=False)
 
             amp_rat = self.czd_amp_ratio()
             waveform = np.concatenate(
