@@ -2776,31 +2776,25 @@ def get_total_corr_depolariz_param(qb_names, fit_results_dict,
                             var_name]['stderr']
             else:
                 if var_name == 'corr':
+                    # make var_name = '123..n'
                     var_name = ''.join([str(i) for i in range(n)])
 
                 print('else: ', var_name)
 
-                corr_qbs_idxs = \
-                    list(itertools.combinations(var_name, correlated_subspace))
-                print('corr_qbs_idxs ', corr_qbs_idxs)
-
                 # get indices of results that must be summed to get one term
                 # in the total_corr_depolariz_param dict
-                keys = []
-                corr_keys = []
-                for idx_tuple in corr_qbs_idxs:
-                    corr_key = ''.join(idx_tuple)
-                    corr_keys += [corr_key]
-                    other_qb_keys = \
-                        ''.join([c for c in var_name if c not in corr_key])
-                    if other_qb_keys in corr_keys:
-                        pass
-                    else:
-                        keys += [(corr_key, other_qb_keys)]
+                smallest_correlated_subspace = \
+                    kw.pop('smallest_correlated_subspace ', 1)
+                keys = get_keys(corr_string=var_name,
+                                corr_s=correlated_subspace,
+                                smallest_corr_s=smallest_correlated_subspace)
                 print('keys ', keys)
+                print('len keys ', len(keys))
 
                 depolariz_param_term = 0
                 depolariz_param_term_stderr = 0
+
+                max_alpha_product = 0
                 for keys_tuple in keys:
                     alpha_temp = []
                     alpha_temp_stderr = []
@@ -2815,19 +2809,38 @@ def get_total_corr_depolariz_param(qb_names, fit_results_dict,
                                 [subspace_depolariz_params_dict[k]['val']]
                             alpha_temp_stderr += \
                                 [subspace_depolariz_params_dict[k]['stderr']]
-                    # print(alpha_temp)
-                    # print(alpha_temp_stderr)
-                    depolariz_param_term += np.product(np.asarray(alpha_temp))
-                    # FIXME: make the calculation of stderr general
-                    depolariz_param_term_stderr += \
-                        np.sqrt((alpha_temp[0]*alpha_temp_stderr[1])**2 +
-                                (alpha_temp[1]*alpha_temp_stderr[0])**2)
+                    print(alpha_temp)
+                    print(alpha_temp_stderr)
+                    alpha_product_temp = np.product(np.asarray(alpha_temp))
+                    print(alpha_product_temp)
 
-                depolariz_param_term /= len(keys)
-                depolariz_param_term_stderr /= len(keys)
+                    if alpha_product_temp > max_alpha_product:
+                        print(keys_tuple)
+                        max_alpha_product = alpha_product_temp
+                        # get std error
+                        std_err_term = 0
+                        for index, err in enumerate(alpha_temp_stderr):
+                            std_err_term += err**2
+                            p = 1
+                            for val in [v for v in alpha_temp
+                                        if v!=alpha_temp[index]]:
+                                p *= val**2
+                            std_err_term *= p
+                        # if keys_tuple == ('0', '1', '2'):
+                        print(np.sqrt(std_err_term))
 
-                # print(depolariz_param_term)
-                # print(depolariz_param_term_stderr)
+                print('max ', max_alpha_product)
+                print('max ', np.sqrt(std_err_term))
+                depolariz_param_term += max_alpha_product
+                depolariz_param_term_stderr += np.sqrt(std_err_term)
+
+                # # i am now picking the max alpha_product so I will have only
+                # # one term so no need to divide by len(keys)
+                # depolariz_param_term /= len(keys)
+                # depolariz_param_term_stderr /= len(keys)
+
+                print(depolariz_param_term)
+                print(depolariz_param_term_stderr)
 
                 total_corr_depolariz_param['val'] += \
                     prefactors[idx] * depolariz_param_term
@@ -2843,3 +2856,34 @@ def get_total_corr_depolariz_param(qb_names, fit_results_dict,
         # pprint(total_corr_depolariz_param)
 
     return total_corr_depolariz_param
+
+
+def get_keys(corr_string, corr_s, smallest_corr_s=1):
+    if len(corr_string)<smallest_corr_s or corr_s<smallest_corr_s:
+        return []
+    else:
+        var_name = corr_string
+        corr_qbs_idxs_sep = list(itertools.combinations(corr_string, corr_s))
+
+        corr_strings = []
+        keys = []
+        for corr_tuple in corr_qbs_idxs_sep:
+            corr_string = ''.join(corr_tuple)
+            corr_strings += [corr_string]
+
+            other_qb_string = \
+                ''.join([c for c in var_name if c not in corr_string])
+
+            if other_qb_string not in corr_strings:
+                keys += [(corr_string, other_qb_string)]
+
+            temp = get_keys(corr_string=corr_string, corr_s=corr_s-1,
+                     smallest_corr_s=smallest_corr_s)
+            keys += [tup+(other_qb_string,) for tup in temp]
+
+            if len(other_qb_string)>smallest_corr_s:
+                temp = get_keys(corr_string=other_qb_string, corr_s=corr_s-1,
+                         smallest_corr_s=smallest_corr_s)
+                keys += [corr_tuple+tup for tup in temp]
+
+        return keys
