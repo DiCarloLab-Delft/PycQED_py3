@@ -735,3 +735,89 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         if show:
             plt.show()
         return ax
+
+
+class QWG_Flux_LutMan(AWG8_Flux_LutMan):
+
+    def __init__(self, name, **kw):
+        super().__init__(name, **kw)
+        self._wave_dict_dist = dict()
+        self.sampling_rate(1e9)
+
+        self.add_parameter('cfg_oldstyle_kernel_enabled',
+                           initial_value=False,
+                           vals=vals.Bool(),
+                           parameter_class=ManualParameter)
+
+    def load_waveform_onto_AWG_lookuptable(self, waveform_name: str,
+                                           regenerate_waveforms: bool=False):
+        """
+        Loads a specific waveform to the AWG
+        """
+        if regenerate_waveforms:
+            # only regenerate the one waveform that is desired
+            gen_wf_func = getattr(self, '_gen_{}'.format(waveform_name))
+            self._wave_dict[waveform_name] = gen_wf_func()
+
+        waveform = self._wave_dict[waveform_name]
+        codeword = self.LutMap()[waveform_name]
+
+        if self.cfg_append_compensation():
+            waveform = self.add_compensation_pulses(waveform)
+
+        if self.cfg_distort():
+            waveform = self.distort_waveform(waveform)
+            self._wave_dict_dist[waveform_name] = waveform
+        self.AWG.get_instr().stop()
+        self.AWG.get_instr().set(codeword, waveform)
+        self.AWG.get_instr().start()
+
+
+    def distort_waveform(self, waveform):
+        """
+        Modifies the ideal waveform to correct for distortions and correct
+        fine delays.
+        Distortions are corrected using the kernel object.
+        Modified to implement also normal kernels.
+        """
+        k = self.instr_distortion_kernel.get_instr()
+
+        # Prepend zeros to delay waveform to correct for fine timing
+        delay_samples = int(self.cfg_pre_pulse_delay()*self.sampling_rate())
+        waveform = np.pad(waveform, (delay_samples, 0), 'constant')
+
+        # duck typing the distort waveform method
+        if hasattr(k, 'distort_waveform'):
+            distorted_waveform = k.distort_waveform(
+                waveform,
+                length_samples=int(
+                    self.cfg_max_wf_length()*self.sampling_rate()))
+        else:  # old kernel object does not have this method
+            distorted_waveform = k.convolve_kernel(
+                [k.kernel(), waveform],
+                length_samples=int(self.cfg_max_wf_length() *
+                                   self.sampling_rate()))
+
+        if self.cfg_oldstyle_kernel_enabled():
+            # hotfix: to distort adding abounce model
+            kernel_oldstyle = self.kernel_oldstyle
+            distorted_waveform = self.convolve_kernel(
+                [kernel_oldstyle, distorted_waveform],
+                length_samples=int(self.cfg_max_wf_length() *
+                                   self.sampling_rate()))
+
+        return distorted_waveform
+
+    def convolve_kernel(self, kernel_list, length_samples=None):
+        """
+        kernel_list : (list of arrays)
+        length_samples      : (int) maximum for convolution
+        Performs a convolution of different kernels
+        """
+        kernels = kernel_list[0]
+        for k in kernel_list[1:]:
+            kernels = np.convolve(k, kernels)[
+                :max(len(k), int(length_samples))]
+        if length_samples is not None:
+            return kernels[:int(length_samples)]
+        return kernels
