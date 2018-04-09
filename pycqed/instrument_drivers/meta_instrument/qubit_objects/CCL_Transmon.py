@@ -527,6 +527,11 @@ class CCLight_Transmon(Qubit):
                                       'to AWG8 and UHFQC'),
                            initial_value=True,
                            parameter_class=ManualParameter)
+        self.add_parameter('cfg_with_vsm', vals=vals.Bool(),
+                           docstring=('to avoid using the VSM if set to False' 
+                                      ' bypasses all commands to vsm if set False'),
+                           initial_value=True,
+                           parameter_class=ManualParameter)
         self.add_parameter(
             'cfg_dc_flux_ch', label='Flux DAC channel',
             docstring=('Used to determine the DAC channel used for DC '
@@ -597,12 +602,9 @@ class CCLight_Transmon(Qubit):
 
     def _prep_cw_spec(self):
         VSM = self.instr_VSM.get_instr()
-        # VSM.set_all_switches_to('OFF')
         if self.spec_type() == 'CW':
-            #mode = 'ON'
             marker_source = 'int'
         else:
-            #mode = 'EXT'
             marker_source = 'ext'
 
         self.instr_spec_source.get_instr().power(self.spec_pow())
@@ -831,7 +833,8 @@ class CCLight_Transmon(Qubit):
         self.prepare_readout()
         self._prep_td_sources()
         self._prep_mw_pulses()
-        self._prep_td_configure_VSM()
+        if not self.cfg_with_vsm():
+          self._prep_td_configure_VSM()
 
     def _prep_td_sources(self):
         self.instr_spec_source.get_instr().off()
@@ -1476,6 +1479,31 @@ class CCLight_Transmon(Qubit):
         self.instr_CC.get_instr().eqasm_program(p.filename)
         MC.set_sweep_function(s)
         MC.set_sweep_points(atts)
+        # real_imag is acutally not polar and as such works for opt weights
+        self.int_avg_det_single._set_real_imag(real_imag)
+        MC.set_detector_function(self.int_avg_det_single)
+        MC.run(name='rabi_'+self.msmt_suffix)
+        ma.MeasurementAnalysis()
+        return True
+
+    def measure_rabi_channel_amp(self, MC=None, amps=np.linspace(0, 1, 31),
+                         analyze=True, close_fig=True, real_imag=True,
+                         prepare_for_timedomain=True, all_modules=False):
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+        p = sqo.off_on(
+            qubit_idx=self.cfg_qubit_nr(), pulse_comb='on',
+            initialize=False,
+            platf_cfg=self.cfg_openql_platform_fn())
+        self.instr_CC.get_instr().eqasm_program(p.filename)
+
+        MW_LutMan = self.instr_LutMan_MW.get_instr()
+
+        s = MW_LutMan.channel_amp
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(amps)
         # real_imag is acutally not polar and as such works for opt weights
         self.int_avg_det_single._set_real_imag(real_imag)
         MC.set_detector_function(self.int_avg_det_single)
