@@ -78,43 +78,48 @@ waveform_type = 'square'
 # CHANNELS 1,2 FOR s0 #
 # CHANNELS 3,4 FOR s2 #
 #######################
-
+QWG.ch_pair1_sideband_frequency(0)
+QWG.ch_pair3_sideband_frequency(0)
+QWG.ch1_amp(1)
+QWG.ch2_amp(1)
+QWG.ch3_amp(1)
+QWG.ch4_amp(1)
+QWG.stop()
 if waveform_type == 'square':
     for ch in range(8):
-        for codeword_int in range(256):
+        for codeword_int in range(16):
             # FOR s0
-            redundant_cw_list = get_redundant_codewords(codeword_int,
-                                                        bit_width=4,
-                                                        bit_shift=4)
-            # update all of them
-            wave_I = np.ones(50)*codeword_int/256
-            wave_Q = -np.ones(50)*codeword_int/256
-            for redundant_cw_idx in redundant_cw_list:
-                redundant_cw_I = 'wave_ch1_cw{:03}'.format(redundant_cw_idx)
-                QWG.get_instr().set(redundant_cw_I, wave_I)
-                redundant_cw_Q = 'wave_ch2_cw{:03}'.format(redundant_cw_idx)
-                QWG.get_instr().set(redundant_cw_Q, wave_Q)
-
-            # FOR s1
             redundant_cw_list = get_redundant_codewords(codeword_int,
                                                         bit_width=4,
                                                         bit_shift=0)
             # update all of them
-            wave_I = np.ones(50)*codeword_int/256
-            wave_Q = -np.ones(50)*codeword_int/256
+            wave_I = np.ones(20)*codeword_int/16
+            wave_Q = -np.ones(20)*codeword_int/16
+            for redundant_cw_idx in redundant_cw_list:
+                redundant_cw_I = 'wave_ch1_cw{:03}'.format(redundant_cw_idx)
+                QWG.set(redundant_cw_I, wave_I)
+                redundant_cw_Q = 'wave_ch2_cw{:03}'.format(redundant_cw_idx)
+                QWG.set(redundant_cw_Q, wave_Q)
+
+            # FOR s1
+            redundant_cw_list = get_redundant_codewords(codeword_int,
+                                                        bit_width=4,
+                                                        bit_shift=4)
+            # update all of them
+            wave_I = np.ones(20)*codeword_int/16
+            wave_Q = -np.ones(20)*codeword_int/16
             for redundant_cw_idx in redundant_cw_list:
                 redundant_cw_I = 'wave_ch3_cw{:03}'.format(redundant_cw_idx)
-                QWG.get_instr().set(redundant_cw_I, wave_I)
+                QWG.set(redundant_cw_I, wave_I)
                 redundant_cw_Q = 'wave_ch4_cw{:03}'.format(redundant_cw_idx)
-                QWG.get_instr().set(redundant_cw_Q, wave_Q)
+                QWG.set(redundant_cw_Q, wave_Q)
 
-
-            QWG.set('wave_ch{}_cw{:03}'.format(ch+1, i), (np.ones(50)*i/256))
 elif waveform_type == 'cos':
     for ch in range(8):
-        for i in range(256):
+        for i in range(16):
             QWG.set('wave_ch{}_cw{:03}'.format(ch+1, i),
                      (np.cos(np.arange(50)/2)*i/32))
 else:
     raise KeyError()
 
+QWG.start()
