@@ -237,13 +237,13 @@ class QWG_MW_LutMan(Base_MW_LutMan):
         super().__init__(name, **kw)
 
     def _add_channel_params(self):
-        super._add_channel_params()
+        super()._add_channel_params()
         self.add_parameter('channel_amp',
                            unit='a.u.',
                             vals=vals.Numbers(0, 1.8),
                             set_cmd=self._set_channel_amp,
                             get_cmd=self._get_channel_amp,
-                            initial_value=1.0,
+                            # initial_value=1.0,
                             docstring=('using the channel amp as additional'
                            'parameter to allow rabi-type experiments without'
                            'wave reloading. Should not be using VSM'))
@@ -416,76 +416,6 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
         return wave_dict
 
 
-class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
-
-    def __init__(self, name, **kw):
-        self._num_channels = 8
-        super().__init__(name, **kw)
-        self.wf_func = wf.mod_gauss_VSM
-        self.spec_func = wf.block_pulse_vsm
-
-    def set_default_lutmap(self):
-        """
-        Set's the default lutmap for standard microwave drive pulses.
-        """
-        def_lm = self._def_lm
-        LutMap = {}
-        for cw_idx, cw_key in enumerate(def_lm):
-            LutMap[cw_key] = (
-                'wave_ch{}_cw{:03}'.format(self.channel_GI(), cw_idx),
-                'wave_ch{}_cw{:03}'.format(self.channel_GQ(), cw_idx),
-                'wave_ch{}_cw{:03}'.format(self.channel_DI(), cw_idx),
-                'wave_ch{}_cw{:03}'.format(self.channel_DQ(), cw_idx))
-        self.LutMap(LutMap)
-
-    def _add_channel_params(self):
-        self.add_parameter('channel_GI',
-                           parameter_class=ManualParameter,
-                           vals=vals.Numbers(1, self._num_channels))
-        self.add_parameter('channel_GQ',
-                           parameter_class=ManualParameter,
-                           vals=vals.Numbers(1, self._num_channels))
-        self.add_parameter('channel_DI',
-                           parameter_class=ManualParameter,
-                           vals=vals.Numbers(1, self._num_channels))
-        self.add_parameter('channel_DQ',
-                           parameter_class=ManualParameter,
-                           vals=vals.Numbers(1, self._num_channels))
-
-    def _add_mixer_corr_pars(self):
-        self.add_parameter('G_mixer_alpha', vals=vals.Numbers(),
-                           parameter_class=ManualParameter,
-                           initial_value=1.0)
-        self.add_parameter('G_mixer_phi', vals=vals.Numbers(), unit='deg',
-                           parameter_class=ManualParameter,
-                           initial_value=0.0)
-        self.add_parameter('D_mixer_alpha', vals=vals.Numbers(),
-                           parameter_class=ManualParameter,
-                           initial_value=1.0)
-        self.add_parameter('D_mixer_phi', vals=vals.Numbers(), unit='deg',
-                           parameter_class=ManualParameter,
-                           initial_value=0.0)
-
-        self.add_parameter(
-            'mixer_apply_predistortion_matrix', vals=vals.Bool(), docstring=(
-                'If True applies a mixer correction using mixer_phi and '
-                'mixer_alpha to all microwave pulses using.'),
-            parameter_class=ManualParameter, initial_value=True)
-
-    def apply_mixer_predistortion_corrections(self, wave_dict):
-
-        M_G = wf.mixer_predistortion_matrix(self.G_mixer_alpha(),
-                                            self.G_mixer_phi())
-        M_D = wf.mixer_predistortion_matrix(self.G_mixer_alpha(),
-                                            self.G_mixer_phi())
-
-        for key, val in wave_dict.items():
-            GI, GQ = np.dot(M_G, val[0:2])  # Mixer correction Gaussian comp.
-            DI, DQ = np.dot(M_D, val[2:4])  # Mixer correction Derivative comp.
-            wave_dict[key] = GI, GQ, DI, DQ
-        return wave_dict
-
-
 class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
     """
     WORK ONGOING:
@@ -538,6 +468,11 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
         self._num_channels = 4
         super().__init__(name, **kw)
 
+        # sacrifices last pulse 'Spec' from std list to have 3 bit (8)
+        self._def_lm = ['I', 'rX180',  'rY180', 'rX90',  'rY90',
+                   'rXm90',  'rYm90', 'rPhi90']
+        self.set_default_lutmap()
+
         self._vqe_lm = ['I', 'X180t',  'Y180t', 'X90t',  'Xm90t',
                         'Y90t',  'Y90t', 'Y180']
 
@@ -554,13 +489,15 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
         self.LutMap(LutMap)
 
     def _add_waveform_parameters(self):
-        super()._add_waveform_parameters(self)
-        # defined here so that the VSM based LutMan can overwrite this
-
+        super()._add_waveform_parameters()
+        # parameters related to codeword bits
         self.add_parameter('bit_shift', unit='', vals=vals.Ints(0, 4),
                            parameter_class=ManualParameter,
                            initial_value=0)
-
+        self.add_parameter('bit_width', unit='', vals=vals.Ints(0, 4),
+                           parameter_class=ManualParameter,
+                           initial_value=0)
+        # parameters related to phase compilation
         self.add_parameter('phi1', unit='rad', vals=vals.Numbers(0, 2*np.pi),
                            parameter_class=ManualParameter,
                            initial_value=0)
@@ -573,7 +510,7 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
         old_mixer_setting = self.mixer_apply_predistortion_matrix()
         self.mixer_apply_predistortion_matrix(False)
         # generate waveforms for standard mapping
-        super().generate_standard_waveforms(self, **kw)
+        super().generate_standard_waveforms()
         self.mixer_apply_predistortion_matrix(old_mixer_setting)
 
         if self.cfg_sideband_mode() == 'static':
@@ -609,8 +546,10 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
         codeword_int = int(codewords[0][-3:])
         # get redundant codewords as a list
         redundant_cw_list = get_redundant_codewords(codeword_int,
+                                                    bit_width=self.bit_width(),
                                                     bit_shift=self.bit_shift())
         # update all of them
+        print(redundant_cw_list)
         for redundant_cw_idx in redundant_cw_list:
             redundant_cw_I = 'wave_ch{}_cw{:03}'.format(self.channel_I(),
                                                         redundant_cw_idx)
