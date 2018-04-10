@@ -706,6 +706,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         Plots the flux arc as used in the lutman based on the polynomial
         coefficients
         """
+
         if ax is None:
             f, ax = plt.subplots()
         amps = np.linspace(-2.5, 2.5, 101)  # maximum voltage of AWG amp mode
@@ -717,7 +718,20 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                    label='$f_{\mathrm{int.}}$:'+' {:.3f} GHz'.format(
             self.cz_freq_interaction()*1e-9),
             c='C1')
-        ax.legend(loc=(1.05, .7))
+
+        ax.fill_between(
+            x=[-5, 5],
+            y1=[self.cz_freq_interaction()-self.cz_J2()]*2,
+            y2=[self.cz_freq_interaction()+self.cz_J2()]*2,
+            label='$J_{\mathrm{2}}/2\pi$:'+' {:.3f} MHz'.format(
+                self.cz_J2()*1e-6),
+            color='C1', alpha=0.25)
+
+        title = ('Calibration visualization\n{}\nchannel {}'.format(
+                    self.AWG(), self.cfg_awg_channel()))
+
+        leg = ax.legend(title=title, loc=(1.05, .7))
+        leg._legend_box.align = 'center'
         set_xlabel(ax, 'AWG amplitude', 'V')
         set_ylabel(ax, 'Frequency', 'Hz')
         ax.set_xlim(-2.5, 2.5)
