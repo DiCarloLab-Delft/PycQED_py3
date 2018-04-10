@@ -1060,6 +1060,7 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
 
         self.proc_data_dict['meas_operators'] = all_Fs
         self.proc_data_dict['covar_matrix'] = all_Omegas
+        self.proc_data_dict['meas_results'] = all_mus
 
         rho_ls = tomo.least_squares_tomography(all_mus, all_Fs, all_Omegas)
         self.proc_data_dict['rho_ls'] = rho_ls

@@ -579,7 +579,7 @@ def measure_multiplexed_readout(qubits, f_LO, nreps=4, liveplot=False,
         [qb.name for qb in qubits])))
 
 
-def measure_active_reset(qubits, feedback_delay, nr_resets=1, nreps=1,
+def measure_active_reset(qubits, reset_cycle_time, nr_resets=1, nreps=1,
                          MC=None, upload=True, sequence='reset_g'):
     """possible sequences: 'reset_g', 'reset_e', 'idle', 'flip'"""
     for qb in qubits:
@@ -592,10 +592,17 @@ def measure_active_reset(qubits, feedback_delay, nr_resets=1, nreps=1,
     #     readout_delay = calculate_minimal_readout_spacing(qubits,
     #                                                       drive_pulses=0)
 
+    operation_dict = {
+        'RO': device.get_multiplexed_readout_pulse_dictionary(qubits)}
+    qb_names = []
+    for qb in qubits:
+        qb_names.append(qb.name)
+        operation_dict.update(qb.get_operation_dict())
+
     sf = awg_swf2.n_qubit_reset(
-        pulse_pars_list=[qb.get_drive_pars() for qb in qubits],
-        RO_pars=device.get_multiplexed_readout_pulse_dictionary(qubits),
-        feedback_delay=feedback_delay,
+        qubit_names = qb_names,
+        operation_dict=operation_dict,
+        reset_cycle_time=reset_cycle_time,
         #sequence=sequence,
         nr_resets=nr_resets,
         upload=upload)
@@ -618,8 +625,7 @@ def measure_active_reset(qubits, feedback_delay, nr_resets=1, nreps=1,
     MC.set_sweep_points_2D(np.arange(nreps))
     MC.set_detector_function(df)
 
-    MC.run_2D(name='active_reset_{}_{}'.format(sequence, '-'.join(
-        [qb.name for qb in qubits])))
+    MC.run_2D(name='active_reset_x{}_{}'.format(nr_resets, ','.join(qb_names)))
 
     MC.soft_avg(prev_avg)
 
@@ -665,7 +671,7 @@ def measure_two_qubit_parity(qb0, qb1, qb2, feedback_delay, f_LO, upload=True,
 
 
 def measure_tomography(qubits, prep_sequence, state_name, f_LO,
-                       rot_bases=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
+                       rots_basis=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
                        use_cal_points=True,
                        preselection=True,
                        rho_target=None,
@@ -692,7 +698,7 @@ def measure_tomography(qubits, prep_sequence, state_name, f_LO,
 
     seq_tomo, elts_tomo = mqs.n_qubit_tomo_seq(qubits,
                                             prep_sequence=prep_sequence,
-                                            rot_bases=rot_bases,
+                                            rots_basis=rots_basis,
                                             return_seq=True,
                                             upload=False)
     seq = seq_tomo
@@ -744,7 +750,7 @@ def measure_tomography(qubits, prep_sequence, state_name, f_LO,
         cal_defs = None
 
     exp_metadata["n_segments"] = n_segments
-    exp_metadata["basis_rots_str"] = rot_bases
+    exp_metadata["rots_basis"] = rots_basis
     if rho_target is not None:
         exp_metadata["rho_target"] = rho_target
     exp_metadata["cal_points"] = cal_defs

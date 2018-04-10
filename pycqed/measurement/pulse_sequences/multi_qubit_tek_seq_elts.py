@@ -1758,59 +1758,94 @@ def three_qubit_GHZ_tomo_seq(qubits,
 
     return seq, el_list
 
-def n_qubit_reset(pulse_pars_list, RO_pars, feedback_delay, nr_resets=1,
+def n_qubit_reset(qubit_names, operation_dict, reset_cycle_time, nr_resets=1,
                   return_seq=False, verbose=False, codeword_indices=None,
                   upload=True):
-    n = len(pulse_pars_list)
-    seq_name = '{}_qubit_{}_reset_sequence'.format(n, nr_resets)
+    """
+
+    Timing constraints:
+        The reset_cycle_time and the readout fixed point should be commensurate
+        with the UHFQC trigger grid and the granularity of the AWGs.
+
+        When the -ro_acq_marker_delay of the readout pulse is larger than
+        the drive pulse length, then it is important that its length is a
+        multiple of the granularity of the AWG.
+    """
+
+    n = len(qubit_names)
+    seq_name = '{}_reset_x{}_sequence'.format(','.join(qubit_names), nr_resets)
     seq = sequence.Sequence(seq_name)
     el_list = []
+    operation_dict = deepcopy(operation_dict)
 
-    # Create a dict with the parameters for all the pulses
-    pars = RO_pars.copy()
-    pars['pulse_delay'] = max(pars['pulse_delay'], -pars['acq_marker_delay'])
-    pulse_dict = {'RO': pars}
-    for i, pulse_pars in enumerate(pulse_pars_list):
-        pars = pulse_pars.copy()
-        pulses = add_suffix_to_dict_keys(
-            get_pulse_dict_from_pars(pars), ' {}'.format(i))
-        pulse_dict.update(pulses)
-    spacerpulse = {'pulse_type': 'SquarePulse',
-                   'channel': RO_pars['acq_marker_channel'],
+    # set all qubit drive pulse delays to the maximum over the qubits
+    max_delay = float('-inf')
+    for qbn in qubit_names:
+        max_delay = max(max_delay, operation_dict['X180 ' + qbn]['pulse_delay'])
+    for qbn in qubit_names:
+        for op in ['X180 ', 'X180s ', 'I ', 'Is ']:
+            operation_dict[op + qbn]['pulse_delay'] = max_delay
+
+    # sort qubits by pulse length
+    pulse_lengths = []
+    for qbn in qubit_names:
+        pulse = operation_dict['X180 ' + qbn]
+        pulse_lengths.append(pulse['sigma']*pulse['nr_sigma'])
+    qubits_sorted = []
+    for idx in np.argsort(pulse_lengths):
+        qubits_sorted.append(qubit_names[idx])
+
+    # increase the readout pulse delay such that the trigger would just
+    # fit in the feedback element
+    mw_pulse = operation_dict['X180 ' + qubits_sorted[-1]]
+    ro_pulse = operation_dict['RO']
+    ro_pulse['pulse_delay'] = max(ro_pulse['pulse_delay'],
+                                  -ro_pulse['acq_marker_delay']
+                                  - mw_pulse['pulse_delay']
+                                  - mw_pulse['sigma']*mw_pulse['nr_sigma'])
+
+    # create the wait pulse such that the length of the reset element would be
+    # reset_cycle_time
+    wait_time = mw_pulse['pulse_delay'] + mw_pulse['sigma']*mw_pulse['nr_sigma']
+    wait_time += ro_pulse['pulse_delay'] + ro_pulse['length']
+    wait_time = reset_cycle_time - wait_time
+    wait_time -=  station.pulsar.inter_element_spacing()
+    wait_pulse = {'pulse_type': 'SquarePulse',
+                   'channel': ro_pulse['acq_marker_channel'],
                    'amplitude': 0.0,
-                   'length': feedback_delay,
+                   'length': wait_time,
                    'pulse_delay': 0}
-    pulse_dict.update({'spacer': spacerpulse})
+    operation_dict.update({'I_fb': wait_pulse})
 
     # create the state-preparation elements and the state reset elements
+    # the longest drive pulse is added last so that the readout does not overlap
+    # with the drive pulses.
+    qubit_order = np.arange(len(qubit_names))[np.argsort(pulse_lengths)]
     for state in range(2 ** n):
         pulses = []
-        for qb in range(n):
-            if state & (1 << qb):
-                pulses += [pulse_dict['X180 {}'.format(qb)].copy()]
+        for i, qbn in enumerate(qubits_sorted):
+            if state & (1 << qubit_names.index(qbn)):
+                if i == 0:
+                    pulses.append(operation_dict['X180 ' + qbn])
+                else:
+                    pulses.append(operation_dict['X180s ' + qbn])
             else:
-                pulses += [pulse_dict['I {}'.format(qb)].copy()]
-            if qb != 0:
-                pulses[-1]['refpoint'] = 'simultaneous'
-        statename = str(state).zfill(len(str(2**n - 1)))
+                if i == 0:
+                    pulses.append(operation_dict['I ' + qbn])
+                else:
+                    pulses.append(operation_dict['Is ' + qbn])
+        pulses += [operation_dict['RO'], operation_dict['I_fb']]
+        statename = str(state).zfill(len(str(2 ** n - 1)))
         el = multi_pulse_elt(state, station, pulses, name='prepare' + statename)
         el_list.append(el)
-        el = multi_pulse_elt(state, station, pulses + [pulse_dict['RO'],
-                                                       pulse_dict['spacer']],
-                             name='reset' + statename, trigger=False)
+        el = multi_pulse_elt(state, station, pulses, name='reset' + statename,
+                             trigger=False)
         el_list.append(el)
-
-    # create the readout element
-    pulses = [pulse_dict['RO'], pulse_dict['spacer']]
-    el = multi_pulse_elt(state, station, pulses, name='readout', trigger=False)
-    el_list.append(el)
 
     # Create the sequence
     for state in range(2 ** n):
         statename = str(state).zfill(len(str(2 ** n - 1)))
         seq.insert('prepare'+statename, 'prepare'+statename, trigger_wait=True)
-        seq.insert('readout' + statename, 'readout',
-                   trigger_wait=False, flags={'readout'})
         for i in range(nr_resets):
             seq.insert('codeword' + statename + '_' + str(i), 'codeword',
                        trigger_wait=False)
@@ -1821,9 +1856,9 @@ def n_qubit_reset(pulse_pars_list, RO_pars, feedback_delay, nr_resets=1,
     for state in range(2 ** n):
         statename = str(state).zfill(len(str(2 ** n - 1)))
         codeword = 0
-        for qb in range(n):
-            if state & (1 << qb):
-                codeword |= (1 << codeword_indices[qb])
+        for qb_idx in range(n):
+            if state & (1 << qb_idx):
+                codeword |= (1 << codeword_indices[qb_idx])
         seq.codewords[codeword] = 'reset' + statename
 
     if upload:
@@ -1867,7 +1902,7 @@ def two_qubit_parity_measurement(
 
     operation_dict.update({
         'I_fb': {'pulse_type': 'SquarePulse',
-                 'channel': operation_dict['RO']['acq_marker_channel'],
+                 'channel': operation_dict['RO mux']['acq_marker_channel'],
                  'amplitude': 0.0,
                  'length': feedback_delay,
                  'pulse_delay': 0}
@@ -1877,20 +1912,20 @@ def two_qubit_parity_measurement(
     operation_dict.update(q2.get_operation_dict())
 
     if prep_sequence is None:
-        prep_sequence = ['Y90 ' + q0n, 'Y90s' + q2n]
+        prep_sequence = ['Y90 ' + q0n, 'Y90s ' + q2n]
 
     # create the elements
     el_list = []
 
     # main (first) element
-    sequence = deepcopy(prep_sequence)
-    sequence.append('mY90s ' + q1n)
-    sequence.append('CZ ' + q0n + ' ' + q1n)
-    sequence.append('CZ ' + q2n + ' ' + q1n)
-    sequence.append('Y90 ' + q1n)
-    sequence.append('RO ' + q1n)
-    sequence.append('I_fb')
-    pulse_list = [operation_dict[pulse] for pulse in sequence]
+    pulse_sequence = deepcopy(prep_sequence)
+    pulse_sequence.append('mY90s ' + q1n)
+    pulse_sequence.append('CZ ' + q1n + ' ' + q0n)
+    pulse_sequence.append('CZ ' + q1n + ' ' + q2n)
+    pulse_sequence.append('Y90 ' + q1n)
+    pulse_sequence.append('RO ' + q1n)
+    pulse_sequence.append('I_fb')
+    pulse_list = [operation_dict[pulse] for pulse in pulse_sequence]
     el_main = multi_pulse_elt(0, station, pulse_list, trigger=True, name='main')
     el_list.append(el_main)
 
@@ -1935,10 +1970,10 @@ def two_qubit_parity_measurement(
         return seq_name
 
 
-def n_qubit_tomo(
+def n_qubit_tomo_seq(
         qubits, prep_sequence=None,
         prep_name=None,
-        rot_bases=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
+        rots_basis=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
         upload=True, verbose=False, return_seq=False):
     """
 
@@ -1961,7 +1996,7 @@ def n_qubit_tomo(
 
     # tomography elements
     tomography_sequences = get_tomography_pulses(*qubit_names,
-                                                 basis_pulses=rot_bases)
+                                                 basis_pulses=rots_basis)
     for i, tomography_sequence in enumerate(tomography_sequences):
         pulse_list = [operation_dict[pulse] for pulse in prep_sequence]
         tomography_sequence.append('RO mux')

@@ -431,12 +431,21 @@ class HDAWG8Pulsar:
                 if data is not None:
                     obj._write_csv_waveform(simplify_name(wfname), data)
 
+            print("Programming {} vawg{} sequence '{}' ({} "
+                  "element(s)) \t".format(obj.name, awg_nr, sequence.name,
+                                          sequence.element_count()), end=' ')
+
             # here we want to use a timeout value longer than the obj.timeout()
             # as programming the AWGs takes more time than normal communications
             obj.configure_awg_from_string(awg_nr, awg_str, timeout=180)
 
             obj.set('awgs_{}_dio_valid_polarity'.format(awg_nr),
                     prev_dio_valid_polarity)
+
+            # Turn on active channels:
+            for ch in range(8):
+                cname = self._id_channel('ch{}'.format(ch + 1), obj.name)
+                obj.set('sigouts_{}_on'.format(ch), self.get(cname + '_active'))
 
         return awg_str
 

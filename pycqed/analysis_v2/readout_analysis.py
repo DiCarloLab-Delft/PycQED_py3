@@ -560,7 +560,10 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
             observables: List of observables. Observable is a dictionary with
                 name of the qubit as key and boolean value indicating if it is
                 selecting exited states. If the qubit is missing from the list
-                of states it is averaged out.
+                of states it is averaged out. Instead of just the qubit name, a
+                tuple of qubit name and a shift value can be passed, where the
+                shift value specifies the relative readout index for which the
+                state is checked.
             n_readouts: Assumed to be the period in the list of shots between
                 experiments with the same prepared state. If shots_of_qubits
                 includes preselection readout results or if there was several
@@ -579,10 +582,11 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
         table = np.zeros((n_readouts, len(observables)))
 
         for qubit, results in shots_of_qubits.items():
-            res_e[qubit] = np.array(results).reshape((n_readouts,-1),order='F')
+            res_e[qubit] = np.array(results).reshape((n_readouts, -1),
+                                                     order='F')
             # This makes copy, but allows faster AND later
             res_g[qubit] = np.logical_not(
-                np.array(results)).reshape((n_readouts,-1),order='F')
+                np.array(results)).reshape((n_readouts, -1), order='F')
 
         for readout_n in range(n_readouts):
             # first result all ground
@@ -591,7 +595,7 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
                 # slow qubit is the first in channel_map list
                 for qubit, state in states_of_qubits.items():
                     if isinstance(qubit, tuple):
-                        seg = (readout_n+qubit[1])%n_readouts
+                        seg = (readout_n+qubit[1]) % n_readouts
                         qubit = qubit[0]
                     else:
                         seg = readout_n
@@ -602,6 +606,25 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
                 table[readout_n, state_n] = np.count_nonzero(mask)
 
         return table*n_readouts/n_shots
+
+    @staticmethod
+    def observable_product(*observables):
+        """
+        Finds the product-observable of the input observables.
+        If the observable conditions are contradicting, returns None. For the
+        format of the observables, see the docstring of `probability_table`.
+        """
+        res_obs = {}
+        for obs in observables:
+            for k in obs:
+                if k in res_obs:
+                    if obs[k] != res_obs[k]:
+                        return None
+                else:
+                    res_obs[k] = obs[k]
+        return res_obs
+
+
 
     def prepare_plots(self):
         self.prepare_plot_prob_table()
@@ -711,41 +734,62 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
             return data, Fs, covars
 
     def calibration_point_means_and_channel_covariations(self):
-        shots_of_qubits = self.proc_data_dict['shots_thresholded']
         observables = list(self.observables.values())
-        cal_points = self.options_dict.get('cal_points')
-        n_readouts = self.n_readouts
-        value_names = list(self.observables.keys())
-        cal_points_list = convert_channel_names_to_index(
-            cal_points, n_readouts, value_names
-        )
+
+        # calculate the mean for each reference state and each observable
+        try:
+            cal_points_list = convert_channel_names_to_index(
+                self.options_dict.get('cal_points'), self.n_readouts,
+                self.raw_data_dict['value_names'][0]
+            )
+        except KeyError:
+            cal_points_list = convert_channel_names_to_index(
+                self.options_dict.get('cal_points'), self.n_readouts,
+                list(self.channel_map.keys())
+            )
         self.proc_data_dict['cal_points_list'] = cal_points_list
-
-        n_shots = next(iter(shots_of_qubits.values())).shape[1]
-
         means = np.zeros((len(cal_points_list), len(observables)))
-        counts = np.zeros_like(means)
-        residuals = [np.array([]) for _ in observables]
+        cal_readouts = set()
+        for i, cal_point in enumerate(cal_points_list):
+            for j, cal_point_chs in enumerate(cal_point):
+                if j == 0:
+                    readout_list = cal_point_chs
+                else:
+                    if readout_list != cal_point_chs:
+                        raise Exception('Different readout indices for a '
+                                        'single reference state: {} and {}'
+                                        .format(readout_list, cal_point_chs))
+            cal_readouts.update(cal_point[0])
+            val_list = [self.proc_data_dict['probability_table'][idx_ro]
+                        for idx_ro in cal_point[0]]
+            means[i] = np.mean(val_list, axis=0)
 
-        for cal_point_idx, observable_lists in enumerate(cal_points_list):
-            for observable_idx, segments_list in enumerate(observable_lists):
-                for segment_n in segments_list:
-                    states_of_qubits = observables[observable_idx]
-                    mask = np.ones((int(n_shots / n_readouts)), dtype=np.bool)
-                    for qubit, state in states_of_qubits.items():
-                        res_e = shots_of_qubits[qubit][segment_n::n_readouts]
-                        if state:
-                            mask = np.logical_and(mask, res_e)
-                        else:
-                            mask = np.logical_and(mask, np.logical_not(res_e))
-                    summ = np.count_nonzero(mask)
-                    means[cal_point_idx, observable_idx] += summ
-                    counts[cal_point_idx, observable_idx] += len(mask)
-                    residuals[observable_idx] = np.append(
-                        residuals[observable_idx], mask - summ/len(mask))
-        means /= counts
-        covars = [[res1.dot(res2) for res1 in residuals] for res2 in residuals]
-        covars = np.array(covars)/(len(residuals[0]) - 1)
+        # find the means for all the products of the operators and the average
+        # covariation of the operators
+        prod_obss = []
+        prod_obs_idxs = {}
+        obs_products = np.zeros([self.n_readouts] + [len(observables)]*2)
+        for i, obsi in enumerate(observables):
+            for j, obsj in enumerate(observables):
+                if i > j:
+                    continue
+                obsp = self.observable_product(obsi, obsj)
+                if obsp is None:
+                    obs_products[:, i, j] = 0
+                    obs_products[:, j, i] = 0
+                else:
+                    prod_obs_idxs[(i, j)] = len(prod_obss)
+                    prod_obs_idxs[(j, i)] = len(prod_obss)
+                    prod_obss.append(obsp)
+        prod_prob_table = self.probability_table(
+            self.proc_data_dict['shots_thresholded'],
+            prod_obss, self.n_readouts)
+        for (i, j), k in prod_obs_idxs.items():
+            obs_products[:, i, j] = prod_prob_table[:, k]
+        covars = -np.array([np.outer(ro, ro) for ro in self.proc_data_dict[
+            'probability_table']]) + obs_products
+        covars = np.mean(covars[list(cal_readouts)], 0)
+
         return means, covars
 
 
