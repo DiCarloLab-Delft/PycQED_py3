@@ -236,6 +236,30 @@ class QWG_MW_LutMan(Base_MW_LutMan):
         self._num_channels = 4
         super().__init__(name, **kw)
 
+    def _add_channel_params(self):
+        super._add_channel_params()
+        self.add_parameter('channel_amp',
+                           unit='a.u.',
+                            vals=vals.Numbers(0, 1.8),
+                            set_cmd=self._set_channel_amp,
+                            get_cmd=self._get_channel_amp,
+                            initial_value=1.0,
+                            docstring=('using the channel amp as additional'
+                           'parameter to allow rabi-type experiments without'
+                           'wave reloading. Should not be using VSM'))
+
+    def _set_channel_amp(self, val):
+        AWG = self.AWG.get_instr()
+        AWG.set('ch{}_amp'.format(self.channel_I()),val)
+        AWG.set('ch{}_amp'.format(self.channel_Q()),val)
+
+    def _get_channel_amp(self):
+        AWG = self.AWG.get_instr()
+        val_I = AWG.get('ch{}_amp'.format(self.channel_I()))
+        val_Q = AWG.get('ch{}_amp'.format(self.channel_Q()))
+        assert val_Q == val_I
+        return val_I
+
 
 class AWG8_MW_LutMan(Base_MW_LutMan):
 
@@ -245,19 +269,19 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
 
     def _add_channel_params(self):
         super._add_channel_params()
-        self.add_parameter('channel_amp', 
-                           unit='a.u.', 
-                            vals=vals.Numbers(0, 1), 
+        self.add_parameter('channel_amp',
+                           unit='a.u.',
+                            vals=vals.Numbers(0, 1),
                             set_cmd=self._set_channel_amp,
                             get_cmd=self._get_channel_amp,
                             initial_value=1.0,
-                            docstring=('using the channel amp as additional' 
+                            docstring=('using the channel amp as additional'
                            'parameter to allow rabi-type experiments without'
                            'wave reloading. Should not be using VSM'))
 
     def _set_channel_amp(self, val):
         AWG = self.AWG.get_instr()
-        for awg_ch in [self.channel_I(), self.channel_Q()] : 
+        for awg_ch in [self.channel_I(), self.channel_Q()] :
             awg_nr = (awg_ch-1)//2
             ch_pair = (awg_ch-1) % 2
             AWG.set('AWGS/{}/OUTPUTS/{}/AMPLITUDE'.format(awg_nr, ch_pair), val)
@@ -265,7 +289,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
     def _get_channel_amp(self):
         AWG = self.AWG.get_instr()
         vals = []
-        for awg_ch in [self.channel_I(), self.channel_Q()] : 
+        for awg_ch in [self.channel_I(), self.channel_Q()] :
             awg_nr = (awg_ch-1)//2
             ch_pair = (awg_ch-1) % 2
             vals.append(AWG.get('AWGS/{}/OUTPUTS/{}/AMPLITUDE'.format(awg_nr, awg_ch)))
@@ -291,6 +315,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         # needs to be fixed in the AWG8 driver (MAR Oct 2017)
         self.AWG.get_instr().upload_codeword_program()
 
+
 class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
 
     def __init__(self, name, **kw):
@@ -314,8 +339,8 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
         self.LutMap(LutMap)
 
     def _add_channel_params(self):
-        # FIXME: add parameter channel amp that sets the ouput amplitude of 
-        # all channels used for this pulse 
+        # FIXME: add parameter channel amp that sets the ouput amplitude of
+        # all channels used for this pulse
         self.add_parameter('channel_GI',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers(1, self._num_channels))
@@ -328,20 +353,20 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
         self.add_parameter('channel_DQ',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers(1, self._num_channels))
-        self.add_parameter('channel_amp', 
-                           unit='a.u.', 
-                            vals=vals.Numbers(0, 1), 
+        self.add_parameter('channel_amp',
+                           unit='a.u.',
+                            vals=vals.Numbers(0, 1),
                             set_cmd=self._set_channel_amp,
                             get_cmd=self._get_channel_amp,
                             initial_value=1.0,
-                            docstring=('using the channel amp as additional' 
+                            docstring=('using the channel amp as additional'
                            'parameter to allow rabi-type experiments without'
                            'wave reloading. Should not be using VSM'))
 
     def _set_channel_amp(self, val):
         AWG = self.AWG.get_instr()
         for awg_ch in [self.channel_GI(), self.channel_GQ(),
-                        self.channel_DI(), self.channel_DQ()] : 
+                        self.channel_DI(), self.channel_DQ()] :
             awg_nr = (awg_ch-1)//2
             ch_pair = (awg_ch-1) % 2
             AWG.set('AWGS/{}/OUTPUTS/{}/AMPLITUDE'.format(awg_nr, ch_pair), val)
@@ -349,8 +374,8 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
     def _get_channel_amp(self):
         AWG = self.AWG.get_instr()
         vals = []
-        for awg_ch in [self.channel_GI(), self.channel_GQ(), 
-                        self.channel_DI(), self.channel_DQ()] : 
+        for awg_ch in [self.channel_GI(), self.channel_GQ(),
+                        self.channel_DI(), self.channel_DQ()] :
             awg_nr = (awg_ch-1)//2
             ch_pair = (awg_ch-1) % 2
             vals.append(AWG.get('AWGS/{}/OUTPUTS/{}/AMPLITUDE'.format(awg_nr, awg_ch)))
@@ -389,7 +414,6 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
             DI, DQ = np.dot(M_D, val[2:4])  # Mixer correction Derivative comp.
             wave_dict[key] = GI, GQ, DI, DQ
         return wave_dict
-
 
 
 class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
