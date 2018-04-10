@@ -528,7 +528,7 @@ class CCLight_Transmon(Qubit):
                            initial_value=True,
                            parameter_class=ManualParameter)
         self.add_parameter('cfg_with_vsm', vals=vals.Bool(),
-                           docstring=('to avoid using the VSM if set to False' 
+                           docstring=('to avoid using the VSM if set to False'
                                       ' bypasses all commands to vsm if set False'),
                            initial_value=True,
                            parameter_class=ManualParameter)
@@ -833,7 +833,7 @@ class CCLight_Transmon(Qubit):
         self.prepare_readout()
         self._prep_td_sources()
         self._prep_mw_pulses()
-        if not self.cfg_with_vsm():
+        if self.cfg_with_vsm():
           self._prep_td_configure_VSM()
 
     def _prep_td_sources(self):
@@ -1201,7 +1201,7 @@ class CCLight_Transmon(Qubit):
         if analyze:
             ma.TwoD_Analysis(label='Resonator_dac_scan', close_fig=close_fig)
 
-    def measure_qubit_frequency_dac_scan(self, freqs, dac_values, 
+    def measure_qubit_frequency_dac_scan(self, freqs, dac_values,
                               pulsed=True, MC=None,
                              analyze=True, close_fig=True):
         if not pulsed:
@@ -1226,7 +1226,7 @@ class CCLight_Transmon(Qubit):
             # Assume the flux is controlled using an SPI rack
             fluxcontrol = self.instr_FluxCtrl.get_instr()
             dac_par = fluxcontrol.parameters[(self.cfg_dc_flux_ch())]
-        
+
         spec_source = self.instr_spec_source.get_instr()
         spec_source.on()
         MC.set_sweep_function(spec_source.frequency)
