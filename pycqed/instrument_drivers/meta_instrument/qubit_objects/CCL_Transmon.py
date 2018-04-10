@@ -601,7 +601,8 @@ class CCLight_Transmon(Qubit):
         self.instr_spec_source.get_instr().off()
 
     def _prep_cw_spec(self):
-        VSM = self.instr_VSM.get_instr()
+        if self.cfg_with_vsm():
+            VSM = self.instr_VSM.get_instr()
         if self.spec_type() == 'CW':
             marker_source = 'int'
         else:
