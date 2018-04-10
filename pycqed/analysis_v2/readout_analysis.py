@@ -805,11 +805,11 @@ class Multiplexed_Readout_Analysis(MultiQubit_SingleShot_Analysis):
         def_seg_names_prep = ["".join(l) for l in list(
             itertools.product(["$0$", "$\pi$"],
                               repeat=len(self.channel_map)))]
-        preselection = False
+        self.preselection_available = False
         if self.n_readouts == len(def_seg_names_prep):
             def_seg_names = def_seg_names_prep
         elif self.n_readouts == 2*len(def_seg_names_prep):
-            preselection = True
+            self.preselection_available = True
             def_seg_names = [x for t in zip(*[
                 ["sel"]*len(def_seg_names_prep),
                 def_seg_names_prep]) for x in t]
@@ -818,7 +818,8 @@ class Multiplexed_Readout_Analysis(MultiQubit_SingleShot_Analysis):
 
         # User can override the automatic value determined from the
         #   number of readouts
-        self.preselection = options_dict.get('preselection', preselection)
+        self.use_preselection = options_dict.get('use_preselection',
+                                             self.preselection_available)
 
         self.observables = options_dict.get('observables', None)
         if self.observables is None:
@@ -831,7 +832,7 @@ class Multiplexed_Readout_Analysis(MultiQubit_SingleShot_Analysis):
 
             self.observables = OrderedDict([])
             # add preselection condition also as an observable
-            if self.preselection:
+            if self.use_preselection:
                 self.observables["pre"] = preselection_condition
             # add all combinations
             for i, states in enumerate(combination_list):
@@ -840,7 +841,7 @@ class Multiplexed_Readout_Analysis(MultiQubit_SingleShot_Analysis):
                            '\\rangle$'
                 self.observables[obs_name] = dict(zip(qubits, states))
                 # add preselection condition
-                if self.preselection:
+                if self.use_preselection:
                     self.observables[obs_name].update(preselection_condition)
 
         options_dict['observables'] = self.observables
@@ -860,7 +861,72 @@ class Multiplexed_Readout_Analysis(MultiQubit_SingleShot_Analysis):
             self.run_analysis()
 
     def prepare_plots(self):
-        super().prepare_plot_prob_table(only_odd=self.preselection)
+        super().prepare_plot_prob_table(only_odd=self.use_preselection)
+
+    def process_data(self):
+        super().process_data()
+
+        # table_norm = self.proc_data_dict['probability_table']
+        # self.proc_data_dict['cross_fidelity_matrix'] = \
+        #     self.cross_fidelity_matrix()
+        # self.proc_data_dict['cross_correlations_matrix'] = \
+        #     self.cross_correlations_matrix()
+
+    @staticmethod
+    def cross_fidelity_matrix(table_norm, n_qubits):
+
+        masks = []
+        for i in reversed(range(3)):
+            masks.append(np.arange(8)//(2**i)%2 != 0)
+        CF = np.zeros((3, 3))
+        for i in range(3):
+            for j in range(3):
+                CF[i, j] = np.mean(PT.T[i][masks[j]] - PT.T[i][np.logical_not(masks[j])])
+
+        # combination_list = list(
+        #     itertools.product([False, True], repeat=n_qubits))
+        # F = np.zeros((n_qubits, n_qubits))
+        # for k in range(n_qubits):
+        #     for l in range(n_qubits):
+        #         for kk, prep_list in enumerate(combination_list):
+        #             prepl = 2*prep_list[l] - 1
+        #             assk = 0
+        #             for ll, ass_list in enumerate(combination_list):
+        #                 assk += (2*ass_list[k] - 1)*table_norm[kk, ll]
+        #             F[k, l] += prepl*assk
+        # F /= 2**n_qubits
+        return CF
+
+    @staticmethod
+    def cross_correlations_matrix(table_norm, n_qubits):
+        gres = np.array([np.power(-1, np.arange(2**n_qubits)//(2**(n_qubits-i-1))) >= 0 for i in range(n_qubits)])
+        pee = np.zeros((n_qubits, n_qubits))
+        peg = np.zeros((n_qubits, n_qubits))
+        pge = np.zeros((n_qubits, n_qubits))
+        pgg = np.zeros((n_qubits, n_qubits))
+        pg = np.zeros(n_qubits)
+        pe = np.zeros(n_qubits)
+        for k in np.arange(2**n_qubits): # prepare state
+            for l in np.arange(2**n_qubits): # result state
+                for i in np.arange(n_qubits): # qubit 1
+                    if gres[i][l]:
+                        pg[i] += table_norm[k, l]/2**n_qubits
+                    else:
+                        pe[i] += table_norm[k, l]/2**n_qubits
+                    for j in np.arange(n_qubits): # qubit 2
+                        if gres[i][l] and gres[j][l]:
+                            pgg[i, j] += table_norm[k, l]/2**n_qubits
+                        elif gres[i][l] and not gres[j][l]:
+                            pge[i, j] += table_norm[k, l]/2**n_qubits
+                        elif not gres[i][l] and gres[j][l]:
+                            peg[i, j] += table_norm[k, l]/2**n_qubits
+                        else:
+                            pee[i, j] += table_norm[k, l]/2**n_qubits
+        C = pgg + pee - pge - peg - np.outer(pg, pg) - np.outer(pe, pe) +\
+            np.outer(pg, pe) + np.outer(pe, pg)
+        C = np.diag(np.diagonal(C)**-0.5).dot(C).dot(np.diag(np.diagonal(C)**-0.5))
+        return C
+
 
 def convert_channel_names_to_index(cal_points, nr_segments, value_names):
     """
