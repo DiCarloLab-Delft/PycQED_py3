@@ -243,6 +243,35 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         self._num_channels = 8
         super().__init__(name, **kw)
 
+    def _add_channel_params(self):
+        super._add_channel_params()
+        self.add_parameter('channel_amp', 
+                           unit='a.u.', 
+                            vals=vals.Numbers(0, 1), 
+                            set_cmd=self._set_channel_amp,
+                            get_cmd=self._get_channel_amp,
+                            initial_value=1.0,
+                            docstring=('using the channel amp as additional' 
+                           'parameter to allow rabi-type experiments without'
+                           'wave reloading. Should not be using VSM'))
+
+    def _set_channel_amp(self, val):
+        AWG = self.AWG.get_instr()
+        for awg_ch in [self.channel_I(), self.channel_Q()] : 
+            awg_nr = (awg_ch-1)//2
+            ch_pair = (awg_ch-1) % 2
+            AWG.set('AWGS/{}/OUTPUTS/{}/AMPLITUDE'.format(awg_nr, ch_pair), val)
+
+    def _get_channel_amp(self):
+        AWG = self.AWG.get_instr()
+        vals = []
+        for awg_ch in [self.channel_I(), self.channel_Q()] : 
+            awg_nr = (awg_ch-1)//2
+            ch_pair = (awg_ch-1) % 2
+            vals.append(AWG.get('AWGS/{}/OUTPUTS/{}/AMPLITUDE'.format(awg_nr, awg_ch)))
+        assert vals[0] == vals[1]
+        return vals[0]
+
     def load_waveforms_onto_AWG_lookuptable(
             self, regenerate_waveforms: bool=True, stop_start: bool = True):
         """
@@ -261,6 +290,106 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         # the False prevents reconfiguring the DIO timings. This
         # needs to be fixed in the AWG8 driver (MAR Oct 2017)
         self.AWG.get_instr().upload_codeword_program()
+
+class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
+
+    def __init__(self, name, **kw):
+        self._num_channels = 8
+        super().__init__(name, **kw)
+        self.wf_func = wf.mod_gauss_VSM
+        self.spec_func = wf.block_pulse_vsm
+
+    def set_default_lutmap(self):
+        """
+        Set's the default lutmap for standard microwave drive pulses.
+        """
+        def_lm = self._def_lm
+        LutMap = {}
+        for cw_idx, cw_key in enumerate(def_lm):
+            LutMap[cw_key] = (
+                'wave_ch{}_cw{:03}'.format(self.channel_GI(), cw_idx),
+                'wave_ch{}_cw{:03}'.format(self.channel_GQ(), cw_idx),
+                'wave_ch{}_cw{:03}'.format(self.channel_DI(), cw_idx),
+                'wave_ch{}_cw{:03}'.format(self.channel_DQ(), cw_idx))
+        self.LutMap(LutMap)
+
+    def _add_channel_params(self):
+        # FIXME: add parameter channel amp that sets the ouput amplitude of 
+        # all channels used for this pulse 
+        self.add_parameter('channel_GI',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(1, self._num_channels))
+        self.add_parameter('channel_GQ',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(1, self._num_channels))
+        self.add_parameter('channel_DI',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(1, self._num_channels))
+        self.add_parameter('channel_DQ',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(1, self._num_channels))
+        self.add_parameter('channel_amp', 
+                           unit='a.u.', 
+                            vals=vals.Numbers(0, 1), 
+                            set_cmd=self._set_channel_amp,
+                            get_cmd=self._get_channel_amp,
+                            initial_value=1.0,
+                            docstring=('using the channel amp as additional' 
+                           'parameter to allow rabi-type experiments without'
+                           'wave reloading. Should not be using VSM'))
+
+    def _set_channel_amp(self, val):
+        AWG = self.AWG.get_instr()
+        for awg_ch in [self.channel_GI(), self.channel_GQ(),
+                        self.channel_DI(), self.channel_DQ()] : 
+            awg_nr = (awg_ch-1)//2
+            ch_pair = (awg_ch-1) % 2
+            AWG.set('AWGS/{}/OUTPUTS/{}/AMPLITUDE'.format(awg_nr, ch_pair), val)
+
+    def _get_channel_amp(self):
+        AWG = self.AWG.get_instr()
+        vals = []
+        for awg_ch in [self.channel_GI(), self.channel_GQ(), 
+                        self.channel_DI(), self.channel_DQ()] : 
+            awg_nr = (awg_ch-1)//2
+            ch_pair = (awg_ch-1) % 2
+            vals.append(AWG.get('AWGS/{}/OUTPUTS/{}/AMPLITUDE'.format(awg_nr, awg_ch)))
+        assert vals[0] == vals[1] == vals[2] == vals[3]
+        return vals[0]
+
+    def _add_mixer_corr_pars(self):
+        self.add_parameter('G_mixer_alpha', vals=vals.Numbers(),
+                           parameter_class=ManualParameter,
+                           initial_value=1.0)
+        self.add_parameter('G_mixer_phi', vals=vals.Numbers(), unit='deg',
+                           parameter_class=ManualParameter,
+                           initial_value=0.0)
+        self.add_parameter('D_mixer_alpha', vals=vals.Numbers(),
+                           parameter_class=ManualParameter,
+                           initial_value=1.0)
+        self.add_parameter('D_mixer_phi', vals=vals.Numbers(), unit='deg',
+                           parameter_class=ManualParameter,
+                           initial_value=0.0)
+
+        self.add_parameter(
+            'mixer_apply_predistortion_matrix', vals=vals.Bool(), docstring=(
+                'If True applies a mixer correction using mixer_phi and '
+                'mixer_alpha to all microwave pulses using.'),
+            parameter_class=ManualParameter, initial_value=True)
+
+    def apply_mixer_predistortion_corrections(self, wave_dict):
+
+        M_G = wf.mixer_predistortion_matrix(self.G_mixer_alpha(),
+                                            self.G_mixer_phi())
+        M_D = wf.mixer_predistortion_matrix(self.G_mixer_alpha(),
+                                            self.G_mixer_phi())
+
+        for key, val in wave_dict.items():
+            GI, GQ = np.dot(M_G, val[0:2])  # Mixer correction Gaussian comp.
+            DI, DQ = np.dot(M_D, val[2:4])  # Mixer correction Derivative comp.
+            wave_dict[key] = GI, GQ, DI, DQ
+        return wave_dict
+
 
 
 class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):

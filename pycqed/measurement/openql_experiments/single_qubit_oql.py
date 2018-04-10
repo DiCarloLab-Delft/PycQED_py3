@@ -683,7 +683,7 @@ def add_single_qubit_cal_points(p, platf, qubit_idx):
     return p
 
 
-def FluxTimingCalibration(qubit_idx: int, buffer_time1, times, platf_cfg: str,
+def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
                           cal_points: bool=True):
     """
     A Ramsey sequence with varying waiting times `times` around a flux pulse.
@@ -692,7 +692,6 @@ def FluxTimingCalibration(qubit_idx: int, buffer_time1, times, platf_cfg: str,
     p = Program(pname="FluxTimingCalibration", nqubits=platf.get_qubit_number(),
                 p=platf)
 
-    buffer_nanoseconds1 = int(round(buffer_time1/1e-9))
     # don't use last 4 points if calibration points are used
     if cal_points:
         times= times[:-4]
@@ -702,8 +701,6 @@ def FluxTimingCalibration(qubit_idx: int, buffer_time1, times, platf_cfg: str,
         k = Kernel("pifluxpi", p=platf)
         k.prepz(qubit_idx)
         k.gate('rx90', qubit_idx)
-        if buffer_nanoseconds1 > 10:
-            k.gate("wait", [qubit_idx], buffer_nanoseconds1)
         k.gate('fl_cw_02', 2, 0)
         if t_nanoseconds > 10:
             k.gate("wait", [qubit_idx], t_nanoseconds)

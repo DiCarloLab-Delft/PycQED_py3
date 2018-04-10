@@ -103,7 +103,7 @@ class CCLight_Transmon(Qubit):
                            parameter_class=ManualParameter)
         self.add_parameter('ro_freq_mod',
                            label='Readout-modulation frequency', unit='Hz',
-                           initial_value=-2e6,
+                           initial_value=-20e6,
                            parameter_class=ManualParameter)
         self.add_parameter('ro_pow_LO', label='RO power LO',
                            unit='dBm', initial_value=20,
@@ -282,7 +282,7 @@ class CCLight_Transmon(Qubit):
                            parameter_class=ManualParameter)
 
         self.add_parameter('mw_freq_mod',
-                           initial_value=-2e6,
+                           initial_value=-100e6,
                            label='pulse-modulation frequency', unit='Hz',
                            parameter_class=ManualParameter)
 
@@ -527,6 +527,11 @@ class CCLight_Transmon(Qubit):
                                       'to AWG8 and UHFQC'),
                            initial_value=True,
                            parameter_class=ManualParameter)
+        self.add_parameter('cfg_with_vsm', vals=vals.Bool(),
+                           docstring=('to avoid using the VSM if set to False'
+                                      ' bypasses all commands to vsm if set False'),
+                           initial_value=True,
+                           parameter_class=ManualParameter)
         self.add_parameter(
             'cfg_dc_flux_ch', label='Flux DAC channel',
             docstring=('Used to determine the DAC channel used for DC '
@@ -597,12 +602,9 @@ class CCLight_Transmon(Qubit):
 
     def _prep_cw_spec(self):
         VSM = self.instr_VSM.get_instr()
-        # VSM.set_all_switches_to('OFF')
         if self.spec_type() == 'CW':
-            #mode = 'ON'
             marker_source = 'int'
         else:
-            #mode = 'EXT'
             marker_source = 'ext'
 
         self.instr_spec_source.get_instr().power(self.spec_pow())
@@ -831,7 +833,8 @@ class CCLight_Transmon(Qubit):
         self.prepare_readout()
         self._prep_td_sources()
         self._prep_mw_pulses()
-        self._prep_td_configure_VSM()
+        if self.cfg_with_vsm():
+          self._prep_td_configure_VSM()
 
     def _prep_td_sources(self):
         self.instr_spec_source.get_instr().off()
@@ -1164,7 +1167,7 @@ class CCLight_Transmon(Qubit):
         if analyze:
             ma.TwoD_Analysis(label='Resonator_power_scan', close_fig=close_fig)
 
-    def measure_resonator_dac(self, freqs, dac_values, MC=None,
+    def measure_resonator_frequency_dac_scan(self, freqs, dac_values, MC=None,
                               analyze: bool =True, close_fig: bool=True):
         self.prepare_for_continuous_wave()
         if MC is None:
@@ -1197,6 +1200,44 @@ class CCLight_Transmon(Qubit):
         MC.run(name='Resonator_dac_scan'+self.msmt_suffix, mode='2D')
         if analyze:
             ma.TwoD_Analysis(label='Resonator_dac_scan', close_fig=close_fig)
+
+    def measure_qubit_frequency_dac_scan(self, freqs, dac_values,
+                              pulsed=True, MC=None,
+                             analyze=True, close_fig=True):
+        if not pulsed:
+            logging.warning('CCL transmon can only perform '
+                            'pulsed spectrocsopy')
+        self.prepare_for_continuous_wave()
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        # Snippet here to create and upload the CCL instructions
+        CCL = self.instr_CC.get_instr()
+        p = sqo.pulsed_spec_seq(
+            qubit_idx=self.cfg_qubit_nr(),
+            spec_pulse_length=self.spec_pulse_length(),
+            platf_cfg=self.cfg_openql_platform_fn())
+        CCL.eqasm_program(p.filename)
+        # CCL gets started in the int_avg detector
+        if 'ivvi' in self.instr_FluxCtrl().lower():
+            IVVI = self.instr_FluxCtrl.get_instr()
+            dac_par = IVVI.parameters['dac{}'.format(self.cfg_dc_flux_ch())]
+        else:
+            # Assume the flux is controlled using an SPI rack
+            fluxcontrol = self.instr_FluxCtrl.get_instr()
+            dac_par = fluxcontrol.parameters[(self.cfg_dc_flux_ch())]
+
+        spec_source = self.instr_spec_source.get_instr()
+        spec_source.on()
+        MC.set_sweep_function(spec_source.frequency)
+        MC.set_sweep_points(freqs)
+        MC.set_sweep_function_2D(dac_par)
+        MC.set_sweep_points_2D(dac_values)
+        self.int_avg_det_single._set_real_imag(False)
+        MC.set_detector_function(self.int_avg_det_single)
+        MC.run(name='Qubit_dac_scan'+self.msmt_suffix, mode='2D')
+        if analyze:
+            ma.TwoD_Analysis(label='Qubit_dac_scan', close_fig=close_fig)
 
     def measure_spectroscopy(self, freqs, pulsed=True, MC=None,
                              analyze=True, close_fig=True):
@@ -1244,7 +1285,6 @@ class CCLight_Transmon(Qubit):
         # plotting really slows down SSRO (16k shots plotting is slow)
         old_plot_setting = MC.live_plot_enabled()
         MC.live_plot_enabled(False)
-        MC.soft_avg(1)  # don't want to average single shots
         if prepare:
             self.prepare_for_timedomain()
             p = sqo.off_on(
@@ -1263,6 +1303,7 @@ class CCLight_Transmon(Qubit):
                              CCL=self.instr_CC.get_instr(),
                              parameter_name='Shot', unit='#',
                              upload=prepare)
+        MC.soft_avg(1)  # don't want to average single shots
         MC.set_sweep_function(s)
         MC.set_sweep_points(np.arange(nr_shots))
         d = self.int_log_det
@@ -1303,7 +1344,7 @@ class CCLight_Transmon(Qubit):
 
                 a = ma.SSRO_Analysis(label='SSRO',
                                      channels=d.value_names,
-                                     no_fits=no_figs, rotate=False)
+                                     no_fits=no_figs, rotate=True)
                 return a.F_a, a.F_d
 
     def measure_transients(self, MC=None, analyze: bool=True,
@@ -1422,6 +1463,7 @@ class CCLight_Transmon(Qubit):
         if all_modules:
           mod_sweep=[]
           for i in range(8):
+            VSM.set('mod{}_ch{}_marker_state'.format(i+1, ch_in),'on')
             G_par=VSM.parameters['mod{}_ch{}_gaussian_att_raw'.format(
                 i+1, ch_in)]
             D_par=VSM.parameters['mod{}_ch{}_derivative_att_raw'.format(
@@ -1437,6 +1479,31 @@ class CCLight_Transmon(Qubit):
         self.instr_CC.get_instr().eqasm_program(p.filename)
         MC.set_sweep_function(s)
         MC.set_sweep_points(atts)
+        # real_imag is acutally not polar and as such works for opt weights
+        self.int_avg_det_single._set_real_imag(real_imag)
+        MC.set_detector_function(self.int_avg_det_single)
+        MC.run(name='rabi_'+self.msmt_suffix)
+        ma.MeasurementAnalysis()
+        return True
+
+    def measure_rabi_channel_amp(self, MC=None, amps=np.linspace(0, 1, 31),
+                         analyze=True, close_fig=True, real_imag=True,
+                         prepare_for_timedomain=True, all_modules=False):
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+        p = sqo.off_on(
+            qubit_idx=self.cfg_qubit_nr(), pulse_comb='on',
+            initialize=False,
+            platf_cfg=self.cfg_openql_platform_fn())
+        self.instr_CC.get_instr().eqasm_program(p.filename)
+
+        MW_LutMan = self.instr_LutMan_MW.get_instr()
+
+        s = MW_LutMan.channel_amp
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(amps)
         # real_imag is acutally not polar and as such works for opt weights
         self.int_avg_det_single._set_real_imag(real_imag)
         MC.set_detector_function(self.int_avg_det_single)
@@ -2117,8 +2184,15 @@ class CCLight_Transmon(Qubit):
         dag.add_edge(self.name + ' pulse amplitude coarse',
                      self.name+' mixer offsets readout')
 
+        dag.add_node(self.name + ' ro pulse-acq window timing')
+
+
         dag.add_node(self.name + ' readout coarse',
                      check_function=self.name + '.measure_ssro')
+
+        dag.add_edge(self.name + ' readout coarse',
+                     self.name + ' ro pulse-acq window timing')
+
         dag.add_edge(self.name + ' readout coarse',
                      self.name + ' pulse amplitude coarse')
 
@@ -2164,9 +2238,14 @@ class CCLight_Transmon(Qubit):
             self.name+' frequency fine',
             calibrate_function=self.name + '.calibrate_frequency_ramsey')
         dag.add_node(self.name+' room temp. dist. corr.')
+        dag.add_node(self.name+' pulsed flux arc')
         dag.add_node(self.name+' cryo dist. corr.')
-        dag.add_edge(self.name+' cryo dist. corr.',
+
+        dag.add_edge(self.name+' pulsed flux arc',
                      self.name+' room temp. dist. corr.')
+
+        dag.add_edge(self.name+' cryo dist. corr.',
+                     self.name+' pulsed flux arc')
 
         dag.add_edge(self.name+' cryo dist. corr.',
                      self.name+' single qubit gates fine')

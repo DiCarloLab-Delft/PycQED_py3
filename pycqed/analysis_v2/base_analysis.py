@@ -53,6 +53,7 @@ class BaseDataAnalysis(object):
     def __init__(self, t_start: str=None, t_stop: str=None,
                  label: str='',
                  data_file_path: str=None,
+                 close_figs: bool=True,
                  options_dict: dict=None, extract_only: bool=False,
                  do_fitting: bool=False):
         '''
@@ -161,7 +162,7 @@ class BaseDataAnalysis(object):
         self.options_dict['save_figs'] = self.options_dict.get(
             'save_figs', True)
         self.options_dict['close_figs'] = self.options_dict.get(
-            'close_figs', True)
+            'close_figs', close_figs)
         ####################################################
         # These options relate to what analysis to perform #
         ####################################################
@@ -785,9 +786,22 @@ class BaseDataAnalysis(object):
             axs.figure.tight_layout()
 
     def plot_colorxy(self, pdict, axs):
+        """
+        This wraps flex_colormesh_plot_vs_xy which excepts data of shape
+            x -> 1D array
+            y -> 1D array
+            z -> 2D array (shaped (xl, yl))
+        """
         self.plot_color2D(flex_colormesh_plot_vs_xy, pdict, axs)
 
     def plot_colorx(self, pdict, axs):
+        """
+        This wraps flex_color_plot_vs_x which excepts data of shape
+            x -> 1D array
+            y -> list "xl" 1D arrays
+            z -> list "xl" 1D arrays
+        """
+
         self.plot_color2D(flex_color_plot_vs_x, pdict, axs)
 
     def plot_color2D_grid_idx(self, pfunc, pdict, axs, idx):
@@ -842,7 +856,7 @@ class BaseDataAnalysis(object):
         plot_xvals = pdict['xvals']
         plot_yvals = pdict['yvals']
         plot_cbar = pdict.get('plotcbar', True)
-        plot_cmap = pdict.get('cmap', 'YlGn')
+        plot_cmap = pdict.get('cmap', 'viridis')
         plot_zrange = pdict.get('zrange', None)
         plot_yrange = pdict.get('yrange', None)
         plot_xrange = pdict.get('xrange', None)
