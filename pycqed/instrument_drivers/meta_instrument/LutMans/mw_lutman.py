@@ -240,18 +240,17 @@ class QWG_MW_LutMan(Base_MW_LutMan):
         super()._add_channel_params()
         self.add_parameter('channel_amp',
                            unit='a.u.',
-                            vals=vals.Numbers(0, 1.8),
-                            set_cmd=self._set_channel_amp,
-                            get_cmd=self._get_channel_amp,
-                            # initial_value=1.0,
-                            docstring=('using the channel amp as additional'
-                           'parameter to allow rabi-type experiments without'
-                           'wave reloading. Should not be using VSM'))
+                           vals=vals.Numbers(0, 1.8),
+                           set_cmd=self._set_channel_amp,
+                           get_cmd=self._get_channel_amp,
+                           docstring=('using the channel amp as additional'
+                                      'parameter to allow rabi-type experiments without'
+                                      'wave reloading. Should not be using VSM'))
 
     def _set_channel_amp(self, val):
         AWG = self.AWG.get_instr()
-        AWG.set('ch{}_amp'.format(self.channel_I()),val)
-        AWG.set('ch{}_amp'.format(self.channel_Q()),val)
+        AWG.set('ch{}_amp'.format(self.channel_I()), val)
+        AWG.set('ch{}_amp'.format(self.channel_Q()), val)
 
     def _get_channel_amp(self):
         AWG = self.AWG.get_instr()
@@ -268,31 +267,31 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         super().__init__(name, **kw)
 
     def _add_channel_params(self):
-        super._add_channel_params()
+        super()._add_channel_params()
         self.add_parameter('channel_amp',
                            unit='a.u.',
-                            vals=vals.Numbers(0, 1),
-                            set_cmd=self._set_channel_amp,
-                            get_cmd=self._get_channel_amp,
-                            initial_value=1.0,
-                            docstring=('using the channel amp as additional'
-                           'parameter to allow rabi-type experiments without'
-                           'wave reloading. Should not be using VSM'))
+                           vals=vals.Numbers(0, 1),
+                           set_cmd=self._set_channel_amp,
+                           get_cmd=self._get_channel_amp,
+                           docstring=('using the channel amp as additional'
+                                      'parameter to allow rabi-type experiments without'
+                                      'wave reloading. Should not be using VSM'))
 
     def _set_channel_amp(self, val):
         AWG = self.AWG.get_instr()
-        for awg_ch in [self.channel_I(), self.channel_Q()] :
+        for awg_ch in [self.channel_I(), self.channel_Q()]:
             awg_nr = (awg_ch-1)//2
             ch_pair = (awg_ch-1) % 2
-            AWG.set('AWGS/{}/OUTPUTS/{}/AMPLITUDE'.format(awg_nr, ch_pair), val)
+            AWG.set('awgs_{}_outputs_{}_amplitude'.format(awg_nr, ch_pair), val)
 
     def _get_channel_amp(self):
         AWG = self.AWG.get_instr()
         vals = []
-        for awg_ch in [self.channel_I(), self.channel_Q()] :
+        for awg_ch in [self.channel_I(), self.channel_Q()]:
             awg_nr = (awg_ch-1)//2
             ch_pair = (awg_ch-1) % 2
-            vals.append(AWG.get('AWGS/{}/OUTPUTS/{}/AMPLITUDE'.format(awg_nr, awg_ch)))
+            vals.append(
+                AWG.get('awgs_{}_outputs_{}_amplitude'.format(awg_nr, awg_ch)))
         assert vals[0] == vals[1]
         return vals[0]
 
@@ -355,30 +354,30 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
                            vals=vals.Numbers(1, self._num_channels))
         self.add_parameter('channel_amp',
                            unit='a.u.',
-                            vals=vals.Numbers(0, 1),
-                            set_cmd=self._set_channel_amp,
-                            get_cmd=self._get_channel_amp,
-                            initial_value=1.0,
-                            docstring=('using the channel amp as additional'
-                           'parameter to allow rabi-type experiments without'
-                           'wave reloading. Should not be using VSM'))
+                           vals=vals.Numbers(0, 1),
+                           set_cmd=self._set_channel_amp,
+                           get_cmd=self._get_channel_amp,
+                           docstring=('using the channel amp as additional'
+                                      'parameter to allow rabi-type experiments without'
+                                      'wave reloading. Should not be using VSM'))
 
     def _set_channel_amp(self, val):
         AWG = self.AWG.get_instr()
         for awg_ch in [self.channel_GI(), self.channel_GQ(),
-                        self.channel_DI(), self.channel_DQ()] :
+                       self.channel_DI(), self.channel_DQ()]:
             awg_nr = (awg_ch-1)//2
             ch_pair = (awg_ch-1) % 2
-            AWG.set('AWGS/{}/OUTPUTS/{}/AMPLITUDE'.format(awg_nr, ch_pair), val)
+            AWG.set('awgs_{}_outputs_{}_amplitude'.format(awg_nr, ch_pair), val)
 
     def _get_channel_amp(self):
         AWG = self.AWG.get_instr()
         vals = []
         for awg_ch in [self.channel_GI(), self.channel_GQ(),
-                        self.channel_DI(), self.channel_DQ()] :
+                       self.channel_DI(), self.channel_DQ()]:
             awg_nr = (awg_ch-1)//2
             ch_pair = (awg_ch-1) % 2
-            vals.append(AWG.get('AWGS/{}/OUTPUTS/{}/AMPLITUDE'.format(awg_nr, awg_ch)))
+            vals.append(
+                AWG.get('awgs_{}_outputs_{}_amplitude'.format(awg_nr, awg_ch)))
         assert vals[0] == vals[1] == vals[2] == vals[3]
         return vals[0]
 
@@ -423,8 +422,8 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
           (use parameters from _add_waveform_parameters.)
 
     """
-    def __init__(self, name, **kw):
 
+    def __init__(self, name, **kw):
         """
         Waveform allocation strategy for VQE.
 
@@ -470,7 +469,7 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
 
         # sacrifices last pulse 'Spec' from std list to have 3 bit (8)
         self._def_lm = ['I', 'rX180',  'rY180', 'rX90',  'rY90',
-                   'rXm90',  'rYm90', 'rPhi90']
+                        'rXm90',  'rYm90', 'rPhi90']
         self.set_default_lutmap()
 
         self._vqe_lm = ['I', 'X180t',  'Y180t', 'X90t',  'Xm90t',
@@ -526,7 +525,6 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
         #     f_modulation=f_modulation,
         #     sampling_rate=self.sampling_rate(), phase=0,
         #     motzoi=self.mw_motzoi())
-
 
         if self.mixer_apply_predistortion_matrix():
             self._wave_dict = self.apply_mixer_predistortion_corrections(
