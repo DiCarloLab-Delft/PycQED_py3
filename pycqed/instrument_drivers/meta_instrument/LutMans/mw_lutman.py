@@ -282,7 +282,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         for awg_ch in [self.channel_I(), self.channel_Q()]:
             awg_nr = (awg_ch-1)//2
             ch_pair = (awg_ch-1) % 2
-            AWG.set('AWGS/{}/OUTPUTS/{}/AMPLITUDE'.format(awg_nr, ch_pair), val)
+            AWG.set('awgs_{}_outputs_{}_amplitude'.format(awg_nr, ch_pair), val)
 
     def _get_channel_amp(self):
         AWG = self.AWG.get_instr()
@@ -291,7 +291,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
             awg_nr = (awg_ch-1)//2
             ch_pair = (awg_ch-1) % 2
             vals.append(
-                AWG.get('AWGS/{}/OUTPUTS/{}/AMPLITUDE'.format(awg_nr, awg_ch)))
+                AWG.get('awgs_{}_outputs_{}_amplitude'.format(awg_nr, awg_ch)))
         assert vals[0] == vals[1]
         return vals[0]
 
@@ -367,7 +367,7 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
                        self.channel_DI(), self.channel_DQ()]:
             awg_nr = (awg_ch-1)//2
             ch_pair = (awg_ch-1) % 2
-            AWG.set('AWGS/{}/OUTPUTS/{}/AMPLITUDE'.format(awg_nr, ch_pair), val)
+            AWG.set('awgs_{}_outputs_{}_amplitude'.format(awg_nr, ch_pair), val)
 
     def _get_channel_amp(self):
         AWG = self.AWG.get_instr()
@@ -377,7 +377,7 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
             awg_nr = (awg_ch-1)//2
             ch_pair = (awg_ch-1) % 2
             vals.append(
-                AWG.get('AWGS/{}/OUTPUTS/{}/AMPLITUDE'.format(awg_nr, awg_ch)))
+                AWG.get('awgs_{}_outputs_{}_amplitude'.format(awg_nr, awg_ch)))
         assert vals[0] == vals[1] == vals[2] == vals[3]
         return vals[0]
 
