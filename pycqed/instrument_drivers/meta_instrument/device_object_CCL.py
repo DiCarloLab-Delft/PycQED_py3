@@ -174,7 +174,7 @@ class DeviceCCL(Instrument):
                                  ('ro_latency_1', self.tim_ro_latency_1()),
                                  ('flux_latency_0', self.tim_flux_latency()),
                                  ('mw_latency_0', self.tim_mw_latency_0()),
-                                 ('mw_latency_1', self.time_mw_latency_1())])
+                                 ('mw_latency_1', self.tim_mw_latency_1())])
 
         # Substract lowest value to ensure minimal latency is used.
         # note that this also supports negative delays (which is useful for
@@ -1012,6 +1012,8 @@ class DeviceCCL(Instrument):
         dag.add_node(self.name + ' mw-ro timing')
         dag.add_edge(self.name + ' mw-ro timing', 'AWG8 MW-staircase')
 
+
+
         dag.add_node(self.name + ' mw-vsm timing')
         dag.add_edge(self.name + ' mw-vsm timing', self.name + ' mw-ro timing')
 
@@ -1051,6 +1053,9 @@ class DeviceCCL(Instrument):
                          self.name + ' mw-ro timing')
 
         for qubit in self.qubits():
+            dag.add_edge(qubit + ' ro pulse-acq window timing',
+                         'AWG8 MW-staircase')
+
             dag.add_edge(qubit+' room temp. dist. corr.',
                          'AWG8 Flux-staircase')
             dag.add_edge(self.name+' multiplexed readout',

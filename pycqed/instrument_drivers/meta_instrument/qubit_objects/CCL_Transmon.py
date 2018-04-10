@@ -2184,8 +2184,15 @@ class CCLight_Transmon(Qubit):
         dag.add_edge(self.name + ' pulse amplitude coarse',
                      self.name+' mixer offsets readout')
 
+        dag.add_node(self.name + ' ro pulse-acq window timing')
+
+
         dag.add_node(self.name + ' readout coarse',
                      check_function=self.name + '.measure_ssro')
+
+        dag.add_edge(self.name + ' readout coarse',
+                     self.name + ' ro pulse-acq window timing')
+
         dag.add_edge(self.name + ' readout coarse',
                      self.name + ' pulse amplitude coarse')
 

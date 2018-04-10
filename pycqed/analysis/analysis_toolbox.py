@@ -1689,7 +1689,7 @@ def color_plot(x, y, z, fig, ax, cax=None,
 
         if 'x' in log:
             x = np.log10(x)
-    except TypeError: #log is not iterable
+    except TypeError:  # log is not iterable
         pass
 
     # calculate coordinates for corners of color blocks
