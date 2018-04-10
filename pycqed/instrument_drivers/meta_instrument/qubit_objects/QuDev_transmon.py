@@ -3612,6 +3612,7 @@ class QuDev_transmon(Qubit):
                                                    sweep_mode='amplitude')
             if prepare_for_timedomain:
                 qb_target.prepare_for_timedomain()
+                self.prepare_for_timedomain()
 
             MC.set_sweep_function(s1)
             MC.set_sweep_points(phases)

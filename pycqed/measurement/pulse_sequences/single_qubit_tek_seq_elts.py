@@ -253,6 +253,7 @@ def T1_seq(times,
         RO_pars['pulse_delay'] = RO_pulse_delay + tau
         #RO_pars['refpoint'] = 'start'  # time defined between start of ops
         if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
+            RO_pars['pulse_delay'] = RO_pulse_delay
             el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
         elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
             RO_pars['pulse_delay'] = RO_pulse_delay

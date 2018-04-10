@@ -165,26 +165,27 @@ class n_qubit_off_on(swf.Hard_Sweep):
                                 verbose=self.verbose)
 
 class n_qubit_reset(swf.Hard_Sweep):
-    def __init__(self, pulse_pars_list, RO_pars, feedback_delay, nr_resets=1,
-                 upload=True, verbose=False, codeword_indices=None):
+    def __init__(self, qubit_names, operation_dict, reset_cycle_time,
+                 nr_resets=1, upload=True, verbose=False,
+                 codeword_indices=None):
         super().__init__()
-        self.pulse_pars_list = pulse_pars_list
-        self.RO_pars = RO_pars
-        self.feedback_delay = feedback_delay
+        self.qubit_names = qubit_names
+        self.operation_dict = operation_dict
+        self.reset_cycle_time = reset_cycle_time
         self.upload = upload
         self.parameter_name = 'sample'
         self.unit = '#'
         self.nr_resets = nr_resets
-        samples = nr_resets*2**len(pulse_pars_list)
+        samples = nr_resets*2**len(qubit_names)
         self.sweep_points = np.arange(samples)
         self.verbose = verbose
-        self.name = '{}_qubit_{}_reset'.format(len(pulse_pars_list), nr_resets)
+        self.name = '{}_reset_x{}'.format(','.join(qubit_names), nr_resets)
 
     def prepare(self, **kw):
         if self.upload:
-            sqs2.n_qubit_reset(pulse_pars_list=self.pulse_pars_list,
-                               RO_pars=self.RO_pars,
-                               feedback_delay=self.feedback_delay,
+            sqs2.n_qubit_reset(qubit_names=self.qubit_names,
+                               operation_dict=self.operation_dict,
+                               reset_cycle_time=self.reset_cycle_time,
                                nr_resets=self.nr_resets,
                                verbose=self.verbose)
 

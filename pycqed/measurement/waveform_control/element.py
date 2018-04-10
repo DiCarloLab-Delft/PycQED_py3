@@ -101,8 +101,9 @@ class Element:
         if len(ends) == 0:
             return 0
         samples = max(ends) + 1
-        samples += int(np.ceil(self.pulsar.inter_element_spacing() /
-                               self._clock(c)))
+        add_spacing = self.pulsar.inter_element_spacing() - \
+                      self.pulsar.get('{}_inter_element_deadtime'.format(c))
+        samples += int(np.ceil(add_spacing / self._clock(c)))
         samples = max(samples, self.pulsar.get('{}_min_length'.format(c)) *
                                self._clock(c))
         while samples % self.pulsar.get('{}_granularity'.format(c)) != 0:
@@ -476,19 +477,20 @@ def is_divisible_by_clock(value, clock=1e9):
         return False
 
 def combine_elements(element_list):
-    name = (el.name for el in element_list)
+    name = tuple(el.name for el in element_list)
     element = Element(name, element_list[0].pulsar,
                       ignore_offset_correction=True,
                       global_time=True,
                       time_offset=0,
-                      ignore_delays=True)
+                      ignore_delays=element_list[0].ignore_delays)
     element.fixed_point_applied = True
-    for originalel in element_list:
+    for i, originalel in enumerate(element_list):
         pulsar = originalel.pulsar
         originalel.pulsar = None
         el = deepcopy(originalel)
         originalel.pulsar = pulsar
-        el.shift_all_pulses(-el.offset() + element.ideal_length())
+        if i != 0:
+            el.shift_all_pulses(-el.offset() + element.ideal_length())
         pulses = {el.name + '_' + p: el.pulses[p] for p in el.pulses}
         for p in pulses:
             pulses[p].name = p

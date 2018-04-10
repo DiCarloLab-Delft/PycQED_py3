@@ -71,6 +71,7 @@ def mixer_calibration_sequence(trigger_separation, amplitude, trigger_channel,
                   'pulse_delay': 0}
     pulses = [RO_trigger]
     channels = [trigger_channel]
+    channels += station.sequencer_config['slave_AWG_trig_channels']
     if pulse_I_channel is not None:
         cos_pulse = {'pulse_type': 'CosPulse',
                      'channel': pulse_I_channel,
@@ -104,9 +105,9 @@ def mixer_calibration_sequence(trigger_separation, amplitude, trigger_channel,
                        'pulse_delay': 0,
                        'refpoint': 'simultaneous'}
         pulses.append(empty_pulse)
-    el = multi_pulse_elt(0, station, pulses, trigger=False)
+    el = multi_pulse_elt(0, station, pulses, trigger=True)
     seq = sequence.Sequence('Sideband_modulation_seq')
-    seq.append(name='SSB_modulation_el', wfname=el.name, trigger_wait=False)
+    seq.append(name='SSB_modulation_el', wfname=el.name, trigger_wait=True)
     if upload:
         station.pulsar.program_awgs(seq, el, channels=channels)
     return seq, [el]
