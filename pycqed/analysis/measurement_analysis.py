@@ -8912,8 +8912,6 @@ def DAC_scan_analysis_and_plot(scan_start, scan_stop, dac, feed, dac_prefix='',p
     pdict={'amp':'all_data',
                  'frequencies':'sweep_points',
                  'dac':'fluxcurrent.'+dac,
-                 'T_mc':'Fridge monitor.T_MClo',
-                 'T_cp':'Fridge monitor.T_CP',
                   }
 
     opt_dict = {'scan_label':dac_prefix+dac,
@@ -8922,8 +8920,13 @@ def DAC_scan_analysis_and_plot(scan_start, scan_stop, dac, feed, dac_prefix='',p
     nparams = ['amp', 
                 'frequencies', 
                 'dac', 
-                'T_mc', 
-                'T_cp']
+                ]
+    
+    if temperature_plots:
+        nparams.append('T_mc')
+        nparams.append('T_cp')
+        pdict['T_mc'] = 'Fridge monitor.T_MClo'
+        pdict['T_cp'] = 'Fridge monitor.T_CP'
 
 
     #retrieve data
@@ -8933,14 +8936,12 @@ def DAC_scan_analysis_and_plot(scan_start, scan_stop, dac, feed, dac_prefix='',p
     dac_values_unsorted = spec_scans.TD_dict['dac']
     sorted_indices = dac_values_unsorted.argsort()
     dac_values=np.array(dac_values_unsorted[sorted_indices], dtype=float)
-    T_mc=np.array(spec_scans.TD_dict['T_mc'][sorted_indices], dtype=float)
-    T_cp=np.array(spec_scans.TD_dict['T_cp'][sorted_indices], dtype=float)
     amplitude_values=np.array(spec_scans.TD_dict['amp'][sorted_indices,feed], dtype=float)
     frequency_values=np.array(spec_scans.TD_dict['frequencies'][sorted_indices], dtype=float)
-    del dac_values_unsorted
-    del sorted_indices
 
     if temperature_plots:
+        T_mc=np.array(spec_scans.TD_dict['T_mc'][sorted_indices], dtype=float)
+        T_cp=np.array(spec_scans.TD_dict['T_cp'][sorted_indices], dtype=float)
         #Plot the smoothed and fitted data
         p = dac_values>=0
         n = dac_values<=0
