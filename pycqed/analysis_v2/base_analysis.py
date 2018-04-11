@@ -421,9 +421,6 @@ class BaseDataAnalysis(object):
         if key_list == 'auto' or key_list is None:
             key_list = self.figs.keys()
         for key in key_list:
-            pdict = self.plot_dicts[key]
-            plot_id_y = pdict.get('plot_id_y', None)
-            plot_id_x = pdict.get('plot_id_x', None)
             if self.presentation_mode:
                 savename = os.path.join(savedir, savebase+key+tstag+'presentation'+'.'+fmt)
                 self.figs[key].savefig(savename, bbox_inches='tight', fmt=fmt)
@@ -431,18 +428,9 @@ class BaseDataAnalysis(object):
                 self.figs[key].savefig(savename, bbox_inches='tight', fmt='svg')
             else:
                 savename = os.path.join(savedir, savebase+key+tstag+'.'+fmt)
-                if plot_id_y is not None:
-                    # plt.close(self.figs[pdict['ax_id']][plot_id_y])
-                    self.axs[pdict['ax_id']].figure.savefig(savename, bbox_inches='tight', fmt=fmt)
-                else:
-                    # plt.close(self.figs[pdict['ax_id']])
-                    self.axs[pdict['ax_id']].figure.savefig(savename, bbox_inches='tight', fmt=fmt)
+                self.figs[key].savefig(savename, bbox_inches='tight', fmt=fmt)
             if close_figs:
-
-                if plot_id_y is not None:
-                    plt.close(self.figs[pdict['ax_id']][plot_id_y])
-                else:
-                    plt.close(self.figs[pdict['ax_id']])
+                plt.close(self.figs[key])
 
 
     def save_data(self, savedir: str=None, savebase: str=None,
