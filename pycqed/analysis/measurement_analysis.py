@@ -8898,7 +8898,7 @@ class CZ_1Q_phase_analysis(TD_Analysis):
 
 
 def DAC_scan_analysis_and_plot(scan_start, scan_stop, dac, feed, dac_prefix='',perc=99.6, factor=1, smooth_window_len=31,smoothing=True,
-    overwrite_old=False, fig_format='png', verbose=False, peak_fitting_sample_n=0, plotsize=None, temperature_plots=True):
+    overwrite_old=False, fig_format='png', verbose=False, peak_fitting_sample_n=0, plotsize=None, temperature_plots=True, current_multiplier=1):
     plotsize = plotsize or (4,10)
     date_folder = scan_stop.split('_')[0]
     time_folder = scan_stop.split('_')[1]
@@ -8935,7 +8935,7 @@ def DAC_scan_analysis_and_plot(scan_start, scan_stop, dac, feed, dac_prefix='',p
     #sort data
     dac_values_unsorted = spec_scans.TD_dict['dac']
     sorted_indices = dac_values_unsorted.argsort()
-    dac_values=np.array(dac_values_unsorted[sorted_indices], dtype=float)
+    dac_values=np.array(dac_values_unsorted[sorted_indices], dtype=float)*current_multiplier
     amplitude_values=np.array(spec_scans.TD_dict['amp'][sorted_indices,feed], dtype=float)
     frequency_values=np.array(spec_scans.TD_dict['frequencies'][sorted_indices], dtype=float)
 
