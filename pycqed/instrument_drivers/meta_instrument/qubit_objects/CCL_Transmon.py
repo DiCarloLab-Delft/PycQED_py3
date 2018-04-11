@@ -2094,9 +2094,14 @@ class CCLight_Transmon(Qubit):
                 options_dict={'scan_label': 'flipping'})
         return a
 
-    def measure_motzoi(self, motzoi_atts=np.linspace(0, 50e3, 31),
+    def measure_motzoi(self, motzoi_atts=None,
                        prepare_for_timedomain: bool=True,
                        MC=None, analyze=True, close_fig=True):
+        using_VSM = self.cfg_with_vsm()
+        MW_LutMan = self.instr_LutMan_MW.get_instr()
+        AWG = MW_LutMan.AWG.get_instr()
+        using_QWG = (AWG.__class__.__name__ == 'QuTech_AWG_Module')
+
         if MC is None:
             MC = self.instr_MC.get_instr()
         if prepare_for_timedomain:
@@ -2110,18 +2115,27 @@ class CCLight_Transmon(Qubit):
                                  values_per_point_suffex=['yX', 'xY'],
                                  always_prepare=True)
 
-        VSM = self.instr_VSM.get_instr()
-        mod_out = self.mw_vsm_mod_out()
-        ch_in = self.mw_vsm_ch_in()
-        D_par = VSM.parameters['mod{}_ch{}_derivative_att_raw'.format(
-            mod_out, ch_in)]
+        if using_VSM:
+            if motzoi_atts:
+                motzoi_atts = np.linspace(0, 50e3, 31)
+            mod_out = self.mw_vsm_mod_out()
+            ch_in = self.mw_vsm_ch_in()
+            D_par = VSM.parameters['mod{}_ch{}_derivative_att_raw'.format(
+                mod_out, ch_in)]
+            swf_func = D_par
+        elif using_QWG:
+            if motzoi_atts:
+                motzoi_atts = np.linspace(-.3, .3, 31)
+            swf_func = swf.QWG_lutman_par(LutMan=MW_LutMan,
+                                          LutMan_parameter=MW_LutMan.mw_motzoi)
+        else:
+            raise NotImplementedError('VSM-less case not implemented without QWG.')
 
-        MC.set_sweep_function(D_par)
+        MC.set_sweep_function(swf_func)
         MC.set_sweep_points(motzoi_atts)
         MC.set_detector_function(d)
 
         MC.run('Motzoi_XY'+self.msmt_suffix)
-
         if analyze:
             if self.ro_acq_weight_type() == 'optimal':
                 a = ma2.Intersect_Analysis(
