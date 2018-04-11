@@ -159,7 +159,7 @@ class HeterodyneInstrument(Instrument):
                 IF=self.f_RO_mod(), weight_function_I=0, weight_function_Q=1)
 
         if self._UHFQC_awg_parameters_changed and self.auto_seq_loading():
-            self._acquisition_instr.awg_sequence_acquisition()
+            # self._acquisition_instr.awg_sequence_acquisition() # Dirty hack to get UHFLI to cooperate
             self._UHFQC_awg_parameters_changed = False
 
         # this sets the result to integration and rotation outcome
