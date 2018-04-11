@@ -710,11 +710,11 @@ class QWG_lutman_par(Soft_Sweep):
         self.LutMan_parameter = LutMan_parameter
 
     def set_parameter(self, val):
-        self.LutMan.QWG.get_instr().stop()
+        self.LutMan.AWG.get_instr().stop()
         self.LutMan_parameter.set(val)
         self.LutMan.load_pulses_onto_AWG_lookuptable(regenerate_pulses=True)
-        self.LutMan.QWG.get_instr().start()
-        self.LutMan.QWG.get_instr().getOperationComplete()
+        self.LutMan.AWG.get_instr().start()
+        self.LutMan.AWG.get_instr().getOperationComplete()
 
 
 class QWG_flux_amp(Soft_Sweep):
