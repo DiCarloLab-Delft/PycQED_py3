@@ -1466,6 +1466,18 @@ class CCLight_Transmon(Qubit):
             self.measure_ssro(no_figs=no_figs)
         return True
 
+    def measure_rabi(self, MC=None, atts=np.linspace(0, 65535, 31),
+                     analyze=True, close_fig=True, real_imag=True,
+                     prepare_for_timedomain=True, all_modules=False):
+        if self.cfg_with_vsm():
+            self.measure_rabi_vsm(MC, atts,
+                                  analyze, close_fig, real_imag,
+                                  prepare_for_timedomain, all_modules)
+        else:
+            self.measure_rabi_channel_amp(MC, atts,
+                                          analyze, close_fig, real_imag,
+                                          prepare_for_timedomain, all_modules)
+
     def measure_rabi_vsm(self, MC=None, atts=np.linspace(0, 65535, 31),
                          analyze=True, close_fig=True, real_imag=True,
                          prepare_for_timedomain=True, all_modules=False):
