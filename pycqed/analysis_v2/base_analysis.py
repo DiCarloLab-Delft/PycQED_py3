@@ -522,22 +522,30 @@ class BaseDataAnalysis(object):
         """
         Saves the fit results
         """
-        fn = a_tools.measurement_filename(a_tools.get_folder(self.timestamps[0]))
-        with h5py.File(fn, 'r+') as data_file:
-            try:
-                analysis_group = data_file.create_group('Analysis')
-            except ValueError:
-                # If the analysis group already exists.
-                # Delete the old group and create a new group (overwrite).
-                del data_file['Analysis']
-                analysis_group = data_file.create_group('Analysis')
 
-            # Iterate over all the fit result dicts
-            for fr_key, fit_res in self.fit_res.items():
-                fr_group = analysis_group.create_group(fr_key)
-                # TODO: convert the params object to a simple dict
-                # write_dict_to_hdf5(fit_res.params, entry_point=fr_group)
-                write_dict_to_hdf5(fit_res.best_values, entry_point=fr_group)
+        # Check weather there is any data to save
+        if self.fit_res is not None and self.fit_res:
+            fn = a_tools.measurement_filename(a_tools.get_folder(self.timestamps[0]))
+            with h5py.File(fn, 'r+') as data_file:
+                try:
+                    analysis_group = data_file.create_group('Analysis')
+                except ValueError:
+                    # If the analysis group already exists.
+                    analysis_group = data_file['Analysis']
+
+                # Iterate over all the fit result dicts
+                for fr_key, fit_res in self.fit_res.items():
+                    try:
+                        fr_group = analysis_group.create_group(fr_key)
+                    except ValueError:
+                        # If the analysis sub group already exists (each fr_key should be unique)
+                        # Delete the old group and create a new group (overwrite).
+                        del fr_group[fr_key]
+                        fr_group = analysis_group.create_group(fr_key)
+                    
+                    # TODO: convert the params object to a simple dict
+                    # write_dict_to_hdf5(fit_res.params, entry_point=fr_group)
+                    write_dict_to_hdf5(fit_res.best_values, entry_point=fr_group)
 
 
     def plot(self, key_list=None, axs_dict=None,
