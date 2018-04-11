@@ -749,6 +749,8 @@ class CCLight_Transmon(Qubit):
 
         else:
             ro_lm = self.instr_LutMan_RO.get_instr()
+            ro_lm.AWG(self.instr_acquisition())
+
             idx = self.ro_pulse_res_nr()
             # These parameters affect all resonators
             ro_lm.set('pulse_type', 'M_' + self.ro_pulse_type())
@@ -1522,7 +1524,7 @@ class CCLight_Transmon(Qubit):
 
     def measure_rabi_channel_amp(self, MC=None, amps=np.linspace(0, 1, 31),
                          analyze=True, close_fig=True, real_imag=True,
-                         prepare_for_timedomain=True, all_modules=False):
+                         prepare_for_timedomain=True, update_mw_lutman=False):
         if MC is None:
             MC = self.instr_MC.get_instr()
         if prepare_for_timedomain:
@@ -1543,6 +1545,9 @@ class CCLight_Transmon(Qubit):
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='rabi_'+self.msmt_suffix)
         ma.MeasurementAnalysis()
+        if update_mw_lutman:
+          a=ma.Rabi_Analysis(label='rabi')
+          MW_LutMan.channel_amp(a.rabi_amplitudes['piPulse'])
         return True
 
     def measure_allxy(self, MC=None,
