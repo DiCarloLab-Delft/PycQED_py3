@@ -33,7 +33,7 @@ class Spectroscopy(ba.BaseDataAnalysis):
                             'freq':'sweep_points',
                             'amp':'amp',
                             'phase':'phase'}
-        self.options_dict.get('xwidth',None)                
+        self.options_dict.get('xwidth',None)
         # {'xlabel': 'sweep_name',
         # 'xunit': 'sweep_unit',
         # 'measurementstring': 'measurementstring',
@@ -80,7 +80,7 @@ class Spectroscopy(ba.BaseDataAnalysis):
             else:
                 xvals = np.array([[tt] for tt in range(len(self.raw_data_dict['timestamps']))])
                 proc_data_dict['plot_xvals'] = self.options_dict.get('xvals',xvals)
-                proc_data_dict['plot_xlabel'] = self.options_dict.get('xlabel','Scan number')            
+                proc_data_dict['plot_xlabel'] = self.options_dict.get('xlabel','Scan number')
             proc_data_dict['plot_xwidth'] = self.options_dict.get('xwidth',None)
             if proc_data_dict['plot_xwidth'] == 'auto':
                 x_diff = np.diff(np.ravel(proc_data_dict['plot_xvals']))
@@ -176,7 +176,7 @@ class complex_spectroscopy(Spectroscopy):
                             'phase':'phase',
                             'real':'real',
                             'imag':'imag'}
-        self.options_dict.get('xwidth',None)                
+        self.options_dict.get('xwidth',None)
 
         if self.extract_fitparams:
             self.params_dict.update({'fitparams':'fit_params'})
@@ -317,16 +317,37 @@ class VNA_analysis(complex_spectroscopy):
             #TODO LorentzianGuess
         elif fitting_model == 'complex':
             raise NotImplementedError('This functions guess function is not coded up yet')
-            complex_guess = VNA_analysis(self.timestamps,do_fitting=True,options_dict = {'fit_options':{'model':'hanger'}})
-            print(complex_guess.fit_dicts.keys())
+            # hanger_fit = VNA_analysis(self.timestamps,
+            #                              do_fitting= True,
+            #                              options_dict= {'fit_options':
+            #                                             {'model':'hanger'}},
+            #                              extract_only= True)
+            # hanger_fit_res = hanger_fit.fit_dicts['reso_fit']['fit_res']
+            # complex_guess = hanger_fit_res.best_values
+
+            # delta_phase = np.unwrap(self.proc_data_dict['plot_phase'])[-1] - /
+            #               np.unwrap(self.proc_data_dict['plot_phase'])[0]
+            # delta_freq = self.proc_data_dict['plot_frequency'][-1] - /
+            #              self.proc_data_dict['plot_frequency'][0]
+            # phase_v = delta_phase/delta_freq
+            # fit_fn = fit_mods.SlopedHangerFuncComplex2
+
+
             #TODO HangerFuncComplexGuess
 
         if len(self.raw_data_dict['timestamps']) == 1:
-            self.fit_dicts['reso_fit'] = {'fit_fn': fit_fn,
-                             'fit_guess_fn': fit_guess_fn,
-                             'fit_yvals': {'data': self.proc_data_dict['plot_amp']},
-                             'fit_xvals': {'f': self.proc_data_dict['plot_frequency']}
-                             }
+            if fitting_model == 'complex':
+                self.fit_dicts['reso_fit'] = {'fit_fn': fit_fn,
+                                 'fit_guess_fn': fit_guess_fn,
+                                 'fit_yvals': {'data': self.proc_data_dict['plot_amp']},
+                                 'fit_xvals': {'f': self.proc_data_dict['plot_frequency']}
+                                 }
+            else:
+                self.fit_dicts['reso_fit'] = {'fit_fn': fit_fn,
+                                 'fit_guess_fn': fit_guess_fn,
+                                 'fit_yvals': {'data': self.proc_data_dict['plot_amp']},
+                                 'fit_xvals': {'f': self.proc_data_dict['plot_frequency']}
+                                 }
         else:
             self.fit_dicts['reso_fit'] = {'fit_fn': fit_fn,
                              'fit_guess_fn': fit_guess_fn,

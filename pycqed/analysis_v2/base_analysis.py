@@ -426,9 +426,9 @@ class BaseDataAnalysis(object):
             plot_id_x = pdict.get('plot_id_x', None)
             if self.presentation_mode:
                 savename = os.path.join(savedir, savebase+key+tstag+'presentation'+'.'+fmt)
-                self.axs[key].figure.savefig(savename, bbox_inches='tight', fmt=fmt)
+                self.figs[key].savefig(savename, bbox_inches='tight', fmt=fmt)
                 savename = os.path.join(savedir, savebase+key+tstag+'presentation'+'.svg')
-                self.axs[key].figure.savefig(savename, bbox_inches='tight', fmt='svg')
+                self.figs[key].savefig(savename, bbox_inches='tight', fmt='svg')
             else:
                 savename = os.path.join(savedir, savebase+key+tstag+'.'+fmt)
                 if plot_id_y is not None:
@@ -505,6 +505,7 @@ class BaseDataAnalysis(object):
         '''
         self.fit_res = {}
         for key, fit_dict in self.fit_dicts.items():
+            multivariable = fit_dict.get('multivariable', None)
             guess_dict = fit_dict.get('guess_dict', None)
             guess_pars = fit_dict.get('guess_pars', None)
             fit_yvals = fit_dict['fit_yvals']
@@ -554,9 +555,13 @@ class BaseDataAnalysis(object):
                         for key, val in list(guess_dict.items()):
                             model.set_param_hint(key, **val)
                         guess_pars = model.make_params()
-
-                fit_dict['fit_res'] = model.fit(
-                    params=guess_pars, **fit_xvals, **fit_yvals)
+                if multivariable: #multivariable fitting
+                    pass
+                    # fit_res = lmfit.minimize(cost_fn, guess_pars,
+                    #          args=(fit_fn, **fit_xvals, **fit_yvals))
+                else:
+                    fit_dict['fit_res'] = model.fit(
+                        params=guess_pars, **fit_xvals, **fit_yvals)
 
             self.fit_res[key] = fit_dict['fit_res']
 
@@ -816,7 +821,6 @@ class BaseDataAnalysis(object):
             axs.legend(title=legend_title, loc=legend_pos, ncol=legend_ncol)
 
         if plot_touching:
-            print('True')
             axs.figure.subplots_adjust(wspace=0, hspace=0)
 
         if self.tight_fig:
