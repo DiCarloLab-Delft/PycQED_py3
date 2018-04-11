@@ -188,7 +188,7 @@ class UHFQC(Instrument):
 
         # Load an AWG program (from Zurich
         # Instruments/LabOne/WebServer/awg/src)
-        self.awg_sequence_acquisition()
+        #self.awg_sequence_acquisition() part of dirty
 
         # Turn on both outputs
         self.sigouts_0_on(1)
@@ -222,10 +222,10 @@ class UHFQC(Instrument):
         self.system_extclk(1)
 
         # Configure the codeword protocol
-        self.awgs_0_dio_strobe_index(31)
-        self.awgs_0_dio_strobe_slope(1) # rising edge
-        self.awgs_0_dio_valid_index(16)
-        self.awgs_0_dio_valid_polarity(2) # high polarity
+        # self.awgs_0_dio_strobe_index(31)
+        # self.awgs_0_dio_strobe_slope(1) # rising edge
+        # self.awgs_0_dio_valid_index(16)
+        # self.awgs_0_dio_valid_polarity(2) # high polarity
 
 
 
@@ -317,7 +317,7 @@ class UHFQC(Instrument):
         if not self._awgModule:
             raise(ziShellModuleError())
 
-        self._awgModule.set('awgModule/index', awg_nr)
+        #self._awgModule.set('awgModule/index', awg_nr) 20180329 dirty hack by Niels  Bultink, this command is failing in python 3.5, firmware 5.2
         self._awgModule.set('awgModule/compiler/sourcestring', program_string)
 
         t0 = time.time()
