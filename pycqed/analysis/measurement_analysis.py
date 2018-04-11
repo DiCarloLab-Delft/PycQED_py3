@@ -2146,14 +2146,25 @@ class Echo_analysis(TD_Analysis):
 
         self.add_analysis_datagroup_to_file()
         # Instantiating here ensures models have no memory of constraints
-        model = lmfit.Model(fit_mods.ExpDecayFunc)
-        model.guess = fit_mods.exp_dec_guess
+        fit_mods.ExpDecayModel.set_param_hint('amplitude',
+                                              value=-0.5,
+                                              min=-2,
+                                              max=2)
+        fit_mods.ExpDecayModel.set_param_hint('tau',
+                                              value=self.sweep_points[1]*50,
+                                              min=self.sweep_points[1],
+                                              max=self.sweep_points[-1]*1000)
+        fit_mods.ExpDecayModel.set_param_hint('offset',
+                                              value=0,
+                                              vary=True)
+        fit_mods.ExpDecayModel.set_param_hint('n',
+                                              value=1,
+                                              vary=False)
+        self.params = fit_mods.ExpDecayModel.make_params()
 
-        params = model.guess(model, data=self.corr_data[:-self.NoCalPoints],
-                             t=self.sweep_points[:-self.NoCalPoints])
-        self.fit_res = model.fit(data=self.corr_data[:-self.NoCalPoints],
-                                 t=self.sweep_points[:-self.NoCalPoints],
-                                 params=params)
+        self.fit_res = fit_mods.ExpDecayModel.fit(data=self.normalized_data_points,
+                                     t=self.sweep_points[:-self.NoCalPoints],
+                                     params=self.params)
         self.save_fitted_parameters(fit_res=self.fit_res,
                                     var_name='corr_data')
 
@@ -8898,7 +8909,7 @@ class CZ_1Q_phase_analysis(TD_Analysis):
 
 
 def DAC_scan_analysis_and_plot(scan_start, scan_stop, dac, feed, dac_prefix='',perc=99.6, factor=1, smooth_window_len=31,smoothing=True,
-    overwrite_old=False, fig_format='png', verbose=False, peak_fitting_sample_n=0, plotsize=None, temperature_plots=True):
+    overwrite_old=False, fig_format='png', verbose=False, peak_fitting_sample_n=0, plotsize=None, temperature_plots=True, current_multiplier=1):
     plotsize = plotsize or (4,10)
     date_folder = scan_stop.split('_')[0]
     time_folder = scan_stop.split('_')[1]
@@ -8935,7 +8946,7 @@ def DAC_scan_analysis_and_plot(scan_start, scan_stop, dac, feed, dac_prefix='',p
     #sort data
     dac_values_unsorted = spec_scans.TD_dict['dac']
     sorted_indices = dac_values_unsorted.argsort()
-    dac_values=np.array(dac_values_unsorted[sorted_indices], dtype=float)
+    dac_values=np.array(dac_values_unsorted[sorted_indices], dtype=float)*current_multiplier
     amplitude_values=np.array(spec_scans.TD_dict['amp'][sorted_indices,feed], dtype=float)
     frequency_values=np.array(spec_scans.TD_dict['frequencies'][sorted_indices], dtype=float)
 
