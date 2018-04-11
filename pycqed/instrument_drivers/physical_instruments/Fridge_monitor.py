@@ -172,8 +172,7 @@ class Fridge_Monitor(Instrument):
         if time_since_update > (self.update_interval()):
             self.temp_dict = {}
             self.press_dict = {}
-            # try:
-            if 1:
+            try:
                 s = urlopen(self.url, timeout=5)
                 source = s.read().decode()
                 self.source = source
@@ -198,10 +197,10 @@ class Fridge_Monitor(Instrument):
                 self.press_dict = {elem[0]: float(
                     elem[1]) for elem in pressuregroups}
 
-            # except Exception as e:
-                # logging.warning(e)
+            except Exception as e:
+                logging.warning(e)
 
-                # for temperature_name in self.monitored_temps:
-                    # self.temp_dict[temperature_name] = 0
-                # for press_name in self.monitored_press:
-                    # self.press_dict[press_name] = 0
+                for temperature_name in self.monitored_temps:
+                    self.temp_dict[temperature_name] = 0
+                for press_name in self.monitored_press:
+                    self.press_dict[press_name] = 0
