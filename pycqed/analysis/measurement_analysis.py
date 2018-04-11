@@ -2145,26 +2145,15 @@ class Echo_analysis(TD_Analysis):
     def fit_data(self, print_fit_results=False, **kw):
 
         self.add_analysis_datagroup_to_file()
-        # Instantiating here ensures models have no memory of constraints
-        fit_mods.ExpDecayModel.set_param_hint('amplitude',
-                                              value=-0.5,
-                                              min=-2,
-                                              max=2)
-        fit_mods.ExpDecayModel.set_param_hint('tau',
-                                              value=self.sweep_points[1]*50,
-                                              min=self.sweep_points[1],
-                                              max=self.sweep_points[-1]*1000)
-        fit_mods.ExpDecayModel.set_param_hint('offset',
-                                              value=0,
-                                              vary=True)
-        fit_mods.ExpDecayModel.set_param_hint('n',
-                                              value=1,
-                                              vary=False)
-        self.params = fit_mods.ExpDecayModel.make_params()
 
-        self.fit_res = fit_mods.ExpDecayModel.fit(data=self.normalized_data_points,
-                                     t=self.sweep_points[:-self.NoCalPoints],
-                                     params=self.params)
+        model = lmfit.Model(fit_mods.ExpDecayFunc)
+        model.guess = fit_mods.exp_dec_guess
+
+        params = model.guess(model, data=self.corr_data[:-self.NoCalPoints],
+                             t=self.sweep_points[:-self.NoCalPoints])
+        self.fit_res = model.fit(data=self.corr_data[:-self.NoCalPoints],
+                                 t=self.sweep_points[:-self.NoCalPoints],
+                                 params=params)
         self.save_fitted_parameters(fit_res=self.fit_res,
                                     var_name='corr_data')
 
@@ -6711,7 +6700,7 @@ class TwoD_Analysis(MeasurementAnalysis):
                 kw["xunit"]=self.parameter_units[0]
             if "yunit" not in kw:
                 kw["yunit"]=self.parameter_units[1]
-                
+
             a_tools.color_plot(x=self.sweep_points,
                                y=self.sweep_points_2D,
                                z=meas_vals.transpose(),
@@ -8928,11 +8917,11 @@ def DAC_scan_analysis_and_plot(scan_start, scan_stop, dac, feed, dac_prefix='',p
     opt_dict = {'scan_label':dac_prefix+dac,
            'exact_label_match':True}
 
-    nparams = ['amp', 
-                'frequencies', 
-                'dac', 
+    nparams = ['amp',
+                'frequencies',
+                'dac',
                 ]
-    
+
     if temperature_plots:
         nparams.append('T_mc')
         nparams.append('T_cp')
@@ -9046,7 +9035,7 @@ def DAC_scan_analysis_and_plot(scan_start, scan_stop, dac, feed, dac_prefix='',p
         for peak in peak_frequencies[i]:
             ax.scatter(dac_value*1e3, peak*1e-9, color='b', s=9)
     f.close()
-  
+
     ax.xaxis.label.set_fontsize(10)
     ax.yaxis.label.set_fontsize(10)
     ax.title.set_fontsize(10)
