@@ -240,7 +240,7 @@ class QWG_MW_LutMan(Base_MW_LutMan):
         super()._add_channel_params()
         self.add_parameter('channel_amp',
                            unit='a.u.',
-                           vals=vals.Numbers(0, 1.8),
+                           vals=vals.Numbers(-1.8, 1.8),
                            set_cmd=self._set_channel_amp,
                            get_cmd=self._get_channel_amp,
                            docstring=('using the channel amp as additional'
@@ -547,7 +547,6 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
                                                     bit_width=self.bit_width(),
                                                     bit_shift=self.bit_shift())
         # update all of them
-        print(redundant_cw_list)
         for redundant_cw_idx in redundant_cw_list:
             redundant_cw_I = 'wave_ch{}_cw{:03}'.format(self.channel_I(),
                                                         redundant_cw_idx)
