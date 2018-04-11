@@ -1525,6 +1525,8 @@ class CCLight_Transmon(Qubit):
     def measure_rabi_channel_amp(self, MC=None, amps=np.linspace(0, 1, 31),
                          analyze=True, close_fig=True, real_imag=True,
                          prepare_for_timedomain=True, update_mw_lutman=False):
+        MW_LutMan = self.instr_LutMan_MW.get_instr()
+        using_QWG = (MW_LutMan.AWG.get_instr().__class__.__name__ == 'QuTech_AWG_Module')
         if MC is None:
             MC = self.instr_MC.get_instr()
         if prepare_for_timedomain:
@@ -1534,8 +1536,6 @@ class CCLight_Transmon(Qubit):
             initialize=False,
             platf_cfg=self.cfg_openql_platform_fn())
         self.instr_CC.get_instr().eqasm_program(p.filename)
-
-        MW_LutMan = self.instr_LutMan_MW.get_instr()
 
         s = MW_LutMan.channel_amp
         MC.set_sweep_function(s)
@@ -1548,6 +1548,8 @@ class CCLight_Transmon(Qubit):
         if update_mw_lutman:
           a=ma.Rabi_Analysis(label='rabi')
           MW_LutMan.channel_amp(a.rabi_amplitudes['piPulse'])
+          if using_QWG:
+            self.mw_amp180(a.rabi_amplitudes['piPulse'])
         return True
 
     def measure_allxy(self, MC=None,
@@ -2116,7 +2118,7 @@ class CCLight_Transmon(Qubit):
                                  always_prepare=True)
 
         if using_VSM:
-            if motzoi_atts:
+            if motzoi_atts is None:
                 motzoi_atts = np.linspace(0, 50e3, 31)
             mod_out = self.mw_vsm_mod_out()
             ch_in = self.mw_vsm_ch_in()
@@ -2124,7 +2126,7 @@ class CCLight_Transmon(Qubit):
                 mod_out, ch_in)]
             swf_func = D_par
         elif using_QWG:
-            if motzoi_atts:
+            if motzoi_atts is None:
                 motzoi_atts = np.linspace(-.3, .3, 31)
             swf_func = swf.QWG_lutman_par(LutMan=MW_LutMan,
                                           LutMan_parameter=MW_LutMan.mw_motzoi)
