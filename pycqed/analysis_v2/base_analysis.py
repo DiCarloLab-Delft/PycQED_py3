@@ -540,7 +540,7 @@ class BaseDataAnalysis(object):
                     except ValueError:
                         # If the analysis sub group already exists (each fr_key should be unique)
                         # Delete the old group and create a new group (overwrite).
-                        del fr_group[fr_key]
+                        del analysis_group[fr_key]
                         fr_group = analysis_group.create_group(fr_key)
                     
                     # TODO: convert the params object to a simple dict
