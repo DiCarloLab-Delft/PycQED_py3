@@ -719,6 +719,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             self.cz_freq_interaction()*1e-9),
             c='C1')
 
+        ax.axvline(0, 0, 1e10, linestyle='dotted', c='grey')
         ax.fill_between(
             x=[-5, 5],
             y1=[self.cz_freq_interaction()-self.cz_J2()]*2,
@@ -745,7 +746,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         dac_val_axis.axvspan(1, 1000, facecolor='.5', alpha=0.5)
         dac_val_axis.axvspan(-1000, -1, facecolor='.5', alpha=0.5)
-
+        f.subplots_adjust(right=.7)
         if show:
             plt.show()
         return ax
