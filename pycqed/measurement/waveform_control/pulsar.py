@@ -364,6 +364,7 @@ class HDAWG8Pulsar:
                         else:
                             # new waveform for this subAWG
                             unique_waveforms[wfhashable] = wfname
+                            wf_name_map[wfname] = wfname
 
                         if len(cid_wf) > 0 and cid_wf[0] != 0.:
                             elements_with_non_zero_first_points.append(el)
