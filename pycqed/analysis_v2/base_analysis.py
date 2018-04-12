@@ -25,6 +25,7 @@ import lmfit
 import h5py
 from pycqed.measurement.hdf5_data import write_dict_to_hdf5
 
+
 class BaseDataAnalysis(object):
     """
     Abstract Base Class (not intended to be instantiated directly) for
@@ -50,16 +51,14 @@ class BaseDataAnalysis(object):
             self.plot(key_list='auto')  # make the plots
     """
 
-
     def __init__(self, t_start: str=None,
-                t_stop: str=None,
-                TwoD: bool=False,
-                label: str='',
-                options_dict: dict=None,
-                data_file_path: str=None,
-                extract_only: bool=False,
-                do_fitting: bool=False):
-
+                 t_stop: str=None,
+                 TwoD: bool=False,
+                 label: str='',
+                 options_dict: dict=None,
+                 data_file_path: str=None,
+                 extract_only: bool=False,
+                 do_fitting: bool=False):
         '''
         This is the __init__ of the abstract base class.
         It is intended to be called at the start of the init of the child
@@ -204,7 +203,6 @@ class BaseDataAnalysis(object):
 
             if self.options_dict['save_figs']:
                 self.save_figures(close_figs=self.options_dict['close_figs'])
-
 
     def get_timestamps(self):
         """
@@ -422,16 +420,18 @@ class BaseDataAnalysis(object):
             key_list = self.figs.keys()
         for key in key_list:
             if self.presentation_mode:
-                savename = os.path.join(savedir, savebase+key+tstag+'presentation'+'.'+fmt)
+                savename = os.path.join(
+                    savedir, savebase+key+tstag+'presentation'+'.'+fmt)
                 self.figs[key].savefig(savename, bbox_inches='tight', fmt=fmt)
-                savename = os.path.join(savedir, savebase+key+tstag+'presentation'+'.svg')
-                self.figs[key].savefig(savename, bbox_inches='tight', fmt='svg')
+                savename = os.path.join(
+                    savedir, savebase+key+tstag+'presentation'+'.svg')
+                self.figs[key].savefig(
+                    savename, bbox_inches='tight', fmt='svg')
             else:
                 savename = os.path.join(savedir, savebase+key+tstag+'.'+fmt)
                 self.figs[key].savefig(savename, bbox_inches='tight', fmt=fmt)
             if close_figs:
                 plt.close(self.figs[key])
-
 
     def save_data(self, savedir: str=None, savebase: str=None,
                   tag_tstamp: bool=True,
@@ -543,7 +543,7 @@ class BaseDataAnalysis(object):
                         for key, val in list(guess_dict.items()):
                             model.set_param_hint(key, **val)
                         guess_pars = model.make_params()
-                if multivariable: #multivariable fitting
+                if multivariable:  # multivariable fitting
                     pass
                     # fit_res = lmfit.minimize(cost_fn, guess_pars,
                     #          args=(fit_fn, **fit_xvals, **fit_yvals))
@@ -557,7 +557,8 @@ class BaseDataAnalysis(object):
         """
         Saves the fit results
         """
-        fn = a_tools.measurement_filename(a_tools.get_folder(self.timestamps[0]))
+        fn = a_tools.measurement_filename(
+            a_tools.get_folder(self.timestamps[0]))
         with h5py.File(fn, 'r+') as data_file:
             try:
                 analysis_group = data_file.create_group('Analysis')
@@ -573,7 +574,6 @@ class BaseDataAnalysis(object):
                 # TODO: convert the params object to a simple dict
                 # write_dict_to_hdf5(fit_res.params, entry_point=fr_group)
                 write_dict_to_hdf5(fit_res.best_values, entry_point=fr_group)
-
 
     def plot(self, key_list=None, axs_dict=None,
              presentation_mode=None, no_label=False):
@@ -612,7 +612,6 @@ class BaseDataAnalysis(object):
                     sharey=pdict.get('sharey', False),
                     figsize=pdict.get('plotsize', (8, 6)))
 
-
                 # transparent background around axes for presenting data
                 self.figs[pdict['ax_id']].patch.set_alpha(0)
 
@@ -623,7 +622,7 @@ class BaseDataAnalysis(object):
                 pdict = self.plot_dicts[key]
                 plot_id_y = pdict.get('plot_id_y', None)
                 plot_id_x = pdict.get('plot_id_x', None)
-                plot_touching = pdict.get('touching',False)
+                plot_touching = pdict.get('touching', False)
                 if type(pdict['plotfn']) is str:
                     plotfn = getattr(self, pdict['plotfn'])
                 else:
@@ -634,7 +633,8 @@ class BaseDataAnalysis(object):
                     plotfn(pdict, axs=self.axs[pdict['ax_id']])
 
                 if plot_touching:
-                    self.figs[pdict['ax_id']].subplots_adjust(wspace=0, hspace=0)
+                    self.figs[pdict['ax_id']].subplots_adjust(wspace=0,
+                                                              hspace=0)
 
             self.format_datetime_xaxes(key_list)
             self.add_to_plots(key_list=key_list)
@@ -744,7 +744,7 @@ class BaseDataAnalysis(object):
         plot_linestyle = pdict.get('linestyle', '-')
         plot_marker = pdict.get('marker', 'o')
         dataset_desc = pdict.get('setdesc', '')
-        plot_touching = pdict.get('touching',False)
+        plot_touching = pdict.get('touching', False)
         # Fixme, this default creates a nasty bug when not plotting a set of
         # lines.
         dataset_label = pdict.get('setlabel', list(range(len(plot_yvals))))
@@ -966,10 +966,10 @@ class BaseDataAnalysis(object):
             plot_xvals_step = 0
             plot_yvals_step = 0
         else:
-            plot_xvals_step = (abs(np.max(plot_xvals)-np.min(plot_xvals))/
-                len(plot_xvals))
-            plot_yvals_step = (abs(np.max(plot_yvals)-np.min(plot_yvals))/
-                len(plot_yvals))
+            plot_xvals_step = (abs(np.max(plot_xvals)-np.min(plot_xvals)) /
+                               len(plot_xvals))
+            plot_yvals_step = (abs(np.max(plot_yvals)-np.min(plot_yvals)) /
+                               len(plot_yvals))
             # plot_yvals_step = plot_yvals[1]-plot_yvals[0]
 
         if plot_zrange is not None:
