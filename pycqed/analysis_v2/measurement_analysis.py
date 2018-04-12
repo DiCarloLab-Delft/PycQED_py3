@@ -19,8 +19,6 @@ reload(sa)
 # only one of these two files should exist in the end
 import pycqed.analysis_v2.cryo_scope_analysis as csa
 reload(csa)
-import pycqed.analysis_v2.cryo_scope_analysis_v2 as csa2
-reload(csa2)
 import pycqed.analysis_v2.distortions_analysis as da
 import pycqed.analysis_v2.optimization_analysis as oa
 reload(da)
