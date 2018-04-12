@@ -81,7 +81,7 @@ class RamZFluxArc(ba.BaseDataAnalysis):
 
             ch_amp = a.data_file[self.ch_amp_key].attrs['value']
             if self.ch_range_key is None:
-                ch_range = 1
+                ch_range = 2  # corresponds to a scale factor of 1
             else:
                 ch_range = a.data_file[self.ch_range_key].attrs['value']
             waveform_amp = a.data_file[self.waveform_amp_key].attrs['value']
@@ -107,8 +107,9 @@ class RamZFluxArc(ba.BaseDataAnalysis):
             nyquist_calc=self.nyquist_calc,
             poly_fit_order=2, plot_fits=False)
         self.proc_data_dict['dac_arc_ana'] = self.dac_arc_ana
+        self.proc_data_dict['poly_coeffs'] = self.dac_arc_ana.poly_fit
 
-        # this is the infamous dac arc conversion method
+        # this is the dac arc conversion method
         # we would like this to be directly accessible
         self.freq_to_amp = self.dac_arc_ana.freq_to_amp
         self.amp_to_freq = self.dac_arc_ana.amp_to_freq
