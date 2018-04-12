@@ -258,12 +258,13 @@ class complex_spectroscopy(Spectroscopy):
 
             self.figs['combined'], axs = plt.subplots(
                 nrows=4, ncols=1, sharex=True, figsize=(8, 6))
+
             for i, name in enumerate(pdict_names):
                 combined_name = 'combined_' + name
                 self.axs[combined_name] = axs[i]
+                self.plot_dicts[combined_name] = self.plot_dicts[name].copy()
                 self.plot_dicts[combined_name]['ax_id'] = combined_name
 
-                self.plot_dicts[combined_name] = self.plot_dicts[name].copy()
                 # shorter label as the axes are now shared
                 self.plot_dicts[combined_name]['ylabel'] = name
                 self.plot_dicts[combined_name]['xlabel'] = None if i in [
