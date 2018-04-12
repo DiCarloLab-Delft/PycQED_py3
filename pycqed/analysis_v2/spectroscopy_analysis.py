@@ -6,6 +6,7 @@ This file contains the Spectroscopy class that forms the basis analysis of all t
 import pycqed.analysis_v2.base_analysis as ba
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from pycqed.analysis import measurement_analysis as MA
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis.tools import data_manipulation as dm_tools
@@ -255,21 +256,22 @@ class complex_spectroscopy(Spectroscopy):
                                        }
             pdict_names = ['amp', 'phase', 'real', 'imag']
 
-            for tt, name in enumerate(pdict_names):
+            self.figs['combined'], axs = plt.subplots(
+                nrows=4, ncols=1, sharex=True, figsize=(8, 6))
+            for i, name in enumerate(pdict_names):
                 combined_name = 'combined_' + name
+                self.axs[combined_name] = axs[i]
+                self.plot_dicts[combined_name]['ax_id'] = combined_name
+
                 self.plot_dicts[combined_name] = self.plot_dicts[name].copy()
-                self.plot_dicts[combined_name]['ax_id'] = 'combined'
-                self.plot_dicts[combined_name]['numplotsy'] = 4
-                self.plot_dicts[combined_name]['plot_id_y'] = tt
-                self.plot_dicts[combined_name]['sharex'] = True
+                # shorter label as the axes are now shared
                 self.plot_dicts[combined_name]['ylabel'] = name
-                self.plot_dicts[combined_name]['xlabel'] = None if tt in [
+                self.plot_dicts[combined_name]['xlabel'] = None if i in [
                     0, 1, 2, 3] else self.plot_dicts[combined_name]['xlabel']
-                self.plot_dicts[combined_name]['title'] = None if tt in [
+                self.plot_dicts[combined_name]['title'] = None if i in [
                     0, 1, 2, 3] else self.plot_dicts[combined_name]['title']
                 self.plot_dicts[combined_name]['touching'] = True
 
-                # self.plot_dicts[combined_name]['multiple'] = True
 
         else:
             raise NotImplementedError('Not coded up yet for multiple traces')
