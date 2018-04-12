@@ -46,6 +46,7 @@ class HandshakeParameter(Parameter):
 class QuTech_AWG_Module(SCPI):
 
     def __init__(self, name, address, port, **kwargs):
+        numCodewords = kwargs.pop('numCodewords', 64)
         super().__init__(name, address, port, **kwargs)
 
         # AWG properties
@@ -57,7 +58,7 @@ class QuTech_AWG_Module(SCPI):
         self.device_descriptor.numMarkers = 8
         self.device_descriptor.numTriggers = 8
         # Commented out until bug fixed
-        self.device_descriptor.numCodewords = 64
+        self.device_descriptor.numCodewords = numCodewords
 
         # valid values
         self.device_descriptor.mvals_trigger_impedance = vals.Enum(50),

@@ -221,7 +221,6 @@ class One_Qubit_Paritycheck_Analysis(ba.BaseDataAnalysis):
         ch_idx_anc = self.options_dict.get('ch_idx_anc', 0)
         ch_idx_data = self.options_dict.get('ch_idx_data', 1)
         nr_of_meas = self.options_dict.get('nr_of_meas', 5)
-        print(nr_of_meas)
         post_sel_th_anc = self.options_dict.get('post_sel_th_anc', 0)
         post_sel_th_data = self.options_dict.get('post_sel_th_data', 0)
 

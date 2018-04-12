@@ -12,7 +12,7 @@ from pycqed.measurement.optimization import nelder_mead, SPSA
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.utilities.get_default_datadir import get_default_datadir
 from pycqed.measurement.hdf5_data import read_dict_from_hdf5
-
+from qcodes.instrument.parameter import ManualParameter
 from qcodes import station
 
 
@@ -38,6 +38,37 @@ class Test_MeasurementControl(unittest.TestCase):
         self.MC.set_sweep_function(None_Sweep())
         self.MC.set_sweep_points(sweep_pts)
         self.MC.set_detector_function(det.Dummy_Detector_Soft())
+        dat = self.MC.run('1D_soft')
+        dset = dat["dset"]
+        x = dset[:, 0]
+        xr = np.arange(len(x))/15
+        y = np.array([np.sin(xr/np.pi), np.cos(xr/np.pi)])
+        y0 = dset[:, 1]
+        y1 = dset[:, 2]
+        np.testing.assert_array_almost_equal(x, sweep_pts)
+        np.testing.assert_array_almost_equal(y0, y[0, :])
+        np.testing.assert_array_almost_equal(y1, y[1, :])
+
+        # Test that the return dictionary has the right entries
+        dat_keys = set(['dset', 'opt_res_dset', 'sweep_parameter_names',
+                        'sweep_parameter_units',
+                        'value_names', 'value_units'])
+        self.assertEqual(dat_keys, set(dat.keys()))
+
+        self.assertEqual(dat['sweep_parameter_names'], ['pts'])
+        self.assertEqual(dat['sweep_parameter_units'], ['arb. unit'])
+        self.assertEqual(dat['value_names'], ['I', 'Q'])
+        self.assertEqual(dat['value_units'], ['V', 'V'])
+
+    def test_soft_sweep_1D_alt_shape(self):
+        # This is a generalization of a 1D sweep function where instead of
+        # a shape (2,) it has a shape (2,1). This isinconsistent with the
+        # N-D hard sweeps. and should be addressed
+
+        sweep_pts = np.linspace(0, 10, 30)
+        self.MC.set_sweep_function(None_Sweep())
+        self.MC.set_sweep_points(sweep_pts)
+        self.MC.set_detector_function(det.Dummy_Detector_Soft_diff_shape())
         dat = self.MC.run('1D_soft')
         dset = dat["dset"]
         x = dset[:, 0]
@@ -202,6 +233,105 @@ class Test_MeasurementControl(unittest.TestCase):
 
         d = self.MC.detector_function
         self.assertEqual(d.times_called, 10)
+
+    def test_variable_sized_return_values_hard_sweep(self):
+        """
+        Tests a detector that acquires data in chunks of varying sizes
+        """
+        self.MC.soft_avg(1)
+        counter_param = ManualParameter('counter', initial_value=0)
+
+        def return_variable_size_values():
+            idx = counter_param() % 3
+            counter_param(counter_param()+1)
+
+            if idx == 0:
+                return np.arange(0, 7)
+            elif idx == 1:
+                return np.arange(7, 11)
+            elif idx == 2:
+                return np.arange(11, 30)
+
+        sweep_pts = np.arange(30)
+
+        d = det.Function_Detector(get_function=return_variable_size_values,
+                                  value_names=['Variable size counter'],
+                                  detector_control='hard')
+        self.MC.set_sweep_function(None_Sweep(sweep_control='hard'))
+        self.MC.set_sweep_points(sweep_pts)
+        self.MC.set_detector_function(d)
+        dat = self.MC.run('varying_chunk_size')
+        dset = dat["dset"]
+        x = dset[:, 0]
+        y = dset[:, 1]
+
+        self.assertEqual(np.shape(dset), (len(sweep_pts), 2))
+        np.testing.assert_array_almost_equal(x, sweep_pts)
+        np.testing.assert_array_almost_equal(y, sweep_pts)
+
+        self.assertEqual(self.MC.total_nr_acquired_values, 1*30)
+
+    def test_soft_sweep_hard_det_1D(self):
+
+        def mock_func():
+            # to also test if the values are set correctly in the sweep
+            arr = np.zeros([2, 2])
+            arr[0, :] = np.array([self.mock_parabola.x()]*2)
+            arr[1, :] = np.array([self.mock_parabola.x()+2]*2)
+            return arr
+
+        d = det.Function_Detector(get_function=mock_func,
+                                  value_names=['x', 'x+2'],
+                                  detector_control='hard')
+        sweep_pts = np.repeat(np.arange(5), 2)
+        self.MC.set_sweep_function(self.mock_parabola.x)
+        self.MC.set_sweep_points(sweep_pts)
+        self.MC.set_detector_function(d)
+        dat = self.MC.run('soft_sweep_hard_det')
+        dset = dat["dset"]
+
+        x = dset[:, 0]
+        y0 = dset[:, 1]
+        y1 = dset[:, 2]
+        np.testing.assert_array_almost_equal(x, sweep_pts)
+        np.testing.assert_array_almost_equal(y0, sweep_pts)
+        np.testing.assert_array_almost_equal(y1, sweep_pts+2)
+
+    def test_variable_sized_return_values_hard_sweep_soft_avg(self):
+        """
+        Tests a detector that acquires data in chunks of varying sizes
+        """
+        self.MC.soft_avg(10)
+        counter_param = ManualParameter('counter', initial_value=0)
+
+        def return_variable_size_values():
+            idx = counter_param() % 3
+            counter_param(counter_param()+1)
+
+            if idx == 0:
+                return np.arange(0, 7)
+            elif idx == 1:
+                return np.arange(7, 11)
+            elif idx == 2:
+                return np.arange(11, 30)
+
+        sweep_pts = np.arange(30)
+
+        d = det.Function_Detector(get_function=return_variable_size_values,
+                                  value_names=['Variable size counter'],
+                                  detector_control='hard')
+        self.MC.set_sweep_function(None_Sweep(sweep_control='hard'))
+        self.MC.set_sweep_points(sweep_pts)
+        self.MC.set_detector_function(d)
+        dat = self.MC.run('varying_chunk_size')
+        dset = dat["dset"]
+        x = dset[:, 0]
+        y = dset[:, 1]
+
+        self.assertEqual(np.shape(dset), (len(sweep_pts), 2))
+        np.testing.assert_array_almost_equal(x, sweep_pts)
+        np.testing.assert_array_almost_equal(y, sweep_pts)
+        self.assertEqual(self.MC.total_nr_acquired_values, 10*30)
 
     def test_soft_averages_hard_sweep_1D(self):
         sweep_pts = np.arange(50)
@@ -368,9 +498,42 @@ class Test_MeasurementControl(unittest.TestCase):
             self.assertLess(x_opt[i], 0.5)
             self.assertLess(x_mean[i], 0.5)
 
+    def test_adaptive_cma_list_of_vals(self):
+        """
+        This tests
+        """
+        # import included in the test to avoid whole suite failing if missing
+        import cma
+
+        self.mock_parabola.noise(.01)
+        self.MC.set_sweep_functions(
+            [self.mock_parabola.x, self.mock_parabola.y,
+             self.mock_parabola.z])
+        self.MC.set_adaptive_function_parameters(
+            {'adaptive_function': cma.fmin,
+             'x0': [-5, 5, 5], 'sigma0': 1,
+             # options for the CMA algorithm can be found using
+             # "cma.CMAOptions()"
+             'options': {'maxfevals': 5000,    # maximum function cals
+                         # Scaling for individual sigma's
+                         'cma_stds': [5, 6, 3],
+                         'ftarget': 0.005},     # Target function value
+             })
+        self.mock_parabola.noise(.5)
+        self.MC.set_detector_function(self.mock_parabola.parabola_list)
+        dat = self.MC.run('CMA test', mode='adaptive')
+        x_opt = self.MC.adaptive_result[0]
+        x_mean = self.MC.adaptive_result[5]
+
+        for i in range(3):
+            self.assertLess(x_opt[i], 0.5)
+            self.assertLess(x_mean[i], 0.5)
+
+
     def test_adaptive_measurement_SPSA(self):
         self.MC.soft_avg(1)
         self.mock_parabola.noise(0)
+        self.mock_parabola.z(0)
         self.MC.set_sweep_functions(
             [self.mock_parabola.x, self.mock_parabola.y])
         self.MC.set_adaptive_function_parameters(

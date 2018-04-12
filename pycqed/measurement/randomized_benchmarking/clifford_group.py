@@ -1,59 +1,9 @@
 import numpy as np
+from pycqed.simulations.pauli_transfer_matrices import I, X, Y, Z, S, S2, H, CZ
 '''
 Decomposition of the single qubit clifford group as per
 Eptstein et al. Phys. Rev. A 89, 062321 (2014)
 '''
-
-
-# Clifford group decomposition maps
-I = np.eye(4)
-# Pauli group
-X = np.array([[1, 0, 0, 0],
-              [0, 1, 0, 0],
-              [0, 0, -1, 0],
-              [0, 0, 0, -1]], dtype=int)
-Y = np.array([[1, 0, 0, 0],
-              [0, -1, 0, 0],
-              [0, 0, 1, 0],
-              [0, 0, 0, -1]], dtype=int)
-Z = np.array([[1, 0, 0, 0],
-              [0, -1, 0, 0],
-              [0, 0, -1, 0],
-              [0, 0, 0, 1]], dtype=int)
-# Exchange group
-S = np.array([[1, 0, 0, 0],
-              [0, 0, 0, 1],
-              [0, 1, 0, 0],
-              [0, 0, 1, 0]], dtype=int)
-S2 = np.dot(S, S)
-# Hadamard group
-H = np.array([[1, 0, 0, 0],
-              [0, 0, 0, 1],
-              [0, 0, -1, 0],
-              [0, 1, 0, 0]], dtype=int)
-
-CZ = np.array([
-    [1,  0,  0,  0,   0,  0,  0,  0,   0,  0,  0,  0,   0, 0,  0,  0],
-    [0,  0,  0,  0,   0,  0,  0,  0,   0,  0,  0,  0,   0, 1,  0,  0],
-    [0,  0,  0,  0,   0,  0,  0,  0,   0,  0,  0,  0,   0, 0,  1,  0],
-    [0,  0,  0,  1,   0,  0,  0,  0,   0,  0,  0,  0,   0, 0,  0,  0],
-
-    [0,  0,  0,  0,   0,  0,  0,  1,   0,  0,  0,  0,   0, 0,  0,  0],
-    [0,  0,  0,  0,   0,  0,  0,  0,   0,  0,  1,  0,   0, 0,  0,  0],
-    [0,  0,  0,  0,   0,  0,  0,  0,   0,  -1,  0,  0,   0, 0,  0,  0],
-    [0,  0,  0,  0,   1,  0,  0,  0,   0,  0,  0,  0,   0, 0,  0,  0],
-
-    [0,  0,  0,  0,   0,  0,  0,  0,   0,  0,  0,  1,   0, 0,  0,  0],
-    [0,  0,  0,  0,   0,  0,  -1,  0,   0,  0,  0,  0,   0, 0,  0,  0],
-    [0,  0,  0,  0,   0,  1,  0,  0,   0,  0,  0,  0,   0, 0,  0,  0],
-    [0,  0,  0,  0,   0,  0,  0,  0,   1,  0,  0,  0,   0, 0,  0,  0],
-
-    [0,  0,  0,  0,   0,  0,  0,  0,   0,  0,  0,  0,   1, 0,  0,  0],
-    [0,  1,  0,  0,   0,  0,  0,  0,   0,  0,  0,  0,   0, 0,  0,  0],
-    [0,  0,  1,  0,   0,  0,  0,  0,   0,  0,  0,  0,   0, 0,  0,  0],
-    [0,  0,  0,  0,   0,  0,  0,  0,   0,  0,  0,  0,   0, 0,  0,  1]],
-    dtype=int)
-
 
 clifford_group_single_qubit = [np.empty([4, 4])]*(24)
 # explictly reversing order because order of operators is order in time

@@ -20,12 +20,21 @@ import pylab
 from pycqed.analysis.tools import data_manipulation as dm_tools
 import imp
 import math
-import pygsti
+try:
+    import pygsti
+except ImportError as e:
+    if str(e).find('pygsti') >= 0:
+        logging.warning('Could not import pygsti')
+    else:
+        raise
+
 from math import erfc
 from scipy.signal import argrelmax, argrelmin
+from scipy.constants import *
 from copy import deepcopy
 from pycqed.analysis.fit_toolbox import functions as func
 from pprint import pprint
+from math import floor
 
 import pycqed.analysis.tools.plotting as pl_tools
 from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel,
@@ -201,7 +210,8 @@ class MeasurementAnalysis(object):
                 fig.savefig(
                     self.savename, dpi=self.dpi, format=plot_format,
                     bbox_inches='tight')
-            except:
+            except Exception as e:
+                print(e)
                 fail_counter = True
         if fail_counter:
             logging.warning('Figure "%s" has not been saved.' % self.savename)
@@ -828,6 +838,14 @@ class MeasurementAnalysis(object):
             x = self.data[0]
             y = self.data[1]
             cols = np.unique(x).shape[0]
+
+            # Adding np.nan for prematurely interupted experiments
+            nr_missing_values = 0
+            if len(x)%cols != 0:
+                nr_missing_values = cols -  len(x)%cols
+            x = np.append(x, np.zeros(nr_missing_values)+np.nan)
+            y = np.append(y, np.zeros(nr_missing_values)+np.nan)
+
             # X,Y,Z can be put in colormap directly
             self.X = x.reshape(-1, cols)
             self.Y = y.reshape(-1, cols)
@@ -836,6 +854,7 @@ class MeasurementAnalysis(object):
 
             if len(self.value_names) == 1:
                 z = self.data[2]
+                z = np.append(z, np.zeros(nr_missing_values)+np.nan)
                 self.Z = z.reshape(-1, cols)
                 self.measured_values = [self.Z.T]
             else:
@@ -843,6 +862,7 @@ class MeasurementAnalysis(object):
                 self.measured_values = []
                 for i in range(len(self.value_names)):
                     z = self.data[2+i]
+                    z = np.append(z, np.zeros(nr_missing_values)+np.nan)
                     Z = z.reshape(-1, cols)
                     self.Z.append(Z)
                     self.measured_values.append(Z.T)
@@ -2125,7 +2145,7 @@ class Echo_analysis(TD_Analysis):
     def fit_data(self, print_fit_results=False, **kw):
 
         self.add_analysis_datagroup_to_file()
-        # Instantiating here ensures models have no memory of constraints
+
         model = lmfit.Model(fit_mods.ExpDecayFunc)
         model.guess = fit_mods.exp_dec_guess
 
@@ -3494,8 +3514,8 @@ class SSRO_Analysis(MeasurementAnalysis):
             # n1, bins1 = np.histogram(shots_I_1_rot, bins=int(min_len/50),
             #                          normed=1)
 
-            edat, = pylab.plot(bins1[:-1]+0.5*(bins1[1]-bins1[0]), n1, 'bo')
-            gdat, = pylab.plot(bins0[:-1]+0.5*(bins0[1]-bins0[0]), n0, 'ro')
+            gdat, = pylab.plot(bins0[:-1]+0.5*(bins0[1]-bins0[0]), n0, 'C0o')
+            edat, = pylab.plot(bins1[:-1]+0.5*(bins1[1]-bins1[0]), n1, 'C3o')
 
             # n, bins1, patches = np.hist(shots_I_1_rot, bins=int(min_len/50),
             #                               label = '1 I',histtype='step',
@@ -3521,13 +3541,13 @@ class SSRO_Analysis(MeasurementAnalysis):
             y1_1 = norm1*frac1_1*pylab.normpdf(bins1, mu1_1, sigma1_1)
             y0_1 = norm1*(1-frac1_1)*pylab.normpdf(bins1, mu0_1, sigma0_1)
 
-            pylab.semilogy(bins0, y0, 'r', linewidth=1.5)
-            pylab.semilogy(bins0, y1_0, 'r--', linewidth=3.5)
-            pylab.semilogy(bins0, y0_0, 'r--', linewidth=3.5)
+            pylab.semilogy(bins0, y0, 'C0', linewidth=1.5)
+            pylab.semilogy(bins0, y1_0, 'C0--', linewidth=3.5)
+            pylab.semilogy(bins0, y0_0, 'C0--', linewidth=3.5)
 
-            pylab.semilogy(bins1, y1, 'b', linewidth=1.5)
-            pylab.semilogy(bins1, y0_1, 'b--', linewidth=3.5)
-            pylab.semilogy(bins1, y1_1, 'b--', linewidth=3.5)
+            pylab.semilogy(bins1, y1, 'C3', linewidth=1.5)
+            pylab.semilogy(bins1, y0_1, 'C3--', linewidth=3.5)
+            pylab.semilogy(bins1, y1_1, 'C3--', linewidth=3.5)
             pdf_max = (max(max(y0), max(y1)))
             (pylab.gca()).set_ylim(pdf_max/1000, 2*pdf_max)
 
@@ -4982,6 +5002,94 @@ class AllXY_Analysis(TD_Analysis):
             self.save_fig(fig1, ylabel='Amplitude (normalized)', **kw)
         self.save_fig(fig2, ylabel='Amplitude', **kw)
 
+class FFC_Analysis(TD_Analysis):
+
+    '''
+    Performs a rotation and normalization on the data and calculates a
+    deviation from the expected ideal data.
+
+    Automatically works for the standard AllXY sequences of 42 and 21 points.
+    Optional keyword arguments can be used to specify
+    'ideal_data': np.array equal in lenght to the data
+    '''
+
+    def __init__(self, label='FFC', make_fig=True,zero_coord=None, one_coord=None, **kw):
+        kw['label'] = label
+        kw['h5mode'] = 'r+'  # Read write mode, file must exist
+        self.zero_coord = zero_coord
+        self.one_coord = one_coord
+        self.make_fig = make_fig
+
+        super(self.__class__, self).__init__(**kw)
+
+    def run_default_analysis(self, print_fit_results=False,
+                             close_main_fig=True, flip_axis=False, **kw):
+        close_file = kw.pop('close_file', True)
+        self.flip_axis = flip_axis
+        self.cal_points = kw.pop('cal_points', None)
+        self.add_analysis_datagroup_to_file()
+        self.get_naming_and_values()
+
+        ideal_data = np.concatenate((0.5*np.ones(1), 1*np.ones(1)))
+        self.rotate_and_normalize_data()
+        self.add_dataset_to_analysisgroup('Corrected data',
+                                          self.corr_data)
+        self.analysis_group.attrs.create('corrected data based on',
+                                         'calibration points'.encode('utf-8'))
+        data_error = self.corr_data - ideal_data
+        self.deviation_total = np.mean(abs(data_error))
+        # Plotting
+        if self.make_fig:
+            self.make_figures(ideal_data=ideal_data,
+                              close_main_fig=close_main_fig, **kw)
+        if close_file:
+            self.data_file.close()
+        return self.deviation_total
+
+    def make_figures(self, ideal_data, close_main_fig, **kw):
+        fig1, fig2, ax1, axarray = self.setup_figures_and_axes()
+        for i in range(len(self.value_names)):
+            if len(self.value_names) == 2:
+                ax = axarray[i]
+            else:
+                ax = axarray
+            self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                            y=self.measured_values[i],
+                                            fig=fig2, ax=ax,
+                                            xlabel=self.xlabel,
+                                            ylabel=str(
+                                                self.value_names[i]),
+                                            save=False)
+        ax1.set_ylim(min(self.corr_data)-.1, max(self.corr_data)+.1)
+        if self.flip_axis:
+            ylabel = r'$F$ $|0 \rangle$'
+        else:
+            ylabel = r'$F$ $|1 \rangle$'
+        self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                        y=self.corr_data,
+                                        fig=fig1, ax=ax1,
+                                        xlabel='',
+                                        ylabel=ylabel,
+                                        save=False)
+        ax1.plot(self.sweep_points, ideal_data)
+        labels = [item.get_text() for item in ax1.get_xticklabels()]
+        locs = np.arange(0, 2)
+        labels = ['NoFB', 'FB']
+
+        ax1.xaxis.set_ticks(locs)
+        ax1.set_xticklabels(labels, rotation=60)
+
+        deviation_text = r'Deviation: %.5f' % self.deviation_total
+        ax1.text(1, 1.05, deviation_text, fontsize=11,
+                 bbox=self.box_props)
+        if not close_main_fig:
+            # Hacked in here, good idea to only show the main fig but can
+            # be optimized somehow
+            self.save_fig(fig1, ylabel='Amplitude (normalized)',
+                          close_fig=False, **kw)
+        else:
+            self.save_fig(fig1, ylabel='Amplitude (normalized)', **kw)
+        self.save_fig(fig2, ylabel='Amplitude', **kw)
 
 class RandomizedBenchmarking_Analysis(TD_Analysis):
 
@@ -5291,9 +5399,13 @@ class RandomizedBench_2D_flat_Analysis(RandomizedBenchmarking_Analysis):
 
 class Homodyne_Analysis(MeasurementAnalysis):
 
-    def __init__(self, label='HM', **kw):
+    def __init__(self, label='HM', custom_power_message: dict=None, **kw):
+        # Custome power message is used to create a message in resonator measurements
+        # dict must be custom_power_message={'Power': -15, 'Atten': 86, 'res_len':3e-6}
+        # Power in dBm, Atten in dB and resonator length in m
         kw['label'] = label
         kw['h5mode'] = 'r+'
+        kw['custom_power_message']=custom_power_message
         super().__init__(**kw)
 
     def run_default_analysis(self, print_fit_results=False,
@@ -5387,6 +5499,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
             Model.set_param_hint('theta', value=0, min=-np.pi/2,
                                  max=np.pi/2)
             Model.set_param_hint('slope', value=0, vary=True)
+
             self.params = Model.make_params()
 
             if fit_window == None:
@@ -5501,7 +5614,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                             y_unit=self.value_units[0],
                                             save=False)
             # ensures that amplitude plot starts at zero
-            ax.set_ylim(ymin=0.0)
+            ax.set_ylim(ymin=-0.001)
 
         elif 'complex' in fitting_model:
             self.plot_complex_results(
@@ -5537,15 +5650,42 @@ class Homodyne_Analysis(MeasurementAnalysis):
             old_vals = ''
 
         if ('hanger' in fitting_model) or ('complex' in fitting_model):
-            textstr = '$f_{\mathrm{center}}$ = %.5f GHz $\pm$ (%.3g) GHz' % (
-                fit_res.params['f0'].value,
-                fit_res.params['f0'].stderr) + '\n' \
-                '$Qc$ = %.1f $\pm$ (%.1f)' % (
-                fit_res.params['Qc'].value,
-                fit_res.params['Qc'].stderr) + '\n' \
-                '$Qi$ = %.1f $\pm$ (%.1f)' % (
-                fit_res.params['Qi'].value, fit_res.params['Qi'].stderr) + \
-                old_vals
+            if kw['custom_power_message'] is None:
+                textstr = '$f_{\mathrm{center}}$ = %.5f GHz $\pm$ (%.3g) GHz' % (
+                    fit_res.params['f0'].value,
+                    fit_res.params['f0'].stderr) + '\n' \
+                    '$Qc$ = %.1f $\pm$ (%.1f)' % (
+                    fit_res.params['Qc'].value,
+                    fit_res.params['Qc'].stderr) + '\n' \
+                    '$Qi$ = %.1f $\pm$ (%.1f)' % (
+                    fit_res.params['Qi'].value, fit_res.params['Qi'].stderr) + \
+                    old_vals
+            else:
+                ###############################################################################
+                # Custom must be a dictionary                                                #
+                # custom_power = {'Power':-15, 'Atten':30, 'res_len':3.6e-6}                   #
+                # Power is power at source in dBm                                             #
+                # Atten is attenuation at sample, including sources attenuation in dB         #
+                # res_len is the lenght of the resonator in m                                 #
+                # All of this is needed to calculate mean photon number and phase velocity    #
+                ###############################################################################
+
+                custom_power = kw['custom_power_message']
+                power_in_w = 10**((custom_power['Power']-custom_power['Atten'])/10)*1e-3
+                mean_ph = (2*(fit_res.params['Q'].value**2)/(fit_res.params['Qc'].value*hbar*(2*pi*fit_res.params['f0'].value*1e9)**2))*power_in_w
+                phase_vel = 4*custom_power['res_len']*fit_res.params['f0'].value*1e9
+
+                textstr = '$f_{\mathrm{center}}$ = %.5f GHz $\pm$ (%.3g) GHz' % (
+                    fit_res.params['f0'].value,
+                    fit_res.params['f0'].stderr) + '\n' \
+                    '$Qc$ = %.1f $\pm$ (%.1f)' % (
+                    fit_res.params['Qc'].value,
+                    fit_res.params['Qc'].stderr) + '\n' \
+                    '$Qi$ = %.1f $\pm$ (%.1f)' % (
+                    fit_res.params['Qi'].value, fit_res.params['Qi'].stderr) + \
+                    old_vals + '\n' \
+                    '$< n_{\mathrm{ph} }>$ = %.1f' %(mean_ph)   + '\n' \
+                    '$v_{\mathrm{phase}}$ = %.3e m/s' %(phase_vel)
 
         elif fitting_model == 'lorentzian':
             textstr = '$f_{{\mathrm{{center}}}}$ = %.5f GHz ' \
@@ -6490,6 +6630,17 @@ class TwoD_Analysis(MeasurementAnalysis):
                              plot_all=True, save_fig=True,
                              transpose=False, figsize=None,
                              **kw):
+        '''
+        Args:
+            linecut_log (bool):
+                log scale for the line cut?
+                Remember to set the labels correctly.
+            colorplot_log (string/bool):
+                True/False for z axis scaling, or any string containing any
+                combination of letters x, y, z for scaling of the according axis.
+                Remember to set the labels correctly.
+
+        '''
         close_file = kw.pop('close_file', True)
 
         self.get_naming_and_values_2D()
@@ -6541,6 +6692,15 @@ class TwoD_Analysis(MeasurementAnalysis):
                 self.timestamp_string, self.measurementstring,
                 self.value_names[i])
 
+            if "xlabel" not in kw:
+                kw["xlabel"]=self.parameter_names[0]
+            if "ylabel" not in kw:
+                kw["ylabel"]=self.parameter_names[1]
+            if "xunit" not in kw:
+                kw["xunit"]=self.parameter_units[0]
+            if "yunit" not in kw:
+                kw["yunit"]=self.parameter_units[1]
+
             a_tools.color_plot(x=self.sweep_points,
                                y=self.sweep_points_2D,
                                z=meas_vals.transpose(),
@@ -6551,8 +6711,8 @@ class TwoD_Analysis(MeasurementAnalysis):
                                normalize=normalize,
                                **kw)
             ax.set_title(fig_title)
-            set_xlabel(ax, self.parameter_names[0], self.parameter_units[0])
-            set_ylabel(ax, self.parameter_names[1], self.parameter_units[1])
+            #set_xlabel(ax, self.parameter_names[0], self.parameter_units[0])
+            #set_ylabel(ax, self.parameter_names[1], self.parameter_units[1])
 
             if save_fig:
                 self.save_fig(fig, figname=savename, **kw)
@@ -6685,8 +6845,8 @@ class Three_Tone_Spectroscopy_Analysis(MeasurementAnalysis):
 
             textstr = 'f01 = {:.4g} GHz'.format(f01*1e-9) + '\n' + \
                 'f12 = {:.4g} GHz'.format(f12*1e-9) + '\n' + \
-                'anharm ~= {:.4g} MHz'.format(anharm*1e-6) + '\n' + \
-                'EC = {:.4g} MHz'.format(EC*1e-6) + '\n' + \
+                'anharm = {:.4g} MHz'.format(anharm*1e-6) + '\n' + \
+                'EC ~= {:.4g} MHz'.format(EC*1e-6) + '\n' + \
                 'EJ = {:.4g} GHz'.format(EJ*1e-9)
             ax1.text(0.95, 0.95, textstr, transform=ax1.transAxes,
                      fontsize=11,
@@ -8736,6 +8896,153 @@ class CZ_1Q_phase_analysis(TD_Analysis):
         plt.tight_layout()
         self.save_fig(fig, **kw)
 
+
+def DAC_scan_analysis_and_plot(scan_start, scan_stop, dac, feed, dac_prefix='',perc=99.6, factor=1, smooth_window_len=31,smoothing=True,
+    overwrite_old=False, fig_format='png', verbose=False, peak_fitting_sample_n=0, plotsize=None, temperature_plots=True, current_multiplier=1):
+    plotsize = plotsize or (4,10)
+    date_folder = scan_stop.split('_')[0]
+    time_folder = scan_stop.split('_')[1]
+    out_path = a_tools.datadir+"/%s/%s_analysis_2D_Plots"%(date_folder,time_folder)
+    try:
+        os.mkdir(out_path)
+    except:
+        if not overwrite_old:
+            raise FileExistsError("Output folder exists. Either move old folder or pass option overwrite_old=True")
+
+    pdict={'amp':'all_data',
+                 'frequencies':'sweep_points',
+                 'dac':'fluxcurrent.'+dac,
+                  }
+
+    opt_dict = {'scan_label':dac_prefix+dac,
+           'exact_label_match':True}
+
+    nparams = ['amp',
+                'frequencies',
+                'dac',
+                ]
+
+    if temperature_plots:
+        nparams.append('T_mc')
+        nparams.append('T_cp')
+        pdict['T_mc'] = 'Fridge monitor.T_MClo'
+        pdict['T_cp'] = 'Fridge monitor.T_CP'
+
+
+    #retrieve data
+    spec_scans = ca.quick_analysis(t_start=scan_start, t_stop=scan_stop, options_dict=opt_dict,
+                      params_dict_TD=pdict, numeric_params=nparams)
+    #sort data
+    dac_values_unsorted = spec_scans.TD_dict['dac']
+    sorted_indices = dac_values_unsorted.argsort()
+    dac_values=np.array(dac_values_unsorted[sorted_indices], dtype=float)*current_multiplier
+    amplitude_values=np.array(spec_scans.TD_dict['amp'][sorted_indices,feed], dtype=float)
+    frequency_values=np.array(spec_scans.TD_dict['frequencies'][sorted_indices], dtype=float)
+
+    if temperature_plots:
+        T_mc=np.array(spec_scans.TD_dict['T_mc'][sorted_indices], dtype=float)
+        T_cp=np.array(spec_scans.TD_dict['T_cp'][sorted_indices], dtype=float)
+        #Plot the smoothed and fitted data
+        p = dac_values>=0
+        n = dac_values<=0
+        scale = floor(2*max(T_cp)/max(T_mc))/2
+        plt.title('Temperatures, feedline %d, %s %s'%(feed,dac_prefix, dac))
+        if n is not None and len(n) > 0:
+            plt.plot(-dac_values[n]*1e3, T_mc[n]*1e3, label='Mixing Chamber (negative current)')
+            plt.plot(-dac_values[n]*1e3, T_cp[n]*1e3/10, label='Cold Plate/%d (negative)'%scale)
+        if p is not None and len(p) > 0:
+            plt.plot(dac_values[p]*1e3, T_mc[p]*1e3, label='Mixing Chamber (positive)')
+            plt.plot(dac_values[p]*1e3, T_cp[p]*1e3/10, label='Cold Plate/10 (positive)')
+        plt.xlabel(r'Flux bias current, I (mA)')
+        plt.ylabel('Temperature (mK)')
+        plt.legend()
+        plt.ylim(0,40)
+        plt.savefig(out_path+"/temperatures-feed_%d_%s%s.%s"%(feed,dac_prefix,dac,fig_format))
+        if verbose:
+            plt.show()
+        plt.close()
+
+    smoothed_amplitude_values = np.zeros_like(amplitude_values)
+    peak_frequencies = np.zeros_like(amplitude_values[:,0], dtype=object)
+    peak_amplitudes = np.zeros_like(amplitude_values[:,0], dtype=object)
+    Qis = np.zeros_like(amplitude_values[:,0], dtype=float)
+
+    #Smooth data and find peeks
+    for i, dac_value in enumerate(dac_values):
+        # try:
+        #     a = Homodyne_Analysis(label='-D4_dac_channel_%s_%.3f'%(dac, dac_value), close_fig=True, show=False)
+        #     Qis[i] = a.fit_results.params['Qi']
+        # except:
+        #     pass
+        peaks_x, peaks_z,smoothed_z=a_tools.peak_finder_v3(frequency_values[i], amplitude_values[i], smoothing=smoothing, perc=perc,  window_len=smooth_window_len,factor=factor)
+        #save peaks and smoothed data
+        smoothed_amplitude_values[i,:] = smoothed_z
+        peak_frequencies[i] = peaks_x
+        peak_amplitudes[i] = peaks_z
+
+    # plt.title('Qi, feedline %d, %s %s'%(feed,dac_prefix, dac))
+    # plt.plot(dac_values*1e3, Qis)
+    # plt.xlabel(r'Flux bias current, I (mA)')
+    # plt.ylabel('Quality Factor (-)')
+    # plt.savefig(out_path+"/Qis-feed_%d_%s%s.%s"%(feed,dac_prefix,dac,fig_format))
+    # if verbose:
+    #     plt.show()
+    # plt.close()
+
+    #Plot parameters
+    spec_scans.plot_dicts['arches'] = {'plotfn': spec_scans.plot_colorx,
+                    'xvals': dac_values*1e3,
+                    'yvals': frequency_values*1e-9,
+                    'zvals': smoothed_amplitude_values.transpose(),
+                    'title': 'transmission, feedline {} '.format(feed)+dac_prefix+dac+'_'+scan_stop,
+                    'xlabel': r'Flux bias current, I (mA)',
+                    'ylabel': r'Frequency (GHz)',
+                    'zlabel': 'Homodyne amplitude (mV)',
+                    'zrange': [smoothed_amplitude_values.min(), smoothed_amplitude_values.max()],
+                    'plotsize': (8,8),
+                    'cmap':'YlGn_r',
+                    }
+
+    #Plot the smoothed and fitted data
+    plt.title('Peak finder sample, feedline %d, %s %s'%(feed, dac_prefix, dac))
+    plt.plot(frequency_values[peak_fitting_sample_n]*1e-9, amplitude_values[peak_fitting_sample_n], label='Raw Data')
+    plt.plot(frequency_values[peak_fitting_sample_n]*1e-9, smoothed_amplitude_values[peak_fitting_sample_n], label='Smoothed Data')
+    for i,peak in enumerate(peak_frequencies[peak_fitting_sample_n]):
+        if verbose:
+            print("%.6f GHz" % (peak*1e-9))
+        plt.scatter(peak*1e-9,peak_amplitudes[peak_fitting_sample_n][i])
+    plt.xlabel('Frequency (GHz)')
+    plt.ylabel('Homodyne amplitude (mV)')
+    plt.legend()
+    plt.savefig(out_path+"/peaks-feed_%d_%s%s.%s"%(feed,dac_prefix,dac,fig_format))
+    if verbose:
+        plt.show()
+    plt.close()
+
+    fig = plt.figure(figsize=plotsize)
+    ax = fig.add_subplot(111)
+    spec_scans.axs['arches'] = ax
+    spec_scans.plot()
+    peaks_container=[]
+
+    txt_file = out_path+'/peaks-feed_%d_%s%s.txt'%(feed,dac_prefix, dac)
+    f=open(txt_file, 'w+')
+
+    for i, dac_value in enumerate(dac_values):
+        line = ','.join(str(x) for x in peak_frequencies[i])
+        f.write('['+line + ']\n')
+        #print(dac_value,line)
+        for peak in peak_frequencies[i]:
+            ax.scatter(dac_value*1e3, peak*1e-9, color='b', s=9)
+    f.close()
+
+    ax.xaxis.label.set_fontsize(10)
+    ax.yaxis.label.set_fontsize(10)
+    ax.title.set_fontsize(10)
+    if verbose:
+        plt.show()
+    fig.savefig(out_path+"/2D_plot-feed_%d_%s%s.%s"%(feed,dac_prefix,dac,fig_format))
+    plt.close()
 
 def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
                            predistort=True, plot=True, timestamp_ground=None,

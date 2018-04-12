@@ -53,6 +53,7 @@ class BaseDataAnalysis(object):
     def __init__(self, t_start: str=None, t_stop: str=None,
                  label: str='',
                  data_file_path: str=None,
+                 close_figs: bool=True,
                  options_dict: dict=None, extract_only: bool=False,
                  do_fitting: bool=False):
         '''
@@ -136,7 +137,6 @@ class BaseDataAnalysis(object):
             self.t_stop = self.t_start
         else:
             self.t_stop = t_stop
-        self.do_timestamp_blocks = self.options_dict.get('do_blocks', False)
         self.do_individual_traces = self.options_dict.get(
             'do_individual_traces', False)
         self.filter_no_analysis = self.options_dict.get(
@@ -162,7 +162,7 @@ class BaseDataAnalysis(object):
         self.options_dict['save_figs'] = self.options_dict.get(
             'save_figs', True)
         self.options_dict['close_figs'] = self.options_dict.get(
-            'close_figs', True)
+            'close_figs', close_figs)
         ####################################################
         # These options relate to what analysis to perform #
         ####################################################
@@ -205,21 +205,12 @@ class BaseDataAnalysis(object):
                     len(self.t_stop) == len(self.t_start)):
                 self.timestamps = []
                 for tt in range(len(self.t_start)):
-                    if self.do_timestamp_blocks:
-                        self.timestamps.append(
-                            a_tools.get_timestamps_in_range(
-                                self.t_start[tt], self.t_stop[tt],
-                                label=self.labels,
-                                exact_label_match=self.exact_label_match))
-                    else:
-                        self.timestamps.extend(
-                            a_tools.get_timestamps_in_range(
-                                self.t_start[tt], self.t_stop[tt],
-                                label=self.labels,
-                                exact_label_match=self.exact_label_match))
+                    self.timestamps.extend(
+                        a_tools.get_timestamps_in_range(
+                            self.t_start[tt], self.t_stop[tt],
+                            label=self.labels,
+                            exact_label_match=self.exact_label_match))
             else:
-                if self.do_timestamp_blocks:
-                    self.do_timestamp_blocks = False
                 raise ValueError("Invalid number of t_stop timestamps.")
         else:
             self.timestamps = a_tools.get_timestamps_in_range(
@@ -243,7 +234,6 @@ class BaseDataAnalysis(object):
 
         Data extraction is now supported in three different ways
             - using json
-            - using timestamp blocks
             - single timestamp only
         """
 
@@ -267,63 +257,26 @@ class BaseDataAnalysis(object):
         # this should always be extracted as it is used to determine where
         # the file is as required for datasaving
         self.params_dict['folder'] = 'folder'
+        self.raw_data_dict = a_tools.get_data_from_timestamp_list(
+            self.timestamps, param_names=self.params_dict,
+            ma_type=self.ma_type,
+            TwoD=TwoD, numeric_params=self.numeric_params,
+            filter_no_analysis=self.filter_no_analysis)
 
-        if self.do_timestamp_blocks:
-            self.raw_data_dict = {key: []
-                                  for key in list(self.params_dict.keys())}
-            self.raw_data_dict['timestamps'] = []
-            for tstamps in self.timestamps:
-                if self.verbose:
-                    print(len(tstamps), type(tstamps))
-                temp_dict = a_tools.get_data_from_timestamp_list(
-                    tstamps, param_names=self.params_dict,
-                    ma_type=self.ma_type,
-                    TwoD=TwoD, numeric_params=self.numeric_params,
-                    filter_no_analysis=self.filter_no_analysis)
-                for key in self.raw_data_dict:
-                    self.raw_data_dict[key].append(temp_dict[key])
+        # Use timestamps to calculate datetimes and add to dictionary
+        self.raw_data_dict['datetime'] = [a_tools.datetime_from_timestamp(
+            timestamp) for timestamp in self.raw_data_dict['timestamps']]
 
-            # Use timestamps to calculate datetimes and add to dictionary
-            self.raw_data_dict['datetime'] = []
-            for tstamps in self.raw_data_dict['timestamps']:
-                self.raw_data_dict['datetime'].append(
-                    [a_tools.datetime_from_timestamp(ts) for ts in tstamps])
-
-            # Convert temperature data to dictionary form and extract Tmc
-            # N.B. This has the hardcoded temperature names from pycqed_py2
-            if 'temperatures' in self.raw_data_dict:
-                self.raw_data_dict['Tmc'] = []
-                for ii, temperatures in enumerate(
-                        self.raw_data_dict['temperatures']):
-                    temp = []
-                    self.raw_data_dict['Tmc'].append([])
-                    for ii in range(len(temperatures)):
-                        exec("temp.append(%s)" % (temperatures[ii]))
-                        self.raw_data_dict['Tmc'][ii].append(
-                            temp[ii].get('T_MClo', None))
-                    self.raw_data_dict['temperatures'][ii] = temp
-
-        else:
-            self.raw_data_dict = a_tools.get_data_from_timestamp_list(
-                self.timestamps, param_names=self.params_dict,
-                ma_type=self.ma_type,
-                TwoD=TwoD, numeric_params=self.numeric_params,
-                filter_no_analysis=self.filter_no_analysis)
-
-            # Use timestamps to calculate datetimes and add to dictionary
-            self.raw_data_dict['datetime'] = [a_tools.datetime_from_timestamp(
-                timestamp) for timestamp in self.raw_data_dict['timestamps']]
-
-            # Convert temperature data to dictionary form and extract Tmc
-            if 'temperatures' in self.raw_data_dict:
-                temp = []
-                self.raw_data_dict['Tmc'] = []
-                for ii in range(len(self.raw_data_dict['temperatures'])):
-                    exec("temp.append(%s)" %
-                         (self.raw_data_dict['temperatures'][ii]))
-                    self.raw_data_dict['Tmc'].append(
-                        temp[ii].get('T_MClo', None))
-                self.raw_data_dict['temperatures'] = temp
+        # Convert temperature data to dictionary form and extract Tmc
+        if 'temperatures' in self.raw_data_dict:
+            temp = []
+            self.raw_data_dict['Tmc'] = []
+            for ii in range(len(self.raw_data_dict['temperatures'])):
+                exec("temp.append(%s)" %
+                     (self.raw_data_dict['temperatures'][ii]))
+                self.raw_data_dict['Tmc'].append(
+                    temp[ii].get('T_MClo', None))
+            self.raw_data_dict['temperatures'] = temp
 
         # this is a hacky way to use the same data extraction when there is
         # many files as when there is few files.
@@ -476,45 +429,31 @@ class BaseDataAnalysis(object):
             if fit_guess_fn is None:
                 fit_guess_fn = model.guess
 
-            if self.do_timestamp_blocks:
-                fit_dict['fit_res'] = []
-                for tt in range(len(fit_yvals)):
-                    if guess_pars is None:
-                        if guess_dict is None:
-                            guess_dict = fit_guess_fn(**fit_yvals[tt],
-                                                      **fit_xvals[tt])
-                        for key, val in list(guess_dict.items()):
-                            model.set_param_hint(key, **val)
-                        guess_pars = model.make_params()
-                    fit_dict['fit_res'].append(
-                        model.fit(params=guess_pars, **fit_xvals[tt],
-                                  **fit_yvals[tt]))
-            else:
-                if guess_pars is None:
-                    if fit_guess_fn is not None:
-                        # a fit function should return lmfit parameter objects
-                        # but can also work by returning a dictionary of guesses
-                        guess_pars = fit_guess_fn(**fit_yvals, **fit_xvals)
-                        if not isinstance(guess_pars, lmfit.Parameters):
-                            for gd_key, val in list(guess_pars.items()):
-                                model.set_param_hint(gd_key, **val)
-                            guess_pars = model.make_params()
-
-                        if guess_dict is not None:
-                            for gd_key, val in guess_dict.items():
-                                for attr, attr_val in val.items():
-                                    # e.g. setattr(guess_pars['frequency'], 'value', 20e6)
-                                    setattr(guess_pars[gd_key], attr, attr_val)
-                        # A guess can also be specified as a dictionary.
-                        # additionally this can be used to overwrite values
-                        # from the guess functions.
-                    else:
-                        for key, val in list(guess_dict.items()):
-                            model.set_param_hint(key, **val)
+            if guess_pars is None:
+                if fit_guess_fn is not None:
+                    # a fit function should return lmfit parameter objects
+                    # but can also work by returning a dictionary of guesses
+                    guess_pars = fit_guess_fn(**fit_yvals, **fit_xvals)
+                    if not isinstance(guess_pars, lmfit.Parameters):
+                        for gd_key, val in list(guess_pars.items()):
+                            model.set_param_hint(gd_key, **val)
                         guess_pars = model.make_params()
 
-                fit_dict['fit_res'] = model.fit(
-                    params=guess_pars, **fit_xvals, **fit_yvals)
+                    if guess_dict is not None:
+                        for gd_key, val in guess_dict.items():
+                            for attr, attr_val in val.items():
+                                # e.g. setattr(guess_pars['frequency'], 'value', 20e6)
+                                setattr(guess_pars[gd_key], attr, attr_val)
+                    # A guess can also be specified as a dictionary.
+                    # additionally this can be used to overwrite values
+                    # from the guess functions.
+                else:
+                    for key, val in list(guess_dict.items()):
+                        model.set_param_hint(key, **val)
+                    guess_pars = model.make_params()
+
+            fit_dict['fit_res'] = model.fit(
+                params=guess_pars, **fit_xvals, **fit_yvals)
 
             self.fit_res[key] = fit_dict['fit_res']
 
@@ -596,7 +535,14 @@ class BaseDataAnalysis(object):
                     plotfn = getattr(self, pdict['plotfn'])
                 else:
                     plotfn = pdict['plotfn']
-                plotfn(pdict, axs=self.axs[pdict['ax_id']])
+                # ensures the argument convention is preserved
+                if hasattr(self, plotfn.__name__):
+                    plotfn(pdict, axs=self.axs[pdict['ax_id']])
+                else:
+                    # Calling the function passing along anything
+                    # defined in the specific plot dict as kwargs
+                    plotfn(ax=self.axs[pdict['ax_id']], **pdict)
+
             self.format_datetime_xaxes(key_list)
             self.add_to_plots(key_list=key_list)
 
@@ -848,9 +794,22 @@ class BaseDataAnalysis(object):
             axs.figure.tight_layout()
 
     def plot_colorxy(self, pdict, axs):
+        """
+        This wraps flex_colormesh_plot_vs_xy which excepts data of shape
+            x -> 1D array
+            y -> 1D array
+            z -> 2D array (shaped (xl, yl))
+        """
         self.plot_color2D(flex_colormesh_plot_vs_xy, pdict, axs)
 
     def plot_colorx(self, pdict, axs):
+        """
+        This wraps flex_color_plot_vs_x which excepts data of shape
+            x -> 1D array
+            y -> list "xl" 1D arrays
+            z -> list "xl" 1D arrays
+        """
+
         self.plot_color2D(flex_color_plot_vs_x, pdict, axs)
 
     def plot_color2D_grid_idx(self, pfunc, pdict, axs, idx):
@@ -905,7 +864,7 @@ class BaseDataAnalysis(object):
         plot_xvals = pdict['xvals']
         plot_yvals = pdict['yvals']
         plot_cbar = pdict.get('plotcbar', True)
-        plot_cmap = pdict.get('cmap', 'YlGn')
+        plot_cmap = pdict.get('cmap', 'viridis')
         plot_zrange = pdict.get('zrange', None)
         plot_yrange = pdict.get('yrange', None)
         plot_xrange = pdict.get('xrange', None)
@@ -945,15 +904,9 @@ class BaseDataAnalysis(object):
             trace['xvals'] = [plot_xvals]
             trace['zvals'] = [plot_zvals]
 
-        # FIXME: we should get rid of do_timestamps_blocks
-        if self.do_timestamp_blocks:
-            block['xvals'] = trace['xvals']
-            block['yvals'] = trace['yvals']
-            block['zvals'] = trace['zvals']
-        else:
-            block['xvals'] = [trace['xvals']]
-            block['yvals'] = [trace['yvals']]
-            block['zvals'] = [trace['zvals']]
+        block['xvals'] = [trace['xvals']]
+        block['yvals'] = [trace['yvals']]
+        block['zvals'] = [trace['zvals']]
 
         for ii in range(len(block['zvals'])):
             traces = {}
@@ -974,14 +927,6 @@ class BaseDataAnalysis(object):
                             zvals=traces['zvals'][tt],  # .transpose(),
                             transpose=plot_transpose,
                             normalize=plot_normalize)
-
-        # else:
-        #     out = pfunc(ax=axs, clim=fig_clim, cmap=plot_cmap,
-        #                 xvals=plot_xvals,
-        #                 yvals=plot_yvals,
-        #                 zvals=plot_zvals.transpose(),
-        #                 transpose=plot_transpose,
-        #                 normalize=plot_normalize)
 
         if plot_xrange is None:
             if plot_xwidth is not None:
@@ -1113,7 +1058,7 @@ class BaseDataAnalysis(object):
         plot_xpos = pdict.get('xpos', .98)
         plot_ypos = pdict.get('ypos', .98)
         verticalalignment = pdict.get('verticalalignment', 'top')
-        horizontalalignment = pdict.get('verticalalignment', 'right')
+        horizontalalignment = pdict.get('horizontalalignment', 'right')
 
         # fancy box props is based on the matplotlib legend
         box_props = pdict.get('box_props', 'fancy')

@@ -927,24 +927,79 @@ class lutman_par_dB_attenuation_UHFQC_dig_trig(Soft_Sweep):
             self.LutMan.AWG.get_instr().acquisition_arm(single=self.single)
 
 
+class dB_attenuation_UHFQC_dig_trig(Soft_Sweep):
+    def __init__(self, LutMan, LutMan_parameter, run=False, **kw):
+        self.set_kw()
+        self.name = LutMan_parameter.name
+        self.parameter_name = LutMan_parameter.label
+        self.unit = 'dB'
+        self.sweep_control = 'soft'
+        self.LutMan = LutMan
+        self.LutMan_parameter = LutMan_parameter
+        self.run = run
+
+    def set_parameter(self, val):
+        self.LutMan_parameter.set(10**(val/20))
+        if self.run:
+            self.LutMan.AWG.get_instr().awgs_0_enable(False)
+        self.LutMan.load_DIO_triggered_sequence_onto_UHFQC()
+        if self.run:
+            self.LutMan.AWG.get_instr().acquisition_arm(single=self.single)
+class UHFQC_pulse_dB_attenuation(Soft_Sweep):
+
+    def __init__(self, UHFQC, IF, dig_trigger=True,**kw):
+        self.set_kw()
+        self.name = 'UHFQC pulse attenuation'
+        self.parameter_name = 'pulse attenuation'
+        self.unit = 'dB'
+        self.sweep_control = 'soft'
+        self.UHFQC = UHFQC
+        self.dig_trigger = dig_trigger
+        self.IF = IF
+
+
+    def set_parameter(self, val):
+        self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(f_RO_mod=self.IF,RO_amp=10**(val/20),RO_pulse_length=2e-6,acquisition_delay=200e-9,dig_trigger=self.dig_trigger)
+        time.sleep(1)
+        #print('refreshed UHFQC')
+
+class multi_sweep_function(Soft_Sweep):
+    '''
+    cascades several sweep functions into a single joint sweep functions.
+    '''
+    def __init__(self, sweep_functions: list, parameter_name=None,name=None,**kw):
+        self.set_kw()
+        self.sweep_functions = sweep_functions
+        self.sweep_control = 'soft'
+        self.name = name or 'multi_sweep'
+        self.unit = sweep_functions[0].unit
+        self.parameter_name = parameter_name or 'multiple_parameters'
+        for i, sweep_function in enumerate(sweep_functions):
+            if self.unit.lower() != sweep_function.unit.lower():
+                raise ValueError('units of the sweepfunctions are not equal')
+
+    def set_parameter(self, val):
+        for sweep_function in self.sweep_functions:
+            sweep_function.set_parameter(val)
+
 class two_par_joint_sweep(Soft_Sweep):
     """
     Allows jointly sweeping two parameters while preserving their
     respective ratios.
+    Allows par_A and par_B to be arrays of parameters
     """
     def __init__(self, par_A, par_B, preserve_ratio: bool=True, **kw):
         self.set_kw()
-        self.name = par_A.name
-        self.parameter_name = par_A.name
         self.unit = par_A.unit
         self.sweep_control = 'soft'
-
         self.par_A = par_A
         self.par_B = par_B
+        self.name = par_A.name
+        self.parameter_name = par_A.name
         if preserve_ratio:
             try:
                 self.par_ratio = self.par_B.get()/self.par_A.get()
-            except NotImplementedError:
+            except:
                 self.par_ratio = (self.par_B.get_latest()/
                                   self.par_A.get_latest())
         else:
