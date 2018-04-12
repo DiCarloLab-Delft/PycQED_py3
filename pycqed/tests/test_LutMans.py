@@ -207,7 +207,10 @@ class Test_Flux_LutMan(unittest.TestCase):
         self.fluxlutman.cfg_awg_channel(1)
 
     def test_plot_flux_arc(self):
-        self.fluxlutman.plot_flux_arc(show=False)
+        self.fluxlutman.plot_flux_arc(show=False, plot_cz_trajectory=True)
+
+    def test_plot_cz_trajectory(self):
+        self.fluxlutman.plot_cz_trajectory(show=False)
 
     def test_generate_standard_flux_waveforms(self):
         self.fluxlutman.generate_standard_waveforms()
