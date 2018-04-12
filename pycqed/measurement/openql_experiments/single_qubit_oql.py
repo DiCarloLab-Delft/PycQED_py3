@@ -316,6 +316,75 @@ def echo(times, qubit_idx: int, platf_cfg: str):
     return p
 
 
+def idle_error_rate_seq(nr_of_idle_gates,
+                        states: list,
+                        gate_duration_ns: int,
+                        echo: bool,
+                        qubit_idx: int, platf_cfg: str,
+                        post_select=True):
+    """
+    Sequence to perform the idle_error_rate_sequence.
+    Virtually identical to a T1 experiment (Z-basis)
+                        or a ramsey/echo experiment (X-basis)
+
+    Input pars:
+        nr_of_idle_gates : list of integers specifying the number of idle gates
+            corresponding to each data point.
+        gate_duration_ns : integer specifying the duration of the wait gate.
+        states  :       list of states to prepare
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+    Returns:
+        p:              OpenQL Program object containing
+
+
+    """
+    allowed_states = ['0', '1', '+']
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="idle_error_rate", nqubits=platf.get_qubit_number(),
+                p=platf)
+    sweep_points = []
+    for N in nr_of_idle_gates:
+        for state in states:
+            if state not in allowed_states:
+                raise ValueError('State must be in {}'.format(allowed_states))
+            k = Kernel("idle_prep{}_N{}".format(state, N), p=platf)
+            # 1. Preparing in the right basis
+            k.prepz(qubit_idx)
+            if post_select:
+                # adds an initialization measurement used to post-select
+                k.measure(qubit_idx)
+            if state =='1':
+                k.gate('rx180', qubit_idx)
+            elif state == '+':
+                k.gate('rym90', qubit_idx)
+            # 2. The "waiting" gates
+            wait_nanoseconds = N*gate_duration_ns
+            if state == '+' and echo:
+                k.gate("wait", [qubit_idx], wait_nanoseconds//2)
+                k.gate('rx180', qubit_idx)
+                k.gate("wait", [qubit_idx], wait_nanoseconds//2)
+            else:
+                k.gate("wait", [qubit_idx], wait_nanoseconds)
+            # 3. Reading out in the proper basis
+            if state == '+' and echo:
+                k.gate('rym90', qubit_idx)
+            elif state =='+':
+                k.gate('ry90', qubit_idx)
+            k.measure(qubit_idx)
+            p.add_kernel(k)
+        sweep_points.append(N)
+
+    p.set_sweep_points(sweep_points, num_sweep_points=len(sweep_points))
+    p.sweep_points = sweep_points
+    with suppress_stdout():
+        p.compile(verbose=False)
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
+
 def single_elt_on(qubit_idx: int, platf_cfg: str):
     platf = Platform('OpenQL_Platform', platf_cfg)
     p = Program(pname="Single_elt_on", nqubits=platf.get_qubit_number(),
@@ -611,9 +680,10 @@ def add_single_qubit_cal_points(p, platf, qubit_idx):
         k.gate('rx180', qubit_idx)
         k.measure(qubit_idx)
         p.add_kernel(k)
+    return p
 
 
-def FluxTimingCalibration(qubit_idx: int, buffer_time1, times, platf_cfg: str,
+def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
                           cal_points: bool=True):
     """
     A Ramsey sequence with varying waiting times `times` around a flux pulse.
@@ -622,7 +692,6 @@ def FluxTimingCalibration(qubit_idx: int, buffer_time1, times, platf_cfg: str,
     p = Program(pname="FluxTimingCalibration", nqubits=platf.get_qubit_number(),
                 p=platf)
 
-    buffer_nanoseconds1 = int(round(buffer_time1/1e-9))
     # don't use last 4 points if calibration points are used
     if cal_points:
         times= times[:-4]
@@ -632,8 +701,6 @@ def FluxTimingCalibration(qubit_idx: int, buffer_time1, times, platf_cfg: str,
         k = Kernel("pifluxpi", p=platf)
         k.prepz(qubit_idx)
         k.gate('rx90', qubit_idx)
-        if buffer_nanoseconds1 > 10:
-            k.gate("wait", [qubit_idx], buffer_nanoseconds1)
         k.gate('fl_cw_02', 2, 0)
         if t_nanoseconds > 10:
             k.gate("wait", [qubit_idx], t_nanoseconds)
@@ -693,3 +760,72 @@ def FluxTimingCalibration_2q(q0, q1, buffer_time1, times, platf_cfg: str):
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
+
+
+def FastFeedbackControl(lantecy, qubit_idx: int, platf_cfg: str):
+    """
+    Single qubit sequence to test fast feedback control (fast conditional
+    execution).
+    Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
+
+    Input pars:
+        lantecy:        the waiting time between measurement and the feedback
+                          pulse, which should be longer than the feedback
+                          latency.
+        feedback:       if apply
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+    Returns:
+        p:              OpenQL Program object containing
+
+
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="FastFdbkCtrl", nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    k = Kernel("FastFdbkCtrl_nofb", p=platf)
+    k.prepz(qubit_idx)
+    k.gate('rx90', qubit_idx)
+    # k.gate('rx180', qubit_idx)
+    k.measure(qubit_idx)
+    wait_nanoseconds = int(round(lantecy/1e-9))
+    k.gate("wait", [qubit_idx], wait_nanoseconds)
+    k.gate("i", qubit_idx)
+    k.measure(qubit_idx)
+
+    p.add_kernel(k)
+
+    k = Kernel("FastFdbkCtrl_fb0", p=platf)
+    k.prepz(qubit_idx)
+    k.gate('rx90', qubit_idx)
+    # k.gate('rx180', qubit_idx)
+    k.measure(qubit_idx)
+    wait_nanoseconds = int(round(lantecy/1e-9))
+    k.gate("wait", [qubit_idx], wait_nanoseconds)
+    k.gate('C0rx180', qubit_idx)  # fast feedback control here
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+
+    k = Kernel("FastFdbkCtrl_fb1", p=platf)
+    k.prepz(qubit_idx)
+    k.gate('rx90', qubit_idx)
+    # k.gate('rx180', qubit_idx)
+    k.measure(qubit_idx)
+    wait_nanoseconds = int(round(lantecy/1e-9))
+    k.gate("wait", [qubit_idx], wait_nanoseconds)
+    k.gate('C1rx180', qubit_idx)  # fast feedback control here
+    k.measure(qubit_idx)
+    p.add_kernel(k)
+
+    # adding the calibration points
+    add_single_qubit_cal_points(p, platf=platf, qubit_idx=qubit_idx)
+
+    with suppress_stdout():
+        p.compile(verbose=False)
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+

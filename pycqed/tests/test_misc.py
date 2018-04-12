@@ -79,3 +79,15 @@ class Test_misc(unittest.TestCase):
         val = gen.getFromDict(test_dict, ['a', 'nest_a'])
         self.assertEqual(val, 23)
         self.assertEqual(test_dict, {'a': {'nest_a': 23}})
+
+
+class Test_int_to_base(unittest.TestCase):
+
+    def test_int2base(self):
+        self.assertEqual(gen.int2base(11, base=3), '102')
+
+        self.assertEqual(gen.int2base(11, base=3, fixed_length=5), '00102')
+
+        self.assertEqual(gen.int2base(0, base=3, fixed_length=3), '000')
+
+        self.assertEqual(gen.int2base(0, base=3), '0')

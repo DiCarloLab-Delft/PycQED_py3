@@ -16,6 +16,7 @@ before_install:
     - chmod +x miniconda.sh
     - ./miniconda.sh -b -p /home/travis/mc
     - export PATH=/home/travis/mc/bin:$PATH
+    - export PYTHONPATH=$PYTHONPATH:$(pwd)
 
 
 # command to install dependencies
@@ -38,7 +39,11 @@ install:
 
     - pip install --upgrade pip
     - pip install -r requirements.txt
+    - pip install ply # a requirement for pygsti
+    - pip install plotly # a requirement for pygsti
+    - pip install networkx # a requirement for pygsti
     - pip install git+git://github.com/DiCarloLab-Delft/Qcodes.git
+    - pip install git+git://github.com/AdriaanRol/AutoDepGraph.git@v02_networkx_rewrite
     - pip install coverage pytest-cov pytest --upgrade
     - pip install coveralls
     - pip install codacy-coverage

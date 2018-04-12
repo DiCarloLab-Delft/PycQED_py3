@@ -11,7 +11,7 @@ import pycqed.measurement.randomized_benchmarking.randomized_benchmarking \
     as rb
 
 from pycqed.measurement.randomized_benchmarking.clifford_decompositions \
-    import(gate_decomposition)
+    import(gate_decomposition, epstein_fixed_length_decomposition)
 
 from pycqed.measurement.randomized_benchmarking import \
     two_qubit_clifford_group as tqc
@@ -95,10 +95,15 @@ class TestGateDecomposition(TestCase):
         for gate in gate_decomposition:
             self.assertEqual(gate_decomposition.count(gate), 1)
 
-    def test_average_number_of_gates(self):
+    def test_average_number_of_gates_epst_efficient(self):
         from itertools import chain
         avg_nr_gates = len(list(chain(*gate_decomposition)))/24
         self.assertEqual(avg_nr_gates, 1.875)
+
+    def test_average_number_of_gates_epst_fixed_length(self):
+        from itertools import chain
+        avg_nr_gates = len(list(chain(*epstein_fixed_length_decomposition)))/24
+        self.assertEqual(avg_nr_gates, 3)
 
 
 ######################################################################
@@ -209,34 +214,7 @@ class Test_CliffordGroupProperties(TestCase):
         self.assertEqual(len(hash_table), 11520)
         self.assertEqual(len(np.unique(hash_table)), 11520)
 
-class TestPauliTransferProps(TestCase):
-    """
-    Only the most basic test for the transfer matrices.
-    Intended to catch silly things like typos
-    """
 
-    def test_single_qubit_Paulis(self):
-        for pauli in [X, Y, Z]:
-            pauli2 = np.dot(pauli,pauli)
-            np.testing.assert_array_equal(pauli2,
-                                          np.eye(4, dtype=int))
-    def test_Hadamard(self):
-        np.testing.assert_array_equal(np.dot(H, H),
-                                      np.eye(4, dtype=int))
-    def test_S_gate(self):
-        np.testing.assert_array_equal(np.dot(S, S), S2)
-        np.testing.assert_array_equal(np.dot(S, S2), np.eye(4,dtype=int))
-
-    def test_cphase(self):
-            CZ2 = np.linalg.multi_dot([CZ, CZ])
-            CZ2 = np.dot(CZ, CZ)
-            np.testing.assert_array_equal(CZ2, np.eye(16, dtype=int))
-
-
-    def test_cphase(self):
-        CZ2 = np.linalg.multi_dot([CZ, CZ])
-        CZ2 = np.dot(CZ, CZ)
-        np.testing.assert_array_equal(CZ2, np.eye(16, dtype=int))
 
 
 class TestCliffordCalculus(TestCase):
@@ -335,11 +313,45 @@ class TestCliffordClassRBSeqs(TestCase):
         seeds = [0, 100, 200, 300, 400]
         net_cliffs = np.arange(len(seeds))
         for seed, net_cl in zip(seeds, net_cliffs):
-            cliffords_single_qubit_class = rb.single_qubit_randomized_benchmarking_sequence(
-                n_cl=20, desired_net_cl=0, seed=0)
-            cliffords = rb.randomized_benchmarking_sequence(
+            cliffords_single_qubit_class = rb.randomized_benchmarking_sequence(
+                n_cl=20, desired_net_cl=0,  number_of_qubits=1, seed=0)
+            cliffords = rb.randomized_benchmarking_sequence_old(
                 n_cl=20, desired_net_cl=0, seed=0)
             np.testing.assert_array_equal(cliffords_single_qubit_class, cliffords)
+
+    def test_interleaved_randomized_benchmarking_sequence_1Q(self):
+        seeds = [0, 100, 200, 300, 400]
+        net_cliffs = np.arange(len(seeds))
+        for seed, net_cl in zip(seeds, net_cliffs):
+            intl_cliffords = rb.randomized_benchmarking_sequence(
+                n_cl=20, desired_net_cl=0, number_of_qubits=1, seed=0,
+                interleaving_cl=0)
+            cliffords = rb.randomized_benchmarking_sequence(
+                n_cl=20, desired_net_cl=0, seed=0)
+
+            new_cliff = np.empty(cliffords.size*2-1, dtype=int)
+            new_cliff[0::2] = cliffords
+            new_cliff[1::2] = 0
+            np.testing.assert_array_equal(intl_cliffords,
+                                          new_cliff)
+
+
+    def test_interleaved_randomized_benchmarking_sequence_2Q(self):
+        seeds = [0, 100, 200, 300, 400]
+        net_cliffs = np.arange(len(seeds))
+        for seed, net_cl in zip(seeds, net_cliffs):
+            intl_cliffords = rb.randomized_benchmarking_sequence(
+                n_cl=20, desired_net_cl=0, number_of_qubits=2, seed=0,
+                interleaving_cl=0)
+            cliffords = rb.randomized_benchmarking_sequence(
+                n_cl=20, number_of_qubits=2, desired_net_cl=0, seed=0)
+
+            new_cliff = np.empty(cliffords.size*2-1, dtype=int)
+            new_cliff[0::2] = cliffords
+            new_cliff[1::2] = 0
+            np.testing.assert_array_equal(intl_cliffords,
+                                          new_cliff)
+
 
     def test_two_qubit_randomized_benchmarking_sequence(self):
         """
@@ -347,8 +359,12 @@ class TestCliffordClassRBSeqs(TestCase):
         seeds = [0, 100, 200, 300, 400]
         net_cliffs = np.arange(len(seeds))
         for seed, net_cl in zip(seeds, net_cliffs):
-            rb.Two_qubit_randomized_benchmarking_sequence(
-                n_cl=20, desired_net_cl=0, seed=0)
+            rb.randomized_benchmarking_sequence(
+                n_cl=20, desired_net_cl=0, number_of_qubits=2, seed=0)
+
+
+            # rb.two_qubit_randomized_benchmarking_sequence(
+            #     n_cl=20, desired_net_cl=0, seed=0)
             # no test for correctness here. Corectness depend on the fact
             # that it implements code very similar to the Single qubit version
             # and has components that are all tested.

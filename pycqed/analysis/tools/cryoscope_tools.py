@@ -2,6 +2,7 @@
 Tools to for cryoscope analysis
 Brian Tarasinski
 Dec 2017
+Edited by Adriaan Rol
 """
 
 import numpy as np
@@ -239,21 +240,16 @@ class CryoscopeAnalyzer:
             plt.plot(self.time, self.phase % (2 * np.pi), ".", color="C0")
         else:
             plt.plot(self.time, self.phase, ".", label="Im", color="C0")
-        plt.xlabel("Time")
-        plt.ylabel("Phase")
-        formatter = matplotlib.ticker.EngFormatter(unit='s')
-        ax.xaxis.set_major_formatter(formatter)
+        set_xlabel(ax, 'Time', 's')
+        set_ylabel(ax, 'Phase', 'deg')
+
 
     def plot_detuning(self):
         ax = plt.gca()
         plt.title("Detuning from demodulation frequency")
         plt.plot(self.time, self.detuning, ".-", color="C0")
-        plt.xlabel("Time")
-        plt.ylabel("Frequency")
-        formatter = matplotlib.ticker.EngFormatter(unit='s')
-        ax.xaxis.set_major_formatter(formatter)
-        formatter = matplotlib.ticker.EngFormatter(unit='Hz')
-        ax.yaxis.set_major_formatter(formatter)
+        set_xlabel(ax, 'Time', 's')
+        set_ylabel(ax, 'Frequency', 'Hz')
 
     def plot_frequency(self, nyquists=None, style=".-", show_demod_freq=True):
         ax = plt.gca()
@@ -263,7 +259,7 @@ class CryoscopeAnalyzer:
             nyquists = [self.nyquist_order]
         for n in nyquists:
             if show_demod_freq:
-                plt.axhline(-self.demod_freq + self.sampling_rate*n)
+                plt.axhline(-self.demod_freq + self.sampling_rate*n, linestyle='--', c='grey')
             real_detuning = self.get_real_detuning(n)
             ax.plot(self.time, real_detuning, style)
         set_xlabel(ax, 'Time', 's')
@@ -428,28 +424,27 @@ class DacArchAnalysis:
 
         return roots[real_mask][np.argmin(dist_from_range)].real
 
-    def plot_freqs(self):
-        plt.plot(self.amps, self.freqs, ".-")
-        ax = plt.gca()
-        formatter = matplotlib.ticker.EngFormatter(unit='Hz')
-        ax.yaxis.set_major_formatter(formatter)
-        plt.xlabel("Amplitude")
-        plt.ylabel("Detuning")
+    def plot_freqs(self, ax=None, title='', **kw):
+        if ax is None:
+            ax = plt.gca()
+        ax.set_title(title)
+        ax.plot(self.amps, self.freqs, ".-")
+        set_xlabel(ax, "Amplitude") #a.u.
+        set_ylabel(ax, 'Detuning', 'Hz')
 
         aa = np.linspace(min(self.amps), max(self.amps), 50)
 
-        plt.plot(aa, np.polyval(self.poly_fit, aa))
+        ax.plot(aa, np.polyval(self.poly_fit, aa))
 
-    def plot_ffts(self, nyquist_unwrap=False):
-
+    def plot_ffts(self, ax=None, title='', nyquist_unwrap=False, **kw):
+        if ax is None:
+            ax = plt.gca()
         if nyquist_unwrap:
             raise NotImplementedError
-
+        ax.set_title(title)
         ffts = np.fft.fft(self.norm_data)
 
         freqs = np.arange(len(ffts[0])) * self.sampling_rate / len(ffts[0])
-
-        print("shape freqs", freqs.shape)
 
         def shift_helper(x):
             diff = np.diff(x) / 2
@@ -457,19 +452,14 @@ class DacArchAnalysis:
             xshift = np.hstack((x, x[-1])) - diff
             return xshift
 
-        print(np.diff(shift_helper(self.amps)))
-
         aa, ff = np.meshgrid(shift_helper(self.amps), shift_helper(freqs))
 
         plt.pcolormesh(aa, ff, np.abs(ffts).T)
-        plt.xlabel("Amplitude")
-        plt.ylabel("Frequency")
-        ax = plt.gca()
-        formatter = matplotlib.ticker.EngFormatter(unit='Hz')
-        ax.yaxis.set_major_formatter(formatter)
+        set_xlabel(ax, "Amplitude", 'V') #a.u.
+        set_ylabel(ax, 'Detuning', 'Hz')
 
-        plt.scatter(self.amps, self.freqs % self.sampling_rate, color="C1")
+        ax.scatter(self.amps, self.freqs % self.sampling_rate, color="C1")
 
         aa = np.linspace(min(self.amps), max(self.amps), 300)
 
-        plt.plot(aa, np.polyval(self.poly_fit, aa) % self.sampling_rate, ".r")
+        ax.plot(aa, np.polyval(self.poly_fit, aa) % self.sampling_rate, ".r")

@@ -21,17 +21,18 @@ mac_dict = {'203178706891063': 'CDickel_Desktop',
             '23213':'Malay_Laptop',
             '31054844829911': 'Sjoerd_laptop',
             '26830024075025': 'Qudev_testbench',
-            '88623634748008':'LaAprilia_1'
+            '88623634748008':'LaAprilia_1',
+            '215977245830009': 'LaVespa',
             }
 
 data_dir_dict = {'tud276606_FPGA_PC': 'D:\Experiments/CBox_Testing/Data',
                  'CDickel_Desktop': 'D:\Experiments/ExperimentName/Data',
                  'Sjoerd_laptop': 'D:\data',
                  'Malay_Laptop':'D:\Tomo datasets',
-                 'Adriaans_Macbook': ('/Users/Adriaan/Documents/Testing/Data'),
+                 'Adriaans_Macbook': ('/Users/Adriaan/Dropbox/PhD-Delft/Data'),
                  'Niels_macbook': '/Users/nbultink/temp_data',
                  'La_Ferrari':  'D:\Experiments/1511_RabiSims2/Data',
-                 'TUD277449': 'D:\Experiments/1710_FlipchipS7/Data',
+                 'TUD277449': 'D:\Experiments/1801_QECVQE/Data',
                  'La_Maserati_Jr': 'D:\\Experiments\\1610_QcodesTests\\Data',
                  'La_Maserati_JrJr': 'D:\\Experiments\\1702_Starmon\\data',
                  'La_Vespa': 'D:\\Experiments\\161111_LaVespa_Intel_HR\\Data',
@@ -47,6 +48,7 @@ data_dir_dict = {'tud276606_FPGA_PC': 'D:\Experiments/CBox_Testing/Data',
                  r'Nathans_Laptop': 'D:/nlangford\My Documents\Projects\Rabi Model\Experiment_1504\Data',
                  'Bart_Laptop': 'C:\Experiments/NumericalOptimization/Data',
                  'Qudev_testbench' : r'E:\Control software\data',
+                 'LaVespa': r'D:\Experiments\18031_Intel_resonators',
                  'LaAprilia_1' : r'D:\Experiments\1802_IntelS7Airbridges'
                  #'LaAprilia_1' : r'D:\Experiments\1802_Argon\Data'
                  }
