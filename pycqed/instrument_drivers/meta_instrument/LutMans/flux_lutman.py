@@ -176,6 +176,9 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         Returns the scale factor to transform an amplitude in 'dac value' to an
         amplitude in 'V'.
 
+        "dac_value" refers to the value between -1 and +1 that is set in a
+        waveform.
+
         N.B. the implementation is specific to this type of AWG
         """
         AWG = self.AWG.get_instr()
@@ -187,6 +190,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         channel_amp = AWG.get('awgs_{}_outputs_{}_amplitude'.format(
             awg_nr, ch_pair))
 
+        # channel range of 5 corresponds to -2.5V to +2.5V
         channel_range_pp = AWG.get('sigouts_{}_range'.format(awg_ch))
         # direct_mode = AWG.get('sigouts_{}_direct'.format(awg_ch))
         scale_factor = channel_amp*(channel_range_pp/2)
