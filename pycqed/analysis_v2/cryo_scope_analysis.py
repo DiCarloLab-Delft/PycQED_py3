@@ -13,7 +13,6 @@ from scipy.stats import sem
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 
 
-
 class RamZFluxArc(ba.BaseDataAnalysis):
     """
     Analysis for the 2D scan that is used to calibrate the FluxArc.
@@ -27,11 +26,35 @@ class RamZFluxArc(ba.BaseDataAnalysis):
 
     def __init__(self, t_start: str, t_stop: str, label='arc',
                  options_dict: dict=None,
+                 ch_amp_key: str='Snapshot/instruments/AWG8_8005'
+                 '/parameters/awgs_0_outputs_1_amplitude',
+                 ch_range_key: str='Snapshot/instruments/AWG8_8005'
+                 '/parameters/sigouts_0_range',
+                 waveform_amp_key: str='Snapshot/instruments/FL_LutMan_QR'
+                 '/parameters/sq_amp',
+                 close_figs=True,
+                 nyquist_calc: str= 'auto',
+                 exclusion_indices: list=None,
+                 ch_idx_cos: int=0,
+                 ch_idx_sin: int=1,
                  f_demod: float=0, demodulate: bool=False, auto=True):
         if options_dict is None:
             options_dict = dict()
+
+        self.ch_amp_key = ch_amp_key
+        # ch_range_keycan also be set to `None`, then the value will
+        # default to 1 (no rescaling)
+        self.ch_range_key = ch_range_key
+        self.waveform_amp_key = waveform_amp_key
+        self.exclusion_indices = exclusion_indices
+        self.exclusion_indices = exclusion_indices \
+            if exclusion_indices is not None else []
+        self.nyquist_calc = nyquist_calc
+        self.ch_idx_cos = ch_idx_cos
+        self.ch_idx_sin = ch_idx_sin
+
         super().__init__(t_start=t_start, t_stop=t_stop, label=label,
-                         options_dict=options_dict)
+                         options_dict=options_dict, close_figs=close_figs)
         if auto:
             self.run_analysis()
 
@@ -48,9 +71,6 @@ class RamZFluxArc(ba.BaseDataAnalysis):
 
         self.raw_data_dict = OrderedDict()
 
-        # FIXME: this is hardcoded and should be an argument in options dict
-        amp_key = 'Snapshot/instruments/AWG8_8005/parameters/awgs_0_outputs_1_amplitude'
-
         self.raw_data_dict['amps'] = []
         self.raw_data_dict['data'] = []
 
@@ -58,8 +78,17 @@ class RamZFluxArc(ba.BaseDataAnalysis):
             a = ma_old.MeasurementAnalysis(
                 timestamp=t, auto=False, close_file=False)
             a.get_naming_and_values()
-            amp = a.data_file[amp_key].attrs['value']
-            data = a.measured_values[2] + 1j * a.measured_values[3]
+
+            ch_amp = a.data_file[self.ch_amp_key].attrs['value']
+            if self.ch_range_key is None:
+                ch_range = 1
+            else:
+                ch_range = a.data_file[self.ch_range_key].attrs['value']
+            waveform_amp = a.data_file[self.waveform_amp_key].attrs['value']
+            amp = ch_amp*ch_range/2*waveform_amp
+            # amp = ch_amp
+            data = a.measured_values[self.ch_idx_cos] + 1j * \
+                a.measured_values[self.ch_idx_sin]
             # hacky but required for data saving
             self.raw_data_dict['folder'] = a.folder
             self.raw_data_dict['amps'].append(amp)
@@ -74,7 +103,9 @@ class RamZFluxArc(ba.BaseDataAnalysis):
             self.raw_data_dict['times'],
             self.raw_data_dict['amps'],
             self.raw_data_dict['data'],
-            poly_fit_order=3, plot_fits=False)
+            exclusion_indices=self.exclusion_indices,
+            nyquist_calc=self.nyquist_calc,
+            poly_fit_order=2, plot_fits=False)
         self.proc_data_dict['dac_arc_ana'] = self.dac_arc_ana
 
         # this is the infamous dac arc conversion method
@@ -85,11 +116,13 @@ class RamZFluxArc(ba.BaseDataAnalysis):
     def prepare_plots(self):
         self.plot_dicts['freqs'] = {
             'plotfn': self.dac_arc_ana.plot_freqs,
-            'title': "Cryoscope arc \n"+self.timestamps[0]+' - '+self.timestamps[-1]}
+            'title': "Cryoscope arc \n" +
+            self.timestamps[0]+' - ' + self.timestamps[-1]}
 
         self.plot_dicts['FluxArc'] = {
             'plotfn': self.dac_arc_ana.plot_ffts,
-            'title': "Cryoscope arc \n"+self.timestamps[0]+' - '+self.timestamps[-1]}
+            'title': "Cryoscope arc \n" +
+            self.timestamps[0]+' - '+self.timestamps[-1]}
 
 
 class Cryoscope_Analysis(ba.BaseDataAnalysis):
@@ -97,6 +130,7 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
     Cryoscope analysis. Requires a function to convert frequency to amp
     for the final step of the analysis.
     """
+
     def __init__(self, t_start: str, t_stop: str,
                  freq_to_amp,
                  label='cryoscope',
@@ -163,12 +197,10 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
         self.ca.freq_to_amp = self.freq_to_amp
         self.ca.nyquist_order = self.nyquist_order
 
-
     def prepare_plots(self):
         self.plot_dicts['freqs'] = {
             'plotfn': self.dac_arc_ana.plot_freqs,
             'title': "Cryoscope arc \n"+self.timestamps[0]+' - '+self.timestamps[-1]}
-
 
         # self.plot_dicts['freqs'] = {
         #     'plotfn': self.dac_arc_ana.plot_freqs,
@@ -177,8 +209,6 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
         # self.plot_dicts['FluxArc'] = {
         #     'plotfn': self.dac_arc_ana.plot_ffts,
         #     'title': "Cryoscope arc \n"+self.timestamps[0]+' - '+self.timestamps[-1]}
-
-
 
 
 class SlidingPulses_Analysis(ba.BaseDataAnalysis):
@@ -296,14 +326,14 @@ def make_phase_plot(t, phase, phase_err, title,  ylim=None, ax=None, **kw):
                label=r'$\pm$5 deg', linewidth=0.5)
     ax.axhline(mean_phase_tail-5, ls='--', c='grey', linewidth=0.5)
     ax.legend()
-    if ylim == None:
+    if ylim is None:
         ax.set_ylim(mean_phase_tail-60, mean_phase_tail+40)
     else:
         ax.set_ylim(ylim[0], ylim[1])
 
 
 def make_amp_err_plot(t, amp, timestamp, ax=None, **kw):
-    if ax == None:
+    if ax is None:
         f, ax = plt.subplots()
 
     mean_amp = np.nanmean(amp[len(amp)//2])
