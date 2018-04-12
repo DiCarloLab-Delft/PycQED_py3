@@ -349,8 +349,12 @@ def get_data_from_ma_v2(ma, param_names, numeric_params=None):
         if param == 'all_data':
             data[param] = ma.measured_values
         elif param == 'exp_metadata':
-            data[param] = hdf5_data.read_dict_from_hdf5(
-                {}, ma.data_file['Experimental Data']['Experimental Metadata'])
+            if 'Experimental Data' not in ma.data_file or \
+               'Experimental Metadata' not in ma.data_file['Experimental Data']:
+                warnings.warn('The data file does not experimental metadata')
+            else:
+                data[param] = hdf5_data.read_dict_from_hdf5(
+                    {}, ma.data_file['Experimental Data']['Experimental Metadata'])
         elif param == 'fit_params':
             temp = ma.data_file['Analysis']
             for key in list(temp.keys()):

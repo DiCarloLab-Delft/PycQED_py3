@@ -16,7 +16,7 @@ from copy import deepcopy
 try:
     import qutip as qtp
 except ImportError as e:
-    logging.warning('Could not import qutip, tomo code will not work')
+    logging.warning('Could not import qutip, tomography code will not work')
 
 
 class AveragedTimedomainAnalysis(ba.BaseDataAnalysis):
@@ -26,15 +26,20 @@ class AveragedTimedomainAnalysis(ba.BaseDataAnalysis):
         self.params_dict = {
             'value_names': 'value_names',
             'measured_values': 'measured_values',
-            'measurementstring': 'measurementstring'}
+            'measurementstring': 'measurementstring',
+            'exp_metadata': 'exp_metadata'}
         self.numeric_params = []
         if kwargs.get('auto', True):
             self.run_analysis()
 
     def process_data(self):
+        self.metadata = self.raw_data_dict.get('exp_metadata', {})
+        if self.metadata is None:
+            self.metadata = {}
+        cal_points = self.metadata.get('cal_points', None)
+        cal_points = self.options_dict.get('cal_points', cal_points)
         cal_points_list = roa.convert_channel_names_to_index(
-            self.options_dict['cal_points'],
-            len(self.raw_data_dict['measured_values'][0]),
+            cal_points, len(self.raw_data_dict['measured_values'][0]),
             self.raw_data_dict['value_names'])
         self.proc_data_dict['cal_points_list'] = cal_points_list
         measured_values = self.raw_data_dict['measured_values']
@@ -988,11 +993,11 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
         covar_matrix: (optional) The covariance matrix of the measurement
                       operators as a 2d numpy array. Overrides the one found
                       from the calibration points.
-        single_qubit_pulses: A list of standard PycQED pulse names that were
+        basis_rots_str: A list of standard PycQED pulse names that were
                              applied to qubits before measurement
-        basis_rotations: As an alternative to single_qubit_pulses, the basis
-                         rotations applied to the system as qutip operators can
-                         be given.
+        basis_rots: As an alternative to single_qubit_pulses, the basis
+                    rotations applied to the system as qutip operators or numpy
+                    matrices can be given.
         mle: True/False, whether to do maximum likelihood fit. If False, only
              least squares fit will be done, which could give negative
              eigenvalues for the density matrix.
@@ -1002,7 +1007,7 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.single_timestamp = True
-        self.params_dict = {}
+        self.params_dict = {'exp_metadata': 'exp_metadata'}
         self.numeric_params = []
         self.data_type = self.options_dict['data_type']
         if self.data_type == 'averaged':
@@ -1028,14 +1033,25 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
             Omega = np.diag(np.ones(len(Fs)))
         elif len(Omega.shape) == 1:
             Omega = np.diag(Omega)
-        if 'single_qubit_pulses' in self.options_dict:
-            single_qubit_pulses = self.options_dict['single_qubit_pulses']
+        metadata = self.raw_data_dict.get('exp_metadata', {})
+        if metadata is None:
+            metadata = {}
+        self.raw_data_dict['exp_metadata'] = metadata
+        basis_rots_str = metadata.get('basis_rots_str', None)
+        basis_rots_str = self.options_dict.get('basis_rots_str', basis_rots_str)
+        if basis_rots_str is not None:
             nr_qubits = int(np.round(np.log2(d)))
-            pulse_list = list(itertools.product(single_qubit_pulses,
+            pulse_list = list(itertools.product(basis_rots_str,
                                                 repeat=nr_qubits))
             rotations = tomo.standard_qubit_pulses_to_rotations(pulse_list)
         else:
-            rotations = self.options_dict['basis_rotations']
+            rotations = metadata.get('basis_rots', None)
+            rotations = self.options_dict.get('basis_rots', rotations)
+            if rotations is None:
+                raise KeyError("Either 'basis_rots_str' or 'basis_rots' "
+                               "parameter must be passed in the options "
+                               "dictionary or in the experimental metadata.")
+        rotations = [qtp.Qobj(U) for U in rotations]
 
         all_Fs = tomo.rotated_measurement_operators(rotations, Fs)
         all_Fs = list(itertools.chain(*np.array(all_Fs).T))
@@ -1044,6 +1060,7 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
 
         self.proc_data_dict['meas_operators'] = all_Fs
         self.proc_data_dict['covar_matrix'] = all_Omegas
+        self.proc_data_dict['meas_results'] = all_mus
 
         rho_ls = tomo.least_squares_tomography(all_mus, all_Fs, all_Omegas)
         self.proc_data_dict['rho_ls'] = rho_ls
@@ -1057,7 +1074,8 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
 
         self.proc_data_dict['purity'] = (rho * rho).tr().real
 
-        rho_target = self.options_dict.get('rho_target', None)
+        rho_target = metadata.get('rho_target', None)
+        rho_target = self.options_dict.get('rho_target', rho_target)
         if rho_target is not None:
             self.proc_data_dict['fidelity'] = tomo.fidelity(rho, rho_target)
 
@@ -1071,7 +1089,8 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
 
     def prepare_density_matrix_plot(self):
         self.tight_fig = self.options_dict.get('tight_fig', False)
-        rho_target = self.options_dict.get('rho_target', None)
+        rho_target = self.raw_data_dict['exp_metadata'].get('rho_target', None)
+        rho_target = self.options_dict.get('rho_target', rho_target)
         d = self.proc_data_dict['d']
         xtick_labels = self.options_dict.get('rho_ticklabels', None)
         ytick_labels = self.options_dict.get('rho_ticklabels', None)
@@ -1099,7 +1118,7 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
                     100 * self.proc_data_dict['fidelity']))]
         meas_string = self.base_analysis.\
             raw_data_dict['measurementstring']
-        if hasattr(meas_string, '__iter__'):
+        if isinstance(meas_string, list):
             if len(meas_string) > 1:
                 meas_string = meas_string[0] + ' to ' + meas_string[-1]
             else:
@@ -1212,7 +1231,8 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
             'do_legend': True
         }
 
-        rho_target = self.options_dict.get('rho_target', None)
+        rho_target = self.raw_data_dict['exp_metadata'].get('rho_target', None)
+        rho_target = self.options_dict.get('rho_target', rho_target)
         if rho_target is not None:
             ytar = tomo.density_matrix_to_pauli_basis(rho_target)
             self.plot_dicts['pauli_basis_target'] = {

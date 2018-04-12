@@ -133,7 +133,7 @@ class Sequence:
             visited |= {i_elt}
             elt = self.elements[i_elt]
             if elt['trigger_wait']:
-                for i in range(elt['nr_repetitions']):
+                for i in range(elt['repetitions']):
                     precompiled_sequence.elements.append(
                         {'name': [elt['name'] + '_' + str(i)],
                          'wfname': [elt['wfname']],
