@@ -450,7 +450,7 @@ class HDAWG8Pulsar:
             awg_str = header + waveform_table + main_loop + footer
 
             # write the waveforms to csv files
-            for data, wfname in unique_waveforms:
+            for data, wfname in unique_waveforms.items():
                 obj._write_csv_waveform(simplify_name(wfname), np.array(data))
 
             print("Programming {} vawg{} sequence '{}' ({} "
