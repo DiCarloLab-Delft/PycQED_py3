@@ -7,23 +7,25 @@ from other files in the analysis_v2 module.
 # This snippet ensures all submodules get reloaded properly
 from importlib import reload
 import pycqed.analysis_v2.base_analysis as ba
+reload(ba)
 import pycqed.analysis_v2.simple_analysis as sa
+reload(sa)
 import pycqed.analysis_v2.timedomain_analysis as ta
+reload(ta)
 import pycqed.analysis_v2.readout_analysis as ra
+reload(ra)
 import pycqed.analysis_v2.syndrome_analysis as synda
+reload(sa)
 # only one of these two files should exist in the end
 import pycqed.analysis_v2.cryo_scope_analysis as csa
+reload(csa)
+import pycqed.analysis_v2.cryo_scope_analysis_v2 as csa2
+reload(csa2)
 import pycqed.analysis_v2.distortions_analysis as da
 import pycqed.analysis_v2.optimization_analysis as oa
-
-reload(ba)
-reload(sa)
-reload(synda)
-reload(ta)
 reload(da)
-reload(ra)
-reload(csa)
-reload(oa)
+import pycqed.analysis_v2.coherence_analysis as cs
+reload(cs)
 
 from pycqed.analysis_v2.base_analysis import *
 from pycqed.analysis_v2.simple_analysis import (
@@ -43,3 +45,4 @@ from pycqed.analysis_v2.distortions_analysis import Scope_Trace_analysis
 
 from pycqed.analysis_v2.optimization_analysis import OptimizationAnalysis
 from pycqed.analysis_v2.timing_cal_analysis import Timing_Cal_Flux_Coarse
+from pycqed.analysis_v2.coherence_analysis import CoherenceTimesAnalysis, CoherenceTimesAnalysisSingle
