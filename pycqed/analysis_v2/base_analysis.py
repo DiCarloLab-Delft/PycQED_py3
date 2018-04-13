@@ -296,22 +296,6 @@ class BaseDataAnalysis(object):
             self.raw_data_dict = new_dict
             self.raw_data_dict['timestamp'] = self.timestamps[0]
         self.raw_data_dict['timestamps'] = self.timestamps
-
-    def extract_data_json(self):
-        file_name = self.t_start
-        with open(file_name, 'r') as f:
-            raw_data_dict = json.load(f)
-        # print [[key, type(val[0]), len(val)] for key, val in
-        # raw_data_dict.items()]
-        self.raw_data_dict = {}
-        for key, val in list(raw_data_dict.items()):
-            if type(val[0]) is dict:
-                self.raw_data_dict[key] = val[0]
-            else:
-                self.raw_data_dict[key] = np.double(val)
-        # print [[key, type(val), len(val)] for key, val in
-        # self.raw_data_dict.items()]
-        self.raw_data_dict['timestamps'] = [self.t_start]
         self.raw_data_dict['nr_experiments'] = len(self.timestamps)
 
         # Converts a multi file 'measured_values' dict to an ordered dict
@@ -330,6 +314,22 @@ class BaseDataAnalysis(object):
             self.raw_data_dict[
                 'measured_values_ord_dict'] = measured_values_dict
 
+    def extract_data_json(self):
+        file_name = self.t_start
+        with open(file_name, 'r') as f:
+            raw_data_dict = json.load(f)
+        # print [[key, type(val[0]), len(val)] for key, val in
+        # raw_data_dict.items()]
+        self.raw_data_dict = {}
+        for key, val in list(raw_data_dict.items()):
+            if type(val[0]) is dict:
+                self.raw_data_dict[key] = val[0]
+            else:
+                self.raw_data_dict[key] = np.double(val)
+        # print [[key, type(val), len(val)] for key, val in
+        # self.raw_data_dict.items()]
+        self.raw_data_dict['timestamps'] = [self.t_start]
+        
     def process_data(self):
         """
         process_data: overloaded in child classes,
