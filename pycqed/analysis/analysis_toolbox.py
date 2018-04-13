@@ -739,7 +739,7 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
         timestamps.reverse()
         all_timestamps += timestamps
     # Ensures the order of the timestamps is ascending
-    all_timestamps.reverse()
+    all_timestamps.sort()
     return all_timestamps
 
 
