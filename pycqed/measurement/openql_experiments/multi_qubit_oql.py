@@ -505,7 +505,7 @@ def Chevron_hack(qubit_idx: int, qubit_idx_spec,
 
 
 def Chevron(qubit_idx: int, qubit_idx_spec: int,
-            buffer_time, buffer_time2, platf_cfg: str):
+            buffer_time, buffer_time2, flux_cw: int, platf_cfg: str):
     """
     Writes output files to the directory specified in openql.
     Output directory is set as an attribute to the program for convenience.
@@ -527,13 +527,15 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int,
 
     buffer_nanoseconds = int(round(buffer_time/1e-9))
     buffer_nanoseconds2 = int(round(buffer_time2/1e-9))
+    if flux_cw is None:
+        flux_cw = 2
 
     k = Kernel("Chevron", p=platf)
     k.prepz(qubit_idx)
     k.gate('rx90', qubit_idx_spec)
     k.gate('rx180', qubit_idx)
     k.gate("wait", [qubit_idx], buffer_nanoseconds)
-    k.gate('fl_cw_02', 2, 0)
+    k.gate('fl_cw_{:02}'.format(flux_cw), 2, 0)
     k.gate('wait', [qubit_idx], buffer_nanoseconds2)
     k.gate('rx180', qubit_idx)
     k.measure(qubit_idx)
