@@ -899,19 +899,37 @@ class CCLight_Transmon(Qubit):
                         self.mw_mixer_offs_DI())
                 AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()+2),
                         self.mw_mixer_offs_DQ())
-        elif using_QWG:
-            MW_LutMan.mw_amp180(1)
-            # case without VSM and with QWG
-            if ((self.mw_G_mixer_phi()!=self.mw_D_mixer_phi())
-                or (self.mw_G_mixer_alpha()!=self.mw_D_mixer_alpha())):
-                logging.warning('CCL_Transmon {}; _prep_mw_pulses: '
-                                'no VSM detected, using mixer parameters'
-                                ' from gaussian channel.'.format(self.name))
-            MW_LutMan.mixer_phi(self.mw_G_mixer_phi())
-            MW_LutMan.mixer_alpha(self.mw_G_mixer_alpha())
-            AWG.set('ch{}_offset'.format(MW_LutMan.channel_I()),self.mw_mixer_offs_GI())
-            AWG.set('ch{}_offset'.format(MW_LutMan.channel_Q()),self.mw_mixer_offs_GQ())
-            MW_LutMan.channel_amp(self.mw_amp180())
+        else:
+          if using_QWG:
+              MW_LutMan.mw_amp180(1)
+              # case without VSM and with QWG
+              if ((self.mw_G_mixer_phi()!=self.mw_D_mixer_phi())
+                  or (self.mw_G_mixer_alpha()!=self.mw_D_mixer_alpha())):
+                  logging.warning('CCL_Transmon {}; _prep_mw_pulses: '
+                                  'no VSM detected, using mixer parameters'
+                                  ' from gaussian channel.'.format(self.name))
+              MW_LutMan.mixer_phi(self.mw_G_mixer_phi())
+              MW_LutMan.mixer_alpha(self.mw_G_mixer_alpha())
+              AWG.set('ch{}_offset'.format(MW_LutMan.channel_I()),self.mw_mixer_offs_GI())
+              AWG.set('ch{}_offset'.format(MW_LutMan.channel_Q()),self.mw_mixer_offs_GQ())
+              MW_LutMan.channel_amp(self.mw_amp180())
+          else:
+              # case with VSM (both QWG and AWG8)
+              MW_LutMan.mw_amp180(self.mw_amp180())
+              MW_LutMan.G_mixer_phi(self.mw_G_mixer_phi())
+              MW_LutMan.G_mixer_alpha(self.mw_G_mixer_alpha())
+              MW_LutMan.D_mixer_phi(self.mw_D_mixer_phi())
+              MW_LutMan.D_mixer_alpha(self.mw_D_mixer_alpha())
+              # N.B. This part is AWG8 specific
+              AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()-1),
+                      self.mw_mixer_offs_GI())
+              AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()+0),
+                      self.mw_mixer_offs_GQ())
+              AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()+1),
+                      self.mw_mixer_offs_DI())
+              AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()+2),
+                      self.mw_mixer_offs_DQ())
+
 
         # 4. reloads the waveforms
         if do_prepare:
