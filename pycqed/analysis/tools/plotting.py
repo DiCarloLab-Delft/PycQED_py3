@@ -285,6 +285,10 @@ def flex_colormesh_plot_vs_xy(xvals, yvals, zvals, ax=None,
     zvals should be a list of arrays with the measured values with shape
     (len(yvals), len(xvals)).
     """
+    
+    xvals = np.array(xvals)
+    yvals = np.array(yvals)
+
 
     # First, we need to sort the data as otherwise we get odd plotting
     # artefacts. An example is e.g., plotting a fourier transform
