@@ -319,7 +319,6 @@ class VNA_analysis(complex_spectroscopy):
             fitting_model = 'hanger'
         else:
             fitting_model = fit_options['model']
-        print(fitting_model)
         if subtract_background:
             self.do_subtract_background(thres=self.options_dict['background_thres'],
                                         back_dict=self.options_dict['background_dict'])

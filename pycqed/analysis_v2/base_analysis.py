@@ -561,7 +561,7 @@ class BaseDataAnalysis(object):
                     
                 # used to ensure axes are touching
                 if plot_touching:
-                    self.figs[pdict['ax_id']].subplots_adjust(wspace=0,
+                    self.axs[pdict['ax_id']].figure.subplots_adjust(wspace=0,
                                                               hspace=0)
                 # ensures the argument convention is preserved
                 if hasattr(self, plotfn.__name__):
