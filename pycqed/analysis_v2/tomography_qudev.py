@@ -165,23 +165,33 @@ def fidelity(rho1: qtp.Qobj, rho2: qtp.Qobj) -> float:
 
     F = Tr(√((√rho1) rho2 √(rho1)))^2
     """
-    if rho1.type == 'ket':
-        rho1 = rho1 * rho1.dag()
-    elif rho1.type == 'bra':
-        rho1 = rho1.dag() * rho1
-    if rho2.type == 'ket':
-        rho2 = rho2 * rho2.dag()
-    elif rho2.type == 'bra':
-        rho2 = rho2.dag() * rho2
-    rho1.dims = rho2.dims
+    rho1 = convert_to_density_matrix(rho1)
+    rho2 = convert_to_density_matrix(rho2)
     return (rho1.sqrtm()*rho2*rho1.sqrtm()).sqrtm().tr().real ** 2
 
 
+def concurrence(rho):
+    """
+    Calculates the concurrence of the two-qubit state rho given in the
+    qubits' basis according to https://doi.org/10.1103/PhysRevLett.78.5022
+    """
+    rho = convert_to_density_matrix(rho)
+    # convert to bell basis
+    b = [np.sqrt(0.5)*qtp.Qobj(np.array(l)) for l in
+            [[1, 0, 0, 1], [1j, 0, 0, -1j], [0, 1j, 1j, 0], [0, 1, -1, 0]]]
+    rhobell = np.zeros((4, 4), dtype=np.complex)
+    for i in range(4):
+        for j in range(4):
+            rhobell[i, j] = (b[j].dag()*rho*b[i])[0, 0]
+    rhobell = qtp.Qobj(rhobell)
+    R = (rhobell.sqrtm()*rhobell.conj()*rhobell.sqrtm()).sqrtm()
+    C = max(0, 2*R.eigenenergies().max() - R.tr())
+    return C
+
+
 def purity(rho: qtp.Qobj) -> float:
-    if rho.type == 'ket' or rho.type == 'bra':
-        return 1
-    else:
-        return (rho*rho).tr().real
+    rho = convert_to_density_matrix(rho)
+    return (rho*rho).tr().real
 
 
 def density_matrix_to_pauli_basis(rho):
@@ -189,11 +199,7 @@ def density_matrix_to_pauli_basis(rho):
     Returns the expectation values for all combinations of Pauli operator
     products. The dimension of the density matrix must be a power of two.
     """
-    if rho.type == 'ket':
-        rho = rho * rho.dag()
-    elif rho.type == 'bra':
-        rho = rho.dag() * rho
-    rho = qtp.Qobj(rho.full())
+    rho = convert_to_density_matrix(rho)
     d = rho.shape[0]
     if 2 ** (d.bit_length() - 1) == d:
         nr_qubits = d.bit_length() - 1
@@ -206,6 +212,16 @@ def density_matrix_to_pauli_basis(rho):
     Os = [qtp.Qobj(qtp.tensor(*O1s).full()) for O1s in
           itertools.product(*[O1] * nr_qubits)]
     return np.array([(rho * O).tr().real for O in Os])
+
+
+def convert_to_density_matrix(rho):
+    if not isinstance(rho, qtp.Qobj):
+        rho = qtp.Qobj(rho)
+    if rho.type == 'ket':
+        rho = rho * rho.dag()
+    elif rho.type == 'bra':
+        rho = rho.dag() * rho
+    return qtp.Qobj(rho.full())
 
 
 # PycQED specific functions

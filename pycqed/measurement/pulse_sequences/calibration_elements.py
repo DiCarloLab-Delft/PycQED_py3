@@ -115,7 +115,8 @@ def mixer_calibration_sequence(trigger_separation, amplitude, trigger_channel,
 
 def readout_pulse_scope_seq(delays, pulse_pars, RO_pars, RO_separation,
                             cal_points=((-4, -3), (-2, -1)), comm_freq=225e6,
-                            verbose=False, upload=True, return_seq=False):
+                            verbose=False, upload=True, return_seq=False,
+                            prep_pulses=None):
     """
     Prepares the AWGs for a readout pulse shape and timing measurement.
 
@@ -130,7 +131,7 @@ def readout_pulse_scope_seq(delays, pulse_pars, RO_pars, RO_separation,
 
     Args:
         delays: A list of delays between the start of the first readout pulse
-                and the center of the drive pulse.
+                and the end of the drive pulse.
         pulse_pars: Pulse dictionary for the drive pulse.
         RO_pars: Pulse dictionary for the readout pulse.
         RO_separation: Separation between the starts of the two readout pulses.
@@ -148,22 +149,22 @@ def readout_pulse_scope_seq(delays, pulse_pars, RO_pars, RO_separation,
     """
     if cal_points is True: cal_points = ((-4, -3), (-2, -1))
     elif cal_points is False or cal_points is None: cal_points = ((), ())
-
-    if comm_freq:
-        RO_separation -= RO_separation % (-1/comm_freq)
+    if prep_pulses is None: prep_pulses = []
+    if comm_freq: RO_separation -= RO_separation % (-1/comm_freq)
 
     seq_name = 'readout_pulse_scope_sequence'
     seq = sequence.Sequence(seq_name)
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
+    min_delay = min(delays)
     readout_x1 = deepcopy(RO_pars)
-    readout_x1['refpoint'] = 'center'
+    readout_x1['refpoint'] = 'end'
     readout_x2 = deepcopy(RO_pars)
     readout_x2['pulse_delay'] = RO_separation
     readout_x2['refpoint'] = 'start'
-
+    probe_pulse = deepcopy(pulses['X180'])
+    prep_pulses = [pulses[pulse_name] for pulse_name in prep_pulses]
     for i, tau in enumerate(delays):
-        readout_x1['pulse_delay'] = -tau
         if i in cal_points[0] or i - len(delays) in cal_points[0]:
             el = multi_pulse_elt(2 * i, station, [pulses['I'], RO_pars])
             el_list.append(el)
@@ -179,8 +180,11 @@ def readout_pulse_scope_seq(delays, pulse_pars, RO_pars, RO_separation,
             el_list.append(el)
             seq.append_element(el, trigger_wait=True)
         else:
-            el = multi_pulse_elt(2 * i, station, [pulses['X180'], readout_x1,
-                                              readout_x2])
+
+            probe_pulse['pulse_delay'] = tau - min_delay
+            readout_x1['pulse_delay'] = -tau
+            el = multi_pulse_elt(2 * i, station, prep_pulses +
+                                 [probe_pulse, readout_x1, readout_x2])
             el_list.append(el)
             seq.append_element(el, trigger_wait=True)
 

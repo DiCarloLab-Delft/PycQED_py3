@@ -1435,7 +1435,8 @@ class QuDev_transmon(Qubit):
                 ma.MeasurementAnalysis(auto=True, qb_name=self.name, **kw)
 
     def measure_readout_pulse_scope(self, delays, freqs, RO_separation=None,
-                                    comm_freq=225e6, analyze=True, label=None,
+                                    prep_pulses=None, comm_freq=225e6,
+                                    analyze=True, label=None,
                                     close_fig=True, upload=True, verbose=False,
                                     cal_points=((-4, -3), (-2, -1)), MC=None):
         """
@@ -1488,6 +1489,7 @@ class QuDev_transmon(Qubit):
             RO_pars=self.get_RO_pars(),
             RO_separation=RO_separation,
             cal_points=cal_points,
+            prep_pulses=prep_pulses,
             comm_freq=comm_freq,
             verbose=verbose,
             upload=upload))
@@ -1504,7 +1506,7 @@ class QuDev_transmon(Qubit):
             integration_length=self.RO_acq_integration_length(),
             values_per_point=2, values_per_point_suffex=['_probe', '_measure'])
         MC.set_detector_function(d)
-        MC.run(label)
+        MC.run_2D(label)
 
         # Create a MeasurementAnalysis object for this measurement
         if analyze:
@@ -3312,7 +3314,7 @@ class QuDev_transmon(Qubit):
 
 
 
-    def calibrate_flux_pulse_frequency(self,MC=None, thetas=None, ampls=None,
+    def calibrate_flux_pulse_frequency(self, MC=None, thetas=None, ampls=None,
                                        analyze=False,
                                        plot=False,
                                        ampls_bidirectional = False,
@@ -3612,7 +3614,6 @@ class QuDev_transmon(Qubit):
                                                    sweep_mode='amplitude')
             if prepare_for_timedomain:
                 qb_target.prepare_for_timedomain()
-                self.prepare_for_timedomain()
 
             MC.set_sweep_function(s1)
             MC.set_sweep_points(phases)

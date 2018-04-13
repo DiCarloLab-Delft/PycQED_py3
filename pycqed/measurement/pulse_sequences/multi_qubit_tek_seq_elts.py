@@ -2026,7 +2026,6 @@ def n_qubit_tomo_seq(
 def get_tomography_pulses(*qubit_names, basis_pulses=('I', 'X180', 'Y90',
                                                       'mY90', 'X90', 'mX90')):
     tomo_sequences = [[]]
-    print(qubit_names)
     for i, qb in enumerate(qubit_names):
         if i == 0:
             qb = ' ' + qb

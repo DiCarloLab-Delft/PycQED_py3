@@ -1078,6 +1078,8 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
         rho_target = self.options_dict.get('rho_target', rho_target)
         if rho_target is not None:
             self.proc_data_dict['fidelity'] = tomo.fidelity(rho, rho_target)
+        if d == 4:
+            self.proc_data_dict['concurrence'] = tomo.concurrence(rho)
 
     def prepare_plots(self):
         self.prepare_density_matrix_plot()
@@ -1116,6 +1118,10 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
             legend_entries += [
                 (empty_artist, r'Fidelity, $F = {:.1f}\%$'.format(
                     100 * self.proc_data_dict['fidelity']))]
+        if d == 4:
+            legend_entries += [
+                (empty_artist, r'Concurrence, $C = {:.1f}\%$'.format(
+                    100 * self.proc_data_dict['concurrence']))]
         meas_string = self.base_analysis.\
             raw_data_dict['measurementstring']
         if isinstance(meas_string, list):
@@ -1152,6 +1158,7 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
         }
 
         if rho_target is not None:
+            rho_target = qtp.Qobj(rho_target)
             if rho_target.type == 'ket':
                 rho_target = rho_target * rho_target.dag()
             elif rho_target.type == 'bra':
@@ -1234,6 +1241,7 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
         rho_target = self.raw_data_dict['exp_metadata'].get('rho_target', None)
         rho_target = self.options_dict.get('rho_target', rho_target)
         if rho_target is not None:
+            rho_target = qtp.Qobj(rho_target)
             ytar = tomo.density_matrix_to_pauli_basis(rho_target)
             self.plot_dicts['pauli_basis_target'] = {
                 'plotfn': self.plot_bar,
@@ -1255,6 +1263,11 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
                 100 * self.proc_data_dict['fidelity'])
         else:
             fidelity_str = ''
+        if self.proc_data_dict['d'] == 4:
+            concurrence_str = '\n' + r'Concurrence, $C = {:.1f}\%$'.format(
+                100 * self.proc_data_dict['concurrence'])
+        else:
+            concurrence_str = ''
         self.plot_dicts['pauli_info_labels'] = {
             'ax_id': 'pauli_basis',
             'plotfn': self.plot_line,

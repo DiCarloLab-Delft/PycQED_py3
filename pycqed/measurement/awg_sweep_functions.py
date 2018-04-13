@@ -2275,14 +2275,15 @@ class Fluxpulse_scope_drive_freq_sweep(swf.Soft_Sweep):
 
 class Readout_pulse_scope_swf(swf.Hard_Sweep):
     def __init__(self, delays, pulse_pars, RO_pars, RO_separation,
-                 cal_points=((-4, -3), (-2, -1)), comm_freq=225e6,
-                 verbose=False, upload=True):
+                 cal_points=((-4, -3), (-2, -1)), prep_pulses=None,
+                 comm_freq=225e6, verbose=False, upload=True):
         super().__init__()
         self.delays = delays
         self.pulse_pars = pulse_pars
         self.RO_pars = RO_pars
         self.RO_separation = RO_separation
         self.cal_points = cal_points
+        self.prep_pulses = prep_pulses
         self.comm_freq = comm_freq
         self.verbose = verbose
         self.upload = upload
@@ -2299,6 +2300,7 @@ class Readout_pulse_scope_swf(swf.Hard_Sweep):
                 RO_pars=self.RO_pars,
                 RO_separation=self.RO_separation,
                 cal_points=self.cal_points,
+                prep_pulses=self.prep_pulses,
                 comm_freq=self.comm_freq,
                 verbose=self.verbose)
 

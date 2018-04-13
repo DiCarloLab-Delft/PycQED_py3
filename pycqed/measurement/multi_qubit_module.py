@@ -660,10 +660,11 @@ def measure_two_qubit_parity(qb0, qb1, qb2, feedback_delay, f_LO, upload=True,
     df = device.get_multiplexed_readout_detector_functions(
         qubits, nr_averages=nr_averages, correlations=[(
             qb0.RO_acq_weight_function_I(), qb2.RO_acq_weight_function_I()
-        )])['int_corr_det']
+        )])\
+        ['int_corr_det']
 
     MC.set_sweep_function(sf)
-    MC.set_sweep_points(2*len(tomography_basis)**2)
+    MC.set_sweep_points(np.arange(len(tomography_basis)**2))
     MC.set_detector_function(df)
 
     MC.run(name='two_qubit_parity-{}'.format('_'.join([qb.name for qb in
