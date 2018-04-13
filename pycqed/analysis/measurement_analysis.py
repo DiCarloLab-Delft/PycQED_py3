@@ -8908,8 +8908,10 @@ class CZ_1Q_phase_analysis(TD_Analysis):
         self.save_fig(fig, **kw)
 
 
-def DAC_scan_analysis_and_plot(scan_start, scan_stop, dac, feed, dac_prefix='',perc=99.6, factor=1, smooth_window_len=31,smoothing=True,
-    overwrite_old=False, fig_format='png', verbose=False, peak_fitting_sample_n=0, plotsize=None, temperature_plots=True, current_multiplier=1):
+def DAC_scan_analysis_and_plot(scan_start, scan_stop, dac, feed, 
+    dac_prefix='',perc=99.6, factor=1, smooth_window_len=31,smoothing=True,
+    overwrite_old=False, fig_format='png', verbose=False, 
+    peak_fitting_sample_n=0, plotsize=None, temperature_plots=True, current_multiplier=1):
     plotsize = plotsize or (4,10)
     date_folder = scan_stop.split('_')[0]
     time_folder = scan_stop.split('_')[1]
@@ -8947,6 +8949,7 @@ def DAC_scan_analysis_and_plot(scan_start, scan_stop, dac, feed, dac_prefix='',p
     dac_values_unsorted = spec_scans.TD_dict['dac']
     sorted_indices = dac_values_unsorted.argsort()
     dac_values=np.array(dac_values_unsorted[sorted_indices], dtype=float)*current_multiplier
+    
     amplitude_values=np.array(spec_scans.TD_dict['amp'][sorted_indices,feed], dtype=float)
     frequency_values=np.array(spec_scans.TD_dict['frequencies'][sorted_indices], dtype=float)
 
@@ -8976,6 +8979,7 @@ def DAC_scan_analysis_and_plot(scan_start, scan_stop, dac, feed, dac_prefix='',p
     smoothed_amplitude_values = np.zeros_like(amplitude_values)
     peak_frequencies = np.zeros_like(amplitude_values[:,0], dtype=object)
     peak_amplitudes = np.zeros_like(amplitude_values[:,0], dtype=object)
+
     Qis = np.zeros_like(amplitude_values[:,0], dtype=float)
 
     #Smooth data and find peeks
@@ -9054,6 +9058,44 @@ def DAC_scan_analysis_and_plot(scan_start, scan_stop, dac, feed, dac_prefix='',p
         plt.show()
     fig.savefig(out_path+"/2D_plot-feed_%d_%s%s.%s"%(feed,dac_prefix,dac,fig_format))
     plt.close()
+
+def time_domain_DAC_scan_analysis_and_plot(scan_start, scan_stop, dac, resonator, qubit, feed, dac_prefix='', factor=1, smooth_window_len=31,smoothing=True,
+    overwrite_old=False, fig_format='png', verbose=False, plotsize=None, current_multiplier=1):
+    plotsize = plotsize or (4,10)
+    date_folder = scan_stop.split('_')[0]
+    time_folder = scan_stop.split('_')[1]
+    out_path = a_tools.datadir+"/%s/%s_analysis_2D_Plots"%(date_folder,time_folder)
+    try:
+        os.mkdir(out_path)
+    except:
+        if not overwrite_old:
+            raise FileExistsError("Output folder exists. Either move old folder or pass option overwrite_old=True")
+
+    pdict={
+            'amp':'all_data',
+            'frequencies':'sweep_points',
+            'dac':'fluxcurrent.'+dac,
+            }
+
+    opt_dict = {'scan_label':dac_prefix+dac,
+           'exact_label_match':True}
+
+    nparams = ['amp', 
+                'frequencies', 
+                'dac', 
+                ]
+    
+    if temperature_plots:
+        nparams.append('T_mc')
+        nparams.append('T_cp')
+        pdict['T_mc'] = 'Fridge monitor.T_MClo'
+        pdict['T_cp'] = 'Fridge monitor.T_CP'
+
+
+    #retrieve data
+    spec_scans = ca.quick_analysis(t_start=scan_start, t_stop=scan_stop, options_dict=opt_dict,
+                      params_dict_TD=pdict, numeric_params=nparams)
+
 
 def Input_average_analysis(IF, fig_format='png', alpha=1, phi=0, I_o=0, Q_o=0,
                            predistort=True, plot=True, timestamp_ground=None,
