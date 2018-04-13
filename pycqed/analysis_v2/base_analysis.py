@@ -951,12 +951,14 @@ class BaseDataAnalysis(object):
                     xwidth = plot_xwidth[tt]
                 else:
                     xwidth = None
+                    
+                zvals = np.array(traces['zvals'][tt]).transpose()
                 out = pfunc(ax=axs,
                             xwidth=xwidth,
                             clim=fig_clim, cmap=plot_cmap,
                             xvals=[traces['xvals'][tt]],
                             yvals=[traces['yvals'][tt]],
-                            zvals=[traces['zvals'][tt].transpose()],
+                            zvals=[zvals],
                             transpose=plot_transpose,
                             normalize=plot_normalize)
 
