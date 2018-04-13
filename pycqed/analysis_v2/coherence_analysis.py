@@ -1,3 +1,6 @@
+import datetime
+from datetime import timedelta
+
 import numpy as np
 import pycqed.analysis_v2.base_analysis as ba
 import matplotlib.dates as mdates
@@ -8,6 +11,7 @@ import numpy as np
 import lmfit
 from matplotlib import pyplot as plt
 import os
+from pycqed.analysis import analysis_toolbox as a_tools
 
 
 class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
@@ -66,29 +70,26 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
 
     def prepare_plots(self):
         if not ("time_stability" in self.plot_dicts):
-            self.plot_dicts["time_stability"] = self._prepare_plot(xk='datetime', yk='tau', ye='tau_stderr',
-                                                                   xlabel='Time in Delft', xunit=None)
+            self._prepare_plot(ax_id='time_stability', xk='datetime', yk='tau', ye='tau_stderr',
+                               xlabel='Time in Delft', xunit=None)
             if self.plot_versus_frequency:
-                self.plot_dicts["freq_relation"] = self._prepare_plot(xk='freq_sorted', yk='freq_sorted_tau',
-                                                                      ye='freq_sorted_tau_stderr',
-                                                                      xlabel='Qubit Frequency', xunit='Hz')
+                self._prepare_plot(ax_id="freq_relation", xk='freq_sorted', yk='freq_sorted_tau',
+                                   ye='freq_sorted_tau_stderr',
+                                   xlabel='Qubit Frequency', xunit='Hz')
             if self.plot_versus_dac:
-                self.plot_dicts["dac_relation"] = self._prepare_plot(xk='dac_sorted', yk='dac_sorted_tau',
-                                                                     ye='dac_sorted_tau_stderr',
-                                                                     xlabel='DAC Value', xunit='A')
+                self._prepare_plot(ax_id="dac_relation", xk='dac_sorted', yk='dac_sorted_tau',
+                                   ye='dac_sorted_tau_stderr',
+                                   xlabel='DAC Value', xunit='A')
 
-    def _prepare_plot(self, xk, yk, ye, xlabel, xunit):
+    def _prepare_plot(self, ax_id, xk, yk, ye, xlabel, xunit):
         xvals = self.raw_data_dict[xk]
         yvals = self.raw_data_dict[yk]
         # fixme: add error bars
         yerr = self.raw_data_dict[ye]
 
         plot_dict = {
-            'plotfn': self.plot_line,
-            'xvals': xvals,
             'xlabel': self.options_dict.get('xlabel', xlabel),
             'xunit': self.options_dict.get('xunit', xunit),
-            'yvals': yvals,
             'ylabel': self.options_dict.get('ylabel', 'Coherence'),
             'yunit': self.options_dict.get('yunit', 's'),
             'yrange': self.options_dict.get('yrange', (0, 1.1 * np.max(yvals))),
@@ -102,7 +103,9 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
             # 'do_legend': do_legend,
             # 'legend_pos': 'upper right'
         }
-        return plot_dict
+
+        self.plot_dicts[ax_id] = plot_scatter_errorbar(self=self, ax_id=ax_id, xdata=xvals, ydata=yvals,
+                                                       xerr=None, yerr=yerr, pdict=plot_dict)
 
 
 class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
@@ -122,7 +125,8 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                  dac_key_pattern: str = 'Instrument settings.fluxcurrent.{DAC}',
                  plot_versus_frequency: bool = True,
                  frequency_key_pattern: str = 'Instrument settings.{Q}.freq_qubit',
-                 res_freq: list = None, res_Qc: list = None, chi_shift: list = None
+                 res_freq: list = None, res_Qc: list = None, chi_shift: list = None,
+                 do_fitting: bool = True, verbose: bool = True,
                  ):
 
         ## Check data and apply default values
@@ -169,14 +173,17 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                          label=label,
                          data_file_path=data_file_path,
                          options_dict=options_dict,
-                         extract_only=extract_only, do_fitting=False)
+                         do_fitting=do_fitting,
+                         extract_only=extract_only)
 
         # Save some data for later use
         self.raw_data_dict = {}
+        self.fit_res = {}
         self.res_Qc = res_Qc
         self.res_freq = res_freq
         self.chi_shift = chi_shift
         self.qubit_names = qubit_instr_names
+        self.verbose = verbose
 
         # Find the dac and frequency keys
         self.dac_keys = [] if plot_versus_dac else None
@@ -232,11 +239,16 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                 a = self.all_analysis[qubit][typ]
                 a.extract_data()
                 self.raw_data_dict[qubit][typ] = a.raw_data_dict
-                tmp_y = self.max_time(a.raw_data_dict["timestamps"])
+                tmp_y = self.max_time(a.raw_data_dict["datetime"])
                 if not youngest or youngest < tmp_y:
                     youngest = tmp_y
+        youngest += datetime.timedelta(seconds=1)
 
-        self.raw_data_dict['timestamps'] = [youngest]
+        self.raw_data_dict['datetime'] = [youngest]
+        self.raw_data_dict['timestamps'] = [youngest.strftime("%Y%m%d_%H%M%S")]
+        self.timestamps = [youngest]
+        folder = a_tools.datadir + '/%s_coherence_analysis' % (youngest.strftime("%Y%m%d/%H%M%S"))
+        self.raw_data_dict['folder'] = [folder]
 
     @staticmethod
     def max_time(times):
@@ -249,206 +261,287 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
     def run_fitting(self):
         if self.freq_keys and self.dac_keys:
             for qubit in self.all_analysis:
+                if self.verbose:
+                    print("Analysing qubit: %s" % qubit)
+                # sort the data by dac (just in case some samples are missing)
+                qo = self.all_analysis[qubit]
                 dac = []
-                for typ in self.all_analysis[qubit]:
-                    a = self.all_analysis[qubit][typ]
+                for typ in qo:
+                    a = qo[typ]
                     data = a.raw_data_dict
-                    dac.append(data['dac'])
+                    data['dac'] = [float(d) for d in data['dac']]
+                    for d in data['dac']:
+                        dac.append(d)
+                dac = [float(d) for d in set(dac)]
 
-                freq = [None] * len(dac)
-                t1 = [None] * len(dac)
-                a = self.all_analysis[qubit][self.T1]
-                qf = a.raw_data_dict['qfreq']
-                tau = a.raw_data_dict['tau']
-                for i, d in enumerate(a.raw_data_dict['dac']):
-                    freq[dac.index(d)] = qf[i]
-                    t1[dac.index(d)] = tau[i]
+                if len(dac) > 4:
+                    freq = [None] * len(dac)
+                    t1 = [None] * len(dac)
+                    a = qo[self.T1]
+                    qf = a.raw_data_dict['qfreq']
+                    tau = a.raw_data_dict['tau']
+                    for i, d in enumerate(a.raw_data_dict['dac']):
+                        index = dac.index(float(d))
+                        freq[index] = qf[i]
+                        t1[index] = tau[i]
 
-                t2s = [None] * len(dac)
-                a = self.all_analysis[qubit][self.T2_star]
-                tau = a.raw_data_dict['tau']
-                for i, d in enumerate(a.raw_data_dict['dac']):
-                    t2s[dac.index(d)] = tau[i]
+                    t2s = [None] * len(dac)
+                    a = qo[self.T2_star]
+                    tau = a.raw_data_dict['tau']
+                    for i, d in enumerate(a.raw_data_dict['dac']):
+                        t2s[dac.index(d)] = tau[i]
 
-                t2e = [None] * len(dac)
-                a = self.all_analysis[qubit][self.T2]
-                for i, d in enumerate(a.raw_data_dict['dac']):
-                    t2e[dac.index(d)] = tau[i]
+                    t2e = [None] * len(dac)
+                    a = qo[self.T2]
+                    for i, d in enumerate(a.raw_data_dict['dac']):
+                        t2e[dac.index(d)] = tau[i]
 
-                t1 = np.array(t1)
-                t2s = np.array(t2s)
-                t2e = np.array(t2e)
-                # Ignore unset values
-                t1_mask = (t1 == None)
-                t2s_mask = (t2s == None)
-                t2e_mask = (t2e == None)
-                #t1[t1_mask] = 0
-                #t2s[t2s_mask] = 0
-                #t2e[t2e_mask] = 0
-                it = prepare_input_table(dac=dac, frequency=freq, T1=t1, T2_star=t2s, T2_echo=t2e,
-                                         T1_mask=t1_mask, T2_star_mask=t2s_mask,
-                                         T2_echo_mask=t2e_mask)
-                chi = self.chi_shift[qubit]
-                res_freq = self.res_freq[qubit]
-                res_Qc = self.res_Qc[qubit]
-                analysis_data_dict = PSD_Analysis(table=it, freq_resonator=res_freq, Qc=res_Qc,
-                                                  chi_shift=chi, path=self.data_file_path)
+                    t1 = np.array(t1)
+                    t2s = np.array(t2s)
+                    t2e = np.array(t2e)
+                    # Ignore unset values
+                    t1_mask = (t1 == None)
+                    t2s_mask = (t2s == None)
+                    t2e_mask = (t2e == None)
+                    # t1[t1_mask] = 0
+                    # t2s[t2s_mask] = 0
+                    # t2e[t2e_mask] = 0
+                    it = prepare_input_table(dac=dac, frequency=freq, T1=t1, T2_star=t2s, T2_echo=t2e,
+                                             T1_mask=t1_mask, T2_star_mask=t2s_mask,
+                                             T2_echo_mask=t2e_mask)
+                    chi = self.chi_shift[qubit] if self.chi_shift else None
+                    res_freq = self.res_freq[qubit] if self.res_freq else None
+                    res_Qc = self.res_Qc[qubit] if self.res_Qc else None
+                    analysis_data_dict = PSD_Analysis(table=it, freq_resonator=res_freq, Qc=res_Qc, chi_shift=chi,
+                                                      verbose=self.verbose)
 
-                self.raw_data_dict[qubit]['analysis'] = analysis_data_dict
-                self.raw_data_dict[qubit]['processed_data'] = {
-                    'dac' : dac, 'qfreq' : freq,
-                    self.T1: t1, self.T2 : t2e, self.T2_star : t2s,
-                    self.T1+'_mask': t1_mask, self.T2+'_mask' : t2e_mask, self.T2_star+'_mask' : t2s_mask,
-                }
+                    self.raw_data_dict[qubit]['analysis'] = analysis_data_dict
+                    self.fit_res[qubit] = analysis_data_dict
+                    self.raw_data_dict[qubit]['processed_data'] = {
+                        'dac': dac, 'qfreq': freq,
+                        self.T1: t1, self.T2: t2e, self.T2_star: t2s,
+                        self.T1 + '_mask': t1_mask, self.T2 + '_mask': t2e_mask, self.T2_star + '_mask': t2s_mask,
+                    }
 
+                else:
+                    # fixme: make this a proper warning
+                    print('Found %d dac values. I need at least 4 dac values to run the PSD analysis.' % len(dac))
         else:
             # fixme: make this a proper warning
             print('You have to enable plot_versus_frequency and plot_versus_dac to execute the PSD analysis.')
 
+    def save_fit_results(self):
+        # todo: if you want to save some results to a hdf5, do it here
+        pass
+
     def prepare_plots(self):
         # prepare axis
-        ax_stability = None
-        ax_freq = None if self.freq_keys else None
-        ax_dac = None if self.dac_keys else None
+        cr_all_base = "coherence_ratios"
+        ct_all_base = 'coherence_times'
+        cg_all_base = 'coherence_gamma'
+        # f, axs = plt.subplots(1, 3, figsize=(18, 5), sharey=True)
+        # self.figs[cg_base] = f
+        # self.plot_dicts[cg_base] = {}
+        # self.axs[cg_base + "_flux"] = axs[0]
+        # self.axs[cg_base + "_frequency"] = axs[1]
+        # self.axs[cg_base + "_sensitivity"] = axs[2]
+
         self.plot_dicts = {}
         for qubit in self.all_analysis:
-            for typ in self.all_analysis[qubit]:
-                a = self.all_analysis[qubit][typ]
-                a.prepare_plots()
+            # if the analysis was succesful
+            dat = self.raw_data_dict[qubit]
+            if dat['analysis']:
+                flux = dat['analysis']['flux']
+                freq = dat['analysis']['qfreq']
+                sensitivity = dat['analysis']['sensitivity']
+                gamma_phi_echo = dat['analysis']['gamma_phi_echo']
+                gamma_phi_echo_f = dat['analysis']['gamma_phi_echo_f']
+                gamma_phi_ramsey = dat['analysis']['gamma_phi_ramsey']
+                gamma_phi_ramsey_f = dat['analysis']['gamma_phi_ramsey_f']
+                # t1 = dat['analysis'][self.T1]
+                # t2 = dat['analysis'][self.T2]
+                # t2s = dat['analysis'][self.T2_star]
 
-                self.plot_dicts["%s_%s_time_stability" % (qubit, typ)] = a.plot_dicts["time_stability"]
-                self.plot_dicts["%s_%s_time_stability" % (qubit, typ)]['ax_id'] = 0
-                self.plot_dicts["%s_%s_time_stability" % (qubit, typ)]['setlabel'] = '%s_%s' % (qubit, typ)
-                self.plot_dicts["%s_%s_time_stability" % (qubit, typ)]['do_legend'] = True
-                self.plot_dicts["%s_%s_time_stability" % (qubit, typ)]['yrange'] = self.options_dict.get('yrange',
-                                                                                                         (0, 60e-6))
+                ############
+                # coherence_gamma
+                pdict_scatter = {
+                    'xlabel': 'Sensitivity',
+                    'xunit': 'GHz/$\Phi_0$',
+                    'ylabel': '$\Gamma_{\phi}$',
+                    'yunit': '$s^{-1}$',
+                    'setlabel': '$\Gamma_{\phi,\mathrm{Ramsey}}$',
+                }
+                pdict_fit = {}
+                cg_base = qubit + "_" + cg_all_base
+                pds, pdf = plot_scatter_errorbar_fit(self=self, ax_id=cg_base, xdata=np.abs(sensitivity),
+                                                     ydata=gamma_phi_ramsey, fitfunc=gamma_phi_ramsey_f,
+                                                     xerr=None, yerr=None, fitextra=0.1, fitpoints=1000,
+                                                     pdict_scatter=pdict_scatter, pdict_fit=pdict_fit)
+                self.plot_dicts[cg_base + '_ramsey_fit'] = pdf
+                self.plot_dicts[cg_base + '_ramsey_scatter'] = pds
 
-                if self.freq_keys:
-                    self.plot_dicts["%s_%s_freq_relation" % (qubit, typ)] = a.plot_dicts["freq_relation"]
-                    self.plot_dicts["%s_%s_freq_relation" % (qubit, typ)]['ax_id'] = 1
-                    self.plot_dicts["%s_%s_freq_relation" % (qubit, typ)]['setlabel'] = '%s_%s' % (qubit, typ)
-                    self.plot_dicts["%s_%s_freq_relation" % (qubit, typ)]['do_legend'] = True
-                    self.plot_dicts["%s_%s_freq_relation" % (qubit, typ)]['yrange'] = self.options_dict.get('yrange',
-                                                                                                            (0, 60e-6))
-                if self.dac_keys:
-                    self.plot_dicts["%s_%s_dac_relation" % (qubit, typ)] = a.plot_dicts["dac_relation"]
-                    self.plot_dicts["%s_%s_dac_relation" % (qubit, typ)]['ax_id'] = 2
-                    self.plot_dicts["%s_%s_dac_relation" % (qubit, typ)]['setlabel'] = '%s_%s' % (qubit, typ)
-                    self.plot_dicts["%s_%s_dac_relation" % (qubit, typ)]['do_legend'] = True
-                    self.plot_dicts["%s_%s_dac_relation" % (qubit, typ)]['yrange'] = self.options_dict.get('yrange',
-                                                                                                           (0, 60e-6))
+                pds, pdf = plot_scatter_errorbar_fit(self=self, ax_id=cg_base, xdata=np.abs(sensitivity),
+                                                     ydata=gamma_phi_echo, fitfunc=gamma_phi_echo_f,
+                                                     xerr=None, yerr=None, fitextra=0.1, fitpoints=1000,
+                                                     pdict_scatter=pdict_scatter, pdict_fit=pdict_fit)
+                self.plot_dicts[cg_base + '_echo_fit'] = pdf
+                self.plot_dicts[cg_base + '_echo_scatter'] = pds
+
+                ############
+                # coherence_ratios
+                cr_base = qubit + '_' + cr_all_base
+
+                ratio_gamma = gamma_phi_ramsey / gamma_phi_echo
+
+                pdict_scatter = {
+                    'xlabel': 'Flux',
+                    'xunit': 'm$\Phi_0$',
+                    'ylabel': '$T_\phi^{\mathrm{Echo}}/T_\phi^{\mathrm{Ramsey}}$',
+                }
+                pds = plot_scatter_errorbar(self=self, ax_id=cr_all_base + '_flux', xdata=flux,
+                                            ydata=ratio_gamma,
+                                            xerr=None, yerr=None,
+                                            pdict=pdict_scatter)
+                self.plot_dicts[cr_base + '_flux'] = pds
+
+                pdict_scatter = {
+                    'xlabel': 'Qubit Frequency',
+                    'xunit': 'Hz',
+                    'ylabel': '$T_\phi^{\mathrm{Echo}}/T_\phi^{\mathrm{Ramsey}}$',
+                }
+                pds = plot_scatter_errorbar(self=self, ax_id=cr_all_base + '_frequency', xdata=freq,
+                                            ydata=ratio_gamma,
+                                            xerr=None, yerr=None,
+                                            pdict=pdict_scatter)
+                self.plot_dicts[cr_base + '_frequency'] = pds
+
+                pdict_scatter = {
+                    'xlabel': r'Sensitivity $|\partial\nu/\partial\Phi|$',
+                    'xunit': 'Hz/$\Phi_0$',
+                    'ylabel': '$T_\phi^{\mathrm{Echo}}/T_\phi^{\mathrm{Ramsey}}$',
+                }
+                pds = plot_scatter_errorbar(self=self, ax_id=cr_all_base + '_sensitivity', xdata=sensitivity,
+                                            ydata=ratio_gamma,
+                                            xerr=None, yerr=None,
+                                            pdict=pdict_scatter)
+                self.plot_dicts[cr_base + '_sensitivity'] = pds
+
+                ############
+                # coherence_times
+                ct_base = qubit + '_' + ct_all_base
+
+                yrange = self.options_dict.get('yrange', (0, 60e-6))
+                for typ in self.all_analysis[qubit]:
+                    a = self.all_analysis[qubit][typ]
+                    a.prepare_plots()
+                    label = '%s_%s' % (qubit, typ)
+
+                    self.plot_dicts[ct_base + '_time_stability_' + typ] = a.plot_dicts["time_stability"]
+                    self.plot_dicts[ct_base + '_time_stability_' + typ]['ax_id'] = ct_base + '_time_stability'
+                    self.plot_dicts[ct_base + '_time_stability_' + typ]['setlabel'] = label
+                    self.plot_dicts[ct_base + '_time_stability_' + typ]['do_legend'] = True
+                    self.plot_dicts[ct_base + '_time_stability_' + typ]['yrange'] = None
+
+                    if self.freq_keys:
+                        self.plot_dicts[ct_base + '_freq_relation_' + typ] = a.plot_dicts["freq_relation"]
+                        self.plot_dicts[ct_base + '_freq_relation_' + typ]['ax_id'] = ct_base + '_freq_relation'
+                        self.plot_dicts[ct_base + '_freq_relation_' + typ]['setlabel'] = label
+                        self.plot_dicts[ct_base + '_freq_relation_' + typ]['do_legend'] = True
+                        self.plot_dicts[ct_base + '_freq_relation_' + typ]['yrange'] = None
+                    if self.dac_keys:
+                        self.plot_dicts[ct_base + '_dac_relation_' + typ] = a.plot_dicts["dac_relation"]
+                        self.plot_dicts[ct_base + '_dac_relation_' + typ]['ax_id'] = ct_base + '_dac_relation'
+                        self.plot_dicts[ct_base + '_dac_relation_' + typ]['setlabel'] = label
+                        self.plot_dicts[ct_base + '_dac_relation_' + typ]['do_legend'] = True
+                        self.plot_dicts[ct_base + '_dac_relation_' + typ]['yrange'] = None
+
+                    if self.dac_keys and self.freq_keys:
+                        pdict_scatter = {
+                            'xlabel': r'Sensitivity $|\partial\nu/\partial\Phi|$',
+                            'xunit': 'Hz/$\Phi_0$',
+                            'ylabel': '$T_\phi^{\mathrm{Echo}}/T_\phi^{\mathrm{Ramsey}}$',
+                            'setlabel': label
+                        }
+                        pds = plot_scatter_errorbar(self=self, ax_id=ct_base + '_flux_relation', xdata=flux,
+                                                    ydata=dat['analysis'][typ],
+                                                    xerr=None, yerr=None,
+                                                    pdict=pdict_scatter)
+                        self.plot_dicts[ct_base + '_flux_relation_' + typ] = pds
 
                 # self.raw_data_dict[qubit][typ] = a.raw_data_dict
 
+        d = np.array([1, 2, 3, 4]) * 1e-6
+        self.plot_dicts['test2'] = plot_scatter_errorbar(self, ax_id='test2', xdata=d, ydata=d, xerr=d / 10,
+                                                         yerr=d / 10, pdict=None)
+        self.plot_dicts['test'] = {
+            'ax_id': 'test',
+            'plotfn': self.plot_line,
+            'xvals': d,
+            'xlabel': 'x',
+            'xunit': 's',
+            'yvals': d,
+            'ylabel': 'y',
+            'yunit': 'yu',
+            'setlabel': 'setlabel',
+            'marker': 'x',
+            'yerr': d / 10,
+            'xerr': d / 10,
+        }
 
-    def plot_gamma_fit(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo,
-                       slope_ramsey, slope_echo, intercept, path,
-                       f=None, ax=None,
-                       figname='Gamma_Fit.PNG'):
-        if f is None:
-            f, ax = plt.subplots()
 
-        ax.plot(np.abs(sensitivity) / 1e9, Gamma_phi_ramsey,
-                'o', color='C2', label='$\Gamma_{\phi,\mathrm{Ramsey}}$')
-        ax.plot(np.abs(sensitivity) / 1e9, slope_ramsey *
-                np.abs(sensitivity) + intercept, color='C2')
+def plot_scatter_errorbar(self, ax_id, xdata, ydata, xerr=None, yerr=None, pdict=None):
+    pdict = pdict or {}
 
-        ax.plot(np.abs(sensitivity) / 1e9, Gamma_phi_echo,
-                'o', color='C0', label='$\Gamma_{\phi,\mathrm{Echo}}$')
-        ax.plot(np.abs(sensitivity) / 1e9, slope_echo *
-                np.abs(sensitivity) + intercept, color='C0')
+    pds = {
+        'ax_id': ax_id,
+        'plotfn': self.plot_line,
+        'xvals': xdata,
+        'xlabel': 'x',
+        'xunit': 'xu',
+        'yvals': ydata,
+        'ylabel': 'y',
+        'yunit': 'yu',
+        'setlabel': 'setlabel',
+        'marker': 'x',
+        'yerr': yerr,
+        'xerr': xerr,
+    }
 
-        ax.legend(loc=0)
-        # ax.set_title('Pure dephasing vs flux sensitivity')
-        ax.set_title('Previous cooldown')
-        ax.set_xlabel(r'$|\partial f/\partial\Phi|$ (GHz/$\Phi_0$)')
-        ax.set_ylabel('$\Gamma_{\phi}$ (1/s)')
-        f.tight_layout()
-        ax.set_ylim(0, np.max(Gamma_phi_ramsey) * 1.05)
-        if path is not None:
-            savename = os.path.abspath(os.path.join(path, figname))
-            f.savefig(savename, format='PNG', dpi=450)
+    if xerr is not None or yerr is not None:
+        pds['func'] = 'errorbar'
+        pds['marker'] = None
+        pds['line_kws'] = {'fmt': 'none'}
+    else:
+        pds['func'] = 'scatter'
 
-    def plot_coherence_times(flux, freq, sensitivity,
-                             T1, Tramsey, Techo, path,
-                             figname='Coherence_times.PNG'):
-        # font = {'size': 16}
-        # matplotlib.rc('font', **font)
+    for k in pdict:
+        pds[k] = pdict[k]
 
-        # f, ax = plt.subplots(1, 3, figsize=[18, 6], sharey=True)
+    return pds
 
-        f, ax = plt.subplots(1, 3, figsize=(18, 5), sharey=True)
 
-        ax[0].plot(flux / 1e-3, T1 / 1e-6, 'o', color='C3', label='$T_1$')
-        ax[0].plot(flux / 1e-3, Tramsey / 1e-6, 'o', color='C2', label='$T_2^*$')
-        ax[0].plot(flux / 1e-3, Techo / 1e-6, 'o', color='C0', label='$T_2$')
-        ax[0].set_title('$T_1$, $T_2^*$, $T_2$ vs flux', size=16)
-        ax[0].set_ylabel('Coherence time ($\mu$s)', size=16)
-        ax[0].set_xlabel('Flux (m$\Phi_0$)', size=16)
+def plot_scatter_errorbar_fit(self, ax_id, xdata, ydata, fitfunc, xerr=None, yerr=None, fitextra=0.1,
+                              fitpoints=1000, pdict_scatter=None, pdict_fit=None):
+    pdict_fit = pdict_fit or {}
+    pds = plot_scatter_errorbar(self=self, ax_id=ax_id, xdata=xdata, ydata=ydata, xerr=xerr, yerr=xerr,
+                                pdict=pdict_scatter)
 
-        ax[1].plot(freq / 1e9, T1 / 1e-6, 'o', color='C3', label='$T_1$')
-        ax[1].plot(freq / 1e9, Tramsey / 1e-6, 'o', color='C2', label='$T_2^*$')
-        ax[1].plot(freq / 1e9, Techo / 1e-6, 'o', color='C0', label='$T_2$')
-        ax[1].set_title('$T_1$, $T_2^*$, $T_2$ vs frequency', size=16)
-        ax[1].set_xlabel('Frequency (GHz)', size=16)
-        ax[1].legend(loc=0)
+    mi, ma = np.min(xdata), np.max(xdata)
+    ex = (ma - mi) * fitextra
+    xdata_fit = np.linspace(mi - ex, ma + ex, fitpoints)
+    ydata_fit = fitfunc(xdata_fit)
 
-        ax[2].plot(np.abs(sensitivity) / 1e9, T1 / 1e-6, 'o', color='C3', label='$T_1$')
-        ax[2].plot(np.abs(sensitivity) / 1e9, Tramsey / 1e-6,
-                   'o', color='C2', label='$T_2^*$')
-        ax[2].plot(
-            np.abs(sensitivity) / 1e9, Techo / 1e-6, 'o', color='C0', label='$T_2$')
-        ax[2].set_title('$T_1$, $T_2^*$, $T_2$ vs sensitivity', size=16)
-        ax[2].set_xlabel(r'$|\partial\nu/\partial\Phi|$ (GHz/$\Phi_0$)', size=16)
-
-        f.tight_layout()
-        if path is not None:
-            savename = os.path.abspath(os.path.join(path, figname))
-            f.savefig(savename, format='PNG', dpi=450)
-
-    def plot_ratios(flux, freq, sensitivity,
-                    Gamma_phi_ramsey, Gamma_phi_echo, path,
-                    figname='Gamma_ratios.PNG'):
-        # Pure dephaning times
-
-        f, ax = plt.subplots(1, 3, figsize=(18, 5), sharey=True)
-        ratio_gamma = Gamma_phi_ramsey / Gamma_phi_echo
-
-        ax[0].plot(flux / 1e-3, ratio_gamma, 'o', color='C0')
-        ax[0].set_title('$T_\phi^{\mathrm{Echo}}/T_\phi^{\mathrm{Ramsey}}$ vs flux', size=16)
-        ax[0].set_ylabel('Ratio', size=16)
-        ax[0].set_xlabel('Flux (m$\Phi_0$)', size=16)
-
-        ax[1].plot(freq / 1e9, ratio_gamma, 'o', color='C0')
-        ax[1].set_title('$T_\phi^{\mathrm{Echo}}/T_\phi^{\mathrm{Ramsey}}$ vs frequency', size=16)
-        ax[1].set_xlabel('Frequency (GHz)', size=16)
-
-        ax[2].plot(np.abs(sensitivity) / 1e9, ratio_gamma, 'o', color='C0')
-        ax[2].set_title('$T_\phi^{\mathrm{Echo}}/T_\phi^{\mathrm{Ramsey}}$ vs sensitivity', size=16)
-        ax[2].set_xlabel(r'$|\partial\nu/\partial\Phi|$ (GHz/$\Phi_0$)', size=16)
-
-        f.tight_layout()
-
-        if path is not None:
-            savename = os.path.abspath(os.path.join(path, figname))
-            f.savefig(savename, format='PNG', dpi=450)
-
-    def plot_coherence_times_freq(flux, freq, sensitivity,
-                                  T1, Tramsey, Techo, path,
-                                  figname='Coherence_times.PNG'):
-        f, ax = plt.subplots()
-
-        ax.plot(freq / 1e9, T1 / 1e-6, 'o', color='C3', label='$T_1$')
-        ax.plot(freq / 1e9, Tramsey / 1e-6, 'o', color='C2', label='$T_2^*$')
-        ax.plot(freq / 1e9, Techo / 1e-6, 'o', color='C0', label='$T_2$')
-        ax.set_title('$T_1$, $T_2^*$, $T_2$ vs frequency')
-        ax.set_xlabel('Frequency (GHz)')
-        ax.legend(loc=0)
-
-        f.tight_layout()
-        if path is not None:
-            savename = os.path.abspath(os.path.join(path, figname))
-            f.savefig(savename, format='PNG', dpi=450)
+    pdf = {
+        'ax_id': ax_id,
+        'plotfn': self.plot_line,
+        'xvals': xdata_fit,
+        'yvals': ydata_fit,
+        'linestyle': '-',
+        'marker': '',
+    }
+    for k in pdict_fit:
+        pdf[k] = pdict_fit[k]
+    return pds, pdf
 
 
 def PSD_Analysis(table, freq_resonator: float = None, Qc: float = None, chi_shift: float = None, verbose: bool = True):
@@ -528,13 +621,23 @@ def PSD_Analysis(table, freq_resonator: float = None, Qc: float = None, chi_shif
         if verbose:
             print('Estimated residual photon number: %s' % n_avg)
 
+    Gamma_phi_echo_f = lambda x: slope_echo * x + intercept
+    Gamma_phi_ramsey_f = lambda x: slope_ramsey * x + intercept
+    data_dict['qfreq'] = freq
+    data_dict['t1'] = T1
+    data_dict['t2'] = Techo
+    data_dict['t2s'] = Tramsey
+    data_dict['flux'] = flux
     data_dict['gamma_intercept'] = intercept
     data_dict['gamma_slope_ramsey'] = slope_ramsey
     data_dict['gamma_slope_echo'] = slope_echo
     data_dict['gamma_phi_ramsey'] = Gamma_phi_ramsey
+    data_dict['gamma_phi_ramsey_f'] = Gamma_phi_ramsey_f
     data_dict['gamma_phi_echo'] = Gamma_phi_echo
+    data_dict['gamma_phi_echo_f'] = Gamma_phi_echo_f
     data_dict['sensitivity'] = sensitivity
     data_dict['sqrtA_echo'] = (sqrtA_echo / 1e-6)
+    data_dict['fit_res'] = fit_res_gammas
 
     return data_dict
 
@@ -670,3 +773,83 @@ def fit_gammas(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo, verbose=0):
     if verbose > 0:
         lmfit.printfuncs.report_fit(fit_result_gammas.params)
     return fit_result_gammas
+
+
+def plot_gamma_fit(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo, slope_ramsey, slope_echo, intercept, ax=None,
+                   **kwargs):
+    if ax is None:
+        f, ax = plt.subplots()
+
+    ax.plot(np.abs(sensitivity) / 1e9, Gamma_phi_ramsey,
+            'o', color='C2', label='$\Gamma_{\phi,\mathrm{Ramsey}}$')
+    ax.plot(np.abs(sensitivity) / 1e9, slope_ramsey *
+            np.abs(sensitivity) + intercept, color='C2')
+
+    ax.plot(np.abs(sensitivity) / 1e9, Gamma_phi_echo,
+            'o', color='C0', label='$\Gamma_{\phi,\mathrm{Echo}}$')
+    ax.plot(np.abs(sensitivity) / 1e9, slope_echo *
+            np.abs(sensitivity) + intercept, color='C0')
+
+    ax.legend(loc=0)
+    ax.set_title('Pure dephasing vs flux sensitivity')
+    ax.set_xlabel(r'$|\partial f/\partial\Phi|$ (GHz/$\Phi_0$)')
+    ax.set_ylabel('$\Gamma_{\phi}$ (1/s)')
+    ax.set_ylim(0, np.max(Gamma_phi_ramsey) * 1.05)
+
+
+def plot_coherence_times(flux, freq, sensitivity, T1, Tramsey, Techo, ax, **kwargs):
+    # if not ax:
+    f, ax = plt.subplots(1, 3, figsize=(18, 5), sharey=True)
+
+    ax[0].plot(flux / 1e-3, T1 / 1e-6, 'o', color='C3', label='$T_1$')
+    ax[0].plot(flux / 1e-3, Tramsey / 1e-6, 'o', color='C2', label='$T_2^*$')
+    ax[0].plot(flux / 1e-3, Techo / 1e-6, 'o', color='C0', label='$T_2$')
+    ax[0].set_title('$T_1$, $T_2^*$, $T_2$ vs flux', size=16)
+    ax[0].set_ylabel('Coherence time ($\mu$s)', size=16)
+    ax[0].set_xlabel('Flux (m$\Phi_0$)', size=16)
+
+    ax[1].plot(freq / 1e9, T1 / 1e-6, 'o', color='C3', label='$T_1$')
+    ax[1].plot(freq / 1e9, Tramsey / 1e-6, 'o', color='C2', label='$T_2^*$')
+    ax[1].plot(freq / 1e9, Techo / 1e-6, 'o', color='C0', label='$T_2$')
+    ax[1].set_title('$T_1$, $T_2^*$, $T_2$ vs frequency', size=16)
+    ax[1].set_xlabel('Frequency (GHz)', size=16)
+    ax[1].legend(loc=0)
+
+    ax[2].plot(np.abs(sensitivity) / 1e9, T1 / 1e-6, 'o', color='C3', label='$T_1$')
+    ax[2].plot(np.abs(sensitivity) / 1e9, Tramsey / 1e-6,
+               'o', color='C2', label='$T_2^*$')
+    ax[2].plot(
+        np.abs(sensitivity) / 1e9, Techo / 1e-6, 'o', color='C0', label='$T_2$')
+    ax[2].set_title('$T_1$, $T_2^*$, $T_2$ vs sensitivity', size=16)
+    ax[2].set_xlabel(r'$|\partial\nu/\partial\Phi|$ (GHz/$\Phi_0$)', size=16)
+
+
+def plot_ratios(flux, freq, sensitivity, Gamma_phi_ramsey, Gamma_phi_echo, ax=None, **kwargs):
+    # Pure dephasing times
+    f, ax = plt.subplots(1, 3, figsize=(18, 5), sharey=True)
+    ratio_gamma = Gamma_phi_ramsey / Gamma_phi_echo
+
+    ax[0].plot(flux / 1e-3, ratio_gamma, 'o', color='C0')
+    ax[0].set_title('$T_\phi^{\mathrm{Echo}}/T_\phi^{\mathrm{Ramsey}}$ vs flux', size=16)
+    ax[0].set_ylabel('Ratio', size=16)
+    ax[0].set_xlabel('Flux (m$\Phi_0$)', size=16)
+
+    ax[1].plot(freq / 1e9, ratio_gamma, 'o', color='C0')
+    ax[1].set_title('$T_\phi^{\mathrm{Echo}}/T_\phi^{\mathrm{Ramsey}}$ vs frequency', size=16)
+    ax[1].set_xlabel('Frequency (GHz)', size=16)
+
+    ax[2].plot(np.abs(sensitivity) / 1e9, ratio_gamma, 'o', color='C0')
+    ax[2].set_title('$T_\phi^{\mathrm{Echo}}/T_\phi^{\mathrm{Ramsey}}$ vs sensitivity', size=16)
+    ax[2].set_xlabel(r'$|\partial\nu/\partial\Phi|$ (GHz/$\Phi_0$)', size=16)
+
+
+def plot_coherence_times_freq(freq, T1, Tramsey, Techo):
+    if not ax:
+        f, ax = plt.subplots()
+
+    ax.plot(freq / 1e9, T1 / 1e-6, 'o', color='C3', label='$T_1$')
+    ax.plot(freq / 1e9, Tramsey / 1e-6, 'o', color='C2', label='$T_2^*$')
+    ax.plot(freq / 1e9, Techo / 1e-6, 'o', color='C0', label='$T_2$')
+    ax.set_title('$T_1$, $T_2^*$, $T_2$ vs frequency')
+    ax.set_xlabel('Frequency (GHz)')
+    ax.legend(loc=0)
