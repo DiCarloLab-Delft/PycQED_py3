@@ -502,10 +502,13 @@ def exp_dec_guess(model, data, t):
     amp_guess = data[np.argmin(t)] - offs_guess
     # guess tau by looking for value closest to 1/e
     tau_guess = t[np.argmin(abs((amp_guess*(1/np.e) + offs_guess)-data))]
-    params = model.make_params(amplitude=amp_guess,
-                               tau=tau_guess,
-                               n=1,
-                               offset=offs_guess)
+
+    model.set_param_hint('amplitude', value=amp_guess)
+    model.set_param_hint('tau', value=tau_guess)
+    model.set_param_hint('n', value=1, vary=False)
+    model.set_param_hint('offset', value=offs_guess)
+
+    params = model.make_params()
     return params
 
 

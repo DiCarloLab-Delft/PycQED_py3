@@ -176,6 +176,9 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         Returns the scale factor to transform an amplitude in 'dac value' to an
         amplitude in 'V'.
 
+        "dac_value" refers to the value between -1 and +1 that is set in a
+        waveform.
+
         N.B. the implementation is specific to this type of AWG
         """
         AWG = self.AWG.get_instr()
@@ -187,6 +190,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         channel_amp = AWG.get('awgs_{}_outputs_{}_amplitude'.format(
             awg_nr, ch_pair))
 
+        # channel range of 5 corresponds to -2.5V to +2.5V
         channel_range_pp = AWG.get('sigouts_{}_range'.format(awg_ch))
         # direct_mode = AWG.get('sigouts_{}_direct'.format(awg_ch))
         scale_factor = channel_amp*(channel_range_pp/2)
@@ -701,7 +705,27 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                                    self.sampling_rate()))
         return distorted_waveform
 
-    def plot_flux_arc(self, ax=None, show=True):
+    def plot_cz_trajectory(self, ax=None, show=True):
+        """
+        Plots the cz trajectory in frequency space.
+        """
+        if ax is None:
+            f, ax = plt.subplots()
+        extra_samples = 10
+        nr_plot_samples = int((self.cz_length()+self.cz_phase_corr_length()) *
+                              self.sampling_rate() + extra_samples)
+        dac_amps = self._wave_dict['cz_z'][:nr_plot_samples]
+        samples = np.arange(len(dac_amps))
+        amps = dac_amps*self.get_dac_val_to_amp_scalefactor()
+        deltas = self.amp_to_detuning(amps)
+        freqs = self.cz_freq_01_max()-deltas
+        ax.scatter(amps, freqs, c=samples, label='CZ trajectory')
+        if show:
+            plt.show()
+        return ax
+
+    def plot_flux_arc(self, ax=None, show=True,
+                      plot_cz_trajectory=False):
         """
         Plots the flux arc as used in the lutman based on the polynomial
         coefficients
@@ -719,6 +743,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             self.cz_freq_interaction()*1e-9),
             c='C1')
 
+        ax.axvline(0, 0, 1e10, linestyle='dotted', c='grey')
         ax.fill_between(
             x=[-5, 5],
             y1=[self.cz_freq_interaction()-self.cz_J2()]*2,
@@ -728,8 +753,9 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             color='C1', alpha=0.25)
 
         title = ('Calibration visualization\n{}\nchannel {}'.format(
-                    self.AWG(), self.cfg_awg_channel()))
-
+            self.AWG(), self.cfg_awg_channel()))
+        if plot_cz_trajectory:
+            self.plot_cz_trajectory(ax=ax, show=False)
         leg = ax.legend(title=title, loc=(1.05, .7))
         leg._legend_box.align = 'center'
         set_xlabel(ax, 'AWG amplitude', 'V')
@@ -745,7 +771,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         dac_val_axis.axvspan(1, 1000, facecolor='.5', alpha=0.5)
         dac_val_axis.axvspan(-1000, -1, facecolor='.5', alpha=0.5)
-
+        f.subplots_adjust(right=.7)
         if show:
             plt.show()
         return ax
@@ -785,7 +811,6 @@ class QWG_Flux_LutMan(AWG8_Flux_LutMan):
         self.AWG.get_instr().stop()
         self.AWG.get_instr().set(codeword, waveform)
         self.AWG.get_instr().start()
-
 
     def distort_waveform(self, waveform):
         """
