@@ -48,15 +48,14 @@ class BaseDataAnalysis(object):
             self.plot(key_list='auto')  # make the plots
     """
 
-    def __init__(self, t_start: str=None,
-                 t_stop: str=None,
-                 TwoD: bool=False,
-                 label: str='',
-                 options_dict: dict=None,
-                 data_file_path: str=None,
-                 close_figs: bool=True,
-                 extract_only: bool=False,
-                 do_fitting: bool=False):
+    def __init__(self, t_start: str = None,
+                 t_stop: str = None,
+                 label: str = '',
+                 options_dict: dict = None,
+                 data_file_path: str = None,
+                 close_figs: bool = True,
+                 extract_only: bool = False,
+                 do_fitting: bool = False):
         '''
         This is the __init__ of the abstract base class.
         It is intended to be called at the start of the init of the child
@@ -149,9 +148,6 @@ class BaseDataAnalysis(object):
         # These options relate to the plotting #
         ########################################
 
-        self.fit_dicts = dict()
-        self.processed_data_dict = dict()
-
         self.plot_dicts = OrderedDict()
         self.axs = OrderedDict()
         self.figs = OrderedDict()
@@ -186,15 +182,15 @@ class BaseDataAnalysis(object):
         This function is at the core of all analysis and defines the flow.
         This function is typically called after the __init__.
         """
-        self.extract_data()    # extract data specified in params dict
-        self.process_data()    # binning, filtering etc
+        self.extract_data()  # extract data specified in params dict
+        self.process_data()  # binning, filtering etc
         if self.do_fitting:
-            self.prepare_fitting()      # set up fit_dicts
-            self.run_fitting()          # fitting to models
+            self.prepare_fitting()  # set up fit_dicts
+            self.run_fitting()  # fitting to models
             self.save_fit_results()
             self.analyze_fit_results()  # analyzing the results of the fits
 
-        self.prepare_plots()   # specify default plots
+        self.prepare_plots()  # specify default plots
         if not self.extract_only:
             self.plot(key_list='auto')  # make the plots
 
@@ -329,7 +325,8 @@ class BaseDataAnalysis(object):
         # print [[key, type(val), len(val)] for key, val in
         # self.raw_data_dict.items()]
         self.raw_data_dict['timestamps'] = [self.t_start]
-        
+        self.raw_data_dict['nr_experiments'] = len(self.timestamps)
+
     def process_data(self):
         """
         process_data: overloaded in child classes,
@@ -351,10 +348,10 @@ class BaseDataAnalysis(object):
         """
         pass
 
-    def save_figures(self, savedir: str=None, savebase: str =None,
-                     tag_tstamp: bool=True,
-                     fmt: str ='png', key_list: list='auto',
-                     close_figs: bool=True):
+    def save_figures(self, savedir: str = None, savebase: str = None,
+                     tag_tstamp: bool = True,
+                     fmt: str = 'png', key_list: list = 'auto',
+                     close_figs: bool = True):
         if savedir is None:
             savedir = self.raw_data_dict.get('folder', '')
             if isinstance(savedir, list):
@@ -362,7 +359,7 @@ class BaseDataAnalysis(object):
         if savebase is None:
             savebase = ''
         if tag_tstamp:
-            tstag = '_'+self.raw_data_dict['timestamps'][0]
+            tstag = '_' + self.raw_data_dict['timestamps'][0]
         else:
             tstag = ''
 
@@ -371,21 +368,21 @@ class BaseDataAnalysis(object):
         for key in key_list:
             if self.presentation_mode:
                 savename = os.path.join(
-                    savedir, savebase+key+tstag+'presentation'+'.'+fmt)
+                    savedir, savebase + key + tstag + 'presentation' + '.' + fmt)
                 self.figs[key].savefig(savename, bbox_inches='tight', fmt=fmt)
                 savename = os.path.join(
-                    savedir, savebase+key+tstag+'presentation'+'.svg')
+                    savedir, savebase + key + tstag + 'presentation' + '.svg')
                 self.figs[key].savefig(
                     savename, bbox_inches='tight', fmt='svg')
             else:
-                savename = os.path.join(savedir, savebase+key+tstag+'.'+fmt)
+                savename = os.path.join(savedir, savebase + key + tstag + '.' + fmt)
                 self.figs[key].savefig(savename, bbox_inches='tight', fmt=fmt)
             if close_figs:
                 plt.close(self.figs[key])
 
-    def save_data(self, savedir: str=None, savebase: str=None,
-                  tag_tstamp: bool=True,
-                  fmt: str='json', key_list='auto'):
+    def save_data(self, savedir: str = None, savebase: str = None,
+                  tag_tstamp: bool = True,
+                  fmt: str = 'json', key_list='auto'):
         '''
         Saves the data from self.raw_data_dict to file.
 
@@ -414,7 +411,7 @@ class BaseDataAnalysis(object):
         if savebase is None:
             savebase = ''
         if tag_tstamp:
-            tstag = '_'+self.raw_data_dict['timestamps'][0]
+            tstag = '_' + self.raw_data_dict['timestamps'][0]
         else:
             tstag = ''
 
@@ -443,7 +440,6 @@ class BaseDataAnalysis(object):
         '''
         self.fit_res = {}
         for key, fit_dict in self.fit_dicts.items():
-            multivariable = fit_dict.get('multivariable', None)
             guess_dict = fit_dict.get('guess_dict', None)
             guess_pars = fit_dict.get('guess_pars', None)
             fit_yvals = fit_dict['fit_yvals']
@@ -488,23 +484,30 @@ class BaseDataAnalysis(object):
         """
         Saves the fit results
         """
-        fn = a_tools.measurement_filename(
-            a_tools.get_folder(self.timestamps[0]))
-        with h5py.File(fn, 'r+') as data_file:
-            try:
-                analysis_group = data_file.create_group('Analysis')
-            except ValueError:
-                # If the analysis group already exists.
-                # Delete the old group and create a new group (overwrite).
-                del data_file['Analysis']
-                analysis_group = data_file.create_group('Analysis')
 
-            # Iterate over all the fit result dicts
-            for fr_key, fit_res in self.fit_res.items():
-                fr_group = analysis_group.create_group(fr_key)
-                # TODO: convert the params object to a simple dict
-                # write_dict_to_hdf5(fit_res.params, entry_point=fr_group)
-                write_dict_to_hdf5(fit_res.best_values, entry_point=fr_group)
+        # Check weather there is any data to save
+        if self.fit_res is not None and self.fit_res:
+            fn = a_tools.measurement_filename(a_tools.get_folder(self.timestamps[0]))
+            with h5py.File(fn, 'r+') as data_file:
+                try:
+                    analysis_group = data_file.create_group('Analysis')
+                except ValueError:
+                    # If the analysis group already exists.
+                    analysis_group = data_file['Analysis']
+
+                # Iterate over all the fit result dicts
+                for fr_key, fit_res in self.fit_res.items():
+                    try:
+                        fr_group = analysis_group.create_group(fr_key)
+                    except ValueError:
+                        # If the analysis sub group already exists (each fr_key should be unique)
+                        # Delete the old group and create a new group (overwrite).
+                        del analysis_group[fr_key]
+                        fr_group = analysis_group.create_group(fr_key)
+
+                    # TODO: convert the params object to a simple dict
+                    # write_dict_to_hdf5(fit_res.params, entry_point=fr_group)
+                    write_dict_to_hdf5(fit_res.best_values, entry_point=fr_group)
 
     def plot(self, key_list=None, axs_dict=None,
              presentation_mode=None, no_label=False):
@@ -541,7 +544,8 @@ class BaseDataAnalysis(object):
                     pdict.get('numplotsy', 1), pdict.get('numplotsx', 1),
                     sharex=pdict.get('sharex', False),
                     sharey=pdict.get('sharey', False),
-                    figsize=pdict.get('plotsize', (8, 6)))
+                    figsize=pdict.get('plotsize', None)  # defaults to matplotlibs `.rc_params`
+                )
 
                 # transparent background around axes for presenting data
                 self.figs[pdict['ax_id']].patch.set_alpha(0)
@@ -558,11 +562,11 @@ class BaseDataAnalysis(object):
                     plotfn = getattr(self, pdict['plotfn'])
                 else:
                     plotfn = pdict['plotfn']
-                    
+
                 # used to ensure axes are touching
                 if plot_touching:
                     self.axs[pdict['ax_id']].figure.subplots_adjust(wspace=0,
-                                                              hspace=0)
+                                                                    hspace=0)
                 # ensures the argument convention is preserved
                 if hasattr(self, plotfn.__name__):
                     plotfn(pdict, axs=self.axs[pdict['ax_id']])
@@ -613,17 +617,17 @@ class BaseDataAnalysis(object):
         dataset_label = pdict.get('setlabel', list(range(len(plot_yvals))))
         do_legend = pdict.get('do_legend', False)
 
-        plot_xwidth = (plot_xedges[1:]-plot_xedges[:-1])
+        plot_xwidth = (plot_xedges[1:] - plot_xedges[:-1])
         # center is left edge + widht /2
-        plot_centers = plot_xedges[:-1] + plot_xwidth/2
+        plot_centers = plot_xedges[:-1] + plot_xwidth / 2
 
         if plot_multiple:
             p_out = []
             for ii, this_yvals in enumerate(plot_yvals):
                 p_out.append(pfunc(plot_centers, this_yvals, width=plot_xwidth,
-                                   color=gco(ii, len(plot_yvals)-1),
+                                   color=gco(ii, len(plot_yvals) - 1),
                                    label='%s%s' % (
-                                       dataset_desc),
+                                       dataset_desc, dataset_label[ii]),
                                    **plot_barkws))
 
         else:
@@ -692,8 +696,8 @@ class BaseDataAnalysis(object):
             plot_multiple = False
         else:
             plot_multiple = True
-            assert(len(plot_xvals) == len(plot_yvals))
-            assert(len(plot_xvals[0]) == len(plot_yvals[0]))
+            assert (len(plot_xvals) == len(plot_yvals))
+            assert (len(plot_xvals[0]) == len(plot_yvals[0]))
 
         if plot_multiple:
             p_out = []
@@ -773,25 +777,25 @@ class BaseDataAnalysis(object):
         plot_xrange = pdict.get('xrange', None)
         plot_yrange = pdict.get('yrange', None)
 
-        plot_xvals_step = plot_xvals[1]-plot_xvals[0]
+        plot_xvals_step = plot_xvals[1] - plot_xvals[0]
 
         for ii, idx in enumerate(slice_idxs):
             if len(slice_idxs) == 1:
                 pfunc(plot_xvals, plot_yvals[idx], '-bo',
                       label='%s = %.2f %s' % (
-                    slice_label, plot_slicevals[idx], slice_units))
+                          slice_label, plot_slicevals[idx], slice_units))
             else:
-                if ii == 0 or ii == len(slice_idxs)-1:
+                if ii == 0 or ii == len(slice_idxs) - 1:
                     pfunc(plot_xvals, plot_yvals[idx], '-o',
-                          color=gco(ii, len(slice_idxs)-1),
+                          color=gco(ii, len(slice_idxs) - 1),
                           label='%s = %.2f %s' % (
-                        slice_label, plot_slicevals[idx], slice_units))
+                              slice_label, plot_slicevals[idx], slice_units))
                 else:
                     pfunc(plot_xvals, plot_yvals[idx], '-o',
-                          color=gco(ii, len(slice_idxs)-1))
+                          color=gco(ii, len(slice_idxs) - 1))
         if plot_xrange is None:
-            xmin, xmax = np.min(plot_xvals)-plot_xvals_step / \
-                2., np.max(plot_xvals)+plot_xvals_step/2.
+            xmin, xmax = np.min(plot_xvals) - plot_xvals_step / \
+                         2., np.max(plot_xvals) + plot_xvals_step / 2.
         else:
             xmin, xmax = plot_xrange
         axs.set_xlim(xmin, xmax)
@@ -906,7 +910,7 @@ class BaseDataAnalysis(object):
         plot_normalize = pdict.get('normalize', False)
         plot_logzscale = pdict.get('logzscale', False)
         if plot_logzscale:
-            plot_zvals = np.log10(pdict['zvals']/plot_logzscale)
+            plot_zvals = np.log10(pdict['zvals'] / plot_logzscale)
         else:
             plot_zvals = pdict['zvals']
 
@@ -914,9 +918,9 @@ class BaseDataAnalysis(object):
             plot_xvals_step = 0
             plot_yvals_step = 0
         else:
-            plot_xvals_step = (abs(np.max(plot_xvals)-np.min(plot_xvals)) /
+            plot_xvals_step = (abs(np.max(plot_xvals) - np.min(plot_xvals)) /
                                len(plot_xvals))
-            plot_yvals_step = (abs(np.max(plot_yvals)-np.min(plot_yvals)) /
+            plot_yvals_step = (abs(np.max(plot_yvals) - np.min(plot_yvals)) /
                                len(plot_yvals))
             # plot_yvals_step = plot_yvals[1]-plot_yvals[0]
 
@@ -951,26 +955,25 @@ class BaseDataAnalysis(object):
                     xwidth = plot_xwidth[tt]
                 else:
                     xwidth = None
-                    
-                zvals = np.array(traces['zvals'][tt]).transpose()
+
                 out = pfunc(ax=axs,
                             xwidth=xwidth,
                             clim=fig_clim, cmap=plot_cmap,
                             xvals=[traces['xvals'][tt]],
                             yvals=[traces['yvals'][tt]],
-                            zvals=[zvals],
+                            zvals=[traces['zvals'][tt]],
                             transpose=plot_transpose,
                             normalize=plot_normalize)
 
         if plot_xrange is None:
             if plot_xwidth is not None:
-                xmin, xmax = min([min(xvals)-plot_xwidth[tt]/2
+                xmin, xmax = min([min(xvals) - plot_xwidth[tt] / 2
                                   for tt, xvals in enumerate(plot_xvals)]), \
-                    max([max(xvals)+plot_xwidth[tt]/2
-                         for tt, xvals in enumerate(plot_xvals)])
+                             max([max(xvals) + plot_xwidth[tt] / 2
+                                  for tt, xvals in enumerate(plot_xvals)])
             else:
-                xmin = np.min(plot_xvals) - plot_xvals_step/2
-                xmax = np.max(plot_xvals) + plot_xvals_step/2
+                xmin = np.min(plot_xvals) - plot_xvals_step / 2
+                xmax = np.max(plot_xvals) + plot_xvals_step / 2
         else:
             xmin, xmax = plot_xrange
         if plot_transpose:
@@ -978,6 +981,7 @@ class BaseDataAnalysis(object):
         else:
             axs.set_xlim(xmin, xmax)
 
+        # Find the min-max-range of the plot
         if plot_yrange is None:
             if plot_xwidth is not None:
                 ymin, ymax = [], []
@@ -1000,7 +1004,7 @@ class BaseDataAnalysis(object):
 
             else:
                 ymin = np.min(plot_yvals) - plot_yvals_step / 2.
-                ymax = np.max(plot_yvals) + plot_yvals_step/2.
+                ymax = np.max(plot_yvals) + plot_yvals_step / 2.
         else:
             ymin, ymax = plot_yrange
         if plot_transpose:
