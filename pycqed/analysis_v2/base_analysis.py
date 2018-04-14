@@ -489,7 +489,7 @@ class BaseDataAnalysis(object):
         """
 
         # Check weather there is any data to save
-        if self.fit_res is not None and self.fit_res:
+        if hasattr(self, 'fit_res') and self.fit_res is not None and self.fit_res:
             fn = a_tools.measurement_filename(a_tools.get_folder(self.timestamps[0]))
             with h5py.File(fn, 'r+') as data_file:
                 try:
@@ -1164,3 +1164,61 @@ class BaseDataAnalysis(object):
         """
         pfunc = getattr(axs, pdict.get('func'))
         pfunc(**pdict['plot_kws'])
+
+
+def plot_scatter_errorbar(self, ax_id, xdata, ydata, xerr=None, yerr=None, pdict=None):
+    pdict = pdict or {}
+
+    pds = {
+        'ax_id': ax_id,
+        'plotfn': self.plot_line,
+        'xvals': xdata,
+        'yvals': ydata,
+        'marker': 'x',
+        'linestyle': 'None',
+        'yerr': yerr,
+        'xerr': xerr,
+    }
+
+    if xerr is not None or yerr is not None:
+        pds['func'] = 'errorbar'
+        pds['marker'] = None
+        pds['line_kws'] = {'fmt': 'none'}
+        if pdict.get('marker', False):
+            pds['line_kws'] = {'fmt': pdict['marker']}
+        else:
+            ys = 0 if yerr is None else np.min(yerr) / np.max(ydata)
+            xs = 0 if xerr is None else np.min(xerr) / np.max(xdata)
+            if ys < 1e-2 and xs < 1e-2:
+                pds['line_kws'] = {'fmt': 'o'}
+    else:
+        pds['func'] = 'scatter'
+
+    for k in pdict:
+        pds[k] = pdict[k]
+
+    return pds
+
+
+def plot_scatter_errorbar_fit(self, ax_id, xdata, ydata, fitfunc, xerr=None, yerr=None, fitextra=0.1,
+                              fitpoints=1000, pdict_scatter=None, pdict_fit=None):
+    pdict_fit = pdict_fit or {}
+    pds = plot_scatter_errorbar(self=self, ax_id=ax_id, xdata=xdata, ydata=ydata, xerr=xerr, yerr=yerr,
+                                pdict=pdict_scatter)
+
+    mi, ma = np.min(xdata), np.max(xdata)
+    ex = (ma - mi) * fitextra
+    xdata_fit = np.linspace(mi - ex, ma + ex, fitpoints)
+    ydata_fit = fitfunc(xdata_fit)
+
+    pdf = {
+        'ax_id': ax_id,
+        'plotfn': self.plot_line,
+        'xvals': xdata_fit,
+        'yvals': ydata_fit,
+        'linestyle': '-',
+        'marker': '',
+    }
+    for k in pdict_fit:
+        pdf[k] = pdict_fit[k]
+    return pds, pdf
