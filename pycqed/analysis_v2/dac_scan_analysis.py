@@ -32,7 +32,7 @@ class BasicDACvsFrequency(ba.BaseDataAnalysis):
                             'phase': self.options_dict.get('phase_key', 'phase'),
                             'dac': self.options_dict.get('dac_key', 'Instrument settings.fluxcurrent.VFCQ6'),
                             }
-        self.numeric_params = ['freq', 'amp', 'phase']
+        self.numeric_params = ['freq', 'amp', 'phase', 'dac']
 
         self.extract_fitparams = self.options_dict.get('fitparams', True)
         if self.extract_fitparams:
@@ -55,15 +55,16 @@ class BasicDACvsFrequency(ba.BaseDataAnalysis):
         self.proc_data_dict = {}
         dac_values_unsorted = np.array(self.raw_data_dict['dac'])
         sorted_indices = dac_values_unsorted.argsort()
-        self.proc_data_dict['dac_values'] = np.array(dac_values_unsorted[sorted_indices],
-                                                     dtype=float) * self.options_dict.get(
-            'current_multiplier', 1)
+        self.proc_data_dict['dac_values'] = np.array(dac_values_unsorted[sorted_indices], dtype=float)
         self.proc_data_dict['amplitude_values'] = np.array(self.raw_data_dict['amp'][sorted_indices], dtype=float)
         self.proc_data_dict['phase_values'] = np.array(self.raw_data_dict['phase'][sorted_indices], dtype=float)
-        self.proc_data_dict['frequency_values'] = np.array(self.raw_data_dict['freq'][sorted_indices],
-                                                           dtype=float)
-        # self.proc_data_dict['distance_values'] = self.proc_data_dict['amplitude_values']
-        # Fixme: calculate s21 distance
+        self.proc_data_dict['frequency_values'] = np.array(self.raw_data_dict['freq'][sorted_indices], dtype=float)
+
+        deg_factor = np.pi / 180
+        rad = self.proc_data_dict['phase_values'] * deg_factor
+        compl = self.proc_data_dict['amplitude_values'] * (np.cos(rad) + 1j * np.sin(rad))
+        self.proc_data_dict['distance_values'] = a_tools.calculate_distance_ground_state(
+            data_real=compl.real, data_imag=compl.imag, percentile=70, normalize=True)
 
         if self.extract_fitparams:
             self.proc_data_dict['fit_frequencies'] = np.array(self.raw_data_dict['fitparams'][sorted_indices],
@@ -115,17 +116,23 @@ class BasicDACvsFrequency(ba.BaseDataAnalysis):
         else:
             factor = 1
 
+        x = self.proc_data_dict['dac_values'] * self.options_dict.get('current_multiplier', 1)
+        y = self.proc_data_dict['frequency_values']
+
         twoDPlot = {'plotfn': self.plot_colorx,
-                    'xvals': self.proc_data_dict['dac_values'],
-                    'yvals': self.proc_data_dict['frequency_values'],
-                    'title': 'transmission, feedline {} ',
+                    'xvals': x,
+                    'yvals': y,
+                    'title': 'Flux Current Spectroscopy Sweep',
                     'xlabel': r'Flux bias current, I',
                     'xunit': 'A',
                     'ylabel': r'Frequency',
                     'yunit': 'Hz',
                     # 'zrange': [smoothed_amplitude_values.min(), smoothed_amplitude_values.max()],
-                    # 'plotsize': (8, 8),
-                    'cmap': 'YlGn_r',
+                    'xrange': [np.min(x), np.max(x)],
+                    'yrange': [np.min(y), np.max(y)],
+                    'plotsize': self.options_dict.get('plotsize', None),
+                    'cmap': self.options_dict.get('cmap', 'YlGn_r'),
+                    'plot_transpose': self.options_dict.get('plot_transpose', False),
                     }
 
         if self.do_fitting:
@@ -146,14 +153,11 @@ class BasicDACvsFrequency(ba.BaseDataAnalysis):
             'linestyle': 'None',
         }
 
-        for ax in ('amplitude', 'phase'):  # 'phase', 'distance'
-            print(self.proc_data_dict[ax + '_values'].shape)
-            print(self.proc_data_dict['frequency_values'].shape)
+        for ax in ['amplitude', 'phase', 'distance']:
+            z = self.proc_data_dict['%s_values' % ax]
             td = deepcopy(twoDPlot)
-            td['ax_id'] = ax
-            td['zvals'] = self.proc_data_dict[ax + '_values'],  # .transpose(),
-            td['zlabel'] = 'Homodyne amplitude' if ax == 'distance' else 'Homodyne amplitude'
-            td['zunit'] = '-' if ax == 'distance' else 'V'
+            td['zvals'] = z
+            td['zlabel'] = ax
             self.plot_dicts[ax] = td
 
             sc = deepcopy(scatter)
