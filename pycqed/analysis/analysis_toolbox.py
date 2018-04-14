@@ -22,6 +22,7 @@ from .tools.data_manipulation import *
 from .tools.plotting import *
 import colorsys as colors
 from matplotlib import cm
+from pycqed.analysis import composite_analysis as RA
 
 from matplotlib.colors import LogNorm
 
