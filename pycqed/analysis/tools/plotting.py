@@ -320,7 +320,7 @@ def flex_colormesh_plot_vs_xy(xvals, yvals, zvals, ax=None,
 
     # various plot options
     # define colormap
-    cmap = plt.get_cmap(kw.pop('cmap', 'CMRmap'))
+    cmap = plt.get_cmap(kw.pop('cmap', 'viridis'))
     clim = kw.pop('clim', [None, None])
     # normalized plot
     if normalize:

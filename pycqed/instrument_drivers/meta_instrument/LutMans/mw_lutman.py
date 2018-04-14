@@ -4,7 +4,6 @@ from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
 from pycqed.measurement.waveform_control_CC import waveform as wf
 
-
 class Base_MW_LutMan(Base_LutMan):
     _def_lm = ['I', 'rX180',  'rY180', 'rX90',  'rY90',
                'rXm90',  'rYm90', 'rPhi90', 'spec']
@@ -416,13 +415,6 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
 
 
 class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
-    """
-    WORK ONGOING:
-    4. define the waveforms accordingly to the VQE lutmap.
-          (use parameters from _add_waveform_parameters.)
-
-    """
-
     def __init__(self, name, **kw):
         """
         Waveform allocation strategy for VQE.
@@ -472,8 +464,8 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
                         'rXm90',  'rYm90', 'rPhi90']
         self.set_default_lutmap()
 
-        self._vqe_lm = ['I', 'X180t',  'Y180t', 'X90t',  'Xm90t',
-                        'Y90t',  'Y90t', 'Y180']
+        self._vqe_lm = ['I', 'X180c',  'Y180c', 'X90c',  'Xm90c',
+                        'Y90c',  'Y90c', 'Y180']
 
     def set_VQE_lutmap(self):
         """
@@ -497,10 +489,7 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
                            parameter_class=ManualParameter,
                            initial_value=0)
         # parameters related to phase compilation
-        self.add_parameter('phi1', unit='rad', vals=vals.Numbers(0, 2*np.pi),
-                           parameter_class=ManualParameter,
-                           initial_value=0)
-        self.add_parameter('phi2', unit='rad', vals=vals.Numbers(0, 2*np.pi),
+        self.add_parameter('phi', unit='rad', vals=vals.Numbers(0, 2*np.pi),
                            parameter_class=ManualParameter,
                            initial_value=0)
 
@@ -517,14 +506,40 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
         else:
             f_modulation = 0
 
-        # """
-        # This pulses still need to be cross-checked.
-        # """
-        # self._wave_dict['cX180_phi'] = self.wf_func(
-        #     amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
-        #     f_modulation=f_modulation,
-        #     sampling_rate=self.sampling_rate(), phase=0,
-        #     motzoi=self.mw_motzoi())
+        self._wave_dict['X180c'] = self.wf_func(
+            amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
+            f_modulation=f_modulation,
+            sampling_rate=self.sampling_rate(), phase=self.phi(),
+            motzoi=self.mw_motzoi())
+        self._wave_dict['rY180c'] = self.wf_func(
+            amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
+            f_modulation=f_modulation,
+            sampling_rate=self.sampling_rate(), phase=90+self.phi(),
+            motzoi=self.mw_motzoi())
+        self._wave_dict['rX90c'] = self.wf_func(
+            amp=self.mw_amp180()*self.mw_amp90_scale(),
+            sigma_length=self.mw_gauss_width(),
+            f_modulation=f_modulation,
+            sampling_rate=self.sampling_rate(), phase=self.phi(),
+            motzoi=self.mw_motzoi())
+        self._wave_dict['rY90c'] = self.wf_func(
+            amp=self.mw_amp180()*self.mw_amp90_scale(),
+            sigma_length=self.mw_gauss_width(),
+            f_modulation=f_modulation,
+            sampling_rate=self.sampling_rate(), phase=90+self.phi(),
+            motzoi=self.mw_motzoi())
+        self._wave_dict['rXm90c'] = self.wf_func(
+            amp=-1*self.mw_amp180()*self.mw_amp90_scale(),
+            sigma_length=self.mw_gauss_width(),
+            f_modulation=f_modulation,
+            sampling_rate=self.sampling_rate(), phase=self.phi(),
+            motzoi=self.mw_motzoi())
+        self._wave_dict['rYm90c'] = self.wf_func(
+            amp=-1*self.mw_amp180()*self.mw_amp90_scale(),
+            sigma_length=self.mw_gauss_width(),
+            f_modulation=f_modulation,
+            sampling_rate=self.sampling_rate(), phase=90+self.phi(),
+            motzoi=self.mw_motzoi())
 
         if self.mixer_apply_predistortion_matrix():
             self._wave_dict = self.apply_mixer_predistortion_corrections(
