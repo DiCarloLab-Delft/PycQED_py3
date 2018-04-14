@@ -712,7 +712,7 @@ class QWG_lutman_par(Soft_Sweep):
     def set_parameter(self, val):
         self.LutMan.AWG.get_instr().stop()
         self.LutMan_parameter.set(val)
-        self.LutMan.load_pulses_onto_AWG_lookuptable(regenerate_pulses=True)
+        self.LutMan.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
         self.LutMan.AWG.get_instr().start()
         self.LutMan.AWG.get_instr().getOperationComplete()
 
