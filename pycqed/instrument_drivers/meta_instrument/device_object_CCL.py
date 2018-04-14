@@ -255,6 +255,8 @@ class DeviceCCL(Instrument):
 
             # set RO modulation to use common LO frequency
             qb.ro_freq_mod(qb.ro_freq() - self.ro_lo_freq())
+            qb._prep_ro_pulse(upload=False)
+        qb._prep_ro_pulse(upload=True)
 
     def _prep_ro_integration_weights(self):
         """
@@ -548,7 +550,7 @@ class DeviceCCL(Instrument):
 
     def prepare_for_timedomain(self):
         self.prepare_readout()
-        self.prepare_fluxing()
+        # self.prepare_fluxing()
         self.prepare_timing()
 
         for qb_name in self.qubits():
@@ -556,7 +558,7 @@ class DeviceCCL(Instrument):
             qb._prep_td_sources()
             qb._prep_mw_pulses()
 
-        self._prep_td_configure_VSM()
+        # self._prep_td_configure_VSM()
 
     ########################################################
     # Measurement methods
@@ -680,7 +682,7 @@ class DeviceCCL(Instrument):
                                nr_shots: int=4088*4,
                                prepare_for_timedomain: bool =True,
                                result_logging_mode='lin_trans',
-                               initialize: bool=True,
+                               initialize: bool=False,
                                analyze=True,
                                MC=None):
         if prepare_for_timedomain:
@@ -862,7 +864,7 @@ class DeviceCCL(Instrument):
             q1.calibrate_optimal_weights(
                 analyze=True, verify=verify_optimal_weights)
 
-        self.measure_two_qubit_SSRO(q0.name, q1.name,
+        self.measure_two_qubit_SSRO([q1.name, q0.name],
                                     result_logging_mode='lin_trans')
 
         res_dict = mra.two_qubit_ssro_fidelity(
@@ -876,7 +878,9 @@ class DeviceCCL(Instrument):
         UHFQC.quex_trans_offset_weightfunction_1(V_offset_cor[1])
 
         # Does not work because axes are not normalized
-        UHFQC.upload_transformation_matrix(res_dict['mu_matrix_inv'])
+        matrix_normalized = res_dict['mu_matrix_inv']
+        matrix_rescaled = matrix_normalized/abs(matrix_normalized).max()
+        UHFQC.upload_transformation_matrix(matrix_rescaled)
 
         # a = self.check_mux_RO(update=update, update_threshold=update_threshold)
         return True
@@ -1072,3 +1076,4 @@ class DeviceCCL(Instrument):
 
         self._dag = dag
         return dag
+
