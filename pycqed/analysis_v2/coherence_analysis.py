@@ -106,6 +106,10 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
         else:
             print('Warning: first run extract_data!')
 
+    def save_fit_results(self):
+        # todo: if you want to save some results to a hdf5, do it here
+        pass
+
     def prepare_plots(self):
         if not ("time_stability" in self.plot_dicts):
             self._prepare_plot(ax_id='time_stability', xvals=self.raw_data_dict['datetime'],
@@ -148,9 +152,10 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                 if 'sensitivity_values' in self.fit_res:
                     # sensitivity vs tau
                     self._prepare_plot(ax_id="sensitivity_relation",
-                                       xvals=self.fit_res['sensitivity_values'],
+                                       xvals=self.fit_res['sensitivity_values']*1e-9,
                                        yvals=self.raw_data_dict['freq_sorted_tau'],
-                                       xlabel='Sensitivity Value', xunit='?')  # todo
+                                       xlabel=r'Sensitivity $|\partial\nu/\partial\Phi|$',
+                                       xunit=r'GHz/$\Phi_0$')
                 if 'flux_values' in self.fit_res:
                     # flux vs tau
                     self._prepare_plot(ax_id="flux_relation",
@@ -197,7 +202,7 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                  plot_versus_frequency: bool = True,
                  frequency_key_pattern: str = 'Instrument settings.{Q}.freq_qubit',
                  res_freq: list = None, res_Qc: list = None, chi_shift: list = None,
-                 do_fitting: bool = True, verbose: bool = True,
+                 do_fitting: bool = True, verbose: bool = True, close_figs: bool = True,
                  ):
 
         ## Check data and apply default values
@@ -245,7 +250,8 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                          data_file_path=data_file_path,
                          options_dict=options_dict,
                          do_fitting=do_fitting,
-                         extract_only=extract_only)
+                         extract_only=extract_only,
+                         close_figs=close_figs)
 
         # Save some data for later use
         self.raw_data_dict = {}
@@ -290,7 +296,8 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                     plot_versus_frequency=plot_versus_frequency,
                     frequency_key=freq_key,
                     data_file_path=data_file_path,
-                    options_dict=options_dict
+                    options_dict=options_dict,
+                    close_figs=close_figs,
                 )
 
         if auto:
@@ -316,22 +323,6 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                 if not youngest or youngest < tmp_y:
                     youngest = tmp_y
 
-                dac = np.append(dac, np.array(a.raw_data_dict['dac'], dtype=float))
-            np.unique(dac).sort()
-            self.raw_data_dict[qubit]['all_dac'] = dac
-
-            # Sort the measurement data (taus) into the dac values
-            qubit_mask = np.array([True] * len(dac), dtype=bool)
-            for typ in self.all_analysis[qubit]:
-                sorted_taus = self._put_data_into_scheme(scheme=dac, scheme_mess=a.raw_data_dict['dac'],
-                                                         other_mess=a.raw_data_dict['tau'])
-                sorted_taus = np.array(sorted_taus, dtype=float)
-                self.raw_data_dict[qubit][typ]['all_dac_sorted_tau'] = sorted_taus
-                mask = (sorted_taus != None)
-                self.raw_data_dict[qubit][typ]['all_dac_sorted_tau_mask'] = mask
-                qubit_mask = (qubit_mask * 1 + mask * 1) == 2
-            self.raw_data_dict[qubit]['all_mask'] = mask
-
         youngest += datetime.timedelta(seconds=1)
 
         self.raw_data_dict['datetime'] = [youngest]
@@ -355,48 +346,88 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
         for i, o in enumerate(other_mess):
             j = scheme.index(float(scheme_mess[i]))
             other[j] = o
+        return other
+
+    def process_data(self):
+        for qubit in self.all_analysis:
+            self.proc_data_dict[qubit] = {}
+            qo = self.all_analysis[qubit]
+
+            # collect all dac values
+            all_dac = np.array([])
+            for typ in qo:
+                a = self.all_analysis[qubit][typ]
+                all_dac = np.append(all_dac, np.array(a.raw_data_dict['dac'], dtype=float))
+            all_dac = np.unique(all_dac)
+            all_dac.sort()
+            self.proc_data_dict[qubit]['all_dac'] = all_dac
+
+            # Sort the measurement data (taus) into the dac values
+            qubit_mask = np.array([True] * len(all_dac), dtype=bool)
+            for typ in qo:
+                self.proc_data_dict[qubit][typ] = {}
+
+                sorted_taus = self._put_data_into_scheme(scheme=all_dac, scheme_mess=a.raw_data_dict['dac'],
+                                                         other_mess=a.raw_data_dict['tau'])
+                sorted_taus = np.array(sorted_taus)
+                self.proc_data_dict[qubit][typ]['all_dac_sorted_tau'] = sorted_taus
+                mask = (sorted_taus == None)
+                self.proc_data_dict[qubit][typ]['all_dac_sorted_tau_mask'] = mask
+                qubit_mask = (qubit_mask * 1 + mask * 1) == 2
+
+            self.proc_data_dict[qubit]['all_mask'] = qubit_mask
+
+            # Calculate gamma = 1/Tau where appropriate
+            for typ in qo:
+                self.proc_data_dict[qubit][typ]['all_dac_sorted_gamma'] = 1.0 / sorted_taus[~qubit_mask]
+
+            gamma_1 = self.proc_data_dict[qubit][self.T1]['all_dac_sorted_gamma']
+            gamma_ramsey = self.proc_data_dict[qubit][self.T2_star]['all_dac_sorted_gamma']
+            gamma_echo = self.proc_data_dict[qubit][self.T2]['all_dac_sorted_gamma']
+            gamma_phi_ramsey = (gamma_ramsey - gamma_1 / 2.0)
+            gamma_phi_echo = (gamma_echo - gamma_1 / 2.0)
+            self.proc_data_dict[qubit]['gamma_phi_ramsey'] = gamma_phi_ramsey
+            self.proc_data_dict[qubit]['gamma_phi_echo'] = gamma_phi_echo
 
     def run_fitting(self):
         if self.freq_keys and self.dac_keys:
             for qubit in self.all_analysis:
                 self.fit_res[qubit] = {}
                 if self.verbose:
-                    print("Analysing qubit: %s" % qubit)
-                # sort the data by dac (just in case some samples are missing)
-                qo = self.all_analysis[qubit]
+                    print("Fitting qubit: %s" % qubit)
 
-                exclusion_mask = self.raw_data_dict[qubit]['all_mask']
-                all_dac = self.raw_data_dict[qubit]['all_dac']
-                for type in qo:
-                    a = qo[type]
-                    qo[type].run_fitting()
-                    self.fit_res[qubit][type] = qo[type].fit_res
+                all_dac = self.proc_data_dict[qubit]['all_dac']
+                for typ in self.all_analysis[qubit]:
+                    self.fit_res[qubit][typ] = {}
+                    a = self.all_analysis[qubit][typ]
+                    # Sort the flux and sensitivity data
+                    if self.freq_keys and self.dac_keys:
+                        # sort the data by dac (just in case some samples are missing)
+                        a.run_fitting()
+                        self.fit_res[qubit][typ] = a.fit_res
 
-                    sorted_sens = self._put_data_into_scheme(scheme=all_dac, scheme_mess=a.raw_data_dict['dac'],
-                                                             other_mess=a.fit_res['sensitivity_values'])
-                    sorted_flux = self._put_data_into_scheme(scheme=all_dac, scheme_mess=a.raw_data_dict['dac'],
-                                                             other_mess=a.fit_res['flux_values'])
-                    sorted_sens = np.array(sorted_sens, dtype=float)
-                    sorted_flux = np.array(sorted_flux, dtype=float)
-                    self.fit_res[qubit][type]['sorted_sensitivity'] = sorted_sens
-                    self.fit_res[qubit][type]['sorted_flux'] = sorted_flux
+                        sorted_sens = self._put_data_into_scheme(scheme=all_dac, scheme_mess=a.raw_data_dict['dac'],
+                                                                 other_mess=a.fit_res['sensitivity_values'])
+                        sorted_flux = self._put_data_into_scheme(scheme=all_dac, scheme_mess=a.raw_data_dict['dac'],
+                                                                 other_mess=a.fit_res['flux_values'])
+                        sorted_sens = np.array(sorted_sens, dtype=float)
+                        sorted_flux = np.array(sorted_flux, dtype=float)
+                        self.fit_res[qubit][typ]['sorted_sensitivity'] = sorted_sens
+                        self.fit_res[qubit][typ]['sorted_flux'] = sorted_flux
+
+                # these should all be the same for all types, so chose one (here T1)
+                self.fit_res[qubit]['sorted_flux'] = self.fit_res[qubit][self.T1]['sorted_flux']
+                self.fit_res[qubit]['sorted_sensitivity'] = self.fit_res[qubit][self.T1][
+                    'sorted_sensitivity']
 
                 # Make the PSD fit, if we have enough data
-                if len(all_dac[~exclusion_mask]) > 4:
-                    # Calculate Pure dephasing times
-                    T1 = self.raw_data_dict[qubit][self.T1]['all_dac_sorted_tau']
-                    Tramsey = self.raw_data_dict[qubit][self.T2]['all_dac_sorted_tau']
-                    Techo = self.raw_data_dict[qubit][self.T2_star]['all_dac_sorted_tau']
-                    sensitivity = self.fit_res[qubit][self.T1]['sorted_sensitivity']
-                    # flux = self.fit_res[qubit][self.T1]['sorted_flux']
-
-                    Gamma_1 = 1.0 / T1[~exclusion_mask]
-                    Gamma_ramsey = 1.0 / Tramsey[~exclusion_mask]
-                    Gamma_echo = 1.0 / Techo[~exclusion_mask]
-
-                    Gamma_phi_ramsey = Gamma_ramsey - Gamma_1 / 2.0
-                    Gamma_phi_echo = Gamma_echo - Gamma_1 / 2.0
-
+                exclusion_mask = self.proc_data_dict[qubit]['all_mask']
+                masked_dac = all_dac[~exclusion_mask]
+                if len(masked_dac) > 4:
+                    # Fit gamma vs sensitivity
+                    sensitivity = self.fit_res[qubit]['sorted_sensitivity']
+                    Gamma_phi_ramsey = self.proc_data_dict[qubit]['gamma_phi_ramsey']
+                    Gamma_phi_echo = self.proc_data_dict[qubit]['gamma_phi_echo']
                     fit_res_gammas = fit_gammas(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo)
 
                     intercept = fit_res_gammas.params['intercept'].value
@@ -429,9 +460,7 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                     self.fit_res[qubit]['gamma_intercept'] = intercept
                     self.fit_res[qubit]['gamma_slope_ramsey'] = slope_ramsey
                     self.fit_res[qubit]['gamma_slope_echo'] = slope_echo
-                    self.fit_res[qubit]['gamma_phi_ramsey'] = Gamma_phi_ramsey
                     self.fit_res[qubit]['gamma_phi_ramsey_f'] = lambda x: slope_ramsey * x + intercept
-                    self.fit_res[qubit]['gamma_phi_echo'] = Gamma_phi_echo
                     self.fit_res[qubit]['gamma_phi_echo_f'] = lambda x: slope_echo * x + intercept
                     self.fit_res[qubit]['sqrtA_echo'] = (sqrtA_echo / 1e-6)
                     self.fit_res[qubit]['fit_res'] = fit_res_gammas
@@ -439,7 +468,8 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
 
                 else:
                     # fixme: make this a proper warning
-                    print('Found %d dac values. I need at least 4 dac values to run the PSD analysis.' % len(all_dac))
+                    print(
+                        'Found %d dac values. I need at least 4 dac values to run the PSD analysis.' % len(masked_dac))
         else:
             # fixme: make this a proper warning
             print('You have to enable plot_versus_frequency and plot_versus_dac to execute the PSD analysis.')
@@ -464,28 +494,29 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
         for qubit in self.all_analysis:
             # if the analysis was succesful
             dat = self.raw_data_dict[qubit]
-            if 'analysis' in dat and dat['analysis']:
-                flux = dat['analysis']['flux']
-                freq = dat['analysis']['qfreq']
-                sensitivity = dat['analysis']['sensitivity']
-                gamma_phi_echo = dat['analysis']['gamma_phi_echo']
-                gamma_phi_echo_f = dat['analysis']['gamma_phi_echo_f']
-                gamma_phi_ramsey = dat['analysis']['gamma_phi_ramsey']
-                gamma_phi_ramsey_f = dat['analysis']['gamma_phi_ramsey_f']
+            if hasattr(self, 'fit_res'):
+                sensitivity = self.fit_res[qubit]['sorted_sensitivity']
+                flux = self.fit_res[qubit]['sorted_flux']
+
+                # freq = self.fit_res[qubit][self.T1]['qfreq']
+                gamma_phi_echo = self.proc_data_dict[qubit]['gamma_phi_echo']
+                gamma_phi_echo_f = self.fit_res[qubit]['gamma_phi_echo_f']
+                gamma_phi_ramsey = self.proc_data_dict[qubit]['gamma_phi_ramsey']
+                gamma_phi_ramsey_f = self.fit_res[qubit]['gamma_phi_ramsey_f']
 
                 ############
                 # coherence_gamma
                 pdict_scatter = {
-                    'xlabel': 'Sensitivity',
-                    'xunit': 'GHz/$\Phi_0$',
-                    'ylabel': '$\Gamma_{\phi}$',
-                    'yunit': '$s^{-1}$',
+                    'xlabel': r'Sensitivity $|\partial\nu/\partial\Phi|$',
+                    'xunit': r'GHz/$\Phi_0$',
+                    'ylabel': r'$\Gamma_{\phi}$',
+                    'yunit': r'$s^{-1}$',
                     'setlabel': '$\Gamma_{\phi,\mathrm{Ramsey}}$',
                 }
                 pdict_fit = {}
                 cg_base = qubit + "_" + cg_all_base
-                pds, pdf = plot_scatter_errorbar_fit(self=self, ax_id=cg_base, xdata=np.abs(sensitivity),
-                                                     ydata=gamma_phi_ramsey, fitfunc=gamma_phi_ramsey_f,
+                pds, pdf = plot_scatter_errorbar_fit(self=self, ax_id=cg_base, xdata=np.abs(sensitivity)*1e-9,
+                                                     ydata=gamma_phi_ramsey*1e-9, fitfunc=gamma_phi_ramsey_f,
                                                      xerr=None, yerr=None, fitextra=0.1, fitpoints=1000,
                                                      pdict_scatter=pdict_scatter, pdict_fit=pdict_fit)
                 self.plot_dicts[cg_base + '_ramsey_fit'] = pdf
@@ -502,19 +533,31 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                 # coherence_ratios
                 cr_base = qubit + '_' + cr_all_base
 
-                ratio_gamma = gamma_phi_ramsey / gamma_phi_echo
+                ratio_gamma = (gamma_phi_ramsey / gamma_phi_echo)
 
                 pdict_scatter = {
                     'xlabel': 'Flux',
                     'xunit': 'm$\Phi_0$',
                     'ylabel': '$T_\phi^{\mathrm{Echo}}/T_\phi^{\mathrm{Ramsey}}$',
                 }
-                pds = plot_scatter_errorbar(self=self, ax_id=cr_all_base + '_flux', xdata=flux,
+                pds = plot_scatter_errorbar(self=self, ax_id=cr_all_base + '_flux', xdata=flux*1e3,
                                             ydata=ratio_gamma,
                                             xerr=None, yerr=None,
                                             pdict=pdict_scatter)
                 self.plot_dicts[cr_base + '_flux'] = pds
 
+                pdict_scatter = {
+                    'xlabel': r'Sensitivity $|\partial\nu/\partial\Phi|$',
+                    'xunit': r'GHz/$\Phi_0$',
+                    'ylabel': '$T_\phi^{\mathrm{Echo}}/T_\phi^{\mathrm{Ramsey}}$',
+                }
+                pds = plot_scatter_errorbar(self=self, ax_id=cr_all_base + '_sensitivity', xdata=np.abs(sensitivity)*1e-9,
+                                            ydata=ratio_gamma,
+                                            xerr=None, yerr=None,
+                                            pdict=pdict_scatter)
+                self.plot_dicts[cr_base + '_sensitivity'] = pds
+
+                '''
                 pdict_scatter = {
                     'xlabel': 'Qubit Frequency',
                     'xunit': 'Hz',
@@ -525,75 +568,73 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                                             xerr=None, yerr=None,
                                             pdict=pdict_scatter)
                 self.plot_dicts[cr_base + '_frequency'] = pds
+                '''
 
-                pdict_scatter = {
-                    'xlabel': r'Sensitivity $|\partial\nu/\partial\Phi|$',
-                    'xunit': 'Hz/$\Phi_0$',
-                    'ylabel': '$T_\phi^{\mathrm{Echo}}/T_\phi^{\mathrm{Ramsey}}$',
-                }
-                pds = plot_scatter_errorbar(self=self, ax_id=cr_all_base + '_sensitivity', xdata=np.abs(sensitivity),
-                                            ydata=ratio_gamma,
-                                            xerr=None, yerr=None,
-                                            pdict=pdict_scatter)
-                self.plot_dicts[cr_base + '_sensitivity'] = pds
+            ############
+            # coherence_times
+            ct_base = qubit + '_' + ct_all_base
 
-                ############
-                # coherence_times
-                ct_base = qubit + '_' + ct_all_base
+            plot_types = ['time_stability', 'freq_relation', 'dac_relation', 'flux_relation', 'sensitivity_relation', ]
+            ymax = [0] * len(plot_types)
+            ymin = [0] * len(plot_types)
+            markers = ('x', 'o', '+')
+            for typi, typ in enumerate(self.all_analysis[qubit]):
+                a = self.all_analysis[qubit][typ]
+                a.prepare_plots()
+                label = '%s_%s' % (qubit, typ)
+                for pti, plot_type in enumerate(plot_types):  # 'dac_freq_relation
 
-                ymax = 0
-                markers = ('x', 'o', '+')
-                for typi, typ in enumerate(self.all_analysis[qubit]):
-                    a = self.all_analysis[qubit][typ]
-                    a.prepare_plots()
-                    label = '%s_%s' % (qubit, typ)
+                    if plot_type in ['freq_relation', ]:
+                        if self.freq_keys:
+                            plot = True
+                        else:
+                            plot = False
+                    elif plot_type in ['dac_relation', ]:
+                        if self.dac_keys:
+                            plot = True
+                        else:
+                            plot = False
+                    elif plot_type in ['flux_relation', 'sensitivity_relation',
+                                       'dac_freq_relation']:
+                        if self.freq_keys and self.dac_keys:
+                            plot = True
+                        else:
+                            plot = False
+                    else:
+                        plot = True
 
-                    self.plot_dicts[ct_base + '_time_stability_' + typ] = a.plot_dicts["time_stability"]
-                    self.plot_dicts[ct_base + '_time_stability_' + typ]['ax_id'] = ct_base + '_time_stability'
-                    self.plot_dicts[ct_base + '_time_stability_' + typ]['setlabel'] = label
-                    self.plot_dicts[ct_base + '_time_stability_' + typ]['do_legend'] = True
-                    self.plot_dicts[ct_base + '_time_stability_' + typ]['yrange'] = None
-                    self.plot_dicts[ct_base + '_time_stability_' + typ]['marker'] = markers[typi % len(markers)]
-                    ymax = max(ymax, np.max(
-                        self.raw_data_dict[qubit][typ]['tau'] + self.raw_data_dict[qubit][typ]['tau_stderr']))
+                    if plot:
+                        if a.plot_dicts[plot_type]['yrange']:
+                            ymin[pti] = min(ymin[pti], a.plot_dicts[plot_type]['yrange'][0])
+                            ymax[pti] = max(ymax[pti], a.plot_dicts[plot_type]['yrange'][1])
 
-                    if self.freq_keys:
-                        self.plot_dicts[ct_base + '_freq_relation_' + typ] = a.plot_dicts["freq_relation"]
-                        self.plot_dicts[ct_base + '_freq_relation_' + typ]['ax_id'] = ct_base + '_freq_relation'
-                        self.plot_dicts[ct_base + '_freq_relation_' + typ]['setlabel'] = label
-                        self.plot_dicts[ct_base + '_freq_relation_' + typ]['do_legend'] = True
-                        self.plot_dicts[ct_base + '_freq_relation_' + typ]['yrange'] = None
-                        self.plot_dicts[ct_base + '_freq_relation_' + typ]['marker'] = markers[typi % len(markers)]
-                    if self.dac_keys:
-                        self.plot_dicts[ct_base + '_dac_relation_' + typ] = a.plot_dicts["dac_relation"]
-                        self.plot_dicts[ct_base + '_dac_relation_' + typ]['ax_id'] = ct_base + '_dac_relation'
-                        self.plot_dicts[ct_base + '_dac_relation_' + typ]['setlabel'] = label
-                        self.plot_dicts[ct_base + '_dac_relation_' + typ]['do_legend'] = True
-                        self.plot_dicts[ct_base + '_dac_relation_' + typ]['yrange'] = None
-                        self.plot_dicts[ct_base + '_dac_relation_' + typ]['marker'] = markers[typi % len(markers)]
+                        key = ct_base + '_' + plot_type + '_' + typ
+                        self.plot_dicts[key] = a.plot_dicts[plot_type]
+                        self.plot_dicts[key]['ax_id'] = ct_base + '_' + plot_type
+                        self.plot_dicts[key]['setlabel'] = label
+                        self.plot_dicts[key]['do_legend'] = True
+                        self.plot_dicts[key]['yrange'] = None
+                        # self.plot_dicts[key]['xrange'] = None
+                        # self.plot_dicts[key]['marker'] = markers[typi % len(markers)]
 
-                    if self.dac_keys and self.freq_keys:
-                        pdict_scatter = {
-                            'xlabel': r'Sensitivity $|\partial\nu/\partial\Phi|$',
-                            'xunit': 'Hz/$\Phi_0$',
-                            'ylabel': '$T_\phi^{\mathrm{Echo}}/T_\phi^{\mathrm{Ramsey}}$',
-                            'setlabel': label
-                        }
-                        pds = plot_scatter_errorbar(self=self, ax_id=ct_base + '_flux_relation', xdata=flux,
-                                                    ydata=dat['analysis'][typ],
-                                                    xerr=None, yerr=None,
-                                                    pdict=pdict_scatter)
-                        self.plot_dicts[ct_base + '_flux_relation_' + typ] = pds
-
-                self.plot_dicts[ct_base + '_time_stability_' + typ]['yrange'] = (0, 1.1 * ymax)
-                if self.freq_keys:
-                    self.plot_dicts[ct_base + '_freq_relation_' + typ]['yrange'] = (0, 1.1 * ymax)
-                if self.dac_keys:
-                    self.plot_dicts[ct_base + '_dac_relation_' + typ]['yrange'] = (0, 1.1 * ymax)
-                # self.raw_data_dict[qubit][typ] = a.raw_data_dict
-
-
-
+                    if 'analysis' in dat and dat['analysis']:
+                        if self.dac_keys and self.freq_keys:
+                            pdict_scatter = {
+                                'xlabel': r'Sensitivity $|\partial\nu/\partial\Phi|$',
+                                'xunit': 'm$\Phi_0$',
+                                'ylabel': '$T_\phi^{\mathrm{Echo}}/T_\phi^{\mathrm{Ramsey}}$',
+                                'setlabel': label
+                            }
+                            pds = plot_scatter_errorbar(self=self, ax_id=ct_base + '_flux_gamma_relation', xdata=flux*1e3,
+                                                        ydata=dat['analysis'][typ],
+                                                        xerr=None, yerr=None,
+                                                        pdict=pdict_scatter)
+                            self.plot_dicts[ct_base + '_flux_gamma_relation_' + typ] = pds
+            for pti, plot_type in enumerate(plot_types):
+                key = ct_base + '_' + plot_type + '_' + typ
+                if key in self.plot_dicts:
+                    self.plot_dicts[key]['yrange'] = [ymin[pti], ymax[pti]]
+            # self.raw_data_dict[qubit][typ] = a.raw_data_dict
 
 
 def calculate_n_avg(freq_resonator, Qc, chi_shift, intercept):
