@@ -1254,3 +1254,69 @@ def add_two_q_cal_points(p, platf, q0: int, q1: int,
         p.add_kernel(k)
 
     return p
+
+
+def partial_tomography_cardinal(q0: int, q1: int, cardinal: int, platf_cfg: str,
+                       precompiled_flux: bool=True,
+                       cal_points: bool=True, second_CZ_delay: int=260,
+                       CZ_duration: int=260,
+                       add_echo_pulses: bool=False):
+    """
+    Tomography sequence for Grover's algorithm.
+
+        cardinal: int denoting cardinal state prepared.
+    """
+
+    if not precompiled_flux:
+        raise NotImplementedError('Currently only precompiled flux pulses '
+                                  'are supported.')
+
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="partial_tomography_cardinal_seq",
+                nqubits=platf.get_qubit_number(), p=platf)
+
+    cardinal_gates = ['i', 'rx180', 'ry90', 'rym90', 'rx90', 'rxm90']
+
+    if (cardinal>35 or cardinal<0):
+        raise ValueError('cardinal must be in [0, 35]')
+
+    idx_p0 = cardinal % 6
+    idx_p1 = ((cardinal - idx_p0)//6) % 6
+    #cardinal_gates[]
+    #k.gate(string_of_the_gate, integer_from_qubit)
+    tomo_gates = [('i','i'),('i','rx180'),('rx180','i'),('rx180','rx180'),
+        ('ry90','ry90'),('rym90','rym90'),('rx90','rx90'),('rxm90','rxm90')]
+
+    for gates in tomo_gates:
+        #strings denoting the gates
+        SP0 = cardinal_gates[idx_p0]
+        SP1 = cardinal_gates[idx_p1]
+        t_q0 = gates[1]
+        t_q1 = gates[0]
+        k = Kernel('PT_{}_tomo_{}_{}'.format(cardinal, idx_p0, idx_p1),
+                   p=platf)
+
+        k.prepz(q0)
+        k.prepz(q1)
+
+        # Cardinal state preparation
+        k.gate(SP0, q0)
+        k.gate(SP1, q1)
+        # tomo pulses
+        #to be taken from list of tuples
+        k.gate(t_q1, q0)
+        k.gate(t_q0, q1)
+
+        k.measure(q0)
+        k.measure(q1)
+        k.gate('wait', [2, 0], 0)
+        p.add_kernel(k)
+
+    p = add_two_q_cal_points(p, platf=platf, q0=q0, q1=q1, reps_per_cal_pt=2)
+    with suppress_stdout():
+        p.compile()
+
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
