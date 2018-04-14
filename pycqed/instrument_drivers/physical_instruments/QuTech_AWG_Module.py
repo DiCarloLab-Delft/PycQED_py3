@@ -132,6 +132,7 @@ class QuTech_AWG_Module(SCPI):
             offset_cmd = 'SOUR{}:VOLT:LEV:IMM:OFFS'.format(ch)
             state_cmd = 'OUTPUT{}:STATE'.format(ch)
             waveform_cmd = 'SOUR{}:WAV'.format(ch)
+            dac_temperature_cmd = 'STATus:DAC{}:TEMperature'.format(ch)
             # Set channel first to ensure sensible sorting of pars
             # Compatibility: 5014, QWG
             self.add_parameter('ch{}_state'.format(ch),
@@ -165,6 +166,15 @@ class QuTech_AWG_Module(SCPI):
                                get_cmd=waveform_cmd+'?',
                                set_cmd=waveform_cmd+' "{}"',
                                vals=vals.Strings())
+
+            self.add_parameter('status_dac{}_temperature'.format(ch),
+                               unit='C',
+                               label=('DAC {} temperature'.format(ch)),
+                               get_cmd=dac_temperature_cmd + '?',
+                               get_parser=float,
+                               docstring='Reads the temperature of a DAC.\n' \
+                                 +'Temperature measurement interval is 10 seconds\n' \
+                                 +'Return:\n     float with temperature in Celsius')
 
         # Waveform parameters
         self.add_parameter('WlistSize',
