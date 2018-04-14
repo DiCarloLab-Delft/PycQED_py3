@@ -140,7 +140,7 @@ class Spectroscopy(ba.BaseDataAnalysis):
                                         'plotsize': plotsize
                                         }
         else:
-            self.plot_dicts['amp'] = {'plotfn': self.plot_colorx ,
+            self.plot_dicts['amp'] = {'plotfn': self.plot_colorx,
                                       'xvals': proc_data_dict['plot_xvals'],
                                       'xwidth': proc_data_dict['plot_xwidth'],
                                       'yvals': proc_data_dict['plot_frequency'],
@@ -155,7 +155,7 @@ class Spectroscopy(ba.BaseDataAnalysis):
                                       'plotcbar': self.options_dict.get('colorbar', False),
                                       }
 
-            self.plot_dicts['amp'] = {'plotfn': self.plot_colorx ,
+            self.plot_dicts['amp'] = {'plotfn': self.plot_colorx,
                                       'xvals': proc_data_dict['plot_xvals'],
                                       'yvals': proc_data_dict['plot_frequency'],
                                       'zvals': proc_data_dict['plot_amp'],
@@ -526,12 +526,12 @@ class ResonatorSpectroscopy(Spectroscopy):
                     ax.plot(list(fit_dict['fit_xvals'].values())[
                                 0], fit_results.best_fit, 'r-', linewidth=1.5)
                     textstr = 'f0 = %.5f $\pm$ %.1g GHz' % (
-                    fit_results.params['f0'].value, fit_results.params['f0'].stderr) + '\n' \
-                                                                                       'Q = %.4g $\pm$ %.0g' % (
-                              fit_results.params['Q'].value, fit_results.params['Q'].stderr) + '\n' \
-                                                                                               'Qc = %.4g $\pm$ %.0g' % (
-                              fit_results.params['Qc'].value, fit_results.params['Qc'].stderr) + '\n' \
-                                                                                                 'Qi = %.4g $\pm$ %.0g' % (
+                        fit_results.params['f0'].value, fit_results.params['f0'].stderr) + '\n' \
+                                                                                           'Q = %.4g $\pm$ %.0g' % (
+                                  fit_results.params['Q'].value, fit_results.params['Q'].stderr) + '\n' \
+                                                                                                   'Qc = %.4g $\pm$ %.0g' % (
+                                  fit_results.params['Qc'].value, fit_results.params['Qc'].stderr) + '\n' \
+                                                                                                     'Qi = %.4g $\pm$ %.0g' % (
                                   fit_results.params['Qi'].value, fit_results.params['Qi'].stderr)
                     box_props = dict(boxstyle='Square',
                                      facecolor='white', alpha=0.8)

@@ -7,7 +7,7 @@ from copy import deepcopy
 from pycqed.analysis_v2.base_analysis import plot_scatter_errorbar_fit, plot_scatter_errorbar
 
 
-class BasicDACvsFrequency(ba.BaseDataAnalysis):
+class FluxFrequency(ba.BaseDataAnalysis):
 
     def __init__(self, t_start: str = None, t_stop: str = None,
                  label: str = '',
@@ -15,7 +15,9 @@ class BasicDACvsFrequency(ba.BaseDataAnalysis):
                  data_file_path: str = None,
                  close_figs: bool = True,
                  options_dict: dict = None, extract_only: bool = False,
-                 do_fitting: bool = False):
+                 do_fitting: bool = False,
+                 is_spectroscopy: bool = True,
+                 extract_fitparams: bool = True):
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
                          data_file_path=data_file_path,
@@ -34,10 +36,16 @@ class BasicDACvsFrequency(ba.BaseDataAnalysis):
                             }
         self.numeric_params = ['freq', 'amp', 'phase', 'dac']
 
-        self.extract_fitparams = self.options_dict.get('fitparams', True)
-        if self.extract_fitparams:
-            p = self.options_dict.get('fitparams_key', 'Fitted Params distance.f0.value')
-            self.params_dict.update({'fitparams': p})
+        self.is_spectroscopy = is_spectroscopy
+        self.extract_fitparams = extract_fitparams
+        if extract_fitparams:
+            if is_spectroscopy:
+                default_key = 'Fitted Params distance.f0.value'
+            else:
+                default_key = 'Fitted Params HM.f0.value'
+
+            p = self.options_dict.get('fitparams_key', default_key)
+            self.params_dict['fitparams'] = p
             self.numeric_params.append('fitparams')
 
         temp_keys = self.options_dict.get('temp_keys', {})
@@ -67,8 +75,9 @@ class BasicDACvsFrequency(ba.BaseDataAnalysis):
             data_real=compl.real, data_imag=compl.imag, percentile=70, normalize=True)
 
         if self.extract_fitparams:
-            self.proc_data_dict['fit_frequencies'] = np.array(self.raw_data_dict['fitparams'][sorted_indices],
-                                                              dtype=float)
+            self.proc_data_dict['fit_frequencies'] = self.raw_data_dict['fitparams'][
+                                                         sorted_indices] * self.options_dict.get('fitparams_corr_fact',
+                                                                                                 1)
 
         if self.temperature_plots:
             self.proc_data_dict['T_mc'] = np.array(self.raw_data_dict['T_mc'][sorted_indices], dtype=float)
@@ -100,8 +109,14 @@ class BasicDACvsFrequency(ba.BaseDataAnalysis):
 
     def run_fitting(self):
         self.fit_dicts = {}
-        fit_result = fit_qubit_dac_arch(freq=self.proc_data_dict['fit_frequencies'],
-                                        dac=self.proc_data_dict['dac_values'])
+        if self.is_spectroscopy:
+            default_fitfunc = fit_qubit_dac_arch
+        else:
+            default_fitfunc = fit_resonator_dac_arch
+
+        fitfunc = self.options_dict.get('fitfunc', default_fitfunc)
+        fit_result = fitfunc(freq=self.proc_data_dict['fit_frequencies'], dac=self.proc_data_dict['dac_values'])
+
         self.fit_dicts['fit_result'] = fit_result
         # self.fit_dicts['E_c'] = fit_result.params['E_c']
         # self.fit_dicts['f_max'] = fit_result.params['f_max']
@@ -110,7 +125,6 @@ class BasicDACvsFrequency(ba.BaseDataAnalysis):
         # self.fit_dicts['asymmetry'] = fit_result.params['asymmetry']
 
     def prepare_plots(self):
-        fit_result = self.fit_dicts['fit_result']
         if self.options_dict.get('plot_vs_flux', False):
             factor = fit_result.params['V_per_phi0']
         else:
@@ -135,7 +149,16 @@ class BasicDACvsFrequency(ba.BaseDataAnalysis):
                     'plot_transpose': self.options_dict.get('plot_transpose', False),
                     }
 
+        scatter = {
+            'plotfn': self.plot_line,
+            'xvals': self.proc_data_dict['dac_values'],
+            'yvals': self.proc_data_dict['fit_frequencies'],
+            'marker': 'x',
+            'linestyle': 'None',
+        }
+
         if self.do_fitting:
+            fit_result = self.fit_dicts['fit_result']
             fit = {
                 'plotfn': self.plot_fit,
                 'fit_res': fit_result,
@@ -145,20 +168,13 @@ class BasicDACvsFrequency(ba.BaseDataAnalysis):
                 'linestyle': '-',
             }
 
-        scatter = {
-            'plotfn': self.plot_line,
-            'xvals': self.proc_data_dict['dac_values'],
-            'yvals': self.proc_data_dict['fit_frequencies'],
-            'marker': 'x',
-            'linestyle': 'None',
-        }
-
         for ax in ['amplitude', 'phase', 'distance']:
             z = self.proc_data_dict['%s_values' % ax]
             td = deepcopy(twoDPlot)
             td['zvals'] = z
             td['zlabel'] = ax
-            self.plot_dicts[ax] = td
+            td['ax_id'] = ax
+            self.plot_dicts[ax + '_z'] = td
 
             sc = deepcopy(scatter)
             sc['ax_id'] = ax
@@ -174,6 +190,21 @@ def fit_qubit_dac_arch(freq, dac):
     arch_model = lmfit.Model(Qubit_dac_to_freq)
     arch_model.set_param_hint('E_c', value=260e6, min=100e6, max=350e6)
     arch_model.set_param_hint('f_max', value=6e9, min=0.1e9, max=10e9)
+    arch_model.set_param_hint('dac_sweet_spot', value=0, min=-0.5, max=0.5)
+    arch_model.set_param_hint('V_per_phi0', value=0.1, min=0)
+    arch_model.set_param_hint('asymmetry', value=0)
+
+    arch_model.make_params()
+
+    fit_result = arch_model.fit(freq, dac_voltage=dac)
+    return fit_result
+
+
+def fit_resonator_dac_arch(freq, dac):
+    # fixme!!!!
+    arch_model = lmfit.Model(Qubit_dac_to_freq)
+    arch_model.set_param_hint('E_c', value=260e6, min=100e6, max=350e6)
+    arch_model.set_param_hint('f_max', value=5e9, min=0.1e9, max=10e9)
     arch_model.set_param_hint('dac_sweet_spot', value=0, min=-0.5, max=0.5)
     arch_model.set_param_hint('V_per_phi0', value=0.1, min=0)
     arch_model.set_param_hint('asymmetry', value=0)
