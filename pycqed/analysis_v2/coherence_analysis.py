@@ -152,7 +152,7 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                 if 'sensitivity_values' in self.fit_res:
                     # sensitivity vs tau
                     self._prepare_plot(ax_id="sensitivity_relation",
-                                       xvals=self.fit_res['sensitivity_values']*1e-9,
+                                       xvals=self.fit_res['sensitivity_values'] * 1e-9,
                                        yvals=self.raw_data_dict['freq_sorted_tau'],
                                        xlabel=r'Sensitivity $|\partial\nu/\partial\Phi|$',
                                        xunit=r'GHz/$\Phi_0$')
@@ -365,10 +365,12 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
             # Sort the measurement data (taus) into the dac values
             qubit_mask = np.array([True] * len(all_dac), dtype=bool)
             for typ in qo:
+                a = self.all_analysis[qubit][typ]
+                d = self.raw_data_dict[qubit][typ]
                 self.proc_data_dict[qubit][typ] = {}
 
-                sorted_taus = self._put_data_into_scheme(scheme=all_dac, scheme_mess=a.raw_data_dict['dac'],
-                                                         other_mess=a.raw_data_dict['tau'])
+                sorted_taus = self._put_data_into_scheme(scheme=all_dac, scheme_mess=d['dac'],
+                                                         other_mess=d['tau'])
                 sorted_taus = np.array(sorted_taus)
                 self.proc_data_dict[qubit][typ]['all_dac_sorted_tau'] = sorted_taus
                 mask = (sorted_taus == None)
@@ -379,11 +381,15 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
 
             # Calculate gamma = 1/Tau where appropriate
             for typ in qo:
+                sorted_taus = self.proc_data_dict[qubit][typ]['all_dac_sorted_tau']
                 self.proc_data_dict[qubit][typ]['all_dac_sorted_gamma'] = 1.0 / sorted_taus[~qubit_mask]
 
             gamma_1 = self.proc_data_dict[qubit][self.T1]['all_dac_sorted_gamma']
             gamma_ramsey = self.proc_data_dict[qubit][self.T2_star]['all_dac_sorted_gamma']
             gamma_echo = self.proc_data_dict[qubit][self.T2]['all_dac_sorted_gamma']
+            # print(gamma_ramsey)
+            # print(gamma_echo)
+            # print(gamma_1)
             gamma_phi_ramsey = (gamma_ramsey - gamma_1 / 2.0)
             gamma_phi_echo = (gamma_echo - gamma_1 / 2.0)
             self.proc_data_dict[qubit]['gamma_phi_ramsey'] = gamma_phi_ramsey
@@ -426,10 +432,11 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                 if len(masked_dac) > 4:
                     # Fit gamma vs sensitivity
                     sensitivity = self.fit_res[qubit]['sorted_sensitivity']
-                    Gamma_phi_ramsey = self.proc_data_dict[qubit]['gamma_phi_ramsey']
-                    Gamma_phi_echo = self.proc_data_dict[qubit]['gamma_phi_echo']
-                    fit_res_gammas = fit_gammas(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo)
-
+                    gamma_phi_ramsey = self.proc_data_dict[qubit]['gamma_phi_ramsey']
+                    gamma_phi_echo = self.proc_data_dict[qubit]['gamma_phi_echo']
+                    fit_res_gammas = fit_gammas(sensitivity=sensitivity, Gamma_phi_ramsey=gamma_phi_ramsey,
+                                                Gamma_phi_echo=gamma_phi_echo, verbose=self.verbose)
+                    self.fit_res[qubit]['fit_res'] = fit_res_gammas
                     intercept = fit_res_gammas.params['intercept'].value
                     slope_ramsey = fit_res_gammas.params['slope_ramsey'].value
                     slope_echo = fit_res_gammas.params['slope_echo'].value
@@ -460,8 +467,8 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                     self.fit_res[qubit]['gamma_intercept'] = intercept
                     self.fit_res[qubit]['gamma_slope_ramsey'] = slope_ramsey
                     self.fit_res[qubit]['gamma_slope_echo'] = slope_echo
-                    self.fit_res[qubit]['gamma_phi_ramsey_f'] = lambda x: slope_ramsey * x + intercept
-                    self.fit_res[qubit]['gamma_phi_echo_f'] = lambda x: slope_echo * x + intercept
+                    self.fit_res[qubit]['gamma_phi_ramsey_f'] = lambda x: slope_ramsey * x * 1e9 + intercept
+                    self.fit_res[qubit]['gamma_phi_echo_f'] = lambda x: slope_echo * x * 1e9 + intercept
                     self.fit_res[qubit]['sqrtA_echo'] = (sqrtA_echo / 1e-6)
                     self.fit_res[qubit]['fit_res'] = fit_res_gammas
 
@@ -515,14 +522,14 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                 }
                 pdict_fit = {}
                 cg_base = qubit + "_" + cg_all_base
-                pds, pdf = plot_scatter_errorbar_fit(self=self, ax_id=cg_base, xdata=np.abs(sensitivity)*1e-9,
-                                                     ydata=gamma_phi_ramsey*1e-9, fitfunc=gamma_phi_ramsey_f,
+                pds, pdf = plot_scatter_errorbar_fit(self=self, ax_id=cg_base, xdata=np.abs(sensitivity) * 1e-9,
+                                                     ydata=gamma_phi_ramsey, fitfunc=gamma_phi_ramsey_f,
                                                      xerr=None, yerr=None, fitextra=0.1, fitpoints=1000,
                                                      pdict_scatter=pdict_scatter, pdict_fit=pdict_fit)
                 self.plot_dicts[cg_base + '_ramsey_fit'] = pdf
                 self.plot_dicts[cg_base + '_ramsey_scatter'] = pds
 
-                pds, pdf = plot_scatter_errorbar_fit(self=self, ax_id=cg_base, xdata=np.abs(sensitivity),
+                pds, pdf = plot_scatter_errorbar_fit(self=self, ax_id=cg_base, xdata=np.abs(sensitivity) * 1e-9,
                                                      ydata=gamma_phi_echo, fitfunc=gamma_phi_echo_f,
                                                      xerr=None, yerr=None, fitextra=0.1, fitpoints=1000,
                                                      pdict_scatter=pdict_scatter, pdict_fit=pdict_fit)
@@ -532,7 +539,6 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                 ############
                 # coherence_ratios
                 cr_base = qubit + '_' + cr_all_base
-
                 ratio_gamma = (gamma_phi_ramsey / gamma_phi_echo)
 
                 pdict_scatter = {
@@ -540,7 +546,7 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                     'xunit': 'm$\Phi_0$',
                     'ylabel': '$T_\phi^{\mathrm{Echo}}/T_\phi^{\mathrm{Ramsey}}$',
                 }
-                pds = plot_scatter_errorbar(self=self, ax_id=cr_all_base + '_flux', xdata=flux*1e3,
+                pds = plot_scatter_errorbar(self=self, ax_id=cr_all_base + '_flux', xdata=flux * 1e3,
                                             ydata=ratio_gamma,
                                             xerr=None, yerr=None,
                                             pdict=pdict_scatter)
@@ -551,7 +557,8 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                     'xunit': r'GHz/$\Phi_0$',
                     'ylabel': '$T_\phi^{\mathrm{Echo}}/T_\phi^{\mathrm{Ramsey}}$',
                 }
-                pds = plot_scatter_errorbar(self=self, ax_id=cr_all_base + '_sensitivity', xdata=np.abs(sensitivity)*1e-9,
+                pds = plot_scatter_errorbar(self=self, ax_id=cr_all_base + '_sensitivity',
+                                            xdata=np.abs(sensitivity) * 1e-9,
                                             ydata=ratio_gamma,
                                             xerr=None, yerr=None,
                                             pdict=pdict_scatter)
@@ -625,7 +632,8 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                                 'ylabel': '$T_\phi^{\mathrm{Echo}}/T_\phi^{\mathrm{Ramsey}}$',
                                 'setlabel': label
                             }
-                            pds = plot_scatter_errorbar(self=self, ax_id=ct_base + '_flux_gamma_relation', xdata=flux*1e3,
+                            pds = plot_scatter_errorbar(self=self, ax_id=ct_base + '_flux_gamma_relation',
+                                                        xdata=flux * 1e3,
                                                         ydata=dat['analysis'][typ],
                                                         xerr=None, yerr=None,
                                                         pdict=pdict_scatter)
@@ -752,7 +760,7 @@ def super_residual(p):
     return data.astype(float)
 
 
-def fit_gammas(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo, verbose=0):
+def fit_gammas(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo, verbose: bool = False):
     # create a parametrrer set for the initial guess
     p = lmfit.Parameters()
     p.add('slope_ramsey', value=100.0, vary=True)
@@ -765,7 +773,6 @@ def fit_gammas(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo, verbose=0):
                                              Gamma_phi_ramsey=Gamma_phi_ramsey,
                                              Gamma_phi_echo=Gamma_phi_echo)
     fit_result_gammas = lmfit.minimize(wrap_residual, p)
-    verbose = 1
-    if verbose > 0:
+    if verbose:
         lmfit.printfuncs.report_fit(fit_result_gammas.params)
     return fit_result_gammas
