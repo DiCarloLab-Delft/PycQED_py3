@@ -14,11 +14,11 @@ from pycqed.analysis import fitting_models as fit_mods
 import lmfit
 
 import importlib
-
 importlib.reload(ba)
 
 
 class Spectroscopy(ba.BaseDataAnalysis):
+
     def __init__(self, t_start: str,
                  t_stop: str = None,
                  options_dict: dict = None,
@@ -37,8 +37,8 @@ class Spectroscopy(ba.BaseDataAnalysis):
                             'measurementstring': 'measurementstring',
                             'freq': 'sweep_points',
                             'amp': 'amp',
-                            'phase': 'phase',
-                            }
+                            'phase': 'phase'}
+        
         self.options_dict.get('xwidth', None)
         # {'xlabel': 'sweep_name',
         # 'xunit': 'sweep_unit',
@@ -210,8 +210,7 @@ class complex_spectroscopy(Spectroscopy):
         self.proc_data_dict['amp_label'] = 'Transmission amplitude (V rms)'
         self.proc_data_dict['phase_label'] = 'Transmission phase (degrees)'
         if len(self.raw_data_dict['timestamps']) == 1:
-            self.proc_data_dict['plot_phase'] = np.unwrap(
-                np.pi / 180. * self.proc_data_dict['plot_phase']) * 180 / np.pi
+            self.proc_data_dict['plot_phase'] = np.unwrap(np.pi / 180. * self.proc_data_dict['plot_phase']) * 180 / np.pi
             self.proc_data_dict['plot_xlabel'] = 'Readout Frequency (Hz)'
         else:
             pass
@@ -226,8 +225,7 @@ class complex_spectroscopy(Spectroscopy):
         self.proc_data_dict['real_label'] = 'Real{S21} (V rms)'
         self.proc_data_dict['imag_label'] = 'Imag{S21} (V rms)'
         if len(self.raw_data_dict['timestamps']) == 1:
-            self.proc_data_dict['plot_phase'] = np.unwrap(
-                np.pi / 180. * self.proc_data_dict['plot_phase']) * 180 / np.pi
+            self.proc_data_dict['plot_phase'] = np.unwrap(np.pi / 180. * self.proc_data_dict['plot_phase']) * 180 / np.pi
             self.proc_data_dict['plot_xlabel'] = 'Frequency (Hz)'
         else:
             pass
@@ -408,8 +406,7 @@ class ResonatorSpectroscopy(Spectroscopy):
         self.proc_data_dict['amp_label'] = 'Transmission amplitude (V rms)'
         self.proc_data_dict['phase_label'] = 'Transmission phase (degrees)'
         if len(self.raw_data_dict['timestamps']) == 1:
-            self.proc_data_dict['plot_phase'] = np.unwrap(
-                np.pi / 180. * self.proc_data_dict['plot_phase']) * 180 / np.pi
+            self.proc_data_dict['plot_phase'] = np.unwrap(np.pi / 180. * self.proc_data_dict['plot_phase']) * 180 / np.pi
             self.proc_data_dict['plot_xlabel'] = 'Readout Frequency (Hz)'
         else:
             pass
@@ -482,6 +479,7 @@ class ResonatorSpectroscopy(Spectroscopy):
                 fmin = f0 - df
                 fmax = f0 + df
                 indices = np.logical_or(x < fmin * 1e9, x > fmax * 1e9)
+                
                 x_filtered.append(x[indices])
                 y_filtered.append(y[indices])
             self.background = pd.concat([pd.Series(y_filtered[tt], index=x_filtered[tt])
@@ -509,8 +507,7 @@ class ResonatorSpectroscopy(Spectroscopy):
             self.background_fit = fit_res
 
             for tt in range(len(self.raw_data_dict['timestamps'])):
-                divide_vals = fit_fn(np.squeeze(self.plot_frequency)[
-                                         tt] * 1e-9, **fit_res.best_values)
+                divide_vals = fit_fn(np.squeeze(self.plot_frequency)[tt] * 1e-9, **fit_res.best_values)
                 self.plot_amp[tt] = np.array(
                     [np.array([np.divide(np.squeeze(self.plot_amp[tt]), divide_vals)])]).transpose()
 
@@ -523,8 +520,7 @@ class ResonatorSpectroscopy(Spectroscopy):
                 fit_results = fit_dict['fit_res']
                 ax = self.axs['amp']
                 if len(self.raw_data_dict['timestamps']) == 1:
-                    ax.plot(list(fit_dict['fit_xvals'].values())[
-                                0], fit_results.best_fit, 'r-', linewidth=1.5)
+                    ax.plot(list(fit_dict['fit_xvals'].values())[0], fit_results.best_fit, 'r-', linewidth=1.5)
                     textstr = 'f0 = %.5f $\pm$ %.1g GHz' % (
                         fit_results.params['f0'].value, fit_results.params['f0'].stderr) + '\n' \
                                                                                            'Q = %.4g $\pm$ %.0g' % (
