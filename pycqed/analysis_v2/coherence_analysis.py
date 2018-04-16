@@ -174,14 +174,16 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                     # sensitivity vs tau
                     self._prepare_plot(ax_id="sensitivity_relation",
                                        xvals=self.fit_res['sensitivity_values'] * 1e-9,
-                                       yvals=self.raw_data_dict['freq_sorted_tau'],
+                                       yvals=self.raw_data_dict['dac_sorted_tau'],
+                                       yerr=self.raw_data_dict['dac_sorted_tau_stderr'],
                                        xlabel=r'Sensitivity $|\partial\nu/\partial\Phi|$',
                                        xunit=r'GHz/$\Phi_0$')
                 if 'flux_values' in self.fit_res:
                     # flux vs tau
                     self._prepare_plot(ax_id="flux_relation",
                                        xvals=self.fit_res['flux_values'],
-                                       yvals=self.raw_data_dict['freq_sorted_tau'],
+                                       yvals=self.raw_data_dict['dac_sorted_tau'],
+                                       yerr=self.raw_data_dict['dac_sorted_tau_stderr'],
                                        xlabel='Flux Value', xunit='$\Phi_0$')
 
     def _prepare_plot(self, ax_id, xvals, yvals, xlabel, xunit, yerr=None):
@@ -289,6 +291,7 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
             assert (len(qubit_instr_names) == len(chi_shift))
 
         # Find the keys for the coherence times and their errors
+        # todo merge instead of overwrite!
         tau_keys = tau_keys or {
             self.T1: 'Analysis.Fitted Params F|1>.tau.value',
             self.T2: 'Analysis.Fitted Params corr_data.tau.value',
@@ -326,7 +329,6 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
         # Call abstract init
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
-                         data_file_path=data_file_path,
                          options_dict=options_dict,
                          do_fitting=do_fitting,
                          extract_only=extract_only,
@@ -339,7 +341,6 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
         self.res_freq = res_freq
         self.chi_shift = chi_shift
         self.qubit_names = qubit_instr_names
-        self.verbose = verbose
 
         # Find the dac and frequency keys
         self.dac_keys = [] if plot_versus_dac else None
@@ -374,7 +375,6 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                     dac_key=dac_key,
                     plot_versus_frequency=plot_versus_frequency,
                     frequency_key=freq_key,
-                    data_file_path=data_file_path,
                     options_dict=options_dict,
                     close_figs=close_figs,
                 )
@@ -643,19 +643,6 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                                             pdict=pdict_scatter)
                 self.plot_dicts[cr_base + '_sensitivity'] = pds
 
-                '''
-                pdict_scatter = {
-                    'xlabel': 'Qubit Frequency',
-                    'xunit': 'Hz',
-                    'ylabel': '$T_\phi^{\mathrm{Echo}}/T_\phi^{\mathrm{Ramsey}}$',
-                }
-                pds = plot_scatter_errorbar(self=self, ax_id=cr_all_base + '_frequency', xdata=freq,
-                                            ydata=ratio_gamma,
-                                            xerr=None, yerr=None,
-                                            pdict=pdict_scatter)
-                self.plot_dicts[cr_base + '_frequency'] = pds
-                '''
-
             ############
             # coherence_times
             ct_base = qubit + '_' + ct_all_base
@@ -701,7 +688,9 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                         self.plot_dicts[key]['do_legend'] = True
                         self.plot_dicts[key]['yrange'] = None
                         # self.plot_dicts[key]['xrange'] = None
-                        # self.plot_dicts[key]['marker'] = markers[typi % len(markers)]
+                        self.plot_dicts[key]['marker'] = markers[typi % len(markers)]
+                        if self.plot_dicts[key]['func'] == 'errorbar':
+                            self.plot_dicts[key]['line_kws'] = {'fmt': markers[typi % len(markers)]}
 
                     if 'analysis' in dat and dat['analysis']:
                         if self.dac_keys and self.freq_keys:

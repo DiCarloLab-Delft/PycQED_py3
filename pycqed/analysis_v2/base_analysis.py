@@ -1209,8 +1209,7 @@ def plot_scatter_errorbar(self, ax_id, xdata, ydata, xerr=None, yerr=None, pdict
     else:
         pds['func'] = 'scatter'
 
-    for k in pdict:
-        pds[k] = pdict[k]
+    pds = _merge_dict_rec(pds, pdict)
 
     return pds
 
@@ -1234,6 +1233,21 @@ def plot_scatter_errorbar_fit(self, ax_id, xdata, ydata, fitfunc, xerr=None, yer
         'linestyle': '-',
         'marker': '',
     }
-    for k in pdict_fit:
-        pdf[k] = pdict_fit[k]
+
+    pdf = _merge_dict_rec(pdf, pdict_fit)
+
     return pds, pdf
+
+
+def _merge_dict_rec(dict_a: dict, dict_b: dict):
+    for k in dict_a:
+        if k in dict_b:
+            if dict_a[k] is dict or dict_b[k] is dict:
+                a = dict_a[k] or {}
+                dict_a[k] = _merge_dict_rec(a, dict_b[k])
+            else:
+                dict_a[k] = dict_b[k]
+    for k in dict_b:
+        if k not in dict_a:
+            dict_a[k] = dict_b[k]
+    return dict_a
