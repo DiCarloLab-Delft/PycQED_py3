@@ -179,7 +179,6 @@ class QuTech_AWG_Module(SCPI):
                                docstring='Reads the temperature of a DAC.\n' \
                                  +'Temperature measurement interval is 10 seconds\n' \
                                  +'Return:\n     float with temperature in Celsius')
-
             self.add_parameter('output{}_voltage'.format(ch),
                                unit='V',
                                label=('Channel {} voltage output').format(ch),
