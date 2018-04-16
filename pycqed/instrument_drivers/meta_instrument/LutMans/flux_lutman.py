@@ -860,3 +860,17 @@ class QWG_Flux_LutMan(AWG8_Flux_LutMan):
         if length_samples is not None:
             return kernels[:int(length_samples)]
         return kernels
+
+    def get_dac_val_to_amp_scalefactor(self):
+        """
+        Returns the scale factor to transform an amplitude in 'dac value' to an
+        amplitude in 'V'.
+
+        N.B. the implementation is specific to this type of AWG (QWG)
+        """
+        AWG = self.AWG.get_instr()
+        awg_ch = self.cfg_awg_channel()
+
+        channel_amp = AWG.get('ch{}_amp'.format(awg_ch))
+        scale_factor = channel_amp
+        return scale_factor
