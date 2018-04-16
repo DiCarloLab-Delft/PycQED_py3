@@ -11,7 +11,7 @@ from pycqed.analysis import analysis_toolbox as a_tools
 class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
     # todo docstring
     def __init__(self, t_start: str = None, t_stop: str = None,
-                 label: str = '', data_file_path: str = None,
+                 label: str = '',
                  options_dict: dict = None, extract_only: bool = False, auto: bool = True,
                  close_figs: bool = True, do_fitting: bool = True,
                  tau_key='Analysis.Fitted Params F|1>.tau.value',
@@ -21,9 +21,30 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                  plot_versus_frequency=True,
                  frequency_key='Instrument settings.Q.freq_qubit',
                  ):
+        '''
+        Plots and Analyses the coherence time (e.g. T1, T2 OR T2*) of one measurement series.
+
+        :param t_start: start time of scan as a string of format YYYYMMDD_HHmmss
+        :param t_stop: end time of scan as a string of format YYYYMMDD_HHmmss
+        :param label: the label that was used to name the measurements (only necessary if non-relevant measurements are in the time range)
+        :param options_dict: Available options are the ones from the base_analysis and:
+                                - (todo)
+        :param auto: Execute all steps automatically
+        :param close_figs: Close the figure (do not display)
+        :param extract_only: Should we also do the plots?
+        :param do_fitting: Should the run_fitting method be executed?
+        :param tau_key: key for the tau (time) fit result, e.g. 'Analysis.Fitted Params F|1>.tau.value'
+        :param tau_std_key: key for the tau (time) standard deviation fit result,
+                            e.g. 'Analysis.Fitted Params F|1>.tau.stderr'
+        :param plot_versus_dac: Extract and plot dac value?
+                                    E.g. set False if you did not vary the dac for this measurement.
+        :param dac_key: key for the dac current values, e.g. 'Instrument settings.fluxcurrent.Q'
+        :param plot_versus_frequency: Extract and plot frequency value?
+                                      E.g. set False if you did not use the Qubit object.
+        :param frequency_key: key for the dac current values, e.g. 'Instrument settings.Q.freq_qubit'
+        '''
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
-                         data_file_path=data_file_path,
                          options_dict=options_dict,
                          do_fitting=do_fitting,
                          close_figs=close_figs,
@@ -192,7 +213,6 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
     def __init__(self, dac_instr_names: list, qubit_instr_names: list,
                  t_start: str = None, t_stop: str = None,
                  label: str = '', labels=None,
-                 data_file_path: str = None,
                  options_dict: dict = None, extract_only: bool = False,
                  auto: bool = True,
                  tau_keys: dict = None,
@@ -202,8 +222,62 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                  plot_versus_frequency: bool = True,
                  frequency_key_pattern: str = 'Instrument settings.{Q}.freq_qubit',
                  res_freq: list = None, res_Qc: list = None, chi_shift: list = None,
-                 do_fitting: bool = True, verbose: bool = True, close_figs: bool = True,
+                 do_fitting: bool = True, close_figs: bool = True,
                  ):
+        '''
+        Plots and Analyses the coherence times (i.e. T1, T2 OR T2*) of one or several measurements.
+
+        :param t_start:
+        :param t_stop:
+        :param label:
+        :param options_dict:
+        :param auto:
+        :param close_figs: Close the figure (do not display)
+        :param extract_only:
+        :param do_fitting:
+        :param tau_key:
+        :param tau_std_key: key for the tau (time) standard deviation fit result,
+                            e.g. 'Analysis.Fitted Params F|1>.tau.stderr'
+        :param plot_versus_dac: Extract and plot dac value?
+                                    E.g. set False if you did not vary the dac for this measurement.
+        :param dac_key:
+        :param plot_versus_frequency: Extract and plot frequency value?
+                                      E.g. set False if you did not use the Qubit object.
+        :param frequency_key:
+
+
+        :param dac_instr_names:
+        :param qubit_instr_names:
+        :param t_start: start time of scan as a string of format YYYYMMDD_HHmmss
+        :param t_stop: end time of scan as a string of format YYYYMMDD_HHmmss
+        :param labels: a dict of the labels that were used to name the measurements (only necessary if non-relevant measurements are in the time range)
+        :param options_dict:  Available options are the ones from the base_analysis and:
+                                - (todo)
+        :param extract_only: Should we also do the plots?
+        :param auto: Execute all steps automatically
+        :param tau_keys: dict of keys for the tau (time) fit results,
+                            e.g. {CoherenceTimesAnalysis.T1 : 'Analysis.Fitted Params F|1>.tau.value', ...}
+        :param tau_std_keys: dict of keys for the tau standard deviation (time) fit results,
+                            e.g. {CoherenceTimesAnalysis.T1 : 'Analysis.Fitted Params F|1>.tau.stderr', ...}
+        :param plot_versus_dac: Extract and plot dac value?
+                                    E.g. set False if you did not vary the dac for this measurement.
+        :param dac_key_pattern: key pattern for the dac current values, e.g. 'Instrument settings.fluxcurrent.{DAC}'
+                                    use {Q} to replace by qubit_instr_names and {DAC} to replace by dac_instr_names.
+        :param plot_versus_frequency: Extract and plot frequency value?
+                                      E.g. set False if you did not use the Qubit object.
+        :param frequency_key_pattern: keys for the dac current values, e.g. 'Instrument settings.{Q}.freq_qubit'
+                                    use {Q} to replace by qubit_instr_names and {DAC} to replace by dac_instr_names.
+        :param res_freq: Frequency of the resonator
+        :param res_Qc: Quality factor of the resonator
+        :param chi_shift: Qubit-induced dispersive shift
+        :param do_fitting: Should the run_fitting method be executed?
+        :param close_figs:  Close the figure (do not display)
+        '''
+
+        if dac_instr_names is str:
+            dac_instr_names = [dac_instr_names, ]
+        if qubit_instr_names is str:
+            qubit_instr_names = [qubit_instr_names, ]
 
         ## Check data and apply default values
         assert (len(qubit_instr_names) == len(dac_instr_names))
@@ -217,19 +291,24 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
         # Find the keys for the coherence times and their errors
         tau_keys = tau_keys or {
             self.T1: 'Analysis.Fitted Params F|1>.tau.value',
-            self.T2: 'Analysis.Fitted Params raw w0.tau.value',
-            self.T2_star: 'Analysis.Fitted Params corr_data.tau.value',
+            self.T2: 'Analysis.Fitted Params corr_data.tau.value',
+            self.T2_star: 'Analysis.Fitted Params raw w0.tau.value',
         }
         tau_std_keys = tau_std_keys or {
             self.T1: 'Analysis.Fitted Params F|1>.tau.stderr',
-            self.T2: 'Analysis.Fitted Params raw w0.tau.stderr',
-            self.T2_star: 'Analysis.Fitted Params corr_data.tau.stderr',
+            self.T2: 'Analysis.Fitted Params corr_data.tau.stderr',
+            self.T2_star: 'Analysis.Fitted Params raw w0.tau.stderr',
         }
 
+        if len(qubit_instr_names) == 1:
+            s = ''
+        else:
+            s = '_{Q}'
+
         labels = labels or {
-            self.T1: '_T1_{Q}',
-            self.T2: '_echo_{Q}',
-            self.T2_star: '_ramsey_{Q}',
+            self.T1: '_T1' + s,
+            self.T2: '_echo' + s,
+            self.T2_star: '_ramsey' + s,
         }
 
         assert (len(tau_keys) == len(labels))
