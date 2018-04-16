@@ -136,6 +136,9 @@ class DeviceObject(Instrument):
         q1.prepare_for_timedomain()
         q0.prepare_for_timedomain()
         RO_LMM.acquisition_delay(q0.RO_acq_marker_delay())
+        #aligining the acquisition delays according to q0, important for optimal
+        #weight calibrations
+        q0.RO_acq_marker_delay(q1.RO_acq_marker_delay())
 
         # Generate multiplexed pulse
         multiplexed_wave = [[q0.RO_LutMan(), 'M_square'],

@@ -8,10 +8,20 @@ import copy as copy
 
 class Base_RO_LutMan(Base_LutMan):
 
-    def __init__(self, name, num_res: int=1, **kw):
+    def __init__(self, name, num_res=2, feedline_number: int=0,**kw):
         if num_res > 9:
             raise ValueError('At most 9 resonators can be read out.')
         self._num_res = num_res
+        self._feedline_number = feedline_number
+        if self._feedline_number ==0: 
+            self._resonator_codeword_bit_mapping=[0,2,3,5,6]
+        elif self._feedline_number ==1: 
+            self._resonator_codeword_bit_mapping=[1,4]
+        else: 
+            raise NotImplementedError(
+              'hardcoded for feedline 0 and 1 of Surface-7')
+        #capping the resonator bit mapping in case a limited number of resonators is used
+        self._resonator_codeword_bit_mapping = self._resonator_codeword_bit_mapping[:self.num_res]
         super().__init__(name, **kw)
 
     def _add_waveform_parameters(self):
@@ -39,13 +49,13 @@ class Base_RO_LutMan(Base_LutMan):
         self.add_parameter('resonator_combinations', vals=vals.Lists(),
                            parameter_class=ManualParameter,
                            docstring=comb_msg,
-                           initial_value=[[0]])
+                           initial_value=[[0], [2], [0,2]])
         self.add_parameter('pulse_type', vals=vals.Enum(
             'M_up_down_down', 'M_square'),
             parameter_class=ManualParameter,
             docstring=comb_msg,
             initial_value='M_square')
-        for res in range(self._num_res):
+        for res in self._resonator_codeword_bit_mapping:
             self.add_parameter('M_modulation_R{}'.format(res),
                                vals=vals.Numbers(), unit='Hz',
                                parameter_class=ManualParameter,
@@ -90,7 +100,7 @@ class Base_RO_LutMan(Base_LutMan):
         # Only generate the combinations required/specified in the LutMap
         # RO pulses
         self._wave_dict = {}
-        for res in range(self._num_res):
+        for res in self._resonator_codeword_bit_mapping:
             M = wf.block_pulse(self.get('M_amp_R{}'.format(res)),
                                self.get('M_length_R{}'.format(res)),  # ns
                                sampling_rate=self.get('sampling_rate'),
@@ -148,9 +158,6 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
         self._voltage_max = 1.0-1.0/2**13
         self.sampling_rate(1.8e9)
 
-        self.add_parameter('hardcode_cases', vals=vals.Lists(),
-                           parameter_class=ManualParameter,
-                           initial_value=[])
 
 
     def set_default_lutmap(self):
@@ -181,7 +188,6 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
 
     def load_DIO_triggered_sequence_onto_UHFQC(self,
                                                regenerate_waveforms=True,
-                                               hardcode_cases=None,
                                                timeout=5):
         '''
         Load a single pulse to the lookuptable, it uses the lut_mapping to
@@ -193,13 +199,6 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
         to codeword 0, the others are not uploaded.
         '''
         resonator_combinations = self.resonator_combinations()
-
-        # TODO: automatically assign right codeword for resonator combinations
-        # 1. convert each combination to binary to extract the expected CW
-        # 2. create a list of these binary numbers or put the combinations in
-        #   a dict with these numbers as keys.
-        # 3. When uploading, ensure that the pulses are loaded to the right
-        # number as specified in 2.
 
         pulse_type = self.pulse_type()
         if regenerate_waveforms:
@@ -230,17 +229,13 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
                             I_waves[i], wave_dict[wavename][0])
                         Q_waves[i] = add_waves_different_length(
                             Q_waves[i], wave_dict[wavename][1])
-
-                    cases[i] += 2**resonator
+                    cases[i] += 2**self._resonator_codeword_bit_mapping.index[resonator]
 
             # clipping the waveform
             I_waves[i] = np.clip(I_waves[i],
                                  self._voltage_min, self._voltage_max)
             Q_waves[i] = np.clip(Q_waves[i], self._voltage_min,
                                  self._voltage_max)
-
-        if self.hardcode_cases() != []:
-            cases = self.hardcode_cases()
 
         self.AWG.get_instr().awg_sequence_acquisition_and_DIO_triggered_pulse(
             I_waves, Q_waves, cases, self.acquisition_delay(), timeout=timeout)
