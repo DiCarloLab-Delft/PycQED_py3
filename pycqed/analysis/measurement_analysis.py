@@ -8974,7 +8974,8 @@ def DAC_scan_analysis_and_plot(scan_start, scan_stop, dac, feed, dac_prefix='',p
         #     Qis[i] = a.fit_results.params['Qi']
         # except:
         #     pass
-        peaks_x, peaks_z,smoothed_z=a_tools.peak_finder_v3(frequency_values[i], amplitude_values[i], smoothing=smoothing, perc=perc,  window_len=smooth_window_len,factor=factor)
+        peaks_x, peaks_z,smoothed_z=a_tools.peak_finder_v3(frequency_values[i], amplitude_values[i], smoothing=smoothing,
+                                                           perc=perc,  window_len=smooth_window_len,factor=factor)
         #save peaks and smoothed data
         smoothed_amplitude_values[i,:] = smoothed_z
         peak_frequencies[i] = peaks_x

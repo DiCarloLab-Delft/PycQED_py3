@@ -18,13 +18,16 @@ importlib.reload(ba)
 
 
 class Spectroscopy(ba.BaseDataAnalysis):
-    def __init__(self, t_start,
-                 options_dict=None,
-                 t_stop=None,
-                 extract_only=False,
-                 auto=True,
-                 do_fitting=False):
-        super(Spectroscopy, self).__init__(t_start, t_stop=t_stop,
+
+    def __init__(self, t_start: str,
+                 t_stop: str = None,
+                 options_dict: dict = None,
+                 label: str = None,
+                 extract_only: bool = False,
+                 auto: bool = True,
+                 do_fitting: bool = False):
+        super(Spectroscopy, self).__init__(t_start=t_start, t_stop=t_stop,
+                                           label=label,
                                            options_dict=options_dict,
                                            extract_only=extract_only,
                                            do_fitting=do_fitting)
@@ -35,6 +38,7 @@ class Spectroscopy(ba.BaseDataAnalysis):
                             'freq': 'sweep_points',
                             'amp': 'amp',
                             'phase': 'phase'}
+        
         self.options_dict.get('xwidth', None)
         # {'xlabel': 'sweep_name',
         # 'xunit': 'sweep_unit',
@@ -45,7 +49,7 @@ class Spectroscopy(ba.BaseDataAnalysis):
         # 'measured_values': 'measured_values'}
 
         if self.extract_fitparams:
-            self.params_dict.update({'fitparams': 'fit_params'})
+            self.params_dict.update({'fitparams': self.options_dict.get('fitparams_key', 'fit_params')})
 
         self.numeric_params = ['freq', 'amp', 'phase']
         if 'qubit_label' in self.options_dict:
@@ -136,9 +140,7 @@ class Spectroscopy(ba.BaseDataAnalysis):
                                         'plotsize': plotsize
                                         }
         else:
-            plotcbar = self.options_dict.get('colorbar', False)
-            plot_fn = self.plot_colorx  # (self, pdict, axs)
-            self.plot_dicts['amp'] = {'plotfn': plot_fn,
+            self.plot_dicts['amp'] = {'plotfn': self.plot_colorx,
                                       'xvals': proc_data_dict['plot_xvals'],
                                       'xwidth': proc_data_dict['plot_xwidth'],
                                       'yvals': proc_data_dict['plot_frequency'],
@@ -150,7 +152,13 @@ class Spectroscopy(ba.BaseDataAnalysis):
                                       'yrange': proc_data_dict['freq_range'],
                                       'zrange': proc_data_dict['amp_range'],
                                       'plotsize': plotsize,
-                                      'plotcbar': plotcbar
+                                      'plotcbar': self.options_dict.get('colorbar', False),
+                                      }
+
+            self.plot_dicts['amp'] = {'plotfn': self.plot_colorx,
+                                      'xvals': proc_data_dict['plot_xvals'],
+                                      'yvals': proc_data_dict['plot_frequency'],
+                                      'zvals': proc_data_dict['plot_amp'],
                                       }
 
     def plot_for_presentation(self, key_list=None, no_label=False):
@@ -160,7 +168,7 @@ class Spectroscopy(ba.BaseDataAnalysis):
             pdict = self.plot_dicts[key]
             if key == 'amp':
                 if pdict['plotfn'] == self.plot_line:
-                    ymin, ymax = 0, 1.2*np.max(np.ravel(pdict['yvals']))
+                    ymin, ymax = 0, 1.2 * np.max(np.ravel(pdict['yvals']))
                     self.axs[key].set_ylim(ymin, ymax)
                     self.axs[key].set_ylabel('Transmission amplitude (V rms)')
 
@@ -202,8 +210,7 @@ class complex_spectroscopy(Spectroscopy):
         self.proc_data_dict['amp_label'] = 'Transmission amplitude (V rms)'
         self.proc_data_dict['phase_label'] = 'Transmission phase (degrees)'
         if len(self.raw_data_dict['timestamps']) == 1:
-            self.proc_data_dict['plot_phase'] = np.unwrap(
-                np.pi/180.*self.proc_data_dict['plot_phase'])*180/np.pi
+            self.proc_data_dict['plot_phase'] = np.unwrap(np.pi / 180. * self.proc_data_dict['plot_phase']) * 180 / np.pi
             self.proc_data_dict['plot_xlabel'] = 'Readout Frequency (Hz)'
         else:
             pass
@@ -218,8 +225,7 @@ class complex_spectroscopy(Spectroscopy):
         self.proc_data_dict['real_label'] = 'Real{S21} (V rms)'
         self.proc_data_dict['imag_label'] = 'Imag{S21} (V rms)'
         if len(self.raw_data_dict['timestamps']) == 1:
-            self.proc_data_dict['plot_phase'] = np.unwrap(
-                np.pi/180.*self.proc_data_dict['plot_phase'])*180/np.pi
+            self.proc_data_dict['plot_phase'] = np.unwrap(np.pi / 180. * self.proc_data_dict['plot_phase']) * 180 / np.pi
             self.proc_data_dict['plot_xlabel'] = 'Frequency (Hz)'
         else:
             pass
@@ -400,8 +406,7 @@ class ResonatorSpectroscopy(Spectroscopy):
         self.proc_data_dict['amp_label'] = 'Transmission amplitude (V rms)'
         self.proc_data_dict['phase_label'] = 'Transmission phase (degrees)'
         if len(self.raw_data_dict['timestamps']) == 1:
-            self.proc_data_dict['plot_phase'] = np.unwrap(
-                np.pi/180.*self.proc_data_dict['plot_phase'])*180/np.pi
+            self.proc_data_dict['plot_phase'] = np.unwrap(np.pi / 180. * self.proc_data_dict['plot_phase']) * 180 / np.pi
             self.proc_data_dict['plot_xlabel'] = 'Readout Frequency (Hz)'
         else:
             pass
@@ -453,7 +458,7 @@ class ResonatorSpectroscopy(Spectroscopy):
                                           'fit_yvals': [{'data': np.squeeze(tt)} for tt in self.plot_amp],
                                           'fit_xvals': np.squeeze([{'f': tt[0]} for tt in self.plot_frequency])}
 
-    def do_subtract_background(self, thres=None, back_dict=None,):
+    def do_subtract_background(self, thres=None, back_dict=None, ):
         if len(self.raw_data_dict['timestamps']) == 1:
             pass
         else:
@@ -470,10 +475,11 @@ class ResonatorSpectroscopy(Spectroscopy):
                 guess_dict = SlopedHangerFuncAmplitudeGuess(y, x)
                 Q = guess_dict['Q']['value']
                 f0 = guess_dict['f0']['value']
-                df = 2*f0/Q
-                fmin = f0-df
-                fmax = f0+df
-                indices = np.logical_or(x < fmin*1e9, x > fmax*1e9)
+                df = 2 * f0 / Q
+                fmin = f0 - df
+                fmax = f0 + df
+                indices = np.logical_or(x < fmin * 1e9, x > fmax * 1e9)
+                
                 x_filtered.append(x[indices])
                 y_filtered.append(y[indices])
             self.background = pd.concat([pd.Series(y_filtered[tt], index=x_filtered[tt])
@@ -483,7 +489,7 @@ class ResonatorSpectroscopy(Spectroscopy):
             amp = background_vals[:, 1]
             # thres = 0.0065
             indices = amp < thres
-            freq = freq[indices]*1e-9
+            freq = freq[indices] * 1e-9
             amp = amp[indices]
             fit_fn = double_cos_linear_offset
             model = lmfit.Model(fit_fn)
@@ -501,8 +507,7 @@ class ResonatorSpectroscopy(Spectroscopy):
             self.background_fit = fit_res
 
             for tt in range(len(self.raw_data_dict['timestamps'])):
-                divide_vals = fit_fn(np.squeeze(self.plot_frequency)[
-                                     tt]*1e-9, **fit_res.best_values)
+                divide_vals = fit_fn(np.squeeze(self.plot_frequency)[tt] * 1e-9, **fit_res.best_values)
                 self.plot_amp[tt] = np.array(
                     [np.array([np.divide(np.squeeze(self.plot_amp[tt]), divide_vals)])]).transpose()
 
@@ -515,17 +520,19 @@ class ResonatorSpectroscopy(Spectroscopy):
                 fit_results = fit_dict['fit_res']
                 ax = self.axs['amp']
                 if len(self.raw_data_dict['timestamps']) == 1:
-                    ax.plot(list(fit_dict['fit_xvals'].values())[
-                            0], fit_results.best_fit, 'r-', linewidth=1.5)
-                    textstr = 'f0 = %.5f $\pm$ %.1g GHz' % (fit_results.params['f0'].value, fit_results.params['f0'].stderr) + '\n' \
-                        'Q = %.4g $\pm$ %.0g' % (fit_results.params['Q'].value, fit_results.params['Q'].stderr) + '\n' \
-                        'Qc = %.4g $\pm$ %.0g' % (fit_results.params['Qc'].value, fit_results.params['Qc'].stderr) + '\n' \
-                        'Qi = %.4g $\pm$ %.0g' % (
-                            fit_results.params['Qi'].value, fit_results.params['Qi'].stderr)
+                    ax.plot(list(fit_dict['fit_xvals'].values())[0], fit_results.best_fit, 'r-', linewidth=1.5)
+                    textstr = 'f0 = %.5f $\pm$ %.1g GHz' % (
+                        fit_results.params['f0'].value, fit_results.params['f0'].stderr) + '\n' \
+                                                                                           'Q = %.4g $\pm$ %.0g' % (
+                                  fit_results.params['Q'].value, fit_results.params['Q'].stderr) + '\n' \
+                                                                                                   'Qc = %.4g $\pm$ %.0g' % (
+                                  fit_results.params['Qc'].value, fit_results.params['Qc'].stderr) + '\n' \
+                                                                                                     'Qi = %.4g $\pm$ %.0g' % (
+                                  fit_results.params['Qi'].value, fit_results.params['Qi'].stderr)
                     box_props = dict(boxstyle='Square',
                                      facecolor='white', alpha=0.8)
                     self.box_props = {key: val for key,
-                                      val in box_props.items()}
+                                                   val in box_props.items()}
                     self.box_props.update({'linewidth': 0})
                     self.box_props['alpha'] = 0.
                     ax.text(0.03, 0.95, textstr, transform=ax.transAxes,
