@@ -395,7 +395,6 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
     def extract_data(self):
         youngest = None
         for qubit in self.all_analysis:
-            dac = np.array([])  # collect all dac values
 
             self.raw_data_dict[qubit] = {}
             for typ in self.all_analysis[qubit]:
@@ -850,12 +849,6 @@ def residual_Gamma(pars_dict, sensitivity, Gamma_phi_ramsey, Gamma_phi_echo):
     return np.concatenate((residual_ramsey, residual_echo))
 
 
-def super_residual(p):
-    data = residual_Gamma(p)
-    # print(type(data))
-    return data.astype(float)
-
-
 def fit_gammas(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo, verbose: bool = False):
     # create a parametrrer set for the initial guess
     p = lmfit.Parameters()
@@ -863,7 +856,6 @@ def fit_gammas(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo, verbose: bool = Fa
     p.add('slope_echo', value=100.0, vary=True)
     p.add('intercept', value=100.0, vary=True)
 
-    # mi = lmfit.minimize(super_residual, p)
     wrap_residual = lambda p: residual_Gamma(p,
                                              sensitivity=sensitivity,
                                              Gamma_phi_ramsey=Gamma_phi_ramsey,

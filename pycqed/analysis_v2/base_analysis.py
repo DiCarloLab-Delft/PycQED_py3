@@ -383,7 +383,7 @@ class BaseDataAnalysis(object):
 
         try:
             os.mkdir(savedir)
-        except:
+        except FileExistsError:
             pass
 
         for key in key_list:
