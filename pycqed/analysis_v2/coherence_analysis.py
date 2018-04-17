@@ -551,6 +551,10 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                     self.fit_res[qubit]['sqrtA_echo'] = (sqrtA_echo / 1e-6)
                     self.fit_res[qubit]['fit_res'] = fit_res_gammas
 
+                    self.fit_res[qubit]['gamma_intercept_std'] = fit_res_gammas.params['intercept'].stderr
+                    self.fit_res[qubit]['gamma_slope_ramsey_std'] = fit_res_gammas.params['slope_ramsey'].stderr
+                    self.fit_res[qubit]['gamma_slope_echo_std'] = fit_res_gammas.params['slope_echo'].stderr
+
 
                 else:
                     # fixme: make this a proper warning
@@ -579,6 +583,8 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
         self.plot_dicts = {}
         for qubit in self.all_analysis:
             # if the analysis was succesful
+            cm = self.options_dict.get('current_multiplier', 1)
+
             dat = self.raw_data_dict[qubit]
             if hasattr(self, 'fit_res'):
                 sensitivity = self.fit_res[qubit]['sorted_sensitivity']
@@ -615,6 +621,23 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                 self.plot_dicts[cg_base + '_echo_fit'] = pdf
                 self.plot_dicts[cg_base + '_echo_scatter'] = pds
 
+                if self.options_dict.get('print_fit_result_plot', True):
+                    dac_fit_text = '$\Gamma = %.5f(\pm %.5f)$\n' % (
+                    self.fit_res[qubit]['gamma_intercept'], self.fit_res[qubit]['gamma_intercept_std'])
+                    # dac_fit_text += '$\Gamma/2 \pi = %.2f(\pm %.3f)$ MHz\n' % (self.fit_res[qubit]['gamma_intercept'], self.fit_res[qubit]['gamma_intercept_std'])
+                    # dac_fit_text += '$\Gamma/2 \pi = %.2f(\pm %.3f)$ MHz\n' % (self.fit_res[qubit]['gamma_intercept'], self.fit_res[qubit]['gamma_intercept_std'])
+
+                    self.fit_res[qubit]['gamma_slope_ramsey_std']
+                    self.fit_res[qubit]['gamma_slope_echo_std']
+
+                    self.plot_dicts[cg_base + '_text_msg'] = {
+                        'ax_id': cg_base,
+                        # 'ypos': 0.15,
+                        'plotfn': self.plot_text,
+                        'box_props': 'fancy',
+                        'text_string': dac_fit_text,
+                    }
+
                 ############
                 # coherence_ratios
                 cr_base = qubit + '_' + cr_all_base
@@ -625,7 +648,8 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                     'xunit': 'm$\Phi_0$',
                     'ylabel': '$T_\phi^{\mathrm{Echo}}/T_\phi^{\mathrm{Ramsey}}$',
                 }
-                pds = plot_scatter_errorbar(self=self, ax_id=cr_all_base + '_flux', xdata=flux * 1e3,
+                pds = plot_scatter_errorbar(self=self, ax_id=cr_all_base + '_flux',
+                                            xdata=flux * 1e3,
                                             ydata=ratio_gamma,
                                             xerr=None, yerr=None,
                                             pdict=pdict_scatter)
