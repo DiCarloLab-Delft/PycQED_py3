@@ -204,7 +204,7 @@ class DeviceCCL(Instrument):
         # fl_lutman.load_waveforms_onto_awg_lookuptable()
         fl_lutman.load_waveforms_onto_AWG_lookuptable()
         awg = fl_lutman.AWG.get_instr()
-        if AWG.__class__.__name__ == 'QuTech_AWG_Module':
+        if awg.__class__.__name__ == 'QuTech_AWG_Module':
             using_QWG = True
         else:
             using_QWG = False
@@ -554,7 +554,7 @@ class DeviceCCL(Instrument):
 
     def prepare_for_timedomain(self):
         self.prepare_readout()
-        # self.prepare_fluxing()
+        self.prepare_fluxing()
         self.prepare_timing()
 
         for qb_name in self.qubits():
@@ -761,13 +761,6 @@ class DeviceCCL(Instrument):
         q0idx = self.find_instrument(q0).cfg_qubit_nr()
         q_specidx = self.find_instrument(q_spec).cfg_qubit_nr()
 
-        # buffer times are hardcoded for now FIXME!
-        p = mqo.Chevron(q0idx, q_specidx, buffer_time=100e-9,
-                        buffer_time2=1750e-9,
-                        platf_cfg=self.cfg_openql_platform_fn())
-        self.instr_CC.get_instr().eqasm_program(p.filename)
-        self.instr_CC.get_instr().start()
-
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
 
         if waveform_name == 'square':
@@ -777,15 +770,17 @@ class DeviceCCL(Instrument):
         else:
             raise ValueError('Waveform shape not understood')
 
+
         awg = fl_lutman.AWG.get_instr()
         using_QWG = (awg.__class__.__name__ == 'QuTech_AWG_Module')
 
         if using_QWG:
-            awg_ch = fl_lutman.cfg_awg_channel()-1
-            awg_par = awg.parameters['ch{}_amp'.format(awg_ch)]
+            awg_ch = fl_lutman.cfg_awg_channel()
+            amp_par = awg.parameters['ch{}_amp'.format(awg_ch)]
             sw = swf.FLsweep_QWG(fl_lutman, length_par,
                                  realtime_loading=False,
                                  waveform_name=waveform_name)
+            flux_cw = 0
 
         else:
             awg_ch = fl_lutman.cfg_awg_channel()-1  # -1 is to account for starting at 1
@@ -797,6 +792,14 @@ class DeviceCCL(Instrument):
             sw = swf.FLsweep(fl_lutman, length_par,
                              realtime_loading=False,
                              waveform_name=waveform_name)
+            flux_cw = 2
+        # buffer times are hardcoded for now FIXME!
+        p = mqo.Chevron(q0idx, q_specidx, buffer_time=100e-9,
+                        buffer_time2=200e-9,
+                        flux_cw=flux_cw,
+                        platf_cfg=self.cfg_openql_platform_fn())
+        self.instr_CC.get_instr().eqasm_program(p.filename)
+        self.instr_CC.get_instr().start()
 
         d = self.get_correlation_detector(single_int_avg=True,
                                           seg_per_point=1)
