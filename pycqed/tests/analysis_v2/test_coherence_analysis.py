@@ -1,3 +1,7 @@
+'''
+Hacked together by Rene Vollmer
+'''
+
 import unittest
 import numpy as np
 import pycqed as pq

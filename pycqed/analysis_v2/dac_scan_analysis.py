@@ -1,3 +1,7 @@
+'''
+Hacked together by Rene Vollmer
+'''
+
 import pycqed.analysis_v2.base_analysis as ba
 import numpy as np
 from pycqed.analysis import analysis_toolbox as a_tools
