@@ -683,7 +683,7 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
 
         self.plot_dicts['counts_table'] = plot_dict
 
-    def measurement_operators_and_results(self):
+    def measurement_operators_and_results(self, tomography_qubits=None):
         """
         Calculates and returns:
             A tuple of
@@ -696,9 +696,10 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
         If there are no calibration segments, perfect readout is assumed.
         """
         qubits = list(self.channel_map.keys())
-        d = 2**len(qubits)
+        if tomography_qubits is None:
+            tomography_qubits = qubits
+        d = 2**len(tomography_qubits)
         data = self.proc_data_dict['probability_table']
-        data = data / data[0].sum()
         data = data.T
         if not 'cal_points' in self.options_dict:
             Fsingle = {None: np.array([[1, 0], [0, 1]]),
@@ -709,7 +710,8 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
             for obs in self.observables.values():
                 F = np.array([[1]])
                 nr_meas = 0
-                for qb in qubits:
+                for qb in tomography_qubits:
+                    # TODO: does not handle conditions on previous readouts
                     Fqb = Fsingle[obs.get(qb, None)]
                     # Kronecker product convention - assumed the same as QuTiP
                     F = np.kron(F, Fqb)

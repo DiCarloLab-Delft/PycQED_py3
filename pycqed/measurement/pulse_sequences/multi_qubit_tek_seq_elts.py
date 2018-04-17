@@ -1758,6 +1758,7 @@ def three_qubit_GHZ_tomo_seq(qubits,
 
     return seq, el_list
 
+
 def n_qubit_reset(qubit_names, operation_dict, reset_cycle_time, nr_resets=1,
                   return_seq=False, verbose=False, codeword_indices=None,
                   upload=True):
@@ -1809,12 +1810,12 @@ def n_qubit_reset(qubit_names, operation_dict, reset_cycle_time, nr_resets=1,
     wait_time = mw_pulse['pulse_delay'] + mw_pulse['sigma']*mw_pulse['nr_sigma']
     wait_time += ro_pulse['pulse_delay'] + ro_pulse['length']
     wait_time = reset_cycle_time - wait_time
-    wait_time -=  station.pulsar.inter_element_spacing()
+    wait_time -= station.pulsar.inter_element_spacing()
     wait_pulse = {'pulse_type': 'SquarePulse',
-                   'channel': ro_pulse['acq_marker_channel'],
-                   'amplitude': 0.0,
-                   'length': wait_time,
-                   'pulse_delay': 0}
+                  'channel': ro_pulse['acq_marker_channel'],
+                  'amplitude': 0.0,
+                  'length': wait_time,
+                  'pulse_delay': 0}
     operation_dict.update({'I_fb': wait_pulse})
 
     # create the state-preparation elements and the state reset elements
@@ -1870,19 +1871,19 @@ def n_qubit_reset(qubit_names, operation_dict, reset_cycle_time, nr_resets=1,
         return seq_name
 
 def two_qubit_parity_measurement(
-        q0, q1, q2, feedback_delay=900e-9, prep_sequence=None,
+        q0, q1, q2, feedback_delay=900e-9, prep_sequence=None, reset=True,
         tomography_basis=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
         upload=True, verbose=False, return_seq=False):
     """
 
     |              elem 1               |  elem 2  | elem 3
-    
+
     |q0> |======|---------*------------------------|======|
          | prep |         |                        | tomo |
-    |q1> | q0,  |--mY90s--*--*--Y90--meas=====Y180-| q0,  |
+    |q1> | q0,  |--mY90s--*--*--Y90--meas===-------| q0,  |
          | q2   |            |             ||      | q2   |
-    |q2> |======|------------*------------Y180-----|======|
-    
+    |q2> |======|------------*------------X180-----|======|
+
     required elements:
         prep_sequence:
             contains everything up to the first readout
@@ -1930,8 +1931,8 @@ def two_qubit_parity_measurement(
     el_list.append(el_main)
 
     # feedback elements
-    fb_sequence_0 = ['I ' + q2n, 'Is ' + q1n]
-    fb_sequence_1 = ['Y180 ' + q2n, 'Y180s ' + q1n]
+    fb_sequence_0 = ['I ' + q2n]
+    fb_sequence_1 = ['X180 ' + q2n] if reset else ['I ' + q2n]
     pulse_list = [operation_dict[pulse] for pulse in fb_sequence_0]
     el_list.append(multi_pulse_elt(0, station, pulse_list, name='feedback_0',
                                    trigger=False, previous_element=el_main))

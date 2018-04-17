@@ -1023,7 +1023,11 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
             self.run_analysis()
 
     def process_data(self):
-        data, Fs, Omega = self.base_analysis.measurement_operators_and_results()
+        tomography_qubits = self.options_dict.get('tomography_qubits', None)
+        data, Fs, Omega = self.base_analysis.measurement_operators_and_results(
+                              tomography_qubits)
+        if 'data_filter' in self.options_dict:
+            data = self.options_dict['data_filter'](data.T).T
         Fs = self.options_dict.get('meas_operators', Fs)
         Fs = [qtp.Qobj(F) for F in Fs]
         d = Fs[0].shape[0]
