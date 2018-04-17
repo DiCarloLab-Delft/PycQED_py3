@@ -465,7 +465,7 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
         self.set_default_lutmap()
 
         self._vqe_lm = ['I', 'X180c',  'Y180c', 'X90c',  'Xm90c',
-                        'Y90c',  'Y90c', 'Y180']
+                        'Y90c',  'Y90c', 'rY180']
 
     def set_VQE_lutmap(self):
         """
@@ -510,6 +510,11 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
             amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
             f_modulation=f_modulation,
             sampling_rate=self.sampling_rate(), phase=self.phi(),
+            motzoi=self.mw_motzoi())
+        self._wave_dict['rY180'] = self.wf_func(
+            amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
+            f_modulation=f_modulation,
+            sampling_rate=self.sampling_rate(), phase=90,
             motzoi=self.mw_motzoi())
         self._wave_dict['rY180c'] = self.wf_func(
             amp=self.mw_amp180(), sigma_length=self.mw_gauss_width(),
