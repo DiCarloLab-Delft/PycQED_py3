@@ -50,11 +50,9 @@ class BaseDataAnalysis(object):
     """
 
     def __init__(self, t_start: str = None, t_stop: str = None,
-                 label: str = '',
-                 data_file_path: str = None,
-                 close_figs: bool = True,
-                 options_dict: dict = None, extract_only: bool = False,
-                 do_fitting: bool = False):
+                 label: str = '', data_file_path: str = None,
+                 close_figs: bool = True, options_dict: dict = None,
+                 extract_only: bool = False, do_fitting: bool = False):
         '''
         This is the __init__ of the abstract base class.
         It is intended to be called at the start of the init of the child
@@ -67,6 +65,7 @@ class BaseDataAnalysis(object):
                 - define self.params_dict and self.numeric_params
                 - specify options specific to that analysis
                 - call self.run_analysis
+
 
         This method sets several attributes of the analysis class.
         These include assigning the arguments of this function to attributes.
@@ -81,16 +80,35 @@ class BaseDataAnalysis(object):
 
         There are several ways to specify where the data should be loaded
         from.
-            data_file_path: directly give the file path of a data file that
-                should be loaded.
-            t_start, t_stop: give a range of timestamps in where data is
-                loaded from. Filtering options can be given through the
-                options dictionary. If t_stop is omitted, the extraction
-                routine looks for the data with time stamp t_start.
-            none of the above: look for the last data which matches the
+
+        none of the below parameters: look for the last data which matches the
                 filtering options from the options dictionary.
-        Note: data_file_path has priority, i.e. if this argument is given
-        time stamps are ignored.
+
+        :param t_start, t_stop: give a range of timestamps in where data is loaded from.
+                                Filtering options can be given through the options dictionary.
+                                If t_stop is omitted, the extraction routine looks for
+                        the data with time stamp t_start.
+        :param label: Only process datasets with this label.
+        :param data_file_path: directly give the file path of a data file that should be loaded.
+                                Note: data_file_path has priority, i.e. if this
+                                argument is given time stamps are ignored.
+        :param close_figs: Close the figure (do not display)
+        :param options_dict: available options are:
+                                -'presentation_mode'
+                                -'tight_fig'
+                                -'plot_init'
+                                -'save_figs'
+                                -'close_figs'
+                                -'verbose'
+                                -'auto-keys'
+                                -'twoD'
+                                -'ma_type'
+                                -'scan_label'
+                                -'do_individual_traces'
+                                -'filter_no_analysis'
+                                -'exact_label_match'
+        :param extract_only: Should we also do the plots?
+        :param do_fitting: Should the run_fitting method be executed?
         '''
         self.single_timestamp = False
         # initialize an empty dict to store results of analysis
@@ -190,7 +208,6 @@ class BaseDataAnalysis(object):
         self.prepare_plots()  # specify default plots
         if not self.extract_only:
             self.plot(key_list='auto')  # make the plots
-
 
         if self.options_dict.get('save_figs', False):
             self.save_figures(close_figs=self.options_dict.get('close_figs', False))
@@ -324,7 +341,6 @@ class BaseDataAnalysis(object):
         # self.raw_data_dict.items()]
         self.raw_data_dict['timestamps'] = [self.t_start]
 
-
     def process_data(self):
         """
         process_data: overloaded in child classes,
@@ -367,17 +383,17 @@ class BaseDataAnalysis(object):
 
         try:
             os.mkdir(savedir)
-        except:
+        except FileExistsError:
             pass
 
         for key in key_list:
             if self.presentation_mode:
-                savename = os.path.join(savedir, savebase+key+tstag+'presentation'+'.'+fmt)
+                savename = os.path.join(savedir, savebase + key + tstag + 'presentation' + '.' + fmt)
                 self.figs[key].savefig(savename, bbox_inches='tight', fmt=fmt)
-                savename = os.path.join(savedir, savebase+key+tstag+'presentation'+'.svg')
+                savename = os.path.join(savedir, savebase + key + tstag + 'presentation' + '.svg')
                 self.figs[key].savefig(savename, bbox_inches='tight', fmt='svg')
             else:
-                savename = os.path.join(savedir, savebase+key+tstag+'.'+fmt)
+                savename = os.path.join(savedir, savebase + key + tstag + '.' + fmt)
                 self.figs[key].savefig(savename, bbox_inches='tight', fmt=fmt)
             if close_figs:
                 plt.close(self.figs[key])
@@ -546,7 +562,7 @@ class BaseDataAnalysis(object):
                     pdict.get('numplotsy', 1), pdict.get('numplotsx', 1),
                     sharex=pdict.get('sharex', False),
                     sharey=pdict.get('sharey', False),
-                    figsize=pdict.get('plotsize', None) #plotsize None uses .rc_default of matplotlib
+                    figsize=pdict.get('plotsize', None)  # plotsize None uses .rc_default of matplotlib
                 )
 
                 # transparent background around axes for presenting data
@@ -570,8 +586,8 @@ class BaseDataAnalysis(object):
                 # used to ensure axes are touching
                 if plot_touching:
                     self.axs[pdict['ax_id']].figure.subplots_adjust(wspace=0, hspace=0)
-                
-				### ensures the argument convention is preserved
+
+                ### ensures the argument convention is preserved
                 # Get the list of parameters the function accepts
                 plotfn_params = signature(plotfn).parameters
                 # Check if pdict is one of them
@@ -633,7 +649,7 @@ class BaseDataAnalysis(object):
             p_out = []
             for ii, this_yvals in enumerate(plot_yvals):
                 p_out.append(pfunc(plot_centers, this_yvals, width=plot_xwidth,
-                                   color=gco(ii, len(plot_yvals)-1),
+                                   color=gco(ii, len(plot_yvals) - 1),
                                    label='%s%s' % (dataset_desc, dataset_label[ii]),
                                    **plot_barkws))
 
@@ -1193,8 +1209,7 @@ def plot_scatter_errorbar(self, ax_id, xdata, ydata, xerr=None, yerr=None, pdict
     else:
         pds['func'] = 'scatter'
 
-    for k in pdict:
-        pds[k] = pdict[k]
+    pds = _merge_dict_rec(pds, pdict)
 
     return pds
 
@@ -1218,6 +1233,21 @@ def plot_scatter_errorbar_fit(self, ax_id, xdata, ydata, fitfunc, xerr=None, yer
         'linestyle': '-',
         'marker': '',
     }
-    for k in pdict_fit:
-        pdf[k] = pdict_fit[k]
+
+    pdf = _merge_dict_rec(pdf, pdict_fit)
+
     return pds, pdf
+
+
+def _merge_dict_rec(dict_a: dict, dict_b: dict):
+    for k in dict_a:
+        if k in dict_b:
+            if dict_a[k] is dict or dict_b[k] is dict:
+                a = dict_a[k] or {}
+                dict_a[k] = _merge_dict_rec(a, dict_b[k])
+            else:
+                dict_a[k] = dict_b[k]
+    for k in dict_b:
+        if k not in dict_a:
+            dict_a[k] = dict_b[k]
+    return dict_a
