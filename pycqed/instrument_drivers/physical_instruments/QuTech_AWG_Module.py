@@ -1,7 +1,7 @@
 '''
 File:       QuTech_AWG_Module.py
 Author:     Wouter Vlothuizen, TNO/QuTech,
-            edited by Adriaan Rol
+            edited by Adriaan Rol, Gerco Versloot
 Purpose:    Instrument driver for Qutech QWG
 Usage:
 Notes:      It is possible to view the QWG log using ssh. To do this connect
@@ -132,7 +132,11 @@ class QuTech_AWG_Module(SCPI):
             offset_cmd = 'SOUR{}:VOLT:LEV:IMM:OFFS'.format(ch)
             state_cmd = 'OUTPUT{}:STATE'.format(ch)
             waveform_cmd = 'SOUR{}:WAV'.format(ch)
+            output_voltage_cmd = 'QUTEch:OUTPut{}:Voltage'.format(ch)
             dac_temperature_cmd = 'STATus:DAC{}:TEMperature'.format(ch)
+            gain_adjust_cmd = 'DAC{}:GAIn:DRIFt:ADJust'.format(ch)
+            dac_digital_value_cmd = 'DAC{}:DIGitalvalue'.format(ch)
+
             # Set channel first to ensure sensible sorting of pars
             # Compatibility: 5014, QWG
             self.add_parameter('ch{}_state'.format(ch),
@@ -175,7 +179,63 @@ class QuTech_AWG_Module(SCPI):
                                docstring='Reads the temperature of a DAC.\n' \
                                  +'Temperature measurement interval is 10 seconds\n' \
                                  +'Return:\n     float with temperature in Celsius')
+            self.add_parameter('output{}_voltage'.format(ch),
+                               unit='V',
+                               label=('Channel {} voltage output').format(ch),
+                               get_cmd=output_voltage_cmd + '?',
+                               get_parser=float,
+                               docstring='Reads the output voltage of a channel.\n' \
+                                 +'Notes:\n    Measurement interval is 10 seconds.\n' \
+                                 +'    The output voltage will only be read if the channel is disabled:\n' \
+                                 +'    E.g.: qwg.chX_state(False)\n' \
+                                 +'    If the channel is enabled it will return an low value: >0.1\n' \
+                                 +'Return:\n   float in voltage')
 
+            self.add_parameter('dac{}_gain_drift_adjust'.format(ch),
+                               unit='',
+                               label=('DAC {}, gain drift adjust').format(ch),
+                               get_cmd=gain_adjust_cmd + '?',
+                               set_cmd=gain_adjust_cmd + ' {}',
+                               vals=vals.Ints(0, 4095),
+                               get_parser=int,
+                               docstring='Gain drift adjust setting of the DAC of a channel.\n' \
+                                 +'Used for calibration of the DAC. Do not use to set the gain of a channel!\n' \
+                                 +'Notes:\n  The gain setting is from 0 to 4095 \n' \
+                                 +'    Where 0 is 0 V and 4095 is 3.3V \n' \
+                                 +'Get Return:\n   Setting of the gain in interger (0 - 4095)\n'\
+                                 +'Set parameter:\n   Integer: Gain of the DAC in , min: 0, max: 4095')
+
+            self.add_parameter('_dac{}_digital_value'.format(ch),
+                               unit='',
+                               label=('DAC {}, set digital value').format(ch),
+                               set_cmd=dac_digital_value_cmd + ' {}',
+                               vals=vals.Ints(0, 4095),
+                               docstring='FOR DEVELOPMENT ONLY: Set a digital value directly into the DAC\n' \
+                                 +'Used for testing the DACs.\n' \
+                                 +'Notes:\n\tThis command will also set the ' \
+                                 +'\tinternal correction matrix (Phase and amplitude) of the channel pair to [0,0,0,0], ' \
+                                 +'disabling any influence from the wave memory.' \
+                                 +'This will also stop the wave the other channel of the pair!\n\n' \
+                                 +'Set parameter:\n\tInteger: Value to write to the DAC, min: 0, max: 4095\n' \
+                                 +'\tWhere 0 is minimal DAC scale and 4095 is maximal DAC scale \n')
+
+        self.add_parameter('status_frontIO_temperature',
+                           unit='C',
+                           label=('FrontIO temperature'),
+                           get_cmd='STATus:FrontIO:TEMperature?',
+                           get_parser=float,
+                           docstring='Reads the temperature of the frontIO.\n' \
+                             +'Temperature measurement interval is 10 seconds\n' \
+                             +'Return:\n     float with temperature in Celsius')
+
+        self.add_parameter('status_fpga_temperature',
+                           unit='C',
+                           label=('FPGA temperature'),
+                           get_cmd='STATus:FPGA:TEMperature?',
+                           get_parser=int,
+                           docstring='Reads the temperature of the FPGA.\n' \
+                             +'Temperature measurement interval is 10 seconds\n' \
+                             +'Return:\n     float with temperature in Celsius')
         # Waveform parameters
         self.add_parameter('WlistSize',
                            label='Waveform list size',
@@ -352,6 +412,8 @@ class QuTech_AWG_Module(SCPI):
         result = str(msg)[1:-1]
         result = result.replace('\"\"', '\"') # SCPI/visa adds additional quotes
         return json.loads(result)
+
+
 
     ##########################################################################
     # AWG5014 functions: SEQUENCE

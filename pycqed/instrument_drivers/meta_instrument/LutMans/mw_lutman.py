@@ -290,7 +290,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
             awg_nr = (awg_ch-1)//2
             ch_pair = (awg_ch-1) % 2
             vals.append(
-                AWG.get('awgs_{}_outputs_{}_amplitude'.format(awg_nr, awg_ch)))
+                AWG.get('awgs_{}_outputs_{}_amplitude'.format(awg_nr, ch_pair)))
         assert vals[0] == vals[1]
         return vals[0]
 
@@ -376,7 +376,7 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
             awg_nr = (awg_ch-1)//2
             ch_pair = (awg_ch-1) % 2
             vals.append(
-                AWG.get('awgs_{}_outputs_{}_amplitude'.format(awg_nr, awg_ch)))
+                AWG.get('awgs_{}_outputs_{}_amplitude'.format(awg_nr, ch_pair)))
         assert vals[0] == vals[1] == vals[2] == vals[3]
         return vals[0]
 
