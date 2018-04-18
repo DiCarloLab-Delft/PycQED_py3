@@ -20,7 +20,7 @@ class FluxFrequency(ba.BaseDataAnalysis):
                  data_file_path: str = None,
                  close_figs: bool = True,
                  options_dict: dict = None, extract_only: bool = False,
-                 do_fitting: bool = False,
+                 do_fitting: bool = True,
                  is_spectroscopy: bool = True,
                  extract_fitparams: bool = True,
                  temp_keys: dict = None,
@@ -282,7 +282,7 @@ class FluxFrequency(ba.BaseDataAnalysis):
                 f['ax_id'] = ax
                 self.plot_dicts[ax + '_fit'] = f
 
-            if self.options_dict.get('print_fit_result_plot', True):
+            if hasattr(self, 'fit_dicts') and self.options_dict.get('print_fit_result_plot', True):
                 dac_fit_text = ''
                 # if ext or self.is_spectroscopy:
                 dac_fit_text += '$E_C/2 \pi = %.2f(\pm %.3f)$ MHz\n' % (
