@@ -954,8 +954,8 @@ class BaseDataAnalysis(object):
         else:
             plot_xvals_step = (abs(np.max(plot_xvals) - np.min(plot_xvals)) /
                                len(plot_xvals))
-            plot_yvals_step = [(abs(np.max(x) - np.min(x)) /
-                                len(x)) for x in plot_yvals]
+            plot_yvals_step = (abs(self._globalmax(plot_yvals) - self._globalmin(plot_yvals)) /
+                               len(plot_yvals))
             # plot_yvals_step = plot_yvals[1]-plot_yvals[0]
 
         if plot_zrange is not None:
