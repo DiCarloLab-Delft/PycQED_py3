@@ -78,12 +78,11 @@ class FluxFrequency(ba.BaseDataAnalysis):
             'freq': 'frequency_values'
         }
         for k in temp:
-            self.proc_data_dict[temp[k]] = [np.array(self.raw_data_dict[k][i], dtype=float) for i in
-                                            sorted_indices]
-        d = np.array(self.raw_data_dict['datetime'], dtype=datetime.datetime)
-        self.proc_data_dict['datetime'] = d[sorted_indices]
+            self.proc_data_dict[temp[k]] = self._sort_by_axis0(self.raw_data_dict[k], sorted_indices)
+        self.proc_data_dict['datetime'] = self._sort_by_axis0(self.raw_data_dict['datetime'], sorted_indices,
+                                                              type=datetime.datetime)
         # Do we have negative angles?
-        negative_angles = np.min([np.min(i) for i in self.proc_data_dict['phase_values']]) < 0
+        negative_angles = self._globalmin(self.proc_data_dict['phase_values']) < 0
         if negative_angles:
             tpi = np.pi
         else:
@@ -230,8 +229,8 @@ class FluxFrequency(ba.BaseDataAnalysis):
                     'ylabel': r'Frequency',
                     'yunit': 'Hz',
                     # 'zrange': [smoothed_amplitude_values.min(), smoothed_amplitude_values.max()],
-                    'xrange': [np.min([np.min(xi) for xi in x]), np.max([np.max(xi) for xi in x])],
-                    'yrange': [np.min([np.min(xi) for xi in y]), np.max([np.max(xi) for xi in y])],
+                    'xrange': [self._globalmin(x), self._globalmax(x)],
+                    'yrange': [self._globalmin(y), self._globalmax(y)],
                     'plotsize': self.options_dict.get('plotsize', None),
                     'cmap': self.options_dict.get('cmap', 'YlGn_r'),
                     'plot_transpose': self.options_dict.get('plot_transpose', False),
@@ -285,7 +284,7 @@ class FluxFrequency(ba.BaseDataAnalysis):
 
             if self.options_dict.get('print_fit_result_plot', True):
                 dac_fit_text = ''
-                #if ext or self.is_spectroscopy:
+                # if ext or self.is_spectroscopy:
                 dac_fit_text += '$E_C/2 \pi = %.2f(\pm %.3f)$ MHz\n' % (
                     self.fit_dicts['E_C'] * 1e-6, self.fit_dicts['E_C_std'] * 1e-6)
                 dac_fit_text += '$E_J/\hbar = %.2f$ GHz\n' % (

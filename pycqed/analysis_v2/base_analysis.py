@@ -955,7 +955,7 @@ class BaseDataAnalysis(object):
             plot_xvals_step = (abs(np.max(plot_xvals) - np.min(plot_xvals)) /
                                len(plot_xvals))
             plot_yvals_step = [(abs(np.max(x) - np.min(x)) /
-                               len(x)) for x in plot_yvals]
+                                len(x)) for x in plot_yvals]
             # plot_yvals_step = plot_yvals[1]-plot_yvals[0]
 
         if plot_zrange is not None:
@@ -1179,6 +1179,38 @@ class BaseDataAnalysis(object):
         """
         pfunc = getattr(axs, pdict.get('func'))
         pfunc(**pdict['plot_kws'])
+
+    @staticmethod
+    def _sort_by_axis0(array, sorted_indices, type=None):
+        '''
+        Sorts the array (possibly a list of unequally long lists) by a list of indicies
+        :param array: array (possibly a list of unequally long lists)
+        :param sorted_indices:  list of indicies
+        :param type: the datatype of the contained values
+        :return: Sorted array
+        '''
+        if type is None:
+            return [np.array(array[i]) for i in sorted_indices]
+        else:
+            return [np.array(array[i], dtype=type) for i in sorted_indices]
+
+    @staticmethod
+    def _globalmin(array):
+        '''
+        Gives the global minimum of an array (possibly a list of unequally long lists)
+        :param array: array (possibly a list of unequally long lists)
+        :return: Global minimum
+        '''
+        return np.min([np.min(v) for v in array])
+
+    @staticmethod
+    def _globalmax(array):
+        '''
+        Gives the global maximum of an array (possibly a list of unequally long lists)
+        :param array: array (possibly a list of unequally long lists)
+        :return: Global maximum
+        '''
+        return np.max([np.max(v) for v in array])
 
 
 def plot_scatter_errorbar(self, ax_id, xdata, ydata, xerr=None, yerr=None, pdict=None):
