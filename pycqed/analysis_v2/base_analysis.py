@@ -1219,6 +1219,7 @@ def plot_scatter_errorbar(self, ax_id, xdata, ydata, xerr=None, yerr=None, pdict
     pds = {
         'ax_id': ax_id,
         'plotfn': self.plot_line,
+        'zorder': 10,
         'xvals': xdata,
         'yvals': ydata,
         'marker': 'x',
@@ -1259,6 +1260,7 @@ def plot_scatter_errorbar_fit(self, ax_id, xdata, ydata, fitfunc, xerr=None, yer
 
     pdf = {
         'ax_id': ax_id,
+        'zorder': 5,
         'plotfn': self.plot_line,
         'xvals': xdata_fit,
         'yvals': ydata_fit,

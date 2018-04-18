@@ -557,7 +557,7 @@ def arc_guess(freq, dac, dd=0.1):
     p = round(max(dd * len(dac), 1))
     f_small = np.average(np.sort(freq)[:p]) + np.std(np.sort(freq)[:p])
     f_big = np.average(np.sort(freq)[-p:]) - np.std(np.sort(freq)[-p:])
-    print(f_small * 1e-9, f_big * 1e-9)
+    #print(f_small * 1e-9, f_big * 1e-9)
 
     fmax = np.max(freq)
     fmin = np.min(freq)

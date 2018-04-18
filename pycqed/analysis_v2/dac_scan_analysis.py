@@ -154,8 +154,7 @@ class FluxFrequency(ba.BaseDataAnalysis):
         else:
             if f_q is None and self.verbose:
                 print('Specify qubit_freq in the options_dict to obtain a better fit!')
-
-            # Todo: provide alternative fit?
+                # Todo: provide alternative fit?
             fitmod = lmfit.Model(Resonator_dac_to_freq)
             fitmod.guess = Resonator_dac_arch_guess.__get__(fitmod, fitmod.__class__)
             fitmod.guess(freq=freq_vals, dac_voltage=dac_vals, f_max_qubit=f_q)
@@ -221,6 +220,7 @@ class FluxFrequency(ba.BaseDataAnalysis):
             s = 'Resonator'
 
         twoDPlot = {'plotfn': self.plot_colorx,
+                    'zorder': 0,
                     'xvals': x,
                     'yvals': y,
                     'title': 'Flux Current ' + s + ' Sweep',
@@ -238,6 +238,7 @@ class FluxFrequency(ba.BaseDataAnalysis):
 
         scatter = {
             'plotfn': self.plot_line,
+            'zorder': 5,
             'xvals': self.proc_data_dict['dac_values'],
             'yvals': self.proc_data_dict['fit_frequencies'],
             'marker': 'x',
@@ -248,6 +249,7 @@ class FluxFrequency(ba.BaseDataAnalysis):
             fit_result = self.fit_result['dac_arc']
             fit = {
                 'plotfn': self.plot_fit,
+                'zorder': 10,
                 'fit_res': fit_result,
                 'xvals': self.proc_data_dict['dac_values'] * cm,
                 'yvals': self.proc_data_dict['fit_frequencies'],
@@ -273,9 +275,10 @@ class FluxFrequency(ba.BaseDataAnalysis):
             td['ax_id'] = ax
             self.plot_dicts[ax] = td
 
-            sc = deepcopy(scatter)
-            sc['ax_id'] = ax
-            self.plot_dicts[ax + '_scatter'] = sc
+            if self.options_dict.get('show_fitted_peaks', True):
+                sc = deepcopy(scatter)
+                sc['ax_id'] = ax
+                self.plot_dicts[ax + '_scatter'] = sc
 
             if self.do_fitting:
                 f = deepcopy(fit)
