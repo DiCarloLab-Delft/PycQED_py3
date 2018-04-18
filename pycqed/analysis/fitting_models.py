@@ -129,7 +129,7 @@ def Resonator_dac_to_freq(dac_voltage, f_max_qubit, f_0_res,
                                    asymmetry=asymmetry)
     delta_qr = (qubit_freq - f_0_res)
     lamb_shift = (coupling ** 2 / delta_qr)
-    resonator_freq = f_0_res + lamb_shift
+    resonator_freq = f_0_res - lamb_shift
 
     return resonator_freq
 
@@ -531,31 +531,109 @@ def exp_dec_guess(model, data, t):
     return params
 
 
-def Resonator_dac_arch_guess(model, freq, dac_voltage):
+def group_consecutives(vals, step=1):
+    """Return list of consecutive lists of numbers from vals (number list)."""
+    run = []
+    result = [run]
+    expect = None
+    for v in vals:
+        if (v == expect) or (expect is None):
+            run.append(v)
+        else:
+            run = [v]
+            result.append(run)
+        expect = v + step
+    return result
+
+
+def arc_guess(freq, dac, dd=0.1):
+    '''
+    Expects the dac values to be sorted!
+    :param freq:
+    :param dac:
+    :param dd:
+    :return:
+    '''
+    p = round(max(dd * len(dac), 1))
+    f_small = np.average(np.sort(freq)[:p]) + np.std(np.sort(freq)[:p])
+    f_big = np.average(np.sort(freq)[-p:]) - np.std(np.sort(freq)[-p:])
+    print(f_small * 1e-9, f_big * 1e-9)
+
     fmax = np.max(freq)
-    dacs_ss = dac_voltage[np.where(freq >= 0.99 * fmax)]
-    dac_ss = dac_voltage[np.argmin(np.abs(dacs_ss))]
-    model.set_param_hint('f_0_res', value=fmax, min=0.4 * fmax, max=2.1 * fmax)
-    model.set_param_hint('f_max_qubit', value=fmax-200e6, min=3e9, max=8.5e9)
-    model.set_param_hint('dac_sweet_spot', value=dac_ss, min=-0.5, max=0.5)
-    model.set_param_hint('V_per_phi0', value=0.005, min=0.0005, max=10)
-    model.set_param_hint('asymmetry', value=0)
-    model.set_param_hint('coupling', value=2e6, min=0.05e6, max=80e6)
-    model.set_param_hint('E_c', value=260e6, min=100e6, max=400e6)
+    fmin = np.min(freq)
+
+    dacs_ss = np.where(freq >= f_big)[0]
+    dacs_as = np.where(freq <= f_small)[0]
+
+    dacs_ss_groups = group_consecutives(vals=dacs_ss, step=1)
+    dacs_as_groups = group_consecutives(vals=dacs_as, step=1)
+
+    dacs_ss_single = []
+    for g in dacs_ss_groups:
+        ind = g[np.argmax(freq[g])]
+        # ind = int(round(np.average(g)))
+        dacs_ss_single.append(ind)
+
+    dac_ss_group_index = np.argmin(np.abs(dac[dacs_ss_single]))
+    dac_ss_index = dacs_ss_single[dac_ss_group_index]
+    min_left = 0
+    min_right = len(dac) - 1
+    dacs_as_single = []
+    for g in dacs_as_groups:
+        if 0 in g:
+            ind = 0
+        elif len(dac) - 1 in g:
+            ind = len(dac) - 1
+        else:
+            ind = int(round(np.average(g)))
+
+        if ind < dac_ss_index:
+            min_left = max(ind, min_left)
+        elif ind > dac_ss_index:
+            min_right = min(ind, min_right)
+        dacs_as_single.append(ind)
+    # print('maxs', dacs_ss_single)
+    # print('mins', dacs_as_single)
+    arc_len = (dac[min_right] - dac[min_left])
+
+    # print('%d to %d = %.5f' % (min_left, min_right, arc_len))
+    if min_left == 0 or min_right == len(dac) - 1:
+        arc_len *= 2
+    elif len(dacs_ss_groups) > 1:
+        arc_len = np.average(dac[dacs_ss_single[1:]] - dac[dacs_ss_single[:-1]])
+
+    return fmax, fmin, dac[dac_ss_index], arc_len
+
+
+def Resonator_dac_arch_guess(model, freq, dac_voltage, f_max_qubit: float = None, E_c: float = None):
+    fmax, fmin, dac_ss, period = arc_guess(freq=freq, dac=dac_voltage)
+    coup_guess = 15e6
+
+    # todo make better f_res guess
+    f_res = np.mean(freq)  # - (coup_guess ** 2 / (f_max_qubit - fmax))
+    f_max_qubit_vary = f_max_qubit is None
+    f_max_qubit = f_max_qubit or f_res - 500e6
+
+    model.set_param_hint('f_0_res', value=f_res, min=f_res / 2, max=2 * f_res)
+    model.set_param_hint('f_max_qubit', value=f_max_qubit, min=3e9, max=8.5e9, vary=f_max_qubit_vary)
+    model.set_param_hint('dac_sweet_spot', value=dac_ss, min=(dac_ss - 0.005) / 2, max=2 * (dac_ss + 0.005))
+    model.set_param_hint('V_per_phi0', value=period, min=period / 3, max=5 * period)
+    model.set_param_hint('asymmetry', value=0, max=1, min=-1)
+    model.set_param_hint('coupling', value=coup_guess, min=1e6, max=80e6)
+    E_c = E_c or 260e6
+    model.set_param_hint('E_c', value=E_c, min=50e6, max=400e6)
 
     params = model.make_params()
     return params
 
 
 def Qubit_dac_arch_guess(model, freq, dac_voltage):
-    fmax = np.max(freq)
-    dacs_ss = dac_voltage[np.where(freq >= 0.99 * fmax)]
-    dac_ss = dac_voltage[np.argmin(np.abs(dacs_ss))]
-    model.set_param_hint('f_max', value=fmax, min=0.8 * fmax, max=1.2 * fmax)
-    model.set_param_hint('dac_sweet_spot', value=dac_ss, min=-0.5, max=0.5)
-    model.set_param_hint('V_per_phi0', value=0.04, min=0.001, max=100)
-    model.set_param_hint('asymmetry', value=0)
-    model.set_param_hint('E_c', value=260e6, min=100e6, max=400e6)
+    fmax, fmin, dac_ss, period = arc_guess(freq=freq, dac=dac_voltage)
+    model.set_param_hint('f_max', value=fmax, min=0.7 * fmax, max=1.3 * fmax)
+    model.set_param_hint('dac_sweet_spot', value=dac_ss, min=(dac_ss - 0.005) / 2, max=2 * (dac_ss + 0.005))
+    model.set_param_hint('V_per_phi0', value=period, min=period / 3, max=5 * period)
+    model.set_param_hint('asymmetry', value=0, max=1, min=-1)
+    model.set_param_hint('E_c', value=260e6, min=50e6, max=400e6)
 
     params = model.make_params()
     return params
