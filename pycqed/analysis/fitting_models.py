@@ -557,7 +557,7 @@ def arc_guess(freq, dac, dd=0.1):
     p = round(max(dd * len(dac), 1))
     f_small = np.average(np.sort(freq)[:p]) + np.std(np.sort(freq)[:p])
     f_big = np.average(np.sort(freq)[-p:]) - np.std(np.sort(freq)[-p:])
-    print(f_small * 1e-9, f_big * 1e-9)
+    #print(f_small * 1e-9, f_big * 1e-9)
 
     fmax = np.max(freq)
     fmin = np.min(freq)
@@ -617,7 +617,7 @@ def Resonator_dac_arch_guess(model, freq, dac_voltage, f_max_qubit: float = None
     model.set_param_hint('f_0_res', value=f_res, min=f_res / 2, max=2 * f_res)
     model.set_param_hint('f_max_qubit', value=f_max_qubit, min=3e9, max=8.5e9, vary=f_max_qubit_vary)
     model.set_param_hint('dac_sweet_spot', value=dac_ss, min=(dac_ss - 0.005) / 2, max=2 * (dac_ss + 0.005))
-    model.set_param_hint('V_per_phi0', value=period, min=period / 3, max=5 * period)
+    model.set_param_hint('V_per_phi0', value=period, min=(period - 0.005) / 3, max=5 * (period + 0.005))
     model.set_param_hint('asymmetry', value=0, max=1, min=-1)
     model.set_param_hint('coupling', value=coup_guess, min=1e6, max=80e6)
     E_c = E_c or 260e6
@@ -631,7 +631,7 @@ def Qubit_dac_arch_guess(model, freq, dac_voltage):
     fmax, fmin, dac_ss, period = arc_guess(freq=freq, dac=dac_voltage)
     model.set_param_hint('f_max', value=fmax, min=0.7 * fmax, max=1.3 * fmax)
     model.set_param_hint('dac_sweet_spot', value=dac_ss, min=(dac_ss - 0.005) / 2, max=2 * (dac_ss + 0.005))
-    model.set_param_hint('V_per_phi0', value=period, min=period / 3, max=5 * period)
+    model.set_param_hint('V_per_phi0', value=period, min=(period - 0.005) / 3, max=5 * (period + 0.005))
     model.set_param_hint('asymmetry', value=0, max=1, min=-1)
     model.set_param_hint('E_c', value=260e6, min=50e6, max=400e6)
 
