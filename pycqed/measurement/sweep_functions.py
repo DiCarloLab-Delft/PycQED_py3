@@ -710,11 +710,11 @@ class QWG_lutman_par(Soft_Sweep):
         self.LutMan_parameter = LutMan_parameter
 
     def set_parameter(self, val):
-        self.LutMan.QWG.get_instr().stop()
+        self.LutMan.AWG.get_instr().stop()
         self.LutMan_parameter.set(val)
-        self.LutMan.load_pulses_onto_AWG_lookuptable(regenerate_pulses=True)
-        self.LutMan.QWG.get_instr().start()
-        self.LutMan.QWG.get_instr().getOperationComplete()
+        self.LutMan.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
+        self.LutMan.AWG.get_instr().start()
+        self.LutMan.AWG.get_instr().getOperationComplete()
 
 
 class QWG_flux_amp(Soft_Sweep):
@@ -1092,3 +1092,35 @@ class FLsweep(Soft_Sweep):
                 awg.configure_awg_from_string(0, awg_hack_program)
             awg.configure_codeword_protocol()
             awg.start()
+
+
+class FLsweep_QWG(Soft_Sweep):
+    """
+    Special sweep function for QWG flux pulses.
+    """
+    def __init__(self, lm, par, waveform_name, realtime_loading=True,
+                 other_waveform=None, **kw):
+        super().__init__(**kw)
+        self.lm = lm
+        self.par = par
+        self.waveform_name = waveform_name
+        self.parameter_name = par.name
+        self.unit = par.unit
+        self.name = par.name
+        self.realtime_loading = realtime_loading
+        self.other_waveform = other_waveform
+
+    def prepare(self):
+        awg = self.lm.AWG.get_instr()
+        awg.stop()
+        self.lm.load_waveform_onto_AWG_lookuptable(
+            self.waveform_name, regenerate_waveforms=True)
+        awg.start()
+
+    def set_parameter(self, val):
+        self.par(val)
+        awg = self.lm.AWG.get_instr()
+        awg.stop()
+        self.lm.load_waveform_onto_AWG_lookuptable(
+            self.waveform_name, regenerate_waveforms=True)
+        awg.start()

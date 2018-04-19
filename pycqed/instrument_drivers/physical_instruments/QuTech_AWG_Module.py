@@ -136,6 +136,7 @@ class QuTech_AWG_Module(SCPI):
             dac_temperature_cmd = 'STATus:DAC{}:TEMperature'.format(ch)
             gain_adjust_cmd = 'DAC{}:GAIn:DRIFt:ADJust'.format(ch)
             dac_digital_value_cmd = 'DAC{}:DIGitalvalue'.format(ch)
+
             # Set channel first to ensure sensible sorting of pars
             # Compatibility: 5014, QWG
             self.add_parameter('ch{}_state'.format(ch),
@@ -178,7 +179,6 @@ class QuTech_AWG_Module(SCPI):
                                docstring='Reads the temperature of a DAC.\n' \
                                  +'Temperature measurement interval is 10 seconds\n' \
                                  +'Return:\n     float with temperature in Celsius')
-
             self.add_parameter('output{}_voltage'.format(ch),
                                unit='V',
                                label=('Channel {} voltage output').format(ch),

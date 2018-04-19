@@ -154,7 +154,7 @@ def two_qubit_off_on(q0: int, q1: int, platf_cfg: str):
     return p
 
 
-def two_qubit_tomo_cardinal(cardinal: int, q0: int, q1: int, platf_cfg: str):
+def two_qubit_tomo_cardinal(q0: int, q1: int, cardinal: int,  platf_cfg: str):
     '''
     Cardinal tomography for two qubits.
     Args:
@@ -195,7 +195,7 @@ def two_qubit_tomo_cardinal(cardinal: int, q0: int, q1: int, platf_cfg: str):
     # every calibration point is repeated 7 times. This is copied from the
     # script for Tektronix driven qubits. I do not know if this repetition
     # is important or even necessary here.
-    p = add_two_q_cal_points(p, platf=platf, q0=0, q1=1, reps_per_cal_pt=7)
+    p = add_two_q_cal_points(p, platf=platf, q0=q1, q1=q0, reps_per_cal_pt=7)
     with suppress_stdout():
         p.compile()
     # attribute is added to program to help finding the output files
@@ -505,7 +505,7 @@ def Chevron_hack(qubit_idx: int, qubit_idx_spec,
 
 
 def Chevron(qubit_idx: int, qubit_idx_spec: int,
-            buffer_time, buffer_time2, platf_cfg: str):
+            buffer_time, buffer_time2, flux_cw: int, platf_cfg: str):
     """
     Writes output files to the directory specified in openql.
     Output directory is set as an attribute to the program for convenience.
@@ -527,13 +527,15 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int,
 
     buffer_nanoseconds = int(round(buffer_time/1e-9))
     buffer_nanoseconds2 = int(round(buffer_time2/1e-9))
+    if flux_cw is None:
+        flux_cw = 2
 
     k = Kernel("Chevron", p=platf)
     k.prepz(qubit_idx)
     k.gate('rx90', qubit_idx_spec)
     k.gate('rx180', qubit_idx)
     k.gate("wait", [qubit_idx], buffer_nanoseconds)
-    k.gate('fl_cw_02', 2, 0)
+    k.gate('fl_cw_{:02}'.format(flux_cw), 2, 0)
     k.gate('wait', [qubit_idx], buffer_nanoseconds2)
     k.gate('rx180', qubit_idx)
     k.measure(qubit_idx)
@@ -1253,4 +1255,160 @@ def add_two_q_cal_points(p, platf, q0: int, q1: int,
         kernel_list.append(k)
         p.add_kernel(k)
 
+    return p
+
+
+def Chevron_first_manifold(qubit_idx: int, qubit_idx_spec: int,
+            buffer_time, buffer_time2, flux_cw: int, platf_cfg: str):
+    """
+    Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
+
+    Input pars:
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        qubit_idx_spec: int specifying the spectator qubit
+        buffer_time   :
+        buffer_time2  :
+
+        platf_cfg:      filename of the platform config file
+    Returns:
+        p:              OpenQL Program object containing
+
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="Chevron", nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    buffer_nanoseconds = int(round(buffer_time/1e-9))
+    buffer_nanoseconds2 = int(round(buffer_time2/1e-9))
+    if flux_cw is None:
+        flux_cw = 2
+
+    k = Kernel("Chevron", p=platf)
+    k.prepz(qubit_idx)
+    k.gate('rx180', qubit_idx)
+    k.gate("wait", [qubit_idx], buffer_nanoseconds)
+    k.gate('fl_cw_{:02}'.format(flux_cw), 2, 0)
+    k.gate('wait', [qubit_idx], buffer_nanoseconds2)
+    k.measure(qubit_idx)
+    k.measure(qubit_idx_spec)
+    k.gate("wait", [qubit_idx, qubit_idx_spec], 0)
+    p.add_kernel(k)
+
+    with suppress_stdout():
+        p.compile()
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
+
+def partial_tomography_cardinal(q0: int, q1: int, cardinal: int, platf_cfg: str,
+                       precompiled_flux: bool=True,
+                       cal_points: bool=True, second_CZ_delay: int=260,
+                       CZ_duration: int=260,
+                       add_echo_pulses: bool=False):
+    """
+    Tomography sequence for Grover's algorithm.
+
+        cardinal: int denoting cardinal state prepared.
+    """
+
+    if not precompiled_flux:
+        raise NotImplementedError('Currently only precompiled flux pulses '
+                                  'are supported.')
+
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="partial_tomography_cardinal_seq",
+                nqubits=platf.get_qubit_number(), p=platf)
+
+    cardinal_gates = ['i', 'rx180', 'ry90', 'rym90', 'rx90', 'rxm90']
+
+    if (cardinal>35 or cardinal<0):
+        raise ValueError('cardinal must be in [0, 35]')
+
+    idx_p0 = cardinal % 6
+    idx_p1 = ((cardinal - idx_p0)//6) % 6
+    #cardinal_gates[]
+    #k.gate(string_of_the_gate, integer_from_qubit)
+    tomo_gates = [('i','i'),('i','rx180'),('rx180','i'),('rx180','rx180'),
+        ('ry90','ry90'),('rym90','rym90'),('rx90','rx90'),('rxm90','rxm90')]
+
+    for gates in tomo_gates:
+        #strings denoting the gates
+        SP0 = cardinal_gates[idx_p0]
+        SP1 = cardinal_gates[idx_p1]
+        t_q0 = gates[1]
+        t_q1 = gates[0]
+        k = Kernel('PT_{}_tomo_{}_{}'.format(cardinal, idx_p0, idx_p1),
+                   p=platf)
+
+        k.prepz(q0)
+        k.prepz(q1)
+
+        # Cardinal state preparation
+        k.gate(SP0, q0)
+        k.gate(SP1, q1)
+        # tomo pulses
+        #to be taken from list of tuples
+        k.gate(t_q1, q0)
+        k.gate(t_q0, q1)
+
+        k.measure(q0)
+        k.measure(q1)
+        k.gate('wait', [2, 0], 0)
+        p.add_kernel(k)
+
+    p = add_two_q_cal_points(p, platf=platf, q0=q0, q1=q1, reps_per_cal_pt=2)
+    with suppress_stdout():
+        p.compile()
+
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
+
+def two_qubit_VQE(q0: int, q1: int, platf_cfg: str):
+    '''
+    VQE tomography for two qubits.
+    Args:
+        cardinal        (int) : index of prep gate
+        q0, q1          (int) : target qubits for the sequence
+    '''
+    tomo_pulses = ['i', 'rx180', 'ry90', 'rym90', 'rx90', 'rxm90']
+    tomo_list_q0 = tomo_pulses
+    tomo_list_q1 = tomo_pulses
+
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="VQE_full_tomo",
+                nqubits=platf.get_qubit_number(), p=platf)
+
+    # Tomography pulses
+    i = 0
+    for p_q1 in tomo_list_q1:
+        for p_q0 in tomo_list_q0:
+            i += 1
+            kernel_name = '{}_{}_{}'.format(i, p_q0, p_q1)
+            k = Kernel(kernel_name, p=platf)
+            k.prepz(q0)
+            k.prepz(q1)
+            k.gate('ry180', q0) #Y180 gate without compilation
+            k.gate('i', q0) #Y180 gate without compilation
+            k.gate("wait", [q1], 40)
+            k.gate('fl_cw_02', 2, 0)
+            k.gate("wait", [q1], 40)
+            k.gate(p_q0, q0) #compiled z gate+pre_rotation
+            k.gate(p_q1, q1) #pre_rotation
+            k.measure(q0)
+            k.measure(q1)
+            p.add_kernel(k)
+    # every calibration point is repeated 7 times. This is copied from the
+    # script for Tektronix driven qubits. I do not know if this repetition
+    # is important or even necessary here.
+    p = add_two_q_cal_points(p, platf=platf, q0=q1, q1=q0, reps_per_cal_pt=7)
+    with suppress_stdout():
+        p.compile()
+    # attribute is added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
     return p

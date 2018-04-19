@@ -17,7 +17,7 @@ from pycqed.measurement.openql_experiments.multi_qubit_oql import \
     add_two_q_cal_points
 
 from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
-from pycqed.measurement.openql_experiments import openql_experiments as oqh
+from pycqed.measurement.openql_experiments import openql_helpers as oqh
 from pycqed.measurement.randomized_benchmarking.two_qubit_clifford_group \
     import SingleQubitClifford, TwoQubitClifford
 base_qasm_path = join(dirname(__file__), 'qasm_files')
@@ -181,9 +181,12 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
 
         if cal_points:
             if number_of_qubits == 1:
-                p = add_single_qubit_cal_points(p, platf=platf, qubit_idx=qubits[0])
+                p = add_single_qubit_cal_points(p, platf=platf,
+                                                qubit_idx=qubits[0])
             elif number_of_qubits == 2:
-                p = add_two_q_cal_points(p, platf=platf, q0=qubits[0], q1=qubits[1])
+                p = add_two_q_cal_points(p, platf=platf,
+                                         q0=qubits[0],
+                                         q1=qubits[1])
     with suppress_stdout():
         p.compile(verbose=False)
 

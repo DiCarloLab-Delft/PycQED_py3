@@ -204,16 +204,20 @@ class DeviceCCL(Instrument):
         # fl_lutman.load_waveforms_onto_awg_lookuptable()
         fl_lutman.load_waveforms_onto_AWG_lookuptable()
         awg = fl_lutman.AWG.get_instr()
-        # awg.upload_codeword_program(awgs=[0])
-
-        awg_hack_program_cz = """
-        while (1) {
-          waitDIOTrigger();
-          playWave("dev8005_wave_ch1_cw001", "dev8005_wave_ch2_cw001");
-        }
-        """
-        awg.configure_awg_from_string(0, awg_hack_program_cz)
-        awg.configure_codeword_protocol()
+        if awg.__class__.__name__ == 'QuTech_AWG_Module':
+            using_QWG = True
+        else:
+            using_QWG = False
+        if not using_QWG:
+          # awg.upload_codeword_program(awgs=[0])
+          awg_hack_program_cz = """
+          while (1) {
+            waitDIOTrigger();
+            playWave("dev8005_wave_ch1_cw001", "dev8005_wave_ch2_cw001");
+          }
+          """
+          awg.configure_awg_from_string(0, awg_hack_program_cz)
+          awg.configure_codeword_protocol()
 
         awg.start()
 
@@ -255,6 +259,8 @@ class DeviceCCL(Instrument):
 
             # set RO modulation to use common LO frequency
             qb.ro_freq_mod(qb.ro_freq() - self.ro_lo_freq())
+            qb._prep_ro_pulse(upload=False)
+        qb._prep_ro_pulse(upload=True)
 
     def _prep_ro_integration_weights(self):
         """
@@ -556,7 +562,7 @@ class DeviceCCL(Instrument):
             qb._prep_td_sources()
             qb._prep_mw_pulses()
 
-        self._prep_td_configure_VSM()
+        # self._prep_td_configure_VSM()
 
     ########################################################
     # Measurement methods
@@ -680,7 +686,7 @@ class DeviceCCL(Instrument):
                                nr_shots: int=4088*4,
                                prepare_for_timedomain: bool =True,
                                result_logging_mode='lin_trans',
-                               initialize: bool=True,
+                               initialize: bool=False,
                                analyze=True,
                                MC=None):
         if prepare_for_timedomain:
@@ -755,33 +761,45 @@ class DeviceCCL(Instrument):
         q0idx = self.find_instrument(q0).cfg_qubit_nr()
         q_specidx = self.find_instrument(q_spec).cfg_qubit_nr()
 
+        fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
+
+        if waveform_name == 'square':
+            length_par = fl_lutman.sq_length
+        elif waveform_name == 'cz_z':
+            length_par = fl_lutman.cz_length,
+        else:
+            raise ValueError('Waveform shape not understood')
+
+
+        awg = fl_lutman.AWG.get_instr()
+        using_QWG = (awg.__class__.__name__ == 'QuTech_AWG_Module')
+
+        if using_QWG:
+            awg_ch = fl_lutman.cfg_awg_channel()
+            amp_par = awg.parameters['ch{}_amp'.format(awg_ch)]
+            sw = swf.FLsweep_QWG(fl_lutman, length_par,
+                                 realtime_loading=False,
+                                 waveform_name=waveform_name)
+            flux_cw = 0
+
+        else:
+            awg_ch = fl_lutman.cfg_awg_channel()-1  # -1 is to account for starting at 1
+            ch_pair = awg_ch % 2
+            awg_nr = awg_ch//2
+
+            amp_par = awg.parameters['awgs_{}_outputs_{}_amplitude'.format(
+                awg_nr, ch_pair)]
+            sw = swf.FLsweep(fl_lutman, length_par,
+                             realtime_loading=False,
+                             waveform_name=waveform_name)
+            flux_cw = 2
         # buffer times are hardcoded for now FIXME!
         p = mqo.Chevron(q0idx, q_specidx, buffer_time=100e-9,
-                        buffer_time2=1750e-9,
+                        buffer_time2=200e-9,
+                        flux_cw=flux_cw,
                         platf_cfg=self.cfg_openql_platform_fn())
         self.instr_CC.get_instr().eqasm_program(p.filename)
         self.instr_CC.get_instr().start()
-
-        fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
-
-        awg = fl_lutman.AWG.get_instr()
-        awg_ch = fl_lutman.cfg_awg_channel()-1  # -1 is to account for starting at 1
-        ch_pair = awg_ch % 2
-        awg_nr = awg_ch//2
-
-        amp_par = awg.parameters['awgs_{}_outputs_{}_amplitude'.format(
-            awg_nr, ch_pair)]
-
-        if waveform_name == 'square':
-            sw = swf.FLsweep(fl_lutman, fl_lutman.sq_length,
-                             realtime_loading=False,
-                             waveform_name=waveform_name)
-        elif waveform_name == 'cz_z':
-            sw = swf.FLsweep(fl_lutman, fl_lutman.cz_length,
-                             realtime_loading=False,
-                             waveform_name=waveform_name)
-        else:
-            raise ValueError()
 
         d = self.get_correlation_detector(single_int_avg=True,
                                           seg_per_point=1)
@@ -862,7 +880,7 @@ class DeviceCCL(Instrument):
             q1.calibrate_optimal_weights(
                 analyze=True, verify=verify_optimal_weights)
 
-        self.measure_two_qubit_SSRO(q0.name, q1.name,
+        self.measure_two_qubit_SSRO([q1.name, q0.name],
                                     result_logging_mode='lin_trans')
 
         res_dict = mra.two_qubit_ssro_fidelity(
@@ -876,7 +894,9 @@ class DeviceCCL(Instrument):
         UHFQC.quex_trans_offset_weightfunction_1(V_offset_cor[1])
 
         # Does not work because axes are not normalized
-        UHFQC.upload_transformation_matrix(res_dict['mu_matrix_inv'])
+        matrix_normalized = res_dict['mu_matrix_inv']
+        matrix_rescaled = matrix_normalized/abs(matrix_normalized).max()
+        UHFQC.upload_transformation_matrix(matrix_rescaled)
 
         # a = self.check_mux_RO(update=update, update_threshold=update_threshold)
         return True
@@ -1072,3 +1092,4 @@ class DeviceCCL(Instrument):
 
         self._dag = dag
         return dag
+
