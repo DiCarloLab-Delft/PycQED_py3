@@ -21,7 +21,7 @@ class Base_RO_LutMan(Base_LutMan):
             raise NotImplementedError(
               'hardcoded for feedline 0 and 1 of Surface-7')
         #capping the resonator bit mapping in case a limited number of resonators is used
-        self._resonator_codeword_bit_mapping = self._resonator_codeword_bit_mapping[:self.num_res]
+        self._resonator_codeword_bit_mapping = self._resonator_codeword_bit_mapping[:self._num_res]
         super().__init__(name, **kw)
 
     def _add_waveform_parameters(self):
@@ -229,7 +229,7 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
                             I_waves[i], wave_dict[wavename][0])
                         Q_waves[i] = add_waves_different_length(
                             Q_waves[i], wave_dict[wavename][1])
-                    cases[i] += 2**self._resonator_codeword_bit_mapping.index[resonator]
+                    cases[i] += 2**self._resonator_codeword_bit_mapping.index(resonator)
 
             # clipping the waveform
             I_waves[i] = np.clip(I_waves[i],
