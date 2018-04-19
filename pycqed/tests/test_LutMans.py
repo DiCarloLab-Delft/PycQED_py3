@@ -8,6 +8,7 @@ from pycqed.measurement.waveform_control_CC import waveform as wf
 from pycqed.instrument_drivers.meta_instrument.LutMans.base_lutman import \
     get_redundant_codewords
 
+
 class Test_MW_LutMan(unittest.TestCase):
 
     @classmethod
@@ -212,9 +213,6 @@ class Test_Flux_LutMan(unittest.TestCase):
     def test_plot_cz_trajectory(self):
         self.fluxlutman.plot_cz_trajectory(show=False)
 
-    def test_generate_standard_flux_waveforms(self):
-        self.fluxlutman.generate_standard_waveforms()
-
     def test_standard_cz_waveform(self):
         self.fluxlutman.czd_double_sided(False)
         self.fluxlutman.generate_standard_waveforms()
@@ -302,7 +300,6 @@ class Test_Flux_LutMan(unittest.TestCase):
         recovered_amp = self.fluxlutman.detuning_to_amp(-5e9)
         self.assertAlmostEqual(recovered_amp, 0.082696256708720065)
 
-
         # Test negative branch of parabola
         test_amps = np.linspace(-0.1, -.5, 11)
         freqs = self.fluxlutman.amp_to_detuning(test_amps)
@@ -310,7 +307,33 @@ class Test_Flux_LutMan(unittest.TestCase):
             freqs, positive_branch=False)
         np.testing.assert_array_almost_equal(test_amps, recovered_amps)
 
+    def test_custom_wf(self):
+        self.fluxlutman.generate_standard_waveforms()
+        np.testing.assert_array_almost_equal(
+            self.fluxlutman._wave_dict['custom_wf'],
+            np.array([]))
 
+        # Tests if the custom wf is part of the default lutmap
+        self.fluxlutman.load_waveforms_onto_AWG_lookuptable()
+        self.assertIn('custom_wf', self.fluxlutman._wave_dict_dist)
+
+        x = np.arange(200)
+        y = np.cos(x)/20
+        self.fluxlutman.custom_wf(y)
+        self.fluxlutman.generate_standard_waveforms()
+        np.testing.assert_array_almost_equal(
+            self.fluxlutman._wave_dict['custom_wf'], y)
+
+        self.fluxlutman.custom_wf_length(30e-9)
+        self.fluxlutman.generate_standard_waveforms()
+        y_cut = np.cos(x)/20
+        cut_sample = 72  # 30ns * 2.4GSps
+        y_cut[cut_sample:] = 0
+        np.testing.assert_array_almost_equal(
+            self.fluxlutman._wave_dict['custom_wf'], y_cut)
+        # base waveform is not changed
+        np.testing.assert_array_almost_equal(
+            self.fluxlutman.custom_wf(), y)
 
     def test_generate_standard_flux_waveforms(self):
         self.fluxlutman.generate_standard_waveforms()
@@ -321,7 +344,6 @@ class Test_Flux_LutMan(unittest.TestCase):
 
     def test_generate_composite(self):
         self.fluxlutman.generate_standard_waveforms()
-        empty_flux_tuples = []
         gen_wf = self.fluxlutman._gen_composite_wf('cz_z', time_tuples=[])
         exp_wf = np.zeros(12000)  # 5us *2.4GSps
         np.testing.assert_array_almost_equal(gen_wf, exp_wf)
@@ -380,21 +402,22 @@ class Test_Flux_LutMan(unittest.TestCase):
             except KeyError:
                 pass
 
+
 class Test_LutMan_Utils(unittest.TestCase):
     def test_get_redundant_codewords(self):
         target_cw = 5
         red_cws_A = get_redundant_codewords(target_cw, 4, 0)
         for cw in red_cws_A:
             print(bin(cw))
-            self.assertEqual(cw&15, target_cw)
+            self.assertEqual(cw & 15, target_cw)
         self.assertEqual(len(red_cws_A), 2**4)
-
 
         red_cws_B = get_redundant_codewords(target_cw, 4, 4)
         for cw in red_cws_B:
             print(bin(cw))
-            self.assertEqual((cw&(256-16))>>4, target_cw)
+            self.assertEqual((cw & (256-16)) >> 4, target_cw)
         self.assertEqual(len(red_cws_B), 2**4)
+
 
 def dict_contained_in(subset, superset):
     if subset.items() <= superset.items():
