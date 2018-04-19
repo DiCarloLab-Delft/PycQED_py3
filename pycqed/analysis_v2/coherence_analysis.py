@@ -74,33 +74,30 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
 
     def extract_data(self):
         # load data
-        if not (hasattr(self, 'raw_data_dict')):
-            super().extract_data()
-            tau = np.array(self.raw_data_dict['tau'], dtype=float)
-            tau_std = np.array(self.raw_data_dict['tau_stderr'], dtype=float)
-            # sort data
+        super().extract_data()
+        tau = np.array(self.raw_data_dict['tau'], dtype=float)
+        tau_std = np.array(self.raw_data_dict['tau_stderr'], dtype=float)
+        # sort data
 
-            if self.plot_versus_dac:
-                dacs = np.array(self.raw_data_dict['dac'], dtype=float)
-                sorted_indices = dacs.argsort()
-                self.raw_data_dict['dac_sorted'] = dacs[sorted_indices]
-                self.raw_data_dict['dac_sorted_tau'] = tau[sorted_indices]
-                self.raw_data_dict['dac_sorted_tau_stderr'] = tau_std[sorted_indices]
-                if self.plot_versus_frequency:
-                    freqs = np.array(self.raw_data_dict['qfreq'], dtype=float)
-                    self.raw_data_dict['dac_sorted_freq'] = freqs[sorted_indices]
-
+        if self.plot_versus_dac:
+            dacs = np.array(self.raw_data_dict['dac'], dtype=float)
+            sorted_indices = dacs.argsort()
+            self.raw_data_dict['dac_sorted'] = dacs[sorted_indices]
+            self.raw_data_dict['dac_sorted_tau'] = tau[sorted_indices]
+            self.raw_data_dict['dac_sorted_tau_stderr'] = tau_std[sorted_indices]
             if self.plot_versus_frequency:
                 freqs = np.array(self.raw_data_dict['qfreq'], dtype=float)
-                sorted_indices = freqs.argsort()
-                self.raw_data_dict['freq_sorted'] = freqs[sorted_indices]
-                self.raw_data_dict['freq_sorted_tau'] = tau[sorted_indices]
-                self.raw_data_dict['freq_sorted_tau_stderr'] = tau_std[sorted_indices]
-                if self.plot_versus_dac:
-                    freqs = np.array(self.raw_data_dict['dac'], dtype=float)
-                    self.raw_data_dict['freq_sorted_dac'] = freqs[sorted_indices]
-        else:
-            print('Warning: don"t run extract_data twice!')
+                self.raw_data_dict['dac_sorted_freq'] = freqs[sorted_indices]
+
+        if self.plot_versus_frequency:
+            freqs = np.array(self.raw_data_dict['qfreq'], dtype=float)
+            sorted_indices = freqs.argsort()
+            self.raw_data_dict['freq_sorted'] = freqs[sorted_indices]
+            self.raw_data_dict['freq_sorted_tau'] = tau[sorted_indices]
+            self.raw_data_dict['freq_sorted_tau_stderr'] = tau_std[sorted_indices]
+            if self.plot_versus_dac:
+                freqs = np.array(self.raw_data_dict['dac'], dtype=float)
+                self.raw_data_dict['freq_sorted_dac'] = freqs[sorted_indices]
 
     def run_fitting(self):
         if hasattr(self, 'raw_data_dict'):

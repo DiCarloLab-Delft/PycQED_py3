@@ -237,9 +237,6 @@ class BaseDataAnalysis(object):
                 label=self.labels,
                 exact_label_match=self.exact_label_match)
 
-        if self.verbose:
-            print(len(self.timestamps), type(self.timestamps[0]))
-
         if len(np.ravel(self.timestamps)) < 1:
             raise ValueError(
                 "No timestamps in range! Check the labels and other filters.")
