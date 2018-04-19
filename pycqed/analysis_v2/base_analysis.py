@@ -1024,8 +1024,8 @@ class BaseDataAnalysis(object):
                 ymin = min(ymin_list)
                 ymax = max(ymax_list)
             else:
-                ymin = np.min(plot_yvals) - plot_yvals_step / 2.
-                ymax = np.max(plot_yvals) + plot_yvals_step / 2.
+                ymin = self._globalmin(plot_yvals) - plot_yvals_step / 2.
+                ymax = self._globalmax(plot_yvals) + plot_yvals_step / 2.
         else:
             ymin, ymax = plot_yrange
         if plot_transpose:
@@ -1178,18 +1178,18 @@ class BaseDataAnalysis(object):
         pfunc(**pdict['plot_kws'])
 
     @staticmethod
-    def _sort_by_axis0(array, sorted_indices, type=None):
+    def _sort_by_axis0(arr, sorted_indices, type=None):
         '''
         Sorts the array (possibly a list of unequally long lists) by a list of indicies
-        :param array: array (possibly a list of unequally long lists)
+        :param arr: array (possibly a list of unequally long lists)
         :param sorted_indices:  list of indicies
         :param type: the datatype of the contained values
         :return: Sorted array
         '''
         if type is None:
-            return [np.array(array[i]) for i in sorted_indices]
+            return [np.array(arr[i]) for i in sorted_indices]
         else:
-            return [np.array(array[i], dtype=type) for i in sorted_indices]
+            return [np.array(arr[i], dtype=type) for i in sorted_indices]
 
     @staticmethod
     def _globalmin(array):

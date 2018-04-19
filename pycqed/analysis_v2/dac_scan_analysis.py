@@ -79,8 +79,7 @@ class FluxFrequency(ba.BaseDataAnalysis):
         }
         for k in temp:
             self.proc_data_dict[temp[k]] = self._sort_by_axis0(self.raw_data_dict[k], sorted_indices)
-        self.proc_data_dict['datetime'] = self._sort_by_axis0(self.raw_data_dict['datetime'], sorted_indices,
-                                                              type=datetime.datetime)
+        self.proc_data_dict['datetime'] = [self.raw_data_dict['datetime'][i] for i in sorted_indices]
         # Do we have negative angles?
         negative_angles = self._globalmin(self.proc_data_dict['phase_values']) < 0
         if negative_angles:
@@ -229,8 +228,8 @@ class FluxFrequency(ba.BaseDataAnalysis):
                     'ylabel': r'Frequency',
                     'yunit': 'Hz',
                     # 'zrange': [smoothed_amplitude_values.min(), smoothed_amplitude_values.max()],
-                    'xrange': [self._globalmin(x), self._globalmax(x)],
-                    'yrange': [self._globalmin(y), self._globalmax(y)],
+                    # 'xrange': [self._globalmin(x), self._globalmax(x)],
+                    # 'yrange': [self._globalmin(y), self._globalmax(y)],
                     'plotsize': self.options_dict.get('plotsize', None),
                     'cmap': self.options_dict.get('cmap', 'YlGn_r'),
                     'plot_transpose': self.options_dict.get('plot_transpose', False),
