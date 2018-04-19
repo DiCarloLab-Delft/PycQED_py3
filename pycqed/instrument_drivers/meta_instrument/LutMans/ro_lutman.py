@@ -13,11 +13,11 @@ class Base_RO_LutMan(Base_LutMan):
             raise ValueError('At most 9 resonators can be read out.')
         self._num_res = num_res
         self._feedline_number = feedline_number
-        if self._feedline_number ==0: 
+        if self._feedline_number==0: 
             self._resonator_codeword_bit_mapping=[0,2,3,5,6]
-        elif self._feedline_number ==1: 
+        elif self._feedline_number==1: 
             self._resonator_codeword_bit_mapping=[1,4]
-        else: 
+        else:
             raise NotImplementedError(
               'hardcoded for feedline 0 and 1 of Surface-7')
         #capping the resonator bit mapping in case a limited number of resonators is used
