@@ -3010,11 +3010,14 @@ class SSRO_Analysis(MeasurementAnalysis):
                              channels=['I', 'Q'],
                              no_fits=False,
                              print_fit_results=False,
+                             pge=None, peg=None,
                              preselection=False,
                              n_bins: int=120, **kw):
 
         self.add_analysis_datagroup_to_file()
         self.no_fits = no_fits
+        self.pge = pge #fixed fraction of ground state in the excited state histogram (relaxation)
+        self.peg = peg #fixed fraction of excited state in the ground state hitogram (residual population)
         self.get_naming_and_values()
         # plotting histograms of the raw shots on I and Q axis
 
@@ -3373,7 +3376,10 @@ class SSRO_Analysis(MeasurementAnalysis):
         NormCdf2Model.set_param_hint('mu1', value=np.average(shots_I_1_rot))
         NormCdf2Model.set_param_hint(
             'sigma1', value=np.std(shots_I_1_rot), min=0)
-        NormCdf2Model.set_param_hint('frac1', value=0.9, min=0, max=1)
+        if self.pge==None:
+            NormCdf2Model.set_param_hint('frac1', value=0.9, min=0, max=1)
+        else:
+            NormCdf2Model.set_param_hint('frac1', value=1-self.pge, vary=False)
 
         # performing the double gaussfits of on 1 data
         params = NormCdf2Model.make_params()
@@ -3396,8 +3402,12 @@ class SSRO_Analysis(MeasurementAnalysis):
         NormCdf2Model.set_param_hint('mu1', value=mu1_1, vary=False)
         NormCdf2Model.set_param_hint(
             'sigma1', value=sigma1_1, min=0, vary=False)
-        NormCdf2Model.set_param_hint(
-            'frac1', value=0.025, min=0, max=1, vary=True)
+        if self.peg==None:
+            NormCdf2Model.set_param_hint(
+                'frac1', value=0.025, min=0, max=1, vary=True)
+        else:
+            NormCdf2Model.set_param_hint(
+                'frac1', value=self.peg,vary=False)
 
         params = NormCdf2Model.make_params()
         fit_res_double_0 = NormCdf2Model.fit(
@@ -4137,10 +4147,10 @@ class Ramsey_Analysis(TD_Analysis):
     Most kw parameters for Rabi_Analysis are also used here.
     """
 
-    def __init__(self, label='Ramsey', **kw):
+    def __init__(self, label='Ramsey', phase_sweep_only=False,**kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
-
+        self.phase_sweep_only = phase_sweep_only
         self.artificial_detuning = kw.pop('artificial_detuning',0)
         if self.artificial_detuning == 0:
             logging.warning('Artificial detuning is unknown. Defaults to %s MHz. '
@@ -4161,7 +4171,7 @@ class Ramsey_Analysis(TD_Analysis):
     def fit_Ramsey(self, x, y, **kw):
 
         print_fit_results = kw.pop('print_fit_results',False)
-        damped_osc_mod = fit_mods.ExpDampOscModel
+        damped_osc_mod = lmfit.Model(fit_mods.ExpDampOscFunc)
         average = np.mean(y)
 
         ft_of_data = np.fft.fft(y)
@@ -4172,45 +4182,58 @@ class Ramsey_Analysis(TD_Analysis):
         fft_axis_scaling = 1/(max_ramsey_delay)
         freq_est = fft_axis_scaling*index_of_fourier_maximum
         est_number_of_periods = index_of_fourier_maximum
-
-        if ((average > 0.7*max(y)) or
-                (est_number_of_periods < 2) or
-                est_number_of_periods > len(ft_of_data)/2.):
-            print('the trace is too short to find multiple periods')
-
-            if print_fit_results:
-                print('Setting frequency to 0 and ' +
-                      'fitting with decaying exponential.')
+        if self.phase_sweep_only:
             damped_osc_mod.set_param_hint('frequency',
-                                          value=freq_est,
+                                          value=1/360,
                                           vary=False)
             damped_osc_mod.set_param_hint('phase',
-                                          value=0,
+                                          value=0, vary=True)
+            damped_osc_mod.set_param_hint('amplitude',
+                                          value=0.5*(max(self.normalized_data_points)-min(self.normalized_data_points)),
+                                          min=0.0, max=4.0)
+            fixed_tau=1e9
+            damped_osc_mod.set_param_hint('tau',
+                                          value=fixed_tau,
                                           vary=False)
         else:
-            damped_osc_mod.set_param_hint('frequency',
-                                          value=freq_est,
-                                          vary=True,
-                                          min=(1/(100 *x[-1])),
-                                          max=(20/x[-1]))
+            if ((average > 0.7*max(y)) or
+                    (est_number_of_periods < 2) or
+                    est_number_of_periods > len(ft_of_data)/2.):
+                print('the trace is too short to find multiple periods')
 
-        if (np.average(y[:4]) >
-                np.average(y[4:8])):
-            phase_estimate = 0
-        else:
-            phase_estimate = np.pi
-        damped_osc_mod.set_param_hint('phase',
-                                          value=phase_estimate, vary=True)
+                if print_fit_results:
+                    print('Setting frequency to 0 and ' +
+                          'fitting with decaying exponential.')
+                damped_osc_mod.set_param_hint('frequency',
+                                              value=freq_est,
+                                              vary=False)
+                damped_osc_mod.set_param_hint('phase',
+                                              value=0,
+                                              vary=False)
+            else:
+                damped_osc_mod.set_param_hint('frequency',
+                                              value=freq_est,
+                                              vary=True,
+                                              min=(1/(100 *x[-1])),
+                                              max=(20/x[-1]))
 
-        amplitude_guess = 1
-        damped_osc_mod.set_param_hint('amplitude',
-                                      value=amplitude_guess,
-                                      min=0.4,
-                                      max=4.0)
-        damped_osc_mod.set_param_hint('tau',
-                                      value=x[1]*10,
-                                      min=x[1],
-                                      max=x[1]*1000)
+            if (np.average(y[:4]) >
+                    np.average(y[4:8])):
+                phase_estimate = 0
+            else:
+                phase_estimate = np.pi
+            damped_osc_mod.set_param_hint('phase',
+                                              value=phase_estimate, vary=True)
+
+            amplitude_guess = 1
+            damped_osc_mod.set_param_hint('amplitude',
+                                          value=amplitude_guess,
+                                          min=0.4,
+                                          max=4.0)
+            damped_osc_mod.set_param_hint('tau',
+                                          value=x[1]*10,
+                                          min=x[1],
+                                          max=x[1]*1000)
         damped_osc_mod.set_param_hint('exponential_offset',
                                       value=0.5,
                                       min=0.4,
@@ -4226,7 +4249,12 @@ class Ramsey_Analysis(TD_Analysis):
         fit_res = damped_osc_mod.fit(data=y,
                                      t=x,
                                      params=self.params)
-        if fit_res.chisqr > .35:
+        if self.phase_sweep_only:
+            chi_sqr_bound = 0
+        else:
+            chi_sqr_bound = 0.35
+
+        if fit_res.chisqr > chi_sqr_bound:
             logging.warning('Fit did not converge, varying phase')
             fit_res_lst = []
 
@@ -9395,3 +9423,80 @@ def SSB_demod(Ivals, Qvals, alpha=1, phi=0, I_o=0, Q_o=0, IF=10e6, predistort=Tr
     I = np.multiply(Ivals, cosI)-np.multiply(Qvals, sinI)
     Q = np.multiply(Ivals, sinI)+np.multiply(Qvals, cosI)
     return I, Q
+
+def fit_eta(timestamp_dephasing=None, timestamp_SNR=None, shift=None, label=None, dephasing_data=None):
+    #used to extract the quantum efficiency
+    if timestamp_dephasing==None:
+        data_file = MeasurementAnalysis(label='CLEAR_amp_sweep_ramsey', auto=True, TwoD=False)
+        timestamp_dephasing=data_file.timestamp_string
+    else:
+        data_file = MeasurementAnalysis(timestamp=timestamp_dephasing, auto=True, TwoD=False)
+        timestamp_dephasing=data_file.timestamp_string
+
+    temp = data_file.load_hdf5data()
+    data_file.get_naming_and_values()
+    clear_scaling_amp_dephasing = data_file.sweep_points
+    coherence = 2*data_file.measured_values[0]
+    if not(dephasing_data==None):
+        clear_scaling_amp_dephasing = dephasing_data[0,:]
+        coherence = 2*dephasing_data[1,:]
+
+
+    if timestamp_SNR==None:
+        if label==None:
+            data_file = MeasurementAnalysis(label='CLEAR_amp_sweep_SNR', auto=True, TwoD=False)
+            timestamp_SNR=data_file.timestamp_string
+        else:
+            data_file = MeasurementAnalysis(label=label, auto=True, TwoD=False)
+            timestamp_SNR=data_file.timestamp_string
+
+    else:
+        data_file = MeasurementAnalysis(timestamp=timestamp_SNR, auto=True, TwoD=False)
+        timestamp_SNR=data_file.timestamp_string
+
+    temp = data_file.load_hdf5data()
+    data_file.get_naming_and_values()
+    clear_scaling_amp_SNR = data_file.sweep_points
+    SNR = data_file.measured_values[0]
+
+    def gaussian(x, sigma, scale):
+        return scale * np.exp(-(x)**2/(2*sigma**2))
+
+    gmodel=fit_mods.lmfit.Model(gaussian)
+    coherence_fit = gmodel.fit(coherence, sigma=0.07, scale=0.9, x=clear_scaling_amp_dephasing)
+    def line(x, a):
+        return a*x
+
+    linemodel=fit_mods.lmfit.Model(line)
+    SNR_fit = linemodel.fit(SNR**2, x=clear_scaling_amp_SNR**2, a=1)
+
+    a=SNR_fit.params['a'].value
+    sigma=coherence_fit.params['sigma'].value
+    eta=a*sigma**2/4
+
+    #calculating uncertainty
+    a=SNR_fit.params['a'].value
+    u_a=SNR_fit.params['a'].stderr
+    sigma=coherence_fit.params['sigma'].value
+    u_sigma=coherence_fit.params['sigma'].stderr
+    eta=a*sigma**2/2
+    u_eta=(u_a/a+2*u_sigma/sigma)*eta
+
+    fig, ax = plt.subplots()
+    plt.plot(clear_scaling_amp_dephasing,coherence, label='coherence', marker='o', linestyle='', color='red')
+    plt.plot(clear_scaling_amp_dephasing, coherence_fit.best_fit, label='coherence fit', linestyle='--', color='red')
+    plt.plot(clear_scaling_amp_SNR,SNR, label='SNR',  marker='o', linestyle='', color='blue')
+    plt.plot(clear_scaling_amp_SNR,a**0.5*clear_scaling_amp_SNR, label='SNR fit', linestyle='--', color='blue')
+    if shift==None:
+        plt.title(r'$\eta$ = {:.3g}+/-{:.3g},  '.format(eta, u_eta)+timestamp_dephasing+'_'+timestamp_SNR)
+    else:
+        plt.title(r'$\eta$ = {:.3g}+/-{:.3g}, shift {:.3g} kHz'.format(eta,u_eta, shift)+'_'+timestamp_SNR)
+
+    plt.xlabel('clear amp scaling (V)')
+    plt.ylabel('SNR, coherence')
+    plt.legend()
+    fig_format='png'
+    plt.savefig(data_file.folder+'\\'+'weight_functions.'+fig_format,format=fig_format)
+    plt.close()
+
+    return eta, u_eta
