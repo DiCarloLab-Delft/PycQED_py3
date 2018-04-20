@@ -241,7 +241,7 @@ class DeviceCCL(Instrument):
             qb.ro_acq_weight_type(self.ro_acq_weight_type())
             qb.ro_acq_integration_length(self.ro_acq_integration_length())
             qb.ro_acq_digitized(self.ro_acq_digitized())
-            qb.ro_acq_delay(self.ro_acq_delay())
+            qb.ro_acq_input_average_length(4096/1.8e9)#hardcoded because UHFLI is not stable for arbitrary values
 
             acq_device = qb.instr_acquisition()
 
