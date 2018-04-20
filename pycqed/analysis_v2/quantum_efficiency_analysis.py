@@ -87,6 +87,7 @@ class QuantumEfficiencyAnalysis(ba.BaseDataAnalysis):
         self.timestamps = [youngest]
         folder = a_tools.datadir + '/%s_quantum_efficiency_analysis' % (youngest.strftime("%Y%m%d/%H%M%S"))
         self.raw_data_dict['folder'] = [folder]
+        self.options_dict['analysis_result_file'] = os.path.join(folder, f + '.hdf5')
 
     def process_data(self):
         self.proc_data_dict = {}
