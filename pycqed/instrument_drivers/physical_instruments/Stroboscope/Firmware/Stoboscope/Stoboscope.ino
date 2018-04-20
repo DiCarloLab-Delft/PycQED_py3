@@ -8,6 +8,7 @@
 
 //#define PSYNC PD2
 //#define MARKER_OUT PD7
+//#define TRIGGER_OUT PD3
 #define PULSE_CYCLE 24
 #define BUF_LENGTH 64
 #define MAX_PHASE 1000
@@ -209,18 +210,18 @@ static uint8_t parse_command(char *cmdline, uint8_t len)
 ISR(INT0_vect)
 {
   trigger = 1;
-//  PORTD &= !(B00001000);
+  PORTD &= ~(B00001000);
   //at pulse 0 start the phase timer, however updating happens in the main interruptable loop. so check for 24
   if(trigger_div_count == PULSE_CYCLE)
   {
-//    PORTD |= B00001000;
+    PORTD |= (B00001000);
     if(phase_timer_done)
     {
       TCCR0B |= B00000011; // Start the phase timer
     }
     else // No pulse came in
     {
-      TCCR0B &= !(B00000011);  // Turn off the clock
+      TCCR0B &= ~(B00000011);  // Turn off the clock
       TCNT0 = 0;               // reset the count
       phase_count = 0;
       TCCR0B |= B00000011; // Start the phase timer
@@ -241,13 +242,13 @@ ISR (TIMER0_COMPA_vect)
   {
     if(mask_timer_done)
     {
-      PORTD &= !(B10000000);      // Turn the mask on
+      PORTD &= ~(B10000000);      // Turn the mask on
       TCCR2B |= B00000100;     // Turn on the mask (Duty cycle) clock to a 64 prescaler
-      TCCR0B &= !(B00000011);  // Turn off the phase clock until the new pulsetube clock pulse comes in
+      TCCR0B &= ~(B00000011);  // Turn off the phase clock until the new pulsetube clock pulse comes in
     }
     else // not finished, the duty cycle time is longer than the pulse tube period.
     {
-      TCCR2B &= !(B00000100);  // Turn off the mask clock
+      TCCR2B &= ~(B00000100);  // Turn off the mask clock
       TCNT2 = 0;               // reset the count
       mask_count = 0;          // reset the mask count
       TCCR2B |= B00000100; // Start the mask timer
@@ -264,7 +265,7 @@ ISR (TIMER2_COMPA_vect)
   if(mask_count >= mask_delay_ms)  // at 'phase' pulses start the Mask (Duty cycle) timer
   {
     PORTD |= (B10000000);      // Turn on the mask (Duty cycle) clock. From now on no more measurements until next cycle
-    TCCR2B &= !(B00000011);  // Turn off the clock until the new phase clock pulse arrives
+    TCCR2B &= ~(B00000100);  // Turn off the clock until the new phase clock pulse arrives. Deze maakt de code kapot bij een ~, wat eigenlijk zou moeten
     mask_count = 0;
     mask_timer_done = 1;
   }
