@@ -1388,7 +1388,7 @@ class CCLight_Transmon(Qubit):
                 else:
                     a=ma.SSRO_Analysis(rotate=True, label='SSRO', no_fits=False, close_fig=True, peg=self.peg, pge=self.pge, channels=d.value_names)
                 return {'SNR':a.SNR, 'F_d':a.F_d, 'F_a':a.F_a}
-                    
+
             else:
                 if len(d.value_names) == 1:
                     if post_select_threshold == None:
@@ -2056,7 +2056,7 @@ class CCLight_Transmon(Qubit):
                                parameter_name='Time', unit='s')
             MC.set_sweep_function(s)
             MC.set_sweep_points(times)
-        else: 
+        else:
             angles = np.arange(0, 421, 20)
             p = sqo.Ramsey_msmt_induced_dephasing(angles, qubit_idx=self.cfg_qubit_nr(),
                          platf_cfg=self.cfg_openql_platform_fn())
@@ -2075,13 +2075,13 @@ class CCLight_Transmon(Qubit):
                                    phase_sweep_only=msmt_induced_dephasing_ramsey)
             if update:
                 if msmt_induced_dephasing_ramsey:
-                    return {'coherence':a.fit_res.params['amplitude'].value/2, 'phase':(a.fit_res.params['phase'].value)*360/(2*np.pi)% 360}
+                    return {'coherence':a.fit_res.params['amplitude'].value, 'phase':(a.fit_res.params['phase'].value)*360/(2*np.pi)% 360}
                     # dict containing val and stderr
-                else:    
+                else:
                     self.T2_star(a.T2_star['T2_star'])
                     return a.T2_star
 
-    
+
     def measure_echo(self, times=None, MC=None,
                      analyze=True, close_fig=True, update=True):
         # docstring from parent class
@@ -2378,61 +2378,66 @@ class CCLight_Transmon(Qubit):
         return dag
 
     #functions for quantum efficiency mweasurements
-    def measure_measurment_induced_dephasing(self, amps, nested_MC=None):
+    def measure_measurement_induced_dephasing(self, amps, nested_MC=None):
         if nested_MC is None:
             nested_MC = self.instr_nested_MC.get_instr()
+        self.ro_pulse_type('up_down_down_final')
         RO_lutman = self.instr_LutMan_RO.get_instr()
+        RO_lutman.set('M_final_amp_R{}'.format(self.cfg_qubit_nr()), self.ro_pulse_amp())
         readout_pulse_length= self.ro_pulse_length()+self.ro_pulse_down_length0()+self.ro_pulse_down_length1()
-        old_ro_acq_delay=self.ro_acq_delay()
-        self.ro_acq_delay(old_ro_acq_delay+readout_pulse_length+RO_lutman.M_final_delay_R0())
+        old_delay = self.ro_acq_delay()
+        self.ro_acq_delay(old_delay+readout_pulse_length+
+                          RO_lutman.get('M_final_delay_R{}'.format(self.cfg_qubit_nr())))
+        self.ro_acq_weight_type('SSB')
         self.prepare_for_timedomain()
         old_ro_prepare_state=self.cfg_prepare_ro_awg()
         self.cfg_prepare_ro_awg(False)
-
-        sweep_function=swf.lutman_par_depletion_pulse_global_scaling(LutMan=RO_lutman, resonator_number=self.ro_pulse_res_nr(), 
-                                                                    optimization_M_amp=self.ro_pulse_amp(), optimization_M_amp_down0=self.ro_pulse_down_amp0(), 
-                                                                    optimization_M_amp_down1=self.ro_pulse_down_amp1(), upload=True)    
+        sweep_function=swf.lutman_par_depletion_pulse_global_scaling(LutMan=RO_lutman, resonator_number=self.cfg_qubit_nr(),
+                                                                    optimization_M_amp=self.ro_pulse_amp(), optimization_M_amp_down0=self.ro_pulse_down_amp0(),
+                                                                    optimization_M_amp_down1=self.ro_pulse_down_amp1(), upload=True)
         d = det.Function_Detector(self.measure_ramsey, msmt_kw={'msmt_induced_dephasing_ramsey':True},result_keys=['coherence', 'phase'])
         nested_MC.set_sweep_function(sweep_function)
         nested_MC.set_sweep_points(amps)
         nested_MC.set_detector_function(d)
         nested_MC.run('CLEAR_amp_sweep_ramsey')
-        ma.MeasurementAnalysis(label='CLEAR_amp_sweep_ramsey', plot_all=False, auto=True)
+        ma.MeasurementAnalysis(label='CLEAR_amp_sweep_ramsey', plot_all=False,
+                               auto=True)
+        self.ro_pulse_type('up_down_down')
         self.cfg_prepare_ro_awg(old_ro_prepare_state)
-        self.ro_acq_delay(old_ro_acq_delay)
+        self.ro_acq_delay(old_delay)
 
     def measure_SNR_sweeping_amps(self, amps, nr_shots=2*4094, nested_MC=None):
+        print('refrehed')
         if nested_MC is None:
             nested_MC = self.instr_nested_MC.get_instr()
         self.prepare_for_timedomain()
         RO_lutman = self.instr_LutMan_RO.get_instr()
-        old_ro_prepare_state=self.cfg_prepare_ro_awg()
+        old_ro_prepare_state = self.cfg_prepare_ro_awg()
         self.cfg_prepare_ro_awg(False)
-        sweep_function=swf.lutman_par_depletion_pulse_global_scaling(LutMan=RO_lutman, resonator_number=self.ro_pulse_res_nr(), 
-                                                                    optimization_M_amp=self.ro_pulse_amp(), optimization_M_amp_down0=self.ro_pulse_down_amp0(), 
-                                                                    optimization_M_amp_down1=self.ro_pulse_down_amp1(), upload=True)    
-        d = det.Function_Detector(self.measure_ssro, msmt_kw={'nr_shots':nr_shots, 'analyze':True, 'SNR_detector':True,'cal_residual_excitation':False}, result_keys=['SNR', 'F_d', 'F_a'])
+        sweep_function = swf.lutman_par_depletion_pulse_global_scaling(LutMan=RO_lutman, resonator_number=self.cfg_qubit_nr(),
+                                                                    optimization_M_amp=self.ro_pulse_amp(), optimization_M_amp_down0=self.ro_pulse_down_amp0(),
+                                                                    optimization_M_amp_down1=self.ro_pulse_down_amp1(), upload=True)
+        d = det.Function_Detector(self.measure_ssro, msmt_kw={'nr_shots': nr_shots, 'analyze': True, 'SNR_detector': True, 'cal_residual_excitation':False}, result_keys=['SNR', 'F_d', 'F_a'])
         nested_MC.set_sweep_function(sweep_function)
         nested_MC.set_sweep_points(amps)
         nested_MC.set_detector_function(d)
-
         label='CLEAR_amp_sweep_SNR_optimized'
         nested_MC.run(label)
         ma.MeasurementAnalysis(label=label, plot_all=False, auto=True)
         self.cfg_prepare_ro_awg(old_ro_prepare_state)
 
 
-    def measure_quantum_efficiency(self, amps=np.linspace(0,0.05,11), nr_shots=2*4094):
-        #requires the cc light to have the readout time configured equal to the measurement and depletion time
+    def measure_quantum_efficiency(self, amps=np.linspace(0, 0.05, 11), nr_shots=2*4094):
+        # requires the cc light to have the readout time configured equal
+        # to the measurement and depletion time + 60 ns buffer
+        # it requires an optimized depletion pulse
         self.cfg_prepare_ro_awg(True)
-        readout_pulse_length= self.ro_pulse_length()+self.ro_pulse_down_length0()+self.ro_pulse_down_length1()
+        self.measure_measurement_induced_dephasing(amps=amps)
+        readout_pulse_length = self.ro_pulse_length()+self.ro_pulse_down_length0()+self.ro_pulse_down_length1()
         self.ro_acq_integration_length(readout_pulse_length+100e-9)
-        self.ro_pulse_type('up_down_down') #currently only implemented for active depletion
         self.calibrate_optimal_weights(verify=False) #calibrating optimal weights
         self.measure_ssro(cal_residual_excitation=True, SNR_detector=True, nr_shots=nr_shots) #calibrating residual excitation and relaxation at high power
         self.measure_SNR_sweeping_amps(amps=amps)
-        self.ro_pulse_type('up_down_down_final')
-        self.measure_measurment_induced_dephasing(amps=amps)
-        self.ro_pulse_type('up_down_down') 
-        eta, u_eta=ma.fit_eta()
-        return {'eta':eta, 'u_eta':u_eta}
+        self.ro_pulse_type('up_down_down') #setting the pulse back to optimal depletion
+        eta, u_eta = ma.fit_eta()
+        return {'eta': eta, 'u_eta': u_eta}

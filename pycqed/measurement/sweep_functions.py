@@ -907,7 +907,7 @@ class lutman_par_UHFQC_dig_trig(Soft_Sweep):
             self.LutMan.AWG.get_instr().acquisition_arm(single=self.single)
 
 class lutman_par_depletion_pulse_global_scaling(Soft_Sweep):
-    def __init__(self, LutMan, resonator_number, optimization_M_amp , optimization_M_amp_down0,optimization_M_amp_down1, upload=True,**kw):
+    def __init__(self, LutMan, resonator_number, optimization_M_amp, optimization_M_amp_down0, optimization_M_amp_down1, upload=True, **kw):
         self.set_kw()
         self.name= 'CLEAR_sweeper'
         self.parameter_name = 'CLEAR_scaling_amp'
