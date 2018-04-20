@@ -165,7 +165,7 @@ class complex_spectroscopy(Spectroscopy):
         super(complex_spectroscopy, self).__init__(t_start, t_stop=t_stop,
                                              options_dict=options_dict,
                                              extract_only=extract_only,
-                                             auto=auto,
+                                             auto=False,
                                              do_fitting =do_fitting)
         self.params_dict = {'freq_label': 'sweep_name',
                             'freq_unit': 'sweep_unit',

@@ -431,7 +431,7 @@ class BaseDataAnalysis(object):
                 self.figs[key].savefig(savename, bbox_inches='tight', fmt=fmt)
             if close_figs:
                 plt.close(self.figs[key])
-                
+
 
     def save_data(self, savedir: str=None, savebase: str=None,
                   tag_tstamp: bool=True,
@@ -493,6 +493,7 @@ class BaseDataAnalysis(object):
         '''
         self.fit_res = {}
         for key, fit_dict in self.fit_dicts.items():
+            multivariable = fit_dict.get('multivariable', None)
             guess_dict = fit_dict.get('guess_dict', None)
             guess_pars = fit_dict.get('guess_pars', None)
             fit_yvals = fit_dict['fit_yvals']
@@ -542,9 +543,13 @@ class BaseDataAnalysis(object):
                         for key, val in list(guess_dict.items()):
                             model.set_param_hint(key, **val)
                         guess_pars = model.make_params()
-
-                fit_dict['fit_res'] = model.fit(
-                    params=guess_pars, **fit_xvals, **fit_yvals)
+                if multivariable: #multivariable fitting
+                    pass
+                    # fit_res = lmfit.minimize(cost_fn, guess_pars,
+                    #          args=(fit_fn, **fit_xvals, **fit_yvals))
+                else:
+                    fit_dict['fit_res'] = model.fit(
+                        params=guess_pars, **fit_xvals, **fit_yvals)
 
             self.fit_res[key] = fit_dict['fit_res']
 
