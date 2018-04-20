@@ -383,6 +383,8 @@ class BaseDataAnalysis(object):
         except FileExistsError:
             pass
 
+        if self.verbose:
+            print('Saving figures to %s'%savedir)
         for key in key_list:
             if self.presentation_mode:
                 savename = os.path.join(savedir, savebase + key + tstag + 'presentation' + '.' + fmt)
@@ -504,7 +506,8 @@ class BaseDataAnalysis(object):
         # Check weather there is any data to save
         if hasattr(self, 'fit_res') and self.fit_res is not None and self.fit_res:
             fn = a_tools.measurement_filename(a_tools.get_folder(self.timestamps[0]))
-            with h5py.File(fn, 'r+') as data_file:
+            fn = self.options_dict.get('analysis_result_file', fn)
+            with h5py.File(fn, 'a') as data_file:
                 try:
                     analysis_group = data_file.create_group('Analysis')
                 except ValueError:

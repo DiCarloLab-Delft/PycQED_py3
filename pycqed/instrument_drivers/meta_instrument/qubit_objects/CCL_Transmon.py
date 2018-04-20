@@ -111,7 +111,7 @@ class CCLight_Transmon(Qubit):
 
         # RO pulse parameters
         self.add_parameter('ro_pulse_type', initial_value='square',
-                           vals=vals.Enum('gated', 'square', 'up_down_down'),
+                           vals=vals.Enum('gated', 'square', 'up_down_down','up_down_down_final'),
                            parameter_class=ManualParameter)
 
         # Mixer offsets correction, RO pulse
@@ -1340,7 +1340,9 @@ class CCLight_Transmon(Qubit):
                      post_select: bool = False,
                      post_select_threshold: float =None,
                      update: bool=True,
-                     verbose: bool=True):
+                     verbose: bool=True,
+                     SNR_detector: bool=False,
+                     cal_residual_excitation: bool=False):
         old_RO_digit = self.ro_acq_digitized()
         self.ro_acq_digitized(False)
         # docstring from parent class
@@ -1378,39 +1380,50 @@ class CCLight_Transmon(Qubit):
             'SSRO{}'.format(self.msmt_suffix))
         MC.live_plot_enabled(old_plot_setting)
         if analyze:
-            if len(d.value_names) == 1:
-
-                if post_select_threshold == None:
-                    post_select_threshold = self.ro_acq_threshold()
-                a = ma2.Singleshot_Readout_Analysis(
-                    t_start=None, t_stop=None,
-                    label='SSRO',
-                    options_dict={'post_select': post_select,
-                                  'nr_samples': 2+2*post_select,
-                                  'post_select_threshold': post_select_threshold},
-                    extract_only=no_figs)
-                if update_threshold:
-                    # UHFQC threshold is wrong, the magic number is a
-                    #  dirty hack. This works. we don't know why.
-                    magic_scale_factor = 1  # 0.655
-                    self.ro_acq_threshold(a.proc_data_dict['threshold_raw'] *
-                                          magic_scale_factor)
-                if update:
-                    self.F_ssro(a.proc_data_dict['F_assignment_raw'])
-                    self.F_discr(a.proc_data_dict['F_discr'])
-                if verbose:
-                    print('Avg. Assignement fidelity: \t{:.4f}\n'.format(
-                        a.proc_data_dict['F_assignment_raw']) +
-                        'Avg. Discrimination fidelity: \t{:.4f}'.format(
-                        a.proc_data_dict['F_discr']))
-                return (a.proc_data_dict['F_assignment_raw'],
-                        a.proc_data_dict['F_discr'])
+            if SNR_detector:
+                if cal_residual_excitation:
+                    a=ma.SSRO_Analysis(rotate=True, label='SSRO', no_fits=False, close_fig=True, peg=None, pge=None, timestamp=None, channels=d.value_names)
+                    self.peg=a.frac1_0
+                    self.pge=1-a.frac1_1
+                else:
+                    a=ma.SSRO_Analysis(rotate=True, label='SSRO', no_fits=False, close_fig=True, peg=self.peg, pge=self.pge, channels=d.value_names)
+                return {'SNR':a.SNR, 'F_d':a.F_d, 'F_a':a.F_a}
+                    
             else:
+                if len(d.value_names) == 1:
+                    if post_select_threshold == None:
+                        post_select_threshold = self.ro_acq_threshold()
+                    a = ma2.Singleshot_Readout_Analysis(
+                        t_start=None, t_stop=None,
+                        label='SSRO',
+                        options_dict={'post_select': post_select,
+                                      'nr_samples': 2+2*post_select,
+                                      'post_select_threshold': post_select_threshold},
+                        extract_only=no_figs)
+                    if update_threshold:
+                        # UHFQC threshold is wrong, the magic number is a
+                        #  dirty hack. This works. we don't know why.
+                        magic_scale_factor = 1  # 0.655
+                        self.ro_acq_threshold(a.proc_data_dict['threshold_raw'] *
+                                              magic_scale_factor)
+                    if update:
+                        self.F_ssro(a.proc_data_dict['F_assignment_raw'])
+                        self.F_discr(a.proc_data_dict['F_discr'])
+                    if verbose:
+                        print('Avg. Assignement fidelity: \t{:.4f}\n'.format(
+                            a.proc_data_dict['F_assignment_raw']) +
+                            'Avg. Discrimination fidelity: \t{:.4f}'.format(
+                            a.proc_data_dict['F_discr']))
+                    return (a.proc_data_dict['F_assignment_raw'],
+                            a.proc_data_dict['F_discr'])
+                else:
+                    a = ma.SSRO_Analysis(label='SSRO',
+                                         channels=d.value_names,
+                                         no_fits=no_figs, rotate=True)
+                    return a.F_a, a.F_d
 
-                a = ma.SSRO_Analysis(label='SSRO',
-                                     channels=d.value_names,
-                                     no_fits=no_figs, rotate=True)
-                return a.F_a, a.F_d
+
+
 
     def measure_transients(self, MC=None, analyze: bool=True,
                            cases=('off', 'on'),
@@ -1997,7 +2010,8 @@ class CCLight_Transmon(Qubit):
                        artificial_detuning: float=None,
                        freq_qubit: float=None,
                        label: str='',
-                       analyze=True, close_fig=True, update=True):
+                       analyze=True, close_fig=True, update=True,
+                       msmt_induced_dephasing_ramsey=False):
         # docstring from parent class
         # N.B. this is a good example for a generic timedomain experiment using
         # the CCL transmon.
@@ -2033,24 +2047,41 @@ class CCLight_Transmon(Qubit):
             'frequency', freq_qubit -
             self.mw_freq_mod.get() + artificial_detuning)
 
-        p = sqo.Ramsey(times, qubit_idx=self.cfg_qubit_nr(),
-                       platf_cfg=self.cfg_openql_platform_fn())
-        s = swf.OpenQL_Sweep(openql_program=p,
-                             CCL=self.instr_CC.get_instr(),
-                             parameter_name='Time', unit='s')
+
+        if not msmt_induced_dephasing_ramsey:
+            p = sqo.Ramsey(times, qubit_idx=self.cfg_qubit_nr(),
+                         platf_cfg=self.cfg_openql_platform_fn())
+            s = swf.OpenQL_Sweep(openql_program=p,
+                               CCL=self.instr_CC.get_instr(),
+                               parameter_name='Time', unit='s')
+            MC.set_sweep_function(s)
+            MC.set_sweep_points(times)
+        else: 
+            angles = np.arange(0, 421, 20)
+            p = sqo.Ramsey_msmt_induced_dephasing(angles, qubit_idx=self.cfg_qubit_nr(),
+                         platf_cfg=self.cfg_openql_platform_fn())
+            s = swf.OpenQL_Sweep(openql_program=p,
+                               CCL=self.instr_CC.get_instr(),
+                               parameter_name='angle', unit='degree')
+            MC.set_sweep_function(s)
+            MC.set_sweep_points(angles)
         d = self.int_avg_det
-        MC.set_sweep_function(s)
-        MC.set_sweep_points(times)
         MC.set_detector_function(d)
         MC.run('Ramsey'+label+self.msmt_suffix)
-        a = ma.Ramsey_Analysis(auto=True, close_fig=True,
-                               freq_qubit=freq_qubit,
-                               artificial_detuning=artificial_detuning)
-        if update:
-            # dict containing val and stderr
-            self.T2_star(a.T2_star['T2_star'])
-        return a.T2_star
+        if analyze:
+            a = ma.Ramsey_Analysis(auto=True, close_fig=True,
+                                   freq_qubit=freq_qubit,
+                                   artificial_detuning=artificial_detuning,
+                                   phase_sweep_only=msmt_induced_dephasing_ramsey)
+            if update:
+                if msmt_induced_dephasing_ramsey:
+                    return {'coherence':a.fit_res.params['amplitude'].value/2, 'phase':(a.fit_res.params['phase'].value)*360/(2*np.pi)% 360}
+                    # dict containing val and stderr
+                else:    
+                    self.T2_star(a.T2_star['T2_star'])
+                    return a.T2_star
 
+    
     def measure_echo(self, times=None, MC=None,
                      analyze=True, close_fig=True, update=True):
         # docstring from parent class
@@ -2345,3 +2376,63 @@ class CCLight_Transmon(Qubit):
                      self.name+' single qubit gates fine')
         self._dag = dag
         return dag
+
+    #functions for quantum efficiency mweasurements
+    def measure_measurment_induced_dephasing(self, amps, nested_MC=None):
+        if nested_MC is None:
+            nested_MC = self.instr_nested_MC.get_instr()
+        RO_lutman = self.instr_LutMan_RO.get_instr()
+        readout_pulse_length= self.ro_pulse_length()+self.ro_pulse_down_length0()+self.ro_pulse_down_length1()
+        old_ro_acq_delay=self.ro_acq_delay()
+        self.ro_acq_delay(old_ro_acq_delay+readout_pulse_length+RO_lutman.M_final_delay_R0())
+        self.prepare_for_timedomain()
+        old_ro_prepare_state=self.cfg_prepare_ro_awg()
+        self.cfg_prepare_ro_awg(False)
+
+        sweep_function=swf.lutman_par_depletion_pulse_global_scaling(LutMan=RO_lutman, resonator_number=self.ro_pulse_res_nr(), 
+                                                                    optimization_M_amp=self.ro_pulse_amp(), optimization_M_amp_down0=self.ro_pulse_down_amp0(), 
+                                                                    optimization_M_amp_down1=self.ro_pulse_down_amp1(), upload=True)    
+        d = det.Function_Detector(self.measure_ramsey, msmt_kw={'msmt_induced_dephasing_ramsey':True},result_keys=['coherence', 'phase'])
+        nested_MC.set_sweep_function(sweep_function)
+        nested_MC.set_sweep_points(amps)
+        nested_MC.set_detector_function(d)
+        nested_MC.run('CLEAR_amp_sweep_ramsey')
+        ma.MeasurementAnalysis(label='CLEAR_amp_sweep_ramsey', plot_all=False, auto=True)
+        self.cfg_prepare_ro_awg(old_ro_prepare_state)
+        self.ro_acq_delay(old_ro_acq_delay)
+
+    def measure_SNR_sweeping_amps(self, amps, nr_shots=2*4094, nested_MC=None):
+        if nested_MC is None:
+            nested_MC = self.instr_nested_MC.get_instr()
+        self.prepare_for_timedomain()
+        RO_lutman = self.instr_LutMan_RO.get_instr()
+        old_ro_prepare_state=self.cfg_prepare_ro_awg()
+        self.cfg_prepare_ro_awg(False)
+        sweep_function=swf.lutman_par_depletion_pulse_global_scaling(LutMan=RO_lutman, resonator_number=self.ro_pulse_res_nr(), 
+                                                                    optimization_M_amp=self.ro_pulse_amp(), optimization_M_amp_down0=self.ro_pulse_down_amp0(), 
+                                                                    optimization_M_amp_down1=self.ro_pulse_down_amp1(), upload=True)    
+        d = det.Function_Detector(self.measure_ssro, msmt_kw={'nr_shots':nr_shots, 'analyze':True, 'SNR_detector':True,'cal_residual_excitation':False}, result_keys=['SNR', 'F_d', 'F_a'])
+        nested_MC.set_sweep_function(sweep_function)
+        nested_MC.set_sweep_points(amps)
+        nested_MC.set_detector_function(d)
+
+        label='CLEAR_amp_sweep_SNR_optimized'
+        nested_MC.run(label)
+        ma.MeasurementAnalysis(label=label, plot_all=False, auto=True)
+        self.cfg_prepare_ro_awg(old_ro_prepare_state)
+
+
+    def measure_quantum_efficiency(self, amps=np.linspace(0,0.05,11), nr_shots=2*4094):
+        #requires the cc light to have the readout time configured equal to the measurement and depletion time
+        self.cfg_prepare_ro_awg(True)
+        readout_pulse_length= self.ro_pulse_length()+self.ro_pulse_down_length0()+self.ro_pulse_down_length1()
+        self.ro_acq_integration_length(readout_pulse_length+100e-9)
+        self.ro_pulse_type('up_down_down') #currently only implemented for active depletion
+        self.calibrate_optimal_weights(verify=False) #calibrating optimal weights
+        self.measure_ssro(cal_residual_excitation=True, SNR_detector=True, nr_shots=nr_shots) #calibrating residual excitation and relaxation at high power
+        self.measure_SNR_sweeping_amps(amps=amps)
+        self.ro_pulse_type('up_down_down_final')
+        self.measure_measurment_induced_dephasing(amps=amps)
+        self.ro_pulse_type('up_down_down') 
+        eta, u_eta=ma.fit_eta()
+        return {'eta':eta, 'u_eta':u_eta}

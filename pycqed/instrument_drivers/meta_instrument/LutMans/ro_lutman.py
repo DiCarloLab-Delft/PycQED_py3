@@ -51,7 +51,7 @@ class Base_RO_LutMan(Base_LutMan):
                            docstring=comb_msg,
                            initial_value=[[0], [2], [0,2]])
         self.add_parameter('pulse_type', vals=vals.Enum(
-            'M_up_down_down', 'M_square'),
+            'M_up_down_down', 'M_square', 'M_up_down_down_final'),
             parameter_class=ManualParameter,
             docstring=comb_msg,
             initial_value='M_square')
@@ -68,6 +68,18 @@ class Base_RO_LutMan(Base_LutMan):
                                vals=vals.Numbers(0, 1),
                                parameter_class=ManualParameter,
                                initial_value=0.1)
+            self.add_parameter('M_final_amp_R{}'.format(res), unit='V',
+                               vals=vals.Numbers(0, 1),
+                               parameter_class=ManualParameter,
+                               initial_value=0.1)
+            self.add_parameter('M_final_length_R{}'.format(res), unit='s',
+                               vals=vals.Numbers(1e-9, 8000e-9),
+                               parameter_class=ManualParameter,
+                               initial_value=1000e-9)
+            self.add_parameter('M_final_delay_R{}'.format(res), unit='s',
+                               vals=vals.Numbers(1e-9, 8000e-9),
+                               parameter_class=ManualParameter,
+                               initial_value=200e-9)
             self.add_parameter('M_phi_R{}'.format(res), unit='deg',
                                parameter_class=ManualParameter,
                                initial_value=0.0)
@@ -106,6 +118,7 @@ class Base_RO_LutMan(Base_LutMan):
                                sampling_rate=self.get('sampling_rate'),
                                delay=0,
                                phase=self.get('M_phi_R{}'.format(res)))
+            #creadting the modulated bloack pulse
             Mod_M = wf.mod_pulse(M[0], M[1],
                                  f_modulation=self.get(
                                      'M_modulation_R{}'.format(res)),
@@ -133,8 +146,26 @@ class Base_RO_LutMan(Base_LutMan):
                                               f_modulation=self.get(
                                                   'M_modulation_R{}'.format(res)),
                                               sampling_rate=self.sampling_rate())
+
+
+            M_final = wf.block_pulse(self.get('M_final_amp_R{}'.format(res)),
+                               self.get('M_final_length_R{}'.format(res)),  # ns
+                               sampling_rate=self.get('sampling_rate'),
+                               delay=self.get('M_final_delay_R{}'.format(res)),
+                               phase=self.get('M_phi_R{}'.format(res)))
+
+            
+            # concatenating up, down, down depletion with an additional final strong measurement at some delay
+            M_up_down_down_final = (np.concatenate((M_up_down_down[0], M_final[0])),
+                                     np.concatenate((M_up_down_down[1], M_final[1])))
+            Mod_M_up_down_down_final = wf.mod_pulse(M_up_down_down_final[0], M_up_down_down_final[1],
+                                              f_modulation=self.get(
+                                                  'M_modulation_R{}'.format(res)),
+                                              sampling_rate=self.sampling_rate())
+
             self._wave_dict.update({'M_square_R{}'.format(res): Mod_M,
-                                    'M_up_down_down_R{}'.format(res): Mod_M_up_down_down})
+                                    'M_up_down_down_R{}'.format(res): Mod_M_up_down_down,
+                                    'M_up_down_down_final_R{}'.format(res): Mod_M_up_down_down_final})
 
         if self.mixer_apply_predistortion_matrix():
             M = wf.mixer_predistortion_matrix(
