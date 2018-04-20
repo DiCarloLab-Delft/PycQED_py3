@@ -1477,6 +1477,7 @@ class CCLight_Transmon(Qubit):
 
         # Ensure that enough averages are used to get accurate weights
         old_avg = self.ro_acq_averages()
+
         self.ro_acq_averages(2**15)
         transients = self.measure_transients(MC=MC, analyze=analyze,
                                              depletion_analysis=False)
@@ -1498,7 +1499,6 @@ class CCLight_Transmon(Qubit):
             weight_scale_factor*optimized_weights_I)
         optimized_weights_Q = np.array(
             weight_scale_factor*optimized_weights_Q)
-        self.ro_acq_averages(old_avg)
 
         if update:
             self.ro_acq_weight_func_I(optimized_weights_I)
