@@ -102,6 +102,17 @@ class QuantumEfficiencyAnalysis(ba.BaseDataAnalysis):
         self.proc_data_dict['etas'] = np.array(eta, dtype=float)
         self.proc_data_dict['u_etas'] = np.array(u_eta, dtype=float)
 
+    def run_fitting(self):
+        # Reformat data for saving in hdf5 file
+        self.fit_res['etas'] = {
+            {power: self.proc_data_dict['etas'][i, j] for j, power in self.raw_data_dict['TWPA_freq_ramesy']}
+            for i, freq in self.raw_data_dict['TWPA_power_ramesy']
+        }
+        self.fit_res['u_etas'] = {
+            {power: self.proc_data_dict['u_etas'][i, j] for j, power in self.raw_data_dict['TWPA_freq_ramesy']}
+            for i, freq in self.raw_data_dict['TWPA_power_ramesy']
+        }
+
     def prepare_plots(self):
         self.plot_dicts['quantum_eff'] = {
             'plotfn': self.plot_colorxy,
@@ -235,10 +246,6 @@ class RamseyAnalysis(ba.BaseDataAnalysis):
                 self.fit_dicts['coherence_fit']['sigma_std'][i, j] = coherence_fit.params['sigma'].stderr
                 self.fit_dicts['coherence_fit']['scale'][i, j] = coherence_fit.params['scale'].value
                 self.fit_dicts['coherence_fit']['scale_std'][i, j] = coherence_fit.params['scale'].stderr
-
-    def save_fit_results(self):
-        # todo: if you want to save some results to a hdf5, do it here
-        pass
 
     def prepare_plots(self):
         # todo: add 2D plot
@@ -381,10 +388,6 @@ class SSROAnalysis(ba.BaseDataAnalysis):
                 self.fit_res['snr_fit'][twpa_freq][twpa_power] = snr_fit
                 self.fit_dicts['snr_fit']['a'][i, j] = snr_fit.params['a'].value
                 self.fit_dicts['snr_fit']['a_std'][i, j] = snr_fit.params['a'].stderr
-
-    def save_fit_results(self):
-        # todo: if you want to save some results to a hdf5, do it here
-        pass
 
     def prepare_plots(self):
         # self.plot_dicts['CLEAR_vs_slope'] = {
