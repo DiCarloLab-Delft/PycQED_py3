@@ -906,6 +906,30 @@ class lutman_par_UHFQC_dig_trig(Soft_Sweep):
         if self.run:
             self.LutMan.AWG.get_instr().acquisition_arm(single=self.single)
 
+class lutman_par_depletion_pulse_global_scaling(Soft_Sweep):
+    def __init__(self, LutMan, resonator_number, optimization_M_amp , optimization_M_amp_down0,optimization_M_amp_down1, upload=True,**kw):
+        self.set_kw()
+        self.name= 'CLEAR_sweeper'
+        self.parameter_name = 'CLEAR_scaling_amp'
+        self.unit = 'V'
+        self.sweep_control = 'soft'
+        self.LutMan = LutMan
+        self.optimization_M_amp = optimization_M_amp
+        self.optimization_M_amp_down0 = optimization_M_amp_down0
+        self.optimization_M_amp_down1 = optimization_M_amp_down1
+        self.resonator_number = resonator_number
+        self.upload=upload
+
+    def set_parameter(self, val):
+        '''
+        Set the parameter(s) to be sweeped. Differs per sweep function
+        '''
+        self.LutMan.set('M_amp_R{}'.format(self.resonator_number),val)
+        print('check this',self.LutMan.get('M_amp_R{}'.format(self.resonator_number)))
+        self.LutMan.set('M_down_amp0_R{}'.format(self.resonator_number),val/self.optimization_M_amp*self.optimization_M_amp_down0)
+        self.LutMan.set('M_down_amp1_R{}'.format(self.resonator_number),val/self.optimization_M_amp*self.optimization_M_amp_down1)
+        if self.upload:
+            self.LutMan.load_DIO_triggered_sequence_onto_UHFQC(regenerate_waveforms=True)
 
 class lutman_par_dB_attenuation_UHFQC_dig_trig(Soft_Sweep):
     def __init__(self, LutMan, LutMan_parameter, run=False, **kw):

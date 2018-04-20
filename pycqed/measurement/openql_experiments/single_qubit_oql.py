@@ -273,6 +273,46 @@ def Ramsey(times, qubit_idx: int, platf_cfg: str):
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
 
+def Ramsey_msmt_induced_dephasing(angles, qubit_idx: int, platf_cfg: str):
+    """
+    Single qubit Ramsey sequence that varies azimuthal phase instead of time.
+    Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
+
+    note: executes the measurement between gates to measure the measurement induced dephasing
+
+    Input pars:
+        angles:         the list of angles for each Ramsey element
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+    Returns:
+        p:              OpenQL Program object containing
+
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="Ramsey_msmt_induced_dephasing", nqubits=platf.get_qubit_number(),
+                p=platf)
+            
+
+    for i, angle in enumerate(angles[:-4]):
+        cw_idx = angle//20 + 9
+        k = Kernel("Ramsey_azi_"+str(angle), p=platf)
+        k.prepz(qubit_idx)
+        k.gate('rx90', qubit_idx)
+        k.measure(qubit_idx)
+        k.gate('cw_{:02}'.format(cw_idx), qubit_idx)
+        p.add_kernel(k)
+
+    # adding the calibration points
+    add_single_qubit_cal_points(p, platf=platf, qubit_idx=qubit_idx)
+
+    with suppress_stdout():
+        p.compile(verbose=False)
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
 
 def echo(times, qubit_idx: int, platf_cfg: str):
     """
