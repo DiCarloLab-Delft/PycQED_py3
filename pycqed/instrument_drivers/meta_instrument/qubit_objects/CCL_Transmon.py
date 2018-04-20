@@ -110,12 +110,6 @@ class CCLight_Transmon(Qubit):
                            parameter_class=ManualParameter)
 
         # RO pulse parameters
-        self.add_parameter('ro_pulse_res_nr',
-                           label='Resonator number', docstring=(
-                               'Resonator number used in lutman for'
-                               ' uploading to the correct UHFQC codeword.'),
-                           initial_value=0, vals=vals.Ints(0, 9),
-                           parameter_class=ManualParameter)
         self.add_parameter('ro_pulse_type', initial_value='square',
                            vals=vals.Enum('gated', 'square', 'up_down_down'),
                            parameter_class=ManualParameter)
@@ -496,10 +490,7 @@ class CCLight_Transmon(Qubit):
         self.add_parameter(
             'cfg_qubit_nr', label='Qubit number', vals=vals.Ints(0, 7),
             parameter_class=ManualParameter, initial_value=0,
-            docstring='The qubit number is used in the OpenQL compiler. '
-            'Beware that a similar parameter (ro_pulse_res_nr) exists that is'
-            ' used for uploading to the right Lookuptable. These params are '
-            'oten but not always identical (e.g., multiple feedlines). ')
+            docstring='The qubit number is used in the OpenQL compiler. ')
 
         self.add_parameter('cfg_qubit_freq_calc_method',
                            initial_value='latest',
@@ -563,7 +554,7 @@ class CCLight_Transmon(Qubit):
                            label='Qubit frequency', unit='Hz',
                            parameter_class=ManualParameter)
         self.add_parameter('freq_max',
-                           label='mwubit sweet spot frequency', unit='Hz',
+                           label='qubit sweet spot frequency', unit='Hz',
                            parameter_class=ManualParameter)
         self.add_parameter('freq_res',
                            label='Resonator frequency', unit='Hz',
@@ -719,7 +710,6 @@ class CCLight_Transmon(Qubit):
         desired wave.
         Relevant parameters are:
             ro_pulse_type ("up_down_down", "square")
-            ro_pulse_res_nr
             ro_freq_mod
             ro_acq_delay
 
@@ -752,7 +742,7 @@ class CCLight_Transmon(Qubit):
             ro_lm = self.instr_LutMan_RO.get_instr()
             ro_lm.AWG(self.instr_acquisition())
 
-            idx = self.ro_pulse_res_nr()
+            idx = self.cfg_qubit_nr()
             # These parameters affect all resonators
             ro_lm.set('pulse_type', 'M_' + self.ro_pulse_type())
             ro_lm.set('mixer_alpha',
