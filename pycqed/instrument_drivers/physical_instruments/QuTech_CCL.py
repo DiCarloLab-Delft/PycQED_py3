@@ -298,6 +298,8 @@ class CCL(SCPI):
         except Exception as e:
             logging.warn('Error: failed to retrive IDN from CC-Light.', str(e))
 
+        self.version_info["Driver Version"] = self.driver_version
+
         return self.version_info
 
     def print_readable_idn(self):
