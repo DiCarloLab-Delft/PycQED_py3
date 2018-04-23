@@ -1779,7 +1779,6 @@ class Rabi_Analysis(TD_Analysis):
         separate_fits = kw.get('separate_fits', False)
 
         self.nr_quadratures = len(self.ylabels)  # for legacy reasons
-
         # Create new sweep points without cal pts variable. Needed here because
         # we may have 0 cal pts, so writing self.sweep_points[:-self.NoCalPoints]
         # will give an error if self.NoCalPoints==0.
@@ -1903,7 +1902,7 @@ class Rabi_Analysis(TD_Analysis):
             # display figure
             if show:
                 plt.show()
-
+            self.ax.set_ylabel('V_homodyne (a.u)')
             # save figure
             self.save_fig(self.fig, figname=self.measurementstring + '_Rabi_fit',
                           **kw)
