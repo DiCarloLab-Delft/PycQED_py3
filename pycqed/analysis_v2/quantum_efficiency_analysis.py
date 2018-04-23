@@ -236,10 +236,10 @@ class QuantumEfficiencyAnalysisTWPA(ba.BaseDataAnalysis):
                 for j, twpa_power in enumerate(twpa_powers):
                     pre = 'freq_%.3f-power_%.3f-'%(twpa_freq,twpa_power)
                     obj = self.proc_data_dict['analysis_objects'][i,j]
-                    for k in ['CLEAR_vs_Ramsey_coherence', 'CLEAR_vs_Ramsey_fit',]:
+                    for k in ['amp_vs_Ramsey_coherence', 'amp_vs_Ramsey_fit',]:
                         self.plot_dicts[pre+k] = obj.ra.plot_dicts[k]
                         self.plot_dicts[pre+k]['ax_id'] = pre+'snr_analysis'
-                    for k in ['CLEAR_vs_SNR_fit', 'CLEAR_vs_SNR_scatter',]:
+                    for k in ['amp_vs_SNR_fit', 'amp_vs_SNR_scatter',]:
                         self.plot_dicts[pre+k] = obj.ssro.plot_dicts[k]
                         self.plot_dicts[pre+k]['ax_id'] = pre+'snr_analysis'
 
@@ -344,14 +344,14 @@ class QuantumEfficiencyAnalysis(ba.BaseDataAnalysis):
         # }
 
     def prepare_plots(self):
-        #self.ra.plot_dicts['CLEAR_vs_Ramsey_fit']
-        #self.ra.plot_dicts['CLEAR_vs_Ramsey_Phase']
-        #self.ra.plot_dicts['CLEAR_vs_Ramsey_coherence']
+        #self.ra.plot_dicts['amp_vs_Ramsey_fit']
+        #self.ra.plot_dicts['amp_vs_Ramsey_Phase']
+        #self.ra.plot_dicts['amp_vs_Ramsey_coherence']
 
-        #self.ssro.plot_dicts['CLEAR_vs_SNR_fit']
-        #self.ssro.plot_dicts['CLEAR_vs_SNR_scatter']
-        #self.ssro.plot_dicts['CLEAR_vs_Fa']
-        #self.ssro.plot_dicts['CLEAR_vs_Fd']
+        #self.ssro.plot_dicts['amp_vs_SNR_fit']
+        #self.ssro.plot_dicts['amp_vs_SNR_scatter']
+        #self.ssro.plot_dicts['amp_vs_Fa']
+        #self.ssro.plot_dicts['amp_vs_Fd']
         self.ra.prepare_plots()
         for d in self.ra.plot_dicts:
             self.plot_dicts[d] = self.ra.plot_dicts[d]
@@ -359,22 +359,22 @@ class QuantumEfficiencyAnalysis(ba.BaseDataAnalysis):
         for d in self.ssro.plot_dicts:
             self.plot_dicts[d] = self.ssro.plot_dicts[d]
 
-        for k in ['CLEAR_vs_Ramsey_coherence', 'CLEAR_vs_Ramsey_fit', 'CLEAR_vs_SNR_fit', 'CLEAR_vs_SNR_scatter']:
+        for k in ['amp_vs_Ramsey_coherence', 'amp_vs_Ramsey_fit', 'amp_vs_SNR_fit', 'amp_vs_SNR_scatter']:
             self.plot_dicts[k]['ax_id'] = 'snr_analysis'
             self.plot_dicts[k]['ylabel'] = 'SNR, coherence'
             self.plot_dicts[k]['yunit'] = 'a.u.'
             self.plot_dicts[k]['title'] = r'$\eta = (%.4f \pm %.4f)$ %%'%(100*self.fit_dicts['eta'], 100*self.fit_dicts['u_eta'])
 
-        self.plot_dicts['CLEAR_vs_Ramsey_fit']['color'] = 'red'
-        self.plot_dicts['CLEAR_vs_Ramsey_coherence']['color'] = 'red'
-        self.plot_dicts['CLEAR_vs_SNR_fit']['color'] = 'blue'
-        self.plot_dicts['CLEAR_vs_SNR_scatter']['color'] = 'blue'
+        self.plot_dicts['amp_vs_Ramsey_fit']['color'] = 'red'
+        self.plot_dicts['amp_vs_Ramsey_coherence']['color'] = 'red'
+        self.plot_dicts['amp_vs_SNR_fit']['color'] = 'blue'
+        self.plot_dicts['amp_vs_SNR_scatter']['color'] = 'blue'
 
-        self.plot_dicts['CLEAR_vs_Ramsey_coherence']['marker'] = 'o'
-        self.plot_dicts['CLEAR_vs_SNR_scatter']['marker'] = 'o'
+        self.plot_dicts['amp_vs_Ramsey_coherence']['marker'] = 'o'
+        self.plot_dicts['amp_vs_SNR_scatter']['marker'] = 'o'
 
-        self.plot_dicts['CLEAR_vs_SNR_fit']['do_legend'] = True
-        self.plot_dicts['CLEAR_vs_Ramsey_fit']['do_legend'] = True
+        self.plot_dicts['amp_vs_SNR_fit']['do_legend'] = True
+        self.plot_dicts['amp_vs_Ramsey_fit']['do_legend'] = True
 
 
 
@@ -391,11 +391,11 @@ class RamseyAnalysis(ba.BaseDataAnalysis):
                          extract_only=extract_only
                          )
 
-        self.params_dict = {'clear_scaling_amp': 'Instrument settings.RO_lutman.M_amp_R0',
+        self.params_dict = {'scaling_amp': 'Instrument settings.RO_lutman.M_amp_R0',
                             'dephasing': 'Analysis.Fitted Params lin_trans w0.amplitude.value',
                             'phase': 'Analysis.Fitted Params lin_trans w0.phase.value',
                             }
-        self.numeric_params = ['clear_scaling_amp', 'dephasing', 'phase']
+        self.numeric_params = ['scaling_amp', 'dephasing', 'phase']
 
         if auto:
             self.run_analysis()
@@ -408,7 +408,7 @@ class RamseyAnalysis(ba.BaseDataAnalysis):
         youngest = np.max(self.raw_data_dict['datetime'])
         youngest += datetime.timedelta(seconds=1)
 
-        f = '%s_CLEAR_amp_sweep_ramsey' % (youngest.strftime("%H%M%S"))
+        f = '%s_amp_sweep_ramsey' % (youngest.strftime("%H%M%S"))
         d = '%s' % (youngest.strftime("%Y%m%d"))
         folder = os.path.join(a_tools.datadir, d, f)
         self.raw_data_dict['folder'] = [folder]
@@ -418,13 +418,13 @@ class RamseyAnalysis(ba.BaseDataAnalysis):
     def process_data(self):
         #Remove None entries
         dephasing = self.raw_data_dict['dephasing']
-        amps = self.raw_data_dict['clear_scaling_amp']
+        amps = self.raw_data_dict['scaling_amp']
         mask = np.intersect1d(np.where(dephasing != None), np.where(amps != None))
         if self.options_dict.get('fit_cutoff', True):
             mask2 = np.where(amps < self.options_dict.get('fit_cutoff', 0.1))
             mask = np.intersect1d(mask, mask2)
 
-        self.proc_data_dict['clear_scaling_amp'] = amps[mask]
+        self.proc_data_dict['scaling_amp'] = amps[mask]
         self.proc_data_dict['dephasing'] = dephasing[mask]
         self.proc_data_dict['phase'] = self.raw_data_dict['phase'][mask]
         # todo: factor 2?
@@ -433,7 +433,7 @@ class RamseyAnalysis(ba.BaseDataAnalysis):
     def run_fitting(self):
         self.fit_res = {}
         coherence = self.proc_data_dict['coherence']
-        clear_scaling_amp = self.proc_data_dict['clear_scaling_amp']
+        scaling_amp = self.proc_data_dict['scaling_amp']
 
         def gaussian(x, sigma, scale):
             return scale * np.exp(-(x) ** 2 / (2 * sigma ** 2))
@@ -442,7 +442,7 @@ class RamseyAnalysis(ba.BaseDataAnalysis):
         gmodel.set_param_hint('sigma', value=0.07, min=-1, max=1)
         gmodel.set_param_hint('scale', value=0.9) # , min=0.1, max=100)
         para = gmodel.make_params()
-        coherence_fit = gmodel.fit(coherence, x=clear_scaling_amp, **para)
+        coherence_fit = gmodel.fit(coherence, x=scaling_amp, **para)
         self.fit_res['coherence_fit'] = coherence_fit
         self.fit_dicts['coherence_fit'] = OrderedDict()
         self.fit_dicts['coherence_fit']['sigma'] = coherence_fit.params['sigma'].value
@@ -452,12 +452,12 @@ class RamseyAnalysis(ba.BaseDataAnalysis):
 
     def prepare_plots(self):
         name = ''
-        self.plot_dicts[name + 'CLEAR_vs_Ramsey_fit'] = {
+        self.plot_dicts[name + 'amp_vs_Ramsey_fit'] = {
             'plotfn': self.plot_fit,
-            'ax_id': name + 'CLEAR_vs_Ramsey',
+            'ax_id': name + 'amp_vs_Ramsey',
             'zorder': 5,
             'fit_res': self.fit_res['coherence_fit'],
-            'xvals': self.proc_data_dict['clear_scaling_amp'],
+            'xvals': self.proc_data_dict['scaling_amp'],
             'marker': '',
             'linestyle': '-',
             'ylabel': 'Coherence',
@@ -466,19 +466,19 @@ class RamseyAnalysis(ba.BaseDataAnalysis):
             'xunit': 'V',
             'setlabel': 'ramsey coherence fit',
         }
-        self.plot_dicts[name + 'CLEAR_vs_Ramsey_coherence'] = {
+        self.plot_dicts[name + 'amp_vs_Ramsey_coherence'] = {
             'plotfn': self.plot_line,
-            'ax_id': name + 'CLEAR_vs_Ramsey',
+            'ax_id': name + 'amp_vs_Ramsey',
             'zorder': 0,
-            'xvals': self.proc_data_dict['clear_scaling_amp'],
+            'xvals': self.proc_data_dict['scaling_amp'],
             'yvals': self.proc_data_dict['coherence'],
             'marker': 'x',
             'linestyle': '',
             'setlabel': 'ramsey coherence data',
         }
-        self.plot_dicts[name + 'CLEAR_vs_Ramsey_Phase'] = {
+        self.plot_dicts[name + 'amp_vs_Ramsey_Phase'] = {
             'plotfn': self.plot_line,
-            'xvals': self.proc_data_dict['clear_scaling_amp'],
+            'xvals': self.proc_data_dict['scaling_amp'],
             'yvals': self.proc_data_dict['phase'],
             'marker': 'x',
             'linestyle': '',
@@ -503,12 +503,12 @@ class SSROAnalysis(ba.BaseDataAnalysis):
                          extract_only=extract_only,
                          )
 
-        self.params_dict = {'clear_scaling_amp': 'Instrument settings.RO_lutman.M_amp_R0',
+        self.params_dict = {'scaling_amp': 'Instrument settings.RO_lutman.M_amp_R0',
                             'SNR': 'Analysis.SSRO_Fidelity.SNR',
                             'F_a': 'Analysis.SSRO_Fidelity.F_a',
                             'F_d': 'Analysis.SSRO_Fidelity.F_d',
                             }
-        self.numeric_params = ['clear_scaling_amp', 'SNR', 'F_a', 'F_d']
+        self.numeric_params = ['scaling_amp', 'SNR', 'F_a', 'F_d']
 
         if auto:
             self.run_analysis()
@@ -520,7 +520,7 @@ class SSROAnalysis(ba.BaseDataAnalysis):
         #Set output paths
         youngest = np.max(self.raw_data_dict['datetime'])
         youngest += datetime.timedelta(seconds=1)
-        f = '%s_CLEAR_amp_sweep_SNR_optimized' % (youngest.strftime("%H%M%S"))
+        f = '%s_amp_sweep_SNR_optimized' % (youngest.strftime("%H%M%S"))
         d = '%s' % (youngest.strftime("%Y%m%d"))
         folder = os.path.join(a_tools.datadir, d, f)
         self.raw_data_dict['folder'] = [folder]
@@ -531,13 +531,13 @@ class SSROAnalysis(ba.BaseDataAnalysis):
 
         #Remove None entries
         snr = self.raw_data_dict['SNR']
-        amps = self.raw_data_dict['clear_scaling_amp']
+        amps = self.raw_data_dict['scaling_amp']
         mask = np.intersect1d(np.where(snr != None), np.where(amps != None))
         if self.options_dict.get('fit_cutoff', True):
             mask2 = np.where(amps < self.options_dict.get('fit_cutoff', 0.1))
             mask = np.intersect1d(mask, mask2)
 
-        self.proc_data_dict['clear_scaling_amp'] = amps[mask]
+        self.proc_data_dict['scaling_amp'] = amps[mask]
         self.proc_data_dict['SNR'] = snr[mask]
         self.proc_data_dict['F_a'] = self.raw_data_dict['F_a'][mask]
         self.proc_data_dict['F_d'] = self.raw_data_dict['F_d'][mask]
@@ -546,7 +546,7 @@ class SSROAnalysis(ba.BaseDataAnalysis):
     def run_fitting(self):
         self.fit_res = {}
         SNR = self.proc_data_dict['SNR']
-        amp = self.proc_data_dict['clear_scaling_amp']
+        amp = self.proc_data_dict['scaling_amp']
 
         def line(x, a):
             return np.sqrt(a) * x
@@ -561,22 +561,22 @@ class SSROAnalysis(ba.BaseDataAnalysis):
 
     def prepare_plots(self):
         name = ''
-        self.plot_dicts[name + 'CLEAR_vs_SNR_fit'] = {
+        self.plot_dicts[name + 'amp_vs_SNR_fit'] = {
             'plotfn': self.plot_fit,
-            'ax_id': name + 'CLEAR_vs_Ramsey',
+            'ax_id': name + 'amp_vs_Ramsey',
             'zorder': 5,
             'fit_res': self.fit_res['snr_fit'],
-            'xvals': self.proc_data_dict['clear_scaling_amp'],
+            'xvals': self.proc_data_dict['scaling_amp'],
             'marker': '',
             'linestyle': '-',
             'setlabel': 'SNR fit',
             'do_legend': True,
         }
-        self.plot_dicts[name + 'CLEAR_vs_SNR_scatter'] = {
+        self.plot_dicts[name + 'amp_vs_SNR_scatter'] = {
             'plotfn': self.plot_line,
-            'ax_id': name + 'CLEAR_vs_Ramsey',
+            'ax_id': name + 'amp_vs_Ramsey',
             'zorder': 0,
-            'xvals': self.proc_data_dict['clear_scaling_amp'],
+            'xvals': self.proc_data_dict['scaling_amp'],
             'xlabel': 'CLEAR scaling amplitude',
             'xunit': 'V',
             'yvals': self.proc_data_dict['SNR'],
@@ -587,22 +587,22 @@ class SSROAnalysis(ba.BaseDataAnalysis):
             'setlabel': 'SNR data',
             'do_legend': True,
         }
-        self.plot_dicts[name + 'CLEAR_vs_Fa'] = {
+        self.plot_dicts[name + 'amp_vs_Fa'] = {
             'plotfn': self.plot_line,
             'zorder': 0,
-            'ax_id': name + 'CLEAR_vs_F',
-            'xvals': self.proc_data_dict['clear_scaling_amp'],
+            'ax_id': name + 'amp_vs_F',
+            'xvals': self.proc_data_dict['scaling_amp'],
             'yvals': self.proc_data_dict['F_a'],
             'marker': 'x',
             'linestyle': '',
             'setlabel': '$F_a$ data',
             'do_legend': True,
         }
-        self.plot_dicts[name + 'CLEAR_vs_Fd'] = {
+        self.plot_dicts[name + 'amp_vs_Fd'] = {
             'plotfn': self.plot_line,
             'zorder': 1,
-            'ax_id': name + 'CLEAR_vs_F',
-            'xvals': self.proc_data_dict['clear_scaling_amp'],
+            'ax_id': name + 'amp_vs_F',
+            'xvals': self.proc_data_dict['scaling_amp'],
             'yvals': self.proc_data_dict['F_d'],
             'marker': 'x',
             'linestyle': '',
