@@ -1,3 +1,9 @@
+'''
+Toolset to analyse measurement-induced Dephasing of qubits
+
+Hacked together by Rene Vollmer
+'''
+
 import pycqed
 from pycqed.analysis_v2.quantum_efficiency_analysis import RamseyAnalysis
 import pycqed.analysis_v2.base_analysis as ba

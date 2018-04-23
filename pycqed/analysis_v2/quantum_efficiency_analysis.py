@@ -1,10 +1,13 @@
 '''
-Collection of classes to analyse Quantum efficiency measurements as a function of TWPA Pump frequency and power.
-General procedure is: for each TWPA Pump frequency and power value,
- - find factor 'a' of the quadratic scaling of the Single-Shot-Readout as a function of clear_scaling_amp (see SSROAnalysis class)
- - find sigma from the Gaussian fit of the Ramsey as a function of clear_scaling_amp (see RamseyAnalysis class)
+Collection of classes to analyse Quantum efficiency measurements.
+General procedure is:
+ - find factor 'a' of the quadratic scaling of the Single-Shot-Readout as a function of scaling_amp (see SSROAnalysis class)
+ - find sigma from the Gaussian fit of the Ramsey as a function of scaling_amp (see RamseyAnalysis class)
  - Calculate eta = a * sigma**2 / 2 (see QuantumEfficiencyAnalysis class)
 For details, see https://arxiv.org/abs/1711.05336
+
+Lastly, the QuantumEfficiencyAnalysisTWPA class allows for analysing the efficiency
+as a function of TWPA power and frequency.
 
 Hacked together by Rene Vollmer
 '''
@@ -546,7 +549,7 @@ class SSROAnalysis(ba.BaseDataAnalysis):
         amp = self.proc_data_dict['clear_scaling_amp']
 
         def line(x, a):
-            return np.sqrt(a * (x ** 2))
+            return np.sqrt(a) * x
 
         gmodel = lmfit.models.Model(line)
         snr_fit = gmodel.fit(SNR, x=amp, a=5)
