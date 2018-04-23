@@ -47,7 +47,17 @@ class BaseDataAnalysis(object):
         self.prepare_plots()   # specify default plots
         if not self.extract_only:
             self.plot(key_list='auto')  # make the plots
+
     """
+
+    fit_res = None
+    '''
+    Dictionary containing fitting objects
+    '''
+    fit_dict = None
+    '''
+    Dictionary containing fitting results
+    '''
 
     def __init__(self, t_start: str = None, t_stop: str = None,
                  label: str = '', data_file_path: str = None,
