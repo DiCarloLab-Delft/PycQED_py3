@@ -14,7 +14,7 @@ t_start = '20180414_121500'
 t_stop = '20180414_141000'
 
 
-class Test_Cryoscope_analysis(unittest.TestCase):
+class Test_DAC_scan_analysis(unittest.TestCase):
 
     @classmethod
     def setUpClass(self):
@@ -27,6 +27,7 @@ class Test_Cryoscope_analysis(unittest.TestCase):
             's21_normalize_per_dac': True,
             's21_normalize_global': True, 's21_percentile': 70,
             'verbose': True,
+            'dac_key': 'Instrument settings.fluxcurrent.' + dac,
         }
         d = ma.FluxFrequency(t_start=t_start, t_stop=t_stop, label='_spectroscopy',
                              options_dict=dic, is_spectroscopy=True, temp_keys={'T_mc': 'Fridge monitor.T_MC'},
@@ -40,6 +41,7 @@ class Test_Cryoscope_analysis(unittest.TestCase):
             'fitparams_corr_fact': 1e9,
             'qubit_freq': 6.95e9,
             'verbose': True,
+            'dac_key': 'Instrument settings.fluxcurrent.' + dac,
         }
         d = ma.FluxFrequency(t_start=t_start, t_stop=t_stop, label='_Resonator',
                              options_dict=dic, is_spectroscopy=False, extract_fitparams=True,
