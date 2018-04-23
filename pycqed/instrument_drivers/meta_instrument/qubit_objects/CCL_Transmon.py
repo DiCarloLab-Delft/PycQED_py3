@@ -4,9 +4,11 @@ import numpy as np
 from autodepgraph.graph_v2 import AutoDepGraph_DAG
 try:
     from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
+    import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
 except ImportError:
     logging.warning('Could not import OpenQL')
     sqo = None
+    mqo = None
 
 from pycqed.utilities.general import gen_sweep_pts
 from .qubit_object import Qubit
@@ -2010,8 +2012,7 @@ class CCLight_Transmon(Qubit):
                        artificial_detuning: float=None,
                        freq_qubit: float=None,
                        label: str='',
-                       analyze=True, close_fig=True, update=True,
-                       msmt_induced_dephasing_ramsey=False):
+                       analyze=True, close_fig=True, update=True):
         # docstring from parent class
         # N.B. this is a good example for a generic timedomain experiment using
         # the CCL transmon.
@@ -2047,24 +2048,52 @@ class CCLight_Transmon(Qubit):
             'frequency', freq_qubit -
             self.mw_freq_mod.get() + artificial_detuning)
 
+        p = sqo.Ramsey(times, qubit_idx=self.cfg_qubit_nr(),
+                     platf_cfg=self.cfg_openql_platform_fn())
+        s = swf.OpenQL_Sweep(openql_program=p,
+                           CCL=self.instr_CC.get_instr(),
+                           parameter_name='Time', unit='s')
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(times)
+        
+        d = self.int_avg_det
+        MC.set_detector_function(d)
+        MC.run('Ramsey'+label+self.msmt_suffix)
+        if analyze:
+            a = ma.Ramsey_Analysis(auto=True, close_fig=True,
+                                   freq_qubit=freq_qubit,
+                                   artificial_detuning=artificial_detuning)
+            if update:
+                self.T2_star(a.T2_star['T2_star'])
+                return a.T2_star
 
-        if not msmt_induced_dephasing_ramsey:
-            p = sqo.Ramsey(times, qubit_idx=self.cfg_qubit_nr(),
-                         platf_cfg=self.cfg_openql_platform_fn())
-            s = swf.OpenQL_Sweep(openql_program=p,
-                               CCL=self.instr_CC.get_instr(),
-                               parameter_name='Time', unit='s')
-            MC.set_sweep_function(s)
-            MC.set_sweep_points(times)
+    def measure_msmt_induced_dephasing_ramsey(self, MC=None,
+                       label: str='',
+                       analyze=True, close_fig=True, update=True, 
+                       cross_target_qubits=None):
+        # docstring from parent class
+        # N.B. this is a good example for a generic timedomain experiment using
+        # the CCL transmon.
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        self.prepare_for_timedomain()
+        angles = np.arange(0, 421, 20)
+        if cross_target_qubit==None:
+          qubits=[self.cfg_qubit_nr()]
         else:
-            angles = np.arange(0, 421, 20)
-            p = sqo.Ramsey_msmt_induced_dephasing(angles, qubit_idx=self.cfg_qubit_nr(),
-                         platf_cfg=self.cfg_openql_platform_fn())
-            s = swf.OpenQL_Sweep(openql_program=p,
-                               CCL=self.instr_CC.get_instr(),
-                               parameter_name='angle', unit='degree')
-            MC.set_sweep_function(s)
-            MC.set_sweep_points(angles)
+            qubits=[]
+            for cross_target_qubit in cross_target_qubits:
+                qubits.append(cross_target_qubit)
+            qubits.append(self.cfg_qubit_nr())
+
+        p = mqo.Ramsey_msmt_induced_dephasing(angles, qubits=qubits,
+                     platf_cfg=self.cfg_openql_platform_fn())
+        s = swf.OpenQL_Sweep(openql_program=p,
+                           CCL=self.instr_CC.get_instr(),
+                           parameter_name='angle', unit='degree')
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(angles)
         d = self.int_avg_det
         MC.set_detector_function(d)
         MC.run('Ramsey'+label+self.msmt_suffix)
@@ -2072,14 +2101,10 @@ class CCLight_Transmon(Qubit):
             a = ma.Ramsey_Analysis(auto=True, close_fig=True,
                                    freq_qubit=freq_qubit,
                                    artificial_detuning=artificial_detuning,
-                                   phase_sweep_only=msmt_induced_dephasing_ramsey)
-            if update:
-                if msmt_induced_dephasing_ramsey:
-                    return {'coherence':a.fit_res.params['amplitude'].value, 'phase':(a.fit_res.params['phase'].value)*360/(2*np.pi)% 360}
+                                   phase_sweep_only=True)
+            return {'coherence':a.fit_res.params['amplitude'].value, 'phase':(a.fit_res.params['phase'].value)*360/(2*np.pi)% 360}
                     # dict containing val and stderr
-                else:
-                    self.T2_star(a.T2_star['T2_star'])
-                    return a.T2_star
+
 
 
     def measure_echo(self, times=None, MC=None,
@@ -2377,67 +2402,99 @@ class CCLight_Transmon(Qubit):
         self._dag = dag
         return dag
 
-    #functions for quantum efficiency mweasurements
-    def measure_measurement_induced_dephasing(self, amps, nested_MC=None):
+    #functions for quantum efficiency measurements and crossdephasing measurements
+    def measure_msmt_induced_dephasing_sweeping_amps(self, amps_rel=None, 
+                                  nested_MC=None, cross_target_qubits=None):
         if nested_MC is None:
             nested_MC = self.instr_nested_MC.get_instr()
+        if cross_target_qubit==None:
+            cfg_qubit_nrs = [self.cfg_qubit_nr()]
+            optimization_M_amps = [self.ro_pulse_amp()]
+            optimization_M_amp_down0s = [self.ro_pulse_down_amp0()]
+            optimization_M_amp_down1s = [self.ro_pulse_down_amp1()]
+            readout_pulse_length = [self.ro_pulse_length()+self.ro_pulse_down_length0()+self.ro_pulse_down_length1()]
+            if amps_rel==None:
+                amps_rel=np.linspace(0,0.5,11)
+        else:
+            cfg_qubit_nrs = []
+            optimization_M_amps = []
+            optimization_M_amp_down0s = []
+            optimization_M_amp_down1s = []
+            readout_pulse_lengths = []
+            for cross_target_qubit in cross_target_qubits:
+                cfg_qubit_nrs.append(cross_target_qubit.cfg_qubit_nr())
+                optimization_M_amp.append(cross_target_qubit.ro_pulse_amp())
+                optimization_M_amp_down0 = cross_target_qubit.ro_pulse_down_amp0()
+                optimization_M_amp_down1 = cross_target_qubit.ro_pulse_down_amp1()
+                readout_pulse_lengths = cross_target_qubit.ro_pulse_length()+cross_target_qubit.ro_pulse_down_length0()+cross_target_qubit.ro_pulse_down_length1()
+            readout_pulse_length = np.max(readout_pulse_lengths)
         self.ro_pulse_type('up_down_down_final')
         RO_lutman = self.instr_LutMan_RO.get_instr()
         RO_lutman.set('M_final_amp_R{}'.format(self.cfg_qubit_nr()), self.ro_pulse_amp())
-        readout_pulse_length= self.ro_pulse_length()+self.ro_pulse_down_length0()+self.ro_pulse_down_length1()
         old_delay = self.ro_acq_delay()
-        self.ro_acq_delay(old_delay+readout_pulse_length+
+        self.ro_acq_delay(old_delay + readout_pulse_length +
                           RO_lutman.get('M_final_delay_R{}'.format(self.cfg_qubit_nr())))
         self.ro_acq_weight_type('SSB')
         self.prepare_for_timedomain()
         old_ro_prepare_state=self.cfg_prepare_ro_awg()
         self.cfg_prepare_ro_awg(False)
-        sweep_function=swf.lutman_par_depletion_pulse_global_scaling(LutMan=RO_lutman, resonator_number=self.cfg_qubit_nr(),
-                                                                    optimization_M_amp=self.ro_pulse_amp(), optimization_M_amp_down0=self.ro_pulse_down_amp0(),
-                                                                    optimization_M_amp_down1=self.ro_pulse_down_amp1(), upload=True)
-        d = det.Function_Detector(self.measure_ramsey, msmt_kw={'msmt_induced_dephasing_ramsey':True},result_keys=['coherence', 'phase'])
+        sweep_function=swf.lutman_par_depletion_pulse_global_scaling(LutMan=RO_lutman, resonator_numbers=cfg_qubit_nrs,
+                                                                    optimization_M_amps=optimization_M_amps, optimization_M_amp_down0s=optimization_M_amp_down0s,
+                                                                    optimization_M_amp_down1s=optimization_M_amp_down1s, upload=True)
+        d = det.Function_Detector(self.measure_msmt_induced_dephasing, msmt_kw={'cross_target_qubits': cross_target_qubits}, result_keys=['coherence', 'phase'])
         nested_MC.set_sweep_function(sweep_function)
-        nested_MC.set_sweep_points(amps)
+        nested_MC.set_sweep_points(amps_rel)
         nested_MC.set_detector_function(d)
-        nested_MC.run('CLEAR_amp_sweep_ramsey')
-        ma.MeasurementAnalysis(label='CLEAR_amp_sweep_ramsey', plot_all=False,
+        if cross_target_qubits==None:
+            label = 'ro_amp_sweep_ramsey'
+        else: 
+            label = 'ro_amp_sweep_ramsey_trgt_' + cross_target_qubits[0].name + '_measured_'+self.name
+        nested_MC.run(label)
+        ma.MeasurementAnalysis(label=label, plot_all=False,
                                auto=True)
         self.ro_pulse_type('up_down_down')
         self.cfg_prepare_ro_awg(old_ro_prepare_state)
         self.ro_acq_delay(old_delay)
 
-    def measure_SNR_sweeping_amps(self, amps, nr_shots=2*4094, nested_MC=None):
-        print('refrehed')
+    def measure_SNR_sweeping_amps(self, amps_rel, nr_shots=2*4094, nested_MC=None):
         if nested_MC is None:
             nested_MC = self.instr_nested_MC.get_instr()
         self.prepare_for_timedomain()
         RO_lutman = self.instr_LutMan_RO.get_instr()
         old_ro_prepare_state = self.cfg_prepare_ro_awg()
         self.cfg_prepare_ro_awg(False)
-        sweep_function = swf.lutman_par_depletion_pulse_global_scaling(LutMan=RO_lutman, resonator_number=self.cfg_qubit_nr(),
-                                                                    optimization_M_amp=self.ro_pulse_amp(), optimization_M_amp_down0=self.ro_pulse_down_amp0(),
-                                                                    optimization_M_amp_down1=self.ro_pulse_down_amp1(), upload=True)
-        d = det.Function_Detector(self.measure_ssro, msmt_kw={'nr_shots': nr_shots, 'analyze': True, 'SNR_detector': True, 'cal_residual_excitation':False}, result_keys=['SNR', 'F_d', 'F_a'])
+        sweep_function = swf.lutman_par_depletion_pulse_global_scaling(LutMan=RO_lutman, 
+                              resonator_numbers=[self.cfg_qubit_nr()],
+                              optimization_M_amps=[self.ro_pulse_amp()], 
+                              optimization_M_amp_down0s=[self.ro_pulse_down_amp0()],
+                              optimization_M_amp_down1s=[self.ro_pulse_down_amp1()], 
+                              upload=True)
+        d = det.Function_Detector(self.measure_ssro, msmt_kw={'nr_shots': nr_shots, 
+                                  'analyze': True, 'SNR_detector': True, 
+                                  'cal_residual_excitation':False}, 
+                                  result_keys=['SNR', 'F_d', 'F_a'])
         nested_MC.set_sweep_function(sweep_function)
-        nested_MC.set_sweep_points(amps)
+        nested_MC.set_sweep_points(amps_rel)
         nested_MC.set_detector_function(d)
-        label='CLEAR_amp_sweep_SNR_optimized'
+        label='ro_amp_sweep_SNR'
         nested_MC.run(label)
         ma.MeasurementAnalysis(label=label, plot_all=False, auto=True)
         self.cfg_prepare_ro_awg(old_ro_prepare_state)
 
 
-    def measure_quantum_efficiency(self, amps=np.linspace(0, 0.05, 11), nr_shots=2*4094):
+    def measure_quantum_efficiency(self, amps_rel=None, nr_shots=2*4094):
         # requires the cc light to have the readout time configured equal
         # to the measurement and depletion time + 60 ns buffer
         # it requires an optimized depletion pulse
+        if amps_rel==None:
+            amps_rel=np.linspace(0,0.5,11)
         self.cfg_prepare_ro_awg(True)
-        self.measure_measurement_induced_dephasing(amps=amps)
+        self.measure_msmt_induced_dephasing_sweeping_amps(amps=amps_rel)
         readout_pulse_length = self.ro_pulse_length()+self.ro_pulse_down_length0()+self.ro_pulse_down_length1()
         self.ro_acq_integration_length(readout_pulse_length+100e-9)
         self.calibrate_optimal_weights(verify=False) #calibrating optimal weights
         self.measure_ssro(cal_residual_excitation=True, SNR_detector=True, nr_shots=nr_shots) #calibrating residual excitation and relaxation at high power
-        self.measure_SNR_sweeping_amps(amps=amps)
+        self.measure_SNR_sweeping_amps(amps=amps_rel)
         self.ro_pulse_type('up_down_down') #setting the pulse back to optimal depletion
         eta, u_eta = ma.fit_eta()
         return {'eta': eta, 'u_eta': u_eta}
