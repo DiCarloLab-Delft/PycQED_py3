@@ -4139,7 +4139,7 @@ class Ramsey_Analysis(TD_Analysis):
     Most kw parameters for Rabi_Analysis are also used here.
     """
 
-    def __init__(self, label='Ramsey', phase_sweep_only=False,**kw):
+    def __init__(self, label='Ramsey', phase_sweep_only=False, **kw):
         kw['label'] = label
         kw['h5mode'] = 'r+'
         self.phase_sweep_only = phase_sweep_only
@@ -9239,7 +9239,7 @@ def SSB_demod(Ivals, Qvals, alpha=1, phi=0, I_o=0, Q_o=0, IF=10e6, predistort=Tr
 def fit_eta(timestamp_dephasing=None, timestamp_SNR=None, shift=None, label=None, dephasing_data=None):
     #used to extract the quantum efficiency
     if timestamp_dephasing==None:
-        data_file = MeasurementAnalysis(label='CLEAR_amp_sweep_ramsey', auto=True, TwoD=False)
+        data_file = MeasurementAnalysis(label='ro_amp_sweep_ramsey', auto=True, TwoD=False)
         timestamp_dephasing=data_file.timestamp_string
     else:
         data_file = MeasurementAnalysis(timestamp=timestamp_dephasing, auto=True, TwoD=False)
@@ -9256,7 +9256,7 @@ def fit_eta(timestamp_dephasing=None, timestamp_SNR=None, shift=None, label=None
 
     if timestamp_SNR==None:
         if label==None:
-            data_file = MeasurementAnalysis(label='CLEAR_amp_sweep_SNR', auto=True, TwoD=False)
+            data_file = MeasurementAnalysis(label='ro_amp_sweep_SNR', auto=True, TwoD=False)
             timestamp_SNR=data_file.timestamp_string
         else:
             data_file = MeasurementAnalysis(label=label, auto=True, TwoD=False)
@@ -9304,7 +9304,7 @@ def fit_eta(timestamp_dephasing=None, timestamp_SNR=None, shift=None, label=None
     else:
         plt.title(r'$\eta$ = {:.3g}+/-{:.3g}, shift {:.3g} kHz'.format(eta,u_eta, shift)+'_'+timestamp_SNR)
 
-    plt.xlabel('clear amp scaling (V)')
+    plt.xlabel('ro amp scaling (V)')
     plt.ylabel('SNR, coherence')
     plt.legend()
     fig_format='png'

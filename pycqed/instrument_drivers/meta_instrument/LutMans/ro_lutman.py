@@ -126,8 +126,7 @@ class Base_RO_LutMan(Base_LutMan):
 
             # 3-step RO pulse with ramp-up and double depletion
             M_down0 = wf.block_pulse(self.get('M_down_amp0_R{}'.format(res)),
-                                     self.get(
-                                         'M_down_length0_R{}'.format(res)),  # ns
+                                     self.get('M_down_length0_R{}'.format(res)),  # ns
                                      sampling_rate=self.get('sampling_rate'),
                                      delay=0,
                                      phase=self.get('M_down_phi0_R{}'.format(res)))
