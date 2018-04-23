@@ -22,6 +22,7 @@ import json
 import lmfit
 import h5py
 from pycqed.measurement.hdf5_data import write_dict_to_hdf5
+import copy
 
 
 class BaseDataAnalysis(object):
@@ -395,6 +396,7 @@ class BaseDataAnalysis(object):
 
         if self.verbose:
             print('Saving figures to %s' % savedir)
+
         for key in key_list:
             if self.presentation_mode:
                 savename = os.path.join(savedir, savebase + key + tstag + 'presentation' + '.' + fmt)
@@ -449,7 +451,10 @@ class BaseDataAnalysis(object):
         for k in key_list:
             save_dict[k] = self.raw_data_dict[k]
 
+
         filepath = os.path.join(savedir, savebase + tstag + '.' + fmt)
+        if self.verbose:
+            print('Saving raw data to %s' % filepath)
         with open(filepath, 'w') as file:
             json.dump(save_dict, file, cls=NumpyJsonEncoder, indent=4)
         print('Data saved to "{}".'.format(filepath))
@@ -517,6 +522,9 @@ class BaseDataAnalysis(object):
         if hasattr(self, 'fit_res') and self.fit_res is not None:
             fn = a_tools.measurement_filename(a_tools.get_folder(self.timestamps[0]))
             fn = self.options_dict.get('analysis_result_file', fn)
+            if self.verbose:
+                print('Saving fitting results to %s' % fn)
+            
             with h5py.File(fn, 'a') as data_file:
                 try:
                     analysis_group = data_file.create_group('Analysis')
@@ -534,7 +542,7 @@ class BaseDataAnalysis(object):
                         del analysis_group[fr_key]
                         fr_group = analysis_group.create_group(fr_key)
                     
-                    d = self._convert_dict_rec(self.fit_res)
+                    d = self._convert_dict_rec(copy.deepcopy(self.fit_res))
                     write_dict_to_hdf5(d, entry_point=fr_group)
 
     @staticmethod
@@ -753,6 +761,8 @@ class BaseDataAnalysis(object):
         plot_title = pdict.get('title', None)
         plot_xrange = pdict.get('xrange', None)
         plot_yrange = pdict.get('yrange', None)
+        if pdict.get('color', False):
+            plot_linekws['color'] = pdict.get('color')
 
         # plot_multiple = pdict.get('multiple', False)
         plot_linestyle = pdict.get('linestyle', '-')
