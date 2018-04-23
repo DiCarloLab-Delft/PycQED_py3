@@ -209,15 +209,15 @@ class DeviceCCL(Instrument):
         else:
             using_QWG = False
         if not using_QWG:
-          # awg.upload_codeword_program(awgs=[0])
-          awg_hack_program_cz = """
+            # awg.upload_codeword_program(awgs=[0])
+            awg_hack_program_cz = """
           while (1) {
             waitDIOTrigger();
             playWave("dev8005_wave_ch1_cw001", "dev8005_wave_ch2_cw001");
           }
           """
-          awg.configure_awg_from_string(0, awg_hack_program_cz)
-          awg.configure_codeword_protocol()
+            awg.configure_awg_from_string(0, awg_hack_program_cz)
+            awg.configure_codeword_protocol()
 
         awg.start()
 
@@ -241,7 +241,8 @@ class DeviceCCL(Instrument):
             qb.ro_acq_weight_type(self.ro_acq_weight_type())
             qb.ro_acq_integration_length(self.ro_acq_integration_length())
             qb.ro_acq_digitized(self.ro_acq_digitized())
-            qb.ro_acq_input_average_length(4096/1.8e9)#hardcoded because UHFLI is not stable for arbitrary values
+            # hardcoded because UHFLI is not stable for arbitrary values
+            qb.ro_acq_input_average_length(4096/1.8e9)
 
             acq_device = qb.instr_acquisition()
 
@@ -770,7 +771,6 @@ class DeviceCCL(Instrument):
         else:
             raise ValueError('Waveform shape not understood')
 
-
         awg = fl_lutman.AWG.get_instr()
         using_QWG = (awg.__class__.__name__ == 'QuTech_AWG_Module')
 
@@ -816,7 +816,35 @@ class DeviceCCL(Instrument):
     def measure_cryoscope(self, q0: str, times,
                           MC=None,
                           experiment_name='Cryoscope',
+                          waveform_name: str='square',
+                          max_delay: float='auto',
                           prepare_for_timedomain: bool=True):
+        """
+        Performs a cryoscope experiment to measure the shape of a flux pulse.
+
+        Args:
+            q0  (str)     :
+                name of the target qubit
+
+            times   (array):
+                array of measurment times
+
+            experiment_name (str):
+                used to label the experiment
+
+            waveform_name (str {"square", "custom_wf"}) :
+                defines the name of the waveform used in the
+                cryoscope. Valid values are either "square" or "custom_wf"
+
+            max_delay {float, "auto"} :
+                determines the delay in the delay in the pusle sequence
+                if set to "auto" this is automatically set to the largest
+                pulse duration for the cryoscope.
+
+            prepare_for_timedomain (bool):
+                calls self.prepare_for_timedomain on start
+        """
+
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
         if MC is None:
@@ -825,16 +853,27 @@ class DeviceCCL(Instrument):
         assert q0 in self.qubits()
         q0idx = self.find_instrument(q0).cfg_qubit_nr()
 
+        if max_delay == 'auto':
+            max_delay = np.max(times) + 40e-9
         p = mqo.Cryoscope(q0idx, buffer_time1=20e-9,
-                          buffer_time2=2000e-9,
+                          buffer_time2=max_delay,
                           platf_cfg=self.cfg_openql_platform_fn())
         self.instr_CC.get_instr().eqasm_program(p.filename)
         self.instr_CC.get_instr().start()
 
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
-        sw = swf.FLsweep(fl_lutman, fl_lutman.sq_length,
-                         realtime_loading=True,
-                         waveform_name='square')
+
+        if waveform_name == 'square':
+            sw = swf.FLsweep(fl_lutman, fl_lutman.sq_length,
+                             realtime_loading=True,
+                             waveform_name='square')
+        elif waveform_name == 'custom_wf':
+            sw = swf.FLsweep(fl_lutman, fl_lutman.custom_wf_length,
+                             realtime_loading=True,
+                             waveform_name='custom_wf')
+        else:
+            raise ValueError('waveform_name "{}" should be either '
+                             '"square" or "custom_wf"'.format(waveform_name))
         MC.set_sweep_function(sw)
         MC.set_sweep_points(times)
         d = self.get_int_avg_det(values_per_point=2,
@@ -1032,8 +1071,6 @@ class DeviceCCL(Instrument):
         dag.add_node(self.name + ' mw-ro timing')
         dag.add_edge(self.name + ' mw-ro timing', 'AWG8 MW-staircase')
 
-
-
         dag.add_node(self.name + ' mw-vsm timing')
         dag.add_edge(self.name + ' mw-vsm timing', self.name + ' mw-ro timing')
 
@@ -1092,4 +1129,3 @@ class DeviceCCL(Instrument):
 
         self._dag = dag
         return dag
-
