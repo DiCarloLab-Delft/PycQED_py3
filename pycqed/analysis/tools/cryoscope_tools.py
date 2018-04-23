@@ -4,7 +4,7 @@ Brian Tarasinski
 Dec 2017
 Edited by Adriaan Rol
 """
-
+from typing import Union
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker
@@ -66,6 +66,9 @@ def fft_based_freq_guess_complex(y):
     offset_guess = np.mean(y)
 
     return freq_guess, phase_guess, offset_guess, amp_guess
+
+
+
 
 
 class CryoscopeAnalyzer:
@@ -167,38 +170,44 @@ class CryoscopeAnalyzer:
         else:
             raise NotImplementedError('Add a "freq_to_amp" method.')
 
-    def plot_short_time_fft(self, window_size=100):
+    def plot_short_time_fft(self, ax=None,
+                            title='Short time Fourier Transform',
+                            window_size=100, **kw):
+
+        if ax is None:
+            ax = plt.gca()
+        ax.set_title(title)
 
         f, t, Zxx = ss.stft(self.norm_data, fs=self.sampling_rate,
                             nperseg=window_size,
                             noverlap=0.95 * window_size, return_onesided=False)
         m = np.argsort(f)
-
-        ax = plt.gca()
-
         ax.pcolormesh(self.time[0] + t, f[m], np.abs(Zxx)[m, :])
-        ax.set_title('Short time Fourier Transform')
         ax.set_ylabel('Frequency')
         ax.set_xlabel('Time')
+
         formatter = matplotlib.ticker.EngFormatter(unit='s')
         ax.xaxis.set_major_formatter(formatter)
         formatter = matplotlib.ticker.EngFormatter(unit='Hz')
         ax.yaxis.set_major_formatter(formatter)
 
-    def plot_raw_data(self, style=".-"):
-        ax = plt.gca()
-        ax.set_title("Raw cryoscope data")
+    def plot_raw_data(self, ax=None, title="Raw cryoscope data",
+                      style=".-", **kw):
+        if ax is None:
+            ax = plt.gca()
+        ax.set_title(title)
         ax.plot(self.time, self.data.real, style, label="Re", color="C0")
         ax.plot(self.time, self.data.imag, style, label="Im", color="C1")
         ax.legend()
-        ax.set_xlabel("Time")
-        ax.set_ylabel("Amplitude")
-        formatter = matplotlib.ticker.EngFormatter(unit='s')
-        ax.xaxis.set_major_formatter(formatter)
+        set_xlabel(ax, 'Time', 's')
+        set_ylabel(ax, "Amplitude", 'a.u.')
 
-    def plot_normalized_data(self, style=".-"):
-        ax = plt.gca()
-        ax.set_title("Normalized cryoscope data")
+    def plot_normalized_data(self, ax=None, title='Normalized cryoscope data',
+                             style=".-", **kw):
+        if ax is None:
+            ax = plt.gca()
+        ax.set_title(title)
+
         ax.plot(
             self.time,
             self.norm_data.real,
@@ -212,9 +221,12 @@ class CryoscopeAnalyzer:
         formatter = matplotlib.ticker.EngFormatter(unit='s')
         ax.xaxis.set_major_formatter(formatter)
 
-    def plot_demodulated_data(self, style=".-"):
-        ax = plt.gca()
-        ax.set_title("Demodulated cryoscope data")
+    def plot_demodulated_data(self, ax=None,
+                              title='Demodulated cryoscope data',
+                              style=".-", **kw):
+        if ax is None:
+            ax = plt.gca()
+        ax.set_title(title)
         ax.plot(
             self.time,
             self.demod_data.real,
@@ -233,47 +245,58 @@ class CryoscopeAnalyzer:
         formatter = matplotlib.ticker.EngFormatter(unit='s')
         ax.xaxis.set_major_formatter(formatter)
 
-    def plot_normalized_data_circle(self):
-        plt.title("Normalized cryoscope data")
-        plt.xlabel("Re")
-        plt.ylabel("Im")
-        plt.plot(self.norm_data.real, self.norm_data.imag, ".")
+    def plot_normalized_data_circle(self, ax=None,
+                                    title='Normalized cryoscope data', **kw):
+        if ax is None:
+            ax = plt.gca()
+        ax.set_title(title)
+        ax.set_xlabel("Re")
+        ax.set_ylabel("Im")
+        ax.plot(self.norm_data.real, self.norm_data.imag, ".")
 
-    def plot_phase(self, wrap=False):
-        ax = plt.gca()
-        plt.title("Cryoscope demodulated phase")
+    def plot_phase(self, ax=None, title="Cryoscope demodulated phase",
+                   wrap=False, **kw):
+        if ax is None:
+            ax = plt.gca()
+        ax.set_title(title)
         if wrap:
-            plt.plot(self.time, self.phase % (2 * np.pi), ".", color="C0")
+            ax.plot(self.time, self.phase % (2 * np.pi), ".", color="C0")
         else:
-            plt.plot(self.time, self.phase, ".", label="Im", color="C0")
+            ax.plot(self.time, self.phase, ".", label="Im", color="C0")
         set_xlabel(ax, 'Time', 's')
         set_ylabel(ax, 'Phase', 'deg')
 
-    def plot_detuning(self):
-        ax = plt.gca()
-        plt.title("Detuning from demodulation frequency")
-        plt.plot(self.time, self.detuning, ".-", color="C0")
+    def plot_detuning(self, ax=None,
+                      title="Detuning from demodulation frequency", **kw):
+        if ax is None:
+            ax = plt.gca()
+        ax.set_title(title)
+        ax.plot(self.time, self.detuning, ".-", color="C0")
         set_xlabel(ax, 'Time', 's')
         set_ylabel(ax, 'Frequency', 'Hz')
 
-    def plot_frequency(self, nyquists=None, style=".-", show_demod_freq=True):
-        ax = plt.gca()
-        plt.title("Detuning frequency")
+    def plot_frequency(self, ax=None, title='Detuning frequency',
+                       nyquists=None, style=".-", show_demod_freq=True, **kw):
+        if ax is None:
+            ax = plt.gca()
+        ax.set_title(title)
 
         if nyquists is None:
             nyquists = [self.nyquist_order]
         for n in nyquists:
             if show_demod_freq:
-                plt.axhline(-self.demod_freq + self.sampling_rate *
+                ax.axhline(-self.demod_freq + self.sampling_rate *
                             n, linestyle='--', c='grey')
             real_detuning = self.get_real_detuning(n)
             ax.plot(self.time, real_detuning, style)
         set_xlabel(ax, 'Time', 's')
         set_ylabel(ax, 'Frequency', 'Hz')
 
-    def plot_amplitude(self, nyquists=None, style=".-"):
-        ax = plt.gca()
-        plt.title("Cryoscope amplitude")
+    def plot_amplitude(self, ax=None, title='Cryoscope amplitude',
+                       nyquists=None, style=".-", **kw):
+        if ax is None:
+            ax = plt.gca()
+        ax.set_title(title)
         amp = self.get_amplitudes()
         ax.plot(self.time, amp, style)
         set_xlabel(ax, 'Time', 's')
@@ -402,7 +425,7 @@ class DacArchAnalysis:
         """
         return np.polyval(self.poly_fit, amp)
 
-    def freq_to_amp(self, freq, kind='interpolate'):
+    def freq_to_amp(self, freq, kind='root_parabola', **kw):
         """
         Find the amplitude that corresponds to a given frequency, by
         numerically inverting the fit.
@@ -413,6 +436,9 @@ class DacArchAnalysis:
             Only works if freq is in the range of measured dac values.
             "root": Finds the inverse of the model numerical. Slow, but can
             extrapolate.
+
+        **kw : get passed on to methods that implement the different "kind"
+            of calculations.
         """
 
         if kind == 'interpolate':
@@ -433,7 +459,42 @@ class DacArchAnalysis:
         if kind == 'root':
             return np.vectorize(self._freq_to_amp_root)(freq)
 
+        if kind == 'root_parabola':
+            # return self._freq_to_amp_root_parabola(freq, **kw)
+            return freq_to_amp_root_parabola(self.poly_fit, freq, **kw)
+
         raise ValueError("`kind` not understood")
+
+    # def _freq_to_amp_root_parabola(self, freq, positive_branch=True):
+    #     """
+    #     Converts freq in Hz to amplitude.
+
+    #     Requires "poly_fit" to be set to the polynomial values
+    #     extracted from the cryoscope flux arc.
+
+    #     Assumes a parabola to find the roots but should also work for a higher
+    #     order polynomial, except that it will pick the wrong branch.
+
+    #     N.B. this method assumes that the polycoeffs are with respect to the
+    #         amplitude in units of V.
+    #     """
+
+    #     # recursive allows dealing with an array of freqs
+    #     if isinstance(freq, (list, np.ndarray)):
+    #         return np.array([self._freq_to_amp_root_parabola(
+    #             f, positive_branch=positive_branch) for f in freq])
+
+    #     p = np.poly1d(self.poly_fit)
+    #     sols = (p-freq).roots
+
+    #     # sols returns 2 solutions (for a 2nd order polynomial)
+    #     if positive_branch:
+    #         sol = np.max(sols)
+    #     else:
+    #         sol = np.min(sols)
+
+    #     # imaginary part is ignored, instead sticking to closest real value
+    #     return np.real(sol)
 
     def _freq_to_amp_root(self, freq):
         """
@@ -504,3 +565,35 @@ class DacArchAnalysis:
         set_xlabel(ax, "Amplitude", 'V')  # a.u.
         set_ylabel(ax, 'Detuning', 'Hz')
         ax.legend()
+
+
+def freq_to_amp_root_parabola(freq, poly_coeffs, positive_branch=True):
+    """
+    Converts freq in Hz to amplitude in V.
+
+    Requires "poly_coeffs" to be set to the polynomial values
+    extracted from the cryoscope flux arc.
+
+    Assumes a parabola to find the roots but should also work for a higher
+    order polynomial, except that it will pick the wrong branch.
+
+    N.B. this method assumes that the polycoeffs are with respect to the
+        amplitude in units of V.
+    """
+    # recursive allows dealing with an array of freqs
+    if isinstance(freq, (list, np.ndarray)):
+        return np.array([freq_to_amp_root_parabola(
+            f, poly_coeffs=poly_coeffs,
+            positive_branch=positive_branch) for f in freq])
+
+    p = np.poly1d(poly_coeffs)
+    sols = (p-freq).roots
+
+    # sols returns 2 solutions (for a 2nd order polynomial)
+    if positive_branch:
+        sol = np.max(sols)
+    else:
+        sol = np.min(sols)
+
+    # imaginary part is ignored, instead sticking to closest real value
+    return np.real(sol)

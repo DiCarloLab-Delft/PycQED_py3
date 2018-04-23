@@ -6,7 +6,7 @@ import os
 import numpy as np
 import copy
 from collections import OrderedDict
-
+from inspect import signature
 import numbers
 from matplotlib import pyplot as plt
 from pycqed.analysis import analysis_toolbox as a_tools
@@ -533,7 +533,7 @@ class BaseDataAnalysis(object):
                         # Delete the old group and create a new group (overwrite).
                         del analysis_group[fr_key]
                         fr_group = analysis_group.create_group(fr_key)
-                    
+
                     d = self._convert_dict_rec(self.fit_res)
                     write_dict_to_hdf5(d, entry_point=fr_group)
 
@@ -599,7 +599,8 @@ class BaseDataAnalysis(object):
                     pdict.get('numplotsy', 1), pdict.get('numplotsx', 1),
                     sharex=pdict.get('sharex', False),
                     sharey=pdict.get('sharey', False),
-                    figsize=pdict.get('plotsize', None)  # plotsize None uses .rc_default of matplotlib
+                    figsize=pdict.get('plotsize', None)
+                    # plotsize None uses .rc_default of matplotlib
                 )
 
                 # transparent background around axes for presenting data
@@ -610,9 +611,6 @@ class BaseDataAnalysis(object):
         else:
             for key in key_list:
                 pdict = self.plot_dicts[key]
-
-                plot_id_y = pdict.get('plot_id_y', None)
-                plot_id_x = pdict.get('plot_id_x', None)
                 plot_touching = pdict.get('touching', False)
 
                 if type(pdict['plotfn']) is str:
@@ -622,18 +620,24 @@ class BaseDataAnalysis(object):
 
                 # used to ensure axes are touching
                 if plot_touching:
-                    self.axs[pdict['ax_id']].figure.subplots_adjust(wspace=0, hspace=0)
+                    self.axs[pdict['ax_id']].figure.subplots_adjust(wspace=0,
+                                                                    hspace=0)
 
-                ### ensures the argument convention is preserved
-                # Get the list of parameters the function accepts
-                plotfn_params = signature(plotfn).parameters
-                # Check if pdict is one of them
-                if plotfn_params is not None and 'pdict' in plotfn_params:
-                    plotfn(pdict, axs=self.axs[pdict['ax_id']])
-                else:
+                # Check if pdict is one of the accepted arguments, these are
+                # the plotting functions in the analysis base class.
+                if 'pdict' in signature(plotfn).parameters:
+                    plotfn(pdict=pdict, axs=self.axs[pdict['ax_id']])
+
+                # most normal plot functions also work, it is required
+                # that these accept an "ax" argument to plot on and **kwargs
+                # the pdict is passed in as kwargs to such a function
+                elif 'ax' in signature(plotfn).parameters:
                     # Calling the function passing along anything
                     # defined in the specific plot dict as kwargs
                     plotfn(ax=self.axs[pdict['ax_id']], **pdict)
+                else:
+                    raise ValueError(
+                        '"{}" is not a valid plot function'.format(plotfn))
 
             self.format_datetime_xaxes(key_list)
             self.add_to_plots(key_list=key_list)
