@@ -30,6 +30,8 @@ import pycqed.analysis_v2.dac_scan_analysis as da
 reload(da)
 import pycqed.analysis_v2.quantum_efficiency_analysis as qea
 reload(qea)
+import pycqed.analysis_v2.cross_dephasing_analysis as cda
+reload(cda)
 
 
 from pycqed.analysis_v2.base_analysis import *
@@ -56,3 +58,4 @@ from pycqed.analysis_v2.coherence_analysis import CoherenceTimesAnalysis, Cohere
 from pycqed.analysis_v2.spectroscopy_analysis import Spectroscopy, ResonatorSpectroscopy, VNA_analysis, complex_spectroscopy
 from pycqed.analysis_v2.dac_scan_analysis import FluxFrequency
 from pycqed.analysis_v2.quantum_efficiency_analysis import QuantumEfficiencyAnalysis, RamseyAnalysis, SSROAnalysis, QuantumEfficiencyAnalysisTWPA
+from pycqed.analysis_v2.cross_dephasing_analysis import CrossDephasingAnalysis
