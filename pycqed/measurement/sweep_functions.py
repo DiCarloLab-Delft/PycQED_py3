@@ -935,7 +935,7 @@ class lutman_par_depletion_pulse_global_scaling(Soft_Sweep):
         '''
         for resonator_number in self.LutMan._resonator_codeword_bit_mapping:
             if resonator_number in self.resonator_numbers:
-                i = resonator_number.index(resonator_number)
+                i = self.resonator_numbers.index(resonator_number)
                 self.LutMan.set('M_amp_R{}'.format(resonator_number),
                     val*self.optimization_M_amps[i])
                 self.LutMan.set('M_down_amp0_R{}'.format(resonator_number),
