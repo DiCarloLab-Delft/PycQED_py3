@@ -1512,6 +1512,45 @@ class QuDev_transmon(Qubit):
             ma.MeasurementAnalysis(TwoD=True, auto=True, close_fig=close_fig,
                                    qb_name=self.name)
 
+    def calibrate_drive_mixer_carrier_NN(self, MC=None, update=True, x0=(0., 0.),
+                                      initial_stepsize=0.01, trigger_sep=5e-6):
+        if MC is None:
+            MC = self.MC
+        self.prepare_for_mixer_calibration(suppress='drive LO')
+        cal_elts.mixer_calibration_sequence(
+              trigger_sep, 0, self.RO_acq_marker_channel(),
+              self.pulse_I_channel(), self.pulse_Q_channel())
+        detector = self.int_avg_det_spec
+        meas_grid = [np.random.normal(0.,0.5,100),
+                     np.random.normal(0.,15,100)]
+        meas_grid = list(map(list, zip(*meas_grid)))
+        ad_func_pars = {'adaptive_function': opti.neural_network_opt,
+                        'training_grid': meas_grid,
+                        'hidden_layer_sizes': [(h,) for h in range(14,36,2)],
+                        'minimize': True,
+                        #Probably some additional params for the NN go here
+                        }
+        chI_par = self.AWG.parameters['{}_offset'.format(
+            self.pulse_I_channel())]
+        chQ_par = self.AWG.parameters['{}_offset'.format(
+            self.pulse_Q_channel())]
+        MC.set_sweep_functions([chI_par, chQ_par])
+        MC.set_detector_function(det.IndexDetector(detector, 0))
+        MC.set_adaptive_function_parameters(ad_func_pars)
+        self.AWG.start()
+        MC.run(name='drive_carrier_calibration' + self.msmt_suffix,
+               mode='adaptive')
+        a = ma.OptimizationAnalysis(label='drive_carrier_calibration')
+        # v2 creates a pretty picture of the optimizations
+        ma.OptimizationAnalysis_v2(label='drive_carrier_calibration')
+
+        ch_1_min = a.optimization_result[0][0]
+        ch_2_min = a.optimization_result[0][1]
+        if update:
+            self.pulse_I_offset(ch_1_min)
+            self.pulse_Q_offset(ch_2_min)
+        return ch_1_min, ch_2_min
+
     def calibrate_drive_mixer_carrier(self, MC=None, update=True, x0=(0., 0.),
                                       initial_stepsize=0.01, trigger_sep=5e-6):
         if MC is None:
