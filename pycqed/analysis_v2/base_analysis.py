@@ -22,6 +22,7 @@ import json
 import lmfit
 import h5py
 from pycqed.measurement.hdf5_data import write_dict_to_hdf5
+import copy
 
 
 class BaseDataAnalysis(object):
@@ -47,7 +48,17 @@ class BaseDataAnalysis(object):
         self.prepare_plots()   # specify default plots
         if not self.extract_only:
             self.plot(key_list='auto')  # make the plots
+
     """
+
+    fit_res = None
+    '''
+    Dictionary containing fitting objects
+    '''
+    fit_dict = None
+    '''
+    Dictionary containing fitting results
+    '''
 
     def __init__(self, t_start: str = None, t_stop: str = None,
                  label: str = '', data_file_path: str = None,
@@ -385,6 +396,7 @@ class BaseDataAnalysis(object):
 
         if self.verbose:
             print('Saving figures to %s' % savedir)
+
         for key in key_list:
             if self.presentation_mode:
                 savename = os.path.join(savedir, savebase + key + tstag + 'presentation' + '.' + fmt)
@@ -439,7 +451,10 @@ class BaseDataAnalysis(object):
         for k in key_list:
             save_dict[k] = self.raw_data_dict[k]
 
+
         filepath = os.path.join(savedir, savebase + tstag + '.' + fmt)
+        if self.verbose:
+            print('Saving raw data to %s' % filepath)
         with open(filepath, 'w') as file:
             json.dump(save_dict, file, cls=NumpyJsonEncoder, indent=4)
         print('Data saved to "{}".'.format(filepath))
@@ -507,6 +522,9 @@ class BaseDataAnalysis(object):
         if hasattr(self, 'fit_res') and self.fit_res is not None:
             fn = a_tools.measurement_filename(a_tools.get_folder(self.timestamps[0]))
             fn = self.options_dict.get('analysis_result_file', fn)
+            if self.verbose:
+                print('Saving fitting results to %s' % fn)
+            
             with h5py.File(fn, 'a') as data_file:
                 try:
                     analysis_group = data_file.create_group('Analysis')
@@ -523,7 +541,9 @@ class BaseDataAnalysis(object):
                         # Delete the old group and create a new group (overwrite).
                         del analysis_group[fr_key]
                         fr_group = analysis_group.create_group(fr_key)
-                    write_dict_to_hdf5(self.fit_res, entry_point=fr_group)
+                    
+                    d = self._convert_dict_rec(copy.deepcopy(self.fit_res))
+                    write_dict_to_hdf5(d, entry_point=fr_group)
 
     @staticmethod
     def _convert_dict_rec(obj):
@@ -541,21 +561,15 @@ class BaseDataAnalysis(object):
     @staticmethod
     def _flatten_lmfit_modelresult(model):
         assert type(model) is lmfit.model.ModelResult
-        dic = model.best_values or {}  # to keep compatibility with the old implementation
-
-        used_fields = ['success', 'message', 'best_values', 'params']
-        if sum([1 for k in model.best_values if k in used_fields]) > 0:
-            raise Warning('None of the params of the fit should be named any of this: ' + str(used_fields))
-
+        dic = OrderedDict()
         dic['success'] = model.success
         dic['message'] = model.message
-        dic['best_values'] = model.best_values
         dic['params'] = {}
         for param_name in model.params:
             dic['params'][param_name] = {}
             param = model.params[param_name]
             for k in param.__dict__:
-                if not k.startswith('_'):
+                if not k.startswith('_') and k not in ['from_internal',]:
                     dic['params'][param_name][k] = getattr(param, k)
         return dic
 
@@ -747,6 +761,8 @@ class BaseDataAnalysis(object):
         plot_title = pdict.get('title', None)
         plot_xrange = pdict.get('xrange', None)
         plot_yrange = pdict.get('yrange', None)
+        if pdict.get('color', False):
+            plot_linekws['color'] = pdict.get('color')
 
         # plot_multiple = pdict.get('multiple', False)
         plot_linestyle = pdict.get('linestyle', '-')

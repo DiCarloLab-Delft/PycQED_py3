@@ -26,7 +26,7 @@ from pycqed.measurement import detector_functions as det
 
 import cma
 from pycqed.measurement.optimization import nelder_mead
-
+import datetime
 
 class CCLight_Transmon(Qubit):
 
@@ -2445,13 +2445,18 @@ class CCLight_Transmon(Qubit):
         nested_MC.set_sweep_function(sweep_function)
         nested_MC.set_sweep_points(amps_rel)
         nested_MC.set_detector_function(d)
+        
         if cross_target_qubits==None:
             label = 'ro_amp_sweep_ramsey'
         else: 
             label = 'ro_amp_sweep_ramsey_trgt_' + cross_target_qubits[0].name + '_measured_'+self.name
         nested_MC.run(label)
-        ma.MeasurementAnalysis(label=label, plot_all=False,
-                               auto=True)
+
+
+        label = 'CLEAR_amp_sweep_ramsey'
+        nested_MC.run(label)
+        #ma.MeasurementAnalysis(label=label, plot_all=False, auto=True)
+
         self.ro_pulse_type('up_down_down')
         self.cfg_prepare_ro_awg(old_ro_prepare_state)
         self.ro_acq_delay(old_delay)
@@ -2478,8 +2483,9 @@ class CCLight_Transmon(Qubit):
         nested_MC.set_detector_function(d)
         label='ro_amp_sweep_SNR'
         nested_MC.run(label)
-        ma.MeasurementAnalysis(label=label, plot_all=False, auto=True)
-        self.cfg_prepare_ro_awg(old_ro_prepare_state)
+        
+        #ma.MeasurementAnalysis(label=label, plot_all=False, auto=True)
+        #self.cfg_prepare_ro_awg(old_ro_prepare_state)
 
 
     def measure_quantum_efficiency(self, amps_rel=None, nr_shots=2*4094):
@@ -2490,11 +2496,31 @@ class CCLight_Transmon(Qubit):
             amps_rel=np.linspace(0,0.5,11)
         self.cfg_prepare_ro_awg(True)
         self.measure_msmt_induced_dephasing_sweeping_amps(amps=amps_rel)
+        
+        start_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        self.measure_measurement_induced_dephasing(amps=amps)
         readout_pulse_length = self.ro_pulse_length()+self.ro_pulse_down_length0()+self.ro_pulse_down_length1()
         self.ro_acq_integration_length(readout_pulse_length+100e-9)
         self.calibrate_optimal_weights(verify=False) #calibrating optimal weights
         self.measure_ssro(cal_residual_excitation=True, SNR_detector=True, nr_shots=nr_shots) #calibrating residual excitation and relaxation at high power
+        
         self.measure_SNR_sweeping_amps(amps=amps_rel)
+        
+        end_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+
         self.ro_pulse_type('up_down_down') #setting the pulse back to optimal depletion
-        eta, u_eta = ma.fit_eta()
+
+        options_dict = {
+            'individual_plots': True,
+        }
+        twpa_name = self.instr_TWPA_pump().name
+        qea = ma2.QuantumEfficiencyAnalysis(t_start=start_time, t_end=end_time, options_dict=options_dict,
+                                            twpa_pump_freq_key='Instrument settings.%s.freq' % twpa_name,
+                                            twpa_pump_power_key='Instrument settings.%s.power' % twpa_name)
+
+        qea.run_analysis()
+        eta = qea.fit_dicts['eta']
+        u_eta = qea.fit_dicts['eta_std']
+        
         return {'eta': eta, 'u_eta': u_eta}
