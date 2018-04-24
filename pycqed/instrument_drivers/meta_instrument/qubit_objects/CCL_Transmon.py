@@ -2088,7 +2088,7 @@ class CCLight_Transmon(Qubit):
             qubits.append(self.cfg_qubit_nr())
 
         p = mqo.Ramsey_msmt_induced_dephasing(angles, #qubits=qubits,
-                     platf_cfg=self.cfg_openql_platform_fn())
+                     platf_cfg=self.cfg_openql_platform_fn(), angles=angles)
         s = swf.OpenQL_Sweep(openql_program=p,
                            CCL=self.instr_CC.get_instr(),
                            parameter_name='angle', unit='degree')
