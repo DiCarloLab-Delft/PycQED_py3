@@ -2512,6 +2512,8 @@ class CCLight_Transmon(Qubit):
         label = 'ro_amp_sweep_SNR'
         nested_MC.run(label)
 
+        self.cfg_prepare_ro_awg(old_ro_prepare_state)
+
         #ma.MeasurementAnalysis(label=label, plot_all=False, auto=True)
         #self.cfg_prepare_ro_awg(old_ro_prepare_state)
 
@@ -2544,9 +2546,12 @@ class CCLight_Transmon(Qubit):
         ## Analyse
         options_dict = {
             'individual_plots': True,
-            'verbose' : True,
+            'verbose': True,
+            'ramsey_amplitude_key': 'Analysis.Fitted Params raw w1.amplitude.value',
+            'ramsey_phase_key': 'Analysis.Fitted Params raw w1.phase.value',
         }
-        qea = ma2.QuantumEfficiencyAnalysis(t_start=start_time, t_end=end_time,
+        qea = ma2.QuantumEfficiencyAnalysis(t_start=start_time,
+                                            t_stop=end_time,
                                             options_dict=options_dict)
 
         qea.run_analysis()

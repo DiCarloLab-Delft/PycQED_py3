@@ -105,7 +105,7 @@ class QuantumEfficiencyAnalysisTWPA(ba.BaseDataAnalysis):
 
         self.proc_data_dict['sorted_datetimes'] = dates
         #self.proc_data_dict['sorted_date_limits'] = date_limits
-    
+
     def process_data(self):
         twpa_freqs = self.proc_data_dict['TWPA_freqs']
         twpa_powers = self.proc_data_dict['TWPA_powers']
@@ -292,7 +292,7 @@ class QuantumEfficiencyAnalysis(ba.BaseDataAnalysis):
     def extract_data(self):
         self.ra.extract_data()
         self.ssro.extract_data()
-        
+
         self.raw_data_dict = OrderedDict()
         youngest = max(np.max(self.ra.raw_data_dict['datetime']), np.max(self.ssro.raw_data_dict['datetime']))
         youngest += datetime.timedelta(seconds=1)
@@ -390,10 +390,11 @@ class RamseyAnalysis(ba.BaseDataAnalysis):
                          close_figs=close_figs,
                          extract_only=extract_only
                          )
-
+        rak  =self.options_dict.get('ramsey_amplitude_key', 'Analysis.Fitted Params lin_trans w0.amplitude.value')
+        rap  =self.options_dict.get('ramsey_phase_key', 'Analysis.Fitted Params lin_trans w0.phase.value')
         self.params_dict = {'scaling_amp': 'Instrument settings.RO_lutman.M_amp_R0',
-                            'dephasing': 'Analysis.Fitted Params lin_trans w0.amplitude.value',
-                            'phase': 'Analysis.Fitted Params lin_trans w0.phase.value',
+                            'dephasing': rak,
+                            'phase': rap,
                             }
         self.numeric_params = ['scaling_amp', 'dephasing', 'phase']
 
