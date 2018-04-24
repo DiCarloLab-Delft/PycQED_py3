@@ -2413,8 +2413,7 @@ class CCLight_Transmon(Qubit):
             optimization_M_amp_down0s = [self.ro_pulse_down_amp0()]
             optimization_M_amp_down1s = [self.ro_pulse_down_amp1()]
             readout_pulse_length = self.ro_pulse_length()+self.ro_pulse_down_length0()+self.ro_pulse_down_length1()
-            if amps_rel==None:
-                amps_rel=np.linspace(0,0.5,11)
+            amps_rel = np.linspace(0, 0.5, 11) if amps_rel is None else amps_rel
         else:
             cfg_qubit_nrs = []
             optimization_M_amps = []
