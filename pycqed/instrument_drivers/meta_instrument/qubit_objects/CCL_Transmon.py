@@ -2079,8 +2079,8 @@ class CCLight_Transmon(Qubit):
 
         self.prepare_for_timedomain()
         angles = np.arange(0, 421, 20)
-        if cross_target_qubit==None:
-          qubits=[self.cfg_qubit_nr()]
+        if cross_target_qubits is None:
+          qubits = [self.cfg_qubit_nr()]
         else:
             qubits=[]
             for cross_target_qubit in cross_target_qubits:
@@ -2443,9 +2443,13 @@ class CCLight_Transmon(Qubit):
         old_ro_prepare_state=self.cfg_prepare_ro_awg()
         self.cfg_prepare_ro_awg(False)
         sweep_function=swf.lutman_par_depletion_pulse_global_scaling(LutMan=RO_lutman, resonator_numbers=cfg_qubit_nrs,
-                                                                    optimization_M_amps=optimization_M_amps, optimization_M_amp_down0s=optimization_M_amp_down0s,
-                                                                    optimization_M_amp_down1s=optimization_M_amp_down1s, upload=True)
-        d = det.Function_Detector(self.measure_msmt_induced_dephasing, msmt_kw={'cross_target_qubits': cross_target_qubits}, result_keys=['coherence', 'phase'])
+                                                                     optimization_M_amps=optimization_M_amps,
+                                                                     optimization_M_amp_down0s=optimization_M_amp_down0s,
+                                                                     optimization_M_amp_down1s=optimization_M_amp_down1s,
+                                                                     upload=True)
+        d = det.Function_Detector(self.measure_msmt_induced_dephasing_ramsey,
+                                  msmt_kw={'cross_target_qubits': cross_target_qubits},
+                                  result_keys=['coherence', 'phase'])
         nested_MC.set_sweep_function(sweep_function)
         nested_MC.set_sweep_points(amps_rel)
         nested_MC.set_detector_function(d)
