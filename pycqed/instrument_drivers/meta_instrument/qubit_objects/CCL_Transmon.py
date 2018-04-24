@@ -2499,7 +2499,7 @@ class CCLight_Transmon(Qubit):
         # it requires an optimized depletion pulse
         amps_rel = np.linspace(0,0.5,11) if amps_rel is None else amps_rel
         self.cfg_prepare_ro_awg(True)
-        self.measure_msmt_induced_dephasing_sweeping_amps(amps=amps_rel)
+        self.measure_msmt_induced_dephasing_sweeping_amps(amps_rel=amps_rel)
 
         start_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
