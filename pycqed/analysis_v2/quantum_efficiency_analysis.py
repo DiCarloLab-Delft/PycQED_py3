@@ -390,9 +390,10 @@ class RamseyAnalysis(ba.BaseDataAnalysis):
                          close_figs=close_figs,
                          extract_only=extract_only
                          )
+        sa = self.options_dict.get('scaling_amp_key_ramsey', 'Instrument settings.RO_lutman.M_amp_R0')
         rak  =self.options_dict.get('ramsey_amplitude_key', 'Analysis.Fitted Params lin_trans w0.amplitude.value')
         rap  =self.options_dict.get('ramsey_phase_key', 'Analysis.Fitted Params lin_trans w0.phase.value')
-        self.params_dict = {'scaling_amp': 'Instrument settings.RO_lutman.M_amp_R0',
+        self.params_dict = {'scaling_amp': sa,
                             'dephasing': rak,
                             'phase': rap,
                             }
@@ -421,15 +422,15 @@ class RamseyAnalysis(ba.BaseDataAnalysis):
         dephasing = self.raw_data_dict['dephasing']
         amps = self.raw_data_dict['scaling_amp']
         mask = np.intersect1d(np.where(dephasing != None), np.where(amps != None))
-        if self.options_dict.get('fit_cutoff', True):
-            mask2 = np.where(amps < self.options_dict.get('fit_cutoff', 0.1))
-            mask = np.intersect1d(mask, mask2)
+        if self.options_dict.get('remove_reference_ramsey', True):
+            if np.argmax(amps) in mask:
+                mask = np.where(mask != np.argmax(amps))
 
         self.proc_data_dict['scaling_amp'] = amps[mask]
         self.proc_data_dict['dephasing'] = dephasing[mask]
         self.proc_data_dict['phase'] = self.raw_data_dict['phase'][mask]
         # todo: factor 2?
-        self.proc_data_dict['coherence'] = self.raw_data_dict['dephasing'] / 2
+        self.proc_data_dict['coherence'] = dephasing[mask] / 2
 
     def run_fitting(self):
         self.fit_res = {}
@@ -504,7 +505,9 @@ class SSROAnalysis(ba.BaseDataAnalysis):
                          extract_only=extract_only,
                          )
 
-        self.params_dict = {'scaling_amp': 'Instrument settings.RO_lutman.M_amp_R0',
+        sa = self.options_dict.get('scaling_amp_key_ssro', 'Instrument settings.RO_lutman.M_amp_R0')
+
+        self.params_dict = {'scaling_amp': sa,
                             'SNR': 'Analysis.SSRO_Fidelity.SNR',
                             'F_a': 'Analysis.SSRO_Fidelity.F_a',
                             'F_d': 'Analysis.SSRO_Fidelity.F_d',
@@ -534,9 +537,9 @@ class SSROAnalysis(ba.BaseDataAnalysis):
         snr = self.raw_data_dict['SNR']
         amps = self.raw_data_dict['scaling_amp']
         mask = np.intersect1d(np.where(snr != None), np.where(amps != None))
-        if self.options_dict.get('fit_cutoff', True):
-            mask2 = np.where(amps < self.options_dict.get('fit_cutoff', 0.1))
-            mask = np.intersect1d(mask, mask2)
+        if self.options_dict.get('remove_reference_ssro', True):
+            if np.argmax(amps) in mask:
+                mask = np.where(mask != np.argmax(amps))
 
         self.proc_data_dict['scaling_amp'] = amps[mask]
         self.proc_data_dict['SNR'] = snr[mask]

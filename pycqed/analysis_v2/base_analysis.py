@@ -528,7 +528,7 @@ class BaseDataAnalysis(object):
             fn = self.options_dict.get('analysis_result_file', fn)
 
             try:
-                os.mkdir(os.dirname(fn))
+                os.mkdir(os.path.dirname(fn))
             except FileExistsError:
                 pass
 
