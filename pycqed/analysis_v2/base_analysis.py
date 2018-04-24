@@ -451,6 +451,10 @@ class BaseDataAnalysis(object):
         for k in key_list:
             save_dict[k] = self.raw_data_dict[k]
 
+        try:
+            os.mkdir(savedir)
+        except FileExistsError:
+            pass
 
         filepath = os.path.join(savedir, savebase + tstag + '.' + fmt)
         if self.verbose:
@@ -522,6 +526,12 @@ class BaseDataAnalysis(object):
         if hasattr(self, 'fit_res') and self.fit_res is not None:
             fn = a_tools.measurement_filename(a_tools.get_folder(self.timestamps[0]))
             fn = self.options_dict.get('analysis_result_file', fn)
+
+            try:
+                os.mkdir(os.dirname(fn))
+            except FileExistsError:
+                pass
+
             if self.verbose:
                 print('Saving fitting results to %s' % fn)
 
@@ -569,7 +579,7 @@ class BaseDataAnalysis(object):
             dic['params'][param_name] = {}
             param = model.params[param_name]
             for k in param.__dict__:
-                if not k.startswith('_') and k not in ['from_internal',]:
+                if not k.startswith('_') and k not in ['from_internal', ]:
                     dic['params'][param_name][k] = getattr(param, k)
         return dic
 
