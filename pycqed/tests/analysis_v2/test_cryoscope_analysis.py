@@ -25,21 +25,24 @@ class Test_Cryoscope_analysis(unittest.TestCase):
         self.assertTrue(expected_figs.issubset(set(a.axs.keys())))
         # Does not actually check for the content
 
-    @unittest.expectedFailure
     def test_RamZFluxArc(self):
         a = ma.RamZFluxArc(t_start='20180205_105633', t_stop='20180205_120210',
                            ch_idx_cos=2, ch_idx_sin=3)
+        poly_coeffs = a.proc_data_dict['poly_coeffs']
 
         # test dac arc conversion
         # For this to work all other parts have to work
-        amps = a.freq_to_amp([.5e9, .6e9, .8e9])
-        exp_amps = np.array([0.67,  0.73,  0.83])
-        np.testing.assert_array_almost_equal(amps, exp_amps, decimal=2)
+        amps = np.linspace(.1, 1, 21)
+        freqs = a.amp_to_freq(amps)
 
-        freqs = a.amp_to_freq([.3, .4, .5])
-        exp_freqs = np.array(
-            [9.42122560e+07,   1.67210367e+08,  2.67461142e+08])
-        np.testing.assert_array_almost_equal(freqs, exp_freqs, decimal=-7)
+        rec_amps = a.freq_to_amp(freqs, kind='interpolate')
+        np.testing.assert_array_almost_equal(amps, rec_amps, decimal=2)
+        rec_amps = a.freq_to_amp(freqs, kind='root')
+        np.testing.assert_array_almost_equal(amps, rec_amps, decimal=2)
+        rec_amps = a.freq_to_amp(freqs, kind='root_parabola')
+        np.testing.assert_array_almost_equal(amps, rec_amps, decimal=2)
+
+        np.testing.assert_array_almost_equal(amps, rec_amps, decimal=2)
 
         poly_coeffs = a.proc_data_dict['poly_coeffs']
         exp_poly_coeffs = np.array(
@@ -48,7 +51,6 @@ class Test_Cryoscope_analysis(unittest.TestCase):
         np.testing.assert_array_almost_equal(poly_coeffs, exp_poly_coeffs,
                                              decimal=-7)
 
-    @unittest.expectedFailure
     def test_sliding_pulses_analysis(self):
 
         a = ma.SlidingPulses_Analysis(t_start='20180221_195729')

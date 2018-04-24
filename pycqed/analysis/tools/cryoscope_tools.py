@@ -68,9 +68,6 @@ def fft_based_freq_guess_complex(y):
     return freq_guess, phase_guess, offset_guess, amp_guess
 
 
-
-
-
 class CryoscopeAnalyzer:
     def __init__(
             self,
@@ -286,7 +283,7 @@ class CryoscopeAnalyzer:
         for n in nyquists:
             if show_demod_freq:
                 ax.axhline(-self.demod_freq + self.sampling_rate *
-                            n, linestyle='--', c='grey')
+                           n, linestyle='--', c='grey')
             real_detuning = self.get_real_detuning(n)
             ax.plot(self.time, real_detuning, style)
         set_xlabel(ax, 'Time', 's')
@@ -461,7 +458,8 @@ class DacArchAnalysis:
 
         if kind == 'root_parabola':
             # return self._freq_to_amp_root_parabola(freq, **kw)
-            return freq_to_amp_root_parabola(self.poly_fit, freq, **kw)
+            return freq_to_amp_root_parabola(freq=freq,
+                                             poly_coeffs=self.poly_fit, **kw)
 
         raise ValueError("`kind` not understood")
 
@@ -530,13 +528,10 @@ class DacArchAnalysis:
 
         ax.plot(amps_sorted, freqs_sorted, ".-")
         ax.scatter(self.excl_amps, self.excl_freqs, marker='x', color='C3')
-
+        aa = np.linspace(min(self.amps), max(self.amps), 50)
+        ax.plot(aa, np.polyval(self.poly_fit, aa), label='fit')
         set_xlabel(ax, "Amplitude", 'V')
         set_ylabel(ax, 'Detuning', 'Hz')
-
-        aa = np.linspace(min(self.amps), max(self.amps), 50)
-
-        ax.plot(aa, np.polyval(self.poly_fit, aa), label='fit')
 
     def plot_ffts(self, ax=None, title='', nyquist_unwrap=False, **kw):
         if ax is None:
@@ -583,7 +578,7 @@ def freq_to_amp_root_parabola(freq, poly_coeffs, positive_branch=True):
     # recursive allows dealing with an array of freqs
     if isinstance(freq, (list, np.ndarray)):
         return np.array([freq_to_amp_root_parabola(
-            f, poly_coeffs=poly_coeffs,
+            freq=f, poly_coeffs=poly_coeffs,
             positive_branch=positive_branch) for f in freq])
 
     p = np.poly1d(poly_coeffs)
