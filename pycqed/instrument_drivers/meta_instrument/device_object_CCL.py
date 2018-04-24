@@ -738,6 +738,32 @@ class DeviceCCL(Instrument):
             a = mra.two_qubit_ssro_fidelity('SSRO_{}_{}'.format(q1, q0))
             a = ma2.Multiplexed_Readout_Analysis()
         return a
+    def measure_msmt_induced_dephasing_matrix(self,
+                                               qubits: list,
+                                               analyze=True,
+                                               MC=None, prepare_for_timedomain=True,
+                                               amps_rel=None):
+        # measures the msmt induced dephasing for readout the readout of qubits i
+        # on qubit j. Additionally measures the SNR as a function of amplitude for the
+        # diagonal elements to obtain the quantum efficiency.
+        # - make sure that all readout_and_depletion pulses are of equal total length
+        # - make sure that the cc light to has the readout time configured equal
+        # to the measurement and depletion time + 60 ns buffer
+        # issue: not sure if the weight function assignment is working correctly. 
+        # the qubit objects will use SSB for the ramsey measurements.
+        amps_rel = amps_rel or np.linspace(0, 1, 11)
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+        target_qubits = qubits
+        measured_qubits = qubits
+        for target_qubit in target_qubits:
+            for measured_qubit in measured_qubits:
+                if target_qubit==measured_qubit:
+                    measured_qubit.measure_quantum_efficiency(amps_rel=amps_rel)
+                else:
+                    measured_qubit.measure_msmt_induced_dephasing_sweeping_amps(amps_rel=amps_rel,
+                                                                                cross_target_qubits=[target_qubit])
+
 
     def measure_chevron(self, q0: str, q_spec: str,
                         amps, lengths,
