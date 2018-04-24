@@ -4,6 +4,8 @@ from pycqed.utilities.general import int2base
 import openql.openql as ql
 from pycqed.utilities.general import suppress_stdout
 from openql.openql import Program, Kernel, Platform
+from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
+
 
 base_qasm_path = join(dirname(__file__), 'qasm_files')
 output_dir = join(dirname(__file__), 'output')
@@ -135,7 +137,7 @@ def multi_qubit_off_on(qubits: list,  initialize: bool,
 def Ramsey_msmt_induced_dephasing(qubits: list, angles: list, platf_cfg: str):
     """
     Ramsey sequence that varies azimuthal phase instead of time. Works for  a single
-    qubit or multiple qubits. The coherence of the LSQ is measured, while the whole list 
+    qubit or multiple qubits. The coherence of the LSQ is measured, while the whole list
     of qubits is measured.
     Writes output files to the directory specified in openql.
     Output directory is set as an attribute to the program for convenience.
@@ -143,7 +145,7 @@ def Ramsey_msmt_induced_dephasing(qubits: list, angles: list, platf_cfg: str):
     note: executes the measurement between gates to measure the measurement induced dephasing
 
     Input pars:
-        qubits:         list specifying the targeted qubit MSQ, and the qubit of which the coherence 
+        qubits:         list specifying the targeted qubit MSQ, and the qubit of which the coherence
                         is measured LSQ.
         angles:         the list of angles for each Ramsey element
         platf_cfg:      filename of the platform config file
@@ -167,7 +169,7 @@ def Ramsey_msmt_induced_dephasing(qubits: list, angles: list, platf_cfg: str):
         p.add_kernel(k)
 
     # adding the calibration points
-    add_single_qubit_cal_points(p, platf=platf, qubit_idx=qubit_idx)
+    sqo.add_single_qubit_cal_points(p, platf=platf, qubit_idx=qubits[-1])
 
     with suppress_stdout():
         p.compile(verbose=False)

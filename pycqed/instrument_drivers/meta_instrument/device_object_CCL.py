@@ -749,7 +749,7 @@ class DeviceCCL(Instrument):
         # - make sure that all readout_and_depletion pulses are of equal total length
         # - make sure that the cc light to has the readout time configured equal
         # to the measurement and depletion time + 60 ns buffer
-        # issue: not sure if the weight function assignment is working correctly. 
+        # issue: not sure if the weight function assignment is working correctly.
         # the qubit objects will use SSB for the ramsey measurements.
         amps_rel = amps_rel or np.linspace(0, 1, 11)
         if prepare_for_timedomain:
@@ -762,7 +762,8 @@ class DeviceCCL(Instrument):
                     measured_qubit.measure_quantum_efficiency(amps_rel=amps_rel)
                 else:
                     measured_qubit.measure_msmt_induced_dephasing_sweeping_amps(amps_rel=amps_rel,
-                                                                                cross_target_qubits=[target_qubit])
+                                                                                cross_target_qubits=[target_qubit],
+                                                                                multi_qubit_platf_cfg=self.cfg_openql_platform_fn())
 
 
     def measure_chevron(self, q0: str, q_spec: str,
