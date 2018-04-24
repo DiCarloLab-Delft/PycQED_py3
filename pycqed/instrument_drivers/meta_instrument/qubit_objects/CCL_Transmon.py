@@ -2087,7 +2087,7 @@ class CCLight_Transmon(Qubit):
                 qubits.append(cross_target_qubit)
             qubits.append(self.cfg_qubit_nr())
 
-        p = mqo.Ramsey_msmt_induced_dephasing(angles, qubits=qubits,
+        p = mqo.Ramsey_msmt_induced_dephasing(angles, #qubits=qubits,
                      platf_cfg=self.cfg_openql_platform_fn())
         s = swf.OpenQL_Sweep(openql_program=p,
                            CCL=self.instr_CC.get_instr(),
@@ -2099,10 +2099,11 @@ class CCLight_Transmon(Qubit):
         MC.run('Ramsey'+label+self.msmt_suffix)
         if analyze:
             a = ma.Ramsey_Analysis(auto=True, close_fig=True,
-                                   freq_qubit=freq_qubit,
+                                   freq_qubit=self.freq_qubit(),
                                    artificial_detuning=artificial_detuning,
                                    phase_sweep_only=True)
-            return {'coherence':a.fit_res.params['amplitude'].value, 'phase':(a.fit_res.params['phase'].value)*360/(2*np.pi)% 360}
+            return {'coherence': a.fit_res.params['amplitude'].value,
+                    'phase': (a.fit_res.params['phase'].value)*360/(2*np.pi) % 360}
                     # dict containing val and stderr
 
 
