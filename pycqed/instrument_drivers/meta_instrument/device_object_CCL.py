@@ -581,6 +581,7 @@ class DeviceCCL(Instrument):
         """
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
+
         if MC is None:
             MC = self.instr_MC.get_instr()
         assert q0 in self.qubits()
@@ -760,21 +761,28 @@ class DeviceCCL(Instrument):
             amps_rel = np.linspace(0, 1, 11)
 
         if prepare_for_timedomain:
+            #for q in qubits:
+            #    q.prepare_for_timedomain()
             self.prepare_for_timedomain()
 
-        target_qubits = qubits
-        measured_qubits = qubits
+        target_qubits = qubits[:]
+        measured_qubits = qubits[:]
         for target_qubit in target_qubits:
             for measured_qubit in measured_qubits:
                 if target_qubit == measured_qubit:
                     measured_qubit.measure_quantum_efficiency(
-                                                    amps_rel=amps_rel)
+                                                    amps_rel=amps_rel,
+                                                    analyze=False)
                 else:
+
                     measured_qubit.measure_msmt_induced_dephasing_sweeping_amps(
                             amps_rel=amps_rel,
                             cross_target_qubits=[target_qubit],
-                            multi_qubit_platf_cfg=self.cfg_openql_platform_fn()
+                            multi_qubit_platf_cfg=self.cfg_openql_platform_fn(),
+                            analyze=False,
                         )
+        if analyze:
+            print('analysis not implemented yet')
 
     def measure_chevron(self, q0: str, q_spec: str,
                         amps, lengths,

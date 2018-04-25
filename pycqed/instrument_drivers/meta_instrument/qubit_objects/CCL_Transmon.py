@@ -2088,7 +2088,7 @@ class CCLight_Transmon(Qubit):
         else:
             qubits = []
             for cross_target_qubit in cross_target_qubits:
-                qubits.append(cross_target_qubit)
+                qubits.append(cross_target_qubit.cfg_qubit_nr())
             qubits.append(self.cfg_qubit_nr())
 
         p = mqo.Ramsey_msmt_induced_dephasing(qubits=qubits, angles=angles,
@@ -2106,8 +2106,14 @@ class CCLight_Transmon(Qubit):
                                    freq_qubit=self.freq_qubit(),
                                    artificial_detuning=0, #fixme
                                    phase_sweep_only=True)
-            return {'coherence':a.fit_res.params['amplitude'].value, 'phase':(a.fit_res.params['phase'].value)*360/(2*np.pi)% 360}
-                    # dict containing val and stderr
+            res = {
+                    'coherence': a.fit_res.params['amplitude'].value,
+                    'phase': (a.fit_res.params['phase'].value)*360/(2*np.pi)% 360
+            }
+            # print('> ramsey analyse',res)
+            return res
+        else:
+            return {}
 
 
 
@@ -2409,7 +2415,7 @@ class CCLight_Transmon(Qubit):
     #functions for quantum efficiency measurements and crossdephasing measurements
     def measure_msmt_induced_dephasing_sweeping_amps(self, amps_rel=None,
                                   nested_MC=None, cross_target_qubits=None,
-                                  multi_qubit_platf_cfg=None):
+                                  multi_qubit_platf_cfg=None, analyze=False):
         if nested_MC is None:
             nested_MC = self.instr_nested_MC.get_instr()
 
@@ -2459,7 +2465,8 @@ class CCLight_Transmon(Qubit):
                       self.measure_msmt_induced_dephasing_ramsey,
                       msmt_kw={
                             'cross_target_qubits': cross_target_qubits,
-                            'multi_qubit_platf_cfg': multi_qubit_platf_cfg
+                            'multi_qubit_platf_cfg': multi_qubit_platf_cfg,
+                            'analyze': True,
                         },
                       result_keys=['coherence', 'phase']
                     )
@@ -2474,11 +2481,17 @@ class CCLight_Transmon(Qubit):
             label = 'ro_amp_sweep_ramsey_trgt_' + cross_target_qubits[0].name + '_measured_'+self.name
         nested_MC.run(label)
 
-        #ma.MeasurementAnalysis(label=label, plot_all=False, auto=True)
-
         self.ro_pulse_type('up_down_down')
         self.cfg_prepare_ro_awg(old_ro_prepare_state)
         self.ro_acq_delay(old_delay)
+
+        if analyze:
+            print('Analyse in measure_msmt_induced_dephasing_sweeping_amps not yet added.')
+            #ma.MeasurementAnalysis(label=label, plot_all=False, auto=True)
+
+        else:
+            return {'dummy':'dummy'}
+
 
     def measure_SNR_sweeping_amps(self, amps_rel, nr_shots=2*4094, nested_MC=None):
         if nested_MC is None:
@@ -2517,7 +2530,8 @@ class CCLight_Transmon(Qubit):
         #ma.MeasurementAnalysis(label=label, plot_all=False, auto=True)
         #self.cfg_prepare_ro_awg(old_ro_prepare_state)
 
-    def measure_quantum_efficiency(self, amps_rel = None, nr_shots=2*4094):
+    def measure_quantum_efficiency(self, amps_rel = None, nr_shots=2*4094,
+                                   analyze=True):
         # requires the cc light to have the readout time configured equal
         # to the measurement and depletion time + 60 ns buffer
         # it requires an optimized depletion pulse
@@ -2544,8 +2558,8 @@ class CCLight_Transmon(Qubit):
         self.ro_pulse_type('up_down_down')
 
         ## Analyse
-        sak = 'Instrument settings.RO_lutman.M_amp_R2'
-        fk = 'Analysis.Fitted Params raw w1'
+        sak = 'Instrument settings.RO_lutman.M_amp_R%d' % self.cfg_qubit_nr()
+        fk = 'Analysis.Fitted Params raw w1'# fixme!
         options_dict = {
             'individual_plots': True,
             'verbose': True,
@@ -2556,12 +2570,16 @@ class CCLight_Transmon(Qubit):
             'remove_reference_ramsey': False,
             'remove_reference_ssro': True,
         }
-        qea = ma2.QuantumEfficiencyAnalysis(t_start=start_time,
-                                            t_stop=end_time,
-                                            options_dict=options_dict)
 
-        qea.run_analysis()
-        eta = qea.fit_dicts['eta']
-        u_eta = qea.fit_dicts['u_eta']
+        if analyze:
+            qea = ma2.QuantumEfficiencyAnalysis(t_start=start_time,
+                                                t_stop=end_time,
+                                                options_dict=options_dict)
 
-        return {'eta': eta, 'u_eta': u_eta}
+            qea.run_analysis()
+            eta = qea.fit_dicts['eta']
+            u_eta = qea.fit_dicts['u_eta']
+
+            return {'eta': eta, 'u_eta': u_eta}
+        else:
+            return {'dummy':'dummy'}
