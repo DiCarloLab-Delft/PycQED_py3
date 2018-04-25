@@ -491,10 +491,37 @@ class RamseyAnalysis(ba.BaseDataAnalysis):
             'setlabel': 'ramsey phase data',
         }
 
+class SSROAnalysisSweep(SSROAnalysis):
+    def __init__(self, t_start: str = None, label: str = '_ro_amp_sweep_SNR',
+                 options_dict: dict = None, extract_only: bool = False, auto: bool = True,
+                 close_figs: bool = True, do_fitting: bool = True):
+        super().__init__(t_start=t_start, t_stop=t_start,
+                         label=label,
+                         options_dict=options_dict,
+                         do_fitting=do_fitting,
+                         close_figs=close_figs,
+                         extract_only=extract_only,
+                         )
 
-class SSROAnalysis(ba.BaseDataAnalysis):
+        sa = self.options_dict.get('scaling_amp_key_ssro', 'Instrument settings.RO_lutman.M_amp_R0')
 
-    def __init__(self, t_start: str = None, t_stop: str = None, label: str = '_SSRO',
+        self.params_dict = {'scaling_amp': 'sweep_points',
+                            'SNR': 'SNR',
+                            'F_a': 'F_a',
+                            'F_d': 'F_d',
+                            }
+        self.numeric_params = ['scaling_amp', 'SNR', 'F_a', 'F_d']
+
+        if auto:
+            self.run_analysis()
+
+
+    def extract_data(self):
+        #Load data
+        super().extract_data()
+
+class SSROAnalysisSingleScans(SSROAnalysis):
+     def __init__(self, t_start: str = None, t_stop: str = None, label: str = '_SSRO',
                  options_dict: dict = None, extract_only: bool = False, auto: bool = True,
                  close_figs: bool = True, do_fitting: bool = True):
         super().__init__(t_start=t_start, t_stop=t_stop,
@@ -531,6 +558,7 @@ class SSROAnalysis(ba.BaseDataAnalysis):
         self.options_dict['analysis_result_file'] = self.options_dict.get('analysis_result_file',
                                                                           os.path.join(folder, f + '.hdf5'))
 
+class SSROAnalysis(ba.BaseDataAnalysis):
     def process_data(self):
 
         #Remove None entries
