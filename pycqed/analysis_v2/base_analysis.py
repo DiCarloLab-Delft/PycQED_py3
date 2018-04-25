@@ -524,8 +524,9 @@ class BaseDataAnalysis(object):
 
         # Check weather there is any data to save
         if hasattr(self, 'fit_res') and self.fit_res is not None:
-            fn = self.options_dict.get('analysis_result_file',
-                                       a_tools.measurement_filename(a_tools.get_folder(self.timestamps[0])))
+            fn = self.options_dict.get('analysis_result_file', False)
+            if fn == False:
+                fn = a_tools.measurement_filename(a_tools.get_folder(self.timestamps[0]))
 
             try:
                 os.mkdir(os.path.dirname(fn))

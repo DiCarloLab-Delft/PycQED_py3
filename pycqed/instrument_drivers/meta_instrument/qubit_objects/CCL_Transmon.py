@@ -2068,7 +2068,7 @@ class CCLight_Transmon(Qubit):
                 return a.T2_star
 
     def measure_msmt_induced_dephasing_ramsey(self, MC=None,
-                       label: str='',
+                       label: str='', verbose:bool = True,
                        analyze=True, close_fig=True, update=True,
                        cross_target_qubits=None, multi_qubit_platf_cfg=None):
         # docstring from parent class
@@ -2110,10 +2110,12 @@ class CCLight_Transmon(Qubit):
                     'coherence': a.fit_res.params['amplitude'].value,
                     'phase': (a.fit_res.params['phase'].value)*360/(2*np.pi)% 360
             }
-            # print('> ramsey analyse',res)
+            if verbose:
+                print('> ramsey analyse', res)
             return res
-        else:
-            return {}
+        #else:
+        #    return {'coherence': -1,
+        #            'phase' : -1}
 
 
 
@@ -2415,7 +2417,8 @@ class CCLight_Transmon(Qubit):
     #functions for quantum efficiency measurements and crossdephasing measurements
     def measure_msmt_induced_dephasing_sweeping_amps(self, amps_rel=None,
                                   nested_MC=None, cross_target_qubits=None,
-                                  multi_qubit_platf_cfg=None, analyze=False):
+                                  multi_qubit_platf_cfg=None, analyze=False,
+                                  verbose=True):
         if nested_MC is None:
             nested_MC = self.instr_nested_MC.get_instr()
 
@@ -2475,10 +2478,7 @@ class CCLight_Transmon(Qubit):
         nested_MC.set_sweep_points(amps_rel)
         nested_MC.set_detector_function(d)
 
-        if cross_target_qubits is None:
-            label = 'ro_amp_sweep_ramsey'
-        else:
-            label = 'ro_amp_sweep_ramsey_trgt_' + cross_target_qubits[0].name + '_measured_'+self.name
+        label = 'ro_amp_sweep_ramsey' + self.msmt_suffix
         nested_MC.run(label)
 
         self.ro_pulse_type('up_down_down')
@@ -2486,14 +2486,12 @@ class CCLight_Transmon(Qubit):
         self.ro_acq_delay(old_delay)
 
         if analyze:
-            print('Analyse in measure_msmt_induced_dephasing_sweeping_amps not yet added.')
-            #ma.MeasurementAnalysis(label=label, plot_all=False, auto=True)
-
-        else:
-            return {'dummy':'dummy'}
+            res = ma.MeasurementAnalysis(label=label, plot_all=False, auto=True)
+            return res
 
 
-    def measure_SNR_sweeping_amps(self, amps_rel, nr_shots=2*4094, nested_MC=None):
+    def measure_SNR_sweeping_amps(self, amps_rel, nr_shots=2*4094,
+                                  nested_MC=None, analyze=True):
         if nested_MC is None:
             nested_MC = self.instr_nested_MC.get_instr()
         self.prepare_for_timedomain()
@@ -2522,16 +2520,16 @@ class CCLight_Transmon(Qubit):
         nested_MC.set_sweep_function(sweep_function)
         nested_MC.set_sweep_points(amps_rel)
         nested_MC.set_detector_function(d)
-        label = 'ro_amp_sweep_SNR'
+        label = 'ro_amp_sweep_SNR' + self.msmt_suffix
         nested_MC.run(label)
 
         self.cfg_prepare_ro_awg(old_ro_prepare_state)
 
-        #ma.MeasurementAnalysis(label=label, plot_all=False, auto=True)
-        #self.cfg_prepare_ro_awg(old_ro_prepare_state)
+        if analyze:
+            ma.MeasurementAnalysis(label=label, plot_all=False, auto=True)
 
     def measure_quantum_efficiency(self, amps_rel = None, nr_shots=2*4094,
-                                   analyze=True):
+                                   analyze=True, verbose=True):
         # requires the cc light to have the readout time configured equal
         # to the measurement and depletion time + 60 ns buffer
         # it requires an optimized depletion pulse
@@ -2540,7 +2538,7 @@ class CCLight_Transmon(Qubit):
 
         start_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
-        self.measure_msmt_induced_dephasing_sweeping_amps(amps_rel=amps_rel)
+        self.measure_msmt_induced_dephasing_sweeping_amps(amps_rel=amps_rel, analyze=False)
         readout_pulse_length = self.ro_pulse_length()+self.ro_pulse_down_length0()+self.ro_pulse_down_length1()
         self.ro_acq_integration_length(readout_pulse_length+100e-9)
 
@@ -2550,31 +2548,31 @@ class CCLight_Transmon(Qubit):
         # calibrate residual excitation and relaxation at high power
         self.measure_ssro(cal_residual_excitation=True, SNR_detector=True,
                           nr_shots=nr_shots)
-        self.measure_SNR_sweeping_amps(amps_rel=amps_rel)
+        self.measure_SNR_sweeping_amps(amps_rel=amps_rel, analyze=False)
 
         end_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
         # set the pulse back to optimal depletion
         self.ro_pulse_type('up_down_down')
 
-        ## Analyse
-        options_dict = {
-            'individual_plots': True,
-            'verbose': True,
-            #'remove_reference_ramsey': False,
-            #'remove_reference_ssro': True,
-        }
-
         if analyze:
-            qea = ma2.QuantumEfficiencyAnalysis(t_start=start_time, t_end=end_time,
+            options_dict = {
+                'individual_plots': True,
+                'verbose': verbose,
+                #'remove_reference_ramsey': False,
+                #'remove_reference_ssro': True,
+            }
+            qea = ma2.QuantumEfficiencyAnalysis(t_start=start_time,
+                                                t_stop=end_time,
                                                 use_sweeps=True,
-                                                label_ramsey='_ro_amp_sweep_ramsey',
-                                                label_ssro='_ro_amp_sweep_SNR')
+                                                label_ramsey='_ro_amp_sweep_ramsey'+self.msmt_suffix,
+                                                label_ssro='_ro_amp_sweep_SNR'+self.msmt_suffix)
 
             qea.run_analysis()
             eta = qea.fit_dicts['eta']
             u_eta = qea.fit_dicts['u_eta']
 
-            return {'eta': eta, 'u_eta': u_eta}
+            return {'eta': eta, 'u_eta': u_eta,
+                    't_start' : start_time, 't_stop' : end_time}
         else:
             return {}

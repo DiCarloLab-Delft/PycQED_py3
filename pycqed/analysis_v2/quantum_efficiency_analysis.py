@@ -311,10 +311,12 @@ class QuantumEfficiencyAnalysis(ba.BaseDataAnalysis):
         d['save_figs'] = False
 
         if use_sweeps:
-            self.ra = RamseyAnalysisSweep(t_start=t_start, label=label_ramsey,
+            self.ra = RamseyAnalysisSweep(t_start=t_start, t_stop=t_stop,
+                                          label=label_ramsey,
                                           options_dict=d, auto=False,
                                           extract_only=True)
-            self.ssro = SSROAnalysisSweep(t_start=t_start, label=label_ssro,
+            self.ssro = SSROAnalysisSweep(t_start=t_start, t_stop=t_stop,
+                                          label=label_ssro,
                                           options_dict=d, auto=False,
                                           extract_only=True)
         else:
@@ -349,8 +351,8 @@ class QuantumEfficiencyAnalysis(ba.BaseDataAnalysis):
         d = '%s' % (youngest.strftime("%Y%m%d"))
         folder = os.path.join(a_tools.datadir, d, f)
         self.raw_data_dict['folder'] = [folder]
-        self.options_dict['analysis_result_file'] = self.options_dict.get('analysis_result_file',
-                                                                      os.path.join(folder, f + '.hdf5'))
+        self.options_dict['analysis_result_file'] = os.path.join(folder, f + '.hdf5')
+
 
     def run_fitting(self):
         self.ra.run_analysis()
@@ -440,9 +442,6 @@ class RamseyAnalysis(ba.BaseDataAnalysis):
         dephasing = self.raw_data_dict['dephasing']
         amps = self.raw_data_dict['scaling_amp']
         mask = np.intersect1d(np.where(dephasing != None), np.where(amps != None))
-        if self.options_dict.get('remove_reference_ramsey', True):
-            if np.argmax(amps) in mask:
-                mask = np.where(mask != np.argmax(amps))
 
         self.proc_data_dict['scaling_amp'] = amps[mask]
         self.proc_data_dict['dephasing'] = dephasing[mask]
@@ -482,8 +481,8 @@ class RamseyAnalysis(ba.BaseDataAnalysis):
             'linestyle': '-',
             'ylabel': 'Coherence',
             'yunit': 'a.u.',
-            'xlabel': 'CLEAR scaling amplitude',
-            'xunit': 'V',
+            'xlabel': 'scaling amplitude',
+            'xunit': 'a.u.',
             'setlabel': 'ramsey coherence fit',
         }
         self.plot_dicts[name + 'amp_vs_Ramsey_coherence'] = {
@@ -504,16 +503,18 @@ class RamseyAnalysis(ba.BaseDataAnalysis):
             'linestyle': '',
             'ylabel': 'Phase',
             'yunit': 'deg.',
-            'xlabel': 'CLEAR scaling amplitude',
-            'xunit': 'V',
+            'xlabel': 'scaling amplitude',
+            'xunit': 'a.u.',
             'setlabel': 'ramsey phase data',
         }
 
 
 class RamseyAnalysisSweep(RamseyAnalysis):
-    def __init__(self, t_start: str = None, label: str = '_ro_amp_sweep_ramsey',
-                 options_dict: dict = None, extract_only: bool = False, auto: bool = True,
-                 close_figs: bool = True, do_fitting: bool = True):
+    def __init__(self, t_start: str = None, t_stop: str = None,
+                 label: str = '_ro_amp_sweep_ramsey',
+                 options_dict: dict = None, extract_only: bool = False,
+                 auto: bool = True, close_figs: bool = True,
+                 do_fitting: bool = True):
         super().__init__(t_start=t_start, t_stop=t_start,
                          label=label,
                          options_dict=options_dict,
@@ -522,19 +523,25 @@ class RamseyAnalysisSweep(RamseyAnalysis):
                          extract_only=extract_only,
                          )
         self.single_timestamp = True
+        ts = a_tools.get_timestamps_in_range(timestamp_start=t_start,
+                                        timestamp_end=t_stop, label=label)
+        if self.verbose:
+            print('RamseyAnalysisSweep', ts)
+        assert(len(ts) == 1)
+        self.timestamp = ts[0]
 
         if auto:
             self.run_analysis()
 
     def extract_data(self):
         self.raw_data_dict = OrderedDict()
-        data_file = MeasurementAnalysis(timestamp=self.t_start,
-                                        label=self.labels[0],
+        data_file = MeasurementAnalysis(timestamp=self.timestamp,
                                         auto=True, TwoD=False)
-        self.timestamps = [data_file.timestamp_string]
-        self.raw_data_dict['timestamps'] = [data_file.timestamp_string]
-        self.raw_data_dict['datetime'] = np.array([a_tools.datetime_from_timestamp(
-            data_file.timestamp_string)], dtype=datetime.datetime)
+
+        dateobj = a_tools.datetime_from_timestamp(self.timestamp)
+        self.timestamps = [self.timestamp]
+        self.raw_data_dict['timestamps'] = [self.timestamp]
+        self.raw_data_dict['datetime'] = np.array([dateobj], dtype=datetime.datetime)
 
         temp = data_file.load_hdf5data()
         data_file.get_naming_and_values()
@@ -571,6 +578,10 @@ class RamseyAnalysisSingleScans(RamseyAnalysis):
     def extract_data(self):
         # Load data
         super().extract_data()
+        #todo: this is buggy
+        if self.options_dict.get('remove_reference_ramsey', Fa):
+            if np.argmax(amps) in mask:
+                mask = np.where(mask != np.argmax(amps))
 
         # Set output paths
         youngest = np.max(self.raw_data_dict['datetime'])
@@ -580,36 +591,33 @@ class RamseyAnalysisSingleScans(RamseyAnalysis):
         d = '%s' % (youngest.strftime("%Y%m%d"))
         folder = os.path.join(a_tools.datadir, d, f)
         self.raw_data_dict['folder'] = [folder]
-        self.options_dict['analysis_result_file'] = self.options_dict.get('analysis_result_file',
-                                                                          os.path.join(folder, f + '.hdf5'))
+        self.options_dict['analysis_result_file'] = os.path.join(folder, f + '.hdf5')
 
 
 class SSROAnalysis(ba.BaseDataAnalysis):
     def process_data(self):
 
         # Remove None entries
-        snr = self.raw_data_dict['SNR']
-        amps = self.raw_data_dict['scaling_amp']
+        snr = np.array(self.raw_data_dict['SNR'], dtype=float)
+        amps = np.array(self.raw_data_dict['scaling_amp'], dtype=float)
         mask = np.intersect1d(np.where(snr != None), np.where(amps != None))
-        if self.options_dict.get('remove_reference_ssro', True):
-            if np.argmax(amps) in mask:
-                mask = np.where(mask != np.argmax(amps))
-
         self.proc_data_dict['scaling_amp'] = amps[mask]
         self.proc_data_dict['SNR'] = snr[mask]
-        self.proc_data_dict['F_a'] = self.raw_data_dict['F_a'][mask]
-        self.proc_data_dict['F_d'] = self.raw_data_dict['F_d'][mask]
+        self.proc_data_dict['F_a'] = np.array(self.raw_data_dict['F_a'], dtype=float)[mask]
+        self.proc_data_dict['F_d'] = np.array(self.raw_data_dict['F_d'], dtype=float)[mask]
 
     def run_fitting(self):
         self.fit_res = OrderedDict()
         SNR = self.proc_data_dict['SNR']
-        amp = self.proc_data_dict['scaling_amp']
+        amps = self.proc_data_dict['scaling_amp']
 
         def line(x, a):
             return np.sqrt(a) * x
 
         gmodel = lmfit.models.Model(line)
-        snr_fit = gmodel.fit(SNR, x=amp, a=5)
+        gmodel.set_param_hint('a', value=1, min=1e-5, max=100)
+        para = gmodel.make_params()
+        snr_fit = gmodel.fit(SNR, x=amps, **para)
         self.fit_res['snr_fit'] = snr_fit
 
         self.fit_dicts['snr_fit'] = OrderedDict()
@@ -634,8 +642,8 @@ class SSROAnalysis(ba.BaseDataAnalysis):
             'ax_id': name + 'amp_vs_SNR',
             'zorder': 0,
             'xvals': self.proc_data_dict['scaling_amp'],
-            'xlabel': 'CLEAR scaling amplitude',
-            'xunit': 'V',
+            'xlabel': 'scaling amplitude',
+            'xunit': 'a.u.',
             'yvals': self.proc_data_dict['SNR'],
             'ylabel': 'SNR',
             'yunit': '-',
@@ -665,15 +673,16 @@ class SSROAnalysis(ba.BaseDataAnalysis):
             'linestyle': '',
             'ylabel': 'Fidelity',
             'yunit': '-',
-            'xlabel': 'CLEAR scaling amplitude',
-            'xunit': 'V',
+            'xlabel': 'scaling amplitude',
+            'xunit': 'a.u.',
             'setlabel': '$F_d$ data',
             'do_legend': True,
         }
 
 
 class SSROAnalysisSweep(SSROAnalysis):
-    def __init__(self, t_start: str = None, label: str = '_ro_amp_sweep_SNR',
+    def __init__(self, t_start: str = None, t_stop: str = None,
+                 label: str = '_ro_amp_sweep_SNR',
                  options_dict: dict = None, extract_only: bool = False, auto: bool = True,
                  close_figs: bool = True, do_fitting: bool = True):
         super().__init__(t_start=t_start, t_stop=t_start,
@@ -685,25 +694,33 @@ class SSROAnalysisSweep(SSROAnalysis):
                          )
         self.single_timestamp = True
 
+        ts = a_tools.get_timestamps_in_range(timestamp_start=t_start,
+                                        timestamp_end=t_stop, label=label)
+        if self.verbose:
+            print('SSROAnalysisSweep', ts)
+        assert(len(ts) == 1)
+        self.timestamp = ts[0]
+
         if auto:
             self.run_analysis()
 
     def extract_data(self):
         self.raw_data_dict = OrderedDict()
-        data_file = MeasurementAnalysis(timestamp=self.t_start,
+        data_file = MeasurementAnalysis(timestamp=self.timestamp,
                                         label=self.labels[0],
                                         auto=True, TwoD=False)
-        self.timestamps = [data_file.timestamp_string]
-        self.raw_data_dict['timestamps'] = [data_file.timestamp_string]
-        self.raw_data_dict['datetime'] = np.array([a_tools.datetime_from_timestamp(
-            data_file.timestamp_string)], dtype=datetime.datetime)
+
+        dateobj = a_tools.datetime_from_timestamp(self.timestamp)
+        self.timestamps = [self.timestamp]
+        self.raw_data_dict['timestamps'] = [self.timestamp]
+        self.raw_data_dict['datetime'] = np.array([dateobj], dtype=datetime.datetime)
 
         temp = data_file.load_hdf5data()
         data_file.get_naming_and_values()
         self.raw_data_dict['scaling_amp'] = data_file.sweep_points
         self.raw_data_dict['SNR'] = np.array(data_file.measured_values[0], dtype=float)
-        self.raw_data_dict['F_a'] = np.array(data_file.measured_values[1], dtype=float)
-        self.raw_data_dict['F_d'] = np.array(data_file.measured_values[2], dtype=float)
+        self.raw_data_dict['F_d'] = np.array(data_file.measured_values[1], dtype=float)
+        self.raw_data_dict['F_a'] = np.array(data_file.measured_values[2], dtype=float)
         self.raw_data_dict['folder'] = data_file.folder
 
 
@@ -736,6 +753,11 @@ class SSROAnalysisSingleScans(SSROAnalysis):
         # Load data
         super().extract_data()
 
+        #todo: this is buggy
+        if self.options_dict.get('remove_reference_ssro', False):
+            if np.argmax(amps) in mask:
+                mask = np.where(mask != np.argmax(amps))
+
         # Set output paths
         youngest = np.max(self.raw_data_dict['datetime'])
         youngest += datetime.timedelta(seconds=1)
@@ -743,5 +765,4 @@ class SSROAnalysisSingleScans(SSROAnalysis):
         d = '%s' % (youngest.strftime("%Y%m%d"))
         folder = os.path.join(a_tools.datadir, d, f)
         self.raw_data_dict['folder'] = [folder]
-        self.options_dict['analysis_result_file'] = self.options_dict.get('analysis_result_file',
-                                                                          os.path.join(folder, f + '.hdf5'))
+        self.options_dict['analysis_result_file'] = os.path.join(folder, f + '.hdf5')

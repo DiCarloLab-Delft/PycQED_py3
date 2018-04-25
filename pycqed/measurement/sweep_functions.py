@@ -908,16 +908,16 @@ class lutman_par_UHFQC_dig_trig(Soft_Sweep):
 
 
 class lutman_par_depletion_pulse_global_scaling(Soft_Sweep):
-    def __init__(self, LutMan, resonator_numbers, optimization_M_amps, 
-                    optimization_M_amp_down0s, optimization_M_amp_down1s, 
+    def __init__(self, LutMan, resonator_numbers, optimization_M_amps,
+                    optimization_M_amp_down0s, optimization_M_amp_down1s,
                     upload=True, **kw):
         # sweeps the readout-and depletion pules of the listed resonators.
         # sets the remaining readout and depletion pulses to 0 amplitude.
 
         self.set_kw()
         self.name= 'depletion_pulse_sweeper'
-        self.parameter_name = 'depletion_pulse_scaling_amp'
-        self.unit = 'V'
+        self.parameter_name = 'relative_depletion_pulse_scaling_amp'
+        self.unit = 'a.u.'
         self.sweep_control = 'soft'
         self.LutMan = LutMan
         self.optimization_M_amps = optimization_M_amps
@@ -929,7 +929,7 @@ class lutman_par_depletion_pulse_global_scaling(Soft_Sweep):
     def set_parameter(self, val):
         '''
         Set the parameter(s) to be swept. Differs per sweep function
-        Sweeping the amplitudes of the readout-and-depletion-pulses in the list 
+        Sweeping the amplitudes of the readout-and-depletion-pulses in the list
         relative to the initially optimized amplitude.
         Sets the remaining depletion pulses to zero.
         '''

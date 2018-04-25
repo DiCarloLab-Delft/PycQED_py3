@@ -743,7 +743,7 @@ class DeviceCCL(Instrument):
     def measure_msmt_induced_dephasing_matrix(self, qubits: list,
                                               analyze=True, MC=None,
                                               prepare_for_timedomain=True,
-                                              amps_rel=None):
+                                              amps_rel=None, verbose=True):
         '''
         Measures the msmt induced dephasing for readout the readout of qubits
         i on qubit j. Additionally measures the SNR as a function of amplitude
@@ -765,22 +765,34 @@ class DeviceCCL(Instrument):
             #    q.prepare_for_timedomain()
             self.prepare_for_timedomain()
 
+        old_suffixes = [q.msmt_suffix for q in qubits]
         target_qubits = qubits[:]
         measured_qubits = qubits[:]
         for target_qubit in target_qubits:
             for measured_qubit in measured_qubits:
+                s = '_trgt_' + measured_qubit.name + '_measured_' + target_qubit.name
+                measured_qubit.msmt_suffix = s
+                target_qubit.msmt_suffix = s
                 if target_qubit == measured_qubit:
-                    measured_qubit.measure_quantum_efficiency(
+                    eff = measured_qubit.measure_quantum_efficiency(
+                                                    verbose=verbose,
                                                     amps_rel=amps_rel,
-                                                    analyze=False)
+                                                    analyze=True)
+                    if verbose:
+                        print(eff)
                 else:
-
-                    measured_qubit.measure_msmt_induced_dephasing_sweeping_amps(
+                    res = measured_qubit.measure_msmt_induced_dephasing_sweeping_amps(
+                            verbose=verbose,
                             amps_rel=amps_rel,
                             cross_target_qubits=[target_qubit],
                             multi_qubit_platf_cfg=self.cfg_openql_platform_fn(),
-                            analyze=False,
+                            analyze=True,
                         )
+                    if verbose:
+                        print(res)
+
+        #reset msmt_suffix'es
+        [q.msmt_suffix(old_suffixes[qi]) for qi, q in enumerate(qubits)]
         if analyze:
             print('analysis not implemented yet')
 
