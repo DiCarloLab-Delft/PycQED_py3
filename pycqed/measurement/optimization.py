@@ -301,11 +301,7 @@ def neural_network_opt(fun,training_grid, hidden_layer_sizes = [(5,)],
     #squared loss as a loss function and 'adam' as solver.
     nn = mlpr()
     gridCV = gcv(nn,parameter_dict,cv=5)
-    # print("Training grid:")
-    # print(training_grid)
-    # print("Target values:")
-    # print(target_values)
-    gridCV.fit(training_grid, target_values)
+    gridCV.fit(training_grid,target_values)
     score = gridCV.best_score_
     bestParams = gridCV.best_params_
     print("Best parameters: "+str(bestParams))
