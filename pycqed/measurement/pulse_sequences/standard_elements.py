@@ -5,23 +5,11 @@ try:
     from math import gcd
 except:  # Moved to math in python 3.5, this is to be 3.4 compatible
     from fractions import gcd
-from ..waveform_control import pulsar
-from ..waveform_control import element
-from ..waveform_control import pulse
-from ..waveform_control.pulse_library import MW_IQmod_pulse, SSB_DRAG_pulse, \
-    Mux_DRAG_pulse, SquareFluxPulse, MartinisFluxPulse
-from ..waveform_control.pulse import CosPulse, SquarePulse
-from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
+from pycqed.measurement.waveform_control import pulsar as pulsar
+from pycqed.measurement.waveform_control import element as element
 
-from importlib import reload
-reload(pulse)
 import pycqed.measurement.waveform_control.pulse_library as pl
 import pycqed.measurement.waveform_control.pulse as bpl  # base pulse lib
-
-from ..waveform_control import pulse_library
-reload(pulse_library)
-
-reload(element)
 
 def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
                     trigger=True, previous_element=None):
@@ -186,7 +174,7 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
                         start=t0,
                         refpulse=last_pulse, refpoint=pulse_pars['refpoint'])
                 elif pulse_pars['pulse_type'] == 'Gated_MW_RO_pulse':
-                    last_pulse = el.add(pulse.SquarePulse(
+                    last_pulse = el.add(bpl.SquarePulse(
                         name='RO_marker', amplitude=pulse_pars['amplitude'],
                         length=pulse_pars['length'],
                         channel=pulse_pars['RO_pulse_marker_channel']),
@@ -198,7 +186,7 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
                       pulse_pars['pulse_type'] == 'Multiplexed_UHFQC_pulse'):
                     # "adding a 0 amp pulse because the sequencer needs an element
                     # for timing
-                    last_pulse = el.add(pulse.SquarePulse(
+                    last_pulse = el.add(bpl.SquarePulse(
                         name='RO_marker', amplitude=0,
                         length=pulse_pars['length'],
                         channel=pulse_pars['RO_pulse_marker_channel']),
@@ -210,7 +198,7 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
                     channels = pulse_pars['acq_marker_channel']
                     channels = list(channels.split(','))
                     for channel in channels:
-                        Acq_marker = pulse.SquarePulse(
+                        Acq_marker = bpl.SquarePulse(
                             name='Acq-trigger', amplitude=1, length=20e-9,
                             channel=channel)
                         # Note that refpoint here is an exception because the
@@ -230,20 +218,48 @@ def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
     # make sure that the waveforms on all the channels end at the same time
     # in case the next element is ran back to back with this one.
     for cname in station.pulsar.channels:
-        el.add(pulse.SquarePulse(name='empty_pulse', channel=cname, amplitude=0,
-                                 length=station.pulsar.get(
-                                     '{}_min_length'.format(cname))),
+        el.add(bpl.SquarePulse(name='empty_pulse', channel=cname, amplitude=0,
+                               length=station.pulsar.get(
+                                   '{}_min_length'.format(cname))),
                refpulse=last_pulse, refpoint='end', refpoint_new='end')
+
 
     # switch to global timing for adding the trigger pulses.
     el.shift_all_pulses(-el.offset())
     el.ignore_offset_correction = True
 
+    # make sure that the channels that have a precompiled FIR filter have
+    # enough zeros at the start such that the filtered waveform will not be cut
+    # off.
+    if trigger:
+        max_advance_len = 0
+        for cname in station.pulsar.channels:
+            if station.pulsar.get(cname + '_type') != 'analog':
+                continue
+            if station.pulsar.get(cname + '_distortion') != 'precalculate':
+                continue
+            distortion_dictionary = station.pulsar.get(
+                '{}_distortion_dict'.format(cname))
+            fir_kernels = distortion_dictionary.get('FIR', None)
+            kernel_length = 1
+            if fir_kernels is not None:
+                if hasattr(fir_kernels, '__iter__') and not \
+                        hasattr(fir_kernels[0], '__iter__'): # 1 kernel only
+                    kernel_length += len(fir_kernels) - 1
+                else:
+                    for kernel in fir_kernels:
+                        kernel_length += len(kernel) - 1
+            advance_len = ((kernel_length + 1)//2)/station.pulsar.clock(cname)
+            max_advance_len = max(advance_len, max_advance_len)
+        max_advance_len += element.calculate_time_correction(
+            max_advance_len, sequencer_config['RO_fixed_point'])
+        el.shift_all_pulses(max_advance_len)
+
     # Trigger the slave AWG-s
     if trigger:
         slave_triggers = sequencer_config.get('slave_AWG_trig_channels', [])
         for cname in slave_triggers:
-            el.add(pulse.SquarePulse(name='slave_trigger', channel=cname,
+            el.add(bpl.SquarePulse(name='slave_trigger', channel=cname,
                                      amplitude=1, length=20e-9), start=10e-9)
 
     return el
