@@ -108,20 +108,30 @@ class QuantumEfficiencyAnalysisTWPA(ba.BaseDataAnalysis):
             print('Found %d twpa freqs and %d amplitudes' % (len(twpa_freqs), len(twpa_powers)))
             print(twpa_freqs, twpa_powers)
 
-        if not self.use_prefit:
-            dates = np.array([[None] * len(twpa_powers)] * len(twpa_freqs))
-            # date_limits = np.array([[(None, None)] * len(twpa_powers)] * len(twpa_freqs))
-            datetimes = np.array(self.raw_data_dict['datetime'], dtype=datetime.datetime)
-            for i, twpa_freq in enumerate(twpa_freqs):
-                freq_indices = np.where(twpa_freqs_unsorted == twpa_freq)
-                for j, twpa_power in enumerate(twpa_powers):
-                    power_indices = np.where(twpa_powers_unsorted == twpa_power)
-                    indices = np.array(np.intersect1d(freq_indices, power_indices), dtype=int)
+        dates = np.array([[None] * len(twpa_powers)] * len(twpa_freqs))
+        # date_limits = np.array([[(None, None)] * len(twpa_powers)] * len(twpa_freqs))
+        datetimes = np.array(self.raw_data_dict['datetime'], dtype=datetime.datetime)
+        for i, twpa_freq in enumerate(twpa_freqs):
+            freq_indices = np.where(twpa_freqs_unsorted == twpa_freq)
+            for j, twpa_power in enumerate(twpa_powers):
+                power_indices = np.where(twpa_powers_unsorted == twpa_power)
+                indices = np.array(np.intersect1d(freq_indices, power_indices), dtype=int)
+                if self.use_prefit:
+                    if len(indices) > 1:
+                        print("Warning: more than one efficiency value found for freq %.3f and power %.3f"%(twpa_freq*1e-9,twpa_power))
+                    elif len(indices) == 1:
+                        print("Warning:no efficiency value found for freq %.3f and power %.3f"%(twpa_freq*1e-9,twpa_power))
+                    dates = indices[0]
+
+                else:
                     dts = datetimes[indices]
                     dates[i, j] = dts
-                    # date_limits[i, j][0] = np.min(dts)
-                    # date_limits[i, j][1] = np.max(dts)
+                # date_limits[i, j][0] = np.min(dts)
+                # date_limits[i, j][1] = np.max(dts)
 
+        if self.use_prefit:
+            self.proc_data_dict['sorted_indices'] = np.array(dates, dtype=int)
+        else:
             self.proc_data_dict['sorted_datetimes'] = dates
             # self.proc_data_dict['sorted_date_limits'] = date_limits
 
@@ -129,6 +139,7 @@ class QuantumEfficiencyAnalysisTWPA(ba.BaseDataAnalysis):
         twpa_freqs = self.proc_data_dict['TWPA_freqs']
         twpa_powers = self.proc_data_dict['TWPA_powers']
         dates = self.proc_data_dict['sorted_datetimes']
+        sorted_indices = self.proc_data_dict['sorted_indices']
         # date_limits = self.proc_data_dict['sorted_date_limits']
 
         eta = np.array([[None] * len(twpa_powers)] * len(twpa_freqs), dtype=float)
@@ -145,12 +156,13 @@ class QuantumEfficiencyAnalysisTWPA(ba.BaseDataAnalysis):
         for i, freq in enumerate(twpa_freqs):
             for j, power in enumerate(twpa_powers):
                 if self.use_prefit:
-                    a[i, j] = self.raw_data_dict['a']
-                    u_a[i, j] = self.raw_data_dict['a_std']
-                    sigma[i, j] = self.raw_data_dict['sigma']
-                    u_sigma[i, j] = self.raw_data_dict['sigma_std']
-                    eta[i, j] = self.raw_data_dict['eta']
-                    u_eta[i, j] = self.raw_data_dict['u_eta']
+                    index = sorted_indices[i, j]
+                    a[i, j] = self.raw_data_dict['a'][index]
+                    u_a[i, j] = self.raw_data_dict['a_std'][index]
+                    sigma[i, j] = self.raw_data_dict['sigma'][index]
+                    u_sigma[i, j] = self.raw_data_dict['sigma_std'][index]
+                    eta[i, j] = self.raw_data_dict['eta'][index]
+                    u_eta[i, j] = self.raw_data_dict['u_eta'][index]
                 else:
                     t_start = [d.strftime("%Y%m%d_%H%M%S") for d in dates[i, j]]  # date_limits[i, j][0]
                     t_stop = None  # date_limits[i, j][1]
