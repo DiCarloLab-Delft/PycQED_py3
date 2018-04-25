@@ -2558,23 +2558,18 @@ class CCLight_Transmon(Qubit):
         self.ro_pulse_type('up_down_down')
 
         ## Analyse
-        sak = 'Instrument settings.RO_lutman.M_amp_R%d' % self.cfg_qubit_nr()
-        fk = 'Analysis.Fitted Params raw w1'# fixme!
         options_dict = {
             'individual_plots': True,
             'verbose': True,
-            'ramsey_amplitude_key': fk + '.amplitude.value',
-            'ramsey_phase_key': fk + '.phase.value',
-            'scaling_amp_key_ramsey': sak,
-            'scaling_amp_key_ssro': sak,
-            'remove_reference_ramsey': False,
-            'remove_reference_ssro': True,
+            #'remove_reference_ramsey': False,
+            #'remove_reference_ssro': True,
         }
 
         if analyze:
-            qea = ma2.QuantumEfficiencyAnalysis(t_start=start_time,
-                                                t_stop=end_time,
-                                                options_dict=options_dict)
+            qea = ma2.QuantumEfficiencyAnalysis(t_start=start_time, t_end=end_time,
+                                                use_sweeps=True,
+                                                label_ramsey='_ro_amp_sweep_ramsey',
+                                                label_ssro='_ro_amp_sweep_SNR')
 
             qea.run_analysis()
             eta = qea.fit_dicts['eta']
@@ -2582,4 +2577,4 @@ class CCLight_Transmon(Qubit):
 
             return {'eta': eta, 'u_eta': u_eta}
         else:
-            return {'dummy':'dummy'}
+            return {}
