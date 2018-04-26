@@ -134,7 +134,7 @@ class RamZFluxArc(ba.BaseDataAnalysis):
                 'yunit': self.raw_data_dict['xunit'][0][0],
 
                 'zvals': self.proc_data_dict['RamZ_{}dat'.format(phase)],
-                'zlabel': data_key,
+                'clabel': data_key,
                 'zunit': self.raw_data_dict['value_units'][0][1],
 
                 'cmap': 'viridis',
@@ -155,7 +155,7 @@ class RamZFluxArc(ba.BaseDataAnalysis):
                 'yunit': self.proc_data_dict['FFT_{}_freq_unit'.format(phase)],
 
                 'zvals': self.proc_data_dict['FFT_{}'.format(phase)],
-                'zlabel': data_key,
+                'clabel': data_key,
                 'zunit': self.raw_data_dict['value_units'][0][1],
 
                 'cmap': 'viridis',
@@ -176,7 +176,7 @@ class RamZFluxArc(ba.BaseDataAnalysis):
         #     'ylabel': self.raw_data_dict['ylabel'],
         #     'yunit': self.raw_data_dict['yunit'],
         #     'zvals': raw_dat,
-        #     'zlabel': self.raw_data_dict['value_names'][0],
+        #     'clabel': self.raw_data_dict['value_names'][0],
         #     'zunit': self.raw_data_dict['value_units'][0],
         #     'do_legend': True, }
 
@@ -191,7 +191,7 @@ class RamZFluxArc(ba.BaseDataAnalysis):
         #     'ylabel': self.proc_data_dict['FFT_ylabel'],
         #     'yunit': self.proc_data_dict['FFT_yunit'],
         #     'zvals': self.proc_data_dict['FFT'],
-        #     'zlabel': self.proc_data_dict['FFT_zlabel'],
+        #     'clabel': self.proc_data_dict['FFT_zlabel'],
         #     'zunit': self.proc_data_dict['FFT_zunit'],
         #     'do_legend': True, }
 

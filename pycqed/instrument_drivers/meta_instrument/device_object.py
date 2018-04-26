@@ -999,7 +999,8 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
                                                nr_shots=4095, UHFQC=None,
                                                pulsar=None,
                                                used_channels=None,
-                                               correlations=None):
+                                               correlations=None,
+                                               **kw):
     max_int_len = 0
     for qb in qubits:
         if qb.RO_acq_integration_length() > max_int_len:
@@ -1027,30 +1028,31 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
         'int_log_det': det.UHFQC_integration_logging_det(
             UHFQC=UHFQC, AWG=pulsar, channels=channels,
             integration_length=max_int_len, nr_shots=nr_shots,
-            result_logging_mode='raw'),
+            result_logging_mode='raw', **kw),
         'dig_log_det': det.UHFQC_integration_logging_det(
             UHFQC=UHFQC, AWG=pulsar, channels=channels,
             integration_length=max_int_len, nr_shots=nr_shots,
-            result_logging_mode='digitized'),
+            result_logging_mode='digitized', **kw),
         'int_avg_det': det.UHFQC_integrated_average_detector(
             UHFQC=UHFQC, AWG=pulsar, channels=channels,
-            integration_length=max_int_len, nr_averages=nr_averages),
+            integration_length=max_int_len, nr_averages=nr_averages, **kw),
         'dig_avg_det': det.UHFQC_integrated_average_detector(
             UHFQC=UHFQC, AWG=pulsar, channels=channels,
             integration_length=max_int_len, nr_averages=nr_averages,
-            result_logging_mode='digitized'),
+            result_logging_mode='digitized', **kw),
         'inp_avg_det': det.UHFQC_input_average_detector(
-            UHFQC=UHFQC, AWG=pulsar, nr_averages=nr_averages, nr_samples=4096),
+            UHFQC=UHFQC, AWG=pulsar, nr_averages=nr_averages, nr_samples=4096,
+            **kw),
         'int_corr_det': det.UHFQC_correlation_detector(
             UHFQC=UHFQC, AWG=pulsar, channels=channels,
             used_channels=used_channels,
             integration_length=max_int_len, nr_averages=nr_averages,
-            correlations=correlations),
+            correlations=correlations, **kw),
         'dig_corr_det': det.UHFQC_correlation_detector(
             UHFQC=UHFQC, AWG=pulsar, channels=channels,
             used_channels=used_channels,
             integration_length=max_int_len, nr_averages=nr_averages,
-            correlations=correlations, thresholding=True),
+            correlations=correlations, thresholding=True, **kw),
     }
 
 def multiplexed_pulse(readouts, f_LO, upload=True, plot_filename=False):

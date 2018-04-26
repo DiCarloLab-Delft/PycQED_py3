@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import logging
+import itertools
 
 import pycqed.measurement.sweep_functions as swf
 import pycqed.measurement.awg_sweep_functions as awg_swf
@@ -439,6 +440,7 @@ def get_multiplexed_readout_pulse_dictionary(qubits):
             'pulse_type': 'Multiplexed_UHFQC_pulse',
             'target_qubit': ','.join([qb.name for qb in qubits])}
 
+
 def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
                                                nr_shots=4095, UHFQC=None,
                                                pulsar=None, correlations=None):
@@ -486,7 +488,18 @@ def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
             correlations=correlations, thresholding=True),
     }
 
+
 def calculate_minimal_readout_spacing(qubits, ro_slack=10e-9, drive_pulses=0):
+    """
+
+    Args:
+        qubits:
+        ro_slack: minimal time needed between end of wint and next RO trigger
+        drive_pulses:
+
+    Returns:
+
+    """
     UHFQC = None
     for qb in qubits:
         UHFQC = qb.UHFQC
@@ -515,9 +528,10 @@ def calculate_minimal_readout_spacing(qubits, ro_slack=10e-9, drive_pulses=0):
     ro_spacing -= max_ro_len
     return ro_spacing
 
+
 def measure_multiplexed_readout(qubits, f_LO, nreps=4, liveplot=False,
-                                ro_spacing=None, preselection=True, MC=None,
-                                plot_filename=False, ro_slack=10e-9,
+                                RO_spacing=1e-6, preselection=True, MC=None,
+                                plot_filename=False,
                                 thresholded=False):
 
     device.multiplexed_pulse(qubits, f_LO, upload=True,
@@ -529,16 +543,16 @@ def measure_multiplexed_readout(qubits, f_LO, nreps=4, liveplot=False,
         else:
             break
 
-    if ro_spacing is None:
-        ro_spacing = calculate_minimal_readout_spacing(qubits, ro_slack,
-                                                       drive_pulses=1)
+    #if ro_spacing is None:
+    #    ro_spacing = calculate_minimal_readout_spacing(qubits, ro_slack,
+    #                                                   drive_pulses=1)
 
     sf = awg_swf2.n_qubit_off_on(
         [qb.get_drive_pars() for qb in qubits],
         device.get_multiplexed_readout_pulse_dictionary(qubits),
         preselection=preselection,
         parallel_pulses=True,
-        RO_spacing=ro_spacing)
+        RO_spacing=RO_spacing)
 
     m = 2 ** (len(qubits))
     if preselection:
@@ -565,7 +579,7 @@ def measure_multiplexed_readout(qubits, f_LO, nreps=4, liveplot=False,
         [qb.name for qb in qubits])))
 
 
-def measure_active_reset(qubits, feedback_delay, nr_resets=1, nreps=1,
+def measure_active_reset(qubits, reset_cycle_time, nr_resets=1, nreps=1,
                          MC=None, upload=True, sequence='reset_g'):
     """possible sequences: 'reset_g', 'reset_e', 'idle', 'flip'"""
     for qb in qubits:
@@ -574,14 +588,17 @@ def measure_active_reset(qubits, feedback_delay, nr_resets=1, nreps=1,
         else:
             break
 
-    # if readout_delay is None:
-    #     readout_delay = calculate_minimal_readout_spacing(qubits,
-    #                                                       drive_pulses=0)
+    operation_dict = {
+        'RO': device.get_multiplexed_readout_pulse_dictionary(qubits)}
+    qb_names = []
+    for qb in qubits:
+        qb_names.append(qb.name)
+        operation_dict.update(qb.get_operation_dict())
 
     sf = awg_swf2.n_qubit_reset(
-        pulse_pars_list=[qb.get_drive_pars() for qb in qubits],
-        RO_pars=device.get_multiplexed_readout_pulse_dictionary(qubits),
-        feedback_delay=feedback_delay,
+        qubit_names=qb_names,
+        operation_dict=operation_dict,
+        reset_cycle_time=reset_cycle_time,
         #sequence=sequence,
         nr_resets=nr_resets,
         upload=upload)
@@ -604,23 +621,22 @@ def measure_active_reset(qubits, feedback_delay, nr_resets=1, nreps=1,
     MC.set_sweep_points_2D(np.arange(nreps))
     MC.set_detector_function(df)
 
-    MC.run_2D(name='active_reset_{}_{}'.format(sequence, '-'.join(
-        [qb.name for qb in qubits])))
+    MC.run_2D(name='active_reset_x{}_{}'.format(nr_resets, ','.join(qb_names)))
 
     MC.soft_avg(prev_avg)
 
 
-def measure_two_qubit_parity(qb0, qb1, qb2, feedback_delay, f_LO, upload=True,
-                             MC=None, nr_averages=2**10, prep_sequence=None,
+def measure_two_qubit_parity(qb0, qb1, qb2, feedback_delay, f_LO, nreps=1,
+                             upload=True, MC=None, prep_sequence=None,
                              tomography_basis=(
-                                 'I', 'X180', 'Y90', 'mY90', 'X90', 'mX90')):
+                                 'I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
+                             reset=True):
     """
     Important things to check when running the experiment:
         Is the readout separation commensurate with 225 MHz?
     """
 
     device.multiplexed_pulse([(qb1,), (qb0, qb1, qb2)], f_LO)
-
 
     qubits = [qb0, qb1, qb2]
     for qb in qubits:
@@ -633,22 +649,123 @@ def measure_two_qubit_parity(qb0, qb1, qb2, feedback_delay, f_LO, upload=True,
         qb.prepare_for_timedomain(multiplexed=True)
 
     sf = awg_swf2.two_qubit_parity(qb0, qb1, qb2, feedback_delay=feedback_delay,
-                                   prep_sequence=prep_sequence,
+                                   prep_sequence=prep_sequence, reset=reset,
                                    tomography_basis=tomography_basis,
                                    upload=upload, verbose=False)
 
+    nr_readouts = 2*len(tomography_basis)**2
+    nr_shots = 4095 - 4095 % nr_readouts
     df = device.get_multiplexed_readout_detector_functions(
-        qubits, nr_averages=nr_averages, correlations=[(
-            qb0.RO_acq_weight_function_I(), qb2.RO_acq_weight_function_I()
-        )])['int_corr_det']
+        qubits, nr_shots=nr_shots)['int_log_det']
 
     MC.set_sweep_function(sf)
-    MC.set_sweep_points(2*len(tomography_basis)**2)
+    MC.set_sweep_points(np.tile(np.arange(nr_readouts)/2,
+                                [nr_shots//nr_readouts]))
+    MC.set_sweep_function_2D(swf.None_Sweep())
+    MC.set_sweep_points_2D(np.arange(nreps))
     MC.set_detector_function(df)
 
-    MC.run(name='two_qubit_parity-{}'.format('_'.join([qb.name for qb in
-                                                       qubits])))
+    MC.run_2D(name='two_qubit_parity{}-{}'.format(
+        '' if reset else '_noreset', '_'.join([qb.name for qb in qubits])))
 
+
+def measure_tomography(qubits, prep_sequence, state_name, f_LO,
+                       rots_basis=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
+                       use_cal_points=True,
+                       preselection=True,
+                       rho_target=None,
+                       MC=None,
+                       ro_spacing=None,
+                       ro_slack=10e-9,
+                       thresholded=False,
+                       liveplot=True,
+                       nreps=1):
+    exp_metadata = {}
+
+    for qb in qubits:
+        if MC is None:
+            MC = qb.MC
+        else:
+            break
+
+    # set up multiplexed readout
+    device.multiplexed_pulse(qubits, f_LO, upload=True)
+
+    if ro_spacing is None:
+        ro_spacing = calculate_minimal_readout_spacing(qubits, ro_slack,
+                                                           drive_pulses=1)
+
+    seq_tomo, elts_tomo = mqs.n_qubit_tomo_seq(qubits,
+                                            prep_sequence=prep_sequence,
+                                            rots_basis=rots_basis,
+                                            return_seq=True,
+                                            upload=False)
+    seq = seq_tomo
+    elts = elts_tomo
+
+    if use_cal_points:
+        seq_cal, elts_cal = mqs.n_qubit_ref_all_seq(qubits,
+                                           return_seq=True,
+                                           upload=False)
+        seq += seq_cal
+        elts += elts_cal
+    n_segments = len(seq.elements)
+
+    # from this point on number of segments is fixed
+    sf = awg_swf2.n_qubit_seq_sweep(seq_len=n_segments)
+    m = n_segments
+    if preselection:
+        m *= 2
+    shots = 4094 - 4094 % m
+
+    if thresholded:
+        df = device.get_multiplexed_readout_detector_functions(qubits,
+                                            nr_shots=shots)['dig_log_det']
+    else:
+        df = device.get_multiplexed_readout_detector_functions(qubits,
+                                            nr_shots=shots)['int_log_det']
+    for qb in qubits:
+        qb.prepare_for_timedomain(multiplexed=True)
+
+    # make a channel map
+    # fixme - channels and qubits are not always in the same order
+    # getting a channel map should be a nice function, but where ?
+    channel_map = {}
+    for qb, channel_name in zip(qubits, df.value_names):
+        channel_map[qb.name] = channel_name
+
+    # todo Calibration point description code should be a reusable function
+    #   but where?
+    if use_cal_points:
+        # calibration definition for all combinations
+        cal_defs = []
+        for i, name in enumerate(itertools.product("ge", repeat=len(qubits))):
+            name = ''.join(name)  # tuple to string
+            cal_defs.append({})
+            for qb in qubits:
+                cal_defs[i][channel_map[qb.name]] = \
+                    [len(seq_tomo.elements) + i]
+    else:
+        cal_defs = None
+
+    exp_metadata["n_segments"] = n_segments
+    exp_metadata["rots_basis"] = rots_basis
+    if rho_target is not None:
+        exp_metadata["rho_target"] = rho_target
+    exp_metadata["cal_points"] = cal_defs
+    exp_metadata["channel_map"] = channel_map
+
+    station.pulsar.program_awgs(seq, *elts)
+
+    MC.live_plot_enabled(liveplot)
+    MC.soft_avg(1)
+    MC.set_sweep_function(sf)
+    MC.set_sweep_points(np.arange(shots))
+    MC.set_sweep_function_2D(swf.None_Sweep())
+    MC.set_sweep_points_2D(np.arange(nreps))
+    MC.set_detector_function(df)
+    MC.run_2D('{}_tomography_ssro_{}'.format(state_name,'-'.join(
+        [qb.name for qb in qubits])), exp_metadata=exp_metadata)
 
 
 def measure_n_qubit_simultaneous_randomized_benchmarking(
@@ -874,6 +991,7 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
 
     return MC
 
+
 def measure_two_qubit_tomo_Bell(bell_state, qb_c, qb_t, f_LO,
                                 basis_pulses=None,
                                 cal_state_repeats=7, spacing=100e-9,
@@ -909,7 +1027,6 @@ def measure_two_qubit_tomo_Bell(bell_state, qb_c, qb_t, f_LO,
         num_flux_pulses (int): number of times to apply a flux pulse with the
             same length as the one used in the CZ gate before the entire
             sequence (before bell state prep).
-            CURRENTLY NOT USED!
         verbose (bool): print runtime info
         nr_averages (float): number of averages to use
         soft_avgs (int): number of soft averages to use
@@ -972,6 +1089,7 @@ def measure_two_qubit_tomo_Bell(bell_state, qb_c, qb_t, f_LO,
         MC.run(label)
 
     ma.MeasurementAnalysis(close_file=True)
+
 
 def measure_three_qubit_tomo_GHZ(qubits, f_LO,
                                  basis_pulses=None,

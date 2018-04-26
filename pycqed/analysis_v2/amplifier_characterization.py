@@ -164,7 +164,7 @@ class Amplifier_Characterization_Analysis(ba.BaseDataAnalysis):
             'xunit': self.proc_data_dict['sweep_unit'],
             'ylabel': self.proc_data_dict['sweep_label_2D'],
             'yunit': self.proc_data_dict['sweep_unit_2D'],
-            'zlabel': 'SNR${}^2$ gain (dB)',
+            'clabel': 'Signal power gain (dB)',
             'zrange': (zmin, zmax),
             'cmap': cmap}
 
@@ -183,7 +183,7 @@ class Amplifier_Characterization_Analysis(ba.BaseDataAnalysis):
             'xunit': self.proc_data_dict['sweep_unit'],
             'ylabel': self.proc_data_dict['sweep_label_2D'],
             'yunit': self.proc_data_dict['sweep_unit_2D'],
-            'zlabel': 'SNR${}^2$ gain (dB)',
+            'clabel': 'SNR${}^2$ gain (dB)',
             'zrange': (zmin, zmax),
             'cmap': cmap}
 

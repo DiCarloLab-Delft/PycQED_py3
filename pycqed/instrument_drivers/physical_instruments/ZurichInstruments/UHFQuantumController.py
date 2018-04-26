@@ -933,11 +933,11 @@ setTrigger(0);"""
             elif len(Iwave) > 16384:
                 raise KeyError("exceeding max AWG wave lenght of 16384 samples "
                                "for I channel, trying to upload {} samples"
-                                   .format(len(Iwave)))
+                               .format(len(Iwave)))
             elif len(Qwave) > 16384:
                 raise KeyError("exceeding max AWG wave lenght of 16384 samples "
                                "for Q channel, trying to upload {} samples"
-                                   .format(len(Qwave)))
+                               .format(len(Qwave)))
             wave_defs += self.array_to_combined_vector_string(
                 Iwave, "Iwave{}".format(i))
             wave_defs += self.array_to_combined_vector_string(
@@ -949,16 +949,17 @@ setTrigger(0);"""
         const IAVG_TRIG = 0x0000020;
         const WINT_EN   = 0x1ff0000;
         setTrigger(WINT_EN);
-        var loop_cnt = getUserReg(0)/{};
+        var loop_cnt = getUserReg(0);
         var wait_delay = getUserReg(2);
         var RO_TRIG;
         if (getUserReg(1)) {{
           RO_TRIG = IAVG_TRIG;
         }} else {{
           RO_TRIG = WINT_TRIG;
-        }}\n""".format(len(readout_pulses))
+        }}\n"""
 
-        loop = """repeat(loop_cnt) {\n"""
+        loop = """for (var i = 0; i < loop_cnt; i = i + {}) {{
+        """.format(len(readout_pulses))
 
         for i, _ in enumerate(readout_pulses):
             loop += """

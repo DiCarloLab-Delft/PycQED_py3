@@ -37,7 +37,6 @@ class QuDev_transmon(Qubit):
                  AWG=None,  # for generating IQ modulated drive pulses and
                             # triggering instruments
                  UHFQC=None,  # For readout
-                 DC_source=None,  # DC voltage source for changing flux bias
                  **kw):
         super().__init__(name, **kw)
 
@@ -110,9 +109,9 @@ class QuDev_transmon(Qubit):
                            label='Drive upconversion board',
                            vals=vals.Enum(*(['UC'+str(i) for i in range(1,6)])),
                            parameter_class=ManualParameter)
-        self.add_parameter('dc_source_channel', initial_value=None,
-                           label='Channel name of the DC source for flux bias',
-                           vals=vals.Strings(), parameter_class=ManualParameter)
+        self.add_parameter('dc_flux_parameter', initial_value=None,
+                           label='QCoDeS parameter to sweep the dc flux',
+                           parameter_class=ManualParameter)
         self.add_parameter('RO_pulse_power', unit='dBm',
                            parameter_class=ManualParameter,
                            label='Readout signal power')
@@ -583,16 +582,15 @@ class QuDev_transmon(Qubit):
                                    qb_name=self.name)
 
     def measure_resonator_spectroscopy_flux_sweep(self, freqs, voltages,
-            flux_channel=None, MC=None, analyze=True, close_fig=True):
+            flux_parameter=None, MC=None, analyze=True, close_fig=True):
         if MC is None:
-            MC == self.MC
-        if flux_channel is None:
-            flux_channel = self.dc_source_channel()
+            MC = self.MC
+        if flux_parameter is None:
+            flux_parameter = self.dc_flux_parameter()
         self.prepare_for_continuous_wave()
         MC.set_sweep_function(self.heterodyne.frequency)
         MC.set_sweep_points(freqs)
-        MC.set_sweep_function_2D(self.DC_source.parameters
-                                 ['volt_' + flux_channel])
+        MC.set_sweep_function_2D(flux_parameter)
         MC.set_sweep_points_2D(voltages)
         demod_mode = 'single' if self.heterodyne.single_sideband_demod() \
             else 'double'
@@ -608,12 +606,12 @@ class QuDev_transmon(Qubit):
             # ma.MeasurementAnalysis(TwoD=True, close_fig=close_fig)
 
     def measure_qubit_spectroscopy_flux_sweep(self, freqs, voltages,
-            flux_channel=None, pulsed=True, MC=None, analyze=True,
+            flux_parameter=None, pulsed=True, MC=None, analyze=True,
                                                   close_fig=True):
         if MC is None:
             MC = self.MC
-        if flux_channel is None:
-            flux_channel = self.dc_source_channel()
+        if flux_parameter is None:
+            flux_parameter = self.dc_flux_parameter()
         if pulsed:
             self.prepare_for_pulsed_spec()
             spec_pars = self.get_spec_pars()
@@ -622,8 +620,7 @@ class QuDev_transmon(Qubit):
             sq.Pulsed_spec_seq(spec_pars, RO_pars)
             MC.set_sweep_function(self.cw_source.frequency)
             MC.set_sweep_points(freqs)
-            MC.set_sweep_function_2D(self.DC_source.parameters
-                                     ['volt_' + flux_channel])
+            MC.set_sweep_function_2D(flux_parameter)
             MC.set_sweep_points_2D(voltages)
             demod_mode = 'single' if self.heterodyne.single_sideband_demod() \
                 else 'double'
@@ -1436,7 +1433,8 @@ class QuDev_transmon(Qubit):
                 ma.MeasurementAnalysis(auto=True, qb_name=self.name, **kw)
 
     def measure_readout_pulse_scope(self, delays, freqs, RO_separation=None,
-                                    comm_freq=225e6, analyze=True, label=None,
+                                    prep_pulses=None, comm_freq=225e6,
+                                    analyze=True, label=None,
                                     close_fig=True, upload=True, verbose=False,
                                     cal_points=((-4, -3), (-2, -1)), MC=None):
         """
@@ -1489,6 +1487,7 @@ class QuDev_transmon(Qubit):
             RO_pars=self.get_RO_pars(),
             RO_separation=RO_separation,
             cal_points=cal_points,
+            prep_pulses=prep_pulses,
             comm_freq=comm_freq,
             verbose=verbose,
             upload=upload))
@@ -1505,7 +1504,7 @@ class QuDev_transmon(Qubit):
             integration_length=self.RO_acq_integration_length(),
             values_per_point=2, values_per_point_suffex=['_probe', '_measure'])
         MC.set_detector_function(d)
-        MC.run(label)
+        MC.run_2D(label)
 
         # Create a MeasurementAnalysis object for this measurement
         if analyze:
@@ -3405,7 +3404,7 @@ class QuDev_transmon(Qubit):
 
 
 
-    def calibrate_flux_pulse_frequency(self,MC=None, thetas=None, ampls=None,
+    def calibrate_flux_pulse_frequency(self, MC=None, thetas=None, ampls=None,
                                        analyze=False,
                                        plot=False,
                                        ampls_bidirectional = False,

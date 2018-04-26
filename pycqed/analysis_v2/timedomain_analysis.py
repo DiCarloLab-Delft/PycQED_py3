@@ -1,11 +1,128 @@
+import logging
 import lmfit
 import numpy as np
+from numpy.linalg import inv
+import scipy as sp
+import itertools
+import matplotlib as mpl
 from collections import OrderedDict
 from pycqed.analysis import fitting_models as fit_mods
 from pycqed.analysis import analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
+import pycqed.analysis_v2.readout_analysis as roa
+import pycqed.analysis_v2.tomography_qudev as tomo
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str
 from copy import deepcopy
+try:
+    import qutip as qtp
+except ImportError as e:
+    logging.warning('Could not import qutip, tomography code will not work')
+
+
+class AveragedTimedomainAnalysis(ba.BaseDataAnalysis):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.single_timestamp = True
+        self.params_dict = {
+            'value_names': 'value_names',
+            'measured_values': 'measured_values',
+            'measurementstring': 'measurementstring',
+            'exp_metadata': 'exp_metadata'}
+        self.numeric_params = []
+        if kwargs.get('auto', True):
+            self.run_analysis()
+
+    def process_data(self):
+        self.metadata = self.raw_data_dict.get('exp_metadata', {})
+        if self.metadata is None:
+            self.metadata = {}
+        cal_points = self.metadata.get('cal_points', None)
+        cal_points = self.options_dict.get('cal_points', cal_points)
+        cal_points_list = roa.convert_channel_names_to_index(
+            cal_points, len(self.raw_data_dict['measured_values'][0]),
+            self.raw_data_dict['value_names'])
+        self.proc_data_dict['cal_points_list'] = cal_points_list
+        measured_values = self.raw_data_dict['measured_values']
+        cal_idxs = self._find_calibration_indices()
+        scales = [np.std(x[cal_idxs]) for x in measured_values]
+        observable_vectors = np.zeros((len(cal_points_list),
+                                       len(measured_values)))
+        observable_vector_stds = np.ones_like(observable_vectors)
+        for i, observable in enumerate(cal_points_list):
+            for ch_idx, seg_idxs in enumerate(observable):
+                x = measured_values[ch_idx][seg_idxs] / scales[ch_idx]
+                if len(x) > 0:
+                    observable_vectors[i][ch_idx] = np.mean(x)
+                if len(x) > 1:
+                    observable_vector_stds[i][ch_idx] = np.std(x)
+        Omtx = (observable_vectors[1:] - observable_vectors[0]).T
+        d0 = observable_vectors[0]
+        corr_values = np.zeros(
+            (len(cal_points_list) - 1, len(measured_values[0])))
+        for i in range(len(measured_values[0])):
+            d = np.array([x[i] / scale for x, scale in zip(measured_values,
+                                                           scales)])
+            corr_values[:, i] = inv(Omtx.T.dot(Omtx)).dot(Omtx.T).dot(d - d0)
+        self.proc_data_dict['corr_values'] = corr_values
+
+    def measurement_operators_and_results(self):
+        """
+        Converts the calibration points to measurement operators. Assumes that
+        the calibration points are ordered the same as the basis states for
+        the tomography calculation (e.g. for two qubits |gg>, |ge>, |eg>, |ee>).
+        Also assumes that each calibration in the passed cal_points uses
+        different segments.
+
+        Returns:
+            A tuple of
+                the measured values with outthe calibration points;
+                the measurement operators corresponding to each channel;
+                and the expected covariation matrix between the operators.
+        """
+        d = len(self.proc_data_dict['cal_points_list'])
+        cal_point_idxs = [set() for _ in range(d)]
+        for i, idxs_lists in enumerate(self.proc_data_dict['cal_points_list']):
+            for idxs in idxs_lists:
+                cal_point_idxs[i].update(idxs)
+        cal_point_idxs = [sorted(list(idxs)) for idxs in cal_point_idxs]
+        cal_point_idxs = np.array(cal_point_idxs)
+        raw_data = self.raw_data_dict['measured_values']
+        means = [None] * d
+        residuals = [list() for _ in raw_data]
+        for i, cal_point_idx in enumerate(cal_point_idxs):
+            means[i] = [np.mean(ch_data[cal_point_idx]) for ch_data in raw_data]
+            for j, ch_residuals in enumerate(residuals):
+                ch_residuals += list(raw_data[j][cal_point_idx] - means[i][j])
+        means = np.array(means)
+        residuals = np.array(residuals)
+        Fs = [np.diag(ms) for ms in means.T]
+        Omega = residuals.dot(residuals.T) / len(residuals.T)
+        data_idxs = np.setdiff1d(np.arange(len(raw_data[0])),
+                                 cal_point_idxs.flatten())
+        data = np.array([ch_data[data_idxs] for ch_data in raw_data])
+        return data, Fs, Omega
+
+    def _find_calibration_indices(self):
+        cal_indices = set()
+        cal_points = self.options_dict['cal_points']
+        nr_segments = self.raw_data_dict['measured_values'].shape[-1]
+        for observable in cal_points:
+            if isinstance(observable, (list, np.ndarray)):
+                for idxs in observable:
+                    cal_indices.update({idx % nr_segments for idx in idxs})
+            else:  # assume dictionaries
+                for idxs in observable.values():
+                    cal_indices.update({idx % nr_segments for idx in idxs})
+        return list(cal_indices)
+
+
+def all_cal_points(d, nr_ch, reps=1):
+    """
+    Generates a list of calibration points for a Hilbert space of dimension d,
+    with nr_ch channels and reps reprtitions of each calibration point.
+    """
+    return [[list(range(-reps*i, -reps*(i-1)))]*nr_ch for i in range(d, 0, -1)]
+
 
 class Single_Qubit_TimeDomainAnalysis(ba.BaseDataAnalysis):
 
@@ -855,3 +972,324 @@ class Conditional_Oscillation_Analysis(ba.BaseDataAnalysis):
                 'plot_kws': {
                     'y': y, 'color': 'C1', 'linestyle': 'dotted'}
                     }
+
+
+class StateTomographyAnalysis(ba.BaseDataAnalysis):
+    """
+    Analyses the results of the state tomography experiment and calculates
+    the corresponding quantum state.
+
+    Possible options that can be passed in the options_dict parameter:
+        cal_points: A data structure specifying the indices of the calibration
+                    points. See the AveragedTimedomainAnalysis for format.
+                    The calibration points need to be in the same order as the
+                    used basis for the result.
+        data_type: 'averaged' or 'singleshot'. For singleshot data each
+                   measurement outcome is saved and arbitrary order correlations
+                   between the states can be calculated.
+        meas_operators: (optional) A list of qutip operators or numpy 2d arrays.
+                        This overrides the measurement operators otherwise
+                        found from the calibration points.
+        covar_matrix: (optional) The covariance matrix of the measurement
+                      operators as a 2d numpy array. Overrides the one found
+                      from the calibration points.
+        basis_rots_str: A list of standard PycQED pulse names that were
+                             applied to qubits before measurement
+        basis_rots: As an alternative to single_qubit_pulses, the basis
+                    rotations applied to the system as qutip operators or numpy
+                    matrices can be given.
+        mle: True/False, whether to do maximum likelihood fit. If False, only
+             least squares fit will be done, which could give negative
+             eigenvalues for the density matrix.
+        rho_target (optional): A qutip density matrix that the result will be
+                               compared to when calculating fidelity.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.single_timestamp = True
+        self.params_dict = {'exp_metadata': 'exp_metadata'}
+        self.numeric_params = []
+        self.data_type = self.options_dict['data_type']
+        if self.data_type == 'averaged':
+            self.base_analysis = AveragedTimedomainAnalysis(*args, **kwargs)
+        elif self.data_type == 'singleshot':
+            self.base_analysis = roa.MultiQubit_SingleShot_Analysis(
+                *args, **kwargs)
+        else:
+            raise KeyError("Invalid tomography data mode: '" + self.data_type +
+                           "'. Valid modes are 'averaged' and 'singleshot'.")
+
+        if kwargs.get('auto', True):
+            self.run_analysis()
+
+    def process_data(self):
+        tomography_qubits = self.options_dict.get('tomography_qubits', None)
+        data, Fs, Omega = self.base_analysis.measurement_operators_and_results(
+                              tomography_qubits)
+        if 'data_filter' in self.options_dict:
+            data = self.options_dict['data_filter'](data.T).T
+        Fs = self.options_dict.get('meas_operators', Fs)
+        Fs = [qtp.Qobj(F) for F in Fs]
+        d = Fs[0].shape[0]
+        self.proc_data_dict['d'] = d
+        Omega = self.options_dict.get('covar_matrix', Omega)
+        if Omega is None:
+            Omega = np.diag(np.ones(len(Fs)))
+        elif len(Omega.shape) == 1:
+            Omega = np.diag(Omega)
+        metadata = self.raw_data_dict.get('exp_metadata', {})
+        if metadata is None:
+            metadata = {}
+        self.raw_data_dict['exp_metadata'] = metadata
+        basis_rots_str = metadata.get('basis_rots_str', None)
+        basis_rots_str = self.options_dict.get('basis_rots_str', basis_rots_str)
+        if basis_rots_str is not None:
+            nr_qubits = int(np.round(np.log2(d)))
+            pulse_list = list(itertools.product(basis_rots_str,
+                                                repeat=nr_qubits))
+            rotations = tomo.standard_qubit_pulses_to_rotations(pulse_list)
+        else:
+            rotations = metadata.get('basis_rots', None)
+            rotations = self.options_dict.get('basis_rots', rotations)
+            if rotations is None:
+                raise KeyError("Either 'basis_rots_str' or 'basis_rots' "
+                               "parameter must be passed in the options "
+                               "dictionary or in the experimental metadata.")
+        rotations = [qtp.Qobj(U) for U in rotations]
+
+        all_Fs = tomo.rotated_measurement_operators(rotations, Fs)
+        all_Fs = list(itertools.chain(*np.array(all_Fs).T))
+        all_mus = np.array(list(itertools.chain(*data.T)))
+        all_Omegas = sp.linalg.block_diag(*[Omega] * len(data[0]))
+
+        self.proc_data_dict['meas_operators'] = all_Fs
+        self.proc_data_dict['covar_matrix'] = all_Omegas
+        self.proc_data_dict['meas_results'] = all_mus
+
+        rho_ls = tomo.least_squares_tomography(all_mus, all_Fs, all_Omegas)
+        self.proc_data_dict['rho_ls'] = rho_ls
+        self.proc_data_dict['rho'] = rho_ls
+        if self.options_dict.get('mle', False):
+            rho_mle = tomo.mle_tomography(all_mus, all_Fs, all_Omegas,
+                                          rho_guess=rho_ls)
+            self.proc_data_dict['rho_mle'] = rho_mle
+            self.proc_data_dict['rho'] = rho_mle
+        rho = self.proc_data_dict['rho']
+
+        self.proc_data_dict['purity'] = (rho * rho).tr().real
+
+        rho_target = metadata.get('rho_target', None)
+        rho_target = self.options_dict.get('rho_target', rho_target)
+        if rho_target is not None:
+            self.proc_data_dict['fidelity'] = tomo.fidelity(rho, rho_target)
+        if d == 4:
+            self.proc_data_dict['concurrence'] = tomo.concurrence(rho)
+
+    def prepare_plots(self):
+        self.prepare_density_matrix_plot()
+        d = self.proc_data_dict['d']
+        if 2 ** (d.bit_length() - 1) == d:
+            # dimension is power of two, plot expectation values of pauli
+            # operators
+            self.prepare_pauli_basis_plot()
+
+    def prepare_density_matrix_plot(self):
+        self.tight_fig = self.options_dict.get('tight_fig', False)
+        rho_target = self.raw_data_dict['exp_metadata'].get('rho_target', None)
+        rho_target = self.options_dict.get('rho_target', rho_target)
+        d = self.proc_data_dict['d']
+        xtick_labels = self.options_dict.get('rho_ticklabels', None)
+        ytick_labels = self.options_dict.get('rho_ticklabels', None)
+        if 2 ** (d.bit_length() - 1) == d:
+            nr_qubits = d.bit_length() - 1
+            fmt_string = '{{:0{}b}}'.format(nr_qubits)
+            labels = [fmt_string.format(i) for i in range(2 ** nr_qubits)]
+            if xtick_labels is None:
+                xtick_labels = ['$|' + lbl + r'\rangle$' for lbl in labels]
+            if ytick_labels is None:
+                ytick_labels = [r'$\langle' + lbl + '|$' for lbl in labels]
+        color = (0.5 * np.angle(self.proc_data_dict['rho'].full()) / np.pi) % 1.
+        cmap = self.options_dict.get('rho_colormap', self.default_phase_cmap())
+        if self.options_dict.get('mle', False):
+            title = 'Maximum likelihood fit of the density matrix\n'
+        else:
+            title = 'Least squares fit of the density matrix\n'
+        empty_artist = mpl.patches.Rectangle((0, 0), 0, 0, visible=False)
+        legend_entries = [(empty_artist,
+                           r'Purity, $Tr(\rho^2) = {:.1f}\%$'.format(
+                               100 * self.proc_data_dict['purity']))]
+        if rho_target is not None:
+            legend_entries += [
+                (empty_artist, r'Fidelity, $F = {:.1f}\%$'.format(
+                    100 * self.proc_data_dict['fidelity']))]
+        if d == 4:
+            legend_entries += [
+                (empty_artist, r'Concurrence, $C = {:.1f}\%$'.format(
+                    100 * self.proc_data_dict['concurrence']))]
+        meas_string = self.base_analysis.\
+            raw_data_dict['measurementstring']
+        if isinstance(meas_string, list):
+            if len(meas_string) > 1:
+                meas_string = meas_string[0] + ' to ' + meas_string[-1]
+            else:
+                meas_string = meas_string[0]
+        self.plot_dicts['density_matrix'] = {
+            'plotfn': self.plot_bar3D,
+            '3d': True,
+            '3d_azim': -35,
+            '3d_elev': 35,
+            'xvals': np.arange(d),
+            'yvals': np.arange(d),
+            'zvals': np.abs(self.proc_data_dict['rho'].full()),
+            'zrange': (0, 1),
+            'color': color,
+            'colormap': cmap,
+            'bar_widthx': 0.5,
+            'bar_widthy': 0.5,
+            'xtick_loc': np.arange(d),
+            'xtick_labels': xtick_labels,
+            'ytick_loc': np.arange(d),
+            'ytick_labels': ytick_labels,
+            'ctick_loc': np.linspace(0, 1, 5),
+            'ctick_labels': ['$0$', r'$\frac{1}{2}\pi$', r'$\pi$',
+                             r'$\frac{3}{2}\pi$', r'$2\pi$'],
+            'clabel': 'Phase (rad)',
+            'title': (title + self.raw_data_dict['timestamp'] + ' ' +
+                      meas_string),
+            'do_legend': True,
+            'legend_entries': legend_entries,
+            'legend_kws': dict(loc='upper left', bbox_to_anchor=(0, 0.94))
+        }
+
+        if rho_target is not None:
+            rho_target = qtp.Qobj(rho_target)
+            if rho_target.type == 'ket':
+                rho_target = rho_target * rho_target.dag()
+            elif rho_target.type == 'bra':
+                rho_target = rho_target.dag() * rho_target
+            self.plot_dicts['density_matrix_target'] = {
+                'plotfn': self.plot_bar3D,
+                '3d': True,
+                '3d_azim': -35,
+                '3d_elev': 35,
+                'xvals': np.arange(d),
+                'yvals': np.arange(d),
+                'zvals': np.abs(rho_target.full()),
+                'zrange': (0, 1),
+                'color': (0.5 * np.angle(rho_target.full()) / np.pi) % 1.,
+                'colormap': cmap,
+                'bar_widthx': 0.5,
+                'bar_widthy': 0.5,
+                'xtick_loc': np.arange(d),
+                'xtick_labels': xtick_labels,
+                'ytick_loc': np.arange(d),
+                'ytick_labels': ytick_labels,
+                'ctick_loc': np.linspace(0, 1, 5),
+                'ctick_labels': ['$0$', r'$\frac{1}{2}\pi$', r'$\pi$',
+                                 r'$\frac{3}{2}\pi$', r'$2\pi$'],
+                'clabel': 'Phase (rad)',
+                'title': ('Target density matrix\n' +
+                          self.raw_data_dict['timestamp'] + ' ' +
+                          meas_string),
+                'bar_kws': dict(zorder=1),
+            }
+
+    def prepare_pauli_basis_plot(self):
+        yexp = tomo.density_matrix_to_pauli_basis(self.proc_data_dict['rho'])
+        nr_qubits = self.proc_data_dict['d'].bit_length() - 1
+        labels = list(itertools.product(*[['I', 'X', 'Y', 'Z']]*nr_qubits))
+        labels = [''.join(label_list) for label_list in labels]
+        if nr_qubits == 1:
+            order = [1, 2, 3]
+        elif nr_qubits == 2:
+            order = [1, 2, 3, 4, 8, 12, 5, 6, 7, 9, 10, 11, 13, 14, 15]
+        elif nr_qubits == 4:
+            order = [1, 2, 3, 4, 8, 12, 16, 32, 48] + \
+                    [5, 6, 7, 9, 10, 11, 13, 14, 15] + \
+                    [17, 18, 19, 33, 34, 35, 49, 50, 51] + \
+                    [20, 24, 28, 36, 40, 44, 52, 56, 60] + \
+                    [21, 22, 23, 25, 26, 27, 29, 30, 31] + \
+                    [37, 38, 39, 41, 42, 43, 45, 46, 47] + \
+                    [53, 54, 55, 57, 58, 59, 61, 62, 63]
+        else:
+            order = np.arange(4**nr_qubits)[1:]
+        if self.options_dict.get('mle', False):
+            fit_type = 'maximum likelihood estimation'
+        else:
+            fit_type = 'least squares fit'
+        meas_string = self.base_analysis. \
+            raw_data_dict['measurementstring']
+        if hasattr(meas_string, '__iter__'):
+            if len(meas_string) > 1:
+                meas_string = meas_string[0] + ' to ' + meas_string[-1]
+            else:
+                meas_string = meas_string[0]
+        self.plot_dicts['pauli_basis'] = {
+            'plotfn': self.plot_bar,
+            'xcenters': np.arange(len(order)),
+            'xwidth': 0.4,
+            'xrange': (-1, len(order)),
+            'yvals': np.array(yexp)[order],
+            'xlabel': r'Pauli operator, $\hat{O}$',
+            'ylabel': r'Expectation value, $\mathrm{Tr}(\hat{O} \hat{\rho})$',
+            'title': 'Pauli operators, ' + fit_type + '\n' +
+                      self.raw_data_dict['timestamp'] + ' ' + meas_string,
+            'yrange': (-1.1, 1.1),
+            'xtick_loc': np.arange(4**nr_qubits - 1),
+            'xtick_labels': np.array(labels)[order],
+            'bar_kws': dict(zorder=10),
+            'setlabel': 'Fit to experiment',
+            'do_legend': True
+        }
+
+        rho_target = self.raw_data_dict['exp_metadata'].get('rho_target', None)
+        rho_target = self.options_dict.get('rho_target', rho_target)
+        if rho_target is not None:
+            rho_target = qtp.Qobj(rho_target)
+            ytar = tomo.density_matrix_to_pauli_basis(rho_target)
+            self.plot_dicts['pauli_basis_target'] = {
+                'plotfn': self.plot_bar,
+                'ax_id': 'pauli_basis',
+                'xcenters': np.arange(len(order)),
+                'xwidth': 0.8,
+                'yvals': np.array(ytar)[order],
+                'xtick_loc': np.arange(len(order)),
+                'xtick_labels': np.array(labels)[order],
+                'bar_kws': dict(color='0.8', zorder=0),
+                'setlabel': 'Target values',
+                'do_legend': True
+            }
+
+        purity_str = r'Purity, $Tr(\rho^2) = {:.1f}\%$'.format(
+            100 * self.proc_data_dict['purity'])
+        if rho_target is not None:
+            fidelity_str = '\n' + r'Fidelity, $F = {:.1f}\%$'.format(
+                100 * self.proc_data_dict['fidelity'])
+        else:
+            fidelity_str = ''
+        if self.proc_data_dict['d'] == 4:
+            concurrence_str = '\n' + r'Concurrence, $C = {:.1f}\%$'.format(
+                100 * self.proc_data_dict['concurrence'])
+        else:
+            concurrence_str = ''
+        self.plot_dicts['pauli_info_labels'] = {
+            'ax_id': 'pauli_basis',
+            'plotfn': self.plot_line,
+            'xvals': [0],
+            'yvals': [0],
+            'line_kws': {'alpha': 0},
+            'setlabel': purity_str + fidelity_str,
+            'do_legend': True
+        }
+
+    def default_phase_cmap(self):
+        cols = np.array(((41, 39, 231), (61, 130, 163), (208, 170, 39),
+                         (209, 126, 4), (181, 28, 20), (238, 76, 152),
+                         (251, 130, 242), (162, 112, 251))) / 255
+        n = len(cols)
+        cdict = {
+            'red': [[i/n, cols[i%n][0], cols[i%n][0]] for i in range(n+1)],
+            'green': [[i/n, cols[i%n][1], cols[i%n][1]] for i in range(n+1)],
+            'blue': [[i/n, cols[i%n][2], cols[i%n][2]] for i in range(n+1)],
+        }
+        return mpl.colors.LinearSegmentedColormap('DMDefault', cdict)
