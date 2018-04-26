@@ -1125,11 +1125,11 @@ class CCLight_Transmon(Qubit):
         self.instr_CC.get_instr().start()
 
         LutMan = self.instr_LutMan_RO.get_instr()
-        LutMan.apply_mixer_predistortion_matrix(True)
+        LutMan.mixer_apply_predistortion_matrix(True)
         MC = self.instr_MC.get_instr()
-        S1 = swf.lutman_par(
+        S1 = swf.lutman_par_UHFQC_dig_trig(
             LutMan, LutMan.mixer_alpha, single=False, run=True)
-        S2 = swf.lutman_par(
+        S2 = swf.lutman_par_UHFQC_dig_trig(
             LutMan, LutMan.mixer_phi, single=False, run=True)
 
         detector = det.Signal_Hound_fixed_frequency(
@@ -1484,7 +1484,8 @@ class CCLight_Transmon(Qubit):
 
     def calibrate_optimal_weights(self, MC=None, verify: bool=True,
                                   analyze: bool=True, update: bool=True,
-                                  no_figs: bool=False)->bool:
+                                  no_figs: bool=False,
+                                  update_threshold: bool=True)->bool:
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -1500,8 +1501,8 @@ class CCLight_Transmon(Qubit):
         self.ro_acq_averages(old_avg)
 
         # Calculate optimal weights
-        optimized_weights_I = -(transients[1][0] - transients[0][0])
-        optimized_weights_Q = -(transients[1][1] - transients[0][1])
+        optimized_weights_I = (transients[1][0] - transients[0][0])
+        optimized_weights_Q = (transients[1][1] - transients[0][1])
         # joint rescaling to +/-1 Volt
         maxI = np.max(np.abs(optimized_weights_I))
         maxQ = np.max(np.abs(optimized_weights_Q))
@@ -1519,7 +1520,7 @@ class CCLight_Transmon(Qubit):
             self.ro_acq_weight_type('optimal')
 
         if verify:
-            self.measure_ssro(no_figs=no_figs)
+            self.measure_ssro(no_figs=no_figs, update_threshold=update_threshold)
         return True
 
     def measure_rabi(self, MC=None, atts=np.linspace(0, 65535, 31),
@@ -2510,7 +2511,7 @@ class CCLight_Transmon(Qubit):
                           msmt_kw={
                                 'nr_shots': nr_shots,
                                 'analyze': True, 'SNR_detector': True,
-                                'cal_residual_excitation': False
+                                'cal_residual_excitation': False,
                                 },
                           result_keys=['SNR', 'F_d', 'F_a']
                         )
@@ -2545,7 +2546,7 @@ class CCLight_Transmon(Qubit):
 
         # calibrate residual excitation and relaxation at high power
         self.measure_ssro(cal_residual_excitation=True, SNR_detector=True,
-                          nr_shots=nr_shots)
+                          nr_shots=nr_shots, update_threshold=False)
         self.measure_SNR_sweeping_amps(amps_rel=amps_rel, analyze=False)
 
         end_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")

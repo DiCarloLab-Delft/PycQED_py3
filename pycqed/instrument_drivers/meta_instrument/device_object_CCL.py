@@ -792,7 +792,9 @@ class DeviceCCL(Instrument):
                         print(res)
 
         #reset msmt_suffix'es
-        [q.msmt_suffix(old_suffixes[qi]) for qi, q in enumerate(qubits)]
+        for qi, q in enumerate(qubits):
+            q.msmt_suffix = old_suffixes[qi]
+
         if analyze:
             print('analysis not implemented yet')
 
