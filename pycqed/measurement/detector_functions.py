@@ -1983,10 +1983,11 @@ class UHFQC_integration_logging_det(Hard_Detector):
         # The averaging-count is used to specify how many times the AWG program
         # should run
         self.UHFQC.awgs_0_single(1)
-        self.UHFQC.awgs_0_userregs_0(self.nr_shots)
-        self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)
-        # The AWG program uses userregs/0 to define the number of iterations
+        self.UHFQC.awgs_0_userregs_0(self.nr_shots) # The AWG program uses 
+        # userregs/0 to define the number of iterations
         # in the loop
+        self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)
+
 
         self.UHFQC.quex_rl_length(self.nr_shots)
         self.UHFQC.quex_rl_avgcnt(0)  # log2(1) for single shot readout

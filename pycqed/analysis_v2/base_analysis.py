@@ -524,11 +524,12 @@ class BaseDataAnalysis(object):
 
         # Check weather there is any data to save
         if hasattr(self, 'fit_res') and self.fit_res is not None:
-            fn = a_tools.measurement_filename(a_tools.get_folder(self.timestamps[0]))
-            fn = self.options_dict.get('analysis_result_file', fn)
+            fn = self.options_dict.get('analysis_result_file', False)
+            if fn == False:
+                fn = a_tools.measurement_filename(a_tools.get_folder(self.timestamps[0]))
 
             try:
-                os.mkdir(os.dirname(fn))
+                os.mkdir(os.path.dirname(fn))
             except FileExistsError:
                 pass
 
@@ -552,7 +553,7 @@ class BaseDataAnalysis(object):
                         del analysis_group[fr_key]
                         fr_group = analysis_group.create_group(fr_key)
 
-                    d = self._convert_dict_rec(copy.deepcopy(self.fit_res))
+                    d = self._convert_dict_rec(copy.deepcopy(fit_res))
                     write_dict_to_hdf5(d, entry_point=fr_group)
 
     @staticmethod

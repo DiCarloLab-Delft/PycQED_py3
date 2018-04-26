@@ -906,17 +906,18 @@ class lutman_par_UHFQC_dig_trig(Soft_Sweep):
         if self.run:
             self.LutMan.AWG.get_instr().acquisition_arm(single=self.single)
 
+
 class lutman_par_depletion_pulse_global_scaling(Soft_Sweep):
-    def __init__(self, LutMan, resonator_numbers, optimization_M_amps, 
-                    optimization_M_amp_down0s, optimization_M_amp_down1s, 
+    def __init__(self, LutMan, resonator_numbers, optimization_M_amps,
+                    optimization_M_amp_down0s, optimization_M_amp_down1s,
                     upload=True, **kw):
-        # sweeps the redout-and depletion pules of the listed resonators.
+        # sweeps the readout-and depletion pules of the listed resonators.
         # sets the remaining readout and depletion pulses to 0 amplitude.
 
         self.set_kw()
         self.name= 'depletion_pulse_sweeper'
-        self.parameter_name = 'depletion_pulse_scaling_amp'
-        self.unit = 'V'
+        self.parameter_name = 'relative_depletion_pulse_scaling_amp'
+        self.unit = 'a.u.'
         self.sweep_control = 'soft'
         self.LutMan = LutMan
         self.optimization_M_amps = optimization_M_amps
@@ -928,25 +929,26 @@ class lutman_par_depletion_pulse_global_scaling(Soft_Sweep):
     def set_parameter(self, val):
         '''
         Set the parameter(s) to be swept. Differs per sweep function
-        Sweeping the amplitudes of the readout-and-depletion-pulses in the list 
+        Sweeping the amplitudes of the readout-and-depletion-pulses in the list
         relative to the initially optimized amplitude.
         Sets the remaining depletion pulses to zero.
         '''
-        for resonator_number in self.Lutman._resonator_codeword_bit_mapping:
+        for resonator_number in self.LutMan._resonator_codeword_bit_mapping:
             if resonator_number in self.resonator_numbers:
-                i = resonator_numbers.index(resonator_number)
-                self.LutMan.set('M_amp_R{}'.format(self.resonator_number),
-                    val*optimization_M_amps[i])
-                self.LutMan.set('M_down_amp0_R{}'.format(self.resonator_number), 
+                i = self.resonator_numbers.index(resonator_number)
+                self.LutMan.set('M_amp_R{}'.format(resonator_number),
+                    val*self.optimization_M_amps[i])
+                self.LutMan.set('M_down_amp0_R{}'.format(resonator_number),
                     val*self.optimization_M_amp_down0s[i])
-                self.LutMan.set('M_down_amp1_R{}'.format(self.resonator_number), 
+                self.LutMan.set('M_down_amp1_R{}'.format(resonator_number),
                     val*self.optimization_M_amp_down1s[i])
             else:
-                self.LutMan.set('M_amp_R{}'.format(self.resonator_number),0)
-                self.LutMan.set('M_down_amp0_R{}'.format(self.resonator_number),0)
-                self.LutMan.set('M_down_amp1_R{}'.format(self.resonator_number),0)
+                self.LutMan.set('M_amp_R{}'.format(resonator_number), 0)
+                self.LutMan.set('M_down_amp0_R{}'.format(resonator_number), 0)
+                self.LutMan.set('M_down_amp1_R{}'.format(resonator_number), 0)
         if self.upload:
             self.LutMan.load_DIO_triggered_sequence_onto_UHFQC(regenerate_waveforms=True)
+
 
 class lutman_par_dB_attenuation_UHFQC_dig_trig(Soft_Sweep):
     def __init__(self, LutMan, LutMan_parameter, run=False, **kw):

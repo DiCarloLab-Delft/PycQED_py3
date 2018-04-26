@@ -581,6 +581,7 @@ class DeviceCCL(Instrument):
         """
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
+
         if MC is None:
             MC = self.instr_MC.get_instr()
         assert q0 in self.qubits()
@@ -738,32 +739,64 @@ class DeviceCCL(Instrument):
             a = mra.two_qubit_ssro_fidelity('SSRO_{}_{}'.format(q1, q0))
             a = ma2.Multiplexed_Readout_Analysis()
         return a
-    def measure_msmt_induced_dephasing_matrix(self,
-                                               qubits: list,
-                                               analyze=True,
-                                               MC=None, prepare_for_timedomain=True,
-                                               amps_rel=None):
-        # measures the msmt induced dephasing for readout the readout of qubits i
-        # on qubit j. Additionally measures the SNR as a function of amplitude for the
-        # diagonal elements to obtain the quantum efficiency.
-        # - make sure that all readout_and_depletion pulses are of equal total length
-        # - make sure that the cc light to has the readout time configured equal
-        # to the measurement and depletion time + 60 ns buffer
-        # issue: not sure if the weight function assignment is working correctly. 
-        # the qubit objects will use SSB for the ramsey measurements.
-        amps_rel = amps_rel or np.linspace(0, 1, 11)
+
+    def measure_msmt_induced_dephasing_matrix(self, qubits: list,
+                                              analyze=True, MC=None,
+                                              prepare_for_timedomain=True,
+                                              amps_rel=None, verbose=True):
+        '''
+        Measures the msmt induced dephasing for readout the readout of qubits
+        i on qubit j. Additionally measures the SNR as a function of amplitude
+        for the diagonal elements to obtain the quantum efficiency.
+        In order to use this: make sure that
+        - all readout_and_depletion pulses are of equal total length
+        - the cc light to has the readout time configured equal to the
+            measurement and depletion time + 60 ns buffer
+
+        fixme: not sure if the weight function assignment is working correctly.
+
+        the qubit objects will use SSB for the ramsey measurements.
+        '''
+        if amps_rel is None:
+            amps_rel = np.linspace(0, 1, 11)
+
         if prepare_for_timedomain:
+            #for q in qubits:
+            #    q.prepare_for_timedomain()
             self.prepare_for_timedomain()
-        target_qubits = qubits
-        measured_qubits = qubits
+
+        old_suffixes = [q.msmt_suffix for q in qubits]
+        target_qubits = qubits[:]
+        measured_qubits = qubits[:]
         for target_qubit in target_qubits:
             for measured_qubit in measured_qubits:
-                if target_qubit==measured_qubit:
-                    measured_qubit.measure_quantum_efficiency(amps_rel=amps_rel)
+                s = '_trgt_' + measured_qubit.name + '_measured_' + target_qubit.name
+                measured_qubit.msmt_suffix = s
+                target_qubit.msmt_suffix = s
+                if target_qubit == measured_qubit:
+                    eff = measured_qubit.measure_quantum_efficiency(
+                                                    verbose=verbose,
+                                                    amps_rel=amps_rel,
+                                                    analyze=True)
+                    if verbose:
+                        print(eff)
                 else:
-                    measured_qubit.measure_msmt_induced_dephasing_sweeping_amps(amps_rel=amps_rel,
-                                                                                cross_target_qubits=[target_qubit])
+                    res = measured_qubit.measure_msmt_induced_dephasing_sweeping_amps(
+                            verbose=verbose,
+                            amps_rel=amps_rel,
+                            cross_target_qubits=[target_qubit],
+                            multi_qubit_platf_cfg=self.cfg_openql_platform_fn(),
+                            analyze=True,
+                        )
+                    if verbose:
+                        print(res)
 
+        #reset msmt_suffix'es
+        for qi, q in enumerate(qubits):
+            q.msmt_suffix = old_suffixes[qi]
+
+        if analyze:
+            print('analysis not implemented yet')
 
     def measure_chevron(self, q0: str, q_spec: str,
                         amps, lengths,
