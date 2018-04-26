@@ -1425,8 +1425,6 @@ class CCLight_Transmon(Qubit):
                     return a.F_a, a.F_d
 
 
-
-
     def measure_transients(self, MC=None, analyze: bool=True,
                            cases=('off', 'on'),
                            prepare: bool=True, depletion_analysis: bool=True,
