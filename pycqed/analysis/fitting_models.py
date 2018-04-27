@@ -334,6 +334,38 @@ def HangerFuncComplex(f, pars):
 
     return S21
 
+def hanger_func_complex_SI(f: float, f0: float, Ql: float, Qe: float,
+                           A: float, theta: float, phi_v: float, phi_0: float,
+                           alpha:float =1):
+    '''
+    This is the complex function for a hanger (lamda/4 resonator).
+    See equation 3.1 of the Asaad master thesis.
+
+    It differens from the "old" HangerFuncComplex in that all inputs are SI
+    (no longer f in SI and f0 not in SI...)
+
+
+    Input:
+        f   : frequency
+        f0  : resonance frequency
+        A   : background transmission amplitude
+        Ql  : loaded quality factor
+        Qe  : extrinsic quality factor
+        theta:  phase of Qe (in rad)
+        phi_v:  phase to account for propagation delay to sample
+        phi_0:  phase to account for propagation delay from sample
+        alpha:  slope of signal around the resonance
+
+    '''
+    slope_corr = (1+alpha*(f-f0)/f0)
+    propagation_delay_corr = np.exp(1j * (phi_v * f + phi_0))
+    hanger_contribution = (1 - Ql / Qe * np.exp(1j * theta)/
+                               (1 + 2.j * Ql * (f  - f0) / f0))
+    S21 = A *  slope_corr * hanger_contribution * propagation_delay_corr
+
+    return S21
+
+
 
 def PolyBgHangerFuncAmplitude(f, f0, Q, Qe, A, theta, poly_coeffs):
     # This is the function for a hanger (lambda/4 resonator) which takes into
