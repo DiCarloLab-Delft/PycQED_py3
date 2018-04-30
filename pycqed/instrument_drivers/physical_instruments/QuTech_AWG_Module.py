@@ -46,7 +46,6 @@ class HandshakeParameter(Parameter):
 class QuTech_AWG_Module(SCPI):
 
     def __init__(self, name, address, port, **kwargs):
-        numCodewords = kwargs.pop('numCodewords', 64)
         super().__init__(name, address, port, **kwargs)
 
         # AWG properties
@@ -58,7 +57,7 @@ class QuTech_AWG_Module(SCPI):
         self.device_descriptor.numMarkers = 8
         self.device_descriptor.numTriggers = 8
         # Commented out until bug fixed
-        self.device_descriptor.numCodewords = numCodewords
+        self.device_descriptor.numCodewords = 64
 
         # valid values
         self.device_descriptor.mvals_trigger_impedance = vals.Enum(50),
@@ -136,7 +135,6 @@ class QuTech_AWG_Module(SCPI):
             dac_temperature_cmd = 'STATus:DAC{}:TEMperature'.format(ch)
             gain_adjust_cmd = 'DAC{}:GAIn:DRIFt:ADJust'.format(ch)
             dac_digital_value_cmd = 'DAC{}:DIGitalvalue'.format(ch)
-
             # Set channel first to ensure sensible sorting of pars
             # Compatibility: 5014, QWG
             self.add_parameter('ch{}_state'.format(ch),
@@ -154,7 +152,7 @@ class QuTech_AWG_Module(SCPI):
                 docstring='Amplitude channel {} (Vpp into 50 Ohm)'.format(ch),
                 get_cmd=amp_cmd + '?',
                 set_cmd=amp_cmd + ' {:.6f}',
-                vals=vals.Numbers(-1.8, 1.8),
+                vals=vals.Numbers(-1.6, 1.6),
                 get_parser=float)
 
             self.add_parameter('ch{}_offset'.format(ch),
