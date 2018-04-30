@@ -431,7 +431,7 @@ class QuantumEfficiencyAnalysis(ba.BaseDataAnalysis):
             for k in ['amp_vs_Ramsey_coherence', 'amp_vs_Ramsey_fit', 'amp_vs_SNR_fit', 'amp_vs_SNR_scatter']:
                 self.plot_dicts[k]['ax_id'] = 'snr_analysis'
                 self.plot_dicts[k]['ylabel'] = 'SNR, coherence'
-                self.plot_dicts[k]['yunit'] = 'a.u.'
+                self.plot_dicts[k]['yunit'] = '(-)'
                 self.plot_dicts[k]['title'] = r'$\eta = (%.4f \pm %.4f)$ %%' % (
                     100 * self.fit_dicts['eta'], 100 * self.fit_dicts['u_eta'])
 
@@ -456,10 +456,8 @@ class RamseyAnalysis(ba.BaseDataAnalysis):
         mask = np.intersect1d(np.where(dephasing != None), np.where(amps != None))
 
         self.proc_data_dict['scaling_amp'] = amps[mask]
-        self.proc_data_dict['dephasing'] = dephasing[mask]
+        self.proc_data_dict['coherence'] = dephasing[mask]
         self.proc_data_dict['phase'] = self.raw_data_dict['phase'][mask]
-        # todo: factor 2?
-        self.proc_data_dict['coherence'] = dephasing[mask] / 2
 
     def run_fitting(self):
         self.fit_res = OrderedDict()
@@ -470,8 +468,8 @@ class RamseyAnalysis(ba.BaseDataAnalysis):
             return scale * np.exp(-(x) ** 2 / (2 * sigma ** 2))
 
         gmodel = lmfit.models.Model(gaussian)
-        gmodel.set_param_hint('sigma', value=0.07, min=-1, max=1)
-        gmodel.set_param_hint('scale', value=0.9)  # , min=0.1, max=100)
+        gmodel.set_param_hint('sigma', value=0.07, min=-5, max=5)
+        gmodel.set_param_hint('scale', value=np.max(coherence))  # , min=0.1, max=100)
         para = gmodel.make_params()
         coherence_fit = gmodel.fit(coherence, x=scaling_amp, **para)
         self.fit_res['coherence_fit'] = coherence_fit
@@ -483,6 +481,15 @@ class RamseyAnalysis(ba.BaseDataAnalysis):
 
     def prepare_plots(self):
         name = ''
+        fit_text = "$\sigma = %.3f \pm %.3f$"%(self.fit_dicts['coherence_fit']['sigma'],
+                                    self.fit_dicts['coherence_fit']['sigma_std'])
+        self.plot_dicts['text_msg_' + name + 'amp_vs_Ramsey'] = {
+                    'ax_id':name + 'amp_vs_Ramsey',
+                    # 'ypos': 0.15,
+                    'plotfn': self.plot_text,
+                    'box_props': 'fancy',
+                    'text_string': fit_text,
+        }
         self.plot_dicts[name + 'amp_vs_Ramsey_fit'] = {
             'plotfn': self.plot_fit,
             'ax_id': name + 'amp_vs_Ramsey',
@@ -491,10 +498,10 @@ class RamseyAnalysis(ba.BaseDataAnalysis):
             'xvals': self.proc_data_dict['scaling_amp'],
             'marker': '',
             'linestyle': '-',
-            'ylabel': 'Coherence',
-            'yunit': 'a.u.',
+            'ylabel': r'Coherence, $\left| \rho_{01} \right|$',
+            'yunit': '',
             'xlabel': 'scaling amplitude',
-            'xunit': 'a.u.',
+            'xunit': 'rel. amp.',
             'setlabel': 'ramsey coherence fit',
         }
         self.plot_dicts[name + 'amp_vs_Ramsey_coherence'] = {
@@ -516,7 +523,7 @@ class RamseyAnalysis(ba.BaseDataAnalysis):
             'ylabel': 'Phase',
             'yunit': 'deg.',
             'xlabel': 'scaling amplitude',
-            'xunit': 'a.u.',
+            'xunit': 'rel. amp.',
             'setlabel': 'ramsey phase data',
         }
 
@@ -536,7 +543,8 @@ class RamseyAnalysisSweep(RamseyAnalysis):
                          )
         self.single_timestamp = True
         ts = a_tools.get_timestamps_in_range(timestamp_start=t_start,
-                                        timestamp_end=t_stop, label=label)
+                                        timestamp_end=t_stop, label=label,
+                                        exact_label_match=True)
         if self.verbose:
             print('RamseyAnalysisSweep', ts)
         assert(len(ts) == 1)
@@ -547,7 +555,8 @@ class RamseyAnalysisSweep(RamseyAnalysis):
 
     def extract_data(self):
         self.raw_data_dict = OrderedDict()
-        data_file = MeasurementAnalysis(timestamp=self.timestamp,
+        data_file = MeasurementAnalysis(label=self.labels[0],
+                                        timestamp=self.timestamp,
                                         auto=True, TwoD=False)
 
         dateobj = a_tools.datetime_from_timestamp(self.timestamp)
@@ -655,7 +664,7 @@ class SSROAnalysis(ba.BaseDataAnalysis):
             'zorder': 0,
             'xvals': self.proc_data_dict['scaling_amp'],
             'xlabel': 'scaling amplitude',
-            'xunit': 'a.u.',
+            'xunit': 'rel. amp.',
             'yvals': self.proc_data_dict['SNR'],
             'ylabel': 'SNR',
             'yunit': '-',
@@ -686,7 +695,7 @@ class SSROAnalysis(ba.BaseDataAnalysis):
             'ylabel': 'Fidelity',
             'yunit': '-',
             'xlabel': 'scaling amplitude',
-            'xunit': 'a.u.',
+            'xunit': 'rel. amp.',
             'setlabel': '$F_d$ data',
             'do_legend': True,
         }
@@ -707,7 +716,8 @@ class SSROAnalysisSweep(SSROAnalysis):
         self.single_timestamp = True
 
         ts = a_tools.get_timestamps_in_range(timestamp_start=t_start,
-                                        timestamp_end=t_stop, label=label)
+                                        timestamp_end=t_stop, label=label,
+                                        exact_label_match=True)
         if self.verbose:
             print('SSROAnalysisSweep', ts)
         assert(len(ts) == 1)
@@ -719,7 +729,6 @@ class SSROAnalysisSweep(SSROAnalysis):
     def extract_data(self):
         self.raw_data_dict = OrderedDict()
         data_file = MeasurementAnalysis(timestamp=self.timestamp,
-                                        label=self.labels[0],
                                         auto=True, TwoD=False)
 
         dateobj = a_tools.datetime_from_timestamp(self.timestamp)

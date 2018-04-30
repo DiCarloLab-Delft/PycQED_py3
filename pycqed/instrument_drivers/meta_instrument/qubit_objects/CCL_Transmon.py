@@ -2417,9 +2417,15 @@ class CCLight_Transmon(Qubit):
     def measure_msmt_induced_dephasing_sweeping_amps(self, amps_rel=None,
                                   nested_MC=None, cross_target_qubits=None,
                                   multi_qubit_platf_cfg=None, analyze=False,
-                                  verbose=True):
+                                  verbose=True, waveform_name: str=None):
+        if pulse_type is None:
+            waveform_name = 'up_down_down_final'
+
         if nested_MC is None:
             nested_MC = self.instr_nested_MC.get_instr()
+
+        if (len(cross_target_qubits) == 1 and self.name == cross_target_qubits[0]):
+            cross_target_qubits = None
 
         if cross_target_qubits is None:
             # Only measure on a single Qubit
@@ -2427,7 +2433,9 @@ class CCLight_Transmon(Qubit):
             optimization_M_amps = [self.ro_pulse_amp()]
             optimization_M_amp_down0s = [self.ro_pulse_down_amp0()]
             optimization_M_amp_down1s = [self.ro_pulse_down_amp1()]
-            readout_pulse_length = self.ro_pulse_length()+self.ro_pulse_down_length0()+self.ro_pulse_down_length1()
+            readout_pulse_length = self.ro_pulse_length()
+            readout_pulse_length += self.ro_pulse_down_length0()
+            readout_pulse_length += self.ro_pulse_down_length1()
             amps_rel = np.linspace(0, 0.5, 11) if amps_rel is None else amps_rel
         else:
             cfg_qubit_nrs = []
@@ -2440,15 +2448,20 @@ class CCLight_Transmon(Qubit):
                 optimization_M_amps.append(cross_target_qubit.ro_pulse_amp())
                 optimization_M_amp_down0s.append(cross_target_qubit.ro_pulse_down_amp0())
                 optimization_M_amp_down1s.append(cross_target_qubit.ro_pulse_down_amp1())
-                readout_pulse_lengths.append(cross_target_qubit.ro_pulse_length()+cross_target_qubit.ro_pulse_down_length0()+cross_target_qubit.ro_pulse_down_length1())
+                ro_len = cross_target_qubit.ro_pulse_length()
+                ro_len += cross_target_qubit.ro_pulse_down_length0()
+                ro_len += cross_target_qubit.ro_pulse_down_length1()
+                readout_pulse_lengths.append(ro_len)
             readout_pulse_length = np.max(readout_pulse_lengths)
 
-        self.ro_pulse_type('up_down_down_final')
+        old_waveform_name = self.ro_pulse_type()
+        self.ro_pulse_type(waveform_name)
         RO_lutman = self.instr_LutMan_RO.get_instr()
         RO_lutman.set('M_final_amp_R{}'.format(self.cfg_qubit_nr()), self.ro_pulse_amp())
         old_delay = self.ro_acq_delay()
-        self.ro_acq_delay(old_delay + readout_pulse_length +
-                          RO_lutman.get('M_final_delay_R{}'.format(self.cfg_qubit_nr())))
+
+        d = RO_lutman.get('M_final_delay_R{}'.format(self.cfg_qubit_nr()))
+        self.ro_acq_delay(old_delay + readout_pulse_length +d)
         self.ro_acq_integration_length(readout_pulse_length+100e-9)
         self.ro_acq_weight_type('SSB')
         self.prepare_for_timedomain()
@@ -2480,7 +2493,8 @@ class CCLight_Transmon(Qubit):
         label = 'ro_amp_sweep_ramsey' + self.msmt_suffix
         nested_MC.run(label)
 
-        self.ro_pulse_type('up_down_down')
+        # Reset qubit objects parameters tp previous settings
+        self.ro_pulse_type(old_waveform_name)
         self.cfg_prepare_ro_awg(old_ro_prepare_state)
         self.ro_acq_delay(old_delay)
 
@@ -2537,8 +2551,11 @@ class CCLight_Transmon(Qubit):
 
         start_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
-        self.measure_msmt_induced_dephasing_sweeping_amps(amps_rel=amps_rel, analyze=False)
-        readout_pulse_length = self.ro_pulse_length()+self.ro_pulse_down_length0()+self.ro_pulse_down_length1()
+        self.measure_msmt_induced_dephasing_sweeping_amps(amps_rel=amps_rel,
+                                                          analyze=False)
+        readout_pulse_length = self.ro_pulse_length()
+        readout_pulse_length += self.ro_pulse_down_length0()
+        readout_pulse_length += self.ro_pulse_down_length1()
         self.ro_acq_integration_length(readout_pulse_length+100e-9)
 
         # calibrate optimal weights
@@ -2558,12 +2575,11 @@ class CCLight_Transmon(Qubit):
             options_dict = {
                 'individual_plots': True,
                 'verbose': verbose,
-                #'remove_reference_ramsey': False,
-                #'remove_reference_ssro': True,
             }
             qea = ma2.QuantumEfficiencyAnalysis(t_start=start_time,
                                                 t_stop=end_time,
                                                 use_sweeps=True,
+                                                options_dict=options_dict,
                                                 label_ramsey='_ro_amp_sweep_ramsey'+self.msmt_suffix,
                                                 label_ssro='_ro_amp_sweep_SNR'+self.msmt_suffix)
 
@@ -2572,6 +2588,6 @@ class CCLight_Transmon(Qubit):
             u_eta = qea.fit_dicts['u_eta']
 
             return {'eta': eta, 'u_eta': u_eta,
-                    't_start' : start_time, 't_stop' : end_time}
+                    't_start': start_time, 't_stop': end_time}
         else:
             return {}
