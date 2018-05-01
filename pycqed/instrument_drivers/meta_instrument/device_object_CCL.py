@@ -768,7 +768,7 @@ class DeviceCCL(Instrument):
             self.prepare_for_timedomain()
 
         old_suffixes = [q.msmt_suffix for q in qubits] #Save old qubit suffixes
-        old_suffix = this.msmt_suffix
+        old_suffix = self.msmt_suffix
 
         # Save the start-time of the experiment for analysis
         start = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -792,6 +792,7 @@ class DeviceCCL(Instrument):
                 if target_qubit == measured_qubit:
                     amps_rel = np.linspace(0, 1, n_amps_rel)
                     mqp = None
+                    list_target_qubits = None
                 else:
                     t_amp_max = max(target_qubit.ro_pulse_down_amp0(),
                                     target_qubit.ro_pulse_down_amp1(),
@@ -799,6 +800,7 @@ class DeviceCCL(Instrument):
                     amp_max = max(t_amp_max, measured_qubit.ro_pulse_amp())
                     amps_rel = np.linspace(0, 0.99/(amp_max), n_amps_rel)
                     mqp = self.cfg_openql_platform_fn()
+                    list_target_qubits = [target_qubit,]
 
                 # If a diagonal element, consider doing the full quantum
                 # efficiency matrix.
@@ -810,7 +812,7 @@ class DeviceCCL(Instrument):
                     res = measured_qubit.measure_msmt_induced_dephasing_sweeping_amps(
                             verbose=verbose,
                             amps_rel=amps_rel,
-                            cross_target_qubits=[target_qubit],
+                            cross_target_qubits=list_target_qubits,
                             multi_qubit_platf_cfg=mqp,
                             analyze=True
                         )

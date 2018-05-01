@@ -2417,14 +2417,14 @@ class CCLight_Transmon(Qubit):
     def measure_msmt_induced_dephasing_sweeping_amps(self, amps_rel=None,
                                   nested_MC=None, cross_target_qubits=None,
                                   multi_qubit_platf_cfg=None, analyze=False,
-                                  verbose=True, waveform_name: str=None):
-        if pulse_type is None:
-            waveform_name = 'up_down_down_final'
+                                  verbose: bool=True):
+        waveform_name = 'up_down_down_final'
 
         if nested_MC is None:
             nested_MC = self.instr_nested_MC.get_instr()
 
-        if (len(cross_target_qubits) == 1 and self.name == cross_target_qubits[0]):
+        if cross_target_qubits is None or
+                    (len(cross_target_qubits) == 1 and self.name == cross_target_qubits[0]):
             cross_target_qubits = None
 
         if cross_target_qubits is None:
