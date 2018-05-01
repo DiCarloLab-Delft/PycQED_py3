@@ -112,8 +112,8 @@ class CCLight_Transmon(Qubit):
                            parameter_class=ManualParameter)
 
         # RO pulse parameters
-        self.add_parameter('ro_pulse_type', initial_value='square',
-                           vals=vals.Enum('gated', 'square', 'up_down_down','up_down_down_final'),
+        self.add_parameter('ro_pulse_type', initial_value='simple',
+                           vals=vals.Enum('gated', 'simple', 'up_down_down','up_down_down_final'),
                            parameter_class=ManualParameter)
 
         # Mixer offsets correction, RO pulse

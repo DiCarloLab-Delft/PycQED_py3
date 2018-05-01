@@ -141,8 +141,8 @@ class DeviceObject(Instrument):
         q0.RO_acq_marker_delay(q1.RO_acq_marker_delay())
 
         # Generate multiplexed pulse
-        multiplexed_wave = [[q0.RO_LutMan(), 'M_square'],
-                            [q1.RO_LutMan(), 'M_square']]
+        multiplexed_wave = [[q0.RO_LutMan(), 'M_simple'],
+                            [q1.RO_LutMan(), 'M_simple']]
         RO_LMM.generate_multiplexed_pulse(multiplexed_wave)
         RO_LMM.load_pulse_onto_AWG_lookuptable('Multiplexed_pulse')
 
