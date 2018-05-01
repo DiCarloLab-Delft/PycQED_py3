@@ -16,6 +16,8 @@ from pycqed.analysis import analysis_toolbox as a_tools
 
 import numpy as np
 import matplotlib.pyplot as plt
+import numpy.ma
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 
 class CrossDephasingAnalysis(ba.BaseDataAnalysis):
@@ -120,7 +122,7 @@ class CrossDephasingAnalysis(ba.BaseDataAnalysis):
             'cmap': self.options_dict.get('cmap', 'YlGn_r'),
         }
         self.plot_dicts['deph_norm'] = {
-            'plotfn': self.plot_labeled_2d,
+            'plotfn': self.plot_norm_matrix,
             'title': 'Normalized by targetted Qubit',  # todo
             'yvals': self.qubit_labels, 'ylabel': 'Targeted Qubit', 'yunit': '',
             'xvals': self.qubit_labels, 'xlabel': 'Dephased Qubit', 'xunit': '',
@@ -148,14 +150,111 @@ class CrossDephasingAnalysis(ba.BaseDataAnalysis):
         xn = np.array(range(len(xl)))+0.5
         yn = np.array(range(len(yl)))+0.5
         pdict['xvals'] = xn
-        pdict['yvals'] = yn
-        pdict['zrange'] = (0,np.max(z))
+        pdict['yvals'] = -yn
+        pdict['zrange'] = (0, np.max(z))
 
         self.plot_colorxy(pdict=pdict, axs=axs)
+
+        axs.yaxis.set_ticklabels(yl)
+        axs.yaxis.set_ticks(-yn)
+        axs.xaxis.set_ticklabels(xl)
+        axs.xaxis.set_ticks(xn)
+
+        axs.cbar.set_label(pdict.get('zlabel', ''))
+
+    def plot_norm_matrix(self, pdict, axs):
+        fig = axs.figure
+        xl = pdict.get('xvals')
+        yl = pdict.get('yvals')
+        z = pdict.get('zvals')
+
+        xn = np.array(range(len(xl)))
+        yn = np.array(range(len(yl)))
+
+        diag_matrix = np.zeros_like(z, dtype=bool)
+        for i in range(len(diag_matrix)):
+            diag_matrix[i, i] = True
+
+        off_diagonal = numpy.ma.masked_array(z, diag_matrix)
+        diagonal = numpy.ma.masked_array(z, diag_matrix == False)
+
+        # axins1 = inset_axes(parent_axes=axs,
+        #                         width="4%",  # width = 10% of parent_bbox width
+        #                         height="45%",  # height : 50%
+        #                         loc=2,
+        #                         bbox_to_anchor=(1.03, 0., 1, 1),
+        #                         bbox_transform=axs.transAxes,
+        #                         borderpad=0,
+        #                     )
+
+        pa = axs.imshow(diagonal, cmap='Reds', vmax=1, vmin=0.95)
+        #cba = fig.colorbar(pa, cax=axins1)
+
+        axins2 = inset_axes(parent_axes=axs,
+                                width="4%",  # width = 10% of parent_bbox width
+                                height="100%",  # height : 50%
+                                loc=3,
+                                bbox_to_anchor=(1.03, 0., 1, 1),
+                                bbox_transform=axs.transAxes,
+                                borderpad=0,
+                            )
+
+        pb = axs.imshow(off_diagonal, cmap='Blues',
+                        vmin=0, vmax=max(np.max(off_diagonal),0.01))
+        cbb = fig.colorbar(pb, cax=axins2)
 
         axs.yaxis.set_ticklabels(yl)
         axs.yaxis.set_ticks(yn)
         axs.xaxis.set_ticklabels(xl)
         axs.xaxis.set_ticks(xn)
 
-        axs.cbar.set_label(pdict.get('zlabel', ''))
+        #axs.cbar.set_label(pdict.get('zlabel', ''))
+
+    def plot_double_matrix(self, pdict, axs):
+        fig = axs.figure
+        xl = pdict.get('xvals')
+        yl = pdict.get('yvals')
+        z = pdict.get('zvals')
+
+        xn = np.array(range(len(xl)))
+        yn = np.array(range(len(yl)))
+
+        diag_matrix = np.zeros_like(z, dtype=bool)
+        for i in range(len(diag_matrix)):
+            diag_matrix[i, i] = True
+
+        off_diagonal = numpy.ma.masked_array(z, diag_matrix)
+        diagonal = numpy.ma.masked_array(z, diag_matrix == False)
+
+        axins1 = inset_axes(parent_axes=axs,
+                                width="4%",  # width = 10% of parent_bbox width
+                                height="45%",  # height : 50%
+                                loc=2,
+                                bbox_to_anchor=(1.03, 0., 1, 1),
+                                bbox_transform=axs.transAxes,
+                                borderpad=0,
+                            )
+
+        pa = axs.imshow(diagonal, cmap='Reds', vmax=1,
+                        vmin=min(np.min(diagonal), 0.99))
+        cba = fig.colorbar(pa, cax=axins1)
+
+        axins2 = inset_axes(parent_axes=axs,
+                                width="4%",  # width = 10% of parent_bbox width
+                                height="100%",  # height : 50%
+                                loc=3,
+                                bbox_to_anchor=(1.03, 0., 1, 1),
+                                bbox_transform=axs.transAxes,
+                                borderpad=0,
+                            )
+
+        pb = axs.imshow(off_diagonal, cmap='Blues_r',
+                        vmin=0, vmax=max(np.max(off_diagonal),0.01))
+        cbb = fig.colorbar(pb, cax=axins2)
+
+        axs.yaxis.set_ticklabels(yl)
+        axs.yaxis.set_ticks(yn)
+        axs.xaxis.set_ticklabels(xl)
+        axs.xaxis.set_ticks(xn)
+
+        #axs.cbar.set_label(pdict.get('zlabel', ''))
