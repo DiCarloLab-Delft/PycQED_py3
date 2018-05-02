@@ -34,7 +34,7 @@ class UHFQC(Instrument):
 
     def __init__(self, name, device='auto', interface='USB',
                  address='127.0.0.1', port=8004, DIO=True, 
-                 nr_integration_channels=5,**kw):
+                 nr_integration_channels=9,**kw):
         '''
         Input arguments:
             name:           (str) name of the instrument
