@@ -149,7 +149,7 @@ class Base_LutMan(Instrument):
                 marker='o', label='chQ')
         ax.legend()
         if self._voltage_min is not None:
-            ax.set_axis_bgcolor('gray')
+            ax.set_facecolor('gray')
             ax.axhspan(self._voltage_min, self._voltage_max, facecolor='w',
                        linewidth=0)
             ax.set_ylim(self._voltage_min*1.1, self._voltage_max*1.1)

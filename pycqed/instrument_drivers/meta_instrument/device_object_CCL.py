@@ -11,6 +11,8 @@ from pycqed.measurement import sweep_functions as swf
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import measurement_analysis as ma2
 import networkx as nx
+import datetime
+
 
 try:
     from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
@@ -743,7 +745,9 @@ class DeviceCCL(Instrument):
     def measure_msmt_induced_dephasing_matrix(self, qubits: list,
                                               analyze=True, MC=None,
                                               prepare_for_timedomain=True,
-                                              amps_rel=None, verbose=True):
+                                              n_amps_rel: int=None,
+                                              verbose=True,
+                                              get_quantum_eff: bool=False):
         '''
         Measures the msmt induced dephasing for readout the readout of qubits
         i on qubit j. Additionally measures the SNR as a function of amplitude
@@ -757,46 +761,84 @@ class DeviceCCL(Instrument):
 
         the qubit objects will use SSB for the ramsey measurements.
         '''
-        if amps_rel is None:
-            amps_rel = np.linspace(0, 1, 11)
-
+        lpatt = '_trgt_{TQ}_measured_{RQ}'
         if prepare_for_timedomain:
             #for q in qubits:
             #    q.prepare_for_timedomain()
             self.prepare_for_timedomain()
 
-        old_suffixes = [q.msmt_suffix for q in qubits]
+        old_suffixes = [q.msmt_suffix for q in qubits] #Save old qubit suffixes
+        old_suffix = self.msmt_suffix
+
+        # Save the start-time of the experiment for analysis
+        start = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # Loop over all target and measurement qubits
         target_qubits = qubits[:]
         measured_qubits = qubits[:]
         for target_qubit in target_qubits:
             for measured_qubit in measured_qubits:
-                s = '_trgt_' + measured_qubit.name + '_measured_' + target_qubit.name
+                # Set measurement label suffix
+                s = lpatt.replace('{TQ}', target_qubit.name)
+                s = s.replace('{RQ}', measured_qubit.name)
                 measured_qubit.msmt_suffix = s
                 target_qubit.msmt_suffix = s
+
+                #Print label
+                if verbose:
+                    print(s)
+
+                # Slight differences if diagonal element
                 if target_qubit == measured_qubit:
-                    eff = measured_qubit.measure_quantum_efficiency(
-                                                    verbose=verbose,
-                                                    amps_rel=amps_rel,
-                                                    analyze=True)
-                    if verbose:
-                        print(eff)
+                    amps_rel = np.linspace(0, 1, n_amps_rel)
+                    mqp = None
+                    list_target_qubits = None
+                else:
+                    t_amp_max = max(target_qubit.ro_pulse_down_amp0(),
+                                    target_qubit.ro_pulse_down_amp1(),
+                                    target_qubit.ro_pulse_amp())
+                    amp_max = max(t_amp_max, measured_qubit.ro_pulse_amp())
+                    amps_rel = np.linspace(0, 0.99/(amp_max), n_amps_rel)
+                    mqp = self.cfg_openql_platform_fn()
+                    list_target_qubits = [target_qubit,]
+
+                # If a diagonal element, consider doing the full quantum
+                # efficiency matrix.
+                if target_qubit == measured_qubit and get_quantum_eff:
+                    res = measured_qubit.measure_quantum_efficiency(
+                                                verbose=verbose,
+                                                amps_rel=amps_rel)
                 else:
                     res = measured_qubit.measure_msmt_induced_dephasing_sweeping_amps(
                             verbose=verbose,
                             amps_rel=amps_rel,
-                            cross_target_qubits=[target_qubit],
-                            multi_qubit_platf_cfg=self.cfg_openql_platform_fn(),
-                            analyze=True,
+                            cross_target_qubits=list_target_qubits,
+                            multi_qubit_platf_cfg=mqp,
+                            analyze=True
                         )
-                    if verbose:
-                        print(res)
+                # Print the result of the measurement
+                if verbose:
+                    print(res)
 
-        #reset msmt_suffix'es
+        # Save the end-time of the experiment
+        stop = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        #reset the msmt_suffix'es
         for qi, q in enumerate(qubits):
             q.msmt_suffix = old_suffixes[qi]
+        self.msmt_suffix = old_suffix
 
+        # Run the analysis for this experiment
         if analyze:
-            print('analysis not implemented yet')
+            options_dict = {
+                'verbose': True,
+            }
+            qarr = [q.name for q in qubits]
+            labelpatt = 'ro_amp_sweep_ramsey'+lpatt
+            ca = ma2.CrossDephasingAnalysis(t_start=start, t_stop=stop,
+                                            label_pattern=labelpatt,
+                                            qubit_labels=qarr,
+                                            options_dict=options_dict)
 
     def measure_chevron(self, q0: str, q_spec: str,
                         amps, lengths,

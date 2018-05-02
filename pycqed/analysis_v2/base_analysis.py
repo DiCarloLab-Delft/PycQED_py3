@@ -95,14 +95,16 @@ class BaseDataAnalysis(object):
         none of the below parameters: look for the last data which matches the
                 filtering options from the options dictionary.
 
-        :param t_start, t_stop: give a range of timestamps in where data is loaded from.
-                                Filtering options can be given through the options dictionary.
-                                If t_stop is omitted, the extraction routine looks for
-                        the data with time stamp t_start.
+        :param t_start, t_stop: give a range of timestamps in where data is
+                                loaded from. Filtering options can be given
+                                through the options dictionary. If t_stop is
+                                omitted, the extraction routine looks for
+                                the data with time stamp t_start.
         :param label: Only process datasets with this label.
-        :param data_file_path: directly give the file path of a data file that should be loaded.
-                                Note: data_file_path has priority, i.e. if this
-                                argument is given time stamps are ignored.
+        :param data_file_path: directly give the file path of a data file that
+                                should be loaded. Note: data_file_path has
+                                priority, i.e. if this argument is given time
+                                stamps are ignored.
         :param close_figs: Close the figure (do not display)
         :param options_dict: available options are:
                                 -'presentation_mode'
@@ -486,7 +488,7 @@ class BaseDataAnalysis(object):
                 fit_fn = fit_dict.get('fit_fn', None)
                 model = fit_dict.get('model', lmfit.Model(fit_fn))
             fit_guess_fn = fit_dict.get('fit_guess_fn', None)
-            if fit_guess_fn is None:
+            if fit_guess_fn is None and fit_dict.get('fit_guess', True):
                 fit_guess_fn = model.guess
 
             if guess_pars is None:
@@ -507,7 +509,7 @@ class BaseDataAnalysis(object):
                     # A guess can also be specified as a dictionary.
                     # additionally this can be used to overwrite values
                     # from the guess functions.
-                else:
+                elif guess_dict is not None:
                     for key, val in list(guess_dict.items()):
                         model.set_param_hint(key, **val)
                     guess_pars = model.make_params()
