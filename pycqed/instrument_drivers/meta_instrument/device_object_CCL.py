@@ -464,7 +464,7 @@ class DeviceCCL(Instrument):
 
             ro_lm = qb.instr_LutMan_RO.get_instr()
             lutmans_to_configure[ro_lm.name] = ro_lm
-            res_nr = qb.ro_pulse_res_nr()
+            res_nr = qb.cfg_qubit_nr()()
 
             # extend the list of combinations to be set for the lutman
 

@@ -174,12 +174,12 @@ class CCLight_Transmon(Qubit):
             'ro_acq_weight_chI', initial_value=0, docstring=(
                 'Determines the I-channel for integration. When the'
                 ' ro_acq_weight_type is optimal only this channel will '
-                'affect the result.'), vals=vals.Ints(0, 5),
+                'affect the result.'), vals=vals.Ints(0, 9),
             parameter_class=ManualParameter)
         self.add_parameter(
             'ro_acq_weight_chQ', initial_value=1, docstring=(
                 'Determines the Q-channel for integration.'),
-            vals=vals.Ints(0, 5), parameter_class=ManualParameter)
+            vals=vals.Ints(0, 9), parameter_class=ManualParameter)
 
         self.add_parameter('ro_acq_weight_func_I',
                            vals=vals.Arrays(),
@@ -512,13 +512,13 @@ class CCLight_Transmon(Qubit):
         # TODO: add docstring (Oct 2017)
         self.add_parameter('cfg_prepare_ro_awg', vals=vals.Bool(),
                            docstring=('If False disables uploading pusles '
-                                      'to AWG8 and UHFQC'),
+                                      'to UHFQC'),
                            initial_value=True,
                            parameter_class=ManualParameter)
 
         self.add_parameter('cfg_prepare_mw_awg', vals=vals.Bool(),
                            docstring=('If False disables uploading pusles '
-                                      'to AWG8 and UHFQC'),
+                                      'to AWG8'),
                            initial_value=True,
                            parameter_class=ManualParameter)
         self.add_parameter('cfg_with_vsm', vals=vals.Bool(),
@@ -1224,7 +1224,7 @@ class CCLight_Transmon(Qubit):
 
         ro_lm = self.instr_LutMan_RO.get_instr()
         m_amp_par = ro_lm.parameters[
-            'M_amp_R{}'.format(self.ro_pulse_res_nr())]
+            'M_amp_R{}'.format(self.cfg_qubit_nr())]
         s2 = swf.lutman_par_dB_attenuation_UHFQC_dig_trig(
             LutMan=ro_lm, LutMan_parameter=m_amp_par)
         MC.set_sweep_function_2D(s2)
