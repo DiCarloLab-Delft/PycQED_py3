@@ -488,7 +488,7 @@ class BaseDataAnalysis(object):
                 fit_fn = fit_dict.get('fit_fn', None)
                 model = fit_dict.get('model', lmfit.Model(fit_fn))
             fit_guess_fn = fit_dict.get('fit_guess_fn', None)
-            if fit_guess_fn is None:
+            if fit_guess_fn is None and fit_dict.get('fit_guess', True):
                 fit_guess_fn = model.guess
 
             if guess_pars is None:
@@ -509,7 +509,7 @@ class BaseDataAnalysis(object):
                     # A guess can also be specified as a dictionary.
                     # additionally this can be used to overwrite values
                     # from the guess functions.
-                else:
+                elif guess_dict is not None:
                     for key, val in list(guess_dict.items()):
                         model.set_param_hint(key, **val)
                     guess_pars = model.make_params()

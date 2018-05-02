@@ -1117,6 +1117,7 @@ class CCLight_Transmon(Qubit):
         '''
 
         # using the restless tuning sequence
+        self.prepare_for_timedomain()
         p = sqo.randomized_benchmarking(
             self.cfg_qubit_nr(), self.cfg_openql_platform_fn(),
             nr_cliffords=[1],
@@ -2423,8 +2424,7 @@ class CCLight_Transmon(Qubit):
         if nested_MC is None:
             nested_MC = self.instr_nested_MC.get_instr()
 
-        if cross_target_qubits is None or
-                    (len(cross_target_qubits) == 1 and self.name == cross_target_qubits[0]):
+        if cross_target_qubits is None or (len(cross_target_qubits) == 1 and self.name == cross_target_qubits[0]):
             cross_target_qubits = None
 
         if cross_target_qubits is None:
