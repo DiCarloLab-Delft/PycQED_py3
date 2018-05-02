@@ -112,6 +112,7 @@ class MeasurementAnalysis(object):
 
         self.h5filepath = a_tools.measurement_filename(folder)
         h5mode = kw.pop('h5mode', 'r+')
+
         self.data_file = h5py.File(self.h5filepath, h5mode)
         if not file_only:
             for k in list(self.data_file.keys()):
@@ -4216,7 +4217,7 @@ class Ramsey_Analysis(TD_Analysis):
         damped_osc_mod.set_param_hint('phase',
                                           value=phase_estimate, vary=True)
 
-        amplitude_guess = 1
+        amplitude_guess = 0.5
         damped_osc_mod.set_param_hint('amplitude',
                                       value=amplitude_guess,
                                       min=0.4,
@@ -4230,8 +4231,11 @@ class Ramsey_Analysis(TD_Analysis):
                                       min=0.4,
                                       max=4.0)
         damped_osc_mod.set_param_hint('oscillation_offset',
-                                      value=0,
-                                      vary=False)
+                                      expr=
+                                      '{}-amplitude-exponential_offset'.format(
+                                          y[0]))
+                                      # value=0,
+                                      # vary=True)
         damped_osc_mod.set_param_hint('n',
                                       value=1,
                                       vary=False)
@@ -9694,8 +9698,7 @@ class Dynamic_phase_Analysis(Fluxpulse_Ramsey_2D_Analysis):
 
             # fit to cosine
             fit_res = self.fit_single_cos(thetas, ampls,
-                                        print_fit_results=False,
-                                        phase_guess=0)
+                                        print_fit_results=False)
 
             # plot
             self.ax.plot(thetas, ampls, 'o-', label=label)

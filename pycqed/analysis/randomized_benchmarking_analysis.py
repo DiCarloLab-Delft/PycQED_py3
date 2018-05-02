@@ -93,7 +93,9 @@ class RandomizedBenchmarking_Analysis(ma.TD_Analysis):
     def extract_data(self, **kw):
 
         qb_RO_channel = kw.pop('qb_RO_channel', None)
-
+        find_empirical_variance = kw.get('find_empirical_variance',
+                                         False)
+        print(find_empirical_variance)
         if self.cal_points is None:
             self.cal_points = [list(range(-4, -2)), list(range(-2, 0))]
 
@@ -117,14 +119,20 @@ class RandomizedBenchmarking_Analysis(ma.TD_Analysis):
             data_raw = self.measured_values[ch]
 
             data = np.zeros((self.n_cl.size))
+            if find_empirical_variance:
+                self.epsilon = np.zeros((self.n_cl.size))
             for i in range(self.n_cl.size):
-                data[i] = np.mean([data_raw[j][i] for j in
-                                   range(self.nr_seeds)])
+                y = [data_raw[j][i] for j in range(self.nr_seeds)]
+                data[i] = np.mean(y)
+
+                if find_empirical_variance:
+                    y = 2*(1 - np.asarray(y)) - 1
+                    self.epsilon[i] = np.std(y)
 
             data = 2*(1 - data) - 1
-            # data = np.mean(self.measured_values)
 
         else:
+            print('cal_points analysis')
             self.n_cl = np.unique(self.sweep_points_2D)
             nr_sweep_pts = self.sweep_points.size #nr_seeds+NoCalPts
             self.nr_seeds = nr_sweep_pts - 2*len(self.cal_points[0])
@@ -143,6 +151,8 @@ class RandomizedBenchmarking_Analysis(ma.TD_Analysis):
             # same shape as measured_values
             # for TwoD==False
             self.data_calibrated = deepcopy(self.data_rearranged[0])
+            if find_empirical_variance:
+                self.epsilon = np.zeros((self.n_cl.size))
             for i in range(self.n_cl.size):
                 a[0] = data_rearranged[0][i]
                 a[1] = data_rearranged[1][i]
@@ -151,6 +161,10 @@ class RandomizedBenchmarking_Analysis(ma.TD_Analysis):
                 self.data_calibrated[i] = data_calibrated
                 data_calibrated = data_calibrated[:-int(self.NoCalPoints)]
                 data[i] = np.mean(data_calibrated)
+
+                if find_empirical_variance:
+                    y = 2*(1 - np.asarray(data_calibrated)) - 1
+                    self.epsilon[i] = np.std(y)
 
             self.calibrated_data_points = np.zeros(
                 shape=(self.data_calibrated.shape[0], self.nr_seeds))
@@ -235,15 +249,15 @@ class RandomizedBenchmarking_Analysis(ma.TD_Analysis):
                                    capsize=self.line_width,
                                    capthick=self.line_width)
 
-        x_fine = np.linspace(0, self.n_cl[-1], 1000)
+        x_fine = np.linspace(0, self.n_cl[-1], 100)
         for fit_res in self.fit_results:
             best_fit = fit_mods.RandomizedBenchmarkingDecay(
                 x_fine, **fit_res.best_values)
             self.ax.plot(x_fine, best_fit, 'C0')
-        # self.ax.set_ylim(min(min(self.data_RB)-.1, -.1),
-        #                  max(max(self.dadata_RBta)+.1, 1.1))
+        self.ax.set_ylim(min(min(self.data_RB)-.1, -.1),
+                         max(max(self.data_RB)+.1, 1.1))
         # self.ax.set_ylim(0.4, max(max(self.data_RB)+.1, 1.1))
-        self.ax.set_ylim([0, 1])
+        # self.ax.set_ylim([0, 1])
         # Here we add the line corresponding to T1 limited fidelity
         plot_T1_lim = kw.pop('plot_T1_lim', True)
         F_T1 = None
@@ -283,6 +297,8 @@ class RandomizedBenchmarking_Analysis(ma.TD_Analysis):
                  show_guess=False,
                  plot_results=False, **kw):
 
+        find_empirical_variance = kw.pop('find_empirical_variance', False)
+        print(find_empirical_variance)
         RBModel = lmfit.Model(fit_mods.RandomizedBenchmarkingDecay)
         # RBModel = fit_mods.RBModel
         RBModel.set_param_hint('Amplitude', value=0)#-0.5)
@@ -307,30 +323,37 @@ class RandomizedBenchmarking_Analysis(ma.TD_Analysis):
 
         params = RBModel.make_params()
 
-        # Run once to get an estimate for the error per Clifford
-        fit_res = RBModel.fit(data, numCliff=numCliff, params=params)
 
-        # Use the found error per Clifford to standard errors for the data
-        # points fro Helsen et al. (2017)
         self.conf_level = kw.pop('conf_level', 0.68)
-        epsilon_guess = kw.pop('epsilon_guess', 0.01)
-        epsilon = calculate_confidence_intervals(
-            nr_seeds=self.nr_seeds,
-            nr_cliffords=self.n_cl,
-            depolariz_param=fit_res.best_values['p'],
-            conf_level=self.conf_level,
-            epsilon_guess=epsilon_guess, d=2)
+        if find_empirical_variance:
+            print('epsilon ', self.epsilon)
+            fit_res = RBModel.fit(data, numCliff=numCliff, params=params,
+                                  scale_covar=False, weights=1/self.epsilon)
+        else:
+            print('old fit')
+            # Run once to get an estimate for the error per Clifford
+            fit_res = RBModel.fit(data, numCliff=numCliff, params=params)
 
-        self.epsilon = epsilon
-        print('epsilon ', self.epsilon)
-        # Run fit again with scale_covar=False, and weights = 1/epsilon
+            # Use the found error per Clifford to standard errors for the data
+            # points fro Helsen et al. (2017)
+            epsilon_guess = kw.pop('epsilon_guess', 0.01)
+            epsilon = calculate_confidence_intervals(
+                nr_seeds=self.nr_seeds,
+                nr_cliffords=self.n_cl,
+                depolariz_param=fit_res.best_values['p'],
+                conf_level=self.conf_level,
+                epsilon_guess=epsilon_guess, d=2)
 
-        # if an entry in epsilon_sqrd is 0, replace it with half the minimum
-        # value in the epsilon_sqrd array
-        idxs = np.where(epsilon==0)[0]
-        epsilon[idxs] = min([eps for eps in epsilon if eps!=0])/2
-        fit_res = RBModel.fit(data, numCliff=numCliff, params=params,
-                              scale_covar=False, weights=1/epsilon)
+            self.epsilon = epsilon
+            print('epsilon ', self.epsilon)
+            # Run fit again with scale_covar=False, and weights = 1/epsilon
+
+            # if an entry in epsilon_sqrd is 0, replace it with half the minimum
+            # value in the epsilon_sqrd array
+            idxs = np.where(epsilon==0)[0]
+            epsilon[idxs] = min([eps for eps in epsilon if eps!=0])/2
+            fit_res = RBModel.fit(data, numCliff=numCliff, params=params,
+                                  scale_covar=False, weights=1/epsilon)
 
         if print_fit_results:
             print(fit_res.fit_report())
@@ -504,7 +527,7 @@ class Interleaved_RB_Analysis(RandomizedBenchmarking_Analysis):
                 self.ax = self.fig.add_subplot(111)
 
         xlabel = 'Number of Cliffords, m'
-        ylabel = r'Probability, $P$ $\left(|g \rangle \right)$'
+        ylabel = r'Expectation value $\langle \sigma_z \rangle$'
         self.title = 'IRB_HZ'
         for msmt_name in self.data_dict:
             self.title += ('_' + msmt_name)
@@ -580,8 +603,8 @@ class Interleaved_RB_Analysis(RandomizedBenchmarking_Analysis):
 
         # plot T1-limited curve
         if plot_T1_lim:
-            F_T1 = np.mean(FT1)
-            p_T1 = np.mean(pT1)
+            self.F_T1 = np.mean(FT1)
+            self.p_T1 = np.mean(pT1)
             amp_mean = np.mean(
                 [self.fit_res_dict[msmt_name].best_values['Amplitude'] for
                  msmt_name in self.fit_res_dict])
@@ -589,12 +612,12 @@ class Interleaved_RB_Analysis(RandomizedBenchmarking_Analysis):
                 [self.fit_res_dict[msmt_name].best_values['offset'] for
                  msmt_name in self.fit_res_dict])
             T1_limited_curve = fit_mods.RandomizedBenchmarkingDecay(
-                x_fine, amp_mean, p_T1, offset_mean)
+                x_fine, amp_mean, self.p_T1, offset_mean)
             self.ax.plot(x_fine, T1_limited_curve, '-.',
                          color='C1',
                          label='decoh-limit (avg)')
             textstr += ('$r_{Cl,avg}^{T_1}$  = ' +
-                        '{:.6g}%\t'.format((1-F_T1)*100))
+                        '{:.6g}%\t'.format((1-self.F_T1)*100))
 
         # Set legend
         handles, labels = self.ax.get_legend_handles_labels()
@@ -785,7 +808,7 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
         make_fig_cross_talk = kw.pop('make_fig_cross_talk', True)
         make_fig_addressab = kw.pop('make_fig_addressab', True)
         msmt_to_not_fit = kw.pop('msmt_to_not_fit', [])
-        add_correction = kw.pop('add_correction', False)
+        add_correction = kw.get('add_correction', False)
 
         self.T1s, self.T2s, self.pulse_lengths = \
             load_T1_T2_pulse_length(self.folders_dict, self.qb_names)
@@ -848,7 +871,7 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                         d = 2
                     self.infidelities[msmt_name][var_name] = \
                         {'val': (d-1)*(1-fit_res.best_values['p'])/d,
-                         'stderr': np.abs((1-d)*fit_res.params['p'].stderr)}
+                         'stderr': np.abs((d-1)*fit_res.params['p'].stderr/d)}
                 else:
                     self.depolariz_params[msmt_name][var_name] = None
                     self.infidelities[msmt_name][var_name] = None
@@ -856,24 +879,24 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
         if 'CxC' in self.data_dict and not ('CxC' in msmt_to_not_fit):
             depolariz_params_dict = self.depolariz_params['CxC']
             # get delta_alpha (delta depolarization params)
-            # delta_alpha_stderr^2 = stderr_corr^2 - (stderr_qb0^2 * p_qb0^2 +
-            #   stderr_qb1^2 * p_qb1^2 + ... + stderr_qbN^2 * p_qbN^2)
             product = 1
-            std_err_product_squared = 1
+            std_err_product_squared = 0
             for qb_name in self.qb_names:
                 product *= depolariz_params_dict[qb_name]['val']
 
-                std_err_product_squared *= \
+                std_err_term_squared = \
                     (depolariz_params_dict[qb_name]['stderr'])**2
                 for other_qb_names in self.qb_names:
                     if other_qb_names != qb_name:
-                        std_err_product_squared *= \
+                        std_err_term_squared *= \
                             (depolariz_params_dict[ other_qb_names]['val'])**2
+
+                std_err_product_squared += std_err_term_squared
 
             delta_alpha = \
                 depolariz_params_dict['corr']['val'] - product
             delta_alpha_stderr = np.sqrt(
-                (depolariz_params_dict['corr']['stderr'])**2 -
+                (depolariz_params_dict['corr']['stderr'])**2 +
                 std_err_product_squared)
 
             self.delta_alpha = {'val': delta_alpha,
@@ -966,6 +989,7 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
         self.msmt_strings = {}
         self.data_files_dict = {}
         self.epsilon_dict = {}
+        self.var_data_dict = {}
         # needed for consistent colors for each qubit
         self.RO_channels = {}
         for msmt_name in self.folders_dict:
@@ -1004,7 +1028,9 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                         if var_name == self.clifford_qbs[msmt_name] or \
                                         var_name == 'corr':
                             self.fit_res_dict_raw[msmt_name][var_name] = \
-                                self.fit_data(dset, self.n_cl, d=d, **kw)
+                                self.fit_data(dset, self.n_cl, d=d,
+                                              epsilon=
+                                              self.var_data_dict[var_name],**kw)
                             self.epsilon_dict[msmt_name][var_name] = \
                                 self.epsilon
                         else:
@@ -1012,7 +1038,9 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                             self.epsilon_dict[msmt_name][var_name] = None
                     else:
                         self.fit_res_dict_raw[msmt_name][var_name] = \
-                            self.fit_data(dset, self.n_cl, d=d, **kw)
+                            self.fit_data(dset, self.n_cl, d=d,
+                                          epsilon=
+                                          self.var_data_dict[var_name], **kw)
                         self.epsilon_dict[msmt_name][var_name] = \
                             self.epsilon
 
@@ -1033,11 +1061,19 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
     def single_shot_analysis(self, **kw):
 
         msmt_to_not_fit = kw.get('msmt_to_not_fit', [])
+        find_empirical_variance = kw.get('find_empirical_variance', False)
 
         self.msmt_strings = {}
         self.data_files_dict = {}
         self.fit_res_dict_raw = {}
         self.epsilon_dict = {}
+        self.var_data_dict = {}
+        for name in self.qb_names+['corr']:
+            if find_empirical_variance:
+                self.var_data_dict[name] = np.array([])
+            else:
+                self.var_data_dict[name] = None
+
         # needed for consistent colors for each qubit
         self.RO_channels = {}
 
@@ -1108,7 +1144,8 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                                         var_name == 'corr':
                             # print('notNone ', msmt_name, var_name)
                             self.fit_res_dict_raw[msmt_name][var_name] = \
-                                self.fit_data(dset, self.n_cl, d=d, **kw)
+                                self.fit_data(dset, self.n_cl, d=d,
+                                  epsilon=self.var_data_dict[var_name], **kw)
                             self.epsilon_dict[msmt_name][var_name] = \
                                 self.epsilon
                         else:
@@ -1118,7 +1155,9 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                     else:
                         # print('notNone ', msmt_name, var_name)
                         self.fit_res_dict_raw[msmt_name][var_name] = \
-                            self.fit_data(dset, self.n_cl, d=d, **kw)
+                            self.fit_data(dset, self.n_cl, d=d,
+                                          epsilon=
+                                          self.var_data_dict[var_name], **kw)
                         self.epsilon_dict[msmt_name][var_name] = \
                             self.epsilon
 
@@ -1139,6 +1178,8 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
     def extract_data(self, **kw):
 
         two_qubits = kw.pop('two_qubits', True)
+        find_empirical_variance = kw.pop('find_empirical_variance', False)
+
         if self.cal_points is None:
             self.cal_points = [[-2], [-1]]
 
@@ -1189,10 +1230,37 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                 qb0 = np.zeros(n_cl.size)
                 qb1 = np.zeros(n_cl.size)
                 corr = np.zeros(n_cl.size)
+
+                if find_empirical_variance:
+                    self.var_data_dict[self.qb_names[0]] = np.array([])
+                    self.var_data_dict[self.qb_names[1]] = np.array([])
+                    self.var_data_dict['corr'] = np.array([])
+                else:
+                    self.var_data_dict[self.qb_names[0]] = None
+                    self.var_data_dict[self.qb_names[1]] = None
+                    self.var_data_dict['corr'] = None
+
                 for i in range(n_cl.size):
-                    qb0[i] = np.mean([qb0_raw[j][i] for j in range(nr_seeds)])
-                    qb1[i] = np.mean([qb1_raw[j][i] for j in range(nr_seeds)])
-                    corr[i] = np.mean([corr_raw[j][i] for j in range(nr_seeds)])
+                    y = [qb0_raw[j][i] for j in range(nr_seeds)]
+                    qb0[i] = np.mean(y)
+                    if find_empirical_variance:
+                        y = 2*(1 - np.asarray(y)) - 1
+                        self.var_data_dict[self.qb_names[0]] = np.append(
+                            self.var_data_dict[self.qb_names[0]], np.std(y))
+
+                    y = [qb1_raw[j][i] for j in range(nr_seeds)]
+                    qb1[i] = np.mean(y)
+                    if find_empirical_variance:
+                        y = 2*(1 - np.asarray(y)) - 1
+                        self.var_data_dict[self.qb_names[1]] =np.append(
+                            self.var_data_dict[self.qb_names[1]], np.std(y))
+
+                    y = [corr_raw[j][i] for j in range(nr_seeds)]
+                    corr[i] = np.mean(y)
+                    if find_empirical_variance:
+                        y = 2*np.asarray(y) - 1
+                        self.var_data_dict['corr'] = np.append(
+                            self.var_data_dict['corr'], np.std(y))
 
                 data['data'][self.qb_names[0]] = 2*(1 - qb0) - 1
                 data['data'][self.qb_names[1]] = 2*(1 - qb1) - 1
@@ -1233,22 +1301,31 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                 raw_correl_data[col] = 1 - np.count_nonzero(
                     measurement_data[:, col]) % 2
 
+            if find_empirical_variance: # here for corr data only
+                y = np.array([])
+                for j in range(self.nr_seeds):
+                    y = np.append(y, np.mean(raw_correl_data[j::self.nr_seeds]))
+                y = 2*y-1
+                self.var_data_dict['corr'] = np.append(
+                        self.var_data_dict['corr'], np.std(y))
+
             mean_data_array[-1] = np.mean(raw_correl_data)
 
             # get averaged results for each qubit measurement
             for i in np.arange(len(self.qb_names)):
                 mean_data_array[i] = 1 - np.mean(measurement_data[i])
 
+                if find_empirical_variance:
+                    dcol = 1 - measurement_data[i]
+                    y = np.array([])
+                    for j in range(self.nr_seeds):
+                        y = np.append(y, np.mean(dcol[j::self.nr_seeds]))
+                    y = 2*y-1
+                    self.var_data_dict[self.qb_names[i]] = np.append(
+                        self.var_data_dict[self.qb_names[i]], np.std(y))
+
             for var_name, data_point in zip(self.qb_names+['corr'],
                                             mean_data_array):
-                # if use_qb5_correction:
-                #     if var_name is 'qb5':
-                #         pe_g = 0.0243
-                #         pg_e = 0.1036
-                #         prob_matrix = np.array([[1-pg_e, pg_e], [pe_g, 1-pe_g]])
-                #         d = np.asarray(([1-data_point, data_point]))
-                #         data_point = np.dot(prob_matrix, d.transpose())[1]
-
                 self.data_dict_raw[msmt_name]['data'][var_name] = np.append(
                     self.data_dict_raw[msmt_name]['data'][var_name],
                     2*data_point-1)
@@ -1285,30 +1362,42 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
 
         params = RBModel.make_params()
 
-        # Run once to get an estimate for the error per Clifford
-        fit_res = RBModel.fit(data, numCliff=numCliff, params=params)
+        if kw.pop('single_fit', False):
+            print('single fit')
+            fit_res = RBModel.fit(data, numCliff=numCliff, params=params)
+        else:
+            self.epsilon = kw.pop('epsilon', None)
+            if self.epsilon is None:
+                print('old fit')
+                # Run once to get an estimate for the error per Clifford
+                fit_res = RBModel.fit(data, numCliff=numCliff, params=params)
 
-        # Use the found error per Clifford to standard errors for the data
-        # points fro Helsen et al. (2017)
-        self.conf_level = kw.pop('conf_level', 0.68)
-        epsilon_guess = kw.pop('epsilon_guess', 0.01)
-        epsilon = calculate_confidence_intervals(
-            nr_seeds=self.nr_seeds,
-            nr_cliffords=self.n_cl,
-            depolariz_param=fit_res.best_values['p'],
-            conf_level=self.conf_level,
-            epsilon_guess=epsilon_guess, d=d)
+                # Use the found error per Clifford to standard errors for the data
+                # points fro Helsen et al. (2017)
+                self.conf_level = kw.pop('conf_level', 0.68)
+                epsilon_guess = kw.pop('epsilon_guess', 0.01)
+                epsilon = calculate_confidence_intervals(
+                    nr_seeds=self.nr_seeds,
+                    nr_cliffords=self.n_cl,
+                    depolariz_param=fit_res.best_values['p'],
+                    conf_level=self.conf_level,
+                    epsilon_guess=epsilon_guess, d=d)
 
-        self.epsilon = epsilon
-        # Run fit again with scale_covar=False, and weights = 1/epsilon
+                self.epsilon = epsilon
+                # Run fit again with scale_covar=False, and weights = 1/epsilon
 
-        # if an entry in epsilon_sqrd is 0, replace it with half the minimum
-        # value in the epsilon_sqrd array
-        idxs = np.where(epsilon==0)[0]
-        epsilon[idxs] = min([eps for eps in epsilon if eps!=0])/2
+                # if an entry in epsilon_sqrd is 0, replace it with half the minimum
+                # value in the epsilon_sqrd array
+                idxs = np.where(epsilon==0)[0]
+                epsilon[idxs] = min([eps for eps in epsilon if eps!=0])/2
+                print(epsilon)
+                fit_res = RBModel.fit(data, numCliff=numCliff, params=params,
+                                      scale_covar=False, weights=1/epsilon)
 
-        fit_res = RBModel.fit(data, numCliff=numCliff, params=params,
-                              scale_covar=False, weights=1/epsilon)
+            else:
+                self.conf_level = kw.pop('conf_level', 0.68)
+                fit_res = RBModel.fit(data, numCliff=numCliff, params=params,
+                                      scale_covar=False, weights=1/self.epsilon)
 
         return fit_res
 
@@ -1335,7 +1424,11 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                 total_depolariz_param = get_total_corr_depolariz_param(
                     qb_names=self.qb_names, fit_results_dict=fit_results_dict)
             else:
+                find_empirical_variance = kw.pop('find_empirical_variance',
+                                                 False)
+                print(find_empirical_variance)
                 correl_data_dict = {}
+                correl_variance_dict = {}
                 # find depolarization params from all possible combinations of
                 # qubit pairs/triplets from the single shots
                 for folder in self.folders_dict['CxC']:
@@ -1349,18 +1442,37 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                                                                 qb_combs))
                         raw_correl_data = np.zeros(len(measurement_data[0]))
 
+                        # calculate correlators for each index tuple by
+                        # multiplying all shots
                         for idxs_combs in idxs_list:
                             subspace_data = measurement_data[
                                             np.asarray(idxs_combs), :]
                             key = ''.join([str(i) for i in idxs_combs])
                             if key not in correl_data_dict:
                                 correl_data_dict[key] = np.array([])
+                            if (key not in correl_variance_dict):
+                                if find_empirical_variance:
+                                    correl_variance_dict[key] = np.array([])
+                                else:
+                                    correl_variance_dict[key] = None
 
                             for col in range(subspace_data.shape[1]):
                                 raw_correl_data[col] = 1 - np.count_nonzero(
                                     subspace_data[:, col]) % 2
 
-                            #get <sigma_z>
+                            if find_empirical_variance:
+                                # if we use empitical variance, then we need to
+                                # find the std of the nr_seeds distribution
+                                y = np.array([])
+                                for j in range(self.nr_seeds):
+                                    y = np.append(
+                                        y,
+                                        np.mean(raw_correl_data[j::self.nr_seeds]))
+                                y = 2*y-1
+                                correl_variance_dict[key] = np.append(
+                                    correl_variance_dict[key], np.std(y))
+
+                            #get <sigma_z^{\otimes s}>
                             mean_correl_data = 2*np.mean(raw_correl_data) - 1
                             correl_data_dict[key] = np.append(
                                 correl_data_dict[key],
@@ -1369,16 +1481,21 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                 # fit each data set and get depolarization params
                 depolariz_params_dict = {}
                 for key, dset in correl_data_dict.items():
+                    print('correl_variance_dict[key] ', correl_variance_dict[key])
                     d_subspace = 2**(len(key))
                     depolariz_params_dict[key] = {}
                     fit_res = self.fit_data(dset,
                                             self.data_dict['CxC']['n_cl'],
-                                            d=d_subspace)
+                                            d=d_subspace,
+                                            epsilon=correl_variance_dict[key])
                     depolariz_params_dict[key]['val'] = \
                         fit_res.best_values['p']
                     depolariz_params_dict[key]['stderr'] = \
                         fit_res.params['p'].stderr
 
+                self.depolariz_params_dict_mq_err = depolariz_params_dict
+                self.correlated_data_dict_mq_err = correl_data_dict
+                self.correl_variance_dict_mq_err = correl_variance_dict
                 # calculate total depolarization param
                 from pprint import pprint
                 pprint(depolariz_params_dict)
@@ -1389,7 +1506,7 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
         print('d in multi-qubit error ', d)
         self.total_error['val'] = (d-1) * \
                                   (1-total_depolariz_param['val'])/d
-        self.total_error['stderr'] = np.abs((1-d) * \
+        self.total_error['stderr'] = np.abs((d-1) * \
                                             total_depolariz_param[
                                                 'stderr']/d)
 
@@ -1555,8 +1672,8 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                      ' = {:.6g} $\pm$ ({:.4g})%'.format(
                         (1-self.fit_res_dict[msmt_name]['corr'].params[
                             'fidelity_per_Clifford'].value)*100,
-                        (1-self.fit_res_dict[msmt_name]['corr'].params[
-                            'fidelity_per_Clifford'].stderr)*100))
+                        100*self.fit_res_dict[msmt_name]['corr'].params[
+                            'fidelity_per_Clifford'].stderr))
 
         if plot_T1_lim_CZ_ISRB:
             default_color_cycle = \
@@ -1742,7 +1859,7 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
         # plot the product \sigma_qb2 * \signam_qb7 which should equal
         # \sigma_corr in the ideal case
         self.find_and_plot_alpha_product(msmt_name=msmt_name, ax=ax,
-                                         legend_labels=legend_labels, n=n)
+                                         legend_labels=legend_labels, n=n, **kw)
 
         if plot_errorbars:
             # set legend
@@ -1805,35 +1922,59 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
         if kw.pop('close_fig', True):
             plt.close(fig)
 
-    def find_and_plot_alpha_product(self, msmt_name, ax, legend_labels, n=None):
+    def find_and_plot_alpha_product(self, msmt_name, ax,
+                                    legend_labels, n=None, **kw):
         # plot the product \sigma_qb2 * \signam_qb7 which should equal
         # \sigma_corr in the ideal case
+
+        add_correction = kw.pop('add_correction', False)
         if n is None:
             n = len(self.qb_names)
 
         # if n == 2:
-        #     self.alpha_product = \
+        #     self.alpha_product_unscaled = \
         #         1 + 2*self.data_dict[msmt_name]['data'][self.qb_names[0]] * \
         #             self.data_dict[msmt_name]['data'][self.qb_names[1]] - \
         #         self.data_dict[msmt_name]['data'][self.qb_names[0]] - \
         #         self.data_dict[msmt_name]['data'][self.qb_names[1]]
         # else:
-        self.alpha_product = np.ones(len(self.data_dict[
+
+        if add_correction:
+            data_dict = self.data_dict_raw
+            print('use unscaled data')
+        else:
+            data_dict = self.data_dict
+
+        self.alpha_product_unscaled = np.ones(len(data_dict[
                                              msmt_name]['data'][
                                              self.qb_names[0]]))
         for qb_name in self.qb_names:
-            self.alpha_product *= self.data_dict[msmt_name]['data'][qb_name]
+            self.alpha_product_unscaled *= \
+                data_dict[msmt_name]['data'][qb_name]
 
-        self.alpha_fit_res = self.fit_data(self.alpha_product,
-                                      self.data_dict[msmt_name]['n_cl'],
-                                      d=2**n)
-        x_fine = np.linspace(self.data_dict[msmt_name]['n_cl'][0],
-                             self.data_dict[msmt_name]['n_cl'][-1], 100)
+        self.alpha_fit_res = self.fit_data(
+            self.alpha_product_unscaled,
+            data_dict[msmt_name]['n_cl'],
+            d=2**n,
+            single_fit=True)
+
+        if kw.pop('add_correction', True):
+            A = self.alpha_fit_res.best_values['Amplitude']
+            B = self.alpha_fit_res.best_values['offset']
+            A_scaled = A+B
+            # overwrite the values of the Amplitude and offset
+            self.alpha_fit_res.best_values['Amplitude'] = A_scaled
+            self.alpha_fit_res.best_values['offset'] = 0
+
+            self.alpha_product = (A_scaled/A)*(self.alpha_product_unscaled - B)
+
+        x_fine = np.linspace(data_dict[msmt_name]['n_cl'][0],
+                             data_dict[msmt_name]['n_cl'][-1], 100)
         alpha_data_fine = fit_mods.RandomizedBenchmarkingDecay(
             x_fine, **self.alpha_fit_res.best_values)
         ax.plot(x_fine, alpha_data_fine, 'm--',
                 label=legend_labels[-1], linewidth=line_width+2, dashes=(2, 2))
-        ax.plot(self.data_dict[msmt_name]['n_cl'], self.alpha_product, 'mo')
+        ax.plot(data_dict[msmt_name]['n_cl'], self.alpha_product, 'mo')
 
     def add_textbox_cross_talk(self, msmt_name, ax, **kw):
         # pring infidelities
@@ -1991,9 +2132,9 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
             self.delta_r[qb_name]['val'] = np.abs(
                 1 - fit_res_IxC_CxI.params['fidelity_per_Clifford'].value -
                 (1 - fit_res_CxC.params['fidelity_per_Clifford'].value))*100
-            self.delta_r[qb_name]['stderr'] = np.abs(
-                1 - fit_res_IxC_CxI.params['fidelity_per_Clifford'].stderr -
-                (1 - fit_res_CxC.params['fidelity_per_Clifford'].stderr))*100
+            self.delta_r[qb_name]['stderr'] = np.sqrt(
+                fit_res_IxC_CxI.params['fidelity_per_Clifford'].stderr**2 +
+                fit_res_CxC.params['fidelity_per_Clifford'].stderr**2)*100
             # add textbox -> ONLY FOR 2 QUBITS
             if add_textbox_addressab:
                 self.add_textbox_addressability(
@@ -2453,30 +2594,46 @@ def calculate_confidence_intervals(nr_seeds, nr_cliffords,
         if n_cl == 0:
             epsilon.append(0)
         else:
-            if np.abs(n_cl*infidelity - 1) < 1:
-                epsilon_guess = 0.01
-            else:
-                epsilon_guess = 0.1
-
+            # if np.abs(n_cl*infidelity - 1) < 1:
+            #     epsilon_guess = 0.01
+            # else:
+            #     epsilon_guess = 0.1
+            # print('epsilon_guess ', epsilon_guess)
             if d==2:
                 # print('1 qubit')
                 # print('n_cl ', n_cl)
-                # V_long_n_cl = 7*infidelity/2
-                # V_short_n_cl = (13*n_cl*infidelity**2)/2
-
-                V = (6 + 0.25*
-                     ((1-depolariz_param**(2*n_cl))/
-                      (1-depolariz_param**2)))*infidelity**2
+                # if n_cl < 20:
+                V_short_n_cl = (13*n_cl*infidelity**2)/2
+                    # V = V_short_n_cl
+                # else:
+                V_long_n_cl = 7*infidelity/2
+                    # V = V_long_n_cl
+                V = min(V_short_n_cl, V_long_n_cl)
+                # V = (6 + 0.25*
+                #      ((1-depolariz_param**(2*n_cl))/
+                #       (1-depolariz_param**2)))*infidelity**2
             else:
                 # print('n qubits')
                 # print('n_cl ', n_cl)
-                # V_short_n_cl = (2*(d+1)/(d-1) + 0.25*(-2+d**2)/((d-1)**2))\
-                #                *n_cl*(infidelity**2)
-                V = 2*((d+1)/(d-1))*(infidelity**2) + \
-                    0.25*((1-depolariz_param**(2*n_cl))/
-                          (1-depolariz_param**2))*((-2+d**2)/((d-1)**2))*\
-                    infidelity**2
-
+                # if np.abs(n_cl*infidelity - 1) < 1:#n_cl<20:
+                    # V_short_n_cl = (2*(d+1)/(d-1) + 0.25*(-2+d**2)/((d-1)**2))\
+                    #                *n_cl*(infidelity**2)
+                V_short_n_cl = \
+                    (0.25*(-2+d**2)/((d-1)**2)) * (infidelity**2) + \
+                    (0.5*n_cl*(n_cl-1)*(d**2)/((d-1)**2)) * (infidelity**2)
+                    # V = V_short_n_cl
+                # else:
+                    # V = 2*((d+1)/(d-1))*(infidelity**2) + \
+                    #     0.25*((1-depolariz_param**(2*n_cl))/
+                    #           (1-depolariz_param**2))*((-2+d**2)/((d-1)**2))*\
+                    #     infidelity**2
+                V1 = 0.25*((-2+d**2)/((d-1)**2))*n_cl*(infidelity**2) * \
+                    depolariz_param**(n_cl-1) + ((d/(d-1))**2) * \
+                    (infidelity**2)*( (1+(n_cl-1) *
+                        (depolariz_param**(2*n_cl)) -
+                        n_cl*(depolariz_param**(2*n_cl-2))) /
+                        (1-depolariz_param**2)**2 )
+                V = min(V1, V_short_n_cl)
             H = lambda eps: (1/(1-eps))**((1-eps)/(V+1)) * \
                             (V/(V+eps))**((V+eps)/(V+1)) - \
                             (delta/2)**(1/nr_seeds)
@@ -2506,8 +2663,8 @@ def estimate_gate_error(p0, p_gate,  p0_stderr, p_gate_stderr, d=2, std=True):
 
     rc = (d-1)*(1-p_gate/p0)/d
     if std:
-        stderr = np.sqrt((p_gate_stderr/(2*p0))**2 +
-                          (p0_stderr*p_gate/(2*p0**2))**2)
+        stderr = ((d-1)/d)*np.sqrt((p_gate_stderr/p0)**2 +
+                          (p0_stderr*p_gate/(p0**2))**2)
         return (rc, stderr)
     else:
         return rc
@@ -2633,25 +2790,27 @@ def get_total_uncorr_depolariz_param(qb_names, fit_results_dict,
                                      other_qb_names].best_values[
                                      'p'])**2
                     stderr += std_err_product_squared
-                stderr = np.sqrt(stderr)
+                # stderr = np.sqrt(stderr)
             else:
                 val = fit_results_dict[var_name].best_values['p']
-                stderr = fit_results_dict[var_name].params['p'].stderr
+                stderr = fit_results_dict[var_name].params['p'].stderr**2
 
             total_uncorr_depolariz_param['val'] += prefactors[idx] * val
-            total_uncorr_depolariz_param['stderr'] += prefactors[idx] * stderr
+            total_uncorr_depolariz_param['stderr'] += \
+                (prefactors[idx]**2) * stderr
 
         total_uncorr_depolariz_param['val'] /= np.sum(prefactors)
-        total_uncorr_depolariz_param['stderr'] /= np.sum(prefactors)
+        total_uncorr_depolariz_param['stderr'] = \
+            np.sqrt(total_uncorr_depolariz_param['stderr'])/np.sum(prefactors)
 
     else:
-        idxs_list = list(range(n))
+        list_of_idxs = list(range(n))
         for qb_combs in np.arange(2, n+1):
             # get list of tuples representing all combinations of qb idxs
-            idxs_list += list(itertools.combinations(range(n),
+            list_of_idxs += list(itertools.combinations(range(n),
                                                      qb_combs))
 
-        for idx, qb_idxs in enumerate(idxs_list):
+        for idx, qb_idxs in enumerate(list_of_idxs):
             if not isinstance(qb_idxs, tuple):
                 # single qb RB fits
                 qb_name = qb_names[qb_idxs]
@@ -2659,8 +2818,8 @@ def get_total_uncorr_depolariz_param(qb_names, fit_results_dict,
                     prefactors[idx] * fit_results_dict[
                         qb_name].best_values['p']
                 total_uncorr_depolariz_param['stderr'] += \
-                    prefactors[idx] * fit_results_dict[
-                        qb_name].params['p'].stderr
+                    (prefactors[idx] * fit_results_dict[
+                        qb_name].params['p'].stderr)**2
             else:
                 # multi qb RB fits
                 val = 1
@@ -2685,10 +2844,11 @@ def get_total_uncorr_depolariz_param(qb_names, fit_results_dict,
 
                 total_uncorr_depolariz_param['val'] += prefactors[idx] * val
                 total_uncorr_depolariz_param['stderr'] += \
-                    prefactors[idx] * np.sqrt(stderr)
+                    (prefactors[idx]**2) * stderr
 
         total_uncorr_depolariz_param['val'] /= np.sum(prefactors)
-        total_uncorr_depolariz_param['stderr'] /= np.sum(prefactors)
+        total_uncorr_depolariz_param['stderr'] = \
+            np.sqrt(total_uncorr_depolariz_param['stderr'])/np.sum(prefactors)
 
     return total_uncorr_depolariz_param
 
@@ -2700,7 +2860,7 @@ def get_multi_qb_error_from_single_qb_RB(qb_names, d,
         qb_names=qb_names, fit_results_dict=single_qb_RB_fit_results_dict)
 
     total_error['val'] = (d-1) * (1-total_depolariz_param['val'])/d
-    total_error['stderr'] = np.abs((1-d) * total_depolariz_param['stderr']/d)
+    total_error['stderr'] = np.abs((d-1) * total_depolariz_param['stderr']/d)
 
     return total_error
 
@@ -2727,10 +2887,11 @@ def get_total_corr_depolariz_param(qb_names, fit_results_dict,
                 prefactors[idx] * fit_results_dict[
                     var_name].best_values['p']
             total_corr_depolariz_param ['stderr'] += \
-                prefactors[idx] * fit_results_dict[
-                    var_name].params['p'].stderr
+                (prefactors[idx] * fit_results_dict[
+                    var_name].params['p'].stderr)**2
         total_corr_depolariz_param ['val'] /= np.sum(prefactors)
-        total_corr_depolariz_param ['stderr'] /= np.sum(prefactors)
+        total_corr_depolariz_param ['stderr'] = \
+            np.sqrt(total_corr_depolariz_param ['stderr'])/np.sum(prefactors)
 
     else:
         if subspace_depolariz_params_dict is None:
@@ -2758,8 +2919,8 @@ def get_total_corr_depolariz_param(qb_names, fit_results_dict,
                                                         var_name]. \
                                                         best_values['p']
                     total_corr_depolariz_param['stderr'] += \
-                        prefactors[idx] * fit_results_dict[
-                            var_name].params['p'].stderr
+                        (prefactors[idx] * fit_results_dict[
+                            var_name].params['p'].stderr)**2
                 except KeyError:
                     # additionally:
                     # if correlated_subspace == 2, do not decompose the
@@ -2772,8 +2933,8 @@ def get_total_corr_depolariz_param(qb_names, fit_results_dict,
                         prefactors[idx] * subspace_depolariz_params_dict[
                             var_name]['val']
                     total_corr_depolariz_param['stderr'] += \
-                        prefactors[idx] * subspace_depolariz_params_dict[
-                            var_name]['stderr']
+                        (prefactors[idx] * subspace_depolariz_params_dict[
+                            var_name]['stderr'])**2
             else:
                 if var_name == 'corr':
                     # make var_name = '123..n'
@@ -2820,38 +2981,46 @@ def get_total_corr_depolariz_param(qb_names, fit_results_dict,
                         # get std error
                         std_err_term = 0
                         for index, err in enumerate(alpha_temp_stderr):
-                            std_err_term += err**2
-                            p = 1
+                            std_err_temp = 0
+                            # print('err**2 ', err**2)
+                            std_err_temp += err**2
+                            print('std_err_temp ', std_err_temp)
+                            # p = 1
                             for val in [v for v in alpha_temp
                                         if v!=alpha_temp[index]]:
-                                p *= val**2
-                            std_err_term *= p
-                        # if keys_tuple == ('0', '1', '2'):
-                        print(np.sqrt(std_err_term))
+                                # print('val**2 ', val**2)
+                                std_err_temp *= val**2
+                            # std_err_temp *= p
+
+                            print('std_err_temp ', std_err_temp)
+                            std_err_term += std_err_temp
+                            print('std_err_term ', std_err_term)
 
                 print('max ', max_alpha_product)
-                print('max ', np.sqrt(std_err_term))
+                print('max ', std_err_term)
                 depolariz_param_term += max_alpha_product
-                depolariz_param_term_stderr += np.sqrt(std_err_term)
+                # depolariz_param_term_stderr += np.sqrt(std_err_term)
+                depolariz_param_term_stderr += std_err_term
 
                 # # i am now picking the max alpha_product so I will have only
                 # # one term so no need to divide by len(keys)
                 # depolariz_param_term /= len(keys)
                 # depolariz_param_term_stderr /= len(keys)
 
-                print(depolariz_param_term)
-                print(depolariz_param_term_stderr)
-
+                # print(depolariz_param_term)
+                # print(depolariz_param_term_stderr)
+                print('idx ', idx)
                 total_corr_depolariz_param['val'] += \
-                    prefactors[idx] * depolariz_param_term
+                    prefactors[idx] * max_alpha_product
                 total_corr_depolariz_param['stderr'] += \
-                    prefactors[idx] * depolariz_param_term_stderr
+                    (prefactors[idx]**2) * std_err_term
 
                 # from pprint import pprint
                 # pprint(total_corr_depolariz_param)
 
         total_corr_depolariz_param['val'] /= np.sum(prefactors)
-        total_corr_depolariz_param['stderr'] /= np.sum(prefactors)
+        total_corr_depolariz_param['stderr'] = \
+            np.sqrt(total_corr_depolariz_param['stderr'])/np.sum(prefactors)
 
         # pprint(total_corr_depolariz_param)
 
