@@ -762,15 +762,15 @@ def gauss_2D_guess(model, data, x, y):
 
     Note: possibly not compatible if the model uses prefixes.
     '''
+    amp = np.sqrt(np.sum(data))
     data_grid = data.reshape(-1, len(np.unique(x)))
     x_proj_data = np.mean(data_grid, axis=0)
     y_proj_data = np.mean(data_grid, axis=1)
 
     x_guess = lmfit.models.GaussianModel().guess(x_proj_data, np.unique(x))
     y_guess = lmfit.models.GaussianModel().guess(y_proj_data, np.unique(y))
-
-    params = model.make_params(amplitude=1,
-                               center_x=x_guess['center'].value,
+    model.set_param_hint('amplitude', value=amp, vary=False)
+    params = model.make_params(center_x=x_guess['center'].value,
                                center_y=y_guess['center'].value,
                                sigma_x=x_guess['sigma'].value,
                                sigma_y=y_guess['sigma'].value)
