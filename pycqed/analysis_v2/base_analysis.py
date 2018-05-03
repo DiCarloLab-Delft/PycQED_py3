@@ -480,6 +480,7 @@ class BaseDataAnalysis(object):
         for key, fit_dict in self.fit_dicts.items():
             guess_dict = fit_dict.get('guess_dict', None)
             guess_pars = fit_dict.get('guess_pars', None)
+            guessfn_pars = fit_dict.get('guessfn_pars', {})
             fit_yvals = fit_dict['fit_yvals']
             fit_xvals = fit_dict['fit_xvals']
 
@@ -495,7 +496,7 @@ class BaseDataAnalysis(object):
                 if fit_guess_fn is not None:
                     # a fit function should return lmfit parameter objects
                     # but can also work by returning a dictionary of guesses
-                    guess_pars = fit_guess_fn(**fit_yvals, **fit_xvals)
+                    guess_pars = fit_guess_fn(**fit_yvals, **fit_xvals, **guessfn_pars)
                     if not isinstance(guess_pars, lmfit.Parameters):
                         for gd_key, val in list(guess_pars.items()):
                             model.set_param_hint(gd_key, **val)
@@ -1275,6 +1276,20 @@ class BaseDataAnalysis(object):
         :return: Global maximum
         '''
         return np.max([np.max(v) for v in array])
+
+    def plot_vlines_auto(self, pdict, axs):
+        xs = pdict.get('xdata')
+        for i,x in enumerate(xs):
+            d = {}
+            for k in pdict:
+                lk = k[:-1]
+                #if lk in signature(axs.axvline).parameters:
+                if k not in ['xdata', 'plotfn', 'ax_id', 'do_legend']:
+                    try:
+                        d[lk] = pdict[k][i]
+                    except:
+                        pass
+            axs.axvline(x=x, **d)
 
 
 def plot_scatter_errorbar(self, ax_id, xdata, ydata, xerr=None, yerr=None, pdict=None):

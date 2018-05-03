@@ -852,6 +852,51 @@ def double_gauss_guess(model, data, x=None, **kwargs):
     else:
         return par_dict
 
+def double_gauss_guess_2(model, data, x, fixed_p01 = False, fixed_p10 = False):
+    # An initial guess is done on the binned data with single gaussians
+    # to constrain the fit params and avoid fitting noise if
+    # e.g., mmt. ind. rel. is very low
+    gmod0 = lmfit.models.GaussianModel()
+    guess0 = gmod0.guess(data=data[0], x=x[0])
+    gmod1 = lmfit.models.GaussianModel()
+    guess1 = gmod1.guess(data=data[1], x=x[1])
+
+
+    model.set_param_hint(
+        'A_center', vary=True, value=guess0['center'].value,
+        min=guess0['center'] - 2 * guess0['sigma'],
+        max=guess0['center'] + 2 * guess0['sigma'])
+    model.set_param_hint(
+        'B_center', vary=True, value=guess1['center'].value,
+        min=guess1['center'] - 2 * guess1['sigma'],
+        max=guess1['center'] + 2 * guess1['sigma'])
+    model.set_param_hint('A_sigma', value=guess0['sigma'].value, vary=True)
+    model.set_param_hint('B_sigma', value=guess1['sigma'].value, vary=True)
+
+    # Amplitudes
+    intarea0 = sum_int(x=x[0], y=data[0])[-1]
+    intarea1 = sum_int(x=x[1], y=data[1])[-1]
+    model.set_param_hint('A_amplitude', value=intarea0, vary=False)
+    model.set_param_hint('B_amplitude', value=intarea1, vary=False)
+
+    # Spurious excitement
+    f = np.sqrt(2*np.pi)
+    amp0 = 0.99 * np.max(data[0]) * guess0['sigma'] * f
+    amp1 = 0.99 * np.max(data[1]) * guess1['sigma'] * f
+    spurious0 = max(1-(amp0/intarea0), 1e-3)
+    spurious1 = max(1-(amp1/intarea1), 1e-3)
+    p01 = fixed_p01 or spurious0
+    p10 = fixed_p10 or spurious1
+    model.set_param_hint('A_spurious', value=p01, min=0, max=1,
+                         vary=fixed_p01 is False)
+    model.set_param_hint('B_spurious', value=p10, min=0, max=1,
+                         vary=fixed_p10 is False)
+
+    return model.make_params()
+
+
+def sum_int(x,y):
+    return np.cumsum(y[:-1]*(x[1:]-x[:-1]))
 
 #################################
 #     User defined Models       #
