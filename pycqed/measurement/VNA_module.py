@@ -47,7 +47,7 @@ def acquire_single_linear_frequency_span(file_name, start_freq=None,
     MC_instr.set_detector_function(det.ZNB_VNA_detector(VNA_instr))
 
     # VNA settings
-    VNA_instr.average_state('off')
+    #VNA_instr.average_state('off')
     VNA_instr.bandwidth(bandwidth)
 
     # hack to measure S parameters different from S21
