@@ -3,13 +3,15 @@ import matplotlib.pyplot as plt
 from scipy.special import erfc
 import lmfit
 import logging
+
+
 #################################
 #   Fitting Functions Library   #
 #################################
 
 
 def RandomizedBenchmarkingDecay(numCliff, Amplitude, p, offset):
-    val = Amplitude * (p**numCliff) + offset
+    val = Amplitude * (p ** numCliff) + offset
     return val
 
 
@@ -17,8 +19,8 @@ def DoubleExpDampOscFunc(t, tau_1, tau_2,
                          freq_1, freq_2,
                          phase_1, phase_2,
                          amp_1, amp_2, osc_offset):
-    cos_1 = amp_1 * (np.cos(2*np.pi*freq_1*t+phase_1)) * np.exp(-(t/tau_1))
-    cos_2 = amp_2 * (np.cos(2*np.pi*freq_2*t+phase_2)) * np.exp(-(t/tau_2))
+    cos_1 = amp_1 * (np.cos(2 * np.pi * freq_1 * t + phase_1)) * np.exp(-(t / tau_1))
+    cos_2 = amp_2 * (np.cos(2 * np.pi * freq_2 * t + phase_2)) * np.exp(-(t / tau_2))
     return cos_1 + cos_2 + osc_offset
 
 
@@ -33,22 +35,22 @@ def double_RandomizedBenchmarkingDecay(numCliff, p, offset,
     pick invert to be 1 or 0
     """
     # Inverting clifford curve
-    val_inv = (1-offset) * (p**numCliff) + offset
+    val_inv = (1 - offset) * (p ** numCliff) + offset
     # flipping clifford curve
-    val_flip = -offset * (p**numCliff) + offset
+    val_flip = -offset * (p ** numCliff) + offset
     # Using invert as a boolean but not using if statement to allow for
     # arrays to be input in the function
-    val = (1-invert) * val_flip + invert*val_inv
+    val = (1 - invert) * val_flip + invert * val_inv
     return val
 
 
 def LorentzFunc(f, amplitude, center, sigma):
-    val = amplitude/np.pi * (sigma / ((f-center)**2 + sigma**2))
+    val = amplitude / np.pi * (sigma / ((f - center) ** 2 + sigma ** 2))
     return val
 
 
 def Lorentzian(f, A, offset, f0, kappa):
-    val = offset + A/np.pi * (kappa / ((f-f0)**2 + kappa**2))
+    val = offset + A / np.pi * (kappa / ((f - f0) ** 2 + kappa ** 2))
     return val
 
 
@@ -82,8 +84,8 @@ def TwinLorentzFunc(f, A_gf_over_2, A, f0_gf_over_2, f0,
                              transition
     background (float):     background offset
     """
-    val = (A_gf_over_2/np.pi * (kappa_gf_over_2 / ((f-f0_gf_over_2)**2 + kappa_gf_over_2**2)) +
-           A/np.pi * (kappa / ((f-f0)**2 + kappa**2)) + background)
+    val = (A_gf_over_2 / np.pi * (kappa_gf_over_2 / ((f - f0_gf_over_2) ** 2 + kappa_gf_over_2 ** 2)) +
+           A / np.pi * (kappa / ((f - f0) ** 2 + kappa ** 2)) + background)
     return val
 
 
@@ -107,13 +109,29 @@ def Qubit_dac_to_freq(dac_voltage, f_max, E_c,
     if dac_flux_coefficient is not None:
         logging.warning('"dac_flux_coefficient" deprecated. Please use the '
                         'physically meaningful "V_per_phi0" instead.')
-        V_per_phi0 = np.pi/dac_flux_coefficient
+        V_per_phi0 = np.pi / dac_flux_coefficient
 
     qubit_freq = (f_max + E_c) * (
-        asymmetry**2 + (1 - asymmetry**2) *
-        np.cos(np.pi / V_per_phi0 *
-               (dac_voltage - dac_sweet_spot))**2)**0.25 - E_c
+            asymmetry ** 2 + (1 - asymmetry ** 2) *
+            np.cos(np.pi / V_per_phi0 *
+                   (dac_voltage - dac_sweet_spot)) ** 2) ** 0.25 - E_c
     return qubit_freq
+
+
+def Resonator_dac_to_freq(dac_voltage, f_max_qubit, f_0_res,
+                          E_c, dac_sweet_spot,
+                          coupling, V_per_phi0=None,
+                          dac_flux_coefficient=None,
+                          asymmetry=0):
+    qubit_freq = Qubit_dac_to_freq(dac_voltage=dac_voltage, f_max=f_max_qubit, E_c=E_c,
+                                   dac_sweet_spot=dac_sweet_spot, V_per_phi0=V_per_phi0,
+                                   dac_flux_coefficient=dac_flux_coefficient,
+                                   asymmetry=asymmetry)
+    delta_qr = (qubit_freq - f_0_res)
+    lamb_shift = (coupling ** 2 / delta_qr)
+    resonator_freq = f_0_res - lamb_shift
+
+    return resonator_freq
 
 
 def Qubit_dac_to_detun(dac_voltage, f_max, E_c, dac_sweet_spot, V_per_phi0,
@@ -158,13 +176,13 @@ def Qubit_freq_to_dac(frequency, f_max, E_c,
     # dac_term = np.arccos(((frequency+E_c)/((f_max+E_c) * asymm_term))**2)
 
     dac_term = np.arccos(np.sqrt(
-        (((frequency + E_c) / (f_max + E_c))**4 - asymmetry**2) /
-        (1 - asymmetry**2)))
+        (((frequency + E_c) / (f_max + E_c)) ** 4 - asymmetry ** 2) /
+        (1 - asymmetry ** 2)))
 
     if dac_flux_coefficient is not None:
         logging.warning('"dac_flux_coefficient" deprecated. Please use the '
                         'physically meaningful "V_per_phi0" instead.')
-        V_per_phi0 = np.pi/dac_flux_coefficient
+        V_per_phi0 = np.pi / dac_flux_coefficient
 
     if branch == 'positive':
         dac_voltage = dac_term * V_per_phi0 / np.pi + dac_sweet_spot
@@ -178,16 +196,16 @@ def Qubit_freq_to_dac(frequency, f_max, E_c,
 
 def Qubit_dac_sensitivity(dac_voltage, f_max: float, E_c: float,
                           dac_sweet_spot: float, V_per_phi0: float,
-                          asymmetry: float=0):
+                          asymmetry: float = 0):
     '''
     Derivative of the qubit detuning vs dac at dac_voltage.
     The returned quantity is "dfreq/dPhi (dac_voltage)"
     '''
     cos_term = np.cos(np.pi / V_per_phi0 * (dac_voltage - dac_sweet_spot))
     sin_term = np.sin(np.pi / V_per_phi0 * (dac_voltage - dac_sweet_spot))
-    return ((f_max + E_c)*(1 - asymmetry**2) * np.pi / (2 * V_per_phi0) *
-            cos_term * sin_term * (asymmetry**2 + (1 - asymmetry**2) *
-                                   cos_term**2)**(-0.75))
+    return ((f_max + E_c) * (1 - asymmetry ** 2) * np.pi / (2 * V_per_phi0) *
+            cos_term * sin_term * (asymmetry ** 2 + (1 - asymmetry ** 2) *
+                                   cos_term ** 2) ** (-0.75))
 
 
 def QubitFreqDac(dac_voltage, f_max, E_c,
@@ -200,8 +218,8 @@ def QubitFreqDac(dac_voltage, f_max, E_c,
 def QubitFreqFlux(flux, f_max, E_c,
                   flux_zero, dac_offset=0):
     'The cosine Arc model for calibrated flux.'
-    calculated_frequency = (f_max + E_c)*np.sqrt(np.abs(
-        np.cos(np.pi*(flux-dac_offset)/flux_zero))) - E_c
+    calculated_frequency = (f_max + E_c) * np.sqrt(np.abs(
+        np.cos(np.pi * (flux - dac_offset) / flux_zero))) - E_c
     return calculated_frequency
 
 
@@ -214,11 +232,18 @@ def CosFunc(t, amplitude, frequency, phase, offset):
         phase in rad
         offset a.u.
     '''
-    return amplitude*np.cos(2*np.pi*frequency*t + phase)+offset
+    return amplitude * np.cos(2 * np.pi * frequency * t + phase) + offset
 
 
 def ExpDecayFunc(t, tau, amplitude, offset, n):
-    return amplitude*np.exp(-(t/tau)**n)+offset
+    return amplitude * np.exp(-(t / tau) ** n) + offset
+
+
+def idle_error_rate_exp_decay(N, N1, N2, A, offset):
+    """
+    exponential decay consisting of two components
+    """
+    return A * np.exp(-N / N1 - (N / N2) ** 2) + offset
 
 
 def gain_corr_ExpDecayFunc(t, tau, amp, gc):
@@ -228,7 +253,7 @@ def gain_corr_ExpDecayFunc(t, tau, amp, gc):
     the distortions.
     """
 
-    y = gc*(1+amp*np.exp(-t/tau))
+    y = gc * (1 + amp * np.exp(-t / tau))
     return y
 
 
@@ -238,21 +263,20 @@ def gain_corr_double_ExpDecayFunc(t, tau_A, tau_B, amp_A, amp_B, gc):
     Includes a "gain correction" parameter that is ignored when correcting
     the distortions.
     """
-    y = gc*(1+amp_A*np.exp(-t/tau_A)+ amp_B*np.exp(-t/tau_B))
+    y = gc * (1 + amp_A * np.exp(-t / tau_A) + amp_B * np.exp(-t / tau_B))
     return y
-
 
 
 def ExpDampOscFunc(t, tau, n, frequency, phase, amplitude,
                    oscillation_offset, exponential_offset):
-    return amplitude*np.exp(-(t/tau)**n)*(np.cos(
-        2*np.pi*frequency*t+phase)+oscillation_offset) + exponential_offset
+    return amplitude * np.exp(-(t / tau) ** n) * (np.cos(
+        2 * np.pi * frequency * t + phase) + oscillation_offset) + exponential_offset
 
 
 def GaussExpDampOscFunc(t, tau, tau_2, frequency, phase, amplitude,
                         oscillation_offset, exponential_offset):
-    return amplitude*np.exp(-(t/tau_2)**2 - (t/tau))*(np.cos(
-        2*np.pi*frequency*t+phase)+oscillation_offset) + exponential_offset
+    return amplitude * np.exp(-(t / tau_2) ** 2 - (t / tau)) * (np.cos(
+        2 * np.pi * frequency * t + phase) + oscillation_offset) + exponential_offset
 
 
 def ExpDampDblOscFunc(t, tau, n, freq_1, freq_2, phase_1, phase_2,
@@ -261,13 +285,13 @@ def ExpDampDblOscFunc(t, tau, n, freq_1, freq_2, phase_1, phase_2,
     '''
     Exponential decay with double cosine modulation
     '''
-    exp_decay = np.exp(-(t/tau)**n)
+    exp_decay = np.exp(-(t / tau) ** n)
     cos_1 = (np.cos(
-        2*np.pi*freq_1*t+phase_1)+osc_offset_1)
+        2 * np.pi * freq_1 * t + phase_1) + osc_offset_1)
     cos_2 = (np.cos(
-        2*np.pi*freq_2*t+phase_2)+osc_offset_2)
+        2 * np.pi * freq_2 * t + phase_2) + osc_offset_2)
 
-    return amp_1*exp_decay*cos_1 + amp_2*exp_decay*cos_2 + exponential_offset
+    return amp_1 * exp_decay * cos_1 + amp_2 * exp_decay * cos_2 + exponential_offset
 
 
 def HangerFuncAmplitude(f, f0, Q, Qe, A, theta):
@@ -283,7 +307,7 @@ def HangerFuncAmplitude(f, f0, Q, Qe, A, theta):
     f is in Hz
     f0 is in GHz
     '''
-    return abs(A*(1.-Q/Qe*np.exp(1.j*theta)/(1.+2.j*Q*(f/1.e9-f0)/f0)))
+    return abs(A * (1. - Q / Qe * np.exp(1.j * theta) / (1. + 2.j * Q * (f / 1.e9 - f0) / f0)))
 
 
 def HangerFuncComplex(f, pars):
@@ -305,8 +329,8 @@ def HangerFuncComplex(f, pars):
     phi_v = pars['phi_v']
     phi_0 = pars['phi_0']
 
-    S21 = A*(1-Q/Qe*np.exp(1j*theta)/(1+2.j*Q*(f/1.e9-f0)/f0)) * \
-        np.exp(1j*(phi_v*f+phi_0))
+    S21 = A * (1 - Q / Qe * np.exp(1j * theta) / (1 + 2.j * Q * (f / 1.e9 - f0) / f0)) * \
+          np.exp(1j * (phi_v * f + phi_0))
 
     return S21
 
@@ -315,50 +339,50 @@ def PolyBgHangerFuncAmplitude(f, f0, Q, Qe, A, theta, poly_coeffs):
     # This is the function for a hanger (lambda/4 resonator) which takes into
     # account a possible polynomial background
     # NOT DEBUGGED
-    return np.abs((1.+np.polyval(poly_coeffs, (f/1.e9-f0)/f0)) *
+    return np.abs((1. + np.polyval(poly_coeffs, (f / 1.e9 - f0) / f0)) *
                   HangerFuncAmplitude(f, f0, Q, Qe, A, theta))
 
 
 def SlopedHangerFuncAmplitude(f, f0, Q, Qe, A, theta, slope):
     # This is the function for a hanger (lambda/4 resonator) which takes into
     # account a possible slope df
-    return np.abs((1.+slope*(f/1.e9-f0)/f0) *
+    return np.abs((1. + slope * (f / 1.e9 - f0) / f0) *
                   HangerFuncAmplitude(f, f0, Q, Qe, A, theta))
 
 
 def SlopedHangerFuncComplex(f, f0, Q, Qe, A, theta, phi_v, phi_0, slope):
     # This is the function for a hanger (lambda/4 resonator) which takes into
     # account a possible slope df
-    return (1.+slope*(f/1.e9-f0)/f0)*np.exp(1.j*(phi_v*f+phi_0-phi_v*f[0])) * \
-        HangerFuncComplex(f, f0, Q, Qe, A, theta)
+    return (1. + slope * (f / 1.e9 - f0) / f0) * np.exp(1.j * (phi_v * f + phi_0 - phi_v * f[0])) * \
+           HangerFuncComplex(f, f0, Q, Qe, A, theta)
 
 
 def linear_with_offset(x, a, b):
     '''
     A linear signal with a fixed offset.
     '''
-    return a*x + b
+    return a * x + b
 
 
 def linear_with_background(x, a, b):
     '''
     A linear signal with a fixed background.
     '''
-    return np.sqrt((a*x)**2 + b**2)
+    return np.sqrt((a * x) ** 2 + b ** 2)
 
 
 def linear_with_background_and_offset(x, a, b, c):
     '''
     A linear signal with a fixed background.
     '''
-    return np.sqrt((a*x)**2 + b**2)+c
+    return np.sqrt((a * x) ** 2 + b ** 2) + c
 
 
 def gaussianCDF(x, amplitude, mu, sigma):
     """
     CDF of gaussian is P(X<=x) = .5 erfc((mu-x)/(sqrt(2)sig))
     """
-    return 0.5 * amplitude * erfc((mu - x) / (np.sqrt(2)*sigma))
+    return 0.5 * amplitude * erfc((mu - x) / (np.sqrt(2) * sigma))
 
 
 def double_gaussianCDF(x, A_amplitude, A_mu, A_sigma,
@@ -388,15 +412,15 @@ def gaussian_2D(x, y, amplitude=1,
 
 def DoubleExpDecayFunc(t, tau1, tau2, amp1, amp2, offset, n):
     return (offset +
-            amp1 * np.exp(-(t / tau1)**n) +
-            amp2 * np.exp(-(t / tau2)**n))
+            amp1 * np.exp(-(t / tau1) ** n) +
+            amp2 * np.exp(-(t / tau2) ** n))
 
 
 def TripleExpDecayFunc(t, tau1, tau2, tau3, amp1, amp2, amp3, offset, n):
     return (offset +
-            amp1*np.exp(-(t/tau1)**n) +
-            amp2*np.exp(-(t/tau2)**n) +
-            amp3*np.exp(-(t/tau3)**n))
+            amp1 * np.exp(-(t / tau1) ** n) +
+            amp2 * np.exp(-(t / tau2) ** n) +
+            amp3 * np.exp(-(t / tau3) ** n))
 
 
 def avoided_crossing_mediated_coupling(flux, f_bus, f_center1, f_center2,
@@ -418,7 +442,7 @@ def avoided_crossing_mediated_coupling(flux, f_bus, f_center1, f_center2,
 
     """
     if type(flux_state) == int:
-        flux_state = [flux_state]*len(flux)
+        flux_state = [flux_state] * len(flux)
 
     frequencies = np.zeros([len(flux), 2])
     for kk, dac in enumerate(flux):
@@ -449,7 +473,7 @@ def avoided_crossing_direct_coupling(flux, f_center1, f_center2,
     """
 
     if type(flux_state) == int:
-        flux_state = [flux_state]*len(flux)
+        flux_state = [flux_state] * len(flux)
 
     frequencies = np.zeros([len(flux), 2])
     for kk, dac in enumerate(flux):
@@ -480,7 +504,7 @@ def residual_complex_fcn(pars, cmp_fcn, x, y):
     '''
     cmp_values = cmp_fcn(x, pars)
 
-    res = cmp_values-y
+    res = cmp_values - y
     res = np.append(res.real, res.imag)
 
     return res
@@ -496,11 +520,137 @@ def exp_dec_guess(model, data, t):
     offs_guess = data[np.argmax(t)]
     amp_guess = data[np.argmin(t)] - offs_guess
     # guess tau by looking for value closest to 1/e
-    tau_guess = t[np.argmin(abs((amp_guess*(1/np.e) + offs_guess)-data))]
-    params = model.make_params(amplitude=amp_guess,
-                               tau=tau_guess,
-                               n=1,
-                               offset=offs_guess)
+    tau_guess = t[np.argmin(abs((amp_guess * (1 / np.e) + offs_guess) - data))]
+
+    model.set_param_hint('amplitude', value=amp_guess)
+    model.set_param_hint('tau', value=tau_guess)
+    model.set_param_hint('n', value=1, vary=False)
+    model.set_param_hint('offset', value=offs_guess)
+
+    params = model.make_params()
+    return params
+
+
+def group_consecutives(vals, step=1):
+    """Return list of consecutive lists of numbers from vals (number list)."""
+    run = []
+    result = [run]
+    expect = None
+    for v in vals:
+        if (v == expect) or (expect is None):
+            run.append(v)
+        else:
+            run = [v]
+            result.append(run)
+        expect = v + step
+    return result
+
+
+def arc_guess(freq, dac, dd=0.1):
+    '''
+    Expects the dac values to be sorted!
+    :param freq:
+    :param dac:
+    :param dd:
+    :return:
+    '''
+    p = round(max(dd * len(dac), 1))
+    f_small = np.average(np.sort(freq)[:p]) + np.std(np.sort(freq)[:p])
+    f_big = np.average(np.sort(freq)[-p:]) - np.std(np.sort(freq)[-p:])
+    #print(f_small * 1e-9, f_big * 1e-9)
+
+    fmax = np.max(freq)
+    fmin = np.min(freq)
+
+    dacs_ss = np.where(freq >= f_big)[0]
+    dacs_as = np.where(freq <= f_small)[0]
+
+    dacs_ss_groups = group_consecutives(vals=dacs_ss, step=1)
+    dacs_as_groups = group_consecutives(vals=dacs_as, step=1)
+
+    dacs_ss_single = []
+    for g in dacs_ss_groups:
+        ind = g[np.argmax(freq[g])]
+        # ind = int(round(np.average(g)))
+        dacs_ss_single.append(ind)
+
+    dac_ss_group_index = np.argmin(np.abs(dac[dacs_ss_single]))
+    dac_ss_index = dacs_ss_single[dac_ss_group_index]
+    min_left = 0
+    min_right = len(dac) - 1
+    dacs_as_single = []
+    for g in dacs_as_groups:
+        if 0 in g:
+            ind = 0
+        elif len(dac) - 1 in g:
+            ind = len(dac) - 1
+        else:
+            ind = int(round(np.average(g)))
+
+        if ind < dac_ss_index:
+            min_left = max(ind, min_left)
+        elif ind > dac_ss_index:
+            min_right = min(ind, min_right)
+        dacs_as_single.append(ind)
+    # print('maxs', dacs_ss_single)
+    # print('mins', dacs_as_single)
+    arc_len = (dac[min_right] - dac[min_left])
+
+    # print('%d to %d = %.5f' % (min_left, min_right, arc_len))
+    if min_left == 0 or min_right == len(dac) - 1:
+        arc_len *= 2
+    elif len(dacs_ss_groups) > 1:
+        arc_len = np.average(dac[dacs_ss_single[1:]] - dac[dacs_ss_single[:-1]])
+
+    return fmax, fmin, dac[dac_ss_index], arc_len
+
+
+def Resonator_dac_arch_guess(model, freq, dac_voltage, f_max_qubit: float = None, E_c: float = None):
+    fmax, fmin, dac_ss, period = arc_guess(freq=freq, dac=dac_voltage)
+    coup_guess = 15e6
+
+    # todo make better f_res guess
+    f_res = np.mean(freq)  # - (coup_guess ** 2 / (f_max_qubit - fmax))
+    f_max_qubit_vary = f_max_qubit is None
+    f_max_qubit = f_max_qubit or f_res - 500e6
+
+    model.set_param_hint('f_0_res', value=f_res, min=f_res / 2, max=2 * f_res)
+    model.set_param_hint('f_max_qubit', value=f_max_qubit, min=3e9, max=8.5e9, vary=f_max_qubit_vary)
+    model.set_param_hint('dac_sweet_spot', value=dac_ss, min=(dac_ss - 0.005) / 2, max=2 * (dac_ss + 0.005))
+    model.set_param_hint('V_per_phi0', value=period, min=(period - 0.005) / 3, max=5 * (period + 0.005))
+    model.set_param_hint('asymmetry', value=0, max=1, min=-1)
+    model.set_param_hint('coupling', value=coup_guess, min=1e6, max=80e6)
+    E_c = E_c or 260e6
+    model.set_param_hint('E_c', value=E_c, min=50e6, max=400e6)
+
+    params = model.make_params()
+    return params
+
+
+def Qubit_dac_arch_guess(model, freq, dac_voltage):
+    fmax, fmin, dac_ss, period = arc_guess(freq=freq, dac=dac_voltage)
+    model.set_param_hint('f_max', value=fmax, min=0.7 * fmax, max=1.3 * fmax)
+    model.set_param_hint('dac_sweet_spot', value=dac_ss, min=(dac_ss - 0.005) / 2, max=2 * (dac_ss + 0.005))
+    model.set_param_hint('V_per_phi0', value=period, min=(period - 0.005) / 3, max=5 * (period + 0.005))
+    model.set_param_hint('asymmetry', value=0, max=1, min=-1)
+    model.set_param_hint('E_c', value=260e6, min=50e6, max=400e6)
+
+    params = model.make_params()
+    return params
+
+
+def idle_err_rate_guess(model, data, N):
+    '''
+    Assumes exponential decay in estimating the parameters
+    '''
+    amp_guess = 0.5
+    offset = np.mean(data)
+    N1 = np.mean(N)
+    N2 = np.mean(N)
+    params = model.make_params(A=amp_guess,
+                               N1=N1,
+                               N2=N2,
+                               offset=offset)
     return params
 
 
@@ -511,14 +661,14 @@ def fft_freq_phase_guess(data, t):
     # Freq guess ! only valid with uniform sampling
     # Only first half of array is used, because the second half contains the
     # negative frequecy components, and we want a positive frequency.
-    w = np.fft.fft(data)[:len(data)//2]
-    f = np.fft.fftfreq(len(data), t[1]-t[0])[:len(w)]
+    w = np.fft.fft(data)[:len(data) // 2]
+    f = np.fft.fftfreq(len(data), t[1] - t[0])[:len(w)]
     w[0] = 0  # Removes DC component from fourier transform
 
     # Use absolute value of complex valued spectrum
     abs_w = np.abs(w)
     freq_guess = abs(f[abs_w == max(abs_w)][0])
-    ph_guess = 2*np.pi-(2*np.pi*t[data == max(data)]*freq_guess)[0]
+    ph_guess = 2 * np.pi - (2 * np.pi * t[data == max(data)] * freq_guess)[0]
     # the condition data == max(data) can have several solutions
     #               (for example when discretization is visible)
     # to prevent errors we pick the first solution
@@ -533,7 +683,7 @@ def Cos_guess(model, data, t, **kwargs):
         model, model.__class__)
     """
 
-    amp_guess = abs(max(data)-min(data))/2  # amp is positive by convention
+    amp_guess = abs(max(data) - min(data)) / 2  # amp is positive by convention
     offs_guess = np.mean(data)
 
     freq_guess, ph_guess = fft_freq_phase_guess(data, t)
@@ -556,11 +706,11 @@ def exp_damp_osc_guess(model, data, t):
     The guess for the exponential is simpler as it sets the exponent (n) at 1
     and the tau at 2/3 of the total range
     """
-    amp_guess = abs(max(data)-min(data))/2  # amp is positive by convention
+    amp_guess = abs(max(data) - min(data)) / 2  # amp is positive by convention
     freq_guess, ph_guess = fft_freq_phase_guess(data, t)
     osc_offs_guess = 0
 
-    tau_guess = 2/3*max(t)
+    tau_guess = 2 / 3 * max(t)
     exp_offs_guess = np.mean(data)
     n_guess = 1
 
@@ -578,10 +728,10 @@ def Cos_amp_phase_guess(model, data, f, t):
     '''
     Guess for a cosine fit with fixed frequency f.
     '''
-    amp_guess = abs(max(data)-min(data))/2  # amp is positive by convention
+    amp_guess = abs(max(data) - min(data)) / 2  # amp is positive by convention
     offs_guess = np.mean(data)
 
-    ph_guess = (-2*np.pi*t[data == max(data)]*f)[0]
+    ph_guess = (-2 * np.pi * t[data == max(data)] * f)[0]
     # the condition data == max(data) can have several solutions
     #               (for example when discretization is visible)
     # to prevent errors we pick the first solution
@@ -679,15 +829,15 @@ def double_gauss_guess(model, data, x=None, **kwargs):
     if x is None:
         x = np.arange(len(data))
     cdf = np.cumsum(data)
-    norm_cdf = cdf/cdf[-1]
+    norm_cdf = cdf / cdf[-1]
     par_dict = {'A_center': x[(np.abs(norm_cdf - 0.25)).argmin()],
                 'B_center': x[(np.abs(norm_cdf - 0.75)).argmin()],
-                'A_sigma': (x[(np.abs(norm_cdf - 0.25 - .33/2)).argmin()] -
-                            x[(np.abs(norm_cdf - 0.25 + .33/2)).argmin()]),
-                'B_sigma': (x[(np.abs(norm_cdf - 0.75 - .33/2)).argmin()] -
-                            x[(np.abs(norm_cdf - 0.75 + .33/2)).argmin()])}
+                'A_sigma': (x[(np.abs(norm_cdf - 0.25 - .33 / 2)).argmin()] -
+                            x[(np.abs(norm_cdf - 0.25 + .33 / 2)).argmin()]),
+                'B_sigma': (x[(np.abs(norm_cdf - 0.75 - .33 / 2)).argmin()] -
+                            x[(np.abs(norm_cdf - 0.75 + .33 / 2)).argmin()])}
 
-    amp = max(data)*(par_dict['A_sigma'] + par_dict['B_sigma'])/2.
+    amp = max(data) * (par_dict['A_sigma'] + par_dict['B_sigma']) / 2.
     if model is not None:
         # Specify explicitly because not all pars are set to those from the par
         # dict
@@ -702,18 +852,19 @@ def double_gauss_guess(model, data, x=None, **kwargs):
     else:
         return par_dict
 
+
 #################################
 #     User defined Models       #
 #################################
 # NOTE: it is actually better to instantiate the model within your analysis
 # file, this prevents the model params having a memory.
-# A valid reason to define it here would be if you want to add a guess function
+# A valid reason to define it here would beexp_dec_guess if you want to add a guess function
 CosModel = lmfit.Model(CosFunc)
 CosModel.guess = Cos_guess
 
 ExpDecayModel = lmfit.Model(ExpDecayFunc)
 TripleExpDecayModel = lmfit.Model(TripleExpDecayFunc)
-ExpDecayModel.guess = exp_dec_guess
+ExpDecayModel.guess = exp_dec_guess  # todo: fix
 ExpDampOscModel = lmfit.Model(ExpDampOscFunc)
 GaussExpDampOscModel = lmfit.Model(GaussExpDampOscFunc)
 ExpDampDblOscModel = lmfit.Model(ExpDampDblOscFunc)
@@ -746,7 +897,7 @@ DoubleGauss2D_model.guess = double_gauss_2D_guess
 
 LorentzModel = lmfit.Model(lmfit.models.lorentzian)
 Lorentz_w_background_Model = lmfit.models.LorentzianModel() + \
-    lmfit.models.LinearModel()
+                             lmfit.models.LinearModel()
 PolyBgHangerAmplitudeModel = (HangerAmplitudeModel *
                               lmfit.models.PolynomialModel(degree=7))
 
@@ -781,34 +932,33 @@ def plot_fitres2D_heatmap(fit_res, x, y, axs=None, cmap='viridis'):
     axs[2].set_title('initial guess')
     return axs
 
-
 # Before defining a new model, take a look at the built in models in lmfit.
 
 # From http://lmfit.github.io/lmfit-py/builtin_models.html
 
 # Built-in Fitting Models in the models module
 # Peak-like models
-    # GaussianModel
-    # LorentzianModel
-    # VoigtModel
-    # PseudoVoigtModel
-    # Pearson7Model
-    # StudentsTModel
-    # BreitWignerModel
-    # LognormalModel
-    # DampedOcsillatorModel
-    # ExponentialGaussianModel
-    # SkewedGaussianModel
-    # DonaichModel
+# GaussianModel
+# LorentzianModel
+# VoigtModel
+# PseudoVoigtModel
+# Pearson7Model
+# StudentsTModel
+# BreitWignerModel
+# LognormalModel
+# DampedOcsillatorModel
+# ExponentialGaussianModel
+# SkewedGaussianModel
+# DonaichModel
 # Linear and Polynomial Models
-    # ConstantModel
-    # LinearModel
-    # QuadraticModel
-    # ParabolicModel
-    # PolynomialModel
+# ConstantModel
+# LinearModel
+# QuadraticModel
+# ParabolicModel
+# PolynomialModel
 # Step-like models
-    # StepModel
-    # RectangleModel
+# StepModel
+# RectangleModel
 # Exponential and Power law models
-    # ExponentialModel
-    # PowerLawModel
+# ExponentialModel
+# PowerLawModel

@@ -15,8 +15,11 @@ import logging
 import subprocess
 from functools import reduce  # forward compatibility for Python 3
 import operator
-
+import string
 from contextlib import ContextDecorator
+
+
+digs = string.digits + string.ascii_letters
 
 
 def get_git_revision_hash():
@@ -61,6 +64,46 @@ def int_to_bin(x, w, lsb_last=True):
         return bin_str
     else:
         return bin_str[::-1]
+
+
+def int2base(x: int, base: int, fixed_length: int=None):
+    """
+    Convert an integer to string representation in a certain base.
+    Useful for e.g., iterating over combinations of prepared states.
+
+    Args:
+        x    (int)          : the value to convert
+        base (int)          : the base to covnert to
+        fixed_length (int)  : if specified prepends zeros
+    """
+    if x < 0:
+        sign = -1
+    elif x == 0:
+        string_repr = digs[0]
+        if fixed_length is None:
+            return string_repr
+        else:
+            return string_repr.zfill(fixed_length)
+
+    else:
+        sign = 1
+
+    x *= sign
+    digits = []
+
+    while x:
+        digits.append(digs[int(x % base)])
+        x = int(x / base)
+
+    if sign < 0:
+        digits.append('-')
+
+    digits.reverse()
+    string_repr = ''.join(digits)
+    if fixed_length is None:
+        return string_repr
+    else:
+        return string_repr.zfill(fixed_length)
 
 
 def mopen(filename, mode='w'):
@@ -428,6 +471,14 @@ def setInDict(dataDict: dict, mapList: list, value):
                         'b': 4}
     """
     getFromDict(dataDict, mapList[:-1])[mapList[-1]] = value
+
+
+def is_more_rencent(filename: str, comparison_filename: str):
+    """
+    Returns True if the contents of "filename" has changed more recently
+    than the contents of "comparison_filename".
+    """
+    return os.path.getmtime(filename) > os.path.getmtime(comparison_filename)
 
 
 class NumpyJsonEncoder(json.JSONEncoder):

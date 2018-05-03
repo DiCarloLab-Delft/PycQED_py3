@@ -61,6 +61,12 @@ class Base_LutMan(Instrument):
         self._wave_dict = {}
         self.set_default_lutmap()
 
+    def time_to_sample(self, time):
+        """
+        Takes a time in seconds and returns the corresponding sample
+        """
+        return int(time*self.sampling_rate())
+
     def set_default_lutmap(self):
         """
         Sets the "LutMap" parameter to
@@ -143,7 +149,7 @@ class Base_LutMan(Instrument):
                 marker='o', label='chQ')
         ax.legend()
         if self._voltage_min is not None:
-            ax.set_axis_bgcolor('gray')
+            ax.set_facecolor('gray')
             ax.axhspan(self._voltage_min, self._voltage_max, facecolor='w',
                        linewidth=0)
             ax.set_ylim(self._voltage_min*1.1, self._voltage_max*1.1)
@@ -183,3 +189,43 @@ class Base_LutMan(Instrument):
         if show:
             plt.show()
         return fig, ax
+
+
+
+def get_redundant_codewords(codeword: int, bit_width: int=4, bit_shift: int=0):
+    """
+    Takes in a desired codeword and generates the redundant codewords.
+
+    Example A:
+        Codeword = 5   -> '101'
+        bit_width = 4  -> '0101'
+        bit_shift = 0  -> xxxx0101
+    The function should return all combinations for all
+        xxxx0101
+
+    Example B:
+        Codeword = 5   -> '101'
+        bit_width = 4  -> '0101'
+        bit_shift = 4  -> 0101xxxx
+    The function should return all combinations for all
+        0101xxxx
+
+    Args:
+        codeword (int) : the desired codeword
+        bit_width (int): the number of bits in the codeword, determines
+            how many redundant combinations are generated.
+        bit_shift (int): determines how many bits the codeword is shifted.
+
+    returns:
+        redundant_codewords (list): all redundant combinations of the codeword
+            see example above.
+    """
+    codeword_shifted = codeword<<bit_shift
+    redundant_codewords = []
+    for i in range(2**bit_width):
+        if bit_shift == 0: #assumes the higher bits are used
+            redundant_codewords.append(codeword_shifted+(i<<bit_width))
+        else: # assumes the lower bits are used
+            redundant_codewords.append(codeword_shifted+i)
+    return redundant_codewords
+

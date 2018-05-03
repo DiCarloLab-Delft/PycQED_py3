@@ -33,7 +33,8 @@ class UHFQC(Instrument):
     """
 
     def __init__(self, name, device='auto', interface='USB',
-                 address='127.0.0.1', port=8004, **kw):
+                 address='127.0.0.1', port=8004, DIO=True, 
+                 nr_integration_channels=9,**kw):
         '''
         Input arguments:
             name:           (str) name of the instrument
@@ -44,8 +45,10 @@ class UHFQC(Instrument):
         # #suggestion W vlothuizen
         t0 = time.time()
         super().__init__(name, **kw)
-
+        self.nr_integration_channels = nr_integration_channels  
+        self.DIO=DIO
         self._daq = zi.ziDAQServer(address, int(port), 5)
+        # self._daq.setDebugLevel(5)
         if device.lower() == 'auto':
             self._device = zi_utils.autoDetect(self._daq)
         else:
@@ -162,7 +165,7 @@ class UHFQC(Instrument):
         # storing an offset correction parameter for all weight functions,
         # this allows normalized calibration when performing cross-talk suppressed
         # readout
-        for i in range(5):
+        for i in range(self.nr_integration_channels):
             self.add_parameter("quex_trans_offset_weightfunction_{}".format(i),
                                unit='',  # unit is adc value
                                label='RO normalization offset',
@@ -223,14 +226,15 @@ class UHFQC(Instrument):
         self.system_extclk(1)
 
         # Configure the codeword protocol
-        self.awgs_0_dio_strobe_index(31)
-        self.awgs_0_dio_strobe_slope(1) # rising edge
-        self.awgs_0_dio_valid_index(16)
-        self.awgs_0_dio_valid_polarity(2) # high polarity
+        if self.DIO:
+            self.awgs_0_dio_strobe_index(31)
+            self.awgs_0_dio_strobe_slope(1) # rising edge
+            self.awgs_0_dio_valid_index(16)
+            self.awgs_0_dio_valid_polarity(2) # high polarity
 
-
-
-
+        # setting the output channels to 50 ohm
+        self.sigouts_0_imp50(True)
+        self.sigouts_1_imp50(True)
 
         # We probably need to adjust some delays here...
         #self.awgs_0_dio_delay_index(31)
@@ -238,17 +242,17 @@ class UHFQC(Instrument):
 
         # No rotation on the output of the weighted integration unit, i.e. take
         # real part of result
-        for i in range(0, 4):
-            eval('self.quex_rot_{0}_real(1.0)'.format(i))
-            eval('self.quex_rot_{0}_imag(0.0)'.format(i))
+        for i in range(0, self.nr_integration_channels):
+            self.set('quex_rot_{0}_real'.format(i), 1.0)
+            self.set('quex_rot_{0}_imag'.format(i), 0.0)
 
         # No cross-coupling in the matrix multiplication (identity matrix)
-        for i in range(0, 4):
-            for j in range(0, 4):
+        for i in range(0, self.nr_integration_channels):
+            for j in range(0,):
                 if i == j:
-                    eval('self.quex_trans_{0}_col_{1}_real(1)'.format(i, j))
+                    self.set('quex_trans_{0}_col_{1}_real'.format(i, j),1)
                 else:
-                    eval('self.quex_trans_{0}_col_{1}_real(0)'.format(i, j))
+                    self.set('quex_trans_{0}_col_{1}_real'.format(i, j),0)
 
         # Configure the result logger to not do any averaging
         self.quex_rl_length(pow(2, LOG2_AVG_CNT)-1)
@@ -338,6 +342,11 @@ class UHFQC(Instrument):
                 success = False
                 print('Timeout encountered during compilation.')
                 break
+            time.sleep(0.01)
+
+        comp_msg = (self._awgModule.get(
+                'awgModule/compiler/statusstring')['compiler']
+                ['statusstring'][0])
 
         if not comp_msg.endswith(succes_msg):
             success = False
@@ -349,7 +358,9 @@ class UHFQC(Instrument):
             # for i, line in enumerate(program_string.splitlines()):
             #     print(i+1, '\t', line)
             # print('\n')
-            raise ziShellCompilationError(comp_msg)
+            #raise ziShellCompilationError(comp_msg)
+            #print("Possible error:", comp)
+            pass
         # If succesful the comipilation success message is printed
         t1 = time.time()
         print(self._awgModule.get('awgModule/compiler/statusstring')
@@ -669,6 +680,7 @@ class UHFQC(Instrument):
         """
         trace_length = 4096
         tbase = np.arange(0, trace_length/1.8e9, 1/1.8e9)
+        print(len(tbase))
         cosI = np.array(np.cos(2*np.pi*IF*tbase))
         sinI = np.array(np.sin(2*np.pi*IF*tbase))
         self.set('quex_wint_weights_{}_real'.format(weight_function_I),
@@ -788,7 +800,7 @@ class UHFQC(Instrument):
             'const TRIGGER1  = 0x000001;\n' +
             'const WINT_TRIG = 0x000010;\n' +
             'const IAVG_TRIG = 0x000020;\n' +
-            'const WINT_EN   = 0x1f0000;\n' +
+            'const WINT_EN   = 0x1ff0000;\n' +
             'const DIO_VALID = 0x00010000;\n' +
             'setTrigger(WINT_EN);\n' +
             'var loop_cnt = getUserReg(0);\n' +
@@ -855,7 +867,7 @@ class UHFQC(Instrument):
                     'setTrigger(0);\n')
         self.awg_string(sequence, timeout=timeout)
 
-    def awg_sequence_acquisition_and_pulse(self, Iwave, Qwave, acquisition_delay):
+    def awg_sequence_acquisition_and_pulse(self, Iwave, Qwave, acquisition_delay, dig_trigger=True):
         if np.max(Iwave) > 1.0 or np.min(Iwave) < -1.0:
             raise KeyError(
                 "exceeding AWG range for I channel, all values should be withing +/-1")
@@ -879,7 +891,7 @@ class UHFQC(Instrument):
 const TRIGGER1  = 0x000001;
 const WINT_TRIG = 0x000010;
 const IAVG_TRIG = 0x000020;
-const WINT_EN   = 0x1f0000;
+const WINT_EN   = 0x1ff0000;
 setTrigger(WINT_EN);
 var loop_cnt = getUserReg(0);
 var wait_delay = getUserReg(2);
@@ -889,16 +901,21 @@ if(getUserReg(1)){
 }else{
   RO_TRIG=WINT_TRIG;
 }\n"""
-
-        loop_start = """
+        if dig_trigger:
+            loop_start = """
 repeat(loop_cnt) {
 \twaitDigTrigger(1, 1);
+\tplayWave(Iwave, Qwave);\n"""
+        else:
+            loop_start = """
+repeat(loop_cnt) {
 \tplayWave(Iwave, Qwave);\n"""
 
         end_string = """
 \tsetTrigger(WINT_EN + RO_TRIG);
 \tsetTrigger(WINT_EN);
 \twaitWave();
+\twait(4000);
 }
 wait(300);
 setTrigger(0);"""
@@ -906,6 +923,7 @@ setTrigger(0);"""
         string = preamble+wave_I_string+wave_Q_string + \
             loop_start+delay_string+end_string
         self.awg_string(string)
+
 
     def array_to_combined_vector_string(self, array, name):
         # this function cuts up arrays into several vectors of maximum length 1024 that are joined.
@@ -938,7 +956,7 @@ setTrigger(0);"""
 const TRIGGER1  = 0x000001;
 const WINT_TRIG = 0x000010;
 const IAVG_TRIG = 0x000020;
-const WINT_EN   = 0x1f0000;
+const WINT_EN   = 0x1ff0000;
 setTrigger(WINT_EN);
 var loop_cnt = getUserReg(0);
 var RO_TRIG;
@@ -964,7 +982,7 @@ setTrigger(0);"""
         self._daq.sync()
 
     def awg_sequence_acquisition_and_pulse_SSB(
-            self, f_RO_mod, RO_amp, RO_pulse_length, acquisition_delay):
+            self, f_RO_mod, RO_amp, RO_pulse_length, acquisition_delay, dig_trigger=True):
         f_sampling = 1.8e9
         samples = RO_pulse_length*f_sampling
         array = np.arange(int(samples))
@@ -972,24 +990,22 @@ setTrigger(0);"""
         coswave = RO_amp*np.cos(2*np.pi*array*f_RO_mod/f_sampling)
         Iwave = (coswave+sinwave)/np.sqrt(2)
         Qwave = (coswave-sinwave)/np.sqrt(2)
-        # Iwave, Qwave = PG.mod_pulse(np.ones(samples), np.zeros(samples), f=f_RO_mod, phase=0, sampling_rate=f_sampling)
         self.awg_sequence_acquisition_and_pulse(
-            Iwave, Qwave, acquisition_delay)
+            Iwave, Qwave, acquisition_delay, dig_trigger=dig_trigger)
 
     def upload_transformation_matrix(self, matrix):
         for i in range(np.shape(matrix)[0]):  # looping over the rows
             for j in range(np.shape(matrix)[1]):  # looping over the colums
-                eval(
-                    'self.quex_trans_{}_col_{}_real(matrix[{}][{}])'.format(j, i, i, j))
+                self.set('quex_trans_{}_col_{}_real'.format(j, i), matrix[i][j])
 
-    def download_transformation_matrix(self, nr_rows=4, nr_cols=4):
+    def download_transformation_matrix(self, nr_rows=None, nr_cols=None):
+        if not nr_rows or not nr_cols:
+            nr_rows = self.nr_integration_channels
+            nr_cols = self.nr_integration_channels
         matrix = np.zeros([nr_rows, nr_cols])
         for i in range(np.shape(matrix)[0]):  # looping over the rows
             for j in range(np.shape(matrix)[1]):  # looping over the colums
-                matrix[i][j] = (
-                    eval('self.quex_trans_{}_col_{}_real()'.format(j, i)))
-                # print(value)
-                # matrix[i,j]=value
+                matrix[i][j] = self.get('quex_trans_{}_col_{}_real'.format(j, i))
         return matrix
 
 

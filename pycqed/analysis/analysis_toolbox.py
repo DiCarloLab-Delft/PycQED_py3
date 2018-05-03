@@ -22,6 +22,9 @@ from .tools.data_manipulation import *
 from .tools.plotting import *
 import colorsys as colors
 from matplotlib import cm
+from pycqed.analysis import composite_analysis as RA
+
+from matplotlib.colors import LogNorm
 
 datadir = get_default_datadir()
 print('Data directory set to:', datadir)
@@ -737,7 +740,7 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
         timestamps.reverse()
         all_timestamps += timestamps
     # Ensures the order of the timestamps is ascending
-    all_timestamps.reverse()
+    all_timestamps.sort()
     return all_timestamps
 
 
@@ -1074,6 +1077,24 @@ def peak_finder_v2(x, y, perc=90, window_len=11):
     sort_mask = np.argsort(y[array_peaks])[::-1]
     return peaks_x[sort_mask]
 
+def peak_finder_v3(x, y, smoothing=True, window_len=31, perc=99.6, factor=1):
+    '''
+    Peak finder based on argrelextrema function from scipy
+    only finds maximums, this can be changed to minimum by using factor=-1
+    '''
+    if smoothing:
+        y = (smooth(y,window_len=window_len)-y)
+    else:
+        y = y - np.average(y)
+    y = factor*y
+    percval = np.percentile(y, perc)
+    filtered_y = np.where(y>percval,y,percval)
+    array_peaks = argrelextrema(filtered_y, np.greater)
+    peaks_x = x[array_peaks]
+    peaks_y = y[array_peaks]
+    sort_mask = np.argsort(y[array_peaks])[::-1]
+    return peaks_x, peaks_y, y
+
 def cut_edges(array, window_len=11):
     array = array[(window_len//2):-(window_len//2)]
     return array
@@ -1392,6 +1413,9 @@ def calculate_rotation_matrix(delta_I, delta_Q):
 
 
 def normalize_TD_data(data, data_zero, data_one):
+    """
+    Normalizes measured data to refernce signals for zero and one
+    """
     return (data - data_zero) / (data_one - data_zero)
 
 
@@ -1646,7 +1670,31 @@ def color_plot(x, y, z, fig, ax, cax=None,
     x, and y are lists, z is a matrix with shape (len(x), len(y))
     In the future this function can be overloaded to handle different
     types of input.
+    Args:
+        x (list):
+            x data
+        y (list):
+            y data
+        fig (Object):
+            figure object
+        log (string/bool):
+            True/False for z axis scaling, or any string containing any
+            combination of letters x, y, z for scaling of the according axis.
+            Remember to set the labels correctly.
     '''
+
+    norm = None
+    try:
+        if log is True or 'z' in log:
+            norm = LogNorm()
+
+        if 'y' in log:
+            y = np.log10(y)
+
+        if 'x' in log:
+            x = np.log10(x)
+    except TypeError:  # log is not iterable
+        pass
 
     # calculate coordinates for corners of color blocks
     # x coordinates
@@ -1671,6 +1719,8 @@ def color_plot(x, y, z, fig, ax, cax=None,
     x_grid, y_grid = np.meshgrid(x_vertices, y_vertices)
     # print x_grid.shape, y_grid.shape
 
+
+
     # # mgrid sets the grid points to start at x (or y) 0 and end at the
     # latest x (or y), the slice includes the edge point through slicing
     # tricks.
@@ -1682,11 +1732,9 @@ def color_plot(x, y, z, fig, ax, cax=None,
     cmap = plt.get_cmap(kw.pop('cmap', cmap_chosen))
     # CMRmap is our old default
 
-    clim = kw.get('clim', [None, None])
-    if log:
-        norm = colors.LogNorm()
-    else:
-        norm = None
+    # Empty values in the array are filled with np.nan, this ensures
+    # the plot limits are set correctly.
+    clim = kw.get('clim', [np.nanmin(z), np.nanmax(z)])
 
     if transpose:
         print('Inverting x and y axis for colormap plot')
@@ -2033,11 +2081,16 @@ def find_min(x, y, return_fit=False, perc=30):
 def get_color_order(i, max_num, cmap='viridis'):
     # take a blue to red scale from 0 to max_num
     # uses HSV system, H_red = 0, H_green = 1/3 H_blue=2/3
-    # return colors.hsv_to_rgb(2.*float(i)/(float(max_num)*3.), 1., 1.)
     print('It is recommended to use the updated function "get_color_cycle".')
     if isinstance(cmap, str):
         cmap = cm.get_cmap(cmap)
     return cmap((i/max_num) % 1)
+
+
+def get_color_order_hsv(i, max_num):
+    # take a blue to red scale from 0 to max_num
+    # uses HSV system, H_red = 0, H_green = 1/3 H_blue=2/3
+    return colors.hsv_to_rgb(2.*float(i)/(float(max_num)*3.), 1., 1.)
 
 
 def get_color_list(max_num, cmap='viridis'):
@@ -2058,3 +2111,37 @@ def get_color_list(max_num, cmap='viridis'):
             logging.warning('Using Vega10 as a fallback, upgrade matplotlib')
             cmap = cm.get_cmap('Vega10')
     return [cmap(i) for i in np.linspace(0.0, 1.0, max_num)]
+
+
+def print_pars_table(n_ts=10, pars=None):
+    '''
+    Prints out a table containing the value for the indicated parameters from the last N timestamps.
+    Input:
+        n_ts (int), number of time-stamps to include in the table (rows).
+        pars (list), list spanning the parameters of interest (columns).
+
+    Every element on the list pars need to correspond to a parameter stored in the Instrument settings of the HDF5 data-files.
+    Examples:
+        pars = ['IVVI.dac1', 'IVVI.dac2', 'IVVI.dac3']
+        pars = ['Qubit.f_RO', 'Qubit.RO_acq_integration_length', 'Qubit.RO_pulse_power']
+        pars = ['Qubit.spec_pow', 'Qubit.RO_power_cw']
+    '''
+    ts_list = return_last_n_timestamps(n_ts)
+    pdict = {}
+    nparams = []
+    for i,p in enumerate(pars):
+        pdict.update({p:p})
+    opt_dict = {'scan_label':'','exact_label_match':True}
+    # print(ts_list)
+    scans = RA.quick_analysis(t_start=ts_list[-1],t_stop=ts_list[0], options_dict=opt_dict,
+                      params_dict_TD=pdict,numeric_params=nparams)
+
+    pars_line = 'timestamp \t'
+    for p in pars:
+        pars_line = pars_line + p + '\t'
+    print(pars_line)
+    for i,ts in enumerate(scans.TD_timestamps):
+        i_line = '%s \t'%ts
+        for p in pars:
+            i_line = i_line + scans.TD_dict[p][i]+'\t'
+        print(i_line)

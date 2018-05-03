@@ -710,11 +710,11 @@ class QWG_lutman_par(Soft_Sweep):
         self.LutMan_parameter = LutMan_parameter
 
     def set_parameter(self, val):
-        self.LutMan.QWG.get_instr().stop()
+        self.LutMan.AWG.get_instr().stop()
         self.LutMan_parameter.set(val)
-        self.LutMan.load_pulses_onto_AWG_lookuptable(regenerate_pulses=True)
-        self.LutMan.QWG.get_instr().start()
-        self.LutMan.QWG.get_instr().getOperationComplete()
+        self.LutMan.load_waveforms_onto_AWG_lookuptable(regenerate_waveforms=True)
+        self.LutMan.AWG.get_instr().start()
+        self.LutMan.AWG.get_instr().getOperationComplete()
 
 
 class QWG_flux_amp(Soft_Sweep):
@@ -907,6 +907,49 @@ class lutman_par_UHFQC_dig_trig(Soft_Sweep):
             self.LutMan.AWG.get_instr().acquisition_arm(single=self.single)
 
 
+class lutman_par_depletion_pulse_global_scaling(Soft_Sweep):
+    def __init__(self, LutMan, resonator_numbers, optimization_M_amps,
+                    optimization_M_amp_down0s, optimization_M_amp_down1s,
+                    upload=True, **kw):
+        # sweeps the readout-and depletion pules of the listed resonators.
+        # sets the remaining readout and depletion pulses to 0 amplitude.
+
+        self.set_kw()
+        self.name= 'depletion_pulse_sweeper'
+        self.parameter_name = 'relative_depletion_pulse_scaling_amp'
+        self.unit = 'a.u.'
+        self.sweep_control = 'soft'
+        self.LutMan = LutMan
+        self.optimization_M_amps = optimization_M_amps
+        self.optimization_M_amp_down0s = optimization_M_amp_down0s
+        self.optimization_M_amp_down1s = optimization_M_amp_down1s
+        self.resonator_numbers = resonator_numbers
+        self.upload=upload
+
+    def set_parameter(self, val):
+        '''
+        Set the parameter(s) to be swept. Differs per sweep function
+        Sweeping the amplitudes of the readout-and-depletion-pulses in the list
+        relative to the initially optimized amplitude.
+        Sets the remaining depletion pulses to zero.
+        '''
+        for resonator_number in self.LutMan._resonator_codeword_bit_mapping:
+            if resonator_number in self.resonator_numbers:
+                i = self.resonator_numbers.index(resonator_number)
+                self.LutMan.set('M_amp_R{}'.format(resonator_number),
+                    val*self.optimization_M_amps[i])
+                self.LutMan.set('M_down_amp0_R{}'.format(resonator_number),
+                    val*self.optimization_M_amp_down0s[i])
+                self.LutMan.set('M_down_amp1_R{}'.format(resonator_number),
+                    val*self.optimization_M_amp_down1s[i])
+            else:
+                self.LutMan.set('M_amp_R{}'.format(resonator_number), 0)
+                self.LutMan.set('M_down_amp0_R{}'.format(resonator_number), 0)
+                self.LutMan.set('M_down_amp1_R{}'.format(resonator_number), 0)
+        if self.upload:
+            self.LutMan.load_DIO_triggered_sequence_onto_UHFQC(regenerate_waveforms=True)
+
+
 class lutman_par_dB_attenuation_UHFQC_dig_trig(Soft_Sweep):
     def __init__(self, LutMan, LutMan_parameter, run=False, **kw):
         self.set_kw()
@@ -927,24 +970,80 @@ class lutman_par_dB_attenuation_UHFQC_dig_trig(Soft_Sweep):
             self.LutMan.AWG.get_instr().acquisition_arm(single=self.single)
 
 
+class dB_attenuation_UHFQC_dig_trig(Soft_Sweep):
+    def __init__(self, LutMan, LutMan_parameter, run=False, **kw):
+        self.set_kw()
+        self.name = LutMan_parameter.name
+        self.parameter_name = LutMan_parameter.label
+        self.unit = 'dB'
+        self.sweep_control = 'soft'
+        self.LutMan = LutMan
+        self.LutMan_parameter = LutMan_parameter
+        self.run = run
+
+    def set_parameter(self, val):
+        self.LutMan_parameter.set(10**(val/20))
+        if self.run:
+            self.LutMan.AWG.get_instr().awgs_0_enable(False)
+        self.LutMan.load_DIO_triggered_sequence_onto_UHFQC()
+        if self.run:
+            self.LutMan.AWG.get_instr().acquisition_arm(single=self.single)
+
+class UHFQC_pulse_dB_attenuation(Soft_Sweep):
+
+    def __init__(self, UHFQC, IF, dig_trigger=True,**kw):
+        self.set_kw()
+        self.name = 'UHFQC pulse attenuation'
+        self.parameter_name = 'pulse attenuation'
+        self.unit = 'dB'
+        self.sweep_control = 'soft'
+        self.UHFQC = UHFQC
+        self.dig_trigger = dig_trigger
+        self.IF = IF
+
+
+    def set_parameter(self, val):
+        self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(f_RO_mod=self.IF,RO_amp=10**(val/20),RO_pulse_length=2e-6,acquisition_delay=200e-9,dig_trigger=self.dig_trigger)
+        time.sleep(1)
+        #print('refreshed UHFQC')
+
+class multi_sweep_function(Soft_Sweep):
+    '''
+    cascades several sweep functions into a single joint sweep functions.
+    '''
+    def __init__(self, sweep_functions: list, parameter_name=None,name=None,**kw):
+        self.set_kw()
+        self.sweep_functions = sweep_functions
+        self.sweep_control = 'soft'
+        self.name = name or 'multi_sweep'
+        self.unit = sweep_functions[0].unit
+        self.parameter_name = parameter_name or 'multiple_parameters'
+        for i, sweep_function in enumerate(sweep_functions):
+            if self.unit.lower() != sweep_function.unit.lower():
+                raise ValueError('units of the sweepfunctions are not equal')
+
+    def set_parameter(self, val):
+        for sweep_function in self.sweep_functions:
+            sweep_function.set_parameter(val)
+
 class two_par_joint_sweep(Soft_Sweep):
     """
     Allows jointly sweeping two parameters while preserving their
     respective ratios.
+    Allows par_A and par_B to be arrays of parameters
     """
     def __init__(self, par_A, par_B, preserve_ratio: bool=True, **kw):
         self.set_kw()
-        self.name = par_A.name
-        self.parameter_name = par_A.name
         self.unit = par_A.unit
         self.sweep_control = 'soft'
-
         self.par_A = par_A
         self.par_B = par_B
+        self.name = par_A.name
+        self.parameter_name = par_A.name
         if preserve_ratio:
             try:
                 self.par_ratio = self.par_B.get()/self.par_A.get()
-            except NotImplementedError:
+            except:
                 self.par_ratio = (self.par_B.get_latest()/
                                   self.par_A.get_latest())
         else:
@@ -991,6 +1090,12 @@ class FLsweep(Soft_Sweep):
           playWave("dev8005_wave_ch1_cw004", "dev8005_wave_ch2_cw004");
         }
         """
+        awg_hack_program_custom_wf = """
+        while (1) {
+          waitDIOTrigger();
+          playWave("dev8005_wave_ch1_cw004", "dev8005_wave_ch2_cw004");
+        }
+        """
         awg = self.lm.AWG.get_instr()
         self.lm.load_waveform_onto_AWG_lookuptable(
             self.waveform_name, regenerate_waveforms=True)
@@ -998,6 +1103,9 @@ class FLsweep(Soft_Sweep):
             awg.configure_awg_from_string(0, awg_hack_program_multi_cz)
         elif 'z' in self.waveform_name:
             awg.configure_awg_from_string(0, awg_hack_program_cz)
+        elif 'custom' in self.waveform_name:
+            awg.configure_awg_from_string(0, awg_hack_program_custom_wf)
+
         else:
             awg.configure_awg_from_string(0, awg_hack_program)
 
@@ -1037,3 +1145,35 @@ class FLsweep(Soft_Sweep):
                 awg.configure_awg_from_string(0, awg_hack_program)
             awg.configure_codeword_protocol()
             awg.start()
+
+
+class FLsweep_QWG(Soft_Sweep):
+    """
+    Special sweep function for QWG flux pulses.
+    """
+    def __init__(self, lm, par, waveform_name, realtime_loading=True,
+                 other_waveform=None, **kw):
+        super().__init__(**kw)
+        self.lm = lm
+        self.par = par
+        self.waveform_name = waveform_name
+        self.parameter_name = par.name
+        self.unit = par.unit
+        self.name = par.name
+        self.realtime_loading = realtime_loading
+        self.other_waveform = other_waveform
+
+    def prepare(self):
+        awg = self.lm.AWG.get_instr()
+        awg.stop()
+        self.lm.load_waveform_onto_AWG_lookuptable(
+            self.waveform_name, regenerate_waveforms=True)
+        awg.start()
+
+    def set_parameter(self, val):
+        self.par(val)
+        awg = self.lm.AWG.get_instr()
+        awg.stop()
+        self.lm.load_waveform_onto_AWG_lookuptable(
+            self.waveform_name, regenerate_waveforms=True)
+        awg.start()
