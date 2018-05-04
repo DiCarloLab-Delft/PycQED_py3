@@ -1007,7 +1007,70 @@ setTrigger(0);"""
             for j in range(np.shape(matrix)[1]):  # looping over the colums
                 matrix[i][j] = self.get('quex_trans_{}_col_{}_real'.format(j, i))
         return matrix
+    
+    def spec_mode_on(self, acq_length=1/1500, IF=20e6, ro_amp=0.1):
+        awg_code = """
+const TRIGGER1  = 0x000001;
+const WINT_TRIG = 0x000010;
+const IAVG_TRIG = 0x000020;
+const WINT_EN   = 0x1f0000;
+setTrigger(WINT_EN);
+var loop_cnt = getUserReg(0);
 
+const Fsample = 1.8e9;
+const triggerdelay = {}; //seconds
+
+repeat(loop_cnt) {{
+setTrigger(WINT_EN + WINT_TRIG + TRIGGER1);
+wait(5);
+setTrigger(WINT_EN);
+wait(triggerdelay*Fsample/8 - 5);
+}}
+wait(1000);
+setTrigger(0);
+        """.format(acq_length)
+        #setting the internal oscillator to the IF
+        self.oscs_0_freq(IF)
+        #setting the integration path to use the oscillator instead of integration functions
+        self.quex_wint_mode(1)
+        #just below the 
+        self.quex_wint_length(int(acq_length*0.99*1.8e9))
+        #uploading the sequence
+        self.awg_string(awg_code)
+        # setting the integration rotation to single sideband
+        self.quex_rot_0_real(1)
+        self.quex_rot_0_imag(1)
+        self.quex_rot_1_real(1)
+        self.quex_rot_1_imag(-1)
+        # setting the mixer deskewing to identity
+        self.quex_deskew_0_col_0(1)
+        self.quex_deskew_1_col_0(0)
+        self.quex_deskew_0_col_1(0)
+        self.quex_deskew_1_col_1(1)
+
+        self.sigouts_0_enables_3(1)
+        self.sigouts_1_enables_7(1)
+        # setting
+        self.sigouts_1_amplitudes_7(ro_amp)#magic scale factor 
+        self.sigouts_0_amplitudes_3(ro_amp)
+
+    def spec_mode_off(self):
+        # Resetting To regular Mode
+        # changing int length
+        self.quex_wint_mode(0)
+        # Default settings copied
+        self.quex_rot_0_imag(0)
+        self.quex_rot_0_real(1)
+        self.quex_rot_1_imag(0)
+        self.quex_rot_1_real(1)
+        # setting to DSB by default
+        self.quex_deskew_0_col_0(1)
+        self.quex_deskew_1_col_0(0)
+        self.quex_deskew_0_col_1(0)
+        self.quex_deskew_1_col_1(1)
+        #switching off the modulation tone
+        self.sigouts_0_enables_3(0)
+        self.sigouts_1_enables_7(0)
 
 class ziShellError(Exception):
     """Base class for exceptions in this module."""
