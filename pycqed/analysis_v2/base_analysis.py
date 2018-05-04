@@ -1114,7 +1114,7 @@ class BaseDataAnalysis(object):
         plot_xunit = pdict['xunit']
         plot_ylabel = pdict['ylabel']
         plot_yunit = pdict['yunit']
-        plot_title = pdict['title']
+        plot_title = pdict.get('title', None)
         if plot_transpose:
             # transpose switches X and Y
             set_xlabel(axs, plot_ylabel, plot_yunit)

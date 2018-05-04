@@ -80,15 +80,19 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['2D_histogram_y'] = [None] * nr_expts
         self.proc_data_dict['2D_histogram_z'] = [None] * nr_expts
         self.proc_data_dict['IQ_pos'] = [None] * nr_expts
+        self.proc_data_dict['raw_offset'] = [None] * nr_expts
+        self.proc_data_dict['SNR_raw'] = [None] * nr_expts
 
         ######################################################
         #  Separating data into shots for 0 and shots for 1  #
         ######################################################
 
         for i, meas_val in enumerate(self.raw_data_dict['measured_values']):
+            unit = self.raw_data_dict['value_units'][i][0]
             # loop through channels
             shots = np.zeros((2, len(meas_val),), dtype=np.ndarray)
             for j, dat in enumerate(meas_val):
+                assert unit == self.raw_data_dict['value_units'][i][j], 'The channels have been measured using different units. This is not supported yet.'
                 sh_0, sh_1 = get_shots_zero_one(
                     dat, post_select=post_select, nr_samples=nr_samples,
                     post_select_threshold=post_select_threshold,
@@ -107,10 +111,12 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 data_range_y = (np.min([np.min(b) for b in shots[:, 1]]),
                                 np.max([np.max(b) for b in shots[:, 1]]))
                 data_range_xy = (data_range_x, data_range_y)
-                H0, xedges, yedges = np.histogram2d(x=shots[0, 0], y=shots[0, 1],
+                H0, xedges, yedges = np.histogram2d(x=shots[0, 0],
+                                                    y=shots[0, 1],
                                                     bins=2*np.sqrt(nr_bins),
                                                     range=data_range_xy)
-                H1, xedges, yedges = np.histogram2d(x=shots[1, 0], y=shots[1, 1],
+                H1, xedges, yedges = np.histogram2d(x=shots[1, 0],
+                                                    y=shots[1, 1],
                                                     bins=2*np.sqrt(nr_bins),
                                                     range=data_range_xy)
                 binsize_x = xedges[1] - xedges[0]
@@ -141,44 +147,50 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                                                      data=H1,
                                                      x=bin_centers_x,
                                                      y=bin_centers_y)
+
+                    x2d=np.array([bin_centers_x]*len(bin_centers_y))
+                    y2d=np.array([bin_centers_y]*len(bin_centers_x)).transpose()
                     fitres0 = gauss2D_model_0.fit(data=H0,
-                                                  x=bin_centers_x,
-                                                  y=bin_centers_y,
+                                                  x=x2d,
+                                                  y=y2d,
                                                   **guess0)
                     fitres1 = gauss2D_model_1.fit(data=H1,
-                                                  x=bin_centers_x,
-                                                  y=bin_centers_y,
+                                                  x=x2d,
+                                                  y=y2d,
                                                   **guess1)
-                    #x0 = guess0['center_x'].value
-                    #x1 = guess1['center_x'].value
-                    #y0 = guess0['center_y'].value
-                    #y1 = guess1['center_y'].value
 
                     x0 = fitres0.best_values['center_x']
                     x1 = fitres1.best_values['center_x']
                     y0 = fitres0.best_values['center_y']
                     y1 = fitres1.best_values['center_y']
-                    self.proc_data_dict['IQ_pos'][i] = [[x0, y0], [x1, y1]]
+                    self.proc_data_dict['IQ_pos'][i] = [[x0, x1], [y0, y1]]
                     dx = x1 - x0
                     dy = y1 - y0
-                    angle = -np.arctan2(dy, dx)
+                    mid = [x0 + dx/2, y0 + dy/2]
+                    angle = -np.arctan2(dy, dx)-np.pi/2
+                else:
+                    mid = [0, 0]
 
                 if self.verbose:
                     ang_deg = (angle*180/np.pi)
-                    print('Mixing I/Q channels with %.3f degrees'%ang_deg)
+                    print('Mixing I/Q channels with %.3f degrees '%ang_deg +
+                          'around point (%.2f, %.2f)%s'%(mid[0], mid[1], unit) +
+                          ' to obtain effective voltage')
+
+                self.proc_data_dict['raw_offset'][i] = [*mid, angle]
                 # create matrix
                 rot_mat = [[+np.cos(angle), -np.sin(angle)],
                            [+np.sin(angle), +np.cos(angle)]]
                 # rotate data accordingly
-                eff_sh = np.dot(rot_mat[0], shots)
+                eff_sh = np.zeros(len(shots[0]), dtype=np.ndarray)
+                eff_sh[0] = np.dot(rot_mat[0], shots[0] - mid)
+                eff_sh[1] = np.dot(rot_mat[0], shots[1] - mid)
             else:
                 # If we have only one quadrature, use that (doh!)
-                print(shots[:, 0])
                 eff_sh = shots[:, 0]
 
-            self.proc_data_dict['shots_xlabel'][i] = self.raw_data_dict['value_names'][i][0]
-            self.proc_data_dict['shots_xunit'][i] = self.raw_data_dict['value_units'][i][0]
-            print(eff_sh.shape)
+            self.proc_data_dict['shots_xlabel'][i] = 'Effective integrated Voltage'#self.raw_data_dict['value_names'][i][0]
+            self.proc_data_dict['shots_xunit'][i] = unit
             self.proc_data_dict['eff_int_voltages'][i] = eff_sh
             self.proc_data_dict['nr_shots'][i] = len(eff_sh[0])
             sh_min = min(np.min(eff_sh[0]), np.min(eff_sh[1]))
@@ -194,7 +206,6 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             self.proc_data_dict['cumsum_x'][i] = [x0, x1]
             self.proc_data_dict['cumsum_y'][i] = [cumsum0, cumsum1]
 
-            print(x0, x1)
             all_x = np.unique(np.sort(np.concatenate((x0, x1))))
             md = self.options_dict.get('max_datapoints', 1000)
             if len(all_x) > md:
@@ -229,7 +240,10 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             opt_idx = np.argmax(F_vs_th)
             self.proc_data_dict['F_assignment_raw'][i] = F_vs_th[opt_idx]
             self.proc_data_dict['threshold_raw'][i] = all_x[opt_idx]
-            print('raw', all_x[opt_idx])
+            # TODO: calculate the SNR! This is BS
+            inf_area = np.sum(np.abs(necumsum0 - necumsum1))/len(necumsum0)
+            self.proc_data_dict['SNR_raw'][i] = inf_area#1/(inf_area*np.sqrt(2*np.pi))
+
 
     def prepare_fitting(self):
         self.fit_dicts = OrderedDict()
@@ -340,192 +354,218 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         # yscale to go from .5 to the current max as otherwise the fits
         # mess up the log plots.
         i = 0
-        x_label = self.proc_data_dict['shots_xlabel'][i]
-        x_unit = self.proc_data_dict['shots_xunit'][i]
+
+        # Did we load two voltage components (shall we do 2D plots?)
+        two_dim_data = len(self.proc_data_dict['all_channel_int_voltages'][i]) >= 2
+
+        eff_voltage_label = self.proc_data_dict['shots_xlabel'][i]
+        eff_voltage_unit = self.proc_data_dict['shots_xunit'][i]
+        x_volt_label = self.raw_data_dict['value_names'][i][0]
+        x_volt_unit = self.raw_data_dict['value_units'][i][0]
+        y_volt_label = self.raw_data_dict['value_names'][i][1]
+        y_volt_unit = self.raw_data_dict['value_units'][i][1]
+        z_hist_label = 'Counts'
+        label_0 = '|g> prepared'
+        label_1 = '|e> prepared'
+        title = ('\n' + self.timestamps[0] +
+                 self.raw_data_dict['measurementstring'][i])
+
 
         #### 1D histograms
         log_hist = self.options_dict.get('log_hist', False)
         bin_x = self.proc_data_dict['bin_edges'][i]
         bin_y = self.proc_data_dict['hist'][i]
-        self.plot_dicts['1D_histogram'] = {
+        self.plot_dicts['hist_0'] = {
+            'title': 'Binned Shot Counts' + title,
+            'ax_id' : '1D_histogram',
             'plotfn': self.plot_bar,
             'xvals': bin_x,
             'yvals': bin_y[0],
             'xwidth' : self.proc_data_dict['binsize'][i],
             'bar_kws': {'log': log_hist, 'alpha': .4, 'facecolor': 'C0',
                         'edgecolor': 'C0'},
-            'setlabel': 'Shots 0',
-            'xlabel': x_label,
-            'xunit': x_unit,
-            'ylabel': 'Counts',
-            'title': (self.timestamps[0] + ' \n' +
-                      self.raw_data_dict['measurementstring'][i])}
-
-        th_raw = self.proc_data_dict['threshold_raw'][i]
-        threshs = [th_raw,]
-        if self.do_fitting:
-            threshs.append(self.proc_data_dict['threshold_fit'])
-            threshs.append(self.proc_data_dict['threshold_discr'])
-        self.plot_dicts['v_lines_hist'] = {
-            'ax_id': '1D_histogram',
-            'plotfn': self.plot_vlines_auto,
-            'xdata': threshs,
-            'linestyles': ['--', '-.', ':'],
-            'labels': ['th_raw', 'th_fit', 'th_d'],
-            'colors': ['0.3', '0.5', '0.2'],
-            'do_legend': True,
+            'setlabel': label_0,
+            'xlabel': eff_voltage_label,
+            'xunit': eff_voltage_unit,
+            'ylabel': z_hist_label,
         }
-        self.plot_dicts['hist_1'] = {
-            'ax_id': '1D_histogram',
-            'plotfn': self.plot_bar,
-            'xvals': bin_x,
-            'yvals': bin_y[1],
-            'xwidth' : self.proc_data_dict['binsize'][i],
-            'bar_kws': {'log': log_hist, 'alpha': .3, 'facecolor': 'C3',
-                        'edgecolor': 'C3'},
-            'setlabel': 'Shots 1', 'do_legend': True,
-            'xlabel': x_label,
-            'xunit': x_unit,
-            'ylabel': 'Counts'}
-        self.plot_dicts['hist_1'] = {
-            'ax_id': '1D_histogram',
-            'plotfn': self.plot_bar,
-            'xvals': bin_x,
-            'yvals': bin_y[1],
-            'xwidth' : self.proc_data_dict['binsize'][i],
-            'bar_kws': {'log': log_hist, 'alpha': .3, 'facecolor': 'C3',
-                        'edgecolor': 'C3'},
-            'setlabel': 'Shots 1', 'do_legend': True,
-            'xlabel': x_label,
-            'xunit': x_unit,
-            'ylabel': 'Counts'}
 
+        self.plot_dicts['hist_1'] = {
+            'ax_id': '1D_histogram',
+            'plotfn': self.plot_bar,
+            'xvals': bin_x,
+            'yvals': bin_y[1],
+            'xwidth' : self.proc_data_dict['binsize'][i],
+            'bar_kws': {'log': log_hist, 'alpha': .3, 'facecolor': 'C3',
+                        'edgecolor': 'C3'},
+            'setlabel': label_1,
+            'do_legend': True,
+            'xlabel': eff_voltage_label,
+            'xunit': eff_voltage_unit,
+            'ylabel': z_hist_label,
+        }
 
         #### CDF
-        self.plot_dicts['v_lines_cdf'] = deepcopy(self.plot_dicts['v_lines_hist'])
-        self.plot_dicts['v_lines_cdf']['ax_id'] = 'cdf'
         cdf_xs = self.proc_data_dict['cumsum_x'][i]
         cdf_ys = self.proc_data_dict['cumsum_y'][i]
         cdf_ys[0] = cdf_ys[0]/np.max(cdf_ys[0])
         cdf_ys[1] = cdf_ys[1]/np.max(cdf_ys[1])
 
         self.plot_dicts['cdf_shots_0'] = {
+            'title': 'Culmulative Shot Counts' + title,
             'ax_id': 'cdf',
             'plotfn': self.plot_line,
             'xvals': cdf_xs[0],
             'yvals': cdf_ys[0],
-            'setlabel': 'CDF shots 0',
+            'setlabel': label_0,
             'line_kws': {'color': 'C0', 'alpha': 0.3},
             'marker': '',
-            'do_legend': True}
+            'xlabel': eff_voltage_label,
+            'xunit': eff_voltage_unit,
+            'ylabel': 'Culmulative Counts',
+            'do_legend': True,
+        }
         self.plot_dicts['cdf_shots_1'] = {
             'ax_id': 'cdf',
             'plotfn': self.plot_line,
             'xvals': cdf_xs[1],
             'yvals': cdf_ys[1],
-            'setlabel': 'CDF shots 0',
+            'setlabel': label_1,
             'line_kws': {'color': 'C3', 'alpha': 0.3},
             'marker': '',
-            'do_legend': True}
+            'xlabel': eff_voltage_label,
+            'xunit': eff_voltage_unit,
+            'ylabel': 'Culmulative Counts',
+            'do_legend': True,
+        }
+
+        ### Vlines for thresholds
+        th_raw = self.proc_data_dict['threshold_raw'][i]
+        threshs = [th_raw,]
+        if self.do_fitting:
+            threshs.append(self.proc_data_dict['threshold_fit'])
+            threshs.append(self.proc_data_dict['threshold_discr'])
+
+        for ax in ['1D_histogram', 'cdf']:
+            self.plot_dicts[ax+'_vlines_thresh'] = {
+                'ax_id': ax,
+                'plotfn': self.plot_vlines_auto,
+                'xdata': threshs,
+                'linestyles': ['--', '-.', ':'],
+                'labels': ['$th_{raw}$', '$th_{fit}$', '$th_{d}$'],
+                'colors': ['0.3', '0.5', '0.2'],
+                'do_legend': True,
+            }
 
         #### 2D Histograms
-        peak_marker_2D = {
-            'plotfn': self.plot_line,
-            'xvals': self.proc_data_dict['IQ_pos'][i][:][:][0],
-            'yvals': self.proc_data_dict['IQ_pos'][i][:][:][1],
-            'xlabel': x_label,
-            'xunit': x_unit,
-            'ylabel': x_label,
-            'yunit': x_unit,
-            'marker': 'x',
-            'linestyle': '',
-            'color': 'black',
-            #'line_kws': {'markersize': 1, 'color': 'black', 'alpha': 1},
-            'setlabel': 'Peaks',
-            'do_legend': True,
-        }
-        self.plot_dicts['2D_histogram_0'] = {
-             'ax_id': '2D_histogram_0',
-             'plotfn': self.plot_colorxy,
-             'xvals': self.proc_data_dict['2D_histogram_y'][i],
-             'yvals': self.proc_data_dict['2D_histogram_x'][i],
-             'zvals': self.proc_data_dict['2D_histogram_z'][i][0],
-             'xlabel': x_label,
-             'xunit': x_unit,
-             'ylabel': x_label,
-             'yunit': x_unit,
-             'zlabel': 'counts',
-             'zunit': '-',
-             'cmap': 'Blues',
-        }
-        dp = deepcopy(peak_marker_2D)
-        dp['ax_id'] = '2D_histogram_0'
-        self.plot_dicts['2D_histogram_0_marker'] = dp
-        self.plot_dicts['2D_histogram_1'] = {
-             'ax_id': '2D_histogram_1',
-             'plotfn': self.plot_colorxy,
-             'xvals': self.proc_data_dict['2D_histogram_y'][i],
-             'yvals': self.proc_data_dict['2D_histogram_x'][i],
-             'zvals': self.proc_data_dict['2D_histogram_z'][i][1],
-             'xlabel': x_label,
-             'xunit': x_unit,
-             'ylabel': x_label,
-             'yunit': x_unit,
-             'zlabel': 'counts',
-             'zunit': '-',
-             'cmap': 'Reds',
-        }
-        dp = deepcopy(peak_marker_2D)
-        dp['ax_id'] = '2D_histogram_1'
-        self.plot_dicts['2D_histogram_1_marker'] = dp
+        if two_dim_data:
+            iq_centers = self.proc_data_dict['IQ_pos'][i]
+            if iq_centers is not None:
+                peak_marker_2D = {
+                    'plotfn': self.plot_line,
+                    'xvals': iq_centers[0],
+                    'yvals': iq_centers[1],
+                    'xlabel': x_volt_label,
+                    'xunit': x_volt_unit,
+                    'ylabel': y_volt_label,
+                    'yunit': y_volt_unit,
+                    'marker': 'x',
+                    'linestyle': '',
+                    'color': 'black',
+                    #'line_kws': {'markersize': 1, 'color': 'black', 'alpha': 1},
+                    'setlabel': 'Peaks',
+                    'do_legend': True,
+                }
+            self.plot_dicts['2D_histogram_0'] = {
+                'title': 'Raw '+label_0+' Binned Shot Counts' + title,
+                'ax_id': '2D_histogram_0',
+                'plotfn': self.plot_colorxy,
+                'xvals': self.proc_data_dict['2D_histogram_y'][i],
+                'yvals': self.proc_data_dict['2D_histogram_x'][i],
+                'zvals': self.proc_data_dict['2D_histogram_z'][i][0],
+                'xlabel': x_volt_label,
+                'xunit': x_volt_unit,
+                'ylabel': y_volt_label,
+                'yunit': y_volt_unit,
+                'zlabel': z_hist_label,
+                'zunit': '-',
+                'cmap': 'Blues',
+            }
+            if iq_centers is not None:
+                dp = deepcopy(peak_marker_2D)
+                dp['ax_id'] = '2D_histogram_0'
+                self.plot_dicts['2D_histogram_0_marker'] = dp
+            self.plot_dicts['2D_histogram_1'] = {
+                'title': 'Raw '+label_1+' Binned Shot Counts' + title,
+                'ax_id': '2D_histogram_1',
+                'plotfn': self.plot_colorxy,
+                'xvals': self.proc_data_dict['2D_histogram_y'][i],
+                'yvals': self.proc_data_dict['2D_histogram_x'][i],
+                'zvals': self.proc_data_dict['2D_histogram_z'][i][1],
+                'xlabel': x_volt_label,
+                'xunit': x_volt_unit,
+                'ylabel': y_volt_label,
+                'yunit': y_volt_unit,
+                'zlabel': z_hist_label,
+                'zunit': '-',
+                'cmap': 'Reds',
+            }
+            if iq_centers is not None:
+                dp = deepcopy(peak_marker_2D)
+                dp['ax_id'] = '2D_histogram_1'
+                self.plot_dicts['2D_histogram_1_marker'] = dp
 
-        #### Scatter Shots
-        volts = self.proc_data_dict['all_channel_int_voltages'][i]
-        vxr = [np.min([np.min(a) for a in volts[:][0]]),
-               np.max([np.max(a) for a in volts[:][0]])]
-        vyr = [np.min([np.min(a) for a in volts[:][1]]),
-               np.max([np.max(a) for a in volts[:][1]])]
-        self.plot_dicts['2D_shots_0'] = {
-            'ax_id': '2D_shots',
-            'plotfn': self.plot_line,
-            'xvals': volts[0][0],
-            'yvals': volts[0][1],
-            'range': [vxr, vyr],
-            'xrange': vxr,
-            'yrange': vyr,
-            'xlabel': x_label,
-            'xunit': x_unit,
-            'ylabel': x_label,
-            'yunit': x_unit,
-            'marker': 'o',
-            'linestyle': '',
-            'color': 'C0',
-            'line_kws': {'markersize': 0.3, 'color': 'C0', 'alpha': 0.5},
-            'setlabel': 'Shots 0',
-            'do_legend': True,
-        }
-        self.plot_dicts['2D_shots_1'] = {
-            'ax_id': '2D_shots',
-            'plotfn': self.plot_line,
-            'xvals': volts[1][0],
-            'yvals': volts[1][1],
-            'range': [vxr, vyr],
-            'xrange': vxr,
-            'yrange': vyr,
-            'xlabel': x_label,
-            'xunit': x_unit,
-            'ylabel': x_label,
-            'yunit': x_unit,
-            'marker': 'o',
-            'linestyle': '',
-            'color': 'C3',
-            'line_kws': {'markersize': 0.3, 'color': 'C3', 'alpha': 0.5},
-            'setlabel': 'Shots 1',
-            'do_legend': True,
-        }
-        dp = deepcopy(peak_marker_2D)
-        dp['ax_id'] = '2D_shots'
-        self.plot_dicts['2D_shots_marker'] = dp
+            #### Scatter Shots
+            volts = self.proc_data_dict['all_channel_int_voltages'][i]
+            vxr = [np.min([np.min(a) for a in volts[:][0]]),
+                   np.max([np.max(a) for a in volts[:][0]])]
+            vyr = [np.min([np.min(a) for a in volts[:][1]]),
+                   np.max([np.max(a) for a in volts[:][1]])]
+            self.plot_dicts['2D_shots_0'] = {
+                'title': 'Raw Shots' + title,
+                'ax_id': '2D_shots',
+                'plotfn': self.plot_line,
+                'xvals': volts[0][1],
+                'yvals': volts[0][0],
+                'range': [vxr, vyr],
+                'xrange': vxr,
+                'yrange': vyr,
+                'xlabel': x_volt_label,
+                'xunit': x_volt_unit,
+                'ylabel': y_volt_label,
+                'yunit': y_volt_unit,
+                'zlabel': z_hist_label,
+                'marker': 'o',
+                'linestyle': '',
+                'color': 'C0',
+                'line_kws': {'markersize': 0.3, 'color': 'C0', 'alpha': 0.5},
+                'setlabel': label_0,
+                'do_legend': True,
+            }
+            self.plot_dicts['2D_shots_1'] = {
+                'ax_id': '2D_shots',
+                'plotfn': self.plot_line,
+                'xvals': volts[1][1],
+                'yvals': volts[1][0],
+                'range': [vxr, vyr],
+                'xrange': vxr,
+                'yrange': vyr,
+                'xlabel': x_volt_label,
+                'xunit': x_volt_unit,
+                'ylabel': y_volt_label,
+                'yunit': y_volt_unit,
+                'zlabel': z_hist_label,
+                'marker': 'o',
+                'linestyle': '',
+                'color': 'C3',
+                'line_kws': {'markersize': 0.3, 'color': 'C3', 'alpha': 0.5},
+                'setlabel': label_1,
+                'do_legend': True,
+            }
+            if iq_centers is not None:
+                dp = deepcopy(peak_marker_2D)
+                dp['ax_id'] = '2D_shots'
+                self.plot_dicts['2D_shots_marker'] = dp
 
         # todo: add line for diff. threshold
 
@@ -541,30 +581,33 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 'plotfn': self.plot_line,
                 'xvals': x,
                 'yvals': ro_g[0],
-                'setlabel': 'Fit shots 0',
+                'setlabel': 'Fit '+label_0,
                 'line_kws': {'color': 'C0'},
                 'marker': '',
-                'do_legend': True}
+                'do_legend': True,
+            }
             self.plot_dicts['new_fit_shots_1'] = {
                 'ax_id': '1D_histogram',
                 'plotfn': self.plot_line,
                 'xvals': x,
                 'yvals': ro_g[1],
                 'marker': '',
-                'setlabel': 'Fit shots 1',
+                'setlabel': 'Fit '+label_1,
                 'line_kws': {'color': 'C3'},
-                'do_legend': True}
+                'do_legend': True,
+            }
 
             self.plot_dicts['cdf_fit_shots_0'] = {
                 'ax_id': 'cdf',
                 'plotfn': self.plot_line,
                 'xvals': x,
                 'yvals': self._CDF_0(x),
-                'setlabel': 'Fit shots 0',
+                'setlabel': 'Fit '+label_0,
                 'line_kws': {'color': 'C0', 'alpha': 1},
                 'linestyle': '--',
                 'marker': '',
-                'do_legend': True}
+                'do_legend': True,
+            }
             self.plot_dicts['cdf_fit_shots_1'] = {
                 'ax_id': 'cdf',
                 'plotfn': self.plot_line,
@@ -572,9 +615,10 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 'yvals': self._CDF_1(x),
                 'marker': '',
                 'linestyle': '--',
-                'setlabel': 'Fit shots 1',
+                'setlabel': 'Fit '+label_1,
                 'line_kws': {'color': 'C3', 'alpha': 1},
-                'do_legend': True}
+                'do_legend': True,
+            }
 
 
         ###########################################
@@ -582,72 +626,63 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         ###########################################
 
         if not self.presentation_mode:
+            fit_text = 'Thresholds:'
+            fit_text += '\nName | Level | Fidelity'
             thr, th_unit = SI_val_to_msg_str(
                 self.proc_data_dict['threshold_raw'][i],
-                x_unit, return_type=float)
-
+                eff_voltage_unit, return_type=float)
             raw_th_msg = (
-                'Raw threshold: {:.2f} {}\n'.format(
-                    thr, th_unit) +
-                r'$F_{A}$-raw: ' +
-                r'{:.3f}'.format(
-                    self.proc_data_dict['F_assignment_raw'][i]))
+                '\n>raw   | ' +
+                '{:.2f} {} | '.format(thr, th_unit) +
+                '{:.1f}%'.format(
+                    self.proc_data_dict['F_assignment_raw'][i]*100))
+
+            fit_text += raw_th_msg
+
             if self.do_fitting:
                 thr, th_unit = SI_val_to_msg_str(
-                    self.proc_data_dict['threshold_fit'],
-                    self.proc_data_dict['shots_xunit'], return_type=float)
+                    self.proc_data_dict['threshold_fit'][i],
+                    eff_voltage_unit, return_type=float)
                 fit_th_msg = (
-                    'Fit threshold: {:.2f} {}\n'.format(
-                        thr, th_unit) +
-                    r'$F_{A}$-fit: ' +
-                    r'{:.3f}'.format(self.proc_data_dict['F_assignment_fit']))
-
-                self.plot_dicts['fit_threshold'] = {
-                    'ax_id': '1D_histogram',
-                    'plotfn': self.plot_vlines,
-                    'x': self.proc_data_dict['threshold_fit'],
-                    'ymin': 0,
-                    'ymax': max_cnts*1.05,
-                    'colors': '.4',
-                    'linestyles': 'dotted',
-                    'line_kws': {'linewidth': .8},
-                    'setlabel': fit_th_msg,
-                    'do_legend': True}
+                    '\n>fit     | ' +
+                    '{:.2f} {} | '.format(thr, th_unit) +
+                    '{:.1f}%'.format(
+                        self.proc_data_dict['F_assignment_fit'][i]*100))
+                fit_text += fit_th_msg
 
                 thr, th_unit = SI_val_to_msg_str(
-                    self.proc_data_dict['threshold_discr'],
-                    self.proc_data_dict['shots_xunit'], return_type=float)
+                    self.proc_data_dict['threshold_discr'][i],
+                    eff_voltage_unit, return_type=float)
                 fit_th_msg = (
-                    'Discr. threshold: {:.2f} {}\n'.format(
-                        thr, th_unit) +
-                    r'$F_{D}$: ' +
-                    ' {:.3f}'.format(self.proc_data_dict['F_discr']))
-                self.plot_dicts['discr_threshold'] = {
-                    'ax_id': '1D_histogram',
-                    'plotfn': self.plot_vlines,
-                    'x': self.proc_data_dict['threshold_discr'],
-                    'ymin': 0,
-                    'ymax': max_cnts*1.05,
-                    'colors': '.3',
-                    'linestyles': '-.',
-                    'line_kws': {'linewidth': .8},
-                    'setlabel': fit_th_msg,
-                    'do_legend': True}
+                    '\n>dis    | ' +
+                    '{:.2f} {} | '.format(thr, th_unit) +
+                    '{:.1f}%'.format(
+                        self.proc_data_dict['F_discr'][i]*100))
+                fit_text += fit_th_msg
+            fit_text += '\nSNR (raw) = {:.2f}'.format(self.proc_data_dict['SNR_raw'][i])
 
-                # To add text only to the legend I create some "fake" data
-                rel_exc_str = ('Mmt. Ind. Rel.: {:.1f}%\n'.format(
-                    self.proc_data_dict['measurement_induced_relaxation']*100) +
-                    'Residual Exc.: {:.1f}%'.format(
-                        self.proc_data_dict['residual_excitation']*100))
-                self.plot_dicts['rel_exc_msg'] = {
-                    'ax_id': '1D_histogram',
-                    'plotfn': self.plot_line,
-                    'xvals': [self.proc_data_dict['threshold_discr']],
-                    'yvals': [max_cnts/2],
-                    'line_kws': {'alpha': 0},
-                    'setlabel': rel_exc_str,
-                    'do_legend': True}
+            fr = self.fit_res['shots_all_%d'%i]
+            bv = fr.best_values
+            fit_text += '\n\nSpurious Excitations:\n'
+            fit_text += '$p(e|0) = {:.3f}$% \n'.format(bv['B_spurious']*100)
+            fit_text += '$p(g|\\pi) = {:.3f}$% \n'.format(bv['A_spurious']*100)
 
+            if two_dim_data:
+                offs = self.proc_data_dict['raw_offset'][i]
+                fit_text += '\nOffset from raw:\n'
+                fit_text += '({:.3f},{:.3f}) {},\n'.format(offs[0], offs[1], eff_voltage_unit)
+                fit_text += 'rotated by ${:.1f}^\\circ$ \n'.format(offs[2]*180/np.pi)
+
+            for ax in ['cdf', '1D_histogram']:
+                self.plot_dicts['text_msg_' + ax] = {
+                        'ax_id': ax,
+                        # 'ypos': 0.15,
+                        'xpos' : 1.05,
+                        'horizontalalignment' : 'left',
+                        'plotfn': self.plot_text,
+                        'box_props': 'fancy',
+                        'text_string': fit_text,
+                    }
 
 class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
     """
@@ -713,7 +748,6 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['ch_names'] = self.raw_data_dict['value_names'][0]
 
         for ch_name, shots in self.raw_data_dict['measured_values_ord_dict'].items():
-            # print(ch_name)
             self.proc_data_dict[ch_name] = shots[0]  # only 1 dataset
             self.proc_data_dict[ch_name +
                                 ' all'] = self.proc_data_dict[ch_name]

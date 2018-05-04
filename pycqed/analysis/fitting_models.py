@@ -404,9 +404,9 @@ def gaussian_2D(x, y, amplitude=1,
     A 2D gaussian function. if you want to use this for fitting you need to
     flatten your data first.
     '''
-    gaus = lmfit.lineshapes.gaussian
-    val = (gaus(x, amplitude, center_x, sigma_x) *
-           gaus(y, amplitude, center_y, sigma_y))
+    gauss = lmfit.lineshapes.gaussian
+    val = (gauss(x, amplitude, center_x, sigma_x) *
+           gauss(y, amplitude, center_y, sigma_y))
     return val
 
 
@@ -762,18 +762,25 @@ def gauss_2D_guess(model, data, x, y):
 
     Note: possibly not compatible if the model uses prefixes.
     '''
-    amp = np.sqrt(np.sum(data))
+    dx = x[1:]-x[:-1]
+    dy = y[1:]-y[:-1]
+    sums = np.sum(((data[:-1,:-1]*dx).transpose()*dy))
+    amp = np.sqrt(sums)
     data_grid = data.reshape(-1, len(np.unique(x)))
     x_proj_data = np.mean(data_grid, axis=0)
     y_proj_data = np.mean(data_grid, axis=1)
-
-    x_guess = lmfit.models.GaussianModel().guess(x_proj_data, np.unique(x))
-    y_guess = lmfit.models.GaussianModel().guess(y_proj_data, np.unique(y))
-    model.set_param_hint('amplitude', value=amp, vary=False)
+    x.sort()
+    y.sort()
+    x_guess = lmfit.models.GaussianModel().guess(data=x_proj_data, x=np.unique(x))
+    y_guess = lmfit.models.GaussianModel().guess(data=y_proj_data, x=np.unique(y))
+    model.set_param_hint('amplitude', value=amp, min=0.9*amp, max=1.1*amp,
+                         vary=True)
+    model.set_param_hint('sigma_x', value=x_guess['sigma'].value, min=0,
+                         vary=True)
+    model.set_param_hint('sigma_y', value=y_guess['sigma'].value, min=0,
+                         vary=True)
     params = model.make_params(center_x=x_guess['center'].value,
-                               center_y=y_guess['center'].value,
-                               sigma_x=x_guess['sigma'].value,
-                               sigma_y=y_guess['sigma'].value)
+                               center_y=y_guess['center'].value,)
     return params
 
 
@@ -784,7 +791,6 @@ def double_gauss_2D_guess(model, data, x, y):
 
     Assumptions on input data
         * input is a flattened version of a 2D grid.
-        * total surface under the gaussians sums up to 1.
     Note: possibly not compatible if the model uses prefixes.
     Note 2: see also gauss_2D_guess() for some notes on how to improve this
             function.
