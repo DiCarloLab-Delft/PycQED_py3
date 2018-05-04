@@ -954,7 +954,6 @@ class OptimizationAnalysis(MeasurementAnalysis):
                 ['MC'].attrs['optimization_method']
         except:
             optimization_method = 'Numerical'
-
         for i, meas_vals in enumerate(self.measured_values):
             if (not plot_all) & (i >= 1):
                 break

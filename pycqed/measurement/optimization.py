@@ -2,6 +2,7 @@ import copy
 import numpy as np
 from sklearn.model_selection import GridSearchCV as gcv
 from sklearn.neural_network import MLPRegressor as mlpr
+from scipy.optimize import fmin
 
 def nelder_mead(fun, x0,
                 initial_step=0.1,
@@ -240,7 +241,7 @@ def SPSA(fun, x0,
 
 
 def neural_network_opt(fun,training_grid, hidden_layer_sizes = [(5,)],
-                   alphas= 0.0001, solver='adam'):
+                   alphas= 0.0001, solver='lbfgs'):
     """
     parameters:
         fun: Function to be optimized. So far this is only an optimization for
@@ -274,20 +275,36 @@ def neural_network_opt(fun,training_grid, hidden_layer_sizes = [(5,)],
         alphas = [alphas]
     #transform input into array
     training_grid = np.array(training_grid)
-
     #get input dimension, training grid contains parameters as column vectors
     inputsize = np.size(training_grid,1)
     datasize = np.size(training_grid,0)
-
     #Acquire first data point for output dim information of fun()
     fun_val = fun(training_grid[0,:])
     output_dim = len(fun_val)
     target_values = np.zeros((datasize,output_dim))
     target_values[0,:] = fun_val
-
     #consequetly, start iteration at 2nd input value
-    for iter in range(1,datasize):
-        target_values[iter,:] = fun(training_grid[iter,:])
+    for it in range(1,datasize):
+        target_values[it,:] = fun(training_grid[it,:])
+
+    #Preprocessing of Data. Mainly transform the data to mean 0 and interval [0,1]
+    input_feature_means = np.zeros(inputsize)       #saving means of training
+    output_feature_means = np.zeros(output_dim)     #and target features
+    input_feature_ext= np.zeros(inputsize)
+    output_feature_ext = np.zeros(output_dim)
+
+    for it in range(inputsize):
+        input_feature_means[it]= np.mean(training_grid[:,it])
+        input_feature_ext[it] = np.max(training_grid[:,it])\
+                                -np.min(training_grid[:,it])
+        training_grid[:,it] -= input_feature_means[it]  #offset to mean 0
+        training_grid[:,it] /= input_feature_ext[it]    #rescale to [-1,1]
+    for it in range(output_dim):
+        output_feature_means[it]= np.mean(target_values[:,it])
+        output_feature_ext[it] = np.max(target_values[:,it])\
+                                 -np.min(target_values[:,it])
+        target_values[:,it] -= output_feature_means[it] #offset to mean 0
+        target_values[:,it] /= output_feature_ext[it]   #rescale to [-1,1]
 
     ##################################################################
     ### initialize grid search cross val with hyperparameter dict. ###
@@ -299,9 +316,9 @@ def neural_network_opt(fun,training_grid, hidden_layer_sizes = [(5,)],
                       'activation':['relu']}
     #initilize the neural network. the scikit learn method MLPRegressor uses a
     #squared loss as a loss function and 'adam' as solver.
-    nn = mlpr()
+    nn = mlpr(solver='lbfgs')
     gridCV = gcv(nn,parameter_dict,cv=5)
-    gridCV.fit(training_grid,target_values)
+    gridCV.fit(training_grid,target_values.ravel())
     score = gridCV.best_score_
     bestParams = gridCV.best_params_
     print("Best parameters: "+str(bestParams))
@@ -311,15 +328,46 @@ def neural_network_opt(fun,training_grid, hidden_layer_sizes = [(5,)],
     ###     perform gradient descent to minimize modeled landscape  ###
     ###################################################################
 
-    h = []
-    for iter in range(inputsize):
-        feature = training_grid[:,iter]
-        #select the grid size for every feature as 5% of the average distance
-        # between traning points. (Could be adaptive)
-        h.append(1e-6*(max(feature)-min(feature))/datasize)
-    x_ini = [np.mean(training_grid[:,0]),np.mean(training_grid[:,1])]
+    x_ini = np.zeros(inputsize)
 
-    return gradient_descent(gridCV.predict,x_ini,h)[0]
+    estimator_wrapper = lambda X: gridCV.predict([X])
+
+    res = fmin(estimator_wrapper, x_ini, full_output=True)
+    result = res[0]
+    #Rescale values
+    amp = res[1] * output_feature_ext + output_feature_means
+    result[0] = result[0]*input_feature_ext[0]+input_feature_means[0]
+    result[1] = result[1]*input_feature_ext[1]+input_feature_means[1]
+    print('minimization results: ',result,'::',amp)
+
+    ## testing plots
+#     x_mesh = np.linspace(-1.,1,200)
+#     y_mesh = np.linspace(-1.,1.,200)
+#     Xm,Ym = np.meshgrid(x_mesh,y_mesh)
+#     Zm = np.zeros_like(Xm)
+#     for k in range(np.size(x_mesh)):
+#         for l in range(np.size(y_mesh)):
+#             Zm[k,l] = gridCV.predict([[Xm[k,l],Ym[k,l]]])
+#     Zm = Zm*output_feature_ext + output_feature_means
+#     Xm = Xm*input_feature_ext[0] +input_feature_means[0]
+#     Ym = Ym*input_feature_ext[1] +input_feature_means[1]
+#     import matplotlib.pyplot as plt
+#     plt.figure()
+#     levels = np.linspace(0,0.06,30)
+#     CP = plt.contourf(Xm,Ym,Zm,levels,extend='both')
+#     plt.plot(result[0],result[1],'co',label='network minimum')
+#     plt.tick_params(axis='both',which='minor',labelsize=14)
+#     plt.ylabel('ch2 offset [V]',fontsize=20)
+#     plt.xlabel('ch1 offset [V]',fontsize=20)
+# #    plt.xlim(-0.2,3)
+#     cbar = plt.colorbar(CP)
+#     cbar.ax.set_ylabel('Magnitude [V]',fontsize=20)
+#     plt.show()
+
+    final_score = fun(np.array(result))
+
+    return [np.array(result), np.array(final_score,dtype='float32')]
+    # return [np.array(result), np.array(amp,dtype='float32')]
     #mght want to adapt alpha,ect.i
 
 

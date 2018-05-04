@@ -1520,15 +1520,17 @@ class QuDev_transmon(Qubit):
               trigger_sep, 0, self.RO_acq_marker_channel(),
               self.pulse_I_channel(), self.pulse_Q_channel())
         detector = self.int_avg_det_spec
-        meas_grid = [x0[0]+np.random.normal(0.,0.1,100),
-                     x0[1]+np.random.normal(0.,0.1,100)]
+        meas_grid = [x0[0]+np.random.normal(0.0,0.02,100),
+                     x0[1]+np.random.normal(0.0,0.02,100)]
         meas_grid = list(map(list, zip(*meas_grid)))
         ad_func_pars = {'adaptive_function': opti.neural_network_opt,
                         'training_grid': meas_grid,
-                        'hidden_layer_sizes': [(h, h, h, h, h) for h in range(2,16,2)],
+                        'hidden_layer_sizes': [(h, h) for h in range(30,50,5)],
+                        'alphas': np.logspace(-6,-4,5).tolist(),
                         'minimize': True,
                         #Probably some additional params for the NN go here
                         }
+
         chI_par = self.AWG.parameters['{}_offset'.format(
             self.pulse_I_channel())]
         chQ_par = self.AWG.parameters['{}_offset'.format(
@@ -1656,7 +1658,7 @@ class QuDev_transmon(Qubit):
             self.UHFQC, qc.station, [self.RO_acq_weight_function_I(),
                                      self.RO_acq_weight_function_Q()],
             self.pulse_I_channel(), self.pulse_Q_channel(),
-            self.alpha, self.phali_skew, self.f_pulse_mod(),
+            self.alpha, self.phi_skew, self.f_pulse_mod(),
             self.RO_acq_marker_channel(),
             amplitude=amplitude, nr_averages=self.RO_acq_averages(),
             RO_trigger_separation=trigger_sep, verbose=False)
@@ -1675,7 +1677,8 @@ class QuDev_transmon(Qubit):
         meas_grid = list(map(list, zip(*meas_grid)))
         ad_func_pars = {'adaptive_function': opti.neural_network_opt,
                         'training_grid': meas_grid,
-                        'hidden_layer_sizes': [(h, h, h, h, h) for h in range(2,10,2)],
+                        'hidden_layer_sizes': [(h, h) for h in range(35,50,5)],
+                        'alphas': np.logspace(-6,-4,3).tolist(),
                         'minimize': True,
                         #Probably some additional params for the NN go here
                         }
