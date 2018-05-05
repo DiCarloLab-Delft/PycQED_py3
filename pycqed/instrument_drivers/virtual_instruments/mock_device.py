@@ -50,6 +50,8 @@ class Mock_Device(Instrument):
                            parameter_class=ManualParameter)
 
         self.add_parameter('acq_type', initial_value='magn_phase',
+                           vals=Enum('real_imag',
+                                          'magn_phase', 'magn'),
                            parameter_class=ManualParameter)
 
         self.add_parameter('cw_noise_level', initial_value=0,
