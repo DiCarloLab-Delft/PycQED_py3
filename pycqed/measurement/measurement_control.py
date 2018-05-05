@@ -19,6 +19,10 @@ from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
 from qcodes.plots.colors import color_cycle
 
+# Used for adaptive sampling
+from adaptive.learner import BaseLearner
+from adaptive import runner
+# from adaptive import BlockingRunner
 
 try:
     import msvcrt  # used on windows to catch keyboard input
@@ -269,7 +273,18 @@ class MeasurementControl(Instrument):
 
         if self.adaptive_function == 'Powell':
             self.adaptive_function = fmin_powell
-        if (isinstance(self.adaptive_function, types.FunctionType) or
+        if issubclass(self.adaptive_function, BaseLearner):
+            Learner = self.adaptive_function
+            self.learner = Learner(self.measurement_function,
+                                   bounds=self.af_pars['bounds'])
+            # N.B. the runner that is used is not an `adaptive.Runner` object
+            # rather it is the `adaptive.runner.simple` function. This
+            # ensures that everything runs in a single process, as is
+            # required by QCoDeS (May 2018) and makes things simpler.
+            self.runner = runner.simple(learner=self.learner,
+                                        goal=self.af_pars['goal'])
+
+        elif (isinstance(self.adaptive_function, types.FunctionType) or
                 isinstance(self.adaptive_function, np.ufunc)):
             try:
                 # exists so it is possible to extract the result
@@ -279,11 +294,11 @@ class MeasurementControl(Instrument):
                                            **self.af_pars)
             except StopIteration:
                 print('Reached f_termination: %s' % (self.f_termination))
+            self.save_optimization_results(self.adaptive_function,
+                                           result=self.adaptive_result)
         else:
             raise Exception('optimization function: "%s" not recognized'
                             % self.adaptive_function)
-        self.save_optimization_results(self.adaptive_function,
-                                       result=self.adaptive_result)
 
         for sweep_function in self.sweep_functions:
             sweep_function.finish()
