@@ -13,6 +13,7 @@ import lmfit
 from collections import OrderedDict
 import numpy as np
 import pycqed.analysis.fitting_models as fit_mods
+from pycqed.analysis.fitting_models import ro_gauss, ro_CDF, ro_CDF_discr, gaussian_2D, gauss_2D_guess, gaussianCDF, ro_double_gauss_guess
 import pycqed.analysis.analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
 from scipy.optimize import minimize
@@ -67,6 +68,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['cumsum_y'] = [None] * nr_expts
         self.proc_data_dict['cumsum_x_ds'] = [None] * nr_expts
         self.proc_data_dict['cumsum_y_ds'] = [None] * nr_expts
+        self.proc_data_dict['cumsum_y_ds_n'] = [None] * nr_expts
         self.proc_data_dict['hist'] = [None] * nr_expts
         self.proc_data_dict['bin_centers'] = [None] * nr_expts
         self.proc_data_dict['bin_edges'] = [None] * nr_expts
@@ -81,7 +83,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['2D_histogram_z'] = [None] * nr_expts
         self.proc_data_dict['IQ_pos'] = [None] * nr_expts
         self.proc_data_dict['raw_offset'] = [None] * nr_expts
-        self.proc_data_dict['SNR_raw'] = [None] * nr_expts
+        self.proc_data_dict['SNR'] = [None] * nr_expts
 
         ######################################################
         #  Separating data into shots for 0 and shots for 1  #
@@ -135,15 +137,15 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                     ##########################################
                     #  Determining the rotation of the data  #
                     ##########################################
-                    gauss2D_model_0 = lmfit.Model(fit_mods.gaussian_2D,
+                    gauss2D_model_0 = lmfit.Model(gaussian_2D,
                                                   independent_vars=['x', 'y'])
-                    gauss2D_model_1 = lmfit.Model(fit_mods.gaussian_2D,
+                    gauss2D_model_1 = lmfit.Model(gaussian_2D,
                                                   independent_vars=['x', 'y'])
-                    guess0 = fit_mods.gauss_2D_guess(model=gauss2D_model_0,
+                    guess0 = gauss_2D_guess(model=gauss2D_model_0,
                                                      data=H0,
                                                      x=bin_centers_x,
                                                      y=bin_centers_y)
-                    guess1 = fit_mods.gauss_2D_guess(model=gauss2D_model_1,
+                    guess1 = gauss_2D_guess(model=gauss2D_model_1,
                                                      data=H1,
                                                      x=bin_centers_x,
                                                      y=bin_centers_y)
@@ -174,8 +176,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 if self.verbose:
                     ang_deg = (angle*180/np.pi)
                     print('Mixing I/Q channels with %.3f degrees '%ang_deg +
-                          'around point (%.2f, %.2f)%s'%(mid[0], mid[1], unit) +
-                          ' to obtain effective voltage')
+                          #'around point (%.2f, %.2f)%s'%(mid[0], mid[1], unit) +
+                          ' to obtain effective voltage.')
 
                 self.proc_data_dict['raw_offset'][i] = [*mid, angle]
                 # create matrix
@@ -183,8 +185,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                            [+np.sin(angle), +np.cos(angle)]]
                 # rotate data accordingly
                 eff_sh = np.zeros(len(shots[0]), dtype=np.ndarray)
-                eff_sh[0] = np.dot(rot_mat[0], shots[0] - mid)
-                eff_sh[1] = np.dot(rot_mat[0], shots[1] - mid)
+                eff_sh[0] = np.dot(rot_mat[0], shots[0])# - mid
+                eff_sh[1] = np.dot(rot_mat[0], shots[1])# - mid
             else:
                 # If we have only one quadrature, use that (doh!)
                 eff_sh = shots[:, 0]
@@ -192,7 +194,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             self.proc_data_dict['shots_xlabel'][i] = 'Effective integrated Voltage'#self.raw_data_dict['value_names'][i][0]
             self.proc_data_dict['shots_xunit'][i] = unit
             self.proc_data_dict['eff_int_voltages'][i] = eff_sh
-            self.proc_data_dict['nr_shots'][i] = len(eff_sh[0])
+            self.proc_data_dict['nr_shots'][i] = [len(eff_sh[0]), len(eff_sh[1])]
             sh_min = min(np.min(eff_sh[0]), np.min(eff_sh[1]))
             sh_max = max(np.max(eff_sh[0]), np.max(eff_sh[1]))
             data_range = (sh_min, sh_max)
@@ -217,6 +219,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
             self.proc_data_dict['cumsum_x_ds'][i] = all_x
             self.proc_data_dict['cumsum_y_ds'][i] = [ecumsum0, ecumsum1]
+            self.proc_data_dict['cumsum_y_ds_n'][i] = [necumsum0, necumsum1]
 
             ##################################
             #  Binning data into histograms  #
@@ -240,9 +243,6 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             opt_idx = np.argmax(F_vs_th)
             self.proc_data_dict['F_assignment_raw'][i] = F_vs_th[opt_idx]
             self.proc_data_dict['threshold_raw'][i] = all_x[opt_idx]
-            # TODO: calculate the SNR! This is BS
-            inf_area = np.sum(np.abs(necumsum0 - necumsum1))/len(necumsum0)
-            self.proc_data_dict['SNR_raw'][i] = inf_area#1/(inf_area*np.sqrt(2*np.pi))
 
 
     def prepare_fitting(self):
@@ -256,23 +256,41 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
         for i in range(nr_expts):
             bin_x = self.proc_data_dict['bin_centers'][i]
+            bin_xs = [bin_x, bin_x]
             bin_ys = self.proc_data_dict['hist'][i]
             m = lmfit.model.Model(ro_gauss)
-            m.guess = fit_mods.double_gauss_guess_2.__get__(m, m.__class__)
-            #params = m.guess()
-            #res = m.fit(x, ro_g, **params)
-            #m_cul = lmfit.model.Model(ro_gauss_cul)
+            m.guess = ro_double_gauss_guess.__get__(m, m.__class__)
+            params = m.guess(x=bin_xs, data=bin_ys,
+                             fixed_p01=self.options_dict.get('fixed_p01', False),
+                             fixed_p10=self.options_dict.get('fixed_p10', False))
+            res = m.fit(x=bin_xs, data=bin_ys, params=params)
 
-
-            self.fit_dicts['shots_all_%d'%i] = {
+            self.fit_dicts['shots_all_hist_%d'%i] = {
                 'model': m,
-                'fit_xvals': {'x': [bin_x, bin_x]},
+                'fit_xvals': {'x': bin_xs},
                 'fit_yvals': {'data': bin_ys},
                 'guessfn_pars': {'fixed_p01': self.options_dict.get('fixed_p01', False),
                                  'fixed_p10': self.options_dict.get('fixed_p10', False)},
             }
-            cdf_xs = self.proc_data_dict['cumsum_x'][i]
-            cdf_ys = self.proc_data_dict['cumsum_y'][i]
+
+            m_cul = lmfit.model.Model(ro_CDF)
+            cdf_xs = self.proc_data_dict['cumsum_x_ds'][i]
+            cdf_xs = [np.array(cdf_xs), np.array(cdf_xs)]
+            cdf_ys = self.proc_data_dict['cumsum_y_ds'][i]
+            cdf_ys = [np.array(cdf_ys[0]), np.array(cdf_ys[1])]
+            #cul_res = m_cul.fit(x=cdf_xs, data=cdf_ys, params=res.params)
+            cum_params = res.params
+            cum_params['A_amplitude'].value = np.max(cdf_ys[0])
+            cum_params['A_amplitude'].vary = False
+            cum_params['B_amplitude'].value = np.max(cdf_ys[1])
+            cum_params['A_amplitude'].vary = False
+            self.fit_dicts['shots_all_%d'%i] = {
+                'model': m_cul,
+                'fit_xvals': {'x': cdf_xs},
+                'fit_yvals': {'data': cdf_ys},
+                'guess_pars': cum_params,
+            }
+
 
     def analyze_fit_results(self):
         #nr_expts = self.raw_data_dict['nr_experiments']
@@ -321,17 +339,17 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         ###########################################
 
         def CDF_0_discr(x):
-            return fit_mods.gaussianCDF(x, amplitude=1,
+            return gaussianCDF(x, amplitude=1,
                                         mu=bv['A_center'], sigma=bv['A_sigma'])
 
         def CDF_1_discr(x):
-            return fit_mods.gaussianCDF(x, amplitude=1,
+            return gaussianCDF(x, amplitude=1,
                                         mu=bv['B_center'], sigma=bv['B_sigma'])
 
         def disc_infid_vs_th(x):
-            cdf0 = fit_mods.gaussianCDF(x, amplitude=1, mu=bv['A_center'],
+            cdf0 = gaussianCDF(x, amplitude=1, mu=bv['A_center'],
                                         sigma=bv['A_sigma'])
-            cdf1 = fit_mods.gaussianCDF(x, amplitude=1, mu=bv['B_center'],
+            cdf1 = gaussianCDF(x, amplitude=1, mu=bv['B_center'],
                                         sigma=bv['B_sigma'])
             return (1-np.abs(cdf0 - cdf1))/2
 
@@ -349,6 +367,12 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
         self.proc_data_dict['threshold_discr'][i] = opt_fid_discr['x'][0]
 
+
+        # calculating the signal-to-noise ratio
+        signal = abs(bvn['A_center'] - bvn['B_center'])
+        noise = (bvn['A_sigma'] + bvn['B_sigma']) / 2
+        self.proc_data_dict['SNR'][i] = signal / noise
+
     def prepare_plots(self):
         # N.B. If the log option is used we should manually set the
         # yscale to go from .5 to the current max as otherwise the fits
@@ -365,8 +389,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         y_volt_label = self.raw_data_dict['value_names'][i][1]
         y_volt_unit = self.raw_data_dict['value_units'][i][1]
         z_hist_label = 'Counts'
-        label_0 = '|g> prepared'
-        label_1 = '|e> prepared'
+        label_0 = '|g> prep.'
+        label_1 = '|e> prep.'
         title = ('\n' + self.timestamps[0] +
                  self.raw_data_dict['measurementstring'][i])
 
@@ -412,7 +436,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         cdf_ys[1] = cdf_ys[1]/np.max(cdf_ys[1])
 
         self.plot_dicts['cdf_shots_0'] = {
-            'title': 'Culmulative Shot Counts' + title,
+            'title': 'Culmulative Shot Counts (no binning)' + title,
             'ax_id': 'cdf',
             'plotfn': self.plot_line,
             'xvals': cdf_xs[0],
@@ -423,6 +447,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             'xlabel': eff_voltage_label,
             'xunit': eff_voltage_unit,
             'ylabel': 'Culmulative Counts',
+            'yunit': 'norm.',
             'do_legend': True,
         }
         self.plot_dicts['cdf_shots_1'] = {
@@ -436,6 +461,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             'xlabel': eff_voltage_label,
             'xunit': eff_voltage_unit,
             'ylabel': 'Culmulative Counts',
+            'yunit': 'norm.',
             'do_legend': True,
         }
 
@@ -575,7 +601,13 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         #####################################
         if self.do_fitting:
             x = np.linspace(bin_x[0], bin_x[-1], 150)
-            ro_g = ro_gauss(x=[x, x], **self.fit_res['shots_all_%d'%i].best_values)
+            para_hist_tmp = self.fit_res['shots_all_hist_%d'%i].best_values
+            para_cdf = self.fit_res['shots_all_%d'%i].best_values
+            para_hist = para_cdf
+            para_hist['A_amplitude'] = para_hist_tmp['A_amplitude']
+            para_hist['B_amplitude'] = para_hist_tmp['B_amplitude']
+
+            ro_g = ro_gauss(x=[x, x], **para_hist)
             self.plot_dicts['new_fit_shots_0'] = {
                 'ax_id': '1D_histogram',
                 'plotfn': self.plot_line,
@@ -621,10 +653,10 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             }
 
 
-        ###########################################
-        # Thresholds and fidelity information     #
-        ###########################################
-
+        ##########################################
+        # Add textbox (eg.g Thresholds, fidelity #
+        # information, number of shots etc)      #
+        ##########################################
         if not self.presentation_mode:
             fit_text = 'Thresholds:'
             fit_text += '\nName | Level | Fidelity'
@@ -659,7 +691,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                     '{:.1f}%'.format(
                         self.proc_data_dict['F_discr'][i]*100))
                 fit_text += fit_th_msg
-            fit_text += '\nSNR (raw) = {:.2f}'.format(self.proc_data_dict['SNR_raw'][i])
+            fit_text += '\nSNR (fit) = {:.2f}'.format(self.proc_data_dict['SNR'][i])
 
             fr = self.fit_res['shots_all_%d'%i]
             bv = fr.best_values
@@ -669,9 +701,13 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
             if two_dim_data:
                 offs = self.proc_data_dict['raw_offset'][i]
-                fit_text += '\nOffset from raw:\n'
-                fit_text += '({:.3f},{:.3f}) {},\n'.format(offs[0], offs[1], eff_voltage_unit)
-                fit_text += 'rotated by ${:.1f}^\\circ$ \n'.format(offs[2]*180/np.pi)
+                #fit_text += '\nOffset from raw:\n'
+                #fit_text += '({:.3f},{:.3f}) {},\n'.format(offs[0], offs[1], eff_voltage_unit)
+                fit_text += '\nRotated by ${:.1f}^\\circ$'.format(offs[2]*180/np.pi)
+                auto_rot = self.options_dict.get('auto_rotation_angle', True)
+                fit_text += '(auto)' if auto_rot else '(man.)'
+
+            fit_text += '\n\nTotal shots: %d+%d'%(*self.proc_data_dict['nr_shots'][i],)
 
             for ax in ['cdf', '1D_histogram']:
                 self.plot_dicts['text_msg_' + ax] = {
@@ -1020,30 +1056,3 @@ def make_mux_ssro_histogram(data_dict, ch_name, title=None, ax=None, **kw):
     if title is not None:
         ax.set_title(title)
 
-
-def ro_gauss(x, A_center, B_center, A_sigma, B_sigma, A_amplitude, B_amplitude, A_spurious, B_spurious):
-    gauss = lmfit.lineshapes.gaussian
-    A_gauss = gauss(x=x[0], center=A_center, sigma=A_sigma, amplitude=A_amplitude)
-    B_gauss = gauss(x=x[1], center=B_center, sigma=B_sigma, amplitude=B_amplitude)
-    gauss0 = ((1-A_spurious)*A_gauss + A_spurious*B_gauss)
-    gauss1 = ((1-B_spurious)*B_gauss + B_spurious*A_gauss)
-    return [gauss0, gauss1]
-
-
-def ro_CDF(x, A_center, B_center, A_sigma, B_sigma, A_amplitude, B_amplitude, A_spurious, B_spurious):
-    cdf = fit_mods.gaussianCDF
-    A_gauss = cdf(x=x[0], mu=A_center, sigma=A_sigma, amplitude=A_amplitude)
-    B_gauss = cdf(x=x[1], mu=B_center, sigma=B_sigma, amplitude=B_amplitude)
-    gauss0 = ((1-A_spurious)*A_gauss + A_spurious*B_gauss)
-    gauss1 = ((1-B_spurious)*B_gauss + B_spurious*A_gauss)
-    return [gauss0, gauss1]
-
-
-def ro_CDF_discr(x, A_center, B_center, A_sigma, B_sigma, A_amplitude, B_amplitude, A_spurious, B_spurious):
-    #A_amplitude /= 1-A_spurious
-    #B_amplitude /= 1-B_spurious
-    return ro_CDF(x, A_center, B_center, A_sigma, B_sigma, A_amplitude, B_amplitude, A_spurious=0, B_spurious=0)
-
-
-def sum_int(x,y):
-    return np.cumsum(y[:-1]*(x[1:]-x[:-1]))
