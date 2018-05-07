@@ -396,6 +396,36 @@ def double_gaussianCDF(x, A_amplitude, A_mu, A_sigma,
     CDF_B = gaussianCDF(x, amplitude=B_amplitude, mu=B_mu, sigma=B_sigma)
     return CDF_A + CDF_B
 
+def ro_gauss(x, A_center, B_center, A_sigma, B_sigma, A_amplitude,
+             B_amplitude, A_spurious, B_spurious):
+    '''
+    Two double-gaussians with sigma and mu/center of the residuals equal to the
+    according state.
+    '''
+    gauss = lmfit.lineshapes.gaussian
+    A_gauss = gauss(x=x[0], center=A_center, sigma=A_sigma, amplitude=A_amplitude)
+    B_gauss = gauss(x=x[1], center=B_center, sigma=B_sigma, amplitude=B_amplitude)
+    gauss0 = ((1-A_spurious)*A_gauss + A_spurious*B_gauss)
+    gauss1 = ((1-B_spurious)*B_gauss + B_spurious*A_gauss)
+    return [gauss0, gauss1]
+
+
+def ro_CDF(x, A_center, B_center, A_sigma, B_sigma, A_amplitude,
+           B_amplitude, A_spurious, B_spurious):
+    cdf = gaussianCDF
+    A_gauss = cdf(x=x[0], mu=A_center, sigma=A_sigma, amplitude=A_amplitude)
+    B_gauss = cdf(x=x[1], mu=B_center, sigma=B_sigma, amplitude=B_amplitude)
+    gauss0 = ((1-A_spurious)*A_gauss + A_spurious*B_gauss)
+    gauss1 = ((1-B_spurious)*B_gauss + B_spurious*A_gauss)
+    return [gauss0, gauss1]
+
+
+def ro_CDF_discr(x, A_center, B_center, A_sigma, B_sigma, A_amplitude,
+                 B_amplitude, A_spurious, B_spurious):
+    #A_amplitude /= 1-A_spurious
+    #B_amplitude /= 1-B_spurious
+    return ro_CDF(x, A_center, B_center, A_sigma, B_sigma, A_amplitude,
+                  B_amplitude, A_spurious=0, B_spurious=0)
 
 def gaussian_2D(x, y, amplitude=1,
                 center_x=0, center_y=0,
@@ -858,7 +888,7 @@ def double_gauss_guess(model, data, x=None, **kwargs):
     else:
         return par_dict
 
-def double_gauss_guess_2(model, data, x, fixed_p01 = False, fixed_p10 = False):
+def ro_double_gauss_guess(model, data, x, fixed_p01 = False, fixed_p10 = False):
     # An initial guess is done on the binned data with single gaussians
     # to constrain the fit params and avoid fitting noise if
     # e.g., mmt. ind. rel. is very low

@@ -514,9 +514,8 @@ class BaseDataAnalysis(object):
                     for key, val in list(guess_dict.items()):
                         model.set_param_hint(key, **val)
                     guess_pars = model.make_params()
-
-            fit_dict['fit_res'] = model.fit(
-                params=guess_pars, **fit_xvals, **fit_yvals)
+            fit_dict['fit_res'] = model.fit(**fit_xvals, **fit_yvals,
+                                            params=guess_pars)
 
             self.fit_res[key] = fit_dict['fit_res']
 
