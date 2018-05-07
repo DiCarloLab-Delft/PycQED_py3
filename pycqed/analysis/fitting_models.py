@@ -427,6 +427,7 @@ def ro_CDF_discr(x, A_center, B_center, A_sigma, B_sigma, A_amplitude,
     return ro_CDF(x, A_center, B_center, A_sigma, B_sigma, A_amplitude,
                   B_amplitude, A_spurious=0, B_spurious=0)
 
+
 def gaussian_2D(x, y, amplitude=1,
                 center_x=0, center_y=0,
                 sigma_x=1, sigma_y=1):
@@ -914,6 +915,8 @@ def ro_double_gauss_guess(model, data, x, fixed_p01 = False, fixed_p10 = False):
     intarea1 = sum_int(x=x[1], y=data[1])[-1]
     model.set_param_hint('A_amplitude', value=intarea0, vary=False)
     model.set_param_hint('B_amplitude', value=intarea1, vary=False)
+    model.set_param_hint('SNR', expr='abs(A_center-B_center)*2/(A_sigma+B_sigma)',
+                         vary=False)
 
     # Spurious excitement
     f = np.sqrt(2*np.pi)
