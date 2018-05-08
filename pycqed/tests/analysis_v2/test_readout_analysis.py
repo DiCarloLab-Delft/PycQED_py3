@@ -5,6 +5,56 @@ import os
 from pycqed.analysis_v2 import measurement_analysis as ma
 from pycqed.analysis_v2 import readout_analysis as ra
 
+# Add test: 20180508\182642 - 183214
+class Test_SSRO_discrimination_analysis(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(self):
+        self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
+        ma.a_tools.datadir = self.datadir
+
+    def test_angles(self):
+        tp = 2*np.pi
+        ro_amp_high_factor = 0.1
+        ts = '20180508_182642'
+        te = '20180508_183214'
+        for angle in np.arange(0, 360, 30):
+            options_dict = {
+                'verbose': True,
+                'rotation_angle': (-angle)*np.pi/180,
+                'auto_rotation_angle': True,
+                'fixed_p01': 0,
+                'fixed_p10': 0,
+                'nr_bins': 100,
+            }
+            label = 'SSRO_%d_%.2f' % (angle,ro_amp_high_factor*100)
+            aut = ma.Singleshot_Readout_Analysis(t_start=ts, t_stop=te,
+                                                 label=label,
+                                                 extract_only=False,
+                                                 do_fitting=True,
+                                                 options_dict=options_dict)
+            aut_angle = aut.proc_data_dict['raw_offset'][2]
+            aut_angle = aut_angle % tp
+            aut_snr = aut.fit_res['shots_all'].params['SNR']
+
+            options_dict['auto_rotation_angle'] = False
+            opt = ma.Singleshot_Readout_Analysis(t_start=ts, t_stop=te,
+                                                 label=label,
+                                                 extract_only=False,
+                                                 do_fitting=True,
+                                                 options_dict=options_dict)
+            opt_angle = opt.proc_data_dict['raw_offset'][2]
+            opt_angle = opt_angle % tp
+            opt_snr = opt.fit_res['shots_all'].params['SNR']
+            da = min(abs(aut_angle-opt_angle),
+                     abs(aut_angle-opt_angle+2*np.pi),
+                     abs(aut_angle-opt_angle-2*np.pi))
+            self.assertLess(da, 5*np.pi/180)
+            self.assertLess(aut_snr, 1.1)
+            self.assertMore(opt_snr, 1.1)
+            self.assertLess(aut_snr, 0.55)
+            self.assertLess(opt_snr, 0.55)
+
 
 class Test_SSRO_discrimination_analysis(unittest.TestCase):
 
