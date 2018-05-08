@@ -128,7 +128,6 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             self.proc_data_dict['2D_histogram_z'] = [H0, H1]
 
             # Find and apply the effective/rotated integrated voltage
-            self.proc_data_dict['all_channel_int_voltages'] = shots
             angle = self.options_dict.get('rotation_angle', 0)
             auto_angle = self.options_dict.get('auto_rotation_angle', True)
             if auto_angle:
@@ -189,6 +188,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             # If we have only one quadrature, use that (doh!)
             eff_sh = shots[:, 0]
 
+        self.proc_data_dict['all_channel_int_voltages'] = shots
         self.proc_data_dict['shots_xlabel'] = 'Effective integrated Voltage'#self.raw_data_dict['value_names'][0]
         self.proc_data_dict['shots_xunit'] = unit
         self.proc_data_dict['eff_int_voltages'] = eff_sh
@@ -356,14 +356,15 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
     def prepare_plots(self):
         # Did we load two voltage components (shall we do 2D plots?)
-        two_dim_data = len(self.proc_data_dict['all_channel_int_voltages']) >= 2
+        two_dim_data = len(self.proc_data_dict['all_channel_int_voltages'][0]) == 2
 
         eff_voltage_label = self.proc_data_dict['shots_xlabel']
         eff_voltage_unit = self.proc_data_dict['shots_xunit']
         x_volt_label = self.raw_data_dict['value_names'][0]
         x_volt_unit = self.raw_data_dict['value_units'][0]
-        y_volt_label = self.raw_data_dict['value_names'][1]
-        y_volt_unit = self.raw_data_dict['value_units'][1]
+        if two_dim_data:
+            y_volt_label = self.raw_data_dict['value_names'][1]
+            y_volt_unit = self.raw_data_dict['value_units'][1]
         z_hist_label = 'Counts'
         label_0 = '|g> prep.'
         label_1 = '|e> prep.'
@@ -464,8 +465,9 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
         #### 2D Histograms
         if two_dim_data:
-            iq_centers = self.proc_data_dict['IQ_pos']
-            if iq_centers is not None:
+            iq_centers = None
+            if 'IQ_pos' in self.proc_data_dict and self.proc_data_dict['IQ_pos'] is not None:
+                iq_centers = self.proc_data_dict['IQ_pos']
                 peak_marker_2D = {
                     'plotfn': self.plot_line,
                     'xvals': iq_centers[0],
@@ -481,25 +483,25 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                     'setlabel': 'Peaks',
                     'do_legend': True,
                 }
-            self.plot_dicts['2D_histogram_0'] = {
-                'title': 'Raw '+label_0+' Binned Shot Counts' + title,
-                'ax_id': '2D_histogram_0',
-                'plotfn': self.plot_colorxy,
-                'xvals': self.proc_data_dict['2D_histogram_y'],
-                'yvals': self.proc_data_dict['2D_histogram_x'],
-                'zvals': self.proc_data_dict['2D_histogram_z'][0],
-                'xlabel': x_volt_label,
-                'xunit': x_volt_unit,
-                'ylabel': y_volt_label,
-                'yunit': y_volt_unit,
-                'zlabel': z_hist_label,
-                'zunit': '-',
-                'cmap': 'Blues',
-            }
-            if iq_centers is not None:
+                self.plot_dicts['2D_histogram_0'] = {
+                    'title': 'Raw '+label_0+' Binned Shot Counts' + title,
+                    'ax_id': '2D_histogram_0',
+                    'plotfn': self.plot_colorxy,
+                    'xvals': self.proc_data_dict['2D_histogram_y'],
+                    'yvals': self.proc_data_dict['2D_histogram_x'],
+                    'zvals': self.proc_data_dict['2D_histogram_z'][0],
+                    'xlabel': x_volt_label,
+                    'xunit': x_volt_unit,
+                    'ylabel': y_volt_label,
+                    'yunit': y_volt_unit,
+                    'zlabel': z_hist_label,
+                    'zunit': '-',
+                    'cmap': 'Blues',
+                }
                 dp = deepcopy(peak_marker_2D)
                 dp['ax_id'] = '2D_histogram_0'
                 self.plot_dicts['2D_histogram_0_marker'] = dp
+
             self.plot_dicts['2D_histogram_1'] = {
                 'title': 'Raw '+label_1+' Binned Shot Counts' + title,
                 'ax_id': '2D_histogram_1',
@@ -543,7 +545,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 'marker': 'o',
                 'linestyle': '',
                 'color': 'C0',
-                'line_kws': {'markersize': 0.3, 'color': 'C0', 'alpha': 0.5},
+                'line_kws': {'markersize': 0.25, 'color': 'C0', 'alpha': 0.5},
                 'setlabel': label_0,
                 'do_legend': True,
             }
@@ -563,7 +565,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 'marker': 'o',
                 'linestyle': '',
                 'color': 'C3',
-                'line_kws': {'markersize': 0.3, 'color': 'C3', 'alpha': 0.5},
+                'line_kws': {'markersize': 0.25, 'color': 'C3', 'alpha': 0.5},
                 'setlabel': label_1,
                 'do_legend': True,
             }
@@ -696,6 +698,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 fit_text += '\n\nRotated by ${:.1f}^\\circ$'.format(offs[2]*180/np.pi)
                 auto_rot = self.options_dict.get('auto_rotation_angle', True)
                 fit_text += '(auto)' if auto_rot else '(man.)'
+            else:
+                fit_text += '\n\n(Single quadrature data)'
 
             fit_text += '\n\nTotal shots: %d+%d'%(*self.proc_data_dict['nr_shots'],)
 

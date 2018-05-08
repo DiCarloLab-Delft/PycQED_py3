@@ -123,6 +123,7 @@ class BaseDataAnalysis(object):
         :param extract_only: Should we also do the plots?
         :param do_fitting: Should the run_fitting method be executed?
         '''
+        # todo: what exactly does this flag do? May 2018 (Adriaan/Rene)
         self.single_timestamp = False
         # initialize an empty dict to store results of analysis
         self.proc_data_dict = OrderedDict()
