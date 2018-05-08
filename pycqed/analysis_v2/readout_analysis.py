@@ -3,7 +3,9 @@ File containing analyses for readout.
 This includes
     - readout discrimination analysis
     - single shot readout analysis
-    - multiplexed readout analysis
+    - multiplexed readout analysis (to be updated!)
+
+Originally written by Adriaan, updated/rewritten by Rene May 2018
 """
 import itertools
 from copy import deepcopy
@@ -13,6 +15,7 @@ import lmfit
 from collections import OrderedDict
 import numpy as np
 import pycqed.analysis.fitting_models as fit_mods
+from pycqed.analysis.fitting_models import ro_gauss, ro_CDF, ro_CDF_discr, gaussian_2D, gauss_2D_guess, gaussianCDF, ro_double_gauss_guess
 import pycqed.analysis.analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
 from scipy.optimize import minimize
@@ -29,12 +32,30 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                  data_file_path: str=None,
                  options_dict: dict=None, extract_only: bool=False,
                  do_fitting: bool=True, auto=True):
+        '''
+        options dict options:
+            'fixed_p10' fixes p(e|g) (do not vary in fit)
+            'fixed_p01' : fixes p(g|pi) (do not vary in fit)
+            'auto_rotation_angle' : (bool) automatically find the I/Q mixing angle
+            'rotation_angle' : manually define the I/Q mixing angle (ignored if auto_rotation_angle is set to True)
+            'nr_bins' : number of bins to use for the histograms
+            'post_select' :
+            'post_select_threshold' :
+            'nr_samples' : amount of different samples (e.g. ground and excited = 2)
+            'sample_0' : index of first sample (ground-state)
+            'sample_1' : index of second sample (first excited-state)
+            'max_datapoints' : maximum amount of datapoints for culumative fit
+            'log_hist' : use log scale for the y-axis of the 1D histograms
+            'verbose' : see BaseDataAnalysis
+            'presentation_mode' : see BaseDataAnalysis
+            see BaseDataAnalysis for more.
+        '''
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
                          data_file_path=data_file_path,
                          options_dict=options_dict,
                          extract_only=extract_only, do_fitting=do_fitting)
-        self.single_timestamp = False
+        self.single_timestamp = True
         self.params_dict = {
             'measurementstring': 'measurementstring',
             'measured_values': 'measured_values',
@@ -42,6 +63,12 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             'value_units': 'value_units'}
 
         self.numeric_params = []
+
+        # Determine the default for auto_rotation_angle
+        man_angle = self.options_dict.get('rotation_angle', False) is False
+        self.options_dict['auto_rotation_angle'] = self.options_dict.get('auto_rotation_angle', man_angle)
+
+
         if auto:
             self.run_analysis()
 
@@ -57,156 +84,208 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         sample_1 = self.options_dict.get('sample_1', 1)
         nr_bins = self.options_dict.get('nr_bins', 100)
 
-        nr_expts = self.raw_data_dict['nr_experiments']
-        self.proc_data_dict['all_channel_int_voltages'] = [None] * nr_expts
-        self.proc_data_dict['nr_shots'] = [0] * nr_expts
-        self.proc_data_dict['eff_int_voltages'] = [None] * nr_expts
-        self.proc_data_dict['min_sh'] = [0] * nr_expts
-        self.proc_data_dict['max_sh'] = [0] * nr_expts
-        self.proc_data_dict['cumsum_x'] = [None] * nr_expts
-        self.proc_data_dict['cumsum_y'] = [None] * nr_expts
-        self.proc_data_dict['cumsum_x_ds'] = [None] * nr_expts
-        self.proc_data_dict['cumsum_y_ds'] = [None] * nr_expts
-        self.proc_data_dict['hist'] = [None] * nr_expts
-        self.proc_data_dict['bin_centers'] = [None] * nr_expts
-        self.proc_data_dict['bin_edges'] = [None] * nr_expts
-        self.proc_data_dict['binsize'] = [0] * nr_expts
-        self.proc_data_dict['hist'] = [None] * nr_expts
-        self.proc_data_dict['shots_xlabel'] = [None] * nr_expts
-        self.proc_data_dict['shots_xunit'] = [0] * nr_expts
-        self.proc_data_dict['F_assignment_raw'] = [0] * nr_expts
-        self.proc_data_dict['threshold_raw'] = [0] * nr_expts
-
         ######################################################
         #  Separating data into shots for 0 and shots for 1  #
         ######################################################
+        meas_val = self.raw_data_dict['measured_values']
+        unit = self.raw_data_dict['value_units'][0]
+        # loop through channels
+        shots = np.zeros((2, len(meas_val),), dtype=np.ndarray)
+        for j, dat in enumerate(meas_val):
+            assert unit == self.raw_data_dict['value_units'][j], 'The channels have been measured using different units. This is not supported yet.'
+            sh_0, sh_1 = get_shots_zero_one(
+                dat, post_select=post_select, nr_samples=nr_samples,
+                post_select_threshold=post_select_threshold,
+                sample_0=sample_0, sample_1=sample_1)
+            shots[0, j] = sh_0
+            shots[1, j] = sh_1
+        #shots = np.array(shots, dtype=float)
 
-        for i, meas_val in enumerate(self.raw_data_dict['measured_values']):
-            # loop through channels
-            shots = np.zeros((2, len(meas_val),), dtype=np.ndarray)
-            for j, dat in enumerate(meas_val):
-                sh_0, sh_1 = get_shots_zero_one(
-                    dat, post_select=post_select, nr_samples=nr_samples,
-                    post_select_threshold=post_select_threshold,
-                    sample_0=sample_0, sample_1=sample_1)
-                shots[0, j] = sh_0
-                shots[1, j] = sh_1
-            #shots = np.array(shots, dtype=float)
+        # Do we have two quadratures?
+        if len(meas_val) == 2:
+            ########################################################
+            #
+            ########################################################
+            data_range_x = (np.min([np.min(b) for b in shots[:, 0]]),
+                            np.max([np.max(b) for b in shots[:, 0]]))
+            data_range_y = (np.min([np.min(b) for b in shots[:, 1]]),
+                            np.max([np.max(b) for b in shots[:, 1]]))
+            data_range_xy = (data_range_x, data_range_y)
+            H0, xedges, yedges = np.histogram2d(x=shots[0, 0],
+                                                y=shots[0, 1],
+                                                bins=4*np.sqrt(nr_bins),
+                                                range=data_range_xy)
+            H1, xedges, yedges = np.histogram2d(x=shots[1, 0],
+                                                y=shots[1, 1],
+                                                bins=4*np.sqrt(nr_bins),
+                                                range=data_range_xy)
+            binsize_x = xedges[1] - xedges[0]
+            binsize_y = yedges[1] - yedges[0]
+            bin_centers_x = xedges[:-1] + binsize_x
+            bin_centers_y = yedges[:-1] + binsize_y
+            self.proc_data_dict['2D_histogram_x'] = bin_centers_x
+            self.proc_data_dict['2D_histogram_y'] = bin_centers_y
+            self.proc_data_dict['2D_histogram_z'] = [H0, H1]
 
-            print(shots.shape)
-            # Do we have two quadratures?
-            if len(meas_val) == 2:
-                # If we do, find and apply the effective/rotated integrated voltage
-                self.proc_data_dict['all_channel_int_voltages'][i] = shots
-                angle = self.options_dict.get('rotation_angle', 0)
-                auto_angle = self.options_dict.get('auto_rotation_angle', True)
-                if auto_angle:
-                    ##########################################
-                    #  Determining the rotation of the data  #
-                    ##########################################
-                    # todo!
-                    raise NotImplementedError('Rotation detection not implemented yet!')
-                # create matrix
-                rot_mat = [[+np.cos(angle), -np.sin(angle)],
-                           [+np.sin(angle), +np.cos(angle)]]
-                # rotate data accordingly
-                eff_sh = np.dot(rot_mat[0], shots)
+            # Find and apply the effective/rotated integrated voltage
+            angle = self.options_dict.get('rotation_angle', 0)
+            auto_angle = self.options_dict.get('auto_rotation_angle', True)
+            if auto_angle:
+                ##########################################
+                #  Determining the rotation of the data  #
+                ##########################################
+                gauss2D_model_0 = lmfit.Model(gaussian_2D,
+                                              independent_vars=['x', 'y'])
+                gauss2D_model_1 = lmfit.Model(gaussian_2D,
+                                              independent_vars=['x', 'y'])
+                guess0 = gauss_2D_guess(model=gauss2D_model_0,
+                                                 data=H0,
+                                                 x=bin_centers_x,
+                                                 y=bin_centers_y)
+                guess1 = gauss_2D_guess(model=gauss2D_model_1,
+                                                 data=H1,
+                                                 x=bin_centers_x,
+                                                 y=bin_centers_y)
+
+                x2d=np.array([bin_centers_x]*len(bin_centers_y))
+                y2d=np.array([bin_centers_y]*len(bin_centers_x)).transpose()
+                fitres0 = gauss2D_model_0.fit(data=H0,
+                                              x=x2d,
+                                              y=y2d,
+                                              **guess0)
+                fitres1 = gauss2D_model_1.fit(data=H1,
+                                              x=x2d,
+                                              y=y2d,
+                                              **guess1)
+
+                x0 = fitres0.best_values['center_x']
+                x1 = fitres1.best_values['center_x']
+                y0 = fitres0.best_values['center_y']
+                y1 = fitres1.best_values['center_y']
+                self.proc_data_dict['IQ_pos'] = [[x0, x1], [y0, y1]]
+                dx = x1 - x0
+                dy = y1 - y0
+                mid = [x0 + dx/2, y0 + dy/2]
+                angle = -np.arctan2(dy, dx)-np.pi/2
             else:
-                # If we have only one quadrature, use that (doh!)
-                print(shots[:, 0])
-                eff_sh = shots[:, 0]
+                mid = [0, 0]
 
-            self.proc_data_dict['shots_xlabel'][i] = self.raw_data_dict['value_names'][i][0]
-            self.proc_data_dict['shots_xunit'][i] = self.raw_data_dict['value_units'][i][0]
-            print(eff_sh.shape)
-            self.proc_data_dict['eff_int_voltages'][i] = eff_sh
-            self.proc_data_dict['nr_shots'][i] = len(eff_sh[0])
-            sh_min = min(np.min(eff_sh[0]), np.min(eff_sh[1]))
-            sh_max = max(np.max(eff_sh[0]), np.max(eff_sh[1]))
-            data_range = (sh_min, sh_max)
+            if self.verbose:
+                ang_deg = (angle*180/np.pi)
+                print('Mixing I/Q channels with %.3f degrees '%ang_deg +
+                      #'around point (%.2f, %.2f)%s'%(mid[0], mid[1], unit) +
+                      ' to obtain effective voltage.')
 
-            eff_sh_sort = np.sort(list(eff_sh), axis=1)
-            x0, n0 = np.unique(eff_sh_sort[0], return_counts=True)
-            cumsum0 = np.cumsum(n0)
-            x1, n1 = np.unique(eff_sh_sort[1], return_counts=True)
-            cumsum1 = np.cumsum(n1)
+            self.proc_data_dict['raw_offset'] = [*mid, angle]
+            # create matrix
+            rot_mat = [[+np.cos(angle), -np.sin(angle)],
+                       [+np.sin(angle), +np.cos(angle)]]
+            # rotate data accordingly
+            eff_sh = np.zeros(len(shots[0]), dtype=np.ndarray)
+            eff_sh[0] = np.dot(rot_mat[0], shots[0])# - mid
+            eff_sh[1] = np.dot(rot_mat[0], shots[1])# - mid
+        else:
+            # If we have only one quadrature, use that (doh!)
+            eff_sh = shots[:, 0]
 
-            self.proc_data_dict['cumsum_x'][i] = [x0, x1]
-            self.proc_data_dict['cumsum_y'][i] = [cumsum0, cumsum1]
+        self.proc_data_dict['all_channel_int_voltages'] = shots
+        self.proc_data_dict['shots_xlabel'] = 'Effective integrated Voltage'#self.raw_data_dict['value_names'][0]
+        self.proc_data_dict['shots_xunit'] = unit
+        self.proc_data_dict['eff_int_voltages'] = eff_sh
+        self.proc_data_dict['nr_shots'] = [len(eff_sh[0]), len(eff_sh[1])]
+        sh_min = min(np.min(eff_sh[0]), np.min(eff_sh[1]))
+        sh_max = max(np.max(eff_sh[0]), np.max(eff_sh[1]))
+        data_range = (sh_min, sh_max)
 
-            print(x0, x1)
-            all_x = np.unique(np.sort(np.concatenate((x0, x1))))
-            md = self.options_dict.get('max_datapoints', 1000)
-            if len(all_x) > md:
-                all_x = np.linspace(*data_range, md)
-            ecumsum0 = np.interp(x=all_x, xp=x0, fp=cumsum0, left=0)
-            necumsum0 = ecumsum0/np.max(ecumsum0)
-            ecumsum1 = np.interp(x=all_x, xp=x1, fp=cumsum1, left=0)
-            necumsum1 = ecumsum1/np.max(ecumsum1)
+        eff_sh_sort = np.sort(list(eff_sh), axis=1)
+        x0, n0 = np.unique(eff_sh_sort[0], return_counts=True)
+        cumsum0 = np.cumsum(n0)
+        x1, n1 = np.unique(eff_sh_sort[1], return_counts=True)
+        cumsum1 = np.cumsum(n1)
 
-            self.proc_data_dict['cumsum_x_ds'][i] = all_x
-            self.proc_data_dict['cumsum_y_ds'][i] = [ecumsum0, ecumsum1]
+        self.proc_data_dict['cumsum_x'] = [x0, x1]
+        self.proc_data_dict['cumsum_y'] = [cumsum0, cumsum1]
 
-            ##################################
-            #  Binning data into histograms  #
-            ##################################
-            h0, bin_edges = np.histogram(eff_sh[0], bins=nr_bins,
-                                         range=data_range)
-            h1, bin_edges = np.histogram(eff_sh[1], bins=nr_bins,
-                                         range=data_range)
-            self.proc_data_dict['hist'][i] = [h0, h1]
-            binsize = (bin_edges[1] - bin_edges[0])
-            self.proc_data_dict['bin_edges'][i] = bin_edges
-            self.proc_data_dict['bin_centers'][i] = bin_edges[:-1]+binsize
-            self.proc_data_dict['binsize'][i] = binsize
+        all_x = np.unique(np.sort(np.concatenate((x0, x1))))
+        md = self.options_dict.get('max_datapoints', 1000)
+        if len(all_x) > md:
+            all_x = np.linspace(*data_range, md)
+        ecumsum0 = np.interp(x=all_x, xp=x0, fp=cumsum0, left=0)
+        necumsum0 = ecumsum0/np.max(ecumsum0)
+        ecumsum1 = np.interp(x=all_x, xp=x1, fp=cumsum1, left=0)
+        necumsum1 = ecumsum1/np.max(ecumsum1)
 
-            #######################################################
-            #  Threshold and fidelity based on culmulative counts #
-            #######################################################
-            # Average assignment fidelity: F_ass = (P01 - P10 )/2
-            # where Pxy equals probability to measure x when starting in y
-            F_vs_th = (1-(1-abs(necumsum0 - necumsum1))/2)
-            opt_idx = np.argmax(F_vs_th)
-            self.proc_data_dict['F_assignment_raw'][i] = F_vs_th[opt_idx]
-            self.proc_data_dict['threshold_raw'][i] = all_x[opt_idx]
-            print('raw', all_x[opt_idx])
+        self.proc_data_dict['cumsum_x_ds'] = all_x
+        self.proc_data_dict['cumsum_y_ds'] = [ecumsum0, ecumsum1]
+        self.proc_data_dict['cumsum_y_ds_n'] = [necumsum0, necumsum1]
+
+        ##################################
+        #  Binning data into histograms  #
+        ##################################
+        h0, bin_edges = np.histogram(eff_sh[0], bins=nr_bins,
+                                     range=data_range)
+        h1, bin_edges = np.histogram(eff_sh[1], bins=nr_bins,
+                                     range=data_range)
+        self.proc_data_dict['hist'] = [h0, h1]
+        binsize = (bin_edges[1] - bin_edges[0])
+        self.proc_data_dict['bin_edges'] = bin_edges
+        self.proc_data_dict['bin_centers'] = bin_edges[:-1]+binsize
+        self.proc_data_dict['binsize'] = binsize
+
+        #######################################################
+        #  Threshold and fidelity based on culmulative counts #
+        #######################################################
+        # Average assignment fidelity: F_ass = (P01 - P10 )/2
+        # where Pxy equals probability to measure x when starting in y
+        F_vs_th = (1-(1-abs(necumsum0 - necumsum1))/2)
+        opt_idx = np.argmax(F_vs_th)
+        self.proc_data_dict['F_assignment_raw'] = F_vs_th[opt_idx]
+        self.proc_data_dict['threshold_raw'] = all_x[opt_idx]
+
 
     def prepare_fitting(self):
         self.fit_dicts = OrderedDict()
 
-        nr_expts = self.raw_data_dict['nr_experiments']
-        self.proc_data_dict['F_discr'] = [None]*nr_expts
-        self.proc_data_dict['threshold_discr'] = [None]*nr_expts
-        self.proc_data_dict['F_assignment_fit'] = [None]*nr_expts
-        self.proc_data_dict['threshold_fit'] = [None]*nr_expts
+        bin_x = self.proc_data_dict['bin_centers']
+        bin_xs = [bin_x, bin_x]
+        bin_ys = self.proc_data_dict['hist']
+        m = lmfit.model.Model(ro_gauss)
+        m.guess = ro_double_gauss_guess.__get__(m, m.__class__)
+        params = m.guess(x=bin_xs, data=bin_ys,
+                         fixed_p01=self.options_dict.get('fixed_p01', False),
+                         fixed_p10=self.options_dict.get('fixed_p10', False))
+        res = m.fit(x=bin_xs, data=bin_ys, params=params)
 
-        for i in range(nr_expts):
-            bin_x = self.proc_data_dict['bin_centers'][i]
-            bin_ys = self.proc_data_dict['hist'][i]
-            m = lmfit.model.Model(ro_gauss)
-            m.guess = fit_mods.double_gauss_guess_2.__get__(m, m.__class__)
-            #params = m.guess()
-            #res = m.fit(x, ro_g, **params)
-            #m_cul = lmfit.model.Model(ro_gauss_cul)
+        self.fit_dicts['shots_all_hist'] = {
+            'model': m,
+            'fit_xvals': {'x': bin_xs},
+            'fit_yvals': {'data': bin_ys},
+            'guessfn_pars': {'fixed_p01': self.options_dict.get('fixed_p01', False),
+                             'fixed_p10': self.options_dict.get('fixed_p10', False)},
+        }
 
+        m_cul = lmfit.model.Model(ro_CDF)
+        cdf_xs = self.proc_data_dict['cumsum_x_ds']
+        cdf_xs = [np.array(cdf_xs), np.array(cdf_xs)]
+        cdf_ys = self.proc_data_dict['cumsum_y_ds']
+        cdf_ys = [np.array(cdf_ys[0]), np.array(cdf_ys[1])]
+        #cul_res = m_cul.fit(x=cdf_xs, data=cdf_ys, params=res.params)
+        cum_params = res.params
+        cum_params['A_amplitude'].value = np.max(cdf_ys[0])
+        cum_params['A_amplitude'].vary = False
+        cum_params['B_amplitude'].value = np.max(cdf_ys[1])
+        cum_params['A_amplitude'].vary = False
+        self.fit_dicts['shots_all'] = {
+            'model': m_cul,
+            'fit_xvals': {'x': cdf_xs},
+            'fit_yvals': {'data': cdf_ys},
+            'guess_pars': cum_params,
+        }
 
-            self.fit_dicts['shots_all_%d'%i] = {
-                'model': m,
-                'fit_xvals': {'x': [bin_x, bin_x]},
-                'fit_yvals': {'data': bin_ys},
-                'guessfn_pars': {'fixed_p01': self.options_dict.get('fixed_p01', False),
-                                 'fixed_p10': self.options_dict.get('fixed_p10', False)},
-            }
-            cdf_xs = self.proc_data_dict['cumsum_x'][i]
-            cdf_ys = self.proc_data_dict['cumsum_y'][i]
 
     def analyze_fit_results(self):
-        #nr_expts = self.raw_data_dict['nr_experiments']
-        #for i in range(nr_expts):
-        i = 0
-
         # Create a CDF based on the fit functions of both fits.
-        fr = self.fit_res['shots_all_%d'%i]
+        fr = self.fit_res['shots_all']
         bv = fr.best_values
 
         bvn = deepcopy(bv)
@@ -234,11 +313,11 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
         # for some reason the fit sometimes returns a list of values
         if isinstance(opt_fid['fun'], float):
-            self.proc_data_dict['F_assignment_fit'][i] = (1-opt_fid['fun'])
+            self.proc_data_dict['F_assignment_fit'] = (1-opt_fid['fun'])
         else:
-            self.proc_data_dict['F_assignment_fit'][i] = (1-opt_fid['fun'])[0]
+            self.proc_data_dict['F_assignment_fit'] = (1-opt_fid['fun'])[0]
 
-        self.proc_data_dict['threshold_fit'][i] = opt_fid['x'][0]
+        self.proc_data_dict['threshold_fit'] = opt_fid['x'][0]
 
         # Calculate the fidelity of both
 
@@ -247,17 +326,17 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         ###########################################
 
         def CDF_0_discr(x):
-            return fit_mods.gaussianCDF(x, amplitude=1,
+            return gaussianCDF(x, amplitude=1,
                                         mu=bv['A_center'], sigma=bv['A_sigma'])
 
         def CDF_1_discr(x):
-            return fit_mods.gaussianCDF(x, amplitude=1,
+            return gaussianCDF(x, amplitude=1,
                                         mu=bv['B_center'], sigma=bv['B_sigma'])
 
         def disc_infid_vs_th(x):
-            cdf0 = fit_mods.gaussianCDF(x, amplitude=1, mu=bv['A_center'],
+            cdf0 = gaussianCDF(x, amplitude=1, mu=bv['A_center'],
                                         sigma=bv['A_sigma'])
-            cdf1 = fit_mods.gaussianCDF(x, amplitude=1, mu=bv['B_center'],
+            cdf1 = gaussianCDF(x, amplitude=1, mu=bv['B_center'],
                                         sigma=bv['B_sigma'])
             return (1-np.abs(cdf0 - cdf1))/2
 
@@ -269,244 +348,382 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
         # for some reason the fit sometimes returns a list of values
         if isinstance(opt_fid_discr['fun'], float):
-            self.proc_data_dict['F_discr'][i] = (1-opt_fid_discr['fun'])
+            self.proc_data_dict['F_discr'] = (1-opt_fid_discr['fun'])
         else:
-            self.proc_data_dict['F_discr'][i] = (1-opt_fid_discr['fun'])[0]
+            self.proc_data_dict['F_discr'] = (1-opt_fid_discr['fun'])[0]
 
-        self.proc_data_dict['threshold_discr'][i] = opt_fid_discr['x'][0]
+        self.proc_data_dict['threshold_discr'] = opt_fid_discr['x'][0]
 
     def prepare_plots(self):
-        # N.B. If the log option is used we should manually set the
-        # yscale to go from .5 to the current max as otherwise the fits
-        # mess up the log plots.
-        i = 0
-        x_label = self.proc_data_dict['shots_xlabel'][i]
-        x_unit = self.proc_data_dict['shots_xunit'][i]
+        # Did we load two voltage components (shall we do 2D plots?)
+        two_dim_data = len(self.proc_data_dict['all_channel_int_voltages'][0]) == 2
 
-        ### The histograms
+        eff_voltage_label = self.proc_data_dict['shots_xlabel']
+        eff_voltage_unit = self.proc_data_dict['shots_xunit']
+        x_volt_label = self.raw_data_dict['value_names'][0]
+        x_volt_unit = self.raw_data_dict['value_units'][0]
+        if two_dim_data:
+            y_volt_label = self.raw_data_dict['value_names'][1]
+            y_volt_unit = self.raw_data_dict['value_units'][1]
+        z_hist_label = 'Counts'
+        label_0 = '|g> prep.'
+        label_1 = '|e> prep.'
+        title = ('\n' + self.timestamps[0] + ' - "' +
+                 self.raw_data_dict['measurementstring'] + '"')
+
+
+        #### 1D histograms
         log_hist = self.options_dict.get('log_hist', False)
-        bin_x = self.proc_data_dict['bin_edges'][i]
-        bin_y = self.proc_data_dict['hist'][i]
-        self.plot_dicts['1D_histogram'] = {
+        bin_x = self.proc_data_dict['bin_edges']
+        bin_y = self.proc_data_dict['hist']
+        self.plot_dicts['hist_0'] = {
+            'title': 'Binned Shot Counts' + title,
+            'ax_id' : '1D_histogram',
             'plotfn': self.plot_bar,
             'xvals': bin_x,
             'yvals': bin_y[0],
-            'xwidth' : self.proc_data_dict['binsize'][i],
+            'xwidth' : self.proc_data_dict['binsize'],
             'bar_kws': {'log': log_hist, 'alpha': .4, 'facecolor': 'C0',
                         'edgecolor': 'C0'},
-            'setlabel': 'Shots 0',
-            'xlabel': x_label,
-            'xunit': x_unit,
-            'ylabel': 'Counts',
-            'title': (self.timestamps[0] + ' \n' +
-                      self.raw_data_dict['measurementstring'][i])}
-
-        th_raw = self.proc_data_dict['threshold_raw'][i]
-        threshs = [th_raw,]
-        if self.do_fitting:
-            threshs.append(self.proc_data_dict['threshold_fit'])
-            threshs.append(self.proc_data_dict['threshold_discr'])
-        self.plot_dicts['v_lines_hist'] = {
-            'ax_id': '1D_histogram',
-            'plotfn': self.plot_vlines_auto,
-            'xdata': threshs,
-            'linestyles': ['--', '-.', ':'],
-            'labels': ['th_raw', 'th_fit', 'th_d'],
-            'colors': ['0.3', '0.5', '0.2'],
-            'do_legend': True,
+            'setlabel': label_0,
+            'xlabel': eff_voltage_label,
+            'xunit': eff_voltage_unit,
+            'ylabel': z_hist_label,
         }
+
         self.plot_dicts['hist_1'] = {
             'ax_id': '1D_histogram',
             'plotfn': self.plot_bar,
             'xvals': bin_x,
             'yvals': bin_y[1],
-            'xwidth' : self.proc_data_dict['binsize'][i],
-            'bar_kws': {'log': log_hist, 'alpha': .4, 'facecolor': 'C3',
+            'xwidth' : self.proc_data_dict['binsize'],
+            'bar_kws': {'log': log_hist, 'alpha': .3, 'facecolor': 'C3',
                         'edgecolor': 'C3'},
-            'setlabel': 'Shots 1', 'do_legend': True,
-            'xlabel': x_label,
-            'xunit': x_unit,
-            'ylabel': 'Counts'}
-        self.plot_dicts['hist_1'] = {
-            'ax_id': '1D_histogram',
-            'plotfn': self.plot_bar,
-            'xvals': bin_x,
-            'yvals': bin_y[1],
-            'xwidth' : self.proc_data_dict['binsize'][i],
-            'bar_kws': {'log': log_hist, 'alpha': .4, 'facecolor': 'C3',
-                        'edgecolor': 'C3'},
-            'setlabel': 'Shots 1', 'do_legend': True,
-            'xlabel': x_label,
-            'xunit': x_unit,
-            'ylabel': 'Counts'}
+            'setlabel': label_1,
+            'do_legend': True,
+            'xlabel': eff_voltage_label,
+            'xunit': eff_voltage_unit,
+            'ylabel': z_hist_label,
+        }
+        if log_hist:
+            self.plot_dicts['hist_0']['yrange'] = (0.5, 1.5*np.max(bin_y[0]))
+            self.plot_dicts['hist_1']['yrange'] = (0.5, 1.5*np.max(bin_y[1]))
 
-
-        ######## PLOT CDF
-        self.plot_dicts['v_lines_cdf'] = deepcopy(self.plot_dicts['v_lines_hist'])
-        self.plot_dicts['v_lines_cdf']['ax_id'] = 'cdf'
-        cdf_xs = self.proc_data_dict['cumsum_x'][i]
-        cdf_ys = self.proc_data_dict['cumsum_y'][i]
+        #### CDF
+        cdf_xs = self.proc_data_dict['cumsum_x']
+        cdf_ys = self.proc_data_dict['cumsum_y']
         cdf_ys[0] = cdf_ys[0]/np.max(cdf_ys[0])
         cdf_ys[1] = cdf_ys[1]/np.max(cdf_ys[1])
 
         self.plot_dicts['cdf_shots_0'] = {
+            'title': 'Culmulative Shot Counts (no binning)' + title,
             'ax_id': 'cdf',
             'plotfn': self.plot_line,
             'xvals': cdf_xs[0],
             'yvals': cdf_ys[0],
-            'setlabel': 'CDF shots 0',
+            'setlabel': label_0,
             'line_kws': {'color': 'C0', 'alpha': 0.3},
             'marker': '',
-            'do_legend': True}
+            'xlabel': eff_voltage_label,
+            'xunit': eff_voltage_unit,
+            'ylabel': 'Culmulative Counts',
+            'yunit': 'norm.',
+            'do_legend': True,
+        }
         self.plot_dicts['cdf_shots_1'] = {
             'ax_id': 'cdf',
             'plotfn': self.plot_line,
             'xvals': cdf_xs[1],
             'yvals': cdf_ys[1],
-            'setlabel': 'CDF shots 0',
+            'setlabel': label_1,
             'line_kws': {'color': 'C3', 'alpha': 0.3},
             'marker': '',
-            'do_legend': True}
+            'xlabel': eff_voltage_label,
+            'xunit': eff_voltage_unit,
+            'ylabel': 'Culmulative Counts',
+            'yunit': 'norm.',
+            'do_legend': True,
+        }
 
-        # self.plot_dicts['2D_shots_0'] = {
-        #     'ax_id': '2D_shots',
-        #     'plotfn': self.plot_xy,
-        #     'xvals': self.proc_data_dict['all_channel_int_voltages'][i][0][0],
-        #     'yvals': self.proc_data_dict['all_channel_int_voltages'][i][0][1],
-        # }
-        # self.plot_dicts['2D_histogram_0'] = {
-        #     'ax_id': '2D_histogram',
-        #     'plotfn': self.plot_xy,
-        #     'xvals': self.proc_data_dict['all_channel_int_voltages'][i][0][0],
-        #     'yvals': self.proc_data_dict['all_channel_int_voltages'][i][0][1],
-        #     'yvals': None,
-        # }
+        ### Vlines for thresholds
+        th_raw = self.proc_data_dict['threshold_raw']
+        threshs = [th_raw,]
+        if self.do_fitting:
+            threshs.append(self.proc_data_dict['threshold_fit'])
+            threshs.append(self.proc_data_dict['threshold_discr'])
 
+        for ax in ['1D_histogram', 'cdf']:
+            self.plot_dicts[ax+'_vlines_thresh'] = {
+                'ax_id': ax,
+                'plotfn': self.plot_vlines_auto,
+                'xdata': threshs,
+                'linestyles': ['--', '-.', ':'],
+                'labels': ['$th_{raw}$', '$th_{fit}$', '$th_{d}$'],
+                'colors': ['0.3', '0.5', '0.2'],
+                'do_legend': True,
+            }
+
+        #### 2D Histograms
+        if two_dim_data:
+            iq_centers = None
+            if 'IQ_pos' in self.proc_data_dict and self.proc_data_dict['IQ_pos'] is not None:
+                iq_centers = self.proc_data_dict['IQ_pos']
+                peak_marker_2D = {
+                    'plotfn': self.plot_line,
+                    'xvals': iq_centers[0],
+                    'yvals': iq_centers[1],
+                    'xlabel': x_volt_label,
+                    'xunit': x_volt_unit,
+                    'ylabel': y_volt_label,
+                    'yunit': y_volt_unit,
+                    'marker': 'x',
+                    'linestyle': '',
+                    'color': 'black',
+                    #'line_kws': {'markersize': 1, 'color': 'black', 'alpha': 1},
+                    'setlabel': 'Peaks',
+                    'do_legend': True,
+                }
+                self.plot_dicts['2D_histogram_0'] = {
+                    'title': 'Raw '+label_0+' Binned Shot Counts' + title,
+                    'ax_id': '2D_histogram_0',
+                    'plotfn': self.plot_colorxy,
+                    'xvals': self.proc_data_dict['2D_histogram_y'],
+                    'yvals': self.proc_data_dict['2D_histogram_x'],
+                    'zvals': self.proc_data_dict['2D_histogram_z'][0],
+                    'xlabel': x_volt_label,
+                    'xunit': x_volt_unit,
+                    'ylabel': y_volt_label,
+                    'yunit': y_volt_unit,
+                    'zlabel': z_hist_label,
+                    'zunit': '-',
+                    'cmap': 'Blues',
+                }
+                dp = deepcopy(peak_marker_2D)
+                dp['ax_id'] = '2D_histogram_0'
+                self.plot_dicts['2D_histogram_0_marker'] = dp
+
+            self.plot_dicts['2D_histogram_1'] = {
+                'title': 'Raw '+label_1+' Binned Shot Counts' + title,
+                'ax_id': '2D_histogram_1',
+                'plotfn': self.plot_colorxy,
+                'xvals': self.proc_data_dict['2D_histogram_y'],
+                'yvals': self.proc_data_dict['2D_histogram_x'],
+                'zvals': self.proc_data_dict['2D_histogram_z'][1],
+                'xlabel': x_volt_label,
+                'xunit': x_volt_unit,
+                'ylabel': y_volt_label,
+                'yunit': y_volt_unit,
+                'zlabel': z_hist_label,
+                'zunit': '-',
+                'cmap': 'Reds',
+            }
+            if iq_centers is not None:
+                dp = deepcopy(peak_marker_2D)
+                dp['ax_id'] = '2D_histogram_1'
+                self.plot_dicts['2D_histogram_1_marker'] = dp
+
+            #### Scatter Shots
+            volts = self.proc_data_dict['all_channel_int_voltages']
+            vxr = [np.min([np.min(a) for a in volts[:][0]]),
+                   np.max([np.max(a) for a in volts[:][0]])]
+            vyr = [np.min([np.min(a) for a in volts[:][1]]),
+                   np.max([np.max(a) for a in volts[:][1]])]
+            self.plot_dicts['2D_shots_0'] = {
+                'title': 'Raw Shots' + title,
+                'ax_id': '2D_shots',
+                'plotfn': self.plot_line,
+                'xvals': volts[0][1],
+                'yvals': volts[0][0],
+                'range': [vxr, vyr],
+                'xrange': vxr,
+                'yrange': vyr,
+                'xlabel': x_volt_label,
+                'xunit': x_volt_unit,
+                'ylabel': y_volt_label,
+                'yunit': y_volt_unit,
+                'zlabel': z_hist_label,
+                'marker': 'o',
+                'linestyle': '',
+                'color': 'C0',
+                'line_kws': {'markersize': 0.25, 'color': 'C0', 'alpha': 0.5},
+                'setlabel': label_0,
+                'do_legend': True,
+            }
+            self.plot_dicts['2D_shots_1'] = {
+                'ax_id': '2D_shots',
+                'plotfn': self.plot_line,
+                'xvals': volts[1][1],
+                'yvals': volts[1][0],
+                'range': [vxr, vyr],
+                'xrange': vxr,
+                'yrange': vyr,
+                'xlabel': x_volt_label,
+                'xunit': x_volt_unit,
+                'ylabel': y_volt_label,
+                'yunit': y_volt_unit,
+                'zlabel': z_hist_label,
+                'marker': 'o',
+                'linestyle': '',
+                'color': 'C3',
+                'line_kws': {'markersize': 0.25, 'color': 'C3', 'alpha': 0.5},
+                'setlabel': label_1,
+                'do_legend': True,
+            }
+            if iq_centers is not None:
+                dp = deepcopy(peak_marker_2D)
+                dp['ax_id'] = '2D_shots'
+                self.plot_dicts['2D_shots_marker'] = dp
 
         # The cumulative histograms
         #####################################
         # Adding the fits to the figures    #
         #####################################
         if self.do_fitting:
+            #todo: add seperate fits for residual and main gaussians
             x = np.linspace(bin_x[0], bin_x[-1], 150)
-            ro_g = ro_gauss(x=[x, x], **self.fit_res['shots_all_%d'%i].best_values)
+            para_hist_tmp = self.fit_res['shots_all_hist'].best_values
+            para_cdf = self.fit_res['shots_all'].best_values
+            para_hist = para_cdf
+            para_hist['A_amplitude'] = para_hist_tmp['A_amplitude']
+            para_hist['B_amplitude'] = para_hist_tmp['B_amplitude']
+
+            ro_g = ro_gauss(x=[x, x], **para_hist)
             self.plot_dicts['new_fit_shots_0'] = {
                 'ax_id': '1D_histogram',
                 'plotfn': self.plot_line,
                 'xvals': x,
                 'yvals': ro_g[0],
-                'setlabel': 'Fit shots 0',
+                'setlabel': 'Fit '+label_0,
                 'line_kws': {'color': 'C0'},
                 'marker': '',
-                'do_legend': True}
+                'do_legend': True,
+            }
             self.plot_dicts['new_fit_shots_1'] = {
                 'ax_id': '1D_histogram',
                 'plotfn': self.plot_line,
                 'xvals': x,
                 'yvals': ro_g[1],
                 'marker': '',
-                'setlabel': 'Fit shots 1',
+                'setlabel': 'Fit '+label_1,
                 'line_kws': {'color': 'C3'},
-                'do_legend': True}
+                'do_legend': True,
+            }
 
             self.plot_dicts['cdf_fit_shots_0'] = {
                 'ax_id': 'cdf',
                 'plotfn': self.plot_line,
                 'xvals': x,
                 'yvals': self._CDF_0(x),
-                'setlabel': 'Fit shots 0',
-                'line_kws': {'color': 'C0', 'alpha': 1},
-                'linestyle': '--',
+                'setlabel': 'Fit '+label_0,
+                'line_kws': {'color': 'C0', 'alpha': 0.8},
+                'linestyle': ':',
                 'marker': '',
-                'do_legend': True}
+                'do_legend': True,
+            }
             self.plot_dicts['cdf_fit_shots_1'] = {
                 'ax_id': 'cdf',
                 'plotfn': self.plot_line,
                 'xvals': x,
                 'yvals': self._CDF_1(x),
                 'marker': '',
-                'linestyle': '--',
-                'setlabel': 'Fit shots 1',
-                'line_kws': {'color': 'C3', 'alpha': 1},
-                'do_legend': True}
+                'linestyle': ':',
+                'setlabel': 'Fit '+label_1,
+                'line_kws': {'color': 'C3', 'alpha': 0.8},
+                'do_legend': True,
+            }
 
 
-        ###########################################
-        # Thresholds and fidelity information     #
-        ###########################################
-
+        ##########################################
+        # Add textbox (eg.g Thresholds, fidelity #
+        # information, number of shots etc)      #
+        ##########################################
         if not self.presentation_mode:
+            fit_text = 'Thresholds:'
+            fit_text += '\nName | Level | Fidelity'
             thr, th_unit = SI_val_to_msg_str(
-                self.proc_data_dict['threshold_raw'][i],
-                x_unit, return_type=float)
-
+                self.proc_data_dict['threshold_raw'],
+                eff_voltage_unit, return_type=float)
             raw_th_msg = (
-                'Raw threshold: {:.2f} {}\n'.format(
-                    thr, th_unit) +
-                r'$F_{A}$-raw: ' +
-                r'{:.3f}'.format(
-                    self.proc_data_dict['F_assignment_raw'][i]))
+                '\n>raw   | ' +
+                '{:.2f} {} | '.format(thr, th_unit) +
+                '{:.1f}%'.format(
+                    self.proc_data_dict['F_assignment_raw']*100))
+
+            fit_text += raw_th_msg
+
             if self.do_fitting:
                 thr, th_unit = SI_val_to_msg_str(
                     self.proc_data_dict['threshold_fit'],
-                    self.proc_data_dict['shots_xunit'], return_type=float)
+                    eff_voltage_unit, return_type=float)
                 fit_th_msg = (
-                    'Fit threshold: {:.2f} {}\n'.format(
-                        thr, th_unit) +
-                    r'$F_{A}$-fit: ' +
-                    r'{:.3f}'.format(self.proc_data_dict['F_assignment_fit']))
-
-                self.plot_dicts['fit_threshold'] = {
-                    'ax_id': '1D_histogram',
-                    'plotfn': self.plot_vlines,
-                    'x': self.proc_data_dict['threshold_fit'],
-                    'ymin': 0,
-                    'ymax': max_cnts*1.05,
-                    'colors': '.4',
-                    'linestyles': 'dotted',
-                    'line_kws': {'linewidth': .8},
-                    'setlabel': fit_th_msg,
-                    'do_legend': True}
+                    '\n>fit     | ' +
+                    '{:.2f} {} | '.format(thr, th_unit) +
+                    '{:.1f}%'.format(
+                        self.proc_data_dict['F_assignment_fit']*100))
+                fit_text += fit_th_msg
 
                 thr, th_unit = SI_val_to_msg_str(
                     self.proc_data_dict['threshold_discr'],
-                    self.proc_data_dict['shots_xunit'], return_type=float)
+                    eff_voltage_unit, return_type=float)
                 fit_th_msg = (
-                    'Discr. threshold: {:.2f} {}\n'.format(
-                        thr, th_unit) +
-                    r'$F_{D}$: ' +
-                    ' {:.3f}'.format(self.proc_data_dict['F_discr']))
-                self.plot_dicts['discr_threshold'] = {
-                    'ax_id': '1D_histogram',
-                    'plotfn': self.plot_vlines,
-                    'x': self.proc_data_dict['threshold_discr'],
-                    'ymin': 0,
-                    'ymax': max_cnts*1.05,
-                    'colors': '.3',
-                    'linestyles': '-.',
-                    'line_kws': {'linewidth': .8},
-                    'setlabel': fit_th_msg,
-                    'do_legend': True}
+                    '\n>dis    | ' +
+                    '{:.2f} {} | '.format(thr, th_unit) +
+                    '{:.1f}%'.format(
+                        self.proc_data_dict['F_discr']*100))
+                fit_text += fit_th_msg
+            snr = self.fit_res['shots_all'].params['SNR']
+            fit_text += '\nSNR (fit) = ${:.3f}\\pm{:.3f}$'.format(snr.value, snr.stderr)
 
-                # To add text only to the legend I create some "fake" data
-                rel_exc_str = ('Mmt. Ind. Rel.: {:.1f}%\n'.format(
-                    self.proc_data_dict['measurement_induced_relaxation']*100) +
-                    'Residual Exc.: {:.1f}%'.format(
-                        self.proc_data_dict['residual_excitation']*100))
-                self.plot_dicts['rel_exc_msg'] = {
-                    'ax_id': '1D_histogram',
-                    'plotfn': self.plot_line,
-                    'xvals': [self.proc_data_dict['threshold_discr']],
-                    'yvals': [max_cnts/2],
-                    'line_kws': {'alpha': 0},
-                    'setlabel': rel_exc_str,
-                    'do_legend': True}
+            fr = self.fit_res['shots_all']
+            bv = fr.params
+            a_sp = bv['A_spurious']
+            fit_text += '\n\nSpurious Excitations:'
+            fit_text += '\n$p(e|0) = {:.3f}$'.format(a_sp.value)
+            if self.options_dict.get('fixed_p01', True) == True:
+                fit_text += '$\\pm{:.3f}$'.format(a_sp.stderr)
+            else:
+                fit_text += ' (fixed)'
 
+            b_sp = bv['B_spurious']
+            fit_text += ' \n$p(g|\\pi) = {:.3f}$'.format(b_sp.value)
+            if self.options_dict.get('fixed_p10', True) == True:
+                fit_text += '$\\pm{:.3f}$'.format(b_sp.stderr)
+            else:
+                fit_text += ' (fixed)'
+
+            if two_dim_data:
+                offs = self.proc_data_dict['raw_offset']
+                #fit_text += '\nOffset from raw:\n'
+                #fit_text += '({:.3f},{:.3f}) {},\n'.format(offs[0], offs[1], eff_voltage_unit)
+                fit_text += '\n\nRotated by ${:.1f}^\\circ$'.format(offs[2]*180/np.pi)
+                auto_rot = self.options_dict.get('auto_rotation_angle', True)
+                fit_text += '(auto)' if auto_rot else '(man.)'
+            else:
+                fit_text += '\n\n(Single quadrature data)'
+
+            fit_text += '\n\nTotal shots: %d+%d'%(*self.proc_data_dict['nr_shots'],)
+
+            for ax in ['cdf', '1D_histogram']:
+                self.plot_dicts['text_msg_' + ax] = {
+                        'ax_id': ax,
+                        # 'ypos': 0.15,
+                        'xpos' : 1.05,
+                        'horizontalalignment' : 'left',
+                        'plotfn': self.plot_text,
+                        'box_props': 'fancy',
+                        'text_string': fit_text,
+                    }
 
 class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
     """
     For two qubits, to make an n-qubit mux readout experiment.
     we should vectorize this analysis
+
+    TODO: This needs to be rewritten/debugged!
+    Suggestion:
+        Use N*(N-1)/2 instances of Singleshot_Readout_Analysis,
+          run them without saving the plots and then merge together the
+          plot_dicts as in the cross_dephasing_analysis.
     """
 
     def __init__(self, t_start: str=None, t_stop: str=None,
@@ -567,7 +784,6 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
         self.proc_data_dict['ch_names'] = self.raw_data_dict['value_names'][0]
 
         for ch_name, shots in self.raw_data_dict['measured_values_ord_dict'].items():
-            # print(ch_name)
             self.proc_data_dict[ch_name] = shots[0]  # only 1 dataset
             self.proc_data_dict[ch_name +
                                 ' all'] = self.proc_data_dict[ch_name]
@@ -587,9 +803,9 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
                 # No post selection implemented yet
                 self.proc_data_dict['{} {}'.format(ch_name, comb)] = \
                     self.proc_data_dict[ch_name][i::number_of_experiments]
-                ##################################
-                #  Binning data into histograms  #
-                ##################################
+                #####################################
+                #  Binning data into 1D histograms  #
+                #####################################
                 hist_name = 'hist {} {}'.format(
                     ch_name, comb)
                 self.proc_data_dict[hist_name] = np.histogram(
@@ -840,112 +1056,3 @@ def make_mux_ssro_histogram(data_dict, ch_name, title=None, ax=None, **kw):
     if title is not None:
         ax.set_title(title)
 
-
-def ro_gauss(x, A_center, B_center, A_sigma, B_sigma, A_amplitude, B_amplitude, A_spurious, B_spurious):
-    gauss = lmfit.lineshapes.gaussian
-    A_gauss = gauss(x=x[0], center=A_center, sigma=A_sigma, amplitude=A_amplitude)
-    B_gauss = gauss(x=x[1], center=B_center, sigma=B_sigma, amplitude=B_amplitude)
-    gauss0 = ((1-A_spurious)*A_gauss + A_spurious*B_gauss)
-    gauss1 = ((1-B_spurious)*B_gauss + B_spurious*A_gauss)
-    return [gauss0, gauss1]
-
-
-def ro_CDF(x, A_center, B_center, A_sigma, B_sigma, A_amplitude, B_amplitude, A_spurious, B_spurious):
-    cdf = fit_mods.gaussianCDF
-    A_gauss = cdf(x=x[0], mu=A_center, sigma=A_sigma, amplitude=A_amplitude)
-    B_gauss = cdf(x=x[1], mu=B_center, sigma=B_sigma, amplitude=B_amplitude)
-    gauss0 = ((1-A_spurious)*A_gauss + A_spurious*B_gauss)
-    gauss1 = ((1-B_spurious)*B_gauss + B_spurious*A_gauss)
-    return [gauss0, gauss1]
-
-def ro_CDF_discr(x, A_center, B_center, A_sigma, B_sigma, A_amplitude, B_amplitude, A_spurious, B_spurious):
-    #A_amplitude /= 1-A_spurious
-    #B_amplitude /= 1-B_spurious
-    return ro_CDF(x, A_center, B_center, A_sigma, B_sigma, A_amplitude, B_amplitude, A_spurious=0, B_spurious=0)
-
-def sum_int(x,y):
-    return np.cumsum(y[:-1]*(x[1:]-x[:-1]))
-
-
-def optimize_IQ_angle(self, shots_I_1, shots_Q_1, shots_I_0,
-                      shots_Q_0, min_len, plot_2D_histograms=True,
-                      **kw):
-    n_bins = 120  # the bins we want to have around our data
-    I_min = min(min(shots_I_0), min(shots_I_1))
-    I_max = max(max(shots_I_0), max(shots_I_1))
-    Q_min = min(min(shots_Q_0), min(shots_Q_1))
-    Q_max = max(max(shots_Q_0), max(shots_Q_1))
-    edge = max(abs(I_min), abs(I_max), abs(Q_min), abs(Q_max))
-    H0, xedges0, yedges0 = np.histogram2d(shots_I_0, shots_Q_0,
-                                          bins=n_bins,
-                                          range=[[I_min, I_max],
-                                                 [Q_min, Q_max]],
-                                          normed=True)
-    H1, xedges1, yedges1 = np.histogram2d(shots_I_1, shots_Q_1,
-                                          bins=n_bins,
-                                          range=[[I_min, I_max, ],
-                                                 [Q_min, Q_max, ]],
-                                          normed=True)
-
-    # this part performs 2D gaussian fits and calculates coordinates of the
-    # maxima
-    def gaussian(height, center_x, center_y, width_x, width_y):
-        width_x = float(width_x)
-        width_y = float(width_y)
-        return lambda x, y: height * np.exp(-(((center_x - x) / width_x) ** 2 + (
-                (center_y - y) / width_y) ** 2) / 2)
-
-    def fitgaussian(data):
-        params = moments(data)
-        errorfunction = lambda p: np.ravel(gaussian(*p)(*np.indices(
-            data.shape)) - data)
-        p, success = optimize.leastsq(errorfunction, params)
-        return p
-
-    def moments(data):
-        total = data.sum()
-        X, Y = np.indices(data.shape)
-        x = (X * data).sum() / total
-        y = (Y * data).sum() / total
-        col = data[:, int(y)]
-        eps = 1e-8  # To prevent division by zero
-        width_x = np.sqrt(abs((np.arange(col.size) - y) ** 2 * col).sum() / (
-                col.sum() + eps))
-        row = data[int(x), :]
-        width_y = np.sqrt(abs((np.arange(row.size) - x) ** 2 * row).sum() / (
-                row.sum() + eps))
-        height = data.max()
-        return height, x, y, width_x, width_y
-
-    data0 = H0
-    params0 = fitgaussian(data0)
-    fit0 = gaussian(*params0)
-    data1 = H1
-    params1 = fitgaussian(data1)
-    fit1 = gaussian(*params1)
-    # interpolating to find the gauss top x and y coordinates
-    x_lin = np.linspace(0, n_bins, n_bins + 1)
-    y_lin = np.linspace(0, n_bins, n_bins + 1)
-    f_x_1 = interp1d(x_lin, xedges1, fill_value='extrapolate')
-    x_1_max = f_x_1(params1[1])
-    f_y_1 = interp1d(y_lin, yedges1, fill_value='extrapolate')
-    y_1_max = f_y_1(params1[2])
-
-    f_x_0 = interp1d(x_lin, xedges0, fill_value='extrapolate')
-    x_0_max = f_x_0(params0[1])
-    f_y_0 = interp1d(y_lin, yedges0, fill_value='extrapolate')
-    y_0_max = f_y_0(params0[2])
-
-    # following part will calculate the angle to rotate the IQ plane
-    # All information is to be rotated to the I channel
-    y_diff = y_1_max - y_0_max
-    x_diff = x_1_max - x_0_max
-    theta = -np.arctan2(y_diff, x_diff)
-
-    shots_I_1_rot = np.cos(theta) * shots_I_1 - np.sin(theta) * shots_Q_1
-    shots_Q_1_rot = np.sin(theta) * shots_I_1 + np.cos(theta) * shots_Q_1
-
-    shots_I_0_rot = np.cos(theta) * shots_I_0 - np.sin(theta) * shots_Q_0
-    shots_Q_0_rot = np.sin(theta) * shots_I_0 + np.cos(theta) * shots_Q_0
-
-    return (theta, shots_I_1_rot, shots_I_0_rot)

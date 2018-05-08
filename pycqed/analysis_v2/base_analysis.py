@@ -123,6 +123,7 @@ class BaseDataAnalysis(object):
         :param extract_only: Should we also do the plots?
         :param do_fitting: Should the run_fitting method be executed?
         '''
+        # todo: what exactly does this flag do? May 2018 (Adriaan/Rene)
         self.single_timestamp = False
         # initialize an empty dict to store results of analysis
         self.proc_data_dict = OrderedDict()
@@ -514,9 +515,8 @@ class BaseDataAnalysis(object):
                     for key, val in list(guess_dict.items()):
                         model.set_param_hint(key, **val)
                     guess_pars = model.make_params()
-
-            fit_dict['fit_res'] = model.fit(
-                params=guess_pars, **fit_xvals, **fit_yvals)
+            fit_dict['fit_res'] = model.fit(**fit_xvals, **fit_yvals,
+                                            params=guess_pars)
 
             self.fit_res[key] = fit_dict['fit_res']
 
@@ -1114,7 +1114,7 @@ class BaseDataAnalysis(object):
         plot_xunit = pdict['xunit']
         plot_ylabel = pdict['ylabel']
         plot_yunit = pdict['yunit']
-        plot_title = pdict['title']
+        plot_title = pdict.get('title', None)
         if plot_transpose:
             # transpose switches X and Y
             set_xlabel(axs, plot_ylabel, plot_yunit)

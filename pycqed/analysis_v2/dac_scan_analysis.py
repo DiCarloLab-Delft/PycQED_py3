@@ -138,6 +138,8 @@ class FluxFrequency(ba.BaseDataAnalysis):
                 # Fixme: save peaks
 
     def run_fitting(self):
+        # This is not the proper way to do this!
+        # TODO: move this to prepare_fitting
         self.fit_dicts = {}
         self.fit_result = {}
 

@@ -396,6 +396,37 @@ def double_gaussianCDF(x, A_amplitude, A_mu, A_sigma,
     CDF_B = gaussianCDF(x, amplitude=B_amplitude, mu=B_mu, sigma=B_sigma)
     return CDF_A + CDF_B
 
+def ro_gauss(x, A_center, B_center, A_sigma, B_sigma, A_amplitude,
+             B_amplitude, A_spurious, B_spurious):
+    '''
+    Two double-gaussians with sigma and mu/center of the residuals equal to the
+    according state.
+    '''
+    gauss = lmfit.lineshapes.gaussian
+    A_gauss = gauss(x=x[0], center=A_center, sigma=A_sigma, amplitude=A_amplitude)
+    B_gauss = gauss(x=x[1], center=B_center, sigma=B_sigma, amplitude=B_amplitude)
+    gauss0 = ((1-A_spurious)*A_gauss + A_spurious*B_gauss)
+    gauss1 = ((1-B_spurious)*B_gauss + B_spurious*A_gauss)
+    return [gauss0, gauss1]
+
+
+def ro_CDF(x, A_center, B_center, A_sigma, B_sigma, A_amplitude,
+           B_amplitude, A_spurious, B_spurious):
+    cdf = gaussianCDF
+    A_gauss = cdf(x=x[0], mu=A_center, sigma=A_sigma, amplitude=A_amplitude)
+    B_gauss = cdf(x=x[1], mu=B_center, sigma=B_sigma, amplitude=B_amplitude)
+    gauss0 = ((1-A_spurious)*A_gauss + A_spurious*B_gauss)
+    gauss1 = ((1-B_spurious)*B_gauss + B_spurious*A_gauss)
+    return [gauss0, gauss1]
+
+
+def ro_CDF_discr(x, A_center, B_center, A_sigma, B_sigma, A_amplitude,
+                 B_amplitude, A_spurious, B_spurious):
+    #A_amplitude /= 1-A_spurious
+    #B_amplitude /= 1-B_spurious
+    return ro_CDF(x, A_center, B_center, A_sigma, B_sigma, A_amplitude,
+                  B_amplitude, A_spurious=0, B_spurious=0)
+
 
 def gaussian_2D(x, y, amplitude=1,
                 center_x=0, center_y=0,
@@ -404,9 +435,9 @@ def gaussian_2D(x, y, amplitude=1,
     A 2D gaussian function. if you want to use this for fitting you need to
     flatten your data first.
     '''
-    gaus = lmfit.lineshapes.gaussian
-    val = (gaus(x, amplitude, center_x, sigma_x) *
-           gaus(y, amplitude, center_y, sigma_y))
+    gauss = lmfit.lineshapes.gaussian
+    val = (gauss(x, amplitude, center_x, sigma_x) *
+           gauss(y, amplitude, center_y, sigma_y))
     return val
 
 
@@ -762,18 +793,25 @@ def gauss_2D_guess(model, data, x, y):
 
     Note: possibly not compatible if the model uses prefixes.
     '''
+    dx = x[1:]-x[:-1]
+    dy = y[1:]-y[:-1]
+    sums = np.sum(((data[:-1,:-1]*dx).transpose()*dy))
+    amp = np.sqrt(sums)
     data_grid = data.reshape(-1, len(np.unique(x)))
     x_proj_data = np.mean(data_grid, axis=0)
     y_proj_data = np.mean(data_grid, axis=1)
-
-    x_guess = lmfit.models.GaussianModel().guess(x_proj_data, np.unique(x))
-    y_guess = lmfit.models.GaussianModel().guess(y_proj_data, np.unique(y))
-
-    params = model.make_params(amplitude=1,
-                               center_x=x_guess['center'].value,
-                               center_y=y_guess['center'].value,
-                               sigma_x=x_guess['sigma'].value,
-                               sigma_y=y_guess['sigma'].value)
+    x.sort()
+    y.sort()
+    x_guess = lmfit.models.GaussianModel().guess(data=x_proj_data, x=np.unique(x))
+    y_guess = lmfit.models.GaussianModel().guess(data=y_proj_data, x=np.unique(y))
+    model.set_param_hint('amplitude', value=amp, min=0.9*amp, max=1.1*amp,
+                         vary=True)
+    model.set_param_hint('sigma_x', value=x_guess['sigma'].value, min=0,
+                         vary=True)
+    model.set_param_hint('sigma_y', value=y_guess['sigma'].value, min=0,
+                         vary=True)
+    params = model.make_params(center_x=x_guess['center'].value,
+                               center_y=y_guess['center'].value,)
     return params
 
 
@@ -784,7 +822,6 @@ def double_gauss_2D_guess(model, data, x, y):
 
     Assumptions on input data
         * input is a flattened version of a 2D grid.
-        * total surface under the gaussians sums up to 1.
     Note: possibly not compatible if the model uses prefixes.
     Note 2: see also gauss_2D_guess() for some notes on how to improve this
             function.
@@ -852,7 +889,7 @@ def double_gauss_guess(model, data, x=None, **kwargs):
     else:
         return par_dict
 
-def double_gauss_guess_2(model, data, x, fixed_p01 = False, fixed_p10 = False):
+def ro_double_gauss_guess(model, data, x, fixed_p01 = False, fixed_p10 = False):
     # An initial guess is done on the binned data with single gaussians
     # to constrain the fit params and avoid fitting noise if
     # e.g., mmt. ind. rel. is very low
@@ -878,6 +915,8 @@ def double_gauss_guess_2(model, data, x, fixed_p01 = False, fixed_p10 = False):
     intarea1 = sum_int(x=x[1], y=data[1])[-1]
     model.set_param_hint('A_amplitude', value=intarea0, vary=False)
     model.set_param_hint('B_amplitude', value=intarea1, vary=False)
+    model.set_param_hint('SNR', expr='abs(A_center-B_center)*2/(A_sigma+B_sigma)',
+                         vary=False)
 
     # Spurious excitement
     f = np.sqrt(2*np.pi)
