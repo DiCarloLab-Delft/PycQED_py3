@@ -83,7 +83,7 @@ def phases_from_unitary(U):
     phi_10 = np.rad2deg(np.angle(U[3, 3]))
     phi_11 = np.rad2deg(np.angle(U[4, 4]))
 
-    phi_cond = phi_11 - phi_01 - phi_10 - phi_00
+    phi_cond = (phi_11 - phi_01 - phi_10 - phi_00)%360
 
     return phi_00, phi_01, phi_10, phi_11, phi_cond
 
@@ -105,6 +105,44 @@ def pro_fid_unitary_compsubspace(U, U_target):
     dim = 4  # 2 qubits comp subspace
 
     return ptrace/dim
+
+def leakage_from_unitary(U):
+    """
+    Calculates leakage by summing over all in and output states in the
+    computational subspace.
+        L1 = 1- sum_i sum_j abs(|<phi_i|U|phi_j>|)**2
+    """
+    sump = 0
+    for i in range(4):
+        for j in range(4):
+            bra_i = qtp.tensor(qtp.ket([i//2], dim=[2]),
+                               qtp.ket([i%2], dim=[3])).dag()
+            ket_j = qtp.tensor(qtp.ket([j//2], dim=[2]),
+                               qtp.ket([j%2], dim=[3]))
+            p = np.abs((bra_i*U*ket_j).data[0,0])**2
+            sump += p
+    sump/=4 # divide by dimension of comp subspace
+    L1 = 1-sump
+    return L1
+
+def seepage_from_unitary(U):
+    """
+    Calculates leakage by summing over all in and output states in the
+    computational subspace.
+        L1 = 1- sum_i sum_j abs(|<phi_i|U|phi_j>|)**2
+    """
+    sump = 0
+    for i in range(2):
+        for j in range(2):
+            bra_i = qtp.tensor(qtp.ket([i], dim=[2]),
+                               qtp.ket([2], dim=[3])).dag()
+            ket_j = qtp.tensor(qtp.ket([j], dim=[2]),
+                               qtp.ket([2], dim=[3]))
+            p = np.abs((bra_i*U*ket_j).data[0,0])**2
+            sump += p
+    sump/=2 # divide by dimension of comp subspace
+    L1 = 1-sump
+    return L1
 
 
 
