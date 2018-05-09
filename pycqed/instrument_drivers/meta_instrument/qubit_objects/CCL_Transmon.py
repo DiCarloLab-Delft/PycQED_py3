@@ -166,7 +166,7 @@ class CCLight_Transmon(Qubit):
 
         self.add_parameter('ro_acq_weight_type',
                            initial_value='DSB',
-                           vals=vals.Enum('SSB', 'DSB', 'optimal'),
+                           vals=vals.Enum('SSB', 'DSB', 'optimal', 'optimal IQ'),
                            docstring=ro_acq_docstr,
                            parameter_class=ManualParameter)
 
@@ -428,7 +428,7 @@ class CCLight_Transmon(Qubit):
             docstring='Current flux bias setting', vals=vals.Numbers(),
             initial_value=0, parameter_class=ManualParameter)
         self.add_parameter(
-            'fl_dc_V0', unit='V', docstring=(
+            'fl_dc_V0', unit='V', label='Flux bias sweet spot', docstring=(
                 'Flux bias offset corresponding to the sweetspot'),
             vals=vals.Numbers(), initial_value=0,
             parameter_class=ManualParameter)
@@ -620,8 +620,11 @@ class CCLight_Transmon(Qubit):
 
     def _prep_ro_instantiate_detectors(self):
         self.instr_MC.get_instr().soft_avg(self.ro_soft_avg())
-        if self.ro_acq_weight_type() == 'optimal':
-            ro_channels = [self.ro_acq_weight_chI()]
+        if 'optimal' in self.ro_acq_weight_type():
+            if self.ro_acq_weight_type()=='optimal':
+                ro_channels = [self.ro_acq_weight_chI()]
+            elif self.ro_acq_weight_type()=='optimal IQ':
+                ro_channels = [self.ro_acq_weight_chI(), self.ro_acq_weight_chQ()]
             result_logging_mode = 'lin_trans'
 
             if self.ro_acq_digitized():
@@ -803,7 +806,7 @@ class CCLight_Transmon(Qubit):
                     IF=self.ro_freq_mod(),
                     weight_function_I=self.ro_acq_weight_chI(),
                     weight_function_Q=self.ro_acq_weight_chQ())
-            elif self.ro_acq_weight_type() == 'optimal':
+            elif  'optimal' in self.ro_acq_weight_type():
                 if (self.ro_acq_weight_func_I() is None or
                         self.ro_acq_weight_func_Q() is None):
                     logging.warning('Optimal weights are None,' +
@@ -817,11 +820,23 @@ class CCLight_Transmon(Qubit):
                     UHFQC.set('quex_wint_weights_{}_imag'.format(
                         self.ro_acq_weight_chI()),
                         self.ro_acq_weight_func_Q())
-
                     UHFQC.set('quex_rot_{}_real'.format(
                         self.ro_acq_weight_chI()), 1.0)
                     UHFQC.set('quex_rot_{}_imag'.format(
                         self.ro_acq_weight_chI()), -1.0)
+                    if self.ro_acq_weight_type()=='optimal IQ':
+                        print('setting the optimal Q')
+                        UHFQC.set('quex_wint_weights_{}_real'.format(
+                            self.ro_acq_weight_chQ()),
+                            self.ro_acq_weight_func_I())
+                        UHFQC.set('quex_wint_weights_{}_imag'.format(
+                            self.ro_acq_weight_chQ()),
+                            self.ro_acq_weight_func_Q())
+                        UHFQC.set('quex_rot_{}_real'.format(
+                            self.ro_acq_weight_chI()), 1.0)
+                        UHFQC.set('quex_rot_{}_imag'.format(
+                            self.ro_acq_weight_chI()), 1.0)
+
         else:
             raise NotImplementedError(
                 'CBox, DDM or other are currently not supported')
@@ -925,6 +940,10 @@ class CCLight_Transmon(Qubit):
                         self.mw_mixer_offs_DI())
                 AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()+2),
                         self.mw_mixer_offs_DQ())
+
+        # 4. reloads the waveforms
+        if do_prepare:
+            MW_LutMan.load_waveforms_onto_AWG_lookuptable()
 
     def _prep_td_configure_VSM(self):
         # Configure VSM
@@ -1233,7 +1252,7 @@ class CCLight_Transmon(Qubit):
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='Resonator_power_scan'+self.msmt_suffix, mode='2D')
         if analyze:
-            ma.TwoD_Analysis(label='Resonator_power_scan', close_fig=close_fig)
+            ma.TwoD_Analysis(label='Resonator_power_scan', close_fig=close_fig, normalize=True)
 
     def measure_resonator_frequency_dac_scan(self, freqs, dac_values, MC=None,
                                              analyze: bool =True, close_fig: bool=True):
@@ -1483,10 +1502,62 @@ class CCLight_Transmon(Qubit):
         else:
             return [np.array(t, dtype=np.float64) for t in transients]
 
+    def measure_transients_CCL_switched(self, MC=None, analyze: bool=True,
+                           cases=('off', 'on'),
+                           prepare: bool=True, depletion_analysis: bool=True,
+                           depletion_analysis_plot: bool=True,
+                           depletion_optimization_window=None):
+        # docstring from parent class
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        self.prepare_for_timedomain()
+            # off/on switching is achieved by turning the MW source on and
+            # off as this is much faster than recompiling/uploading
+
+        transients = []
+        for i, pulse_comb in enumerate(cases):
+            p = sqo.off_on(
+                qubit_idx=self.cfg_qubit_nr(), pulse_comb=pulse_comb,
+                initialize=False,
+                platf_cfg=self.cfg_openql_platform_fn())
+            self.instr_CC.get_instr().eqasm_program(p.filename)
+
+            s = swf.OpenQL_Sweep(openql_program=p,
+                                 CCL=self.instr_CC.get_instr(),
+                                 parameter_name='Transient time', unit='s',
+                                 upload=prepare)
+            MC.set_sweep_function(s)
+
+            if 'UHFQC' in self.instr_acquisition():
+                sampling_rate = 1.8e9
+            else:
+                raise NotImplementedError()
+            MC.set_sweep_points(
+                np.arange(self.input_average_detector.nr_samples) /
+                sampling_rate)
+            MC.set_detector_function(self.input_average_detector)
+            data = MC.run(
+                'Measure_transients{}_{}'.format(self.msmt_suffix, i))
+            dset = data['dset']
+            transients.append(dset.T[1:])
+            if analyze:
+                ma.MeasurementAnalysis()
+        if depletion_analysis:
+            a = ma.Input_average_analysis(
+                IF=self.ro_freq_mod(),
+                optimization_window=depletion_optimization_window,
+                plot=depletion_analysis_plot)
+            return a
+        else:
+            return [np.array(t, dtype=np.float64) for t in transients]
+
     def calibrate_optimal_weights(self, MC=None, verify: bool=True,
                                   analyze: bool=True, update: bool=True,
                                   no_figs: bool=False,
-                                  update_threshold: bool=True)->bool:
+                                  update_threshold: bool=True,
+                                  optimal_IQ: bool=False,
+                                  measure_transients_CCL_switched: bool=False)->bool:
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -1494,7 +1565,12 @@ class CCLight_Transmon(Qubit):
         old_avg = self.ro_acq_averages()
 
         self.ro_acq_averages(2**15)
-        transients = self.measure_transients(MC=MC, analyze=analyze,
+        if measure_transients_CCL_switched:
+            transients = self.measure_transients_CCL_switched(MC=MC,
+                                            analyze=analyze,
+                                            depletion_analysis=False)
+        else:
+            transients = self.measure_transients(MC=MC, analyze=analyze,
                                              depletion_analysis=False)
         if analyze:
             ma.Input_average_analysis(IF=self.ro_freq_mod())
@@ -1518,8 +1594,10 @@ class CCLight_Transmon(Qubit):
         if update:
             self.ro_acq_weight_func_I(optimized_weights_I)
             self.ro_acq_weight_func_Q(optimized_weights_Q)
-            self.ro_acq_weight_type('optimal')
-
+            if optimal_IQ:
+                self.ro_acq_weight_type('optimal IQ')
+            else:
+                self.ro_acq_weight_type('optimal')
         if verify:
             self.measure_ssro(no_figs=no_figs, update_threshold=update_threshold)
         return True
@@ -2229,7 +2307,7 @@ class CCLight_Transmon(Qubit):
                 motzoi_atts = np.linspace(0, 50e3, 31)
             mod_out = self.mw_vsm_mod_out()
             ch_in = self.mw_vsm_ch_in()
-            D_par = VSM.parameters['mod{}_ch{}_derivative_att_raw'.format(
+            D_par = self.instr_VSM.get_instr().parameters['mod{}_ch{}_derivative_att_raw'.format(
                 mod_out, ch_in)]
             swf_func = D_par
         else:
