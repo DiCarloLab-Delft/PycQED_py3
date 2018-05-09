@@ -599,10 +599,7 @@ class RamseyAnalysisSingleScans(RamseyAnalysis):
     def extract_data(self):
         # Load data
         super().extract_data()
-        #todo: this is buggy
-        if self.options_dict.get('remove_reference_ramsey', Fa):
-            if np.argmax(amps) in mask:
-                mask = np.where(mask != np.argmax(amps))
+        #todo: we need an option to remove outliers and the reference point
 
         # Set output paths
         youngest = np.max(self.raw_data_dict['datetime'])
@@ -774,10 +771,7 @@ class SSROAnalysisSingleScans(SSROAnalysis):
         # Load data
         super().extract_data()
 
-        #todo: this is buggy
-        if self.options_dict.get('remove_reference_ssro', False):
-            if np.argmax(amps) in mask:
-                mask = np.where(mask != np.argmax(amps))
+        #todo: we need an option to remove outliers and the reference point
 
         # Set output paths
         youngest = np.max(self.raw_data_dict['datetime'])
