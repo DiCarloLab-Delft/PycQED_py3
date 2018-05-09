@@ -1,4 +1,5 @@
 import unittest
+import matplotlib.pyplot as plt
 import qutip as qtp
 import numpy as np
 
@@ -43,6 +44,65 @@ class Test_cz_unitary_simulation(unittest.TestCase):
             # after removing rotating term, single qubit terms have static phase
             self.assertTrue(abs(np.angle(U[1,1]))<.1)
             self.assertTrue(abs(np.angle(U[3,3]))<.1)
+
+
+
+    def test_resonant_sudden_CZ(self):
+
+        alpha_q0 = 250e6 *2*np.pi
+        J = 2.5e6 *2*np.pi
+        w_q0 = 6e9 *2*np.pi
+        w_q1 = w_q0+alpha_q0
+
+        H_0 = czu.coupled_transmons_hamiltonian(w_q0, w_q1,
+                                                alpha_q0=alpha_q0, J=J)
+        tlist = np.arange(0, 150e-9, .1e-9)
+
+        U_t = qtp.propagator(H_0, tlist)
+
+        time_idx = [0, 500, 1000] # 0, 50 and 100ns
+
+        # time_idx = range(len(tlist))
+        phases = np.asanyarray([czu.phases_from_unitary(
+            czu.rotating_frame_transformation(
+                U_t[t_idx], tlist[t_idx], w_q0, w_q1) )
+            for t_idx in time_idx])
+        # f, ax = plt.subplots()
+        # ax.plot(tlist, phases[:,0], label='Phi_00')
+        # ax.plot(tlist, phases[:,1], label='Phi_01')
+        # ax.plot(tlist, phases[:,2], label='Phi_10')
+        # ax.plot(tlist, phases[:,3], label='Phi_11')
+        # ax.plot(tlist, phases[:,4], label='Phi_cond')
+        # ax.legend()
+        # plt.show()
+
+        np.testing.assert_almost_equal(phases[0, 3], 0, decimal=-1)
+        np.testing.assert_almost_equal(phases[1, 3], 0, decimal=-1)
+        np.testing.assert_almost_equal(phases[2, 3], 180, decimal=-1)
+
+
+    def test_offresonant_adiabatic_CZ(self):
+        alpha_q0 = 250e6 *2*np.pi
+        J = 2.5e6 *2*np.pi
+        w_q0 = 6e9 *2*np.pi
+        w_q1 = w_q0+alpha_q0*1.05
+
+        H_0 = czu.coupled_transmons_hamiltonian(w_q0, w_q1,
+                                                alpha_q0=alpha_q0, J=J)
+        tlist = np.arange(0, 150e-9, .1e-9)
+
+        U_t = qtp.propagator(H_0, tlist)
+
+        time_idx = [0, 500, 1000] # 0, 50 and 100ns
+        phases = np.asanyarray([czu.phases_from_unitary(
+            czu.rotating_frame_transformation(
+                U_t[t_idx], tlist[t_idx], w_q0, w_q1) )
+            for t_idx in time_idx])
+
+        np.testing.assert_almost_equal(phases[0, 3], 0, decimal=-1)
+        np.testing.assert_almost_equal(phases[1, 3], -20, decimal=-1)
+        np.testing.assert_almost_equal(phases[2, 3], -32, decimal=-1)
+
 
 
 

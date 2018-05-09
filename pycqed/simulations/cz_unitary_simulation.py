@@ -31,7 +31,10 @@ def coupled_transmons_hamiltonian(w_q0, w_q1, alpha_q0, J):
     intended avoided crossing:
         11 <-> 02
 
+    N.B. the frequency of q1 is expected to be larger than that of q0
+        w_q1 > w_q1
     """
+
     H_0 =   w_q0 * n_q0 + w_q1 * n_q1 +  \
        1/2*alpha_q0*(a.dag()*a.dag()*a*a) +\
         J * (a.dag() + a) * (b + b.dag())
