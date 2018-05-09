@@ -160,7 +160,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 dx = x1 - x0
                 dy = y1 - y0
                 mid = [x0 + dx/2, y0 + dy/2]
-                angle = -np.arctan2(dy, dx)
+                angle = np.arctan2(dy, dx)
             else:
                 mid = [0, 0]
 
@@ -172,8 +172,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
             self.proc_data_dict['raw_offset'] = [*mid, angle]
             # create matrix
-            rot_mat = [[+np.cos(angle), -np.sin(angle)],
-                       [+np.sin(angle), +np.cos(angle)]]
+            rot_mat = [[+np.cos(-angle), -np.sin(-angle)],
+                       [+np.sin(-angle), +np.cos(-angle)]]
             # rotate data accordingly
             eff_sh = np.zeros(len(shots[0]), dtype=np.ndarray)
             eff_sh[0] = np.dot(rot_mat[0], shots[0])# - mid
