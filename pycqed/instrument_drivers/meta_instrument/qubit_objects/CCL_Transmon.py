@@ -833,9 +833,9 @@ class CCLight_Transmon(Qubit):
                             self.ro_acq_weight_chQ()),
                             self.ro_acq_weight_func_Q())
                         UHFQC.set('quex_rot_{}_real'.format(
-                            self.ro_acq_weight_chI()), 1.0)
+                            self.ro_acq_weight_chQ()), 1.0)
                         UHFQC.set('quex_rot_{}_imag'.format(
-                            self.ro_acq_weight_chI()), 1.0)
+                            self.ro_acq_weight_chQ()), 1.0)
 
         else:
             raise NotImplementedError(
