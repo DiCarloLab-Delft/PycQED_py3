@@ -1413,6 +1413,9 @@ def calculate_rotation_matrix(delta_I, delta_Q):
 
 
 def normalize_TD_data(data, data_zero, data_one):
+    """
+    Normalizes measured data to refernce signals for zero and one
+    """
     return (data - data_zero) / (data_one - data_zero)
 
 

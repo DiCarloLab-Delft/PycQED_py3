@@ -11,6 +11,8 @@ from pycqed.measurement import sweep_functions as swf
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import measurement_analysis as ma2
 import networkx as nx
+import datetime
+
 
 try:
     from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
@@ -204,20 +206,20 @@ class DeviceCCL(Instrument):
         # fl_lutman.load_waveforms_onto_awg_lookuptable()
         fl_lutman.load_waveforms_onto_AWG_lookuptable()
         awg = fl_lutman.AWG.get_instr()
-        if AWG.__class__.__name__ == 'QuTech_AWG_Module':
+        if awg.__class__.__name__ == 'QuTech_AWG_Module':
             using_QWG = True
         else:
             using_QWG = False
         if not using_QWG:
-          # awg.upload_codeword_program(awgs=[0])
-          awg_hack_program_cz = """
+            # awg.upload_codeword_program(awgs=[0])
+            awg_hack_program_cz = """
           while (1) {
             waitDIOTrigger();
             playWave("dev8005_wave_ch1_cw001", "dev8005_wave_ch2_cw001");
           }
           """
-          awg.configure_awg_from_string(0, awg_hack_program_cz)
-          awg.configure_codeword_protocol()
+            awg.configure_awg_from_string(0, awg_hack_program_cz)
+            awg.configure_codeword_protocol()
 
         awg.start()
 
@@ -241,7 +243,8 @@ class DeviceCCL(Instrument):
             qb.ro_acq_weight_type(self.ro_acq_weight_type())
             qb.ro_acq_integration_length(self.ro_acq_integration_length())
             qb.ro_acq_digitized(self.ro_acq_digitized())
-            qb.ro_acq_delay(self.ro_acq_delay())
+            # hardcoded because UHFLI is not stable for arbitrary values
+            qb.ro_acq_input_average_length(4096/1.8e9)
 
             acq_device = qb.instr_acquisition()
 
@@ -461,7 +464,7 @@ class DeviceCCL(Instrument):
 
             ro_lm = qb.instr_LutMan_RO.get_instr()
             lutmans_to_configure[ro_lm.name] = ro_lm
-            res_nr = qb.ro_pulse_res_nr()
+            res_nr = qb.cfg_qubit_nr()()
 
             # extend the list of combinations to be set for the lutman
 
@@ -554,7 +557,7 @@ class DeviceCCL(Instrument):
 
     def prepare_for_timedomain(self):
         self.prepare_readout()
-        # self.prepare_fluxing()
+        self.prepare_fluxing()
         self.prepare_timing()
 
         for qb_name in self.qubits():
@@ -580,6 +583,7 @@ class DeviceCCL(Instrument):
         """
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
+
         if MC is None:
             MC = self.instr_MC.get_instr()
         assert q0 in self.qubits()
@@ -738,6 +742,104 @@ class DeviceCCL(Instrument):
             a = ma2.Multiplexed_Readout_Analysis()
         return a
 
+    def measure_msmt_induced_dephasing_matrix(self, qubits: list,
+                                              analyze=True, MC=None,
+                                              prepare_for_timedomain=True,
+                                              n_amps_rel: int=None,
+                                              verbose=True,
+                                              get_quantum_eff: bool=False):
+        '''
+        Measures the msmt induced dephasing for readout the readout of qubits
+        i on qubit j. Additionally measures the SNR as a function of amplitude
+        for the diagonal elements to obtain the quantum efficiency.
+        In order to use this: make sure that
+        - all readout_and_depletion pulses are of equal total length
+        - the cc light to has the readout time configured equal to the
+            measurement and depletion time + 60 ns buffer
+
+        fixme: not sure if the weight function assignment is working correctly.
+
+        the qubit objects will use SSB for the ramsey measurements.
+        '''
+        lpatt = '_trgt_{TQ}_measured_{RQ}'
+        if prepare_for_timedomain:
+            #for q in qubits:
+            #    q.prepare_for_timedomain()
+            self.prepare_for_timedomain()
+
+        old_suffixes = [q.msmt_suffix for q in qubits] #Save old qubit suffixes
+        old_suffix = self.msmt_suffix
+
+        # Save the start-time of the experiment for analysis
+        start = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # Loop over all target and measurement qubits
+        target_qubits = qubits[:]
+        measured_qubits = qubits[:]
+        for target_qubit in target_qubits:
+            for measured_qubit in measured_qubits:
+                # Set measurement label suffix
+                s = lpatt.replace('{TQ}', target_qubit.name)
+                s = s.replace('{RQ}', measured_qubit.name)
+                measured_qubit.msmt_suffix = s
+                target_qubit.msmt_suffix = s
+
+                #Print label
+                if verbose:
+                    print(s)
+
+                # Slight differences if diagonal element
+                if target_qubit == measured_qubit:
+                    amps_rel = np.linspace(0, 1, n_amps_rel)
+                    mqp = None
+                    list_target_qubits = None
+                else:
+                    t_amp_max = max(target_qubit.ro_pulse_down_amp0(),
+                                    target_qubit.ro_pulse_down_amp1(),
+                                    target_qubit.ro_pulse_amp())
+                    amp_max = max(t_amp_max, measured_qubit.ro_pulse_amp())
+                    amps_rel = np.linspace(0, 0.99/(amp_max), n_amps_rel)
+                    mqp = self.cfg_openql_platform_fn()
+                    list_target_qubits = [target_qubit,]
+
+                # If a diagonal element, consider doing the full quantum
+                # efficiency matrix.
+                if target_qubit == measured_qubit and get_quantum_eff:
+                    res = measured_qubit.measure_quantum_efficiency(
+                                                verbose=verbose,
+                                                amps_rel=amps_rel)
+                else:
+                    res = measured_qubit.measure_msmt_induced_dephasing_sweeping_amps(
+                            verbose=verbose,
+                            amps_rel=amps_rel,
+                            cross_target_qubits=list_target_qubits,
+                            multi_qubit_platf_cfg=mqp,
+                            analyze=True
+                        )
+                # Print the result of the measurement
+                if verbose:
+                    print(res)
+
+        # Save the end-time of the experiment
+        stop = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        #reset the msmt_suffix'es
+        for qi, q in enumerate(qubits):
+            q.msmt_suffix = old_suffixes[qi]
+        self.msmt_suffix = old_suffix
+
+        # Run the analysis for this experiment
+        if analyze:
+            options_dict = {
+                'verbose': True,
+            }
+            qarr = [q.name for q in qubits]
+            labelpatt = 'ro_amp_sweep_ramsey'+lpatt
+            ca = ma2.CrossDephasingAnalysis(t_start=start, t_stop=stop,
+                                            label_pattern=labelpatt,
+                                            qubit_labels=qarr,
+                                            options_dict=options_dict)
+
     def measure_chevron(self, q0: str, q_spec: str,
                         amps, lengths,
                         prepare_for_timedomain=True, MC=None,
@@ -761,13 +863,6 @@ class DeviceCCL(Instrument):
         q0idx = self.find_instrument(q0).cfg_qubit_nr()
         q_specidx = self.find_instrument(q_spec).cfg_qubit_nr()
 
-        # buffer times are hardcoded for now FIXME!
-        p = mqo.Chevron(q0idx, q_specidx, buffer_time=100e-9,
-                        buffer_time2=1750e-9,
-                        platf_cfg=self.cfg_openql_platform_fn())
-        self.instr_CC.get_instr().eqasm_program(p.filename)
-        self.instr_CC.get_instr().start()
-
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
 
         if waveform_name == 'square':
@@ -781,11 +876,12 @@ class DeviceCCL(Instrument):
         using_QWG = (awg.__class__.__name__ == 'QuTech_AWG_Module')
 
         if using_QWG:
-            awg_ch = fl_lutman.cfg_awg_channel()-1
-            awg_par = awg.parameters['ch{}_amp'.format(awg_ch)]
+            awg_ch = fl_lutman.cfg_awg_channel()
+            amp_par = awg.parameters['ch{}_amp'.format(awg_ch)]
             sw = swf.FLsweep_QWG(fl_lutman, length_par,
                                  realtime_loading=False,
                                  waveform_name=waveform_name)
+            flux_cw = 0
 
         else:
             awg_ch = fl_lutman.cfg_awg_channel()-1  # -1 is to account for starting at 1
@@ -797,6 +893,14 @@ class DeviceCCL(Instrument):
             sw = swf.FLsweep(fl_lutman, length_par,
                              realtime_loading=False,
                              waveform_name=waveform_name)
+            flux_cw = 2
+        # buffer times are hardcoded for now FIXME!
+        p = mqo.Chevron(q0idx, q_specidx, buffer_time=100e-9,
+                        buffer_time2=200e-9,
+                        flux_cw=flux_cw,
+                        platf_cfg=self.cfg_openql_platform_fn())
+        self.instr_CC.get_instr().eqasm_program(p.filename)
+        self.instr_CC.get_instr().start()
 
         d = self.get_correlation_detector(single_int_avg=True,
                                           seg_per_point=1)
@@ -813,7 +917,35 @@ class DeviceCCL(Instrument):
     def measure_cryoscope(self, q0: str, times,
                           MC=None,
                           experiment_name='Cryoscope',
+                          waveform_name: str='square',
+                          max_delay: float='auto',
                           prepare_for_timedomain: bool=True):
+        """
+        Performs a cryoscope experiment to measure the shape of a flux pulse.
+
+        Args:
+            q0  (str)     :
+                name of the target qubit
+
+            times   (array):
+                array of measurment times
+
+            experiment_name (str):
+                used to label the experiment
+
+            waveform_name (str {"square", "custom_wf"}) :
+                defines the name of the waveform used in the
+                cryoscope. Valid values are either "square" or "custom_wf"
+
+            max_delay {float, "auto"} :
+                determines the delay in the delay in the pusle sequence
+                if set to "auto" this is automatically set to the largest
+                pulse duration for the cryoscope.
+
+            prepare_for_timedomain (bool):
+                calls self.prepare_for_timedomain on start
+        """
+
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
         if MC is None:
@@ -822,16 +954,27 @@ class DeviceCCL(Instrument):
         assert q0 in self.qubits()
         q0idx = self.find_instrument(q0).cfg_qubit_nr()
 
+        if max_delay == 'auto':
+            max_delay = np.max(times) + 40e-9
         p = mqo.Cryoscope(q0idx, buffer_time1=20e-9,
-                          buffer_time2=2000e-9,
+                          buffer_time2=max_delay,
                           platf_cfg=self.cfg_openql_platform_fn())
         self.instr_CC.get_instr().eqasm_program(p.filename)
         self.instr_CC.get_instr().start()
 
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
-        sw = swf.FLsweep(fl_lutman, fl_lutman.sq_length,
-                         realtime_loading=True,
-                         waveform_name='square')
+
+        if waveform_name == 'square':
+            sw = swf.FLsweep(fl_lutman, fl_lutman.sq_length,
+                             realtime_loading=True,
+                             waveform_name='square')
+        elif waveform_name == 'custom_wf':
+            sw = swf.FLsweep(fl_lutman, fl_lutman.custom_wf_length,
+                             realtime_loading=True,
+                             waveform_name='custom_wf')
+        else:
+            raise ValueError('waveform_name "{}" should be either '
+                             '"square" or "custom_wf"'.format(waveform_name))
         MC.set_sweep_function(sw)
         MC.set_sweep_points(times)
         d = self.get_int_avg_det(values_per_point=2,
@@ -1029,8 +1172,6 @@ class DeviceCCL(Instrument):
         dag.add_node(self.name + ' mw-ro timing')
         dag.add_edge(self.name + ' mw-ro timing', 'AWG8 MW-staircase')
 
-
-
         dag.add_node(self.name + ' mw-vsm timing')
         dag.add_edge(self.name + ' mw-vsm timing', self.name + ' mw-ro timing')
 
@@ -1089,4 +1230,3 @@ class DeviceCCL(Instrument):
 
         self._dag = dag
         return dag
-
