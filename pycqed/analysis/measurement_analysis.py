@@ -2985,8 +2985,14 @@ class SSRO_Analysis(MeasurementAnalysis):
     the optimum threshold and fidelity from cumulative histograms.
     '''
 
-    def __init__(self, rotate=True, close_fig=True, channels=['I', 'Q'],
+    def __init__(self, rotate=True, close_fig=True, channels=None,
                  hist_log_scale: bool = True, **kw):
+        if channels is None:
+            channels = ['I', 'Q']
+
+        logging.warning('The use of this class is deprectated!' +
+                         ' Use the new v2 analysis instead.')
+
         kw['h5mode'] = 'r+'
         self.rotate = rotate
         self.channels = channels
