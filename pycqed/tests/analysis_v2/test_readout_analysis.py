@@ -91,16 +91,13 @@ class Test_SSRO_discrimination_analysis(unittest.TestCase):
         t_stop = t_start
         a = ma.Singleshot_Readout_Analysis(t_start=t_start, t_stop=t_stop,
                                            extract_only=True)
-        np.testing.assert_almost_equal(a.proc_data_dict['threshold_raw'],
-                                       -3.30, decimal=2)
+        self.assertBetween(a.proc_data_dict['threshold_raw'], -3.3, -3.2)
         np.testing.assert_almost_equal(a.proc_data_dict['F_assignment_raw'],
-                                       0.944, decimal=3)
-        np.testing.assert_almost_equal(a.proc_data_dict['threshold_fit'],
-                                       -3.25, decimal=2)
+                                       0.944, decimal=2)
+        self.assertBetween(a.proc_data_dict['threshold_fit'], -3.3, -3.2)
         np.testing.assert_almost_equal(a.proc_data_dict['F_assignment_fit'],
                                        0.944, decimal=2)
-        np.testing.assert_almost_equal(a.proc_data_dict['threshold_discr'],
-                                       -3.2, decimal=1)
+        self.assertBetween(a.proc_data_dict['threshold_discr'], -3.3, -3.2)
         np.testing.assert_almost_equal(a.proc_data_dict['F_discr'],
                                        0.99, decimal=2)
 
@@ -111,17 +108,16 @@ class Test_SSRO_discrimination_analysis(unittest.TestCase):
         t_stop = t_start
         a = ma.Singleshot_Readout_Analysis(t_start=t_start, t_stop=t_stop,
                                            extract_only=True)
-        np.testing.assert_almost_equal(a.proc_data_dict['threshold_raw'],
-                                       -.95, decimal=2)
+        self.assertBetween(a.proc_data_dict['threshold_raw'], -1, -0.7)
         np.testing.assert_almost_equal(a.proc_data_dict['F_assignment_raw'],
-                                       0.949, decimal=3)
-        self.assertBetween(a.proc_data_dict['threshold_fit'], -1, -.9)
+                                       0.949, decimal=2)
+        self.assertBetween(a.proc_data_dict['threshold_fit'], -1, -.7)
         np.testing.assert_almost_equal(a.proc_data_dict['F_assignment_fit'],
                                        0.945, decimal=2)
         self.assertBetween(a.proc_data_dict['threshold_discr'], -1, -.7)
         np.testing.assert_almost_equal(a.proc_data_dict['F_discr'],
                                        1.000, decimal=2)
-        self.assertLess(a.proc_data_dict['residual_excitation'], 0.02)
+        self.assertLess(a.proc_data_dict['residual_excitation'], 0.09)
         np.testing.assert_almost_equal(
             a.proc_data_dict['measurement_induced_relaxation'], 0.1,
             decimal=1)

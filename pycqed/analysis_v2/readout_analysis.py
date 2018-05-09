@@ -28,7 +28,7 @@ from pycqed.utilities.general import int2base
 class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
     def __init__(self, t_start: str=None, t_stop: str=None,
-                 label: str='',
+                 label: str='', do_fitting: bool = True,
                  data_file_path: str=None,
                  options_dict: dict=None, auto=True, **kw):
         '''
@@ -50,7 +50,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             see BaseDataAnalysis for more.
         '''
         super().__init__(t_start=t_start, t_stop=t_stop,
-                         label=label,
+                         label=label, do_fitting=do_fitting,
                          data_file_path=data_file_path,
                          options_dict=options_dict,
                          **kw)
@@ -348,6 +348,11 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             self.proc_data_dict['F_discr'] = (1-opt_fid_discr['fun'])[0]
 
         self.proc_data_dict['threshold_discr'] = opt_fid_discr['x'][0]
+
+        fr = self.fit_res['shots_all']
+        bv = fr.params
+        self.proc_data_dict['residual_excitation'] = bv['B_spurious'].value
+        self.proc_data_dict['measurement_induced_relaxation'] = bv['A_spurious'].value
 
     def prepare_plots(self):
         # Did we load two voltage components (shall we do 2D plots?)
