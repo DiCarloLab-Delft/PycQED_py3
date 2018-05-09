@@ -123,6 +123,7 @@ class BaseDataAnalysis(object):
         :param extract_only: Should we also do the plots?
         :param do_fitting: Should the run_fitting method be executed?
         '''
+        # todo: what exactly does this flag do? May 2018 (Adriaan/Rene)
         self.single_timestamp = False
         # initialize an empty dict to store results of analysis
         self.proc_data_dict = OrderedDict()
@@ -480,6 +481,7 @@ class BaseDataAnalysis(object):
         for key, fit_dict in self.fit_dicts.items():
             guess_dict = fit_dict.get('guess_dict', None)
             guess_pars = fit_dict.get('guess_pars', None)
+            guessfn_pars = fit_dict.get('guessfn_pars', {})
             fit_yvals = fit_dict['fit_yvals']
             fit_xvals = fit_dict['fit_xvals']
 
@@ -495,7 +497,7 @@ class BaseDataAnalysis(object):
                 if fit_guess_fn is not None:
                     # a fit function should return lmfit parameter objects
                     # but can also work by returning a dictionary of guesses
-                    guess_pars = fit_guess_fn(**fit_yvals, **fit_xvals)
+                    guess_pars = fit_guess_fn(**fit_yvals, **fit_xvals, **guessfn_pars)
                     if not isinstance(guess_pars, lmfit.Parameters):
                         for gd_key, val in list(guess_pars.items()):
                             model.set_param_hint(gd_key, **val)
@@ -513,9 +515,8 @@ class BaseDataAnalysis(object):
                     for key, val in list(guess_dict.items()):
                         model.set_param_hint(key, **val)
                     guess_pars = model.make_params()
-
-            fit_dict['fit_res'] = model.fit(
-                params=guess_pars, **fit_xvals, **fit_yvals)
+            fit_dict['fit_res'] = model.fit(**fit_xvals, **fit_yvals,
+                                            params=guess_pars)
 
             self.fit_res[key] = fit_dict['fit_res']
 
@@ -1113,7 +1114,7 @@ class BaseDataAnalysis(object):
         plot_xunit = pdict['xunit']
         plot_ylabel = pdict['ylabel']
         plot_yunit = pdict['yunit']
-        plot_title = pdict['title']
+        plot_title = pdict.get('title', None)
         if plot_transpose:
             # transpose switches X and Y
             set_xlabel(axs, plot_ylabel, plot_yunit)
@@ -1275,6 +1276,20 @@ class BaseDataAnalysis(object):
         :return: Global maximum
         '''
         return np.max([np.max(v) for v in array])
+
+    def plot_vlines_auto(self, pdict, axs):
+        xs = pdict.get('xdata')
+        for i,x in enumerate(xs):
+            d = {}
+            for k in pdict:
+                lk = k[:-1]
+                #if lk in signature(axs.axvline).parameters:
+                if k not in ['xdata', 'plotfn', 'ax_id', 'do_legend']:
+                    try:
+                        d[lk] = pdict[k][i]
+                    except:
+                        pass
+            axs.axvline(x=x, **d)
 
 
 def plot_scatter_errorbar(self, ax_id, xdata, ydata, xerr=None, yerr=None, pdict=None):

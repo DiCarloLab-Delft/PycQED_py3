@@ -100,6 +100,8 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                 self.raw_data_dict['freq_sorted_dac'] = freqs[sorted_indices]
 
     def run_fitting(self):
+        # This is not the proper way to do this!
+        # TODO: move this to prepare_fitting
         if hasattr(self, 'raw_data_dict'):
             self.fit_res = {}
             if self.plot_versus_dac and self.plot_versus_frequency:
@@ -466,15 +468,14 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
             gamma_1 = self.proc_data_dict[qubit][self.T1]['all_dac_sorted_gamma']
             gamma_ramsey = self.proc_data_dict[qubit][self.T2_star]['all_dac_sorted_gamma']
             gamma_echo = self.proc_data_dict[qubit][self.T2]['all_dac_sorted_gamma']
-            # print(gamma_ramsey)
-            # print(gamma_echo)
-            # print(gamma_1)
             gamma_phi_ramsey = (gamma_ramsey - gamma_1 / 2.0)
             gamma_phi_echo = (gamma_echo - gamma_1 / 2.0)
             self.proc_data_dict[qubit]['gamma_phi_ramsey'] = gamma_phi_ramsey
             self.proc_data_dict[qubit]['gamma_phi_echo'] = gamma_phi_echo
 
     def run_fitting(self):
+        # This is not the proper way to do this!
+        # TODO: move this to prepare_fitting
         if self.freq_keys and self.dac_keys:
             for qubit in self.all_analysis:
                 self.fit_res[qubit] = {}
