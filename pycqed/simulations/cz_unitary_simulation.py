@@ -144,7 +144,31 @@ def seepage_from_unitary(U):
     L1 = 1-sump
     return L1
 
+def pro_fid__from_unitary(U, U_target):
+    """
+    i and j sum over the states that span the full computation subspace.
+        F = sum_i sum_j abs(|<phi_i| U^dag * U_t |phi_j>|)**2
 
+    """
+
+    psi_0 = qtp.ket([0])
+    psi_1 = qtp.ket([1])
+    psi_x = 1/np.sqrt(2)*(psi_0+psi_1)
+    psi_mx = -1/np.sqrt(2)*(psi_0+psi_1)
+    psi_y = 1/np.sqrt(2)*(psi_0-psi_1)
+    psi_my = -1/np.sqrt(2)*(psi_0-psi_1)
+
+
+
+    inner = U.dag()*U_target
+
+    # part_idx = [0, 1, 3, 4]  # only computational subspace
+    # ptrace = 0
+    # for i in part_idx:
+    #     ptrace += inner[i, i]
+    # dim = 4  # 2 qubits comp subspace
+
+    # return ptrace/dim
 
 
 
