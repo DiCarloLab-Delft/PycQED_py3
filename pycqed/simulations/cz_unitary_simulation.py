@@ -5,18 +5,20 @@ Simulates the trajectory implementing a CZ gate.
 import time
 import numpy as np
 import qutip as qtp
+from pycqed.measurement import detector_functions as det
 from scipy.interpolate import interp1d
+from pycqed.measurement.waveform_control_CC import waveform as wf
 
 alpha_q0 = 250e6 * 2*np.pi
-w_q0 = 6e9  * 2 * np.pi  # Lower frequency qubit
-w_q1 = 7e9  * 2 * np.pi  # Upper frequency (fluxing) qubit
+w_q0 = 6e9 * 2 * np.pi  # Lower frequency qubit
+w_q1 = 7e9 * 2 * np.pi  # Upper frequency (fluxing) qubit
 
-J  = 2.5e6 * 2 * np.pi  # coupling strength
+J = 2.5e6 * 2 * np.pi  # coupling strength
 
 tlist = np.arange(0, 250e-9, .05e-9)
 
 # operators
-b  = qtp.tensor(qtp.destroy(2), qtp.qeye(3))  # LSB is static qubit
+b = qtp.tensor(qtp.destroy(2), qtp.qeye(3))  # LSB is static qubit
 a = qtp.tensor(qtp.qeye(2), qtp.destroy(3))
 n_q0 = a.dag() * a
 n_q1 = b.dag() * b
@@ -38,27 +40,29 @@ def coupled_transmons_hamiltonian(w_q0, w_q1, alpha_q0, J):
         w_q1 > w_q1
     """
 
-    H_0 =   w_q0 * n_q0 + w_q1 * n_q1 +  \
-       1/2*alpha_q0*(a.dag()*a.dag()*a*a) +\
+    H_0 = w_q0 * n_q0 + w_q1 * n_q1 +  \
+        1/2*alpha_q0*(a.dag()*a.dag()*a*a) +\
         J * (a.dag() + a) * (b + b.dag())
     return H_0
 
-H_0 = coupled_transmons_hamiltonian(w_q0 =w_q0, w_q1=w_q1, alpha_q0=alpha_q0,
+
+H_0 = coupled_transmons_hamiltonian(w_q0=w_q0, w_q1=w_q1, alpha_q0=alpha_q0,
                                     J=J)
 
 #
 U_target = qtp.Qobj([[1, 0, 0, 0, 0, 0],
-                                [0, 1, 0, 0, 0, 0],
-                                [0, 0, -1, 0, 0, 0],
-                                [0, 0, 0, 1, 0, 0],
-                                [0, 0, 0, 0, -1, 0],
-                                [0, 0, 0, 0, 0, 1]],
-                               type='oper',
-                               dims=[[2, 3], [3, 2]])
+                     [0, 1, 0, 0, 0, 0],
+                     [0, 0, -1, 0, 0, 0],
+                     [0, 0, 0, 1, 0, 0],
+                     [0, 0, 0, 0, -1, 0],
+                     [0, 0, 0, 0, 0, 1]],
+                    type='oper',
+                    dims=[[2, 3], [3, 2]])
 U_target._type = 'oper'
 
+
 def rotating_frame_transformation(U, t: float,
-                                  w_q0: float=0, w_q1:float =0):
+                                  w_q0: float=0, w_q1: float =0):
     """
     Transforms the frame of the unitary according to
         U' = U_{RF}*U*U_{RF}^dag
@@ -72,25 +76,24 @@ def rotating_frame_transformation(U, t: float,
         w_q1 (float): freq of frame for q1
 
     """
-    U_RF =   (1j*w_q0*n_q0*t).expm() * (1j*w_q1*n_q1*t).expm()
+    U_RF = (1j*w_q0*n_q0*t).expm() * (1j*w_q1*n_q1*t).expm()
 
-    U_prime = U_RF * U #* U_RF(t=0).dag()
-    return  U_prime
+    U_prime = U_RF * U  # * U_RF(t=0).dag()
+    return U_prime
+
 
 def phases_from_unitary(U):
     """
     Returns the phases from the unitary
     """
-    phi_00 = np.rad2deg(np.angle(U[0, 0])) # expected to equal 0
+    phi_00 = np.rad2deg(np.angle(U[0, 0]))  # expected to equal 0
     phi_01 = np.rad2deg(np.angle(U[1, 1]))
     phi_10 = np.rad2deg(np.angle(U[3, 3]))
     phi_11 = np.rad2deg(np.angle(U[4, 4]))
 
-    phi_cond = (phi_11 - phi_01 - phi_10 - phi_00)%360
+    phi_cond = (phi_11 - phi_01 - phi_10 - phi_00) % 360
 
     return phi_00, phi_01, phi_10, phi_11, phi_cond
-
-
 
 
 def pro_fid_unitary_compsubspace(U, U_target):
@@ -109,6 +112,7 @@ def pro_fid_unitary_compsubspace(U, U_target):
 
     return ptrace/dim
 
+
 def leakage_from_unitary(U):
     """
     Calculates leakage by summing over all in and output states in the
@@ -119,14 +123,15 @@ def leakage_from_unitary(U):
     for i in range(4):
         for j in range(4):
             bra_i = qtp.tensor(qtp.ket([i//2], dim=[2]),
-                               qtp.ket([i%2], dim=[3])).dag()
+                               qtp.ket([i % 2], dim=[3])).dag()
             ket_j = qtp.tensor(qtp.ket([j//2], dim=[2]),
-                               qtp.ket([j%2], dim=[3]))
-            p = np.abs((bra_i*U*ket_j).data[0,0])**2
+                               qtp.ket([j % 2], dim=[3]))
+            p = np.abs((bra_i*U*ket_j).data[0, 0])**2
             sump += p
-    sump/=4 # divide by dimension of comp subspace
+    sump /= 4  # divide by dimension of comp subspace
     L1 = 1-sump
     return L1
+
 
 def seepage_from_unitary(U):
     """
@@ -141,11 +146,12 @@ def seepage_from_unitary(U):
                                qtp.ket([2], dim=[3])).dag()
             ket_j = qtp.tensor(qtp.ket([j], dim=[2]),
                                qtp.ket([2], dim=[3]))
-            p = np.abs((bra_i*U*ket_j).data[0,0])**2
+            p = np.abs((bra_i*U*ket_j).data[0, 0])**2
             sump += p
-    sump/=2 # divide by dimension of comp subspace
+    sump /= 2  # divide by dimension of comp subspace
     L1 = 1-sump
     return L1
+
 
 def pro_fid_from_unitary(U, U_target):
     """
@@ -168,10 +174,9 @@ def pro_fid_from_unitary(U, U_target):
     # return F
 
 
-
 def simulate_quantities_of_interest(H_0, tlist, eps_vec,
                                     sim_step: float=0.1e-9,
-                                    verbose:bool=True):
+                                    verbose: bool=True):
     """
     Calculates the quantities of interest from the propagator U
 
@@ -193,7 +198,6 @@ def simulate_quantities_of_interest(H_0, tlist, eps_vec,
         for phase errors.
     """
 
-
     eps_interp = interp1d(tlist, eps_vec, fill_value='extrapolate')
 
     # function only exists to wrap
@@ -206,14 +210,101 @@ def simulate_quantities_of_interest(H_0, tlist, eps_vec,
     tlist_sim = (np.arange(0, np.max(tlist), sim_step))
     t0 = time.time()
     U_t = qtp.propagator(H_t, tlist_sim)
-    t1=time.time()
+    t1 = time.time()
     if verbose:
         print('simulation took {:.2f}s'.format(t1-t0))
 
     U_final = U_t[-1]
     phases = phases_from_unitary(U_final)
-    phi_cond=phases[-1]
+    phi_cond = phases[-1]
     L1 = leakage_from_unitary(U_final)
     L2 = seepage_from_unitary(U_final)
-    return {'phi_cond': phi_cond, 'L1':L1, 'L2':L2}
+    return {'phi_cond': phi_cond, 'L1': L1, 'L2': L2}
 
+
+class CZ_trajectory(det.Soft_Detector):
+    def __init__(self, H_0, fluxlutman):
+        """
+        Detector for simulating a CZ trajectory.
+        Args:
+            fluxlutman (instr): an instrument that contains the parameters
+                required to generate the waveform for the trajectory.
+        """
+        super().__init__()
+        self.value_names = ['Cost func', 'Cond phase', 'L1', 'L2']
+        self.value_units = ['a.u.', 'deg', '%', '%']
+        self.fluxlutman = fluxlutman
+        self.H_0 = H_0
+
+    def acquire_data_point(self, **kw):
+        tlist = (np.arange(0, self.fluxlutman.cz_length(),
+                           1/self.fluxlutman.sampling_rate()))
+        if not self.fluxlutman.czd_double_sided():
+            f_pulse = wf.martinis_flux_pulse(
+                length=self.fluxlutman.cz_length(),
+                lambda_2=self.fluxlutman.cz_lambda_2(),
+                lambda_3=self.fluxlutman.cz_lambda_3(),
+                theta_f=self.fluxlutman.cz_theta_f(),
+                f_01_max=self.fluxlutman.cz_freq_01_max(),
+                J2=self.fluxlutman.cz_J2(),
+                f_interaction=self.fluxlutman.cz_freq_interaction(),
+                sampling_rate=self.fluxlutman.sampling_rate(),
+                return_unit='f01')
+        else:
+            self.get_f_pulse_double_sided()
+
+        # extract base frequency from the Hamiltonian
+        w_q1 = np.real(self.H_0[3,3])
+        eps_vec = f_pulse - w_q1
+
+        qoi = simulate_quantities_of_interest(
+            H_0=self.H_0,
+            tlist=tlist, eps_vec=eps_vec,
+            sim_step=1e-9, verbose=False)
+
+        cost_func_val = abs(qoi['phi_cond']-180) + qoi['L1']*100 * 5
+        return cost_func_val, qoi['phi_cond'], qoi['L1']*100, qoi['L2']*100
+
+    def get_f_pulse_double_sided(self):
+        half_CZ_A = wf.martinis_flux_pulse(
+            length=self.fluxlutman.cz_length()*self.fluxlutman.czd_length_ratio(),
+            lambda_2=self.fluxlutman.cz_lambda_2(),
+            lambda_3=self.fluxlutman.cz_lambda_3(),
+            theta_f=self.fluxlutman.cz_theta_f(),
+            f_01_max=self.fluxlutman.cz_freq_01_max(),
+            J2=self.fluxlutman.cz_J2(),
+            # E_c=self.fluxlutman.cz_E_c(),
+            f_interaction=self.fluxlutman.cz_freq_interaction(),
+            sampling_rate=self.fluxlutman.sampling_rate(),
+            return_unit='f01')
+
+        # Generate the second CZ pulse. If the params are np.nan, default
+        # to the main parameter
+        if not np.isnan(self.fluxlutman.czd_theta_f()):
+            d_theta_f = self.fluxlutman.czd_theta_f()
+        else:
+            d_theta_f = self.fluxlutman.cz_theta_f()
+
+        if not np.isnan(self.fluxlutman.czd_lambda_2()):
+            d_lambda_2 = self.fluxlutman.czd_lambda_2()
+        else:
+            d_lambda_2 = self.fluxlutman.cz_lambda_2()
+        if not np.isnan(self.fluxlutman.czd_lambda_3()):
+            d_lambda_3 = self.fluxlutman.czd_lambda_3()
+        else:
+            d_lambda_3 = self.fluxlutman.cz_lambda_3()
+
+        half_CZ_B = wf.martinis_flux_pulse(
+            length=self.fluxlutman.cz_length()*(1-self.fluxlutman.czd_length_ratio()),
+            lambda_2=d_lambda_2,
+            lambda_3=d_lambda_3,
+            theta_f=d_theta_f,
+            f_01_max=self.fluxlutman.cz_freq_01_max(),
+            J2=self.fluxlutman.cz_J2(),
+            f_interaction=self.fluxlutman.cz_freq_interaction(),
+            sampling_rate=self.fluxlutman.sampling_rate(),
+            return_unit='f01')
+
+        # N.B. No amp scaling and offset present
+        f_pulse = np.concatenate([half_CZ_A, half_CZ_B])
+        return f_pulse

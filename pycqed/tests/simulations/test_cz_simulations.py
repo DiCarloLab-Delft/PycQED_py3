@@ -9,6 +9,7 @@ from pycqed.simulations.CZ_leakage_simulation import \
 from pycqed.simulations import cz_unitary_simulation as czu
 from pycqed.measurement.waveform_control_CC.waveform import \
     martinis_flux_pulse
+from pycqed.instrument_drivers.meta_instrument.LutMans import flux_lutman as flm
 
 
 class Test_cz_unitary_simulation(unittest.TestCase):
@@ -216,6 +217,41 @@ class Test_cz_unitary_simulation(unittest.TestCase):
             H_0=H_0, tlist=tlist, eps_vec=eps_vec, sim_step=1e-9)
         self.assertAlmostEqual(qoi['phi_cond'], 260.5987691809, places=0)
         self.assertAlmostEqual(qoi['L1'], 0.001272424, places=3)
+
+    def test_simulate_using_detector(self):
+
+        fluxlutman = flm.AWG8_Flux_LutMan('fluxlutman')
+
+
+        # Hamiltonian pars
+        alpha_q0 = 285e6 * 2*np.pi
+        J = 2.9e6 * 2*np.pi
+        w_q0 = 4.11e9 * 2*np.pi
+        w_q1 = 5.42e9 * 2*np.pi
+
+        H_0 = czu.coupled_transmons_hamiltonian(w_q0, w_q1,
+                                                alpha_q0=alpha_q0, J=J)
+
+        fluxlutman.cz_J2(J*np.sqrt(2))
+        fluxlutman.cz_freq_01_max(w_q1)
+        fluxlutman.cz_freq_interaction(w_q0+alpha_q0)
+        fluxlutman.cz_theta_f(80)
+        fluxlutman.cz_lambda_2(0)
+        fluxlutman.cz_lambda_3(0)
+        fluxlutman.sampling_rate(2.4e9)
+        fluxlutman.cz_length(220e-9)
+
+
+
+        d = czu.CZ_trajectory(H_0=H_0, fluxlutman=fluxlutman)
+        vals = d.acquire_data_point()
+        self.assertAlmostEquals(vals[0], 13.588, places=1)
+        self.assertAlmostEquals(vals[1], 166.87, places=1)
+        self.assertAlmostEquals(vals[2], 0.0920, places=1)
+        self.assertAlmostEquals(vals[3], 0.1841, places=1)
+
+        fluxlutman.close()
+
 
 
 class Test_CZ_single_trajectory_analysis(unittest.TestCase):
