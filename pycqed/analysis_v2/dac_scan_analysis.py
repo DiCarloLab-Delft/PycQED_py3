@@ -39,7 +39,7 @@ class FluxFrequency(ba.BaseDataAnalysis):
                             'freq': self.options_dict.get('sweep_points_key', 'sweep_points'),
                             'amp': self.options_dict.get('amp_key', 'amp'),
                             'phase': self.options_dict.get('phase_key', 'phase'),
-                            'dac': self.options_dict.get('dac_key', 'Instrument settings.fluxcurrent.VFCQ6'),
+                            'dac': self.options_dict.get('dac_key', 'Instrument settings.fluxcurrent.Q'),
                             }
         self.numeric_params = ['freq', 'amp', 'phase', 'dac']
 
@@ -138,6 +138,8 @@ class FluxFrequency(ba.BaseDataAnalysis):
                 # Fixme: save peaks
 
     def run_fitting(self):
+        # This is not the proper way to do this!
+        # TODO: move this to prepare_fitting
         self.fit_dicts = {}
         self.fit_result = {}
 

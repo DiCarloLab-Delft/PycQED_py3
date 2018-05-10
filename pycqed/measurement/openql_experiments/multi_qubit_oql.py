@@ -4,6 +4,8 @@ from pycqed.utilities.general import int2base
 import openql.openql as ql
 from pycqed.utilities.general import suppress_stdout
 from openql.openql import Program, Kernel, Platform
+from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
+
 
 base_qasm_path = join(dirname(__file__), 'qasm_files')
 output_dir = join(dirname(__file__), 'output')
@@ -130,6 +132,50 @@ def multi_qubit_off_on(qubits: list,  initialize: bool,
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
 
+    return p
+
+def Ramsey_msmt_induced_dephasing(qubits: list, angles: list, platf_cfg: str):
+    """
+    Ramsey sequence that varies azimuthal phase instead of time. Works for  a single
+    qubit or multiple qubits. The coherence of the LSQ is measured, while the whole list
+    of qubits is measured.
+    Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
+
+    note: executes the measurement between gates to measure the measurement induced dephasing
+
+    Input pars:
+        qubits:         list specifying the targeted qubit MSQ, and the qubit of which the coherence
+                        is measured LSQ.
+        angles:         the list of angles for each Ramsey element
+        platf_cfg:      filename of the platform config file
+    Returns:
+        p:              OpenQL Program object containing
+
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="Ramsey_msmt_induced_dephasing", nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    for i, angle in enumerate(angles[:-4]):
+        cw_idx = angle//20 + 9
+        k = Kernel("Ramsey_azi_"+str(angle), p=platf)
+        for qubit in qubits:
+            k.prepz(qubit)
+        k.gate('rx90', qubits[-1])
+        for qubit in qubits:
+            k.measure(qubit)
+        k.gate('cw_{:02}'.format(cw_idx), qubits[-1])
+        p.add_kernel(k)
+
+    # adding the calibration points
+    sqo.add_single_qubit_cal_points(p, platf=platf, qubit_idx=qubits[-1])
+
+    with suppress_stdout():
+        p.compile(verbose=False)
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
     return p
 
 
