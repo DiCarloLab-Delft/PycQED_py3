@@ -2,8 +2,10 @@
 April 2018
 Simulates the trajectory implementing a CZ gate.
 """
+import time
 import numpy as np
 import qutip as qtp
+from scipy.interpolate import interp1d
 
 alpha_q0 = 250e6 * 2*np.pi
 w_q0 = 6e9  * 2 * np.pi  # Lower frequency qubit
@@ -12,12 +14,13 @@ w_q1 = 7e9  * 2 * np.pi  # Upper frequency (fluxing) qubit
 J  = 2.5e6 * 2 * np.pi  # coupling strength
 
 tlist = np.arange(0, 250e-9, .05e-9)
+
 # operators
 b  = qtp.tensor(qtp.destroy(2), qtp.qeye(3))  # LSB is static qubit
 a = qtp.tensor(qtp.qeye(2), qtp.destroy(3))
-
 n_q0 = a.dag() * a
 n_q1 = b.dag() * b
+
 
 # Hamiltonian
 def coupled_transmons_hamiltonian(w_q0, w_q1, alpha_q0, J):
@@ -144,33 +147,73 @@ def seepage_from_unitary(U):
     L1 = 1-sump
     return L1
 
-def pro_fid__from_unitary(U, U_target):
+def pro_fid_from_unitary(U, U_target):
     """
     i and j sum over the states that span the full computation subspace.
         F = sum_i sum_j abs(|<phi_i| U^dag * U_t |phi_j>|)**2
+    """
+    raise NotImplementedError
 
+    # sump = 0
+    # for i in range(36):
+    #     for j in range(36):
+    #         bra_i = pauli_bases_states[i].dag()
+    #         ket_j = pauli_bases_states[j]
+    #         inner = U.dag()*U_target
+    #         p = np.abs((bra_i*inner*ket_j).data[0,0])**2
+    #         sump+=p
+    #         print(sump, p)
+
+    # F = sump # normalize for dimension
+    # return F
+
+
+
+def simulate_quantities_of_interest(H_0, tlist, eps_vec,
+                                    sim_step: float=0.1e-9,
+                                    verbose:bool=True):
+    """
+    Calculates the quantities of interest from the propagator U
+
+    Args:
+        H_0 (Qobj): static hamiltonian, see "coupled_transmons_hamiltonian"
+            for the expected form of the Hamiltonian.
+        tlist (array): times in s, describes the x component of the
+            trajectory to simulate
+        eps_vec(array): detuning describes the y-component of the trajectory
+            to simulate.
+
+    Returns
+        phi_cond (float):   conditional phase (deg)
+        L1      (float):    leakage
+        L2      (float):    seepage
+
+    # TODO:
+        return the Fidelity in the comp subspace with and without correcting
+        for phase errors.
     """
 
-    psi_0 = qtp.ket([0])
-    psi_1 = qtp.ket([1])
-    psi_x = 1/np.sqrt(2)*(psi_0+psi_1)
-    psi_mx = -1/np.sqrt(2)*(psi_0+psi_1)
-    psi_y = 1/np.sqrt(2)*(psi_0-psi_1)
-    psi_my = -1/np.sqrt(2)*(psi_0-psi_1)
 
+    eps_interp = interp1d(tlist, eps_vec, fill_value='extrapolate')
 
+    # function only exists to wrap
+    def eps_t(t, args=None):
+        return eps_interp(t)
 
-    inner = U.dag()*U_target
+    H_c = n_q1
+    H_t = [H_0, [H_c, eps_t]]
 
-    # part_idx = [0, 1, 3, 4]  # only computational subspace
-    # ptrace = 0
-    # for i in part_idx:
-    #     ptrace += inner[i, i]
-    # dim = 4  # 2 qubits comp subspace
+    tlist_sim = (np.arange(0, np.max(tlist), sim_step))
+    t0 = time.time()
+    U_t = qtp.propagator(H_t, tlist_sim)
+    t1=time.time()
+    if verbose:
+        print('simulation took {:.2f}s'.format(t1-t0))
 
-    # return ptrace/dim
+    U_final = U_t[-1]
+    phases = phases_from_unitary(U_final)
+    phi_cond=phases[-1]
+    L1 = leakage_from_unitary(U_final)
+    L2 = seepage_from_unitary(U_final)
+    return {'phi_cond': phi_cond, 'L1':L1, 'L2':L2}
 
-
-
-# Plts the output unitary
-# qtp.hinton(U_outp)

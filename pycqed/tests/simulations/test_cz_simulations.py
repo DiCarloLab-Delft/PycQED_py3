@@ -180,6 +180,43 @@ class Test_cz_unitary_simulation(unittest.TestCase):
         np.testing.assert_array_almost_equal(L1, expected_L1)
         np.testing.assert_array_almost_equal(L2, expected_L2)
 
+    def test_simulate_quantities_of_interest(self):
+        # Hamiltonian pars
+        alpha_q0 = 250e6 * 2*np.pi
+        J = 2.5e6 * 2*np.pi
+        w_q0 = 6e9 * 2*np.pi
+        w_q1 = 7e9 * 2*np.pi
+
+        H_0 = czu.coupled_transmons_hamiltonian(w_q0, w_q1,
+                                                alpha_q0=alpha_q0, J=J)
+        f_interaction = w_q0+alpha_q0
+        f_01_max = w_q1
+
+        J2 = np.sqrt(2)*J
+        length = 180e-9
+        sampling_rate = 1e9#2.4e9
+        lambda_2 = 0
+        lambda_3 = 0
+        V_per_phi0 = 2
+        E_c = 250e6
+
+        theta_f = 60
+
+        tlist = (np.arange(0, length, 1/sampling_rate))
+        f_pulse = martinis_flux_pulse(
+            length, lambda_2=lambda_2, lambda_3=lambda_3,
+            theta_f=theta_f, f_01_max=f_01_max, E_c=E_c,
+            V_per_phi0=V_per_phi0,
+            f_interaction=f_interaction, J2=J2,
+            return_unit='f01',
+            sampling_rate=sampling_rate)
+        eps_vec = f_pulse - w_q1
+
+        qoi = czu.simulate_quantities_of_interest(
+            H_0=H_0, tlist=tlist, eps_vec=eps_vec, sim_step=1e-9)
+        self.assertAlmostEqual(qoi['phi_cond'], 260.5987691809, places=0)
+        self.assertAlmostEqual(qoi['L1'], 0.001272424, places=3)
+
 
 class Test_CZ_single_trajectory_analysis(unittest.TestCase):
 
