@@ -251,7 +251,7 @@ class CZ_trajectory(det.Soft_Detector):
                 sampling_rate=self.fluxlutman.sampling_rate(),
                 return_unit='f01')
         else:
-            self.get_f_pulse_double_sided()
+            f_pulse = self.get_f_pulse_double_sided()
 
         # extract base frequency from the Hamiltonian
         w_q1 = np.real(self.H_0[3,3])
