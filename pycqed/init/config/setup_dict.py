@@ -55,7 +55,7 @@ data_dir_dict = {'tud276606_FPGA_PC': 'D:\Experiments/CBox_Testing/Data',
                  # 'Luthi_Desktop': r'\\TUD277620\\Experiments\\1607_NWv7A4_Magnet\\Data' # To Ducati Old
                  'Luthi_Desktop': r'\\TUD277620\Experiments\mag_niet\Data',
                  'Thijs_laptop' : 'C:\\Users\\Thijs\\Documents\\TUDelft\\PhD\\Data',
-                 'Thijs_Desktop': r'\\TUD277620\Experiments\\1803_NW_TwoAxis\Data',
+                 'Thijs_Desktop': r'\\TUD277620\Experiments\1805_NW_Cheesymon_P4\Data',
                  'LaAprilia_1' : r'D:\Experiments\\1802_IntelS7Airbridges'
                  #'LaAprilia_1' : r'D:\Experiments\1802_Argon\Data'
                  }
