@@ -14,6 +14,8 @@ from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_swf
 from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_det
 from pycqed.analysis.tools.data_manipulation import get_generation_means
 
+from pycqed.analysis.tools.plot_interpolation import interpolate_heatmap
+
 from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
@@ -30,7 +32,7 @@ except:
     print('Could not import msvcrt (used for detecting keystrokes)')
 
 try:
-    from qcodes.plots.pyqtgraph import QtPlot
+    from qcodes.plots.pyqtgraph import QtPlot, TransformState
 except Exception:
     print('pyqtgraph plotting not supported, '
           'try "from qcodes.plots.pyqtgraph import QtPlot" '
@@ -264,7 +266,6 @@ class MeasurementControl(Instrument):
         self.save_optimization_settings()
         self.adaptive_function = self.af_pars.pop('adaptive_function')
         if self.live_plot_enabled():
-            # self.initialize_plot_monitor()
             self.initialize_plot_monitor_adaptive()
         for sweep_function in self.sweep_functions:
             sweep_function.prepare()
@@ -703,6 +704,63 @@ class MeasurementControl(Instrument):
             except Exception as e:
                 logging.warning(e)
 
+    def initialize_plot_monitor_2D_interp(self):
+        """
+        Initialize a 2D plot monitor for interpolated (adaptive) plots
+        """
+        if self.live_plot_enabled() and len(self.sweep_function_names) ==2:
+            self.time_last_2Dplot_update = time.time()
+
+            self.secondary_QtPlot.clear()
+            slabels = self.sweep_par_names
+            sunits = self.sweep_par_units
+            zlabels = self.detector_function.value_names
+            zunits = self.detector_function.value_units
+
+            for j in range(len(self.detector_function.value_names)):
+                self.secondary_QtPlot.add(x=[0, 1],
+                                          y=[0, 1],
+                                          z=np.zeros([2,2]),
+                                          xlabel=slabels[0], xunit=sunits[0],
+                                          ylabel=slabels[1], yunit=sunits[1],
+                                          zlabel=zlabels[j], zunit=zunits[j],
+                                          subplot=j+1,
+                                          cmap='viridis')
+
+    def update_plotmon_2D_interp(self, force_update=False):
+        '''
+        Updates the interpolated 2D heatmap
+        '''
+        if self.live_plot_enabled() and len(self.sweep_function_names) ==2:
+            # try:
+                if (time.time() - self.time_last_2Dplot_update >
+                        self.plotting_interval() or force_update):
+                    # exists to force reset the x- and y-axis scale
+                    new_sc = TransformState(0, 1, True)
+
+                    x_vals = self.dset[:, 0]
+                    y_vals = self.dset[:, 1]
+                    for j in range(len(self.detector_function.value_names)):
+                        z_ind = len(self.sweep_functions) + j
+                        z_vals = self.dset[:, z_ind]
+
+                        # Interpolate points
+                        x_grid, y_grid, z_grid  = interpolate_heatmap(
+                            x_vals, y_vals, z_vals)
+                        trace = self.secondary_QtPlot.traces[j]
+                        trace['config']['x'] = x_grid
+                        trace['config']['y'] = y_grid
+                        trace['config']['z'] = z_grid
+                        # force rescale the axes
+                        trace['plot_object']['scales']['x'] = new_sc
+                        trace['plot_object']['scales']['y'] = new_sc
+
+                    self.time_last_2Dplot_update = time.time()
+                    self.secondary_QtPlot.update_plot()
+            # except Exception as e:
+            #     logging.warning(e)
+
+
     def initialize_plot_monitor_adaptive(self):
         '''
         Uses the Qcodes plotting windows for plotting adaptive plot updates
@@ -711,41 +769,44 @@ class MeasurementControl(Instrument):
             return self.initialize_plot_monitor_adaptive_cma()
         else:
             self.initialize_plot_monitor()
+            # init plotmon 2d interp checks if there are 2 sweep funcs
+            self.initialize_plot_monitor_2D_interp()
         self.time_last_ad_plot_update = time.time()
-        self.secondary_QtPlot.clear()
+        # self.secondary_QtPlot.clear()
 
-        zlabels = self.detector_function.value_names
-        zunits = self.detector_function.value_units
+        # zlabels = self.detector_function.value_names
+        # zunits = self.detector_function.value_units
 
-        for j in range(len(self.detector_function.value_names)):
-            self.secondary_QtPlot.add(x=[0],
-                                      y=[0],
-                                      xlabel='iteration',
-                                      ylabel=zlabels[j],
-                                      yunit=zunits[j],
-                                      subplot=j+1,
-                                      symbol='o', symbolSize=5)
+        # for j in range(len(self.detector_function.value_names)):
+        #     self.secondary_QtPlot.add(x=[0],
+        #                               y=[0],
+        #                               xlabel='iteration',
+        #                               ylabel=zlabels[j],
+        #                               yunit=zunits[j],
+        #                               subplot=j+1,
+        #                               symbol='o', symbolSize=5)
 
     def update_plotmon_adaptive(self, force_update=False):
         if self.adaptive_function.__module__ == 'cma.evolution_strategy':
             return self.update_plotmon_adaptive_cma(force_update=force_update)
         else:
             self.update_plotmon(force_update=force_update)
+            self.update_plotmon_2D_interp(force_update=force_update)
 
-        if self.live_plot_enabled():
-            try:
-                if (time.time() - self.time_last_ad_plot_update >
-                        self.plotting_interval() or force_update):
-                    for j in range(len(self.detector_function.value_names)):
-                        y_ind = len(self.sweep_functions) + j
-                        y = self.dset[:, y_ind]
-                        x = range(len(y))
-                        self.secondary_QtPlot.traces[j]['config']['x'] = x
-                        self.secondary_QtPlot.traces[j]['config']['y'] = y
-                        self.time_last_ad_plot_update = time.time()
-                        self.secondary_QtPlot.update_plot()
-            except Exception as e:
-                logging.warning(e)
+        # if self.live_plot_enabled():
+        #     try:
+        #         if (time.time() - self.time_last_ad_plot_update >
+        #                 self.plotting_interval() or force_update):
+        #             for j in range(len(self.detector_function.value_names)):
+        #                 y_ind = len(self.sweep_functions) + j
+        #                 y = self.dset[:, y_ind]
+        #                 x = range(len(y))
+        #                 self.secondary_QtPlot.traces[j]['config']['x'] = x
+        #                 self.secondary_QtPlot.traces[j]['config']['y'] = y
+        #                 self.time_last_ad_plot_update = time.time()
+        #                 self.secondary_QtPlot.update_plot()
+        #     except Exception as e:
+        #         logging.warning(e)
 
     def initialize_plot_monitor_adaptive_cma(self):
         '''
