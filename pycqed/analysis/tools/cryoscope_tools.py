@@ -4,6 +4,7 @@ Brian Tarasinski
 Dec 2017
 Edited by Adriaan Rol
 """
+import logging
 from typing import Union
 import numpy as np
 import matplotlib.pyplot as plt
@@ -367,15 +368,21 @@ class DacArchAnalysis:
 
         self.norm_data = np.array(self.norm_data)
 
-        for nd in self.norm_data:
+        for idx, nd in enumerate(self.norm_data):
             guess_f, guess_ph, *_ = fft_based_freq_guess_complex(nd)
             guess_f *= self.sampling_rate
 
             nd_real_imag = np.hstack([nd.real, nd.imag])
-
-            fit, err = so.curve_fit(sincos_model_real_imag,
-                                    self.times, nd_real_imag,
-                                    p0=[guess_f, guess_ph])
+            try:
+                fit, err = so.curve_fit(sincos_model_real_imag,
+                                        self.times, nd_real_imag,
+                                        p0=[guess_f, guess_ph])
+            except Exception as e:
+                logging.warning(e)
+                logging.warning('Fitting failed for trace: {}, '
+                                'replacing with nan'.format(idx))
+                fit = [np.nan]
+                err = [np.nan]
 
             if plot_fits:
                 plt.figure()

@@ -619,6 +619,11 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int,
     Returns:
         p:              OpenQL Program object containing
 
+
+    Circuit:
+        q0    -x180-flux-x180-RO-
+        qspec --x90-----------RO-
+
     """
     platf = Platform('OpenQL_Platform', platf_cfg)
     p = Program(pname="Chevron", nqubits=platf.get_qubit_number(),
