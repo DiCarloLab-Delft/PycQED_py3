@@ -779,8 +779,6 @@ class BaseDataAnalysis(object):
         plot_title = pdict.get('title', None)
         plot_xrange = pdict.get('xrange', None)
         plot_yrange = pdict.get('yrange', None)
-        if pdict.get('color', False):
-            plot_linekws['color'] = pdict.get('color')
 
         # plot_multiple = pdict.get('multiple', False)
         plot_linestyle = pdict.get('linestyle', '-')
@@ -821,6 +819,9 @@ class BaseDataAnalysis(object):
                                    **plot_linekws))
 
         else:
+            if pdict.get('color', False):
+                plot_linekws['color'] = pdict.get('color')
+
             p_out = pfunc(plot_xvals, plot_yvals,
                           linestyle=plot_linestyle, marker=plot_marker,
                           label='%s%s' % (dataset_desc, dataset_label),

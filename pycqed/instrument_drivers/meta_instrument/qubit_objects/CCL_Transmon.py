@@ -2145,13 +2145,15 @@ class CCLight_Transmon(Qubit):
                 self.T2_star(a.T2_star['T2_star'])
                 return a.T2_star
 
-    def measure_msmt_induced_dephasing_ramsey(self, MC=None,
-                       label: str='', verbose:bool = True,
-                       analyze=True, close_fig=True, update=True,
-                       cross_target_qubits=None, multi_qubit_platf_cfg=None):
+    def measure_msmt_induced_dephasing(self, MC=None, sequence='ramsey',
+                                              label: str='',
+                                              verbose: bool=True,
+                                              analyze: bool=True,
+                                              close_fig: bool=True,
+                                              update: bool=True,
+                                              cross_target_qubits: list=None,
+                                              multi_qubit_platf_cfg=None):
         # docstring from parent class
-        # N.B. this is a good example for a generic timedomain experiment using
-        # the CCL transmon.
         if MC is None:
             MC = self.instr_MC.get_instr()
         if cross_target_qubits is None:
@@ -2160,7 +2162,6 @@ class CCLight_Transmon(Qubit):
             platf_cfg = multi_qubit_platf_cfg
 
         self.prepare_for_timedomain()
-        angles = np.arange(0, 421, 20)
         if cross_target_qubits is None:
             qubits = [self.cfg_qubit_nr()]
         else:
@@ -2169,24 +2170,36 @@ class CCLight_Transmon(Qubit):
                 qubits.append(cross_target_qubit.cfg_qubit_nr())
             qubits.append(self.cfg_qubit_nr())
 
-        p = mqo.Ramsey_msmt_induced_dephasing(qubits=qubits, angles=angles,
-                     platf_cfg=platf_cfg)
+        angles = np.arange(0, 421, 20)
+        if sequence=='ramsey':
+            p = mqo.Ramsey_msmt_induced_dephasing(qubits=qubits, angles=angles,
+                                              platf_cfg=platf_cfg)
+        elif sequence=='echo':
+            readout_pulse_length = self.ro_pulse_length()
+            readout_pulse_length += self.ro_pulse_down_length0()
+            readout_pulse_length += self.ro_pulse_down_length1()
+            p = mqo.echo_msmt_induced_dephasing(qubits=qubits, angles=angles,
+                                              platf_cfg=platf_cfg,
+                                              wait_time=readout_pulse_length)
+        else:
+            raise ValueError('sequence must be set to ramsey or echo')
         s = swf.OpenQL_Sweep(openql_program=p,
-                           CCL=self.instr_CC.get_instr(),
-                           parameter_name='angle', unit='degree')
+                             CCL=self.instr_CC.get_instr(),
+                             parameter_name='angle', unit='degree')
         MC.set_sweep_function(s)
         MC.set_sweep_points(angles)
         d = self.int_avg_det
         MC.set_detector_function(d)
-        MC.run('Ramsey'+label+self.msmt_suffix)
+        MC.run(sequence+label+self.msmt_suffix)
         if analyze:
-            a = ma.Ramsey_Analysis(auto=True, close_fig=True,
+            a = ma.Ramsey_Analysis(label=sequence, auto=True, close_fig=True,
                                    freq_qubit=self.freq_qubit(),
                                    artificial_detuning=0, #fixme
                                    phase_sweep_only=True)
+            phase_deg = (a.fit_res.params['phase'].value)*360/(2*np.pi) % 360
             res = {
                     'coherence': a.fit_res.params['amplitude'].value,
-                    'phase': (a.fit_res.params['phase'].value)*360/(2*np.pi)% 360
+                    'phase': phase_deg,
             }
             if verbose:
                 print('> ramsey analyse', res)
@@ -2194,8 +2207,6 @@ class CCLight_Transmon(Qubit):
         #else:
         #    return {'coherence': -1,
         #            'phase' : -1}
-
-
 
     def measure_echo(self, times=None, MC=None,
                      analyze=True, close_fig=True, update=True):
@@ -2496,7 +2507,7 @@ class CCLight_Transmon(Qubit):
     def measure_msmt_induced_dephasing_sweeping_amps(self, amps_rel=None,
                                   nested_MC=None, cross_target_qubits=None,
                                   multi_qubit_platf_cfg=None, analyze=False,
-                                  verbose: bool=True):
+                                  verbose: bool=True, sequence='ramsey'):
         waveform_name = 'up_down_down_final'
 
         if nested_MC is None:
@@ -2532,14 +2543,25 @@ class CCLight_Transmon(Qubit):
                 readout_pulse_lengths.append(ro_len)
             readout_pulse_length = np.max(readout_pulse_lengths)
 
+        RO_lutman = self.instr_LutMan_RO.get_instr()
+        if sequence=='ramsey':
+            RO_lutman.set('M_final_delay_R{}'.format(self.cfg_qubit_nr()), 200e-9)
+        elif sequence == 'echo':
+            RO_lutman.set('M_final_delay_R{}'.format(self.cfg_qubit_nr()),
+                          200e-9+readout_pulse_length)
+        else:
+            raise NotImplementedError('dephasing sequence not recognized')
+
         old_waveform_name = self.ro_pulse_type()
         self.ro_pulse_type(waveform_name)
-        RO_lutman = self.instr_LutMan_RO.get_instr()
-        RO_lutman.set('M_final_amp_R{}'.format(self.cfg_qubit_nr()), self.ro_pulse_amp())
+        RO_lutman.set('M_final_amp_R{}'.format(self.cfg_qubit_nr()),
+                      self.ro_pulse_amp())
         old_delay = self.ro_acq_delay()
-
         d = RO_lutman.get('M_final_delay_R{}'.format(self.cfg_qubit_nr()))
-        self.ro_acq_delay(old_delay + readout_pulse_length +d)
+
+        self.ro_acq_delay(old_delay + readout_pulse_length + d)
+
+
         self.ro_acq_integration_length(readout_pulse_length+100e-9)
         self.ro_acq_weight_type('SSB')
         self.prepare_for_timedomain()
@@ -2555,11 +2577,12 @@ class CCLight_Transmon(Qubit):
                         upload=True
                     )
         d = det.Function_Detector(
-                      self.measure_msmt_induced_dephasing_ramsey,
+                      self.measure_msmt_induced_dephasing,
                       msmt_kw={
                             'cross_target_qubits': cross_target_qubits,
                             'multi_qubit_platf_cfg': multi_qubit_platf_cfg,
                             'analyze': True,
+                            'sequence': sequence,
                         },
                       result_keys=['coherence', 'phase']
                     )
@@ -2568,7 +2591,7 @@ class CCLight_Transmon(Qubit):
         nested_MC.set_sweep_points(amps_rel)
         nested_MC.set_detector_function(d)
 
-        label = 'ro_amp_sweep_ramsey' + self.msmt_suffix
+        label = 'ro_amp_sweep_dephasing' + self.msmt_suffix
         nested_MC.run(label)
 
         # Reset qubit objects parameters tp previous settings
@@ -2579,7 +2602,6 @@ class CCLight_Transmon(Qubit):
         if analyze:
             res = ma.MeasurementAnalysis(label=label, plot_all=False, auto=True)
             return res
-
 
     def measure_SNR_sweeping_amps(self, amps_rel, nr_shots=2*4094,
                                   nested_MC=None, analyze=True):
@@ -2620,7 +2642,8 @@ class CCLight_Transmon(Qubit):
             ma.MeasurementAnalysis(label=label, plot_all=False, auto=True)
 
     def measure_quantum_efficiency(self, amps_rel = None, nr_shots=2*4094,
-                                   analyze=True, verbose=True):
+                                   analyze=True, verbose=True,
+                                   dephasing_sequence='ramsey'):
         # requires the cc light to have the readout time configured equal
         # to the measurement and depletion time + 60 ns buffer
         # it requires an optimized depletion pulse
@@ -2630,7 +2653,8 @@ class CCLight_Transmon(Qubit):
         start_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
         self.measure_msmt_induced_dephasing_sweeping_amps(amps_rel=amps_rel,
-                                                          analyze=False)
+                                                          analyze=False,
+                                                          sequence=dephasing_sequence)
         readout_pulse_length = self.ro_pulse_length()
         readout_pulse_length += self.ro_pulse_down_length0()
         readout_pulse_length += self.ro_pulse_down_length1()

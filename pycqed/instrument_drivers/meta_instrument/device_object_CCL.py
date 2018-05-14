@@ -747,7 +747,8 @@ class DeviceCCL(Instrument):
                                               prepare_for_timedomain=True,
                                               n_amps_rel: int=None,
                                               verbose=True,
-                                              get_quantum_eff: bool=False):
+                                              get_quantum_eff: bool=False,
+                                              dephasing_sequence='ramsey'):
         '''
         Measures the msmt induced dephasing for readout the readout of qubits
         i on qubit j. Additionally measures the SNR as a function of amplitude
@@ -759,11 +760,12 @@ class DeviceCCL(Instrument):
 
         fixme: not sure if the weight function assignment is working correctly.
 
-        the qubit objects will use SSB for the ramsey measurements.
+        the qubit objects will use SSB for the dephasing measurements.
         '''
+
         lpatt = '_trgt_{TQ}_measured_{RQ}'
         if prepare_for_timedomain:
-            #for q in qubits:
+            # for q in qubits:
             #    q.prepare_for_timedomain()
             self.prepare_for_timedomain()
 
@@ -794,11 +796,12 @@ class DeviceCCL(Instrument):
                     mqp = None
                     list_target_qubits = None
                 else:
-                    t_amp_max = max(target_qubit.ro_pulse_down_amp0(),
-                                    target_qubit.ro_pulse_down_amp1(),
-                                    target_qubit.ro_pulse_amp())
-                    amp_max = max(t_amp_max, measured_qubit.ro_pulse_amp())
-                    amps_rel = np.linspace(0, 0.99/(amp_max), n_amps_rel)
+                    #t_amp_max = max(target_qubit.ro_pulse_down_amp0(),
+                    #                target_qubit.ro_pulse_down_amp1(),
+                    #                target_qubit.ro_pulse_amp())
+                    #amp_max = max(t_amp_max, measured_qubit.ro_pulse_amp())
+                    #amps_rel = np.linspace(0, 0.49/(amp_max), n_amps_rel)
+                    amps_rel = np.linspace(0, 1, n_amps_rel)
                     mqp = self.cfg_openql_platform_fn()
                     list_target_qubits = [target_qubit,]
 
@@ -807,14 +810,16 @@ class DeviceCCL(Instrument):
                 if target_qubit == measured_qubit and get_quantum_eff:
                     res = measured_qubit.measure_quantum_efficiency(
                                                 verbose=verbose,
-                                                amps_rel=amps_rel)
+                                                amps_rel=amps_rel,
+                                                dephasing_sequence=dephasing_sequence)
                 else:
                     res = measured_qubit.measure_msmt_induced_dephasing_sweeping_amps(
                             verbose=verbose,
                             amps_rel=amps_rel,
                             cross_target_qubits=list_target_qubits,
                             multi_qubit_platf_cfg=mqp,
-                            analyze=True
+                            analyze=True,
+                            sequence=dephasing_sequence
                         )
                 # Print the result of the measurement
                 if verbose:
@@ -834,7 +839,7 @@ class DeviceCCL(Instrument):
                 'verbose': True,
             }
             qarr = [q.name for q in qubits]
-            labelpatt = 'ro_amp_sweep_ramsey'+lpatt
+            labelpatt = 'ro_amp_sweep_dephasing'+lpatt
             ca = ma2.CrossDephasingAnalysis(t_start=start, t_stop=stop,
                                             label_pattern=labelpatt,
                                             qubit_labels=qarr,
