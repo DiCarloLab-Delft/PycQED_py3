@@ -641,6 +641,7 @@ class DephasingAnalysisSingleScans(DephasingAnalysis):
     def extract_data(self):
         # Load data
         super().extract_data()
+        #todo: we need an option to remove outliers and the reference point
 
         # Set output paths
         youngest = np.max(self.raw_data_dict['datetime'])
@@ -846,6 +847,7 @@ class SSROAnalysisSingleScans(SSROAnalysis):
         # Load data
         super().extract_data()
 
+        #todo: we need an option to remove outliers and the reference point
         # Set output paths
         youngest = np.max(self.raw_data_dict['datetime'])
         youngest += datetime.timedelta(seconds=1)

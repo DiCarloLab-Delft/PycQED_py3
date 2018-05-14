@@ -533,6 +533,10 @@ class CCLight_Transmon(Qubit):
                        'or a str (channel name) when using an SPI rack.'),
             initial_value=1,
             parameter_class=ManualParameter)
+        self.add_parameter('cfg_spec_mode', vals=vals.Bool(),
+            docstring=('Used to activate spec mode in measurements'),
+            initial_value=False, 
+            parameter_class=ManualParameter)
 
     def add_generic_qubit_parameters(self):
         self.add_parameter('E_c', unit='Hz',
@@ -1201,9 +1205,13 @@ class CCLight_Transmon(Qubit):
 
     def measure_heterodyne_spectroscopy(self, freqs, MC=None,
                                         analyze=True, close_fig=True):
+        UHFQC=self.instr_acquisition.get_instr()
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
+        # Starting specmode if set in config
+        if self.cfg_spec_mode():
+            UHFQC.spec_mode_on(IF=self.ro_freq_mod(), ro_amp=self.ro_pulse_amp())
         # Snippet here to create and upload the CCL instructions
         CCL = self.instr_CC.get_instr()
         CCL.stop()
@@ -1220,6 +1228,10 @@ class CCLight_Transmon(Qubit):
         self.int_avg_det_single._set_real_imag(False)
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='Resonator_scan'+self.msmt_suffix)
+        # Stopping specmode 
+        if self.cfg_spec_mode():
+            UHFQC.spec_mode_off()
+            self._prep_ro_pulse(upload=True)
         if analyze:
             ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
 

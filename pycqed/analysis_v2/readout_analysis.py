@@ -28,10 +28,9 @@ from pycqed.utilities.general import int2base
 class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
     def __init__(self, t_start: str=None, t_stop: str=None,
-                 label: str='',
+                 label: str='', do_fitting: bool = True,
                  data_file_path: str=None,
-                 options_dict: dict=None, extract_only: bool=False,
-                 do_fitting: bool=True, auto=True):
+                 options_dict: dict=None, auto=True, **kw):
         '''
         options dict options:
             'fixed_p10' fixes p(e|g) (do not vary in fit)
@@ -51,10 +50,10 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             see BaseDataAnalysis for more.
         '''
         super().__init__(t_start=t_start, t_stop=t_stop,
-                         label=label,
+                         label=label, do_fitting=do_fitting,
                          data_file_path=data_file_path,
                          options_dict=options_dict,
-                         extract_only=extract_only, do_fitting=do_fitting)
+                         **kw)
         self.single_timestamp = True
         self.params_dict = {
             'measurementstring': 'measurementstring',
@@ -67,7 +66,6 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         # Determine the default for auto_rotation_angle
         man_angle = self.options_dict.get('rotation_angle', False) is False
         self.options_dict['auto_rotation_angle'] = self.options_dict.get('auto_rotation_angle', man_angle)
-
 
         if auto:
             self.run_analysis()
@@ -111,13 +109,14 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             data_range_y = (np.min([np.min(b) for b in shots[:, 1]]),
                             np.max([np.max(b) for b in shots[:, 1]]))
             data_range_xy = (data_range_x, data_range_y)
+            nr_bins_2D = self.options_dict.get('nr_bins_2D', 6*np.sqrt(nr_bins))
             H0, xedges, yedges = np.histogram2d(x=shots[0, 0],
                                                 y=shots[0, 1],
-                                                bins=4*np.sqrt(nr_bins),
+                                                bins=nr_bins_2D,
                                                 range=data_range_xy)
             H1, xedges, yedges = np.histogram2d(x=shots[1, 0],
                                                 y=shots[1, 1],
-                                                bins=4*np.sqrt(nr_bins),
+                                                bins=nr_bins_2D,
                                                 range=data_range_xy)
             binsize_x = xedges[1] - xedges[0]
             binsize_y = yedges[1] - yedges[0]
@@ -138,35 +137,30 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                                               independent_vars=['x', 'y'])
                 gauss2D_model_1 = lmfit.Model(gaussian_2D,
                                               independent_vars=['x', 'y'])
-                guess0 = gauss_2D_guess(model=gauss2D_model_0,
-                                                 data=H0,
-                                                 x=bin_centers_x,
-                                                 y=bin_centers_y)
-                guess1 = gauss_2D_guess(model=gauss2D_model_1,
-                                                 data=H1,
-                                                 x=bin_centers_x,
-                                                 y=bin_centers_y)
+                guess0 = gauss_2D_guess(model=gauss2D_model_0, data=H0.transpose(),
+                                        x=bin_centers_x, y=bin_centers_y)
+                guess1 = gauss_2D_guess(model=gauss2D_model_1, data=H1.transpose(),
+                                        x=bin_centers_x, y=bin_centers_y)
 
-                x2d=np.array([bin_centers_x]*len(bin_centers_y))
-                y2d=np.array([bin_centers_y]*len(bin_centers_x)).transpose()
-                fitres0 = gauss2D_model_0.fit(data=H0,
-                                              x=x2d,
-                                              y=y2d,
+                x2d = np.array([bin_centers_x]*len(bin_centers_y))
+                y2d = np.array([bin_centers_y]*len(bin_centers_x)).transpose()
+                fitres0 = gauss2D_model_0.fit(data=H0.transpose(), x=x2d, y=y2d,
                                               **guess0)
-                fitres1 = gauss2D_model_1.fit(data=H1,
-                                              x=x2d,
-                                              y=y2d,
+                fitres1 = gauss2D_model_1.fit(data=H1.transpose(),  x=x2d, y=y2d,
                                               **guess1)
+                
+                fr0 = fitres0.best_values
+                fr1 = fitres1.best_values
+                x0 = fr0['center_x']
+                x1 = fr1['center_x']
+                y0 = fr0['center_y']
+                y1 = fr1['center_y']
 
-                x0 = fitres0.best_values['center_x']
-                x1 = fitres1.best_values['center_x']
-                y0 = fitres0.best_values['center_y']
-                y1 = fitres1.best_values['center_y']
                 self.proc_data_dict['IQ_pos'] = [[x0, x1], [y0, y1]]
                 dx = x1 - x0
                 dy = y1 - y0
                 mid = [x0 + dx/2, y0 + dy/2]
-                angle = -np.arctan2(dy, dx)-np.pi/2
+                angle = np.arctan2(dy, dx)
             else:
                 mid = [0, 0]
 
@@ -178,8 +172,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
             self.proc_data_dict['raw_offset'] = [*mid, angle]
             # create matrix
-            rot_mat = [[+np.cos(angle), -np.sin(angle)],
-                       [+np.sin(angle), +np.cos(angle)]]
+            rot_mat = [[+np.cos(-angle), -np.sin(-angle)],
+                       [+np.sin(-angle), +np.cos(-angle)]]
             # rotate data accordingly
             eff_sh = np.zeros(len(shots[0]), dtype=np.ndarray)
             eff_sh[0] = np.dot(rot_mat[0], shots[0])# - mid
@@ -238,7 +232,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         # Average assignment fidelity: F_ass = (P01 - P10 )/2
         # where Pxy equals probability to measure x when starting in y
         F_vs_th = (1-(1-abs(necumsum0 - necumsum1))/2)
-        opt_idx = np.argmax(F_vs_th)
+        opt_idxs = np.argwhere(F_vs_th == np.amax(F_vs_th))
+        opt_idx = int(round(np.average(opt_idxs)))
         self.proc_data_dict['F_assignment_raw'] = F_vs_th[opt_idx]
         self.proc_data_dict['threshold_raw'] = all_x[opt_idx]
 
@@ -308,7 +303,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         self._CDF_1 = CDF_1
         self._infid_vs_th = infid_vs_th
 
-        thr_guess = (bv['B_center'] - bv['A_center'])/2
+        thr_guess = (3*bv['B_center'] - bv['A_center'])/2
         opt_fid = minimize(infid_vs_th, thr_guess)
 
         # for some reason the fit sometimes returns a list of values
@@ -327,17 +322,17 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
         def CDF_0_discr(x):
             return gaussianCDF(x, amplitude=1,
-                                        mu=bv['A_center'], sigma=bv['A_sigma'])
+                               mu=bv['A_center'], sigma=bv['A_sigma'])
 
         def CDF_1_discr(x):
             return gaussianCDF(x, amplitude=1,
-                                        mu=bv['B_center'], sigma=bv['B_sigma'])
+                               mu=bv['B_center'], sigma=bv['B_sigma'])
 
         def disc_infid_vs_th(x):
             cdf0 = gaussianCDF(x, amplitude=1, mu=bv['A_center'],
-                                        sigma=bv['A_sigma'])
+                               sigma=bv['A_sigma'])
             cdf1 = gaussianCDF(x, amplitude=1, mu=bv['B_center'],
-                                        sigma=bv['B_sigma'])
+                               sigma=bv['B_sigma'])
             return (1-np.abs(cdf0 - cdf1))/2
 
         self._CDF_0_discr = CDF_0_discr
@@ -353,6 +348,11 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             self.proc_data_dict['F_discr'] = (1-opt_fid_discr['fun'])[0]
 
         self.proc_data_dict['threshold_discr'] = opt_fid_discr['x'][0]
+
+        fr = self.fit_res['shots_all']
+        bv = fr.params
+        self.proc_data_dict['residual_excitation'] = bv['B_spurious'].value
+        self.proc_data_dict['measurement_induced_relaxation'] = bv['A_spurious'].value
 
     def prepare_plots(self):
         # Did we load two voltage components (shall we do 2D plots?)
@@ -414,6 +414,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         cdf_ys = self.proc_data_dict['cumsum_y']
         cdf_ys[0] = cdf_ys[0]/np.max(cdf_ys[0])
         cdf_ys[1] = cdf_ys[1]/np.max(cdf_ys[1])
+        xra = (bin_x[0], bin_x[-1])
 
         self.plot_dicts['cdf_shots_0'] = {
             'title': 'Culmulative Shot Counts (no binning)' + title,
@@ -422,6 +423,7 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
             'xvals': cdf_xs[0],
             'yvals': cdf_ys[0],
             'setlabel': label_0,
+            'xrange': xra,
             'line_kws': {'color': 'C0', 'alpha': 0.3},
             'marker': '',
             'xlabel': eff_voltage_label,
@@ -470,8 +472,8 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 iq_centers = self.proc_data_dict['IQ_pos']
                 peak_marker_2D = {
                     'plotfn': self.plot_line,
-                    'xvals': iq_centers[0],
-                    'yvals': iq_centers[1],
+                    'xvals': iq_centers[1],
+                    'yvals': iq_centers[0],
                     'xlabel': x_volt_label,
                     'xunit': x_volt_unit,
                     'ylabel': y_volt_label,
@@ -483,21 +485,26 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                     'setlabel': 'Peaks',
                     'do_legend': True,
                 }
-                self.plot_dicts['2D_histogram_0'] = {
-                    'title': 'Raw '+label_0+' Binned Shot Counts' + title,
-                    'ax_id': '2D_histogram_0',
-                    'plotfn': self.plot_colorxy,
-                    'xvals': self.proc_data_dict['2D_histogram_y'],
-                    'yvals': self.proc_data_dict['2D_histogram_x'],
-                    'zvals': self.proc_data_dict['2D_histogram_z'][0],
-                    'xlabel': x_volt_label,
-                    'xunit': x_volt_unit,
-                    'ylabel': y_volt_label,
-                    'yunit': y_volt_unit,
-                    'zlabel': z_hist_label,
-                    'zunit': '-',
-                    'cmap': 'Blues',
-                }
+                peak_marker_2D_rot = deepcopy(peak_marker_2D)
+                peak_marker_2D_rot['xvals'] = iq_centers[0]
+                peak_marker_2D_rot['yvals'] = iq_centers[1]
+
+            self.plot_dicts['2D_histogram_0'] = {
+                'title': 'Raw '+label_0+' Binned Shot Counts' + title,
+                'ax_id': '2D_histogram_0',
+                'plotfn': self.plot_colorxy,
+                'xvals': self.proc_data_dict['2D_histogram_y'],
+                'yvals': self.proc_data_dict['2D_histogram_x'],
+                'zvals': self.proc_data_dict['2D_histogram_z'][0],
+                'xlabel': x_volt_label,
+                'xunit': x_volt_unit,
+                'ylabel': y_volt_label,
+                'yunit': y_volt_unit,
+                'zlabel': z_hist_label,
+                'zunit': '-',
+                'cmap': 'Blues',
+            }
+            if iq_centers is not None:
                 dp = deepcopy(peak_marker_2D)
                 dp['ax_id'] = '2D_histogram_0'
                 self.plot_dicts['2D_histogram_0_marker'] = dp
@@ -524,19 +531,19 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
             #### Scatter Shots
             volts = self.proc_data_dict['all_channel_int_voltages']
-            vxr = [np.min([np.min(a) for a in volts[:][0]]),
-                   np.max([np.max(a) for a in volts[:][0]])]
-            vyr = [np.min([np.min(a) for a in volts[:][1]]),
+            vxr = [np.min([np.min(a) for a in volts[:][1]]),
                    np.max([np.max(a) for a in volts[:][1]])]
+            vyr = [np.min([np.min(a) for a in volts[:][0]]),
+                   np.max([np.max(a) for a in volts[:][0]])]
             self.plot_dicts['2D_shots_0'] = {
                 'title': 'Raw Shots' + title,
                 'ax_id': '2D_shots',
                 'plotfn': self.plot_line,
                 'xvals': volts[0][1],
                 'yvals': volts[0][0],
-                'range': [vxr, vyr],
-                'xrange': vxr,
-                'yrange': vyr,
+                #'range': [vxr, vyr],
+                #'xrange': vxr,
+                #'yrange': vyr,
                 'xlabel': x_volt_label,
                 'xunit': x_volt_unit,
                 'ylabel': y_volt_label,
@@ -554,9 +561,9 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 'plotfn': self.plot_line,
                 'xvals': volts[1][1],
                 'yvals': volts[1][0],
-                'range': [vxr, vyr],
-                'xrange': vxr,
-                'yrange': vyr,
+                #'range': [vxr, vyr],
+                #'xrange': vxr,
+                #'yrange': vyr,
                 'xlabel': x_volt_label,
                 'xunit': x_volt_unit,
                 'ylabel': y_volt_label,
@@ -632,7 +639,6 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                 'do_legend': True,
             }
 
-
         ##########################################
         # Add textbox (eg.g Thresholds, fidelity #
         # information, number of shots etc)      #
@@ -671,31 +677,31 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                     '{:.1f}%'.format(
                         self.proc_data_dict['F_discr']*100))
                 fit_text += fit_th_msg
-            snr = self.fit_res['shots_all'].params['SNR']
-            fit_text += '\nSNR (fit) = ${:.3f}\\pm{:.3f}$'.format(snr.value, snr.stderr)
+                snr = self.fit_res['shots_all'].params['SNR']
+                fit_text += '\nSNR (fit) = ${:.3f}\\pm{:.3f}$'.format(snr.value, snr.stderr)
 
-            fr = self.fit_res['shots_all']
-            bv = fr.params
-            a_sp = bv['A_spurious']
-            fit_text += '\n\nSpurious Excitations:'
-            fit_text += '\n$p(e|0) = {:.3f}$'.format(a_sp.value)
-            if self.options_dict.get('fixed_p01', True) == True:
-                fit_text += '$\\pm{:.3f}$'.format(a_sp.stderr)
-            else:
-                fit_text += ' (fixed)'
+                fr = self.fit_res['shots_all']
+                bv = fr.params
+                a_sp = bv['A_spurious']
+                fit_text += '\n\nSpurious Excitations:'
+                fit_text += '\n$p(e|0) = {:.3f}$'.format(a_sp.value)
+                if self.options_dict.get('fixed_p01', True) == True:
+                    fit_text += '$\\pm{:.3f}$'.format(a_sp.stderr)
+                else:
+                    fit_text += ' (fixed)'
 
-            b_sp = bv['B_spurious']
-            fit_text += ' \n$p(g|\\pi) = {:.3f}$'.format(b_sp.value)
-            if self.options_dict.get('fixed_p10', True) == True:
-                fit_text += '$\\pm{:.3f}$'.format(b_sp.stderr)
-            else:
-                fit_text += ' (fixed)'
+                b_sp = bv['B_spurious']
+                fit_text += ' \n$p(g|\\pi) = {:.3f}$'.format(b_sp.value)
+                if self.options_dict.get('fixed_p10', True) == True:
+                    fit_text += '$\\pm{:.3f}$'.format(b_sp.stderr)
+                else:
+                    fit_text += ' (fixed)'
 
             if two_dim_data:
                 offs = self.proc_data_dict['raw_offset']
                 #fit_text += '\nOffset from raw:\n'
                 #fit_text += '({:.3f},{:.3f}) {},\n'.format(offs[0], offs[1], eff_voltage_unit)
-                fit_text += '\n\nRotated by ${:.1f}^\\circ$'.format(offs[2]*180/np.pi)
+                fit_text += '\n\nRotated by ${:.1f}^\\circ$'.format((offs[2]*180/np.pi)%180)
                 auto_rot = self.options_dict.get('auto_rotation_angle', True)
                 fit_text += '(auto)' if auto_rot else '(man.)'
             else:

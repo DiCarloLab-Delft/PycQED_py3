@@ -1,4 +1,8 @@
-[
+[  
+  [
+    "system/fpgarevision",
+    "float"
+  ],
   [
     "awgs/0/sequencer/program",
     "vector_g"

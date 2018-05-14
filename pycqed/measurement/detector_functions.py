@@ -1136,6 +1136,37 @@ class Signal_Hound_fixed_frequency(Soft_Detector):
         self.SH.abort()
 
 
+class Signal_Hound_sweeped_frequency(Hard_Detector):
+
+    def __init__(self, signal_hound, Navg=1, delay=0.1,
+                  **kw):
+        super().__init__()
+        self.name = 'SignalHound_fixed_frequency'
+        self.value_names = ['Power']
+        self.value_units = ['dBm']
+        self.delay = delay
+        self.SH = signal_hound
+        self.Navg = Navg
+
+    def acquire_data_point(self, **kw):
+        frequency=self.swp.pop()
+        self.SH.set('frequency', frequency)
+        self.SH.prepare_for_measurement()
+        time.sleep(self.delay)
+        return self.SH.get_power_at_freq(Navg=self.Navg)
+
+    def get_values(self):
+        return([self.acquire_data_point()])
+
+
+    def prepare(self, sweep_points):
+        self.swp=list(sweep_points)
+        #self.SH.prepare_for_measurement()
+
+    def finish(self, **kw):
+        self.SH.abort()
+
+
 class SH_mixer_skewness_det(Soft_Detector):
 
     '''

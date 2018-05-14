@@ -802,8 +802,15 @@ def gauss_2D_guess(model, data, x, y):
     y_proj_data = np.mean(data_grid, axis=1)
     x.sort()
     y.sort()
-    x_guess = lmfit.models.GaussianModel().guess(data=x_proj_data, x=np.unique(x))
-    y_guess = lmfit.models.GaussianModel().guess(data=y_proj_data, x=np.unique(y))
+    xm = lmfit.models.GaussianModel()
+    ym = lmfit.models.GaussianModel()
+    x_guess = xm.guess(data=x_proj_data, x=np.unique(x))
+    x_res = xm.fit(data=x_proj_data, x=np.unique(x), params=x_guess)
+    y_guess = ym.guess(data=y_proj_data, x=np.unique(y))
+    y_res = ym.fit(data=y_proj_data, x=np.unique(y), params=y_guess)
+
+    x_guess = x_res.params
+    y_guess = y_res.params
     model.set_param_hint('amplitude', value=amp, min=0.9*amp, max=1.1*amp,
                          vary=True)
     model.set_param_hint('sigma_x', value=x_guess['sigma'].value, min=0,
@@ -924,8 +931,8 @@ def ro_double_gauss_guess(model, data, x, fixed_p01 = False, fixed_p10 = False):
     amp1 = 0.99 * np.max(data[1]) * guess1['sigma'] * f
     spurious0 = max(1-(amp0/intarea0), 1e-3)
     spurious1 = max(1-(amp1/intarea1), 1e-3)
-    p01 = fixed_p01 or spurious0
-    p10 = fixed_p10 or spurious1
+    p01 = fixed_p01 if fixed_p01 is not False else spurious0
+    p10 = fixed_p10 if fixed_p10 is not False else spurious1
     model.set_param_hint('A_spurious', value=p01, min=0, max=1,
                          vary=fixed_p01 is False)
     model.set_param_hint('B_spurious', value=p10, min=0, max=1,
