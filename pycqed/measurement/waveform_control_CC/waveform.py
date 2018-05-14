@@ -384,7 +384,7 @@ def martinis_flux_pulse(length: float, lambda_2: float, lambda_3: float,
     scale = t[-1]/t_samples[-1]
     interp_wave = scipy.interpolate.interp1d(
         t/scale, theta_wave_clipped, bounds_error=False,
-        fill_value=0)(t_samples)
+        fill_value='extrapolate')(t_samples)
 
     # Return in the specified units
     if return_unit == 'theta':
@@ -414,6 +414,9 @@ def martinis_flux_pulse(length: float, lambda_2: float, lambda_3: float,
     # why sometimes the last sample is nan is not known,
     # but we will surely figure it out someday.
     # (Brian and Adriaan, 14.11.2017)
+    # This may be caused by the fill_value of the interp_wave (~30 lines up)
+    # that was set to 0 instead of extrapolate. This caused
+    # the np.tan(interp_wave) to divide by zero. (MAR 10-05-2018)
     voltage_wave = np.nan_to_num(voltage_wave)
 
     return voltage_wave
