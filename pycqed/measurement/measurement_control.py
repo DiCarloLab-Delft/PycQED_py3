@@ -450,6 +450,8 @@ class MeasurementControl(Instrument):
         self.iteration += 1
         if self.mode != 'adaptive':
             self.print_progress(stop_idx)
+        else:
+            self.print_progress_adaptive()
         return vals
 
     def optimization_function(self, x):
@@ -1316,6 +1318,19 @@ class MeasurementControl(Instrument):
                 end_char = ''
             else:
                 end_char = '\n'
+            print('\r', progress_message, end=end_char)
+
+    def print_progress_adaptive(self):
+        if self.verbose():
+            acquired_points = self.dset.shape[0]
+
+            elapsed_time = time.time() - self.begintime
+            progress_message = \
+                "\rAcquired {acquired_points} points, \telapsed time: "\
+                "{t_elapsed}s".format(
+                    acquired_points = acquired_points,
+                    t_elapsed=round(elapsed_time, 1))
+            end_char = ''
             print('\r', progress_message, end=end_char)
 
     def is_complete(self):
