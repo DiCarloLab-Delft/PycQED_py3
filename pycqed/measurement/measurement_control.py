@@ -717,6 +717,9 @@ class MeasurementControl(Instrument):
             zlabels = self.detector_function.value_names
             zunits = self.detector_function.value_units
 
+            self.im_plots = []
+            self.im_plot_scatters = []
+
             for j in range(len(self.detector_function.value_names)):
                 self.secondary_QtPlot.add(x=[0, 1],
                                           y=[0, 1],
@@ -726,6 +729,14 @@ class MeasurementControl(Instrument):
                                           zlabel=zlabels[j], zunit=zunits[j],
                                           subplot=j+1,
                                           cmap='viridis')
+
+                self.im_plots.append(self.secondary_QtPlot.traces[-1])
+                self.secondary_QtPlot.add(x=[0], y=[0],
+                                          pen=None,
+                                          color=1.0, width=0,
+                                          symbol='o', symbolSize=2,
+                                          subplot=j+1)
+                self.im_plot_scatters.append(self.secondary_QtPlot.traces[-1])
 
     def update_plotmon_2D_interp(self, force_update=False):
         '''
@@ -747,13 +758,20 @@ class MeasurementControl(Instrument):
                         # Interpolate points
                         x_grid, y_grid, z_grid  = interpolate_heatmap(
                             x_vals, y_vals, z_vals)
-                        trace = self.secondary_QtPlot.traces[j]
+                        # trace = self.secondary_QtPlot.traces[j]
+                        trace = self.im_plots[j]
                         trace['config']['x'] = x_grid
                         trace['config']['y'] = y_grid
                         trace['config']['z'] = z_grid
                         # force rescale the axes
                         trace['plot_object']['scales']['x'] = new_sc
                         trace['plot_object']['scales']['y'] = new_sc
+
+                        # Mark all measured points on which the interpolation
+                        # is based
+                        trace = self.im_plot_scatters[j]
+                        trace['config']['x'] = x_vals
+                        trace['config']['y'] = y_vals
 
                     self.time_last_2Dplot_update = time.time()
                     self.secondary_QtPlot.update_plot()
