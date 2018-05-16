@@ -461,7 +461,7 @@ def make_zoomed_cryoscope_fig(t, amp, title, ax=None, **kw):
     ax2.axhline(0.999, ls=':', c='grey')
     ax2.plot(x, y/gc, '-')
 
-    formatter = ticker.FuncFormatter(lambda x, pos: x*1e9)
+    formatter = ticker.FuncFormatter(lambda x, pos: round(x*1e9,3))
     ax2.xaxis.set_major_formatter(formatter)
 
     ax2.set_ylim(0.998, 1.002)
