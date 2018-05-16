@@ -9,7 +9,9 @@ import pycqed.analysis_v2.base_analysis as ba
 import numpy as np
 from scipy.stats import sem
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
-
+from matplotlib import gridspec, ticker
+from mpl_toolkits.axes_grid.inset_locator import (inset_axes, InsetPosition,
+                                                  mark_inset)
 
 class RamZFluxArc(ba.BaseDataAnalysis):
     """
@@ -269,6 +271,13 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
             'title': self.timestamp+'\nShort time Fourier Transform'}
 
 
+        self.plot_dicts['zoomed_cryoscope_amplitude'] = {
+            'plotfn': make_zoomed_cryoscope_fig,
+            't': self.ca.time,
+            'amp': self.ca.get_amplitudes(),
+            'title': self.timestamp+'\n Zoomed cryoscope amplitude'}
+
+
 class SlidingPulses_Analysis(ba.BaseDataAnalysis):
     """
     Analysis for the sliding pulses experiment.
@@ -407,3 +416,58 @@ def make_amp_err_plot(t, amp, timestamp, ax=None, **kw):
     ax.set_title('Normalized to {:.2f}\n {}'.format(mean_amp, timestamp))
     set_xlabel(ax, 'Time', 's')
     set_ylabel(ax, 'Normalized Amplitude')
+
+
+
+def make_zoomed_cryoscope_fig(t, amp, title, ax=None, **kw):
+
+    # x = ca.time
+    x = t
+    y = amp
+    # y = ca.get_amplitudes()
+    gc = np.mean(y[len(y)//5:4*len(y)//5])
+
+    if ax is not None:
+        ax=ax
+        f=plt.gcf()
+    else:
+        f, ax = plt.subplots()
+    ax.plot(x,y/gc,  label='Signal')
+    ax.axhline(1.01, ls='--', c='grey', label=r'$\pm$1%')
+    ax.axhline(0.99, ls='--', c='grey')
+    ax.axhline(1.0, ls='-', c='grey', linewidth=.5)
+
+    ax.axhline(1.001, ls=':', c='grey', label=r'$\pm$ 0.1%')
+    ax.axhline(0.999, ls=':', c='grey')
+    # ax.axvline(10e-9, ls='--', c='k')
+
+    ax.set_ylim(.95, 1.02)
+    # ax.set_xlim(-0e-9, 480e-9)
+    set_xlabel(ax, 'Time', 's')
+    set_ylabel(ax, 'Normalized Amplitude', '')
+
+    # Create a set of inset Axes: these should fill the bounding box allocated to
+    # them.
+    ax2 = plt.axes([0,0,1,1])
+    # Manually set the position and relative size of the inset axes within ax1
+    ip = InsetPosition(ax, [.29, .14, 0.65, .4])
+    ax2.set_axes_locator(ip)
+
+    mark_inset(ax, ax2, 1,3, color='grey')
+    ax2.axhline(1.0, ls='-', c='grey')
+    ax2.axhline(1.01, ls='--', c='grey', label=r'$\pm$1%')
+    ax2.axhline(0.99, ls='--', c='grey')
+    ax2.axhline(1.001, ls=':', c='grey', label=r'$\pm$ 0.1%')
+    ax2.axhline(0.999, ls=':', c='grey')
+    ax2.plot(x, y/gc, '-')
+
+    formatter = ticker.FuncFormatter(lambda x, pos: x*1e9)
+    ax2.xaxis.set_major_formatter(formatter)
+
+    ax2.set_ylim(0.998, 1.002)
+    ax2.set_xlim(0, min(150e-9, max(t)))
+    ax.legend(loc=1)
+
+    ax.set_title(title)
+    ax.text(.02, .93, '(a)', color='black', transform=ax.transAxes)
+
