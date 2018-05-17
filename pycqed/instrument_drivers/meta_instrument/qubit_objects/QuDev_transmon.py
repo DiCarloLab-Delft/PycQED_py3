@@ -1517,8 +1517,9 @@ class QuDev_transmon(Qubit):
             MC = self.MC
         self.prepare_for_mixer_calibration(suppress='drive LO')
         cal_elts.mixer_calibration_sequence(
-              trigger_sep, 0, self.RO_acq_marker_channel(),
-              self.pulse_I_channel(), self.pulse_Q_channel())
+            trigger_sep, 0, RO_pars=self.get_RO_pars(),
+            pulse_I_channel=self.pulse_I_channel(),
+            pulse_Q_channel=self.pulse_Q_channel())
         detector = self.int_avg_det_spec
         meas_grid = [x0[0]+np.random.normal(0.0,0.02,100),
                      x0[1]+np.random.normal(0.0,0.02,100)]
@@ -1559,8 +1560,9 @@ class QuDev_transmon(Qubit):
             MC = self.MC
         self.prepare_for_mixer_calibration(suppress='drive LO')
         cal_elts.mixer_calibration_sequence(
-            trigger_sep, 0, self.RO_acq_marker_channel(),
-            self.pulse_I_channel(), self.pulse_Q_channel())
+            trigger_sep, 0, RO_pars=self.get_RO_pars(),
+            pulse_I_channel=self.pulse_I_channel(),
+            pulse_Q_channel=self.pulse_Q_channel())
         detector = self.int_avg_det_spec
         ad_func_pars = {'adaptive_function': opti.nelder_mead,
                         'x0': x0,
@@ -1611,7 +1613,7 @@ class QuDev_transmon(Qubit):
         MC.set_detector_function(det.IndexDetector(detector, 0))
         MC.set_adaptive_function_parameters(ad_func_pars)
         cal_elts.mixer_calibration_sequence(
-            trigger_sep, 0, self.RO_acq_marker_channel())
+            trigger_sep, 0, RO_pars=self.get_RO_pars())
         self.AWG.start()
         MC.run(name='readout_skewness_calibration' + self.msmt_suffix,
                mode='adaptive')
@@ -1634,9 +1636,13 @@ class QuDev_transmon(Qubit):
             MC = self.MC
         self.prepare_for_mixer_calibration('drive LO')
         cal_elts.mixer_calibration_sequence(
-            trigger_sep, amplitude, self.RO_acq_marker_channel(),
-            self.pulse_I_channel(), self.pulse_Q_channel(), self.f_pulse_mod(),
-            self.phi_skew(), self.alpha()
+            trigger_sep, amplitude,
+            trigger_channel=None,
+            RO_pars=self.get_RO_pars(),
+            pulse_I_channel=self.pulse_I_channel(),
+            pulse_Q_channel=self.pulse_Q_channel(),
+            f_pulse_mod=self.f_pulse_mod(),
+            phi_skew=self.phi_skew(), alpha=self.alpha()
         )
         DC_LO_freqs = (if_freqs*trigger_sep).astype(np.int)/trigger_sep + \
                       self.drive_LO.frequency() - self.f_RO_mod()
@@ -1661,6 +1667,7 @@ class QuDev_transmon(Qubit):
             self.pulse_I_channel(), self.pulse_Q_channel(),
             self.alpha, self.phi_skew, self.f_pulse_mod(),
             self.RO_acq_marker_channel(),
+            self.get_RO_pars(),
             amplitude=amplitude, nr_averages=self.RO_acq_averages(),
             RO_trigger_separation=trigger_sep, verbose=False)
         # detector = det.UHFQC_readout_mixer_skewness_det(
@@ -1716,6 +1723,7 @@ class QuDev_transmon(Qubit):
             self.pulse_I_channel(), self.pulse_Q_channel(),
             self.alpha, self.phi_skew, self.f_pulse_mod(),
             self.RO_acq_marker_channel(),
+            self.get_RO_pars(),
             amplitude=amplitude, nr_averages=self.RO_acq_averages(),
             RO_trigger_separation=trigger_sep, verbose=False)
         # detector = det.UHFQC_readout_mixer_skewness_det(
