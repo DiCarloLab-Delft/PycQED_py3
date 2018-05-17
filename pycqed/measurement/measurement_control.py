@@ -58,8 +58,7 @@ class MeasurementControl(Instrument):
                            initial_value=datadir,
                            vals=vals.Strings(),
                            parameter_class=ManualParameter)
-        # Soft average is currently only available for "hard"
-        # measurements. It does not work with adaptive measurements.
+        # Soft average does not work with adaptive measurements.
         self.add_parameter('soft_avg',
                            label='Number of soft averages',
                            parameter_class=ManualParameter,
@@ -745,7 +744,7 @@ class MeasurementControl(Instrument):
         Updates the interpolated 2D heatmap
         '''
         if self.live_plot_enabled() and len(self.sweep_function_names) ==2:
-            # try:
+            try:
                 if (time.time() - self.time_last_2Dplot_update >
                         self.plotting_interval() or force_update):
                     # exists to force reset the x- and y-axis scale
@@ -777,8 +776,8 @@ class MeasurementControl(Instrument):
 
                     self.time_last_2Dplot_update = time.time()
                     self.secondary_QtPlot.update_plot()
-            # except Exception as e:
-            #     logging.warning(e)
+            except Exception as e:
+                logging.warning(e)
 
 
     def initialize_plot_monitor_adaptive(self):
