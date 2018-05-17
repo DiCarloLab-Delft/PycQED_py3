@@ -2317,6 +2317,60 @@ class UHFQC_single_qubit_statistics_logging_det(UHFQC_statistics_logging_det):
         # reverts the order to start with the number of flips
         return super().acquire_data_point()[:2][::-1]
 
+class UHFQC_mixer_calibration_det(UHFQC_integrated_average_detector):
+    """
+    Based on the "UHFQC_integrated_average" detector.
+    generates an AWG seq to measure sideband transmission.
+    """
+
+    def __init__(self, UHFQC, station, UHFQC_channels, pulseIch,
+                 pulseQch, alpha, phi_skew, f_mod, RO_trigger_channel,
+                 amplitude=0.1, nr_averages=2**10, RO_trigger_separation=5e-6,
+                 verbose=False):
+        super().__init__(UHFQC, AWG=station.pulsar, integration_length=2.2e-6,
+                         nr_averages=nr_averages, channels=UHFQC_channels,
+                         real_imag=False, single_int_avg=True)
+        self.name = 'UHFQC_mixer_skewness_det'
+        self.station = station
+        self.pulseIch = pulseIch
+        self.pulseQch = pulseQch
+        self.alpha = alpha
+        self.phi_skew = phi_skew
+        self.f_mod = f_mod
+        self.amplitude = amplitude
+        self.verbose = verbose
+        self.RO_trigger_separation = RO_trigger_separation
+        self.RO_trigger_channel = RO_trigger_channel
+
+    def acquire_data_point(self):
+        if not isinstance(self.alpha,list) \
+                and not isinstance(self.phi_skew,list):
+            if self.verbose:
+                print('alpha: {:.3f}'.format(self.alpha()))
+                print('phi_skew: {:.3f}'.format(self.phi_skew()))
+            cal_elts.mixer_calibration_sequence(
+                self.RO_trigger_separation, self.amplitude, self.RO_trigger_channel,
+                self.pulseIch, self.pulseQch, f_pulse_mod=self.f_mod,
+                phi_skew=self.phi_skew(), alpha=self.alpha()
+            )
+        elif isinstance(self.alpha,list) and isinstance(self.phi_skew,list):
+            cal_elts.mixer_calibration_sequence_NN(
+                self.RO_trigger_separation, self.amplitude, self.RO_trigger_channel,
+                self.pulseIch, self.pulseQch, f_pulse_mod=self.f_mod,
+                phi_skew=self.phi_skew(), alpha=self.alpha()
+            )
+
+        return super().acquire_data_point()
+
+    def prepare(self, **kw):
+        super().prepare(**kw)
+
+    def finish(self):
+        super().finish()
+
+
+
+
 class UHFQC_mixer_skewness_det(UHFQC_integrated_average_detector):
     """
     Based on the "UHFQC_integrated_average" detector.
@@ -2343,14 +2397,22 @@ class UHFQC_mixer_skewness_det(UHFQC_integrated_average_detector):
         self.RO_trigger_channel = RO_trigger_channel
 
     def acquire_data_point(self):
-        if self.verbose:
-            print('alpha: {:.3f}'.format(self.alpha()))
-            print('phi_skew: {:.3f}'.format(self.phi_skew()))
-        cal_elts.mixer_calibration_sequence(
-            self.RO_trigger_separation, self.amplitude, self.RO_trigger_channel,
-            self.pulseIch, self.pulseQch, f_pulse_mod=self.f_mod,
-            phi_skew=self.phi_skew(), alpha=self.alpha()
-        )
+        if not isinstance(self.alpha,list) \
+        and not isinstance(self.phi_skew,list):
+            if self.verbose:
+                print('alpha: {:.3f}'.format(self.alpha()))
+                print('phi_skew: {:.3f}'.format(self.phi_skew()))
+            cal_elts.mixer_calibration_sequence(
+                self.RO_trigger_separation, self.amplitude, self.RO_trigger_channel,
+                self.pulseIch, self.pulseQch, f_pulse_mod=self.f_mod,
+                phi_skew=self.phi_skew(), alpha=self.alpha()
+            )
+        elif isinstance(self.alpha,list) and isinstance(self.phi_skew,list):
+            cal_elts.mixer_calibration_sequence_NN(
+                self.RO_trigger_separation, self.amplitude, self.RO_trigger_channel,
+                self.pulseIch, self.pulseQch, f_pulse_mod=self.f_mod,
+                phi_skew=self.phi_skew(), alpha=self.alpha()
+            )
 
         return super().acquire_data_point()
 

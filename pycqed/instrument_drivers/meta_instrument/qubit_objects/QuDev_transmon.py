@@ -1528,6 +1528,7 @@ class QuDev_transmon(Qubit):
                         'hidden_layer_sizes': [(h, h) for h in range(30,50,5)],
                         'alphas': np.logspace(-6,-4,5).tolist(),
                         'minimize': True,
+                        'estimator': 'MLP_Regressor_scikit'
                         #Probably some additional params for the NN go here
                         }
 
@@ -1674,15 +1675,16 @@ class QuDev_transmon(Qubit):
         #Could make sample size variable (maxiter) for better adapting)
         meas_grid = [np.random.normal(self.alpha(),0.5,100),
                      np.random.normal(self.phi_skew(),15,100)]
-        meas_grid = list(map(list, zip(*meas_grid)))
+        #meas_grid = list(map(list, zip(*meas_grid))) #not required if new calibration_sequence_NN is used.
         ad_func_pars = {'adaptive_function': opti.neural_network_opt,
                         'training_grid': meas_grid,
                         'hidden_layer_sizes': [(h, h) for h in range(35,50,5)],
                         'alphas': np.logspace(-6,-4,3).tolist(),
                         'minimize': True,
+                        'estimator': 'MLP_Regressor_scikit'
                         #Probably some additional params for the NN go here
                         }
-        MC.set_sweep_functions([self.alpha, self.phi_skew]) #not sure if has to be changed. Seems ok
+        MC.set_sweep_functions([self.alpha, self.phi_skew])
         MC.set_detector_function(det.IndexDetector(detector, 0))
         MC.set_adaptive_function_parameters(ad_func_pars)
         MC.run(name='drive_skewness_calibration' + self.msmt_suffix,
