@@ -1,4 +1,5 @@
 import numpy as np
+import time
 from pycqed.analysis.fitting_models import hanger_func_complex_SI
 from qcodes.instrument.base import Instrument
 from qcodes.utils.validators import Numbers, Enum, Ints
@@ -54,13 +55,17 @@ class Mock_Device(Instrument):
                                           'magn_phase', 'magn'),
                            parameter_class=ManualParameter)
 
+        self.add_parameter('acq_delay', initial_value=0,
+                           unit='s',
+                           parameter_class=ManualParameter)
+
         self.add_parameter('cw_noise_level', initial_value=0,
                            parameter_class=ManualParameter)
 
         self.add_parameter('S21', unit='V', get_cmd=self.measure_transmission)
 
     def measure_transmission(self):
-
+        time.sleep(self.acq_delay())
         # TODO: add attenuation and gain
         transmission = dBm_to_Vpeak(self.mw_pow())
 

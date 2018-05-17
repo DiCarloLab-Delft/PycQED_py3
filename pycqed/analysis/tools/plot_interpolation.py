@@ -1,0 +1,67 @@
+import numpy as np
+import logging
+from scipy import interpolate
+
+def areas(ip):
+    p = ip.tri.points[ip.tri.vertices]
+    q = p[:, :-1, :] - p[:, -1, None, :]
+    areas = abs(q[:, 0, 0] * q[:, 1, 1] - q[:, 0, 1] * q[:, 1, 0]) / 2
+    return areas
+
+
+def scale(points, xy_mean, xy_scale):
+    points = np.asarray(points, dtype=float)
+    return (points - xy_mean) / xy_scale
+
+
+def unscale(points, xy_mean, xy_scale):
+    points = np.asarray(points, dtype=float)
+    return points * xy_scale + xy_mean
+
+def interpolate_heatmap(x, y, z, n=None):
+    """
+    Args:
+
+    Returns:
+        x_grid : N*1 array of x-values of the interpolated grid
+        y_grid : N*1 array of x-values of the interpolated grid
+        z_grid : N*N array of z-values that form a grid.
+
+    The output of this method can directly be used for
+        plt.imshow(z_grid, extent=extent, aspect='auto')
+        where the extent is determined by the min and max of the x_grid and
+        y_grid
+    """
+
+    points = list(zip(x, y))
+    lbrt = np.min(points, axis=0), np.max(points, axis=0)
+    lbrt = lbrt[0][0], lbrt[0][1], lbrt[1][0], lbrt[1][1]
+
+    xy_mean = np.mean([lbrt[0], lbrt[2]]), np.mean([lbrt[1], lbrt[3]])
+    xy_scale = np.ptp([lbrt[0], lbrt[2]]), np.ptp([lbrt[1], lbrt[3]])
+
+    # interpolation needs to happen on a rescaled grid, this is somewhat akin to an
+    # assumption in the interpolation that the scale of the experiment is chosen sensibly.
+    ip = interpolate.LinearNDInterpolator(scale(points, xy_mean=xy_mean, xy_scale=xy_scale),
+                                          z)
+
+    if n is None:
+        # Calculate how many grid points are needed.
+        # factor from A=√3/4 * a² (equilateral triangle)
+        n = int(0.658 / np.sqrt(areas(ip).min()))
+        n = max(n, 10)
+        if n > 500:
+            logging.warning('n: {} larger than 500'.format(n))
+            n=500
+
+    x_lin = y_lin = np.linspace(-0.5, 0.5, n)
+    # Interpolation is evaulated linearly in the domain for interpolation
+    z_grid = ip(x_lin[:, None], y_lin[None, :]).squeeze()
+
+    # x and y grid points need to be rescaled from the linearly chosen points
+    points_grid = unscale(list(zip(x_lin, y_lin)), xy_mean=xy_mean, xy_scale=xy_scale)
+    x_grid = points_grid[:, 0]
+    y_grid = points_grid[:, 1]
+
+
+    return x_grid, y_grid, (z_grid).T
