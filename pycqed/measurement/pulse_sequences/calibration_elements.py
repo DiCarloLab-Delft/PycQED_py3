@@ -61,14 +61,22 @@ def cos_seq(amplitude, frequency, channels, phases,
     station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
     return seq_name
 
-def mixer_calibration_sequence(trigger_separation, amplitude, trigger_channel,
+def mixer_calibration_sequence(trigger_separation, amplitude, trigger_channel=None,
+                               RO_pars = None,
                                pulse_I_channel=None, pulse_Q_channel=None,
                                f_pulse_mod=0, phi_skew=0, alpha=1, upload=True):
-    RO_trigger = {'pulse_type': 'SquarePulse',
-                  'channel': trigger_channel,
-                  'length': 20e-9,
-                  'amplitude': 1.,
-                  'pulse_delay': 0}
+    if trigger_channel is not None:
+        RO_trigger = {'pulse_type': 'SquarePulse',
+                      'channel': trigger_channel,
+                      'length': 20e-9,
+                      'amplitude': 1.,
+                      'pulse_delay': 0}
+    elif RO_pars is not None:
+        RO_trigger = RO_pars
+        trigger_channel = RO_pars['acq_marker_channel']
+    else:
+        raise ValueError('Set either RO_pars or trigger_channel')
+
     pulses = [RO_trigger]
     channels = [trigger_channel]
     channels += station.sequencer_config['slave_AWG_trig_channels']

@@ -2325,6 +2325,7 @@ class UHFQC_mixer_skewness_det(UHFQC_integrated_average_detector):
 
     def __init__(self, UHFQC, station, UHFQC_channels, pulseIch,
                  pulseQch, alpha, phi_skew, f_mod, RO_trigger_channel,
+                 RO_pars,
                  amplitude=0.1, nr_averages=2**10, RO_trigger_separation=5e-6,
                  verbose=False):
         super().__init__(UHFQC, AWG=station.pulsar, integration_length=2.2e-6,
@@ -2341,14 +2342,17 @@ class UHFQC_mixer_skewness_det(UHFQC_integrated_average_detector):
         self.verbose = verbose
         self.RO_trigger_separation = RO_trigger_separation
         self.RO_trigger_channel = RO_trigger_channel
+        self.RO_pars = RO_pars
 
     def acquire_data_point(self):
         if self.verbose:
             print('alpha: {:.3f}'.format(self.alpha()))
             print('phi_skew: {:.3f}'.format(self.phi_skew()))
         cal_elts.mixer_calibration_sequence(
-            self.RO_trigger_separation, self.amplitude, self.RO_trigger_channel,
-            self.pulseIch, self.pulseQch, f_pulse_mod=self.f_mod,
+            self.RO_trigger_separation, self.amplitude,
+            RO_pars=self.RO_pars,
+            pulse_I_channel=self.pulseIch,
+            pulse_Q_channel=self.pulseQch, f_pulse_mod=self.f_mod,
             phi_skew=self.phi_skew(), alpha=self.alpha()
         )
 
