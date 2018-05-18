@@ -12,6 +12,10 @@ import logging
 import numpy as np
 from scipy import signal
 
+# Uses an "old-style" kernel to correct the bounce. This should be replaced
+# by a signal.lfilter provided by Yves (MAR May 2018)
+from pycqed.measurement.kernel_functions import bounce_kernel
+
 
 def bias_tee_correction(ysig, tau: float, sampling_rate: float=1):
     """
@@ -67,6 +71,26 @@ def exponential_decay_correction(ysig, tau: float, amp: float,
     return filtered_signal
 
 
+
+def bounce_correction(ysig, tau:float, amp: float,
+                      sampling_rate:float = 1):
+    """
+    Corrects for a bounce
+
+    Args:
+        ysig: the signal to be predistorted
+        tau: the time at which the bounce occurs
+        amp: the amplitude of the bounce correction
+        sampling_rate: the sampling rate of the signal
+    returns:
+        filtered_signal : the signal corrected for the bounce
+    """
+
+    # kernel is cut of after 8*tau, this menas that it will only correct
+    # bounces up to 8th order, this is good for coefficients << 1
+    kern = bounce_kernel(amp, time=tau, length=8*tau, sampling_rate=sampling_rate)
+    filter_signal = np.convolve(ysig, kern, mode='full')
+    return filter_signal[:len(ysig)]
 
 
 #################################################################
