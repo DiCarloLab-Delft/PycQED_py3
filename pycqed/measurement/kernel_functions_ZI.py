@@ -202,7 +202,7 @@ def multipath_bounce_correction(sig, delay, amp, paths = 8, bufsize = 128):
     It is constrained to be smaller than 1. The amplitude is represented as a 18-bit fixed point number on the FPGA.
     """
     if not 0 <= delay < bufsize-8:
-        raise ValueError("The maximulm delay is limitted to 120 (bufsize-8) samples to save hardware resources.")
+        raise ValueError("The maximum delay is limitted to 120 (bufsize-8) samples to save hardware resources.")
     if not -1 <= amp < 1:
         raise ValueError("The amplitude needs to be between -1 and 1.")
 
@@ -213,9 +213,11 @@ def multipath_bounce_correction(sig, delay, amp, paths = 8, bufsize = 128):
 
     # iterate in steps of eight samples through the input signal to simulate the implementation with parallel paths on the FPGA
     for i in range(0, len(sig), paths):
-        buffer[paths:] = buffer[:-paths]
-        buffer[:paths] = sig[i:i+8]
-        sigout[i:i+8] = sig[i:i+8] + amp_hw*buffer[delay:delay+8]
+        buffer[:-paths] = buffer[paths:]
+        upper_ind = min(i+paths, len(sig))
+        n_samples = upper_ind - i
+        buffer[-paths-1:-paths+n_samples-1] = sig[i:upper_ind]
+        sigout[i:i+8] = sig[i:i+paths] + amp_hw*buffer[-delay-paths-1:-delay-1]
     return sigout
 
 
