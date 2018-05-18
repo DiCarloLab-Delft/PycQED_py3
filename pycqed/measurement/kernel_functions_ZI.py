@@ -196,11 +196,11 @@ def multipath_filter2(sig, alpha, k, paths):
 def multipath_first_order_bounce_correction(sig, delay, amp, paths = 8, bufsize = 128):
     """
     This function simulates a possible FPGA implementation of a first-order bounce correction filter (only one reflection considered).
-    The signal (sig) is assumed to be a numpy array representing a wavefomr with sampling rate 2.4 GSa/s.
+    The signal (sig) is assumed to be a numpy array representing a waveform with sampling rate 2.4 GSa/s.
 
     Args:
         sig:   The signal to be filtered as a numpy array
-        delay: The delay is specified in number of samples. It needs to be an interger.
+        delay: The delay is specified in number of samples. It needs to be an integer.
         amp:   The amplitude of the bounce specified relative to the amplitude of the input signal.
                The amplitude is constrained to be smaller than 1. The amplitude is represented as a 18-bit fixed point number on the FPGA.
         paths: The number of parallel paths on the FPGA
