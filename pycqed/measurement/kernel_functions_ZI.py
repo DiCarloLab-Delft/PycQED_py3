@@ -217,7 +217,7 @@ def multipath_bounce_correction(sig, delay, amp, paths = 8, bufsize = 128):
         upper_ind = min(i+paths, len(sig))
         n_samples = upper_ind - i
         buffer[-paths-1:-paths+n_samples-1] = sig[i:upper_ind]
-        sigout[i:i+8] = sig[i:i+paths] + amp_hw*buffer[-delay-paths-1:-delay-1]
+        sigout[i:upper_ind] = sig[i:upper_ind] + amp_hw*buffer[-delay-paths-1:-delay-paths+n_samples-1]
     return sigout
 
 
