@@ -193,17 +193,20 @@ def multipath_filter2(sig, alpha, k, paths):
     duf = duf[0:sig.size]
     return sig + k * (duf - sig)
 
-def multipath_bounce_correction(sig, delay, amp, paths = 8, bufsize = 128):
+def multipath_first_order_bounce_correction(sig, delay, amp, paths = 8, bufsize = 128):
     """
-    This function simulates a possible FPGA implementation of a first-order bounce correction filter.
+    This function simulates a possible FPGA implementation of a first-order bounce correction filter (only one reflection considered).
     The signal (sig) is assumed to be a numpy array representing a wavefomr with sampling rate 2.4 GSa/s.
     The delay is specified in number of samples. It needs to be an interger.
     The amplitude (amp) of the bounce is specified relative to the amplitude of the input signal.
     It is constrained to be smaller than 1. The amplitude is represented as a 18-bit fixed point number on the FPGA.
     """
-    if not 0 <= delay < bufsize-8:
-        raise ValueError("The maximum delay is limitted to 120 (bufsize-8) samples to save hardware resources.")
-    if not -1 <= amp < 1:
+    if not 1 <= delay < bufsize-8:
+        raise ValueError(textwrap.dedent("""
+            The maximum delay needs to be less than 120 (bufsize-8) samples to save hardware resources.
+            The delay needs to be at least 1 sample.")
+            """))
+    if not -1 < amp < 1:
         raise ValueError("The amplitude needs to be between -1 and 1.")
 
     sigout = np.zeros(len(sig))
@@ -217,16 +220,46 @@ def multipath_bounce_correction(sig, delay, amp, paths = 8, bufsize = 128):
         upper_ind = min(i+paths, len(sig))
         n_samples = upper_ind - i
         buffer[-paths-1:-paths+n_samples-1] = sig[i:upper_ind]
-        sigout[i:upper_ind] = sig[i:upper_ind] + amp_hw*buffer[-delay-paths-1:-delay-paths+n_samples-1]
+        sigout[i:upper_ind] = sig[i:upper_ind] - amp_hw*buffer[-delay-paths-1:-delay-paths+n_samples-1]
     return sigout
 
+def first_order_bounce_corr(sig, delay, amp, sampling_rate):
+    """ This function provides a wrapper to call the multipath_first_order_bounce_correction
+    using natural units.
+    delay: delay in seconds
+    amp: amplitude of the bounce
+    sampling_rate: the sampling rate in Hz
+    """
+    delay_n_samples = round(sampling_rate*delay)
+    if not delay_n_samples >= 1:
+        raise ValueError("The delay need to be at least one sample.")
+    sigout = multipath_first_order_bounce_correction(sig, delay_n_samples, amp)
+    return sigout
 
-def ideal_inverted_fir_kernel(impulse_response, zero_ind=0):
+def first_order_bounce_kern(delay, amp, sampling_rate):
+    """ This function computes the kernel for first-order bounce (only one reflection considered).
+    delay: the delay in seconds
+    amp: the amplitude of the bounce
+    sampling_rate: the sampling rate in Hz
+    """
+    delay_n_samples = round(sampling_rate*delay)
+    if not delay_n_samples >= 1:
+        raise ValueError("The delay need to be at least one sample.")
+    kern = np.zeros(delay_n_samples+1)
+    kern[0] = 1
+    kern[-1] = amp
+    return kern
+
+def ideal_inverted_fir_kernel(impulse_response, zero_ind=0, zero_padding=0):
     """
     This function computes the ideal inverted FIR filter kernel for a given impulse_response.
-    The argument zero_ind provides the index corresponding to time t=0 within the impulse_response array.
+    impulse_response: array representing the impulse response of the distortion to be corrected.
+    zero_ind: index of the time 0
+    zero_padding: number of zeros to append to the the impulse_response
     """
-    f = np.fft.fft(impulse_response)
-    impulse_response_inv = np.fft.ifft(1/f)
-    impulse_response_inv_re_trunc= np.real(impulse_response_inv)[zero_ind:]
-    return impulse_response_inv_re_trunc
+    resp = np.concatenate([impulse_response, np.zeros(zero_padding)])
+
+    f = np.fft.fft(resp)
+    kern = np.fft.ifft(1/f)
+    kern_re_trunc = np.real(kern)[zero_ind:]
+    return kern_re_trunc
