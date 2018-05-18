@@ -157,7 +157,7 @@ class Test_QO(unittest.TestCase):
 
         self.CCL_qubit.spec_vsm_ch_in(2)
         self.CCL_qubit.spec_vsm_ch_out(1)
-        self.CCL_qubit.spec_vsm_att(112)
+        self.CCL_qubit.spec_vsm_amp(0.5)
 
         self.CCL_qubit.prepare_for_continuous_wave()
 
@@ -165,7 +165,7 @@ class Test_QO(unittest.TestCase):
         self.assertEqual(self.VSM.in1_out2_switch(), 'OFF')
         self.assertEqual(self.VSM.in2_out1_switch(), 'EXT')
         self.assertEqual(self.VSM.in2_out2_switch(), 'OFF')
-        self.assertEqual(self.VSM.in2_out1_att(), 112)
+        self.assertEqual(self.VSM.in2_out1_amp(), 0.5)
 
     @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_prep_for_fluxing(self):
@@ -348,14 +348,14 @@ class Test_QO(unittest.TestCase):
 
     @unittest.skipIf(Dummy_VSM_not_fixed, 'Dummy_VSM_not_fixed')
     def test_prep_td_config_vsm(self):
-        self.CCL_qubit.mw_vsm_G_att(10234)
-        self.CCL_qubit.mw_vsm_D_phase(10206)
+        self.CCL_qubit.mw_vsm_G_amp(0.8)
+        self.CCL_qubit.mw_vsm_D_phase(0)
         self.CCL_qubit.mw_vsm_ch_in(2)
         self.CCL_qubit.mw_vsm_mod_out(5)
         self.CCL_qubit.prepare_for_timedomain()
 
-        self.assertEqual(self.VSM.mod5_ch2_gaussian_att_raw(), 10234)
-        self.assertEqual(self.VSM.mod5_ch2_derivative_phase_raw(), 10206)
+        self.assertEqual(self.VSM.mod5_ch2_gaussian_amp(), 0.8)
+        self.assertEqual(self.VSM.mod5_ch2_derivative_phase(), 0)
 
 
     ###################################################
