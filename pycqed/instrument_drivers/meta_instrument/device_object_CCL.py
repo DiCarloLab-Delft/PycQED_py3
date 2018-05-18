@@ -1,6 +1,6 @@
 import numpy as np
 import logging
-
+import adaptive
 from collections import OrderedDict
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
@@ -847,6 +847,8 @@ class DeviceCCL(Instrument):
 
     def measure_chevron(self, q0: str, q_spec: str,
                         amps, lengths,
+                        adaptive_sampling=False,
+                        adaptive_sampling_pts=None,
                         prepare_for_timedomain=True, MC=None,
                         waveform_name='square'):
         """
@@ -884,7 +886,7 @@ class DeviceCCL(Instrument):
             awg_ch = fl_lutman.cfg_awg_channel()
             amp_par = awg.parameters['ch{}_amp'.format(awg_ch)]
             sw = swf.FLsweep_QWG(fl_lutman, length_par,
-                                 realtime_loading=False,
+                                 realtime_loading=True,
                                  waveform_name=waveform_name)
             flux_cw = 0
 
@@ -896,7 +898,7 @@ class DeviceCCL(Instrument):
             amp_par = awg.parameters['awgs_{}_outputs_{}_amplitude'.format(
                 awg_nr, ch_pair)]
             sw = swf.FLsweep(fl_lutman, length_par,
-                             realtime_loading=False,
+                             realtime_loading=True,
                              waveform_name=waveform_name)
             flux_cw = 2
         # buffer times are hardcoded for now FIXME!
@@ -912,12 +914,21 @@ class DeviceCCL(Instrument):
 
         MC.set_sweep_function(amp_par)
         MC.set_sweep_function_2D(sw)
-        MC.set_sweep_points(amps)
-        MC.set_sweep_points_2D(lengths)
         MC.set_detector_function(d)
 
-        MC.run('Chevron {} {}'.format(q0, q_spec), mode='2D')
-        ma.TwoD_Analysis()
+        if not adaptive_sampling:
+            MC.set_sweep_points(amps)
+            MC.set_sweep_points_2D(lengths)
+
+            MC.run('Chevron {} {}'.format(q0, q_spec), mode='2D')
+            ma.TwoD_Analysis()
+        else:
+            MC.set_adaptive_function_parameters(
+                {'adaptive_function': adaptive.Learner2D,
+                 'goal':lambda l: l.npoints>adaptive_sampling_pts,
+                 'bounds':(amps, lengths)})
+            MC.run('Chevron {} {}'.format(q0, q_spec), mode='adaptive')
+
 
     def measure_cryoscope(self, q0: str, times,
                           MC=None,
