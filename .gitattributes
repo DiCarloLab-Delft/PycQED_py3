@@ -1,9 +1,10 @@
 # Auto detect text files and perform LF normalization
 * text=auto
 
+*.ipynb filter=ipynb_filter
+
 # Custom for Visual Studio
 *.cs     diff=csharp
-
 # Standard to msysgit
 *.doc	 diff=astextplain
 *.DOC	 diff=astextplain

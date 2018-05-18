@@ -909,13 +909,13 @@ class lutman_par_UHFQC_dig_trig(Soft_Sweep):
 
 class lutman_par_depletion_pulse_global_scaling(Soft_Sweep):
     def __init__(self, LutMan, resonator_numbers, optimization_M_amps,
-                    optimization_M_amp_down0s, optimization_M_amp_down1s,
-                    upload=True, **kw):
+                 optimization_M_amp_down0s, optimization_M_amp_down1s,
+                 upload=True, **kw):
         # sweeps the readout-and depletion pules of the listed resonators.
         # sets the remaining readout and depletion pulses to 0 amplitude.
 
         self.set_kw()
-        self.name= 'depletion_pulse_sweeper'
+        self.name = 'depletion_pulse_sweeper'
         self.parameter_name = 'relative_depletion_pulse_scaling_amp'
         self.unit = 'a.u.'
         self.sweep_control = 'soft'
@@ -924,7 +924,7 @@ class lutman_par_depletion_pulse_global_scaling(Soft_Sweep):
         self.optimization_M_amp_down0s = optimization_M_amp_down0s
         self.optimization_M_amp_down1s = optimization_M_amp_down1s
         self.resonator_numbers = resonator_numbers
-        self.upload=upload
+        self.upload = upload
 
     def set_parameter(self, val):
         '''
@@ -937,11 +937,11 @@ class lutman_par_depletion_pulse_global_scaling(Soft_Sweep):
             if resonator_number in self.resonator_numbers:
                 i = self.resonator_numbers.index(resonator_number)
                 self.LutMan.set('M_amp_R{}'.format(resonator_number),
-                    val*self.optimization_M_amps[i])
+                                val*self.optimization_M_amps[i])
                 self.LutMan.set('M_down_amp0_R{}'.format(resonator_number),
-                    val*self.optimization_M_amp_down0s[i])
+                                val*self.optimization_M_amp_down0s[i])
                 self.LutMan.set('M_down_amp1_R{}'.format(resonator_number),
-                    val*self.optimization_M_amp_down1s[i])
+                                val*self.optimization_M_amp_down1s[i])
             else:
                 self.LutMan.set('M_amp_R{}'.format(resonator_number), 0)
                 self.LutMan.set('M_down_amp0_R{}'.format(resonator_number), 0)

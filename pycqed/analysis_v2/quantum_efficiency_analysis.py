@@ -2,7 +2,7 @@
 Collection of classes to analyse Quantum efficiency measurements.
 General procedure is:
  - find factor 'a' of the quadratic scaling of the Single-Shot-Readout as a function of scaling_amp (see SSROAnalysis class)
- - find sigma from the Gaussian fit of the Ramsey as a function of scaling_amp (see RamseyAnalysis class)
+ - find sigma from the Gaussian fit of the Dephasing as a function of scaling_amp (see dephasingAnalysis class)
  - Calculate eta = a * sigma**2 / 2 (see QuantumEfficiencyAnalysis class)
 For details, see https://arxiv.org/abs/1711.05336
 
@@ -33,7 +33,7 @@ class QuantumEfficiencyAnalysisTWPA(ba.BaseDataAnalysis):
     '''
 
     def __init__(self, t_start: str = None, t_stop: str = None,
-                 label_ramsey: str = '_Ramsey',
+                 label_dephasing: str = '_dephasing',
                  label_ssro: str = '_SSRO', label: str = '',
                  options_dict: dict = None,
                  extract_only: bool = False, auto: bool = True,
@@ -54,7 +54,7 @@ class QuantumEfficiencyAnalysisTWPA(ba.BaseDataAnalysis):
         :param close_figs: Close the figure (do not display)
         :param extract_only: Should we also do the plots?
         :param do_fitting: Should the run_fitting method be executed?
-        :param label_ramsey: the label that was used to name the ramsey measurements
+        :param label_dephasing: the label that was used to name the dephasing measurements
         :param label_ssro: the label that was used to name the SSRO measurements
         :param label: (Optional) common label that was used to name all measurements
         :param twpa_pump_freq_key: key for the TWPA Pump Frequency, e.g. 'Instrument settings.TWPA_Pump.frequency'
@@ -67,7 +67,7 @@ class QuantumEfficiencyAnalysisTWPA(ba.BaseDataAnalysis):
                          close_figs=close_figs,
                          extract_only=extract_only)
         self.use_prefit = use_prefit
-        self.label_ramsey = label_ramsey
+        self.label_dephasing = label_dephasing
         self.label_ssro = label_ssro
 
         self.params_dict = {'TWPA_freq': twpa_pump_freq_key,
@@ -167,7 +167,7 @@ class QuantumEfficiencyAnalysisTWPA(ba.BaseDataAnalysis):
                     t_start = [d.strftime("%Y%m%d_%H%M%S") for d in dates[i, j]]  # date_limits[i, j][0]
                     t_stop = None  # date_limits[i, j][1]
                     # print(t_start, t_stop)
-                    qea = QuantumEfficiencyAnalysis(t_start=t_start, t_stop=t_stop, label_ramsey=self.label_ramsey,
+                    qea = QuantumEfficiencyAnalysis(t_start=t_start, t_stop=t_stop, label_dephasing=self.label_dephasing,
                                                     label_ssro=self.label_ssro, options_dict=d, auto=False,
                                                     extract_only=True)
                     qea.run_analysis()
@@ -201,13 +201,16 @@ class QuantumEfficiencyAnalysisTWPA(ba.BaseDataAnalysis):
         self.proc_data_dict['etas_std'] = u_eta
 
     def prepare_plots(self):
+        title = ('\n' + self.timestamps[0] + ' - "' +
+                 self.raw_data_dict['measurementstring'] + '"')
+
         twpa_powers = self.proc_data_dict['TWPA_powers']
         twpa_freqs = self.proc_data_dict['TWPA_freqs']
 
         # Quantum Efficiency
         self.plot_dicts['quantum_eff'] = {
             'plotfn': self.plot_colorxy,
-            'title': '',  # todo
+            'title': '' + title,  # todo
             'yvals': twpa_powers, 'ylabel': r'TWPA Power', 'yunit': 'dBm',
             'xvals': twpa_freqs, 'xlabel': 'TWPA Frequency', 'xunit': 'Hz',
             'zvals': self.proc_data_dict['etas'].transpose() * 100,
@@ -217,7 +220,7 @@ class QuantumEfficiencyAnalysisTWPA(ba.BaseDataAnalysis):
         }
         self.plot_dicts['quantum_eff_vari'] = {
             'plotfn': self.plot_colorxy,
-            'title': '',  # todo
+            'title': '' + title,  # todo
             'yvals': twpa_powers, 'ylabel': r'TWPA Power', 'yunit': 'dBm',
             'xvals': twpa_freqs, 'xlabel': 'TWPA Frequency', 'xunit': 'Hz',
             'zvals': self.proc_data_dict['etas_std'].transpose(),
@@ -229,7 +232,7 @@ class QuantumEfficiencyAnalysisTWPA(ba.BaseDataAnalysis):
         # SSRO Slope
         self.plot_dicts['ssro_slope'] = {
             'plotfn': self.plot_colorxy,
-            'title': '',  # todo
+            'title': '' + title,  # todo
             'yvals': twpa_powers, 'ylabel': r'TWPA Power', 'yunit': 'dBm',
             'xvals': twpa_freqs, 'xlabel': 'TWPA Frequency', 'xunit': 'Hz',
             'zvals': self.proc_data_dict['as'].transpose(),
@@ -239,7 +242,7 @@ class QuantumEfficiencyAnalysisTWPA(ba.BaseDataAnalysis):
         }
         self.plot_dicts['ssro_slope_vari'] = {
             'plotfn': self.plot_colorxy,
-            'title': '',  # todo
+            'title': '' + title,  # todo
             'yvals': twpa_powers, 'ylabel': r'TWPA Power', 'yunit': 'dBm',
             'xvals': twpa_freqs, 'xlabel': 'TWPA Frequency', 'xunit': 'Hz',
             'zvals': self.proc_data_dict['as_std'].transpose(),
@@ -248,24 +251,24 @@ class QuantumEfficiencyAnalysisTWPA(ba.BaseDataAnalysis):
             'cmap': self.options_dict.get('cmap', 'YlGn_r'),
         }
 
-        # Ramsey Gauss Width
-        self.plot_dicts['ramsey_gauss_width'] = {
+        # Dephasing Gauss Width
+        self.plot_dicts['dephasing_gauss_width'] = {
             'plotfn': self.plot_colorxy,
             'title': '',  # todo
             'yvals': twpa_powers, 'ylabel': r'TWPA Power', 'yunit': 'dBm',
             'xvals': twpa_freqs, 'xlabel': 'TWPA Frequency', 'xunit': 'Hz',
             'zvals': self.proc_data_dict['sigmas'].transpose(),
-            'zlabel': r'Ramsey Gauss width $\sigma$',
+            'zlabel': r'dephasing Gauss width $\sigma$',
             'plotsize': self.options_dict.get('plotsize', None),
             'cmap': self.options_dict.get('cmap', 'YlGn_r'),
         }
-        self.plot_dicts['ramsey_gauss_width_vari'] = {
+        self.plot_dicts['dephasing_gauss_width_vari'] = {
             'plotfn': self.plot_colorxy,
-            'title': '',  # todo
+            'title': '' + title,  # todo
             'yvals': twpa_powers, 'ylabel': r'TWPA Power', 'yunit': 'dBm',
             'xvals': twpa_freqs, 'xlabel': 'TWPA Frequency', 'xunit': 'Hz',
             'zvals': self.proc_data_dict['sigmas_std'].transpose(),
-            'zlabel': r'Ramsey Gauss width variance $\delta\sigma$',
+            'zlabel': r'dephasing Gauss width variance $\delta\sigma$',
             'plotsize': self.options_dict.get('plotsize', None),
             'cmap': self.options_dict.get('cmap', 'YlGn_r'),
         }
@@ -276,7 +279,7 @@ class QuantumEfficiencyAnalysisTWPA(ba.BaseDataAnalysis):
                 for j, twpa_power in enumerate(twpa_powers):
                     pre = 'freq_%.3f-power_%.3f-' % (twpa_freq, twpa_power)
                     obj = self.proc_data_dict['analysis_objects'][i, j]
-                    for k in ['amp_vs_Ramsey_coherence', 'amp_vs_Ramsey_fit', ]:
+                    for k in ['amp_vs_dephasing_coherence', 'amp_vs_dephasing_fit', ]:
                         self.plot_dicts[pre + k] = obj.ra.plot_dicts[k]
                         self.plot_dicts[pre + k]['ax_id'] = pre + 'snr_analysis'
                     for k in ['amp_vs_SNR_fit', 'amp_vs_SNR_scatter', ]:
@@ -290,9 +293,9 @@ class QuantumEfficiencyAnalysis(ba.BaseDataAnalysis):
     '''
 
     def __init__(self, t_start: str = None, t_stop: str = None,
-                 label_ramsey: str = '_Ramsey',
-                 label_ssro: str = '_SSRO',
-                 options_dict: dict = None,
+                 label_dephasing: str = '_dephasing', label_ssro: str = '_SSRO',
+                 options_dict: dict = None, options_dict_ssro: dict = None,
+                 options_dict_dephasing: dict = None,
                  extract_only: bool = False, auto: bool = True,
                  close_figs: bool = True, do_fitting: bool = True,
                  use_sweeps: bool = True):
@@ -305,13 +308,19 @@ class QuantumEfficiencyAnalysis(ba.BaseDataAnalysis):
                                 - cmap : colormap for 2D plots
                                 - plotsize : plotsize for 2D plots
                                 - (todo)
+        :param options_dict_dephasing: same as options_dict, but exclusively for
+                                    the dephasing analysis.
+        :param options_dict_ssro: same as options_dict, but exclusively for
+                                  the ssro analysis.
         :param auto: Execute all steps automatically
         :param close_figs: Close the figure (do not display)
         :param extract_only: Should we also do the plots?
         :param do_fitting: Should the run_fitting method be executed?
-        :param label_ramsey: the label that was used to name the ramsey measurements
-        :param label_ssro: the label that was used to name the SSRO measurements
-        :param use_sweeps:
+        :param label_dephasing: the label to identify the dephasing measurements
+        :param label_ssro: the label to identify the SSRO measurements
+        :param use_sweeps: True: Use the datat from one sweep folder.
+                           False: Collect the results from the individual
+                                  measurements (not tested yet)
         '''
         super().__init__(t_start=t_start, t_stop=t_stop,
                          options_dict=options_dict,
@@ -319,26 +328,32 @@ class QuantumEfficiencyAnalysis(ba.BaseDataAnalysis):
                          close_figs=close_figs,
                          extract_only=extract_only,
                          )
+        if options_dict_dephasing is None:
+             options_dict_dephasing = {}
+        if options_dict_ssro is None:
+            options_dict_ssro = {}
         d = copy.deepcopy(self.options_dict)
         d['save_figs'] = False
+        dr = {**d, **options_dict_dephasing}
+        ds = {**d, **options_dict_ssro}
 
         if use_sweeps:
-            self.ra = RamseyAnalysisSweep(t_start=t_start, t_stop=t_stop,
-                                          label=label_ramsey,
-                                          options_dict=d, auto=False,
+            self.ra = DephasingAnalysisSweep(t_start=t_start, t_stop=t_stop,
+                                          label=label_dephasing,
+                                          options_dict=dr, auto=False,
                                           extract_only=True)
             self.ssro = SSROAnalysisSweep(t_start=t_start, t_stop=t_stop,
                                           label=label_ssro,
-                                          options_dict=d, auto=False,
+                                          options_dict=ds, auto=False,
                                           extract_only=True)
         else:
-            self.ra = RamseyAnalysisSingleScans(t_start=t_start, t_stop=t_stop,
-                                                label=label_ramsey,
-                                                options_dict=d, auto=False,
+            self.ra = DephasingAnalysisSingleScans(t_start=t_start, t_stop=t_stop,
+                                                label=label_dephasing,
+                                                options_dict=dr, auto=False,
                                                 extract_only=True)
             self.ssro = SSROAnalysisSingleScans(t_start=t_start, t_stop=t_stop,
                                                 label=label_ssro,
-                                                options_dict=d, auto=False,
+                                                options_dict=ds, auto=False,
                                                 extract_only=True)
 
         if auto:
@@ -365,7 +380,6 @@ class QuantumEfficiencyAnalysis(ba.BaseDataAnalysis):
         self.raw_data_dict['folder'] = [folder]
         self.options_dict['analysis_result_file'] = os.path.join(folder, f + '.hdf5')
 
-
     def run_fitting(self):
         self.ra.run_analysis()
         self.ssro.run_analysis()
@@ -382,8 +396,8 @@ class QuantumEfficiencyAnalysis(ba.BaseDataAnalysis):
         a = self.fit_dicts['a']
         u_a = self.fit_dicts['a_std']
 
-        eta = a * sigma ** 2 / 2
-        u_eta = (u_a / a + 2 * u_sigma / sigma) * eta
+        eta = (a * sigma) ** 2 / 2
+        u_eta = 2 * (u_a / a + u_sigma / sigma) * eta
 
         if self.verbose:
             print('eta = %.4f +- %.4f' % (eta, u_eta))
@@ -391,7 +405,7 @@ class QuantumEfficiencyAnalysis(ba.BaseDataAnalysis):
         self.fit_dicts['eta'] = eta
         self.fit_dicts['u_eta'] = u_eta
 
-        #For saving
+        # For saving
         self.fit_res = OrderedDict()
         self.fit_res['quantum_efficiency'] = OrderedDict()
         self.fit_res['quantum_efficiency']['eta'] = eta
@@ -401,20 +415,12 @@ class QuantumEfficiencyAnalysis(ba.BaseDataAnalysis):
         self.fit_res['quantum_efficiency']['a'] = a
         self.fit_res['quantum_efficiency']['a_std'] = u_a
 
-        # todo: Reformat data for saving in hdf5 file
-        # self.fit_res['etas'] = {
-        #    {power: self.proc_data_dict['etas'][i, j] for j, power in self.raw_data_dict['TWPA_freq_ramesy']}
-        #    for i, freq in self.raw_data_dict['TWPA_power_ramesy']
-        # }
-        # self.fit_res['u_etas'] = {
-        #    {power: self.proc_data_dict['u_etas'][i, j] for j, power in self.raw_data_dict['TWPA_freq_ramesy']}
-        #    for i, freq in self.raw_data_dict['TWPA_power_ramesy']
-        # }
-
     def prepare_plots(self):
-        # self.ra.plot_dicts['amp_vs_Ramsey_fit']
-        # self.ra.plot_dicts['amp_vs_Ramsey_Phase']
-        # self.ra.plot_dicts['amp_vs_Ramsey_coherence']
+        title = ('\n' + self.timestamps[0] + ' - "' +
+                 self.raw_data_dict['measurementstring'] + '"')
+        # self.ra.plot_dicts['amp_vs_dephasing_fit']
+        # self.ra.plot_dicts['amp_vs_dephasing_Phase']
+        # self.ra.plot_dicts['amp_vs_dephasing_coherence']
 
         # self.ssro.plot_dicts['amp_vs_SNR_fit']
         # self.ssro.plot_dicts['amp_vs_SNR_scatter']
@@ -428,26 +434,34 @@ class QuantumEfficiencyAnalysis(ba.BaseDataAnalysis):
             self.plot_dicts[d] = self.ssro.plot_dicts[d]
 
         if self.options_dict.get('subplots', True):
-            for k in ['amp_vs_Ramsey_coherence', 'amp_vs_Ramsey_fit', 'amp_vs_SNR_fit', 'amp_vs_SNR_scatter']:
+            for k in ['amp_vs_dephasing_coherence_fitted',
+                      'amp_vs_dephasing_coherence_not_fitted',
+                      'amp_vs_dephasing_fit',
+                      'amp_vs_SNR_scatter_fitted',
+                      'amp_vs_SNR_scatter_not_fitted',
+                      'amp_vs_SNR_fit',]:
                 self.plot_dicts[k]['ax_id'] = 'snr_analysis'
                 self.plot_dicts[k]['ylabel'] = 'SNR, coherence'
                 self.plot_dicts[k]['yunit'] = '(-)'
                 self.plot_dicts[k]['title'] = r'$\eta = (%.4f \pm %.4f)$ %%' % (
                     100 * self.fit_dicts['eta'], 100 * self.fit_dicts['u_eta'])
+                + title
 
-            self.plot_dicts['amp_vs_Ramsey_fit']['color'] = 'red'
-            self.plot_dicts['amp_vs_Ramsey_coherence']['color'] = 'red'
-            self.plot_dicts['amp_vs_SNR_fit']['color'] = 'blue'
-            self.plot_dicts['amp_vs_SNR_scatter']['color'] = 'blue'
+            #self.plot_dicts['amp_vs_dephasing_fit']['color'] = 'red'
+            #self.plot_dicts['amp_vs_dephasing_coherence_fitted']['color'] = 'red'
+            #self.plot_dicts['amp_vs_dephasing_coherence_not_fitted']['color'] = 'red'
+            #self.plot_dicts['amp_vs_SNR_fit']['color'] = 'blue'
+            #self.plot_dicts['amp_vs_SNR_scatter_fitted']['color'] = 'blue'
+            #self.plot_dicts['amp_vs_SNR_scatter_not_fitted']['color'] = 'blue'
 
-            self.plot_dicts['amp_vs_Ramsey_coherence']['marker'] = 'o'
-            self.plot_dicts['amp_vs_SNR_scatter']['marker'] = 'o'
+            # self.plot_dicts['amp_vs_dephasing_coherence']['marker'] = 'o'
+            # self.plot_dicts['amp_vs_SNR_scatter']['marker'] = 'o'
 
             self.plot_dicts['amp_vs_SNR_fit']['do_legend'] = True
-            self.plot_dicts['amp_vs_Ramsey_fit']['do_legend'] = True
+            self.plot_dicts['amp_vs_dephasing_fit']['do_legend'] = True
 
 
-class RamseyAnalysis(ba.BaseDataAnalysis):
+class DephasingAnalysis(ba.BaseDataAnalysis):
 
     def process_data(self):
         # Remove None entries
@@ -461,62 +475,90 @@ class RamseyAnalysis(ba.BaseDataAnalysis):
 
     def run_fitting(self):
         self.fit_res = OrderedDict()
+        self.fit_dicts['coherence_fit'] = OrderedDict()
         coherence = self.proc_data_dict['coherence']
-        scaling_amp = self.proc_data_dict['scaling_amp']
+        amps = self.proc_data_dict['scaling_amp']
+
+        mask = range(0, len(amps))
+        inv_mask = []
+        if self.options_dict.get('amp_threshold', False):
+            mask = np.where(amps < self.options_dict['amp_threshold'])
+            inv_mask = np.where(amps >= self.options_dict['amp_threshold'])
+            amps = amps[mask]
+            coherence = coherence[mask]
+        self.fit_dicts['coherence_fit']['mask'] = mask
+        self.fit_dicts['coherence_fit']['inv_mask'] = inv_mask
 
         def gaussian(x, sigma, scale):
             return scale * np.exp(-(x) ** 2 / (2 * sigma ** 2))
 
         gmodel = lmfit.models.Model(gaussian)
-        gmodel.set_param_hint('sigma', value=0.07, min=-5, max=5)
+        gmodel.set_param_hint('sigma', value=0.5, min=0, max=10)
         gmodel.set_param_hint('scale', value=np.max(coherence))  # , min=0.1, max=100)
         para = gmodel.make_params()
-        coherence_fit = gmodel.fit(coherence, x=scaling_amp, **para)
+        coherence_fit = gmodel.fit(coherence, x=amps, **para)
         self.fit_res['coherence_fit'] = coherence_fit
-        self.fit_dicts['coherence_fit'] = OrderedDict()
         self.fit_dicts['coherence_fit']['sigma'] = coherence_fit.params['sigma'].value
         self.fit_dicts['coherence_fit']['sigma_std'] = coherence_fit.params['sigma'].stderr
         self.fit_dicts['coherence_fit']['scale'] = coherence_fit.params['scale'].value
         self.fit_dicts['coherence_fit']['scale_std'] = coherence_fit.params['scale'].stderr
 
     def prepare_plots(self):
+        amps = self.proc_data_dict['scaling_amp']
         name = ''
-        fit_text = "$\sigma = %.3f \pm %.3f$"%(self.fit_dicts['coherence_fit']['sigma'],
-                                    self.fit_dicts['coherence_fit']['sigma_std'])
-        self.plot_dicts['text_msg_' + name + 'amp_vs_Ramsey'] = {
-                    'ax_id':name + 'amp_vs_Ramsey',
+        fit_text = "$\sigma = %.3f \pm %.3f$" % (
+                        self.fit_dicts['coherence_fit']['sigma'],
+                        self.fit_dicts['coherence_fit']['sigma_std'])
+        self.plot_dicts['text_msg_' + name + 'amp_vs_dephasing'] = {
+                    'ax_id': name + 'amp_vs_dephasing',
                     # 'ypos': 0.15,
                     'plotfn': self.plot_text,
                     'box_props': 'fancy',
                     'text_string': fit_text,
         }
-        self.plot_dicts[name + 'amp_vs_Ramsey_fit'] = {
+        self.plot_dicts[name + 'amp_vs_dephasing_fit'] = {
             'plotfn': self.plot_fit,
-            'ax_id': name + 'amp_vs_Ramsey',
+            'ax_id': name + 'amp_vs_dephasing',
             'zorder': 5,
             'fit_res': self.fit_res['coherence_fit'],
-            'xvals': self.proc_data_dict['scaling_amp'],
+            'xvals': amps,
             'marker': '',
             'linestyle': '-',
             'ylabel': r'Coherence, $\left| \rho_{01} \right|$',
             'yunit': '',
             'xlabel': 'scaling amplitude',
             'xunit': 'rel. amp.',
-            'setlabel': 'ramsey coherence fit',
+            'setlabel': 'coherence fit',
+            'color': 'red',
         }
-        self.plot_dicts[name + 'amp_vs_Ramsey_coherence'] = {
+
+        fit_mask = self.fit_dicts['coherence_fit']['mask']
+        fit_mask_inv = self.fit_dicts['coherence_fit']['inv_mask']
+        self.plot_dicts[name + 'amp_vs_dephasing_coherence_fitted'] = {
             'plotfn': self.plot_line,
-            'ax_id': name + 'amp_vs_Ramsey',
+            'ax_id': name + 'amp_vs_dephasing',
             'zorder': 0,
-            'xvals': self.proc_data_dict['scaling_amp'],
-            'yvals': self.proc_data_dict['coherence'],
+            'xvals': amps[fit_mask],
+            'yvals': self.proc_data_dict['coherence'][fit_mask],
+            'marker': 'o',
+            'linestyle': '',
+            'setlabel': 'coherence data',
+            'color': 'red',
+        }
+        self.plot_dicts[name + 'amp_vs_dephasing_coherence_not_fitted'] = {
+            'plotfn': self.plot_line,
+            'ax_id': name + 'amp_vs_dephasing',
+            'zorder': 1,
+            'xvals': amps[fit_mask_inv],
+            'yvals': self.proc_data_dict['coherence'][fit_mask_inv],
             'marker': 'x',
             'linestyle': '',
-            'setlabel': 'ramsey coherence data',
+            'setlabel': 'coherence data (not fitted)',
+            'color': 'red',
         }
-        self.plot_dicts[name + 'amp_vs_Ramsey_Phase'] = {
+        self.plot_dicts[name + 'amp_vs_dephasing_Phase'] = {
             'plotfn': self.plot_line,
-            'xvals': self.proc_data_dict['scaling_amp'],
+            'xvals': amps,
             'yvals': self.proc_data_dict['phase'],
             'marker': 'x',
             'linestyle': '',
@@ -524,13 +566,13 @@ class RamseyAnalysis(ba.BaseDataAnalysis):
             'yunit': 'deg.',
             'xlabel': 'scaling amplitude',
             'xunit': 'rel. amp.',
-            'setlabel': 'ramsey phase data',
+            'setlabel': 'dephasing phase data',
         }
 
 
-class RamseyAnalysisSweep(RamseyAnalysis):
+class DephasingAnalysisSweep(DephasingAnalysis):
     def __init__(self, t_start: str = None, t_stop: str = None,
-                 label: str = '_ro_amp_sweep_ramsey',
+                 label: str = '_ro_amp_sweep_dephasing',
                  options_dict: dict = None, extract_only: bool = False,
                  auto: bool = True, close_figs: bool = True,
                  do_fitting: bool = True):
@@ -546,8 +588,8 @@ class RamseyAnalysisSweep(RamseyAnalysis):
                                         timestamp_end=t_stop, label=label,
                                         exact_label_match=True)
         if self.verbose:
-            print('RamseyAnalysisSweep', ts)
-        assert(len(ts) == 1)
+            print('DephasingAnalysisSweep', ts)
+        assert len(ts) == 1, 'Expected a single match, found %d'%len(ts)
         self.timestamp = ts[0]
 
         if auto:
@@ -572,9 +614,9 @@ class RamseyAnalysisSweep(RamseyAnalysis):
         self.raw_data_dict['folder'] = data_file.folder
 
 
-class RamseyAnalysisSingleScans(RamseyAnalysis):
+class DephasingAnalysisSingleScans(DephasingAnalysis):
 
-    def __init__(self, t_start: str = None, t_stop: str = None, label: str = '_Ramsey',
+    def __init__(self, t_start: str = None, t_stop: str = None, label: str = '_dephasing',
                  options_dict: dict = None, extract_only: bool = False, auto: bool = True,
                  close_figs: bool = True, do_fitting: bool = True):
         super().__init__(t_start=t_start, t_stop=t_stop,
@@ -584,9 +626,9 @@ class RamseyAnalysisSingleScans(RamseyAnalysis):
                          close_figs=close_figs,
                          extract_only=extract_only
                          )
-        sa = self.options_dict.get('scaling_amp_key_ramsey', 'Instrument settings.RO_lutman.M_amp_R0')
-        rak = self.options_dict.get('ramsey_amplitude_key', 'Analysis.Fitted Params lin_trans w0.amplitude.value')
-        rap = self.options_dict.get('ramsey_phase_key', 'Analysis.Fitted Params lin_trans w0.phase.value')
+        sa = self.options_dict.get('scaling_amp_key_dephasing', 'Instrument settings.RO_lutman.M_amp_R0')
+        rak = self.options_dict.get('dephasing_amplitude_key', 'Analysis.Fitted Params lin_trans w0.amplitude.value')
+        rap = self.options_dict.get('dephasing_phase_key', 'Analysis.Fitted Params lin_trans w0.phase.value')
         self.params_dict = {'scaling_amp': sa,
                             'dephasing': rak,
                             'phase': rap,
@@ -605,7 +647,7 @@ class RamseyAnalysisSingleScans(RamseyAnalysis):
         youngest = np.max(self.raw_data_dict['datetime'])
         youngest += datetime.timedelta(seconds=1)
 
-        f = '%s_amp_sweep_ramsey' % (youngest.strftime("%H%M%S"))
+        f = '%s_amp_sweep_dephasing' % (youngest.strftime("%H%M%S"))
         d = '%s' % (youngest.strftime("%Y%m%d"))
         folder = os.path.join(a_tools.datadir, d, f)
         self.raw_data_dict['folder'] = [folder]
@@ -626,11 +668,22 @@ class SSROAnalysis(ba.BaseDataAnalysis):
 
     def run_fitting(self):
         self.fit_res = OrderedDict()
+        self.fit_dicts['snr_fit'] = OrderedDict()
         SNR = self.proc_data_dict['SNR']
         amps = self.proc_data_dict['scaling_amp']
 
+        mask = range(0, len(amps))
+        inv_mask = []
+        if self.options_dict.get('amp_threshold', False):
+            mask = np.where(amps < self.options_dict['amp_threshold'])
+            inv_mask = np.where(amps >= self.options_dict['amp_threshold'])
+            amps = amps[mask]
+            SNR = SNR[mask]
+        self.fit_dicts['snr_fit']['mask'] = mask
+        self.fit_dicts['snr_fit']['inv_mask'] = inv_mask
+
         def line(x, a):
-            return np.sqrt(a) * x
+            return a * x
 
         gmodel = lmfit.models.Model(line)
         gmodel.set_param_hint('a', value=1, min=1e-5, max=100)
@@ -638,11 +691,11 @@ class SSROAnalysis(ba.BaseDataAnalysis):
         snr_fit = gmodel.fit(SNR, x=amps, **para)
         self.fit_res['snr_fit'] = snr_fit
 
-        self.fit_dicts['snr_fit'] = OrderedDict()
         self.fit_dicts['snr_fit']['a'] = snr_fit.params['a'].value
         self.fit_dicts['snr_fit']['a_std'] = snr_fit.params['a'].stderr
 
     def prepare_plots(self):
+        amps = self.proc_data_dict['scaling_amp']
         name = ''
         self.plot_dicts[name + 'amp_vs_SNR_fit'] = {
             'plotfn': self.plot_fit,
@@ -654,27 +707,47 @@ class SSROAnalysis(ba.BaseDataAnalysis):
             'linestyle': '-',
             'setlabel': 'SNR fit',
             'do_legend': True,
+            'color': 'blue',
         }
-        self.plot_dicts[name + 'amp_vs_SNR_scatter'] = {
+        fit_mask = self.fit_dicts['snr_fit']['mask']
+        fit_mask_inv = self.fit_dicts['snr_fit']['inv_mask']
+        self.plot_dicts[name + 'amp_vs_SNR_scatter_fitted'] = {
             'plotfn': self.plot_line,
             'ax_id': name + 'amp_vs_SNR',
             'zorder': 0,
-            'xvals': self.proc_data_dict['scaling_amp'],
+            'xvals': amps[fit_mask],
             'xlabel': 'scaling amplitude',
             'xunit': 'rel. amp.',
-            'yvals': self.proc_data_dict['SNR'],
+            'yvals': self.proc_data_dict['SNR'][fit_mask],
+            'ylabel': 'SNR',
+            'yunit': '-',
+            'marker': 'o',
+            'linestyle': '',
+            'setlabel': 'SNR data',
+            'do_legend': True,
+            'color': 'blue',
+        }
+        self.plot_dicts[name + 'amp_vs_SNR_scatter_not_fitted'] = {
+            'plotfn': self.plot_line,
+            'ax_id': name + 'amp_vs_SNR',
+            'zorder': 0,
+            'xvals': amps[fit_mask_inv],
+            'xlabel': 'scaling amplitude',
+            'xunit': 'rel. amp.',
+            'yvals': self.proc_data_dict['SNR'][fit_mask_inv],
             'ylabel': 'SNR',
             'yunit': '-',
             'marker': 'x',
             'linestyle': '',
-            'setlabel': 'SNR data',
+            'setlabel': 'SNR data (not fitted)',
             'do_legend': True,
+            'color': 'blue',
         }
         self.plot_dicts[name + 'amp_vs_Fa'] = {
             'plotfn': self.plot_line,
             'zorder': 0,
             'ax_id': name + 'amp_vs_F',
-            'xvals': self.proc_data_dict['scaling_amp'],
+            'xvals': amps,
             'yvals': self.proc_data_dict['F_a'],
             'marker': 'x',
             'linestyle': '',
@@ -685,7 +758,7 @@ class SSROAnalysis(ba.BaseDataAnalysis):
             'plotfn': self.plot_line,
             'zorder': 1,
             'ax_id': name + 'amp_vs_F',
-            'xvals': self.proc_data_dict['scaling_amp'],
+            'xvals': amps,
             'yvals': self.proc_data_dict['F_d'],
             'marker': 'x',
             'linestyle': '',
@@ -713,11 +786,12 @@ class SSROAnalysisSweep(SSROAnalysis):
         self.single_timestamp = True
 
         ts = a_tools.get_timestamps_in_range(timestamp_start=t_start,
-                                        timestamp_end=t_stop, label=label,
-                                        exact_label_match=True)
+                                             timestamp_end=t_stop,
+                                             label=label,
+                                             exact_label_match=True)
         if self.verbose:
             print('SSROAnalysisSweep', ts)
-        assert(len(ts) == 1)
+        assert len(ts) == 1, 'Expected a single match, found %d'%len(ts)
         self.timestamp = ts[0]
 
         if auto:
@@ -744,8 +818,9 @@ class SSROAnalysisSweep(SSROAnalysis):
 
 class SSROAnalysisSingleScans(SSROAnalysis):
 
-    def __init__(self, t_start: str = None, t_stop: str = None, label: str = '_SSRO',
-                 options_dict: dict = None, extract_only: bool = False, auto: bool = True,
+    def __init__(self, t_start: str = None, t_stop: str = None,
+                 label: str = '_SSRO', options_dict: dict = None,
+                 extract_only: bool = False, auto: bool = True,
                  close_figs: bool = True, do_fitting: bool = True):
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
@@ -755,7 +830,8 @@ class SSROAnalysisSingleScans(SSROAnalysis):
                          extract_only=extract_only,
                          )
 
-        sa = self.options_dict.get('scaling_amp_key_ssro', 'Instrument settings.RO_lutman.M_amp_R0')
+        sa = self.options_dict.get('scaling_amp_key_ssro',
+                                   'Instrument settings.RO_lutman.M_amp_R0')
 
         self.params_dict = {'scaling_amp': sa,
                             'SNR': 'Analysis.SSRO_Fidelity.SNR',
@@ -772,7 +848,6 @@ class SSROAnalysisSingleScans(SSROAnalysis):
         super().extract_data()
 
         #todo: we need an option to remove outliers and the reference point
-
         # Set output paths
         youngest = np.max(self.raw_data_dict['datetime'])
         youngest += datetime.timedelta(seconds=1)
