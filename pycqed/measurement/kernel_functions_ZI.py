@@ -168,3 +168,37 @@ def multipath_filter2(sig, alpha, k, paths):
             duf = np.append(duf, tpl * acc[j])
     duf = duf[0:sig.size]
     return sig + k * (duf - sig)
+
+def multipath_bounce_correction(sig, delay, amp, paths = 8, bufsize = 128):
+    """
+    This function simulates a possible FPGA implementation of a first-order bounce correction filter.
+    The signal (sig) is assumed to be a numpy array representing a wavefomr with sampling rate 2.4 GSa/s.
+    The delay is specified in number of samples. It needs to be an interger.
+    The amplitude (amp) of the bounce is specified relative to the amplitude of the input signal.
+    It is constrained to be smaller than 1. The amplitude is represented as a 18-bit fixed point number on the FPGA.
+    """
+    assert 0 <= delay < bufsize-8, "The maximulm delay is limitted to 120 (bufsize-8) samples to save hardware resources."
+    assert -1 <= amp < 1, "The amplitude needs to be between -1 and 1."
+
+    sigout = np.zeros(len(sig))
+    buffer = np.zeros(bufsize)
+
+    amp_hw = coef_round(amp)
+
+    # iterate in steps of eight samples through the input signal to simulate the implementation with parallel paths on the FPGA
+    for i in range(0, len(sig), paths):
+        buffer[paths:] = buffer[:-paths]
+        buffer[:paths] = sig[i:i+8]
+        sigout[i:i+8] = sig[i:i+8] + amp_hw*buffer[delay:delay+8]
+    return sigout
+
+
+def ideal_inverted_fir_kernel(impulse_response, zero_ind=0):
+    """
+    This function computes the ideal inverted FIR filter kernel for a given impulse_response.
+    The argument zero_ind provides the index corresponding to time t=0 within the impulse_response array.
+    """
+    f = np.fft.fft(impulse_response)
+    impulse_response_inv = np.fft.ifft(1/f)
+    impulse_response_inv_re_trunc= np.real(impulse_response_inv)[zero_ind:]
+    return impulse_response_inv_re_trunc
