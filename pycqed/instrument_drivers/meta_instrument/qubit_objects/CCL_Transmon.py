@@ -339,8 +339,8 @@ class CCLight_Transmon(Qubit):
                            parameter_class=ManualParameter)
         self.add_parameter('mw_vsm_D_amp',
                            label='VSM amp Derivative component',
-                           vals=vals.Numbers(0, 65536),
-                           initial_value=65536/2,
+                           vals=vals.Numbers(0.2, 2.0),
+                           initial_value=1.0,
                            parameter_class=ManualParameter)
         self.add_parameter('mw_vsm_G_phase',
                            vals=vals.Numbers(-125, 45),
