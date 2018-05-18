@@ -173,9 +173,16 @@ def multipath_first_order_bounce_correction(sig, delay, amp, paths = 8, bufsize 
     """
     This function simulates a possible FPGA implementation of a first-order bounce correction filter (only one reflection considered).
     The signal (sig) is assumed to be a numpy array representing a wavefomr with sampling rate 2.4 GSa/s.
-    The delay is specified in number of samples. It needs to be an interger.
-    The amplitude (amp) of the bounce is specified relative to the amplitude of the input signal.
-    It is constrained to be smaller than 1. The amplitude is represented as a 18-bit fixed point number on the FPGA.
+
+    Args:
+        sig:   The signal to be filtered as a numpy array
+        delay: The delay is specified in number of samples. It needs to be an interger.
+        amp:   The amplitude of the bounce specified relative to the amplitude of the input signal.
+               The amplitude is constrained to be smaller than 1. The amplitude is represented as a 18-bit fixed point number on the FPGA.
+        paths: The number of parallel paths on the FPGA
+
+    Returns:
+        sigout: Numpy array representing the output signal of the filter
     """
     if not 1 <= delay < bufsize-8:
         raise ValueError(textwrap.dedent("""
@@ -202,9 +209,15 @@ def multipath_first_order_bounce_correction(sig, delay, amp, paths = 8, bufsize 
 def first_order_bounce_corr(sig, delay, amp, sampling_rate):
     """ This function provides a wrapper to call the multipath_first_order_bounce_correction
     using natural units.
-    delay: delay in seconds
-    amp: amplitude of the bounce
-    sampling_rate: the sampling rate in Hz
+
+    Args:
+        sig:           The signal to be filtered as a numpy array.
+        delay:         The delay of the bounce in seconds.
+        amp:           The amplitude of the bounce.
+        sampling_rate: The sampling rate in Hz.
+
+    Returns:
+        sigout: Numpy array representing the output signal of the filter
     """
     delay_n_samples = round(sampling_rate*delay)
     if not delay_n_samples >= 1:
@@ -213,10 +226,15 @@ def first_order_bounce_corr(sig, delay, amp, sampling_rate):
     return sigout
 
 def first_order_bounce_kern(delay, amp, sampling_rate):
-    """ This function computes the kernel for first-order bounce (only one reflection considered).
-    delay: the delay in seconds
-    amp: the amplitude of the bounce
-    sampling_rate: the sampling rate in Hz
+    """ This function computes the filter kernel for first-order bounce (only one reflection considered).
+
+    Args:
+        delay:          The delay in seconds
+        amp:            The amplitude of the bounce
+        sampling_rate:  The sampling rate in Hz
+
+    Returns:
+        kern: Numpy array representing the filter kernel
     """
     delay_n_samples = round(sampling_rate*delay)
     if not delay_n_samples >= 1:
@@ -229,9 +247,14 @@ def first_order_bounce_kern(delay, amp, sampling_rate):
 def ideal_inverted_fir_kernel(impulse_response, zero_ind=0, zero_padding=0):
     """
     This function computes the ideal inverted FIR filter kernel for a given impulse_response.
-    impulse_response: array representing the impulse response of the distortion to be corrected.
-    zero_ind: index of the time 0
-    zero_padding: number of zeros to append to the the impulse_response
+
+    Args:
+        impulse_response: Array representing the impulse response of the distortion to be corrected.
+        zero_ind:         Index of the time 0
+        zero_padding:     Number of zeros to append to the the impulse_response
+
+    Returns:
+        kern_re_trunc:    The inverted kernel as a real-valued numpy array.
     """
     resp = np.concatenate([impulse_response, np.zeros(zero_padding)])
 
