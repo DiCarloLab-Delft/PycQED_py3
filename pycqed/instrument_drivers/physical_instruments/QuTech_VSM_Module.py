@@ -198,7 +198,7 @@ class QuTechVSMModule(SCPI):
                                   'input of channel {c} ' \
                                   'of module {m}.'.format(p=pulse, d=dac,
                                                           c=channel, m=mod)
-                        ch_name = 'mod{m}_ch{c}'.format(m=mod, c=channel)
+                        ch_name = '_mod{m}_ch{c}'.format(m=mod, c=channel)
                         ch_scpi = ':MODULE{m}:CHANNEL{c}'.format(m=mod,
                                                                  c=channel)
                         scpi_name = 'CALIBRATION' + ch_scpi + var_scpi
@@ -218,13 +218,13 @@ class QuTechVSMModule(SCPI):
         for pulse in ('gaussian', 'derivative'):
             for channel in self.channels:
                 for mod in self.modules:
-                    ch_name = '_mod{m}_ch{c}'.format(m=mod, c=channel)
+                    ch_name = 'mod{m}_ch{c}'.format(m=mod, c=channel)
                     ch_scpi = ':MODULE{m}:CHANNEL{c}'.format(m=mod, c=channel)
 
                     doc_var = 'Attenuation value (in dB) for the {p} ' \
                               'input of channel {c} ' \
                               'of module {m}.'.format(p=pulse, c=channel, m=mod)
-                    var_name = ch_name + '_{p}_att_db'.format(p=pulse)
+                    var_name = '_'+ch_name + '_{p}_att_db'.format(p=pulse)
                     var_scpi = ch_scpi + ':{p}:ATTENUATION:DB'.format(p=pulse.upper())
                     scpi_name = 'CALIBRATION' + var_scpi
                     self.add_parameter(var_name,
@@ -234,10 +234,11 @@ class QuTechVSMModule(SCPI):
                                        unit='dB',
                                        get_parser=float,
                                        vals=validators.Numbers())
-                    doc_var = 'Attenuation value (linear) for the {p} ' \
+                    doc_var = 'Amplitude value (linear) for the {p} ' \
                               'input of channel {c} ' \
                               'of module {m}.'.format(p=pulse, c=channel, m=mod)
-                    var_name = ch_name + '_{p}_att_lin'.format(p=pulse)
+                    var_name = ch_name + '_{p}_amp'.format(p=pulse)
+
                     var_scpi = ch_scpi + ':{p}:ATTENUATION:LIN'.format(p=pulse.upper())
                     scpi_name = 'CALIBRATION' + var_scpi
                     self.add_parameter(var_name,
@@ -245,12 +246,12 @@ class QuTechVSMModule(SCPI):
                                        get_cmd=scpi_name + '?',
                                        set_cmd=scpi_name + ' {}',
                                        get_parser=float,
-                                       vals=validators.Numbers())
+                                       vals=validators.Numbers(min_value=0.2, max_value=2.0))
 
                     doc_var = 'Phase value (in rad) for the {p} ' \
                               'input of channel {c} ' \
                               'of module {m}.'.format(p=pulse, c=channel, m=mod)
-                    var_name = ch_name + '_{p}_phs_rad'.format(p=pulse)
+                    var_name = '_' + ch_name + '_{p}_phs_rad'.format(p=pulse)
                     var_scpi = ch_scpi + ':{p}:PHASE:RAD'.format(p=pulse.upper())
                     scpi_name = 'CALIBRATION' + var_scpi
                     self.add_parameter(var_name,
@@ -263,7 +264,7 @@ class QuTechVSMModule(SCPI):
                     doc_var = 'Phase value (in deg) for the {p} ' \
                               'input of channel {c} ' \
                               'of module {m}.'.format(p=pulse, c=channel, m=mod)
-                    var_name = ch_name + '_{p}_phs_deg'.format(p=pulse)
+                    var_name = ch_name + '_{p}_phase'.format(p=pulse)
                     var_scpi = ch_scpi + ':{p}:PHASE:DEG'.format(p=pulse.upper())
                     scpi_name = 'CALIBRATION' + var_scpi
                     self.add_parameter(var_name,
@@ -272,7 +273,7 @@ class QuTechVSMModule(SCPI):
                                        set_cmd=scpi_name + ' {}',
                                        unit='deg',
                                        get_parser=float,
-                                       vals=validators.Numbers())
+                                       vals=validators.Numbers(-125,45))
 
 
 

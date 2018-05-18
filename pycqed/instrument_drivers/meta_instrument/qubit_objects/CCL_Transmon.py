@@ -332,23 +332,23 @@ class CCLight_Transmon(Qubit):
                            initial_value=1,
                            parameter_class=ManualParameter)
 
-        self.add_parameter('mw_vsm_G_att',
-                           label='VSM attenuation Gaussian component',
-                           vals=vals.Numbers(0, 65536),
-                           initial_value=65536/2,
+        self.add_parameter('mw_vsm_G_amp',
+                           label='VSM amp Gaussian component',
+                           vals=vals.Numbers(0.2, 2.0),
+                           initial_value=1.0,
                            parameter_class=ManualParameter)
-        self.add_parameter('mw_vsm_D_att',
-                           label='VSM attenuation Derivative component',
+        self.add_parameter('mw_vsm_D_amp',
+                           label='VSM amp Derivative component',
                            vals=vals.Numbers(0, 65536),
                            initial_value=65536/2,
                            parameter_class=ManualParameter)
         self.add_parameter('mw_vsm_G_phase',
-                           vals=vals.Numbers(0, 65536),
-                           initial_value=65536/2,
+                           vals=vals.Numbers(-125, 45),
+                           initial_value=0, unit='deg',
                            parameter_class=ManualParameter)
         self.add_parameter('mw_vsm_D_phase',
-                           vals=vals.Numbers(0, 65536),
-                           initial_value=65536/2,
+                           vals=vals.Numbers(-125, 45),
+                           initial_value=0, unit='deg',
                            parameter_class=ManualParameter)
 
     def _set_mw_vsm_delay(self, val):
@@ -361,10 +361,10 @@ class CCLight_Transmon(Qubit):
         return self._mw_vsm_delay
 
     def add_spec_parameters(self):
-        self.add_parameter('spec_vsm_att',
-                           label='VSM attenuation for spec pulses',
-                           vals=vals.Numbers(0, 65536),
-                           initial_value=65536/2,
+        self.add_parameter('spec_vsm_amp',
+                           label='VSM amplitude for spec pulses',
+                           vals=vals.Numbers(0.2,2.0),
+                           initial_value=1.0,
                            parameter_class=ManualParameter)
 
         self.add_parameter('spec_vsm_mod_out',
@@ -407,7 +407,7 @@ class CCLight_Transmon(Qubit):
             'spec_amp', unit='V', docstring=(
                 'Amplitude of the spectroscopy pulse in the mw LutMan. '
                 'The power of the spec pulse should be controlled through '
-                'the vsm attenuation "spec_vsm_att"'),
+                'the vsm amplitude "spec_vsm_amp"'),
             vals=vals.Numbers(0, 1), parameter_class=ManualParameter,
             initial_value=0.8)
         self.add_parameter(
@@ -941,13 +941,13 @@ class CCLight_Transmon(Qubit):
         VSM.set('mod{}_marker_source'.format(
             self.mw_vsm_mod_out()), self.mw_vsm_marker_source())
 
-        VSM.set('mod{}_ch{}_derivative_att_raw'.format(
-            self.mw_vsm_mod_out(), self.mw_vsm_ch_in()), self.mw_vsm_D_att())
-        VSM.set('mod{}_ch{}_derivative_phase_raw'.format(
+        VSM.set('mod{}_ch{}_derivative_amp'.format(
+            self.mw_vsm_mod_out(), self.mw_vsm_ch_in()), self.mw_vsm_D_amp())
+        VSM.set('mod{}_ch{}_derivative_phase'.format(
             self.mw_vsm_mod_out(), self.mw_vsm_ch_in()), self.mw_vsm_D_phase())
-        VSM.set('mod{}_ch{}_gaussian_att_raw'.format(
-            self.mw_vsm_mod_out(), self.mw_vsm_ch_in()), self.mw_vsm_G_att())
-        VSM.set('mod{}_ch{}_gaussian_phase_raw'.format(
+        VSM.set('mod{}_ch{}_gaussian_amp'.format(
+            self.mw_vsm_mod_out(), self.mw_vsm_ch_in()), self.mw_vsm_G_amp())
+        VSM.set('mod{}_ch{}_gaussian_phase'.format(
             self.mw_vsm_mod_out(), self.mw_vsm_ch_in()), self.mw_vsm_G_phase())
 
         self.instr_CC.get_instr().set(
@@ -986,7 +986,7 @@ class CCLight_Transmon(Qubit):
 
     def calibrate_motzoi(self, MC=None, verbose=True, update=True):
         """
-        Calibrates the motzoi VSM attenauation prameter
+        Calibrates the motzoi VSM amplitude prameter
         """
         using_VSM = self.cfg_with_vsm()
         if using_VSM:
@@ -995,7 +995,7 @@ class CCLight_Transmon(Qubit):
             motzois = gen_sweep_pts(center=0, span=.3, num=31)
 
         # large range
-        a = self.measure_motzoi(MC=MC, motzoi_atts=motzois, analyze=True)
+        a = self.measure_motzoi(MC=MC, motzoi_amps=motzois, analyze=True)
         opt_motzoi = a.get_intersect()[0]
         if opt_motzoi > max(motzois) or opt_motzoi < min(motzois):
             if verbose:
@@ -1006,7 +1006,7 @@ class CCLight_Transmon(Qubit):
             if using_VSM:
                 if verbose:
                     print('Setting motzoi to {:.3f}'.format(opt_motzoi))
-                self.mw_vsm_D_att(opt_motzoi)
+                self.mw_vsm_D_amp(opt_motzoi)
             else:
                 self.mw_motzoi(opt_motzoi)
         return opt_motzoi
@@ -1065,8 +1065,8 @@ class CCLight_Transmon(Qubit):
 
             # Calibrate Gaussian component mixer
             # the use of modula 8 for mixer calibrations is hardcoded.
-            VSM.set('mod8_ch{}_gaussian_att_raw'.format(ch_in), 50000)
-            VSM.set('mod8_ch{}_derivative_att_raw'.format(ch_in), 0)
+            VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 50000)
+            VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 0)
             offset_I, offset_Q = mixer_carrier_cancellation(
                 SH=self.instr_SH.get_instr(),
                 source=self.instr_LO_mw.get_instr(),
@@ -1077,8 +1077,8 @@ class CCLight_Transmon(Qubit):
                 self.mw_mixer_offs_GQ(offset_Q)
 
             # Calibrate Derivative component mixer
-            VSM.set('mod8_ch{}_gaussian_att_raw'.format(ch_in), 0)
-            VSM.set('mod8_ch{}_derivative_att_raw'.format(ch_in), 50000)
+            VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 0)
+            VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 50000)
 
             offset_I, offset_Q = mixer_carrier_cancellation(
                 SH=self.instr_SH.get_instr(),
@@ -1536,19 +1536,19 @@ class CCLight_Transmon(Qubit):
             self.measure_ssro(no_figs=no_figs, update_threshold=update_threshold)
         return True
 
-    def measure_rabi(self, MC=None, atts=np.linspace(0, 65535, 31),
+    def measure_rabi(self, MC=None, amps=np.linspace(0.2, 2.0, 31),
                      analyze=True, close_fig=True, real_imag=True,
                      prepare_for_timedomain=True, all_modules=False):
         if self.cfg_with_vsm():
-            self.measure_rabi_vsm(MC, atts,
+            self.measure_rabi_vsm(MC, amps,
                                   analyze, close_fig, real_imag,
                                   prepare_for_timedomain, all_modules)
         else:
-            self.measure_rabi_channel_amp(MC, atts,
+            self.measure_rabi_channel_amp(MC, amps,
                                           analyze, close_fig, real_imag,
                                           prepare_for_timedomain, all_modules)
 
-    def measure_rabi_vsm(self, MC=None, atts=np.linspace(0, 65535, 31),
+    def measure_rabi_vsm(self, MC=None, amps=np.linspace(0.2, 2.0, 31),
                          analyze=True, close_fig=True, real_imag=True,
                          prepare_for_timedomain=True, all_modules=False):
         if MC is None:
@@ -1568,22 +1568,22 @@ class CCLight_Transmon(Qubit):
             mod_sweep = []
             for i in range(8):
                 VSM.set('mod{}_ch{}_marker_state'.format(i+1, ch_in), 'on')
-                G_par = VSM.parameters['mod{}_ch{}_gaussian_att_raw'.format(
+                G_par = VSM.parameters['mod{}_ch{}_gaussian_amp'.format(
                     i+1, ch_in)]
-                D_par = VSM.parameters['mod{}_ch{}_derivative_att_raw'.format(
+                D_par = VSM.parameters['mod{}_ch{}_derivative_amp'.format(
                     i+1, ch_in)]
                 mod_sweep.append(swf.two_par_joint_sweep(
                     G_par, D_par, preserve_ratio=False))
             s = swf.multi_sweep_function(sweep_functions=mod_sweep)
         else:
-            G_par = VSM.parameters['mod{}_ch{}_gaussian_att_raw'.format(
+            G_par = VSM.parameters['mod{}_ch{}_gaussian_amp'.format(
                 mod_out, ch_in)]
-            D_par = VSM.parameters['mod{}_ch{}_derivative_att_raw'.format(
+            D_par = VSM.parameters['mod{}_ch{}_derivative_amp'.format(
                 mod_out, ch_in)]
             s = swf.two_par_joint_sweep(G_par, D_par, preserve_ratio=True)
         self.instr_CC.get_instr().eqasm_program(p.filename)
         MC.set_sweep_function(s)
-        MC.set_sweep_points(atts)
+        MC.set_sweep_points(amps)
         # real_imag is acutally not polar and as such works for opt weights
         self.int_avg_det_single._set_real_imag(real_imag)
         MC.set_detector_function(self.int_avg_det_single)
@@ -1648,9 +1648,9 @@ class CCLight_Transmon(Qubit):
 
     def calibrate_mw_gates_restless(
             self, MC=None,
-            parameter_list: list = ['G_att', 'D_att', 'freq'],
+            parameter_list: list = ['G_amp', 'D_amp', 'freq'],
             initial_values: list =None,
-            initial_steps: list= [2e3, 3e3, 1e6],
+            initial_steps: list= [0.05, 0.05, 1e6],
             nr_cliffords: int=80, nr_seeds: int=200,
             verbose: bool = True, update: bool=True,
             prepare_for_timedomain: bool=True):
@@ -1667,9 +1667,9 @@ class CCLight_Transmon(Qubit):
 
     def calibrate_mw_gates_rb(
             self, MC=None,
-            parameter_list: list = ['G_att', 'D_att', 'freq'],
+            parameter_list: list = ['G_amp', 'D_amp', 'freq'],
             initial_values: list =None,
-            initial_steps: list= [2e3, 3e3, 1e6],
+            initial_steps: list= [0.05, 0.05, 1e6],
             nr_cliffords: int=80, nr_seeds: int=200,
             verbose: bool = True, update: bool=True,
             prepare_for_timedomain: bool=True,
@@ -1692,26 +1692,26 @@ class CCLight_Transmon(Qubit):
             self.prepare_for_timedomain()
 
         if parameter_list is None:
-            parameter_list = ["freq_qubit", "mw_vsm_G_att", "mw_vsm_D_att"]
+            parameter_list = ["freq_qubit", "mw_vsm_G_amp", "mw_vsm_D_amp"]
 
         VSM = self.instr_VSM.get_instr()
         mod_out = self.mw_vsm_mod_out()
         ch_in = self.mw_vsm_ch_in()
-        G_att_par = VSM.parameters['mod{}_ch{}_gaussian_att_raw'.format(
+        G_amp_par = VSM.parameters['mod{}_ch{}_gaussian_amp'.format(
             mod_out, ch_in)]
-        D_att_par = VSM.parameters['mod{}_ch{}_derivative_att_raw'.format(
+        D_amp_par = VSM.parameters['mod{}_ch{}_derivative_amp'.format(
             mod_out, ch_in)]
-        D_phase_par = VSM.parameters['mod{}_ch{}_derivative_phase_raw'.format(
+        D_phase_par = VSM.parameters['mod{}_ch{}_derivative_phase'.format(
             mod_out, ch_in)]
 
         freq_par = self.instr_LO_mw.get_instr().frequency
 
         sweep_pars = []
         for par in parameter_list:
-            if par == 'G_att':
-                sweep_pars.append(G_att_par)
-            elif par == 'D_att':
-                sweep_pars.append(D_att_par)
+            if par == 'G_amp':
+                sweep_pars.append(G_amp_par)
+            elif par == 'D_amp':
+                sweep_pars.append(D_amp_par)
             elif par == 'D_phase':
                 sweep_pars.append(D_phase_par)
             elif par == 'freq':
@@ -1774,14 +1774,14 @@ class CCLight_Transmon(Qubit):
 
             opt_par_values = a.optimization_result[0]
             for par in parameter_list:
-                if par == 'G_att':
-                    G_idx = parameter_list.index('G_att')
-                    self.mw_vsm_G_att(opt_par_values[G_idx])
-                elif par == 'D_att':
-                    D_idx = parameter_list.index('D_att')
-                    self.mw_vsm_D_att(opt_par_values[D_idx])
+                if par == 'G_amp':
+                    G_idx = parameter_list.index('G_amp')
+                    self.mw_vsm_G_amp(opt_par_values[G_idx])
+                elif par == 'D_amp':
+                    D_idx = parameter_list.index('D_amp')
+                    self.mw_vsm_D_amp(opt_par_values[D_idx])
                 elif par == 'D_phase':
-                    D_idx = parameter_list.index('D_att')
+                    D_idx = parameter_list.index('D_phase')
                     self.mw_vsm_D_phase(opt_par_values[D_idx])
                 elif par == 'freq':
                     freq_idx = parameter_list.index('freq')
@@ -1799,7 +1799,7 @@ class CCLight_Transmon(Qubit):
         # FIXME2: this tuneup does not return True upon success
         if initial_steps is None:
             if parameter_list is None:
-                initial_steps = [1e6, 4e2, 2e3]
+                initial_steps = [1e6, 0.05, 0.05]
             else:
                 raise ValueError(
                     "must pass initial steps if setting parameter_list")
@@ -1809,8 +1809,8 @@ class CCLight_Transmon(Qubit):
 
         if parameter_list is None:
             parameter_list = ["freq_qubit",
-                              "mw_vsm_G_att",
-                              "mw_vsm_D_att"]
+                              "mw_vsm_G_amp",
+                              "mw_vsm_D_amp"]
 
         nested_MC.set_sweep_functions([
             self.__getattr__(p) for p in parameter_list])
@@ -2215,7 +2215,7 @@ class CCLight_Transmon(Qubit):
                 options_dict={'scan_label': 'flipping'})
         return a
 
-    def measure_motzoi(self, motzoi_atts=None,
+    def measure_motzoi(self, motzoi_amps=None,
                        prepare_for_timedomain: bool=True,
                        MC=None, analyze=True, close_fig=True):
         using_VSM = self.cfg_with_vsm()
@@ -2237,17 +2237,17 @@ class CCLight_Transmon(Qubit):
                                  always_prepare=True)
 
         if using_VSM:
-            if motzoi_atts is None:
-                motzoi_atts = np.linspace(0, 50e3, 31)
+            if motzoi_amps is None:
+                motzoi_amps = np.linspace(0.2, 2.0, 31)
             mod_out = self.mw_vsm_mod_out()
             ch_in = self.mw_vsm_ch_in()
-            D_par = VSM.parameters['mod{}_ch{}_derivative_att_raw'.format(
+            D_par = VSM.parameters['mod{}_ch{}_derivative_amp'.format(
                 mod_out, ch_in)]
             swf_func = D_par
         else:
             if using_QWG:
-                if motzoi_atts is None:
-                    motzoi_atts = np.linspace(-.3, .3, 31)
+                if motzoi_amps is None:
+                    motzoi_amps = np.linspace(-.3, .3, 31)
                 swf_func = swf.QWG_lutman_par(LutMan=MW_LutMan,
                                               LutMan_parameter=MW_LutMan.mw_motzoi)
             else:
@@ -2255,7 +2255,7 @@ class CCLight_Transmon(Qubit):
                     'VSM-less case not implemented without QWG.')
 
         MC.set_sweep_function(swf_func)
-        MC.set_sweep_points(motzoi_atts)
+        MC.set_sweep_points(motzoi_amps)
         MC.set_detector_function(d)
 
         MC.run('Motzoi_XY'+self.msmt_suffix)
