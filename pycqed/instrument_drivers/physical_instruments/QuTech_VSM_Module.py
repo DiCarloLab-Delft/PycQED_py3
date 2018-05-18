@@ -223,7 +223,8 @@ class QuTechVSMModule(SCPI):
 
                     doc_var = 'Attenuation value (in dB) for the {p} ' \
                               'input of channel {c} ' \
-                              'of module {m}.'.format(p=pulse, c=channel, m=mod)
+                              'of module {m}.\nN.B. Safe range: '\
+                              '0.2<=v<=2.0'.format(p=pulse, c=channel, m=mod)
                     var_name = '_'+ch_name + '_{p}_att_db'.format(p=pulse)
                     var_scpi = ch_scpi + ':{p}:ATTENUATION:DB'.format(p=pulse.upper())
                     scpi_name = 'CALIBRATION' + var_scpi
@@ -246,7 +247,8 @@ class QuTechVSMModule(SCPI):
                                        get_cmd=scpi_name + '?',
                                        set_cmd=scpi_name + ' {}',
                                        get_parser=float,
-                                       vals=validators.Numbers(min_value=0.2, max_value=2.0))
+                                       vals=validators.Numbers(min_value=0.2,
+                                                               max_value=3.0))
 
                     doc_var = 'Phase value (in rad) for the {p} ' \
                               'input of channel {c} ' \

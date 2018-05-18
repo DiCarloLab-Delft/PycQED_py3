@@ -334,12 +334,12 @@ class CCLight_Transmon(Qubit):
 
         self.add_parameter('mw_vsm_G_amp',
                            label='VSM amp Gaussian component',
-                           vals=vals.Numbers(0.2, 2.0),
+                           vals=vals.Numbers(0.2, 3.0),
                            initial_value=1.0,
                            parameter_class=ManualParameter)
         self.add_parameter('mw_vsm_D_amp',
                            label='VSM amp Derivative component',
-                           vals=vals.Numbers(0.2, 2.0),
+                           vals=vals.Numbers(0.2, 3.0),
                            initial_value=1.0,
                            parameter_class=ManualParameter)
         self.add_parameter('mw_vsm_G_phase',
@@ -363,7 +363,7 @@ class CCLight_Transmon(Qubit):
     def add_spec_parameters(self):
         self.add_parameter('spec_vsm_amp',
                            label='VSM amplitude for spec pulses',
-                           vals=vals.Numbers(0.2,2.0),
+                           vals=vals.Numbers(0.2,3.0),
                            initial_value=1.0,
                            parameter_class=ManualParameter)
 
@@ -535,7 +535,7 @@ class CCLight_Transmon(Qubit):
             parameter_class=ManualParameter)
         self.add_parameter('cfg_spec_mode', vals=vals.Bool(),
             docstring=('Used to activate spec mode in measurements'),
-            initial_value=False, 
+            initial_value=False,
             parameter_class=ManualParameter)
 
     def add_generic_qubit_parameters(self):
@@ -952,6 +952,8 @@ class CCLight_Transmon(Qubit):
     def _prep_td_configure_VSM(self):
         # Configure VSM
         VSM = self.instr_VSM.get_instr()
+        VSM.set('ch{}_frequency'.format(
+               self.mw_vsm_ch_in()), self.freq_qubit())
 
         VSM.set('mod{}_ch{}_marker_state'.format(
             self.mw_vsm_mod_out(), self.mw_vsm_ch_in()), 'on')
@@ -1084,8 +1086,8 @@ class CCLight_Transmon(Qubit):
 
             # Calibrate Gaussian component mixer
             # the use of modula 8 for mixer calibrations is hardcoded.
-            VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 50000)
-            VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 0)
+            VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 2.0)
+            VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 0.2)
             offset_I, offset_Q = mixer_carrier_cancellation(
                 SH=self.instr_SH.get_instr(),
                 source=self.instr_LO_mw.get_instr(),
@@ -1096,8 +1098,8 @@ class CCLight_Transmon(Qubit):
                 self.mw_mixer_offs_GQ(offset_Q)
 
             # Calibrate Derivative component mixer
-            VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 0)
-            VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 50000)
+            VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 0.2)
+            VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 2.0)
 
             offset_I, offset_Q = mixer_carrier_cancellation(
                 SH=self.instr_SH.get_instr(),
@@ -1228,7 +1230,7 @@ class CCLight_Transmon(Qubit):
         self.int_avg_det_single._set_real_imag(False)
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='Resonator_scan'+self.msmt_suffix)
-        # Stopping specmode 
+        # Stopping specmode
         if self.cfg_spec_mode():
             UHFQC.spec_mode_off()
             self._prep_ro_pulse(upload=True)
@@ -1658,7 +1660,8 @@ class CCLight_Transmon(Qubit):
                 mod_out, ch_in)]
             D_par = VSM.parameters['mod{}_ch{}_derivative_amp'.format(
                 mod_out, ch_in)]
-            s = swf.two_par_joint_sweep(G_par, D_par, preserve_ratio=True)
+            s = swf.two_par_joint_sweep(G_par, D_par, preserve_ratio=False)
+
         self.instr_CC.get_instr().eqasm_program(p.filename)
         MC.set_sweep_function(s)
         MC.set_sweep_points(amps)
