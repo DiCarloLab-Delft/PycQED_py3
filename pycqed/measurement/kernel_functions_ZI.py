@@ -177,8 +177,10 @@ def multipath_bounce_correction(sig, delay, amp, paths = 8, bufsize = 128):
     The amplitude (amp) of the bounce is specified relative to the amplitude of the input signal.
     It is constrained to be smaller than 1. The amplitude is represented as a 18-bit fixed point number on the FPGA.
     """
-    assert 0 <= delay < bufsize-8, "The maximulm delay is limitted to 120 (bufsize-8) samples to save hardware resources."
-    assert -1 <= amp < 1, "The amplitude needs to be between -1 and 1."
+    if not 0 <= delay < bufsize-8:
+        raise ValueError("The maximulm delay is limitted to 120 (bufsize-8) samples to save hardware resources.")
+    if not -1 <= amp < 1:
+        raise ValueError("The amplitude needs to be between -1 and 1.")
 
     sigout = np.zeros(len(sig))
     buffer = np.zeros(bufsize)

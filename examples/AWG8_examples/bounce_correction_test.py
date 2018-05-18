@@ -14,8 +14,6 @@ mpl.rcParams['figure.titlesize'] = 'medium'
 
 
 # Settings
-
-
 fs = 2.4e9
 time_start = -50e-9
 time_start = np.around(time_start*fs)/fs
