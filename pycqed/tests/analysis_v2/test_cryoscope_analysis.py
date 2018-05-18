@@ -12,19 +12,44 @@ class Test_Cryoscope_analysis(unittest.TestCase):
         self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
         ma.a_tools.datadir = self.datadir
 
+    def test_Cryoscope_Analysis(self):
+        a = ma.Cryoscope_Analysis(
+            t_start='20180423_114715',
+            polycoeffs_freq_conv='Snapshot/instruments/FL_LutMan_QR/parameters/polycoeffs_freq_conv/value',
+            derivative_window_length=2e-9)
+
+        expected_figs = {'raw_data', 'demod_data', 'norm_data_circ',
+                         'demod_phase', 'frequency_detuning',
+                         'cryoscope_amplitude', 'short_time_fft'}
+        self.assertTrue(expected_figs.issubset(set(a.figs.keys())))
+        self.assertTrue(expected_figs.issubset(set(a.axs.keys())))
+        # Does not actually check for the content
+
     def test_RamZFluxArc(self):
-        a = ma.RamZFluxArc(t_start='20180205_105633', t_stop='20180205_120210')
+        a = ma.RamZFluxArc(t_start='20180205_105633', t_stop='20180205_120210',
+                           ch_idx_cos=2, ch_idx_sin=3)
+        poly_coeffs = a.proc_data_dict['poly_coeffs']
 
         # test dac arc conversion
         # For this to work all other parts have to work
-        amps = a.freq_to_amp([.5e9, .6e9, .8e9])
-        exp_amps = np.array([0.5357841,  0.58333725,  0.66727005])
-        np.testing.assert_array_almost_equal(amps, exp_amps, decimal=2)
+        amps = np.linspace(.1, 1, 21)
+        freqs = a.amp_to_freq(amps)
 
-        freqs = a.amp_to_freq([.3, .4, .5])
-        exp_freqs = np.array(
-            [1.46405902e+08,   2.67461142e+08,   4.31098670e+08])
-        np.testing.assert_array_almost_equal(freqs, exp_freqs, decimal=-7)
+        rec_amps = a.freq_to_amp(freqs, kind='interpolate')
+        np.testing.assert_array_almost_equal(amps, rec_amps, decimal=2)
+        rec_amps = a.freq_to_amp(freqs, kind='root')
+        np.testing.assert_array_almost_equal(amps, rec_amps, decimal=2)
+        rec_amps = a.freq_to_amp(freqs, kind='root_parabola')
+        np.testing.assert_array_almost_equal(amps, rec_amps, decimal=2)
+
+        np.testing.assert_array_almost_equal(amps, rec_amps, decimal=2)
+
+        poly_coeffs = a.proc_data_dict['poly_coeffs']
+        exp_poly_coeffs = np.array(
+            [1.36263320e+09, -2.23862128e+08, 3.87339064e+07])
+        print(poly_coeffs)
+        np.testing.assert_array_almost_equal(poly_coeffs, exp_poly_coeffs,
+                                             decimal=-7)
 
     def test_sliding_pulses_analysis(self):
 
@@ -43,7 +68,8 @@ class Test_Cryoscope_analysis(unittest.TestCase):
 
         # a reference curve is needed to convert to amps
         da = ma.RamZFluxArc(t_start='20180205_105633',
-                                t_stop='20180205_120210')
+                            t_stop='20180205_120210',
+                            ch_idx_cos=2, ch_idx_sin=3)
         a = ma.SlidingPulses_Analysis(
             t_start='20180221_195729',
             freq_to_amp=da.freq_to_amp, amp_to_freq=da.amp_to_freq)

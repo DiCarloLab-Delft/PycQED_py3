@@ -22,6 +22,7 @@ from .tools.data_manipulation import *
 from .tools.plotting import *
 import colorsys as colors
 from matplotlib import cm
+from pycqed.analysis import composite_analysis as RA
 
 from matplotlib.colors import LogNorm
 
@@ -1412,6 +1413,9 @@ def calculate_rotation_matrix(delta_I, delta_Q):
 
 
 def normalize_TD_data(data, data_zero, data_one):
+    """
+    Normalizes measured data to refernce signals for zero and one
+    """
     return (data - data_zero) / (data_one - data_zero)
 
 

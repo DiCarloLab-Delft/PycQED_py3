@@ -1136,6 +1136,37 @@ class Signal_Hound_fixed_frequency(Soft_Detector):
         self.SH.abort()
 
 
+class Signal_Hound_sweeped_frequency(Hard_Detector):
+
+    def __init__(self, signal_hound, Navg=1, delay=0.1,
+                  **kw):
+        super().__init__()
+        self.name = 'SignalHound_fixed_frequency'
+        self.value_names = ['Power']
+        self.value_units = ['dBm']
+        self.delay = delay
+        self.SH = signal_hound
+        self.Navg = Navg
+
+    def acquire_data_point(self, **kw):
+        frequency=self.swp.pop()
+        self.SH.set('frequency', frequency)
+        self.SH.prepare_for_measurement()
+        time.sleep(self.delay)
+        return self.SH.get_power_at_freq(Navg=self.Navg)
+
+    def get_values(self):
+        return([self.acquire_data_point()])
+
+
+    def prepare(self, sweep_points):
+        self.swp=list(sweep_points)
+        #self.SH.prepare_for_measurement()
+
+    def finish(self, **kw):
+        self.SH.abort()
+
+
 class SH_mixer_skewness_det(Soft_Detector):
 
     '''
@@ -1983,10 +2014,11 @@ class UHFQC_integration_logging_det(Hard_Detector):
         # The averaging-count is used to specify how many times the AWG program
         # should run
         self.UHFQC.awgs_0_single(1)
-        self.UHFQC.awgs_0_userregs_0(self.nr_shots)
-        self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)
-        # The AWG program uses userregs/0 to define the number of iterations
+        self.UHFQC.awgs_0_userregs_0(self.nr_shots) # The AWG program uses 
+        # userregs/0 to define the number of iterations
         # in the loop
+        self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)
+
 
         self.UHFQC.quex_rl_length(self.nr_shots)
         self.UHFQC.quex_rl_avgcnt(0)  # log2(1) for single shot readout

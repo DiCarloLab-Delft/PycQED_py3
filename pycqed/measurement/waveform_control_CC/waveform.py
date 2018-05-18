@@ -389,17 +389,17 @@ def martinis_flux_pulse(length: float, lambda_2: float, lambda_3: float,
     # Return in the specified units
     if return_unit == 'theta':
         # Theta is returned in radians here
-        return interp_wave
+        return np.nan_to_num(interp_wave)
 
     # Convert to detuning from f_interaction
     delta_f_wave = 2 * J2 / np.tan(interp_wave)
     if return_unit == 'eps':
-        return delta_f_wave
+        return np.nan_to_num(delta_f_wave)
 
     # Convert to parametrization of f_01
     f_01_wave = delta_f_wave + f_interaction
     if return_unit == 'f01':
-        return f_01_wave
+        return np.nan_to_num(f_01_wave)
 
     # Convert to voltage
     voltage_wave = Qubit_freq_to_dac(

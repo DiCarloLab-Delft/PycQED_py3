@@ -1,6 +1,7 @@
 from .base_lutman import Base_LutMan
 import numpy as np
 import logging
+from copy import copy
 from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter
 from qcodes.utils import validators as vals
 from pycqed.instrument_drivers.pq_parameters import NP_NANs
@@ -15,7 +16,7 @@ class Base_Flux_LutMan(Base_LutMan):
     # this default lutman is if a flux pulse can be done with only one
     # other qubit. this needs to be expanded if there are more qubits
     # to interact with.
-    _def_lm = ['i', 'cz_z', 'square', 'park', 'multi_cz']
+    _def_lm = ['i', 'cz_z', 'square', 'park', 'multi_cz', 'custom_wf']
 
     def render_wave(self, wave_name, show=True, time_units='s',
                     reload_pulses: bool=True, render_distorted_wave: bool=True,
@@ -81,7 +82,8 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             ' where sc is the desired scaling factor that includes the sq_amp '
             'used and the range of the AWG (5 in amp mode).',
             vals=vals.Arrays(),
-            initial_value=np.array([0, 0, 0]),
+            # initial value is chosen to not raise errors
+            initial_value=np.array([2e9, 0, 0]),
             parameter_class=ManualParameter)
 
         self.add_parameter('cfg_operating_mode',
@@ -121,7 +123,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         self.add_parameter('cfg_max_wf_length',
                            parameter_class=ManualParameter,
-                           initial_value=100e-6,
+                           initial_value=10e-6,
                            unit='s', vals=vals.Numbers(0, 100e-6))
 
     def amp_to_detuning(self, amp):
@@ -176,6 +178,9 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         Returns the scale factor to transform an amplitude in 'dac value' to an
         amplitude in 'V'.
 
+        "dac_value" refers to the value between -1 and +1 that is set in a
+        waveform.
+
         N.B. the implementation is specific to this type of AWG
         """
         AWG = self.AWG.get_instr()
@@ -187,6 +192,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         channel_amp = AWG.get('awgs_{}_outputs_{}_amplitude'.format(
             awg_nr, ch_pair))
 
+        # channel range of 5 corresponds to -2.5V to +2.5V
         channel_range_pp = AWG.get('sigouts_{}_range'.format(awg_ch))
         # direct_mode = AWG.get('sigouts_{}_direct'.format(awg_ch))
         scale_factor = channel_amp*(channel_range_pp/2)
@@ -209,6 +215,14 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
     def _add_waveform_parameters(self):
         """
         Adds the parameters required to generate the standard waveforms
+
+        The following prefixes are used for waveform parameters
+            sq
+            cz
+            czd
+            mcz
+            custom
+
         """
         self.add_parameter('sq_amp', initial_value=.5,
                            # units is part of the total range of AWG8
@@ -263,10 +277,16 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             parameter_class=ManualParameter)
 
         self.add_parameter('cz_freq_01_max', vals=vals.Numbers(),
+                           # initial value is chosen to not raise errors
+                           initial_value=6e9,
                            unit='Hz', parameter_class=ManualParameter)
         self.add_parameter('cz_J2', vals=vals.Numbers(), unit='Hz',
+                            # initial value is chosen to not raise errors
+                           initial_value=15e6,
                            parameter_class=ManualParameter)
         self.add_parameter('cz_freq_interaction', vals=vals.Numbers(),
+                           # initial value is chosen to not raise errors
+                           initial_value=5e9,
                            unit='Hz',
                            parameter_class=ManualParameter)
 
@@ -307,6 +327,27 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                            parameter_class=ManualParameter,
                            vals=vals.Numbers(min_value=0))
 
+        self.add_parameter(
+            'custom_wf',
+            initial_value=np.array([]),
+            label='Custom waveform',
+            docstring=('Specifies a custom waveform, note that '
+                       '`custom_wf_length` is used to cut of the waveform if'
+                       'it is set.'),
+            parameter_class=ManualParameter,
+            vals=vals.Arrays())
+        self.add_parameter(
+            'custom_wf_length',
+            unit='s',
+            label='Custom waveform length',
+            initial_value=np.inf,
+            docstring=('Used to determine at what sample the custom waveform '
+                       'is forced to zero. This is used to facilitate easy '
+                       'cryoscope measurements of custom waveforms.'),
+            parameter_class=ManualParameter,
+            vals=vals.Numbers(min_value=0))
+
+
     def generate_standard_waveforms(self):
         """
         Generates all the standard waveforms and populates self._wave_dict
@@ -320,7 +361,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         self._wave_dict['cz'] = self._gen_cz()
         self._wave_dict['cz_z'] = self._gen_cz_z(regenerate_cz=False)
         self._wave_dict['idle_z'] = self._gen_idle_z()
-
+        self._wave_dict['custom_wf'] = self._gen_custom_wf()
         self._wave_dict['multi_square'] = self._gen_multi_square(
             regenerate_square=False)
         # multi_cz is used because there is no real-time flux correction yet
@@ -498,6 +539,16 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         # CZ with phase correction
         return waveform
 
+    def _gen_custom_wf(self):
+        base_wf = copy(self.custom_wf())
+
+        if self.custom_wf_length() != np.inf:
+            # cuts of the waveform at a certain length by setting
+            # all subsequent samples to 0.
+            max_sample = int(self.custom_wf_length()*self.sampling_rate())
+            base_wf[max_sample:] = 0
+        return base_wf
+
     def _gen_composite_wf(self, primitive_waveform_name: str,
                           time_tuples: list):
         """
@@ -597,10 +648,11 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             self._wave_dict_dist[waveform_name] = waveform
         self.AWG.get_instr().set(codeword, waveform)
 
-    def load_composite_waveform_onto_AWG_lookuptable(self,
-                                                     primitive_waveform_name: str,
-                                                     time_tuples: list,
-                                                     codeword: int):
+    def load_composite_waveform_onto_AWG_lookuptable(
+        self,
+            primitive_waveform_name: str,
+            time_tuples: list,
+            codeword: int):
         """
         Creates a composite waveform based on time_tuples extracted from a qisa
         file.
@@ -701,7 +753,27 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                                    self.sampling_rate()))
         return distorted_waveform
 
-    def plot_flux_arc(self, ax=None, show=True):
+    def plot_cz_trajectory(self, ax=None, show=True):
+        """
+        Plots the cz trajectory in frequency space.
+        """
+        if ax is None:
+            f, ax = plt.subplots()
+        extra_samples = 10
+        nr_plot_samples = int((self.cz_length()+self.cz_phase_corr_length()) *
+                              self.sampling_rate() + extra_samples)
+        dac_amps = self._wave_dict['cz_z'][:nr_plot_samples]
+        samples = np.arange(len(dac_amps))
+        amps = dac_amps*self.get_dac_val_to_amp_scalefactor()
+        deltas = self.amp_to_detuning(amps)
+        freqs = self.cz_freq_01_max()-deltas
+        ax.scatter(amps, freqs, c=samples, label='CZ trajectory')
+        if show:
+            plt.show()
+        return ax
+
+    def plot_flux_arc(self, ax=None, show=True,
+                      plot_cz_trajectory=False):
         """
         Plots the flux arc as used in the lutman based on the polynomial
         coefficients
@@ -729,8 +801,9 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             color='C1', alpha=0.25)
 
         title = ('Calibration visualization\n{}\nchannel {}'.format(
-                    self.AWG(), self.cfg_awg_channel()))
-
+            self.AWG(), self.cfg_awg_channel()))
+        if plot_cz_trajectory:
+            self.plot_cz_trajectory(ax=ax, show=False)
         leg = ax.legend(title=title, loc=(1.05, .7))
         leg._legend_box.align = 'center'
         set_xlabel(ax, 'AWG amplitude', 'V')
@@ -787,7 +860,6 @@ class QWG_Flux_LutMan(AWG8_Flux_LutMan):
         self.AWG.get_instr().set(codeword, waveform)
         self.AWG.get_instr().start()
 
-
     def distort_waveform(self, waveform):
         """
         Modifies the ideal waveform to correct for distortions and correct
@@ -836,3 +908,17 @@ class QWG_Flux_LutMan(AWG8_Flux_LutMan):
         if length_samples is not None:
             return kernels[:int(length_samples)]
         return kernels
+
+    def get_dac_val_to_amp_scalefactor(self):
+        """
+        Returns the scale factor to transform an amplitude in 'dac value' to an
+        amplitude in 'V'.
+
+        N.B. the implementation is specific to this type of AWG (QWG)
+        """
+        AWG = self.AWG.get_instr()
+        awg_ch = self.cfg_awg_channel()
+
+        channel_amp = AWG.get('ch{}_amp'.format(awg_ch))
+        scale_factor = channel_amp
+        return scale_factor
