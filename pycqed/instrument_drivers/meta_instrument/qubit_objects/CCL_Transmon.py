@@ -2329,6 +2329,7 @@ class CCLight_Transmon(Qubit):
                                  always_prepare=True)
 
         if using_VSM:
+            VSM = self.instr_VSM.get_instr()
             if motzoi_amps is None:
                 motzoi_amps = np.linspace(0.2, 2.0, 31)
             mod_out = self.mw_vsm_mod_out()
