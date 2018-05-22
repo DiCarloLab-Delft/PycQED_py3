@@ -1244,7 +1244,8 @@ class BaseDataAnalysis(object):
 
         """
         pfunc = getattr(axs, pdict.get('func'))
-        pfunc(**pdict['plot_kws'])
+        pdict['plot_args'] = pdict.get('plot_args', [])
+        pfunc(*pdict['plot_args'], **pdict['plot_kws'])
 
     @staticmethod
     def _sort_by_axis0(arr, sorted_indices, type=None):
