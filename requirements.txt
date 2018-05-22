@@ -9,3 +9,5 @@ spirack
 nose
 adaptive
 hsluv
+autodepgraph
+networkx
