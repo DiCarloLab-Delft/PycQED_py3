@@ -192,3 +192,97 @@ def multipath_filter2(sig, alpha, k, paths):
             duf = np.append(duf, tpl * acc[j])
     duf = duf[0:sig.size]
     return sig + k * (duf - sig)
+
+def multipath_first_order_bounce_correction(sig, delay, amp, paths = 8, bufsize = 128):
+    """
+    This function simulates a possible FPGA implementation of a first-order bounce correction filter (only one reflection considered).
+    The signal (sig) is assumed to be a numpy array representing a waveform with sampling rate 2.4 GSa/s.
+
+    Args:
+        sig:   The signal to be filtered as a numpy array
+        delay: The delay is specified in number of samples. It needs to be an integer.
+        amp:   The amplitude of the bounce specified relative to the amplitude of the input signal.
+               The amplitude is constrained to be smaller than 1. The amplitude is represented as a 18-bit fixed point number on the FPGA.
+        paths: The number of parallel paths on the FPGA
+
+    Returns:
+        sigout: Numpy array representing the output signal of the filter
+    """
+    if not 1 <= delay < bufsize-8:
+        raise ValueError(textwrap.dedent("""
+            The maximum delay needs to be less than 120 (bufsize-8) samples to save hardware resources.
+            The delay needs to be at least 1 sample.")
+            """))
+    if not -1 < amp < 1:
+        raise ValueError("The amplitude needs to be between -1 and 1.")
+
+    sigout = np.zeros(len(sig))
+    buffer = np.zeros(bufsize)
+
+    amp_hw = coef_round(amp)
+
+    # iterate in steps of eight samples through the input signal to simulate the implementation with parallel paths on the FPGA
+    for i in range(0, len(sig), paths):
+        buffer[:-paths] = buffer[paths:]
+        upper_ind = min(i+paths, len(sig))
+        n_samples = upper_ind - i
+        buffer[-paths-1:-paths+n_samples-1] = sig[i:upper_ind]
+        sigout[i:upper_ind] = sig[i:upper_ind] - amp_hw*buffer[-delay-paths-1:-delay-paths+n_samples-1]
+    return sigout
+
+def first_order_bounce_corr(sig, delay, amp, sampling_rate):
+    """ This function provides a wrapper to call the multipath_first_order_bounce_correction
+    using natural units.
+
+    Args:
+        sig:           The signal to be filtered as a numpy array.
+        delay:         The delay of the bounce in seconds.
+        amp:           The amplitude of the bounce.
+        sampling_rate: The sampling rate in Hz.
+
+    Returns:
+        sigout: Numpy array representing the output signal of the filter
+    """
+    delay_n_samples = round(sampling_rate*delay)
+    if not delay_n_samples >= 1:
+        raise ValueError("The delay need to be at least one sample.")
+    sigout = multipath_first_order_bounce_correction(sig, delay_n_samples, amp)
+    return sigout
+
+def first_order_bounce_kern(delay, amp, sampling_rate):
+    """ This function computes the filter kernel for first-order bounce (only one reflection considered).
+
+    Args:
+        delay:          The delay in seconds
+        amp:            The amplitude of the bounce
+        sampling_rate:  The sampling rate in Hz
+
+    Returns:
+        kern: Numpy array representing the filter kernel
+    """
+    delay_n_samples = round(sampling_rate*delay)
+    if not delay_n_samples >= 1:
+        raise ValueError("The delay need to be at least one sample.")
+    kern = np.zeros(delay_n_samples+1)
+    kern[0] = 1
+    kern[-1] = amp
+    return kern
+
+def ideal_inverted_fir_kernel(impulse_response, zero_ind=0, zero_padding=0):
+    """
+    This function computes the ideal inverted FIR filter kernel for a given impulse_response.
+
+    Args:
+        impulse_response: Array representing the impulse response of the distortion to be corrected.
+        zero_ind:         Index of the time 0
+        zero_padding:     Number of zeros to append to the the impulse_response
+
+    Returns:
+        kern_re_trunc:    The inverted kernel as a real-valued numpy array.
+    """
+    resp = np.concatenate([impulse_response, np.zeros(zero_padding)])
+
+    f = np.fft.fft(resp)
+    kern = np.fft.ifft(1/f)
+    kern_re_trunc = np.real(kern)[zero_ind:]
+    return kern_re_trunc

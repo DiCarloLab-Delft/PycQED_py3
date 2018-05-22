@@ -442,7 +442,6 @@ def make_zoomed_cryoscope_fig(t, amp, title, ax=None, **kw):
     # ax.axvline(10e-9, ls='--', c='k')
 
     ax.set_ylim(.95, 1.02)
-    # ax.set_xlim(-0e-9, 480e-9)
     set_xlabel(ax, 'Time', 's')
     set_ylabel(ax, 'Normalized Amplitude', '')
 
@@ -454,7 +453,7 @@ def make_zoomed_cryoscope_fig(t, amp, title, ax=None, **kw):
     ax2.set_axes_locator(ip)
 
     mark_inset(ax, ax2, 1,3, color='grey')
-    ax2.axhline(1.0, ls='-', c='grey')
+    ax2.axhline(1.0, ls='-', c='grey', linewidth=.5)
     ax2.axhline(1.01, ls='--', c='grey', label=r'$\pm$1%')
     ax2.axhline(0.99, ls='--', c='grey')
     ax2.axhline(1.001, ls=':', c='grey', label=r'$\pm$ 0.1%')
