@@ -1671,10 +1671,9 @@ def color_plot(x, y, z, fig, ax, cax=None,
     In the future this function can be overloaded to handle different
     types of input.
     Args:
-        x (list):
-            x data
-        y (list):
-            y data
+        x (array [shape: n*1]):     x data
+        y (array [shape: m*1]):     y data
+        z (array [shape: n*m]):     z data
         fig (Object):
             figure object
         log (string/bool):

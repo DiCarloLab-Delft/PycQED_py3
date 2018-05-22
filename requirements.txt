@@ -8,3 +8,4 @@ cma
 spirack
 nose
 adaptive
+hsluv

@@ -18,19 +18,26 @@ def unscale(points, xy_mean, xy_scale):
     points = np.asarray(points, dtype=float)
     return points * xy_scale + xy_mean
 
-def interpolate_heatmap(x, y, z, n=None):
+def interpolate_heatmap(x, y, z, n: int=None):
     """
     Args:
+        x   (array): x data points
+        y   (array): y data points
+        z   (array): z data points
+        n     (int): number of points for each dimension on the interpolated
+            grid
 
     Returns:
         x_grid : N*1 array of x-values of the interpolated grid
         y_grid : N*1 array of x-values of the interpolated grid
         z_grid : N*N array of z-values that form a grid.
 
+
     The output of this method can directly be used for
         plt.imshow(z_grid, extent=extent, aspect='auto')
         where the extent is determined by the min and max of the x_grid and
         y_grid
+
     """
 
     points = list(zip(x, y))
@@ -54,14 +61,15 @@ def interpolate_heatmap(x, y, z, n=None):
             logging.warning('n: {} larger than 500'.format(n))
             n=500
 
+
     x_lin = y_lin = np.linspace(-0.5, 0.5, n)
     # Interpolation is evaulated linearly in the domain for interpolation
     z_grid = ip(x_lin[:, None], y_lin[None, :]).squeeze()
 
     # x and y grid points need to be rescaled from the linearly chosen points
-    points_grid = unscale(list(zip(x_lin, y_lin)), xy_mean=xy_mean, xy_scale=xy_scale)
+    points_grid = unscale(list(zip(x_lin, y_lin)),
+                          xy_mean=xy_mean, xy_scale=xy_scale)
     x_grid = points_grid[:, 0]
     y_grid = points_grid[:, 1]
-
 
     return x_grid, y_grid, (z_grid).T
