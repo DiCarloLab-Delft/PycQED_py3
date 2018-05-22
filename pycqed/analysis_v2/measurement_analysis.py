@@ -36,7 +36,7 @@ reload(cda)
 
 from pycqed.analysis_v2.base_analysis import *
 from pycqed.analysis_v2.simple_analysis import (
-    Basic1DAnalysis, Basic2DAnalysis)
+    Basic1DAnalysis, Basic2DAnalysis, Basic2DInterpolatedAnalysis)
 from pycqed.analysis_v2.timedomain_analysis import (
     FlippingAnalysis, Intersect_Analysis, CZ_1QPhaseCal_Analysis,
     Conditional_Oscillation_Analysis, Idling_Error_Rate_Analyisis,

@@ -10,8 +10,13 @@ We distinguish 3 cases (for the most trivial analyses)
 
 """
 import numpy as np
+from collections import OrderedDict
+from copy import deepcopy
 import pycqed.analysis_v2.base_analysis as ba
-
+from pycqed.analysis.tools.plot_interpolation import interpolate_heatmap
+from pycqed.analysis import analysis_toolbox as a_tools
+from pycqed.analysis import measurement_analysis as ma_old
+from pycqed.analysis.analysis_toolbox import color_plot
 
 class Basic1DAnalysis(ba.BaseDataAnalysis):
     """
@@ -145,3 +150,84 @@ class Basic2DAnalysis(Basic1DAnalysis):
                           self.raw_data_dict['measurementstring'][0]),
                 'do_legend': True,
                 'legend_pos': 'upper right'}
+
+
+class Basic2DInterpolatedAnalysis(ba.BaseDataAnalysis):
+    """
+    Basic 2D analysis, produces interpolated heatmaps for all measured
+    quantities
+    """
+
+    def __init__(self, t_start: str = None, t_stop: str = None,
+                 label: str = '', data_file_path: str = None,
+                 close_figs: bool = True, options_dict: dict = None,
+                 extract_only: bool = False, do_fitting: bool = False,
+                 auto:bool=True):
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         data_file_path=data_file_path,
+                         close_figs=close_figs,
+                         options_dict=options_dict,
+                         extract_only=extract_only, do_fitting=do_fitting)
+        if auto:
+            self.run_analysis()
+
+
+    def extract_data(self):
+        self.raw_data_dict = OrderedDict()
+        self.timestamps = a_tools.get_timestamps_in_range(
+            self.t_start, self.t_stop,
+            label=self.labels)
+        self.raw_data_dict['timestamps'] = self.timestamps
+
+        self.timestamp = self.timestamps[0]
+        a = ma_old.MeasurementAnalysis(
+            timestamp=self.timestamp, auto=False, close_file=False)
+        a.get_naming_and_values()
+
+
+        for idx, lab  in enumerate(['x', 'y']):
+            self.raw_data_dict[lab] = a.sweep_points[idx]
+            self.raw_data_dict['{}label'.format(lab)] = a.parameter_names[idx]
+            self.raw_data_dict['{}unit'.format(lab)] = a.parameter_units[idx]
+
+        self.raw_data_dict['measured_values'] = a.measured_values
+        self.raw_data_dict['value_names'] = a.value_names
+        self.raw_data_dict['value_units'] = a.value_units
+        self.raw_data_dict['measurementstring'] =a.measurementstring
+        self.raw_data_dict['folder'] = a.folder
+        a.finish()
+
+
+    def process_data(self):
+        self.proc_data_dict = deepcopy(self.raw_data_dict)
+
+        self.proc_data_dict['interpolated_values'] = []
+        for i in range(len(self.proc_data_dict['value_names'])):
+            x_int, y_int, z_int = interpolate_heatmap(
+                self.proc_data_dict['x'], self.proc_data_dict['y'],
+                self.proc_data_dict['measured_values'][i])
+            self.proc_data_dict['interpolated_values'].append(z_int)
+        self.proc_data_dict['x_int'] = x_int
+        self.proc_data_dict['y_int'] = y_int
+
+
+    def prepare_plots(self):
+        # assumes that value names are unique in an experiment
+        super().prepare_plots()
+        for i, val_name in enumerate(self.proc_data_dict['value_names']):
+
+            zlabel = '{} ({})'.format(val_name,
+                                      self.proc_data_dict['value_units'][i])
+            self.plot_dicts[val_name] = {
+                'plotfn': color_plot,
+                'x': self.proc_data_dict['x_int'],
+                'y': self.proc_data_dict['y_int'],
+                'z': self.proc_data_dict['interpolated_values'][i],
+                'xlabel': self.proc_data_dict['xlabel'],
+                'x_unit': self.proc_data_dict['xunit'],
+                'ylabel': self.proc_data_dict['ylabel'],
+                'y_unit': self.proc_data_dict['yunit'],
+                'zlabel': zlabel,
+                'title': '{}\n{}'.format(
+                    self.timestamp, self.proc_data_dict['measurementstring'])}

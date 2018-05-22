@@ -1663,7 +1663,7 @@ def current_timemark():
 ######################################################################
 
 
-def color_plot(x, y, z, fig, ax, cax=None,
+def color_plot(x, y, z, fig=None, ax=None, cax=None,
                show=False, normalize=False, log=False,
                transpose=False, add_colorbar=True, **kw):
     '''
@@ -1681,6 +1681,8 @@ def color_plot(x, y, z, fig, ax, cax=None,
             combination of letters x, y, z for scaling of the according axis.
             Remember to set the labels correctly.
     '''
+    if ax == None:
+        fig, ax = plt.subplots()
 
     norm = None
     try:
@@ -1747,7 +1749,7 @@ def color_plot(x, y, z, fig, ax, cax=None,
                                  linewidth=0, rasterized=True,
                                  vmin=clim[0], vmax=clim[1])
 
-    plot_title = kw.pop('plot_title', None)
+    title = kw.pop('title', None)
 
     xlabel = kw.pop('xlabel', None)
     ylabel = kw.pop('ylabel', None)
@@ -1758,8 +1760,8 @@ def color_plot(x, y, z, fig, ax, cax=None,
     xlim = kw.pop('xlim', None)
     ylim = kw.pop('ylim', None)
 
-    if plot_title is not None:
-        ax.set_title(plot_title, y=1.05, fontsize=18)
+    if title is not None:
+        ax.set_title(title)
 
     ax.get_yaxis().set_tick_params(direction='out')
     ax.get_xaxis().set_tick_params(direction='out')
@@ -1787,7 +1789,7 @@ def color_plot(x, y, z, fig, ax, cax=None,
     if add_colorbar:
         if cax is None:
             ax_divider = make_axes_locatable(ax)
-            cax = ax_divider.append_axes('right', size='10%', pad='5%')
+            cax = ax_divider.append_axes('right', size='5%', pad='2%')
         cbar = plt.colorbar(colormap, cax=cax, orientation='vertical')
         if zlabel is not None:
             cbar.set_label(zlabel)
