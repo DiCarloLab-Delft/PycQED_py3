@@ -18,7 +18,7 @@ def unscale(points, xy_mean, xy_scale):
     points = np.asarray(points, dtype=float)
     return points * xy_scale + xy_mean
 
-def interpolate_heatmap(x, y, z, n: int=None):
+def interpolate_heatmap(x, y, z, n: int=None, interp_method:str='linear'):
     """
     Args:
         x   (array): x data points
@@ -26,6 +26,8 @@ def interpolate_heatmap(x, y, z, n: int=None):
         z   (array): z data points
         n     (int): number of points for each dimension on the interpolated
             grid
+        interp_method {"linear", "nearest"} determines what interpolation
+            method is used.
 
     Returns:
         x_grid : N*1 array of x-values of the interpolated grid
@@ -49,8 +51,10 @@ def interpolate_heatmap(x, y, z, n: int=None):
 
     # interpolation needs to happen on a rescaled grid, this is somewhat akin to an
     # assumption in the interpolation that the scale of the experiment is chosen sensibly.
-    ip = interpolate.LinearNDInterpolator(scale(points, xy_mean=xy_mean, xy_scale=xy_scale),
-                                          z)
+    # N.B. even if interp_method == "nearest" the linear interpolation is used
+    # to determine the amount of grid points. Could be improved.
+    ip = interpolate.LinearNDInterpolator(
+        scale(points, xy_mean=xy_mean, xy_scale=xy_scale), z)
 
     if n is None:
         # Calculate how many grid points are needed.
@@ -61,6 +65,9 @@ def interpolate_heatmap(x, y, z, n: int=None):
             logging.warning('n: {} larger than 500'.format(n))
             n=500
 
+    if interp_method == "nearest":
+        ip = interpolate.NearestNDInterpolator(
+            scale(points, xy_mean=xy_mean, xy_scale=xy_scale), z)
 
     x_lin = y_lin = np.linspace(-0.5, 0.5, n)
     # Interpolation is evaulated linearly in the domain for interpolation

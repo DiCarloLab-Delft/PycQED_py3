@@ -155,20 +155,23 @@ class Basic2DAnalysis(Basic1DAnalysis):
 class Basic2DInterpolatedAnalysis(ba.BaseDataAnalysis):
     """
     Basic 2D analysis, produces interpolated heatmaps for all measured
-    quantities
+    quantities.
+    This is intended to be a fully featured class to create fancy figures.
+    If you want special options, implement a dedicated class.
     """
 
     def __init__(self, t_start: str = None, t_stop: str = None,
                  label: str = '', data_file_path: str = None,
                  close_figs: bool = True, options_dict: dict = None,
                  extract_only: bool = False, do_fitting: bool = False,
-                 auto:bool=True):
+                 auto:bool=True, interp_method='linear'):
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
                          data_file_path=data_file_path,
                          close_figs=close_figs,
                          options_dict=options_dict,
                          extract_only=extract_only, do_fitting=do_fitting)
+        self.interp_method = interp_method
         if auto:
             self.run_analysis()
 
@@ -206,7 +209,8 @@ class Basic2DInterpolatedAnalysis(ba.BaseDataAnalysis):
         for i in range(len(self.proc_data_dict['value_names'])):
             x_int, y_int, z_int = interpolate_heatmap(
                 self.proc_data_dict['x'], self.proc_data_dict['y'],
-                self.proc_data_dict['measured_values'][i])
+                self.proc_data_dict['measured_values'][i],
+                interp_method=self.interp_method)
             self.proc_data_dict['interpolated_values'].append(z_int)
         self.proc_data_dict['x_int'] = x_int
         self.proc_data_dict['y_int'] = y_int
