@@ -901,9 +901,9 @@ class DeviceCCL(Instrument):
                              realtime_loading=True,
                              waveform_name=waveform_name)
             flux_cw = 2
-        # buffer times are hardcoded for now FIXME!
-        p = mqo.Chevron(q0idx, q_specidx, buffer_time=100e-9,
-                        buffer_time2=200e-9,
+
+        p = mqo.Chevron(q0idx, q_specidx, buffer_time=40e-9,
+                        buffer_time2=max(lengths)+40e-9,
                         flux_cw=flux_cw,
                         platf_cfg=self.cfg_openql_platform_fn())
         self.instr_CC.get_instr().eqasm_program(p.filename)
