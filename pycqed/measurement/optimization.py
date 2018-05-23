@@ -319,20 +319,17 @@ def neural_network_opt(fun,training_grid, hidden_layer_sizes = [(5,)],
 
     inputsize = len(training_grid[0])
     datasize = len(training_grid)
-
+    target_values = []
     ################### not used atm ##################################
     #Acquire first data point for output dim information of fun()
-    # fun_val = fun(training_grid[0,:])
-    # output_dim = len(fun_val)
-    # target_values = np.zeros((datasize,output_dim))
-    # target_values[0,:] = fun_val
-    # #consequetly, start iteration at 2nd input value
-    # for it in range(1,datasize):
-    #     target_values[it,:] = fun(training_grid[it,:])
+    fun_val = fun(training_grid[0,:])
+    output_dim = len(fun_val)
+    target_values = np.zeros((datasize,output_dim))
+    target_values[0,:] = fun_val
+    #consequetly, start iteration at 2nd input value
+    for it in range(1,datasize):
+        target_values[it,:] = fun(training_grid[it,:])
     ####################################################################
-
-    target_values = fun(training_grid)  #measure ske
-    output_dim = len(target_values)
 
     #Preprocessing of Data. Mainly transform the data to mean 0 and interval [0,1]
     training_grid,target_values,\
