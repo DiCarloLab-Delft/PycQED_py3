@@ -70,6 +70,15 @@ class Base_MW_LutMan(Base_LutMan):
             parameter_class=ManualParameter, initial_value=50.0e6)
         self._add_mixer_corr_pars()
 
+        self.add_parameter('mw_ts_modulation', vals=vals.Numbers(), unit='Hz',
+            docstring=('Modulation frequency for driving pulses to the '
+                       'two-state.'),
+            parameter_class=ManualParameter, initial_value=50.0e6)
+        self.add_parameter('mw_ts_amp180', vals=vals.Numbers(), unit='frac',
+            docstring=('Pulse amplitude for pulsing the 1<->2 transition'),
+            vals=vals.Numbers(-1, 1),
+            parameter_class=ManualParameter, initial_value=.2)
+
     def _add_mixer_corr_pars(self):
         self.add_parameter('mixer_alpha', vals=vals.Numbers(),
                            parameter_class=ManualParameter,
@@ -163,6 +172,14 @@ class Base_MW_LutMan(Base_LutMan):
             delay=0,
             phase=0)
 
+        self._wave_dict['rX12'] = self.wf_func(
+            amp=self.mw_ts_amp180(),
+            sigma_length=self.mw_gauss_width(),
+            f_modulation=self.mw_ts_modulation(),
+            sampling_rate=self.sampling_rate(),
+            phase=0,
+            motzoi=0)
+
         for i in range(18):
             angle = i * 20
             self._wave_dict['r{}_90'.format(angle)] = self.wf_func(
@@ -176,7 +193,7 @@ class Base_MW_LutMan(Base_LutMan):
             self._wave_dict = self.apply_mixer_predistortion_corrections(
                 self._wave_dict)
         return self._wave_dict
-
+ 
     def apply_mixer_predistortion_corrections(self, wave_dict):
         M = wf.mixer_predistortion_matrix(self.mixer_alpha(),
                                           self.mixer_phi())
@@ -191,6 +208,21 @@ class Base_MW_LutMan(Base_LutMan):
         waveforms = self._wave_dict[waveform_name]
         codewords = self.LutMap()[waveform_name]
         for waveform, cw in zip(waveforms, codewords):
+            self.AWG.get_instr().set(cw, waveform)
+
+    def load_twostate_rabi_pulses_to_AWG_lookuptable(self, amps):
+        """
+        Special loading method
+        """
+        if (len(amps) != 18):
+            raise ValueError('18 amplitude values must be provided')
+        for i, amp in enumerate(amps):
+            waveforms  = self.wf_func(
+                amp=self.mw_amp180()*self.mw_amp90_scale(),
+                sigma_length=self.mw_gauss_width(),
+                f_modulation=f_modulation,
+                sampling_rate=self.sampling_rate(), phase=angle,
+                motzoi=self.mw_motzoi())
             self.AWG.get_instr().set(cw, waveform)
 
 
