@@ -34,8 +34,8 @@ class BaseDataAnalysis(object):
         - __init__      -> specify params to be extracted, set options
                            specific to analysis and call run_analysis method.
         - process_data  -> mundane tasks such as binning and filtering
-        - prepare_plots -> specify default plots and set up plotting dicts
         - run_fitting   -> perform fits to data
+        - prepare_plots -> specify default plots and set up plotting dicts
 
     The core of this class is the flow defined in run_analysis and should
     be called at the end of the __init__. This executes
