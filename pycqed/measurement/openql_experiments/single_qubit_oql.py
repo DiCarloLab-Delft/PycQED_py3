@@ -829,3 +829,58 @@ def FastFeedbackControl(lantecy, qubit_idx: int, platf_cfg: str):
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
 
+
+def two_state_rabi(q0: int,
+                   amps: list,
+                   platf_cfg: str,
+                   recovery_pulse: bool=True,
+                   add_cal_points: bool=True):
+    """
+    Sequence used to calibrate pulses for 2nd excited state.
+
+    Timing of the sequence:
+    q0:   --   X180 -- X12 -- (X180) -- RO
+
+    Args:
+        q0      (str): name of the addressed qubit
+        amps   (list): amps for the two state pulse, note that these are only
+            used to label the kernels. Load the pulse in the LutMan
+        recovery_pulse (bool): if True adds a recovery pulse to enhance
+            contrast in the measured signal.
+    """
+    if len(amps)>18:
+        raise ValueError('Only 18 free codewords available for amp pulses')
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="two_state_rabi_seq",
+                nqubits=platf.get_qubit_number(),
+                p=platf)
+    # These angles correspond to special pi/2 pulses in the lutman
+    for i, amp in enumerate(amps):
+        # cw_idx corresponds to special hardcoded pulses in the lutman
+        cw_idx = i + 9
+
+        k = Kernel("two_state_A{}".format(amp), p=platf)
+        k.prepz(q0)
+        k.gate('rx180', q0)
+        k.gate('cw_{:02}'.format(cw_idx), q0)
+        if recovery_pulse:
+            k.gate('rx180', q0)
+        k.measure(q0)
+        p.add_kernel(k)
+    if add_cal_points:
+        p = add_single_qubit_cal_points(p, platf=platf, qubit_idx=q0)
+    with suppress_stdout():
+        p.compile()
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+
+    if add_single_qubit_cal_points:
+        cal_pts_idx = [amps[-1]+.1, amps[-1]+.15,
+                        amps[-1]+.2, amps[-1]+.25]
+    else:
+        cal_pts_idx = []
+
+    p.sweep_points = np.concatenate([amps, cal_pts_idx])
+    p.set_sweep_points(p.sweep_points, len(p.sweep_points))
+    return p
