@@ -4208,13 +4208,13 @@ class Ramsey_Analysis(TD_Analysis):
                                           min=(1/(100 *x[-1])),
                                           max=(20/x[-1]))
 
-        if (np.average(y[:4]) >
-                np.average(y[4:8])):
-            phase_estimate = 0
-        else:
-            phase_estimate = np.pi
-        damped_osc_mod.set_param_hint('phase',
-                                          value=phase_estimate, vary=True)
+            if (np.average(y[:4]) >
+                    np.average(y[4:8])):
+                phase_estimate = 0
+            else:
+                phase_estimate = np.pi
+            damped_osc_mod.set_param_hint('phase',
+                                              value=phase_estimate, vary=True)
 
         amplitude_guess = 0.5
         damped_osc_mod.set_param_hint('amplitude',
@@ -4233,24 +4233,37 @@ class Ramsey_Analysis(TD_Analysis):
                                       expr=
                                       '{}-amplitude-exponential_offset'.format(
                                           y[0]))
-                                      # value=0,
-                                      # vary=True)
         damped_osc_mod.set_param_hint('n',
                                       value=1,
-                                      vary=False)
+                                      vary=True)
         self.params = damped_osc_mod.make_params()
 
         fit_res = damped_osc_mod.fit(data=y,
                                      t=x,
                                      params=self.params)
+
+        if fit_res.chisqr > .35:
+
+            damped_osc_mod.set_param_hint('oscillation_offset',
+                                          expr=None,
+                                          value=0,
+                                          vary=True)
+            self.params = damped_osc_mod.make_params()
+            fit_res = damped_osc_mod.fit(data=y, t=x, params=self.params)
+
         if fit_res.chisqr > .35:
             logging.warning('Fit did not converge, varying phase')
             fit_res_lst = []
 
+            damped_osc_mod.set_param_hint('oscillation_offset',
+                                          expr=None,
+                                          value=0,
+                                          vary=True)
             for phase_estimate in np.linspace(0, 2*np.pi, 8):
                 damped_osc_mod.set_param_hint('phase',
                                               value=phase_estimate)
                 self.params = damped_osc_mod.make_params()
+
                 fit_res_lst += [damped_osc_mod.fit(
                                 data=y,
                                 t=x,
@@ -4304,7 +4317,8 @@ class Ramsey_Analysis(TD_Analysis):
                         len(self.sweep_points)*100)
 
         if show_guess:
-            y_init = fit_mods.ExpDampOscFunc(x, **fit_res.init_values)
+            # y_init = fit_mods.ExpDampOscFunc(x, **fit_res.init_values)
+            y_init = fit_res.model.func(x, **fit_res.init_values)
             ax.plot(x, y_init, 'k--', linewidth=self.line_width)
 
         best_vals = fit_res.best_values
