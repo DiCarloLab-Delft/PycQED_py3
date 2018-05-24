@@ -1529,6 +1529,7 @@ class QuDev_transmon(Qubit):
                         'hidden_layer_sizes': [(h, h) for h in range(30,50,5)],
                         'alphas': np.logspace(-6,-4,5).tolist(),
                         'minimize': True,
+                        'estimator': 'MLP_Regressor_scikit'
                         #Probably some additional params for the NN go here
                         }
 
@@ -1660,15 +1661,6 @@ class QuDev_transmon(Qubit):
         if MC is None:
             MC = self.MC
         self.prepare_for_mixer_calibration(suppress='drive sideband')
-        detector = det.UHFQC_mixer_skewness_det(
-            self.UHFQC, qc.station, [self.RO_acq_weight_function_I(),
-                                     self.RO_acq_weight_function_Q()],
-            self.pulse_I_channel(), self.pulse_Q_channel(),
-            self.alpha, self.phi_skew, self.f_pulse_mod(),
-            self.RO_acq_marker_channel(),
-            self.get_RO_pars(),
-            amplitude=amplitude, nr_averages=self.RO_acq_averages(),
-            RO_trigger_separation=trigger_sep, verbose=False)
         # detector = det.UHFQC_readout_mixer_skewness_det(
         #     self.UHFQC, qc.station, [self.RO_acq_weight_function_I(),
         #                              self.RO_acq_weight_function_Q()],
@@ -1682,14 +1674,25 @@ class QuDev_transmon(Qubit):
         meas_grid = [np.random.normal(self.alpha(),0.5,100),
                      np.random.normal(self.phi_skew(),15,100)]
         meas_grid = list(map(list, zip(*meas_grid)))
+        detector = det.UHFQC_mixer_calibration_det(
+            self.UHFQC, qc.station, [self.RO_acq_weight_function_I(),
+                                     self.RO_acq_weight_function_Q()],
+            self.pulse_I_channel(), self.pulse_Q_channel(),
+            self.alpha, self.phi_skew, self.f_pulse_mod(),
+            self.RO_acq_marker_channel(),
+            self.get_RO_pars(),
+            amplitude=amplitude, nr_averages=self.RO_acq_averages(),
+            RO_trigger_separation=trigger_sep, verbose=False,
+            data_points= len(meas_grid[0]))
         ad_func_pars = {'adaptive_function': opti.neural_network_opt,
                         'training_grid': meas_grid,
                         'hidden_layer_sizes': [(h, h) for h in range(35,50,5)],
                         'alphas': np.logspace(-6,-4,3).tolist(),
                         'minimize': True,
+                        'estimator': 'MLP_Regressor_scikit'
                         #Probably some additional params for the NN go here
                         }
-        MC.set_sweep_functions([self.alpha, self.phi_skew]) #not sure if has to be changed. Seems ok
+        MC.set_sweep_functions([self.alpha, self.phi_skew])
         MC.set_detector_function(det.IndexDetector(detector, 0))
         MC.set_adaptive_function_parameters(ad_func_pars)
         MC.run(name='drive_skewness_calibration' + self.msmt_suffix,

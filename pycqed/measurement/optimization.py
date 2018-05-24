@@ -1,7 +1,12 @@
 import copy
+import math
+import logging
 import numpy as np
-from sklearn.model_selection import GridSearchCV as gcv
+
+from sklearn.model_selection import GridSearchCV as gcv, train_test_split
 from sklearn.neural_network import MLPRegressor as mlpr
+import tensorflow as tf
+
 from scipy.optimize import fmin
 
 def nelder_mead(fun, x0,
@@ -239,9 +244,44 @@ def SPSA(fun, x0,
     fun(res[0][0])
     return res[0]
 
+def center_and_scale(X,y):
+    '''
+    Preprocessing of Data. Mainly transform the data to mean 0 and interval [-1,1]
+    :param X: training data list of parameters (each equally long)
+    :param y: validation data list of parameters (each equally long)
+    :output:
+        :X: rescaled and centered training data
+        :y: rescaled and centered test data
+        :input_feature_means: mean values of initial training data parameters
+        :output_feature_means: mean values of initial validation data parameters
+        :input_feature_ext: abs(max-min) of initial training data parameters
+        :output_feature_ext: abs(max-min) of initial validation data parameters
+    '''
+    input_feature_means = np.zeros(np.size(X,1))       #saving means of training
+    output_feature_means = np.zeros(y.ndim)     #and target features
+    input_feature_ext= np.zeros(np.size(X,1))
+    output_feature_ext = np.zeros(y.ndim)
+
+    for it in range(np.size(X,1)):
+        input_feature_means[it]= np.mean(X[:,it])
+        input_feature_ext[it] = np.max(X[:,it]) \
+                                -np.min(X[:,it])
+        X[:,it] -= input_feature_means[it]  #offset to mean 0
+        X[:,it] /= input_feature_ext[it]    #rescale to [-1,1]
+    for it in range(y.ndim):
+        output_feature_means[it]= np.mean(y)
+        output_feature_ext[it] = np.max(y) \
+                                 -np.min(y)
+        y -= output_feature_means[it] #offset to mean 0
+        y /= output_feature_ext[it]   #rescale to [-1,1]
+
+    return X,y,input_feature_means,input_feature_ext,\
+           output_feature_means,output_feature_ext
+
 
 def neural_network_opt(fun,training_grid, hidden_layer_sizes = [(5,)],
-                   alphas= 0.0001, solver='lbfgs'):
+                       alphas= 0.0001, solver='lbfgs',estimator='MLPRegressor',
+                       iters = 200):
     """
     parameters:
         fun: Function to be optimized. So far this is only an optimization for
@@ -274,10 +314,13 @@ def neural_network_opt(fun,training_grid, hidden_layer_sizes = [(5,)],
     if not isinstance(alphas,list):
         alphas = [alphas]
     #transform input into array
-    training_grid = np.array(training_grid)
-    #get input dimension, training grid contains parameters as column vectors
-    inputsize = np.size(training_grid,1)
-    datasize = np.size(training_grid,0)
+    #training_grid = np.array(training_grid)
+    #get input dimension, training grid contains parameters as row!! vectors
+
+    inputsize = len(training_grid[0])
+    datasize = len(training_grid)
+    target_values = []
+    ################### not used atm ##################################
     #Acquire first data point for output dim information of fun()
     fun_val = fun(training_grid[0,:])
     output_dim = len(fun_val)
@@ -286,53 +329,45 @@ def neural_network_opt(fun,training_grid, hidden_layer_sizes = [(5,)],
     #consequetly, start iteration at 2nd input value
     for it in range(1,datasize):
         target_values[it,:] = fun(training_grid[it,:])
+    ####################################################################
 
     #Preprocessing of Data. Mainly transform the data to mean 0 and interval [0,1]
-    input_feature_means = np.zeros(inputsize)       #saving means of training
-    output_feature_means = np.zeros(output_dim)     #and target features
-    input_feature_ext= np.zeros(inputsize)
-    output_feature_ext = np.zeros(output_dim)
-
-    for it in range(inputsize):
-        input_feature_means[it]= np.mean(training_grid[:,it])
-        input_feature_ext[it] = np.max(training_grid[:,it])\
-                                -np.min(training_grid[:,it])
-        training_grid[:,it] -= input_feature_means[it]  #offset to mean 0
-        training_grid[:,it] /= input_feature_ext[it]    #rescale to [-1,1]
-    for it in range(output_dim):
-        output_feature_means[it]= np.mean(target_values[:,it])
-        output_feature_ext[it] = np.max(target_values[:,it])\
-                                 -np.min(target_values[:,it])
-        target_values[:,it] -= output_feature_means[it] #offset to mean 0
-        target_values[:,it] /= output_feature_ext[it]   #rescale to [-1,1]
+    training_grid,target_values,\
+    input_feature_means,input_feature_ext,\
+    output_feature_means,output_feature_ext \
+        = center_and_scale(training_grid,target_values)
 
     ##################################################################
     ### initialize grid search cross val with hyperparameter dict. ###
     ###    and MLPR instance and fit a model function to fun()     ###
     ##################################################################
+    def mlpr():
+        est = MLP_Regressor_scikit(hidden_layers=hidden_layer_sizes,
+                                   output_dim=output_dim,
+                                   n_feature=inputsize,
+                                   alpha=alphas)
+        est.fit(training_grid, target_values)
+        est.print_best_params()
+        return est
 
-    parameter_dict = {'hidden_layer_sizes': hidden_layer_sizes,
-                      'alpha': alphas,
-                      'activation':['relu']}
-    #initilize the neural network. the scikit learn method MLPRegressor uses a
-    #squared loss as a loss function and 'adam' as solver.
-    nn = mlpr(solver='lbfgs')
-    gridCV = gcv(nn,parameter_dict,cv=5)
-    gridCV.fit(training_grid,target_values.ravel())
-    score = gridCV.best_score_
-    bestParams = gridCV.best_params_
-    print("Best parameters: "+str(bestParams))
-    print("Best CV score of ANN: "+str(score))
+    def dnnr():
+        est = DNN_Regressor_tf(hidden_layers=hidden_layer_sizes,
+                               output_dim=output_dim,
+                               n_feature=inputsize,
+                               alpha=alphas,
+                               iters = iters)
+        est.fit(training_grid,target_values)
+        return est
 
+    estimators = {'MLP_Regressor_scikit': mlpr, #defines all current estimators currently implemented
+                  'DNN_Regressor_tf': dnnr}
+
+    est = estimators[estimator]()       #create and fit instance of the chosen estimator
     ###################################################################
     ###     perform gradient descent to minimize modeled landscape  ###
     ###################################################################
-
     x_ini = np.zeros(inputsize)
-
-    estimator_wrapper = lambda X: gridCV.predict([X])
-
-    res = fmin(estimator_wrapper, x_ini, full_output=True)
+    res = fmin(est.predict, x_ini, full_output=True)
     result = res[0]
     #Rescale values
     amp = res[1] * output_feature_ext + output_feature_means
@@ -363,12 +398,161 @@ def neural_network_opt(fun,training_grid, hidden_layer_sizes = [(5,)],
 #     cbar = plt.colorbar(CP)
 #     cbar.ax.set_ylabel('Magnitude [V]',fontsize=20)
 #     plt.show()
-
     final_score = fun(np.array(result))
 
     return [np.array(result), np.array(final_score,dtype='float32')]
     # return [np.array(result), np.array(amp,dtype='float32')]
     #mght want to adapt alpha,ect.i
+
+
+class MLP_Regressor_scikit:
+
+    def __init__(self,hidden_layers=[10],output_dim=1,n_feature=1, alpha = 0.5,
+                 activation = ['relu']):
+        self._n_feature = n_feature
+        self._hidden_layers = hidden_layers
+        self._output_dim = output_dim
+        self.alpha = alpha
+        self.activation = activation
+        self.mlpr_ = mlpr(solver='lbfgs')
+        self.parameter_dict = {'hidden_layer_sizes': self.hidden_layers,
+                          'alpha': self.alpha,
+                          'activation': self.activation}
+        self.gridCV = gcv(self.mlpr_nn,self.parameter_dict,cv=5)
+        self.train_input = None
+        self.train_valid = None
+        self.bestParams = None
+        self.score = None
+
+    def fit(self, x_train, y_train):
+        if self.train_input is None:
+            self.train_input = x_train
+            self.train_valid = y_train
+        else:
+            logging.warning('< MLP_Regressor_scikit > has already been trained!'
+                            're-training estimator on new input data!')
+        self.gridCV.fit(x_train, y_train)
+        self.bestParams = self.gridCV.best_params_
+        self.score = self.gridCV.best_score_
+
+
+    def predict(self, x_pred):
+        '''
+        Has to be callable by scipy optimizers such as fmin(). I.e input has
+        has to be wrapped to a list for the estimators predict method.
+        '''
+        return self.gridCV.predict([x_pred])
+
+    def print_best_params(self):
+        print("Best parameters: "+str(self.bestParams))
+        print("Best CV score of ANN: "+str(self.score))
+
+class DNN_Regressor_tf:
+    def __init__(self, hidden_layers=[10],output_dim=1, alpha = 0.5,
+                 beta=1., n_feature = 1, iters = 200):
+
+        self._n_feature = n_feature
+        self._hidden_layers = hidden_layers
+        self._output_dim = output_dim
+        self._session = tf.Session()
+        self.alpha = alpha
+        self.beta = beta
+        self.iters = iters
+
+    def get_stddev(self,inp_dim, out_dim):
+        std = 1.3 / math.sqrt(float(inp_dim) + float(out_dim))
+        return std
+
+    def network(self, x):
+        x = tf.cast(x,tf.float32)
+        hidden = []
+        #input layer. Input does not need to be transformed as we are regressing
+        with tf.name_scope("input"):
+            weights = tf.Variable(tf.truncated_normal([self._n_feature, self._hidden_layers[0]],
+                                                      stddev=self.get_stddev(self._n_feature,
+                                                                             self._hidden_layers[0])),
+                                                      name='weights')
+            biases = tf.Variable(tf.zeros([self._hidden_layers[0]]), name='biases')
+            input_ = tf.matmul(x, weights) + biases
+
+        #hidden layers
+        for ind, size in enumerate(self._hidden_layers):
+            if ind == len(self._hidden_layers) - 1: break
+            with tf.name_scope("hidden{}".format(ind+1)):
+                weights = tf.Variable(tf.truncated_normal([size, self._hidden_layers[ind+1]],
+                                                          stddev=self.get_stddev(self._n_feature, self._hidden_layers[ind+1])), name='weights')
+                biases = tf.Variable(tf.zeros([self._hidden_layers[ind+1]]), name='biases')
+                inputs = input_ if ind == 0 else hidden[ind-1]
+                hidden.append(tf.nn.relu(tf.matmul(inputs,weights)+biases,name="hidden{}".format(ind+1)))
+        #output layer
+        with tf.name_scope("output"):
+            weights =  tf.Variable(tf.truncated_normal([self._hidden_layers[-1],self._output_dim],
+                                                       stddev=self.get_stddev(self._hidden_layers[-1],self._output_dim)),name='weights')
+            biases = tf.Variable(tf.zeros([self._output_dim]),name='biases')
+            logits = tf.matmul(hidden[-1],weights)+biases               #regression model. Select linear act. fct.
+
+        return logits
+
+    def wrapper(self,opt_var=None):
+        x = tf.placeholder(tf.float32,[None,self._n_feature])
+        out = self.network(x)
+        return self._session.run(out, feed_dict={x: opt_var})
+
+    def drill(self,x_ini):
+        wrapper2 = lambda opt_var: self.wrapper(np.reshape(np.array(opt_var),(1,self._n_feature)))
+        min_val = fmin(wrapper2,x_ini, full_output=True)
+        return tf.convert_to_tensor(min_val[1])
+
+    def loss(self,logits,y):
+        y=tf.cast(y,tf.float32)
+        diff = y-logits
+        norm_diff = tf.norm(diff) #+ self.beta*tf.square(self.drill([0.]*self._n_feature))
+        return norm_diff #/tf.cast(tf.shape(y)[0],tf.float32)
+
+    def fit(self,x_train=None,y_train=None):
+        if x_train is not None:
+            logging.warning('< DNN_Regressor_tf > has already been trained!'
+                            're-training estimator on new input data!')
+        x = tf.placeholder(tf.float32, [None, self._n_feature])
+        y = tf.placeholder(tf.float32, [None, self._output_dim])
+        logits = self.network(x)
+        loss = self.loss(logits,y) # +self.beta*tf.square(self.drill([0.]*self._n_feature))
+        train_op = tf.train.GradientDescentOptimizer(self.alpha).minimize(loss)
+
+        self._x = x
+        self._y = y
+        self._logits = logits
+
+        accuracy = self.evaluate(logits,y)  #used for learning curve creation
+
+        init = tf.initialize_all_variables()
+        self._session.run(init)
+
+        # plt.figure()
+        # plt.grid(True)
+        # plt.title('learning curve')       ## Learning Curve plotting
+        # plt.xlabel('learning epoch')
+        # plt.ylabel('loss')
+        learning_progress = []
+        for i in range(self.iters):
+            print('test')
+            self._session.run(train_op,feed_dict={x:x_train, y: y_train})
+            _acc = self._session.run(accuracy, feed_dict={self._x: x_train, self._y: y_train})
+            learning_progress.append(_acc)
+        self.learning_acc = learning_progress
+        # plt.plot(range(self.iters),learning_progress,'go')
+        # plt.show()
+
+    def evaluate(self,logits_test,y_test):
+        _accuracy = 1 - \
+                    tf.reduce_sum(tf.square(y_test-logits_test))\
+                   /tf.reduce_sum(tf.square(y_test-tf.reduce_mean(y_test)))
+        return _accuracy
+
+
+    def predict(self, samples):
+        predictions = self._logits
+        return self._session.run(predictions, {self._x: [samples]})
 
 
 def gradient(fun,x,grid_spacing):
