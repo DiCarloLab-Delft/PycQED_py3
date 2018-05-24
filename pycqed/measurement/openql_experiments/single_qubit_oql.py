@@ -830,13 +830,13 @@ def FastFeedbackControl(lantecy, qubit_idx: int, platf_cfg: str):
     return p
 
 
-def two_state_rabi(q0: int,
+def ef_rabi_seq(q0: int,
                    amps: list,
                    platf_cfg: str,
                    recovery_pulse: bool=True,
                    add_cal_points: bool=True):
     """
-    Sequence used to calibrate pulses for 2nd excited state.
+    Sequence used to calibrate pulses for 2nd excited state (ef/12 transition)
 
     Timing of the sequence:
     q0:   --   X180 -- X12 -- (X180) -- RO
@@ -851,7 +851,7 @@ def two_state_rabi(q0: int,
     if len(amps)>18:
         raise ValueError('Only 18 free codewords available for amp pulses')
     platf = Platform('OpenQL_Platform', platf_cfg)
-    p = Program(pname="two_state_rabi_seq",
+    p = Program(pname="ef_rabi_seq",
                 nqubits=platf.get_qubit_number(),
                 p=platf)
     # These angles correspond to special pi/2 pulses in the lutman
@@ -859,7 +859,7 @@ def two_state_rabi(q0: int,
         # cw_idx corresponds to special hardcoded pulses in the lutman
         cw_idx = i + 9
 
-        k = Kernel("two_state_A{}".format(amp), p=platf)
+        k = Kernel("ef_A{}".format(amp), p=platf)
         k.prepz(q0)
         k.gate('rx180', q0)
         k.gate('cw_{:02}'.format(cw_idx), q0)

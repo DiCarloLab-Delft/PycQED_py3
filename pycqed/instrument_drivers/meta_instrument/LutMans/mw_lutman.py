@@ -70,11 +70,11 @@ class Base_MW_LutMan(Base_LutMan):
             parameter_class=ManualParameter, initial_value=50.0e6)
         self._add_mixer_corr_pars()
 
-        self.add_parameter('mw_ts_modulation', vals=vals.Numbers(), unit='Hz',
+        self.add_parameter('mw_ef_modulation', vals=vals.Numbers(), unit='Hz',
             docstring=('Modulation frequency for driving pulses to the '
-                       'two-state.'),
+                       'second excited-state.'),
             parameter_class=ManualParameter, initial_value=50.0e6)
-        self.add_parameter('mw_ts_amp180', vals=vals.Numbers(), unit='frac',
+        self.add_parameter('mw_ef_amp180', unit='frac',
             docstring=('Pulse amplitude for pulsing the 1<->2 transition'),
             vals=vals.Numbers(-1, 1),
             parameter_class=ManualParameter, initial_value=.2)
@@ -173,9 +173,9 @@ class Base_MW_LutMan(Base_LutMan):
             phase=0)
 
         self._wave_dict['rX12'] = self.wf_func(
-            amp=self.mw_ts_amp180(),
+            amp=self.mw_ef_amp180(),
             sigma_length=self.mw_gauss_width(),
-            f_modulation=self.mw_ts_modulation(),
+            f_modulation=self.mw_ef_modulation(),
             sampling_rate=self.sampling_rate(),
             phase=0,
             motzoi=0)
@@ -193,7 +193,7 @@ class Base_MW_LutMan(Base_LutMan):
             self._wave_dict = self.apply_mixer_predistortion_corrections(
                 self._wave_dict)
         return self._wave_dict
- 
+
     def apply_mixer_predistortion_corrections(self, wave_dict):
         M = wf.mixer_predistortion_matrix(self.mixer_alpha(),
                                           self.mixer_phi())
@@ -210,20 +210,11 @@ class Base_MW_LutMan(Base_LutMan):
         for waveform, cw in zip(waveforms, codewords):
             self.AWG.get_instr().set(cw, waveform)
 
-    def load_twostate_rabi_pulses_to_AWG_lookuptable(self, amps):
-        """
-        Special loading method
-        """
-        if (len(amps) != 18):
-            raise ValueError('18 amplitude values must be provided')
-        for i, amp in enumerate(amps):
-            waveforms  = self.wf_func(
-                amp=self.mw_amp180()*self.mw_amp90_scale(),
-                sigma_length=self.mw_gauss_width(),
-                f_modulation=f_modulation,
-                sampling_rate=self.sampling_rate(), phase=angle,
-                motzoi=self.mw_motzoi())
-            self.AWG.get_instr().set(cw, waveform)
+
+    def load_ef_rabi_pulses_to_AWG_lookuptable(self, amps:list,
+                                               mod_freqs:list=None):
+        # Currently (May 2018) only implemented in `AWG8_VSM_MW_LutMan` -MAR
+        raise NotImplementedError()
 
 
 class CBox_MW_LutMan(Base_MW_LutMan):
@@ -341,9 +332,13 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
             stop_start=stop_start)
         # Uploading the codeword program (again) is needed to link the new
         # waveforms.
-        # the False prevents reconfiguring the DIO timings. This
-        # needs to be fixed in the AWG8 driver (MAR Oct 2017)
-        self.AWG.get_instr().upload_codeword_program()
+
+        # This ensures only the channels that are relevant get reconfigured
+        if 'channel_GI' in self.parameters:
+            awgs = [self.channel_GI()//2, self.channel_DI()//2]
+        else:
+            awgs = [self.channel_I()]
+        self.AWG.get_instr().upload_codeword_program(awgs=awgs)
 
 
 class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
@@ -444,6 +439,48 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
             DI, DQ = np.dot(M_D, val[2:4])  # Mixer correction Derivative comp.
             wave_dict[key] = GI, GQ, DI, DQ
         return wave_dict
+
+    def load_ef_rabi_pulses_to_AWG_lookuptable(self, amps:list,
+                                               mod_freqs:list=None):
+        """
+        Special loading method that loads (up to) 18 pulses in
+        order to do a rabi on the ef (1-2) transition.
+
+        This method also generates the waveforms.
+        """
+
+        if (len(amps) > 18):
+            raise ValueError('max 18 amplitude values can be provided')
+        if len(amps) ==1:
+            amps = [amps]*len(mod_freqs)
+
+        if mod_freqs == None:
+            mod_freqs = [self.mw_ef_modulation()]*len(amps)
+        elif len(mod_freqs) == 1:
+            mod_freqs = [mod_freqs]*len(amps)
+
+        for i, (amp, mod_freq) in enumerate(zip(amps, mod_freqs)):
+            cw_idx = i + 9
+            codewords = (
+                'wave_ch{}_cw{:03}'.format(self.channel_GI(), cw_idx),
+                'wave_ch{}_cw{:03}'.format(self.channel_GQ(), cw_idx),
+                'wave_ch{}_cw{:03}'.format(self.channel_DI(), cw_idx),
+                'wave_ch{}_cw{:03}'.format(self.channel_DQ(), cw_idx))
+            self._wave_dict['ef_{}'.format(i)] = self.wf_func(
+                amp=amp, sigma_length=self.mw_gauss_width(),
+                f_modulation=mod_freq, sampling_rate=self.sampling_rate(),
+                phase=0,
+                motzoi=self.mw_motzoi())
+            for cw, waveform in zip(codewords,
+                                    self._wave_dict['ef_{}'.format(i)]):
+                self.AWG.get_instr().set(cw, waveform)
+
+        # This ensures only the channels that are relevant get reconfigured
+        if 'channel_GI' in self.parameters:
+            awgs = [self.channel_GI()//2, self.channel_DI()//2]
+        else:
+            awgs = [self.channel_I()]
+        self.AWG.get_instr().upload_codeword_program(awgs=awgs)
 
 
 class QWG_MW_LutMan_VQE(QWG_MW_LutMan):

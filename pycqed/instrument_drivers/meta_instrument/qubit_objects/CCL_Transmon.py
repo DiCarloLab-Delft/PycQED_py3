@@ -2422,6 +2422,44 @@ class CCLight_Transmon(Qubit):
             self.F_RB(a.fit_res.params['fidelity_per_Clifford'].value)
         return a.fit_res.params['fidelity_per_Clifford'].value
 
+
+    def measure_ef_rabi(self, amps:list, recovery_pulse:bool=True,
+                        MC=None, label: str ='',
+                        analyze=True, close_fig=True,
+                        prepare_for_timedomain=True):
+        """
+        Measures a rabi oscillation of the ef/12 transition.
+
+        Hint: the expected pi-pulse amplitude of the ef/12 transition is ~1/2
+            the pi-pulse amplitude of the ge/01 transition.
+        """
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+
+        mw_lutman = self.instr_LutMan_MW.get_instr()
+        mw_lutman.load_ef_rabi_pulses_to_AWG_lookuptable(amps=amps)
+
+        p = sqo.ef_rabi_seq(
+            self.cfg_qubit_nr(),
+            amps=amps, recovery_pulse=recovery_pulse,
+            platf_cfg=self.cfg_openql_platform_fn())
+
+
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             parameter_name='Pulse amp',
+                             unit='dac',
+                             CCL=self.instr_CC.get_instr())
+        d = self.int_avg_det
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(p.sweep_points)
+        MC.set_detector_function(d)
+        MC.run('ef_rabi'+label+self.msmt_suffix)
+        if analyze:
+            a = ma.Rabi_Analysis(close_main_fig=close_fig, label='ef_rabi')
+            return a
+
     def create_dep_graph(self):
         dag = AutoDepGraph_DAG(name=self.name+' DAG')
 
