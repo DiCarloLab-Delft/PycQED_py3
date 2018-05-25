@@ -39,11 +39,15 @@ def set_axis_label(axis_type, axes, label, unit=None, **kw):
         raise KeyError('No axis named' + str(axis_type))
     if unit is not None and unit != '':
         ticks = get_ticks()
+
         scale_factor, unit = SI_prefix_and_scale_factor(
             val=max(abs(ticks)), unit=unit)
-        formatter = matplotlib.ticker.FuncFormatter(lambda x, pos:
-                                                    x*scale_factor)
+
+        formatter = matplotlib.ticker.FuncFormatter(
+            lambda x, pos: float('{:.4f}'.format(x*scale_factor)))
+
         axis.set_major_formatter(formatter)
+
         set_label(label+' ({})'.format(unit), **kw)
     else:
         set_label(label, **kw)
@@ -92,6 +96,7 @@ def SI_prefix_and_scale_factor(val, unit=None):
 
     if unit is None:
         unit = ''  # to ensure proper return value
+
     return scale_factor, unit
 
 
