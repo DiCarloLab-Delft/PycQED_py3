@@ -67,7 +67,7 @@ class Element:
             if self.fixed_point_applied:
                 offset += calculate_time_correction(
                               offset, self.readout_fixed_point) - \
-                          self.readout_fixed_point
+                          2*self.readout_fixed_point
             return offset
 
     def ideal_length(self):
