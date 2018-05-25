@@ -32,7 +32,9 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                             initialize: bool=True,
                             interleaving_cliffords = [None],
                             program_name: str='randomized_benchmarking',
-                            cal_points: bool=True, recompile: bool=True):
+                            cal_points: bool=True,
+                            f_state_cal_pts: bool=True,
+                            recompile: bool=True):
     '''
     Input pars:
         qubits:         list of ints specifying qubit indices.
@@ -160,8 +162,9 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
 
         if cal_points:
             if number_of_qubits == 1:
-                p = add_single_qubit_cal_points(p, platf=platf,
-                                                qubit_idx=qubits[0])
+                p = add_single_qubit_cal_points(
+                    p, platf=platf, qubit_idx=qubits[0],
+                    f_state_cal_pts=f_state_cal_pts)
             elif number_of_qubits == 2:
                 p = add_two_q_cal_points(p, platf=platf,
                                          q0=qubits[0],

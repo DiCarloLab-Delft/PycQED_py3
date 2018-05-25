@@ -667,7 +667,16 @@ def Ram_Z(qubit_name,
     pass
 
 
-def add_single_qubit_cal_points(p, platf, qubit_idx):
+def add_single_qubit_cal_points(p, platf, qubit_idx,
+                                f_state_cal_pts:bool=False):
+    """
+    Adds single qubit calibration points to an OpenQL program
+
+    Args:
+        p
+        platf
+        qubit_idx
+    """
     for i in np.arange(2):
         k = Kernel("cal_gr_"+str(i), p=platf)
         k.prepz(qubit_idx)
@@ -680,6 +689,14 @@ def add_single_qubit_cal_points(p, platf, qubit_idx):
         k.gate('rx180', qubit_idx)
         k.measure(qubit_idx)
         p.add_kernel(k)
+    if f_state_cal_pts:
+        for i in np.arange(2):
+            k = Kernel("cal_f_"+str(i), p=platf)
+            k.prepz(qubit_idx)
+            k.gate('rx180', qubit_idx)
+            k.gate('rx12', qubit_idx)
+            k.measure(qubit_idx)
+            p.add_kernel(k)
     return p
 
 

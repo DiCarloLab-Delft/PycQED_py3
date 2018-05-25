@@ -2370,7 +2370,7 @@ class CCLight_Transmon(Qubit):
                                         nr_seeds=100,
                                         double_curves=False,
                                         MC=None, analyze=True, close_fig=True,
-                                        verbose=False, upload=True,
+                                        verbose:bool=True, upload=True,
                                         update=True):
         # Adding calibration points
         if double_curves:
@@ -2383,6 +2383,9 @@ class CCLight_Transmon(Qubit):
         MC.soft_avg(nr_seeds)
         counter_param = ManualParameter('name_ctr', initial_value=0)
         programs = []
+        if verbose:
+            print('Generating {} RB programs'.format(nr_seeds))
+        t0 = time.time()
         for i in range(nr_seeds):
             p = sqo.randomized_benchmarking(
                 qubit_idx=self.cfg_qubit_nr(),
@@ -2391,6 +2394,9 @@ class CCLight_Transmon(Qubit):
                 nr_seeds=1, program_name='RB_{}'.format(i),
                 double_curves=double_curves)
             programs.append(p)
+        if verbose:
+            print('Succesfully generated {} RB programs in {:.1f}s'.format(
+                nr_seeds*len(grouped_nr_cliffords), time.time()-t0))
 
         prepare_function_kwargs = {
             'counter_param': counter_param,
