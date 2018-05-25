@@ -94,7 +94,7 @@ class RandomizedBenchmarking_Analysis(ma.TD_Analysis):
 
         qb_RO_channel = kw.pop('qb_RO_channel', None)
         find_empirical_variance = kw.get('find_empirical_variance',
-                                         False)
+                                         True)
         print(find_empirical_variance)
         if self.cal_points is None:
             self.cal_points = [list(range(-4, -2)), list(range(-2, 0))]
@@ -297,7 +297,7 @@ class RandomizedBenchmarking_Analysis(ma.TD_Analysis):
                  show_guess=False,
                  plot_results=False, **kw):
 
-        find_empirical_variance = kw.pop('find_empirical_variance', False)
+        find_empirical_variance = kw.pop('find_empirical_variance', True)
         print(find_empirical_variance)
         RBModel = lmfit.Model(fit_mods.RandomizedBenchmarkingDecay)
         # RBModel = fit_mods.RBModel
@@ -1061,7 +1061,7 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
     def single_shot_analysis(self, **kw):
 
         msmt_to_not_fit = kw.get('msmt_to_not_fit', [])
-        find_empirical_variance = kw.get('find_empirical_variance', False)
+        find_empirical_variance = kw.get('find_empirical_variance', True)
 
         self.msmt_strings = {}
         self.data_files_dict = {}
@@ -1178,7 +1178,7 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
     def extract_data(self, **kw):
 
         two_qubits = kw.pop('two_qubits', True)
-        find_empirical_variance = kw.pop('find_empirical_variance', False)
+        find_empirical_variance = kw.pop('find_empirical_variance', True)
 
         if self.cal_points is None:
             self.cal_points = [[-2], [-1]]
@@ -1425,7 +1425,7 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
                     qb_names=self.qb_names, fit_results_dict=fit_results_dict)
             else:
                 find_empirical_variance = kw.pop('find_empirical_variance',
-                                                 False)
+                                                 True)
                 print(find_empirical_variance)
                 correl_data_dict = {}
                 correl_variance_dict = {}
