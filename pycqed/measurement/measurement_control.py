@@ -133,6 +133,13 @@ class MeasurementControl(Instrument):
                     Dictionary containing experimental metadata that is saved
                     to the data file at the location
                         file['Experimental Data']['Experimental Metadata']
+                bins (list):
+                    If bins is specified in exp_metadata this is used to
+                    average data in specific bins for live plotting.
+                    This is useful when it is required to take data in single
+                    shot mode.
+
+
             mode (str):
                     Measurement mode. Can '1D', '2D', or 'adaptive'.
             disable_snapshot_metadata (bool):
@@ -165,11 +172,19 @@ class MeasurementControl(Instrument):
         with h5d.Data(name=self.get_measurement_name(),
                       datadir=self.datadir()) as self.data_object:
             try:
+
                 self.check_keyboard_interrupt()
                 self.get_measurement_begintime()
                 if not disable_snapshot_metadata:
                     self.save_instrument_settings(self.data_object)
                 self.create_experimentaldata_dataset()
+
+                self.plotting_bins = None
+                if exp_metadata is not None:
+                    self.save_exp_metadata(exp_metadata, self.data_object)
+                    if 'bins' in exp_metadata.keys():
+                        self.plotting_bins = exp_metadata['bins']
+
                 if mode is not 'adaptive':
                     try:
                         # required for 2D plotting and data storing.
@@ -192,8 +207,9 @@ class MeasurementControl(Instrument):
             result = self.dset[()]
             self.get_measurement_endtime()
             self.save_MC_metadata(self.data_object)  # timing labels etc
-            if exp_metadata is not None:
-                self.save_exp_metadata(exp_metadata, self.data_object)
+
+
+
             return_dict = self.create_experiment_result_dict()
 
         self.finish(result)
@@ -609,6 +625,10 @@ class MeasurementControl(Instrument):
                                              color=0.75,  # a grayscale value
                                              pen=None,
                                              symbol='o', symbolSize=5)
+                if self.mode == 'adaptive':
+                    kw = {'pen': None}
+                else:
+                    kw = {}
                 self.main_QtPlot.add(x=[0], y=[0],
                                      xlabel=xlab,
                                      xunit=xunits[xi],
@@ -616,16 +636,17 @@ class MeasurementControl(Instrument):
                                      yunit=yunits[yi],
                                      subplot=j+1,
                                      color=color_cycle[j % len(color_cycle)],
-                                     pen=None,
-                                     symbol='o', symbolSize=5)
+                                     # pen=None,
+                                     symbol='o', symbolSize=5, **kw)
                 self.curves.append(self.main_QtPlot.traces[-1])
                 j += 1
             self.main_QtPlot.win.nextRow()
 
     def update_plotmon(self, force_update=False):
         # Note: plotting_max_pts takes precendence over force update
-        if self.live_plot_enabled() and (self.dset.shape[0] <
-                                         self.plotting_max_pts()):
+        if (self.live_plot_enabled() and (self.dset.shape[0] <
+                                         self.plotting_max_pts() or
+                (self.plotting_bins is not None))):
             i = 0
             try:
                 time_since_last_mon_update = time.time() - self._mon_upd_time
@@ -642,6 +663,14 @@ class MeasurementControl(Instrument):
                         for x_ind in range(nr_sweep_funcs):
                             x = self.dset[:, x_ind]
                             y = self.dset[:, nr_sweep_funcs+y_ind]
+
+                            # used to average e.g., single shot measuremnts
+                            # can be specified in MC.run(exp_metadata['bins'])
+                            if self.plotting_bins is not None:
+                                x = self.plotting_bins
+                                y = np.mean(y.reshape(
+                                    (len(self.plotting_bins), -1),
+                                    order='F'), axis=1)
 
                             self.curves[i]['config']['x'] = x
                             self.curves[i]['config']['y'] = y
