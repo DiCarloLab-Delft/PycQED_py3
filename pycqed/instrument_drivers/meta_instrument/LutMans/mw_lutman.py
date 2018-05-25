@@ -211,7 +211,7 @@ class Base_MW_LutMan(Base_LutMan):
             self.AWG.get_instr().set(cw, waveform)
 
 
-    def load_ef_rabi_pulses_to_AWG_lookuptable(self, amps:list,
+    def load_ef_rabi_pulses_to_AWG_lookuptable(self, amps:list=None,
                                                mod_freqs:list=None):
         # Currently (May 2018) only implemented in `AWG8_VSM_MW_LutMan` -MAR
         raise NotImplementedError()
@@ -440,7 +440,7 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
             wave_dict[key] = GI, GQ, DI, DQ
         return wave_dict
 
-    def load_ef_rabi_pulses_to_AWG_lookuptable(self, amps:list,
+    def load_ef_rabi_pulses_to_AWG_lookuptable(self, amps:list=None,
                                                mod_freqs:list=None):
         """
         Special loading method that loads (up to) 18 pulses in
@@ -449,10 +449,13 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
         This method also generates the waveforms.
         """
 
+        if (amps==None) and (mod_freqs is None):
+            amps = [self.mw_ef_amp180()]
+        elif len(amps)==1:
+            amps = [amps]*len(mod_freqs)
+
         if (len(amps) > 18):
             raise ValueError('max 18 amplitude values can be provided')
-        if len(amps) ==1:
-            amps = [amps]*len(mod_freqs)
 
         if mod_freqs == None:
             mod_freqs = [self.mw_ef_modulation()]*len(amps)

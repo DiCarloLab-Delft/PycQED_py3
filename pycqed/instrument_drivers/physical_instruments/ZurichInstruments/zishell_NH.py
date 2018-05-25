@@ -1033,7 +1033,6 @@ class ziShellDevice:
         success_and_ready = False
         # This check (and while loop) is added as a workaround for #9
         while not success_and_ready:
-            print('Disabling codeword triggering')
             self.seti('awgs/' + str(awg_nr) + '/dio/valid/polarity', 0)
             self.seti('awgs/' + str(awg_nr) + '/dio/strobe/slope', 0)
 
@@ -1068,7 +1067,6 @@ class ziShellDevice:
             if not comp_msg.endswith(succes_msg):
                 success = False
 
-            print('Reenabling codeword triggering')
             self.seti('awgs/' + str(awg_nr) + '/dio/valid/polarity', 2)
             self.seti('awgs/' + str(awg_nr) + '/dio/strobe/slope', 2)
 
@@ -1084,13 +1082,11 @@ class ziShellDevice:
             if self.geti('awgs/'+str(awg_nr)+'/ready')!= 1:
                 logging.warning('AWG not ready')
                 success_and_ready = False
-                print('not ready')
             else:
                 success_and_ready = True
-                print('ready')
 
-        print('AWG {} ready: {}'.format(awg_nr,
-                                     self.geti('awgs/'+str(awg_nr)+'/ready')))
+        # print('AWG {} ready: {}'.format(awg_nr,
+        #                              self.geti('awgs/'+str(awg_nr)+'/ready')))
         t1 = time.time()
         print(self.awgModule.get('awgModule/compiler/statusstring')
               ['compiler']['statusstring'][0] + ' in {:.2f}s'.format(t1-t0))

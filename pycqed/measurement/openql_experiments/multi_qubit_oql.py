@@ -67,8 +67,10 @@ def multi_qubit_off_on(qubits: list,  initialize: bool,
                        second_excited_state: bool, platf_cfg: str):
     """
     Performs an 'off_on' sequence on the qubits specified.
-        off: (RO) - prepz -      - RO
-        on:  (RO) - prepz - x180 - RO
+        off: (RO) - prepz -      -     - RO
+        on:  (RO) - prepz - x180 -     - RO
+        2nd  (RO) - prepz - X180 - X12 - RO  (if second_excited_state == True)
+
     Will cycle through all combinations of off and on. Last qubit in the list
     is considered the Least Significant Qubit (LSQ).
 
@@ -82,12 +84,10 @@ def multi_qubit_off_on(qubits: list,  initialize: bool,
     """
 
     if second_excited_state:
-        raise NotImplementedError()
-
-    if second_excited_state:
         base = 3
     else:
         base = 2
+
     combinations = [int2base(i, base=base, fixed_length=len(qubits)) for
                     i in range(base**len(qubits))]
 
@@ -116,7 +116,7 @@ def multi_qubit_off_on(qubits: list,  initialize: bool,
                 k.gate('rx180', target_qubit)
             elif state == '2':
                 k.gate('rx180', target_qubit)
-                raise NotImplementedError()  # 2nd excited state pulse
+                k.gate('rx12', target_qubit)
         # 4. measurement of all qubits
         k.gate('wait', qubits, 0)
         # Used to ensure timing is aligned

@@ -24,6 +24,7 @@ def_opcode["qwaitr"]   = 0x38
 def_q_arg_none["qnop"] = 0x00
 def_q_arg_st["C0_cw_00"]	= 0x30
 def_q_arg_st["C0_cw_07"]	= 0x37
+def_q_arg_st["C0_cw_09"]	= 0x39
 def_q_arg_st["C0_cw_01"]	= 0x31
 def_q_arg_st["C0_cw_03"]	= 0x33
 def_q_arg_st["C0_cw_05"]	= 0x35
