@@ -1997,8 +1997,8 @@ class Rabi_Analysis(TD_Analysis):
             if phase_fit == 0:
                 piPulse = 1/(2*freq_fit)
                 piHalfPulse = 1/(4*freq_fit)
-                piPulse_std = freq_std/freq_fit
-                piHalfPulse_std = freq_std/freq_fit
+                piPulse_std = freq_std/(2*freq_fit**2)
+                piHalfPulse_std = freq_std/(4*freq_fit**2)
 
             else:
                 n = np.arange(-2, 3)
@@ -2008,8 +2008,9 @@ class Rabi_Analysis(TD_Analysis):
 
                 # find piHalfPulse
                 try:
-                    piHalfPulse = np.min(np.take(piHalfPulse_vals,
-                                                 np.where(piHalfPulse_vals>=0)))
+                    piHalfPulse = \
+                        np.min(piHalfPulse_vals[piHalfPulse_vals >= 0])
+                    n_piHalf_pulse = n[piHalfPulse_vals==piHalfPulse]
                 except ValueError:
                     piHalfPulse = np.asarray([])
 
@@ -2019,15 +2020,17 @@ class Rabi_Analysis(TD_Analysis):
                                    i<piHalfPulse_vals.size):
                         i+=1
                     piHalfPulse = piHalfPulse_vals[i]
+                    n_piHalf_pulse = n[i]
 
-                # fin piPulse
+                # find piPulse
                 try:
                     if piHalfPulse.size != 0:
-                        piPulse = np.min(np.take(
-                            piPulse_vals, np.where(piPulse_vals>=piHalfPulse)))
+                        piPulse = \
+                            np.min(piPulse_vals[piPulse_vals>=piHalfPulse])
                     else:
-                        piPulse = np.min(np.take(piPulse_vals,
-                                                 np.where(piPulse_vals>=0.001)))
+                        piPulse = np.min(piPulse_vals[piPulse_vals>=0.001])
+                    n_pi_pulse = n[piHalfPulse_vals==piHalfPulse]
+
                 except ValueError:
                     piPulse = np.asarray([])
 
@@ -2037,7 +2040,7 @@ class Rabi_Analysis(TD_Analysis):
                                    i<piPulse_vals.size):
                         i+=1
                     piPulse = piPulse_vals[i]
-
+                    n_pi_pulse = n[i]
 
                 # piPulse = 1/(2*freq_fit) - phase_fit/(2*np.pi*freq_fit)
                 # piHalfPulse = 1/(4*freq_fit) - phase_fit/(2*np.pi*freq_fit)
@@ -2055,12 +2058,20 @@ class Rabi_Analysis(TD_Analysis):
                 else:
                     cov_freq_phase=0
 
-                piPulse_std = piPulse*np.sqrt( (2*np.pi*freq_std/freq_fit)**2 +
-                                               (phase_std/phase_fit)**2
-                                               -cov_freq_phase/
-                                               (np.pi*freq_fit*phase_fit) )
-                piHalfPulse_std = np.sqrt( (piPulse_std)**2 +
-                                           (freq_std/freq_fit)**2 )
+                piPulse_std = self.calculate_pulse_stderr(
+                    f=freq_fit,
+                    phi=phase_fit,
+                    f_err=freq_std,
+                    phi_err=phase_std,
+                    period_num=n_pi_pulse,
+                    cov=cov_freq_phase)
+                piHalfPulse_std = self.calculate_pulse_stderr(
+                    f=freq_fit,
+                    phi=phase_fit,
+                    f_err=freq_std,
+                    phi_err=phase_std,
+                    period_num=n_piHalf_pulse,
+                    cov=cov_freq_phase)
 
             if kw.get('print_parameters', False):
                 print('\u03C0'+'-Pulse Amplitude = {:.6} '.format(piPulse)+
@@ -2100,6 +2111,12 @@ class Rabi_Analysis(TD_Analysis):
                 amp180 = fitted_pars_1['period'].attrs['value']/2
         return amp180
 
+    def calculate_pulse_stderr(self, f, phi, f_err, phi_err,
+                               period_num, cov=0):
+        x = period_num + phi
+        return np.sqrt((f_err*x/(2*np.pi*(f**2)))**2 +
+                       (phi_err/(2*np.pi*f))**2 -
+                       2*(cov**2)*x/((2*np.pi*(f**3))**2))
 
 class TD_UHFQC(TD_Analysis):
 
@@ -2758,43 +2775,46 @@ class QScale_Analysis(TD_Analysis):
 
         #Calculate standard deviation
         #(http://ugastro.berkeley.edu/infrared09/PDF-2009/statistics1.pdf)
-        b1_idx = self.fit_res[1].var_names.index('intercept')
-        m1_idx = self.fit_res[1].var_names.index('slope')
-        b2_idx = self.fit_res[2].var_names.index('intercept')
-        m2_idx = self.fit_res[2].var_names.index('slope')
-
-        if self.fit_res[1].covar is not None:
-            cov_b1_m1 = self.fit_res[1].covar[b1_idx,m1_idx]
-        else:
-            cov_b1_m1 = 0
-        if self.fit_res[2].covar is not None:
-            cov_b2_m2 = self.fit_res[2].covar[b2_idx,m2_idx]
-        else:
-            cov_b2_m2 = 0
-
-        cov_qscale_squared = (- cov_b1_m1 - cov_b2_m2)**2
+        # b1_idx = self.fit_res[1].var_names.index('intercept')
+        # m1_idx = self.fit_res[1].var_names.index('slope')
+        # b2_idx = self.fit_res[2].var_names.index('intercept')
+        # m2_idx = self.fit_res[2].var_names.index('slope')
+        #
+        # if self.fit_res[1].covar is not None:
+        #     cov_b1_m1 = self.fit_res[1].covar[b1_idx,m1_idx]
+        # else:
+        #     cov_b1_m1 = 0
+        # if self.fit_res[2].covar is not None:
+        #     cov_b2_m2 = self.fit_res[2].covar[b2_idx,m2_idx]
+        # else:
+        #     cov_b2_m2 = 0
+        #
+        # cov_qscale_squared = (- cov_b1_m1 - cov_b2_m2)**2
 
         intercept_diff_mean = self.fit_res[1].params['intercept'].value - \
                               self.fit_res[2].params['intercept'].value
         slope_diff_mean = self.fit_res[2].params['slope'].value - \
                           self.fit_res[1].params['slope'].value
 
-        intercept_diff_std_squared = \
-            (self.fit_res[1].params['intercept'].stderr)**2 + \
-            (self.fit_res[2].params['intercept'].stderr)**2
-        slope_diff_std_squared = \
-            (self.fit_res[2].params['slope'].stderr)**2 + \
-            (self.fit_res[1].params['slope'].stderr)**2
+        intercept_diff_std = \
+            np.sqrt((self.fit_res[1].params['intercept'].stderr)**2 + \
+            (self.fit_res[2].params['intercept'].stderr)**2)
+        slope_diff_std = \
+            np.sqrt((self.fit_res[2].params['slope'].stderr)**2 + \
+            (self.fit_res[1].params['slope'].stderr)**2)
 
-        sqrt_quantity = intercept_diff_std_squared/((intercept_diff_mean)**2) + \
-                        slope_diff_std_squared/((slope_diff_mean)**2) - \
-                        2*cov_qscale_squared/(intercept_diff_mean*slope_diff_mean)
-        if sqrt_quantity<0:
-            optimal_qscale_stddev = optimal_qscale*np.sqrt(
-                intercept_diff_std_squared/((intercept_diff_mean)**2) + \
-                slope_diff_std_squared/((slope_diff_mean)**2))
-        else:
-            optimal_qscale_stddev = optimal_qscale*np.sqrt(sqrt_quantity)
+        optimal_qscale_stddev = np.sqrt(
+            (intercept_diff_std/slope_diff_mean)**2 +
+            (intercept_diff_mean*slope_diff_std/(slope_diff_std**2))**2)
+        # sqrt_quantity = intercept_diff_std_squared/((intercept_diff_mean)**2) + \
+        #                 slope_diff_std_squared/((slope_diff_mean)**2) - \
+        #                 2*cov_qscale_squared/(intercept_diff_mean*slope_diff_mean)
+        # if sqrt_quantity<0:
+        #     optimal_qscale_stddev = optimal_qscale*np.sqrt(
+        #         intercept_diff_std_squared/((intercept_diff_mean)**2) + \
+        #         slope_diff_std_squared/((slope_diff_mean)**2))
+        # else:
+        #     optimal_qscale_stddev = optimal_qscale*np.sqrt(sqrt_quantity)
 
         if print_parameters:
             print('Optimal QScale Parameter = {} \t QScale Stddev = {}'.format(
@@ -4208,19 +4228,28 @@ class Ramsey_Analysis(TD_Analysis):
                                           min=(1/(100 *x[-1])),
                                           max=(20/x[-1]))
 
-        if (np.average(y[:4]) >
-                np.average(y[4:8])):
-            phase_estimate = 0
-        else:
-            phase_estimate = np.pi
-        damped_osc_mod.set_param_hint('phase',
-                                          value=phase_estimate, vary=True)
+            if (np.average(y[:4]) >
+                    np.average(y[4:8])):
+                phase_estimate = 0
+            else:
+                phase_estimate = np.pi
+            damped_osc_mod.set_param_hint('phase',
+                                              value=phase_estimate, vary=True)
 
         amplitude_guess = 0.5
-        damped_osc_mod.set_param_hint('amplitude',
-                                      value=amplitude_guess,
-                                      min=0.4,
-                                      max=4.0)
+        if np.all(np.logical_and(y>0, y<1)):
+            damped_osc_mod.set_param_hint('amplitude',
+                                          value=amplitude_guess,
+                                          min=0.4,
+                                          max=4.0,
+                                          vary=False)
+        else:
+            print('data is not normalized, varying amplitude')
+            damped_osc_mod.set_param_hint('amplitude',
+                                          value=amplitude_guess,
+                                          min=0.4,
+                                          max=4.0,
+                                          vary=False)
         damped_osc_mod.set_param_hint('tau',
                                       value=x[1]*10,
                                       min=x[1],
@@ -4228,45 +4257,53 @@ class Ramsey_Analysis(TD_Analysis):
         damped_osc_mod.set_param_hint('exponential_offset',
                                       value=0.5,
                                       min=0.4,
-                                      max=4.0)
-        damped_osc_mod.set_param_hint('oscillation_offset',
-                                      expr=
-                                      '{}-amplitude-exponential_offset'.format(
-                                          y[0]))
-                                      # value=0,
-                                      # vary=True)
-        damped_osc_mod.set_param_hint('n',
-                                      value=1,
+                                      max=4.0,
                                       vary=False)
-        self.params = damped_osc_mod.make_params()
+        damped_osc_mod.set_param_hint('oscillation_offset',
+                                      # expr=
+                                      # '{}-amplitude-exponential_offset'.format(
+                                      #     y[0]))
+                                      value=0,
+                                      vary=False)
 
-        fit_res = damped_osc_mod.fit(data=y,
-                                     t=x,
-                                     params=self.params)
-        if fit_res.chisqr > .35:
-            logging.warning('Fit did not converge, varying phase')
-            fit_res_lst = []
+        self.fit_results_dict = {}
+        decay_labels = ['gaussian', 'exponential', ]
+        for label, n in zip(decay_labels, [2,1]):
+            damped_osc_mod.set_param_hint('n',
+                                          value=float('{:.1f}'.format(n)),
+                                          vary=False)
+            self.params = damped_osc_mod.make_params()
 
-            for phase_estimate in np.linspace(0, 2*np.pi, 8):
-                damped_osc_mod.set_param_hint('phase',
-                                              value=phase_estimate)
-                self.params = damped_osc_mod.make_params()
-                fit_res_lst += [damped_osc_mod.fit(
-                                data=y,
-                                t=x,
-                                params=self.params)]
+            fit_res = damped_osc_mod.fit(data=y,
+                                         t=x,
+                                         params=self.params)
 
-            chisqr_lst = [fit_res.chisqr for fit_res in fit_res_lst]
-            fit_res = fit_res_lst[np.argmin(chisqr_lst)]
-        self.fit_results.append(fit_res)
+            if fit_res.chisqr > .35:
+                logging.warning('Fit did not converge, varying phase')
+                fit_res_lst = []
 
-        if print_fit_results:
-            print(fit_res.fit_report())
+                for phase_estimate in np.linspace(0, 2*np.pi, 8):
+                    damped_osc_mod.set_param_hint('phase',
+                                                  value=phase_estimate)
+                    self.params = damped_osc_mod.make_params()
+
+                    fit_res_lst += [damped_osc_mod.fit(
+                                    data=y,
+                                    t=x,
+                                    params=self.params)]
+
+                chisqr_lst = [fit_res.chisqr for fit_res in fit_res_lst]
+                fit_res = fit_res_lst[np.argmin(chisqr_lst)]
+            self.fit_results.append(fit_res)
+
+            self.fit_results_dict[label] = fit_res
+            if print_fit_results:
+                print(fit_res.fit_report())
 
         return fit_res
 
     def plot_results(self, fit_res, show_guess=False, art_det=0,
-                     fig=None, ax=None, textbox=True):
+                     fig=None, ax=None, textbox=True, plot_gaussian=False):
 
         self.units = SI_prefix_and_scale_factor( val=max(abs(ax.get_xticks())),
                                             unit=self.sweep_unit[0] )[1] #list
@@ -4275,23 +4312,49 @@ class Ramsey_Analysis(TD_Analysis):
             art_det = art_det[0]
 
         if textbox:
-            textstr = ('$f_{qubit \_ old}$ = %.7g GHz'
-                       % (self.qubit_freq_spec*1e-9) +
-                        '\n$f_{qubit \_ new}$ = %.7g $\pm$ (%.5g) GHz'
-                       % (self.qubit_frequency*1e-9,
-                          fit_res.params['frequency'].stderr*1e-9) +
-                       '\n$\Delta f$ = %.5g $ \pm$ (%.5g) MHz'
+            if plot_gaussian:
+                fit_res_gauss = self.fit_results_dict['gaussian']
+                fit_res_array = [fit_res, fit_res_gauss]
+
+                textstr = ('$f_{qubit \_ old}$ = %.7g GHz'
+                           % (self.qubit_freq_spec*1e-9) +
+                           '\n$f_{qubit \_ new \_ exp}$ = %.7g $\pm$ (%.5g) GHz'
+                           % (self.qubit_frequency*1e-9,
+                              fit_res.params['frequency'].stderr*1e-9) +
+                           '\n$f_{qubit \_ new \_ gauss}$ = %.7g $\pm$ (%.5g) GHz'
+                           % (self.qubit_frequency_gauss *1e-9,
+                              fit_res_gauss.params['frequency'].stderr*1e-9))
+                T2_star_str = ('\n$T_{2,exp}^\star$ = %.6g '
+                               % (fit_res.params['tau'].value*self.scale)  +
+                               self.units + ' $\pm$ (%.6g) '
+                               % (fit_res.params['tau'].stderr*self.scale) +
+                               self.units +
+                               '\n$T_{2,gauss}^\star$ = %.6g '
+                               %(fit_res_gauss.params['tau'].value*self.scale) +
+                               self.units + ' $\pm$ (%.6g) '
+                               %(fit_res_gauss.params['tau'].stderr*self.scale)+
+                               self.units)
+            else:
+                fit_res_array = [fit_res]
+                textstr = ('$f_{qubit \_ old}$ = %.7g GHz'
+                           % (self.qubit_freq_spec*1e-9) +
+                           '\n$f_{qubit \_ new}$ = %.7g $\pm$ (%.5g) GHz'
+                           % (self.qubit_frequency*1e-9,
+                              fit_res.params['frequency'].stderr*1e-9))
+                T2_star_str = ('\n$T_2^\star$ = %.6g '
+                               % (fit_res.params['tau'].value*self.scale)  +
+                               self.units + ' $\pm$ (%.6g) '
+                               % (fit_res.params['tau'].stderr*self.scale) +
+                               self.units)
+
+            textstr += ('\n$\Delta f$ = %.5g $ \pm$ (%.5g) MHz'
                        % ((self.qubit_frequency-self.qubit_freq_spec)*1e-6,
                           fit_res.params['frequency'].stderr*1e-6) +
                        '\n$f_{Ramsey}$ = %.5g $ \pm$ (%.5g) MHz'
                        % (fit_res.params['frequency'].value*1e-6,
-                          fit_res.params['frequency'].stderr*1e-6) +
-                       '\n$T_2^\star$ = %.6g '
-                       % (fit_res.params['tau'].value*self.scale)  +
-                       self.units + ' $\pm$ (%.6g) '
-                       % (fit_res.params['tau'].stderr*self.scale) +
-                       self.units +
-                       '\nartificial detuning = %.2g MHz'
+                          fit_res.params['frequency'].stderr*1e-6))
+            textstr += T2_star_str
+            textstr += ('\nartificial detuning = %.2g MHz'
                        % (art_det*1e-6))
 
             fig.text(0.5, 0, textstr, fontsize=self.font_size,
@@ -4299,25 +4362,39 @@ class Ramsey_Analysis(TD_Analysis):
                      verticalalignment='top',
                      horizontalalignment='center', bbox=self.box_props)
 
-        x = np.linspace(self.sweep_points[0],
-                        self.sweep_points[-self.NoCalPoints-1],
-                        len(self.sweep_points)*100)
+            x = np.linspace(self.sweep_points[0],
+                            self.sweep_points[-self.NoCalPoints-1],
+                            len(self.sweep_points)*100)
 
-        if show_guess:
-            y_init = fit_mods.ExpDampOscFunc(x, **fit_res.init_values)
-            ax.plot(x, y_init, 'k--', linewidth=self.line_width)
+            for i, f_res in enumerate(fit_res_array):
+                if i==1:
+                    color = 'C4'
+                    guess_c = 'C7'
+                    label = 'Gaussian decay'
+                else:
+                    color = 'r'
+                    guess_c = 'k'
+                    label = 'Exponential decay'
 
-        best_vals = fit_res.best_values
-        y = fit_mods.ExpDampOscFunc(
-            x, tau=best_vals['tau'],
-            n=best_vals['n'],
-            frequency=best_vals['frequency'],
-            phase=best_vals['phase'],
-            amplitude=best_vals['amplitude'],
-            oscillation_offset=best_vals['oscillation_offset'],
-            exponential_offset=best_vals['exponential_offset'])
-        ax.plot(x, y, 'r-',linewidth=self.line_width)
+                y = f_res.model.func(x, **f_res.best_values)
+                # best_vals = f_res.best_values
+                #  tau=best_vals['tau'],
+                # n=best_vals['n'],
+                # frequency=best_vals['frequency'],
+                # phase=best_vals['phase'],
+                # amplitude=best_vals['amplitude'],
+                # oscillation_offset=best_vals['oscillation_offset'],
+                # exponential_offset=best_vals['exponential_offset'])
+                ax.plot(x, y, '-', c=color, linewidth=self.line_width,
+                        label=label)
 
+                if show_guess:
+                    # y_init = fit_mods.ExpDampOscFunc(x, **fit_res.init_values)
+                    y_init = f_res.model.func(x, **f_res.init_values)
+                    ax.plot(x, y_init, '--', c=guess_c,
+                            linewidth=self.line_width)
+
+            ax.legend(frameon=False)
 
     def run_default_analysis(self, print_fit_results=False,
                              close_file=False, **kw):
@@ -4368,19 +4445,29 @@ class Ramsey_Analysis(TD_Analysis):
         self.save_computed_parameters({'artificial_detuning':
                                            self.artificial_detuning},
                                       var_name=self.value_names[0])
+
+
         self.save_computed_parameters(self.T2_star,
                                       var_name=self.value_names[0])
+        self.save_computed_parameters(self.T2_star_gauss,
+                                      var_name=(self.value_names[0]+
+                                      ' gaussian decay'))
+
         self.save_computed_parameters({'qubit_freq': self.qubit_frequency},
                                       var_name=self.value_names[0])
+        self.save_computed_parameters({'qubit_freq_gauss':
+                                           self.qubit_frequency_gauss},
+                                      var_name=(self.value_names[0]+
+                                               ' gaussian decay'))
 
         #Print the T2_star values on screen
         unit = self.parameter_units[0][-1]
         if kw.pop('print_parameters', False):
-            print('New qubit frequency = {:.7f} (GHz)'.format(
+            print('New qubit frequency exp = {:.7f} (GHz)'.format(
                 self.qubit_frequency*1e-9) +
                   '\t\tqubit frequency stderr = {:.7f} (MHz)'.format(
                 self.ramsey_freq['freq_stderr']*1e-6)+
-                '\nT2* = {:.5f} '.format(
+                '\nT2* exp = {:.5f} '.format(
                 self.T2_star['T2_star']*self.scale) +'('+'μ'+unit+')'+
                 '\t\tT2* stderr = {:.5f} '.format(
                 self.T2_star['T2_star_stderr']*self.scale) +
@@ -4396,15 +4483,26 @@ class Ramsey_Analysis(TD_Analysis):
         #Perform fit and save fitted parameters
         self.fit_res = self.fit_Ramsey(x=self.sweep_points[:-self.NoCalPoints],
                                        y=self.normalized_data_points, **kw)
-        self.save_fitted_parameters(self.fit_res, var_name=self.value_names[0])
+        self.save_fitted_parameters(self.fit_res,
+                                    var_name=self.value_names[0])
+        self.save_fitted_parameters(self.fit_results_dict['gaussian'],
+                                    var_name=(self.value_names[0]+
+                                              ' gaussian decay'))
         self.get_measured_freq(fit_res=self.fit_res, **kw)
 
         # Calculate new qubit frequency
         self.qubit_frequency = self.qubit_freq_spec + self.artificial_detuning \
                                - self.ramsey_freq['freq']
+        self.qubit_frequency_gauss = self.qubit_freq_spec + \
+                                     self.artificial_detuning - \
+                                     self.fit_results_dict[
+                                         'gaussian'].best_values['frequency']
 
         #Extract T2 star and save it
-        self.get_measured_T2_star(fit_res=self.fit_res, **kw)
+        self.T2_star = self.get_measured_T2_star(fit_res=self.fit_res, **kw)
+        self.T2_star_gauss = \
+            self.get_measured_T2_star(
+                fit_res=self.fit_results_dict['gaussian'], **kw)
         # the call above defines self.T2_star as a dict; units are seconds
 
         self.total_detuning = self.fit_res.params['frequency'].value
@@ -4415,17 +4513,20 @@ class Ramsey_Analysis(TD_Analysis):
             #Plot results
             show_guess = kw.pop('show_guess', False)
             show = kw.pop('show', False)
+            plot_gaussian = kw.pop('plot_gaussian', True)
             self.plot_results(self.fit_res, show_guess=show_guess,
                               art_det=self.artificial_detuning,
-                              fig=self.fig, ax=self.ax)
+                              fig=self.fig, ax=self.ax,
+                              plot_gaussian=plot_gaussian)
 
             #dispaly figure
             if show:
                 plt.show()
 
             #save figure
-            self.save_fig(self.fig, figname=self.measurementstring+'_Ramsey_fit',
-                          **kw)
+            fig_name_suffix = kw.pop('fig_name_suffix', 'Ramsey_fit')
+            self.save_fig(self.fig, figname=(self.measurementstring+'_'+
+                                             fig_name_suffix), **kw)
 
     def two_art_dets_analysis(self, **kw):
 
@@ -4493,7 +4594,7 @@ class Ramsey_Analysis(TD_Analysis):
             qb_stderr = ramsey_freq_dict_2['freq_stderr']
 
         #Extract T2 star and save it
-        self.get_measured_T2_star(fit_res=self.fit_res, **kw)  #defines self.T2_star as a dict;
+        self.T2_star = self.get_measured_T2_star(fit_res=self.fit_res, **kw)
         # units are seconds
 
         ################
@@ -4569,8 +4670,9 @@ class Ramsey_Analysis(TD_Analysis):
                 plt.show()
 
             #save figure
-            self.save_fig(self.fig, figname=self.measurementstring+'_Ramsey_fit',
-                          **kw)
+            fig_name_suffix = kw.pop('fig_name_suffix', 'Ramsey_fit')
+            self.save_fig(self.fig, figname=(self.measurementstring+
+                                            '_'+fig_name_suffix), **kw)
 
 
     def get_measured_freq(self, fit_res, **kw):
@@ -4589,9 +4691,9 @@ class Ramsey_Analysis(TD_Analysis):
         T2 = fit_res.params['tau'].value
         T2_stderr = fit_res.params['tau'].stderr
 
-        self.T2_star = {'T2_star':T2, 'T2_star_stderr':T2_stderr}
+        T2_star = {'T2_star':T2, 'T2_star_stderr':T2_stderr}
 
-        return self.T2_star
+        return T2_star
 
 
 class DragDetuning_Analysis(TD_Analysis):

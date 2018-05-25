@@ -745,8 +745,8 @@ class QuDev_transmon(Qubit):
                                    qb_name=self.name)
 
     def measure_rabi(self, amps=None, MC=None, analyze=True,
-                     close_fig=True, cal_points=True, no_cal_points=2,
-                     upload=True, label=None,  n=1):
+             close_fig=True, cal_points=True, no_cal_points=2,
+             upload=True, label=None,  n=1):
 
         """
         Varies the amplitude of the qubit drive pulse and measures the readout
@@ -2753,7 +2753,7 @@ class QuDev_transmon(Qubit):
                                          gate_decomp=gate_decomposition,
                                          last_ge_pulse=last_ge_pulse, **kw)
 
-        return
+        return RB_Analysis
 
     def find_frequency_T2_ramsey(self, times, artificial_detuning=0,
                                  upload=True, MC=None, label=None,
