@@ -77,7 +77,7 @@ class VirtualAWG8(Instrument):
                     docstring=docst)
                 self._params_to_skip_update.append(parname)
 
-    def upload_codeword_program(self):
+    def upload_codeword_program(self, awgs=np.arange(4)):
         pass
 
     def stop(self):
