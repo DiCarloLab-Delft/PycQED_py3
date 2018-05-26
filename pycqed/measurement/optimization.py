@@ -3,6 +3,7 @@ import math
 import logging
 import numpy as np
 
+from neupy.algorithms import GRNN as grnn
 from sklearn.model_selection import GridSearchCV as gcv, train_test_split
 from sklearn.neural_network import MLPRegressor as mlpr
 import tensorflow as tf
@@ -264,15 +265,15 @@ def center_and_scale(X,y):
 
     for it in range(np.size(X,1)):
         input_feature_means[it]= np.mean(X[:,it])
+        X[:,it] -= input_feature_means[it]  #offset to mean 0
         input_feature_ext[it] = np.max(X[:,it]) \
                                 -np.min(X[:,it])
-        X[:,it] -= input_feature_means[it]  #offset to mean 0
         X[:,it] /= input_feature_ext[it]    #rescale to [-1,1]
     for it in range(y.ndim):
         output_feature_means[it]= np.mean(y)
+        y -= output_feature_means[it] #offset to mean 0
         output_feature_ext[it] = np.max(y) \
                                  -np.min(y)
-        y -= output_feature_means[it] #offset to mean 0
         y /= output_feature_ext[it]   #rescale to [-1,1]
 
     return X,y,input_feature_means,input_feature_ext,\
@@ -281,7 +282,7 @@ def center_and_scale(X,y):
 
 def neural_network_opt(fun,training_grid, hidden_layer_sizes = [(5,)],
                        alphas= 0.0001, solver='lbfgs',estimator='MLPRegressor',
-                       iters = 200):
+                       iters = 200, beta=1.,gamma=1.):
     """
     parameters:
         fun: Function to be optimized. So far this is only an optimization for
@@ -339,7 +340,7 @@ def neural_network_opt(fun,training_grid, hidden_layer_sizes = [(5,)],
 
     ##################################################################
     ### initialize grid search cross val with hyperparameter dict. ###
-    ###    and MLPR instance and fit a model function to fun()     ###
+    ###    and MLPR instance and fit a model functione to fun()     ###
     ##################################################################
     def mlpr():
         est = MLP_Regressor_scikit(hidden_layers=hidden_layer_sizes,
@@ -355,12 +356,20 @@ def neural_network_opt(fun,training_grid, hidden_layer_sizes = [(5,)],
                                output_dim=output_dim,
                                n_feature=inputsize,
                                alpha=alphas,
-                               iters = iters)
+                               iters = iters,
+                               beta = beta)
         est.fit(training_grid,target_values)
         return est
 
+    def grnn():
+        est = GRNN_neupy(gamma=gamma)
+        est.fit(training_grid,target_values)
+        return est
+
+
     estimators = {'MLP_Regressor_scikit': mlpr, #defines all current estimators currently implemented
-                  'DNN_Regressor_tf': dnnr}
+                  'DNN_Regressor_tf': dnnr,
+                  'GRNN_neupy': grnn}
 
     est = estimators[estimator]()       #create and fit instance of the chosen estimator
     ###################################################################
@@ -448,6 +457,10 @@ class MLP_Regressor_scikit:
         print("Best CV score of ANN: "+str(self.score))
 
 class DNN_Regressor_tf:
+    '''
+        alpha: learning rate for gradient descent
+        beta: L1 regression multiplier. 0. --> regression disabled
+    '''
     def __init__(self, hidden_layers=[10],output_dim=1, alpha = 0.5,
                  beta=1., n_feature = 1, iters = 200):
 
@@ -466,6 +479,8 @@ class DNN_Regressor_tf:
     def network(self, x):
         x = tf.cast(x,tf.float32)
         hidden = []
+        regularizer = tf.contrib.layers.l1_regularizer(self.beta)
+        reg_terms = []
         #input layer. Input does not need to be transformed as we are regressing
         with tf.name_scope("input"):
             weights = tf.Variable(tf.truncated_normal([self._n_feature, self._hidden_layers[0]],
@@ -474,6 +489,7 @@ class DNN_Regressor_tf:
                                                       name='weights')
             biases = tf.Variable(tf.zeros([self._hidden_layers[0]]), name='biases')
             input_ = tf.matmul(x, weights) + biases
+            reg_terms.append(tf.contrib.layers.apply_regularization(regularizer,[weights,biases]))
 
         #hidden layers
         for ind, size in enumerate(self._hidden_layers):
@@ -484,30 +500,17 @@ class DNN_Regressor_tf:
                 biases = tf.Variable(tf.zeros([self._hidden_layers[ind+1]]), name='biases')
                 inputs = input_ if ind == 0 else hidden[ind-1]
                 hidden.append(tf.nn.relu(tf.matmul(inputs,weights)+biases,name="hidden{}".format(ind+1)))
-        #output layer
+                reg_terms.append(tf.contrib.layers.apply_regularization(regularizer,[weights,biases]))
+
+    #output layer
         with tf.name_scope("output"):
             weights =  tf.Variable(tf.truncated_normal([self._hidden_layers[-1],self._output_dim],
                                                        stddev=self.get_stddev(self._hidden_layers[-1],self._output_dim)),name='weights')
             biases = tf.Variable(tf.zeros([self._output_dim]),name='biases')
             logits = tf.matmul(hidden[-1],weights)+biases               #regression model. Select linear act. fct.
+            reg_terms.append(tf.contrib.layers.apply_regularization(regularizer,[weights,biases]))
 
-        return logits
-
-    def wrapper(self,opt_var=None):
-        x = tf.placeholder(tf.float32,[None,self._n_feature])
-        out = self.network(x)
-        return self._session.run(out, feed_dict={x: opt_var})
-
-    def drill(self,x_ini):
-        wrapper2 = lambda opt_var: self.wrapper(np.reshape(np.array(opt_var),(1,self._n_feature)))
-        min_val = fmin(wrapper2,x_ini, full_output=True)
-        return tf.convert_to_tensor(min_val[1])
-
-    def loss(self,logits,y):
-        y=tf.cast(y,tf.float32)
-        diff = y-logits
-        norm_diff = tf.norm(diff) #+ self.beta*tf.square(self.drill([0.]*self._n_feature))
-        return norm_diff #/tf.cast(tf.shape(y)[0],tf.float32)
+        return logits, reg_terms
 
     def fit(self,x_train=None,y_train=None):
         if x_train is not None:
@@ -515,8 +518,8 @@ class DNN_Regressor_tf:
                             're-training estimator on new input data!')
         x = tf.placeholder(tf.float32, [None, self._n_feature])
         y = tf.placeholder(tf.float32, [None, self._output_dim])
-        logits = self.network(x)
-        loss = self.loss(logits,y) # +self.beta*tf.square(self.drill([0.]*self._n_feature))
+        logits ,reg_terms = self.network(x)
+        loss = self.loss(logits,y) + reg_terms
         train_op = tf.train.GradientDescentOptimizer(self.alpha).minimize(loss)
 
         self._x = x
@@ -553,6 +556,51 @@ class DNN_Regressor_tf:
     def predict(self, samples):
         predictions = self._logits
         return self._session.run(predictions, {self._x: [samples]})
+
+class GRNN_neupy:
+    '''
+    Generalized Regression Neural Network implementation from neupy
+        gamma: scaling factor for the standard dev. input.
+               1.--> use std (or -if None- the regular std dev of the input data)
+    '''
+    def __init__(self,std=None,gamma=1.,verbose =False):
+        self._std = std
+        self._gamma = gamma
+        self._verbose = verbose
+        self.score = None
+        self._grnn = None
+
+    def fit(self,x_train,y_train):
+        if not isinstance(x_train,np.ndarray):
+            x_train = np.array(x_train)
+            if x_train.ndim == 1:
+                x_train.reshape((np.size(x_train),x_train.ndim))
+        if not isinstance(y_train,np.ndarray):
+            y_train = np.array(y_train)
+            if y_train.ndim == 1:
+                y_train.reshape((np.size(y_train),y_train.ndim))
+        if self._std is None:
+            std_x = 0.
+            for it in x_train.ndim:
+                std_x+= np.std(x_train[:,it])
+            std_x = self._gamma*std_x/x_train.ndim
+            self._std = std_x
+        self._grnn = grnn(self._std)
+        self._grnn.train(x_train,y_train)
+
+    def predict(self,samples):
+
+        if not isinstance(samples,np.ndarray):
+            x_train = np.array(samples)
+        return self._grnn.predict(samples)
+
+    def evaluate(self,x,y):
+
+        pred = self._grnn.predict(x)
+        acc = 1. - np.linalg.norm(pred-y)**2  \
+                   /np.linalg.norm(y-np.mean(y,axis=0))
+        return acc
+
 
 
 def gradient(fun,x,grid_spacing):
