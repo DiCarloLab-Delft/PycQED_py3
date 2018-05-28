@@ -1,4 +1,5 @@
 import lmfit
+from copy import deepcopy
 from pycqed.analysis import analysis_toolbox as a_tools
 from collections import OrderedDict
 from pycqed.analysis import measurement_analysis as ma_old
@@ -74,6 +75,39 @@ class RandomizedBenchmarking_SingleQubit_Analyasis(ba.BaseDataAnalysis):
         self.raw_data_dict['timestamps'] = self.timestamps
         a.finish() # closes data file
 
+    def process_data(self):
+        self.proc_data_dict = deepcopy(self.raw_data_dict)
+
+
+        for key in ['V0', 'V1', 'V2', 'SI', 'SX', 'P0', 'P1', 'P2', 'M_inv']:
+            self.proc_data_dict[key] = OrderedDict()
+
+        for val_name in self.raw_data_dict['value_names']:
+            V0 = np.mean(
+                self.raw_data_dict['cal_pts_zero'][val_name])
+            V1 = np.mean(
+                self.raw_data_dict['cal_pts_one'][val_name])
+            V2 = np.mean(
+                self.raw_data_dict['cal_pts_two'][val_name])
+
+            self.proc_data_dict['V0'][val_name] =V0
+            self.proc_data_dict['V1'][val_name] =V1
+            self.proc_data_dict['V2'][val_name] =V2
+
+            SI = np.mean(
+                self.raw_data_dict['measured_values_I'][val_name], axis=1)
+            SX = np.mean(
+                self.raw_data_dict['measured_values_X'][val_name], axis=1)
+            self.proc_data_dict['SI'][val_name] = SI
+            self.proc_data_dict['SX'][val_name] = SX
+
+            P0, P1, P2, M_inv = populations_using_rate_equations(
+                SI, SX, V0, V1, V2)
+            self.proc_data_dict['P0'][val_name] = P0
+            self.proc_data_dict['P1'][val_name] = P1
+            self.proc_data_dict['P2'][val_name] = P2
+            self.proc_data_dict['M_inv'][val_name] = M_inv
+
     def prepare_plots(self):
         val_names = self.raw_data_dict['value_names']
 
@@ -91,9 +125,8 @@ class RandomizedBenchmarking_SingleQubit_Analyasis(ba.BaseDataAnalysis):
             }
 
         fs = plt.rcParams['figure.figsize']
-
         self.plot_dicts['cal_points_hexbin'] = {
-            'plotfn':plot_cal_points_scatter,
+            'plotfn':plot_cal_points_hexbin,
             'shots_0': (self.raw_data_dict['cal_pts_zero'][val_names[0]],
                         self.raw_data_dict['cal_pts_zero'][val_names[1]]),
             'shots_1': (self.raw_data_dict['cal_pts_one'][val_names[0]],
@@ -104,9 +137,28 @@ class RandomizedBenchmarking_SingleQubit_Analyasis(ba.BaseDataAnalysis):
             'xunit': self.raw_data_dict['value_units'][0],
             'ylabel': val_names[1],
             'yunit': self.raw_data_dict['value_units'][1],
-            'title':self.raw_data_dict['timestamp_string']+'\n'+self.raw_data_dict['measurementstring'],
+            'title':self.raw_data_dict['timestamp_string']+'\n'+self.raw_data_dict['measurementstring'] +' hexbin plot',
             'plotsize':(fs[0]*1.5, fs[1])
             }
+
+
+        for i, val_name in enumerate(val_names):
+            self.plot_dicts['raw_RB_curve_data_{}'.format(val_name)] = {
+                    'plotfn': plot_raw_RB_curve,
+                    'ncl': self.proc_data_dict['ncl'],
+                    'SI': self.proc_data_dict['SI'][val_name],
+                    'SX': self.proc_data_dict['SX'][val_name],
+                    'V0': self.proc_data_dict['V0'][val_name],
+                    'V1': self.proc_data_dict['V1'][val_name],
+                    'V2': self.proc_data_dict['V2'][val_name],
+
+                    'xlabel': 'Number of Cliffrods',
+                    'xunit': '#',
+                    'ylabel': val_name,
+                    'yunit': self.proc_data_dict['value_units'][i],
+                'title': self.proc_data_dict['timestamp_string']+'\n'+self.proc_data_dict['measurementstring'],
+            }
+
 
 
 class InterleavedTwoQubitRB_Analyasis(ba.BaseDataAnalysis):
@@ -164,7 +216,7 @@ class InterleavedTwoQubitRB_Analyasis(ba.BaseDataAnalysis):
             'plotfn': self.dac_arc_ana.plot_ffts,
             'title':"Cryoscope arc \n"+self.timestamps[0]+' - '+self.timestamps[-1]}
 
-def plot_cal_points_scatter(shots_0,
+def plot_cal_points_hexbin(shots_0,
                             shots_1,
                             shots_2,
                             xlabel:str, xunit:str,
@@ -198,20 +250,32 @@ def plot_cal_points_scatter(shots_0,
     set_ylabel(ax, ylabel, yunit)
     ax.set_title(title)
 
+def plot_raw_RB_curve(ncl, SI, SX, V0, V1, V2, title, ax,
+                      xlabel, xunit, ylabel, yunit,**kw):
+    ax.plot(ncl,SI, label='SI', marker='o')
+    ax.plot(ncl,SX, label='SX', marker='o')
+    ax.plot(ncl[-1]+.5, V0, label='V0', marker='o', c='C0')
+    ax.plot(ncl[-1]+1.5, V1, label='V1', marker='o', c='C1')
+    ax.plot(ncl[-1]+2.5, V2, label='V2', marker='o', c='C2')
+    ax.set_title(title)
+    set_xlabel(ax, xlabel, xunit)
+    set_ylabel(ax, ylabel, yunit)
+    ax.legend()
 
 
 
-def populations_using_rate_equations(S0:float , SX:float ,
+
+def populations_using_rate_equations(SI:np.array , SX:np.array ,
                                      V0:float , V1:float , V2:float):
     """
     Args:
-        S0 (float):
-        SX (float):
+        SI (float): signal value for signal with I (Identity) added
+        SX (float): signal value for signal with X (π-pulse) added
         V0 (float):
         V1 (float):
         V2 (float):
 
-    Based on equation (S1) from Asaad & Dickel et al. (2016)
+    Based on equation (S1) from Asaad & Dickel et al. npj Quant. Info. (2016)
 
     To quantify leakage, we monitor the populations Pi of the three lowest
     energy states (i ∈ {0, 1, 2}) and calculate the average
@@ -228,4 +292,15 @@ def populations_using_rate_equations(S0:float , SX:float ,
     M =np.array([[V0-V2, V1-V2], [V1-V2, V0-V2]])
     M_inv = np.linalg.inv(M)
 
+    P0 = np.zeros(len(SI))
+    P1 = np.zeros(len(SX))
+    for i, (sI, sX) in enumerate(zip(SI, SX)):
+        p0, p1 = np.dot(np.array([sI-V2, sX-V2]), M_inv)
+        p0, p1 = np.dot(M_inv, np.array([sI-V2, sX-V2]))
+        P0[i] = p0
+        P1[i] = p1
+
+    P2 = 1- P0 - P1
+
+    return P0, P1, P2, M_inv
 
