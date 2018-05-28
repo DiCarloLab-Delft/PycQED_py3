@@ -32,6 +32,8 @@ import pycqed.analysis_v2.quantum_efficiency_analysis as qea
 reload(qea)
 import pycqed.analysis_v2.cross_dephasing_analysis as cda
 reload(cda)
+import  pycqed.analysis_v2.randomized_benchmarking_analysis as rba
+reload(rba)
 
 
 from pycqed.analysis_v2.base_analysis import *
@@ -59,3 +61,4 @@ from pycqed.analysis_v2.spectroscopy_analysis import Spectroscopy, ResonatorSpec
 from pycqed.analysis_v2.dac_scan_analysis import FluxFrequency
 from pycqed.analysis_v2.quantum_efficiency_analysis import QuantumEfficiencyAnalysis, DephasingAnalysisSingleScans, DephasingAnalysisSweep, SSROAnalysisSingleScans, SSROAnalysisSweep, QuantumEfficiencyAnalysisTWPA
 from pycqed.analysis_v2.cross_dephasing_analysis import CrossDephasingAnalysis
+from pycqed.analysis_v2.randomized_benchmarking_analysis import RandomizedBenchmarking_SingleQubit_Analyasis
