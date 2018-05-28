@@ -556,8 +556,6 @@ class Test_MeasurementControl(unittest.TestCase):
         self.assertLess(yf, 0.7)
         self.assertLess(pf, 0.7)
 
-    @unittest.expectedFailure('see issue #58 of addaptive')
-    # Using 0.4.0dev version works
     def test_adaptive_sampling(self):
         self.MC.soft_avg(1)
         self.mock_parabola.noise(0)
