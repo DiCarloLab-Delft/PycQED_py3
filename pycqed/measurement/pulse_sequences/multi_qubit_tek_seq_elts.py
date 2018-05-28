@@ -12,7 +12,6 @@ import pycqed.measurement.waveform_control.fluxpulse_predistortion as \
 from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import \
     get_pulse_dict_from_pars
 import pycqed.instrument_drivers.meta_instrument.device_object as device
-
 station = None
 kernel_dir = 'kernels/'
 # You need to explicitly set this before running any functions from this module

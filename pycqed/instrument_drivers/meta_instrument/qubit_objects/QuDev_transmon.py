@@ -1683,7 +1683,7 @@ class QuDev_transmon(Qubit):
             self.get_RO_pars(),
             amplitude=amplitude, nr_averages=self.RO_acq_averages(),
             RO_trigger_separation=trigger_sep, verbose=False,
-            data_points= len(meas_grid[0]))
+            data_points= len(meas_grid))
         ad_func_pars = {'adaptive_function': opti.neural_network_opt,
                         'training_grid': meas_grid,
                         'hidden_layer_sizes': [(h, h) for h in range(35,50,5)],

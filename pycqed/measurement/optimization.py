@@ -3,7 +3,7 @@ import math
 import logging
 import numpy as np
 
-from neupy.algorithms import GRNN as grnn
+#from neupy.algorithms import GRNN as grnn
 from sklearn.model_selection import GridSearchCV as gcv, train_test_split
 from sklearn.neural_network import MLPRegressor as mlpr
 import tensorflow as tf
@@ -315,23 +315,25 @@ def neural_network_opt(fun,training_grid, hidden_layer_sizes = [(5,)],
     if not isinstance(alphas,list):
         alphas = [alphas]
     #transform input into array
-    #training_grid = np.array(training_grid)
+    training_grid = np.array(training_grid)
     #get input dimension, training grid contains parameters as row!! vectors
-
-    inputsize = len(training_grid[0])
-    datasize = len(training_grid)
-    target_values = []
+    n_samples = np.size(training_grid,0)
+    n_features = np.size(training_grid,1)
     ################### not used atm ##################################
     #Acquire first data point for output dim information of fun()
     fun_val = fun(training_grid[0,:])
-    output_dim = len(fun_val)
-    target_values = np.zeros((datasize,output_dim))
+
+    if hasattr(fun_val,'__len__'):      #test if fun_val is a collection or scalar
+        output_dim = np.array(fun_val).ndim
+    else: output_dim = 1                #if Scalar output_dim is for sure 1
+
+    target_values = np.zeros((n_samples,output_dim))
     target_values[0,:] = fun_val
     #consequetly, start iteration at 2nd input value
-    for it in range(1,datasize):
+    for it in range(1,n_samples):
         target_values[it,:] = fun(training_grid[it,:])
     ####################################################################
-
+    print()
     #Preprocessing of Data. Mainly transform the data to mean 0 and interval [0,1]
     training_grid,target_values,\
     input_feature_means,input_feature_ext,\
@@ -345,7 +347,7 @@ def neural_network_opt(fun,training_grid, hidden_layer_sizes = [(5,)],
     def mlpr():
         est = MLP_Regressor_scikit(hidden_layers=hidden_layer_sizes,
                                    output_dim=output_dim,
-                                   n_feature=inputsize,
+                                   n_feature=n_samples,
                                    alpha=alphas)
         est.fit(training_grid, target_values)
         est.print_best_params()
@@ -354,7 +356,7 @@ def neural_network_opt(fun,training_grid, hidden_layer_sizes = [(5,)],
     def dnnr():
         est = DNN_Regressor_tf(hidden_layers=hidden_layer_sizes,
                                output_dim=output_dim,
-                               n_feature=inputsize,
+                               n_feature=n_samples,
                                alpha=alphas,
                                iters = iters,
                                beta = beta)
@@ -375,7 +377,7 @@ def neural_network_opt(fun,training_grid, hidden_layer_sizes = [(5,)],
     ###################################################################
     ###     perform gradient descent to minimize modeled landscape  ###
     ###################################################################
-    x_ini = np.zeros(inputsize)
+    x_ini = np.zeros(n_features)
     res = fmin(est.predict, x_ini, full_output=True)
     result = res[0]
     #Rescale values
@@ -424,10 +426,10 @@ class MLP_Regressor_scikit:
         self.alpha = alpha
         self.activation = activation
         self.mlpr_ = mlpr(solver='lbfgs')
-        self.parameter_dict = {'hidden_layer_sizes': self.hidden_layers,
+        self.parameter_dict = {'hidden_layer_sizes': self._hidden_layers,
                           'alpha': self.alpha,
                           'activation': self.activation}
-        self.gridCV = gcv(self.mlpr_nn,self.parameter_dict,cv=5)
+        self.gridCV = gcv(self.mlpr_,self.parameter_dict,cv=5)
         self.train_input = None
         self.train_valid = None
         self.bestParams = None
