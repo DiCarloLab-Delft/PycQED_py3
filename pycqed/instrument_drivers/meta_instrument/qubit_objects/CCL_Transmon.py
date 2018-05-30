@@ -133,7 +133,7 @@ class CCLight_Transmon(Qubit):
                            parameter_class=ManualParameter)
         self.add_parameter('ro_pulse_amp', unit='V',
                            label='Readout pulse amplitude',
-                           initial_value=1,
+                           initial_value=0.1,
                            parameter_class=ManualParameter)
         self.add_parameter('ro_pulse_phi', unit='deg', initial_value=0,
                            parameter_class=ManualParameter)
@@ -400,7 +400,7 @@ class CCLight_Transmon(Qubit):
                 '"vsm_gated":  uses the  VSM in external mode to gate the spec '
                 'source. \n '
                 '"IQ" uses the TD source and AWG8 to generate a spec pulse'),
-            initial_value='vsm_gated',
+            initial_value='CW',
             vals=vals.Enum('CW', 'IQ', 'vsm_gated'))
 
         self.add_parameter(
