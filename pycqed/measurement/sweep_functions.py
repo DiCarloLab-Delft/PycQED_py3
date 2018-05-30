@@ -131,6 +131,8 @@ class Heterodyne_Frequency_Sweep_simple(Soft_Sweep):
     def set_parameter(self, val):
         # RF = LO + IF
         self.MW_LO_source.frequency(val-self.IF)
+        # retrieve paramter to ensure setting  is complete.
+        self.MW_LO_source.frequency()
 
 
 class None_Sweep(Soft_Sweep):
