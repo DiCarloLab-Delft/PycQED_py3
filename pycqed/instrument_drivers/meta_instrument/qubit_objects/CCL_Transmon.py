@@ -2293,9 +2293,9 @@ class CCLight_Transmon(Qubit):
         self.prepare_for_timedomain()
         p = sqo.flipping(number_of_flips=nf, equator=equator,
                          qubit_idx=self.cfg_qubit_nr(),
-                         unit='#',
                          platf_cfg=self.cfg_openql_platform_fn())
         s = swf.OpenQL_Sweep(openql_program=p,
+                             unit='#',
                              CCL=self.instr_CC.get_instr())
         d = self.int_avg_det
         MC.set_sweep_function(s)
@@ -2396,7 +2396,7 @@ class CCLight_Transmon(Qubit):
             programs.append(p)
         if verbose:
             print('Succesfully generated {} RB programs in {:.1f}s'.format(
-                nr_seeds*len(grouped_nr_cliffords), time.time()-t0))
+                nr_seeds, time.time()-t0))
 
         prepare_function_kwargs = {
             'counter_param': counter_param,
