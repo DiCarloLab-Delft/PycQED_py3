@@ -11,3 +11,4 @@ adaptive
 hsluv
 autodepgraph
 networkx
+scikit-learn
