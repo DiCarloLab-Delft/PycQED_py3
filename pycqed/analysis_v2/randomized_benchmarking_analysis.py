@@ -8,20 +8,29 @@ import pycqed.analysis_v2.base_analysis as ba
 import pycqed.measurement.waveform_control_CC.waveform as wf
 import pycqed.analysis.fitting_models as fit_mods
 import numpy as np
+import logging
 from numpy.fft import fft, ifft, fftfreq
 from scipy.stats import sem
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 import matplotlib.pyplot as plt
 import matplotlib.pylab as pl
 from matplotlib.colors import ListedColormap
+from sklearn import linear_model
+import time
+from matplotlib import colors as c
 
 class RandomizedBenchmarking_SingleQubit_Analyasis(ba.BaseDataAnalysis):
     def __init__(self, t_start: str=None, t_stop: str=None, label='',
-                 options_dict: dict=None,auto=True, close_figs=True):
+                 options_dict: dict=None, auto=True, close_figs=True,
+                 classification_method='rates'):
         if options_dict is None:
             options_dict = dict()
         super().__init__(t_start=t_start, t_stop=t_stop, label=label,
-                         options_dict=options_dict, close_figs=close_figs)
+                         options_dict=options_dict, close_figs=close_figs,
+                         do_fitting=True)
+        # used to determine how to determine 2nd excited state population
+        self.classification_method = classification_method
+
         if auto:
             self.run_analysis()
 
@@ -32,10 +41,11 @@ class RandomizedBenchmarking_SingleQubit_Analyasis(ba.BaseDataAnalysis):
         self.raw_data_dict = OrderedDict()
 
         self.timestamps = a_tools.get_timestamps_in_range(
-                self.t_start, self.t_stop,
-                label=self.labels)
+            self.t_start, self.t_stop,
+            label=self.labels)
 
-        a = ma_old.MeasurementAnalysis(timestamp=self.timestamps[0], auto=False, close_file=False)
+        a = ma_old.MeasurementAnalysis(
+            timestamp=self.timestamps[0], auto=False, close_file=False)
         a.get_naming_and_values()
 
         if 'bins' in a.data_file['Experimental Data']['Experimental Metadata'].keys():
@@ -46,38 +56,38 @@ class RandomizedBenchmarking_SingleQubit_Analyasis(ba.BaseDataAnalysis):
             self.raw_data_dict['value_names'] = a.value_names
             self.raw_data_dict['value_units'] = a.value_units
             self.raw_data_dict['measurementstring'] = a.measurementstring
-            self.raw_data_dict['timestamp_string'] =a.timestamp_string
+            self.raw_data_dict['timestamp_string'] = a.timestamp_string
 
-            self.raw_data_dict['binned_vals']=OrderedDict()
+            self.raw_data_dict['binned_vals'] = OrderedDict()
             self.raw_data_dict['cal_pts_zero'] = OrderedDict()
             self.raw_data_dict['cal_pts_one'] = OrderedDict()
             self.raw_data_dict['cal_pts_two'] = OrderedDict()
             self.raw_data_dict['measured_values_I'] = OrderedDict()
             self.raw_data_dict['measured_values_X'] = OrderedDict()
             for i, val_name in enumerate(a.value_names):
-                binned_yvals = np.reshape(a.measured_values[i], (len(bins), -1), order='F')
+                binned_yvals = np.reshape(
+                    a.measured_values[i], (len(bins), -1), order='F')
                 self.raw_data_dict['binned_vals'][val_name] = binned_yvals
                 self.raw_data_dict['cal_pts_zero'][val_name] =\
-                     binned_yvals[-6:-4, :].flatten()
+                    binned_yvals[-6:-4, :].flatten()
                 self.raw_data_dict['cal_pts_one'][val_name] =\
-                     binned_yvals[-4:-2, :].flatten()
+                    binned_yvals[-4:-2, :].flatten()
                 self.raw_data_dict['cal_pts_two'][val_name] =\
-                     binned_yvals[-2:, :].flatten()
+                    binned_yvals[-2:, :].flatten()
                 self.raw_data_dict['measured_values_I'][val_name] =\
-                     binned_yvals[:-6:2, :]
+                    binned_yvals[:-6:2, :]
                 self.raw_data_dict['measured_values_X'][val_name] =\
-                     binned_yvals[1:-6:2, :]
+                    binned_yvals[1:-6:2, :]
 
         else:
             bins = None
 
         self.raw_data_dict['folder'] = a.folder
         self.raw_data_dict['timestamps'] = self.timestamps
-        a.finish() # closes data file
+        a.finish()  # closes data file
 
     def process_data(self):
         self.proc_data_dict = deepcopy(self.raw_data_dict)
-
 
         for key in ['V0', 'V1', 'V2', 'SI', 'SX', 'P0', 'P1', 'P2', 'M_inv']:
             self.proc_data_dict[key] = OrderedDict()
@@ -90,9 +100,9 @@ class RandomizedBenchmarking_SingleQubit_Analyasis(ba.BaseDataAnalysis):
             V2 = np.mean(
                 self.raw_data_dict['cal_pts_two'][val_name])
 
-            self.proc_data_dict['V0'][val_name] =V0
-            self.proc_data_dict['V1'][val_name] =V1
-            self.proc_data_dict['V2'][val_name] =V2
+            self.proc_data_dict['V0'][val_name] = V0
+            self.proc_data_dict['V1'][val_name] = V1
+            self.proc_data_dict['V2'][val_name] = V2
 
             SI = np.mean(
                 self.raw_data_dict['measured_values_I'][val_name], axis=1)
@@ -108,25 +118,90 @@ class RandomizedBenchmarking_SingleQubit_Analyasis(ba.BaseDataAnalysis):
             self.proc_data_dict['P2'][val_name] = P2
             self.proc_data_dict['M_inv'][val_name] = M_inv
 
+
+        classifier = logisticreg_classifier_machinelearning(
+            self.proc_data_dict['cal_pts_zero'],
+            self.proc_data_dict['cal_pts_one'],
+            self.proc_data_dict['cal_pts_two'])
+        self.proc_data_dict['classifier'] = classifier
+
+        if self.classification_method == 'rates':
+            # Hacky default to 2nd channel FIXME
+            self.proc_data_dict['M0'] = self.proc_data_dict['P0'][val_name]
+            self.proc_data_dict['X1'] = 1-self.proc_data_dict['P2'][val_name]
+        else:
+            raise NotImplementedError()
+
+
+    def run_fitting(self):
+        super().run_fitting()
+
+        leak_mod = lmfit.Model(leak_decay, independent_vars='m')
+        leak_mod.set_param_hint('A', value=.95, min=0, vary=True)
+        leak_mod.set_param_hint('B', value=.1, min=0, vary=True)
+
+        leak_mod.set_param_hint('lambda_1', value=.99, vary=True)
+        leak_mod.set_param_hint('L1', expr='(1-A)*(1-lambda_1)')
+        leak_mod.set_param_hint('L2', expr='A*(1-lambda_1)')
+        params = leak_mod.make_params()
+        try:
+            fit_res_leak = leak_mod.fit(data=self.proc_data_dict['X1'],
+                                  m=self.proc_data_dict['ncl'],
+                                  params=params)
+            self.fit_res['leakage_decay']= fit_res_leak
+            lambda_1 = fit_res_leak.best_values['lambda_1']
+        except Exception as e :
+            logging.warning("Fitting failed")
+            logging.warning(e)
+            lambda_1 = 1
+
+            self.fit_res['leakage_decay'] = {}
+
+
+        fit_mod_rb = lmfit.Model(full_rb_decay, independent_vars='m')
+        fit_mod_rb.set_param_hint('A', value=.5, min=0, vary=True)
+        fit_mod_rb.set_param_hint('B', value=.1, min=0, vary=True)
+        fit_mod_rb.set_param_hint('C', value=.4, min=0,max=1, vary=True)
+
+        fit_mod_rb.set_param_hint('lambda_1', value=lambda_1, vary=False)
+        fit_mod_rb.set_param_hint('lambda_2', value=.95, vary=True)
+
+        params = fit_mod_rb.make_params()
+        try:
+            fit_res_rb = fit_mod_rb.fit(data=self.proc_data_dict['M0'],
+                                  m=self.proc_data_dict['ncl'],
+                                  params=params)
+
+            self.fit_res['rb_decay'] = fit_res_rb
+        except Exception as e :
+            logging.warning("Fitting failed")
+            logging.warning(e)
+            lambda_1 = 1
+
+
+            self.fit_res['rb_decay'] = {}
+
+
+
     def prepare_plots(self):
         val_names = self.raw_data_dict['value_names']
 
         for i, val_name in enumerate(val_names):
             self.plot_dicts['binned_data_{}'.format(val_name)] = {
-                    'plotfn': self.plot_line,
-                    'xvals': self.raw_data_dict['bins'],
-                    'yvals': np.mean(self.raw_data_dict['binned_vals'][val_name], axis=1),
-                    'yerr':  sem(self.raw_data_dict['binned_vals'][val_name], axis=1) ,
-                    'xlabel': 'Number of Cliffrods',
-                    'xunit': '#',
-                    'ylabel': val_name,
-                    'yunit': self.raw_data_dict['value_units'][i],
+                'plotfn': self.plot_line,
+                'xvals': self.raw_data_dict['bins'],
+                'yvals': np.mean(self.raw_data_dict['binned_vals'][val_name], axis=1),
+                'yerr':  sem(self.raw_data_dict['binned_vals'][val_name], axis=1),
+                'xlabel': 'Number of Cliffrods',
+                'xunit': '#',
+                'ylabel': val_name,
+                'yunit': self.raw_data_dict['value_units'][i],
                 'title': self.raw_data_dict['timestamp_string']+'\n'+self.raw_data_dict['measurementstring'],
             }
 
         fs = plt.rcParams['figure.figsize']
         self.plot_dicts['cal_points_hexbin'] = {
-            'plotfn':plot_cal_points_hexbin,
+            'plotfn': plot_cal_points_hexbin,
             'shots_0': (self.raw_data_dict['cal_pts_zero'][val_names[0]],
                         self.raw_data_dict['cal_pts_zero'][val_names[1]]),
             'shots_1': (self.raw_data_dict['cal_pts_one'][val_names[0]],
@@ -137,28 +212,83 @@ class RandomizedBenchmarking_SingleQubit_Analyasis(ba.BaseDataAnalysis):
             'xunit': self.raw_data_dict['value_units'][0],
             'ylabel': val_names[1],
             'yunit': self.raw_data_dict['value_units'][1],
-            'title':self.raw_data_dict['timestamp_string']+'\n'+self.raw_data_dict['measurementstring'] +' hexbin plot',
-            'plotsize':(fs[0]*1.5, fs[1])
-            }
-
+            'title': self.raw_data_dict['timestamp_string']+'\n'+self.raw_data_dict['measurementstring'] + ' hexbin plot',
+            'plotsize': (fs[0]*1.5, fs[1])
+        }
 
         for i, val_name in enumerate(val_names):
             self.plot_dicts['raw_RB_curve_data_{}'.format(val_name)] = {
-                    'plotfn': plot_raw_RB_curve,
-                    'ncl': self.proc_data_dict['ncl'],
-                    'SI': self.proc_data_dict['SI'][val_name],
-                    'SX': self.proc_data_dict['SX'][val_name],
-                    'V0': self.proc_data_dict['V0'][val_name],
-                    'V1': self.proc_data_dict['V1'][val_name],
-                    'V2': self.proc_data_dict['V2'][val_name],
+                'plotfn': plot_raw_RB_curve,
+                'ncl': self.proc_data_dict['ncl'],
+                'SI': self.proc_data_dict['SI'][val_name],
+                'SX': self.proc_data_dict['SX'][val_name],
+                'V0': self.proc_data_dict['V0'][val_name],
+                'V1': self.proc_data_dict['V1'][val_name],
+                'V2': self.proc_data_dict['V2'][val_name],
 
-                    'xlabel': 'Number of Cliffrods',
-                    'xunit': '#',
-                    'ylabel': val_name,
-                    'yunit': self.proc_data_dict['value_units'][i],
+                'xlabel': 'Number of Cliffrods',
+                'xunit': '#',
+                'ylabel': val_name,
+                'yunit': self.proc_data_dict['value_units'][i],
                 'title': self.proc_data_dict['timestamp_string']+'\n'+self.proc_data_dict['measurementstring'],
             }
 
+            self.plot_dicts['rb_rate_eq_pops_{}'.format(val_name)] = {
+                'plotfn': plot_populations_RB_curve,
+                'ncl': self.proc_data_dict['ncl'],
+                'P0': self.proc_data_dict['P0'][val_name],
+                'P1': self.proc_data_dict['P1'][val_name],
+                'P2': self.proc_data_dict['P2'][val_name],
+                'title': self.proc_data_dict['timestamp_string']+'\n' +
+                'Population using rate equations ch{}'.format(val_name)
+            }
+        self.plot_dicts['logres_decision_bound'] = {
+            'plotfn': plot_classifier_decission_boundary,
+            'classifier': self.proc_data_dict['classifier'],
+            'shots_0': (self.proc_data_dict['cal_pts_zero'][val_names[0]],
+                        self.proc_data_dict['cal_pts_zero'][val_names[1]]),
+            'shots_1': (self.proc_data_dict['cal_pts_one'][val_names[0]],
+                        self.proc_data_dict['cal_pts_one'][val_names[1]]),
+            'shots_2': (self.proc_data_dict['cal_pts_two'][val_names[0]],
+                        self.proc_data_dict['cal_pts_two'][val_names[1]]),
+            'xlabel': val_names[0],
+            'xunit': self.proc_data_dict['value_units'][0],
+            'ylabel': val_names[1],
+            'yunit': self.proc_data_dict['value_units'][1],
+            'title': self.proc_data_dict['timestamp_string']+'\n'+
+                self.proc_data_dict['measurementstring'] +
+                ' Decision boundary',
+            'plotsize': (fs[0]*1.5, fs[1]) }
+
+        # define figure and axes here to have custom layout
+        self.figs['main_rb_decay'], axs = plt.subplots(
+            nrows=2, sharex=True, gridspec_kw={'height_ratios':(2,1)})
+        self.figs['main_rb_decay'].patch.set_alpha(0)
+        self.axs['main_rb_decay'] = axs[0]
+        self.axs['leak_decay'] = axs[1]
+        self.plot_dicts['main_rb_decay'] = {
+            'plotfn': plot_rb_decay_woods_gambetta,
+            'ncl':self.proc_data_dict['ncl'],
+            'M0':self.proc_data_dict['M0'],
+            'X1':self.proc_data_dict['X1'],
+            'ax1': axs[1],
+            'title': self.proc_data_dict['timestamp_string']+'\n'+
+                self.proc_data_dict['measurementstring'] }
+
+        self.plot_dicts['fit_leak'] = {
+            'plotfn': self.plot_fit,
+            'ax_id': 'leak_decay',
+            'fit_res':self.fit_res['leakage_decay'],
+            'setlabel': 'Leakage fit',
+            'do_legend': True,
+            }
+        self.plot_dicts['fit_rb'] = {
+            'plotfn': self.plot_fit,
+            'ax_id': 'main_rb_decay',
+            'fit_res':self.fit_res['rb_decay'],
+            'setlabel': 'RB fit',
+            'do_legend': True,
+            }
 
 
 class InterleavedTwoQubitRB_Analyasis(ba.BaseDataAnalysis):
@@ -179,10 +309,11 @@ class InterleavedTwoQubitRB_Analyasis(ba.BaseDataAnalysis):
         self.raw_data_dict = OrderedDict()
 
         self.timestamps = a_tools.get_timestamps_in_range(
-                self.t_start, self.t_stop,
-                label=self.labels)
+            self.t_start, self.t_stop,
+            label=self.labels)
 
-        a = ma_old.MeasurementAnalysis(timestamp=self.timestamps[0], auto=False, close_file=False)
+        a = ma_old.MeasurementAnalysis(
+            timestamp=self.timestamps[0], auto=False, close_file=False)
         a.get_naming_and_values()
 
         self.raw_data_dict['ncl'] = a.sweep_points
@@ -193,8 +324,7 @@ class InterleavedTwoQubitRB_Analyasis(ba.BaseDataAnalysis):
         self.raw_data_dict['data'] = []
         self.raw_data_dict['folder'] = a.folder
         self.raw_data_dict['timestamps'] = self.timestamps
-        a.finish() # closes data file
-
+        a.finish()  # closes data file
 
     def process_data(self):
         dd = self.raw_data_dict
@@ -203,35 +333,26 @@ class InterleavedTwoQubitRB_Analyasis(ba.BaseDataAnalysis):
             self.proc_data_dict['p_{}'.format(frac)] = 1-dd[frac]
             self.proc_data_dict['p_{}'.format(frac)] = 1-dd[frac]
         self.proc_data_dict['p_00_base'] = (1-dd['q0_base'])*(1-dd['q1_base'])
-        self.proc_data_dict['p_00_inter'] = (1-dd['q0_inter'])*(1-dd['q1_inter'])
+        self.proc_data_dict['p_00_inter'] = (
+            1-dd['q0_inter'])*(1-dd['q1_inter'])
 
-
-
-    def prepare_plots(self):
-        self.plot_dicts['freqs'] = {
-            'plotfn': self.dac_arc_ana.plot_freqs,
-            'title':"Cryoscope arc \n"+self.timestamps[0]+' - '+self.timestamps[-1]}
-
-        self.plot_dicts['FluxArc'] = {
-            'plotfn': self.dac_arc_ana.plot_ffts,
-            'title':"Cryoscope arc \n"+self.timestamps[0]+' - '+self.timestamps[-1]}
 
 def plot_cal_points_hexbin(shots_0,
-                            shots_1,
-                            shots_2,
-                            xlabel:str, xunit:str,
-                            ylabel:str, yunit:str,
-                            title:str,
-                            ax, **kw):
+                           shots_1,
+                           shots_2,
+                           xlabel: str, xunit: str,
+                           ylabel: str, yunit: str,
+                           title: str,
+                           ax, **kw):
     # Choose colormap
     alpha_cmaps = []
     for cmap in [pl.cm.Blues, pl.cm.Reds, pl.cm.Greens]:
         my_cmap = cmap(np.arange(cmap.N))
-        my_cmap[:,-1] = np.linspace(0, 1, cmap.N)
+        my_cmap[:, -1] = np.linspace(0, 1, cmap.N)
         my_cmap = ListedColormap(my_cmap)
         alpha_cmaps.append(my_cmap)
 
-    f=plt.gcf()
+    f = plt.gcf()
     hb = ax.hexbin(x=shots_2[0], y=shots_2[1], cmap=alpha_cmaps[2])
     clim = hb.get_clim()
 
@@ -250,30 +371,48 @@ def plot_cal_points_hexbin(shots_0,
     set_ylabel(ax, ylabel, yunit)
     ax.set_title(title)
 
+
 def plot_raw_RB_curve(ncl, SI, SX, V0, V1, V2, title, ax,
-                      xlabel, xunit, ylabel, yunit,**kw):
-    ax.plot(ncl,SI, label='SI', marker='o')
-    ax.plot(ncl,SX, label='SX', marker='o')
-    ax.plot(ncl[-1]+.5, V0, label='V0', marker='o', c='C0')
-    ax.plot(ncl[-1]+1.5, V1, label='V1', marker='o', c='C1')
-    ax.plot(ncl[-1]+2.5, V2, label='V2', marker='o', c='C2')
+                      xlabel, xunit, ylabel, yunit, **kw):
+    ax.plot(ncl, SI, label='SI', marker='o')
+    ax.plot(ncl, SX, label='SX', marker='o')
+    ax.plot(ncl[-1]+.5, V0, label='V0', marker='d', c='C0')
+    ax.plot(ncl[-1]+1.5, V1, label='V1', marker='d', c='C1')
+    ax.plot(ncl[-1]+2.5, V2, label='V2', marker='d', c='C2')
     ax.set_title(title)
     set_xlabel(ax, xlabel, xunit)
     set_ylabel(ax, ylabel, yunit)
     ax.legend()
 
 
+def plot_populations_RB_curve(ncl, P0, P1, P2, title, ax, **kw):
+    ax.axhline(.5, c='k', lw=.5, ls='--')
+    ax.plot(ncl, P0, c='C0', label=r'P($|g\rangle$)', marker='v')
+    ax.plot(ncl, P1, c='C3', label=r'P($|e\rangle$)', marker='^')
+    ax.plot(ncl, P2, c='C2', label=r'P($|f\rangle$)', marker='d')
+
+    ax.set_xlabel('Number of Cliffords (#)')
+    ax.set_ylabel('Population')
+    ax.grid(axis='y')
+    ax.legend()
+    ax.set_ylim(-.05, 1.05)
+    ax.set_title(title)
 
 
-def populations_using_rate_equations(SI:np.array , SX:np.array ,
-                                     V0:float , V1:float , V2:float):
+def populations_using_rate_equations(SI: np.array, SX: np.array,
+                                     V0: float, V1: float, V2: float):
     """
     Args:
-        SI (float): signal value for signal with I (Identity) added
-        SX (float): signal value for signal with X (π-pulse) added
+        SI (array): signal value for signal with I (Identity) added
+        SX (array): signal value for signal with X (π-pulse) added
         V0 (float):
         V1 (float):
         V2 (float):
+    returns:
+        P0 (array): population of the |0> state
+        P1 (array): population of the |1> state
+        P2 (array): population of the |2> state
+        M_inv (2D array) :  Matrix inverse to find populations
 
     Based on equation (S1) from Asaad & Dickel et al. npj Quant. Info. (2016)
 
@@ -289,7 +428,7 @@ def populations_using_rate_equations(SI:np.array , SX:np.array ,
 
     where S (S') is the measured signal level without (with) final π pulse. The populations are extracted by matrix inversion.
     """
-    M =np.array([[V0-V2, V1-V2], [V1-V2, V0-V2]])
+    M = np.array([[V0-V2, V1-V2], [V1-V2, V0-V2]])
     M_inv = np.linalg.inv(M)
 
     P0 = np.zeros(len(SI))
@@ -300,7 +439,96 @@ def populations_using_rate_equations(SI:np.array , SX:np.array ,
         P0[i] = p0
         P1[i] = p1
 
-    P2 = 1- P0 - P1
+    P2 = 1 - P0 - P1
 
     return P0, P1, P2, M_inv
+
+
+def logisticreg_classifier_machinelearning(shots_0, shots_1, shots_2):
+    """
+    """
+    # reshaping of the entries in proc_data_dict
+    shots_0 = np.array(list(
+        zip(list(shots_0.values())[0],
+            list(shots_0.values())[1])))
+
+    shots_1 = np.array(list(
+        zip(list(shots_1.values())[0],
+            list(shots_1.values())[1])))
+    shots_2 = np.array(list(
+        zip(list(shots_2.values())[0],
+            list(shots_2.values())[1])))
+
+    X = np.concatenate([shots_0, shots_1, shots_2])
+    Y = np.concatenate([0*np.ones(shots_0.shape[0]),
+                        1*np.ones(shots_1.shape[0]),
+                        2*np.ones(shots_2.shape[0])])
+
+    logreg = linear_model.LogisticRegression(C=1e5)
+    logreg.fit(X, Y)
+    return logreg
+
+def plot_classifier_decission_boundary(shots_0, shots_1, shots_2,
+                                       classifier,
+                                       xlabel: str, xunit: str,
+                                       ylabel: str, yunit: str,
+                                       title: str, ax, **kw):
+    """
+    Plots decision boundary on top of the hexbin plot of the training dataset
+    (usually the calibration points).
+    """
+    grid_points = 200
+
+
+
+    x_min = np.min([shots_0[0], shots_1[0], shots_2[0]])
+    x_max = np.max([shots_0[0], shots_1[0], shots_2[0]])
+    y_min = np.min([shots_0[1], shots_1[1], shots_2[1]])
+    y_max = np.max([shots_0[1], shots_1[1], shots_2[1]])
+    # xr = abs(X[:, 0].min() - X[:, 0].max())
+    # yr = abs(Y[:, 0].min() - Y[:, 0].max())
+    # x_min, x_max = X[:, 0].min() - .5, X[:, 0].max() + .5
+    # y_min, y_max = X[:, 1].min() - .5, X[:, 1].max() + .5
+    xx, yy = np.meshgrid(np.linspace(x_min, x_max, grid_points),
+                         np.linspace(y_min, y_max, grid_points))
+    Z = classifier.predict(np.c_[xx.ravel(), yy.ravel()])
+    Z = Z.reshape(xx.shape)
+
+    plot_cal_points_hexbin(shots_0=shots_0,
+                           shots_1=shots_1,
+                           shots_2=shots_2,
+                           xlabel=xlabel, xunit=xunit,
+                           ylabel=ylabel, yunit=yunit,
+                           title=title, ax=ax)
+    ax.pcolormesh(xx, yy, Z,
+                  cmap=c.ListedColormap(['C0', 'C3', 'C2']),
+                  alpha=.2)
+
+def plot_rb_decay_woods_gambetta(ncl, M0, X1, ax, ax1, title='', **kw):
+    ax.plot(ncl, M0, marker='o', linestyle='')
+    ax1.plot(ncl, X1, marker='d', linestyle='')
+    ax.set_ylim(-.05, 1.05)
+    ax1.set_ylim(min(min(.97*X1), .92), 1.01)
+    ax.set_ylabel(r'$M_0$ probability')
+    ax1.set_ylabel(r'$X_1$ probability')
+    ax1.set_xlabel('Number of Cliffords')
+    ax.set_title(title)
+
+
+def leak_decay(A, B, lambda_1, m):
+    """
+    Eq. (9) of Wood Gambetta 2018
+
+        A ~= L2/ (L1+L2)
+        B ~= L1/ (L1+L2) + eps_m
+        lambda_1 = 1 - L1 - L2
+
+    """
+    return A+ B*lambda_1**m
+
+def full_rb_decay(A, B, C, lambda_1, lambda_2, m):
+    """
+    Eq. (15) of Wood Gambetta 2018
+    """
+    return A + B*lambda_1**m+C*lambda_2**m
 

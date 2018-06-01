@@ -1,5 +1,6 @@
 from .base_lutman import Base_LutMan, get_redundant_codewords
 import numpy as np
+from collections import Iterable
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
 from pycqed.measurement.waveform_control_CC import waveform as wf
@@ -75,7 +76,7 @@ class Base_MW_LutMan(Base_LutMan):
                        'second excited-state.'),
             parameter_class=ManualParameter, initial_value=50.0e6)
         self.add_parameter('mw_ef_amp180', unit='frac',
-            docstring=('Pulse amplitude for pulsing the 1<->2 transition'),
+            docstring=('Pulse amplitude for pulsing the ef/12 transition'),
             vals=vals.Numbers(-1, 1),
             parameter_class=ManualParameter, initial_value=.2)
 
@@ -449,7 +450,7 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
         This method also generates the waveforms.
         """
 
-        if (amps==None) and (mod_freqs is None):
+        if not isinstance(amps, Iterable) and (mod_freqs is None):
             amps = [self.mw_ef_amp180()]
         elif len(amps)==1:
             amps = [amps]*len(mod_freqs)
