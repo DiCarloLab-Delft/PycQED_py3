@@ -8,6 +8,7 @@ import pycqed.analysis_v2.base_analysis as ba
 import pycqed.measurement.waveform_control_CC.waveform as wf
 import pycqed.analysis.fitting_models as fit_mods
 import numpy as np
+import logging
 from numpy.fft import fft, ifft, fftfreq
 from scipy.stats import sem
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
@@ -143,13 +144,20 @@ class RandomizedBenchmarking_SingleQubit_Analyasis(ba.BaseDataAnalysis):
         leak_mod.set_param_hint('L1', expr='(1-A)*(1-lambda_1)')
         leak_mod.set_param_hint('L2', expr='A*(1-lambda_1)')
         params = leak_mod.make_params()
-        fit_res_leak = leak_mod.fit(data=self.proc_data_dict['X1'],
-                              m=self.proc_data_dict['ncl'],
-                              params=params)
-        self.fit_res['leakage_decay']= fit_res_leak
+        try:
+            fit_res_leak = leak_mod.fit(data=self.proc_data_dict['X1'],
+                                  m=self.proc_data_dict['ncl'],
+                                  params=params)
+            self.fit_res['leakage_decay']= fit_res_leak
+            lambda_1 = fit_res_leak.best_values['lambda_1']
+        except Exception as e :
+            logging.warning("Fitting failed")
+            logging.warning(e)
+            lambda_1 = 1
+
+            self.fit_res['leakage_decay'] = {}
 
 
-        lambda_1 = fit_res_leak.best_values['lambda_1']
         fit_mod_rb = lmfit.Model(full_rb_decay, independent_vars='m')
         fit_mod_rb.set_param_hint('A', value=.5, min=0, vary=True)
         fit_mod_rb.set_param_hint('B', value=.1, min=0, vary=True)
@@ -159,11 +167,20 @@ class RandomizedBenchmarking_SingleQubit_Analyasis(ba.BaseDataAnalysis):
         fit_mod_rb.set_param_hint('lambda_2', value=.95, vary=True)
 
         params = fit_mod_rb.make_params()
-        fit_res_rb = fit_mod_rb.fit(data=self.proc_data_dict['M0'],
-                              m=self.proc_data_dict['ncl'],
-                              params=params)
+        try:
+            fit_res_rb = fit_mod_rb.fit(data=self.proc_data_dict['M0'],
+                                  m=self.proc_data_dict['ncl'],
+                                  params=params)
 
-        self.fit_res['rb_decay'] = fit_res_rb
+            self.fit_res['rb_decay'] = fit_res_rb
+        except Exception as e :
+            logging.warning("Fitting failed")
+            logging.warning(e)
+            lambda_1 = 1
+
+
+            self.fit_res['rb_decay'] = {}
+
 
 
     def prepare_plots(self):

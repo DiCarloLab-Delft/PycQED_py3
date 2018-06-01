@@ -5,6 +5,7 @@ from inspect import signature
 import os
 import numpy as np
 import copy
+import logging
 from collections import OrderedDict
 from inspect import signature
 import numbers
@@ -22,7 +23,6 @@ import json
 import lmfit
 import h5py
 from pycqed.measurement.hdf5_data import write_dict_to_hdf5
-import copy
 
 
 class BaseDataAnalysis(object):
@@ -1162,6 +1162,13 @@ class BaseDataAnalysis(object):
         """
         Plots an lmfit fit result object using the plot_line function.
         """
+        if pdict['fit_res'] == {}:
+            # This is an implicit way of indicating a failed fit.
+            # We can probably do better by for example plotting the initial
+            # guess.
+            logging.warning('fit_res is an empty dictionary, cannot plot.')
+            return
+
         model = pdict['fit_res'].model
         plot_init = pdict.get('plot_init', False)  # plot the initial guess
         pdict['marker'] = pdict.get('marker', '')  # different default
