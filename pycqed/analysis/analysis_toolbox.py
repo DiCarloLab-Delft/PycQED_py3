@@ -1626,6 +1626,8 @@ def datetime_from_timestamp(timestamp):
             return datetime.datetime.strptime(timestamp, "%Y%m%d%H%M%S")
         elif len(timestamp) == 15:
             return datetime.datetime.strptime(timestamp, "%Y%m%d_%H%M%S")
+        else:
+            raise ValueError
     except Exception as e:
         print('Invalid timestamp :"{}"'.format(timestamp))
         raise e
