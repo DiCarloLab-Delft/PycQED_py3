@@ -5,6 +5,7 @@ from autodepgraph.graph_v2 import AutoDepGraph_DAG
 try:
     from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
     import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
+    from pycqed.measurement.openql_experiments import clifford_rb_oql as cl_oql
 except ImportError:
     logging.warning('Could not import OpenQL')
     sqo = None
@@ -14,19 +15,20 @@ from pycqed.utilities.general import gen_sweep_pts
 from .qubit_object import Qubit
 from qcodes.utils import validators as vals
 from qcodes.instrument.parameter import (
-    _BaseParameter,  ManualParameter, InstrumentRefParameter)
+    ManualParameter, InstrumentRefParameter)
 from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import measurement_analysis as ma2
 from pycqed.measurement.calibration_toolbox import (
-    mixer_carrier_cancellation, multi_channel_mixer_carrier_cancellation)
-from pycqed.measurement.calibration_toolbox import mixer_skewness_cal_UHFQC_adaptive
-from pycqed.measurement.openql_experiments.openql_helpers import load_range_of_oql_programs
+    mixer_carrier_cancellation)
+from pycqed.measurement.openql_experiments.openql_helpers import \
+    load_range_of_oql_programs
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import detector_functions as det
 
 import cma
 from pycqed.measurement.optimization import nelder_mead
 import datetime
+
 
 class CCLight_Transmon(Qubit):
 
@@ -113,7 +115,8 @@ class CCLight_Transmon(Qubit):
 
         # RO pulse parameters
         self.add_parameter('ro_pulse_type', initial_value='simple',
-                           vals=vals.Enum('gated', 'simple', 'up_down_down','up_down_down_final'),
+                           vals=vals.Enum('gated', 'simple',
+                                          'up_down_down', 'up_down_down_final'),
                            parameter_class=ManualParameter)
 
         # Mixer offsets correction, RO pulse
@@ -166,7 +169,8 @@ class CCLight_Transmon(Qubit):
 
         self.add_parameter('ro_acq_weight_type',
                            initial_value='DSB',
-                           vals=vals.Enum('SSB', 'DSB', 'optimal', 'optimal IQ'),
+                           vals=vals.Enum(
+                               'SSB', 'DSB', 'optimal', 'optimal IQ'),
                            docstring=ro_acq_docstr,
                            parameter_class=ManualParameter)
 
@@ -294,6 +298,11 @@ class CCLight_Transmon(Qubit):
                            vals=vals.Numbers(min_value=0, max_value=1.0),
                            parameter_class=ManualParameter)
 
+        self.add_parameter('mw_ef_amp',
+                           label='Pi-pulse amplitude ef-transition', unit='V',
+                           initial_value=.4,
+                           parameter_class=ManualParameter)
+
         self.add_parameter('mw_awg_ch', parameter_class=ManualParameter,
                            initial_value=1)
         self.add_parameter('mw_gauss_width', unit='s',
@@ -363,7 +372,7 @@ class CCLight_Transmon(Qubit):
     def add_spec_parameters(self):
         self.add_parameter('spec_vsm_amp',
                            label='VSM amplitude for spec pulses',
-                           vals=vals.Numbers(0.2,3.0),
+                           vals=vals.Numbers(0.2, 3.0),
                            initial_value=1.0,
                            parameter_class=ManualParameter)
 
@@ -534,9 +543,10 @@ class CCLight_Transmon(Qubit):
             initial_value=1,
             parameter_class=ManualParameter)
         self.add_parameter('cfg_spec_mode', vals=vals.Bool(),
-            docstring=('Used to activate spec mode in measurements'),
-            initial_value=False,
-            parameter_class=ManualParameter)
+                           docstring=(
+                               'Used to activate spec mode in measurements'),
+                           initial_value=False,
+                           parameter_class=ManualParameter)
 
     def add_generic_qubit_parameters(self):
         self.add_parameter('E_c', unit='Hz',
@@ -569,6 +579,13 @@ class CCLight_Transmon(Qubit):
                            docstring='Asymmetry parameter of the SQUID loop',
                            initial_value=0,
                            parameter_class=ManualParameter)
+        self.add_parameter('anharmonicity', unit='Hz',
+                           label='Anharmonicity',
+                           docstring='Anharmonicity, negative by convention',
+                           parameter_class=ManualParameter,
+                           # typical target value
+                           initial_value=-300e6,
+                           vals=vals.Numbers())
 
         self.add_parameter('F_ssro',
                            initial_value=0,
@@ -625,10 +642,11 @@ class CCLight_Transmon(Qubit):
     def _prep_ro_instantiate_detectors(self):
         self.instr_MC.get_instr().soft_avg(self.ro_soft_avg())
         if 'optimal' in self.ro_acq_weight_type():
-            if self.ro_acq_weight_type()=='optimal':
+            if self.ro_acq_weight_type() == 'optimal':
                 ro_channels = [self.ro_acq_weight_chI()]
-            elif self.ro_acq_weight_type()=='optimal IQ':
-                ro_channels = [self.ro_acq_weight_chI(), self.ro_acq_weight_chQ()]
+            elif self.ro_acq_weight_type() == 'optimal IQ':
+                ro_channels = [
+                    self.ro_acq_weight_chI(), self.ro_acq_weight_chQ()]
             result_logging_mode = 'lin_trans'
 
             if self.ro_acq_digitized():
@@ -810,7 +828,7 @@ class CCLight_Transmon(Qubit):
                     IF=self.ro_freq_mod(),
                     weight_function_I=self.ro_acq_weight_chI(),
                     weight_function_Q=self.ro_acq_weight_chQ())
-            elif  'optimal' in self.ro_acq_weight_type():
+            elif 'optimal' in self.ro_acq_weight_type():
                 if (self.ro_acq_weight_func_I() is None or
                         self.ro_acq_weight_func_Q() is None):
                     logging.warning('Optimal weights are None,' +
@@ -828,7 +846,7 @@ class CCLight_Transmon(Qubit):
                         self.ro_acq_weight_chI()), 1.0)
                     UHFQC.set('quex_rot_{}_imag'.format(
                         self.ro_acq_weight_chI()), -1.0)
-                    if self.ro_acq_weight_type()=='optimal IQ':
+                    if self.ro_acq_weight_type() == 'optimal IQ':
                         print('setting the optimal Q')
                         UHFQC.set('quex_wint_weights_{}_real'.format(
                             self.ro_acq_weight_chQ()),
@@ -877,6 +895,11 @@ class CCLight_Transmon(Qubit):
         MW_LutMan.mw_motzoi(self.mw_motzoi())
         MW_LutMan.mw_modulation(self.mw_freq_mod())
         MW_LutMan.spec_amp(self.spec_amp())
+
+        # used for ef pulsing
+        MW_LutMan.mw_ef_amp180(self.mw_ef_amp())
+        MW_LutMan.mw_ef_modulation(MW_LutMan.mw_modulation() +
+                                   self.anharmonicity())
 
         # 3. Does case-dependent things:
         #                mixers offset+skewness
@@ -953,7 +976,7 @@ class CCLight_Transmon(Qubit):
         # Configure VSM
         VSM = self.instr_VSM.get_instr()
         VSM.set('ch{}_frequency'.format(
-               self.mw_vsm_ch_in()), self.freq_qubit())
+            self.mw_vsm_ch_in()), self.freq_qubit())
 
         VSM.set('mod{}_ch{}_marker_state'.format(
             self.mw_vsm_mod_out(), self.mw_vsm_ch_in()), 'on')
@@ -1207,13 +1230,14 @@ class CCLight_Transmon(Qubit):
 
     def measure_heterodyne_spectroscopy(self, freqs, MC=None,
                                         analyze=True, close_fig=True):
-        UHFQC=self.instr_acquisition.get_instr()
+        UHFQC = self.instr_acquisition.get_instr()
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
         # Starting specmode if set in config
         if self.cfg_spec_mode():
-            UHFQC.spec_mode_on(IF=self.ro_freq_mod(), ro_amp=self.ro_pulse_amp())
+            UHFQC.spec_mode_on(IF=self.ro_freq_mod(),
+                               ro_amp=self.ro_pulse_amp())
         # Snippet here to create and upload the CCL instructions
         CCL = self.instr_CC.get_instr()
         CCL.stop()
@@ -1266,7 +1290,8 @@ class CCLight_Transmon(Qubit):
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='Resonator_power_scan'+self.msmt_suffix, mode='2D')
         if analyze:
-            ma.TwoD_Analysis(label='Resonator_power_scan', close_fig=close_fig, normalize=True)
+            ma.TwoD_Analysis(label='Resonator_power_scan',
+                             close_fig=close_fig, normalize=True)
 
     def measure_resonator_frequency_dac_scan(self, freqs, dac_values, MC=None,
                                              analyze: bool =True, close_fig: bool=True):
@@ -1418,12 +1443,14 @@ class CCLight_Transmon(Qubit):
         if analyze:
             if SNR_detector:
                 if cal_residual_excitation:
-                    a=ma.SSRO_Analysis(rotate=True, label='SSRO', no_fits=False, close_fig=True, peg=None, pge=None, timestamp=None, channels=d.value_names)
-                    self.peg=a.frac1_0
-                    self.pge=1-a.frac1_1
+                    a = ma.SSRO_Analysis(rotate=True, label='SSRO', no_fits=False, close_fig=True,
+                                         peg=None, pge=None, timestamp=None, channels=d.value_names)
+                    self.peg = a.frac1_0
+                    self.pge = 1-a.frac1_1
                 else:
-                    a=ma.SSRO_Analysis(rotate=True, label='SSRO', no_fits=False, close_fig=True, peg=self.peg, pge=self.pge, channels=d.value_names)
-                return {'SNR':a.SNR, 'F_d':a.F_d, 'F_a':a.F_a}
+                    a = ma.SSRO_Analysis(rotate=True, label='SSRO', no_fits=False,
+                                         close_fig=True, peg=self.peg, pge=self.pge, channels=d.value_names)
+                return {'SNR': a.SNR, 'F_d': a.F_d, 'F_a': a.F_a}
 
             else:
                 if len(d.value_names) == 1:
@@ -1457,7 +1484,6 @@ class CCLight_Transmon(Qubit):
                                          channels=d.value_names,
                                          no_fits=no_figs, rotate=True)
                     return a.F_a, a.F_d
-
 
     def measure_transients(self, MC=None, analyze: bool=True,
                            cases=('off', 'on'),
@@ -1517,17 +1543,17 @@ class CCLight_Transmon(Qubit):
             return [np.array(t, dtype=np.float64) for t in transients]
 
     def measure_transients_CCL_switched(self, MC=None, analyze: bool=True,
-                           cases=('off', 'on'),
-                           prepare: bool=True, depletion_analysis: bool=True,
-                           depletion_analysis_plot: bool=True,
-                           depletion_optimization_window=None):
+                                        cases=('off', 'on'),
+                                        prepare: bool=True, depletion_analysis: bool=True,
+                                        depletion_analysis_plot: bool=True,
+                                        depletion_optimization_window=None):
         # docstring from parent class
         if MC is None:
             MC = self.instr_MC.get_instr()
 
         self.prepare_for_timedomain()
-            # off/on switching is achieved by turning the MW source on and
-            # off as this is much faster than recompiling/uploading
+        # off/on switching is achieved by turning the MW source on and
+        # off as this is much faster than recompiling/uploading
 
         transients = []
         for i, pulse_comb in enumerate(cases):
@@ -1581,11 +1607,11 @@ class CCLight_Transmon(Qubit):
         self.ro_acq_averages(2**15)
         if measure_transients_CCL_switched:
             transients = self.measure_transients_CCL_switched(MC=MC,
-                                            analyze=analyze,
-                                            depletion_analysis=False)
+                                                              analyze=analyze,
+                                                              depletion_analysis=False)
         else:
             transients = self.measure_transients(MC=MC, analyze=analyze,
-                                             depletion_analysis=False)
+                                                 depletion_analysis=False)
         if analyze:
             ma.Input_average_analysis(IF=self.ro_freq_mod())
 
@@ -1613,7 +1639,8 @@ class CCLight_Transmon(Qubit):
             else:
                 self.ro_acq_weight_type('optimal')
         if verify:
-            self.measure_ssro(no_figs=no_figs, update_threshold=update_threshold)
+            self.measure_ssro(
+                no_figs=no_figs, update_threshold=update_threshold)
         return True
 
     def measure_rabi(self, MC=None, amps=np.linspace(0.2, 2.0, 31),
@@ -2142,10 +2169,10 @@ class CCLight_Transmon(Qubit):
             self.mw_freq_mod.get() + artificial_detuning)
 
         p = sqo.Ramsey(times, qubit_idx=self.cfg_qubit_nr(),
-                     platf_cfg=self.cfg_openql_platform_fn())
+                       platf_cfg=self.cfg_openql_platform_fn())
         s = swf.OpenQL_Sweep(openql_program=p,
-                           CCL=self.instr_CC.get_instr(),
-                           parameter_name='Time', unit='s')
+                             CCL=self.instr_CC.get_instr(),
+                             parameter_name='Time', unit='s')
         MC.set_sweep_function(s)
         MC.set_sweep_points(times)
 
@@ -2161,13 +2188,13 @@ class CCLight_Transmon(Qubit):
                 return a.T2_star
 
     def measure_msmt_induced_dephasing(self, MC=None, sequence='ramsey',
-                                              label: str='',
-                                              verbose: bool=True,
-                                              analyze: bool=True,
-                                              close_fig: bool=True,
-                                              update: bool=True,
-                                              cross_target_qubits: list=None,
-                                              multi_qubit_platf_cfg=None):
+                                       label: str='',
+                                       verbose: bool=True,
+                                       analyze: bool=True,
+                                       close_fig: bool=True,
+                                       update: bool=True,
+                                       cross_target_qubits: list=None,
+                                       multi_qubit_platf_cfg=None):
         # docstring from parent class
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -2186,16 +2213,16 @@ class CCLight_Transmon(Qubit):
             qubits.append(self.cfg_qubit_nr())
 
         angles = np.arange(0, 421, 20)
-        if sequence=='ramsey':
+        if sequence == 'ramsey':
             p = mqo.Ramsey_msmt_induced_dephasing(qubits=qubits, angles=angles,
-                                              platf_cfg=platf_cfg)
-        elif sequence=='echo':
+                                                  platf_cfg=platf_cfg)
+        elif sequence == 'echo':
             readout_pulse_length = self.ro_pulse_length()
             readout_pulse_length += self.ro_pulse_down_length0()
             readout_pulse_length += self.ro_pulse_down_length1()
             p = mqo.echo_msmt_induced_dephasing(qubits=qubits, angles=angles,
-                                              platf_cfg=platf_cfg,
-                                              wait_time=readout_pulse_length)
+                                                platf_cfg=platf_cfg,
+                                                wait_time=readout_pulse_length)
         else:
             raise ValueError('sequence must be set to ramsey or echo')
         s = swf.OpenQL_Sweep(openql_program=p,
@@ -2209,17 +2236,17 @@ class CCLight_Transmon(Qubit):
         if analyze:
             a = ma.Ramsey_Analysis(label=sequence, auto=True, close_fig=True,
                                    freq_qubit=self.freq_qubit(),
-                                   artificial_detuning=0, #fixme
+                                   artificial_detuning=0,  # fixme
                                    phase_sweep_only=True)
             phase_deg = (a.fit_res.params['phase'].value)*360/(2*np.pi) % 360
             res = {
-                    'coherence': a.fit_res.params['amplitude'].value,
-                    'phase': phase_deg,
+                'coherence': a.fit_res.params['amplitude'].value,
+                'phase': phase_deg,
             }
             if verbose:
                 print('> ramsey analyse', res)
             return res
-        #else:
+        # else:
         #    return {'coherence': -1,
         #            'phase' : -1}
 
@@ -2366,12 +2393,104 @@ class CCLight_Transmon(Qubit):
                                   'ch_idx_B': 2})
             return a
 
-    def measure_randomized_benchmarking(self, nr_cliffords=2**np.arange(12),
-                                        nr_seeds=100,
-                                        double_curves=False,
-                                        MC=None, analyze=True, close_fig=True,
-                                        verbose:bool=True, upload=True,
-                                        update=True):
+    def measure_single_qubit_randomized_benchmarking(
+            self, nr_cliffords=2**np.arange(12), nr_seeds=100,
+            MC=None,
+            recompile: bool ='as needed', prepare_for_timedomain: bool=True):
+        """
+        Measures randomized benchmarking decay including second excited state
+        population.
+
+        For this it:
+            - stores single shots using SSB weights (int. logging)
+            - uploads a pulse driving the ef/12 transition (should be calibr.)
+            - performs RB both with and without an extra pi-pulse
+            - Includes calibration poitns for 0, 1, and 2 (g,e, and f)
+            - analysis extracts fidelity and leakage/seepage
+        """
+
+        # because only 1 seed is uploaded each time
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        MC.soft_avg(1)
+        counter_param = ManualParameter('name_ctr', initial_value=0)
+        programs = []
+
+        # Settings that have to be changed....
+        old_weight_type = self.ro_acq_weight_type()
+        old_digitized = self.ro_acq_digitized()
+        self.ro_acq_weight_type('SSB')
+        self.ro_acq_digitized(False)
+
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+        else:
+            self.prepare_readout()
+
+        # set back the settings
+        self.ro_acq_weight_type(old_weight_type)
+        self.ro_acq_digitized(old_digitized)
+
+        # Load pulses to the ef transition
+        mw_lutman = self.instr_LutMan_MW.get_instr()
+        mw_lutman.load_ef_rabi_pulses_to_AWG_lookuptable()
+
+        t0 = time.time()
+        net_cliffords = [0, 3]  # always measure double sided
+        print('Generating {} RB programs'.format(nr_seeds))
+        for i in range(nr_seeds):
+            p = cl_oql.randomized_benchmarking(
+                qubits=[self.cfg_qubit_nr()],
+                nr_cliffords=nr_cliffords,
+                net_cliffords=net_cliffords,  # always measure double sided
+                nr_seeds=1,
+                platf_cfg=self.cfg_openql_platform_fn(),
+                program_name='RB_s{}_ncl{}_net{}_{}'.format(
+                    i, nr_cliffords, net_cliffords, self.name),
+                recompile=recompile)
+            programs.append(p)
+            print('Generated {} RB programs in {:.1f}s'.format(
+                i+1, time.time()-t0), end='\r')
+        print('Succesfully generated {} RB programs in {:.1f}s'.format(
+            nr_seeds, time.time()-t0))
+        prepare_function_kwargs = {
+            'counter_param': counter_param,
+            'programs': programs,
+            'CC': self.instr_CC.get_instr()}
+
+        # to include calibration points
+        sweep_points = np.append(
+            # repeat twice because of net clifford being 0 and 3
+            np.repeat(nr_cliffords, 2),
+            [nr_cliffords[-1]+.5]*2 + [nr_cliffords[-1]+1.5]*2 +
+            [nr_cliffords[-1]+2.5]*2,
+        )
+
+        d = self.int_log_det
+        d.prepare_function = load_range_of_oql_programs
+        d.prepare_function_kwargs = prepare_function_kwargs
+        reps_per_seed = 4094//len(sweep_points)
+        d.nr_shots = reps_per_seed*len(sweep_points)
+
+        s = swf.None_Sweep(parameter_name='Number of Cliffords', unit='#')
+
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.tile(sweep_points, reps_per_seed*nr_seeds))
+        MC.set_detector_function(d)
+        MC.run('RB_{}seeds'.format(nr_seeds)+self.msmt_suffix,
+               exp_metadata={'bins': sweep_points})
+
+        a = ma2.RandomizedBenchmarking_SingleQubit_Analyasis(label='RB_')
+        return a
+
+    def measure_randomized_benchmarking_old(self, nr_cliffords=2**np.arange(12),
+                                            nr_seeds=100,
+                                            double_curves=False,
+                                            MC=None, analyze=True, close_fig=True,
+                                            verbose: bool=True, upload=True,
+                                            update=True):
+        # Old version not including two-state calibration points and logging
+        # detector.
         # Adding calibration points
         if double_curves:
             nr_cliffords = np.repeat(nr_cliffords, 2)
@@ -2428,8 +2547,7 @@ class CCLight_Transmon(Qubit):
             self.F_RB(a.fit_res.params['fidelity_per_Clifford'].value)
         return a.fit_res.params['fidelity_per_Clifford'].value
 
-
-    def measure_ef_rabi(self, amps:list, recovery_pulse:bool=True,
+    def measure_ef_rabi(self, amps: list, recovery_pulse: bool=True,
                         MC=None, label: str ='',
                         analyze=True, close_fig=True,
                         prepare_for_timedomain=True):
@@ -2451,7 +2569,6 @@ class CCLight_Transmon(Qubit):
             self.cfg_qubit_nr(),
             amps=amps, recovery_pulse=recovery_pulse,
             platf_cfg=self.cfg_openql_platform_fn())
-
 
         s = swf.OpenQL_Sweep(openql_program=p,
                              parameter_name='Pulse amp',
@@ -2563,11 +2680,11 @@ class CCLight_Transmon(Qubit):
         self._dag = dag
         return dag
 
-    #functions for quantum efficiency measurements and crossdephasing measurements
+    # functions for quantum efficiency measurements and crossdephasing measurements
     def measure_msmt_induced_dephasing_sweeping_amps(self, amps_rel=None,
-                                  nested_MC=None, cross_target_qubits=None,
-                                  multi_qubit_platf_cfg=None, analyze=False,
-                                  verbose: bool=True, sequence='ramsey'):
+                                                     nested_MC=None, cross_target_qubits=None,
+                                                     multi_qubit_platf_cfg=None, analyze=False,
+                                                     verbose: bool=True, sequence='ramsey'):
         waveform_name = 'up_down_down_final'
 
         if nested_MC is None:
@@ -2585,7 +2702,8 @@ class CCLight_Transmon(Qubit):
             readout_pulse_length = self.ro_pulse_length()
             readout_pulse_length += self.ro_pulse_down_length0()
             readout_pulse_length += self.ro_pulse_down_length1()
-            amps_rel = np.linspace(0, 0.5, 11) if amps_rel is None else amps_rel
+            amps_rel = np.linspace(
+                0, 0.5, 11) if amps_rel is None else amps_rel
         else:
             cfg_qubit_nrs = []
             optimization_M_amps = []
@@ -2595,8 +2713,10 @@ class CCLight_Transmon(Qubit):
             for cross_target_qubit in cross_target_qubits:
                 cfg_qubit_nrs.append(cross_target_qubit.cfg_qubit_nr())
                 optimization_M_amps.append(cross_target_qubit.ro_pulse_amp())
-                optimization_M_amp_down0s.append(cross_target_qubit.ro_pulse_down_amp0())
-                optimization_M_amp_down1s.append(cross_target_qubit.ro_pulse_down_amp1())
+                optimization_M_amp_down0s.append(
+                    cross_target_qubit.ro_pulse_down_amp0())
+                optimization_M_amp_down1s.append(
+                    cross_target_qubit.ro_pulse_down_amp1())
                 ro_len = cross_target_qubit.ro_pulse_length()
                 ro_len += cross_target_qubit.ro_pulse_down_length0()
                 ro_len += cross_target_qubit.ro_pulse_down_length1()
@@ -2604,8 +2724,9 @@ class CCLight_Transmon(Qubit):
             readout_pulse_length = np.max(readout_pulse_lengths)
 
         RO_lutman = self.instr_LutMan_RO.get_instr()
-        if sequence=='ramsey':
-            RO_lutman.set('M_final_delay_R{}'.format(self.cfg_qubit_nr()), 200e-9)
+        if sequence == 'ramsey':
+            RO_lutman.set('M_final_delay_R{}'.format(
+                self.cfg_qubit_nr()), 200e-9)
         elif sequence == 'echo':
             RO_lutman.set('M_final_delay_R{}'.format(self.cfg_qubit_nr()),
                           200e-9+readout_pulse_length)
@@ -2621,7 +2742,6 @@ class CCLight_Transmon(Qubit):
 
         self.ro_acq_delay(old_delay + readout_pulse_length + d)
 
-
         self.ro_acq_integration_length(readout_pulse_length+100e-9)
         self.ro_acq_weight_type('SSB')
         self.prepare_for_timedomain()
@@ -2629,23 +2749,23 @@ class CCLight_Transmon(Qubit):
         self.cfg_prepare_ro_awg(False)
 
         sweep_function = swf.lutman_par_depletion_pulse_global_scaling(
-                        LutMan=RO_lutman,
-                        resonator_numbers=cfg_qubit_nrs,
-                        optimization_M_amps=optimization_M_amps,
-                        optimization_M_amp_down0s=optimization_M_amp_down0s,
-                        optimization_M_amp_down1s=optimization_M_amp_down1s,
-                        upload=True
-                    )
+            LutMan=RO_lutman,
+            resonator_numbers=cfg_qubit_nrs,
+            optimization_M_amps=optimization_M_amps,
+            optimization_M_amp_down0s=optimization_M_amp_down0s,
+            optimization_M_amp_down1s=optimization_M_amp_down1s,
+            upload=True
+        )
         d = det.Function_Detector(
-                      self.measure_msmt_induced_dephasing,
-                      msmt_kw={
-                            'cross_target_qubits': cross_target_qubits,
-                            'multi_qubit_platf_cfg': multi_qubit_platf_cfg,
-                            'analyze': True,
-                            'sequence': sequence,
-                        },
-                      result_keys=['coherence', 'phase']
-                    )
+            self.measure_msmt_induced_dephasing,
+            msmt_kw={
+                'cross_target_qubits': cross_target_qubits,
+                'multi_qubit_platf_cfg': multi_qubit_platf_cfg,
+                'analyze': True,
+                'sequence': sequence,
+            },
+            result_keys=['coherence', 'phase']
+        )
 
         nested_MC.set_sweep_function(sweep_function)
         nested_MC.set_sweep_points(amps_rel)
@@ -2660,7 +2780,8 @@ class CCLight_Transmon(Qubit):
         self.ro_acq_delay(old_delay)
 
         if analyze:
-            res = ma.MeasurementAnalysis(label=label, plot_all=False, auto=True)
+            res = ma.MeasurementAnalysis(
+                label=label, plot_all=False, auto=True)
             return res
 
     def measure_SNR_sweeping_amps(self, amps_rel, nr_shots=2*4094,
@@ -2673,22 +2794,22 @@ class CCLight_Transmon(Qubit):
         self.cfg_prepare_ro_awg(False)
 
         sweep_function = swf.lutman_par_depletion_pulse_global_scaling(
-                       LutMan=RO_lutman,
-                       resonator_numbers=[self.cfg_qubit_nr()],
-                       optimization_M_amps=[self.ro_pulse_amp()],
-                       optimization_M_amp_down0s=[self.ro_pulse_down_amp0()],
-                       optimization_M_amp_down1s=[self.ro_pulse_down_amp1()],
-                       upload=True
-                    )
+            LutMan=RO_lutman,
+            resonator_numbers=[self.cfg_qubit_nr()],
+            optimization_M_amps=[self.ro_pulse_amp()],
+            optimization_M_amp_down0s=[self.ro_pulse_down_amp0()],
+            optimization_M_amp_down1s=[self.ro_pulse_down_amp1()],
+            upload=True
+        )
         d = det.Function_Detector(
-                          self.measure_ssro,
-                          msmt_kw={
-                                'nr_shots': nr_shots,
-                                'analyze': True, 'SNR_detector': True,
-                                'cal_residual_excitation': False,
-                                },
-                          result_keys=['SNR', 'F_d', 'F_a']
-                        )
+            self.measure_ssro,
+            msmt_kw={
+                'nr_shots': nr_shots,
+                'analyze': True, 'SNR_detector': True,
+                'cal_residual_excitation': False,
+            },
+            result_keys=['SNR', 'F_d', 'F_a']
+        )
 
         nested_MC.set_sweep_function(sweep_function)
         nested_MC.set_sweep_points(amps_rel)
@@ -2701,20 +2822,21 @@ class CCLight_Transmon(Qubit):
         if analyze:
             ma.MeasurementAnalysis(label=label, plot_all=False, auto=True)
 
-    def measure_quantum_efficiency(self, amps_rel = None, nr_shots=2*4094,
+    def measure_quantum_efficiency(self, amps_rel=None, nr_shots=2*4094,
                                    analyze=True, verbose=True,
                                    dephasing_sequence='ramsey'):
         # requires the cc light to have the readout time configured equal
         # to the measurement and depletion time + 60 ns buffer
         # it requires an optimized depletion pulse
-        amps_rel = np.linspace(0,0.5,11) if amps_rel is None else amps_rel
+        amps_rel = np.linspace(0, 0.5, 11) if amps_rel is None else amps_rel
         self.cfg_prepare_ro_awg(True)
 
         start_time = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
-        self.measure_msmt_induced_dephasing_sweeping_amps(amps_rel=amps_rel,
-                                                          analyze=False,
-                                                          sequence=dephasing_sequence)
+        self.measure_msmt_induced_dephasing_sweeping_amps(
+            amps_rel=amps_rel,
+            analyze=False,
+            sequence=dephasing_sequence)
         readout_pulse_length = self.ro_pulse_length()
         readout_pulse_length += self.ro_pulse_down_length0()
         readout_pulse_length += self.ro_pulse_down_length1()
@@ -2738,12 +2860,13 @@ class CCLight_Transmon(Qubit):
                 'individual_plots': True,
                 'verbose': verbose,
             }
-            qea = ma2.QuantumEfficiencyAnalysis(t_start=start_time,
-                                                t_stop=end_time,
-                                                use_sweeps=True,
-                                                options_dict=options_dict,
-                                                label_ramsey='_ro_amp_sweep_ramsey'+self.msmt_suffix,
-                                                label_ssro='_ro_amp_sweep_SNR'+self.msmt_suffix)
+            qea = ma2.QuantumEfficiencyAnalysis(
+                t_start=start_time,
+                t_stop=end_time,
+                use_sweeps=True,
+                options_dict=options_dict,
+                label_ramsey='_ro_amp_sweep_ramsey'+self.msmt_suffix,
+                label_ssro='_ro_amp_sweep_SNR'+self.msmt_suffix)
 
             qea.run_analysis()
             eta = qea.fit_dicts['eta']

@@ -621,6 +621,13 @@ class Transmon(Qubit):
         self.add_parameter('E_j', unit='Hz',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers())
+        self.add_parameter('anharmonicity', unit='Hz',
+                           label='Anharmonicity',
+                           docstring='Anharmonicity, negative by convention',
+                           parameter_class=ManualParameter,
+                           # typical target value
+                           initial_value=-300e6,
+                           vals=vals.Numbers())
         self.add_parameter('T1', unit='s',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers(0, 200e-6))
