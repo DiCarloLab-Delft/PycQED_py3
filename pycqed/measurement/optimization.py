@@ -280,7 +280,7 @@ def center_and_scale(X,y):
            output_feature_means,output_feature_ext
 
 
-def neural_network_opt(fun,training_grid, hidden_layer_sizes = [(5,)],
+def neural_network_opt(training_grid, target_values ,hidden_layer_sizes = [(5,)],
                        alphas= 0.0001, solver='lbfgs',estimator='MLPRegressor',
                        iters = 200, beta=1.,gamma=1.):
     """
@@ -315,25 +315,13 @@ def neural_network_opt(fun,training_grid, hidden_layer_sizes = [(5,)],
     if not isinstance(alphas,list):
         alphas = [alphas]
     #transform input into array
-    training_grid = np.array(training_grid)
+    training_grid = np.transpose(training_grid)
+    target_values = np.transpose(target_values)
     #get input dimension, training grid contains parameters as row!! vectors
     n_samples = np.size(training_grid,0)
     n_features = np.size(training_grid,1)
-    ################### not used atm ##################################
-    #Acquire first data point for output dim information of fun()
-    fun_val = fun(training_grid[0,:])
+    output_dim = target_values.ndim
 
-    if hasattr(fun_val,'__len__'):      #test if fun_val is a collection or scalar
-        output_dim = np.array(fun_val).ndim
-    else: output_dim = 1                #if Scalar output_dim is for sure 1
-
-    target_values = np.zeros((n_samples,output_dim))
-    target_values[0,:] = fun_val
-    #consequetly, start iteration at 2nd input value
-    for it in range(1,n_samples):
-        target_values[it,:] = fun(training_grid[it,:])
-    ####################################################################
-    print()
     #Preprocessing of Data. Mainly transform the data to mean 0 and interval [0,1]
     training_grid,target_values,\
     input_feature_means,input_feature_ext,\
@@ -409,9 +397,8 @@ def neural_network_opt(fun,training_grid, hidden_layer_sizes = [(5,)],
 #     cbar = plt.colorbar(CP)
 #     cbar.ax.set_ylabel('Magnitude [V]',fontsize=20)
 #     plt.show()
-    final_score = fun(np.array(result))
 
-    return [np.array(result), np.array(final_score,dtype='float32')]
+    return np.array(result),est
     # return [np.array(result), np.array(amp,dtype='float32')]
     #mght want to adapt alpha,ect.i
 

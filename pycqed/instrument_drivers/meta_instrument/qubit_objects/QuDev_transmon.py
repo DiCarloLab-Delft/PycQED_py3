@@ -1673,37 +1673,57 @@ class QuDev_transmon(Qubit):
         #Could make sample size variable (maxiter) for better adapting)
         meas_grid = [np.random.normal(self.alpha(),0.5,100),
                      np.random.normal(self.phi_skew(),15,100)]
-        meas_grid = list(map(list, zip(*meas_grid)))
-        detector = det.UHFQC_mixer_calibration_det(
-            self.UHFQC, qc.station, [self.RO_acq_weight_function_I(),
-                                     self.RO_acq_weight_function_Q()],
-            self.pulse_I_channel(), self.pulse_Q_channel(),
-            self.alpha, self.phi_skew, self.f_pulse_mod(),
-            self.RO_acq_marker_channel(),
-            self.get_RO_pars(),
-            amplitude=amplitude, nr_averages=self.RO_acq_averages(),
-            RO_trigger_separation=trigger_sep, verbose=False,
-            data_points= len(meas_grid))
+        # detector = det.UHFQC_mixer_calibration_det(
+        #     self.UHFQC, qc.station, [self.RO_acq_weight_function_I(),
+        #                              self.RO_acq_weight_function_Q()],
+        #     self.pulse_I_channel(), self.pulse_Q_channel(),
+        #     self.alpha, self.phi_skew, self.f_pulse_mod(),
+        #     self.RO_acq_marker_channel(),
+        #     self.get_RO_pars(),
+        #     amplitude=amplitude, nr_averages=self.RO_acq_averages(),
+        #     RO_trigger_separation=trigger_sep, verbose=False,
+        #     data_points = len(meas_grid))
+
+        MC.set_sweep_function(awg_swf.mixer_calibration_swf(
+            pulseIch=self.pulse_I_channel(),
+            pulseQch=self.pulse_Q_channel(),
+            alpha=meas_grid[0],
+            phi_skew=meas_grid[1],
+            f_mod=self.f_pulse_mod(),
+            RO_trigger_channel=None,
+            RO_pars=self.get_RO_pars(),
+            amplitude=0.1,
+            RO_trigger_separation=5e-6,
+            verbose=False,
+            data_points=len(meas_grid[0]),
+            upload=True
+            ))
+        MC.set_sweep_points(np.linspace(1, 100, 100))
+        # MC.set_detector_function(det.IndexDetector(detector, 0))
+        MC.set_detector_function(self.int_avg_det)
         ad_func_pars = {'adaptive_function': opti.neural_network_opt,
                         'training_grid': meas_grid,
                         'hidden_layer_sizes': [(h, h) for h in range(35,50,5)],
                         'alphas': np.logspace(-6,-4,3).tolist(),
                         'minimize': True,
-                        'estimator': 'MLP_Regressor_scikit'
+                        'estimator': 'MLP_Regressor_scikit',
+                        'iterations': 600,
+                        'beta': 1e-2
                         #Probably some additional params for the NN go here
                         }
-        MC.set_sweep_functions([self.alpha, self.phi_skew])
-        MC.set_detector_function(det.IndexDetector(detector, 0))
-        MC.set_adaptive_function_parameters(ad_func_pars)
-        MC.run(name='drive_skewness_calibration' + self.msmt_suffix,
-               mode='adaptive')
-        a = ma.OptimizationAnalysis(label='drive_skewness_calibration')
+        # MC.set_adaptive_function_parameters(ad_func_pars)
+        MC.run(name='drive_skewness_calibration' + self.msmt_suffix)
+
+
+        a = ma.OptimizationAnalysisNN(label='drive_skewness_calibration',
+                                      ad_func_pars=ad_func_pars,
+                                      meas_grid=meas_grid)
         # v2 creates a pretty picture of the optimizations
-        ma.OptimizationAnalysis_v2(label='drive_skewness_calibration')
+        # ma.OptimizationAnalysis_v2(label='drive_skewness_calibration')
 
         # phi and alpha are the coefficients that go in the predistortion matrix
-        alpha = a.optimization_result[0][0]
-        phi = a.optimization_result[0][1]
+        alpha = a.optimization_result[0]
+        phi = a.optimization_result[1]
         if update:
             self.alpha(alpha)
             self.phi_skew(phi)

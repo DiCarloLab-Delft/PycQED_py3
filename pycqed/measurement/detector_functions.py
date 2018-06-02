@@ -1572,6 +1572,8 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         if self.AWG is not None:
             self.AWG.start()
 
+        print(self.nr_sweep_points)
+
         data_raw = self.UHFQC.acquisition_poll(
             samples=self.nr_sweep_points, arm=False, acquisition_time=0.01)
 
@@ -2329,7 +2331,9 @@ class UHFQC_mixer_calibration_det(UHFQC_integrated_average_detector):
                  verbose=False,  data_points=1):
         super().__init__(UHFQC, AWG=station.pulsar, integration_length=2.2e-6,
                          nr_averages=nr_averages, channels=UHFQC_channels,
-                         real_imag=False, single_int_avg=True)
+                         real_imag=False, single_int_avg=True,
+                         always_prepare=True,
+                         seg_per_point=data_points)
         self.name = 'UHFQC_mixer_skewness_det'
         self.station = station
         self.pulseIch = pulseIch
@@ -2344,18 +2348,20 @@ class UHFQC_mixer_calibration_det(UHFQC_integrated_average_detector):
         self.RO_pars = RO_pars
         self.data_points = data_points
         self.n_measured = 0
-        self.seq  = None
+        self.seq = None
         self.elts = []
         self.finished = False
-        self.channels = ['AWG1_ch3_m2', 'AWG1_ch2_m2', 'AWG1_ch1_m1', 'AWG1_ch1_m2', 'AWG1_ch2_m1', 'AWG1_ch4']
+        self.channels = ['AWG1_ch3_m2', 'AWG1_ch2_m2', 'AWG1_ch1_m1', 'AWG1_ch1_m2', 'AWG1_ch2_m1', 'AWG1_ch3', 'AWG1_ch4']
         print(self.channels)
 
     def acquire_data_point(self):
         print(self.n_measured,'::',self.data_points)
-        if self.n_measured <= self.data_points:
+        if self.n_measured < self.data_points:
                new_seq, new_elt = cal_elts.mixer_calibration_sequence(
-                                        self.RO_trigger_separation,self.amplitude,
-                                        self.RO_trigger_channel,
+                                        self.RO_trigger_separation,
+                                        self.amplitude,
+                                        None,
+                                        self.RO_pars,
                                         self.pulseIch, self.pulseQch,
                                         f_pulse_mod=self.f_mod,
                                         phi_skew=self.phi_skew(),
@@ -2375,7 +2381,7 @@ class UHFQC_mixer_calibration_det(UHFQC_integrated_average_detector):
             logging.warning('The expected number of measurement points is '
                             'exceeded. returning [0] and not adding new sequence'
                             'element. <UHFQC_mixer_calibration_det>')
-        if self.n_measured > self.data_points:
+        if self.n_measured >= self.data_points:
             self.finished = True
             self.station.pulsar.program_awgs(self.seq, *self.elts,
                                              channels=self.channels,
@@ -2426,6 +2432,7 @@ class UHFQC_mixer_skewness_det(UHFQC_integrated_average_detector):
             print('phi_skew: {:.3f}'.format(self.phi_skew()))
         cal_elts.mixer_calibration_sequence(
                 self.RO_trigger_separation, self.amplitude, self.RO_trigger_channel,
+                self.RO_pars,
                 self.pulseIch, self.pulseQch, f_pulse_mod=self.f_mod,
                 phi_skew=self.phi_skew(), alpha=self.alpha()
             )

@@ -26,6 +26,7 @@ from scipy.signal import argrelmax, argrelmin
 from copy import deepcopy
 from pycqed.analysis.fit_toolbox import functions as func
 from pprint import pprint
+from pycqed.measurement import optimization as opt
 
 import pycqed.analysis.tools.plotting as pl_tools
 from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel,
@@ -944,6 +945,41 @@ class OptimizationAnalysis_v2(MeasurementAnalysis):
                 set_xlabel(ax, self.parameter_names[0], self.parameter_units[0])
                 set_ylabel(ax, self.parameter_names[1], self.parameter_units[1])
                 self.save_fig(f, figname=base_figname, **kw)
+
+
+class OptimizationAnalysisNN(MeasurementAnalysis):
+
+    def run_default_analysis(self, close_file=True, show=False, plot_all=False, **kw):
+        self.get_naming_and_values()
+        self.meas_grid = kw.pop('meas_grid')
+        self.ad_func_pars = kw.pop('ad_func_pars')
+        self.hidden_layer_sizes = self.ad_func_pars.pop('hidden_layer_sizes',[(5,)])
+        self.alphas = self.ad_func_pars.pop('alphas',1)
+        self.estimator = self.ad_func_pars.pop('estimator','MLP_Regressor_scikit')
+        self.beta = self.ad_func_pars.pop('beta',0)
+        self.iters = self.ad_func_pars.pop('iterations')
+        self.optimization_result,\
+        self.fitted_est             = self.train_NN(**kw)
+        self.make_figures(**kw)
+        if close_file:
+            self.data_file.close()
+        return self.optimization_result
+
+    def train_NN(self, **kw):
+        abs_vals = np.sqrt(self.measured_values[0,:]**2 + self.measured_values[1,:]**2)
+        result,est = opt.neural_network_opt(self.meas_grid,
+                                        abs_vals,
+                                        hidden_layer_sizes = self.hidden_layer_sizes,
+                                        alphas= self.alphas,
+                                        solver='lbfgs',
+                                        estimator=self.estimator,
+                                        iters = self.iters,
+                                        beta=self.beta,
+                                        gamma=1.)
+        return result,est
+
+    def make_figures(self, **kw):
+        pass
 
 
 class OptimizationAnalysis(MeasurementAnalysis):

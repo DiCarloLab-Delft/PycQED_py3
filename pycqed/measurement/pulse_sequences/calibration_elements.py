@@ -116,7 +116,6 @@ def mixer_calibration_sequence(trigger_separation, amplitude, trigger_channel=No
     el = multi_pulse_elt(0, station, pulses, trigger=True)
     seq = sequence.Sequence('Sideband_modulation_seq')
     seq.append(name='SSB_modulation_el', wfname=el.name, trigger_wait=True)
-    print(channels)
     if upload:
         station.pulsar.program_awgs(seq, el, channels=channels)
     return seq, [el]
