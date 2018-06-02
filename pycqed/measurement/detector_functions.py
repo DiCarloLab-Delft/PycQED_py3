@@ -2421,7 +2421,8 @@ class UHFQC_mixer_skewness_det(UHFQC_integrated_average_detector):
                 print('alpha: {:.3f}'.format(self.alpha()))
                 print('phi_skew: {:.3f}'.format(self.phi_skew()))
             cal_elts.mixer_calibration_sequence(
-                self.RO_trigger_separation, self.amplitude, self.RO_trigger_channel,
+                self.RO_trigger_separation, self.amplitude, None,
+                self.RO_pars,
                 self.pulseIch, self.pulseQch, f_pulse_mod=self.f_mod,
                 phi_skew=self.phi_skew(), alpha=self.alpha()
             )

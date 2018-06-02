@@ -1994,84 +1994,87 @@ class Rabi_Analysis(TD_Analysis):
                                 'frequency "%s" is too high.' %freq_fit)
 
             #Extract pi and pi/2 amplitudes from best fit values
-            if phase_fit == 0:
-                piPulse = 1/(2*freq_fit)
-                piHalfPulse = 1/(4*freq_fit)
-                piPulse_std = freq_std/(2*freq_fit**2)
-                piHalfPulse_std = freq_std/(4*freq_fit**2)
+            # if phase_fit == 0:
+            #     piPulse = 1/(2*freq_fit)
+            #     piHalfPulse = 1/(4*freq_fit)
+            #     piPulse_std = freq_std/(2*freq_fit**2)
+            #     piHalfPulse_std = freq_std/(4*freq_fit**2)
+            #
+            # else:
+            n = np.arange(-2, 10)
 
-            else:
-                n = np.arange(-2, 3)
+            piPulse_vals = (n*np.pi+phase_fit)/(2*np.pi*freq_fit)
+            piHalfPulse_vals = (n*np.pi+np.pi/2+phase_fit)/(2*np.pi*freq_fit)
 
-                piPulse_vals = (n*np.pi+phase_fit)/(2*np.pi*freq_fit)
-                piHalfPulse_vals = (n*np.pi+np.pi/2+phase_fit)/(2*np.pi*freq_fit)
+            # find piHalfPulse
+            try:
+                piHalfPulse = \
+                    np.min(piHalfPulse_vals[piHalfPulse_vals >= self.sweep_points[1]])
+                n_piHalf_pulse = n[piHalfPulse_vals==piHalfPulse]
+            except ValueError:
+                piHalfPulse = np.asarray([])
 
-                # find piHalfPulse
-                try:
-                    piHalfPulse = \
-                        np.min(piHalfPulse_vals[piHalfPulse_vals >= 0])
-                    n_piHalf_pulse = n[piHalfPulse_vals==piHalfPulse]
-                except ValueError:
-                    piHalfPulse = np.asarray([])
+            if piHalfPulse.size==0 or piHalfPulse>max(self.sweep_points):
+                i=0
+                while (piHalfPulse_vals[i]<min(self.sweep_points) and
+                               i<piHalfPulse_vals.size):
+                    i+=1
+                piHalfPulse = piHalfPulse_vals[i]
+                n_piHalf_pulse = n[i]
 
-                if piHalfPulse.size==0 or piHalfPulse>max(self.sweep_points):
-                    i=0
-                    while (piHalfPulse_vals[i]<min(self.sweep_points) and
-                                   i<piHalfPulse_vals.size):
-                        i+=1
-                    piHalfPulse = piHalfPulse_vals[i]
-                    n_piHalf_pulse = n[i]
+            # find piPulse
+            try:
+                if piHalfPulse.size != 0:
+                    piPulse = \
+                        np.min(piPulse_vals[piPulse_vals>=piHalfPulse])
+                else:
+                    piPulse = np.min(piPulse_vals[piPulse_vals>=0.001])
+                n_pi_pulse = n[piHalfPulse_vals==piHalfPulse]
 
-                # find piPulse
-                try:
-                    if piHalfPulse.size != 0:
-                        piPulse = \
-                            np.min(piPulse_vals[piPulse_vals>=piHalfPulse])
-                    else:
-                        piPulse = np.min(piPulse_vals[piPulse_vals>=0.001])
-                    n_pi_pulse = n[piHalfPulse_vals==piHalfPulse]
+            except ValueError:
+                piPulse = np.asarray([])
 
-                except ValueError:
-                    piPulse = np.asarray([])
+            if piPulse.size==0: #or piPulse>max(self.sweep_points):
+                i=0
+                while (piPulse_vals[i]<min(self.sweep_points) and
+                               i<piPulse_vals.size):
+                    i+=1
+                piPulse = piPulse_vals[i]
+                n_pi_pulse = n[i]
 
-                if piPulse.size==0: #or piPulse>max(self.sweep_points):
-                    i=0
-                    while (piPulse_vals[i]<min(self.sweep_points) and
-                                   i<piPulse_vals.size):
-                        i+=1
-                    piPulse = piPulse_vals[i]
-                    n_pi_pulse = n[i]
+            # piPulse = 1/(2*freq_fit) - phase_fit/(2*np.pi*freq_fit)
+            # piHalfPulse = 1/(4*freq_fit) - phase_fit/(2*np.pi*freq_fit)
 
-                # piPulse = 1/(2*freq_fit) - phase_fit/(2*np.pi*freq_fit)
-                # piHalfPulse = 1/(4*freq_fit) - phase_fit/(2*np.pi*freq_fit)
+            #Calculate std. deviation for pi and pi/2 amplitudes based on error
+            # propagation theory
+            #(http://ugastro.berkeley.edu/infrared09/PDF-2009/statistics1.pdf)
+            #Errors were assumed to be uncorrelated.
 
-                #Calculate std. deviation for pi and pi/2 amplitudes based on error
-                # propagation theory
-                #(http://ugastro.berkeley.edu/infrared09/PDF-2009/statistics1.pdf)
-                #Errors were assumed to be uncorrelated.
-
-                #extract cov(phase,freq)
+            #extract cov(phase,freq)
+            try:
                 freq_idx = self.fit_result.var_names.index('frequency')
                 phase_idx = self.fit_result.var_names.index('phase')
                 if self.fit_result.covar is not None:
                     cov_freq_phase = self.fit_result.covar[freq_idx,phase_idx]
                 else:
-                    cov_freq_phase=0
+                    cov_freq_phase = 0
+            except ValueError:
+                cov_freq_phase = 0
 
-                piPulse_std = self.calculate_pulse_stderr(
-                    f=freq_fit,
-                    phi=phase_fit,
-                    f_err=freq_std,
-                    phi_err=phase_std,
-                    period_num=n_pi_pulse,
-                    cov=cov_freq_phase)
-                piHalfPulse_std = self.calculate_pulse_stderr(
-                    f=freq_fit,
-                    phi=phase_fit,
-                    f_err=freq_std,
-                    phi_err=phase_std,
-                    period_num=n_piHalf_pulse,
-                    cov=cov_freq_phase)
+            piPulse_std = self.calculate_pulse_stderr(
+                f=freq_fit,
+                phi=phase_fit,
+                f_err=freq_std,
+                phi_err=phase_std,
+                period_num=n_pi_pulse,
+                cov=cov_freq_phase)
+            piHalfPulse_std = self.calculate_pulse_stderr(
+                f=freq_fit,
+                phi=phase_fit,
+                f_err=freq_std,
+                phi_err=phase_std,
+                period_num=n_piHalf_pulse,
+                cov=cov_freq_phase)
 
             if kw.get('print_parameters', False):
                 print('\u03C0'+'-Pulse Amplitude = {:.6} '.format(piPulse)+
@@ -6502,6 +6505,11 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                 amplitude_guess = -amplitude_guess
                 amplitude_guess_ef = -amplitude_guess_ef
 
+            if kappa_guess_ef > kappa_guess:
+                temp = deepcopy(kappa_guess)
+                kappa_guess = deepcopy(kappa_guess_ef)
+                kappa_guess_ef = temp
+
             DoubleLorentzianModel = fit_mods.TwinLorentzModel
 
             DoubleLorentzianModel.set_param_hint('f0',
@@ -9715,7 +9723,7 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
             ax.set_ylabel('|S21| (arb. units)')
             ax.legend(['data','fits'])
 
-            if only_cos_fits:
+            if not only_cos_fits:
                 if fit_range is None:
                     self.ax[1].plot(self.sweep_points_2D,phase_list)
                 else:
@@ -9959,6 +9967,7 @@ class FluxPulse_Scope_Analysis(MeasurementAnalysis):
             fit_res = self.fit_single_slice(data_slice,
                                             sign_of_peaks=sign_of_peaks,
                                             plot=False, print_res=False)
+            self.fit_res = fit_res
             fitted_freqs[i] = fit_res.best_values['mu']
             fitted_stds[i] = np.sqrt(fit_res.covar[2, 2])
 

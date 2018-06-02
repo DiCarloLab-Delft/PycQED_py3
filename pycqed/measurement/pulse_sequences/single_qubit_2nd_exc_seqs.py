@@ -23,7 +23,6 @@ def Rabi_2nd_exc_seq(amps, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
     """
     seq_name = 'Rabi_2nd_exc_sequence'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
     pulses_2nd = get_pulse_dict_from_pars(pulse_pars_2nd)
@@ -107,7 +106,6 @@ def Ramsey_2nd_exc_seq(times, pulse_pars, pulse_pars_2nd, RO_pars, n=1,
 
     seq_name = 'Ramsey_2nd_exc_sequence'
     seq = sequence.Sequence(seq_name)
-    station.pulsar.update_channel_settings()
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
     pulses_2nd = get_pulse_dict_from_pars(pulse_pars_2nd)

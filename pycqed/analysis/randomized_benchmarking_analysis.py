@@ -66,7 +66,7 @@ class RandomizedBenchmarking_Analysis(ma.TD_Analysis):
 
     def run_default_analysis(self, **kw):
 
-        make_fig_RB = kw.pop('make_fig_RB', False)
+        make_fig_RB = kw.pop('make_fig_RB', True)
         if not kw.pop('skip', False):
             close_main_fig = kw.pop('close_main_fig', True)
             close_file = kw.pop('close_file', True)
@@ -197,15 +197,15 @@ class RandomizedBenchmarking_Analysis(ma.TD_Analysis):
             textstr += ('\n$F_{Cl}^{T_1}$  = ' +
                         '{:.6g}%'.format(F_T1*100))
 
-        horizontal_alignment = kw.pop('horizontal_alignment', 'left')
-        horiz_place = 0.025
-        if horizontal_alignment == 'right':
-            horiz_place = 0.975
+        horizontal_alignment = kw.pop('horizontal_alignment', 'right')
+        horiz_place = 0.975
+        if horizontal_alignment == 'left':
+            horiz_place = 0.025
 
-        vertical_alignment = kw.pop('horizontal_alignment', 'bottom')
-        vert_place = 0.025
-        if vertical_alignment == 'top':
-            vert_place = 0.975
+        vertical_alignment = kw.pop('horizontal_alignment', 'top')
+        vert_place = 0.975
+        if vertical_alignment == 'bottom':
+            vert_place = 0.025
 
         ax.text(horiz_place, vert_place, textstr, transform=ax.transAxes,
                 fontsize=self.font_size, verticalalignment=vertical_alignment,

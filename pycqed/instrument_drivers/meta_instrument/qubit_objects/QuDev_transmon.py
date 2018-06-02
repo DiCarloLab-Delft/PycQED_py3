@@ -828,24 +828,21 @@ class QuDev_transmon(Qubit):
         if MC is None:
             MC = self.MC
 
-        if self.cal_points:
-            if cal_points:
-                step = np.abs(amps[-1]-amps[-2])
-                if no_cal_points == 6:
-                    sweep_points = np.concatenate(
-                        [amps, [amps[-1]+step, amps[-1]+2*step, amps[-1]+3*step,
-                            amps[-1]+4*step, amps[-1]+5*step, amps[-1]+6*step]])
-                elif no_cal_points == 4:
-                    sweep_points = np.concatenate(
-                        [amps, [amps[-1]+step, amps[-1]+2*step, amps[-1]+3*step,
-                            amps[-1]+4*step]])
-                elif no_cal_points == 2:
-                    sweep_points = np.concatenate(
-                        [amps, [amps[-1]+step, amps[-1]+2*step]])
-                else:
-                    sweep_points = amps
-        else:
-            sweep_points = amps
+        if cal_points:
+            step = np.abs(amps[-1]-amps[-2])
+            if no_cal_points == 6:
+                sweep_points = np.concatenate(
+                    [amps, [amps[-1]+step, amps[-1]+2*step, amps[-1]+3*step,
+                        amps[-1]+4*step, amps[-1]+5*step, amps[-1]+6*step]])
+            elif no_cal_points == 4:
+                sweep_points = np.concatenate(
+                    [amps, [amps[-1]+step, amps[-1]+2*step, amps[-1]+3*step,
+                        amps[-1]+4*step]])
+            elif no_cal_points == 2:
+                sweep_points = np.concatenate(
+                    [amps, [amps[-1]+step, amps[-1]+2*step]])
+            else:
+                sweep_points = amps
 
         MC.set_sweep_function(awg_swf.Rabi_2nd_exc(
                         pulse_pars=self.get_drive_pars(),
@@ -1348,8 +1345,8 @@ class QuDev_transmon(Qubit):
                         + self.msmt_suffix
 
         if thresholded:
-            if int(self.UHFQC.get('quex_thres_{}_level'.format(
-                    self.RO_acq_weight_function_I()))) == 0:
+            if self.UHFQC.get('quex_thres_{}_level'.format(
+                    self.RO_acq_weight_function_I())) == 0.0:
                 raise ValueError('The threshold value is not set.')
 
         nr_seeds_arr = np.arange(nr_seeds)
@@ -3338,7 +3335,7 @@ class QuDev_transmon(Qubit):
 
 
 
-    def calibrate_flux_pulse_timing(self, MC=None, freqs=None, delays=None,
+    def calibrate_flux_pulse_timing(self, freqs=None, delays=None, MC=None,
                                     analyze=False, update=False,**kw):
         """
         flux pulse timing calibration
@@ -3733,10 +3730,10 @@ class QuDev_transmon(Qubit):
                 label='CPhase_measurement_{}_{}'.format(self.name,
                                                         qb_target.name),
                 qb_name=self.name, cal_points=cal_points,
-                reference_measurements=True
+                reference_measurements=True, auto=False
             )
             fitted_phases, fitted_amps = \
-                flux_pulse_ma.fit_all(plot=plot,
+                flux_pulse_ma.fit_all(plot=False,
                                       cal_points=cal_points,
                                       return_ampl=True,
                                       )
@@ -3763,7 +3760,8 @@ class QuDev_transmon(Qubit):
                               cal_points=cal_points,
                               return_ampl=True,
                               save_plot=True,
-                              plot_title=plot_title
+                              plot_title=plot_title,
+                              only_cos_fits=True
                               )
         cphase_all = np.array(cphase_all)
         population_loss_all = np.array(population_loss_all)

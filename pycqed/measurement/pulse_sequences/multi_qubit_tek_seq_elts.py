@@ -1488,7 +1488,7 @@ def two_qubit_tomo_bell_qudev_seq(bell_state,
                 operation_dict['ICZ ' + qb_name] = \
                     deepcopy(operation_dict['I ' + qb_name])
                 operation_dict['ICZ ' + qb_name]['sigma'] = \
-                    operation_dict[CZ_op]['length']
+                    operation_dict[CZ_op]['pulse_length']
                 operation_dict['ICZ ' + qb_name]['nr_sigma'] = 1
 
     # make all pulses for qubit1 and qubit2 be simultaneous with qubit0

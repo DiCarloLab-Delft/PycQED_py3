@@ -1268,7 +1268,8 @@ def cphase_gate_tuneup(qb_control, qb_target,
                               amps=[pulse_amplitude_init],
                               lengths=[pulse_length_init],
                               cal_points=False, plot=False,
-                              phases=ramsey_phases, spacing=spacing
+                              phases=ramsey_phases, spacing=spacing,
+                              prepare_for_timedomain=False
                               )
 
     d = cdet.CPhase_optimization(qb_control=qb_control, qb_target=qb_target,
