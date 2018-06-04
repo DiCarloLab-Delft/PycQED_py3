@@ -3,13 +3,9 @@ from copy import deepcopy
 from pycqed.analysis import analysis_toolbox as a_tools
 from collections import OrderedDict
 from pycqed.analysis import measurement_analysis as ma_old
-from pycqed.analysis.tools import cryoscope_tools as ct
 import pycqed.analysis_v2.base_analysis as ba
-import pycqed.measurement.waveform_control_CC.waveform as wf
-import pycqed.analysis.fitting_models as fit_mods
 import numpy as np
 import logging
-from numpy.fft import fft, ifft, fftfreq
 from scipy.stats import sem
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 import matplotlib.pyplot as plt
@@ -18,6 +14,7 @@ from matplotlib.colors import ListedColormap
 from sklearn import linear_model
 import time
 from matplotlib import colors as c
+
 
 class RandomizedBenchmarking_SingleQubit_Analyasis(ba.BaseDataAnalysis):
     def __init__(self, t_start: str=None, t_stop: str=None, label='',
