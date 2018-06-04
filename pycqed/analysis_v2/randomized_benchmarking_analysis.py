@@ -157,6 +157,8 @@ class RandomizedBenchmarking_SingleQubit_Analyasis(ba.BaseDataAnalysis):
 
             self.fit_res['leakage_decay'] = {}
 
+        lambda_1 = fit_res_leak.best_values['lambda_1']
+        L1 = fit_res_leak.params['L1'].value
 
         fit_mod_rb = lmfit.Model(full_rb_decay, independent_vars='m')
         fit_mod_rb.set_param_hint('A', value=.5, min=0, vary=True)
@@ -165,6 +167,14 @@ class RandomizedBenchmarking_SingleQubit_Analyasis(ba.BaseDataAnalysis):
 
         fit_mod_rb.set_param_hint('lambda_1', value=lambda_1, vary=False)
         fit_mod_rb.set_param_hint('lambda_2', value=.95, vary=True)
+
+        # dimensionality of computational subspace, FIXME for 2Q RB
+        fit_mod_rb.set_param_hint('d1', value=2, vary=False)
+        fit_mod_rb.set_param_hint('L1', value=L1, vary=False)
+        fit_mod_rb.set_param_hint(
+            'F', expr='1/d1*((d1-1)*lambda_2+1-L1)', vary=True)
+        fit_mod_rb.set_param_hint('F_g', expr='F**(1/1.875)')
+
 
         params = fit_mod_rb.make_params()
         try:
