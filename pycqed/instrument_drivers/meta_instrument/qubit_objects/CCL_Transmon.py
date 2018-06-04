@@ -633,6 +633,9 @@ class CCLight_Transmon(Qubit):
         - generate the RO pulse
         - set the integration weights
         """
+
+        self.instr_acquisition.get_instr().load_default_settings()
+
         self._prep_ro_instantiate_detectors()
         self._prep_ro_sources()
         if self.cfg_prepare_ro_awg():
@@ -2412,7 +2415,7 @@ class CCLight_Transmon(Qubit):
         # because only 1 seed is uploaded each time
         if MC is None:
             MC = self.instr_MC.get_instr()
-        MC.soft_avg(1)
+
         counter_param = ManualParameter('name_ctr', initial_value=0)
         programs = []
 
@@ -2426,7 +2429,7 @@ class CCLight_Transmon(Qubit):
             self.prepare_for_timedomain()
         else:
             self.prepare_readout()
-
+        MC.soft_avg(1)
         # set back the settings
         self.ro_acq_weight_type(old_weight_type)
         self.ro_acq_digitized(old_digitized)
@@ -2480,7 +2483,7 @@ class CCLight_Transmon(Qubit):
         MC.run('RB_{}seeds'.format(nr_seeds)+self.msmt_suffix,
                exp_metadata={'bins': sweep_points})
 
-        a = ma2.RandomizedBenchmarking_SingleQubit_Analyasis(label='RB_')
+        a = ma2.RandomizedBenchmarking_SingleQubit_Analysis(label='RB_')
         return a
 
     def measure_randomized_benchmarking_old(self, nr_cliffords=2**np.arange(12),
