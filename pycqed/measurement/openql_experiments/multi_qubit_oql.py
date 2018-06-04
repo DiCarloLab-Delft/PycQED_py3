@@ -180,6 +180,7 @@ def Ramsey_msmt_induced_dephasing(qubits: list, angles: list, platf_cfg: str):
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
 
+
 def echo_msmt_induced_dephasing(qubits: list, angles: list, platf_cfg: str,
                                 wait_time: float=0):
     """
@@ -1321,6 +1322,8 @@ def CZ_restless_state_cycling(q0: str, q1: str, N: int=1):
     # qasm_file.writelines('RO {}\n'.format(q0))
 
 
+
+
 def add_two_q_cal_points(p, platf, q0: int, q1: int,
                          reps_per_cal_pt: int =1):
     """
@@ -1362,8 +1365,37 @@ def add_two_q_cal_points(p, platf, q0: int, q1: int,
     return p
 
 
+def add_multi_q_cal_points(p, platf, qubits: list,
+                           combinations: list):
+    """
+    Adds calibration points based on a list of state combinations
+    """
+    kernel_list = []
+    for i, comb in enumerate(combinations):
+        k = Kernel('cal{}_{}'.format(i, comb), p=platf)
+        for q in qubits:
+            k.prepz(q)
+
+        for j, q in enumerate(qubits):
+            if comb[j] == '1':
+                k.gate('rx180', q)
+            elif comb[j] == '2':
+                k.gate('rx180', q)
+                k.gate('rx12', q)
+            else:
+                pass
+        # Used to ensure timing is aligned
+        k.gate('wait', qubits, 0)
+        for q in qubits:
+            k.measure(q)
+        k.gate('wait', qubits, 0)
+        kernel_list.append(k)
+        p.add_kernel(k)
+    return p
+
+
 def Chevron_first_manifold(qubit_idx: int, qubit_idx_spec: int,
-            buffer_time, buffer_time2, flux_cw: int, platf_cfg: str):
+                           buffer_time, buffer_time2, flux_cw: int, platf_cfg: str):
     """
     Writes output files to the directory specified in openql.
     Output directory is set as an attribute to the program for convenience.
@@ -1408,10 +1440,10 @@ def Chevron_first_manifold(qubit_idx: int, qubit_idx_spec: int,
 
 
 def partial_tomography_cardinal(q0: int, q1: int, cardinal: int, platf_cfg: str,
-                       precompiled_flux: bool=True,
-                       cal_points: bool=True, second_CZ_delay: int=260,
-                       CZ_duration: int=260,
-                       add_echo_pulses: bool=False):
+                                precompiled_flux: bool=True,
+                                cal_points: bool=True, second_CZ_delay: int=260,
+                                CZ_duration: int=260,
+                                add_echo_pulses: bool=False):
     """
     Tomography sequence for Grover's algorithm.
 
@@ -1428,18 +1460,18 @@ def partial_tomography_cardinal(q0: int, q1: int, cardinal: int, platf_cfg: str,
 
     cardinal_gates = ['i', 'rx180', 'ry90', 'rym90', 'rx90', 'rxm90']
 
-    if (cardinal>35 or cardinal<0):
+    if (cardinal > 35 or cardinal < 0):
         raise ValueError('cardinal must be in [0, 35]')
 
     idx_p0 = cardinal % 6
     idx_p1 = ((cardinal - idx_p0)//6) % 6
-    #cardinal_gates[]
+    # cardinal_gates[]
     #k.gate(string_of_the_gate, integer_from_qubit)
-    tomo_gates = [('i','i'),('i','rx180'),('rx180','i'),('rx180','rx180'),
-        ('ry90','ry90'),('rym90','rym90'),('rx90','rx90'),('rxm90','rxm90')]
+    tomo_gates = [('i', 'i'), ('i', 'rx180'), ('rx180', 'i'), ('rx180', 'rx180'),
+                  ('ry90', 'ry90'), ('rym90', 'rym90'), ('rx90', 'rx90'), ('rxm90', 'rxm90')]
 
     for gates in tomo_gates:
-        #strings denoting the gates
+        # strings denoting the gates
         SP0 = cardinal_gates[idx_p0]
         SP1 = cardinal_gates[idx_p1]
         t_q0 = gates[1]
@@ -1454,7 +1486,7 @@ def partial_tomography_cardinal(q0: int, q1: int, cardinal: int, platf_cfg: str,
         k.gate(SP0, q0)
         k.gate(SP1, q1)
         # tomo pulses
-        #to be taken from list of tuples
+        # to be taken from list of tuples
         k.gate(t_q1, q0)
         k.gate(t_q0, q1)
 
@@ -1496,13 +1528,13 @@ def two_qubit_VQE(q0: int, q1: int, platf_cfg: str):
             k = Kernel(kernel_name, p=platf)
             k.prepz(q0)
             k.prepz(q1)
-            k.gate('ry180', q0) #Y180 gate without compilation
-            k.gate('i', q0) #Y180 gate without compilation
+            k.gate('ry180', q0)  # Y180 gate without compilation
+            k.gate('i', q0)  # Y180 gate without compilation
             k.gate("wait", [q1], 40)
             k.gate('fl_cw_02', 2, 0)
             k.gate("wait", [q1], 40)
-            k.gate(p_q0, q0) #compiled z gate+pre_rotation
-            k.gate(p_q1, q1) #pre_rotation
+            k.gate(p_q0, q0)  # compiled z gate+pre_rotation
+            k.gate(p_q1, q1)  # pre_rotation
             k.measure(q0)
             k.measure(q1)
             p.add_kernel(k)
