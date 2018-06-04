@@ -19,7 +19,8 @@ from matplotlib import colors as c
 class RandomizedBenchmarking_SingleQubit_Analyasis(ba.BaseDataAnalysis):
     def __init__(self, t_start: str=None, t_stop: str=None, label='',
                  options_dict: dict=None, auto=True, close_figs=True,
-                 classification_method='rates'):
+                 classification_method='rates', rates_ch_idx: int =1,
+                 ):
         if options_dict is None:
             options_dict = dict()
         super().__init__(t_start=t_start, t_stop=t_stop, label=label,
@@ -27,7 +28,7 @@ class RandomizedBenchmarking_SingleQubit_Analyasis(ba.BaseDataAnalysis):
                          do_fitting=True)
         # used to determine how to determine 2nd excited state population
         self.classification_method = classification_method
-
+        self.rates_ch_idx = rates_ch_idx
         if auto:
             self.run_analysis()
 
@@ -115,7 +116,6 @@ class RandomizedBenchmarking_SingleQubit_Analyasis(ba.BaseDataAnalysis):
             self.proc_data_dict['P2'][val_name] = P2
             self.proc_data_dict['M_inv'][val_name] = M_inv
 
-
         classifier = logisticreg_classifier_machinelearning(
             self.proc_data_dict['cal_pts_zero'],
             self.proc_data_dict['cal_pts_one'],
@@ -123,12 +123,11 @@ class RandomizedBenchmarking_SingleQubit_Analyasis(ba.BaseDataAnalysis):
         self.proc_data_dict['classifier'] = classifier
 
         if self.classification_method == 'rates':
-            # Hacky default to 2nd channel FIXME
+            val_name = self.raw_data_dict['value_names'][self.rates_ch_idx]
             self.proc_data_dict['M0'] = self.proc_data_dict['P0'][val_name]
             self.proc_data_dict['X1'] = 1-self.proc_data_dict['P2'][val_name]
         else:
             raise NotImplementedError()
-
 
     def run_fitting(self):
         super().run_fitting()
@@ -143,24 +142,22 @@ class RandomizedBenchmarking_SingleQubit_Analyasis(ba.BaseDataAnalysis):
         params = leak_mod.make_params()
         try:
             fit_res_leak = leak_mod.fit(data=self.proc_data_dict['X1'],
-                                  m=self.proc_data_dict['ncl'],
-                                  params=params)
-            self.fit_res['leakage_decay']= fit_res_leak
+                                        m=self.proc_data_dict['ncl'],
+                                        params=params)
+            self.fit_res['leakage_decay'] = fit_res_leak
             lambda_1 = fit_res_leak.best_values['lambda_1']
-        except Exception as e :
+            L1 = fit_res_leak.params['L1'].value
+        except Exception as e:
             logging.warning("Fitting failed")
             logging.warning(e)
             lambda_1 = 1
-
+            L1 = 0
             self.fit_res['leakage_decay'] = {}
-
-        lambda_1 = fit_res_leak.best_values['lambda_1']
-        L1 = fit_res_leak.params['L1'].value
 
         fit_mod_rb = lmfit.Model(full_rb_decay, independent_vars='m')
         fit_mod_rb.set_param_hint('A', value=.5, min=0, vary=True)
         fit_mod_rb.set_param_hint('B', value=.1, min=0, vary=True)
-        fit_mod_rb.set_param_hint('C', value=.4, min=0,max=1, vary=True)
+        fit_mod_rb.set_param_hint('C', value=.4, min=0, max=1, vary=True)
 
         fit_mod_rb.set_param_hint('lambda_1', value=lambda_1, vary=False)
         fit_mod_rb.set_param_hint('lambda_2', value=.95, vary=True)
@@ -172,23 +169,36 @@ class RandomizedBenchmarking_SingleQubit_Analyasis(ba.BaseDataAnalysis):
             'F', expr='1/d1*((d1-1)*lambda_2+1-L1)', vary=True)
         fit_mod_rb.set_param_hint('F_g', expr='F**(1/1.875)')
 
-
         params = fit_mod_rb.make_params()
         try:
             fit_res_rb = fit_mod_rb.fit(data=self.proc_data_dict['M0'],
-                                  m=self.proc_data_dict['ncl'],
-                                  params=params)
+                                        m=self.proc_data_dict['ncl'],
+                                        params=params)
 
             self.fit_res['rb_decay'] = fit_res_rb
-        except Exception as e :
+        except Exception as e:
             logging.warning("Fitting failed")
             logging.warning(e)
             lambda_1 = 1
 
-
             self.fit_res['rb_decay'] = {}
+        try:
+            fr_rb = self.fit_res['rb_decay']
+            fr_dec = self.fit_res['leakage_decay']
+            text_msg = (
+                '$F_{Cl.}$:\t' + '{:.3f}'.format(fr_rb.params['F'].value*100)
+                + r'$\pm$' + '{:.3f}%\n'.format(fr_rb.params['F'].stderr*100))
+            text_msg += (
+                '$L_1$:\t\t' + '{:.3f}'.format(fr_dec.params['L1'].value*100) +
+                r'$\pm$' + '{:.3f}%\n'.format(fr_dec.params['L1'].stderr*100))
+            text_msg += (
+                '$L_2$:\t\t' + '{:.3f}'.format(fr_dec.params['L2'].value*100) +
+                r'$\pm$' + '{:.3f}%\n'.format(fr_dec.params['L2'].stderr*100))
+        except Exception as e:
+            logging.warning(e)
+            text_msg = ''
 
-
+        self.proc_data_dict['rb_msg'] = text_msg
 
     def prepare_plots(self):
         val_names = self.raw_data_dict['value_names']
@@ -262,40 +272,46 @@ class RandomizedBenchmarking_SingleQubit_Analyasis(ba.BaseDataAnalysis):
             'xunit': self.proc_data_dict['value_units'][0],
             'ylabel': val_names[1],
             'yunit': self.proc_data_dict['value_units'][1],
-            'title': self.proc_data_dict['timestamp_string']+'\n'+
-                self.proc_data_dict['measurementstring'] +
-                ' Decision boundary',
-            'plotsize': (fs[0]*1.5, fs[1]) }
+            'title': self.proc_data_dict['timestamp_string']+'\n' +
+            self.proc_data_dict['measurementstring'] +
+            ' Decision boundary',
+            'plotsize': (fs[0]*1.5, fs[1])}
 
         # define figure and axes here to have custom layout
         self.figs['main_rb_decay'], axs = plt.subplots(
-            nrows=2, sharex=True, gridspec_kw={'height_ratios':(2,1)})
+            nrows=2, sharex=True, gridspec_kw={'height_ratios': (2, 1)})
         self.figs['main_rb_decay'].patch.set_alpha(0)
         self.axs['main_rb_decay'] = axs[0]
         self.axs['leak_decay'] = axs[1]
         self.plot_dicts['main_rb_decay'] = {
             'plotfn': plot_rb_decay_woods_gambetta,
-            'ncl':self.proc_data_dict['ncl'],
-            'M0':self.proc_data_dict['M0'],
-            'X1':self.proc_data_dict['X1'],
+            'ncl': self.proc_data_dict['ncl'],
+            'M0': self.proc_data_dict['M0'],
+            'X1': self.proc_data_dict['X1'],
             'ax1': axs[1],
-            'title': self.proc_data_dict['timestamp_string']+'\n'+
-                self.proc_data_dict['measurementstring'] }
+            'title': self.proc_data_dict['timestamp_string']+'\n' +
+            self.proc_data_dict['measurementstring']}
 
         self.plot_dicts['fit_leak'] = {
             'plotfn': self.plot_fit,
             'ax_id': 'leak_decay',
-            'fit_res':self.fit_res['leakage_decay'],
+            'fit_res': self.fit_res['leakage_decay'],
             'setlabel': 'Leakage fit',
             'do_legend': True,
-            }
+        }
         self.plot_dicts['fit_rb'] = {
             'plotfn': self.plot_fit,
             'ax_id': 'main_rb_decay',
-            'fit_res':self.fit_res['rb_decay'],
+            'fit_res': self.fit_res['rb_decay'],
             'setlabel': 'RB fit',
             'do_legend': True,
-            }
+        }
+
+        self.plot_dicts['rb_text'] = {
+            'plotfn': self.plot_text,
+            'text_string': self.proc_data_dict['rb_msg'],
+            'xpos': 1.05, 'ypos': .6, 'ax_id': 'main_rb_decay',
+            'horizontalalignment': 'left'}
 
 
 class InterleavedTwoQubitRB_Analyasis(ba.BaseDataAnalysis):
@@ -475,6 +491,7 @@ def logisticreg_classifier_machinelearning(shots_0, shots_1, shots_2):
     logreg.fit(X, Y)
     return logreg
 
+
 def plot_classifier_decission_boundary(shots_0, shots_1, shots_2,
                                        classifier,
                                        xlabel: str, xunit: str,
@@ -485,8 +502,6 @@ def plot_classifier_decission_boundary(shots_0, shots_1, shots_2,
     (usually the calibration points).
     """
     grid_points = 200
-
-
 
     x_min = np.min([shots_0[0], shots_1[0], shots_2[0]])
     x_max = np.max([shots_0[0], shots_1[0], shots_2[0]])
@@ -511,9 +526,12 @@ def plot_classifier_decission_boundary(shots_0, shots_1, shots_2,
                   cmap=c.ListedColormap(['C0', 'C3', 'C2']),
                   alpha=.2)
 
+
 def plot_rb_decay_woods_gambetta(ncl, M0, X1, ax, ax1, title='', **kw):
     ax.plot(ncl, M0, marker='o', linestyle='')
     ax1.plot(ncl, X1, marker='d', linestyle='')
+    ax.grid(axis='y')
+    ax1.grid(axis='y')
     ax.set_ylim(-.05, 1.05)
     ax1.set_ylim(min(min(.97*X1), .92), 1.01)
     ax.set_ylabel(r'$M_0$ probability')
@@ -531,11 +549,11 @@ def leak_decay(A, B, lambda_1, m):
         lambda_1 = 1 - L1 - L2
 
     """
-    return A+ B*lambda_1**m
+    return A + B*lambda_1**m
+
 
 def full_rb_decay(A, B, C, lambda_1, lambda_2, m):
     """
     Eq. (15) of Wood Gambetta 2018
     """
     return A + B*lambda_1**m+C*lambda_2**m
-
