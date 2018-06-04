@@ -12,7 +12,7 @@ class Test_RBAnalysis(unittest.TestCase):
         ma.a_tools.datadir = self.datadir
 
     def test_single_qubit_RB_analysis(self):
-        a = ma.RandomizedBenchmarking_SingleQubit_Analyasis(
+        a = ma.RandomizedBenchmarking_SingleQubit_Analysis(
             t_start='20180601_135117',
             classification_method='rates', rates_ch_idx=1)
 

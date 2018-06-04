@@ -1,10 +1,9 @@
 """
-This is the file one imports for daily use.
-This file should only contain import statements to import functions
-from other files in the analysis_v2 module.
+This file imports all the relevant classes for daily use.
 """
 
-# This snippet ensures all submodules get reloaded properly
+# This snippet ensures all submodules get reloaded properly as we like to
+# modify things when using it.
 from importlib import reload
 import pycqed.analysis_v2.base_analysis as ba
 reload(ba)
@@ -61,4 +60,6 @@ from pycqed.analysis_v2.spectroscopy_analysis import Spectroscopy, ResonatorSpec
 from pycqed.analysis_v2.dac_scan_analysis import FluxFrequency
 from pycqed.analysis_v2.quantum_efficiency_analysis import QuantumEfficiencyAnalysis, DephasingAnalysisSingleScans, DephasingAnalysisSweep, SSROAnalysisSingleScans, SSROAnalysisSweep, QuantumEfficiencyAnalysisTWPA
 from pycqed.analysis_v2.cross_dephasing_analysis import CrossDephasingAnalysis
-from pycqed.analysis_v2.randomized_benchmarking_analysis import RandomizedBenchmarking_SingleQubit_Analyasis
+from pycqed.analysis_v2.randomized_benchmarking_analysis import (
+    RandomizedBenchmarking_SingleQubit_Analysis,
+    RandomizedBenchmarking_TwoQubit_Analysis)
