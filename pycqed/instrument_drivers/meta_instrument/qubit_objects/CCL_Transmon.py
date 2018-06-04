@@ -2547,13 +2547,17 @@ class CCLight_Transmon(Qubit):
             self.F_RB(a.fit_res.params['fidelity_per_Clifford'].value)
         return a.fit_res.params['fidelity_per_Clifford'].value
 
-    def measure_ef_rabi(self, amps: list, recovery_pulse: bool=True,
+    def measure_ef_rabi(self,
+                        amps: list=np.linspace(-.8, .8, 18),
+                        recovery_pulse: bool=True,
                         MC=None, label: str ='',
                         analyze=True, close_fig=True,
                         prepare_for_timedomain=True):
         """
         Measures a rabi oscillation of the ef/12 transition.
 
+        Modulation frequency of the "ef" pusles is controlled through the
+        `anharmonicity` parameter of the qubit object.
         Hint: the expected pi-pulse amplitude of the ef/12 transition is ~1/2
             the pi-pulse amplitude of the ge/01 transition.
         """
