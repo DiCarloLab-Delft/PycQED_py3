@@ -102,13 +102,7 @@ class MeasurementControl(Instrument):
 
         # pyqtgraph plotting process is reused for different measurements.
         if self.live_plot_enabled():
-            self.main_QtPlot = QtPlot(
-                window_title='Main plotmon of {}'.format(self.name),
-                figsize=(600, 400))
-            self.secondary_QtPlot = QtPlot(
-                window_title='Secondary plotmon of {}'.format(self.name),
-                figsize=(600, 400))
-
+            self.create_plot_monitor()
         self.plotting_interval(plotting_interval)
 
         self.soft_iteration = 0  # used as a counter for soft_avg
@@ -596,6 +590,23 @@ class MeasurementControl(Instrument):
     There are (will be) three kinds of plotmons, the regular plotmon,
     the 2D plotmon (which does a heatmap) and the adaptive plotmon.
     '''
+
+    def create_plot_monitor(self):
+        """
+        Creates new PyQTgraph plotting monitor.
+        Can also be used to recreate these when plotting has crashed.
+        """
+        if hasattr(self, 'main_QtPlot'):
+            del self.main_QtPlot
+        if hasattr(self, 'secondary_QtPlot'):
+            del self.secondary_QtPlot
+
+        self.main_QtPlot = QtPlot(
+            window_title='Main plotmon of {}'.format(self.name),
+            figsize=(600, 400))
+        self.secondary_QtPlot = QtPlot(
+            window_title='Secondary plotmon of {}'.format(self.name),
+            figsize=(600, 400))
 
     def initialize_plot_monitor(self):
         # new code
