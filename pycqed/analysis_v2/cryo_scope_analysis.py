@@ -9,9 +9,9 @@ import pycqed.analysis_v2.base_analysis as ba
 import numpy as np
 from scipy.stats import sem
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
-from matplotlib import gridspec, ticker
-from mpl_toolkits.axes_grid.inset_locator import (inset_axes, InsetPosition,
-                                                  mark_inset)
+from matplotlib import ticker
+from mpl_toolkits.axes_grid1.inset_locator import InsetPosition, mark_inset
+
 
 class RamZFluxArc(ba.BaseDataAnalysis):
     """
