@@ -346,7 +346,7 @@ class RandomizedBenchmarking_TwoQubit_Analysis(ba.BaseDataAnalysis):
 
         if 'bins' in a.data_file['Experimental Data']['Experimental Metadata'].keys():
             bins = a.data_file['Experimental Data']['Experimental Metadata']['bins'].value
-            self.raw_data_dict['ncl'] = bins[:-6:2]
+            self.raw_data_dict['ncl'] = bins[:-7:2]  # 7 calibration points
             self.raw_data_dict['bins'] = bins
 
             self.raw_data_dict['value_names'] = a.value_names
@@ -355,25 +355,48 @@ class RandomizedBenchmarking_TwoQubit_Analysis(ba.BaseDataAnalysis):
             self.raw_data_dict['timestamp_string'] = a.timestamp_string
 
             self.raw_data_dict['binned_vals'] = OrderedDict()
-            self.raw_data_dict['cal_pts_zero'] = OrderedDict()
-            self.raw_data_dict['cal_pts_one'] = OrderedDict()
-            self.raw_data_dict['cal_pts_two'] = OrderedDict()
+            self.raw_data_dict['cal_pts_x0'] = OrderedDict()
+            self.raw_data_dict['cal_pts_x1'] = OrderedDict()
+            self.raw_data_dict['cal_pts_x2'] = OrderedDict()
+            self.raw_data_dict['cal_pts_0x'] = OrderedDict()
+            self.raw_data_dict['cal_pts_1x'] = OrderedDict()
+            self.raw_data_dict['cal_pts_2x'] = OrderedDict()
+
             self.raw_data_dict['measured_values_I'] = OrderedDict()
             self.raw_data_dict['measured_values_X'] = OrderedDict()
+
             for i, val_name in enumerate(a.value_names):
+                invalid_idxs = np.where((a.measured_values[0] == 0) &
+                                        (a.measured_values[1] == 0) &
+                                        (a.measured_values[2] == 0) &
+                                        (a.measured_values[3] == 0))[0]
+                a.measured_values[:, invalid_idxs] = \
+                    np.array([[np.nan]*len(invalid_idxs)]*4)
+
                 binned_yvals = np.reshape(
                     a.measured_values[i], (len(bins), -1), order='F')
                 self.raw_data_dict['binned_vals'][val_name] = binned_yvals
-                self.raw_data_dict['cal_pts_zero'][val_name] =\
-                    binned_yvals[-6:-4, :].flatten()
-                self.raw_data_dict['cal_pts_one'][val_name] =\
-                    binned_yvals[-4:-2, :].flatten()
-                self.raw_data_dict['cal_pts_two'][val_name] =\
-                    binned_yvals[-2:, :].flatten()
+
+                # 7 cal points:  [00, 01, 10, 11, 02, 20, 22]
+                #      col_idx:  [-7, -6, -5, -4, -3, -2, -1]
+                self.raw_data_dict['cal_pts_x0'][val_name] =\
+                    binned_yvals[(-7, -5), :].flatten()
+                self.raw_data_dict['cal_pts_x1'][val_name] =\
+                    binned_yvals[(-6, -4), :].flatten()
+                self.raw_data_dict['cal_pts_x2'][val_name] =\
+                    binned_yvals[(-3, -1), :].flatten()
+
+                self.raw_data_dict['cal_pts_0x'][val_name] =\
+                    binned_yvals[(-7, -6), :].flatten()
+                self.raw_data_dict['cal_pts_1x'][val_name] =\
+                    binned_yvals[(-5, -4), :].flatten()
+                self.raw_data_dict['cal_pts_2x'][val_name] =\
+                    binned_yvals[(-2, -1), :].flatten()
+
                 self.raw_data_dict['measured_values_I'][val_name] =\
-                    binned_yvals[:-6:2, :]
+                    binned_yvals[:-7:2, :]
                 self.raw_data_dict['measured_values_X'][val_name] =\
-                    binned_yvals[1:-6:2, :]
+                    binned_yvals[1:-7:2, :]
 
         else:
             bins = None
@@ -382,26 +405,64 @@ class RandomizedBenchmarking_TwoQubit_Analysis(ba.BaseDataAnalysis):
         self.raw_data_dict['timestamps'] = self.timestamps
         a.finish()  # closes data file
 
-
     def process_data(self):
         self.proc_data_dict = deepcopy(self.raw_data_dict)
 
-
     def prepare_plots(self):
-        val_names = self.raw_data_dict['value_names']
+        val_names = self.proc_data_dict['value_names']
 
         for i, val_name in enumerate(val_names):
             self.plot_dicts['binned_data_{}'.format(val_name)] = {
                 'plotfn': self.plot_line,
-                'xvals': self.raw_data_dict['bins'],
-                'yvals': np.mean(self.raw_data_dict['binned_vals'][val_name], axis=1),
-                'yerr':  sem(self.raw_data_dict['binned_vals'][val_name], axis=1),
+                'xvals': self.proc_data_dict['bins'],
+                'yvals': np.mean(self.proc_data_dict['binned_vals'][val_name], axis=1),
+                'yerr':  sem(self.proc_data_dict['binned_vals'][val_name], axis=1),
                 'xlabel': 'Number of Cliffrods',
                 'xunit': '#',
                 'ylabel': val_name,
-                'yunit': self.raw_data_dict['value_units'][i],
-                'title': self.raw_data_dict['timestamp_string']+'\n'+self.raw_data_dict['measurementstring'],
+                'yunit': self.proc_data_dict['value_units'][i],
+                'title': self.proc_data_dict['timestamp_string'] +
+                '\n'+self.proc_data_dict['measurementstring'],
             }
+
+        fs = plt.rcParams['figure.figsize']
+        self.plot_dicts['cal_points_hexbin_q0'] = {
+            'plotfn': plot_cal_points_hexbin,
+            'shots_0': (self.proc_data_dict['cal_pts_x0'][val_names[0]],
+                        self.proc_data_dict['cal_pts_x0'][val_names[1]]),
+            'shots_1': (self.proc_data_dict['cal_pts_x1'][val_names[0]],
+                        self.proc_data_dict['cal_pts_x1'][val_names[1]]),
+            'shots_2': (self.proc_data_dict['cal_pts_x2'][val_names[0]],
+                        self.proc_data_dict['cal_pts_x2'][val_names[1]]),
+            'xlabel': val_names[0],
+            'xunit': self.proc_data_dict['value_units'][0],
+            'ylabel': val_names[1],
+            'yunit': self.proc_data_dict['value_units'][1],
+            'common_clims':False,
+            'title': self.proc_data_dict['timestamp_string'] +
+            '\n'+self.proc_data_dict['measurementstring'] +
+            ' hexbin plot q0',
+            'plotsize': (fs[0]*1.5, fs[1])
+        }
+        self.plot_dicts['cal_points_hexbin_q1'] = {
+            'plotfn': plot_cal_points_hexbin,
+            'shots_0': (self.proc_data_dict['cal_pts_0x'][val_names[2]],
+                        self.proc_data_dict['cal_pts_0x'][val_names[3]]),
+            'shots_1': (self.proc_data_dict['cal_pts_1x'][val_names[2]],
+                        self.proc_data_dict['cal_pts_1x'][val_names[3]]),
+            'shots_2': (self.proc_data_dict['cal_pts_2x'][val_names[2]],
+                        self.proc_data_dict['cal_pts_2x'][val_names[3]]),
+            'xlabel': val_names[2],
+            'xunit': self.proc_data_dict['value_units'][2],
+            'ylabel': val_names[3],
+            'yunit': self.proc_data_dict['value_units'][3],
+            'common_clims':False,
+            'title': self.proc_data_dict['timestamp_string'] +
+            '\n'+self.proc_data_dict['measurementstring'] +
+            ' hexbin plot q1',
+            'plotsize': (fs[0]*1.5, fs[1])
+        }
+
 
 def plot_cal_points_hexbin(shots_0,
                            shots_1,
@@ -409,7 +470,9 @@ def plot_cal_points_hexbin(shots_0,
                            xlabel: str, xunit: str,
                            ylabel: str, yunit: str,
                            title: str,
-                           ax, **kw):
+                           ax,
+                           common_clims: bool=True,
+                           **kw):
     # Choose colormap
     alpha_cmaps = []
     for cmap in [pl.cm.Blues, pl.cm.Reds, pl.cm.Greens]:
@@ -419,19 +482,23 @@ def plot_cal_points_hexbin(shots_0,
         alpha_cmaps.append(my_cmap)
 
     f = plt.gcf()
-    hb = ax.hexbin(x=shots_2[0], y=shots_2[1], cmap=alpha_cmaps[2])
-    clim = hb.get_clim()
-
-    cb = f.colorbar(hb, ax=ax)
+    hb2 = ax.hexbin(x=shots_2[0], y=shots_2[1], cmap=alpha_cmaps[2])
+    cb = f.colorbar(hb2, ax=ax)
     cb.set_label(r'Counts $|2\rangle$')
-    hb = ax.hexbin(x=shots_1[0], y=shots_1[1], cmap=alpha_cmaps[1])
-    hb.set_clim(clim)
-    cb = f.colorbar(hb, ax=ax)
+
+    hb1 = ax.hexbin(x=shots_1[0], y=shots_1[1], cmap=alpha_cmaps[1])
+    cb = f.colorbar(hb1, ax=ax)
     cb.set_label(r'Counts $|1\rangle$')
-    hb = ax.hexbin(x=shots_0[0], y=shots_0[1], cmap=alpha_cmaps[0])
-    hb.set_clim(clim)
-    cb = f.colorbar(hb, ax=ax)
+
+    hb0 = ax.hexbin(x=shots_0[0], y=shots_0[1], cmap=alpha_cmaps[0])
+    cb = f.colorbar(hb0, ax=ax)
     cb.set_label(r'Counts $|0\rangle$')
+
+    if common_clims:
+        clims = hb0.get_clim(), hb1.get_clim(), hb2.get_clim()
+        clim = np.min(clims), np.max(clims)
+        for hb in hb0, hb1, hb2:
+            hb.set_clim(clim)
 
     set_xlabel(ax, xlabel, xunit)
     set_ylabel(ax, ylabel, yunit)
