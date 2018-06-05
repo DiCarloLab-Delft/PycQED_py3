@@ -1032,7 +1032,8 @@ class two_par_joint_sweep(Soft_Sweep):
     respective ratios.
     Allows par_A and par_B to be arrays of parameters
     """
-    def __init__(self, par_A, par_B, preserve_ratio: bool=True, **kw):
+    def __init__(self, par_A, par_B, preserve_ratio: bool=True,
+                 retrieve_value=False, **kw):
         self.set_kw()
         self.unit = par_A.unit
         self.sweep_control = 'soft'
@@ -1040,6 +1041,7 @@ class two_par_joint_sweep(Soft_Sweep):
         self.par_B = par_B
         self.name = par_A.name
         self.parameter_name = par_A.name
+        self.retrieve_value = retrieve_value
         if preserve_ratio:
             try:
                 self.par_ratio = self.par_B.get()/self.par_A.get()
@@ -1052,6 +1054,8 @@ class two_par_joint_sweep(Soft_Sweep):
     def set_parameter(self, val):
         self.par_A.set(val)
         self.par_B.set(val*self.par_ratio)
+        if self.retrieve_value:
+            self.par_A()  # only get first one to prevent overhead
 
 
 class FLsweep(Soft_Sweep):

@@ -34,7 +34,8 @@ def generate_config(filename: str,
 
     qubits = ['q0', 'q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7']
     lut_map = ['i {}', 'rx180 {}', 'ry180 {}', 'rx90 {}', 'ry90 {}',
-               'rxm90 {}', 'rym90 {}', 'rphi90 {}', 'spec {}', 'rx12 {}']
+               'rxm90 {}', 'rym90 {}', 'rphi90 {}', 'spec {}', 'rx12 {}',
+               'square {}']
     flux_tuples = [("q2", "q0"), ("q0", "q2"),
                    ("q0", "q3"), ("q3", "q0"),
                    ("q3", "q1"), ("q1", "q3"),

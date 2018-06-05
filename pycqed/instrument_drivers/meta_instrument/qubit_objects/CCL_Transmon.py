@@ -24,6 +24,7 @@ from pycqed.measurement.openql_experiments.openql_helpers import \
     load_range_of_oql_programs
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import detector_functions as det
+from pycqed.measurement.mc_parameter_wrapper import wrap_par_to_swf
 
 import cma
 from pycqed.measurement.optimization import nelder_mead
@@ -633,14 +634,13 @@ class CCLight_Transmon(Qubit):
         - generate the RO pulse
         - set the integration weights
         """
-
-        self.instr_acquisition.get_instr().load_default_settings()
+        if self.cfg_prepare_ro_awg():
+            self.instr_acquisition.get_instr().load_default_settings()
+            self._prep_ro_pulse()
+            self._prep_ro_integration_weights()
 
         self._prep_ro_instantiate_detectors()
         self._prep_ro_sources()
-        if self.cfg_prepare_ro_awg():
-            self._prep_ro_pulse()
-            self._prep_ro_integration_weights()
 
     def _prep_ro_instantiate_detectors(self):
         self.instr_MC.get_instr().soft_avg(self.ro_soft_avg())
@@ -1808,12 +1808,15 @@ class CCLight_Transmon(Qubit):
         VSM = self.instr_VSM.get_instr()
         mod_out = self.mw_vsm_mod_out()
         ch_in = self.mw_vsm_ch_in()
-        G_amp_par = VSM.parameters['mod{}_ch{}_gaussian_amp'.format(
-            mod_out, ch_in)]
-        D_amp_par = VSM.parameters['mod{}_ch{}_derivative_amp'.format(
-            mod_out, ch_in)]
-        D_phase_par = VSM.parameters['mod{}_ch{}_derivative_phase'.format(
-            mod_out, ch_in)]
+        G_amp_par = wrap_par_to_swf(
+            VSM.parameters['mod{}_ch{}_gaussian_amp'.format(
+                mod_out, ch_in)], retrieve_value=True)
+        D_amp_par = wrap_par_to_swf(
+            VSM.parameters['mod{}_ch{}_derivative_amp'.format(
+                mod_out, ch_in)], retrieve_value=True)
+        D_phase_par = wrap_par_to_swf(
+            VSM.parameters['mod{}_ch{}_derivative_phase'.format(
+                mod_out, ch_in)], retrieve_value=True)
 
         freq_par = self.instr_LO_mw.get_instr().frequency
 
@@ -2131,6 +2134,40 @@ class CCLight_Transmon(Qubit):
             self.T1(a.T1)
         return a.T1
 
+    def measure_T1_2nd_excited_state(self, times=None, MC=None,
+                                     analyze=True, close_fig=True, update=True,
+                                     prepare_for_timedomain=True):
+        """
+        Performs a T1 experiment on the 2nd excited state.
+        """
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        # default timing
+        if times is None:
+            times = np.linspace(0, self.T1()*4, 31)
+
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+
+        # Load pulses to the ef transition
+        mw_lutman = self.instr_LutMan_MW.get_instr()
+        mw_lutman.load_ef_rabi_pulses_to_AWG_lookuptable()
+
+        p = sqo.T1_second_excited_state(times, qubit_idx=self.cfg_qubit_nr(),
+                                        platf_cfg=self.cfg_openql_platform_fn())
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             parameter_name='Time',
+                             unit='s',
+                             CCL=self.instr_CC.get_instr())
+        d = self.int_avg_det
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(p.sweep_points)
+        MC.set_detector_function(d)
+        MC.run('T1_2nd_exc_state_'+self.msmt_suffix)
+        a = ma.T1_Analysis(auto=True, close_fig=True)
+        return a.T1
+
     def measure_ramsey(self, times=None, MC=None,
                        artificial_detuning: float=None,
                        freq_qubit: float=None,
@@ -2366,7 +2403,7 @@ class CCLight_Transmon(Qubit):
             ch_in = self.mw_vsm_ch_in()
             D_par = VSM.parameters['mod{}_ch{}_derivative_amp'.format(
                 mod_out, ch_in)]
-            swf_func = D_par
+            swf_func = wrap_par_to_swf(D_par, retrieve_value=True)
         else:
             if using_QWG:
                 if motzoi_amps is None:

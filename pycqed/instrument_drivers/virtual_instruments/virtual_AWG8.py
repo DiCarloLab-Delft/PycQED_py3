@@ -85,3 +85,25 @@ class VirtualAWG8(Instrument):
 
     def start(self):
         pass
+
+    def upload_waveform_realtime(self, w0, w1, awg_nr:int, wf_nr:int =1):
+        """
+        Arguments:
+            w0   (array): waveform for ch0 of the awg pair.
+            w1   (array): waveform for ch1 of the awg pair.
+            awg_nr (int): awg_nr indicating what awg pair to use.
+            wf_nr  (int): waveform in memory to overwrite, default is 1.
+
+        There are a few important notes when using this method
+        - w0 and w1 must be of the same length
+        - any parts of a waveform longer than w0/w1 will not be overwritten.
+        - loading speed depends on the size of w0 and w1 and is ~80ms for 20us.
+
+        """
+        # these two attributes are added for debugging purposes.
+        # they allow checking what the realtime loaded waveforms are.
+        self._realtime_w0 = w0
+        self._realtime_w1 = w1
+        # stacking is here to mimic the full realtime loading
+        c = np.vstack((w0, w1)).reshape((-2,), order='F')
+        self._realtime_wf_c = c

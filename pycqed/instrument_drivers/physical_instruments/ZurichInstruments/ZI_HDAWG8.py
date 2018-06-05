@@ -164,38 +164,37 @@ class ZI_HDAWG8(ZI_base_instrument):
             curr_valid = (d & valid) != 0
 
             if count_high:
-              if curr_strobe:
-                strobe_high += 1
-              else:
-                if (strobe_low > 0) and (strobe_low != strobe_high):
-                    count_ok = False
+                if curr_strobe:
+                    strobe_high += 1
+                else:
+                    if (strobe_low > 0) and (strobe_low != strobe_high):
+                        count_ok = False
 
             if count_low:
-              if not curr_strobe:
-                strobe_low += 1
-              else:
-                if (strobe_high > 0) and (strobe_low != strobe_high):
-                    count_ok = False
+                if not curr_strobe:
+                    strobe_low += 1
+                else:
+                    if (strobe_high > 0) and (strobe_low != strobe_high):
+                        count_ok = False
 
             if (last_strobe != None):
-              if (curr_strobe and not last_strobe):
-                got_strobe_re = True
-                strobe_high = 0
-                count_high = True
-                count_low = False
-                index_high = n
-              elif (not curr_strobe and last_strobe):
-                got_strobe_fe = True
-                strobe_low = 0
-                count_low = True
-                count_high = False
-                index_low = n
+                if (curr_strobe and not last_strobe):
+                    got_strobe_re = True
+                    strobe_high = 0
+                    count_high = True
+                    count_low = False
+                    index_high = n
+                elif (not curr_strobe and last_strobe):
+                    got_strobe_fe = True
+                    strobe_low = 0
+                    count_low = True
+                    count_high = False
+                    index_low = n
 
             if (last_valid != None) and (curr_valid and not last_valid):
                 got_valid_re = True
             if (last_valid != None) and (not curr_valid and last_valid):
                 got_valid_fe = True
-
 
             got_bits |= (d & mask)
             last_strobe = curr_strobe
@@ -263,7 +262,8 @@ class ZI_HDAWG8(ZI_base_instrument):
                     done[i] = True
                     print('[SUCCESS]')
             if not ok:
-                print("  A problem was detected with the protocol. Will try to reinitialize the clock as it sometimes helps.")
+                print(
+                    "  A problem was detected with the protocol. Will try to reinitialize the clock as it sometimes helps.")
                 self._dev.seti('awgs/*/enable', 0)
                 self._dev.seti('system/extclk', 0)
                 time.sleep(1)
@@ -396,7 +396,7 @@ class ZI_HDAWG8(ZI_base_instrument):
         t1 = time.time()
         print('Set all zeros waveforms in {:.1f} s'.format(t1-t0))
 
-    def upload_waveform_realtime(self, w0, w1, awg_nr:int, wf_nr:int =1):
+    def upload_waveform_realtime(self, w0, w1, awg_nr: int, wf_nr: int =1):
         """
         Warning! This method should be used with care.
         Uploads a waveform to the awg in realtime, note that this get's
@@ -423,7 +423,6 @@ class ZI_HDAWG8(ZI_base_instrument):
         self._dev.seti('awgs/{}/waveform/index'.format(awg_nr), wf_nr)
         self._dev.setv('awgs/{}/waveform/data'.format(awg_nr), c)
         self._dev.seti('awgs/{}/enable'.format(awg_nr), wf_nr)
-
 
     def upload_codeword_program(self, awgs=np.arange(4)):
         """

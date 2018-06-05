@@ -235,6 +235,54 @@ def T1(times, qubit_idx: int, platf_cfg: str):
     return p
 
 
+def T1_second_excited_state(times, qubit_idx: int, platf_cfg: str):
+    """
+    Single qubit T1 sequence for the second excited states.
+    Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
+
+    Input pars:
+        times:          the list of waiting times for each T1 element
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+    Returns:
+        p:              OpenQL Program object containing
+
+
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="T1_2nd_exc", nqubits=platf.get_qubit_number(),
+                p=platf)
+    for i, time in enumerate(times):
+        for j in range(2):
+            k = Kernel("T1_2nd_exc_{}_{}".format(i, j), p=platf)
+            k.prepz(qubit_idx)
+            wait_nanoseconds = int(round(time/1e-9))
+            k.gate('rx180', qubit_idx)
+            k.gate('rx12', qubit_idx)
+            k.gate("wait", [qubit_idx], wait_nanoseconds)
+            if j == 1:
+                k.gate('rx180', qubit_idx)
+            k.measure(qubit_idx)
+            p.add_kernel(k)
+
+    # adding the calibration points
+    add_single_qubit_cal_points(p, platf=platf, qubit_idx=qubit_idx,
+                                f_state_cal_pts=True)
+
+    with suppress_stdout():
+        p.compile(verbose=False)
+
+    dt = times[1] - times[0]
+    sweep_points = np.concatenate([np.repeat(times, 2),
+                                  times[-1]+dt*np.arange(6)+dt])
+    # attribute get's added to program to help finding the output files
+    p.sweep_points = sweep_points
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
+
 def Ramsey(times, qubit_idx: int, platf_cfg: str):
     """
     Single qubit Ramsey sequence.
@@ -668,7 +716,7 @@ def Ram_Z(qubit_name,
 
 
 def add_single_qubit_cal_points(p, platf, qubit_idx,
-                                f_state_cal_pts:bool=False):
+                                f_state_cal_pts: bool=False):
     """
     Adds single qubit calibration points to an OpenQL program
 

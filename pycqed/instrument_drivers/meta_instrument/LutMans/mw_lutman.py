@@ -1,9 +1,10 @@
 from .base_lutman import Base_LutMan, get_redundant_codewords
 import numpy as np
-from collections import Iterable
+from collections import Iterable, OrderedDict
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
 from pycqed.measurement.waveform_control_CC import waveform as wf
+
 
 class Base_MW_LutMan(Base_LutMan):
     _def_lm = ['I', 'rX180',  'rY180', 'rX90',  'rY90',
@@ -18,7 +19,7 @@ class Base_MW_LutMan(Base_LutMan):
         Set's the default lutmap for standard microwave drive pulses.
         """
         def_lm = self._def_lm
-        LutMap = {}
+        LutMap = OrderedDict()
         for cw_idx, cw_key in enumerate(def_lm):
             LutMap[cw_key] = (
                 'wave_ch{}_cw{:03}'.format(self.channel_I(), cw_idx),
@@ -72,13 +73,14 @@ class Base_MW_LutMan(Base_LutMan):
         self._add_mixer_corr_pars()
 
         self.add_parameter('mw_ef_modulation', vals=vals.Numbers(), unit='Hz',
-            docstring=('Modulation frequency for driving pulses to the '
-                       'second excited-state.'),
-            parameter_class=ManualParameter, initial_value=50.0e6)
+                           docstring=('Modulation frequency for driving pulses to the '
+                                      'second excited-state.'),
+                           parameter_class=ManualParameter, initial_value=50.0e6)
         self.add_parameter('mw_ef_amp180', unit='frac',
-            docstring=('Pulse amplitude for pulsing the ef/12 transition'),
-            vals=vals.Numbers(-1, 1),
-            parameter_class=ManualParameter, initial_value=.2)
+                           docstring=(
+                               'Pulse amplitude for pulsing the ef/12 transition'),
+                           vals=vals.Numbers(-1, 1),
+                           parameter_class=ManualParameter, initial_value=.2)
 
     def _add_mixer_corr_pars(self):
         self.add_parameter('mixer_alpha', vals=vals.Numbers(),
@@ -103,7 +105,7 @@ class Base_MW_LutMan(Base_LutMan):
                            vals=vals.Numbers(1, self._num_channels))
 
     def generate_standard_waveforms(self):
-        self._wave_dict = {}
+        self._wave_dict = OrderedDict()
         if self.cfg_sideband_mode() == 'static':
             f_modulation = self.mw_modulation()
         else:
@@ -211,9 +213,8 @@ class Base_MW_LutMan(Base_LutMan):
         for waveform, cw in zip(waveforms, codewords):
             self.AWG.get_instr().set(cw, waveform)
 
-
-    def load_ef_rabi_pulses_to_AWG_lookuptable(self, amps:list=None,
-                                               mod_freqs:list=None):
+    def load_ef_rabi_pulses_to_AWG_lookuptable(self, amps: list=None,
+                                               mod_freqs: list=None):
         # Currently (May 2018) only implemented in `AWG8_VSM_MW_LutMan` -MAR
         raise NotImplementedError()
 
@@ -245,7 +246,7 @@ class CBox_MW_LutMan(Base_MW_LutMan):
         Set's the default lutmap for standard microwave drive pulses.
         """
         def_lm = self._def_lm
-        LutMap = {}
+        LutMap = OrderedDict()
         for cw_idx, cw_key in enumerate(def_lm):
             max_cw_cbox = 8
             if cw_idx < max_cw_cbox:
@@ -355,7 +356,7 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
         Set's the default lutmap for standard microwave drive pulses.
         """
         def_lm = self._def_lm
-        LutMap = {}
+        LutMap = OrderedDict()
         for cw_idx, cw_key in enumerate(def_lm):
             LutMap[cw_key] = (
                 'wave_ch{}_cw{:03}'.format(self.channel_GI(), cw_idx),
@@ -363,6 +364,26 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
                 'wave_ch{}_cw{:03}'.format(self.channel_DI(), cw_idx),
                 'wave_ch{}_cw{:03}'.format(self.channel_DQ(), cw_idx))
         self.LutMap(LutMap)
+
+    def _add_waveform_parameters(self):
+        super()._add_waveform_parameters()
+        # Parameters for a square pulse
+        self.add_parameter('sq_G_amp', unit='frac', vals=vals.Numbers(-1, 1),
+                           parameter_class=ManualParameter,
+                           initial_value=1)
+        self.add_parameter('sq_D_amp', unit='frac', vals=vals.Numbers(-1, 1),
+                           parameter_class=ManualParameter,
+                           initial_value=0)
+
+    def generate_standard_waveforms(self):
+
+        wave_dict = super().generate_standard_waveforms()
+        wave_dict['square'] = wf.mod_square_VSM(
+            amp_G=self.sq_G_amp(), amp_D=self.sq_D_amp(),
+            length=self.mw_gauss_width()*4,  # to ensure same duration as mw
+            f_modulation=self.mw_modulation(),
+            sampling_rate=self.sampling_rate())
+
 
     def _add_channel_params(self):
         # FIXME: add parameter channel amp that sets the ouput amplitude of
@@ -387,6 +408,20 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
                            docstring=('using the channel amp as additional'
                                       'parameter to allow rabi-type experiments without'
                                       'wave reloading. Should not be using VSM'))
+
+    def load_waveform_realtime(self, waveform_name: str,
+                               wf_nr: int = None):
+
+        self.generate_standard_waveforms()
+        GI, GQ, DI, DQ = self._wave_dict[waveform_name]
+
+        AWG = self.AWG.get_instr()
+
+        awg_nr_G = self.channel_GI//2
+        awg_nr_D = self.channel_DI//2
+        AWG.upload_waveform_realtime(GI, GQ, awg_nr_G, wf_nr=wf_nr)
+        AWG.upload_waveform_realtime(DI, DQ, awg_nr_D, wf_nr=wf_nr)
+
 
     def _set_channel_amp(self, val):
         AWG = self.AWG.get_instr()
@@ -441,8 +476,8 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
             wave_dict[key] = GI, GQ, DI, DQ
         return wave_dict
 
-    def load_ef_rabi_pulses_to_AWG_lookuptable(self, amps:list=None,
-                                               mod_freqs:list=None):
+    def load_ef_rabi_pulses_to_AWG_lookuptable(self, amps: list=None,
+                                               mod_freqs: list=None):
         """
         Special loading method that loads (up to) 18 pulses in
         order to do a rabi on the ef (1-2) transition.
@@ -452,7 +487,7 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
 
         if not isinstance(amps, Iterable) and (mod_freqs is None):
             amps = [self.mw_ef_amp180()]
-        elif len(amps)==1:
+        elif len(amps) == 1:
             amps = [amps]*len(mod_freqs)
 
         if (len(amps) > 18):
@@ -545,7 +580,7 @@ class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
         Set's the default lutmap for standard microwave drive pulses.
         """
         vqe_lm = self._vqe_lm
-        LutMap = {}
+        LutMap = OrderedDict()
         for cw_idx, cw_key in enumerate(vqe_lm):
             LutMap[cw_key] = (
                 'wave_ch{}_cw{:03}'.format(self.channel_I(), cw_idx),
@@ -678,7 +713,7 @@ class QWG_VSM_MW_LutMan(AWG8_VSM_MW_LutMan):
         Set's the default lutmap for standard microwave drive pulses.
         """
         def_lm = self._def_lm
-        LutMap = {}
+        LutMap = OrderedDict()
         for cw_idx, cw_key in enumerate(def_lm):
             LutMap[cw_key] = (
                 'wave_ch1_cw{:03}'.format(cw_idx),
