@@ -603,7 +603,7 @@ class ZI_HDAWG8(ZI_base_instrument):
 
             # In the mw protocol bits [0:7] -> CW0 and bits [(8+1):15] -> CW1
             # N.B. DIO bit 8 (first of 2nd byte)  not connected in AWG8!
-            if self.cfg_codeword_protocol() == 'microwave':
+            elif self.cfg_codeword_protocol() == 'microwave':
                 if awg_nr in [0, 1]:
                     self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
                 elif awg_nr in [2, 3]:
@@ -612,8 +612,11 @@ class ZI_HDAWG8(ZI_base_instrument):
             elif self.cfg_codeword_protocol() == 'flux':
                 # bits[0:3] for awg0_ch0, bits[4:6] for awg0_ch1 etc.
                 # self.set('awgs_{}_dio_mask_value'.format(awg_nr), 2**6-1)
-                self.set('awgs_{}_dio_mask_value'.format(awg_nr), 2**3-1)
                 # self.set('awgs_{}_dio_mask_shift'.format(awg_nr), awg_nr*6)
+
+                # FIXME: this is a protocol that does identical flux pulses
+                # on each channel.
+                self.set('awgs_{}_dio_mask_value'.format(awg_nr), 2**3-1)
                 self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 3)
 
         ####################################################

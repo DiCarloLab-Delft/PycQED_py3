@@ -65,6 +65,8 @@ class VirtualAWG8(Instrument):
             parnames.append('awgs_{}_dio_strobe_slope'.format(i))
             parnames.append('awgs_{}_dio_valid_index'.format(i))
             parnames.append('awgs_{}_dio_valid_polarity'.format(i))
+            parnames.append('awgs_{}_outputs_0_amplitude'.format(i))
+            parnames.append('awgs_{}_outputs_1_amplitude'.format(i))
         parnames.append('system_extclk')
 
         for par in parnames:

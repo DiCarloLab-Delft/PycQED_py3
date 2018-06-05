@@ -860,6 +860,64 @@ class RT_distortion_corrector_AWG8(Distortion_corrector):
         self.scope_sampling_rate = 1/(self.time_pts[1]-self.time_pts[0])
 
 
+class RT_distortion_corrector_QWG(Distortion_corrector):
+
+    def __init__(self, name, measure_scope_trace,
+                 nr_plot_points: int=1000, **kw):
+        '''
+        Instantiates an object.
+        Note: Sampling rate of the scope is assumed to be 5 GHz. Sampling rate
+        of the AWG is assumed to be 1 GHz.
+
+        Args:
+            flux_lutman (Instrument):
+                    Lookup table manager for the AWG.
+            oscilloscope (Instrument):
+                    Oscilloscope instrument.
+
+            nr_plot_points (int):
+                    Number of points of the waveform that are plotted. Can be
+                    changed in self.cfg_nr_plot_points().
+        '''
+        super().__init__(name, sampling_rate=1e9,
+                         nr_plot_points=nr_plot_points, **kw)
+
+        self.add_parameter('instr_flux_lutman',
+                           parameter_class=InstrumentRefParameter)
+
+        self.measure_scope_trace = measure_scope_trace
+
+        self.raw_waveform = []
+        self.raw_time_pts = []
+        self._edge_for_trace = 0.05
+
+    def measure_trace(self, verbose=True):
+        '''
+        Measure a trace with the oscilloscope.
+        Raw data is saved to self.raw_time_pts and self.raw_waveform.
+        Data clipped to start at the rising edge is saved to self.time_pts
+        and self.waveform.
+
+        N.B. This measure trace method makes two assumptions
+            1. The scope is properly configured.
+            2. The CCLight is running the correct program that triggers the
+               AWG8.
+        '''
+        # Upload waveform
+        self.instr_flux_lutman.get_instr().load_waveform_onto_AWG_lookuptable(
+            'square', regenerate_waveforms=True)
+        if verbose:
+            print('Measuring trace...')
+        self.raw_time_pts, self.waveform = self.measure_scope_trace()
+
+        # Find rising edge
+        if self.edge_idx == None:
+            # this is because finding the edge is usally most robust in the
+            # beginning
+            self.edge_idx = detect_edge(self.waveform, edge_level=self._edge_for_trace)
+        self.time_pts = self.raw_time_pts - self.raw_time_pts[self.edge_idx]
+        self.scope_sampling_rate = 1/(self.time_pts[1]-self.time_pts[0])
+
 
 # def detect_edge(y, edge_level=0.1):
 #     """

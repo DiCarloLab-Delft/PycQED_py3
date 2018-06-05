@@ -1,14 +1,10 @@
-[
+[  
   [
-    "awgs/0/outputs/0/enables/0",
+    "system/fpgarevision",
     "float"
   ],
   [
-    "awgs/0/elf/checksum",
-    "float"
-  ],
-  [
-    "awgs/0/sequencer/assembly",
+    "awgs/0/sequencer/program",
     "vector_g"
   ],
   [
@@ -148,12 +144,8 @@
     "float"
   ],
   [
-    "sigouts/0/over",
-    "float"
-  ],
-  [
-    "quex/wint/weights/6/real",
-    "vector_gs"
+    "quex/iavg/data/0",
+    "vector_g"
   ],
   [
     "quex/wint/weights/5/imag",
@@ -164,6 +156,82 @@
     "vector_g"
   ],
   [
+    "quex/rl/data/0",
+    "vector_g"
+  ],
+  [
+    "quex/rl/data/1",
+    "vector_g"
+  ],
+  [
+    "quex/rl/data/2",
+    "vector_g"
+  ],
+  [
+    "quex/rl/data/3",
+    "vector_g"
+  ],
+  [
+    "quex/rl/data/4",
+    "vector_g"
+  ],
+  [
+    "quex/rl/data/5",
+    "vector_g"
+  ],
+  [
+    "quex/rl/data/6",
+    "vector_g"
+  ],
+  [
+    "quex/rl/data/7",
+    "vector_g"
+  ],
+  [
+    "quex/rl/data/8",
+    "vector_g"
+  ],
+  [
+    "quex/wint/weights/0/real",
+    "vector_gs"
+  ],
+  [
+    "quex/wint/weights/1/real",
+    "vector_gs"
+  ],
+  [
+    "quex/wint/weights/2/real",
+    "vector_gs"
+  ],
+  [
+    "quex/wint/weights/3/real",
+    "vector_gs"
+  ],
+  [
+    "quex/wint/weights/4/real",
+    "vector_gs"
+  ],
+  [
+    "quex/wint/weights/5/real",
+    "vector_gs"
+  ],
+  [
+    "quex/wint/weights/6/real",
+    "vector_gs"
+  ],
+  [
+    "quex/wint/weights/7/real",
+    "vector_gs"
+  ],
+  [
+    "quex/wint/weights/8/real",
+    "vector_gs"
+  ],
+  [
+    "quex/wint/weights/0/imag",
+    "vector_gs"
+  ],
+  [
     "quex/wint/weights/1/imag",
     "vector_gs"
   ],
@@ -172,95 +240,7 @@
     "vector_gs"
   ],
   [
-    "quex/wint/weights/8/real",
-    "vector_gs"
-  ],
-  [
-    "quex/wint/weights/4/real",
-    "vector_gs"
-  ],
-  [
-    "quex/wint/weights/7/real",
-    "vector_gs"
-  ],
-  [
-    "quex/rl/data/7",
-    "vector_g"
-  ],
-  [
-    "quex/wint/weights/3/real",
-    "vector_gs"
-  ],
-  [
-    "quex/rl/data/0",
-    "vector_g"
-  ],
-  [
-    "quex/iavg/data/0",
-    "vector_g"
-  ],
-  [
-    "quex/rl/data/6",
-    "vector_g"
-  ],
-  [
-    "quex/wint/weights/5/real",
-    "vector_gs"
-  ],
-  [
-    "quex/wint/weights/8/imag",
-    "vector_gs"
-  ],
-  [
-    "quex/rl/data/8",
-    "vector_g"
-  ],
-  [
-    "quex/sl/statemap",
-    "vector_gs"
-  ],
-  [
     "quex/wint/weights/3/imag",
-    "vector_gs"
-  ],
-  [
-    "quex/wint/weights/2/real",
-    "vector_gs"
-  ],
-  [
-    "quex/rl/data/4",
-    "vector_g"
-  ],
-  [
-    "quex/wint/weights/6/imag",
-    "vector_gs"
-  ],
-  [
-    "quex/iavg/data/1",
-    "vector_g"
-  ],
-  [
-    "quex/wint/weights/7/imag",
-    "vector_gs"
-  ],
-  [
-    "quex/rl/data/1",
-    "vector_g"
-  ],
-  [
-    "quex/wint/weights/1/real",
-    "vector_gs"
-  ],
-  [
-    "quex/wint/weights/0/real",
-    "vector_gs"
-  ],
-  [
-    "quex/rl/data/5",
-    "vector_g"
-  ],
-  [
-    "quex/wint/weights/0/imag",
     "vector_gs"
   ],
   [
@@ -268,13 +248,22 @@
     "vector_gs"
   ],
   [
-    "quex/rl/data/3",
-    "vector_g"
+    "quex/wint/weights/5/imag",
+    "vector_gs"
   ],
   [
-    "dios/0/auxdrive",
-    "float"
+    "quex/wint/weights/6/imag",
+    "vector_gs"
   ],
+  [
+    "quex/wint/weights/7/imag",
+    "vector_gs"
+  ],
+  [
+    "quex/wint/weights/8/imag",
+    "vector_gs"
+  ],
+
   [
     "dios/0/input",
     "vector_s"

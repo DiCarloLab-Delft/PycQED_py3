@@ -355,10 +355,10 @@
     "version": {
         "Embedded Software Build Time": "18/12/2017-09:12:28",
         "Embedded Software Version": "0.2.0",
-        "Firmware Build Time": "17/12/2017-23:05:41",
+        "Firmware Build Time": "18/12/2017-15:54:16",
         "Kernel Module Build Time": "18/12/2017-00:56:35",
         "Kernel Module Version": "0.2.0",
-        "firmware": "99.5.0",
+        "firmware": "99.5.1",
         "model": "CCL1",
         "serial": "00000001",
         "vendor": "QuTech"

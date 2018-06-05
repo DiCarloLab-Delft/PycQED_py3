@@ -296,6 +296,10 @@ def flex_colormesh_plot_vs_xy(xvals, yvals, zvals, ax=None,
     (len(yvals), len(xvals)).
     """
 
+    xvals = np.array(xvals)
+    yvals = np.array(yvals)
+
+
     # First, we need to sort the data as otherwise we get odd plotting
     # artefacts. An example is e.g., plotting a fourier transform
     sorted_x_arguments = xvals.argsort()
@@ -330,7 +334,7 @@ def flex_colormesh_plot_vs_xy(xvals, yvals, zvals, ax=None,
 
     # various plot options
     # define colormap
-    cmap = plt.get_cmap(kw.pop('cmap', 'CMRmap'))
+    cmap = plt.get_cmap(kw.pop('cmap', 'viridis'))
     clim = kw.pop('clim', [None, None])
     # normalized plot
     if normalize:

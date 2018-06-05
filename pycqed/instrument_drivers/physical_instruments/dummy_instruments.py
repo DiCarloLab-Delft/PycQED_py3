@@ -38,6 +38,10 @@ class DummyParHolder(Instrument):
 
         self.add_parameter('parabola', unit='V',
                            get_cmd=self._measure_parabola)
+
+        self.add_parameter('parabola_list', unit='V',
+                           get_cmd=self._measure_parabola_list)
+
         self.add_parameter('skewed_parabola', unit='V',
                            get_cmd=self._measure_skewed_parabola)
         self.add_parameter('cos_mod_parabola', unit='V',
@@ -48,7 +52,6 @@ class DummyParHolder(Instrument):
 
         self.add_parameter('lorentz_dip_cos_mod', unit='V',
                            get_cmd=self._measure_lorentz_dip_cos_mod)
-
 
         self.add_parameter('array_like', unit='a.u.',
                            parameter_class=ManualParameter,
@@ -69,8 +72,8 @@ class DummyParHolder(Instrument):
         y1 = LorentzFunc(self.y(), -1, center=self.y0(), sigma=5)
         y2 = LorentzFunc(self.z(), -1, center=self.z0(), sigma=5)
 
-        y = y0+y1+y2+ self.noise()*np.random.rand(1)
-        return  y
+        y = y0+y1+y2 + self.noise()*np.random.rand(1)
+        return y
 
     def _measure_lorentz_dip_cos_mod(self):
         time.sleep(self.delay())
@@ -81,13 +84,22 @@ class DummyParHolder(Instrument):
     def _measure_parabola(self):
         time.sleep(self.delay())
         return ((self.x()-self.x0())**2 +
-                       (self.y()-self.y0())**2 +
-                       (self.z()-self.z0())**2 +
-                        self.noise()*np.random.rand(1))
+                (self.y()-self.y0())**2 +
+                (self.z()-self.z0())**2 +
+                self.noise()*np.random.rand(1))
+
+    def _measure_parabola_list(self):
+        # Returns same as measure parabola but then as a list of list
+        # This corresponds to a natural format for e.g., the
+        # UHFQC single int avg detector.
+        # Where the outer list would be lenght 1 (seq of 1 segment)
+        # with 1 entry (only one value logged)
+        return [self._measure_parabola()]
 
     def _measure_cos_mod_parabola(self):
         time.sleep(self.delay())
-        cos_val = np.cos(self.x()/10+self.y()/10 + self.z()/10)**2  # ensures always larger than 1
+        cos_val = np.cos(self.x()/10+self.y()/10 + self.z() /
+                         10)**2  # ensures always larger than 1
         par = self._measure_parabola()
         n = self.noise()*np.random.rand(1)
         return cos_val*par + n + par/10

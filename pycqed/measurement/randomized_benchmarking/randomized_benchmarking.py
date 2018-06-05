@@ -1,6 +1,8 @@
+import logging
 import numpy as np
 from pycqed.measurement.randomized_benchmarking.clifford_group import(
     clifford_lookuptable)
+import pycqed.measurement.randomized_benchmarking.two_qubit_clifford_group as tqc
 
 from pycqed.measurement.randomized_benchmarking.clifford_decompositions \
     import (HZ_gate_decomposition, XY_gate_decomposition)
@@ -150,15 +152,25 @@ def convert_clifford_sequence_to_tape(clifford_sequence, lutmapping,
 def randomized_benchmarking_sequence(n_cl, desired_net_cl=0,
                                      seed=None, interleaved_gate=None):
     '''
-    Generates a sequence of length "n_cl" random cliffords and appends a
-    recovery clifford to make the net result correspond to applying the
-    "desired_net_cl".
+    Generates a sequence of "n_cl" random single qubit Cliffords followed
+    by a a recovery Clifford to make the net result correspond
+    to the "desired_net_cl".
+
+    Args:
+        n_cl           (int) : number of Cliffords
+        desired_net_cl (int) : idx of the desired net clifford
+        seed           (int) : seed used to initialize the random number
+            generator.
+
     The default behaviour is that the net clifford corresponds to an
     identity ("0"). If you want e.g. an inverting sequence you should set
     the desired_net_cl to "3" (corresponds to Pauli X).
 
     If IRB, pass in interleaved_gate as string. Example: 'X180'.
     '''
+    logging.warning("deprecation warning, only exists for testing "
+                    "equivalence to new function.")
+
     if seed is None:
         rb_cliffords = np.random.randint(0, 24, int(n_cl))
     else:
@@ -179,3 +191,83 @@ def randomized_benchmarking_sequence(n_cl, desired_net_cl=0,
 
     rb_cliffords = np.append(rb_cliffords, recovery_clifford)
     return rb_cliffords
+
+##############################################################################
+# New style RB sequences (using the hash-table method) compatible
+# with Clifford object.
+# More advanced sequences are avaliable using this method.
+##############################################################################
+
+def randomized_benchmarking_sequence_new(
+        n_cl: int,
+        desired_net_cl:int = 0,
+        number_of_qubits:int = 1,
+        max_clifford_idx: int = 11520,
+        interleaving_cl: int = None,
+        seed: int=None):
+    """
+    Generates a randomized benchmarking sequence for the one or two qubit
+    clifford group.
+
+    Args:
+        n_cl           (int) : number of Cliffords
+        desired_net_cl (int) : idx of the desired net clifford
+        number_of_qubits(int): used to determine if Cliffords are drawn
+            from the single qubit or two qubit clifford group.
+        max_clifford_idx (int): used to set the index of the highest random
+            clifford generated. Useful to generate e.g., simultaneous two
+            qubit RB sequences.
+        interleaving_cl (int): interleaves the sequence with a specific
+            clifford if desired
+        seed           (int) : seed used to initialize the random number
+            generator.
+    Returns:
+        list of clifford indices (ints)
+
+    N.B. in the case of the 1 qubit clifford group this function does the
+    same as "randomized_benchmarking_sequence_old" but
+    does not use the 24 by 24 lookuptable method to calculate the
+    net clifford. It instead uses the "Clifford" objects used in
+    constructing the two qubit Clifford classes.
+    The old method exists to establish the equivalence between the two methods.
+
+    """
+    if number_of_qubits == 1:
+        Cl = tqc.SingleQubitClifford
+        group_size = np.min([24, max_clifford_idx])
+    elif number_of_qubits ==2:
+        Cl = tqc.TwoQubitClifford
+        group_size = np.min([11520, max_clifford_idx])
+    else:
+        raise NotImplementedError()
+
+    # Generate a random sequence of Cliffords
+    if seed is None:
+        rb_clifford_indices = np.random.randint(0, group_size, int(n_cl))
+    if seed is not None:
+        rng_seed = np.random.RandomState(seed)
+        rb_clifford_indices = rng_seed.randint(0, group_size, int(n_cl))
+
+    # Add interleaving cliffords if applicable
+    if interleaving_cl is not None:
+        rb_clif_ind_intl = np.empty(rb_clifford_indices.size*2, dtype=int)
+        rb_clif_ind_intl[0::2] = rb_clifford_indices
+        rb_clif_ind_intl[1::2] = interleaving_cl
+        rb_clifford_indices = rb_clif_ind_intl
+
+    # Calculate the net clifford
+    net_clifford = Cl(0)
+    for idx in rb_clifford_indices:
+        cliff = Cl(idx)
+        # order of operators applied in is right to left, therefore
+        # the new operator is applied on the left side.
+        net_clifford = cliff*net_clifford
+
+    # determine the inverse of the sequence
+    recovery_to_idx_clifford = net_clifford.get_inverse()
+    recovery_clifford = Cl(desired_net_cl)*recovery_to_idx_clifford
+    rb_clifford_indices = np.append(rb_clifford_indices,
+                                    recovery_clifford.idx)
+    return rb_clifford_indices
+
+

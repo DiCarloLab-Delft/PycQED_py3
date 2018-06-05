@@ -72,6 +72,10 @@ class Qubit(Instrument):
             spec_   : parameters relating to spectroscopy (single qubit CW)
             fl_     : parameters relating to flux control, this includes both
                       flux pulsing as well as flux offset (DC).
+            tim_    : parameters related to timing, used to set latencies,
+                        these are generally part of a device object (rather
+                        than the qubit objects) but are listed here for
+                        completeness.
             cfg_    : configuration, this can be info relevant for compilers
                       or configurations that determine how the qubit operates.
                       examples are cfg_qasm and cfg_f_qubit_calc_method.

@@ -750,7 +750,79 @@
     2.0
   ],
   [
-    "quex/rot/4/imag",
+    "quex/corr/3/mode",
+    "bool",
+    0,
+    1
+  ],
+  [
+    "quex/corr/3/source",
+    "int_8bit",
+    0,
+    4
+  ],
+  [
+    "quex/corr/4/mode",
+    "bool",
+    0,
+    1
+  ],
+  [
+    "quex/corr/4/source",
+    "int_8bit",
+    0,
+    4
+  ],
+  [
+    "quex/corr/5/mode",
+    "bool",
+    0,
+    1
+  ],
+  [
+    "quex/corr/5/source",
+    "int_8bit",
+    0,
+    4
+  ],
+  [
+    "quex/corr/6/mode",
+    "bool",
+    0,
+    1
+  ],
+  [
+    "quex/corr/6/source",
+    "int_8bit",
+    0,
+    4
+  ],
+  [
+    "quex/corr/7/mode",
+    "bool",
+    0,
+    1
+  ],
+  [
+    "quex/corr/7/source",
+    "int_8bit",
+    0,
+    4
+  ],
+  [
+    "quex/corr/8/mode",
+    "bool",
+    0,
+    1
+  ],
+  [
+    "quex/corr/8/source",
+    "int_8bit",
+    0,
+    4
+  ],
+  [
+    "quex/rot/0/imag",
     "float",
     -2.0,
     2.0
@@ -810,16 +882,52 @@
     2.0
   ],
   [
-    "quex/sl/length",
-    "int",
-    0,
-    16777215.0
+    "quex/rot/5/imag",
+    "float",
+    -2.0,
+    2.0
   ],
   [
-    "quex/sl/readout",
-    "bool",
-    0,
-    1.0
+    "quex/rot/5/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/rot/6/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/rot/6/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/rot/7/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/rot/7/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/rot/8/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/rot/8/real",
+    "float",
+    -2.0,
+    2.0
   ],
   [
     "quex/thres/0/level",
@@ -854,519 +962,1065 @@
   [
     "quex/thres/5/level",
     "float",
-    -128.0,
-    128.0
+    -32.0,
+    32.0
   ],
   [
     "quex/thres/6/level",
     "float",
-    -128.0,
-    128.0
+    -32.0,
+    32.0
   ],
   [
     "quex/thres/7/level",
     "float",
-    -128.0,
-    128.0
+    -32.0,
+    32.0
   ],
   [
     "quex/thres/8/level",
     "float",
-    -128.0,
-    128.0
+    -32.0,
+    32.0
   ],
+
+
+
+
   [
     "quex/trans/0/col/0/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/0/col/0/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/0/col/1/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/0/col/1/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/0/col/2/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/0/col/2/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/0/col/3/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/0/col/3/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/0/col/4/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/0/col/4/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/0/col/5/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/0/col/5/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/0/col/6/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/0/col/6/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/0/col/7/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/0/col/7/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/0/col/8/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/0/col/8/real",
-    "float",
-    -2.0,
-    2.0
-  ],
+
+
+
   [
     "quex/trans/1/col/0/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/1/col/0/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/1/col/1/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/1/col/1/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/1/col/2/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/1/col/2/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/1/col/3/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/1/col/3/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/1/col/4/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/1/col/4/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/1/col/5/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/1/col/5/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/1/col/6/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/1/col/6/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/1/col/7/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/1/col/7/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/1/col/8/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/1/col/8/real",
-    "float",
-    -2.0,
-    2.0
-  ],
+  
+
+
+
   [
     "quex/trans/2/col/0/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/2/col/0/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/2/col/1/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/2/col/1/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/2/col/2/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/2/col/2/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/2/col/3/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/2/col/3/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/2/col/4/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/2/col/4/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/2/col/5/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/2/col/5/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/2/col/6/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/2/col/6/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/2/col/7/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/2/col/7/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/2/col/8/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/2/col/8/real",
-    "float",
-    -2.0,
-    2.0
-  ],
+  
+
+
+
   [
     "quex/trans/3/col/0/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/3/col/0/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/3/col/1/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/3/col/1/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/3/col/2/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/3/col/2/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/3/col/3/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/3/col/3/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/3/col/4/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/3/col/4/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/3/col/5/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/3/col/5/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/3/col/6/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/3/col/6/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/3/col/7/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/3/col/7/real",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/3/col/8/imag",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/3/col/8/real",
-    "float",
-    -2.0,
-    2.0
-  ],
+  
+
+
+
   [
     "quex/trans/4/col/0/imag",
     "float",
     -2.0,
     2.0
   ],
+    [
+    "quex/trans/4/col/1/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/4/col/2/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/4/col/3/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/4/col/4/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/4/col/5/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/4/col/6/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/4/col/7/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/4/col/8/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+
+
+
+
+  [
+    "quex/trans/5/col/0/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/5/col/1/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/5/col/2/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/5/col/3/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/5/col/4/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/5/col/5/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/5/col/6/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/5/col/7/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/5/col/8/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  
+
+
+
+  [
+    "quex/trans/6/col/0/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/6/col/1/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/6/col/2/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/6/col/3/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/6/col/4/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/6/col/5/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/6/col/6/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/6/col/7/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/6/col/8/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  
+
+
+
+  [
+    "quex/trans/7/col/0/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/7/col/1/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/7/col/2/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/7/col/3/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/7/col/4/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/7/col/5/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/7/col/6/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/7/col/7/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/7/col/8/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  
+
+
+
+  [
+    "quex/trans/8/col/0/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/8/col/1/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/8/col/2/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/8/col/3/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/8/col/4/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/8/col/5/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/8/col/6/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/8/col/7/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+  [
+    "quex/trans/8/col/8/imag",
+    "float",
+    -2.0,
+    2.0
+  ],
+
+
+
+  [
+    "quex/trans/0/col/0/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/0/col/1/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/0/col/2/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/0/col/3/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/0/col/4/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/0/col/5/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/0/col/6/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/0/col/7/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/0/col/8/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+
+
+
+  [
+    "quex/trans/1/col/0/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/1/col/1/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/1/col/2/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/1/col/3/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/1/col/4/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/1/col/5/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/1/col/6/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/1/col/7/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/1/col/8/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+  
+
+
+
+  [
+    "quex/trans/2/col/0/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/2/col/1/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/2/col/2/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/2/col/3/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/2/col/4/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/2/col/5/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/2/col/6/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/2/col/7/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/2/col/8/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+
+
+
+  [
+    "quex/trans/3/col/0/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/3/col/1/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/3/col/2/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/3/col/3/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/3/col/4/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/3/col/5/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/3/col/6/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/3/col/7/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/3/col/8/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+
+
+
   [
     "quex/trans/4/col/0/real",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/4/col/1/imag",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/4/col/1/real",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/4/col/2/imag",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/4/col/2/real",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/4/col/3/imag",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/4/col/3/real",
     "float",
     -2.0,
     2.0
   ],
-  [
-    "quex/trans/4/col/4/imag",
-    "float",
-    -2.0,
-    2.0
-  ],
-  [
+    [
     "quex/trans/4/col/4/real",
     "float",
     -2.0,
     2.0
   ],
+    [
+    "quex/trans/4/col/5/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/4/col/6/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/4/col/7/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/4/col/8/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+
+
+
+  [
+    "quex/trans/5/col/0/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/5/col/1/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/5/col/2/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/5/col/3/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/5/col/4/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/5/col/5/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/5/col/6/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/5/col/7/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/5/col/8/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+
+
+
+  [
+    "quex/trans/6/col/0/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/6/col/1/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/6/col/2/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/6/col/3/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/6/col/4/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/6/col/5/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/6/col/6/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/6/col/7/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/6/col/8/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+
+
+
+  [
+    "quex/trans/7/col/0/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/7/col/1/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/7/col/2/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/7/col/3/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/7/col/4/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/7/col/5/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/7/col/6/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/7/col/7/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/7/col/8/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+
+
+
+  [
+    "quex/trans/8/col/0/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/8/col/1/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/8/col/2/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/8/col/3/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/8/col/4/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/8/col/5/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/8/col/6/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/8/col/7/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+    [
+    "quex/trans/8/col/8/real",
+    "float",
+    -2.0,
+    2.0
+  ],
+
+
+
   [
     "quex/trans/4/col/5/imag",
     "float",
@@ -1899,25 +2553,25 @@
     "quex/wint/source/5",
     "bool",
     0,
-    1.0
+    1
   ],
   [
     "quex/wint/source/6",
     "bool",
     0,
-    1.0
+    1
   ],
   [
     "quex/wint/source/7",
     "bool",
     0,
-    1.0
+    1
   ],
   [
     "quex/wint/source/8",
     "bool",
     0,
-    1.0
+    1
   ],
   [
     "dios/0/decimation",
