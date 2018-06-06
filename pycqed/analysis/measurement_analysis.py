@@ -5637,7 +5637,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                             y_unit=self.value_units[0],
                                             save=False)
             # ensures that amplitude plot starts at zero
-            ax.set_ylim(ymin=-0.001)
+            ax.set_ylim(ymin=0.000)
 
         elif 'complex' in fitting_model:
             self.plot_complex_results(
@@ -6650,7 +6650,7 @@ class TwoD_Analysis(MeasurementAnalysis):
     def run_default_analysis(self, normalize=False, plot_linecuts=True,
                              linecut_log=False, colorplot_log=False,
                              plot_all=True, save_fig=True,
-                             transpose=False, figsize=None,
+                             transpose=False, figsize=None, filtered=False,
                              **kw):
         '''
         Args:
@@ -6670,6 +6670,16 @@ class TwoD_Analysis(MeasurementAnalysis):
         self.ax_array = []
 
         for i, meas_vals in enumerate(self.measured_values):
+            if filtered:
+                # print(self.measured_values)
+                # print(self.value_names)
+                if self.value_names[i] == 'Phase':
+                    self.measured_values[i] = dm_tools.filter_resonator_visibility(
+                                                        x=self.sweep_points,
+                                                        y=self.sweep_points_2D,
+                                                        z=self.measured_values[i],
+                                                        **kw)
+
             if (not plot_all) & (i >= 1):
                 break
             # Linecuts are above because somehow normalization applies to both
