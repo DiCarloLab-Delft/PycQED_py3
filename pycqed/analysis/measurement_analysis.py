@@ -941,9 +941,10 @@ class OptimizationAnalysis_v2(MeasurementAnalysis):
                     z=self.measured_values[i], ax=ax,
                     zlabel=self.value_names[i])
                 ax.plot(self.sweep_points[0],
-                        self.sweep_points[1], '-o', c='grey')
+                        self.sweep_points[1], linewidth=.5, marker='.',
+                        alpha=.3, c='grey')
                 ax.plot(self.sweep_points[0][-1], self.sweep_points[1][-1],
-                        'o', markersize=5, c='w')
+                        'x', markersize=5, c='w')
                 plot_title = kw.pop('plot_title', textwrap.fill(
                     self.timestamp_string + '_' +
                     self.measurementstring, 40))
