@@ -32,6 +32,7 @@ def_q_arg_st["C0_cw_02"]	= 0x32
 def_q_arg_st["C0_cw_04"]	= 0x34
 def_q_arg_st["C0_cw_06"]	= 0x36
 def_q_arg_st["C0_cw_08"]	= 0x38
+def_q_arg_st["C0_cw_10"]	= 0x3a
 def_q_arg_st["C1_cw_00"]	= 0x28
 def_q_arg_st["C1_cw_07"]	= 0x2f
 def_q_arg_st["C1_cw_01"]	= 0x29
