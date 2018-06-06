@@ -42,12 +42,12 @@ class DecouplingAnalysis:
         # adds the dac channels to the extraction dictionary
         for d in self.dac_channel_labels:
 
-            pdict.update({'dac_'+d: self.dac_instrument+'.'+d})
-            nparams.append('dac_'+d)
+            pdict.update({d: self.dac_instrument+'.'+d})
+            nparams.append(d)
 
         # extracts the data
         for i, q_label in enumerate(self.qubit_scan_labels):
-            opt_dict = {'scan_label': 'y'+q_label,
+            opt_dict = {'scan_label': '__qubit_'+q_label,
                        'exact_label_match':True}
 
             self.spec_scans[i] = RA.quick_analysis(t_start=self.scan_start,
@@ -65,9 +65,10 @@ class DecouplingAnalysis:
             for j,q in enumerate(self.qubit_scan_labels):
                 start_slice = self.num_points*(i)
                 stop_slice = self.num_points*(i+1)
-                dac_key = 'dac_'+d
+                dac_key = d
 
                 this_ax = ax[j, i]
+                #print(self.spec_scans[j].TD_dict)
                 dac_vector = self.spec_scans[j].TD_dict[
                     dac_key][start_slice:stop_slice]
 
@@ -96,7 +97,7 @@ class DecouplingAnalysis:
             for q in range(self.Nq):
                 start_slice = self.num_points*(i)
                 stop_slice = self.num_points*(i+1)
-                dac_key = 'dac_'+d
+                dac_key = d
                 this_ax = ax[q, i]
                 filter_points = ~self.filter_mask_vector[i, q, :]
                 dac_vector = self.spec_scans[q].TD_dict[
