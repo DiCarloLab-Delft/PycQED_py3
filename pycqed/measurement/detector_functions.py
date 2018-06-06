@@ -1572,7 +1572,13 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.seg_per_point = max(seg_per_point, values_per_point)
 
         self.AWG = AWG
-        self.nr_averages = nr_averages
+
+        rounded_nr_averages = 2**int(np.log2(nr_averages))
+        if rounded_nr_averages != nr_averages:
+            logging.warning("nr_averages must be a power of 2, rounded to {} (from {}) ".format(
+                rounded_nr_averages, nr_averages))
+
+        self.nr_averages = rounded_nr_averages
         self.integration_length = integration_length
         # 0/1/2 crosstalk supressed /digitized/raw
         res_logging_indices = {'lin_trans': 0, 'digitized': 1, 'raw': 2}
@@ -1610,19 +1616,15 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         """
 
         self.real_imag = real_imag
-        # Commented this out as it is already done in the init -MAR Dec 2017
-        # if self.result_logging_mode == 'raw':
-        #     self.value_units = ['V']*len(self.channels)
-        # else:
-        #     self.value_units = ['']*len(self.channels)
 
         if not self.real_imag:
-            if len(self.channels) != 2:
-                raise ValueError('Length of "{}" is not 2'.format(
+            if len(self.channels)%2 != 0:
+                raise ValueError('Length of "{}" is not even'.format(
                                  self.channels))
-            self.value_names[0] = 'Magn'
-            self.value_names[1] = 'Phase'
-            self.value_units[1] = 'deg'
+            for i in range(len(self.channels)//2):
+                self.value_names[2*i] = 'Magn'
+                self.value_names[2*i+1] = 'Phase'
+                self.value_units[2*i+1] = 'deg'
 
     def get_values(self):
         if self.always_prepare:
@@ -1660,14 +1662,18 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         return data
 
     def convert_to_polar(self, data):
-        if len(data) != 2:
-            raise ValueError('Expect 2 channels for rotation. Got {}'.format(
+        """
+        Convert data to polar coordinates,
+        assuming that the channels in ascencing are used as pairs of I, Q
+        """
+        if len(data)%2 != 0:
+            raise ValueError('Expect even number of channels for rotation. Got {}'.format(
                              len(data)))
-        I = data[0]
-        Q = data[1]
-        S21 = I + 1j*Q
-        data[0] = np.abs(S21)
-        data[1] = np.angle(S21)/(2*np.pi)*360
+        for i in range(len(data)//2):
+            I, Q = data[2*i], data[2*i+1]
+            S21 = I + 1j*Q
+            data[2*i] = np.abs(S21)
+            data[2*i+1] = np.angle(S21)/(2*np.pi)*360
         return data
 
     def acquire_data_point(self):
