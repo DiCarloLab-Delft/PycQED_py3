@@ -1058,7 +1058,8 @@ class CCLight_Transmon(Qubit):
                 self.mw_motzoi(opt_motzoi)
         return opt_motzoi
 
-    def calibrate_mixer_offsets_drive(self, update: bool =True)-> bool:
+    def calibrate_mixer_offsets_drive(self, mixer_channels=['G', 'D'],
+                                      update: bool =True)-> bool:
         '''
         Calibrates the mixer skewness and updates the I and Q offsets in
         the qubit object.
@@ -1094,48 +1095,42 @@ class CCLight_Transmon(Qubit):
                 chDI_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch+1)]
                 chDQ_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch+2)]
                 # End of AWG8 specific part
-            offset_pars = [chGI_par, chGQ_par, chDI_par, chDQ_par]
 
             VSM = self.instr_VSM.get_instr()
 
             ch_in = self.mw_vsm_ch_in()
-            mod_out = self.mw_vsm_mod_out()
-            # module 8 is hardcoded for use mixer calls (signal hound)
+            # module 8 is hardcoded for mixer calibartions (signal hound)
             VSM.set('mod8_marker_source'.format(ch_in), 'int')
             VSM.set('mod8_ch{}_marker_state'.format(ch_in), 'on')
 
-            #####
-            # This snippet is the 4 parameter joint optimization
-            #####
-
-            # return True
-
             # Calibrate Gaussian component mixer
-            # the use of modula 8 for mixer calibrations is hardcoded.
-            VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 2.0)
-            VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 0.2)
-            offset_I, offset_Q = mixer_carrier_cancellation(
-                SH=self.instr_SH.get_instr(),
-                source=self.instr_LO_mw.get_instr(),
-                MC=self.instr_MC.get_instr(),
-                chI_par=chGI_par, chQ_par=chGQ_par)
-            if update:
-                self.mw_mixer_offs_GI(offset_I)
-                self.mw_mixer_offs_GQ(offset_Q)
+            if 'G' in mixer_channels:
+                VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 2.0)
+                VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 0.2)
+                offset_I, offset_Q = mixer_carrier_cancellation(
+                    SH=self.instr_SH.get_instr(),
+                    source=self.instr_LO_mw.get_instr(),
+                    MC=self.instr_MC.get_instr(),
+                    chI_par=chGI_par, chQ_par=chGQ_par,
+                    label='Mixer_offsets_drive_G'+self.msmt_suffix)
+                if update:
+                    self.mw_mixer_offs_GI(offset_I)
+                    self.mw_mixer_offs_GQ(offset_Q)
+            if 'D' in mixer_channels:
+                # Calibrate Derivative component mixer
+                VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 0.2)
+                VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 2.0)
 
-            # Calibrate Derivative component mixer
-            VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 0.2)
-            VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 2.0)
-
-            offset_I, offset_Q = mixer_carrier_cancellation(
-                SH=self.instr_SH.get_instr(),
-                source=self.instr_LO_mw.get_instr(),
-                MC=self.instr_MC.get_instr(),
-                chI_par=chDI_par,
-                chQ_par=chDQ_par)
-            if update:
-                self.mw_mixer_offs_DI(offset_I)
-                self.mw_mixer_offs_DQ(offset_Q)
+                offset_I, offset_Q = mixer_carrier_cancellation(
+                    SH=self.instr_SH.get_instr(),
+                    source=self.instr_LO_mw.get_instr(),
+                    MC=self.instr_MC.get_instr(),
+                    chI_par=chDI_par,
+                    chQ_par=chDQ_par,
+                    label='Mixer_offsets_drive_D'+self.msmt_suffix)
+                if update:
+                    self.mw_mixer_offs_DI(offset_I)
+                    self.mw_mixer_offs_DQ(offset_Q)
 
         else:
             if using_QWG:
@@ -1160,6 +1155,92 @@ class CCLight_Transmon(Qubit):
                     'VSM-less case not implemented without QWG.')
 
         return True
+
+
+
+    def calibrate_mixer_skewness_drive(self, MC=None,
+                                       mixer_channels: list=['G', 'D'],
+                                       update: bool =True)-> bool:
+        '''
+        Calibrates the mixer skewness and updates values in the qubit object.
+
+        Args:
+            MC : instance of Measurement Control
+            mixer_channels: list of strings indicating what channels to
+                calibrate
+            update: if True updates values in the qubit object.
+        return:
+            success (bool) : returns True if succesful. Currently always
+                returns True (i.e., no sanity check implemented)
+        '''
+
+        # turn relevant channels on
+        if MC == None:
+            MC = self.instr_MC.get_instr()
+
+        # Load the sequence
+        CCL = self.instr_CC.get_instr()
+        p = sqo.CW_tone(
+            qubit_idx=self.cfg_qubit_nr(),
+            platf_cfg=self.cfg_openql_platform_fn())
+        CCL.eqasm_program(p.filename)
+        CCL.start()
+
+        ##### Open the VSM channel
+        VSM = self.instr_VSM.get_instr()
+        ch_in = self.mw_vsm_ch_in()
+        # module 8 is hardcoded for use mixer calls (signal hound)
+        VSM.set('mod8_marker_source'.format(ch_in), 'int')
+        VSM.set('mod8_ch{}_marker_state'.format(ch_in), 'on')
+        VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 2.0)
+        VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 2.0)
+
+
+        mw_lutman = self.instr_LutMan_MW.get_instr()
+        mw_lutman.mixer_apply_predistortion_matrix(True)
+        # # Define the parameters that will be varied
+        for mixer_ch in mixer_channels:
+            if mixer_ch == 'G':
+                mw_lutman.sq_G_amp(.5)
+                mw_lutman.sq_D_amp(0)
+            elif mixer_ch == 'D':
+                mw_lutman.sq_G_amp(0)
+                mw_lutman.sq_D_amp(.5)
+            alpha = mw_lutman.parameters['{}_mixer_alpha'.format(mixer_ch)]
+            phi = mw_lutman.parameters['{}_mixer_phi'.format(mixer_ch)]
+            spurious_sideband_freq = self.freq_qubit() - 2*self.mw_freq_mod()
+            detector = det.Signal_Hound_fixed_frequency(
+                self.instr_SH.get_instr(), spurious_sideband_freq,
+                prepare_for_each_point=True,
+                Navg=5,
+                prepare_function=mw_lutman.load_waveform_realtime,
+                # Codeword 10 is hardcoded in the generate CCL config
+                prepare_function_kwargs={'waveform_name': 'square', 'wf_nr': 10})
+            ad_func_pars = {'adaptive_function': cma.fmin,
+                            'x0': [1.0, 0.0],
+                            'sigma0': 1,
+                            'minimize': True,
+                            'noise_handler': cma.NoiseHandler(N=2),
+                            'options': {'cma_stds': [.15, 10],
+                                        'maxfevals': 250}}  # Should be enough for mixer skew
+
+            MC.set_sweep_functions([alpha, phi])
+            MC.set_detector_function(detector)  # sets test_detector
+            MC.set_adaptive_function_parameters(ad_func_pars)
+            MC.run(
+                name='Spurious_sideband_{}{}'.format(mixer_ch, self.msmt_suffix),
+                mode='adaptive')
+            # For the figure
+            ma.OptimizationAnalysis_v2()
+            a = ma.OptimizationAnalysis(auto=True, label='Spurious_sideband')
+            alpha = a.optimization_result[0][0]
+            phi = a.optimization_result[0][1]
+            if update:
+                self.set('mw_{}_mixer_alpha'.format(mixer_ch), alpha)
+                self.set('mw_{}_mixer_phi'.format(mixer_ch), phi)
+
+        return True
+
 
     def calibrate_mixer_skewness_RO(self, update=True):
         '''
@@ -1684,13 +1765,15 @@ class CCLight_Transmon(Qubit):
                     i+1, ch_in)]
                 mod_sweep.append(swf.two_par_joint_sweep(
                     G_par, D_par, preserve_ratio=False))
-            s = swf.multi_sweep_function(sweep_functions=mod_sweep)
+            s = swf.multi_sweep_function(sweep_functions=mod_sweep,
+                                         retrieve_value=True)
         else:
             G_par = VSM.parameters['mod{}_ch{}_gaussian_amp'.format(
                 mod_out, ch_in)]
             D_par = VSM.parameters['mod{}_ch{}_derivative_amp'.format(
                 mod_out, ch_in)]
-            s = swf.two_par_joint_sweep(G_par, D_par, preserve_ratio=False)
+            s = swf.two_par_joint_sweep(G_par, D_par, preserve_ratio=False,
+                                        retrieve_value=True)
 
         self.instr_CC.get_instr().eqasm_program(p.filename)
         MC.set_sweep_function(s)

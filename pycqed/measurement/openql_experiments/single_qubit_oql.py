@@ -14,8 +14,25 @@ output_dir = join(dirname(__file__), 'output')
 ql.set_output_dir(output_dir)
 
 
-def CW_tone():
-    pass
+def CW_tone(qubit_idx: int, platf_cfg: str):
+    """
+    Sequence to generate an "always on" pulse or "ContinuousWave" (CW) tone.
+    This is a sequence that goes a bit against the paradigm of openql.
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="CW_tone",
+                nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    k = Kernel("main", p=platf)
+    for i in range(40):
+        k.gate('square', qubit_idx)
+    p.add_kernel(k)
+    with suppress_stdout():
+        p.compile(verbose=False)
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
 
 
 def vsm_timing_cal_sequence(qubit_idx: int, platf_cfg: str):

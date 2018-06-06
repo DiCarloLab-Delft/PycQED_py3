@@ -927,7 +927,7 @@ class Function_Detector(Soft_Detector):
                  detector_control: str='soft',
                  value_units: list=None, msmt_kw: dict ={},
                  result_keys: list=None,
-                 prepare_function=None, prepare_function_kw: dict={},
+                 prepare_function=None, prepare_function_kwargs: dict={},
                  always_prepare: bool=False, **kw):
         super().__init__()
         self.get_function = get_function
@@ -942,7 +942,7 @@ class Function_Detector(Soft_Detector):
             self.value_units = ['a.u.'] * len(self.value_names)
 
         self.prepare_function = prepare_function
-        self.prepare_function_kw = prepare_function_kw
+        self.prepare_function_kwargs = prepare_function_kwargs
         self.always_prepare = always_prepare
 
     def prepare(self, **kw):
@@ -1110,7 +1110,9 @@ class Heterodyne_probe_soft_avg(Soft_Detector):
 class Signal_Hound_fixed_frequency(Soft_Detector):
 
     def __init__(self, signal_hound, frequency=None, Navg=1, delay=0.1,
-                 prepare_for_each_point=False, **kw):
+                 prepare_for_each_point=False,
+                 prepare_function=None,
+                 prepare_function_kwargs: dict={}):
         super().__init__()
         self.frequency = frequency
         self.name = 'SignalHound_fixed_frequency'
@@ -1122,15 +1124,20 @@ class Signal_Hound_fixed_frequency(Soft_Detector):
             self.SH.set('frequency', frequency)
         self.Navg = Navg
         self.prepare_for_each_point = prepare_for_each_point
+        self.prepare_function = prepare_function
+        self.prepare_function_kwargs = prepare_function_kwargs
 
     def acquire_data_point(self, **kw):
         if self.prepare_for_each_point:
-            self.SH.prepare_for_measurement()
+            self.prepare()
         time.sleep(self.delay)
         return self.SH.get_power_at_freq(Navg=self.Navg)
 
     def prepare(self, **kw):
         self.SH.prepare_for_measurement()
+        if self.prepare_function is not None:
+            self.prepare_function(**self.prepare_function_kwargs)
+
 
     def finish(self, **kw):
         self.SH.abort()
@@ -2020,7 +2027,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
         # The averaging-count is used to specify how many times the AWG program
         # should run
         self.UHFQC.awgs_0_single(1)
-        self.UHFQC.awgs_0_userregs_0(self.nr_shots) # The AWG program uses 
+        self.UHFQC.awgs_0_userregs_0(self.nr_shots) # The AWG program uses
         # userregs/0 to define the number of iterations
         # in the loop
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)

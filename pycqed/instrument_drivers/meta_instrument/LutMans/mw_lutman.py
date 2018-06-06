@@ -104,7 +104,8 @@ class Base_MW_LutMan(Base_LutMan):
                            parameter_class=ManualParameter,
                            vals=vals.Numbers(1, self._num_channels))
 
-    def generate_standard_waveforms(self):
+    def generate_standard_waveforms(self,
+                                    apply_predistortion_matrix: bool=True):
         self._wave_dict = OrderedDict()
         if self.cfg_sideband_mode() == 'static':
             f_modulation = self.mw_modulation()
@@ -192,7 +193,8 @@ class Base_MW_LutMan(Base_LutMan):
                 sampling_rate=self.sampling_rate(), phase=angle,
                 motzoi=self.mw_motzoi())
 
-        if self.mixer_apply_predistortion_matrix():
+        if (self.mixer_apply_predistortion_matrix()
+                and apply_predistortion_matrix):
             self._wave_dict = self.apply_mixer_predistortion_corrections(
                 self._wave_dict)
         return self._wave_dict
@@ -370,20 +372,25 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
         # Parameters for a square pulse
         self.add_parameter('sq_G_amp', unit='frac', vals=vals.Numbers(-1, 1),
                            parameter_class=ManualParameter,
-                           initial_value=1)
+                           initial_value=0.5)
         self.add_parameter('sq_D_amp', unit='frac', vals=vals.Numbers(-1, 1),
                            parameter_class=ManualParameter,
                            initial_value=0)
 
     def generate_standard_waveforms(self):
 
-        wave_dict = super().generate_standard_waveforms()
+        wave_dict = super().generate_standard_waveforms(
+            apply_predistortion_matrix=False)
         wave_dict['square'] = wf.mod_square_VSM(
             amp_G=self.sq_G_amp(), amp_D=self.sq_D_amp(),
             length=self.mw_gauss_width()*4,  # to ensure same duration as mw
             f_modulation=self.mw_modulation(),
             sampling_rate=self.sampling_rate())
 
+        if self.mixer_apply_predistortion_matrix():
+            self._wave_dict = self.apply_mixer_predistortion_corrections(
+                self._wave_dict)
+        return self._wave_dict
 
     def _add_channel_params(self):
         # FIXME: add parameter channel amp that sets the ouput amplitude of
@@ -417,8 +424,8 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
 
         AWG = self.AWG.get_instr()
 
-        awg_nr_G = self.channel_GI//2
-        awg_nr_D = self.channel_DI//2
+        awg_nr_G = self.channel_GI()//2
+        awg_nr_D = self.channel_DI()//2
         AWG.upload_waveform_realtime(GI, GQ, awg_nr_G, wf_nr=wf_nr)
         AWG.upload_waveform_realtime(DI, DQ, awg_nr_D, wf_nr=wf_nr)
 
@@ -467,8 +474,8 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
 
         M_G = wf.mixer_predistortion_matrix(self.G_mixer_alpha(),
                                             self.G_mixer_phi())
-        M_D = wf.mixer_predistortion_matrix(self.G_mixer_alpha(),
-                                            self.G_mixer_phi())
+        M_D = wf.mixer_predistortion_matrix(self.D_mixer_alpha(),
+                                            self.D_mixer_phi())
 
         for key, val in wave_dict.items():
             GI, GQ = np.dot(M_G, val[0:2])  # Mixer correction Gaussian comp.
