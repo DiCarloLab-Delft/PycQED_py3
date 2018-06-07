@@ -202,7 +202,7 @@ class Test_Flux_LutMan(unittest.TestCase):
     def setUpClass(self):
         self.AWG = v8.VirtualAWG8('DummyAWG8')
 
-        self.fluxlutman = flm.AWG8_Flux_LutMan('Flux_LutMan')
+        self.fluxlutman = flm.AWG8_Flux_LutMan('fluxlutman_main')
         self.k0 = ko.DistortionKernel('k0')
         self.fluxlutman.instr_distortion_kernel(self.k0.name)
         self.fluxlutman.AWG(self.AWG.name)
@@ -210,6 +210,7 @@ class Test_Flux_LutMan(unittest.TestCase):
         self.fluxlutman.cz_theta_f(80)
         self.fluxlutman.cz_freq_01_max(6.8e9)
         self.fluxlutman.cz_J2(4.1e6)
+        self.fluxlutman.cfg_awg_channel(1)
         # self.fluxlutman.cz_E_c(250e6)
         self.fluxlutman.cz_freq_interaction(5.1e9)
         self.fluxlutman.cfg_max_wf_length(5e-6)
@@ -218,8 +219,27 @@ class Test_Flux_LutMan(unittest.TestCase):
                                 5.25834946e+07])
         self.fluxlutman.polycoeffs_freq_conv(poly_coeffs)
         self.fluxlutman.set_default_lutmap()
-        # for i in range(10):
-        #     self.fluxlutman.set('mcz_phase_corr_amp_{}'.format(i+1), i/10)
+        self.fluxlutman.instr_partner_lutman('fluxlutman_partner')
+
+        ################################################
+
+        self.fluxlutman_partner = flm.AWG8_Flux_LutMan('fluxlutman_partner')
+        self.fluxlutman_partner.instr_distortion_kernel(self.k0.name)
+        self.fluxlutman_partner.AWG(self.AWG.name)
+        self.fluxlutman_partner.sampling_rate(2.4e9)
+        self.fluxlutman_partner.cz_theta_f(80)
+        self.fluxlutman_partner.cz_freq_01_max(6.8e9)
+        self.fluxlutman_partner.cz_J2(4.1e6)
+        self.fluxlutman_partner.cfg_awg_channel(2)
+
+        self.fluxlutman_partner.cz_freq_interaction(5.1e9)
+        self.fluxlutman_partner.cfg_max_wf_length(5e-6)
+
+        poly_coeffs = np.array([1.95027142e+09,  -3.22560292e+08,
+                                5.25834946e+07])
+        self.fluxlutman_partner.polycoeffs_freq_conv(poly_coeffs)
+        self.fluxlutman_partner.set_default_lutmap()
+        self.fluxlutman_partner.instr_partner_lutman('fluxlutman_main')
 
 
     def test__program_hash_differs_AWG8_flux_lutman(self):
@@ -358,6 +378,7 @@ class Test_Flux_LutMan(unittest.TestCase):
 
     def test_custom_wf(self):
         self.fluxlutman.generate_standard_waveforms()
+
         np.testing.assert_array_almost_equal(
             self.fluxlutman._wave_dict['custom_wf'],
             np.array([]))

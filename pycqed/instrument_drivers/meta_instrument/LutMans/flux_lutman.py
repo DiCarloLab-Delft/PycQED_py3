@@ -806,7 +806,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                 waveform = self.distort_waveform(waveform)
                 self._wave_dict_dist[waveform_name] = waveform
 
-        waveform = self._wave_dict[waveform_name]
+        waveform = self._wave_dict_dist[waveform_name]
 
         if self.instr_partner_lutman() is None:
             logging.warning('no partner lutman specified')
@@ -814,22 +814,32 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         else:
             partner_lm = self.instr_partner_lutman.get_instr()
             prtnr_wf_name = partner_lm._get_wf_name_from_cw(codeword=wf_nr)
-
             if regenerate_waveforms:
                 gen_wf_func = getattr(partner_lm,
                                       '_gen_{}'.format(prtnr_wf_name))
                 waveform = gen_wf_func()
+
                 if partner_lm.cfg_append_compensation():
                     waveform = partner_lm.add_compensation_pulses(waveform)
+
                 if partner_lm.cfg_distort():
                     waveform = partner_lm.distort_waveform(waveform)
                     partner_lm._wave_dict_dist[prtnr_wf_name] = waveform
 
             other_waveform = partner_lm._wave_dict_dist[prtnr_wf_name]
 
+        if len(waveform) != len(other_waveform):
+            other_waveform = np.zeros(len(waveform))
+            msg = ('Lenghts of waveforms "{}" ({}) and "{}" ({}) do '
+                   'not match.'.format(waveform_name, len(waveform),
+                                       prtnr_wf_name, len(other_waveform)))
+            logging.warning(msg)
+            logging.warning('Setting "other waveform" to array of zeros.')
+
         awg_ch = self.cfg_awg_channel()-1  # -1 is to account for starting at 1
         ch_pair = awg_ch % 2
         awg_nr = awg_ch//2
+
 
         if ch_pair == 0:
             waveforms = (waveform, other_waveform)
