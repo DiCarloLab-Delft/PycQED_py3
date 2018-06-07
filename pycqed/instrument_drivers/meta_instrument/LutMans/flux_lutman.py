@@ -86,10 +86,6 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             initial_value=np.array([2e9, 0, 0]),
             parameter_class=ManualParameter)
 
-        self.add_parameter('cfg_operating_mode',
-                           initial_value='Codeword',
-                           vals=vals.Enum('Codeword', 'LongSeq'),
-                           parameter_class=ManualParameter)
         self.add_parameter('cfg_awg_channel',
                            initial_value=1,
                            vals=vals.Ints(1, 8),
@@ -136,10 +132,32 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             parameter_class=ManualParameter, initial_value=None,
             vals=vals.Ints())
 
+        self.add_parameter(
+            'cfg_operating_mode',
+            initial_value='Codeword_normal',
+            vals=vals.Enum('Codeword_normal',
+                           'CW_single_01', 'CW_single_02',
+                           'CW_single_03', 'CW_single_04',
+                           'CW_single_05', 'CW_single_06'),
+            docstring='Used to determine what program to load in the AWG8. '
+            'If set to "Codeword_normal" it does codeword triggering, '
+            'other modes exist to play only a specific single waveform.',
+            set_cmd=self._set_cfg_operating_mode,
+            get_cmd=self._get_cfg_operating_mode)
+        self._cfg_operating_mode = 'Codeword_normal'
+
         self.add_parameter('cfg_max_wf_length',
                            parameter_class=ManualParameter,
                            initial_value=10e-6,
                            unit='s', vals=vals.Numbers(0, 100e-6))
+
+    def _set_cfg_operating_mode(self, val):
+        self._cfg_operating_mode = val
+        # this is to ensure changing the mode requires reuploading the program
+        self._awgs_fl_sequencer_program_expected_hash(101)
+
+    def _get_cfg_operating_mode(self):
+        return self._cfg_operating_mode
 
     def amp_to_detuning(self, amp):
         """
@@ -703,24 +721,59 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         else:
             lutmans += [self.instr_partner_lutman.get_instr()]
 
+        if self.cfg_operating_mode() != 'Codeword_normal':
+            # Regenerating only one waveform in this case, see below
+            regenerate_waveforms_realtime = regenerate_waveforms
+            regenerate_waveforms = False
+
         for lm in lutmans:
             if regenerate_waveforms:
                 lm.generate_standard_waveforms()
-            for waveform_name, lookuptable in lm.LutMap().items():
-                lm.load_waveform_onto_AWG_lookuptable(waveform_name)
+                for waveform_name, lookuptable in lm.LutMap().items():
+                    lm.load_waveform_onto_AWG_lookuptable(waveform_name)
 
         # Uploading the codeword program if required
         if self._program_hash_differs() or force_load_sequencer_program:
             # This ensures only the channels that are relevant get reconfigured
             awg_nr = (self.cfg_awg_channel()-1)//2
-            self.AWG.get_instr().upload_codeword_program(awgs=[awg_nr])
+            self._upload_codeword_program(awg_nr)
 
-        for waveform_name in self.LutMap().keys():
+        if self.cfg_operating_mode() == 'Codeword_normal':
+            for waveform_name in self.LutMap().keys():
+                self.load_waveform_realtime(
+                    waveform_name=waveform_name,
+                    wf_nr=None, regenerate_waveforms=False)
+        else:
+            # Only load one waveform and do it in realtime.
+            cw_idx = int(self.cfg_operating_mode()[-2:])
+            waveform_name = self._get_wf_name_from_cw(cw_idx)
             self.load_waveform_realtime(
                 waveform_name=waveform_name,
-                wf_nr=None, regenerate_waveforms=False)
+                wf_nr=None, regenerate_waveforms=regenerate_waveforms_realtime)
 
         self._update_expected_program_hash()
+
+    def _generate_single_cw_program(self, cw_idx):
+        devname = self.AWG.get_instr()._devname
+        ch = self.cfg_awg_channel() - (self.cfg_awg_channel()+1) % 2
+        awg_single_wf_program = (
+            '\nwhile (1) {\n' +
+            'waitDIOTrigger();\n' +
+            'playWave("{}_wave_ch{}_cw{:03}", '.format(devname, ch, cw_idx) +
+            '"{}_wave_ch{}_cw{:03}");'.format(devname, ch+1, cw_idx)+ '\n}')
+        return awg_single_wf_program
+
+    def _upload_codeword_program(self, awg_nr):
+        awg = self.AWG.get_instr()
+        if self.cfg_operating_mode() == 'Codeword_normal':
+            awg.upload_codeword_program(awgs=[awg_nr])
+        else:
+            cw_idx = int(self.cfg_operating_mode()[-2:])
+            single_cw_program = self._generate_single_cw_program(cw_idx)
+            awg.configure_awg_from_string(awg_nr, single_cw_program)
+            awg.configure_codeword_protocol()
+            awg.start()
+
 
     def _update_expected_program_hash(self):
         """
@@ -817,14 +870,14 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             if regenerate_waveforms:
                 gen_wf_func = getattr(partner_lm,
                                       '_gen_{}'.format(prtnr_wf_name))
-                waveform = gen_wf_func()
+                prtnr_wf = gen_wf_func()
 
                 if partner_lm.cfg_append_compensation():
-                    waveform = partner_lm.add_compensation_pulses(waveform)
+                    prtnr_wf = partner_lm.add_compensation_pulses(prtnr_wf)
 
                 if partner_lm.cfg_distort():
-                    waveform = partner_lm.distort_waveform(waveform)
-                    partner_lm._wave_dict_dist[prtnr_wf_name] = waveform
+                    prtnr_wf = partner_lm.distort_waveform(prtnr_wf)
+                    partner_lm._wave_dict_dist[prtnr_wf_name] = prtnr_wf
 
             other_waveform = partner_lm._wave_dict_dist[prtnr_wf_name]
 
@@ -839,7 +892,6 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         awg_ch = self.cfg_awg_channel()-1  # -1 is to account for starting at 1
         ch_pair = awg_ch % 2
         awg_nr = awg_ch//2
-
 
         if ch_pair == 0:
             waveforms = (waveform, other_waveform)

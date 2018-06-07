@@ -5,6 +5,7 @@ from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
 from zlib import crc32
 
+
 class VirtualAWG8(Instrument):
     """
     Dummy instrument that implements some of the interface of the AWG8.
@@ -23,6 +24,8 @@ class VirtualAWG8(Instrument):
                                                vals.Enum(None)))
         self._num_channels = 8
         self._num_codewords = 256
+
+        self._devname = 'dev{}'.format(name)
 
         self._add_codeword_parameters()
         self.add_dummy_parameters()
@@ -96,6 +99,9 @@ class VirtualAWG8(Instrument):
         hash = crc32(program_string.encode('utf-8'))
         self.set('awgs_{}_sequencer_program_crc32_hash'.format(awg_nr),
                  hash)
+
+    def configure_codeword_protocol(self, default_dio_timing: bool=False):
+        pass
 
     def stop(self):
         pass
