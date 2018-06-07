@@ -266,3 +266,28 @@ class Test_Waveforms(unittest.TestCase):
         # FIXME:  Only testing for the shape as the waveform has been updated
         self.assertEqual(np.shape(theta_wave), np.shape(test_wave_2))
         # np.testing.assert_almost_equal(theta_wave, test_wave_2)
+
+    def test_mod_square_VSM(self):
+        waveform = wf.mod_square_VSM(1, 0,
+                                     20e-9, f_modulation=0, sampling_rate=1e9)
+
+        np.testing.assert_almost_equal(waveform[0], np.ones(20))
+        np.testing.assert_almost_equal(waveform[1], np.zeros(20))
+        np.testing.assert_almost_equal(waveform[2], np.zeros(20))
+        np.testing.assert_almost_equal(waveform[3], np.zeros(20))
+
+        waveform = wf.mod_square_VSM(1, 1,
+                                     20e-9, f_modulation=0, sampling_rate=1e9)
+
+        np.testing.assert_almost_equal(waveform[0], np.ones(20))
+        np.testing.assert_almost_equal(waveform[1], np.zeros(20))
+        np.testing.assert_almost_equal(waveform[2], np.ones(20))
+        np.testing.assert_almost_equal(waveform[3], np.zeros(20))
+
+
+        waveform = wf.mod_square_VSM(0, 1,
+                                     20e-9, f_modulation=0, sampling_rate=1e9)
+        np.testing.assert_almost_equal(waveform[0], np.zeros(20))
+        np.testing.assert_almost_equal(waveform[1], np.zeros(20))
+        np.testing.assert_almost_equal(waveform[2], np.ones(20))
+        np.testing.assert_almost_equal(waveform[3], np.zeros(20))

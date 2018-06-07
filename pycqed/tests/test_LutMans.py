@@ -135,6 +135,9 @@ class Test_MW_LutMan(unittest.TestCase):
         # Does not check the full lutmap
         dict_contained_in(expected_dict, self.AWG8_VSM_MW_LutMan.LutMap())
 
+    def test_realtime_loading_square_wf_AWG8_VSM(self):
+        self.AWG8_VSM_MW_LutMan.load_waveform_realtime('square', wf_nr=3)
+
     def test_uploading_standard_pulses_AWG8_VSM(self):
         # Tests that all waveforms are present and no error is raised.
         self.AWG8_VSM_MW_LutMan.load_waveforms_onto_AWG_lookuptable()

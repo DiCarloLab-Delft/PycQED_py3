@@ -8,15 +8,15 @@ import copy as copy
 
 class Base_RO_LutMan(Base_LutMan):
 
-    def __init__(self, name, num_res=2, feedline_number: int=0,**kw):
+    def __init__(self, name, num_res=2, feedline_number: int=0, **kw):
         if num_res > 9:
             raise ValueError('At most 9 resonators can be read out.')
         self._num_res = num_res
         self._feedline_number = feedline_number
-        if self._feedline_number==0:
-            self._resonator_codeword_bit_mapping=[0,2,3,5,6]
-        elif self._feedline_number==1:
-            self._resonator_codeword_bit_mapping=[1,4]
+        if self._feedline_number == 0:
+            self._resonator_codeword_bit_mapping = [0, 2, 3, 5, 6]
+        elif self._feedline_number == 1:
+            self._resonator_codeword_bit_mapping = [1, 4]
         else:
             raise NotImplementedError(
               'hardcoded for feedline 0 and 1 of Surface-7')
@@ -182,8 +182,8 @@ class Base_RO_LutMan(Base_LutMan):
             ## 3-step RO pulse with ramp-up and double depletion
             up_len = self.get('M_length_R{}'.format(res))-gauss_length/2
             M_up = self.add_pulse(self.get('M_amp_R{}'.format(res)),
-                                     up_len, delay=0,
-                                     phase=self.get('M_phi_R{}'.format(res)))
+                                  up_len, delay=0,
+                                  phase=self.get('M_phi_R{}'.format(res)))
             M_down0 = self.add_pulse(self.get('M_down_amp0_R{}'.format(res)),
                                      self.get('M_down_length0_R{}'.format(res)),  # ns
                                      delay=0,
@@ -206,7 +206,7 @@ class Base_RO_LutMan(Base_LutMan):
                                phase=self.get('M_phi_R{}'.format(res)))
 
             M_up_down_down_final = (np.concatenate((M_up_down_down[0], M_final[0])),
-                                     np.concatenate((M_up_down_down[1], M_final[1])))
+                                    np.concatenate((M_up_down_down[1], M_final[1])))
             res_wave_dict['M_up_down_down_final_R{}'.format(res)] = M_up_down_down_final
 
             # 2. convolve with gaussian (if desired)
@@ -250,7 +250,6 @@ class UHFQC_RO_LutMan(Base_RO_LutMan):
         self._voltage_min = -1.0
         self._voltage_max = 1.0-1.0/2**13
         self.sampling_rate(1.8e9)
-
 
 
     def set_default_lutmap(self):

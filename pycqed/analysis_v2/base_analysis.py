@@ -5,6 +5,7 @@ from inspect import signature
 import os
 import numpy as np
 import copy
+import logging
 from collections import OrderedDict
 from inspect import signature
 import numbers
@@ -22,7 +23,6 @@ import json
 import lmfit
 import h5py
 from pycqed.measurement.hdf5_data import write_dict_to_hdf5
-import copy
 
 
 class BaseDataAnalysis(object):
@@ -34,8 +34,8 @@ class BaseDataAnalysis(object):
         - __init__      -> specify params to be extracted, set options
                            specific to analysis and call run_analysis method.
         - process_data  -> mundane tasks such as binning and filtering
-        - prepare_plots -> specify default plots and set up plotting dicts
         - run_fitting   -> perform fits to data
+        - prepare_plots -> specify default plots and set up plotting dicts
 
     The core of this class is the flow defined in run_analysis and should
     be called at the end of the __init__. This executes
@@ -779,8 +779,6 @@ class BaseDataAnalysis(object):
         plot_title = pdict.get('title', None)
         plot_xrange = pdict.get('xrange', None)
         plot_yrange = pdict.get('yrange', None)
-        if pdict.get('color', False):
-            plot_linekws['color'] = pdict.get('color')
 
         # plot_multiple = pdict.get('multiple', False)
         plot_linestyle = pdict.get('linestyle', '-')
@@ -821,6 +819,9 @@ class BaseDataAnalysis(object):
                                    **plot_linekws))
 
         else:
+            if pdict.get('color', False):
+                plot_linekws['color'] = pdict.get('color')
+
             p_out = pfunc(plot_xvals, plot_yvals,
                           linestyle=plot_linestyle, marker=plot_marker,
                           label='%s%s' % (dataset_desc, dataset_label),
@@ -1161,6 +1162,13 @@ class BaseDataAnalysis(object):
         """
         Plots an lmfit fit result object using the plot_line function.
         """
+        if pdict['fit_res'] == {}:
+            # This is an implicit way of indicating a failed fit.
+            # We can probably do better by for example plotting the initial
+            # guess.
+            logging.warning('fit_res is an empty dictionary, cannot plot.')
+            return
+
         model = pdict['fit_res'].model
         plot_init = pdict.get('plot_init', False)  # plot the initial guess
         pdict['marker'] = pdict.get('marker', '')  # different default
@@ -1243,7 +1251,8 @@ class BaseDataAnalysis(object):
 
         """
         pfunc = getattr(axs, pdict.get('func'))
-        pfunc(**pdict['plot_kws'])
+        pdict['plot_args'] = pdict.get('plot_args', [])
+        pfunc(*pdict['plot_args'], **pdict['plot_kws'])
 
     @staticmethod
     def _sort_by_axis0(arr, sorted_indices, type=None):

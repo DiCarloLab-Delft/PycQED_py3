@@ -443,6 +443,7 @@ class MeasurementAnalysis(object):
                              show=False, log=False, transpose=False, **kw):
 
         if TwoD is False:
+
             self.get_naming_and_values()
             self.sweep_points = kw.pop('sweep_points', self.sweep_points)
             # Preallocate the array of axes in the figure
@@ -460,6 +461,7 @@ class MeasurementAnalysis(object):
                         figsize=(7, 4 * len(self.value_names)), dpi=self.dpi)
 
             else:
+
                 if self.no_of_columns == 2:
                     fig, axs = plt.subplots(max(len(self.value_names), 1), 1,
                                             figsize=(3.375,
@@ -939,9 +941,10 @@ class OptimizationAnalysis_v2(MeasurementAnalysis):
                     z=self.measured_values[i], ax=ax,
                     zlabel=self.value_names[i])
                 ax.plot(self.sweep_points[0],
-                        self.sweep_points[1], '-o', c='grey')
+                        self.sweep_points[1], linewidth=.5, marker='.',
+                        alpha=.3, c='grey')
                 ax.plot(self.sweep_points[0][-1], self.sweep_points[1][-1],
-                        'o', markersize=5, c='w')
+                        'x', markersize=5, c='w')
                 plot_title = kw.pop('plot_title', textwrap.fill(
                     self.timestamp_string + '_' +
                     self.measurementstring, 40))
@@ -4148,7 +4151,7 @@ class Ramsey_Analysis(TD_Analysis):
         kw['label'] = label
         kw['h5mode'] = 'r+'
         self.phase_sweep_only = phase_sweep_only
-        self.artificial_detuning = kw.pop('artificial_detuning', 0) 
+        self.artificial_detuning = kw.pop('artificial_detuning', 0)
         if self.artificial_detuning == 0:
             logging.warning('Artificial detuning is unknown. Defaults to %s MHz. '
                             'New qubit frequency might be incorrect.'
@@ -5635,7 +5638,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                             y_unit=self.value_units[0],
                                             save=False)
             # ensures that amplitude plot starts at zero
-            ax.set_ylim(ymin=-0.001)
+            ax.set_ylim(ymin=0.000)
 
         elif 'complex' in fitting_model:
             self.plot_complex_results(
@@ -6648,7 +6651,7 @@ class TwoD_Analysis(MeasurementAnalysis):
     def run_default_analysis(self, normalize=False, plot_linecuts=True,
                              linecut_log=False, colorplot_log=False,
                              plot_all=True, save_fig=True,
-                             transpose=False, figsize=None,
+                             transpose=False, figsize=None, filtered=False,
                              **kw):
         '''
         Args:
@@ -6668,6 +6671,16 @@ class TwoD_Analysis(MeasurementAnalysis):
         self.ax_array = []
 
         for i, meas_vals in enumerate(self.measured_values):
+            if filtered:
+                # print(self.measured_values)
+                # print(self.value_names)
+                if self.value_names[i] == 'Phase':
+                    self.measured_values[i] = dm_tools.filter_resonator_visibility(
+                                                        x=self.sweep_points,
+                                                        y=self.sweep_points_2D,
+                                                        z=self.measured_values[i],
+                                                        **kw)
+
             if (not plot_all) & (i >= 1):
                 break
             # Linecuts are above because somehow normalization applies to both

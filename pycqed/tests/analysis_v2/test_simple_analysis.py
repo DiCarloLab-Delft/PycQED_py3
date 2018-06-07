@@ -32,3 +32,10 @@ class Test_SimpleAnalysis(unittest.TestCase):
                                t_stop='20170726_164845',
                                options_dict={'scan_label': 'flipping'})
         self.assertTrue(len(a.timestamps) > 5)
+
+    def test_2D_interpolated(self):
+        a=ma.Basic2DInterpolatedAnalysis(t_start='20180522_030206')
+        fig_keys = list(a.figs.keys())
+        exp_list_keys = ['Cost function value', 'Conditional phase',
+                         'offset difference']
+        self.assertEqual(fig_keys, exp_list_keys)

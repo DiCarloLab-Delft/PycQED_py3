@@ -927,7 +927,7 @@ class Function_Detector(Soft_Detector):
                  detector_control: str='soft',
                  value_units: list=None, msmt_kw: dict ={},
                  result_keys: list=None,
-                 prepare_function=None, prepare_function_kw: dict={},
+                 prepare_function=None, prepare_function_kwargs: dict={},
                  always_prepare: bool=False, **kw):
         super().__init__()
         self.get_function = get_function
@@ -942,7 +942,7 @@ class Function_Detector(Soft_Detector):
             self.value_units = ['a.u.'] * len(self.value_names)
 
         self.prepare_function = prepare_function
-        self.prepare_function_kw = prepare_function_kw
+        self.prepare_function_kwargs = prepare_function_kwargs
         self.always_prepare = always_prepare
 
     def prepare(self, **kw):
@@ -1110,7 +1110,9 @@ class Heterodyne_probe_soft_avg(Soft_Detector):
 class Signal_Hound_fixed_frequency(Soft_Detector):
 
     def __init__(self, signal_hound, frequency=None, Navg=1, delay=0.1,
-                 prepare_for_each_point=False, **kw):
+                 prepare_for_each_point=False,
+                 prepare_function=None,
+                 prepare_function_kwargs: dict={}):
         super().__init__()
         self.frequency = frequency
         self.name = 'SignalHound_fixed_frequency'
@@ -1122,15 +1124,20 @@ class Signal_Hound_fixed_frequency(Soft_Detector):
             self.SH.set('frequency', frequency)
         self.Navg = Navg
         self.prepare_for_each_point = prepare_for_each_point
+        self.prepare_function = prepare_function
+        self.prepare_function_kwargs = prepare_function_kwargs
 
     def acquire_data_point(self, **kw):
         if self.prepare_for_each_point:
-            self.SH.prepare_for_measurement()
+            self.prepare()
         time.sleep(self.delay)
         return self.SH.get_power_at_freq(Navg=self.Navg)
 
     def prepare(self, **kw):
         self.SH.prepare_for_measurement()
+        if self.prepare_function is not None:
+            self.prepare_function(**self.prepare_function_kwargs)
+
 
     def finish(self, **kw):
         self.SH.abort()
@@ -1572,7 +1579,13 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         self.seg_per_point = max(seg_per_point, values_per_point)
 
         self.AWG = AWG
-        self.nr_averages = nr_averages
+
+        rounded_nr_averages = 2**int(np.log2(nr_averages))
+        if rounded_nr_averages != nr_averages:
+            logging.warning("nr_averages must be a power of 2, rounded to {} (from {}) ".format(
+                rounded_nr_averages, nr_averages))
+
+        self.nr_averages = rounded_nr_averages
         self.integration_length = integration_length
         # 0/1/2 crosstalk supressed /digitized/raw
         res_logging_indices = {'lin_trans': 0, 'digitized': 1, 'raw': 2}
@@ -1610,19 +1623,15 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         """
 
         self.real_imag = real_imag
-        # Commented this out as it is already done in the init -MAR Dec 2017
-        # if self.result_logging_mode == 'raw':
-        #     self.value_units = ['V']*len(self.channels)
-        # else:
-        #     self.value_units = ['']*len(self.channels)
 
         if not self.real_imag:
-            if len(self.channels) != 2:
-                raise ValueError('Length of "{}" is not 2'.format(
+            if len(self.channels)%2 != 0:
+                raise ValueError('Length of "{}" is not even'.format(
                                  self.channels))
-            self.value_names[0] = 'Magn'
-            self.value_names[1] = 'Phase'
-            self.value_units[1] = 'deg'
+            for i in range(len(self.channels)//2):
+                self.value_names[2*i] = 'Magn'
+                self.value_names[2*i+1] = 'Phase'
+                self.value_units[2*i+1] = 'deg'
 
     def get_values(self):
         if self.always_prepare:
@@ -1660,14 +1669,18 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         return data
 
     def convert_to_polar(self, data):
-        if len(data) != 2:
-            raise ValueError('Expect 2 channels for rotation. Got {}'.format(
+        """
+        Convert data to polar coordinates,
+        assuming that the channels in ascencing are used as pairs of I, Q
+        """
+        if len(data)%2 != 0:
+            raise ValueError('Expect even number of channels for rotation. Got {}'.format(
                              len(data)))
-        I = data[0]
-        Q = data[1]
-        S21 = I + 1j*Q
-        data[0] = np.abs(S21)
-        data[1] = np.angle(S21)/(2*np.pi)*360
+        for i in range(len(data)//2):
+            I, Q = data[2*i], data[2*i+1]
+            S21 = I + 1j*Q
+            data[2*i] = np.abs(S21)
+            data[2*i+1] = np.angle(S21)/(2*np.pi)*360
         return data
 
     def acquire_data_point(self):
@@ -2014,7 +2027,7 @@ class UHFQC_integration_logging_det(Hard_Detector):
         # The averaging-count is used to specify how many times the AWG program
         # should run
         self.UHFQC.awgs_0_single(1)
-        self.UHFQC.awgs_0_userregs_0(self.nr_shots) # The AWG program uses 
+        self.UHFQC.awgs_0_userregs_0(self.nr_shots) # The AWG program uses
         # userregs/0 to define the number of iterations
         # in the loop
         self.UHFQC.awgs_0_userregs_1(0)  # 0 for rl, 1 for iavg (input avg)

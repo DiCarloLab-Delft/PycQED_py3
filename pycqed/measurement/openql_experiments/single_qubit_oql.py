@@ -14,8 +14,25 @@ output_dir = join(dirname(__file__), 'output')
 ql.set_output_dir(output_dir)
 
 
-def CW_tone():
-    pass
+def CW_tone(qubit_idx: int, platf_cfg: str):
+    """
+    Sequence to generate an "always on" pulse or "ContinuousWave" (CW) tone.
+    This is a sequence that goes a bit against the paradigm of openql.
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="CW_tone",
+                nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    k = Kernel("main", p=platf)
+    for i in range(40):
+        k.gate('square', qubit_idx)
+    p.add_kernel(k)
+    with suppress_stdout():
+        p.compile(verbose=False)
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
 
 
 def vsm_timing_cal_sequence(qubit_idx: int, platf_cfg: str):
@@ -48,13 +65,22 @@ def CW_RO_sequence(qubit_idx: int, platf_cfg: str):
     A sequence that performs readout back to back without initialization.
     The separation of the readout triggers is done by specifying the duration
     of the readout parameter in the configuration file used for compilation.
+
+    qubit_idx can also be a list, then the corresponding set of measurements is triggered.
     """
     platf = Platform('OpenQL_Platform', platf_cfg)
     p = Program(pname="CW_RO_sequence", nqubits=platf.get_qubit_number(),
                 p=platf)
 
     k = Kernel("main", p=platf)
-    k.measure(qubit_idx)
+    if not hasattr(qubit_idx, "__iter__"):
+        qubit_idx = [qubit_idx]
+
+    k.gate('wait', qubit_idx, 0)
+    for qi in qubit_idx:
+        k.measure(qi)
+    k.gate('wait', qubit_idx, 0)
+
     p.add_kernel(k)
     with suppress_stdout():
         p.compile(verbose=False)
@@ -230,6 +256,54 @@ def T1(times, qubit_idx: int, platf_cfg: str):
     with suppress_stdout():
         p.compile(verbose=False)
     # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
+
+def T1_second_excited_state(times, qubit_idx: int, platf_cfg: str):
+    """
+    Single qubit T1 sequence for the second excited states.
+    Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
+
+    Input pars:
+        times:          the list of waiting times for each T1 element
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+    Returns:
+        p:              OpenQL Program object containing
+
+
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="T1_2nd_exc", nqubits=platf.get_qubit_number(),
+                p=platf)
+    for i, time in enumerate(times):
+        for j in range(2):
+            k = Kernel("T1_2nd_exc_{}_{}".format(i, j), p=platf)
+            k.prepz(qubit_idx)
+            wait_nanoseconds = int(round(time/1e-9))
+            k.gate('rx180', qubit_idx)
+            k.gate('rx12', qubit_idx)
+            k.gate("wait", [qubit_idx], wait_nanoseconds)
+            if j == 1:
+                k.gate('rx180', qubit_idx)
+            k.measure(qubit_idx)
+            p.add_kernel(k)
+
+    # adding the calibration points
+    add_single_qubit_cal_points(p, platf=platf, qubit_idx=qubit_idx,
+                                f_state_cal_pts=True)
+
+    with suppress_stdout():
+        p.compile(verbose=False)
+
+    dt = times[1] - times[0]
+    sweep_points = np.concatenate([np.repeat(times, 2),
+                                  times[-1]+dt*np.arange(6)+dt])
+    # attribute get's added to program to help finding the output files
+    p.sweep_points = sweep_points
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
@@ -667,7 +741,16 @@ def Ram_Z(qubit_name,
     pass
 
 
-def add_single_qubit_cal_points(p, platf, qubit_idx):
+def add_single_qubit_cal_points(p, platf, qubit_idx,
+                                f_state_cal_pts: bool=False):
+    """
+    Adds single qubit calibration points to an OpenQL program
+
+    Args:
+        p
+        platf
+        qubit_idx
+    """
     for i in np.arange(2):
         k = Kernel("cal_gr_"+str(i), p=platf)
         k.prepz(qubit_idx)
@@ -680,6 +763,14 @@ def add_single_qubit_cal_points(p, platf, qubit_idx):
         k.gate('rx180', qubit_idx)
         k.measure(qubit_idx)
         p.add_kernel(k)
+    if f_state_cal_pts:
+        for i in np.arange(2):
+            k = Kernel("cal_f_"+str(i), p=platf)
+            k.prepz(qubit_idx)
+            k.gate('rx180', qubit_idx)
+            k.gate('rx12', qubit_idx)
+            k.measure(qubit_idx)
+            p.add_kernel(k)
     return p
 
 
@@ -827,5 +918,61 @@ def FastFeedbackControl(lantecy, qubit_idx: int, platf_cfg: str):
     # attribute get's added to program to help finding the output files
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
+
+def ef_rabi_seq(q0: int,
+                   amps: list,
+                   platf_cfg: str,
+                   recovery_pulse: bool=True,
+                   add_cal_points: bool=True):
+    """
+    Sequence used to calibrate pulses for 2nd excited state (ef/12 transition)
+
+    Timing of the sequence:
+    q0:   --   X180 -- X12 -- (X180) -- RO
+
+    Args:
+        q0      (str): name of the addressed qubit
+        amps   (list): amps for the two state pulse, note that these are only
+            used to label the kernels. Load the pulse in the LutMan
+        recovery_pulse (bool): if True adds a recovery pulse to enhance
+            contrast in the measured signal.
+    """
+    if len(amps)>18:
+        raise ValueError('Only 18 free codewords available for amp pulses')
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="ef_rabi_seq",
+                nqubits=platf.get_qubit_number(),
+                p=platf)
+    # These angles correspond to special pi/2 pulses in the lutman
+    for i, amp in enumerate(amps):
+        # cw_idx corresponds to special hardcoded pulses in the lutman
+        cw_idx = i + 9
+
+        k = Kernel("ef_A{}".format(amp), p=platf)
+        k.prepz(q0)
+        k.gate('rx180', q0)
+        k.gate('cw_{:02}'.format(cw_idx), q0)
+        if recovery_pulse:
+            k.gate('rx180', q0)
+        k.measure(q0)
+        p.add_kernel(k)
+    if add_cal_points:
+        p = add_single_qubit_cal_points(p, platf=platf, qubit_idx=q0)
+    with suppress_stdout():
+        p.compile()
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+
+    if add_single_qubit_cal_points:
+        cal_pts_idx = [amps[-1]+.1, amps[-1]+.15,
+                        amps[-1]+.2, amps[-1]+.25]
+    else:
+        cal_pts_idx = []
+
+    p.sweep_points = np.concatenate([amps, cal_pts_idx])
+    p.set_sweep_points(p.sweep_points, len(p.sweep_points))
     return p
 

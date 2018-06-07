@@ -5,7 +5,7 @@ Hacked together by Rene Vollmer
 '''
 
 import pycqed
-from pycqed.analysis_v2.quantum_efficiency_analysis import RamseyAnalysisSweep
+from pycqed.analysis_v2.quantum_efficiency_analysis import DephasingAnalysisSweep
 import pycqed.analysis_v2.base_analysis as ba
 import numpy as np
 from collections import OrderedDict
@@ -27,7 +27,7 @@ class CrossDephasingAnalysis(ba.BaseDataAnalysis):
 
     def __init__(self, qubit_labels: list,
     			 t_start: str = None, t_stop: str = None,
-                 label_pattern: str = 'ro_amp_sweep_ramsey_trgt_{TQ}_measured_{RQ}',
+                 label_pattern: str = 'ro_amp_sweep_dephasing_trgt_{TQ}_measured_{RQ}',
                  options_dict: dict = None,
                  extract_only: bool = False, auto: bool = True,
                  close_figs: bool = True, do_fitting: bool = True):
@@ -47,7 +47,7 @@ class CrossDephasingAnalysis(ba.BaseDataAnalysis):
         for i, tq in enumerate(qubit_labels):
             for j, rq in enumerate(qubit_labels):
                 label = label_pattern.replace('{TQ}', tq).replace('{RQ}', rq)
-                self.ra[i, j] = RamseyAnalysisSweep(
+                self.ra[i, j] = DephasingAnalysisSweep(
                                                 t_start=t_start,
                                                 t_stop=t_stop,
                                                 label=label, options_dict=d,
@@ -107,7 +107,7 @@ class CrossDephasingAnalysis(ba.BaseDataAnalysis):
             'yvals': self.qubit_labels, 'ylabel': 'Targeted Qubit', 'yunit': '',
             'xvals': self.qubit_labels, 'xlabel': 'Dephased Qubit', 'xunit': '',
             'zvals': self.fit_dicts['sigmas'],
-            'zlabel': r'Ramsey Gauss width $\sigma$',
+            'zlabel': r'Dephasing Gauss width $\sigma$',
             #'plotsize': self.options_dict.get('plotsize', None),
             'cmap': self.options_dict.get('cmap', 'YlGn_r'),
         }
@@ -117,7 +117,7 @@ class CrossDephasingAnalysis(ba.BaseDataAnalysis):
             'yvals': self.qubit_labels, 'ylabel': 'Targeted Qubit', 'yunit': '',
             'xvals': self.qubit_labels, 'xlabel': 'Dephased Qubit', 'xunit': '',
             'zvals': self.fit_dicts['sigmas_norm'],
-            'zlabel': r'Normalized Ramsey Gauss width $\sigma$',
+            'zlabel': r'Normalized Dephasing Gauss width $\sigma$',
             'plotsize': self.options_dict.get('plotsize', None),
             'cmap': self.options_dict.get('cmap', 'YlGn_r'),
         }
@@ -127,7 +127,7 @@ class CrossDephasingAnalysis(ba.BaseDataAnalysis):
             'yvals': self.qubit_labels, 'ylabel': 'Targeted Qubit', 'yunit': '',
             'xvals': self.qubit_labels, 'xlabel': 'Dephased Qubit', 'xunit': '',
             'zvals': self.fit_dicts['deph_norm'],
-            'zlabel': r'Normalized Inverse Ramsey Gauss width $\sigma^{-1}$',
+            'zlabel': r'Normalized Inverse Dephasing Gauss width $\sigma^{-1}$',
             'plotsize': self.options_dict.get('plotsize', None),
             'cmap': self.options_dict.get('cmap', 'YlGn_r'),
         }
@@ -191,16 +191,16 @@ class CrossDephasingAnalysis(ba.BaseDataAnalysis):
         #cba = fig.colorbar(pa, cax=axins1)
 
         axins2 = inset_axes(parent_axes=axs,
-                                width="4%",  # width = 10% of parent_bbox width
-                                height="100%",  # height : 50%
-                                loc=3,
-                                bbox_to_anchor=(1.03, 0., 1, 1),
-                                bbox_transform=axs.transAxes,
-                                borderpad=0,
+                            width="4%",  # width = 10% of parent_bbox width
+                            height="100%",  # height : 50%
+                            loc=3,
+                            bbox_to_anchor=(1.03, 0., 1, 1),
+                            bbox_transform=axs.transAxes,
+                            borderpad=0,
                             )
 
         pb = axs.imshow(off_diagonal, cmap='Blues',
-                        vmin=0, vmax=max(np.max(off_diagonal),0.01))
+                        vmin=0, vmax=max(np.max(off_diagonal), 0.01))
         cbb = fig.colorbar(pb, cax=axins2)
 
         axs.yaxis.set_ticklabels(yl)
