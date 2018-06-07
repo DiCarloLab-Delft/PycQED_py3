@@ -120,6 +120,21 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         self.add_parameter('instr_distortion_kernel',
                            parameter_class=InstrumentRefParameter)
+        self.add_parameter('instr_partner_lutman',
+                           docstring='LutMan responsible for the corresponding'
+                           'channel in the AWG8 channel pair. '
+                           'Reference is used when uploading waveforms',
+                           parameter_class=InstrumentRefParameter)
+
+        self.add_parameter(
+            '_awgs_fl_sequencer_program_expected_hash',
+            docstring='crc32 hash of the awg8 sequencer program. '
+            'This parameter is used to dynamically determine '
+            'if the program needs to be uploaded. The initial_value is'
+            ' None, indicating that the program needs to be uploaded.'
+            ' After the first program is uploaded, the value is set.',
+            parameter_class=ManualParameter, initial_value=None,
+            vals=vals.Ints())
 
         self.add_parameter('cfg_max_wf_length',
                            parameter_class=ManualParameter,
@@ -212,6 +227,13 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                 self.cfg_awg_channel(), cw_idx)
         self.LutMap(LutMap)
 
+    def _get_wf_name_from_cw(self, codeword: int):
+        for wf_name, val in self.LutMap().items():
+            if int(val[-3:]) == codeword:
+                return wf_name
+        raise ValueError("Codeword {} not specified"
+                         " in LutMap".format(codeword))
+
     def _add_waveform_parameters(self):
         """
         Adds the parameters required to generate the standard waveforms
@@ -281,7 +303,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                            initial_value=6e9,
                            unit='Hz', parameter_class=ManualParameter)
         self.add_parameter('cz_J2', vals=vals.Numbers(), unit='Hz',
-                            # initial value is chosen to not raise errors
+                           # initial value is chosen to not raise errors
                            initial_value=15e6,
                            parameter_class=ManualParameter)
         self.add_parameter('cz_freq_interaction', vals=vals.Numbers(),
@@ -347,6 +369,9 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             parameter_class=ManualParameter,
             vals=vals.Numbers(min_value=0))
 
+    #################################
+    #  Waveform generation methods  #
+    #################################
 
     def generate_standard_waveforms(self):
         """
@@ -627,6 +652,10 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         # CZ with phase correction
         return waveform
 
+    #################################
+    #  Waveform loading methods     #
+    #################################
+
     def load_waveform_onto_AWG_lookuptable(self, waveform_name: str,
                                            regenerate_waveforms: bool=False):
         """
@@ -647,6 +676,83 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             waveform = self.distort_waveform(waveform)
             self._wave_dict_dist[waveform_name] = waveform
         self.AWG.get_instr().set(codeword, waveform)
+
+    def load_waveforms_onto_AWG_lookuptable(
+            self, regenerate_waveforms: bool=True, stop_start: bool = True,
+            force_load_sequencer_program: bool=False):
+        """
+        Loads all waveforms specified in the LutMap to an AWG for both this
+        LutMap and the partner LutMap.
+
+        Args:
+            regenerate_waveforms (bool): if True calls
+                generate_standard_waveforms before uploading.
+            stop_start           (bool): if True stops and starts the AWG.
+
+
+        Because of realtime loading vs the DIO sequencer program the uploading
+        flow for the AWG8 is slightly different.
+        """
+
+        # Generate the waveforms and link them to the AWG8 parameters
+        lutmans = [self]
+        # If statement is here because it should be possible to function
+        # independently
+        if self.instr_partner_lutman() is None:
+            logging.warning('No partner_lutman specified')
+        else:
+            lutmans += [self.instr_partner_lutman.get_instr()]
+
+        for lm in lutmans:
+            if regenerate_waveforms:
+                lm.generate_standard_waveforms()
+            for waveform_name, lookuptable in lm.LutMap().items():
+                lm.load_waveform_onto_AWG_lookuptable(waveform_name)
+
+        # Uploading the codeword program if required
+        if self._program_hash_differs() or force_load_sequencer_program:
+            # This ensures only the channels that are relevant get reconfigured
+            awg_nr = (self.cfg_awg_channel()-1)//2
+            self.AWG.get_instr().upload_codeword_program(awgs=[awg_nr])
+
+        for waveform_name in self.LutMap().keys():
+            self.load_waveform_realtime(
+                waveform_name=waveform_name,
+                wf_nr=None, regenerate_waveforms=False)
+
+        self._update_expected_program_hash()
+
+    def _update_expected_program_hash(self):
+        """
+        Updates the expected AWG sequencer program hash with the current
+        hash of the sequencer program. This is intended to be called after
+        setting the hash.
+        """
+        awg_nr = (self.cfg_awg_channel()-1)//2
+        hash = self.AWG.get_instr().get(
+            'awgs_{}_sequencer_program_crc32_hash'.format(awg_nr))
+        self._awgs_fl_sequencer_program_expected_hash(hash)
+
+    def _program_hash_differs(self)-> bool:
+        """
+        Args:
+            --
+        Returns:
+            hash_different (bool): returns True if one of the hashes does not
+                correspond to the expected hash.
+
+        Compares current AWG sequencer program hash for the relevant channels
+        with the expected program hash and, returns True if one ore more
+        hashes do not match, indicating that uploading the programs is
+        required.
+        """
+        awg_nr = (self.cfg_awg_channel()-1)//2
+        hash = self.AWG.get_instr().get(
+            'awgs_{}_sequencer_program_crc32_hash'.format(awg_nr))
+        expected_hash = self._awgs_fl_sequencer_program_expected_hash()
+        hash_differs = (hash != expected_hash)
+
+        return hash_differs
 
     def load_composite_waveform_onto_AWG_lookuptable(
         self,
@@ -677,45 +783,61 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         self.AWG.get_instr().set(codeword, waveform)
 
     def load_waveform_realtime(self, waveform_name: str,
-                               other_waveform=None):
+                               wf_nr: int = None,
+                               regenerate_waveforms: bool=True):
         """
-        Warning! Care should be taken when using this method.
-        It makes certain assumptions about the program being used
-        and is optimized for speed.
-
         Args:
-            waveform_name (str) : name of the waveform to reload
-            other_waveform (array): used to fill the other channel,
-                                    filled with zeros if nothing is specified
-        It assumes
-            - an AWG8 program with only a single waveform is played
-            - it will always regenerate the desired waveform.
-            - it does not update the _wave_dict
-        """
-        gen_wf_func = getattr(self, '_gen_{}'.format(waveform_name))
-        waveform = gen_wf_func()
+            waveform_name:        (str) : name of the waveform
+            wf_nr                 (int) : what codeword to load the pulse onto
+                if set to None, will determine awg_nr based on self.LutMap
+            regenerate_waveforms (bool) : if True regenerates all waveforms
 
-        if self.cfg_append_compensation():
-            waveform = self.add_compensation_pulses(waveform)
-        if self.cfg_distort():
-            waveform = self.distort_waveform(waveform)
-            self._wave_dict_dist[waveform_name] = waveform
+        """
+
+        if wf_nr is None:
+            wf_nr = int(self.LutMap()[waveform_name][-3:])
+
+        if regenerate_waveforms:
+            gen_wf_func = getattr(self, '_gen_{}'.format(waveform_name))
+            waveform = gen_wf_func()
+            if self.cfg_append_compensation():
+                waveform = self.add_compensation_pulses(waveform)
+            if self.cfg_distort():
+                waveform = self.distort_waveform(waveform)
+                self._wave_dict_dist[waveform_name] = waveform
+
+        waveform = self._wave_dict[waveform_name]
+
+        if self.instr_partner_lutman() is None:
+            logging.warning('no partner lutman specified')
+            other_waveform = np.zeros(len(waveform))
+        else:
+            partner_lm = self.instr_partner_lutman.get_instr()
+            prtnr_wf_name = partner_lm._get_wf_name_from_cw(codeword=wf_nr)
+
+            if regenerate_waveforms:
+                gen_wf_func = getattr(partner_lm,
+                                      '_gen_{}'.format(prtnr_wf_name))
+                waveform = gen_wf_func()
+                if partner_lm.cfg_append_compensation():
+                    waveform = partner_lm.add_compensation_pulses(waveform)
+                if partner_lm.cfg_distort():
+                    waveform = partner_lm.distort_waveform(waveform)
+                    partner_lm._wave_dict_dist[prtnr_wf_name] = waveform
+
+            other_waveform = partner_lm._wave_dict_dist[prtnr_wf_name]
 
         awg_ch = self.cfg_awg_channel()-1  # -1 is to account for starting at 1
         ch_pair = awg_ch % 2
         awg_nr = awg_ch//2
-
-        if other_waveform is None:
-            other_waveform = np.zeros(len(waveform))
 
         if ch_pair == 0:
             waveforms = (waveform, other_waveform)
         else:
             waveforms = (other_waveform, waveform)
 
-        # wf_nr = 1 is the assumption of only a sinlge waveform in the program
         self.AWG.get_instr().upload_waveform_realtime(
-            w0=waveforms[0], w1=waveforms[1], awg_nr=awg_nr, wf_nr=1)
+            w0=waveforms[0], w1=waveforms[1], awg_nr=awg_nr, wf_nr=wf_nr)
 
     def add_compensation_pulses(self, waveform):
         """
@@ -752,6 +874,10 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                 length_samples=int(self.cfg_max_wf_length() *
                                    self.sampling_rate()))
         return distorted_waveform
+
+    #################################
+    #  Plotting methods            #
+    #################################
 
     def plot_cz_trajectory(self, ax=None, show=True):
         """

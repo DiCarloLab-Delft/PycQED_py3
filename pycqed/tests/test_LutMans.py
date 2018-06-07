@@ -217,9 +217,21 @@ class Test_Flux_LutMan(unittest.TestCase):
         poly_coeffs = np.array([1.95027142e+09,  -3.22560292e+08,
                                 5.25834946e+07])
         self.fluxlutman.polycoeffs_freq_conv(poly_coeffs)
-
+        self.fluxlutman.set_default_lutmap()
         # for i in range(10):
         #     self.fluxlutman.set('mcz_phase_corr_amp_{}'.format(i+1), i/10)
+
+
+    def test__program_hash_differs_AWG8_flux_lutman(self):
+
+        # set to a random value to ensure different
+        self.fluxlutman._awgs_fl_sequencer_program_expected_hash(351340)
+        hash_differs = self.fluxlutman._program_hash_differs()
+        self.assertTrue(hash_differs)
+
+        self.fluxlutman._update_expected_program_hash()
+        hash_differs = self.fluxlutman._program_hash_differs()
+        self.assertFalse(hash_differs)
 
     def test_amp_to_dac_val_conversions(self):
         self.fluxlutman.cfg_awg_channel(1)
