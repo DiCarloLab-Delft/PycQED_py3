@@ -248,7 +248,7 @@ class UHFQC(Instrument):
 
         # No cross-coupling in the matrix multiplication (identity matrix)
         for i in range(0, self.nr_integration_channels):
-            for j in range(0,):
+            for j in range(0,self.nr_integration_channels):
                 if i == j:
                     self.set('quex_trans_{0}_col_{1}_real'.format(i, j), 1)
                 else:
