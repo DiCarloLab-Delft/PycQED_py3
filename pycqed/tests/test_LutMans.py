@@ -21,6 +21,7 @@ class Test_MW_LutMan(unittest.TestCase):
         self.AWG8_MW_LutMan.channel_Q(2)
         self.AWG8_MW_LutMan.mw_modulation(100e6)
         self.AWG8_MW_LutMan.sampling_rate(2.4e9)
+        self.AWG8_MW_LutMan.set_default_lutmap()
 
         self.AWG8_VSM_MW_LutMan = mwl.AWG8_VSM_MW_LutMan('MW_LutMan_VSM')
         self.AWG8_VSM_MW_LutMan.AWG(self.AWG.name)
@@ -30,9 +31,45 @@ class Test_MW_LutMan(unittest.TestCase):
         self.AWG8_VSM_MW_LutMan.channel_DQ(4)
         self.AWG8_VSM_MW_LutMan.mw_modulation(100e6)
         self.AWG8_VSM_MW_LutMan.sampling_rate(2.4e9)
+        self.AWG8_VSM_MW_LutMan.set_default_lutmap()
 
         self.CBox_MW_LutMan = mwl.CBox_MW_LutMan('CBox_MW_LutMan')
         self.QWG_MW_LutMan = mwl.QWG_MW_LutMan('QWG_MW_LutMan')
+
+    def test__program_hash_differs_AWG8_lutman(self):
+
+        # set to a random value to ensure different
+        self.AWG8_MW_LutMan._awgs_mw_sequencer_program_expected_hash(351340)
+        hash_differs = self.AWG8_MW_LutMan._program_hash_differs()
+        self.assertTrue(hash_differs)
+
+        self.AWG8_MW_LutMan._update_expected_program_hash()
+        hash_differs = self.AWG8_MW_LutMan._program_hash_differs()
+        self.assertFalse(hash_differs)
+
+    def test__program_hash_differs_AWG8_VSM_lutman(self):
+
+        # set to a random value to ensure different
+        self.AWG8_VSM_MW_LutMan._awgs_mwG_sequencer_program_expected_hash(351340)
+        hash_differs = self.AWG8_VSM_MW_LutMan._program_hash_differs()
+        self.assertTrue(hash_differs)
+
+        self.AWG8_VSM_MW_LutMan._update_expected_program_hash()
+        hash_differs = self.AWG8_VSM_MW_LutMan._program_hash_differs()
+        self.assertFalse(hash_differs)
+
+
+
+    def test__program_hash_updated_when_loading_program(self):
+        self.AWG8_MW_LutMan._awgs_mw_sequencer_program_expected_hash(351340)
+        hash_differs = self.AWG8_MW_LutMan._program_hash_differs()
+        self.assertTrue(hash_differs)
+
+        self.AWG8_MW_LutMan.load_waveforms_onto_AWG_lookuptable()
+        hash_differs = self.AWG8_MW_LutMan._program_hash_differs()
+        self.assertFalse(hash_differs)
+
+
 
     def test_uploading_standard_pulses(self):
         # Tests that all waveforms are present and no error is raised.
