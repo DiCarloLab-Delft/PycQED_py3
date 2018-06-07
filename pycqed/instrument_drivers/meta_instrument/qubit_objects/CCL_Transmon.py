@@ -1037,7 +1037,7 @@ class CCLight_Transmon(Qubit):
         """
         using_VSM = self.cfg_with_vsm()
         if using_VSM:
-            motzois = gen_sweep_pts(center=30e3, span=30e3, num=31)
+            motzois = gen_sweep_pts(start=0.2, stop=2.5, num=31)
         else:
             motzois = gen_sweep_pts(center=0, span=.3, num=31)
 
