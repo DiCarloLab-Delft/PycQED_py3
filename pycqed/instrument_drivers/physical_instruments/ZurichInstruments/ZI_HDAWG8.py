@@ -92,9 +92,10 @@ class ZI_HDAWG8(ZI_base_instrument):
             parameter_class=ManualParameter)
 
         for i in range(4):
-            self.add_parameter('awgs_{}_sequencer_program_crc32_hash'.format(i),
-                               parameter_class=ManualParameter,
-                               initial_value=0, vals=vals.Ints())
+            self.add_parameter(
+                'awgs_{}_sequencer_program_crc32_hash'.format(i),
+                parameter_class=ManualParameter,
+                initial_value=0, vals=vals.Ints())
 
     def snapshot_base(self, update=False, params_to_skip_update=None):
         if params_to_skip_update is None:
