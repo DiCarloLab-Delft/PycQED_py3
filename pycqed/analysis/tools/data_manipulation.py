@@ -12,6 +12,8 @@ roughly split into
 from collections import deque
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.signal as sig
+
 
 
 def count_rounds_to_error(series):
@@ -483,7 +485,79 @@ def get_generations_by_index(generation_indices, array):
 
     return generations
 
+
 def get_generation_means(generation_indices, array):
     generations = get_generations_by_index(generation_indices, array)
     means = [np.mean(gen) for gen in generations]
     return means
+
+
+def filter_resonator_visibility(x, y, z, deg=True, cutoff_factor=0,
+                                sav_windowlen_factor=None,
+                                sav_polorder=4,
+                                hipass_left=0.05,
+                                hipass_right=0.1, **kw):
+
+    """
+    Filters resonator-dac sweeps on phase data to show only the resonator dips
+    and remove background
+    Inputs
+        Optional
+        deg: True/False if data is in degree or rad. Expected rad and deg
+        standard range is [-pi, pi] or [-180, 180], respectively.
+
+        sav_windowlen_factor: Length of the window for the Savitsky-Golay
+        filter, expressed in a factor of the total length of thedata
+        -> value between 0 and 1. Default is 0.1
+
+        sav_polorder: Polyorder of Savitsky-Golay filter. Default is 4
+
+        hipass_left, hipass_right: Factor cutoff of all data of
+        left and right side of high pass, as data is not shifted
+    """
+    # cutoff in frequency space optional if high freq data is noisy
+    cutoff = round(len(x)*(1-cutoff_factor))
+    x_cut = x[:cutoff]
+    restruct = []
+    # Go line by line for filtering
+    for i in range(len(z[0])):
+        ppcut = z[:cutoff, i]
+        # Pick type of data (deg or rad) to unwrap
+        # Expected rad standard range is [-pi,pi]
+        if deg:
+            ppcut_rad = np.deg2rad(ppcut)+np.pi
+            ppcut_unwrap = np.unwrap(ppcut_rad)
+        else:
+            ppcut_unwrap = np.unwrap(ppcut)
+        # Remove linear offset of unwrap
+        [a, b] = np.polyfit(x_cut, ppcut_unwrap, deg=1)
+        fit = a*x_cut + b
+        reduced = ppcut_unwrap - fit
+        # Use Savitsky-Golay filter
+        if sav_windowlen_factor is None:
+            sav_windowlen_factor = round(0.1*len(x)/2)*2+1
+        red_filt = sig.savgol_filter(reduced, window_length=sav_windowlen_factor, polyorder=sav_polorder)
+
+        # Flatten curve by removing the filtered signal
+        flat = reduced - red_filt
+
+        # Poor-mans high pass filter using
+        # FFT -> Removing frequency components --> IFFT
+        llcut_f = np.fft.fft(flat)
+        left = round(hipass_left*len(x))
+        right = round(hipass_right*len(x))
+
+        # Cut and apply 'highpass filter'
+        llcut_f[:left] = [0]*left
+        llcut_f[-1-right:-1] = [0]*right
+
+        # Convert back to frequency domain
+        llcut_if = np.fft.ifft(llcut_f)
+
+        # Build new 2D dataset
+        restruct.append(llcut_if)
+
+    # Absolute value of complex IFFT result
+    restruct = np.abs(np.array(restruct))
+
+    return restruct

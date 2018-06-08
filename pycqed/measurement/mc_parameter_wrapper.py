@@ -27,7 +27,7 @@ def wrap_par_to_swf(parameter, retrieve_value=False):
         sweep_function.set_parameter = set_par
     else:
         sweep_function.set_parameter = parameter.set
-
+    sweep_function.get = parameter.get
     return sweep_function
 
 

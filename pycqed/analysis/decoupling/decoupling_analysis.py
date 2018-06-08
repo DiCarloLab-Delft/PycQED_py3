@@ -17,36 +17,38 @@ from matplotlib import pyplot as plt
 
 class DecouplingAnalysis:
 
-    def __init__(self, N, scan_start, scan_stop, qubit_scan_labels,
-                 dac_mapping, num_points):
-        assert(N == len(qubit_scan_labels))
-        self.N = N
+    def __init__(self, scan_start, scan_stop, qubit_scan_labels,
+                  num_points, dac_channel_labels, dac_instrument='IVVI'):
+        self.Ndac = len(dac_channel_labels)
+        self.Nq = len(qubit_scan_labels)
         self.scan_start = scan_start
         self.scan_stop = scan_stop
         self.qubit_scan_labels = qubit_scan_labels
-        self.dac_mapping = dac_mapping
+        self.dac_channel_labels = dac_channel_labels
         self.num_points = num_points
-        self.filter_mask_vector = np.zeros((self.N, self.N,
+        self.filter_mask_vector = np.zeros((self.Ndac, self.Nq,
                                             self.num_points),
                                            dtype=np.bool)
         self.filter_mask_vector[:, :, :] = False
+        self.dac_instrument=dac_instrument
 
     def extract_data(self):
-        self.spec_scans = [None] * self.N
+        self.spec_scans = [None] * self.Nq
 
         pdict = {'amp': 'amp',
                  'frequencies': 'sweep_points'}
         nparams = ['amp', 'frequencies']
 
         # adds the dac channels to the extraction dictionary
-        for d in self.dac_mapping:
-            pdict.update({'dac%d' % d: 'IVVI.dac%d' % d})
-            nparams.append('dac%d' % d)
+        for d in self.dac_channel_labels:
+
+            pdict.update({d: self.dac_instrument+'.'+d})
+            nparams.append(d)
 
         # extracts the data
         for i, q_label in enumerate(self.qubit_scan_labels):
-            opt_dict = {'scan_label':  q_label,
-                        'exact_label_match':True}
+            opt_dict = {'scan_label': '__qubit_'+q_label,
+                       'exact_label_match':True}
 
             self.spec_scans[i] = RA.quick_analysis(t_start=self.scan_start,
                                                    t_stop=self.scan_stop,
@@ -56,24 +58,25 @@ class DecouplingAnalysis:
 
 
     def plot_freq_vs_dac_raw(self):
-        fig, ax = plt.subplots(self.N, self.N, figsize=(15, 15))
+        fig, ax = plt.subplots(self.Nq, self.Ndac, figsize=(self.Ndac*3, self.Nq*3))
 
         # for i in range(1, self.N+1):
-        for d, i in zip(self.dac_mapping, range(len(self.dac_mapping))):
-            for q in range(self.N):
+        for i,d in enumerate(self.dac_channel_labels):
+            for j,q in enumerate(self.qubit_scan_labels):
                 start_slice = self.num_points*(i)
                 stop_slice = self.num_points*(i+1)
-                dac_key = 'dac%d' % d
+                dac_key = d
 
-                this_ax = ax[q, i]
-                dac_vector = self.spec_scans[q].TD_dict[
+                this_ax = ax[j, i]
+                #print(self.spec_scans[j].TD_dict)
+                dac_vector = self.spec_scans[j].TD_dict[
                     dac_key][start_slice:stop_slice]
 
 
-                freq_vector = self.spec_scans[q].TD_dict[
+                freq_vector = self.spec_scans[j].TD_dict[
                     'frequencies'][start_slice:stop_slice]
 
-                z_vector = self.spec_scans[q].TD_dict[
+                z_vector = self.spec_scans[j].TD_dict[
                     'amp'][start_slice:stop_slice]
 
                 pk_vec = get_peaks(dac_vector,
@@ -81,20 +84,20 @@ class DecouplingAnalysis:
                                    z_vector)
 
                 plot_scan(
-                    self.spec_scans[q], this_ax, dac_vector, freq_vector, z_vector, d)
+                    self.spec_scans[j], this_ax, dac_vector, freq_vector, z_vector, d,q)
                 this_ax.plot(dac_vector, pk_vec, 'o')
 
     def plot_fit_freq_vs_dac(self):
-        fig, ax = plt.subplots(self.N, self.N, figsize=(15, 15))
+        fig, ax = plt.subplots(self.Nq, self.Ndac, figsize=(self.Ndac*3, self.Nq*3))
 
         ylims = []
         xlims = []
-        fits_freq = np.zeros((self.N, self.N, 2))
-        for d, i in zip(self.dac_mapping, range(len(self.dac_mapping))):
-            for q in range(self.N):
+        fits_freq = np.zeros((self.Nq, self.Ndac, 2))
+        for d, i in zip(self.dac_channel_labels, range(len(self.dac_channel_labels))):
+            for q in range(self.Nq):
                 start_slice = self.num_points*(i)
                 stop_slice = self.num_points*(i+1)
-                dac_key = 'dac%d' % d
+                dac_key = d
                 this_ax = ax[q, i]
                 filter_points = ~self.filter_mask_vector[i, q, :]
                 dac_vector = self.spec_scans[q].TD_dict[
@@ -119,10 +122,8 @@ class DecouplingAnalysis:
                     q, i, :] = np.polyfit(dac_vector[filter_points], freqs[filter_points], 1).flatten()
                 this_ax.plot(dac_vector[filter_points], np.polyval(
                     fits_freq[q, i, :], dac_vector[filter_points]))
-        for i in range(self.N):
-            for q in range(self.N):
-                #         ax[i,q].set_ylim(ylims[i][0],ylims[i][1])
-                #         ax[i,q].set_xlim(xlims[i][0],xlims[i][1])
+        for i in range(self.Nq):
+            for q in range(self.Ndac):
                 ax[i, q].ticklabel_format(useOffset=False)
         matrix = fits_freq[:, :, 0]
         diagonal = np.diagonal(matrix)
@@ -168,7 +169,7 @@ class DecouplingAnalysis:
         """
 
 
-def plot_scan(spec_scan_obj, ax, xvals, yvals, zvals, idx_dac):
+def plot_scan(spec_scan_obj, ax, xvals, yvals, zvals, idx_dac,idx_qubit):
     spec_scan_obj.plot_dicts['arches'] = {'plotfn': spec_scan_obj.plot_colorx,
                                           'xvals': xvals,
                                           'yvals': yvals,
@@ -176,8 +177,8 @@ def plot_scan(spec_scan_obj, ax, xvals, yvals, zvals, idx_dac):
                                           #                 'zvals': peak_finder_v2spec_scans.TD_dict['amp'].transpose(),
                                           'title': '',
                                           #                 'title': '%s - %s: Qubit Arches'%(spec_scan_obj.TD_timestamps[0],spec_scans.TD_timestamps[-1]),
-                                          'xlabel': r'Dac %d value (mV)' % idx_dac,
-                                          'ylabel': r'Frequency (GHz)',
+                                          'xlabel': r'Dac '+idx_dac+' value (mV)' ,
+                                          'ylabel': r'Frequency '+idx_qubit+' (GHz)',
                                           'zlabel': 'Homodyne amplitude (mV)',
                                           'zrange': [0.5, 1],
                                           'plotsize': (8, 8),
@@ -212,11 +213,11 @@ def plot_scan_flux(spec_scan_obj, ax, xvals, yvals, zvals, idx_dac):
 
 
 def get_peaks(dac_vector, f_vector, z_vector):
-    plot_z = np.zeros(np.array(z_vector).shape)
     int_interval = np.arange(20)
+    plot_z=[]
     for i in range(len(dac_vector)):
-        plot_z[i][:] = a_tools.smooth(
-            z_vector[i][:], 11)-np.mean(z_vector[i][1:10])
+        plot_z.append(a_tools.smooth(
+            z_vector[i][:], 11)-np.mean(z_vector[i][1:10]))
     peaks = np.zeros(len(dac_vector))
     for i in range(len(dac_vector)):
         p_dict = a_tools.peak_finder(f_vector[i][1:-2], plot_z[i][1:-2])

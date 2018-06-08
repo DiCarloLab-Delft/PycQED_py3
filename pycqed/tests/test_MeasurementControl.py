@@ -2,6 +2,7 @@ import os
 import pycqed as pq
 import unittest
 import numpy as np
+import adaptive
 import pycqed.analysis.analysis_toolbox as a_tools
 from pycqed.measurement import measurement_control
 from pycqed.measurement.sweep_functions import None_Sweep, None_Sweep_idx
@@ -554,6 +555,20 @@ class Test_MeasurementControl(unittest.TestCase):
         self.assertLess(xf, 0.7)
         self.assertLess(yf, 0.7)
         self.assertLess(pf, 0.7)
+
+    def test_adaptive_sampling(self):
+        self.MC.soft_avg(1)
+        self.mock_parabola.noise(0)
+        self.MC.set_sweep_functions(
+            [self.mock_parabola.x, self.mock_parabola.y])
+        self.MC.set_adaptive_function_parameters({'adaptive_function': adaptive.Learner2D,
+                                     'goal':lambda l: l.npoints>20*20,
+                                     'bounds':((-50, +50),
+                                               (-20, +30))})
+        self.MC.set_detector_function(self.mock_parabola.parabola)
+        dat = self.MC.run('2D adaptive sampling test', mode='adaptive')
+
+
 
     @classmethod
     def tearDownClass(self):

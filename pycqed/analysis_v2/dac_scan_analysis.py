@@ -39,7 +39,7 @@ class FluxFrequency(ba.BaseDataAnalysis):
                             'freq': self.options_dict.get('sweep_points_key', 'sweep_points'),
                             'amp': self.options_dict.get('amp_key', 'amp'),
                             'phase': self.options_dict.get('phase_key', 'phase'),
-                            'dac': self.options_dict.get('dac_key', 'Instrument settings.fluxcurrent.VFCQ6'),
+                            'dac': self.options_dict.get('dac_key', 'Instrument settings.fluxcurrent.Q'),
                             }
         self.numeric_params = ['freq', 'amp', 'phase', 'dac']
 
@@ -138,6 +138,8 @@ class FluxFrequency(ba.BaseDataAnalysis):
                 # Fixme: save peaks
 
     def run_fitting(self):
+        # This is not the proper way to do this!
+        # TODO: move this to prepare_fitting and write the fit_dicts dict accordingly
         self.fit_dicts = {}
         self.fit_result = {}
 
@@ -167,6 +169,9 @@ class FluxFrequency(ba.BaseDataAnalysis):
         else:
             f0 = fit_result.params['f_max_qubit']
 
+        # TODO: This is very dirty code! Derived values like E_J should be set as
+        # fitmod.set_param_hint('E_J', expr='(f0 ** 2 + 2 * EC * f0 + EC ** 2) / (8 * EC)', vary=False)
+        # And fit_dicts is used completely wrong (see above).
         self.fit_dicts['E_C'] = EC.value
         self.fit_dicts['E_J'] = (f0.value ** 2 + 2 * EC.value * f0.value + EC.value ** 2) / (8 * EC.value)
         self.fit_dicts['f_sweet_spot'] = f0.value

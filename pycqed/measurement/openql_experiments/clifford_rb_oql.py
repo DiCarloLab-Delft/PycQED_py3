@@ -2,19 +2,15 @@
 This file reads in a pygsti dataset file and converts it to a valid
 OpenQL sequence.
 """
-from importlib import reload
 
-import numpy as np
-import pygsti
 from os.path import join, dirname
 import openql.openql as ql
-from pycqed.utilities.general import suppress_stdout, is_more_rencent
-import pycqed as pq
+from pycqed.utilities.general import suppress_stdout
 from openql.openql import Program, Kernel, Platform
 from pycqed.measurement.openql_experiments.single_qubit_oql import \
     add_single_qubit_cal_points
 from pycqed.measurement.openql_experiments.multi_qubit_oql import \
-    add_two_q_cal_points
+    add_two_q_cal_points, add_multi_q_cal_points
 
 from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
 from pycqed.measurement.openql_experiments import openql_helpers as oqh
@@ -30,9 +26,11 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                             net_cliffords: list=[0],
                             max_clifford_idx: int=11520,
                             initialize: bool=True,
-                            interleaving_cliffords = [None],
+                            interleaving_cliffords=[None],
                             program_name: str='randomized_benchmarking',
-                            cal_points: bool=True, recompile: bool=True):
+                            cal_points: bool=True,
+                            f_state_cal_pts: bool=True,
+                            recompile: bool=True):
     '''
     Input pars:
         qubits:         list of ints specifying qubit indices.
@@ -112,35 +110,14 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
     p.filename = join(p.output_dir, p.name + '.qisa')
 
     if not oqh.check_recompilation_needed(
-        program_fn = p.filename, platf_cfg=platf_cfg, recompile=recompile):
+            program_fn=p.filename, platf_cfg=platf_cfg, recompile=recompile):
         return p
 
-    # if recompile == True:
-    #     pass
-    # elif recompile == 'as needed':
-    #     try:
-    #         if is_more_rencent(p.filename, platf_cfg):
-    #             return p
-    #         else:
-    #             pass # compilation is required
-    #     except FileNotFoundError:
-    #         # File doesn't exist means compilation is required
-    #         pass
-
-    # elif recompile == False: # if False
-    #     if is_more_rencent(p.filename, platf_cfg):
-    #         return p
-    #     else:
-    #         raise ValueError('OpenQL config has changed more recently '
-    #                          'than program.')
-    # else:
-    #     raise NotImplementedError('recompile should be True, False or "as needed"')
-
-    if len(qubits) ==1:
+    if len(qubits) == 1:
         qubit_map = {'q0': qubits[0]}
         number_of_qubits = 1
         Cl = SingleQubitClifford
-    elif len(qubits) ==2:
+    elif len(qubits) == 2:
         qubit_map = {'q0': qubits[0],
                      'q1': qubits[1]}
         number_of_qubits = 2
@@ -181,14 +158,21 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
 
         if cal_points:
             if number_of_qubits == 1:
-                p = add_single_qubit_cal_points(p, platf=platf,
-                                                qubit_idx=qubits[0])
+                p = add_single_qubit_cal_points(
+                    p, platf=platf, qubit_idx=qubits[0],
+                    f_state_cal_pts=f_state_cal_pts)
             elif number_of_qubits == 2:
-                p = add_two_q_cal_points(p, platf=platf,
-                                         q0=qubits[0],
-                                         q1=qubits[1])
+
+                if f_state_cal_pts:
+                    combinations = ['00', '01', '10', '11', '02', '20', '22']
+                else:
+                    combinations = ['00', '01', '10', '11']
+                p = add_multi_q_cal_points(p, platf=platf,
+                                           qubits=qubits,
+                                           combinations=combinations)
+
+
     with suppress_stdout():
         p.compile(verbose=False)
-
 
     return p

@@ -7,3 +7,8 @@ pygsti
 cma
 spirack
 nose
+adaptive
+hsluv
+autodepgraph
+networkx
+scikit-learn

@@ -79,6 +79,10 @@ class LinDistortionKernel(Instrument):
                         y_sig = kf.exponential_decay_correction(
                             y_sig, sampling_rate=self.cfg_sampling_rate(),
                             **filt['params'])
+                    elif model == 'bounce':
+                        y_sig = kf.bounce_correction(
+                            y_sig, sampling_rate=self.cfg_sampling_rate(),
+                            **filt['params'])
                     else:
                         raise KeyError('Model {} not recognized'.format(model))
                 else:

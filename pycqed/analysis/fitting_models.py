@@ -334,6 +334,38 @@ def HangerFuncComplex(f, pars):
 
     return S21
 
+def hanger_func_complex_SI(f: float, f0: float, Ql: float, Qe: float,
+                           A: float, theta: float, phi_v: float, phi_0: float,
+                           alpha:float =1):
+    '''
+    This is the complex function for a hanger (lamda/4 resonator).
+    See equation 3.1 of the Asaad master thesis.
+
+    It differens from the "old" HangerFuncComplex in that all inputs are SI
+    (no longer f in SI and f0 not in SI...)
+
+
+    Input:
+        f   : frequency
+        f0  : resonance frequency
+        A   : background transmission amplitude
+        Ql  : loaded quality factor
+        Qe  : extrinsic quality factor
+        theta:  phase of Qe (in rad)
+        phi_v:  phase to account for propagation delay to sample
+        phi_0:  phase to account for propagation delay from sample
+        alpha:  slope of signal around the resonance
+
+    '''
+    slope_corr = (1+alpha*(f-f0)/f0)
+    propagation_delay_corr = np.exp(1j * (phi_v * f + phi_0))
+    hanger_contribution = (1 - Ql / Qe * np.exp(1j * theta)/
+                               (1 + 2.j * Ql * (f  - f0) / f0))
+    S21 = A *  slope_corr * hanger_contribution * propagation_delay_corr
+
+    return S21
+
+
 
 def PolyBgHangerFuncAmplitude(f, f0, Q, Qe, A, theta, poly_coeffs):
     # This is the function for a hanger (lambda/4 resonator) which takes into
@@ -396,6 +428,37 @@ def double_gaussianCDF(x, A_amplitude, A_mu, A_sigma,
     CDF_B = gaussianCDF(x, amplitude=B_amplitude, mu=B_mu, sigma=B_sigma)
     return CDF_A + CDF_B
 
+def ro_gauss(x, A_center, B_center, A_sigma, B_sigma, A_amplitude,
+             B_amplitude, A_spurious, B_spurious):
+    '''
+    Two double-gaussians with sigma and mu/center of the residuals equal to the
+    according state.
+    '''
+    gauss = lmfit.lineshapes.gaussian
+    A_gauss = gauss(x=x[0], center=A_center, sigma=A_sigma, amplitude=A_amplitude)
+    B_gauss = gauss(x=x[1], center=B_center, sigma=B_sigma, amplitude=B_amplitude)
+    gauss0 = ((1-A_spurious)*A_gauss + A_spurious*B_gauss)
+    gauss1 = ((1-B_spurious)*B_gauss + B_spurious*A_gauss)
+    return [gauss0, gauss1]
+
+
+def ro_CDF(x, A_center, B_center, A_sigma, B_sigma, A_amplitude,
+           B_amplitude, A_spurious, B_spurious):
+    cdf = gaussianCDF
+    A_gauss = cdf(x=x[0], mu=A_center, sigma=A_sigma, amplitude=A_amplitude)
+    B_gauss = cdf(x=x[1], mu=B_center, sigma=B_sigma, amplitude=B_amplitude)
+    gauss0 = ((1-A_spurious)*A_gauss + A_spurious*B_gauss)
+    gauss1 = ((1-B_spurious)*B_gauss + B_spurious*A_gauss)
+    return [gauss0, gauss1]
+
+
+def ro_CDF_discr(x, A_center, B_center, A_sigma, B_sigma, A_amplitude,
+                 B_amplitude, A_spurious, B_spurious):
+    #A_amplitude /= 1-A_spurious
+    #B_amplitude /= 1-B_spurious
+    return ro_CDF(x, A_center, B_center, A_sigma, B_sigma, A_amplitude,
+                  B_amplitude, A_spurious=0, B_spurious=0)
+
 
 def gaussian_2D(x, y, amplitude=1,
                 center_x=0, center_y=0,
@@ -404,9 +467,9 @@ def gaussian_2D(x, y, amplitude=1,
     A 2D gaussian function. if you want to use this for fitting you need to
     flatten your data first.
     '''
-    gaus = lmfit.lineshapes.gaussian
-    val = (gaus(x, amplitude, center_x, sigma_x) *
-           gaus(y, amplitude, center_y, sigma_y))
+    gauss = lmfit.lineshapes.gaussian
+    val = (gauss(x, amplitude, center_x, sigma_x) *
+           gauss(y, amplitude, center_y, sigma_y))
     return val
 
 
@@ -762,18 +825,32 @@ def gauss_2D_guess(model, data, x, y):
 
     Note: possibly not compatible if the model uses prefixes.
     '''
+    dx = x[1:]-x[:-1]
+    dy = y[1:]-y[:-1]
+    sums = np.sum(((data[:-1,:-1]*dx).transpose()*dy))
+    amp = np.sqrt(sums)
     data_grid = data.reshape(-1, len(np.unique(x)))
     x_proj_data = np.mean(data_grid, axis=0)
     y_proj_data = np.mean(data_grid, axis=1)
+    x.sort()
+    y.sort()
+    xm = lmfit.models.GaussianModel()
+    ym = lmfit.models.GaussianModel()
+    x_guess = xm.guess(data=x_proj_data, x=np.unique(x))
+    x_res = xm.fit(data=x_proj_data, x=np.unique(x), params=x_guess)
+    y_guess = ym.guess(data=y_proj_data, x=np.unique(y))
+    y_res = ym.fit(data=y_proj_data, x=np.unique(y), params=y_guess)
 
-    x_guess = lmfit.models.GaussianModel().guess(x_proj_data, np.unique(x))
-    y_guess = lmfit.models.GaussianModel().guess(y_proj_data, np.unique(y))
-
-    params = model.make_params(amplitude=1,
-                               center_x=x_guess['center'].value,
-                               center_y=y_guess['center'].value,
-                               sigma_x=x_guess['sigma'].value,
-                               sigma_y=y_guess['sigma'].value)
+    x_guess = x_res.params
+    y_guess = y_res.params
+    model.set_param_hint('amplitude', value=amp, min=0.9*amp, max=1.1*amp,
+                         vary=True)
+    model.set_param_hint('sigma_x', value=x_guess['sigma'].value, min=0,
+                         vary=True)
+    model.set_param_hint('sigma_y', value=y_guess['sigma'].value, min=0,
+                         vary=True)
+    params = model.make_params(center_x=x_guess['center'].value,
+                               center_y=y_guess['center'].value,)
     return params
 
 
@@ -784,7 +861,6 @@ def double_gauss_2D_guess(model, data, x, y):
 
     Assumptions on input data
         * input is a flattened version of a 2D grid.
-        * total surface under the gaussians sums up to 1.
     Note: possibly not compatible if the model uses prefixes.
     Note 2: see also gauss_2D_guess() for some notes on how to improve this
             function.
@@ -852,6 +928,53 @@ def double_gauss_guess(model, data, x=None, **kwargs):
     else:
         return par_dict
 
+def ro_double_gauss_guess(model, data, x, fixed_p01 = False, fixed_p10 = False):
+    # An initial guess is done on the binned data with single gaussians
+    # to constrain the fit params and avoid fitting noise if
+    # e.g., mmt. ind. rel. is very low
+    gmod0 = lmfit.models.GaussianModel()
+    guess0 = gmod0.guess(data=data[0], x=x[0])
+    gmod1 = lmfit.models.GaussianModel()
+    guess1 = gmod1.guess(data=data[1], x=x[1])
+
+
+    model.set_param_hint(
+        'A_center', vary=True, value=guess0['center'].value,
+        min=guess0['center'] - 2 * guess0['sigma'],
+        max=guess0['center'] + 2 * guess0['sigma'])
+    model.set_param_hint(
+        'B_center', vary=True, value=guess1['center'].value,
+        min=guess1['center'] - 2 * guess1['sigma'],
+        max=guess1['center'] + 2 * guess1['sigma'])
+    model.set_param_hint('A_sigma', value=guess0['sigma'].value, vary=True)
+    model.set_param_hint('B_sigma', value=guess1['sigma'].value, vary=True)
+
+    # Amplitudes
+    intarea0 = sum_int(x=x[0], y=data[0])[-1]
+    intarea1 = sum_int(x=x[1], y=data[1])[-1]
+    model.set_param_hint('A_amplitude', value=intarea0, vary=False)
+    model.set_param_hint('B_amplitude', value=intarea1, vary=False)
+    model.set_param_hint('SNR', expr='abs(A_center-B_center)*2/(A_sigma+B_sigma)',
+                         vary=False)
+
+    # Spurious excitement
+    f = np.sqrt(2*np.pi)
+    amp0 = 0.99 * np.max(data[0]) * guess0['sigma'] * f
+    amp1 = 0.99 * np.max(data[1]) * guess1['sigma'] * f
+    spurious0 = max(1-(amp0/intarea0), 1e-3)
+    spurious1 = max(1-(amp1/intarea1), 1e-3)
+    p01 = fixed_p01 if fixed_p01 is not False else spurious0
+    p10 = fixed_p10 if fixed_p10 is not False else spurious1
+    model.set_param_hint('A_spurious', value=p01, min=0, max=1,
+                         vary=fixed_p01 is False)
+    model.set_param_hint('B_spurious', value=p10, min=0, max=1,
+                         vary=fixed_p10 is False)
+
+    return model.make_params()
+
+
+def sum_int(x,y):
+    return np.cumsum(y[:-1]*(x[1:]-x[:-1]))
 
 #################################
 #     User defined Models       #

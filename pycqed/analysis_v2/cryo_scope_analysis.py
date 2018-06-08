@@ -1,16 +1,16 @@
 import matplotlib.pyplot as plt
-import lmfit
+from typing import Union
+from copy import deepcopy
 from pycqed.analysis import analysis_toolbox as a_tools
 from collections import OrderedDict
 from pycqed.analysis import measurement_analysis as ma_old
 from pycqed.analysis.tools import cryoscope_tools as ct
 import pycqed.analysis_v2.base_analysis as ba
-import pycqed.measurement.waveform_control_CC.waveform as wf
-import pycqed.analysis.fitting_models as fit_mods
 import numpy as np
-from numpy.fft import fft, ifft, fftfreq
 from scipy.stats import sem
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
+from matplotlib import ticker
+from mpl_toolkits.axes_grid1.inset_locator import InsetPosition, mark_inset
 
 
 class RamZFluxArc(ba.BaseDataAnalysis):
@@ -61,9 +61,6 @@ class RamZFluxArc(ba.BaseDataAnalysis):
     def extract_data(self):
         """
         Custom data extraction for this specific experiment.
-
-        Overwrite this method if you wnat to
-
         """
         self.timestamps = a_tools.get_timestamps_in_range(
             self.t_start, self.t_stop,
@@ -132,60 +129,105 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
     for the final step of the analysis.
     """
 
-    def __init__(self, t_start: str, t_stop: str,
-                 freq_to_amp,
-                 label='cryoscope',
-                 derivative_window_length: float=15e-9,
-                 norm_window_size: int=31,
-                 nyquist_order: int =0,
-                 options_dict: dict=None,
-                 auto=True):
+    def __init__(
+            self, t_start: str,
+            t_stop: str =None,
+            label='cryoscope',
+            derivative_window_length: float=5e-9,
+            norm_window_size: int=31,
+            nyquist_order: int =0,
+            ch_amp_key: str='Snapshot/instruments/AWG8_8005'
+        '/parameters/awgs_0_outputs_1_amplitude',
+            ch_range_key: str='Snapshot/instruments/AWG8_8005'
+        '/parameters/sigouts_0_range',
+            polycoeffs_freq_conv: Union[list, str] =
+        'Snapshot/instruments/FL_LutMan_QR/parameters/polycoeffs_freq_conv/value',
+            ch_idx_cos: int=0,
+            ch_idx_sin: int=1,
+            input_wf_key: str=None,
+            options_dict: dict=None,
+            close_figs: bool=True,
+            auto=True):
+        """
+        Cryoscope analysis for an arbitrary waveform.
+        """
         if options_dict is None:
             options_dict = dict()
-        super().__init__(t_start=t_start, t_stop=t_stop, label=label,
-                         options_dict=options_dict)
-        if auto:
-            self.run_analysis()
 
-        self.freq_to_amp = freq_to_amp
+        self.polycoeffs_freq_conv = polycoeffs_freq_conv
+
+        self.ch_amp_key = ch_amp_key
+        # ch_range_keycan also be set to `None`, then the value will
+        # default to 1 (no rescaling)
+        self.ch_range_key = ch_range_key
+
         self.derivative_window_length = derivative_window_length
         self.norm_window_size = norm_window_size
         self.nyquist_order = nyquist_order
 
+        self.ch_idx_cos = ch_idx_cos
+        self.ch_idx_sin = ch_idx_sin
+
+        super().__init__(
+            t_start=t_start, t_stop=t_stop, label=label,
+            options_dict=options_dict, close_figs=close_figs)
+        if auto:
+            self.run_analysis()
+
+    def amp_to_freq(self, amp):
+        return np.polyval(self.polycoeffs_freq_conv, amp)
+
+    def freq_to_amp(self, freq, positive_branch=True):
+        return ct.freq_to_amp_root_parabola(freq,
+                                            poly_coeffs=self.polycoeffs_freq_conv,
+                                            positive_branch=positive_branch)
+
     def extract_data(self):
         """
         Custom data extraction for this specific experiment.
-
         """
-        # timestamps in range so that multiple datasets can be averaged together
         self.timestamps = a_tools.get_timestamps_in_range(
             self.t_start, self.t_stop,
             label=self.labels)
-
+        self.timestamp = self.timestamps[0]
         self.raw_data_dict = OrderedDict()
 
-        # FIXME: this is hardcoded and should be an argument in options dict
-        amp_key = 'Snapshot/instruments/AWG8_8005/parameters/awgs_0_outputs_1_amplitude'
+        self.raw_data_dict['amps'] = []
+        self.raw_data_dict['data'] = []
 
-        data = []
-        for t in self.timestamps:
-            a = ma_old.MeasurementAnalysis(
-                timestamp=t, auto=False, close_file=False)
-            a.get_naming_and_values()
-            amp = a.data_file[amp_key].attrs['value']
-            data = a.measured_values[0] + 1j * a.measured_values[1]
-            # hacky but required for data saving
-            self.raw_data_dict['folder'] = a.folder
-            self.raw_data_dict['amp'] = amp  # Should be the same for all
-            data.append(data)
-            a.finish()
+        a = ma_old.MeasurementAnalysis(
+            timestamp=self.timestamp, auto=False, close_file=False)
+        a.get_naming_and_values()
 
-        self.raw_data_dict['data'] = np.mean(data)  # axis= 0 or 1?
+        ch_amp = a.data_file[self.ch_amp_key].attrs['value']
+        if self.ch_range_key is None:
+            ch_range = 2  # corresponds to a scale factor of 1
+        else:
+            ch_range = a.data_file[self.ch_range_key].attrs['value']
+        amp = ch_amp*ch_range/2
+        # amp = ch_amp
+
+        # read conversion polynomial from the datafile if not provided as input
+        if isinstance(self.polycoeffs_freq_conv, str):
+            self.polycoeffs_freq_conv = np.array(
+                a.data_file[self.polycoeffs_freq_conv])
+            print(np.array(self.polycoeffs_freq_conv))
+
+        self.raw_data_dict['data'] = a.measured_values[self.ch_idx_cos] + 1j * \
+            a.measured_values[self.ch_idx_sin]
+
+        # hacky but required for data saving
+        self.raw_data_dict['folder'] = a.folder
+        self.raw_data_dict['amps'].append(amp)
+        a.finish()
+
         self.raw_data_dict['times'] = a.sweep_points
         self.raw_data_dict['timestamps'] = self.timestamps
 
     def process_data(self):
-        self.proc_data_dict['derivative_window_length'] = self.derivative_window_length
+        self.proc_data_dict = deepcopy(self.raw_data_dict)
+        self.proc_data_dict['derivative_window_length'] = \
+            self.derivative_window_length
         self.proc_data_dict['norm_window_size'] = self.norm_window_size
         self.proc_data_dict['nyquist_order'] = self.nyquist_order
 
@@ -199,17 +241,41 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
         self.ca.nyquist_order = self.nyquist_order
 
     def prepare_plots(self):
-        self.plot_dicts['freqs'] = {
-            'plotfn': self.dac_arc_ana.plot_freqs,
-            'title': "Cryoscope arc \n"+self.timestamps[0]+' - '+self.timestamps[-1]}
+        # pass
+        self.plot_dicts['raw_data'] = {
+            'plotfn': self.ca.plot_raw_data,
+            'title': self.timestamp+'\nRaw cryoscope data'}
 
-        # self.plot_dicts['freqs'] = {
-        #     'plotfn': self.dac_arc_ana.plot_freqs,
-        #     'title': "Cryoscope arc \n"+self.timestamps[0]+' - '+self.timestamps[-1]}
+        self.plot_dicts['demod_data'] = {
+            'plotfn': self.ca.plot_demodulated_data,
+            'title': self.timestamp+'\nDemodulated data'}
 
-        # self.plot_dicts['FluxArc'] = {
-        #     'plotfn': self.dac_arc_ana.plot_ffts,
-        #     'title': "Cryoscope arc \n"+self.timestamps[0]+' - '+self.timestamps[-1]}
+        self.plot_dicts['norm_data_circ'] = {
+            'plotfn': self.ca.plot_normalized_data_circle,
+            'title': self.timestamp+'\nNormalized cryoscope data'}
+
+        self.plot_dicts['demod_phase'] = {
+            'plotfn': self.ca.plot_phase,
+            'title': self.timestamp+'\nDemodulated phase'}
+
+        self.plot_dicts['frequency_detuning'] = {
+            'plotfn': self.ca.plot_frequency,
+            'title': self.timestamp+'\nDetuning frequency'}
+
+        self.plot_dicts['cryoscope_amplitude'] = {
+            'plotfn': self.ca.plot_amplitude,
+            'title': self.timestamp+'\nCryoscope amplitude'}
+
+        self.plot_dicts['short_time_fft'] = {
+            'plotfn': self.ca.plot_short_time_fft,
+            'title': self.timestamp+'\nShort time Fourier Transform'}
+
+
+        self.plot_dicts['zoomed_cryoscope_amplitude'] = {
+            'plotfn': make_zoomed_cryoscope_fig,
+            't': self.ca.time,
+            'amp': self.ca.get_amplitudes(),
+            'title': self.timestamp+'\n Zoomed cryoscope amplitude'}
 
 
 class SlidingPulses_Analysis(ba.BaseDataAnalysis):
@@ -350,3 +416,57 @@ def make_amp_err_plot(t, amp, timestamp, ax=None, **kw):
     ax.set_title('Normalized to {:.2f}\n {}'.format(mean_amp, timestamp))
     set_xlabel(ax, 'Time', 's')
     set_ylabel(ax, 'Normalized Amplitude')
+
+
+
+def make_zoomed_cryoscope_fig(t, amp, title, ax=None, **kw):
+
+    # x = ca.time
+    x = t
+    y = amp
+    # y = ca.get_amplitudes()
+    gc = np.mean(y[len(y)//5:4*len(y)//5])
+
+    if ax is not None:
+        ax=ax
+        f=plt.gcf()
+    else:
+        f, ax = plt.subplots()
+    ax.plot(x,y/gc,  label='Signal')
+    ax.axhline(1.01, ls='--', c='grey', label=r'$\pm$1%')
+    ax.axhline(0.99, ls='--', c='grey')
+    ax.axhline(1.0, ls='-', c='grey', linewidth=.5)
+
+    ax.axhline(1.001, ls=':', c='grey', label=r'$\pm$ 0.1%')
+    ax.axhline(0.999, ls=':', c='grey')
+    # ax.axvline(10e-9, ls='--', c='k')
+
+    ax.set_ylim(.95, 1.02)
+    set_xlabel(ax, 'Time', 's')
+    set_ylabel(ax, 'Normalized Amplitude', '')
+
+    # Create a set of inset Axes: these should fill the bounding box allocated to
+    # them.
+    ax2 = plt.axes([0,0,1,1])
+    # Manually set the position and relative size of the inset axes within ax1
+    ip = InsetPosition(ax, [.29, .14, 0.65, .4])
+    ax2.set_axes_locator(ip)
+
+    mark_inset(ax, ax2, 1,3, color='grey')
+    ax2.axhline(1.0, ls='-', c='grey', linewidth=.5)
+    ax2.axhline(1.01, ls='--', c='grey', label=r'$\pm$1%')
+    ax2.axhline(0.99, ls='--', c='grey')
+    ax2.axhline(1.001, ls=':', c='grey', label=r'$\pm$ 0.1%')
+    ax2.axhline(0.999, ls=':', c='grey')
+    ax2.plot(x, y/gc, '-')
+
+    formatter = ticker.FuncFormatter(lambda x, pos: round(x*1e9,3))
+    ax2.xaxis.set_major_formatter(formatter)
+
+    ax2.set_ylim(0.998, 1.002)
+    ax2.set_xlim(0, min(150e-9, max(t)))
+    ax.legend(loc=1)
+
+    ax.set_title(title)
+    ax.text(.02, .93, '(a)', color='black', transform=ax.transAxes)
+
