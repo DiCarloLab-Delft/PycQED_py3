@@ -57,7 +57,7 @@ class QuTech_AWG_Module(SCPI):
         self.device_descriptor.numMarkers = 8
         self.device_descriptor.numTriggers = 8
         # Commented out until bug fixed
-        self.device_descriptor.numCodewords = 64
+        self.device_descriptor.numCodewords = 128
 
         # valid values
         self.device_descriptor.mvals_trigger_impedance = vals.Enum(50),
@@ -235,6 +235,16 @@ class QuTech_AWG_Module(SCPI):
                            docstring='Reads the temperature of the FPGA.\n' \
                              +'Temperature measurement interval is 10 seconds\n' \
                              +'Return:\n     float with temperature in Celsius')
+
+        for cw in range(self.device_descriptor.numCodewords):
+            for j in range(self.device_descriptor.numChannels):
+                ch = j+1
+                # Codeword 0 corresponds to bitcode 0
+                cw_cmd = 'sequence:element{:d}:waveform{:d}'.format(cw, ch)
+                self.add_parameter('codeword_{}_ch{}_waveform'.format(cw, ch),
+                                   get_cmd=cw_cmd+'?',
+                                   set_cmd=cw_cmd+' "{:s}"',
+                                   vals=vals.Strings())
         # Waveform parameters
         self.add_parameter('WlistSize',
                            label='Waveform list size',
