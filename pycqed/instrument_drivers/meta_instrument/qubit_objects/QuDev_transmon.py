@@ -1654,10 +1654,9 @@ class QuDev_transmon(Qubit):
         ma.MeasurementAnalysis(plot_args=dict(log=True, marker=''))
 
     def calibrate_drive_mixer_skewness_NN(self, MC=None, update=True,
-                                           amplitude=0.1, trigger_sep=5e-6,
-                                           initial_stepsize=None):
-        if initial_stepsize is None:
-            initial_stepsize = [0.15, 10]
+                                          meas_grid=None,n_meas=100,
+                                          amplitude=0.1,trigger_sep=5e-6,
+                                          **kwargs):
         if MC is None:
             MC = self.MC
         self.prepare_for_mixer_calibration(suppress='drive sideband')
@@ -1671,8 +1670,23 @@ class QuDev_transmon(Qubit):
         #     verbose=False)
 
         #Could make sample size variable (maxiter) for better adapting)
-        meas_grid = [np.random.normal(self.alpha(),0.5,100),
-                     np.random.normal(self.phi_skew(),15,100)]
+        std_devs = kwargs.pop('std_devs',[0.5,15])
+        if isinstance(std_devs,list) or isinstance(std_devs,np.ndarray):
+            if(len(std_devs) != 2 ):
+                logging.error('std_devs passed in kwargs of "calibrate_drive_'
+                              'mixer_skewness_NN is of length: ',len(std_devs),
+                              '. Requires length 2 instead.')
+        else:
+            logging.error('standard deviation argument "std_devs" in < calibrate_'
+                          'drive_mixer_skewness_NN has to be a list or array of '
+                          'the form [std_alpha,std_phi] got ',std_devs,' instead!')
+        if meas_grid is None:
+            meas_grid = [np.random.normal(self.alpha(),std_devs[0],n_meas),
+                         np.random.normal(self.phi_skew(),std_devs[1],n_meas)]
+        elif meas_grid.ndim !=2:
+            logging.error('The function argument meas_grid is not 2D. Tuples of '
+                          '[alpha,phi] values for skewness calibration.')
+
         # detector = det.UHFQC_mixer_calibration_det(
         #     self.UHFQC, qc.station, [self.RO_acq_weight_function_I(),
         #                              self.RO_acq_weight_function_Q()],
@@ -1683,22 +1697,24 @@ class QuDev_transmon(Qubit):
         #     amplitude=amplitude, nr_averages=self.RO_acq_averages(),
         #     RO_trigger_separation=trigger_sep, verbose=False,
         #     data_points = len(meas_grid))
-
-        MC.set_sweep_function(awg_swf.mixer_calibration_swf(
-            pulseIch=self.pulse_I_channel(),
-            pulseQch=self.pulse_Q_channel(),
-            alpha=meas_grid[0],
-            phi_skew=meas_grid[1],
-            f_mod=self.f_pulse_mod(),
-            RO_trigger_channel=None,
-            RO_pars=self.get_RO_pars(),
-            amplitude=0.1,
-            RO_trigger_separation=5e-6,
-            verbose=False,
-            data_points=len(meas_grid[0]),
-            upload=True
-            ))
-        MC.set_sweep_points(np.linspace(1, 100, 100))
+        s1 =  awg_swf.mixer_calibration_swf(
+                                 pulseIch=self.pulse_I_channel(),
+                                 pulseQch=self.pulse_Q_channel(),
+                                 alpha=meas_grid[0],
+                                 phi_skew=meas_grid[1],
+                                 f_mod=self.f_pulse_mod(),
+                                 RO_trigger_channel=None,
+                                 RO_pars=self.get_RO_pars(),
+                                 amplitude=amplitude,
+                                 RO_trigger_separation=trigger_sep,
+                                 verbose=False,
+                                 data_points=n_meas,
+                                 upload=True)
+        s2 = awg_swf.arbitrary_variable_swf()
+        #IDEA: h5d file does not contain meas_grid. Only possible to add by using
+        #two sweep functions. The second one here is just a dummy.
+        MC.set_sweep_functions([s1,s2])             ###NOT TESTED
+        MC.set_sweep_points(meas_grid.T)            ###NOT TESTED
         # MC.set_detector_function(det.IndexDetector(detector, 0))
         MC.set_detector_function(self.int_avg_det)
         ad_func_pars = {'adaptive_function': opti.neural_network_opt,

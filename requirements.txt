@@ -5,3 +5,4 @@ qutip
 pyqtgraph
 pygsti
 cma
+qcodes

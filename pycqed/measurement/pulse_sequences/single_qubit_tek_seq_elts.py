@@ -139,21 +139,25 @@ def mixer_cal_sqs(pulseIch,
     elts = []
     verbose = False
 
-    channels = ['AWG1_ch3_m2', 'AWG1_ch2_m2', 'AWG1_ch1_m1',
+    channels_ = ['AWG1_ch3_m2', 'AWG1_ch2_m2', 'AWG1_ch1_m1',
                      'AWG1_ch1_m2', 'AWG1_ch2_m1', 'AWG1_ch3', 'AWG1_ch4']
-    print(channels)
-
+    channels =[RO_pars['acq_marker_channel'],
+               station.sequencer_config['slave_AWG_trig_channels'],
+               pulseIch,pulseQch]
+    print('Channels correct?: ',channels==channels_)
     for n in range(data_points):
+        #if here the pulseIch and pulseQch values could be set in each iteration,
+        #it would be easy to optimize the complete set of data values.
         new_seq, new_elt = cal_elts.mixer_calibration_sequence(
-            RO_trigger_separation,
-            amplitude,
-            None,
-            RO_pars,
-            pulseIch, pulseQch,
-            f_pulse_mod=f_mod,
-            phi_skew=phi_skew[n],
-            alpha=alpha[n],
-            upload=False)
+                                                          RO_trigger_separation,
+                                                          amplitude,
+                                                          None,
+                                                          RO_pars,
+                                                          pulseIch, pulseQch,
+                                                          f_pulse_mod=f_mod,
+                                                          phi_skew=phi_skew[n],
+                                                          alpha=alpha[n],
+                                                          upload=False)
         new_elt[0].name = '{}-pulse-elt_{}'. \
             format(len(new_elt[0].pulses), n)
         if seq is None:

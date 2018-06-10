@@ -101,9 +101,6 @@ class mixer_calibration_swf(swf.Hard_Sweep):
         self.seq = None
         self.elts = []
         self.finished = False
-        self.channels = ['AWG1_ch3_m2', 'AWG1_ch2_m2', 'AWG1_ch1_m1',
-                         'AWG1_ch1_m2', 'AWG1_ch2_m1', 'AWG1_ch3', 'AWG1_ch4']
-        print(self.channels)
         self.upload = upload
 
     def prepare(self):
@@ -118,11 +115,26 @@ class mixer_calibration_swf(swf.Hard_Sweep):
                               amplitude=self.amplitude,
                               RO_trigger_separation=self.RO_trigger_separation,
                               data_points=self.data_points)
+class arbitrary_variable_swf(swf.Hard_Sweep):
 
+    def __init__(self,control=None,parameter = None):
 
+        super.__init__()
+        if control is not None:
+            if not hasattr(control,'children'):
+                control.children = [self]
+            if not hasattr(control,'prepared'):
+                control.prepared = [False]
+        self.control_swf = control
 
+    def set_parameter(self,value):
+        pass
 
-
+    def prepare(self):
+        if self.control_swf is not None:
+            #here there has to be a name map in the control swf in order to find
+            #the correct swf. in control_swf and set it's prepared value to True.
+        pass
 
 class Rabi(swf.Hard_Sweep):
 
