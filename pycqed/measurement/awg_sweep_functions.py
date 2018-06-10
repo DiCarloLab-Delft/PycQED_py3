@@ -134,7 +134,7 @@ class arbitrary_variable_swf(swf.Hard_Sweep):
         if self.control_swf is not None:
             #here there has to be a name map in the control swf in order to find
             #the correct swf. in control_swf and set it's prepared value to True.
-        pass
+          pass
 
 class Rabi(swf.Hard_Sweep):
 
