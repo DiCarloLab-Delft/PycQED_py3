@@ -119,7 +119,7 @@ class arbitrary_variable_swf(swf.Hard_Sweep):
 
     def __init__(self,control=None,parameter = None):
 
-        super.__init__()
+        super().__init__()
         if control is not None:
             if not hasattr(control,'children'):
                 control.children = [self]

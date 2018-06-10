@@ -7,7 +7,7 @@ from abc import ABCMeta, abstractmethod
 #from neupy.algorithms import GRNN as grnn
 from sklearn.model_selection import GridSearchCV as gcv, train_test_split
 from sklearn.neural_network import MLPRegressor as mlpr
-from neupy.algorithms import GRNN as grnn
+#from neupy.algorithms import GRNN as grnn
 import tensorflow as tf
 
 

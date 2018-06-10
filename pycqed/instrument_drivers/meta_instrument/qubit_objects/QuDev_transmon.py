@@ -1681,8 +1681,8 @@ class QuDev_transmon(Qubit):
                           'drive_mixer_skewness_NN has to be a list or array of '
                           'the form [std_alpha,std_phi] got ',std_devs,' instead!')
         if meas_grid is None:
-            meas_grid = [np.random.normal(self.alpha(),std_devs[0],n_meas),
-                         np.random.normal(self.phi_skew(),std_devs[1],n_meas)]
+            meas_grid = np.array([np.random.normal(self.alpha(),std_devs[0],n_meas),
+                         np.random.normal(self.phi_skew(),std_devs[1],n_meas)])
         elif meas_grid.ndim !=2:
             logging.error('The function argument meas_grid is not 2D. Tuples of '
                           '[alpha,phi] values for skewness calibration.')
