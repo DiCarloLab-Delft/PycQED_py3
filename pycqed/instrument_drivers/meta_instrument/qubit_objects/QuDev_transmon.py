@@ -1512,17 +1512,19 @@ class QuDev_transmon(Qubit):
                                    qb_name=self.name)
 
     def calibrate_drive_mixer_carrier_NN(self, MC=None, update=True, x0=(0., 0.),
-                                      initial_stepsize=0.01, trigger_sep=5e-6):
+                                         initial_stepsize=0.01, trigger_sep=5e-6,
+                                         n_meas=100,two_rounds=False,**kwargs):
         if MC is None:
             MC = self.MC
+        std_devs = kwargs.pop('std_devs',[0.02,0.02])
         self.prepare_for_mixer_calibration(suppress='drive LO')
         cal_elts.mixer_calibration_sequence(
             trigger_sep, 0, RO_pars=self.get_RO_pars(),
             pulse_I_channel=self.pulse_I_channel(),
             pulse_Q_channel=self.pulse_Q_channel())
         detector = self.int_avg_det_spec
-        meas_grid = [x0[0]+np.random.normal(0.0,0.02,100),
-                     x0[1]+np.random.normal(0.0,0.02,100)]
+        meas_grid = [x0[0]+np.random.normal(0.0,std_devs[0],n_meas),
+                     x0[1]+np.random.normal(0.0,std_devs[1],n_meas)]
         meas_grid = list(map(list, zip(*meas_grid)))
         ad_func_pars = {'adaptive_function': opti.neural_network_opt,
                         'training_grid': meas_grid,
@@ -1543,15 +1545,30 @@ class QuDev_transmon(Qubit):
         self.AWG.start()
         MC.run(name='drive_carrier_calibration' + self.msmt_suffix,
                mode='adaptive')
-        a = ma.OptimizationAnalysis(label='drive_carrier_calibration')
-        # v2 creates a pretty picture of the optimizations
-        ma.OptimizationAnalysis_v2(label='drive_carrier_calibration')
+        if not two_rounds:
+            a = ma.OptimizationAnalysisNN(label='drive_carrier_calibration')
+            # v2 creates a pretty picture of the optimizations
+            #ma.OptimizationAnalysis_v2(label='drive_carrier_calibration')
 
         ch_1_min = a.optimization_result[0][0]
         ch_2_min = a.optimization_result[0][1]
-        if update:
+        if update and not two_rounds:
             self.pulse_I_offset(ch_1_min)
             self.pulse_Q_offset(ch_2_min)
+
+        if two_rounds:
+            meas_grid = np.array([np.random.normal(ch_1_min,
+                                                   0.3*std_devs[0],
+                                                   n_meas),
+                                  np.random.normal(ch_2_min,
+                                                   0.3*std_devs[1],
+                                                   n_meas)])
+            self.calibrate_drive_mixer_skewness_NN(MC=MC, update=update,
+                                                   meas_grid=meas_grid,
+                                                   n_meas=n_meas,
+                                                   trigger_sep=trigger_sep,
+                                                   two_rounds = False,**kwargs)
+
         return ch_1_min, ch_2_min
 
     def calibrate_drive_mixer_carrier(self, MC=None, update=True, x0=(0., 0.),
@@ -1656,6 +1673,7 @@ class QuDev_transmon(Qubit):
     def calibrate_drive_mixer_skewness_NN(self, MC=None, update=True,
                                           meas_grid=None,n_meas=100,
                                           amplitude=0.1,trigger_sep=5e-6,
+                                          two_rounds=False,
                                           **kwargs):
         if MC is None:
             MC = self.MC
@@ -1681,8 +1699,8 @@ class QuDev_transmon(Qubit):
                           'drive_mixer_skewness_NN has to be a list or array of '
                           'the form [std_alpha,std_phi] got ',std_devs,' instead!')
         if meas_grid is None:
-            meas_grid = [np.random.normal(self.alpha(),std_devs[0],n_meas),
-                         np.random.normal(self.phi_skew(),std_devs[1],n_meas)]
+            meas_grid = np.array([np.random.normal(self.alpha(),std_devs[0],n_meas),
+                         np.random.normal(self.phi_skew(),std_devs[1],n_meas)])
         elif meas_grid.ndim !=2:
             logging.error('The function argument meas_grid is not 2D. Tuples of '
                           '[alpha,phi] values for skewness calibration.')
@@ -1730,19 +1748,33 @@ class QuDev_transmon(Qubit):
         # MC.set_adaptive_function_parameters(ad_func_pars)
         MC.run(name='drive_skewness_calibration' + self.msmt_suffix)
 
-
-        a = ma.OptimizationAnalysisNN(label='drive_skewness_calibration',
-                                      ad_func_pars=ad_func_pars,
-                                      meas_grid=meas_grid)
+        if not two_rounds:
+            a = ma.OptimizationAnalysisNN(label='drive_skewness_calibration',
+                                          ad_func_pars=ad_func_pars,
+                                          meas_grid=meas_grid)
         # v2 creates a pretty picture of the optimizations
         # ma.OptimizationAnalysis_v2(label='drive_skewness_calibration')
 
         # phi and alpha are the coefficients that go in the predistortion matrix
         alpha = a.optimization_result[0]
         phi = a.optimization_result[1]
-        if update:
+        if update and not two_rounds:
             self.alpha(alpha)
             self.phi_skew(phi)
+        if two_rounds:
+            meas_grid = np.array([np.random.normal(alpha,
+                                                   0.3*std_devs[0],
+                                                   n_meas),
+                                  np.random.normal(phi,
+                                                   0.3*std_devs[1],
+                                                   n_meas)])
+            self.calibrate_drive_mixer_skewness_NN(MC=MC, update=update,
+                                                   meas_grid=meas_grid,
+                                                   n_meas=n_meas,
+                                                   amplitude=amplitude,
+                                                   trigger_sep=trigger_sep,
+                                                   two_rounds = False,**kwargs)
+
         return alpha, phi
 
 
