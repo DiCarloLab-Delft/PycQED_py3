@@ -15,6 +15,7 @@ Hacked together by Rene Vollmer
 import datetime
 import pycqed.analysis_v2.base_analysis as ba
 from pycqed.analysis_v2.base_analysis import plot_scatter_errorbar_fit, plot_scatter_errorbar
+from copy import deepcopy
 
 import numpy as np
 import lmfit
@@ -416,36 +417,44 @@ class QuantumEfficiencyAnalysis(ba.BaseDataAnalysis):
         self.fit_res['quantum_efficiency']['a_std'] = u_a
 
     def prepare_plots(self):
-        title = ('\n' + self.timestamps[0] + ' - "' +
-                 self.raw_data_dict['measurementstring'] + '"')
+        title = '\n' + str(self.timestamps[0])
+        if 'measurementstring' in self.raw_data_dict:
+            title += ' - "' + self.raw_data_dict['measurementstring'] + '"'
         # self.ra.plot_dicts['amp_vs_dephasing_fit']
-        # self.ra.plot_dicts['amp_vs_dephasing_Phase']
+        # self.ra.plot_dicts['amp_vs_dephasing_phase']
         # self.ra.plot_dicts['amp_vs_dephasing_coherence']
 
         # self.ssro.plot_dicts['amp_vs_SNR_fit']
         # self.ssro.plot_dicts['amp_vs_SNR_scatter']
         # self.ssro.plot_dicts['amp_vs_Fa']
         # self.ssro.plot_dicts['amp_vs_Fd']
+        pd = OrderedDict()
         self.ra.prepare_plots()
         for d in self.ra.plot_dicts:
-            self.plot_dicts[d] = self.ra.plot_dicts[d]
+            pd[d] = self.ra.plot_dicts[d]
         self.ssro.prepare_plots()
         for d in self.ssro.plot_dicts:
-            self.plot_dicts[d] = self.ssro.plot_dicts[d]
+            pd[d] = self.ssro.plot_dicts[d]
 
+        # Do we want to plot all the plots from self.ra and self.ssro or just
+        # the main result (quantumeff analysis)?
         if self.options_dict.get('subplots', True):
-            for k in ['amp_vs_dephasing_coherence_fitted',
-                      'amp_vs_dephasing_coherence_not_fitted',
-                      'amp_vs_dephasing_fit',
-                      'amp_vs_SNR_scatter_fitted',
-                      'amp_vs_SNR_scatter_not_fitted',
-                      'amp_vs_SNR_fit',]:
-                self.plot_dicts[k]['ax_id'] = 'snr_analysis'
-                self.plot_dicts[k]['ylabel'] = 'SNR, coherence'
-                self.plot_dicts[k]['yunit'] = '(-)'
-                self.plot_dicts[k]['title'] = r'$\eta = (%.4f \pm %.4f)$ %%' % (
-                    100 * self.fit_dicts['eta'], 100 * self.fit_dicts['u_eta'])
-                + title
+            self.plot_dicts = pd
+
+        # Do main fit
+        for k in ['amp_vs_dephasing_fitted',
+                  'amp_vs_dephasing_not_fitted',
+                  'amp_vs_dephasing_fit',
+                  'amp_vs_SNR_scatter_fitted',
+                  'amp_vs_SNR_scatter_not_fitted',
+                  'amp_vs_SNR_fit',]:
+            if k in self.plot_dicts:
+                k2 = str(k) + '_main'
+                self.plot_dicts[k2] = deepcopy(pd[k])
+                self.plot_dicts[k2]['ax_id'] = 'main_analysis'
+                self.plot_dicts[k2]['ylabel'] = 'SNR, coherence'
+                self.plot_dicts[k2]['yunit'] = '(-)'
+                self.plot_dicts[k2]['title'] = title
 
             #self.plot_dicts['amp_vs_dephasing_fit']['color'] = 'red'
             #self.plot_dicts['amp_vs_dephasing_coherence_fitted']['color'] = 'red'
@@ -457,8 +466,23 @@ class QuantumEfficiencyAnalysis(ba.BaseDataAnalysis):
             # self.plot_dicts['amp_vs_dephasing_coherence']['marker'] = 'o'
             # self.plot_dicts['amp_vs_SNR_scatter']['marker'] = 'o'
 
-            self.plot_dicts['amp_vs_SNR_fit']['do_legend'] = True
-            self.plot_dicts['amp_vs_dephasing_fit']['do_legend'] = True
+            if 'amp_vs_SNR_fit_main' in self.plot_dicts:
+                self.plot_dicts['amp_vs_SNR_fit_main']['do_legend'] = True
+            if 'amp_vs_dephasing_fit_main' in self.plot_dicts:
+                self.plot_dicts['amp_vs_dephasing_fit_main']['do_legend'] = True
+
+        self.plot_dicts['text_msg_main'] = {
+            'plotfn': self.plot_line,
+            'ax_id': 'main_analysis',
+            'zorder': 0,
+            'xvals': [0, 0],
+            'yvals': [0, 0],
+            'marker': None,
+            'linestyle': '',
+            'setlabel': r'$\eta = (%.4f \pm %.4f)$ %%' % (
+                    100 * self.fit_dicts['eta'], 100 * self.fit_dicts['u_eta']),
+            'do_legend': True,
+        }
 
 
 class DephasingAnalysis(ba.BaseDataAnalysis):
@@ -534,29 +558,31 @@ class DephasingAnalysis(ba.BaseDataAnalysis):
 
         fit_mask = self.fit_dicts['coherence_fit']['mask']
         fit_mask_inv = self.fit_dicts['coherence_fit']['inv_mask']
-        self.plot_dicts[name + 'amp_vs_dephasing_coherence_fitted'] = {
-            'plotfn': self.plot_line,
-            'ax_id': name + 'amp_vs_dephasing',
-            'zorder': 0,
-            'xvals': amps[fit_mask],
-            'yvals': self.proc_data_dict['coherence'][fit_mask],
-            'marker': 'o',
-            'linestyle': '',
-            'setlabel': 'coherence data',
-            'color': 'red',
-        }
-        self.plot_dicts[name + 'amp_vs_dephasing_coherence_not_fitted'] = {
-            'plotfn': self.plot_line,
-            'ax_id': name + 'amp_vs_dephasing',
-            'zorder': 1,
-            'xvals': amps[fit_mask_inv],
-            'yvals': self.proc_data_dict['coherence'][fit_mask_inv],
-            'marker': 'x',
-            'linestyle': '',
-            'setlabel': 'coherence data (not fitted)',
-            'color': 'red',
-        }
-        self.plot_dicts[name + 'amp_vs_dephasing_Phase'] = {
+        if len(fit_mask) > 0:
+            self.plot_dicts[name + 'amp_vs_dephasing_fitted'] = {
+                'plotfn': self.plot_line,
+                'ax_id': name + 'amp_vs_dephasing',
+                'zorder': 0,
+                'xvals': amps[fit_mask],
+                'yvals': self.proc_data_dict['coherence'][fit_mask],
+                'marker': 'o',
+                'linestyle': '',
+                'setlabel': 'coherence data',
+                'color': 'red',
+            }
+        if len(fit_mask_inv) > 0:
+            self.plot_dicts[name + 'amp_vs_dephasing_not_fitted'] = {
+                'plotfn': self.plot_line,
+                'ax_id': name + 'amp_vs_dephasing',
+                'zorder': 1,
+                'xvals': amps[fit_mask_inv],
+                'yvals': self.proc_data_dict['coherence'][fit_mask_inv],
+                'marker': 'x',
+                'linestyle': '',
+                'setlabel': 'coherence data (not fitted)',
+                'color': 'red',
+            }
+        self.plot_dicts[name + 'amp_vs_dephasing_phase'] = {
             'plotfn': self.plot_line,
             'xvals': amps,
             'yvals': self.proc_data_dict['phase'],
@@ -711,38 +737,40 @@ class SSROAnalysis(ba.BaseDataAnalysis):
         }
         fit_mask = self.fit_dicts['snr_fit']['mask']
         fit_mask_inv = self.fit_dicts['snr_fit']['inv_mask']
-        self.plot_dicts[name + 'amp_vs_SNR_scatter_fitted'] = {
-            'plotfn': self.plot_line,
-            'ax_id': name + 'amp_vs_SNR',
-            'zorder': 0,
-            'xvals': amps[fit_mask],
-            'xlabel': 'scaling amplitude',
-            'xunit': 'rel. amp.',
-            'yvals': self.proc_data_dict['SNR'][fit_mask],
-            'ylabel': 'SNR',
-            'yunit': '-',
-            'marker': 'o',
-            'linestyle': '',
-            'setlabel': 'SNR data',
-            'do_legend': True,
-            'color': 'blue',
-        }
-        self.plot_dicts[name + 'amp_vs_SNR_scatter_not_fitted'] = {
-            'plotfn': self.plot_line,
-            'ax_id': name + 'amp_vs_SNR',
-            'zorder': 0,
-            'xvals': amps[fit_mask_inv],
-            'xlabel': 'scaling amplitude',
-            'xunit': 'rel. amp.',
-            'yvals': self.proc_data_dict['SNR'][fit_mask_inv],
-            'ylabel': 'SNR',
-            'yunit': '-',
-            'marker': 'x',
-            'linestyle': '',
-            'setlabel': 'SNR data (not fitted)',
-            'do_legend': True,
-            'color': 'blue',
-        }
+        if len(fit_mask) > 0:
+            self.plot_dicts[name + 'amp_vs_SNR_scatter_fitted'] = {
+                'plotfn': self.plot_line,
+                'ax_id': name + 'amp_vs_SNR',
+                'zorder': 0,
+                'xvals': amps[fit_mask],
+                'xlabel': 'scaling amplitude',
+                'xunit': 'rel. amp.',
+                'yvals': self.proc_data_dict['SNR'][fit_mask],
+                'ylabel': 'SNR',
+                'yunit': '-',
+                'marker': 'o',
+                'linestyle': '',
+                'setlabel': 'SNR data',
+                'do_legend': True,
+                'color': 'blue',
+            }
+        if len(fit_mask_inv) > 0:
+            self.plot_dicts[name + 'amp_vs_SNR_scatter_not_fitted'] = {
+                'plotfn': self.plot_line,
+                'ax_id': name + 'amp_vs_SNR',
+                'zorder': 0,
+                'xvals': amps[fit_mask_inv],
+                'xlabel': 'scaling amplitude',
+                'xunit': 'rel. amp.',
+                'yvals': self.proc_data_dict['SNR'][fit_mask_inv],
+                'ylabel': 'SNR',
+                'yunit': '-',
+                'marker': 'x',
+                'linestyle': '',
+                'setlabel': 'SNR data (not fitted)',
+                'do_legend': True,
+                'color': 'blue',
+            }
         self.plot_dicts[name + 'amp_vs_Fa'] = {
             'plotfn': self.plot_line,
             'zorder': 0,
