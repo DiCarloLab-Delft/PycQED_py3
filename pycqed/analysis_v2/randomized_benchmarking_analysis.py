@@ -59,7 +59,7 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
 
             self.raw_data_dict['binned_vals'] = OrderedDict()
             self.raw_data_dict['cal_pts_zero'] = OrderedDict()
-            self.raw_data_dict['cal_pts_one'] = OrderedDict()
+            self.raw_data_dic t['cal_pts_one'] = OrderedDict()
             self.raw_data_dict['cal_pts_two'] = OrderedDict()
             self.raw_data_dict['measured_values_I'] = OrderedDict()
             self.raw_data_dict['measured_values_X'] = OrderedDict()
@@ -336,7 +336,7 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
             'fit_res': self.fit_res['leakage_decay'],
             'setlabel': 'Leakage fit',
             'do_legend': True,
-            'color': 'C2',
+            'color': 'C2',    
         }
         self.plot_dicts['fit_rb_simple'] = {
             'plotfn': self.plot_fit,
@@ -511,14 +511,14 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
 
         for i, val_name in enumerate(val_names):
             self.plot_dicts['binned_data_{}'.format(val_name)] = {
-                'plotfn': self.plot_line,
+                'plotfn': self.plot_line, 
                 'xvals': self.proc_data_dict['bins'],
                 'yvals': np.mean(self.proc_data_dict['binned_vals'][val_name], axis=1),
                 'yerr':  sem(self.proc_data_dict['binned_vals'][val_name], axis=1),
                 'xlabel': 'Number of Cliffrods',
                 'xunit': '#',
                 'ylabel': val_name,
-                'yunit': self.proc_data_dict['value_units'][i],
+                'yunit': self.proc_data_dict['value_u    nits'][i],
                 'title': self.proc_data_dict['timestamp_string'] +
                 '\n'+self.proc_data_dict['measurementstring'],
             }
@@ -583,7 +583,7 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
                         self.proc_data_dict['cal_pts_2x'][val_names[3]]),
             'xlabel': val_names[2],
             'xunit': self.proc_data_dict['value_units'][2],
-            'ylabel': val_names[3],
+            'ylabel': val_names[3],  
             'yunit': self.proc_data_dict['value_units'][3],
             'common_clims': False,
             'title': self.proc_data_dict['timestamp_string'] +
@@ -604,7 +604,7 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
             'M0': self.proc_data_dict['M0'],
             'X1': self.proc_data_dict['X1'],
             'ax1': axs[1],
-            'title': self.proc_data_dict['timestamp_string']+'\n' +
+            'title': self.proc_d ta_dict['timestamp_string']+'\n' +
             self.proc_data_dict['measurementstring']}
 
         self.plot_dicts['fit_leak'] = {
