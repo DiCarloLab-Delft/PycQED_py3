@@ -7,6 +7,8 @@ from ..waveform_control import pulse
 from ..waveform_control import sequence
 from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
 from pycqed.measurement.pulse_sequences.standard_elements import multi_pulse_elt
+from pycqed.measurement.pulse_sequences import calibration_elements as cal_elts
+# import pycqed.measurement.pulse_sequences.calibration_elements as cal_elts
 
 from importlib import reload
 reload(pulse)
@@ -104,6 +106,70 @@ def photon_number_splitting_seq(spec_pars, RO_pars, disp_pars, upload=True, retu
         station.pulsar.program_awgs(seq, *el_list, verbose=False)
     return seq
 
+
+def mixer_cal_sqs(pulseIch,
+                  pulseQch,
+                  alpha,
+                  phi_skew,
+                  f_mod,
+                  RO_trigger_channel,
+                  RO_pars,
+                  amplitude,
+                  RO_trigger_separation,
+                  data_points):
+    '''
+
+    Args:
+        pulseIch:
+        pulseQch:
+        alpha:
+        phi_skew:
+        f_mod:
+        RO_trigger_channel:
+        RO_pars:
+        amplitude:
+        RO_trigger_separation:
+        data_point:
+
+    Returns:
+
+    '''
+
+    seq = None
+    elts = []
+    verbose = False
+
+    channels_ = ['AWG1_ch3_m2', 'AWG1_ch2_m2', 'AWG1_ch1_m1',
+                     'AWG1_ch1_m2', 'AWG1_ch2_m1', 'AWG1_ch3', 'AWG1_ch4']
+    channels =[RO_pars['acq_marker_channel'],
+               station.sequencer_config['slave_AWG_trig_channels'],
+               pulseIch,pulseQch]
+    print('Channels correct?: ',channels==channels_)
+    for n in range(data_points):
+        #if here the pulseIch and pulseQch values could be set in each iteration,
+        #it would be easy to optimize the complete set of data values.
+        new_seq, new_elt = cal_elts.mixer_calibration_sequence(
+                                                          RO_trigger_separation,
+                                                          amplitude,
+                                                          None,
+                                                          RO_pars,
+                                                          pulseIch, pulseQch,
+                                                          f_pulse_mod=f_mod,
+                                                          phi_skew=phi_skew[n],
+                                                          alpha=alpha[n],
+                                                          upload=False)
+        new_elt[0].name = '{}-pulse-elt_{}'. \
+            format(len(new_elt[0].pulses), n)
+        if seq is None:
+            seq = sequence.Sequence('Sideband_modulation_seq')
+            seq.append_element(*new_elt, trigger_wait=True)
+        else:
+            seq.append_element(*new_elt, trigger_wait=True)
+        elts.append(*new_elt)
+
+    station.pulsar.program_awgs(seq, *elts,
+                                channels=channels,
+                                verbose=verbose)
 
 def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=0, no_cal_points=2,
              cal_points=True, verbose=False, upload=True, return_seq=False):

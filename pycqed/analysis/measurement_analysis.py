@@ -36,6 +36,7 @@ from copy import deepcopy
 from pycqed.analysis.fit_toolbox import functions as func
 from pprint import pprint
 from math import floor
+from pycqed.measurement import optimization as opt
 
 import pycqed.analysis.tools.plotting as pl_tools
 from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel,
@@ -960,6 +961,166 @@ class OptimizationAnalysis_v2(MeasurementAnalysis):
                 plot_title = kw.pop('plot_title', textwrap.fill(
                     self.timestamp_string + '_' +
                     self.measurementstring, 40))
+                ax.set_title(plot_title)
+                set_xlabel(ax, self.parameter_names[0], self.parameter_units[0])
+                set_ylabel(ax, self.parameter_names[1], self.parameter_units[1])
+                self.save_fig(f, figname=base_figname, **kw)
+
+
+class OptimizationAnalysisNN(MeasurementAnalysis):
+
+    def run_default_analysis(self, close_file=True, show=False, plot_all=False, **kw):
+
+        self.get_naming_and_values()
+        try:
+            optimization_method = self.data_file['Instrument settings']\
+                ['MC'].attrs['optimization_method']
+        except:
+            optimization_method = 'Numerical'
+        self.meas_grid = kw.pop('meas_grid')
+        self.ad_func_pars = kw.pop('ad_func_pars')
+        self.hidden_layer_sizes = self.ad_func_pars.pop('hidden_layer_sizes',[(5,)])
+        self.alphas = self.ad_func_pars.pop('alphas',1)
+        self.estimator_name = self.ad_func_pars.pop('estimator','MLP_Regressor_scikit')
+        self.beta = self.ad_func_pars.pop('beta',0)
+        self.iters = self.ad_func_pars.pop('iterations')
+        self.accuracy= -np.infty
+        #already rescaled to original average,interval.
+        self.optimization_result,\
+        self.estimator,\
+        self.test_data =    self.train_NN(**kw)
+        self.make_figures(**kw)
+        if close_file:
+            self.data_file.close()
+        return self.optimization_result
+
+    def train_NN(self, **kw):
+        abs_vals = np.sqrt(self.measured_values[0,:]**2 + self.measured_values[1,:]**2)
+        result,est,test_data = opt.neural_network_opt(self.meas_grid,
+                                        abs_vals,
+                                        hidden_layer_sizes = self.hidden_layer_sizes,
+                                        alphas= self.alphas,
+                                        solver='lbfgs',
+                                        estimator=self.estimator,
+                                        iters = self.iters,
+                                        beta=self.beta,
+                                        gamma=1.)
+        #test_grid and test_target values. Centered and scaled to [-1,1] since
+        #only used for performance estimation of estimator
+        test_grid = test_data[0]
+        test_target = test_data[1]
+        self.accuracy = est.evaluate(test_grid,test_target)
+        return result,est,test_data
+
+    def make_figures(self, **kw):
+
+        fontsize = kw.pop('label_fontsize',16.)
+        try:
+            optimization_method = self.data_file['Instrument settings'] \
+                ['MC'].attrs['optimization_method']
+        except:
+            optimization_method = 'Numerical'
+
+        pre_proc_dict = self.estimator.pre_processing_dict
+        output_scale = pre_proc_dict.get('output',{}).get('scaling',1.)
+        output_means = pre_proc_dict.get('output',{}).get('centering',0.)
+        input_scale = pre_proc_dict.get('input',{}).get('scaling',1.)
+        input_means = pre_proc_dict.get('input',{}).get('centering',0.)
+        #create contour plot
+        fig1 = plt.figure(figsize=(10,8))
+        #Create data grid for contour plot
+        lower_x = np.min(self.measured_values[0,:])-np.std(self.measured_values[0,:])
+        upper_x = np.max(self.measured_values[0,:])+np.std(self.measured_values[0,:])
+        lower_y = np.min(self.measured_values[1,:])-np.std(self.measured_values[1,:])
+        upper_y = np.max(self.measured_values[1,:])+np.std(self.measured_values[1,:])
+        x_mesh = np.linspace(lower_x,upper_x,200)
+        y_mesh = np.linspace(lower_y,upper_y,200)
+        Xm,Ym = np.meshgrid(x_mesh,y_mesh)
+        Zm = np.zeros_like(Xm)
+        for k in range(np.size(x_mesh)):
+            for l in range(np.size(y_mesh)):
+                Zm[k,l] = self.estimator.predict([Xm[k,l],Ym[k,l]])
+        Zm = Zm*output_scale + output_means
+        Xm = Xm*input_scale[0] + input_means[0]
+        Ym = Ym*input_scale[1] + input_means[1]
+        #Landscape plot of network
+        #In case we use tensorflow, add a learning curve plot
+        if self.estimator_name=='DNN_Regressor_tf':
+            plt_grid = plt.GridSpec(2,10,hspace=0.6)
+            ax1 = plt.subplot(plt_grid[0,:])
+            ax2 = plt.subplot(plt_grid[1,:8])
+            textstr2 = 'Accuracy on test data: %s \n'% np.round(self.accuracy,3)
+            textstr2 +='Accuracy on training data, last epoch: %s' \
+                        % np.round(self.estimator.learning_acc[-1],3)
+            ax2.text(0.95, 0.1, textstr2,
+                     transform=ax2.transAxes,
+                     fontsize=11, verticalalignment='bottom',
+                     horizontalalignment='right',
+                     bbox=dict(facecolor='white',edgecolor='black'))
+            ax2.set_title('Learning_curve',fontsize=fontsize)
+            ax2.plot(self.estimator.learning_acc,'g-',linewidth='3')
+            ax2.set_ylabel('Coefficient of determination $R^2$'
+                           ,fontsize=fontsize)
+            ax2.set_xlabel('learning epoch',fontsize=fontsize)
+            ax2.grid("True")
+        else:
+            ax1 = plt.subplot(111)
+        base_figname = optimization_method + ' optimization of '
+        figname1 = self.timestamp_string+'_'
+        for i,meas_vals in enumerate(self.measured_values):
+            figname1 += self.value_names[i]
+            figname1 += ';'
+            base_figname += self.value_names[i]
+        textstr = 'Optimization converged to: \n'
+        for i in range(len(self.parameter_names)):
+               textstr+='%s: %.3g %s' % (self.parameter_names[i],
+                                         self.optimization_result[i],
+                                         self.parameter_units[i])
+               if not i== len(self.parameter_names)-1:
+                   textstr+='\n'
+        ax1.text(0.98, 0.05, textstr,
+             transform=ax1.transAxes,
+             fontsize=11, verticalalignment='bottom',
+             horizontalalignment='right',
+             bbox=dict(facecolor='white',edgecolor='None',
+             alpha=0.75, boxstyle='round'))
+        figname1+= self.estimator_name+' fitted landscape'
+        savename1 = self.timestamp_string + '_' + base_figname
+  #                 fig1_type
+
+        levels = np.linspace(np.min(Zm),np.max(Zm),30)
+        CP = plt.contourf(Xm,Ym,Zm,levels,extend='both')
+        plt.scatter(self.optimization_result[0],self.optimization_result[0],
+                 marker='o',c='white',label='network minimum')
+        plt.scatter(self.sweep_points[0,:],self.sweep_points[1,:],
+                 marker='o',c='r',label='training data',s=10)
+        plt.scatter(self.test_data[0][:,0],self.test_data[0][:,1],
+                    marker='o',c='y',label='training data',s=10)
+        ax1.tick_params(axis='both',which='minor',labelsize=14)
+        ax1.set_ylabel(self.parameter_labels[1],fontsize=fontsize)
+        ax1.set_xlabel(self.parameter_labels[0],fontsize=fontsize)
+        cbar = plt.colorbar(CP,ax=ax1,orientation='vertical')
+        cbar.ax.set_ylabel(self.ylabels[0],fontsize=fontsize)
+        ax1.legend(loc='upper left',framealpha=0.75)
+        ax1.set_title(self.timestamp_string + ' ' + figname1)
+        self.save_fig(fig1,figname=savename1,**kw)
+
+
+        #interpolation plot with only measurement points
+        for i in range(len(self.value_names)):
+            base_figname = 'optimization of ' + self.value_names[i]
+            if np.shape(self.sweep_points)[0] == 2:
+                f, ax = plt.subplots()
+                a_tools.color_plot_interpolated(
+                    x=self.sweep_points[0], y=self.sweep_points[1],
+                    z=self.measured_values[i], ax=ax,N_levels=25,
+                    zlabel=self.value_names[i])
+                ax.plot(self.sweep_points[0],
+                        self.sweep_points[1], 'o', c='grey')
+                ax.plot(self.optimization_result[0],
+                        self.optimization_result[1],
+                        'o', markersize=5, c='w')
+                plot_title = self.timestamp_string + '_' +self.measurementstring
                 ax.set_title(plot_title)
                 set_xlabel(ax, self.parameter_names[0], self.parameter_units[0])
                 set_ylabel(ax, self.parameter_names[1], self.parameter_units[1])

@@ -1509,17 +1509,19 @@ class QuDev_transmon(Qubit):
                                    qb_name=self.name)
 
     def calibrate_drive_mixer_carrier_NN(self, MC=None, update=True, x0=(0., 0.),
-                                      initial_stepsize=0.01, trigger_sep=5e-6):
+                                         initial_stepsize=0.01, trigger_sep=5e-6,
+                                         n_meas=100,two_rounds=False,**kwargs):
         if MC is None:
             MC = self.MC
+        std_devs = kwargs.pop('std_devs',[0.02,0.02])
         self.prepare_for_mixer_calibration(suppress='drive LO')
         cal_elts.mixer_calibration_sequence(
             trigger_sep, 0, RO_pars=self.get_RO_pars(),
             pulse_I_channel=self.pulse_I_channel(),
             pulse_Q_channel=self.pulse_Q_channel())
         detector = self.int_avg_det_spec
-        meas_grid = [x0[0]+np.random.normal(0.0,0.02,100),
-                     x0[1]+np.random.normal(0.0,0.02,100)]
+        meas_grid = [x0[0]+np.random.normal(0.0,std_devs[0],n_meas),
+                     x0[1]+np.random.normal(0.0,std_devs[1],n_meas)]
         meas_grid = list(map(list, zip(*meas_grid)))
         ad_func_pars = {'adaptive_function': opti.neural_network_opt,
                         'training_grid': meas_grid,
@@ -1540,15 +1542,30 @@ class QuDev_transmon(Qubit):
         self.AWG.start()
         MC.run(name='drive_carrier_calibration' + self.msmt_suffix,
                mode='adaptive')
-        a = ma.OptimizationAnalysis(label='drive_carrier_calibration')
-        # v2 creates a pretty picture of the optimizations
-        ma.OptimizationAnalysis_v2(label='drive_carrier_calibration')
+        if not two_rounds:
+            a = ma.OptimizationAnalysisNN(label='drive_carrier_calibration')
+            # v2 creates a pretty picture of the optimizations
+            #ma.OptimizationAnalysis_v2(label='drive_carrier_calibration')
 
         ch_1_min = a.optimization_result[0][0]
         ch_2_min = a.optimization_result[0][1]
-        if update:
+        if update and not two_rounds:
             self.pulse_I_offset(ch_1_min)
             self.pulse_Q_offset(ch_2_min)
+
+        if two_rounds:
+            meas_grid = np.array([np.random.normal(ch_1_min,
+                                                   0.3*std_devs[0],
+                                                   n_meas),
+                                  np.random.normal(ch_2_min,
+                                                   0.3*std_devs[1],
+                                                   n_meas)])
+            self.calibrate_drive_mixer_skewness_NN(MC=MC, update=update,
+                                                   meas_grid=meas_grid,
+                                                   n_meas=n_meas,
+                                                   trigger_sep=trigger_sep,
+                                                   two_rounds = False,**kwargs)
+
         return ch_1_min, ch_2_min
 
     def calibrate_drive_mixer_carrier(self, MC=None, update=True, x0=(0., 0.),
@@ -1651,10 +1668,10 @@ class QuDev_transmon(Qubit):
         ma.MeasurementAnalysis(plot_args=dict(log=True, marker=''))
 
     def calibrate_drive_mixer_skewness_NN(self, MC=None, update=True,
-                                           amplitude=0.1, trigger_sep=5e-6,
-                                           initial_stepsize=None):
-        if initial_stepsize is None:
-            initial_stepsize = [0.15, 10]
+                                          meas_grid=None,n_meas=100,
+                                          amplitude=0.1,trigger_sep=5e-6,
+                                          two_rounds=False,
+                                          **kwargs):
         if MC is None:
             MC = self.MC
         self.prepare_for_mixer_calibration(suppress='drive sideband')
@@ -1668,42 +1685,93 @@ class QuDev_transmon(Qubit):
         #     verbose=False)
 
         #Could make sample size variable (maxiter) for better adapting)
-        meas_grid = [np.random.normal(self.alpha(),0.5,100),
-                     np.random.normal(self.phi_skew(),15,100)]
-        meas_grid = list(map(list, zip(*meas_grid)))
-        detector = det.UHFQC_mixer_calibration_det(
-            self.UHFQC, qc.station, [self.RO_acq_weight_function_I(),
-                                     self.RO_acq_weight_function_Q()],
-            self.pulse_I_channel(), self.pulse_Q_channel(),
-            self.alpha, self.phi_skew, self.f_pulse_mod(),
-            self.RO_acq_marker_channel(),
-            self.get_RO_pars(),
-            amplitude=amplitude, nr_averages=self.RO_acq_averages(),
-            RO_trigger_separation=trigger_sep, verbose=False,
-            data_points= len(meas_grid[0]))
+        std_devs = kwargs.pop('std_devs',[0.5,15])
+        if isinstance(std_devs,list) or isinstance(std_devs,np.ndarray):
+            if(len(std_devs) != 2 ):
+                logging.error('std_devs passed in kwargs of "calibrate_drive_'
+                              'mixer_skewness_NN is of length: ',len(std_devs),
+                              '. Requires length 2 instead.')
+        else:
+            logging.error('standard deviation argument "std_devs" in < calibrate_'
+                          'drive_mixer_skewness_NN has to be a list or array of '
+                          'the form [std_alpha,std_phi] got ',std_devs,' instead!')
+        if meas_grid is None:
+            meas_grid = np.array([np.random.normal(self.alpha(),std_devs[0],n_meas),
+                         np.random.normal(self.phi_skew(),std_devs[1],n_meas)])
+        elif meas_grid.ndim !=2:
+            logging.error('The function argument meas_grid is not 2D. Tuples of '
+                          '[alpha,phi] values for skewness calibration.')
+
+        # detector = det.UHFQC_mixer_calibration_det(
+        #     self.UHFQC, qc.station, [self.RO_acq_weight_function_I(),
+        #                              self.RO_acq_weight_function_Q()],
+        #     self.pulse_I_channel(), self.pulse_Q_channel(),
+        #     self.alpha, self.phi_skew, self.f_pulse_mod(),
+        #     self.RO_acq_marker_channel(),
+        #     self.get_RO_pars(),
+        #     amplitude=amplitude, nr_averages=self.RO_acq_averages(),
+        #     RO_trigger_separation=trigger_sep, verbose=False,
+        #     data_points = len(meas_grid))
+        s1 =  awg_swf.mixer_calibration_swf(
+                                 pulseIch=self.pulse_I_channel(),
+                                 pulseQch=self.pulse_Q_channel(),
+                                 alpha=meas_grid[0],
+                                 phi_skew=meas_grid[1],
+                                 f_mod=self.f_pulse_mod(),
+                                 RO_trigger_channel=None,
+                                 RO_pars=self.get_RO_pars(),
+                                 amplitude=amplitude,
+                                 RO_trigger_separation=trigger_sep,
+                                 verbose=False,
+                                 data_points=n_meas,
+                                 upload=True)
+        s2 = awg_swf.arbitrary_variable_swf()
+        #IDEA: h5d file does not contain meas_grid. Only possible to add by using
+        #two sweep functions. The second one here is just a dummy.
+        MC.set_sweep_functions([s1,s2])             ###NOT TESTED
+        MC.set_sweep_points(meas_grid.T)            ###NOT TESTED
+        # MC.set_detector_function(det.IndexDetector(detector, 0))
+        MC.set_detector_function(self.int_avg_det)
         ad_func_pars = {'adaptive_function': opti.neural_network_opt,
                         'training_grid': meas_grid,
                         'hidden_layer_sizes': [(h, h) for h in range(35,50,5)],
                         'alphas': np.logspace(-6,-4,3).tolist(),
                         'minimize': True,
-                        'estimator': 'MLP_Regressor_scikit'
+                        'estimator': 'MLP_Regressor_scikit',
+                        'iterations': 600,
+                        'beta': 1e-2
                         #Probably some additional params for the NN go here
                         }
-        MC.set_sweep_functions([self.alpha, self.phi_skew])
-        MC.set_detector_function(det.IndexDetector(detector, 0))
-        MC.set_adaptive_function_parameters(ad_func_pars)
-        MC.run(name='drive_skewness_calibration' + self.msmt_suffix,
-               mode='adaptive')
-        a = ma.OptimizationAnalysis(label='drive_skewness_calibration')
+        # MC.set_adaptive_function_parameters(ad_func_pars)
+        MC.run(name='drive_skewness_calibration' + self.msmt_suffix)
+
+        if not two_rounds:
+            a = ma.OptimizationAnalysisNN(label='drive_skewness_calibration',
+                                          ad_func_pars=ad_func_pars,
+                                          meas_grid=meas_grid)
         # v2 creates a pretty picture of the optimizations
-        ma.OptimizationAnalysis_v2(label='drive_skewness_calibration')
+        # ma.OptimizationAnalysis_v2(label='drive_skewness_calibration')
 
         # phi and alpha are the coefficients that go in the predistortion matrix
-        alpha = a.optimization_result[0][0]
-        phi = a.optimization_result[0][1]
-        if update:
+        alpha = a.optimization_result[0]
+        phi = a.optimization_result[1]
+        if update and not two_rounds:
             self.alpha(alpha)
             self.phi_skew(phi)
+        if two_rounds:
+            meas_grid = np.array([np.random.normal(alpha,
+                                                   0.3*std_devs[0],
+                                                   n_meas),
+                                  np.random.normal(phi,
+                                                   0.3*std_devs[1],
+                                                   n_meas)])
+            self.calibrate_drive_mixer_skewness_NN(MC=MC, update=update,
+                                                   meas_grid=meas_grid,
+                                                   n_meas=n_meas,
+                                                   amplitude=amplitude,
+                                                   trigger_sep=trigger_sep,
+                                                   two_rounds = False,**kwargs)
+
         return alpha, phi
 
 

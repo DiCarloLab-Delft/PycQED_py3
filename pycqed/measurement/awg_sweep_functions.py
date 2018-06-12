@@ -2,6 +2,7 @@ import numpy as np
 import logging
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
+from pycqed.measurement.waveform_control import sequence
 from pycqed.measurement.pulse_sequences import standard_sequences as st_seqs
 from pycqed.measurement.pulse_sequences import single_qubit_tek_seq_elts as sqs
 from pycqed.measurement.pulse_sequences import single_qubit_2nd_exc_seqs as sqs2
@@ -73,6 +74,67 @@ class awg_seq_swf(swf.Hard_Sweep):
         # exists for compatibility reasons with 2D sweeps
         pass
 
+
+class mixer_calibration_swf(swf.Hard_Sweep):
+    """
+    Based on the "UHFQC_integrated_average" detector.
+    generates an AWG seq to measure sideband transmission.
+    """
+
+    def __init__(self, pulseIch, pulseQch, alpha, phi_skew,
+                 f_mod, RO_trigger_channel, RO_pars,
+                 amplitude=0.1, RO_trigger_separation=5e-6,
+                 verbose=False,  data_points=1, upload=True):
+        super().__init__()
+        self.pulseIch = pulseIch
+        self.pulseQch = pulseQch
+        self.alpha = alpha
+        self.phi_skew = phi_skew
+        self.f_mod = f_mod
+        self.amplitude = amplitude
+        self.verbose = verbose
+        self.RO_trigger_separation = RO_trigger_separation
+        self.RO_trigger_channel = RO_trigger_channel
+        self.RO_pars = RO_pars
+        self.data_points = data_points
+        self.n_measured = 0
+        self.seq = None
+        self.elts = []
+        self.finished = False
+        self.upload = upload
+
+    def prepare(self):
+        if self.upload:
+            sqs.mixer_cal_sqs(pulseIch=self.pulseIch,
+                              pulseQch=self.pulseQch,
+                              alpha=self.alpha,
+                              phi_skew=self.phi_skew,
+                              f_mod=self.f_mod,
+                              RO_trigger_channel=self.RO_trigger_channel,
+                              RO_pars=self.RO_pars,
+                              amplitude=self.amplitude,
+                              RO_trigger_separation=self.RO_trigger_separation,
+                              data_points=self.data_points)
+class arbitrary_variable_swf(swf.Hard_Sweep):
+
+    def __init__(self,control=None,parameter = None):
+
+        super().__init__()
+        if control is not None:
+            if not hasattr(control,'children'):
+                control.children = [self]
+            if not hasattr(control,'prepared'):
+                control.prepared = [False]
+        self.control_swf = control
+
+    def set_parameter(self,value):
+        pass
+
+    def prepare(self):
+        if self.control_swf is not None:
+            #here there has to be a name map in the control swf in order to find
+            #the correct swf. in control_swf and set it's prepared value to True.
+          pass
 
 class Rabi(swf.Hard_Sweep):
 

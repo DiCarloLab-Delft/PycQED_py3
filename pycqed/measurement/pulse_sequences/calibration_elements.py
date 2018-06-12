@@ -121,42 +121,6 @@ def mixer_calibration_sequence(trigger_separation, amplitude, trigger_channel=No
     return seq, [el]
 
 
-def mixer_calibration_sequence_NN(trigger_separation, amplitude, trigger_channel,
-                                  pulse_I_channel=None, pulse_Q_channel=None,
-                                  f_pulse_mod=0, phi_skew=[0], alpha=[1], upload=True):
-
-
-    if not isinstance(phi_skew,list):
-        phi_skew = [phi_skew]
-    if not isinstance(alpha,list):
-        alpha = [alpha]
-    if not len(alpha) == len(phi_skew):
-        raise ValueError('pulse properties have to be of equal size. Received: ',
-                         'len(phi): ',len(phi_skew),'. len(alpha): ',len(alpha))
-    seq = []
-    el = []
-    channels = [trigger_channel]
-    channels += station.sequencer_config['slave_AWG_trig_channels']
-
-    if pulse_I_channel is not None:
-        channels.append(pulse_I_channel)
-    if pulse_Q_channel is not None:
-        channels.append(pulse_Q_channel)
-
-    for it in range(len(alpha)):
-        new_seq, new_el = mixer_calibration_sequence(trigger_separation, amplitude,
-                                              trigger_channel,
-                                              pulse_I_channel=pulse_I_channel,
-                                              pulse_Q_channel=pulse_Q_channel,
-                                              f_pulse_mod=f_pulse_mod,
-                                              phi_skew=phi_skew[it],
-                                              alpha=alpha[it],
-                                              upload=False)
-        seq.append(new_seq)
-        el += new_el
-    if upload:
-        station.pulsar.program_awgs(seq, el, channels=channels)
-    return seq,el
 
 
 
