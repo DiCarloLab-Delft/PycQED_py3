@@ -200,27 +200,14 @@ class DeviceCCL(Instrument):
         self._prep_ro_instantiate_detectors()
 
     def prepare_fluxing(self):
-        # prepares by loading the awg_hack_program
         q0 = self.qubits()[0]
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
-        # fl_lutman.load_waveforms_onto_awg_lookuptable()
         fl_lutman.load_waveforms_onto_AWG_lookuptable()
         awg = fl_lutman.AWG.get_instr()
         if awg.__class__.__name__ == 'QuTech_AWG_Module':
             using_QWG = True
         else:
             using_QWG = False
-        if not using_QWG:
-            # awg.upload_codeword_program(awgs=[0])
-            awg_hack_program_cz = """
-          while (1) {
-            waitDIOTrigger();
-            playWave("dev8005_wave_ch1_cw001", "dev8005_wave_ch2_cw001");
-          }
-          """
-            awg.configure_awg_from_string(0, awg_hack_program_cz)
-            awg.configure_codeword_protocol()
-
         awg.start()
 
     def _prep_ro_setup_qubits(self):
