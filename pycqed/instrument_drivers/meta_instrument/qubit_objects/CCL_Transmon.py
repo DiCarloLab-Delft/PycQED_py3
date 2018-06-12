@@ -1709,6 +1709,35 @@ class CCLight_Transmon(Qubit):
             return a
         else:
             return [np.array(t, dtype=np.float64) for t in transients]
+    
+    def measure_dispersive_shift_pulsed(self, freqs, MC=None, analyze: bool=True,
+                                        prepare: bool=True):
+        # docstring from parent class
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        self.prepare_for_timedomain()
+        # off/on switching is achieved by turning the MW source on and
+        # off as this is much faster than recompiling/uploading
+        for i, pulse_comb in enumerate(['off', 'on']):
+            p = sqo.off_on(
+                qubit_idx=self.cfg_qubit_nr(), pulse_comb=pulse_comb,
+                initialize=False,
+                platf_cfg=self.cfg_openql_platform_fn())
+            self.instr_CC.get_instr().eqasm_program(p.filename)
+            # CCL gets started in the int_avg detector
+
+            MC.set_sweep_function(swf.Heterodyne_Frequency_Sweep_simple(
+                MW_LO_source=self.instr_LO_ro.get_instr(),
+                IF=self.ro_freq_mod()))
+            MC.set_sweep_points(freqs)
+
+            self.int_avg_det_single._set_real_imag(False)
+            MC.set_detector_function(self.int_avg_det_single)
+            MC.run(name='Resonator_scan_'+pulse_comb+self.msmt_suffix)
+            if analyze:
+                ma.MeasurementAnalysis()
+
 
     def calibrate_optimal_weights(self, MC=None, verify: bool=True,
                                   analyze: bool=True, update: bool=True,
