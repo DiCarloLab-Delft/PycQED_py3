@@ -1,7 +1,7 @@
 import logging
 import numpy as np
 import matplotlib.pyplot as plt
-
+from copy import deepcopy
 import qcodes as qc
 
 from qcodes.instrument.parameter import ManualParameter
@@ -1510,10 +1510,16 @@ class QuDev_transmon(Qubit):
 
     def calibrate_drive_mixer_carrier_NN(self, MC=None, update=True, x0=(0., 0.),
                                          initial_stepsize=0.01, trigger_sep=5e-6,
+                                         estimator='DNN_Regressor_tf',
                                          n_meas=100,two_rounds=False,**kwargs):
         if MC is None:
             MC = self.MC
-        std_devs = kwargs.pop('std_devs',[0.02,0.02])
+        std_devs = kwargs.pop('std_devs',[0.25,0.25])
+        estimator_name = kwargs.pop('estimator','MLP_Regressor_scikit')
+        alpha = kwargs.pop('alpha',1e-3)
+        beta = kwargs.pop('beta',0.)
+        gamma = kwargs.pop('gamma',1.)
+        iters = kwargs.pop('iters',5000)
         self.prepare_for_mixer_calibration(suppress='drive LO')
         cal_elts.mixer_calibration_sequence(
             trigger_sep, 0, RO_pars=self.get_RO_pars(),
@@ -1522,13 +1528,18 @@ class QuDev_transmon(Qubit):
         detector = self.int_avg_det_spec
         meas_grid = [x0[0]+np.random.normal(0.0,std_devs[0],n_meas),
                      x0[1]+np.random.normal(0.0,std_devs[1],n_meas)]
-        meas_grid = list(map(list, zip(*meas_grid)))
+        # meas_grid = list(map(list, zip(*meas_grid)))
+        meas_grid = np.array(meas_grid)
+        meas_grid_cp = deepcopy(meas_grid)
         ad_func_pars = {'adaptive_function': opti.neural_network_opt,
                         'training_grid': meas_grid,
-                        'hidden_layer_sizes': [(h, h) for h in range(30,50,5)],
-                        'alphas': np.logspace(-6,-4,5).tolist(),
+                        'hidden_layer_sizes': [40,40],
+                        'iters':iters,
+                        'alpha': alpha,
                         'minimize': True,
-                        'estimator': 'MLP_Regressor_scikit'
+                        'estimator': estimator_name,
+                        'beta': beta,
+                        'gamma': gamma
                         #Probably some additional params for the NN go here
                         }
 
@@ -1543,12 +1554,14 @@ class QuDev_transmon(Qubit):
         MC.run(name='drive_carrier_calibration' + self.msmt_suffix,
                mode='adaptive')
         if not two_rounds:
-            a = ma.OptimizationAnalysisNN(label='drive_carrier_calibration')
+            a = ma.OptimizationAnalysisNN(label='drive_carrier_calibration',
+                                          meas_grid=meas_grid_cp,
+                                          ad_func_pars=ad_func_pars)
             # v2 creates a pretty picture of the optimizations
             #ma.OptimizationAnalysis_v2(label='drive_carrier_calibration')
 
-        ch_1_min = a.optimization_result[0][0]
-        ch_2_min = a.optimization_result[0][1]
+        ch_1_min = a.optimization_result[0]
+        ch_2_min = a.optimization_result[1]
         if update and not two_rounds:
             self.pulse_I_offset(ch_1_min)
             self.pulse_Q_offset(ch_2_min)
@@ -1560,7 +1573,7 @@ class QuDev_transmon(Qubit):
                                   np.random.normal(ch_2_min,
                                                    0.3*std_devs[1],
                                                    n_meas)])
-            self.calibrate_drive_mixer_skewness_NN(MC=MC, update=update,
+            self.calibrate_drive_mixer_carrier_NN(MC=MC, update=update,
                                                    meas_grid=meas_grid,
                                                    n_meas=n_meas,
                                                    trigger_sep=trigger_sep,
@@ -1671,9 +1684,15 @@ class QuDev_transmon(Qubit):
                                           meas_grid=None,n_meas=100,
                                           amplitude=0.1,trigger_sep=5e-6,
                                           two_rounds=False,
+                                          estimator='DNN_Regressor_tf',
                                           **kwargs):
         if MC is None:
             MC = self.MC
+        alpha = kwargs.pop('alpha',1e-2)
+        beta = kwargs.pop('beta',0.)
+        gamma = kwargs.pop('gamma',1.)
+        std_devs = kwargs.pop('std_devs',[0.1,10])
+        iters = kwargs.pop('iters',5000)
         self.prepare_for_mixer_calibration(suppress='drive sideband')
         # detector = det.UHFQC_readout_mixer_skewness_det(
         #     self.UHFQC, qc.station, [self.RO_acq_weight_function_I(),
@@ -1685,7 +1704,6 @@ class QuDev_transmon(Qubit):
         #     verbose=False)
 
         #Could make sample size variable (maxiter) for better adapting)
-        std_devs = kwargs.pop('std_devs',[0.5,15])
         if isinstance(std_devs,list) or isinstance(std_devs,np.ndarray):
             if(len(std_devs) != 2 ):
                 logging.error('std_devs passed in kwargs of "calibrate_drive_'
@@ -1734,12 +1752,14 @@ class QuDev_transmon(Qubit):
         MC.set_detector_function(self.int_avg_det)
         ad_func_pars = {'adaptive_function': opti.neural_network_opt,
                         'training_grid': meas_grid,
-                        'hidden_layer_sizes': [(h, h) for h in range(35,50,5)],
-                        'alphas': np.logspace(-6,-4,3).tolist(),
+                        'hidden_layer_sizes': [40,40],
+                        'iters':5000,
+                        'alphas': alpha,
                         'minimize': True,
-                        'estimator': 'MLP_Regressor_scikit',
-                        'iterations': 600,
-                        'beta': 1e-2
+                        'estimator': 'DNN_Regressor_tf',
+                        'iters': iters,
+                        'beta': beta,
+                        'gamma': gamma
                         #Probably some additional params for the NN go here
                         }
         # MC.set_adaptive_function_parameters(ad_func_pars)

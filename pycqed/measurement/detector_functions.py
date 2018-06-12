@@ -1644,7 +1644,7 @@ class UHFQC_integrated_average_detector(Hard_Detector):
         if self.AWG is not None:
             self.AWG.start()
 
-        print(self.nr_sweep_points)
+        # print(self.nr_sweep_points)
 
         data_raw = self.UHFQC.acquisition_poll(
             samples=self.nr_sweep_points, arm=False, acquisition_time=0.01)

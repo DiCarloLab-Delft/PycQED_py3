@@ -84,7 +84,7 @@ class MLP_Regressor_scikit(Estimator):
     def __init__(self,hidden_layers=[10],output_dim=1,n_feature=1, alpha = 0.5,
                  activation = ['relu'],pre_proc_dict=None):
 
-        super.__init__(name='MLP_Regressor_scikit',pre_proc_dict=pre_proc_dict,
+        super().__init__(name='MLP_Regressor_scikit',pre_proc_dict=pre_proc_dict,
                        type='Regressor')
         self._hidden_layers = hidden_layers
         self.output_dim = output_dim
@@ -131,11 +131,11 @@ class DNN_Regressor_tf(Estimator):
          R_acc = 1-sum((y-y_pred)**2)/sum((y-mean(y))**2)
         -optimizer: tf.GradientDescentOptimizer
     '''
-    def __init__(self, hidden_layers=[10],output_dim=1, alpha = 0.5,
+    def __init__(self, hidden_layers=[10], output_dim=1, alpha = 0.5,
                  beta=1., n_feature = 1, iters = 200, pre_proc_dict = None):
 
-        super.__init__(name='DNN_Regressor_tf',pre_proc_dict=pre_proc_dict,
-                       type='Regressor')
+        super().__init__(name='DNN_Regressor_tf',pre_proc_dict=pre_proc_dict,
+                         type='Regressor')
         self._n_feature = n_feature
         self._hidden_layers = hidden_layers
         self._output_dim = output_dim
@@ -145,7 +145,7 @@ class DNN_Regressor_tf(Estimator):
         self.iters = iters
         self.learning_acc = []
 
-    def get_stddev(self,inp_dim, out_dim):
+    def get_stddev(self, inp_dim, out_dim):
         std = 1.3 / math.sqrt(float(inp_dim) + float(out_dim))
         return std
 
@@ -189,18 +189,21 @@ class DNN_Regressor_tf(Estimator):
         if x_train is not None:
             logging.warning('< DNN_Regressor_tf > has already been trained!'
                             're-training estimator on new input data!')
-        x_train,y_train, \
+        # x_train,y_train, \
         x = tf.placeholder(tf.float32, [None, self._n_feature])
         y = tf.placeholder(tf.float32, [None, self._output_dim])
-        logits ,reg_terms = self.network(x)
-        loss = self.loss(logits,y) + reg_terms
+        logits, reg_terms = self.network(x)
+
+        loss = self.loss(logits, y) + tf.reduce_sum(reg_terms)
+        print(loss)
+        print(self.alpha)
         train_op = tf.train.GradientDescentOptimizer(self.alpha).minimize(loss)
 
         self._x = x
         self._y = y
         self._logits = logits
 
-        accuracy = self.evaluate(logits,y)  #used for learning curve creation
+        accuracy = self.evaluate_np(logits,y)  #used for learning curve creation
 
         init = tf.initialize_all_variables()
         self._session.run(init)
@@ -211,17 +214,28 @@ class DNN_Regressor_tf(Estimator):
         # plt.xlabel('learning epoch')
         # plt.ylabel('loss')
         for i in range(self.iters):
-            self._session.run(train_op,feed_dict={x:x_train, y: y_train})
-            _acc = self._session.run(accuracy, feed_dict={self._x: x_train, self._y: y_train})
-            self.learning_acc.append(_acc)
+            self._session.run(train_op,feed_dict={x: x_train, y: y_train})
+            _acc = self._session.run(accuracy, feed_dict={x: x_train, y: y_train})
+            self.learning_acc.append([i, _acc])
         self.score = self.learning_acc[-1]
         # plt.plot(range(self.iters),learning_progress,'go')
         # plt.show()
 
-    def evaluate(self,logits_test,y_test):
+    def loss(self, logits_test, y_test):
+        _tmp = tf.square(y_test-logits_test)
+        _loss = tf.reduce_sum(_tmp) / tf.reduce_sum(tf.square(y_test-tf.reduce_mean(y_test)))
+        return _loss
+
+    def evaluate_np(self,logits_test,y_test):
         _accuracy = 1 - \
                     tf.reduce_sum(tf.square(y_test-logits_test)) \
                     /tf.reduce_sum(tf.square(y_test-tf.reduce_mean(y_test)))
+        return _accuracy
+
+    def evaluate(self,logits_test=np.array([]),y_test=np.array([])):
+        _accuracy = 1 - \
+            np.linalg.norm((y_test-logits_test)**2) \
+            /np.linalg.norm((y_test-np.linalg.norm(y_test)**2))
         return _accuracy
 
 

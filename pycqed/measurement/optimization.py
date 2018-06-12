@@ -256,9 +256,9 @@ def center_and_scale(X,y):
         :output_feature_ext: abs(max-min) of initial validation data parameters
     '''
     input_feature_means = np.zeros(np.size(X,1))       #saving means of training
-    output_feature_means = np.zeros(len(np.shape(y)))     #and target features
+    output_feature_means = np.zeros(np.size(y,1))     #and target features
     input_feature_ext= np.zeros(np.size(X,1))
-    output_feature_ext = np.zeros(len(np.shape(y)))
+    output_feature_ext = np.zeros(np.size(y,1))
     if len(np.shape(X))==1:
         input_feature_means= [np.mean(X)]
         input_feature_ext = [np.max(X) \
@@ -273,7 +273,7 @@ def center_and_scale(X,y):
                                     -np.min(X[:,it])
             X[:,it] -= input_feature_means[it]  #offset to mean 0
             X[:,it] /= input_feature_ext[it]    #rescale to [-1,1]
-    if len(np.shape(y))==1:
+    if np.size(y,1) == 1:
         output_feature_means= [np.mean(y)]
         output_feature_ext = [np.max(y) \
                               -np.min(y)]
@@ -291,11 +291,13 @@ def center_and_scale(X,y):
            output_feature_means,output_feature_ext
 
 
-def neural_network_opt(training_grid, target_values ,hidden_layer_sizes = [(5,)],
-                       alphas= 0.0001, solver='lbfgs',estimator='MLPRegressor',
-                       iters = 200, beta=1.,gamma=1.,test_size=0.1):
+def neural_network_opt(fun, training_grid, target_values = None,
+                       hidden_layer_sizes=[10, 10],
+                       alpha= 0.0001, solver='lbfgs',estimator='DNN_Regressor_tf',
+                       iters = 200, beta=0.9 , gamma=1., test_size=0.1):
     """
     parameters:
+        fun:           Function that can be used to get data points
         training_grid: The values on which to train the Neural Network. It
                        contains features as column vectors of length as the
                        number of datapoints in the training set.
@@ -328,15 +330,28 @@ def neural_network_opt(training_grid, target_values ,hidden_layer_sizes = [(5,)]
     if not isinstance(hidden_layer_sizes,list):
         hidden_layer_sizes = [hidden_layer_sizes]
 
-    if not isinstance(alphas,list):
-        alphas = [alphas]
+    # if not isinstance(alphas,list):
+    #     alphas = [alphas]
     #transform input into array
     training_grid = np.transpose(training_grid)
-    target_values = np.transpose(target_values)
     #get input dimension, training grid contains parameters as row!! vectors
     n_samples = np.size(training_grid,0)
     n_features = np.size(training_grid,1)
-    output_dim = target_values.ndim
+
+    if fun is None:
+        target_values = np.transpose(np.array([target_values]))
+        print(np.size(target_values))
+        output_dim = np.size(target_values,1)
+        print(output_dim)
+
+    else:
+        target_values = []
+        for i in range(n_samples):
+            target_values.append(fun(training_grid[i]))
+        target_values = np.array(target_values)
+        output_dim = np.size(target_values,1)
+        print(output_dim)
+
 
     #Preprocessing of Data. Mainly transform the data to mean 0 and interval [-1,1]
     training_grid,target_values,\
@@ -360,17 +375,17 @@ def neural_network_opt(training_grid, target_values ,hidden_layer_sizes = [(5,)]
         est = ml.MLP_Regressor_scikit(hidden_layers=hidden_layer_sizes,
                                    output_dim=output_dim,
                                    n_feature=n_samples,
-                                   alpha=alphas,
+                                   alpha=[alpha],
                                    pre_proc_dict=pre_processing_dict)
-        est.fit(training_grid, target_values)
+        est.fit(training_grid, np.ravel(target_values))
         est.print_best_params()
         return est
 
     def dnnr():
         est = ml.DNN_Regressor_tf(hidden_layers=hidden_layer_sizes,
                                output_dim=output_dim,
-                               n_feature=n_samples,
-                               alpha=alphas,
+                               n_feature=n_features,
+                               alpha=alpha,
                                iters = iters,
                                beta = beta,
                                pre_proc_dict=pre_processing_dict)
@@ -398,12 +413,12 @@ def neural_network_opt(training_grid, target_values ,hidden_layer_sizes = [(5,)]
     res = fmin(estimator_wrapper, x_ini, full_output=True)
     result = res[0]
     #Rescale values
-    amp = res[1] * output_feature_ext + output_feature_means
+    amp = res[1] * output_feature_ext[0] + output_feature_means[0]
     result[0] = result[0]*input_feature_ext[0]+input_feature_means[0]
     result[1] = result[1]*input_feature_ext[1]+input_feature_means[1]
     print('minimization results: ',result,'::',amp)
 
-    return np.array(result),est,[test_grid,test_values]
+    return np.array(result), est, [test_grid,test_values]
     # return [np.array(result), np.array(amp,dtype='float32')]
     #mght want to adapt alpha,ect.i
 

@@ -139,12 +139,12 @@ def mixer_cal_sqs(pulseIch,
     elts = []
     verbose = False
 
-    channels_ = ['AWG1_ch3_m2', 'AWG1_ch2_m2', 'AWG1_ch1_m1',
-                     'AWG1_ch1_m2', 'AWG1_ch2_m1', 'AWG1_ch3', 'AWG1_ch4']
-    channels =[RO_pars['acq_marker_channel'],
-               station.sequencer_config['slave_AWG_trig_channels'],
-               pulseIch,pulseQch]
-    print('Channels correct?: ',channels==channels_)
+    # channels_ = ['AWG1_ch3_m2', 'AWG1_ch2_m2', 'AWG1_ch1_m1',
+    #                  'AWG1_ch1_m2', 'AWG1_ch2_m1', 'AWG1_ch3', 'AWG1_ch4']
+    channels = [RO_pars['acq_marker_channel'],
+                RO_pars['RO_pulse_marker_channel'],
+                *station.sequencer_config['slave_AWG_trig_channels'],
+                pulseIch, pulseQch]
     for n in range(data_points):
         #if here the pulseIch and pulseQch values could be set in each iteration,
         #it would be easy to optimize the complete set of data values.
