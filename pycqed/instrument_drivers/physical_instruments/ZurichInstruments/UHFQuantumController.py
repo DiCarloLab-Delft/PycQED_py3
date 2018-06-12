@@ -900,6 +900,8 @@ class UHFQC(Instrument):
 
         wave_I_string = self.array_to_combined_vector_string(Iwave, "Iwave")
         wave_Q_string = self.array_to_combined_vector_string(Qwave, "Qwave")
+        #removed from below
+        #\twait(4000);
         preamble = """
 const TRIGGER1  = 0x000001;
 const WINT_TRIG = 0x000010;
@@ -914,25 +916,17 @@ if(getUserReg(1)){
 }else{
   RO_TRIG=WINT_TRIG;
 }\n"""
-        if dig_trigger:
-            loop_start = """
+        loop_start = """
 repeat(loop_cnt) {
 """ + ("\twaitDigTrigger(1, 1);" if trigger else "") + """
 \tplayWave(Iwave, Qwave);\n"""
-        else:
-            loop_start = """
-repeat(loop_cnt) {
-\tplayWave(Iwave, Qwave);\n"""
-
         end_string = """
 \tsetTrigger(WINT_EN + RO_TRIG);
 \tsetTrigger(WINT_EN);
 \twaitWave();
-\twait(4000);
 }
 wait(300);
 setTrigger(0);"""
-
         string = preamble+wave_I_string+wave_Q_string + \
             loop_start+end_string
         self.awg_string(string)

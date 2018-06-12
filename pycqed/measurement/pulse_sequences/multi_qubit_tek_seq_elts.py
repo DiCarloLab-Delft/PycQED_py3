@@ -965,7 +965,7 @@ def n_qubit_off_on(pulse_pars_list, RO_pars, return_seq=False, verbose=False,
     el_list = []
 
     # Create a dict with the parameters for all the pulses
-    pulse_dict = {'RO': RO_pars, 'RO presel': RO_pars.copy()}
+    pulse_dict = {'RO': RO_pars, 'RO presel': deepcopy(RO_pars)}
     pulse_dict['RO presel']['refpoint'] = 'start'
     pulse_dict['RO presel']['pulse_delay'] = -RO_spacing
     for i, pulse_pars in enumerate(pulse_pars_list):
@@ -986,21 +986,34 @@ def n_qubit_off_on(pulse_pars_list, RO_pars, return_seq=False, verbose=False,
                     'pulse_delay': 0}
     pulse_dict.update({'spacer': spacerpulse})
 
+    spacerpulse_front = {'pulse_type': 'SquarePulse',
+                         'channel': RO_pars['acq_marker_channel'],
+                         'amplitude': 0.0,
+                         'length': RO_spacing,
+                         'refpoint': 'start',
+                         'pulse_delay': -RO_spacing}
+    pulse_dict.update({'spacer_front': spacerpulse_front})
+
     # Create a list of required pulses
     pulse_combinations = []
+
     for pulse_list in itertools.product(*(n*[['I', 'X180']])):
         pulse_comb = (n+1)*['']
         for i, pulse in enumerate(pulse_list):
             pulse_comb[i] = pulse + ' {}'.format(i)
         pulse_comb[-1] = 'RO'
         if preselection:
-            pulse_comb = pulse_comb + ['RO presel', 'spacer']
+            pulse_comb = pulse_comb + ['RO presel', 'spacer', 'spacer_front']
         pulse_combinations.append(pulse_comb)
-
+    print('reloaded')
     for i, pulse_comb in enumerate(pulse_combinations):
         pulses = []
         for j, p in enumerate(pulse_comb):
             pulses += [pulse_dict[p]]
+        # if preselection:
+        #     pulses[0] = deepcopy(pulses[0])
+        #     pulses[0]['pulse_delay'] += 600e-9
+
         el = multi_pulse_elt(i, station, pulses)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)

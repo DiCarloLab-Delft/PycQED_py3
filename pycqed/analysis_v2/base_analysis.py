@@ -1523,7 +1523,7 @@ def _merge_dict_rec(dict_a: dict, dict_b: dict):
         if k not in dict_a:
             dict_a[k] = dict_b[k]
     return dict_a
-        pfunc(**pdict['plot_kws'])
+
 
 def str_to_float(s):
     if s[-1] == '%':

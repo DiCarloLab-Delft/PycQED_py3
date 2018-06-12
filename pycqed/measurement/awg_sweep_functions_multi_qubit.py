@@ -148,7 +148,7 @@ class n_qubit_off_on(swf.Hard_Sweep):
         samples = 2**len(pulse_pars_list)
         if preselection:
             samples *= 2
-        self.sweep_points = np.arange(samples)
+        # self.sweep_points = np.arange(samples)
         self.verbose = verbose
         self.preselection = preselection
         self.parallel_pulses = parallel_pulses
@@ -233,7 +233,7 @@ class two_qubit_Simultaneous_RB_fixed_length(swf.Hard_Sweep):
         self.CZ_info_dict = CZ_info_dict
         self.interleave_CZ = interleave_CZ
         self.spacing = spacing
-        self.cal_points=cal_points
+        self.cal_points = cal_points
 
         self.parameter_name = 'Nr of Seeds'
         self.unit = '#'

@@ -736,7 +736,7 @@ class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
           plot_dicts as in the cross_dephasing_analysis.
     """
 
-def __init__(self, t_start: str=None, t_stop: str=None,
+    def __init__(self, t_start: str=None, t_stop: str=None,
                  label: str='',
                  data_file_path: str=None,
                  options_dict: dict=None, extract_only: bool=False,

@@ -416,6 +416,9 @@ class Element:
 
         for wf in wfs:
             amp = self.pulsar.get('{}_amp'.format(wf))
+            # #Temporarily fix to AWG8v1
+            # if 'AWG8' in wf:
+            #     amp = 1
 
             if self.pulsar.get('{}_type'.format(wf)) == 'analog':
                 wfs[wf] = wfs[wf] / amp

@@ -1,6 +1,66 @@
-[  
+[
   [
-    "system/fpgarevision",
+    "awgs/0/auxtriggers/1/state",
+    "float"
+  ],
+  [
+    "awgs/0/elf/name",
+    "vector_g"
+  ],
+  [
+    "awgs/0/sequencer/memoryusage",
+    "float"
+  ],
+  [
+    "awgs/0/elf/data",
+    "vector_gs"
+  ],
+  [
+    "awgs/0/sequencer/assembly",
+    "vector_g"
+  ],
+  [
+    "awgs/0/waveform/descriptors",
+    "vector_g"
+  ],
+  [
+    "awgs/0/sequencer/pc",
+    "float"
+  ],
+  [
+    "awgs/0/triggers/0/state",
+    "float"
+  ],
+  [
+    "awgs/0/elf/length",
+    "float"
+  ],
+  [
+    "awgs/0/sequencer/next",
+    "float"
+  ],
+  [
+    "awgs/0/waveform/memoryusage",
+    "float"
+  ],
+  [
+    "awgs/0/sweep/awgtrigs/1",
+    "float"
+  ],
+  [
+    "awgs/0/outputs/1/enables/1",
+    "float"
+  ],
+  [
+    "awgs/0/triggers/1/state",
+    "float"
+  ],
+  [
+    "awgs/0/sweep/awgtrigs/2",
+    "float"
+  ],
+  [
+    "awgs/0/outputs/0/enables/0",
     "float"
   ],
   [
@@ -8,11 +68,27 @@
     "vector_g"
   ],
   [
+    "awgs/0/ready",
+    "float"
+  ],
+  [
+    "awgs/0/dio/data",
+    "vector_g"
+  ],
+  [
+    "awgs/0/elf/memoryusage",
+    "float"
+  ],
+  [
     "awgs/0/outputs/1/enables/0",
     "float"
   ],
   [
-    "awgs/0/triggers/0/state",
+    "awgs/0/sweep/awgtrigs/0",
+    "float"
+  ],
+  [
+    "awgs/0/elf/progress",
     "float"
   ],
   [
@@ -24,91 +100,7 @@
     "float"
   ],
   [
-    "awgs/0/sequencer/pc",
-    "float"
-  ],
-  [
-    "awgs/0/elf/length",
-    "float"
-  ],
-  [
-    "awgs/0/sequencer/program",
-    "vector_g"
-  ],
-  [
-    "awgs/0/sweep/awgtrigs/2",
-    "float"
-  ],
-  [
-    "awgs/0/waveform/descriptors",
-    "vector_g"
-  ],
-  [
-    "awgs/0/sweep/awgtrigs/3",
-    "float"
-  ],
-  [
-    "awgs/0/outputs/1/enables/1",
-    "float"
-  ],
-  [
-    "awgs/0/elf/name",
-    "vector_g"
-  ],
-  [
-    "awgs/0/elf/data",
-    "vector_gs"
-  ],
-  [
-    "awgs/0/waveform/memoryusage",
-    "float"
-  ],
-  [
-    "awgs/0/sequencer/memoryusage",
-    "float"
-  ],
-  [
-    "awgs/0/sweep/awgtrigs/1",
-    "float"
-  ],
-  [
-    "awgs/0/auxtriggers/1/state",
-    "float"
-  ],
-  [
-    "awgs/0/triggers/1/state",
-    "float"
-  ],
-  [
-    "awgs/0/sequencer/status",
-    "float"
-  ],
-  [
-    "awgs/0/waveform/data",
-    "vector_gs"
-  ],
-  [
-    "awgs/0/elf/memoryusage",
-    "float"
-  ],
-  [
-    "awgs/0/dio/data",
-    "vector_g"
-  ],
-  [
     "awgs/0/auxtriggers/0/state",
-    "float"
-  ],
-  [
-    "awgs/0/sweep/awgtrigs/0",
-    "float"
-  ],
-  [
-    "awgs/0/sequencer/next",
-    "float"
-  ],
-  [
-    "awgs/0/elf/progress",
     "float"
   ],
   [
@@ -116,15 +108,19 @@
     "float"
   ],
   [
-    "sigins/0/autorange",
+    "awgs/0/waveform/data",
+    "vector_gs"
+  ],
+  [
+    "awgs/0/sequencer/status",
     "float"
   ],
   [
-    "sigins/1/autorange",
+    "awgs/0/elf/checksum",
     "float"
   ],
   [
-    "sigins/1/min",
+    "awgs/0/sweep/awgtrigs/3",
     "float"
   ],
   [
@@ -132,7 +128,15 @@
     "float"
   ],
   [
+    "sigins/0/autorange",
+    "float"
+  ],
+  [
     "sigins/1/max",
+    "float"
+  ],
+  [
+    "sigins/1/autorange",
     "float"
   ],
   [
@@ -140,11 +144,23 @@
     "float"
   ],
   [
+    "sigins/1/min",
+    "float"
+  ],
+  [
+    "sigouts/0/over",
+    "float"
+  ],
+  [
     "sigouts/1/over",
     "float"
   ],
   [
-    "quex/iavg/data/0",
+    "quex/wint/weights/0/real",
+    "vector_gs"
+  ],
+  [
+    "quex/rl/data/3",
     "vector_g"
   ],
   [
@@ -152,67 +168,11 @@
     "vector_gs"
   ],
   [
-    "quex/rl/data/2",
-    "vector_g"
-  ],
-  [
-    "quex/rl/data/0",
-    "vector_g"
-  ],
-  [
-    "quex/rl/data/1",
-    "vector_g"
-  ],
-  [
-    "quex/rl/data/2",
-    "vector_g"
-  ],
-  [
-    "quex/rl/data/3",
-    "vector_g"
-  ],
-  [
-    "quex/rl/data/4",
-    "vector_g"
-  ],
-  [
-    "quex/rl/data/5",
-    "vector_g"
-  ],
-  [
-    "quex/rl/data/6",
-    "vector_g"
-  ],
-  [
-    "quex/rl/data/7",
-    "vector_g"
-  ],
-  [
-    "quex/rl/data/8",
-    "vector_g"
-  ],
-  [
-    "quex/wint/weights/0/real",
+    "quex/wint/weights/7/imag",
     "vector_gs"
   ],
   [
-    "quex/wint/weights/1/real",
-    "vector_gs"
-  ],
-  [
-    "quex/wint/weights/2/real",
-    "vector_gs"
-  ],
-  [
-    "quex/wint/weights/3/real",
-    "vector_gs"
-  ],
-  [
-    "quex/wint/weights/4/real",
-    "vector_gs"
-  ],
-  [
-    "quex/wint/weights/5/real",
+    "quex/wint/weights/8/imag",
     "vector_gs"
   ],
   [
@@ -220,19 +180,43 @@
     "vector_gs"
   ],
   [
-    "quex/wint/weights/7/real",
-    "vector_gs"
-  ],
-  [
-    "quex/wint/weights/8/real",
-    "vector_gs"
+    "quex/rl/data/6",
+    "vector_g"
   ],
   [
     "quex/wint/weights/0/imag",
     "vector_gs"
   ],
   [
-    "quex/wint/weights/1/imag",
+    "quex/wint/weights/7/real",
+    "vector_gs"
+  ],
+  [
+    "quex/wint/weights/5/real",
+    "vector_gs"
+  ],
+  [
+    "quex/iavg/data/0",
+    "vector_g"
+  ],
+  [
+    "quex/wint/weights/8/real",
+    "vector_gs"
+  ],
+  [
+    "quex/rl/data/1",
+    "vector_g"
+  ],
+  [
+    "quex/rl/data/7",
+    "vector_g"
+  ],
+  [
+    "quex/rl/data/4",
+    "vector_g"
+  ],
+  [
+    "quex/wint/weights/4/real",
     "vector_gs"
   ],
   [
@@ -248,7 +232,19 @@
     "vector_gs"
   ],
   [
-    "quex/wint/weights/5/imag",
+    "quex/rl/data/0",
+    "vector_g"
+  ],
+  [
+    "quex/rl/data/2",
+    "vector_g"
+  ],
+  [
+    "quex/rl/data/5",
+    "vector_g"
+  ],
+  [
+    "quex/wint/weights/1/imag",
     "vector_gs"
   ],
   [
@@ -256,20 +252,35 @@
     "vector_gs"
   ],
   [
-    "quex/wint/weights/7/imag",
+    "quex/iavg/data/1",
+    "vector_g"
+  ],
+  [
+    "quex/wint/weights/2/real",
     "vector_gs"
   ],
   [
-    "quex/wint/weights/8/imag",
+    "quex/wint/weights/3/real",
     "vector_gs"
   ],
-
+  [
+    "quex/wint/weights/1/real",
+    "vector_gs"
+  ],
+  [
+    "quex/sl/statemap",
+    "vector_gs"
+  ],
+  [
+    "quex/rl/data/8",
+    "vector_g"
+  ],
   [
     "dios/0/input",
     "vector_s"
   ],
   [
-    "triggers/in/0/autothreshold",
+    "dios/0/auxdrive",
     "float"
   ],
   [
@@ -277,11 +288,15 @@
     "float"
   ],
   [
+    "triggers/in/1/autothreshold",
+    "float"
+  ],
+  [
     "triggers/in/3/autothreshold",
     "float"
   ],
   [
-    "triggers/in/1/autothreshold",
+    "triggers/in/0/autothreshold",
     "float"
   ]
 ]

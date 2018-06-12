@@ -74,15 +74,16 @@ XY_gate_decomposition[22] = ['mX90', 'Y180']
 XY_gate_decomposition[23] = ['X90', 'Y90', 'mX90']
 
 # assigning to this variable for legacy reasons
-gate_decomposition = epstein_efficient_decomposition
+gate_decomposition = XY_gate_decomposition
+epstein_efficient_decomposition = XY_gate_decomposition
+
 # The fixed length decomposition
-epstein_fixed_length_decomposition = deepcopy(epstein_efficient_decomposition)
+epstein_fixed_length_decomposition = deepcopy(XY_gate_decomposition)
 for el in epstein_fixed_length_decomposition:
     for i in range(3-len(el)):
         el.append('I')
 '''
 Gate decomposition decomposition of the clifford group as per
-Eptstein et al. Phys. Rev. A 89, 062321 (2014) and
 McKay et al. Phys. Rev. A 96, 022330 (2017)
 '''
 HZ_gate_decomposition = [[]]*(24)

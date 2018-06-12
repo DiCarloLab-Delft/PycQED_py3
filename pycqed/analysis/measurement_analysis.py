@@ -4251,15 +4251,31 @@ class Ramsey_Analysis(TD_Analysis):
         else:
             if ((average > 0.7*max(y)) or
                     (est_number_of_periods < 2) or
-                    est_number_of_periods > len(ft_of_data)/2.):
+                        est_number_of_periods > len(ft_of_data)/2.):
                 print('the trace is too short to find multiple periods')
 
-            if (np.average(y[:4]) >
-                    np.average(y[4:8])):
-                phase_estimate = 0
+                if print_fit_results:
+                    print('Setting frequency to 0 and ' +
+                          'fitting with decaying exponential.')
+                damped_osc_mod.set_param_hint('frequency',
+                                              value=freq_est,
+                                              vary=False)
+                damped_osc_mod.set_param_hint('phase',
+                                              value=0,
+                                              vary=False)
             else:
-                phase_estimate = np.pi
-            damped_osc_mod.set_param_hint('phase',
+                damped_osc_mod.set_param_hint('frequency',
+                                              value=freq_est,
+                                              vary=True,
+                                              min=(1/(100 *x[-1])),
+                                              max=(20/x[-1]))
+
+                if (np.average(y[:4]) >
+                        np.average(y[4:8])):
+                    phase_estimate = 0
+                else:
+                    phase_estimate = np.pi
+                damped_osc_mod.set_param_hint('phase',
                                               value=phase_estimate, vary=True)
 
         amplitude_guess = 0.5
