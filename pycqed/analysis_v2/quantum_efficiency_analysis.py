@@ -71,6 +71,7 @@ class QuantumEfficiencyAnalysisTWPA(ba.BaseDataAnalysis):
         self.label_ssro = label_ssro
 
         self.params_dict = {'TWPA_freq': twpa_pump_freq_key,
+                            'measurementstring': 'measurementstring',
                             'TWPA_power': twpa_pump_power_key}
 
         self.numeric_params = ['TWPA_freq', 'TWPA_power']
@@ -378,6 +379,7 @@ class QuantumEfficiencyAnalysis(ba.BaseDataAnalysis):
         d = '%s' % (youngest.strftime("%Y%m%d"))
         folder = os.path.join(a_tools.datadir, d, f)
         self.raw_data_dict['folder'] = [folder]
+        self.raw_data_dict['measurementstring'] = f
         self.options_dict['analysis_result_file'] = os.path.join(folder, f + '.hdf5')
 
     def run_fitting(self):
@@ -443,9 +445,10 @@ class QuantumEfficiencyAnalysis(ba.BaseDataAnalysis):
                 self.plot_dicts[k]['ax_id'] = 'snr_analysis'
                 self.plot_dicts[k]['ylabel'] = 'SNR, coherence'
                 self.plot_dicts[k]['yunit'] = '(-)'
-                self.plot_dicts[k]['title'] = r'$\eta = (%.4f \pm %.4f)$ %%' % (
-                    100 * self.fit_dicts['eta'], 100 * self.fit_dicts['u_eta'])
-                + title
+                self.plot_dicts[k]['title'] = ''
+                #self.plot_dicts[k]['title'] = r'$\eta = (%.4f \pm %.4f)$ %%' % (
+                #    100 * self.fit_dicts['eta'], 100 * self.fit_dicts['u_eta'])
+                #+ title
 
             #self.plot_dicts['amp_vs_dephasing_fit']['color'] = 'red'
             #self.plot_dicts['amp_vs_dephasing_coherence_fitted']['color'] = 'red'

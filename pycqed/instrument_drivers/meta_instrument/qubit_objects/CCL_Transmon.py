@@ -1377,6 +1377,40 @@ class CCLight_Transmon(Qubit):
             ma.TwoD_Analysis(label='Resonator_power_scan',
                              close_fig=close_fig, normalize=True)
 
+
+    def measure_photon_number_splitting(self, freqs, powers, MC=None,
+                                analyze: bool=True, close_fig: bool=True):
+        self.prepare_for_continuous_wave()
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        # Snippet here to create and upload the CCL instructions
+        CCL = self.instr_CC.get_instr()
+        CCL.stop()
+        p = sqo.CW_RO_sequence(qubit_idx=self.cfg_qubit_nr(),
+                               platf_cfg=self.cfg_openql_platform_fn())
+        CCL.eqasm_program(p.filename)
+        # CCL gets started in the int_avg detector
+        spec_source = self.instr_spec_source.get_instr()
+        spec_source.on()
+        MC.set_sweep_function(spec_source.frequency)
+        MC.set_sweep_points(freqs)
+
+        ro_lm = self.instr_LutMan_RO.get_instr()
+        m_amp_par = ro_lm.parameters[
+            'M_amp_R{}'.format(self.cfg_qubit_nr())]
+        s2 = swf.lutman_par_dB_attenuation_UHFQC_dig_trig(
+            LutMan=ro_lm, LutMan_parameter=m_amp_par)
+        MC.set_sweep_function_2D(s2)
+        MC.set_sweep_points_2D(powers)
+        self.int_avg_det_single._set_real_imag(False)
+        MC.set_detector_function(self.int_avg_det_single)
+        label='Photon_number_splitting'
+        MC.run(name=label+self.msmt_suffix, mode='2D')
+        spec_source.off()
+        if analyze:
+            ma.TwoD_Analysis(label=label,
+                             close_fig=close_fig, normalize=True)
+
     def measure_resonator_frequency_dac_scan(self, freqs, dac_values, MC=None,
                                              analyze: bool =True, close_fig: bool=True):
         self.prepare_for_continuous_wave()
@@ -2849,6 +2883,11 @@ class CCLight_Transmon(Qubit):
                 ro_len += cross_target_qubit.ro_pulse_down_length1()
                 readout_pulse_lengths.append(ro_len)
             readout_pulse_length = np.max(readout_pulse_lengths)
+        print(cfg_qubit_nrs)
+        print(optimization_M_amps)
+        print(optimization_M_amp_down0s)
+        print(optimization_M_amp_down1s)
+
 
         RO_lutman = self.instr_LutMan_RO.get_instr()
         if sequence == 'ramsey':
@@ -2992,7 +3031,7 @@ class CCLight_Transmon(Qubit):
                 t_stop=end_time,
                 use_sweeps=True,
                 options_dict=options_dict,
-                label_ramsey='_ro_amp_sweep_ramsey'+self.msmt_suffix,
+                label_dephasing='_ro_amp_sweep_dephasing'+self.msmt_suffix,
                 label_ssro='_ro_amp_sweep_SNR'+self.msmt_suffix)
 
             qea.run_analysis()

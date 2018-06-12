@@ -190,8 +190,9 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
         sh_min = min(np.min(eff_sh[0]), np.min(eff_sh[1]))
         sh_max = max(np.max(eff_sh[0]), np.max(eff_sh[1]))
         data_range = (sh_min, sh_max)
-
-        eff_sh_sort = np.sort(list(eff_sh), axis=1)
+        print(shots)
+        print(eff_sh)
+        eff_sh_sort = [np.sort(eff_sh[0]), np.sort(eff_sh[1])]
         x0, n0 = np.unique(eff_sh_sort[0], return_counts=True)
         cumsum0 = np.cumsum(n0)
         x1, n1 = np.unique(eff_sh_sort[1], return_counts=True)
