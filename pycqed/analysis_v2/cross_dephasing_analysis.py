@@ -101,9 +101,11 @@ class CrossDephasingAnalysis(ba.BaseDataAnalysis):
             self.fit_dicts['deph_norm'][i,:] = self.fit_dicts['sigmas'][i, i] / self.fit_dicts['sigmas'][i,:]
 
     def prepare_plots(self):
+        pt = '\n'
+        t = self.timestamps[0]
         self.plot_dicts['sigmas'] = {
             'plotfn': self.plot_labeled_2d,
-            'title': '',  # todo
+            'title': t,
             'yvals': self.qubit_labels, 'ylabel': 'Targeted Qubit', 'yunit': '',
             'xvals': self.qubit_labels, 'xlabel': 'Dephased Qubit', 'xunit': '',
             'zvals': self.fit_dicts['sigmas'],
@@ -113,7 +115,7 @@ class CrossDephasingAnalysis(ba.BaseDataAnalysis):
         }
         self.plot_dicts['sigmas_norm'] = {
             'plotfn': self.plot_labeled_2d,
-            'title': 'Normalized by targetted Qubit',  # todo
+            'title': 'Normalized by targetted Qubit' + pt + t,
             'yvals': self.qubit_labels, 'ylabel': 'Targeted Qubit', 'yunit': '',
             'xvals': self.qubit_labels, 'xlabel': 'Dephased Qubit', 'xunit': '',
             'zvals': self.fit_dicts['sigmas_norm'],
@@ -123,7 +125,7 @@ class CrossDephasingAnalysis(ba.BaseDataAnalysis):
         }
         self.plot_dicts['deph_norm'] = {
             'plotfn': self.plot_norm_matrix,
-            'title': 'Normalized by targetted Qubit',  # todo
+            'title': 'Normalized by targetted Qubit' + pt + t,
             'yvals': self.qubit_labels, 'ylabel': 'Targeted Qubit', 'yunit': '',
             'xvals': self.qubit_labels, 'xlabel': 'Dephased Qubit', 'xunit': '',
             'zvals': self.fit_dicts['deph_norm'],
@@ -140,7 +142,10 @@ class CrossDephasingAnalysis(ba.BaseDataAnalysis):
                 for p in ra.plot_dicts:
                     self.plot_dicts[p+label] = ra.plot_dicts[p]
                     self.plot_dicts[p+label]['ax_id'] = self.plot_dicts[p+label].get('ax_id', '')+label
-                    self.plot_dicts[p+label]['title'] = self.plot_dicts[p+label].get('title', 'Coherence ')+label
+                    t = self.plot_dicts[p+label].get('title', 'Coherence ')
+                    t += '\n' + 'Target: '+tq+', Meas.: '+rq
+                    #t += '\n' + label
+                    self.plot_dicts[p+label]['title'] = t
 
     def plot_labeled_2d(self, pdict, axs):
         xl = pdict.get('xvals')
