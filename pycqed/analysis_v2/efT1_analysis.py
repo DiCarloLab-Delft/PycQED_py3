@@ -14,6 +14,10 @@ from matplotlib.colors import ListedColormap
 from sklearn import linear_model
 import time
 from matplotlib import colors as c
+<<<<<<< Updated upstream
+=======
+from pycqed.analysis.tools.plotting import SI_val_to_msg_str
+>>>>>>> Stashed changes
 
 class efT1_analysis(ba.BaseDataAnalysis):
     def __init__(self, t_start: str=None, t_stop: str=None, label='',
@@ -112,8 +116,13 @@ class efT1_analysis(ba.BaseDataAnalysis):
         self.fit_res['fit_res_P0']=OrderedDict() 
         decay_mod = lmfit.Model(ExpDecayFunclocal, independent_vars='t')
         decay_mod.set_param_hint('tau', value=15e-6, min=0, vary=True)
+<<<<<<< Updated upstream
         decay_mod.set_param_hint('amplitude', value=.99, min=0, vary=True)
         decay_mod.set_param_hint('offset', value=.99, vary=True)
+=======
+        decay_mod.set_param_hint('amplitude', value=1, min=0, vary=True)
+        decay_mod.set_param_hint('offset', value=0, vary=True)
+>>>>>>> Stashed changes
         params1 = decay_mod.make_params()
 
         try:
@@ -121,17 +130,32 @@ class efT1_analysis(ba.BaseDataAnalysis):
                 fit_res_P2 = decay_mod.fit(data=self.proc_data_dict['P2'][value_name],
                     t=self.proc_data_dict['time'],params=params1)
             self.fit_res['fit_res_P2'] = fit_res_P2
+<<<<<<< Updated upstream
             tau1_best = fit_res_P2.best_values['tau']
+=======
+            tau_best = fit_res_P2.best_values['tau']
+            text_msg = (
+                    r'$T_1^{fe}$  : ' + SI_val_to_msg_str(round(fit_res_P2.params['tau'].value,6),'s')[0]
+                    + SI_val_to_msg_str(fit_res_P2.params['tau'].value,'s')[1]
+                    )
+>>>>>>> Stashed changes
         except Exception as e:
             logging.warning("Fitting failed")
             logging.warning(e)         
             self.fit_res['fit_res_P2'] = {}
 
         doubledecay_mod = lmfit.Model(DoubleExpDecayFunclocal, independent_vars='t')
+<<<<<<< Updated upstream
         doubledecay_mod.set_param_hint('tau1', value=15e-6, min=0, vary=True)
         doubledecay_mod.set_param_hint('tau2', value=15e-6, min=0, vary=True)
         doubledecay_mod.set_param_hint('amplitude1', value=0.5, min=0, vary=True)
         doubledecay_mod.set_param_hint('amplitude2', value=0.5, min=0, vary=True)
+=======
+        doubledecay_mod.set_param_hint('tau1', value=10e-6, min=0, vary=True)
+        doubledecay_mod.set_param_hint('tau2', value=tau_best, min=0, vary=True)
+        doubledecay_mod.set_param_hint('amplitude1', value=1, min=0, vary=True)
+        doubledecay_mod.set_param_hint('amplitude2', value=1, min=0, vary=True)
+>>>>>>> Stashed changes
         doubledecay_mod.set_param_hint('offset', value=.0, vary=True)
 
         params2 = doubledecay_mod.make_params()
@@ -145,12 +169,23 @@ class efT1_analysis(ba.BaseDataAnalysis):
                                         params=params2)
             self.fit_res['fit_res_P1'] = fit_res_P1
             self.fit_res['fit_res_P0'] = fit_res_P0
+<<<<<<< Updated upstream
+=======
+            text_msg += ('\n' +
+                   r'$T_1^{eg}$  : ' + SI_val_to_msg_str(round(fit_res_P1.params['tau1'].value,6),'s')[0]
+                 + SI_val_to_msg_str(fit_res_P1.params['tau1'].value,'s')[1]
+                 )
+>>>>>>> Stashed changes
         except Exception as e:
             logging.warning("Doulbe Fitting failed")
             logging.warning(e)         
             self.fit_res['fit_res_P1'] = {}
             self.fit_res['fit_res_P0'] = {}   
+<<<<<<< Updated upstream
    
+=======
+        self.proc_data_dict['fit_msg'] = text_msg
+>>>>>>> Stashed changes
 
     def prepare_plots(self):
         val_names = self.raw_data_dict['value_names']
@@ -167,7 +202,11 @@ class efT1_analysis(ba.BaseDataAnalysis):
                 'xunit': self.raw_data_dict['time units'],
                 'ylabel': val_name,
                 'yunit': self.proc_data_dict['value_units'][i],
+<<<<<<< Updated upstream
                 'title': self.proc_data_dict['timestamp_string']+'\n'+self.proc_data_dict['measurementstring'],
+=======
+                #'title': self.proc_data_dict['timestamp_string']+'\n'+self.proc_data_dict['measurementstring'],
+>>>>>>> Stashed changes
                 }
             fs = plt.rcParams['figure.figsize']
         
@@ -175,18 +214,32 @@ class efT1_analysis(ba.BaseDataAnalysis):
    
             self.plot_dicts['fit_res_P0'] = {
                 'plotfn': self.plot_fit,
+<<<<<<< Updated upstream
                 'ax_id': 'plot_populations_{}'.format(val_name),
                 'fit_res': self.fit_res['fit_res_P0'],
                 'setlabel': 'P0 fit',
+=======
+                #'plot_init': True, 
+                'ax_id': 'plot_populations_{}'.format(val_name),
+                'fit_res': self.fit_res['fit_res_P0'],
+                'setlabel': r'P($|g\rangle$) fit',
+>>>>>>> Stashed changes
                 'do_legend': True,
                 'color': 'C0',    
             }
 
             self.plot_dicts['fit_res_P1'] = {
                 'plotfn': self.plot_fit,
+<<<<<<< Updated upstream
                 'ax_id':'plot_populations_{}'.format(val_name),
                 'fit_res': self.fit_res['fit_res_P1'],
                 'setlabel': 'P1 fit',
+=======
+                #'plot_init': True, 
+                'ax_id':'plot_populations_{}'.format(val_name),
+                'fit_res': self.fit_res['fit_res_P1'],
+                'setlabel': r'P($|e\rangle$) fit',
+>>>>>>> Stashed changes
                 'do_legend': True,
                 'color': 'C1',    
 
@@ -196,12 +249,27 @@ class efT1_analysis(ba.BaseDataAnalysis):
                 'plotfn': self.plot_fit,
                 'ax_id': 'plot_populations_{}'.format(val_name),
                 'fit_res': self.fit_res['fit_res_P2'],
+<<<<<<< Updated upstream
                 'setlabel': 'P2 fit',
+=======
+                'setlabel': r'P($|f\rangle$) fit',
+>>>>>>> Stashed changes
                 'do_legend': True,
                 'color': 'C2',    
             }
 
+<<<<<<< Updated upstream
 def plot_populations(time, P0, P1, P2, ax, 
+=======
+            self.plot_dicts['fit_msg'] = {
+                'plotfn': self.plot_text,
+                'text_string': self.proc_data_dict['fit_msg'],
+                'xpos': 0.1, 'ypos': .9, 
+                'ax_id': 'plot_populations_{}'.format(val_name),
+                'horizontalalignment': 'left'}
+
+def plot_populations(time, P0, P1, P2, ax,
+>>>>>>> Stashed changes
                      xlabel='Time', xunit='s', 
                      ylabel='Population', yunit='',
                      title='', **kw):
@@ -216,6 +284,10 @@ def plot_populations(time, P0, P1, P2, ax,
     ax.set_ylim(-.05, 1.05)
     ax.set_title(title)
 
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
 def populations_using_rate_equations(SI: np.array, SX: np.array,
                                      V0: float, V1: float, V2: float):
     """
@@ -263,5 +335,10 @@ def populations_using_rate_equations(SI: np.array, SX: np.array,
 def ExpDecayFunclocal(t, tau, amplitude, offset):
     return amplitude * np.exp(-(t / tau)) + offset    
 
+<<<<<<< Updated upstream
 def DoubleExpDecayFunclocal(t, tau1, tau2, amplitude1, amplitude2, offset):
     return amplitude1 * np.exp(-(t / tau1)) + amplitude2 * np.exp(-(t / tau2)) + offset
+=======
+def DoubleExpDecayFunclocal(t, tau1, tau2, amplitude1,amplitude2, offset):
+    return amplitude1 * np.exp(-(t / tau1)) - amplitude2* np.exp(-(t / tau2)) + offset
+>>>>>>> Stashed changes

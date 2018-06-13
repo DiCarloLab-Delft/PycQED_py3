@@ -355,7 +355,6 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
         }
 
 
-
         self.plot_dicts['rb_text'] = {
             'plotfn': self.plot_text,
             'text_string': self.proc_data_dict['rb_msg'],
@@ -518,7 +517,7 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
                 'xlabel': 'Number of Cliffrods',
                 'xunit': '#',
                 'ylabel': val_name,
-                'yunit': self.proc_data_dict['value_u    nits'][i],
+                'yunit': self.proc_data_dict['value_units'][i],
                 'title': self.proc_data_dict['timestamp_string'] +
                 '\n'+self.proc_data_dict['measurementstring'],
             }
@@ -604,7 +603,7 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
             'M0': self.proc_data_dict['M0'],
             'X1': self.proc_data_dict['X1'],
             'ax1': axs[1],
-            'title': self.proc_d ta_dict['timestamp_string']+'\n' +
+            'title': self.proc_data_dict['timestamp_string']+'\n' +
             self.proc_data_dict['measurementstring']}
 
         self.plot_dicts['fit_leak'] = {
