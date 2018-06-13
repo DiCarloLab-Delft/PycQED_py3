@@ -1268,7 +1268,7 @@ class CCLight_Transmon(Qubit):
         detector = det.Signal_Hound_fixed_frequency(
             self.instr_SH.get_instr(), frequency=(self.instr_LO_ro.get_instr().frequency() -
                                                   self.ro_freq_mod()),
-            Navg=5, delay=0.0, prepare_each_point=False)
+            Navg=5, delay=0.0, prepare_for_each_point=False)
 
         ad_func_pars = {'adaptive_function': nelder_mead,
                         'x0': [1.0, 0.0],

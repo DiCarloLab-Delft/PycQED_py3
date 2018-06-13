@@ -537,28 +537,30 @@ class DephasingAnalysis(ba.BaseDataAnalysis):
 
         fit_mask = self.fit_dicts['coherence_fit']['mask']
         fit_mask_inv = self.fit_dicts['coherence_fit']['inv_mask']
-        self.plot_dicts[name + 'amp_vs_dephasing_coherence_fitted'] = {
-            'plotfn': self.plot_line,
-            'ax_id': name + 'amp_vs_dephasing',
-            'zorder': 0,
-            'xvals': amps[fit_mask],
-            'yvals': self.proc_data_dict['coherence'][fit_mask],
-            'marker': 'o',
-            'linestyle': '',
-            'setlabel': 'coherence data',
-            'color': 'red',
-        }
-        self.plot_dicts[name + 'amp_vs_dephasing_coherence_not_fitted'] = {
-            'plotfn': self.plot_line,
-            'ax_id': name + 'amp_vs_dephasing',
-            'zorder': 1,
-            'xvals': amps[fit_mask_inv],
-            'yvals': self.proc_data_dict['coherence'][fit_mask_inv],
-            'marker': 'x',
-            'linestyle': '',
-            'setlabel': 'coherence data (not fitted)',
-            'color': 'red',
-        }
+        if len(fit_mask) > 0:
+            self.plot_dicts[name + 'amp_vs_dephasing_coherence_fitted'] = {
+                'plotfn': self.plot_line,
+                'ax_id': name + 'amp_vs_dephasing',
+                'zorder': 0,
+                'xvals': amps[fit_mask],
+                'yvals': self.proc_data_dict['coherence'][fit_mask],
+                'marker': 'o',
+                'linestyle': '',
+                'setlabel': 'coherence data',
+                'color': 'red',
+            }
+        if len(fit_mask_inv) > 0:
+            self.plot_dicts[name + 'amp_vs_dephasing_coherence_not_fitted'] = {
+                'plotfn': self.plot_line,
+                'ax_id': name + 'amp_vs_dephasing',
+                'zorder': 1,
+                'xvals': amps[fit_mask_inv],
+                'yvals': self.proc_data_dict['coherence'][fit_mask_inv],
+                'marker': 'x',
+                'linestyle': '',
+                'setlabel': 'coherence data (not fitted)',
+                'color': 'red',
+            }
         self.plot_dicts[name + 'amp_vs_dephasing_Phase'] = {
             'plotfn': self.plot_line,
             'xvals': amps,
