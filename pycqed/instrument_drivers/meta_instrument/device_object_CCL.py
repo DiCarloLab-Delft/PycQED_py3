@@ -544,7 +544,8 @@ class DeviceCCL(Instrument):
 
     def prepare_for_timedomain(self):
         self.prepare_readout()
-        self.prepare_fluxing()
+        if self.find_instrument(self.qubits()[0]).instr_LutMan_Flux()!=None:
+            self.prepare_fluxing()
         self.prepare_timing()
 
         for qb_name in self.qubits():
