@@ -1577,3 +1577,331 @@ def convert_channel_names_to_index(cal_points, nr_segments, value_names):
                         [idx % nr_segments for idx in idxs]
             cal_points_list.append(observable_list)
     return cal_points_list
+
+
+class SingleQubitResetAnalysis(ba.BaseDataAnalysis):
+    def __init__(self, t_start: str=None, t_stop: str=None,
+                 data_file_path: str=None,
+                 options_dict: dict=None, extract_only: bool=False,
+                 do_fitting: bool=True, auto=True):
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         extract_only=extract_only, do_fitting=do_fitting)
+        # only 1 datafile should be processed
+        self.single_timestamp = True
+
+        # these parameters are converted to floats
+        self.numeric_params = []
+
+        # these parameters are extracted from the hdf5 file
+        self.params_dict = {
+            'measurementstring': 'measurementstring',
+            'measured_values': 'measured_values',
+            'value_names': 'value_names',
+            'value_units': 'value_units'}
+
+        if auto:
+            self.run_analysis()
+
+    def process_data(self):
+        nr_reset = self.options_dict.get('nr_reset')
+        nr_readout = nr_reset + 1
+        nr_bins = self.options_dict.get('nr_bins', 100)
+
+        ######################################
+        # extract shots to individual arrays #
+        ######################################
+        self.shots_max = float('-inf')
+        self.shots_min = float('inf')
+        self.proc_data_dict['shots_0'] = ['']*nr_readout
+        self.proc_data_dict['shots_1'] = ['']*nr_readout
+        self.proc_data_dict['shots_0_dig'] = ['']*nr_readout
+        self.proc_data_dict['shots_1_dig'] = ['']*nr_readout
+        self.proc_data_dict['channel_idx'] = self.raw_data_dict['value_names'] \
+            .index(self.options_dict['channel_name'])
+        for i in range(nr_readout):
+            channel_idx = self.proc_data_dict['channel_idx']
+            shots0 = self.raw_data_dict['measured_values'] \
+                [channel_idx][i::(2*nr_readout)]
+            shots1 = self.raw_data_dict['measured_values'] \
+                [channel_idx][(i+nr_readout)::(2*nr_readout)]
+            self.shots_max = max(self.shots_max, max(shots0.max(), shots1.max()))
+            self.shots_min = min(self.shots_min, min(shots0.min(), shots1.min()))
+            self.proc_data_dict['shots_0'][i] = shots0
+            self.proc_data_dict['shots_1'][i] = shots1
+            self.proc_data_dict['shots_0_dig'][i] = shots0 >= self.options_dict['threshold']
+            self.proc_data_dict['shots_1_dig'][i] = shots1 >= self.options_dict['threshold']
+
+        ###########################################
+        # generate 1D histograms for each readout #
+        ###########################################
+        self.proc_data_dict['hist_0'] = ['']*nr_readout
+        self.proc_data_dict['hist_1'] = ['']*nr_readout
+        for i in range(nr_readout):
+            hist0, bins = np.histogram(self.proc_data_dict['shots_0'][i],
+                                       bins=nr_bins, range=(self.shots_min, self.shots_max))
+            hist1, bins = np.histogram(self.proc_data_dict['shots_1'][i],
+                                       bins=nr_bins, range=(self.shots_min, self.shots_max))
+            self.proc_data_dict['hist_0'][i] = hist0
+            self.proc_data_dict['hist_1'][i] = hist1
+        self.proc_data_dict['bin_edges'] = bins
+        self.proc_data_dict['bin_centers'] = (bins[1:] + bins[:-1])/2
+
+        #########################################
+        # generate 2D histograms for each reset #
+        #########################################
+        self.proc_data_dict['hist2_0'] = ['']*nr_reset
+        self.proc_data_dict['hist2_1'] = ['']*nr_reset
+        for i in range(nr_reset):
+            hist0, _, _ = np.histogram2d(self.proc_data_dict['shots_0'][i], self.proc_data_dict['shots_0'][i+1],
+                                         bins=nr_bins, range=((self.shots_min, self.shots_max), (self.shots_min, self.shots_max)))
+            hist1, _, _ = np.histogram2d(self.proc_data_dict['shots_1'][i], self.proc_data_dict['shots_1'][i+1],
+                                         bins=nr_bins, range=((self.shots_min, self.shots_max), (self.shots_min, self.shots_max)))
+            self.proc_data_dict['hist2_0'][i] = hist0
+            self.proc_data_dict['hist2_1'][i] = hist1
+
+        ###############################
+        # Extract state probabilities #
+        ###############################
+        self.proc_data_dict['pg0'] = ['']*nr_readout
+        self.proc_data_dict['pe0'] = ['']*nr_readout
+        self.proc_data_dict['pg1'] = ['']*nr_readout
+        self.proc_data_dict['pe1'] = ['']*nr_readout
+        self.proc_data_dict['pgg0'] = ['']*nr_reset
+        self.proc_data_dict['pge0'] = ['']*nr_reset
+        self.proc_data_dict['peg0'] = ['']*nr_reset
+        self.proc_data_dict['pee0'] = ['']*nr_reset
+        self.proc_data_dict['pgg1'] = ['']*nr_reset
+        self.proc_data_dict['pge1'] = ['']*nr_reset
+        self.proc_data_dict['peg1'] = ['']*nr_reset
+        self.proc_data_dict['pee1'] = ['']*nr_reset
+        for i in range(nr_readout):
+            ce0 = np.count_nonzero(self.proc_data_dict['shots_0_dig'][i])
+            ce1 = np.count_nonzero(self.proc_data_dict['shots_1_dig'][i])
+            cg0 = np.count_nonzero(np.logical_not(self.proc_data_dict['shots_0_dig'][i]))
+            cg1 = np.count_nonzero(np.logical_not(self.proc_data_dict['shots_1_dig'][i]))
+            self.proc_data_dict['pe0'][i] = ce0/(ce0 + cg0)
+            self.proc_data_dict['pe1'][i] = ce1/(ce1 + cg1)
+            self.proc_data_dict['pg0'][i] = cg0/(ce0 + cg0)
+            self.proc_data_dict['pg1'][i] = cg1/(ce1 + cg1)
+            if i < nr_readout - 1:
+                cgg0 = np.count_nonzero(~self.proc_data_dict['shots_0_dig'][i] *
+                                        ~self.proc_data_dict['shots_0_dig'][i+1])
+                cge0 = np.count_nonzero(~self.proc_data_dict['shots_0_dig'][i] *
+                                        self.proc_data_dict['shots_0_dig'][i+1])
+                ceg0 = np.count_nonzero(self.proc_data_dict['shots_0_dig'][i] *
+                                        ~self.proc_data_dict['shots_0_dig'][i+1])
+                cee0 = np.count_nonzero(self.proc_data_dict['shots_0_dig'][i] *
+                                        self.proc_data_dict['shots_0_dig'][i+1])
+                cgg1 = np.count_nonzero(~self.proc_data_dict['shots_1_dig'][i] *
+                                        ~self.proc_data_dict['shots_1_dig'][i+1])
+                cge1 = np.count_nonzero(~self.proc_data_dict['shots_1_dig'][i] *
+                                        self.proc_data_dict['shots_1_dig'][i+1])
+                ceg1 = np.count_nonzero(self.proc_data_dict['shots_1_dig'][i] *
+                                        ~self.proc_data_dict['shots_1_dig'][i+1])
+                cee1 = np.count_nonzero(self.proc_data_dict['shots_1_dig'][i] *
+                                        self.proc_data_dict['shots_1_dig'][i+1])
+                self.proc_data_dict['pgg0'][i] = cgg0/(cgg0 + cge0 + ceg0 + cee0)
+                self.proc_data_dict['pge0'][i] = cge0/(cgg0 + cge0 + ceg0 + cee0)
+                self.proc_data_dict['peg0'][i] = ceg0/(cgg0 + cge0 + ceg0 + cee0)
+                self.proc_data_dict['pee0'][i] = cee0/(cgg0 + cge0 + ceg0 + cee0)
+                self.proc_data_dict['pgg1'][i] = cgg1/(cgg1 + cge1 + ceg1 + cee1)
+                self.proc_data_dict['pge1'][i] = cge1/(cgg1 + cge1 + ceg1 + cee1)
+                self.proc_data_dict['peg1'][i] = ceg1/(cgg1 + cge1 + ceg1 + cee1)
+                self.proc_data_dict['pee1'][i] = cee1/(cgg1 + cge1 + ceg1 + cee1)
+
+        ###############################################
+        # Extract readout result vector probabilities #
+        ###############################################
+        nr_readout_analysis = self.options_dict.get('nr_analysis_readouts', False)
+        if nr_readout_analysis:
+            self.proc_data_dict['result_vector_count_0'] = np.zeros(2**nr_readout_analysis)
+            self.proc_data_dict['result_vector_count_1'] = np.zeros(2**nr_readout_analysis)
+            for i in range(len(self.proc_data_dict['shots_0'][0])):
+                result_index_0 = 0
+                result_index_1 = 0
+                for j in range(nr_readout_analysis):
+                    if self.proc_data_dict['shots_0'][j][i] >= self.options_dict['threshold']:
+                        result_index_0 += 1 << j
+                    if self.proc_data_dict['shots_1'][j][i] >= self.options_dict['threshold']:
+                        result_index_1 += 1 << j
+                self.proc_data_dict['result_vector_count_0'][result_index_0] += 1
+                self.proc_data_dict['result_vector_count_1'][result_index_1] += 1
+
+        ##################################################
+        # Extract transfer matrices for each reset event #
+        ##################################################
+        self.proc_data_dict['p_g->g'] = [['']*nr_reset, ['']*nr_reset]
+        self.proc_data_dict['p_g->e'] = [['']*nr_reset, ['']*nr_reset]
+        self.proc_data_dict['p_e->g'] = [['']*nr_reset, ['']*nr_reset]
+        self.proc_data_dict['p_e->e'] = [['']*nr_reset, ['']*nr_reset]
+        for i in range(nr_reset):
+            for init in range(2):
+                cgg = self.proc_data_dict['pgg{}'.format(init)][i]
+                cge = self.proc_data_dict['pge{}'.format(init)][i]
+                ceg = self.proc_data_dict['peg{}'.format(init)][i]
+                cee = self.proc_data_dict['pee{}'.format(init)][i]
+                self.proc_data_dict['p_g->g'][init][i] = cgg/(cgg + cge)
+                self.proc_data_dict['p_g->e'][init][i] = cge/(cgg + cge)
+                self.proc_data_dict['p_e->g'][init][i] = ceg/(ceg + cee)
+                self.proc_data_dict['p_e->e'][init][i] = cee/(ceg + cee)
+
+    def prepare_plots(self):
+        nr_reset = self.options_dict.get('nr_reset')
+        nr_readout = nr_reset + 1
+
+        # readout histograms
+        for i in range(nr_readout):
+            self.plot_dicts['ro_{}_hist'.format(i+1)] = {
+                'title': 'Readout {} histogram'.format(i+1),
+                'plotfn': self.plot_line,
+                'xvals': self.proc_data_dict['bin_centers'],
+                'yvals': self.proc_data_dict['hist_0'][i],
+                'xlabel': 'Readout signal',
+                'xunit': self.raw_data_dict['value_units'][0],
+                'ylabel': 'Counts',
+                'setlabel': r'Prepared 0',
+                'linestyle': '',
+                'line_kws': {'color': 'C0'},
+                'marker': 'o',
+                'do_legend': True}
+            self.plot_dicts['hist_1_{}'.format(i)] = {
+                'ax_id': 'ro_{}_hist'.format(i+1),
+                'plotfn': self.plot_line,
+                'xvals': self.proc_data_dict['bin_centers'],
+                'yvals': self.proc_data_dict['hist_1'][i],
+                'setlabel': r'Prepared $\pi$',
+                'linestyle': '',
+                'line_kws': {'color': 'C3'},
+                'marker': 'o'}
+            max_cnts = max(self.proc_data_dict['hist_1'][i].max(),
+                           self.proc_data_dict['hist_0'][i].max())
+            self.plot_dicts['ro_threshold_{}'.format(i)] = {
+                'ax_id': 'ro_{}_hist'.format(i+1),
+                'plotfn': self.plot_vlines,
+                'x': self.options_dict['threshold'],
+                'ymin': 0,
+                'ymax': max_cnts*1.05,
+                'colors': '.3',
+                'linestyles': 'dashed',
+                'line_kws': {'linewidth': .8},
+                'setlabel': 'Threshold',
+                'do_legend': True}
+            self.plot_dicts['prob_0_{}'.format(i)] = {
+                'ax_id': 'ro_{}_hist'.format(i+1),
+                'plotfn': self.plot_line,
+                'xvals': [self.options_dict['threshold']],
+                'yvals': [max_cnts/2],
+                'line_kws': {'alpha': 0},
+                'setlabel': r'$p(e|0) = {:.1f}$'.format(100*self.proc_data_dict['pe0'][i]),
+                'do_legend': True}
+            self.plot_dicts['prob_1_{}'.format(i)] = {
+                'ax_id': 'ro_{}_hist'.format(i+1),
+                'plotfn': self.plot_line,
+                'xvals': [self.options_dict['threshold']],
+                'yvals': [max_cnts/2],
+                'line_kws': {'alpha': 0},
+                'setlabel': r'$p(e|\pi) = {:.1f}$'.format(100*self.proc_data_dict['pe1'][i]),
+                'do_legend': True}
+
+        # reset histograms
+        for i in range(nr_reset):
+            hist2D = self.proc_data_dict['hist2_0'][i] + self.proc_data_dict['hist2_1'][i]
+            self.plot_dicts['reset_{}_hist'.format(i+1)] = {
+                'title': 'Reset {} histogram'.format(i+1),
+                'plotfn': self.plot_colorxy,
+                'xvals': self.proc_data_dict['bin_centers'],
+                'yvals': self.proc_data_dict['bin_centers'],
+                'zvals': hist2D.T,
+                'xlabel': 'Readout signal {}'.format(i+1),
+                'xunit': self.raw_data_dict['value_units'][0],
+                #'xrange': (-2.5e-3, -2.0e-3),
+                'ylabel': 'Readout signal {}'.format(i+2),
+                'yunit': self.raw_data_dict['value_units'][0],
+                'zrange': (0, np.log10(hist2D.max())),
+                'logzscale': True,
+                'zlabel': 'log10(counts)'}
+            self.plot_dicts['reset_{}_hist_vline'.format(i+1)] = {
+                'ax_id': 'reset_{}_hist'.format(i+1),
+                'plotfn': self.plot_vlines,
+                'x': self.options_dict['threshold'],
+                'ymin': self.proc_data_dict['bin_edges'].min(),
+                'ymax': self.proc_data_dict['bin_edges'].max(),
+                'colors': '.3',
+                'linestyles': 'dashed',
+                'line_kws': {'linewidth': .8}}
+            self.plot_dicts['reset_{}_hist_hline'.format(i+1)] = {
+                'ax_id': 'reset_{}_hist'.format(i+1),
+                'plotfn': self.plot_vlines,
+                'func': 'hlines',
+                'x': self.options_dict['threshold'],
+                'ymin': self.proc_data_dict['bin_edges'].min(),
+                'ymax': self.proc_data_dict['bin_edges'].max(),
+                'colors': '.3',
+                'linestyles': 'dashed',
+                'line_kws': {'linewidth': .8}}
+            self.plot_dicts['reset_{}_hist_g'.format(i+1)] = {
+                'title': 'Reset {} histogram, ground state preparation'.format(i+1),
+                'plotfn': self.plot_colorxy,
+                'xvals': self.proc_data_dict['bin_centers'],
+                'yvals': self.proc_data_dict['bin_centers'],
+                'zvals': self.proc_data_dict['hist2_0'][i].T,
+                'xlabel': 'Readout signal {}'.format(i+1),
+                'xunit': self.raw_data_dict['value_units'][0],
+                'ylabel': 'Readout signal {}'.format(i+2),
+                'yunit': self.raw_data_dict['value_units'][0],
+                'zrange': (0, np.log10(hist2D.max())),
+                'logzscale': True,
+                'zlabel': 'log10(counts)'}
+            self.plot_dicts['reset_{}_hist_g_vline'.format(i+1)] = {
+                'ax_id': 'reset_{}_hist_g'.format(i+1),
+                'plotfn': self.plot_vlines,
+                'x': self.options_dict['threshold'],
+                'ymin': self.proc_data_dict['bin_edges'].min(),
+                'ymax': self.proc_data_dict['bin_edges'].max(),
+                'colors': '.3',
+                'linestyles': 'dashed',
+                'line_kws': {'linewidth': .8}}
+            self.plot_dicts['reset_{}_hist_g_hline'.format(i+1)] = {
+                'ax_id': 'reset_{}_hist_g'.format(i+1),
+                'plotfn': self.plot_vlines,
+                'func': 'hlines',
+                'x': self.options_dict['threshold'],
+                'ymin': self.proc_data_dict['bin_edges'].min(),
+                'ymax': self.proc_data_dict['bin_edges'].max(),
+                'colors': '.3',
+                'linestyles': 'dashed',
+                'line_kws': {'linewidth': .8}}
+            self.plot_dicts['reset_{}_hist_e'.format(i+1)] = {
+                'title': 'Reset {} histogram, excited state preparation'.format(i+1),
+                'plotfn': self.plot_colorxy,
+                'xvals': self.proc_data_dict['bin_centers'],
+                'yvals': self.proc_data_dict['bin_centers'],
+                'zvals': self.proc_data_dict['hist2_1'][i].T,
+                'xlabel': 'Readout signal {}'.format(i+1),
+                'xunit': self.raw_data_dict['value_units'][0],
+                'ylabel': 'Readout signal {}'.format(i+2),
+                'yunit': self.raw_data_dict['value_units'][0],
+                'zrange': (0, np.log10(hist2D.max())),
+                'logzscale': True,
+                'zlabel': 'log10(counts)'}
+            self.plot_dicts['reset_{}_hist_e_vline'.format(i+1)] = {
+                'ax_id': 'reset_{}_hist_e'.format(i+1),
+                'plotfn': self.plot_vlines,
+                'x': self.options_dict['threshold'],
+                'ymin': self.proc_data_dict['bin_edges'].min(),
+                'ymax': self.proc_data_dict['bin_edges'].max(),
+                'colors': '.3',
+                'linestyles': 'dashed',
+                'line_kws': {'linewidth': .8}}
+            self.plot_dicts['reset_{}_hist_e_hline'.format(i+1)] = {
+                'ax_id': 'reset_{}_hist_e'.format(i+1),
+                'plotfn': self.plot_vlines,
+                'func': 'hlines',
+                'x': self.options_dict['threshold'],
+                'ymin': self.proc_data_dict['bin_edges'].min(),
+                'ymax': self.proc_data_dict['bin_edges'].max(),
+                'colors': '.3',
+                'linestyles': 'dashed',
+                'line_kws': {'linewidth': .8}}

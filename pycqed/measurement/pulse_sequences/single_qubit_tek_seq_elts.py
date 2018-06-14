@@ -145,6 +145,7 @@ def mixer_cal_sqs(pulseIch,
                 RO_pars['RO_pulse_marker_channel'],
                 *station.sequencer_config['slave_AWG_trig_channels'],
                 pulseIch, pulseQch]
+    # print(channels)
     for n in range(data_points):
         #if here the pulseIch and pulseQch values could be set in each iteration,
         #it would be easy to optimize the complete set of data values.
@@ -160,6 +161,7 @@ def mixer_cal_sqs(pulseIch,
                                                           upload=False)
         new_elt[0].name = '{}-pulse-elt_{}'. \
             format(len(new_elt[0].pulses), n)
+        # print(new_elt)
         if seq is None:
             seq = sequence.Sequence('Sideband_modulation_seq')
             seq.append_element(*new_elt, trigger_wait=True)

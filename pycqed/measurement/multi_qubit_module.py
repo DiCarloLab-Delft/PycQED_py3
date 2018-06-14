@@ -615,6 +615,9 @@ def measure_active_reset(qubits, reset_cycle_time, nr_resets=1, nreps=1,
     for qb in qubits:
         qb.prepare_for_timedomain()
 
+    f_LO = qubits[0].f_RO() - qubits[0].f_RO_mod()
+    multiplexed_pulse(qubits, f_LO)
+
     MC.set_sweep_function(sf)
     MC.set_sweep_points(np.arange(shots))
     MC.set_sweep_function_2D(swf.None_Sweep())
