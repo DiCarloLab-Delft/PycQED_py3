@@ -15,14 +15,18 @@ import os
 from pycqed.analysis import analysis_toolbox as a_tools
 
 import numpy as np
-import matplotlib.pyplot as plt
 import numpy.ma
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 
 class CrossDephasingAnalysis(ba.BaseDataAnalysis):
     '''
-    Analyses measurement-induced Dephasing of qubits
+    Analyses measurement-induced Dephasing of qubits.
+
+    options_dict options:
+     - The inherited options from BaseDataAnalysis
+     - The inherited options from DephasingAnalysis
+     -
     '''
 
     def __init__(self, qubit_labels: list,
@@ -52,6 +56,7 @@ class CrossDephasingAnalysis(ba.BaseDataAnalysis):
                                                 t_stop=t_stop,
                                                 label=label, options_dict=d,
                                                 auto=False, extract_only=True)
+                #TODO: add option to use DephasingAnalysisSingleScans instead
 
         if auto:
             self.run_analysis()

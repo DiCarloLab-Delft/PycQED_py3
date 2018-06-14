@@ -483,6 +483,15 @@ class QuantumEfficiencyAnalysis(ba.BaseDataAnalysis):
         }
 
 class DephasingAnalysis(ba.BaseDataAnalysis):
+    '''
+
+    options_dict options:
+     - fit_phase_offset (bool) - Fit the phase offset?
+     - default_phase_offset (float) - Fixed value for the phase offset.
+                                        Ignored if fit_phase_offset=True
+     - amp_threshold: (float) - maximal amplitude to fit.
+                                 Do not set or set to False to fit all data.
+    '''
 
     def process_data(self):
         # Remove None entries
@@ -560,10 +569,17 @@ class DephasingAnalysis(ba.BaseDataAnalysis):
             params = lmfit.Parameters()
             params.add('s', value=30, min=0.01, max=100, vary=True)
             i = max(int(round(len(phase)/10)), 1)
-            params.add('b', value=np.mean(phase[0:i]), vary=False)
+            fit_offset = self.options_dict.get('fit_phase_offset', False)
+            dpo = self.options_dict.get('default_phase_offset', 180)
+            phase_guess = np.mean(phase[0:i]) if fit_offset else dpo
+
+            params.add('b', value=phase_guess, vary=False)
             params.add('c', expr=cexp)
             mini = lmfit.Minimizer(minimizer_function, params=params, fcn_args=(amps, phase))
             res = mini.minimize(method='differential_evolution')
+
+            if not fit_offset:
+                return res
 
             params2 = lmfit.Parameters()
             params2.add('s', value=res.params['s'].value, min=0.01, max=100, vary=True)
@@ -584,8 +600,6 @@ class DephasingAnalysis(ba.BaseDataAnalysis):
         fit_phase = square(x=fit_amps, s=res.params['s'], b=res.params['b'])
         self.proc_data_dict['coherence_phase_fit'] = {'amps': fit_amps,
                                                       'phase': fit_phase}
-
-
 
     def prepare_plots(self):
         t = self.timestamps[0]
@@ -716,6 +730,10 @@ class DephasingAnalysis(ba.BaseDataAnalysis):
 
 
 class DephasingAnalysisSweep(DephasingAnalysis):
+    '''
+    Gathers/Loads data from a single coherence/dephasing (e.g. Ramsey/) sweep scan
+    and analyses it (see DephasingAnalysis).
+    '''
     def __init__(self, t_start: str = None, t_stop: str = None,
                  label: str = '_ro_amp_sweep_dephasing',
                  options_dict: dict = None, extract_only: bool = False,
@@ -760,6 +778,19 @@ class DephasingAnalysisSweep(DephasingAnalysis):
 
 
 class DephasingAnalysisSingleScans(DephasingAnalysis):
+    '''
+    Gathers/Loads data from a range of single coherence/dephasing scans (e.g. Ramsey/)
+    and analyses it (see DephasingAnalysis).
+
+    options_dict options:
+     - Inherited option from DephasingAnalysis
+     - scaling_amp_key_dephasing (string) - key of the scaling amp in the hdf5 file
+                                             e.g. 'Instrument settings.RO_lutman.M_amp_R0'
+     - dephasing_amplitude_key (string) - key of the coherence amp in the hdf5 file
+                                           e.g. 'Analysis.Fitted Params lin_trans w0.amplitude.value'
+     - dephasing_phase_key: (string) - key of the coherence phase in the hdf5 file
+                                        e.g. 'Analysis.Fitted Params lin_trans w0.phase.value'
+    '''
 
     def __init__(self, t_start: str = None, t_stop: str = None, label: str = '_dephasing',
                  options_dict: dict = None, extract_only: bool = False, auto: bool = True,
