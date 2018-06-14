@@ -71,6 +71,7 @@ class QuantumEfficiencyAnalysisTWPA(ba.BaseDataAnalysis):
         self.label_ssro = label_ssro
 
         self.params_dict = {'TWPA_freq': twpa_pump_freq_key,
+                            'measurementstring': 'measurementstring',
                             'TWPA_power': twpa_pump_power_key}
 
         self.numeric_params = ['TWPA_freq', 'TWPA_power']
@@ -378,6 +379,7 @@ class QuantumEfficiencyAnalysis(ba.BaseDataAnalysis):
         d = '%s' % (youngest.strftime("%Y%m%d"))
         folder = os.path.join(a_tools.datadir, d, f)
         self.raw_data_dict['folder'] = [folder]
+        self.raw_data_dict['measurementstring'] = f
         self.options_dict['analysis_result_file'] = os.path.join(folder, f + '.hdf5')
 
     def run_fitting(self):
@@ -443,9 +445,10 @@ class QuantumEfficiencyAnalysis(ba.BaseDataAnalysis):
                 self.plot_dicts[k]['ax_id'] = 'snr_analysis'
                 self.plot_dicts[k]['ylabel'] = 'SNR, coherence'
                 self.plot_dicts[k]['yunit'] = '(-)'
-                self.plot_dicts[k]['title'] = r'$\eta = (%.4f \pm %.4f)$ %%' % (
-                    100 * self.fit_dicts['eta'], 100 * self.fit_dicts['u_eta'])
-                + title
+                self.plot_dicts[k]['title'] = ''
+                #self.plot_dicts[k]['title'] = r'$\eta = (%.4f \pm %.4f)$ %%' % (
+                #    100 * self.fit_dicts['eta'], 100 * self.fit_dicts['u_eta'])
+                #+ title
 
             #self.plot_dicts['amp_vs_dephasing_fit']['color'] = 'red'
             #self.plot_dicts['amp_vs_dephasing_coherence_fitted']['color'] = 'red'
@@ -534,28 +537,30 @@ class DephasingAnalysis(ba.BaseDataAnalysis):
 
         fit_mask = self.fit_dicts['coherence_fit']['mask']
         fit_mask_inv = self.fit_dicts['coherence_fit']['inv_mask']
-        self.plot_dicts[name + 'amp_vs_dephasing_coherence_fitted'] = {
-            'plotfn': self.plot_line,
-            'ax_id': name + 'amp_vs_dephasing',
-            'zorder': 0,
-            'xvals': amps[fit_mask],
-            'yvals': self.proc_data_dict['coherence'][fit_mask],
-            'marker': 'o',
-            'linestyle': '',
-            'setlabel': 'coherence data',
-            'color': 'red',
-        }
-        self.plot_dicts[name + 'amp_vs_dephasing_coherence_not_fitted'] = {
-            'plotfn': self.plot_line,
-            'ax_id': name + 'amp_vs_dephasing',
-            'zorder': 1,
-            'xvals': amps[fit_mask_inv],
-            'yvals': self.proc_data_dict['coherence'][fit_mask_inv],
-            'marker': 'x',
-            'linestyle': '',
-            'setlabel': 'coherence data (not fitted)',
-            'color': 'red',
-        }
+        if len(fit_mask) > 0:
+            self.plot_dicts[name + 'amp_vs_dephasing_coherence_fitted'] = {
+                'plotfn': self.plot_line,
+                'ax_id': name + 'amp_vs_dephasing',
+                'zorder': 0,
+                'xvals': amps[fit_mask],
+                'yvals': self.proc_data_dict['coherence'][fit_mask],
+                'marker': 'o',
+                'linestyle': '',
+                'setlabel': 'coherence data',
+                'color': 'red',
+            }
+        if len(fit_mask_inv) > 0:
+            self.plot_dicts[name + 'amp_vs_dephasing_coherence_not_fitted'] = {
+                'plotfn': self.plot_line,
+                'ax_id': name + 'amp_vs_dephasing',
+                'zorder': 1,
+                'xvals': amps[fit_mask_inv],
+                'yvals': self.proc_data_dict['coherence'][fit_mask_inv],
+                'marker': 'x',
+                'linestyle': '',
+                'setlabel': 'coherence data (not fitted)',
+                'color': 'red',
+            }
         self.plot_dicts[name + 'amp_vs_dephasing_Phase'] = {
             'plotfn': self.plot_line,
             'xvals': amps,

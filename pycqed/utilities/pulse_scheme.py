@@ -108,3 +108,23 @@ def interval(ax, start, stop, height=1.5, label=None, labelHeight=None,
     if label is not None:
         ax.text((start + stop) / 2, labelHeight, label, color=color,
                 horizontalalignment='center')
+
+def interval_vertical(ax, start, stop, position, label=None, labelHeight=None,
+                      color='k', arrowstyle='<|-|>', labeloffset:float = 0,
+                      horizontalalignment='center'):
+    '''
+    Draw an arrow to indicate an interval.
+    '''
+    if labelHeight is None:
+        labelHeight = (start+stop)/2
+
+    arrow = matplotlib.patches.FancyArrowPatch(
+        posA=(position, start), posB=(position, stop), arrowstyle=arrowstyle,
+        color=color, mutation_scale=7)
+    ax.add_patch(arrow)
+
+    if label is not None:
+        ax.text(position+labeloffset, labelHeight, label, color=color,
+                horizontalalignment=horizontalalignment)
+
+

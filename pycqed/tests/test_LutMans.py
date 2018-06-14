@@ -21,6 +21,7 @@ class Test_MW_LutMan(unittest.TestCase):
         self.AWG8_MW_LutMan.channel_Q(2)
         self.AWG8_MW_LutMan.mw_modulation(100e6)
         self.AWG8_MW_LutMan.sampling_rate(2.4e9)
+        self.AWG8_MW_LutMan.set_default_lutmap()
 
         self.AWG8_VSM_MW_LutMan = mwl.AWG8_VSM_MW_LutMan('MW_LutMan_VSM')
         self.AWG8_VSM_MW_LutMan.AWG(self.AWG.name)
@@ -30,9 +31,42 @@ class Test_MW_LutMan(unittest.TestCase):
         self.AWG8_VSM_MW_LutMan.channel_DQ(4)
         self.AWG8_VSM_MW_LutMan.mw_modulation(100e6)
         self.AWG8_VSM_MW_LutMan.sampling_rate(2.4e9)
+        self.AWG8_VSM_MW_LutMan.set_default_lutmap()
 
         self.CBox_MW_LutMan = mwl.CBox_MW_LutMan('CBox_MW_LutMan')
         self.QWG_MW_LutMan = mwl.QWG_MW_LutMan('QWG_MW_LutMan')
+
+    def test__program_hash_differs_AWG8_lutman(self):
+
+        # set to a random value to ensure different
+        self.AWG8_MW_LutMan._awgs_mw_sequencer_program_expected_hash(351340)
+        hash_differs = self.AWG8_MW_LutMan._program_hash_differs()
+        self.assertTrue(hash_differs)
+
+        self.AWG8_MW_LutMan._update_expected_program_hash()
+        hash_differs = self.AWG8_MW_LutMan._program_hash_differs()
+        self.assertFalse(hash_differs)
+
+    def test__program_hash_differs_AWG8_VSM_lutman(self):
+
+        # set to a random value to ensure different
+        self.AWG8_VSM_MW_LutMan._awgs_mwG_sequencer_program_expected_hash(
+            351340)
+        hash_differs = self.AWG8_VSM_MW_LutMan._program_hash_differs()
+        self.assertTrue(hash_differs)
+
+        self.AWG8_VSM_MW_LutMan._update_expected_program_hash()
+        hash_differs = self.AWG8_VSM_MW_LutMan._program_hash_differs()
+        self.assertFalse(hash_differs)
+
+    def test__program_hash_updated_when_loading_program(self):
+        self.AWG8_MW_LutMan._awgs_mw_sequencer_program_expected_hash(351340)
+        hash_differs = self.AWG8_MW_LutMan._program_hash_differs()
+        self.assertTrue(hash_differs)
+
+        self.AWG8_MW_LutMan.load_waveforms_onto_AWG_lookuptable()
+        hash_differs = self.AWG8_MW_LutMan._program_hash_differs()
+        self.assertFalse(hash_differs)
 
     def test_uploading_standard_pulses(self):
         # Tests that all waveforms are present and no error is raised.
@@ -168,7 +202,7 @@ class Test_Flux_LutMan(unittest.TestCase):
     def setUpClass(self):
         self.AWG = v8.VirtualAWG8('DummyAWG8')
 
-        self.fluxlutman = flm.AWG8_Flux_LutMan('Flux_LutMan')
+        self.fluxlutman = flm.AWG8_Flux_LutMan('fluxlutman_main')
         self.k0 = ko.DistortionKernel('k0')
         self.fluxlutman.instr_distortion_kernel(self.k0.name)
         self.fluxlutman.AWG(self.AWG.name)
@@ -176,6 +210,7 @@ class Test_Flux_LutMan(unittest.TestCase):
         self.fluxlutman.cz_theta_f(80)
         self.fluxlutman.cz_freq_01_max(6.8e9)
         self.fluxlutman.cz_J2(4.1e6)
+        self.fluxlutman.cfg_awg_channel(1)
         # self.fluxlutman.cz_E_c(250e6)
         self.fluxlutman.cz_freq_interaction(5.1e9)
         self.fluxlutman.cfg_max_wf_length(5e-6)
@@ -183,9 +218,40 @@ class Test_Flux_LutMan(unittest.TestCase):
         poly_coeffs = np.array([1.95027142e+09,  -3.22560292e+08,
                                 5.25834946e+07])
         self.fluxlutman.polycoeffs_freq_conv(poly_coeffs)
+        self.fluxlutman.set_default_lutmap()
+        self.fluxlutman.instr_partner_lutman('fluxlutman_partner')
 
-        # for i in range(10):
-        #     self.fluxlutman.set('mcz_phase_corr_amp_{}'.format(i+1), i/10)
+        ################################################
+
+        self.fluxlutman_partner = flm.AWG8_Flux_LutMan('fluxlutman_partner')
+        self.fluxlutman_partner.instr_distortion_kernel(self.k0.name)
+        self.fluxlutman_partner.AWG(self.AWG.name)
+        self.fluxlutman_partner.sampling_rate(2.4e9)
+        self.fluxlutman_partner.cz_theta_f(80)
+        self.fluxlutman_partner.cz_freq_01_max(6.8e9)
+        self.fluxlutman_partner.cz_J2(4.1e6)
+        self.fluxlutman_partner.cfg_awg_channel(2)
+
+        self.fluxlutman_partner.cz_freq_interaction(5.1e9)
+        self.fluxlutman_partner.cfg_max_wf_length(5e-6)
+
+        poly_coeffs = np.array([1.95027142e+09,  -3.22560292e+08,
+                                5.25834946e+07])
+        self.fluxlutman_partner.polycoeffs_freq_conv(poly_coeffs)
+        self.fluxlutman_partner.set_default_lutmap()
+        self.fluxlutman_partner.instr_partner_lutman('fluxlutman_main')
+
+
+    def test__program_hash_differs_AWG8_flux_lutman(self):
+
+        # set to a random value to ensure different
+        self.fluxlutman._awgs_fl_sequencer_program_expected_hash(351340)
+        hash_differs = self.fluxlutman._program_hash_differs()
+        self.assertTrue(hash_differs)
+
+        self.fluxlutman._update_expected_program_hash()
+        hash_differs = self.fluxlutman._program_hash_differs()
+        self.assertFalse(hash_differs)
 
     def test_amp_to_dac_val_conversions(self):
         self.fluxlutman.cfg_awg_channel(1)
@@ -209,6 +275,25 @@ class Test_Flux_LutMan(unittest.TestCase):
         self.assertEqual(sc_inv, 1/sf)
 
         self.fluxlutman.cfg_awg_channel(1)
+
+    def test_partner_lutman_loading(self):
+        self.fluxlutman.sq_amp(.3)
+        self.fluxlutman_partner.sq_amp(.5)
+        self.fluxlutman.load_waveform_realtime('square')
+
+        self.assertEqual(self.AWG._realtime_w0[0], [.3])
+        self.assertEqual(self.AWG._realtime_w1[0], [.5])
+
+    def test_operating_mode_program_loading(self):
+        self.fluxlutman.cfg_operating_mode('Codeword_normal')
+        self.fluxlutman.load_waveforms_onto_AWG_lookuptable()
+
+        self.fluxlutman.cfg_operating_mode('CW_single_02')
+        self.fluxlutman.load_waveforms_onto_AWG_lookuptable()
+
+        self.fluxlutman.cfg_operating_mode('Codeword_normal')
+        self.fluxlutman.load_waveforms_onto_AWG_lookuptable()
+
 
     def test_plot_flux_arc(self):
         self.fluxlutman.plot_flux_arc(show=False, plot_cz_trajectory=True)
@@ -312,6 +397,7 @@ class Test_Flux_LutMan(unittest.TestCase):
 
     def test_custom_wf(self):
         self.fluxlutman.generate_standard_waveforms()
+
         np.testing.assert_array_almost_equal(
             self.fluxlutman._wave_dict['custom_wf'],
             np.array([]))

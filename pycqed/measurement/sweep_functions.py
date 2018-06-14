@@ -1078,79 +1078,79 @@ class FLsweep(Soft_Sweep):
         self.other_waveform = other_waveform
 
     def prepare(self):
-        awg_hack_program = """
-        while (1) {
-          waitDIOTrigger();
-          playWave("dev8005_wave_ch1_cw002", "dev8005_wave_ch2_cw002");
-        }
-        """
-        awg_hack_program_cz = """
-        while (1) {
-          waitDIOTrigger();
-          playWave("dev8005_wave_ch1_cw001", "dev8005_wave_ch2_cw001");
-        }
-        """
-        awg_hack_program_multi_cz = """
-        while (1) {
-          waitDIOTrigger();
-          playWave("dev8005_wave_ch1_cw004", "dev8005_wave_ch2_cw004");
-        }
-        """
-        awg_hack_program_custom_wf = """
-        while (1) {
-          waitDIOTrigger();
-          playWave("dev8005_wave_ch1_cw004", "dev8005_wave_ch2_cw004");
-        }
-        """
-        awg = self.lm.AWG.get_instr()
-        self.lm.load_waveform_onto_AWG_lookuptable(
-            self.waveform_name, regenerate_waveforms=True)
-        if 'multi' in self.waveform_name:
-            awg.configure_awg_from_string(0, awg_hack_program_multi_cz)
-        elif 'z' in self.waveform_name:
-            awg.configure_awg_from_string(0, awg_hack_program_cz)
-        elif 'custom' in self.waveform_name:
-            awg.configure_awg_from_string(0, awg_hack_program_custom_wf)
+        pass
+        # awg_hack_program = """
+        # while (1) {
+        #   waitDIOTrigger();
+        #   playWave("dev8005_wave_ch1_cw002", "dev8005_wave_ch2_cw002");
+        # }
+        # """
+        # awg_hack_program_cz = """
+        # while (1) {
+        #   waitDIOTrigger();
+        #   playWave("dev8005_wave_ch1_cw001", "dev8005_wave_ch2_cw001");
+        # }
+        # """
+        # awg_hack_program_multi_cz = """
+        # while (1) {
+        #   waitDIOTrigger();
+        #   playWave("dev8005_wave_ch1_cw004", "dev8005_wave_ch2_cw004");
+        # }
+        # """
+        # awg_hack_program_custom_wf = """
+        # while (1) {
+        #   waitDIOTrigger();
+        #   playWave("dev8005_wave_ch1_cw004", "dev8005_wave_ch2_cw004");
+        # }
+        # """
+        # awg = self.lm.AWG.get_instr()
+        # self.lm.load_waveform_onto_AWG_lookuptable(
+        #     self.waveform_name, regenerate_waveforms=True)
+        # if 'multi' in self.waveform_name:
+        #     awg.configure_awg_from_string(0, awg_hack_program_multi_cz)
+        # elif 'z' in self.waveform_name:
+        #     awg.configure_awg_from_string(0, awg_hack_program_cz)
+        # elif 'custom' in self.waveform_name:
+        #     awg.configure_awg_from_string(0, awg_hack_program_custom_wf)
 
-        else:
-            awg.configure_awg_from_string(0, awg_hack_program)
+        # else:
+        #     awg.configure_awg_from_string(0, awg_hack_program)
 
-        awg.configure_codeword_protocol()
-        awg.start()
+        # awg.configure_codeword_protocol()
+        # awg.start()
 
     def set_parameter(self, val):
         self.par(val)
-        if self.realtime_loading:
-            self.lm.load_waveform_realtime(
-                self.waveform_name, other_waveform=self.other_waveform)
-        else:
-            awg = self.lm.AWG.get_instr()
-            awg_hack_program = """
-            while (1) {
-              waitDIOTrigger();
-              playWave("dev8005_wave_ch1_cw002", "dev8005_wave_ch2_cw002");
-            }
-            """
-            awg_hack_program_cz = """
-            while (1) {
-              waitDIOTrigger();
-              playWave("dev8005_wave_ch1_cw001", "dev8005_wave_ch2_cw001");
-            }
-            """
-            awg_hack_program_multi_cz = """
-            while (1) {
-              waitDIOTrigger();
-              playWave("dev8005_wave_ch1_cw004", "dev8005_wave_ch2_cw004");
-            }
-            """
-            self.lm.load_waveform_onto_AWG_lookuptable(
-                self.waveform_name, regenerate_waveforms=True)
-            if 'z' in self.waveform_name:
-                awg.configure_awg_from_string(0, awg_hack_program_cz)
-            else:
-                awg.configure_awg_from_string(0, awg_hack_program)
-            awg.configure_codeword_protocol()
-            awg.start()
+        # if self.realtime_loading:
+        self.lm.load_waveform_realtime(self.waveform_name)
+        # else:
+        #     awg = self.lm.AWG.get_instr()
+        #     awg_hack_program = """
+        #     while (1) {
+        #       waitDIOTrigger();
+        #       playWave("dev8005_wave_ch1_cw002", "dev8005_wave_ch2_cw002");
+        #     }
+        #     """
+        #     awg_hack_program_cz = """
+        #     while (1) {
+        #       waitDIOTrigger();
+        #       playWave("dev8005_wave_ch1_cw001", "dev8005_wave_ch2_cw001");
+        #     }
+        #     """
+        #     awg_hack_program_multi_cz = """
+        #     while (1) {
+        #       waitDIOTrigger();
+        #       playWave("dev8005_wave_ch1_cw004", "dev8005_wave_ch2_cw004");
+        #     }
+        #     """
+        #     self.lm.load_waveform_onto_AWG_lookuptable(
+        #         self.waveform_name, regenerate_waveforms=True)
+        #     if 'z' in self.waveform_name:
+        #         awg.configure_awg_from_string(0, awg_hack_program_cz)
+        #     else:
+        #         awg.configure_awg_from_string(0, awg_hack_program)
+        #     awg.configure_codeword_protocol()
+        #     awg.start()
 
 
 class FLsweep_QWG(Soft_Sweep):
