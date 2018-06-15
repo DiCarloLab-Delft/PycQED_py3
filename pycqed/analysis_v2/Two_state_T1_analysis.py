@@ -58,7 +58,6 @@ class efT1_analysis(ba.BaseDataAnalysis):
         self.raw_data_dict['measured_values_X'] = OrderedDict()
 
         for i, val_name in enumerate(a.value_names):
-            measured_values[i]
             self.raw_data_dict['cal_pts_zero'][val_name] = \
                 a.measured_values[i][-6:-4]
             self.raw_data_dict['cal_pts_one'][val_name] = \
@@ -326,9 +325,10 @@ def ExpDecayFunclocal(t, tau, amplitude, offset):
 
 
 def DoubleExpDecayFunclocal(t, tau1, tau2, amplitude1, amplitude2, offset):
-    return amplitude1 * np.exp(-(t / tau1)) - amplitude2 * np.exp(-(t / tau2))
-    + offset
+    return amplitude1 * np.exp(-(t / tau1)) - \
+        amplitude2 * np.exp(-(t / tau2)) + offset
+
 
 def DoubleExpDecayFunclocal2(t, tau1, tau2, amplitude1, amplitude2, offset):
-    return amplitude1/tau1 * np.exp(-(t / tau1))
-    - amplitude2/tau2 * np.exp(-(t / tau2)) + offset
+    return amplitude1/tau1 * np.exp(-(t / tau1)) - \
+        amplitude2/tau2 * np.exp(-(t / tau2)) + offset
