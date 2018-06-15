@@ -135,10 +135,10 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         self.add_parameter(
             'cfg_operating_mode',
             initial_value='Codeword_normal',
-            vals=vals.Enum('Codeword_normal',
-                           'CW_single_01', 'CW_single_02',
-                           'CW_single_03', 'CW_single_04',
-                           'CW_single_05', 'CW_single_06'),
+            vals=vals.Enum('Codeword_normal'),
+                           # 'CW_single_01', 'CW_single_02',
+                           # 'CW_single_03', 'CW_single_04',
+                           # 'CW_single_05', 'CW_single_06'),
             docstring='Used to determine what program to load in the AWG8. '
             'If set to "Codeword_normal" it does codeword triggering, '
             'other modes exist to play only a specific single waveform.',
@@ -540,7 +540,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
     def _gen_cz_z(self, regenerate_cz=True):
         if regenerate_cz:
             self._wave_dict['cz'] = self._gen_cz()
-        phase_corr = self._gen_phase_corr(cz_offset_comp=False)
+        phase_corr = self._gen_phase_corr(cz_offset_comp=True)
         # CZ with phase correction
         cz_z = np.concatenate([self._wave_dict['cz'], phase_corr])
 
@@ -560,7 +560,13 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             sample_start_idx = int(self.mcz_gate_separation() *
                                    self.sampling_rate())*i
             sq = self._wave_dict['square']
-            waveform[sample_start_idx:sample_start_idx+len(sq)] += sq
+            try:
+                waveform[sample_start_idx:sample_start_idx+len(sq)] += sq
+            except ValueError as e:
+                logging.warning('Could not add square pulse {} in {}'.format(
+                    i, self.name))
+                logging.warning(e)
+                break
         return waveform
 
     def _gen_multi_cz(self, regenerate_cz=True):
@@ -578,7 +584,13 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             cz_z = self._wave_dict['cz_z']
             sample_start_idx = int(self.mcz_gate_separation() *
                                    self.sampling_rate())*i
-            waveform[sample_start_idx:sample_start_idx+len(cz_z)] += cz_z
+            try:
+                waveform[sample_start_idx:sample_start_idx+len(cz_z)] += cz_z
+            except ValueError as e:
+                logging.warning('Could not add cz_z pulse {} in {}'.format(
+                    i, self.name))
+                logging.warning(e)
+                break
         # CZ with phase correction
         return waveform
 
@@ -666,7 +678,13 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                                    phase_corr])
             sample_start_idx = int(self.mcz_gate_separation() *
                                    self.sampling_rate())*i
-            waveform[sample_start_idx:sample_start_idx+len(cz_z)] += cz_z
+            try:
+                waveform[sample_start_idx:sample_start_idx+len(cz_z)] += cz_z
+            except ValueError as e:
+                logging.warning('Could not add idle_z pulse {} in {}'.format(
+                    i, self.name))
+                logging.warning(e)
+                break
         # CZ with phase correction
         return waveform
 
@@ -734,6 +752,10 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         # Uploading the codeword program if required
         if self._program_hash_differs() or force_load_sequencer_program:
+            # FIXME: List of conditions in which reloading is required
+            # - program hash differs
+            # - max waveform length has changed
+            # N.B. these other conditions need to be included here.
             # This ensures only the channels that are relevant get reconfigured
             awg_nr = (self.cfg_awg_channel()-1)//2
             self._upload_codeword_program(awg_nr)
@@ -860,6 +882,8 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                 self._wave_dict_dist[waveform_name] = waveform
 
         waveform = self._wave_dict_dist[waveform_name]
+        codeword = self.LutMap()[waveform_name]
+        self.AWG.get_instr().set(codeword, waveform)
 
         if self.instr_partner_lutman() is None:
             logging.warning('no partner lutman specified')

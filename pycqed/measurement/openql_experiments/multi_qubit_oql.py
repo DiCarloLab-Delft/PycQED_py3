@@ -925,6 +925,7 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
                                 add_cal_points: bool=True,
                                 CZ_duration: int=260,
                                 nr_of_repeated_gates: int =1,
+                                fixed_max_nr_of_repeated_gates: int=None,
                                 cases: list=('no_excitation', 'excitation'),
                                 flux_codeword: str='fl_cw_01'):
     '''
@@ -963,9 +964,15 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
             if not CZ_disabled:
                 for j in range(nr_of_repeated_gates):
                     k.gate(flux_codeword, 2, 0)
+                if fixed_max_nr_of_repeated_gates is not None:
+                    for l in range(fixed_max_nr_of_repeated_gates-j):
+                        k.gate('fl_cw_00', 2,0)
             else:
                 for j in range(nr_of_repeated_gates):
                     k.gate('wait', [2, 0], CZ_duration)  # in ns
+                if fixed_max_nr_of_repeated_gates is not None:
+                    for l in range(fixed_max_nr_of_repeated_gates-j):
+                        k.gate('wait', [2, 0], CZ_duration)
             k.gate('wait', [2, 0], wait_time)
             # hardcoded angles, must be uploaded to AWG
             if angle == 90:
@@ -1166,7 +1173,9 @@ def grovers_tomography(q0: int, q1: int, omega: int, platf_cfg: str,
     return p
 
 
-def CZ_poisoned_purity_seq(q0, q1, platf_cfg: str, cal_points: bool=True):
+def CZ_poisoned_purity_seq(q0, q1, platf_cfg: str,
+                           nr_of_repeated_gates: int,
+                           cal_points: bool=True):
     """
     Creates the |00> + |11> Bell state and does a partial tomography in
     order to determine the purity of both qubits.
@@ -1184,7 +1193,8 @@ def CZ_poisoned_purity_seq(q0, q1, platf_cfg: str, cal_points: bool=True):
         # Create a Bell state:  |00> + |11>
         k.gate('rym90', q0)
         k.gate('ry90', q1)
-        k.gate('fl_cw_01', 2, 0)
+        for i in range(nr_of_repeated_gates):
+            k.gate('fl_cw_01', 2, 0)
         k.gate('rym90', q1)
 
         # Perform pulses to measure the purity of both qubits
