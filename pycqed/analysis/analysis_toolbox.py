@@ -1861,6 +1861,7 @@ def linecut_plot(x, y, z, fig, ax,
     z must be a 2D array with shape(len(x),len(y)).
     '''
     colormap = plt.cm.get_cmap('RdYlBu')
+    # FIXME: replace with set_prop_cycle
     plt.gca().set_color_cycle([colormap(i) for i in np.linspace(
                               0, 0.9, len(y))])
     for i in range(len(y)):
