@@ -886,6 +886,21 @@ class lutman_par_dB_attenuation_UHFQC(Soft_Sweep):
             self.LutMan.UHFQC.acquisition_arm(single=self.single)
 
 
+class par_dB_attenuation_UHFQC_AWG_direct(Soft_Sweep):
+    def __init__(self, UHFQC, **kw):
+        self.set_kw()
+        self.name = "UHFQC attenuation"
+        self.parameter_name = "UHFQC attenuation"
+        self.unit = 'dB'
+        self.sweep_control = 'soft'
+        self.UHFQC = UHFQC
+
+    def set_parameter(self, val):
+        UHFQC.awgs_0_outputs_1_amplitude(10**(val/20))
+        UHFQC.awgs_0_outputs_0_amplitude(10**(val/20))
+       
+
+
 class lutman_par_UHFQC_dig_trig(Soft_Sweep):
     def __init__(self, LutMan, LutMan_parameter, single=True, run=False,**kw):
         self.set_kw()
