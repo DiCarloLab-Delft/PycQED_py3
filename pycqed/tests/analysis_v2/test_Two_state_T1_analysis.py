@@ -3,9 +3,9 @@ import pycqed as pq
 import os
 from pycqed.analysis_v2 import measurement_analysis as ma
 from pycqed.analysis_v2 import Two_state_T1_analysis as Ta
-
 class Test_efT1_analysis(unittest.TestCase):
 
+    @classmethod
     def setUpClass(self):
         self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
         ma.a_tools.datadir = self.datadir

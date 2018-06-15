@@ -41,7 +41,6 @@ class efT1_analysis(ba.BaseDataAnalysis):
         a.get_naming_and_values()
 
         time = a.sweep_points[:-6:2]
-        measured_values = a.measured_values
 
         self.raw_data_dict['time'] = time
         self.raw_data_dict['time units'] = a.sweep_unit[0]
