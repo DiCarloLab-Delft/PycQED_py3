@@ -7,7 +7,6 @@ import pycqed.analysis_v2.base_analysis as ba
 import numpy as np
 import logging
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
-import matplotlib.pyplot as plt
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str
 
 
@@ -186,7 +185,7 @@ class efT1_analysis(ba.BaseDataAnalysis):
                 fit_res_P0 = doubledecay_mod.fit(
                              data=self.proc_data_dict['P0'][value_name],
                              t=self.proc_data_dict['time'],
-                             params=params2)
+                             params=params3)
 
             self.fit_res['fit_res_P0'] = fit_res_P0
         except Exception as e:
@@ -215,13 +214,12 @@ class efT1_analysis(ba.BaseDataAnalysis):
                           + '\n' +
                           self.proc_data_dict['measurementstring']
                 }
-            fs = plt.rcParams['figure.figsize']
 
             # define figure and axes here to have custom layout
 
             self.plot_dicts['fit_res_P0'] = {
                 'plotfn': self.plot_fit,
-                #'plot_init': True,
+                # 'plot_init': True,
                 'ax_id': 'plot_populations_{}'.format(val_name),
                 'fit_res': self.fit_res['fit_res_P0'],
                 'setlabel': r'P($|g\rangle$) fit',
@@ -231,7 +229,7 @@ class efT1_analysis(ba.BaseDataAnalysis):
 
             self.plot_dicts['fit_res_P1'] = {
                 'plotfn': self.plot_fit,
-                #'plot_init': True,
+                # 'plot_init': True,
                 'ax_id': 'plot_populations_{}'.format(val_name),
                 'fit_res': self.fit_res['fit_res_P1'],
                 'setlabel': r'P($|e\rangle$) fit',
@@ -269,7 +267,7 @@ def plot_populations(time, P0, P1, P2, ax,
             label=r'P($|f\rangle$)', marker='d')
 
     set_xlabel(ax, xlabel, xunit)
-    ax.set_ylabel('Population')
+    set_ylabel('Population')
     ax.grid(axis='y')
     ax.legend()
     ax.set_ylim(-.05, 1.05)
@@ -329,9 +327,8 @@ def ExpDecayFunclocal(t, tau, amplitude, offset):
 
 def DoubleExpDecayFunclocal(t, tau1, tau2, amplitude1, amplitude2, offset):
     return amplitude1 * np.exp(-(t / tau1)) - amplitude2 * np.exp(-(t / tau2))
-           + offset
-
+    + offset
 
 def DoubleExpDecayFunclocal2(t, tau1, tau2, amplitude1, amplitude2, offset):
     return amplitude1/tau1 * np.exp(-(t / tau1))
-           - amplitude2/tau2 * np.exp(-(t / tau2)) + offset
+    - amplitude2/tau2 * np.exp(-(t / tau2)) + offset
