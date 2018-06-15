@@ -47,16 +47,13 @@ AWG8 = ZI_HDAWG8.ZI_HDAWG8('AWG8_8006', device='dev8006')
 #  2. Starting AWG8 test program in CCL  #
 ##########################################
 
-AWG_type = 'microwave'
-# AWG_type = 'flux'
+# AWG_type = 'microwave'
+AWG_type = 'flux'
 
 if AWG_type == 'microwave':
     example_fp = os.path.abspath(
         os.path.join(pq.__path__[0], '..', 'examples', 'CCLight_example',
                      'qisa_test_assembly', 'consecutive_cws_double.qisa'))
-    # example_fp = os.path.abspath(
-    #     os.path.join(pq.__path__[0], '..', 'examples', 'CCLight_example',
-    #                  'qisa_test_assembly', 'consecutive_cws_double_back_to_back.qisa'))
 elif AWG_type == 'flux':
     example_fp = os.path.abspath(os.path.join(pq.__path__[0], '..',
                                               'examples', 'CCLight_example',
@@ -105,6 +102,23 @@ AWG8.upload_codeword_program()
 
 
 success = AWG8.calibrate_dio_protocol()
+
+
+#######################################################################
+#  4. Verifying the DIO calibration with back to back staircase       #
+#######################################################################
+
+if AWG_type == 'microwave':
+    example_fp = os.path.abspath(
+        os.path.join(pq.__path__[0], '..',
+                     'examples', 'CCLight_example', 'qisa_test_assembly',
+                     'consecutive_cws_double_back_to_back.qisa'))
+elif AWG_type == 'flux':
+    example_fp = os.path.abspath(
+        os.path.join(pq.__path__[0], '..',
+                     'examples', 'CCLight_example', 'qisa_test_assembly',
+                     'consecutive_cws_flux_back_to_back.qisa'))
+
+print(example_fp)
 CCL.eqasm_program(example_fp)
 CCL.start()
-AWG8.calibrate_dio_protocol()
