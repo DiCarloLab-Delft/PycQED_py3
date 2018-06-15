@@ -1607,8 +1607,10 @@ class SingleQubitResetAnalysis(ba.BaseDataAnalysis):
     def process_data(self):
         nr_reset = self.options_dict.get('nr_reset')
         nr_readout = nr_reset + 1
+        qubit_idx = self.options_dict.get('qubit_idx')
+        nr_qubits = len(self.raw_data_dict['value_names'])
         nr_bins = self.options_dict.get('nr_bins', 100)
-
+        
         ######################################
         # extract shots to individual arrays #
         ######################################
@@ -1620,12 +1622,17 @@ class SingleQubitResetAnalysis(ba.BaseDataAnalysis):
         self.proc_data_dict['shots_1_dig'] = ['']*nr_readout
         self.proc_data_dict['channel_idx'] = self.raw_data_dict['value_names'] \
             .index(self.options_dict['channel_name'])
+        channel_idx = self.proc_data_dict['channel_idx']
+        
+        readout_idxs = np.arange(len(self.raw_data_dict['measured_values'][0]))
         for i in range(nr_readout):
-            channel_idx = self.proc_data_dict['channel_idx']
+            mask0 = (readout_idxs % nr_readout == i)
+            mask1 = mask0*((readout_idxs//(nr_readout*2**qubit_idx))%2 == 1)
+            mask0 = mask0*((readout_idxs//(nr_readout*2**qubit_idx))%2 == 0)
             shots0 = self.raw_data_dict['measured_values'] \
-                [channel_idx][i::(2*nr_readout)]
+                [channel_idx][mask0]
             shots1 = self.raw_data_dict['measured_values'] \
-                [channel_idx][(i+nr_readout)::(2*nr_readout)]
+                [channel_idx][mask1]
             self.shots_max = max(self.shots_max, max(shots0.max(), shots1.max()))
             self.shots_min = min(self.shots_min, min(shots0.min(), shots1.min()))
             self.proc_data_dict['shots_0'][i] = shots0
@@ -1750,10 +1757,11 @@ class SingleQubitResetAnalysis(ba.BaseDataAnalysis):
     def prepare_plots(self):
         nr_reset = self.options_dict.get('nr_reset')
         nr_readout = nr_reset + 1
-
+        qubit_idx = self.options_dict.get('qubit_idx')
+        
         # readout histograms
         for i in range(nr_readout):
-            self.plot_dicts['ro_{}_hist'.format(i+1)] = {
+            self.plot_dicts['ro_{}_hist_qb_idx{}'.format(i+1, qubit_idx)] = {
                 'title': 'Readout {} histogram'.format(i+1),
                 'plotfn': self.plot_line,
                 'xvals': self.proc_data_dict['bin_centers'],
@@ -1767,7 +1775,7 @@ class SingleQubitResetAnalysis(ba.BaseDataAnalysis):
                 'marker': 'o',
                 'do_legend': True}
             self.plot_dicts['hist_1_{}'.format(i)] = {
-                'ax_id': 'ro_{}_hist'.format(i+1),
+                'ax_id': 'ro_{}_hist_qb_idx{}'.format(i+1, qubit_idx),
                 'plotfn': self.plot_line,
                 'xvals': self.proc_data_dict['bin_centers'],
                 'yvals': self.proc_data_dict['hist_1'][i],
@@ -1778,7 +1786,7 @@ class SingleQubitResetAnalysis(ba.BaseDataAnalysis):
             max_cnts = max(self.proc_data_dict['hist_1'][i].max(),
                            self.proc_data_dict['hist_0'][i].max())
             self.plot_dicts['ro_threshold_{}'.format(i)] = {
-                'ax_id': 'ro_{}_hist'.format(i+1),
+                'ax_id': 'ro_{}_hist_qb_idx{}'.format(i+1, qubit_idx),
                 'plotfn': self.plot_vlines,
                 'x': self.options_dict['threshold'],
                 'ymin': 0,
@@ -1789,7 +1797,7 @@ class SingleQubitResetAnalysis(ba.BaseDataAnalysis):
                 'setlabel': 'Threshold',
                 'do_legend': True}
             self.plot_dicts['prob_0_{}'.format(i)] = {
-                'ax_id': 'ro_{}_hist'.format(i+1),
+                'ax_id': 'ro_{}_hist_qb_idx{}'.format(i+1, qubit_idx),
                 'plotfn': self.plot_line,
                 'xvals': [self.options_dict['threshold']],
                 'yvals': [max_cnts/2],
@@ -1797,7 +1805,7 @@ class SingleQubitResetAnalysis(ba.BaseDataAnalysis):
                 'setlabel': r'$p(e|0) = {:.1f}$'.format(100*self.proc_data_dict['pe0'][i]),
                 'do_legend': True}
             self.plot_dicts['prob_1_{}'.format(i)] = {
-                'ax_id': 'ro_{}_hist'.format(i+1),
+                'ax_id': 'ro_{}_hist_qb_idx{}'.format(i+1, qubit_idx),
                 'plotfn': self.plot_line,
                 'xvals': [self.options_dict['threshold']],
                 'yvals': [max_cnts/2],
@@ -1808,7 +1816,7 @@ class SingleQubitResetAnalysis(ba.BaseDataAnalysis):
         # reset histograms
         for i in range(nr_reset):
             hist2D = self.proc_data_dict['hist2_0'][i] + self.proc_data_dict['hist2_1'][i]
-            self.plot_dicts['reset_{}_hist'.format(i+1)] = {
+            self.plot_dicts['reset_{}_hist_qb_idx{}'.format(i+1, qubit_idx)] = {
                 'title': 'Reset {} histogram'.format(i+1),
                 'plotfn': self.plot_colorxy,
                 'xvals': self.proc_data_dict['bin_centers'],
@@ -1821,9 +1829,9 @@ class SingleQubitResetAnalysis(ba.BaseDataAnalysis):
                 'yunit': self.raw_data_dict['value_units'][0],
                 'zrange': (0, np.log10(hist2D.max())),
                 'logzscale': True,
-                'zlabel': 'log10(counts)'}
+                'clabel': 'log10(counts)'}
             self.plot_dicts['reset_{}_hist_vline'.format(i+1)] = {
-                'ax_id': 'reset_{}_hist'.format(i+1),
+                'ax_id': 'reset_{}_hist_qb_idx{}'.format(i+1, qubit_idx),
                 'plotfn': self.plot_vlines,
                 'x': self.options_dict['threshold'],
                 'ymin': self.proc_data_dict['bin_edges'].min(),
@@ -1832,7 +1840,7 @@ class SingleQubitResetAnalysis(ba.BaseDataAnalysis):
                 'linestyles': 'dashed',
                 'line_kws': {'linewidth': .8}}
             self.plot_dicts['reset_{}_hist_hline'.format(i+1)] = {
-                'ax_id': 'reset_{}_hist'.format(i+1),
+                'ax_id': 'reset_{}_hist_qb_idx{}'.format(i+1, qubit_idx),
                 'plotfn': self.plot_vlines,
                 'func': 'hlines',
                 'x': self.options_dict['threshold'],
@@ -1841,7 +1849,7 @@ class SingleQubitResetAnalysis(ba.BaseDataAnalysis):
                 'colors': '.3',
                 'linestyles': 'dashed',
                 'line_kws': {'linewidth': .8}}
-            self.plot_dicts['reset_{}_hist_g'.format(i+1)] = {
+            self.plot_dicts['reset_{}_hist_g_qb_idx{}'.format(i+1, qubit_idx)] = {
                 'title': 'Reset {} histogram, ground state preparation'.format(i+1),
                 'plotfn': self.plot_colorxy,
                 'xvals': self.proc_data_dict['bin_centers'],
@@ -1855,7 +1863,7 @@ class SingleQubitResetAnalysis(ba.BaseDataAnalysis):
                 'logzscale': True,
                 'zlabel': 'log10(counts)'}
             self.plot_dicts['reset_{}_hist_g_vline'.format(i+1)] = {
-                'ax_id': 'reset_{}_hist_g'.format(i+1),
+                'ax_id': 'reset_{}_hist_g_qb_idx{}'.format(i+1, qubit_idx),
                 'plotfn': self.plot_vlines,
                 'x': self.options_dict['threshold'],
                 'ymin': self.proc_data_dict['bin_edges'].min(),
@@ -1864,7 +1872,7 @@ class SingleQubitResetAnalysis(ba.BaseDataAnalysis):
                 'linestyles': 'dashed',
                 'line_kws': {'linewidth': .8}}
             self.plot_dicts['reset_{}_hist_g_hline'.format(i+1)] = {
-                'ax_id': 'reset_{}_hist_g'.format(i+1),
+                'ax_id': 'reset_{}_hist_g_qb_idx{}'.format(i+1, qubit_idx),
                 'plotfn': self.plot_vlines,
                 'func': 'hlines',
                 'x': self.options_dict['threshold'],
@@ -1873,7 +1881,7 @@ class SingleQubitResetAnalysis(ba.BaseDataAnalysis):
                 'colors': '.3',
                 'linestyles': 'dashed',
                 'line_kws': {'linewidth': .8}}
-            self.plot_dicts['reset_{}_hist_e'.format(i+1)] = {
+            self.plot_dicts['reset_{}_hist_e_qb_idx{}'.format(i+1, qubit_idx)] = {
                 'title': 'Reset {} histogram, excited state preparation'.format(i+1),
                 'plotfn': self.plot_colorxy,
                 'xvals': self.proc_data_dict['bin_centers'],
@@ -1887,7 +1895,7 @@ class SingleQubitResetAnalysis(ba.BaseDataAnalysis):
                 'logzscale': True,
                 'zlabel': 'log10(counts)'}
             self.plot_dicts['reset_{}_hist_e_vline'.format(i+1)] = {
-                'ax_id': 'reset_{}_hist_e'.format(i+1),
+                'ax_id': 'reset_{}_hist_e_qb_idx{}'.format(i+1, qubit_idx),
                 'plotfn': self.plot_vlines,
                 'x': self.options_dict['threshold'],
                 'ymin': self.proc_data_dict['bin_edges'].min(),
@@ -1896,7 +1904,7 @@ class SingleQubitResetAnalysis(ba.BaseDataAnalysis):
                 'linestyles': 'dashed',
                 'line_kws': {'linewidth': .8}}
             self.plot_dicts['reset_{}_hist_e_hline'.format(i+1)] = {
-                'ax_id': 'reset_{}_hist_e'.format(i+1),
+                'ax_id': 'reset_{}_hist_e_qb_idx{}'.format(i+1, qubit_idx),
                 'plotfn': self.plot_vlines,
                 'func': 'hlines',
                 'x': self.options_dict['threshold'],

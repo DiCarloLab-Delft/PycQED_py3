@@ -8,7 +8,10 @@ from abc import ABCMeta, abstractmethod
 from sklearn.model_selection import GridSearchCV as gcv, train_test_split
 from sklearn.neural_network import MLPRegressor as mlpr
 #from neupy.algorithms import GRNN as grnn
-import tensorflow as tf
+try:
+	import tensorflow as tf
+except Exception:
+	logging.warning('Could not import tensorflow')
 
 
 class Estimator(metaclass=ABCMeta):
