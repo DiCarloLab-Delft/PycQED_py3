@@ -1216,7 +1216,7 @@ class TD_Analysis(MeasurementAnalysis):
         self.add_dataset_to_analysisgroup('Corrected data',
                                           self.corr_data)
         self.analysis_group.attrs.create('corrected data based on',
-                                         'calibration points'.encode('utf-8'))
+                                        'calibration points'.encode('utf-8'))
 
         # Plotting
         if self.make_fig:
@@ -6879,8 +6879,8 @@ class Three_Tone_Spectroscopy_Analysis(MeasurementAnalysis):
                      verticalalignment='top',
                      horizontalalignment='right',
                      bbox=self.box_props)
-        self.save_fig(fig1, figname=ax1.get_title(), **kw)
-        self.save_fig(fig2, figname=ax2.get_title(), **kw)
+        self.save_fig(fig1, figname=fig1_title, **kw)
+        self.save_fig(fig2, figname=fig2_title, **kw)
         self.finish()
 
     def fit_twin_lorentz(self, x, data,
@@ -7937,20 +7937,20 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         self.get_naming_and_values_2D()
 
         flux = self.Y[:, 0]
-        peaks_low, peaks_high = self.find_peaks()
-        self.f, self.ax = self.make_unfiltered_figure(peaks_low, peaks_high,
+        self.peaks_low, self.peaks_high = self.find_peaks()
+        self.f, self.ax = self.make_unfiltered_figure(self.peaks_low, self.peaks_high,
                                                       transpose=transpose, cmap=cmap,
                                                       add_title=add_title,
                                                       xlabel=xlabel, ylabel=ylabel)
 
-        filtered_dat = self.filter_data(flux, peaks_low, peaks_high,
+        self.filtered_dat = self.filter_data(flux, self.peaks_low, self.peaks_high,
                                         a=filt_func_a, x0=filt_func_x0,
                                         y0=filt_func_y0,
                                         filter_idx_low=filter_idx_low,
                                         filter_idx_high=filter_idx_high,
                                         filter_threshold=filter_threshold)
         filt_flux_low, filt_flux_high, filt_peaks_low, filt_peaks_high, \
-        filter_func = filtered_dat
+        filter_func = self.filtered_dat
 
         self.f, self.ax = self.make_filtered_figure(filt_flux_low, filt_flux_high,
                                                     filt_peaks_low, filt_peaks_high, filter_func,
