@@ -267,7 +267,7 @@ def plot_populations(time, P0, P1, P2, ax,
             label=r'P($|f\rangle$)', marker='d')
 
     set_xlabel(ax, xlabel, xunit)
-    set_ylabel(ylabel)
+    set_ylabel(ax, ylabel)
     ax.grid(axis='y')
     ax.legend()
     ax.set_ylim(-.05, 1.05)
