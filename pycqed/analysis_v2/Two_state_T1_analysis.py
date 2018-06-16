@@ -202,7 +202,7 @@ class efT1_analysis(ba.BaseDataAnalysis):
                 'time': self.proc_data_dict['time'],
                 'P0': self.proc_data_dict['P0'][val_name],
                 'P1': self.proc_data_dict['P1'][val_name],
-                'P2':   self.proc_data_dict['P2'][val_name],
+                'P2': self.proc_data_dict['P2'][val_name],
 
                 'xlabel': 'Time',
                 'xunit': self.raw_data_dict['time units'],
@@ -329,5 +329,5 @@ def DoubleExpDecayFunclocal(t, tau1, tau2, amplitude1, amplitude2, offset):
 
 
 def DoubleExpDecayFunclocal2(t, tau1, tau2, amplitude1, amplitude2, offset):
-    return amplitude1/tau1 * np.exp(-(t / tau1)) - \
-        amplitude2/tau2 * np.exp(-(t / tau2)) + offset
+    return - amplitude1 * np.exp(-(t / tau1)) + \
+        amplitude2 * np.exp(-(t / tau2)) * tau2 / tau1 + offset
