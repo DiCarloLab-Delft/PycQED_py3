@@ -15,3 +15,4 @@ class Test_efT1_analysis(unittest.TestCase):
     def test_efT1_analysis(self):
         Ta.efT1_analysis(
             t_start='20180606_144110', auto=True, close_figs=False)
+        self.fit_res['fit_res_P0'].params['tau1'].value
