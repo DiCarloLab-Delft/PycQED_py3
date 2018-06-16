@@ -15,5 +15,7 @@ class Test_efT1_analysis(unittest.TestCase):
     def test_efT1_analysis(self):
         b = Ta.efT1_analysis(
             t_start='20180606_144110', auto=True, close_figs=False)
-        t1 = b.fit_res['fit_res_P0'].params['tau1'].value
-        self.assertAlmostEqual(t1*1e6, 33.393, places=1)
+        t1_ef = b.fit_res['fit_res_P2'].params['tau'].value
+        t1_eg = b.fit_res['fit_res_P1'].params['tau1'].value
+        self.assertAlmostEqual(t1_ef*1e6, 25.698, places=1)
+        self.assertAlmostEqual(t1_eg*1e6, 33.393, places=1)
