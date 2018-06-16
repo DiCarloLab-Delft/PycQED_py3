@@ -13,6 +13,7 @@ class Test_efT1_analysis(unittest.TestCase):
         ma.a_tools.datadir = self.datadir
 
     def test_efT1_analysis(self):
-        Ta.efT1_analysis(
+        b = Ta.efT1_analysis(
             t_start='20180606_144110', auto=True, close_figs=False)
-        self.fit_res['fit_res_P0'].params['tau1'].value
+        t1 = b.fit_res['fit_res_P0'].params['tau1'].value
+        self.assertAlmostEqual(t1*1e6, 33.393, places=1)
