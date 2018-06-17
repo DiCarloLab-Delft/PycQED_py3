@@ -703,8 +703,8 @@ class MeasurementAnalysis(object):
         ax.xaxis.offsetText.set_fontsize(self.font_size)
         ax.yaxis.offsetText.set_fontsize(self.font_size)
         if ticks_around:
-            ax.xaxis.set_tick_params(labeltop='off', top='on', direction='in')
-            ax.yaxis.set_tick_params(labeltop='off', top='on', direction='in')
+            ax.xaxis.set_tick_params(labeltop=False, top=True, direction='in')
+            ax.yaxis.set_tick_params(labeltop=False, top=True, direction='in')
         ax.tick_params(axis='both', labelsize=self.font_size,
                        length=self.tick_length, width=self.tick_width)
 
