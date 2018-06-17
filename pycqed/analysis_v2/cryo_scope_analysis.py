@@ -294,11 +294,12 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
                  options_dict: dict=None,
                  sliding_pulse_duration=220e-9,
                  freq_to_amp=None, amp_to_freq=None,
+                 close_figs: bool = True,
                  f_demod: float=0, demodulate: bool=False, auto=True):
         if options_dict is None:
             options_dict = dict()
         super().__init__(t_start=t_start, t_stop=t_stop, label=label,
-                         options_dict=options_dict)
+                         options_dict=options_dict, close_figs=close_figs)
 
         self.freq_to_amp = freq_to_amp
         self.amp_to_freq = amp_to_freq
