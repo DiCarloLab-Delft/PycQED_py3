@@ -921,7 +921,8 @@ def two_qubit_repeated_parity_check(qD: int, qA: int, platf_cfg: str,
 def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
                                 CZ_disabled: bool=False,
                                 angles=np.arange(0, 360, 20),
-                                wait_time: int=0,
+                                wait_time_between: int=0,
+                                wait_time_after: int=0,
                                 add_cal_points: bool=True,
                                 CZ_duration: int=260,
                                 nr_of_repeated_gates: int =1,
@@ -943,7 +944,9 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
         RO_target   (str): can be q0, q1, or 'all'
         CZ_disabled (bool): disable CZ gate
         angles      (array): angles of the recovery pulse
-        wait_time   (int): wait time in ns after triggering the flux
+        wait_time_between (int) wait time in ns added after each flux pulse
+        wait_time_after   (int): wait time in ns after triggering all flux
+            pulses
     '''
     platf = Platform('OpenQL_Platform', platf_cfg)
     p = Program(pname="conditional_oscillation_seq",
@@ -963,17 +966,28 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
             k.gate('rx90', q0)
             if not CZ_disabled:
                 for j in range(nr_of_repeated_gates):
+                    if j!=0:
+                        k.gate('wait', [2, 0], wait_time_between)
                     k.gate(flux_codeword, 2, 0)
                 if fixed_max_nr_of_repeated_gates is not None:
                     for l in range(fixed_max_nr_of_repeated_gates-j):
+                        k.gate('wait', [2, 0], wait_time_between)
                         k.gate('fl_cw_00', 2,0)
             else:
                 for j in range(nr_of_repeated_gates):
+                    if j!=0:
+                        k.gate('wait', [2, 0], wait_time_between)
                     k.gate('wait', [2, 0], CZ_duration)  # in ns
                 if fixed_max_nr_of_repeated_gates is not None:
                     for l in range(fixed_max_nr_of_repeated_gates-j):
+                        k.gate('wait', [2, 0], wait_time_between)
                         k.gate('wait', [2, 0], CZ_duration)
-            k.gate('wait', [2, 0], wait_time)
+            try:
+                k.gate('wait', [2, 0], (wait_time_after))
+            except Exception as e:
+                print('Wait time after-between',
+                      (wait_time_after-wait_time_between))
+                raise(e)
             # hardcoded angles, must be uploaded to AWG
             if angle == 90:
                 # special because the cw phase pulses go in mult of 20 deg

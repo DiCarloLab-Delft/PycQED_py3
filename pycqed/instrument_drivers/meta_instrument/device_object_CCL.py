@@ -589,13 +589,13 @@ class DeviceCCL(Instrument):
 
         # These are hardcoded angles in the mw_lutman for the AWG8
         angles = np.arange(0, 341, 20)
-        p = mqo.conditional_oscillation_seq(q0idx, q1idx,
-                                            platf_cfg=self.cfg_openql_platform_fn(),
-                                            angles=angles, wait_time=wait_time_ns,
-                                            flux_codeword=flux_codeword,
-                                            nr_of_repeated_gates=nr_of_repeated_gates,
-                                            fixed_max_nr_of_repeated_gates=fixed_max_nr_of_repeated_gates,
-                                            CZ_disabled=False)
+        p = mqo.conditional_oscillation_seq(
+            q0idx, q1idx, platf_cfg=self.cfg_openql_platform_fn(),
+            angles=angles, wait_time_after=wait_time_ns,
+            flux_codeword=flux_codeword,
+            nr_of_repeated_gates=nr_of_repeated_gates,
+            fixed_max_nr_of_repeated_gates=fixed_max_nr_of_repeated_gates,
+            CZ_disabled=False)
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr(),
                              parameter_name='Phase', unit='deg')
