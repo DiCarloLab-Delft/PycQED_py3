@@ -305,12 +305,14 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
         # todo merge instead of overwrite!
         tau_keys = tau_keys or {
             self.T1: 'Analysis.Fitted Params F|1>.tau.value',
-            self.T2: 'Analysis.Fitted Params raw w0.tau.value',
+            self.T2: 'Analysis.Fitted Params corr_data.tau.value',
+            # self.T2: 'Analysis.Fitted Params raw w0.tau.value',
             self.T2_star: 'Analysis.Fitted Params raw w0.tau.value',
         }
         tau_std_keys = tau_std_keys or {
             self.T1: 'Analysis.Fitted Params F|1>.tau.stderr',
-            self.T2: 'Analysis.Fitted Params raw w0.tau.stderr',
+            self.T2: 'Analysis.Fitted Params corr_data.tau.stderr',
+            # self.T2: 'Analysis.Fitted Params raw w0.tau.stderr',
             self.T2_star: 'Analysis.Fitted Params raw w0.tau.stderr',
         }
 
