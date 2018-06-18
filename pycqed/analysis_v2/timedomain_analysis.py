@@ -595,7 +595,7 @@ class Intersect_Analysis(Single_Qubit_TimeDomainAnalysis):
                 'line_kws': {'alpha': .5, 'color':'gray',
                             'markersize':15},
                 'marker': 'o',
-                'setlabel': 'Intercept: {:.1f} {}'.format(ic, ic_unit),
+                'setlabel': 'Intercept: {:.3f} {}'.format(ic, ic_unit),
                 'do_legend': True}
 
     def get_intersect(self):

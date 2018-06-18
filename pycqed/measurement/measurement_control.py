@@ -102,13 +102,7 @@ class MeasurementControl(Instrument):
 
         # pyqtgraph plotting process is reused for different measurements.
         if self.live_plot_enabled():
-            self.main_QtPlot = QtPlot(
-                window_title='Main plotmon of {}'.format(self.name),
-                figsize=(600, 400))
-            self.secondary_QtPlot = QtPlot(
-                window_title='Secondary plotmon of {}'.format(self.name),
-                figsize=(600, 400))
-
+            self.create_plot_monitor()
         self.plotting_interval(plotting_interval)
 
         self.soft_iteration = 0  # used as a counter for soft_avg
@@ -207,8 +201,6 @@ class MeasurementControl(Instrument):
             result = self.dset[()]
             self.get_measurement_endtime()
             self.save_MC_metadata(self.data_object)  # timing labels etc
-
-
 
             return_dict = self.create_experiment_result_dict()
 
@@ -597,6 +589,23 @@ class MeasurementControl(Instrument):
     the 2D plotmon (which does a heatmap) and the adaptive plotmon.
     '''
 
+    def create_plot_monitor(self):
+        """
+        Creates new PyQTgraph plotting monitor.
+        Can also be used to recreate these when plotting has crashed.
+        """
+        if hasattr(self, 'main_QtPlot'):
+            del self.main_QtPlot
+        if hasattr(self, 'secondary_QtPlot'):
+            del self.secondary_QtPlot
+
+        self.main_QtPlot = QtPlot(
+            window_title='Main plotmon of {}'.format(self.name),
+            figsize=(600, 400))
+        self.secondary_QtPlot = QtPlot(
+            window_title='Secondary plotmon of {}'.format(self.name),
+            figsize=(600, 400))
+
     def initialize_plot_monitor(self):
         # new code
         if self.main_QtPlot.traces != []:
@@ -645,8 +654,8 @@ class MeasurementControl(Instrument):
     def update_plotmon(self, force_update=False):
         # Note: plotting_max_pts takes precendence over force update
         if (self.live_plot_enabled() and (self.dset.shape[0] <
-                                         self.plotting_max_pts() or
-                (self.plotting_bins is not None))):
+                                          self.plotting_max_pts() or
+                                          (self.plotting_bins is not None))):
             i = 0
             try:
                 time_since_last_mon_update = time.time() - self._mon_upd_time
@@ -738,7 +747,7 @@ class MeasurementControl(Instrument):
         """
         Initialize a 2D plot monitor for interpolated (adaptive) plots
         """
-        if self.live_plot_enabled() and len(self.sweep_function_names) ==2:
+        if self.live_plot_enabled() and len(self.sweep_function_names) == 2:
             self.time_last_2Dplot_update = time.time()
 
             # self.secondary_QtPlot.clear()
@@ -753,7 +762,7 @@ class MeasurementControl(Instrument):
             for j in range(len(self.detector_function.value_names)):
                 self.secondary_QtPlot.add(x=[0, 1],
                                           y=[0, 1],
-                                          z=np.zeros([2,2]),
+                                          z=np.zeros([2, 2]),
                                           xlabel=slabels[0], xunit=sunits[0],
                                           ylabel=slabels[1], yunit=sunits[1],
                                           zlabel=zlabels[j], zunit=zunits[j],
@@ -772,7 +781,7 @@ class MeasurementControl(Instrument):
         '''
         Updates the interpolated 2D heatmap
         '''
-        if self.live_plot_enabled() and len(self.sweep_function_names) ==2:
+        if self.live_plot_enabled() and len(self.sweep_function_names) == 2:
             try:
                 if (time.time() - self.time_last_2Dplot_update >
                         self.plotting_interval() or force_update):
@@ -786,7 +795,7 @@ class MeasurementControl(Instrument):
                         z_vals = self.dset[:, z_ind]
 
                         # Interpolate points
-                        x_grid, y_grid, z_grid  = interpolate_heatmap(
+                        x_grid, y_grid, z_grid = interpolate_heatmap(
                             x_vals, y_vals, z_vals)
                         # trace = self.secondary_QtPlot.traces[j]
                         trace = self.im_plots[j]
@@ -808,13 +817,15 @@ class MeasurementControl(Instrument):
             except Exception as e:
                 logging.warning(e)
 
-
     def initialize_plot_monitor_adaptive(self):
         '''
         Uses the Qcodes plotting windows for plotting adaptive plot updates
         '''
         if self.adaptive_function.__module__ == 'cma.evolution_strategy':
-            return self.initialize_plot_monitor_adaptive_cma()
+            self.initialize_plot_monitor_adaptive_cma()
+            self.secondary_QtPlot.clear()
+            self.initialize_plot_monitor_2D_interp()
+
         else:
             self.initialize_plot_monitor()
             self.time_last_ad_plot_update = time.time()
@@ -829,25 +840,21 @@ class MeasurementControl(Instrument):
             # Because of a bug in QCoDes pytqtgraph backend we don't
             # want line plots and heatmaps in the same plotmon
             # this if statement prevents that from happening
-            if len(self.sweep_functions) ==2:
+            if len(self.sweep_functions) == 2:
                 iter_plotmon = self.main_QtPlot
-                iter_plotmon.win.nextRow()
                 iter_start_idx = len(self.sweep_functions)*len(zlabels)
             else:
                 iter_plotmon = self.secondary_QtPlot
-                iter_start_idx=0
+                iter_start_idx = 0
 
             for j in range(len(zlabels)):
                 iter_plotmon.add(x=[0], y=[0],
-                                          xlabel='iteration',
-                                          ylabel=zlabels[j], yunit=zunits[j],
-                                          subplot=j+1+iter_start_idx,
-                                          symbol='o',
-                                          symbolSize=5)
+                                 xlabel='iteration',
+                                 ylabel=zlabels[j], yunit=zunits[j],
+                                 subplot=j+1+iter_start_idx,
+                                 symbol='o',
+                                 symbolSize=5)
                 self.iter_traces.append(iter_plotmon.traces[-1])
-
-
-
 
     def update_plotmon_adaptive(self, force_update=False):
         if self.adaptive_function.__module__ == 'cma.evolution_strategy':
@@ -869,7 +876,6 @@ class MeasurementControl(Instrument):
             except Exception as e:
                 logging.warning(e)
         self.update_plotmon_2D_interp(force_update=force_update)
-
 
     def initialize_plot_monitor_adaptive_cma(self):
         '''
@@ -951,43 +957,47 @@ class MeasurementControl(Instrument):
         # Secondary plotmon
         ##########################################
 
-        self.secondary_QtPlot.clear()
+        # self.secondary_QtPlot.clear()
         self.iter_traces = []
         self.iter_bever_traces = []
         self.iter_mean_traces = []
-        for j in range(len(self.detector_function.value_names)):
-            self.secondary_QtPlot.add(x=[0],
-                                      y=[0],
-                                      name='Measured values',
-                                      xlabel='Iteration',
-                                      x_unit='#',
-                                      color=color_cycle[0],
-                                      ylabel=ylabels[j],
-                                      yunit=yunits[j],
-                                      subplot=j+1,
-                                      symbol='o', symbolSize=5)
-            self.iter_traces.append(self.secondary_QtPlot.traces[-1])
 
-            self.secondary_QtPlot.add(x=[0], y=[0],
-                                      symbol='star', symbolSize=15,
-                                      name='Best ever measured',
-                                      color=color_cycle[1],
-                                      xlabel='iteration',
-                                      x_unit='#',
-                                      ylabel=ylabels[j],
-                                      yunit=yunits[j],
-                                      subplot=j+1)
-            self.iter_bever_traces.append(self.secondary_QtPlot.traces[-1])
-            self.secondary_QtPlot.add(x=[0], y=[0],
-                                      color=color_cycle[2],
-                                      name='Generational mean',
-                                      symbol='o', symbolSize=8,
-                                      xlabel='iteration',
-                                      x_unit='#',
-                                      ylabel=ylabels[j],
-                                      yunit=yunits[j],
-                                      subplot=j+1)
-            self.iter_mean_traces.append(self.secondary_QtPlot.traces[-1])
+        plot_num = j
+        iter_plotmon = self.main_QtPlot
+        for j in range(len(self.detector_function.value_names)):
+            iter_plotmon.add(x=[0],
+                             y=[0],
+                             name='Measured values',
+                             xlabel='Iteration',
+                             x_unit='#',
+                             color=color_cycle[0],
+                             ylabel=ylabels[j],
+                             yunit=yunits[j],
+                             subplot=plot_num+1,
+                             symbol='o', symbolSize=5)
+            self.iter_traces.append(iter_plotmon.traces[-1])
+
+            iter_plotmon.add(x=[0], y=[0],
+                             symbol='star', symbolSize=15,
+                             name='Best ever measured',
+                             color=color_cycle[1],
+                             xlabel='iteration',
+                             x_unit='#',
+                             ylabel=ylabels[j],
+                             yunit=yunits[j],
+                             subplot=plot_num+1)
+            self.iter_bever_traces.append(iter_plotmon.traces[-1])
+            iter_plotmon.add(x=[0], y=[0],
+                             color=color_cycle[2],
+                             name='Generational mean',
+                             symbol='o', symbolSize=8,
+                             xlabel='iteration',
+                             x_unit='#',
+                             ylabel=ylabels[j],
+                             yunit=yunits[j],
+                             subplot=plot_num+1)
+            self.iter_mean_traces.append(iter_plotmon.traces[-1])
+            plot_num += 1
 
         # required for the first update call to work
         self.time_last_ad_plot_update = time.time()
@@ -1063,7 +1073,7 @@ class MeasurementControl(Instrument):
                         self.iter_bever_traces[j]['config']['y'] = best_func_val
 
                     self.main_QtPlot.update_plot()
-                    self.secondary_QtPlot.update_plot()
+                    self.update_plotmon_2D_interp(force_update=True)
 
                     self.time_last_ad_plot_update = time.time()
 
@@ -1345,8 +1355,6 @@ class MeasurementControl(Instrument):
 
     def print_progress(self, stop_idx=None):
         if self.verbose():
-            acquired_points = self.dset.shape[0]
-            total_nr_pts = len(self.get_sweep_points())
             percdone = self.get_percdone()
             elapsed_time = time.time() - self.begintime
             progress_message = "\r {percdone}% completed \telapsed time: "\
@@ -1371,7 +1379,7 @@ class MeasurementControl(Instrument):
             progress_message = \
                 "\rAcquired {acquired_points} points, \telapsed time: "\
                 "{t_elapsed}s".format(
-                    acquired_points = acquired_points,
+                    acquired_points=acquired_points,
                     t_elapsed=round(elapsed_time, 1))
             end_char = ''
             print('\r', progress_message, end=end_char)
@@ -1648,4 +1656,6 @@ class KeyboardFinish(KeyboardInterrupt):
     Indicates that the user safely aborts/finishes the experiment.
     Used to finish the experiment without raising an exception.
     """
+
+    # FIXME: replace with version from pycqed/utilities/general
     pass

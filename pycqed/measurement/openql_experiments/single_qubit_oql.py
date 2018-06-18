@@ -14,8 +14,25 @@ output_dir = join(dirname(__file__), 'output')
 ql.set_output_dir(output_dir)
 
 
-def CW_tone():
-    pass
+def CW_tone(qubit_idx: int, platf_cfg: str):
+    """
+    Sequence to generate an "always on" pulse or "ContinuousWave" (CW) tone.
+    This is a sequence that goes a bit against the paradigm of openql.
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="CW_tone",
+                nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    k = Kernel("main", p=platf)
+    for i in range(40):
+        k.gate('square', qubit_idx)
+    p.add_kernel(k)
+    with suppress_stdout():
+        p.compile(verbose=False)
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
 
 
 def vsm_timing_cal_sequence(qubit_idx: int, platf_cfg: str):
@@ -48,13 +65,22 @@ def CW_RO_sequence(qubit_idx: int, platf_cfg: str):
     A sequence that performs readout back to back without initialization.
     The separation of the readout triggers is done by specifying the duration
     of the readout parameter in the configuration file used for compilation.
+
+    qubit_idx can also be a list, then the corresponding set of measurements is triggered.
     """
     platf = Platform('OpenQL_Platform', platf_cfg)
     p = Program(pname="CW_RO_sequence", nqubits=platf.get_qubit_number(),
                 p=platf)
 
     k = Kernel("main", p=platf)
-    k.measure(qubit_idx)
+    if not hasattr(qubit_idx, "__iter__"):
+        qubit_idx = [qubit_idx]
+
+    k.gate('wait', qubit_idx, 0)
+    for qi in qubit_idx:
+        k.measure(qi)
+    k.gate('wait', qubit_idx, 0)
+
     p.add_kernel(k)
     with suppress_stdout():
         p.compile(verbose=False)
@@ -230,6 +256,54 @@ def T1(times, qubit_idx: int, platf_cfg: str):
     with suppress_stdout():
         p.compile(verbose=False)
     # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
+
+def T1_second_excited_state(times, qubit_idx: int, platf_cfg: str):
+    """
+    Single qubit T1 sequence for the second excited states.
+    Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
+
+    Input pars:
+        times:          the list of waiting times for each T1 element
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        platf_cfg:      filename of the platform config file
+    Returns:
+        p:              OpenQL Program object containing
+
+
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="T1_2nd_exc", nqubits=platf.get_qubit_number(),
+                p=platf)
+    for i, time in enumerate(times):
+        for j in range(2):
+            k = Kernel("T1_2nd_exc_{}_{}".format(i, j), p=platf)
+            k.prepz(qubit_idx)
+            wait_nanoseconds = int(round(time/1e-9))
+            k.gate('rx180', qubit_idx)
+            k.gate('rx12', qubit_idx)
+            k.gate("wait", [qubit_idx], wait_nanoseconds)
+            if j == 1:
+                k.gate('rx180', qubit_idx)
+            k.measure(qubit_idx)
+            p.add_kernel(k)
+
+    # adding the calibration points
+    add_single_qubit_cal_points(p, platf=platf, qubit_idx=qubit_idx,
+                                f_state_cal_pts=True)
+
+    with suppress_stdout():
+        p.compile(verbose=False)
+
+    dt = times[1] - times[0]
+    sweep_points = np.concatenate([np.repeat(times, 2),
+                                  times[-1]+dt*np.arange(6)+dt])
+    # attribute get's added to program to help finding the output files
+    p.sweep_points = sweep_points
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
@@ -668,7 +742,7 @@ def Ram_Z(qubit_name,
 
 
 def add_single_qubit_cal_points(p, platf, qubit_idx,
-                                f_state_cal_pts:bool=False):
+                                f_state_cal_pts: bool=False):
     """
     Adds single qubit calibration points to an OpenQL program
 

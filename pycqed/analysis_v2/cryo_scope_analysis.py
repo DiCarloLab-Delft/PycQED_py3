@@ -9,9 +9,9 @@ import pycqed.analysis_v2.base_analysis as ba
 import numpy as np
 from scipy.stats import sem
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
-from matplotlib import gridspec, ticker
-from mpl_toolkits.axes_grid.inset_locator import (inset_axes, InsetPosition,
-                                                  mark_inset)
+from matplotlib import ticker
+from mpl_toolkits.axes_grid1.inset_locator import InsetPosition, mark_inset
+
 
 class RamZFluxArc(ba.BaseDataAnalysis):
     """
@@ -294,11 +294,12 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
                  options_dict: dict=None,
                  sliding_pulse_duration=220e-9,
                  freq_to_amp=None, amp_to_freq=None,
+                 close_figs: bool = True,
                  f_demod: float=0, demodulate: bool=False, auto=True):
         if options_dict is None:
             options_dict = dict()
         super().__init__(t_start=t_start, t_stop=t_stop, label=label,
-                         options_dict=options_dict)
+                         options_dict=options_dict, close_figs=close_figs)
 
         self.freq_to_amp = freq_to_amp
         self.amp_to_freq = amp_to_freq

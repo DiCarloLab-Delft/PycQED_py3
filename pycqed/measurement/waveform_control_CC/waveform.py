@@ -293,9 +293,27 @@ def mod_gauss_VSM(amp, sigma_length, f_modulation, axis='x', phase=0,
     return G_I_mod, G_Q_mod, D_I_mod, D_Q_mod
 
 
+def mod_square_VSM(amp_G, amp_D, length, f_modulation,
+                   phase_G: float = 0, phase_D: float=0,
+                   sampling_rate: float=1e9):
+    """
+    4-channel square waveform modulated using SSB modulation.
+    """
+    G_I, G_Q = block_pulse(amp_G, length=length, sampling_rate=sampling_rate,
+                           phase=phase_G)
+    D_I, D_Q = block_pulse(amp_D, length=length, sampling_rate=sampling_rate,
+                           phase=phase_D)
+    G_I_mod, G_Q_mod = mod_pulse(G_I, G_Q, f_modulation,
+                                 sampling_rate=sampling_rate)
+    D_I_mod, D_Q_mod = mod_pulse(D_I, D_Q, f_modulation,
+                                 sampling_rate=sampling_rate)
+    return G_I_mod, G_Q_mod, D_I_mod, D_Q_mod
+
+
 #####################################################
 # Flux pulses
 #####################################################
+
 
 def martinis_flux_pulse(length: float, lambda_2: float, lambda_3: float,
                         theta_f: float,

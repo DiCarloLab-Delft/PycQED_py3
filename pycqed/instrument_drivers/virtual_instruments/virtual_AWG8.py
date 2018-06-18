@@ -3,6 +3,7 @@ import numpy as np
 from qcodes.instrument.base import Instrument
 from qcodes.instrument.parameter import ManualParameter
 from qcodes.utils import validators as vals
+from zlib import crc32
 
 
 class VirtualAWG8(Instrument):
@@ -23,6 +24,8 @@ class VirtualAWG8(Instrument):
                                                vals.Enum(None)))
         self._num_channels = 8
         self._num_codewords = 256
+
+        self._devname = 'dev{}'.format(name)
 
         self._add_codeword_parameters()
         self.add_dummy_parameters()
@@ -45,6 +48,12 @@ class VirtualAWG8(Instrument):
                                parameter_class=ManualParameter)
         for par in parnames:
             self.add_parameter(par, parameter_class=ManualParameter)
+
+        for i in range(4):
+            self.add_parameter(
+                'awgs_{}_sequencer_program_crc32_hash'.format(i),
+                parameter_class=ManualParameter,
+                initial_value=0, vals=vals.Ints())
 
     def snapshot_base(self, update=False, params_to_skip_update=None):
         if params_to_skip_update is None:
@@ -78,6 +87,20 @@ class VirtualAWG8(Instrument):
                 self._params_to_skip_update.append(parname)
 
     def upload_codeword_program(self, awgs=np.arange(4)):
+        for awg_nr in awgs:
+            program = 'some dummy program_{}'.format(awg_nr)
+            self.configure_awg_from_string(awg_nr=int(awg_nr),
+                                           program_string=program,
+                                           timeout=self.timeout())
+
+    def configure_awg_from_string(self, awg_nr: int, program_string: str,
+                                  timeout: float=15):
+        # Actual uploading does not exist in the dummy AWG8
+        hash = crc32(program_string.encode('utf-8'))
+        self.set('awgs_{}_sequencer_program_crc32_hash'.format(awg_nr),
+                 hash)
+
+    def configure_codeword_protocol(self, default_dio_timing: bool=False):
         pass
 
     def stop(self):
@@ -85,3 +108,25 @@ class VirtualAWG8(Instrument):
 
     def start(self):
         pass
+
+    def upload_waveform_realtime(self, w0, w1, awg_nr: int, wf_nr: int =1):
+        """
+        Arguments:
+            w0   (array): waveform for ch0 of the awg pair.
+            w1   (array): waveform for ch1 of the awg pair.
+            awg_nr (int): awg_nr indicating what awg pair to use.
+            wf_nr  (int): waveform in memory to overwrite, default is 1.
+
+        There are a few important notes when using this method
+        - w0 and w1 must be of the same length
+        - any parts of a waveform longer than w0/w1 will not be overwritten.
+        - loading speed depends on the size of w0 and w1 and is ~80ms for 20us.
+
+        """
+        # these two attributes are added for debugging purposes.
+        # they allow checking what the realtime loaded waveforms are.
+        self._realtime_w0 = w0
+        self._realtime_w1 = w1
+        # stacking is here to mimic the full realtime loading
+        c = np.vstack((w0, w1)).reshape((-2,), order='F')
+        self._realtime_wf_c = c

@@ -6,6 +6,7 @@ from . import zishell_NH as zs
 from qcodes.utils import validators as vals
 from .ZI_base_instrument import ZI_base_instrument
 from qcodes.instrument.parameter import ManualParameter
+from zlib import crc32
 
 import ctypes
 from ctypes.wintypes import MAX_PATH
@@ -90,6 +91,12 @@ class ZI_HDAWG8(ZI_base_instrument):
                 ' pins are used in for which AWG numbers.'),
             parameter_class=ManualParameter)
 
+        for i in range(4):
+            self.add_parameter(
+                'awgs_{}_sequencer_program_crc32_hash'.format(i),
+                parameter_class=ManualParameter,
+                initial_value=0, vals=vals.Ints())
+
     def snapshot_base(self, update=False, params_to_skip_update=None):
         if params_to_skip_update is None:
             params_to_skip_update = self._params_to_skip_update
@@ -106,10 +113,22 @@ class ZI_HDAWG8(ZI_base_instrument):
         self.restart_device = self._dev.restart_device
         self.poll = self._dev.poll
         self.sync = self._dev.sync
-        self.configure_awg_from_string = self._dev.configure_awg_from_string
         self.read_from_scope = self._dev.read_from_scope
         self.restart_scope_module = self._dev.restart_scope_module
         self.restart_awg_module = self._dev.restart_awg_module
+
+    def configure_awg_from_string(self, awg_nr: int, program_string: str,
+                                  timeout: float=15):
+        """
+        Uploads a program string to one of the AWGs of the AWG8.
+        Also
+        """
+        self._dev.configure_awg_from_string(awg_nr=awg_nr,
+                                            program_string=program_string,
+                                            timeout=timeout)
+        hash = crc32(program_string.encode('utf-8'))
+        self.set('awgs_{}_sequencer_program_crc32_hash'.format(awg_nr),
+                 hash)
 
     def get_idn(self):
         idn_dict = {'vendor': 'ZurichInstruments',
@@ -164,38 +183,37 @@ class ZI_HDAWG8(ZI_base_instrument):
             curr_valid = (d & valid) != 0
 
             if count_high:
-              if curr_strobe:
-                strobe_high += 1
-              else:
-                if (strobe_low > 0) and (strobe_low != strobe_high):
-                    count_ok = False
+                if curr_strobe:
+                    strobe_high += 1
+                else:
+                    if (strobe_low > 0) and (strobe_low != strobe_high):
+                        count_ok = False
 
             if count_low:
-              if not curr_strobe:
-                strobe_low += 1
-              else:
-                if (strobe_high > 0) and (strobe_low != strobe_high):
-                    count_ok = False
+                if not curr_strobe:
+                    strobe_low += 1
+                else:
+                    if (strobe_high > 0) and (strobe_low != strobe_high):
+                        count_ok = False
 
             if (last_strobe != None):
-              if (curr_strobe and not last_strobe):
-                got_strobe_re = True
-                strobe_high = 0
-                count_high = True
-                count_low = False
-                index_high = n
-              elif (not curr_strobe and last_strobe):
-                got_strobe_fe = True
-                strobe_low = 0
-                count_low = True
-                count_high = False
-                index_low = n
+                if (curr_strobe and not last_strobe):
+                    got_strobe_re = True
+                    strobe_high = 0
+                    count_high = True
+                    count_low = False
+                    index_high = n
+                elif (not curr_strobe and last_strobe):
+                    got_strobe_fe = True
+                    strobe_low = 0
+                    count_low = True
+                    count_high = False
+                    index_low = n
 
             if (last_valid != None) and (curr_valid and not last_valid):
                 got_valid_re = True
             if (last_valid != None) and (not curr_valid and last_valid):
                 got_valid_fe = True
-
 
             got_bits |= (d & mask)
             last_strobe = curr_strobe
@@ -263,7 +281,8 @@ class ZI_HDAWG8(ZI_base_instrument):
                     done[i] = True
                     print('[SUCCESS]')
             if not ok:
-                print("  A problem was detected with the protocol. Will try to reinitialize the clock as it sometimes helps.")
+                print(
+                    "  A problem was detected with the protocol. Will try to reinitialize the clock as it sometimes helps.")
                 self._dev.seti('awgs/*/enable', 0)
                 self._dev.seti('system/extclk', 0)
                 time.sleep(1)
@@ -396,7 +415,7 @@ class ZI_HDAWG8(ZI_base_instrument):
         t1 = time.time()
         print('Set all zeros waveforms in {:.1f} s'.format(t1-t0))
 
-    def upload_waveform_realtime(self, w0, w1, awg_nr:int, wf_nr:int =1):
+    def upload_waveform_realtime(self, w0, w1, awg_nr: int, wf_nr: int =1):
         """
         Warning! This method should be used with care.
         Uploads a waveform to the awg in realtime, note that this get's
@@ -423,7 +442,6 @@ class ZI_HDAWG8(ZI_base_instrument):
         self._dev.seti('awgs/{}/waveform/index'.format(awg_nr), wf_nr)
         self._dev.setv('awgs/{}/waveform/data'.format(awg_nr), c)
         self._dev.seti('awgs/{}/enable'.format(awg_nr), wf_nr)
-
 
     def upload_codeword_program(self, awgs=np.arange(4)):
         """
@@ -610,7 +628,8 @@ class ZI_HDAWG8(ZI_base_instrument):
                 # FIXME: this is a protocol that does identical flux pulses
                 # on each channel.
                 self.set('awgs_{}_dio_mask_value'.format(awg_nr), 2**3-1)
-                self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 3)
+                # self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 3)
+                self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
 
         ####################################################
         # Turn on device

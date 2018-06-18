@@ -143,8 +143,16 @@ class Base_LutMan(Instrument):
                           self._voltage_min, self._voltage_max, linestyle='--')
 
         ax.set_title(wave_name)
-        ax.plot(x, self._wave_dict[wave_name][0], marker=',', label='chI')
-        ax.plot(x, self._wave_dict[wave_name][1], marker=',', label='chQ')
+        if len(self._wave_dict[wave_name]) == 2:
+            ax.plot(x, self._wave_dict[wave_name][0], marker='.', label='chI')
+            ax.plot(x, self._wave_dict[wave_name][1], marker='.', label='chQ')
+        elif len(self._wave_dict[wave_name]) == 4:
+            ax.plot(x, self._wave_dict[wave_name][0], marker='.', label='chGI')
+            ax.plot(x, self._wave_dict[wave_name][1], marker='.', label='chGQ')
+            ax.plot(x, self._wave_dict[wave_name][2], marker='.', label='chDI')
+            ax.plot(x, self._wave_dict[wave_name][3], marker='.', label='chDQ')
+        else:
+            raise ValueError("waveform shape not understood")
         ax.legend()
         if self._voltage_min is not None:
             ax.set_facecolor('gray')

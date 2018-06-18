@@ -19,6 +19,11 @@ import string
 from contextlib import ContextDecorator
 
 
+try:
+    import msvcrt  # used on windows to catch keyboard input
+except:
+    pass
+
 digs = string.digits + string.ascii_letters
 
 
@@ -533,3 +538,26 @@ class suppress_stdout(ContextDecorator):
         # Close all file descriptors
         for fd in self.null_fds + self.save_fds:
             os.close(fd)
+
+
+class KeyboardFinish(KeyboardInterrupt):
+    """
+    Indicates that the user safely aborts/finishes the experiment.
+    Used to finish the experiment without raising an exception.
+    """
+    pass
+
+
+def check_keyboard_interrupt():
+    try:  # Try except statement is to make it work on non windows pc
+        if msvcrt.kbhit():
+            key = msvcrt.getch()
+            if b'q' in key:
+                # this causes a KeyBoardInterrupt
+                raise KeyboardInterrupt('Human "q" terminated experiment.')
+            elif b'f' in key:
+                # this should not raise an exception
+                raise KeyboardFinish(
+                    'Human "f" terminated experiment safely.')
+    except Exception:
+        pass

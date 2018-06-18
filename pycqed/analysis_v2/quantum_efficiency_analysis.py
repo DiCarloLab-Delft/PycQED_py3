@@ -71,6 +71,7 @@ class QuantumEfficiencyAnalysisTWPA(ba.BaseDataAnalysis):
         self.label_ssro = label_ssro
 
         self.params_dict = {'TWPA_freq': twpa_pump_freq_key,
+                            'measurementstring': 'measurementstring',
                             'TWPA_power': twpa_pump_power_key}
 
         self.numeric_params = ['TWPA_freq', 'TWPA_power']
@@ -210,7 +211,7 @@ class QuantumEfficiencyAnalysisTWPA(ba.BaseDataAnalysis):
         # Quantum Efficiency
         self.plot_dicts['quantum_eff'] = {
             'plotfn': self.plot_colorxy,
-            'title': '' + title,  # todo
+            'title': title,
             'yvals': twpa_powers, 'ylabel': r'TWPA Power', 'yunit': 'dBm',
             'xvals': twpa_freqs, 'xlabel': 'TWPA Frequency', 'xunit': 'Hz',
             'zvals': self.proc_data_dict['etas'].transpose() * 100,
@@ -220,7 +221,7 @@ class QuantumEfficiencyAnalysisTWPA(ba.BaseDataAnalysis):
         }
         self.plot_dicts['quantum_eff_vari'] = {
             'plotfn': self.plot_colorxy,
-            'title': '' + title,  # todo
+            'title': '' + title,
             'yvals': twpa_powers, 'ylabel': r'TWPA Power', 'yunit': 'dBm',
             'xvals': twpa_freqs, 'xlabel': 'TWPA Frequency', 'xunit': 'Hz',
             'zvals': self.proc_data_dict['etas_std'].transpose(),
@@ -378,6 +379,7 @@ class QuantumEfficiencyAnalysis(ba.BaseDataAnalysis):
         d = '%s' % (youngest.strftime("%Y%m%d"))
         folder = os.path.join(a_tools.datadir, d, f)
         self.raw_data_dict['folder'] = [folder]
+        self.raw_data_dict['measurementstring'] = f
         self.options_dict['analysis_result_file'] = os.path.join(folder, f + '.hdf5')
 
     def run_fitting(self):
@@ -443,9 +445,10 @@ class QuantumEfficiencyAnalysis(ba.BaseDataAnalysis):
                 self.plot_dicts[k]['ax_id'] = 'snr_analysis'
                 self.plot_dicts[k]['ylabel'] = 'SNR, coherence'
                 self.plot_dicts[k]['yunit'] = '(-)'
-                self.plot_dicts[k]['title'] = r'$\eta = (%.4f \pm %.4f)$ %%' % (
-                    100 * self.fit_dicts['eta'], 100 * self.fit_dicts['u_eta'])
-                + title
+                self.plot_dicts[k]['title'] = ''
+                #self.plot_dicts[k]['title'] = r'$\eta = (%.4f \pm %.4f)$ %%' % (
+                #    100 * self.fit_dicts['eta'], 100 * self.fit_dicts['u_eta'])
+                #+ title
 
             #self.plot_dicts['amp_vs_dephasing_fit']['color'] = 'red'
             #self.plot_dicts['amp_vs_dephasing_coherence_fitted']['color'] = 'red'
@@ -504,6 +507,8 @@ class DephasingAnalysis(ba.BaseDataAnalysis):
         self.fit_dicts['coherence_fit']['scale_std'] = coherence_fit.params['scale'].stderr
 
     def prepare_plots(self):
+        t = self.timestamps[0]
+
         amps = self.proc_data_dict['scaling_amp']
         name = ''
         fit_text = "$\sigma = %.3f \pm %.3f$" % (
@@ -534,29 +539,34 @@ class DephasingAnalysis(ba.BaseDataAnalysis):
 
         fit_mask = self.fit_dicts['coherence_fit']['mask']
         fit_mask_inv = self.fit_dicts['coherence_fit']['inv_mask']
-        self.plot_dicts[name + 'amp_vs_dephasing_coherence_fitted'] = {
-            'plotfn': self.plot_line,
-            'ax_id': name + 'amp_vs_dephasing',
-            'zorder': 0,
-            'xvals': amps[fit_mask],
-            'yvals': self.proc_data_dict['coherence'][fit_mask],
-            'marker': 'o',
-            'linestyle': '',
-            'setlabel': 'coherence data',
-            'color': 'red',
-        }
-        self.plot_dicts[name + 'amp_vs_dephasing_coherence_not_fitted'] = {
-            'plotfn': self.plot_line,
-            'ax_id': name + 'amp_vs_dephasing',
-            'zorder': 1,
-            'xvals': amps[fit_mask_inv],
-            'yvals': self.proc_data_dict['coherence'][fit_mask_inv],
-            'marker': 'x',
-            'linestyle': '',
-            'setlabel': 'coherence data (not fitted)',
-            'color': 'red',
-        }
+        if len(fit_mask) > 0:
+            self.plot_dicts[name + 'amp_vs_dephasing_coherence_fitted'] = {
+                'title' : t,
+                'plotfn': self.plot_line,
+                'ax_id': name + 'amp_vs_dephasing',
+                'zorder': 0,
+                'xvals': amps[fit_mask],
+                'yvals': self.proc_data_dict['coherence'][fit_mask],
+                'marker': 'o',
+                'linestyle': '',
+                'setlabel': 'coherence data (used in fitting)',
+                'color': 'red',
+            }
+        if len(fit_mask_inv) > 0:
+            self.plot_dicts[name + 'amp_vs_dephasing_coherence_not_fitted'] = {
+                'title' : t,
+                'plotfn': self.plot_line,
+                'ax_id': name + 'amp_vs_dephasing',
+                'zorder': 1,
+                'xvals': amps[fit_mask_inv],
+                'yvals': self.proc_data_dict['coherence'][fit_mask_inv],
+                'marker': 'x',
+                'linestyle': '',
+                'setlabel': 'coherence data (not fitted)',
+                'color': 'red',
+            }
         self.plot_dicts[name + 'amp_vs_dephasing_Phase'] = {
+            'title' : t,
             'plotfn': self.plot_line,
             'xvals': amps,
             'yvals': self.proc_data_dict['phase'],
@@ -695,9 +705,12 @@ class SSROAnalysis(ba.BaseDataAnalysis):
         self.fit_dicts['snr_fit']['a_std'] = snr_fit.params['a'].stderr
 
     def prepare_plots(self):
+        t = self.timestamps[0]
+
         amps = self.proc_data_dict['scaling_amp']
         name = ''
         self.plot_dicts[name + 'amp_vs_SNR_fit'] = {
+            'title' : t,
             'plotfn': self.plot_fit,
             'ax_id': name + 'amp_vs_SNR',
             'zorder': 5,
@@ -711,39 +724,45 @@ class SSROAnalysis(ba.BaseDataAnalysis):
         }
         fit_mask = self.fit_dicts['snr_fit']['mask']
         fit_mask_inv = self.fit_dicts['snr_fit']['inv_mask']
-        self.plot_dicts[name + 'amp_vs_SNR_scatter_fitted'] = {
-            'plotfn': self.plot_line,
-            'ax_id': name + 'amp_vs_SNR',
-            'zorder': 0,
-            'xvals': amps[fit_mask],
-            'xlabel': 'scaling amplitude',
-            'xunit': 'rel. amp.',
-            'yvals': self.proc_data_dict['SNR'][fit_mask],
-            'ylabel': 'SNR',
-            'yunit': '-',
-            'marker': 'o',
-            'linestyle': '',
-            'setlabel': 'SNR data',
-            'do_legend': True,
-            'color': 'blue',
-        }
-        self.plot_dicts[name + 'amp_vs_SNR_scatter_not_fitted'] = {
-            'plotfn': self.plot_line,
-            'ax_id': name + 'amp_vs_SNR',
-            'zorder': 0,
-            'xvals': amps[fit_mask_inv],
-            'xlabel': 'scaling amplitude',
-            'xunit': 'rel. amp.',
-            'yvals': self.proc_data_dict['SNR'][fit_mask_inv],
-            'ylabel': 'SNR',
-            'yunit': '-',
-            'marker': 'x',
-            'linestyle': '',
-            'setlabel': 'SNR data (not fitted)',
-            'do_legend': True,
-            'color': 'blue',
+        if len(fit_mask) > 0:
+            self.plot_dicts[name + 'amp_vs_SNR_scatter_fitted'] = {
+                'title' : t,
+                'plotfn': self.plot_line,
+                'ax_id': name + 'amp_vs_SNR',
+                'zorder': 0,
+                'xvals': amps[fit_mask],
+                'xlabel': 'scaling amplitude',
+                'xunit': 'rel. amp.',
+                'yvals': self.proc_data_dict['SNR'][fit_mask],
+                'ylabel': 'SNR',
+                'yunit': '-',
+                'marker': 'o',
+                'linestyle': '',
+                'setlabel': 'SNR data (used for fitting)',
+                'do_legend': True,
+                'color': 'blue',
+            }
+
+        if len(fit_mask_inv) > 0:
+            self.plot_dicts[name + 'amp_vs_SNR_scatter_not_fitted'] = {
+                'title' : t,
+                'plotfn': self.plot_line,
+                'ax_id': name + 'amp_vs_SNR',
+                'zorder': 0,
+                'xvals': amps[fit_mask_inv],
+                'xlabel': 'scaling amplitude',
+                'xunit': 'rel. amp.',
+                'yvals': self.proc_data_dict['SNR'][fit_mask_inv],
+                'ylabel': 'SNR',
+                'yunit': '-',
+                'marker': 'x',
+                'linestyle': '',
+                'setlabel': 'SNR data (not fitted)',
+                'do_legend': True,
+                'color': 'blue',
         }
         self.plot_dicts[name + 'amp_vs_Fa'] = {
+            'title' : t,
             'plotfn': self.plot_line,
             'zorder': 0,
             'ax_id': name + 'amp_vs_F',
@@ -755,6 +774,7 @@ class SSROAnalysis(ba.BaseDataAnalysis):
             'do_legend': True,
         }
         self.plot_dicts[name + 'amp_vs_Fd'] = {
+            'title' : t,
             'plotfn': self.plot_line,
             'zorder': 1,
             'ax_id': name + 'amp_vs_F',

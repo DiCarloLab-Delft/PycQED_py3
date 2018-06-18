@@ -703,8 +703,8 @@ class MeasurementAnalysis(object):
         ax.xaxis.offsetText.set_fontsize(self.font_size)
         ax.yaxis.offsetText.set_fontsize(self.font_size)
         if ticks_around:
-            ax.xaxis.set_tick_params(labeltop='off', top='on', direction='in')
-            ax.yaxis.set_tick_params(labeltop='off', top='on', direction='in')
+            ax.xaxis.set_tick_params(labeltop=False, top=True, direction='in')
+            ax.yaxis.set_tick_params(labeltop=False, top=True, direction='in')
         ax.tick_params(axis='both', labelsize=self.font_size,
                        length=self.tick_length, width=self.tick_width)
 
@@ -941,9 +941,10 @@ class OptimizationAnalysis_v2(MeasurementAnalysis):
                     z=self.measured_values[i], ax=ax,
                     zlabel=self.value_names[i])
                 ax.plot(self.sweep_points[0],
-                        self.sweep_points[1], '-o', c='grey')
+                        self.sweep_points[1], linewidth=.5, marker='.',
+                        alpha=.3, c='grey')
                 ax.plot(self.sweep_points[0][-1], self.sweep_points[1][-1],
-                        'o', markersize=5, c='w')
+                        'x', markersize=5, c='w')
                 plot_title = kw.pop('plot_title', textwrap.fill(
                     self.timestamp_string + '_' +
                     self.measurementstring, 40))
@@ -5637,7 +5638,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                             y_unit=self.value_units[0],
                                             save=False)
             # ensures that amplitude plot starts at zero
-            ax.set_ylim(ymin=-0.001)
+            ax.set_ylim(ymin=0.000)
 
         elif 'complex' in fitting_model:
             self.plot_complex_results(
@@ -6650,7 +6651,7 @@ class TwoD_Analysis(MeasurementAnalysis):
     def run_default_analysis(self, normalize=False, plot_linecuts=True,
                              linecut_log=False, colorplot_log=False,
                              plot_all=True, save_fig=True,
-                             transpose=False, figsize=None,
+                             transpose=False, figsize=None, filtered=False,
                              **kw):
         '''
         Args:
@@ -6670,6 +6671,16 @@ class TwoD_Analysis(MeasurementAnalysis):
         self.ax_array = []
 
         for i, meas_vals in enumerate(self.measured_values):
+            if filtered:
+                # print(self.measured_values)
+                # print(self.value_names)
+                if self.value_names[i] == 'Phase':
+                    self.measured_values[i] = dm_tools.filter_resonator_visibility(
+                                                        x=self.sweep_points,
+                                                        y=self.sweep_points_2D,
+                                                        z=self.measured_values[i],
+                                                        **kw)
+
             if (not plot_all) & (i >= 1):
                 break
             # Linecuts are above because somehow normalization applies to both

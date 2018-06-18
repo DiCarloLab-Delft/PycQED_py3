@@ -114,6 +114,9 @@ $RECYCLE.BIN/
 # Pycqed specific files
 # ======================
 
+# Multiprocessing dask generated files
+*dask-worker-space*
+
 # code generated qasm files
 *.qasm
 # micro instruction assembly files

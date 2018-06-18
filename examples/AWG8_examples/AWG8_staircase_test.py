@@ -47,8 +47,8 @@ AWG8 = ZI_HDAWG8.ZI_HDAWG8('AWG8_8006', device='dev8006')
 #  2. Starting AWG8 test program in CCL  #
 ##########################################
 
-AWG_type = 'microwave'
-# AWG_type = 'flux'
+# AWG_type = 'microwave'
+AWG_type = 'flux'
 
 if AWG_type == 'microwave':
     example_fp = os.path.abspath(
@@ -64,6 +64,7 @@ CCL.eqasm_program(example_fp)
 CCL.start()
 
 
+
 ##########################################
 #  3. Configuring the DIO protocol       #
 ##########################################
@@ -72,17 +73,17 @@ CCL.start()
 import numpy as np
 
 waveform_type = 'square'
-# waveform_type = 'cos'
+# waveform_type = 'sin'
 
 if waveform_type == 'square':
     for ch in range(8):
         for i in range(32):
             AWG8.set('wave_ch{}_cw{:03}'.format(ch+1, i), (np.ones(48)*i/32))
-elif waveform_type == 'cos':
+elif waveform_type == 'sin':
     for ch in range(8):
         for i in range(32):
             AWG8.set('wave_ch{}_cw{:03}'.format(ch+1, i),
-                     (np.cos(np.arange(48)/2)*i/32))
+                     (np.sin(np.arange(48)/48*2*np.pi*i)*i/32))
 else:
     raise KeyError()
 
@@ -95,7 +96,29 @@ AWG8.upload_codeword_program()
 ##########################################
 #  4. Configuring the DIO protocol       #
 ##########################################
-AWG8.cfg_codeword_protocol('microwave')  # <- ensures all bits are uploaded
+AWG8.cfg_codeword_protocol(AWG_type)  # <- ensures all bits are uploaded
 AWG8.configure_codeword_protocol()
 AWG8.upload_codeword_program()
-AWG8.calibrate_dio_protocol()
+
+
+success = AWG8.calibrate_dio_protocol()
+
+
+#######################################################################
+#  4. Verifying the DIO calibration with back to back staircase       #
+#######################################################################
+
+if AWG_type == 'microwave':
+    example_fp = os.path.abspath(
+        os.path.join(pq.__path__[0], '..',
+                     'examples', 'CCLight_example', 'qisa_test_assembly',
+                     'consecutive_cws_double_back_to_back.qisa'))
+elif AWG_type == 'flux':
+    example_fp = os.path.abspath(
+        os.path.join(pq.__path__[0], '..',
+                     'examples', 'CCLight_example', 'qisa_test_assembly',
+                     'consecutive_cws_flux_back_to_back.qisa'))
+
+print(example_fp)
+CCL.eqasm_program(example_fp)
+CCL.start()

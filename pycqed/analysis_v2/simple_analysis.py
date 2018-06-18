@@ -51,11 +51,13 @@ class Basic1DAnalysis(ba.BaseDataAnalysis):
                             'measured_values': 'measured_values'}
 
         # x2 is whatever parameter is varied between sweeps
+        self.numeric_params = []
         x2 = self.options_dict.get('x2', None)
         if x2 is not None:
             self.params_dict['x2'] = x2
+            self.numeric_params = ["x2"]
 
-        self.numeric_params = []
+        
         if auto:
             self.run_analysis()
 
