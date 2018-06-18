@@ -19,7 +19,7 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                  options_dict: dict = None, extract_only: bool = False, auto: bool = True,
                  close_figs: bool = True, do_fitting: bool = True,
                  tau_key='Analysis.Fitted Params F|1>.tau.value',
-                 tau_std_key='Analysis.Fitted Params F|1>.tau.stderr',
+                 tau_std_key='Analysis.Fitted Params F|1>.tau.stderr', use_chisqr = False
                  plot_versus_dac=True,
                  dac_key='Instrument settings.fluxcurrent.Q',
                  plot_versus_frequency=True,
@@ -54,17 +54,26 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                          close_figs=close_figs,
                          extract_only=extract_only)
         # self.single_timestamp = False
-        if 'F|1>' in tau_key:
-            chisquared_key = 'Analysis.Fitted Params F|1>.chisqr'
-        elif 'raw' in tau_key:
-            chisquared_key = 'Analysis.Fitted Params raw w0.chisqr'
-        elif 'corr_data' in tau_key:
-            chisquared_key = 'Analysis.Fitted Params corr_data.chisqr'
-        self.params_dict = {'tau': tau_key,
-                            'tau_stderr': tau_std_key,
-                            'chisquared' : chisquared_key
-                            }
-        self.numeric_params = ['tau', 'tau_stderr', 'chisquared']
+        if use_chisqr:
+            if 'F|1>' in tau_key:
+                chisquared_key = 'Analysis.Fitted Params F|1>.chisqr'
+            elif 'raw' in tau_key:
+                chisquared_key = 'Analysis.Fitted Params raw w0.chisqr'
+            elif 'corr_data' in tau_key:
+                chisquared_key = 'Analysis.Fitted Params corr_data.chisqr'
+            self.params_dict = {'tau': tau_key,
+                                'tau_stderr': tau_std_key,
+                                'chisquared' : chisquared_key
+                                }
+            self.numeric_params = ['tau', 'tau_stderr', 'chisquared']
+        else:
+            self.params_dict = {'tau': tau_key,
+                                'tau_stderr': tau_std_key,
+                                # 'chisquared' : chisquared_key
+                                }
+            self.numeric_params = ['tau', 'tau_stderr'] #, 'chisquared'
+
+
 
         self.plot_versus_dac = plot_versus_dac
         if plot_versus_dac:
@@ -235,7 +244,7 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                  plot_versus_frequency: bool = True,
                  frequency_key_pattern: str = 'Instrument settings.{Q}.freq_qubit',
                  res_freq: list = None, res_Qc: list = None, chi_shift: list = None,
-                 do_fitting: bool = True, close_figs: bool = True,
+                 do_fitting: bool = True, close_figs: bool = True, use_chisqr = False,
                  ):
         '''
         Plots and Analyses the coherence times (i.e. T1, T2 OR T2*) of one or several measurements.
@@ -390,6 +399,7 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                     frequency_key=freq_key,
                     options_dict=options_dict,
                     close_figs=close_figs,
+                    use_chisqr = use_chisqr
                 )
 
         if auto:
