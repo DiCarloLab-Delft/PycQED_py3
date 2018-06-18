@@ -352,10 +352,22 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                            vals=vals.Numbers(),
                            parameter_class=ManualParameter)
 
+        self.add_parameter(
+            'czd_net_integral', docstring='Used determine what the integral of'
+            ' the CZ waveform should evaluate to. This is realized by adding'
+            ' an offset to the phase correction pulse.\nBy setting this '
+            'parameter to np.nan no offset correction is performed.',
+           initial_value=0,
+           unit='dac value * samples',
+           vals=vals.MultiType(vals.Numbers(), NP_NANs()),
+           parameter_class=ManualParameter)
+
+
         self.add_parameter('czd_double_sided',
                            initial_value=False,
                            vals=vals.Bool(),
                            parameter_class=ManualParameter)
+
 
         self.add_parameter('mcz_nr_of_repeated_gates',
                            initial_value=1, vals=vals.PermissiveInts(1, 40),
@@ -496,9 +508,18 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             return waveform
 
     def _get_phase_corr_offset(self):
-        net_charge = np.sum(self._wave_dict['cz'])
+        wf_integral = np.sum(self._wave_dict['cz'])
         corr_samples = self.sampling_rate()*self.cz_phase_corr_length()
-        offset = -net_charge/corr_samples
+
+        if np.isnan(self.czd_net_integral()):
+            offset = 0
+        else:
+            offset = (self.czd_net_integral()-wf_integral)/corr_samples
+        if abs(offset)>0.4:
+            # if this warning is raised, it is recommended to play with
+            # the cz_lenght ratio parameter.
+            logging.warning('net-zero offset ({:.2f}) larger than 0.4'.format(
+                            offset))
         return offset
 
     def _gen_phase_corr(self, phase_corr_amp: float = None,
