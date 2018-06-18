@@ -178,6 +178,25 @@ class QuDev_transmon(Qubit):
                                      'imbalance',
                            vals=vals.Numbers(),
                            parameter_class=ManualParameter)
+        self.add_parameter('ro_pulse_shape', initial_value='square',
+                           docstring="Shape of the RO pulse. ['square',"
+                                     "'gaussian_filtered']",
+                           vals=vals.Enum('square', 'gaussian_filtered'),
+                           parameter_class=ManualParameter)
+        self.add_parameter('ro_pulse_filter_sigma', unit='s',
+                           initial_value=10e-9,
+                           docstring='Width of the Gaussian '
+                                     'filter for the RO pulse',
+                           label='RO pulse Gaussian filter width',
+                           vals=vals.Numbers(0),
+                           parameter_class=ManualParameter)
+        self.add_parameter('ro_pulse_nr_sigma',
+                           initial_value=5, unit='sigma',
+                           docstring='Number of standard deviations for the '
+                                     'RO pulse Gaussian filter',
+                           label='RO pulse Gaussian filter length',
+                           vals=vals.Numbers(0),
+                           parameter_class=ManualParameter)
 
         # add pulsed spectroscopy pulse parameters
         self.add_operation('Spec')
@@ -407,10 +426,20 @@ class QuDev_transmon(Qubit):
                     self.RO_I_channel(), self.RO_I_offset()))
                 eval('self.UHFQC.sigouts_{}_offset({})'.format(
                     self.RO_Q_channel(), self.RO_Q_offset()))
-                self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(
-                    f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
-                    RO_pulse_length=self.RO_pulse_length(),
-                    alpha=self.ro_alpha(), phi_skew=self.ro_phi_skew())
+                if self.ro_pulse_shape() == 'square':
+                    self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(
+                        f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
+                        RO_pulse_length=self.RO_pulse_length(),
+                        alpha=self.ro_alpha(), phi_skew=self.ro_phi_skew())
+                elif self.ro_pulse_shape() == 'gaussian_filtered':
+                    self.UHFQC.awg_sequence_acquisition_and_pulse_SSB_gaussian_filtered(
+                        f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
+                        RO_pulse_length=self.RO_pulse_length(),
+                        filter_sigma=self.ro_pulse_filter_sigma(),
+                        nr_sigma=self.ro_pulse_nr_sigma(),
+                        alpha=self.ro_alpha(), phi_skew=self.ro_phi_skew())
+                else:
+                    raise ValueError('Invalid ro pulse shape.')
                 self.readout_UC_LO.pulsemod_state('Off')
                 self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
                 self.readout_UC_LO.on()
@@ -1527,7 +1556,6 @@ class QuDev_transmon(Qubit):
         gamma = kwargs.pop('gamma',1.)
         iters = kwargs.pop('iters',5000)
         mode = kwargs.pop('mode','carrier')
-        self.prepare_for_mixer_calibration(suppress='drive LO') #what to set here?#
         detector = self.int_avg_det_spec
         if mode=='carrier':
             cal_elts.mixer_calibration_sequence(
@@ -1830,8 +1858,7 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_points(meas_grid.T)
         MC.set_detector_function(self.int_avg_det)
         ad_func_pars = {'hidden_layers': hidden_layers,
-                        'iters':5000,
-                        'alphas': alpha,
+                        'alpha': alpha,
                         'minimize': True,
                         'estimator': estimator,
                         'iters': iters,
@@ -1933,7 +1960,7 @@ class QuDev_transmon(Qubit):
     def find_optimized_weights(self, MC=None, update=True, measure=True, **kw):
         # FIXME: Make a proper analysis class for this (Ants, 04.12.2017)
         if measure:
-            self.measure_transients(MC, analyze=False, **kw)
+            self.measure_transients(MC, analyze=True, **kw)
         MAon = ma.MeasurementAnalysis(label='timetrace_on')
         MAoff = ma.MeasurementAnalysis(label='timetrace_off')
         don = MAon.measured_values[0] + 1j * MAon.measured_values[1]
@@ -1951,6 +1978,8 @@ class QuDev_transmon(Qubit):
             tbase = np.linspace(0, npoints/1.8e9, npoints, endpoint=False)
             modulation = np.exp(2j * np.pi * self.f_RO_mod() * tbase)
             plt.subplot(311)
+            plt.title('optimized weights ' + self.name + '\n' +
+                      MAon.timestamp_string + '\n' + MAoff.timestamp_string)
             plt.plot(tbase / 1e-9, np.real(don * modulation), '-', label='I')
             plt.plot(tbase / 1e-9, np.imag(don * modulation), '-', label='Q')
             plt.ylabel('d.c. voltage,\npi pulse (V)')
@@ -1977,7 +2006,7 @@ class QuDev_transmon(Qubit):
 
     def find_ssro_fidelity(self, nreps=1, MC=None, analyze=True, close_fig=True,
                            no_fits=False, upload=True, preselection_pulse=True,
-                           thresholded=False, RO_comm=1/225e6):
+                           thresholded=False, RO_comm=3/225e6):
         """
         Conduct an off-on measurement on the qubit recording single-shot
         results and determine the single shot readout fidelity.
@@ -2024,16 +2053,8 @@ class QuDev_transmon(Qubit):
 
         RO_spacing = self.UHFQC.quex_wint_delay()*2/1.8e9
         RO_spacing += self.RO_acq_integration_length()
-        RO_spacing += 10e-9 # for slack
-        RO_spacing -= self.gauss_sigma()*self.nr_sigma()
-        RO_spacing -= self.RO_pulse_delay()
-        RO_spacing -= self.pulse_delay()
-        RO_spacing = max(0, RO_spacing)
-        delta_comm = RO_spacing + self.gauss_sigma()*self.nr_sigma() + \
-                     self.RO_pulse_delay() + self.pulse_delay() + \
-                     self.RO_pulse_length()
-        delta_comm %= RO_comm
-        RO_spacing += RO_comm - delta_comm
+        RO_spacing += 50e-9  # for slack
+        RO_spacing = np.ceil(RO_spacing/RO_comm)*RO_comm
 
         MC.set_sweep_function(awg_swf2.n_qubit_off_on(
             pulse_pars_list=[self.get_drive_pars()],

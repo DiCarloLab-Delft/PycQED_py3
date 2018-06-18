@@ -257,8 +257,8 @@ class HDAWG8Pulsar:
         self.add_parameter('{}_min_length'.format(name),
                            get_cmd=lambda: 8 / 2.4e9)
         self.add_parameter('{}_inter_element_deadtime'.format(name),
-                           # get_cmd=lambda: 8 / 2.4e9)
-                           get_cmd=lambda: 0 / 2.4e9)
+                           get_cmd=lambda: 8 / 2.4e9)
+                           # get_cmd=lambda: 0 / 2.4e9)
         self.add_parameter('{}_precompile'.format(name), initial_value=False,
                            label='{} precompile segments'.format(name),
                            parameter_class=ManualParameter, vals=vals.Bool())
@@ -504,7 +504,8 @@ class HDAWG8Pulsar:
         #     else '\t\twaitWave();\n'
         trigger_str = '\t\twaitDigTrigger(1);\n' if wait else ''
         if name1 is None and name2 is None:
-            play_str = '\t\tplayWaveDIO();\n'
+            play_str = '\t\twaitWave();\n' \
+                       '\t\tplayWaveDIO();\n'
         elif name1 is None:
             play_str = '\t\tplayWave(2, {});\n'.format(name2)
         elif name2 is None:

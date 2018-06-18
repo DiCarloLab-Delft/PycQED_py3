@@ -248,18 +248,18 @@ class UHFQC(Instrument):
             self.set('quex_rot_{0}_imag'.format(i), 0.0)
 
         # No thresholding or correlation modes
-        for i in range(0, 9):
+        for i in range(0, self.nr_integration_channels):
             eval('self.quex_thres_{0}_level(0)'.format(i))
             eval('self.quex_corr_{0}_mode(0)'.format(i))
             eval('self.quex_corr_{0}_source(0)'.format(i))
 
         # No cross-coupling in the matrix multiplication (identity matrix)
         for i in range(0, self.nr_integration_channels):
-            for j in range(0,):
+            for j in range(0, self.nr_integration_channels):
                 if i == j:
-                    self.set('quex_trans_{0}_col_{1}_real'.format(i, j),1)
+                    self.set('quex_trans_{0}_col_{1}_real'.format(i, j), 1)
                 else:
-                    self.set('quex_trans_{0}_col_{1}_real'.format(i, j),0)
+                    self.set('quex_trans_{0}_col_{1}_real'.format(i, j), 0)
 
         # Configure the result logger to not do any averaging
         self.quex_rl_length(pow(2, LOG2_AVG_CNT)-1)
@@ -1078,10 +1078,34 @@ setTrigger(0);"""
             alpha=1, phi_skew=0):
         f_sampling = 1.8e9
         samples = RO_pulse_length*f_sampling
-        array = np.arange(int(samples))
+        sample_idxs = np.arange(int(samples))
         Iwave = RO_amp * alpha * np.cos(
-            2 * np.pi * array * f_RO_mod / f_sampling + phi_skew * np.pi / 180)
-        Qwave = - RO_amp * np.sin(2 * np.pi * array * f_RO_mod / f_sampling)
+            2 * np.pi * sample_idxs * f_RO_mod / f_sampling + phi_skew * np.pi / 180)
+        Qwave = - RO_amp * np.sin(2 * np.pi * sample_idxs * f_RO_mod / f_sampling)
+        self.awg_sequence_acquisition_and_pulse(Iwave, Qwave)
+
+    def awg_sequence_acquisition_and_pulse_SSB_gaussian_filtered(
+            self, f_RO_mod, RO_amp, RO_pulse_length, filter_sigma, nr_sigma,
+            alpha=1, phi_skew=0):
+        f_sampling = 1.8e9
+        samples = RO_pulse_length*f_sampling
+        sample_idxs = np.arange(int(samples))
+        Iwave = np.cos(2 * np.pi * sample_idxs * f_RO_mod / f_sampling +
+                       phi_skew * np.pi / 180)
+        Qwave = -np.sin(2 * np.pi * sample_idxs * f_RO_mod / f_sampling)
+
+        filter_samples = int(filter_sigma*nr_sigma*f_sampling)
+        filter_sample_idxs = np.arange(filter_samples)
+        filter = np.exp(-0.5*(filter_sample_idxs - filter_samples/2)**2 /
+                        (filter_sigma*f_sampling)**2)
+        filter /= filter.sum()
+
+        Iwave = np.convolve(Iwave, filter, mode='full')
+        Qwave = np.convolve(Qwave, filter, mode='full')
+
+        Iwave = RO_amp * alpha * Iwave
+        Qwave = RO_amp * Qwave
+
         self.awg_sequence_acquisition_and_pulse(Iwave, Qwave)
 
     def upload_transformation_matrix(self, matrix):

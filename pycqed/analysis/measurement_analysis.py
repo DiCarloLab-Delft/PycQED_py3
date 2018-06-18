@@ -4257,9 +4257,10 @@ class T1_Analysis(TD_Analysis):
                                               vary=False)
         self.params = fit_mods.ExpDecayModel.make_params()
 
-        fit_res = fit_mods.ExpDecayModel.fit(data=self.normalized_data_points,
-                                             t=self.sweep_points[:-self.NoCalPoints],
-                                             params=self.params)
+        fit_res = fit_mods.ExpDecayModel.fit(
+            data=self.normalized_data_points,
+            t=self.sweep_points[:len(self.sweep_points) - self.NoCalPoints],
+            params=self.params)
 
         if kw.get('print_fit_results', False):
             print(fit_res.fit_report())
@@ -4324,8 +4325,9 @@ class T1_Analysis(TD_Analysis):
                           bbox=self.box_props)
 
             if show_guess:
-                self.ax.plot(self.sweep_points[:-self.NoCalPoints],
-                             self.fit_res.init_fit, 'k--', linewidth=self.line_width)
+                self.ax.plot(
+                    self.sweep_points[:len(self.sweep_points)-self.NoCalPoints],
+                    self.fit_res.init_fit, 'k--', linewidth=self.line_width)
 
             best_vals = self.fit_res.best_values
             t = np.linspace(self.sweep_points[0],
