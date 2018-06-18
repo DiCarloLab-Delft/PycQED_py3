@@ -1,6 +1,7 @@
 from .base_lutman import Base_LutMan
 import numpy as np
 import logging
+from scipy.optimize import minimize
 from copy import copy
 from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter
 from qcodes.utils import validators as vals
@@ -709,6 +710,104 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         # CZ with phase correction
         return waveform
 
+
+    ###########################################################
+    #  Waveform generation net-zero phase correction methods  #
+    ###########################################################
+    def _calc_modified_wf(self, base_wf, a_i, corr_samples):
+
+        if not np.isnan(self.czd_net_integral()):
+            curr_int = np.sum(base_wf)
+            corr_int = self.czd_net_integral()-curr_int
+            corr_pulse = phase_corr_triangle(int_val=corr_int, nr_samples=corr_samples)
+            if np.max(corr_pulse)> 0.5:
+                logging.warning('net-zero integral correction({:.2f}) larger than 0.4'.format(
+                    np.max(corr_pulse)))
+        else:
+            corr_pulse= np.zeros(corr_samples)
+
+        corr_pulse += phase_corr_sine_series(a_i, corr_samples)
+
+        modified_wf = np.concatenate([base_wf, corr_pulse])
+        return modified_wf
+
+
+
+    def _phase_corr_cost_func(self, base_wf, a_i, corr_samples,
+                              print_result=False):
+        """
+        The cost function of the cz_z waveform is designed to meet
+        the following criteria
+        1. Net-zero character of waveform
+            Integral of wf = 0
+        2. Single qubit phase correction
+            Integral of phase_corr_part**2 = desired constant
+        3. Target_wf ends at 0
+        4. No-distortions present after cutting of waveform
+            predistorted_wf ends at 0 smoothly (as many derivatives as possible 0)
+
+        5. Minimize the maximum amplitude
+            Prefer small non-violent pulses
+        """
+        # samples to quanitify leftover distoritons
+        tail_samples = 500
+
+        target_wf = self._calc_modified_wf(
+                base_wf, a_i=a_i, corr_samples=corr_samples)
+        k0 = self.instr_distortion_kernel.get_instr()
+        predistorted_wf = k0.distort_waveform(target_wf,
+                                              len(target_wf)+tail_samples)
+
+        # 2. Phase correction pulse
+        phase_corr_int = np.sum(
+            target_wf[len(base_wf):len(base_wf)+corr_samples]**2)/corr_samples
+        cv_2 = ((phase_corr_int - self.cz_phase_corr_amp()**2)*1000)**2
+
+        # 4. No-distortions present after cutting of waveform
+        cv_4 = np.sum(abs(predistorted_wf[-tail_samples+50:]))*20
+        # 5. no violent waveform
+        cv_5 = np.max(abs(target_wf)*100)**2
+
+        cost_val = cv_2 + cv_4+cv_5
+
+        if print_result:
+            print("Cost function value")
+
+    #         print("cv_1 net_zero_character: {:.6f}".format(cv_1))
+            print("cv_2 phase corr pulse  : {:.6f}".format(cv_2))
+    #         print("cv_3 ends at 0         : {:.6f}".format(cv_3))
+            print("cv_4 distortions tail  : {:.6f}".format(cv_4))
+            print("cv_5 non violent       : {:.6f}".format(cv_5))
+
+        return cost_val
+
+
+
+    def _get_phase_corrected_pulse(self, base_wf):
+        """
+        Takes the second part of the phase correction pulse and modifies it such
+        that the pulse is optimally canceled.
+
+        It should be noted that this is a simple numerical optimization and not a
+        proper analytic inverse.
+        """
+        corr_samples = int(self.cz_phase_corr_length()*self.sampling_rate())
+
+        res_obj = minimize(lambda x: self._phase_corr_cost_func(
+            base_wf, a_i=x, corr_samples=corr_samples),
+        [0]*1, method='COBYLA')
+
+        self._phase_corr_cost_func(
+            base_wf, a_i=res_obj.x,
+            corr_samples=corr_samples, print_result=True)
+
+
+        modified_wf =self._calc_modified_wf(base_wf, a_i=res_obj.x,
+                                            corr_samples=corr_samples)
+
+        return modified_wf, res_obj
+
+
     #################################
     #  Waveform loading methods     #
     #################################
@@ -1052,6 +1151,8 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         dac_val_axis.axvspan(1, 1000, facecolor='.5', alpha=0.5)
         dac_val_axis.axvspan(-1000, -1, facecolor='.5', alpha=0.5)
+        # get figure is here in case an axis object was passed as input
+        f = ax.get_figure()
         f.subplots_adjust(right=.7)
         if show:
             plt.show()
@@ -1155,3 +1256,34 @@ class QWG_Flux_LutMan(AWG8_Flux_LutMan):
         channel_amp = AWG.get('ch{}_amp'.format(awg_ch))
         scale_factor = channel_amp
         return scale_factor
+
+#########################################################################
+# Convenience functions below
+#########################################################################
+def phase_corr_triangle(int_val, nr_samples):
+    """
+    Creates an offset triangle with desired integrated value
+    """
+    x = np.arange(nr_samples)
+    # nr_samples+1 is because python counting starts at 0
+    b = 2*int_val/(nr_samples+1)
+    a = -b/nr_samples
+    y = a*x+b
+    return y
+
+
+
+def phase_corr_sine_series(a_i, nr_samples):
+    """
+    Phase correction pulse as a fourier sine series.
+
+    The integeral (sum) of this waveform is
+    gauranteed to be equal to zero (within rounding error)
+    by the choice of function.
+    """
+    x = np.linspace(0, 2*np.pi, nr_samples)
+    s = np.zeros(nr_samples)
+
+    for i, a in enumerate(a_i):
+        s+= a*np.sin((i+1)*x)
+    return s
