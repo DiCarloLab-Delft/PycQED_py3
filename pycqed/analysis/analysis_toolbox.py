@@ -420,6 +420,7 @@ def get_data_from_ma_v2(ma, param_names, numeric_params=None):
                     temp = ma.data_file
                 else:
                     extract_param = False
+                    print(ma.folder)
                     warnings.warn(
                         'The data file attribute %s does not exist or hasn''t been coded for extraction.' % (param))
                 if extract_param:
@@ -433,7 +434,7 @@ def get_data_from_ma_v2(ma, param_names, numeric_params=None):
         if numeric_params is not None:
             if param in numeric_params:
                 data[param] = np.double(data[param])
-
+    print(data)
     return data
 
 
@@ -739,6 +740,7 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
                       for dirname in all_measdirs]
         timestamps.reverse()
         all_timestamps += timestamps
+    # print(folder, exact_label_match, all_timestamps, datetime_start, datetime_end, days_delta, all_measdirs)
     # Ensures the order of the timestamps is ascending
     all_timestamps.sort()
     return all_timestamps
@@ -1626,6 +1628,8 @@ def datetime_from_timestamp(timestamp):
             return datetime.datetime.strptime(timestamp, "%Y%m%d%H%M%S")
         elif len(timestamp) == 15:
             return datetime.datetime.strptime(timestamp, "%Y%m%d_%H%M%S")
+        else:
+            raise ValueError
     except Exception as e:
         print('Invalid timestamp :"{}"'.format(timestamp))
         raise e
