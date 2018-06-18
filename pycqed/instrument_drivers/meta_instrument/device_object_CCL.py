@@ -743,7 +743,7 @@ class DeviceCCL(Instrument):
     def measure_msmt_induced_dephasing_matrix(self, qubits: list,
                                               analyze=True, MC=None,
                                               prepare_for_timedomain=True,
-                                              n_amps_rel: int=None,
+                                              amps_rel=np.linspace(0, 1, 25),
                                               verbose=True,
                                               get_quantum_eff: bool=False,
                                               dephasing_sequence='ramsey'):
@@ -790,7 +790,7 @@ class DeviceCCL(Instrument):
 
                 # Slight differences if diagonal element
                 if target_qubit == measured_qubit:
-                    amps_rel = np.linspace(0, 1, n_amps_rel)
+                    amps_rel = amps_rel
                     mqp = None
                     list_target_qubits = None
                 else:
@@ -799,7 +799,7 @@ class DeviceCCL(Instrument):
                     #                target_qubit.ro_pulse_amp())
                     #amp_max = max(t_amp_max, measured_qubit.ro_pulse_amp())
                     #amps_rel = np.linspace(0, 0.49/(amp_max), n_amps_rel)
-                    amps_rel = np.linspace(0, 1, n_amps_rel)
+                    amps_rel = amps_rel
                     mqp = self.cfg_openql_platform_fn()
                     list_target_qubits = [target_qubit,]
 
