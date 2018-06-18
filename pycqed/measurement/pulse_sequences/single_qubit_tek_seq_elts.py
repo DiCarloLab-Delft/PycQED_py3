@@ -107,7 +107,7 @@ def photon_number_splitting_seq(spec_pars, RO_pars, disp_pars, upload=True, retu
     return seq
 
 
-def mixer_cal_sqs(pulseIch,
+def mixer_skewness_cal_sqs(pulseIch,
                   pulseQch,
                   alpha,
                   phi_skew,
@@ -129,7 +129,7 @@ def mixer_cal_sqs(pulseIch,
         RO_pars:
         amplitude:
         RO_trigger_separation:
-        data_point:
+        data_points:
 
     Returns:
 
@@ -139,8 +139,6 @@ def mixer_cal_sqs(pulseIch,
     elts = []
     verbose = False
 
-    # channels_ = ['AWG1_ch3_m2', 'AWG1_ch2_m2', 'AWG1_ch1_m1',
-    #                  'AWG1_ch1_m2', 'AWG1_ch2_m1', 'AWG1_ch3', 'AWG1_ch4']
     channels = [RO_pars['acq_marker_channel'],
                 RO_pars['RO_pulse_marker_channel'],
                 *station.sequencer_config['slave_AWG_trig_channels'],
@@ -170,6 +168,7 @@ def mixer_cal_sqs(pulseIch,
     station.pulsar.program_awgs(seq, *elts,
                                 channels=channels,
                                 verbose=verbose)
+
 
 def Rabi_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=0, no_cal_points=2,
              cal_points=True, verbose=False, upload=True, return_seq=False):

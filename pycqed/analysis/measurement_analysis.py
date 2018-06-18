@@ -979,7 +979,7 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
             optimization_method = 'Numerical'
         self.meas_grid = kw.pop('meas_grid')
         self.ad_func_pars = kw.pop('ad_func_pars')
-        self.hidden_layer_sizes = self.ad_func_pars.pop('hidden_layer_sizes',[10.,10.])
+        self.hidden_layer_sizes = self.ad_func_pars.pop('hidden_layers',[10.,10.])
         self.alpha = self.ad_func_pars.pop('alpha',1e-2)
         self.estimator_name = self.ad_func_pars.pop('estimator','DNN_Regressor_tf')
         self.beta = self.ad_func_pars.pop('beta',0.)
@@ -1002,7 +1002,7 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
             self.abs_vals = np.sqrt(self.measured_values[0,:]**2 + self.measured_values[1,:]**2)
         result,est,test_data = opt.neural_network_opt(None, self.meas_grid,
                                         self.abs_vals,
-                                        hidden_layer_sizes = self.hidden_layer_sizes,
+                                        hidden_layer_sizes = self.hidden_layers,
                                         alpha= self.alpha,
                                         solver='lbfgs',
                                         estimator=self.estimator_name,
@@ -1014,6 +1014,7 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
         self.test_grid = test_data[0]
         self.test_target = test_data[1]
         self.accuracy = est.evaluate(self.test_grid,self.test_target)
+
         return result,est,test_data
 
     def make_figures(self, **kw):

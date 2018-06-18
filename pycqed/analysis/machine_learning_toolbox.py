@@ -81,46 +81,43 @@ class Estimator(metaclass=ABCMeta):
 
 class MLP_Regressor_scikit(Estimator):
 
-    def __init__(self,hidden_layers=[10],output_dim=1,n_feature=1, alpha = 0.5,
-                 activation = ['relu'],pre_proc_dict=None):
+    def __init__(self,hidden_layers=[10],output_dim=1,n_feature=1, alpha=0.5,
+                 activation='relu',pre_proc_dict=None):
 
         super().__init__(name='MLP_Regressor_scikit',pre_proc_dict=pre_proc_dict,
                        type='Regressor')
-        self._hidden_layers = hidden_layers
+        self._hidden_layers = tuple(hidden_layers)
         self.output_dim = output_dim
         self.n_feature = n_feature
         self.alpha = alpha
         self.activation = activation
-        self.mlpr_ = mlpr(solver='lbfgs')
-        self.parameter_dict = {'hidden_layer_sizes': self._hidden_layers,
-                               'alpha': self.alpha,
-                               'activation': self.activation}
-        self.gridCV = gcv(self.mlpr_,self.parameter_dict,cv=5)
-        self.bestParams = None
+        self.mlpr_ = mlpr(solver='lbfgs',
+                          hidden_layer_sizes=self._hidden_layers,
+                          activation=self.activation,
+                          alpha=self.alpha,
+                          max_iter=5000)
+        self.score = -np.infty
 
     def fit(self, x_train, y_train):
 
-        self.gridCV.fit(x_train, y_train)
-        self.bestParams = self.gridCV.best_params_
-        self.score = self.gridCV.best_score_
-
+        self.mlpr_.fit(x_train, y_train)
+        self.score = self.evaluate(x_train,y_train)
+        print('MLP_Regressor scikit trained with '+
+              self.score+' accuracy on training set.')
 
     def predict(self, x_pred):
         '''
         Has to be callable by scipy optimizers such as fmin(). I.e input has
         has to be wrapped to a list for the estimators predict method.
         '''
-        return self.gridCV.predict(x_pred)
+        return self.mlpr_.predict(x_pred)
 
     def evaluate(self,x,y):
-        pred = self.gridCV.predict(x)
-        acc = 1. - np.linalg.norm(pred-y)**2 \
-                   / np.linalg.norm(y-np.mean(y,axis=0))**2
-        return acc
+        self.score = self.mlpr_.score(x,y)
+        return self.score
 
-    def print_best_params(self):
-        print("Best parameters: "+str(self.bestParams))
-        print("Best CV score of ANN: "+str(self.score))
+    def print_score(self):
+        print("Training score of ANN: "+str(self.score))
 
 class DNN_Regressor_tf(Estimator):
     '''
@@ -253,7 +250,7 @@ class GRNN_neupy(Estimator):
     def __init__(self,std=None,gamma=1.,verbose =False,
                  pre_proc_dict=None):
 
-        super.__init__(name='MLP_Regressor_scikit',pre_proc_dict=pre_proc_dict,
+        super.__init__(name='GRNN_neupy',pre_proc_dict=pre_proc_dict,
                        type='Regressor')
         self._std = std
         self._gamma = gamma

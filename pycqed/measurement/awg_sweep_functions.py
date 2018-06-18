@@ -1,5 +1,6 @@
 import numpy as np
 import logging
+import collections
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
 from pycqed.measurement.waveform_control import sequence
@@ -75,7 +76,7 @@ class awg_seq_swf(swf.Hard_Sweep):
         pass
 
 
-class mixer_calibration_swf(swf.Hard_Sweep):
+class mixer_skewness_calibration_swf(swf.Hard_Sweep):
     """
     Based on the "UHFQC_integrated_average" detector.
     generates an AWG seq to measure sideband transmission.
@@ -105,7 +106,7 @@ class mixer_calibration_swf(swf.Hard_Sweep):
 
     def prepare(self):
         if self.upload:
-            sqs.mixer_cal_sqs(pulseIch=self.pulseIch,
+            sqs.mixer_skewness_cal_sqs(pulseIch=self.pulseIch,
                               pulseQch=self.pulseQch,
                               alpha=self.alpha,
                               phi_skew=self.phi_skew,
@@ -115,6 +116,8 @@ class mixer_calibration_swf(swf.Hard_Sweep):
                               amplitude=self.amplitude,
                               RO_trigger_separation=self.RO_trigger_separation,
                               data_points=self.data_points)
+
+
 class arbitrary_variable_swf(swf.Hard_Sweep):
 
     def __init__(self,control=None,parameter = None):

@@ -1508,78 +1508,177 @@ class QuDev_transmon(Qubit):
             ma.MeasurementAnalysis(TwoD=True, auto=True, close_fig=close_fig,
                                    qb_name=self.name)
 
-    def calibrate_drive_mixer_carrier_NN(self, MC=None, update=True, x0=(0., 0.),
-                                         initial_stepsize=0.01, trigger_sep=5e-6,
-                                         estimator='DNN_Regressor_tf',
-                                         n_meas=100,two_rounds=False,**kwargs):
+    def calibrate_drive_mixer_NN(self,MC=None, update=True,trigger_sep=5e-6,
+                                 x0=(0., 0.),amplitude=0.1,
+                                 estimator='DNN_Regressor_tf',
+                                 n_meas=100,two_rounds=False,
+                                 hidden_layers = [30,30],**kwargs):
+        '''
+        Prospect function to handle simultaneous optimization of carrier and
+        skewness calibration.
+        By default used for mixer carrier suppression.
+        The carrier suppression makes use of the measure_soft_static method in MC
+        '''
         if MC is None:
             MC = self.MC
         std_devs = kwargs.pop('std_devs',[0.25,0.25])
-        estimator_name = kwargs.pop('estimator','MLP_Regressor_scikit')
         alpha = kwargs.pop('alpha',1e-3)
         beta = kwargs.pop('beta',0.)
         gamma = kwargs.pop('gamma',1.)
         iters = kwargs.pop('iters',5000)
-        self.prepare_for_mixer_calibration(suppress='drive LO')
-        cal_elts.mixer_calibration_sequence(
-            trigger_sep, 0, RO_pars=self.get_RO_pars(),
-            pulse_I_channel=self.pulse_I_channel(),
-            pulse_Q_channel=self.pulse_Q_channel())
+        mode = kwargs.pop('mode','carrier')
+        self.prepare_for_mixer_calibration(suppress='drive LO') #what to set here?#
         detector = self.int_avg_det_spec
-        meas_grid = [x0[0]+np.random.normal(0.0,std_devs[0],n_meas),
-                     x0[1]+np.random.normal(0.0,std_devs[1],n_meas)]
-        # meas_grid = list(map(list, zip(*meas_grid)))
-        meas_grid = np.array(meas_grid)
-        meas_grid_cp = deepcopy(meas_grid)
-        ad_func_pars = {'adaptive_function': opti.neural_network_opt,
-                        'training_grid': meas_grid,
-                        'hidden_layer_sizes': [40,40],
-                        'iters':iters,
-                        'alpha': alpha,
+        if mode=='carrier':
+            cal_elts.mixer_calibration_sequence(
+                trigger_sep, 0, RO_pars=self.get_RO_pars(),
+                pulse_I_channel=self.pulse_I_channel(),
+                pulse_Q_channel=self.pulse_Q_channel())
+            meas_grid = np.array([x0[0]+np.random.normal(0.0,std_devs[0],n_meas),
+                                  x0[1]+np.random.normal(0.0,std_devs[1],n_meas)])
+            if isinstance(std_devs,list) or isinstance(std_devs,np.ndarray):
+                if(len(std_devs) != 2 ):
+                    logging.error('std_devs passed in kwargs of "calibrate_drive_'
+                                  'mixer_NN is of length: ',len(std_devs),
+                                  '. Requires length 2 instead.')
+            chI_par = self.AWG.parameters['{}_offset'.format(
+                self.pulse_I_channel())]
+            chQ_par = self.AWG.parameters['{}_offset'.format(
+                self.pulse_Q_channel())]
+            S = [chI_par,chQ_par]
+
+        ## THIS IS NOT WORKING
+        #elif mode=='complete':
+
+
+            # meas_grid = np.array([x0[0]+np.random.normal(0.0,std_devs[0],n_meas),
+            #                       x0[1]+np.random.normal(0.0,std_devs[1],n_meas),
+            #                       np.random.normal(self.alpha(),std_devs[0],n_meas),
+            #                       np.random.normal(self.phi_skew(),std_devs[1],n_meas)])
+            # if isinstance(std_devs,list) or isinstance(std_devs,np.ndarray):
+            #     if(len(std_devs) != 4 ):
+            #         logging.error('std_devs passed in kwargs of "calibrate_drive_'
+            #                       'mixer_NN is of length: ',len(std_devs),
+            #                       '. Requires length 2 instead.')
+            # s1 =  awg_swf.mixer_calibration_swf(
+            #     pulseIch=self.pulse_I_channel(),
+            #     pulseQch=self.pulse_Q_channel(),
+            #     Ich_vals=meas_grid[0],
+            #     Qch_vals=meas_grid[1],
+            #     alpha=meas_grid[2],
+            #     phi_skew=meas_grid[3],
+            #     f_mod=self.f_pulse_mod(),
+            #     RO_trigger_channel=None,
+            #     RO_pars=self.get_RO_pars(),
+            #     amplitude=amplitude,
+            #     RO_trigger_separation=trigger_sep,
+            #     verbose=False,
+            #     data_points=n_meas,
+            #     mode=mode,
+            #     upload=True)
+            # s2 = awg_swf.arbitrary_variable_swf()
+            # s3 = awg_swf.arbitrary_variable_swf()
+            # s4 = awg_swf.arbitrary_variable_swf()
+            # S=[s1,s2,s3,s4]
+
+        MC.set_sweep_functions(S)
+        MC.set_sweep_points(meas_grid.T)
+        MC.set_detector_function(detector)
+        ad_func_pars = {'hidden_layers': hidden_layers,
+                        'iters':5000,
+                        'alphas': alpha,
                         'minimize': True,
-                        'estimator': estimator_name,
+                        'estimator': estimator,
+                        'iters': iters,
                         'beta': beta,
                         'gamma': gamma
-                        #Probably some additional params for the NN go here
                         }
+        MC.run(name='drive_skewness_calibration' + self.msmt_suffix)
 
-        chI_par = self.AWG.parameters['{}_offset'.format(
-            self.pulse_I_channel())]
-        chQ_par = self.AWG.parameters['{}_offset'.format(
-            self.pulse_Q_channel())]
-        MC.set_sweep_functions([chI_par, chQ_par])
-        MC.set_detector_function(det.IndexDetector(detector, 0))
-        MC.set_adaptive_function_parameters(ad_func_pars)
-        self.AWG.start()
-        MC.run(name='drive_carrier_calibration' + self.msmt_suffix,
-               mode='adaptive')
         if not two_rounds:
-            a = ma.OptimizationAnalysisNN(label='drive_carrier_calibration',
-                                          meas_grid=meas_grid_cp,
-                                          ad_func_pars=ad_func_pars)
-            # v2 creates a pretty picture of the optimizations
-            #ma.OptimizationAnalysis_v2(label='drive_carrier_calibration')
+            if mode=='carrier':
+                a = ma.OptimizationAnalysisNN(label='drive_carrier_calibration',
+                                              meas_grid=meas_grid,
+                                              ad_func_pars=ad_func_pars)
 
-        ch_1_min = a.optimization_result[0]
-        ch_2_min = a.optimization_result[1]
-        if update and not two_rounds:
-            self.pulse_I_offset(ch_1_min)
-            self.pulse_Q_offset(ch_2_min)
+                ch_1_min = a.optimization_result[0]
+                ch_2_min = a.optimization_result[1]
+                if update:
+                    self.pulse_I_offset(ch_1_min)
+                    self.pulse_Q_offset(ch_2_min)
+            #elif mode=='complete':
+            #    return
 
-        if two_rounds:
-            meas_grid = np.array([np.random.normal(ch_1_min,
-                                                   0.3*std_devs[0],
-                                                   n_meas),
-                                  np.random.normal(ch_2_min,
-                                                   0.3*std_devs[1],
-                                                   n_meas)])
-            self.calibrate_drive_mixer_carrier_NN(MC=MC, update=update,
-                                                   meas_grid=meas_grid,
-                                                   n_meas=n_meas,
-                                                   trigger_sep=trigger_sep,
-                                                   two_rounds = False,**kwargs)
+    def calibrate_drive_mixer_carrier_NN(self, MC=None, update=True, x0=(0., 0.),
+                                             trigger_sep=5e-6,
+                                             estimator='DNN_Regressor_tf',
+                                             n_meas=100,two_rounds=False,
+                                             hidden_layers = [30,30],
+                                             **kwargs):
+            if MC is None:
+                MC = self.MC
+            std_devs = kwargs.pop('std_devs',[0.25,0.25])
+            alpha = kwargs.pop('alpha',1e-3)
+            beta = kwargs.pop('beta',0.)
+            gamma = kwargs.pop('gamma',1.)
+            iters = kwargs.pop('iters',5000)
 
-        return ch_1_min, ch_2_min
+            self.prepare_for_mixer_calibration(suppress='drive LO')
+            cal_elts.mixer_calibration_sequence(
+                trigger_sep, 0, RO_pars=self.get_RO_pars(),
+                pulse_I_channel=self.pulse_I_channel(),
+                pulse_Q_channel=self.pulse_Q_channel())
+            detector = self.int_avg_det_spec
+            meas_grid = [x0[0]+np.random.normal(0.0,std_devs[0],n_meas),
+                         x0[1]+np.random.normal(0.0,std_devs[1],n_meas)]
+            meas_grid = np.array(meas_grid)
+            meas_grid_cp = deepcopy(meas_grid)
+            ad_func_pars = {'adaptive_function': opti.neural_network_opt,
+                            'training_grid': meas_grid,
+                            'hidden_layers': hidden_layers,
+                            'iters':iters,
+                            'alpha': alpha,
+                            'minimize': True,
+                            'estimator': estimator,
+                            'beta': beta,
+                            'gamma': gamma
+                            }
+
+            chI_par = self.AWG.parameters['{}_offset'.format(
+                self.pulse_I_channel())]
+            chQ_par = self.AWG.parameters['{}_offset'.format(
+                self.pulse_Q_channel())]
+            MC.set_sweep_functions([chI_par, chQ_par])
+            MC.set_detector_function(det.IndexDetector(detector, 0))
+            MC.set_adaptive_function_parameters(ad_func_pars)
+            self.AWG.start()
+            MC.run(name='drive_carrier_calibration' + self.msmt_suffix,
+                   mode='adaptive')
+            if not two_rounds:
+                a = ma.OptimizationAnalysisNN(label='drive_carrier_calibration',
+                                              meas_grid=meas_grid_cp,
+                                              ad_func_pars=ad_func_pars)
+
+            ch_1_min = a.optimization_result[0]
+            ch_2_min = a.optimization_result[1]
+            if update and not two_rounds:
+                self.pulse_I_offset(ch_1_min)
+                self.pulse_Q_offset(ch_2_min)
+
+            if two_rounds:
+                meas_grid = np.array([np.random.normal(ch_1_min,
+                                                       0.3*std_devs[0],
+                                                       n_meas),
+                                      np.random.normal(ch_2_min,
+                                                       0.3*std_devs[1],
+                                                       n_meas)])
+                self.calibrate_drive_mixer_carrier_NN(MC=MC, update=update,
+                                                       meas_grid=meas_grid,
+                                                       n_meas=n_meas,
+                                                       trigger_sep=trigger_sep,
+                                                       two_rounds = False,**kwargs)
+
+            return ch_1_min, ch_2_min
 
     def calibrate_drive_mixer_carrier(self, MC=None, update=True, x0=(0., 0.),
                                       initial_stepsize=0.01, trigger_sep=5e-6):
@@ -1685,6 +1784,7 @@ class QuDev_transmon(Qubit):
                                           amplitude=0.1,trigger_sep=5e-6,
                                           two_rounds=False,
                                           estimator='DNN_Regressor_tf',
+                                          hidden_layers = [30,30],
                                           **kwargs):
         if MC is None:
             MC = self.MC
@@ -1694,14 +1794,6 @@ class QuDev_transmon(Qubit):
         std_devs = kwargs.pop('std_devs',[0.1,10])
         iters = kwargs.pop('iters',5000)
         self.prepare_for_mixer_calibration(suppress='drive sideband')
-        # detector = det.UHFQC_readout_mixer_skewness_det(
-        #     self.UHFQC, qc.station, [self.RO_acq_weight_function_I(),
-        #                              self.RO_acq_weight_function_Q()],
-        #     self.ro_alpha, self.ro_phi_skew, self.f_RO_mod(),
-        #     self.RO_acq_marker_channel(),
-        #     nr_averages=self.RO_acq_averages(),
-        #     RO_pulse_length=self.RO_pulse_length(),
-        #     verbose=False)
 
         #Could make sample size variable (maxiter) for better adapting)
         if isinstance(std_devs,list) or isinstance(std_devs,np.ndarray):
@@ -1720,17 +1812,7 @@ class QuDev_transmon(Qubit):
             logging.error('The function argument meas_grid is not 2D. Tuples of '
                           '[alpha,phi] values for skewness calibration.')
 
-        # detector = det.UHFQC_mixer_calibration_det(
-        #     self.UHFQC, qc.station, [self.RO_acq_weight_function_I(),
-        #                              self.RO_acq_weight_function_Q()],
-        #     self.pulse_I_channel(), self.pulse_Q_channel(),
-        #     self.alpha, self.phi_skew, self.f_pulse_mod(),
-        #     self.RO_acq_marker_channel(),
-        #     self.get_RO_pars(),
-        #     amplitude=amplitude, nr_averages=self.RO_acq_averages(),
-        #     RO_trigger_separation=trigger_sep, verbose=False,
-        #     data_points = len(meas_grid))
-        s1 =  awg_swf.mixer_calibration_swf(
+        s1 =  awg_swf.mixer_skewness_calibration_swf(
                                  pulseIch=self.pulse_I_channel(),
                                  pulseQch=self.pulse_Q_channel(),
                                  alpha=meas_grid[0],
@@ -1744,34 +1826,24 @@ class QuDev_transmon(Qubit):
                                  data_points=n_meas,
                                  upload=True)
         s2 = awg_swf.arbitrary_variable_swf()
-        #IDEA: h5d file does not contain meas_grid. Only possible to add by using
-        #two sweep functions. The second one here is just a dummy.
-        MC.set_sweep_functions([s1,s2])             ###NOT TESTED
-        MC.set_sweep_points(meas_grid.T)            ###NOT TESTED
-        # MC.set_detector_function(det.IndexDetector(detector, 0))
+        MC.set_sweep_functions([s1,s2])
+        MC.set_sweep_points(meas_grid.T)
         MC.set_detector_function(self.int_avg_det)
-        ad_func_pars = {'adaptive_function': opti.neural_network_opt,
-                        'training_grid': meas_grid,
-                        'hidden_layer_sizes': [40,40],
+        ad_func_pars = {'hidden_layers': hidden_layers,
                         'iters':5000,
                         'alphas': alpha,
                         'minimize': True,
-                        'estimator': 'DNN_Regressor_tf',
+                        'estimator': estimator,
                         'iters': iters,
                         'beta': beta,
                         'gamma': gamma
-                        #Probably some additional params for the NN go here
                         }
-        # MC.set_adaptive_function_parameters(ad_func_pars)
         MC.run(name='drive_skewness_calibration' + self.msmt_suffix)
 
         if not two_rounds:
             a = ma.OptimizationAnalysisNN(label='drive_skewness_calibration',
                                           ad_func_pars=ad_func_pars,
                                           meas_grid=meas_grid)
-        # v2 creates a pretty picture of the optimizations
-        # ma.OptimizationAnalysis_v2(label='drive_skewness_calibration')
-
         # phi and alpha are the coefficients that go in the predistortion matrix
         alpha = a.optimization_result[0]
         phi = a.optimization_result[1]

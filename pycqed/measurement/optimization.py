@@ -5,7 +5,7 @@ from pycqed.analysis import machine_learning_toolbox as ml
 
 from sklearn.model_selection import GridSearchCV as gcv, train_test_split
 
-from scipy.optimize import fmin
+from scipy.optimize import fmin_l_bfgs_b
 
 def nelder_mead(fun, x0,
                 initial_step=0.1,
@@ -327,12 +327,7 @@ def neural_network_opt(fun, training_grid, target_values = None,
     ###############################################################
     ###          create measurement data from test_grid         ###
     ###############################################################
-    if not isinstance(hidden_layer_sizes,list):
-        hidden_layer_sizes = [hidden_layer_sizes]
 
-    # if not isinstance(alphas,list):
-    #     alphas = [alphas]
-    #transform input into array
     training_grid = np.transpose(training_grid)
     #get input dimension, training grid contains parameters as row!! vectors
     n_samples = np.size(training_grid,0)
@@ -340,18 +335,16 @@ def neural_network_opt(fun, training_grid, target_values = None,
 
     if fun is None:
         target_values = np.transpose(np.array([target_values]))
-        print(np.size(target_values))
         output_dim = np.size(target_values,1)
-        print(output_dim)
 
     else:
-        target_values = []
-        for i in range(n_samples):
-            target_values.append(fun(training_grid[i]))
-        target_values = np.array(target_values)
-        output_dim = np.size(target_values,1)
-        print(output_dim)
-
+        #if the sweep is adaptive, acquire data points by applying fun
+        first_value = fun(training_grid[0])
+        output_dim = len(first_value)
+        target_values = np.zeros((n_samples,output_dim))
+        target_values[0,:] = first_value
+        for i in range(1,n_samples):
+            target_values[i,:]=fun(training_grid[i])
 
     #Preprocessing of Data. Mainly transform the data to mean 0 and interval [-1,1]
     training_grid,target_values,\
@@ -410,17 +403,20 @@ def neural_network_opt(fun, training_grid, target_values = None,
     ###     perform gradient descent to minimize modeled landscape  ###
     ###################################################################
     x_ini = np.zeros(n_features)
-    res = fmin(estimator_wrapper, x_ini, full_output=True)
+    #The data is centered. No values above -1,1 should be encountered
+    bounds=[(-1.,1.) for i in range(n_features)]
+    #minimize network predictor with on bounded set, approximate gradient
+    res = fmin_l_bfgs_b(estimator_wrapper, x_ini,bounds=bounds,approx_grad=True)
     result = res[0]
+    amp = res[1]
     #Rescale values
-    amp = res[1] * output_feature_ext[0] + output_feature_means[0]
-    result[0] = result[0]*input_feature_ext[0]+input_feature_means[0]
-    result[1] = result[1]*input_feature_ext[1]+input_feature_means[1]
+    for it in range(output_dim):
+         amp[it]=amp[it]* output_feature_ext[it] + output_feature_means[it]
+    for it in range(n_features):
+        result[it] = result[it]*input_feature_ext[it]+input_feature_means[it]
     print('minimization results: ',result,'::',amp)
 
     return np.array(result), est, [test_grid,test_values]
-    # return [np.array(result), np.array(amp,dtype='float32')]
-    #mght want to adapt alpha,ect.i
 
 
 
