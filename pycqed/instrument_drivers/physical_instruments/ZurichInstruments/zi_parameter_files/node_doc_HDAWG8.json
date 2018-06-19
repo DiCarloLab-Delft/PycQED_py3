@@ -3500,5 +3500,197 @@
         "Properties": "Read, Write, Setting",
         "Type": "Double",
         "Unit": "V"
+    },
+    "/DEV8018/TRIGGERS/OUT/0/SOURCE": {
+        "Node": "/DEV8018/TRIGGERS/OUT/0/SOURCE",
+        "Description": "Assign a signal to a marker.",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None",
+        "Options": {
+            "0": "Off."
+        }
+    },
+    "/DEV8018/TRIGGERS/OUT/0/PULSEWIDTH": {
+        "Node": "/DEV8018/TRIGGERS/OUT/0/PULSEWIDTH",
+        "Description": "",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "s"
+    },
+    "/DEV8018/TRIGGERS/OUT/0/DELAY": {
+        "Node": "/DEV8018/TRIGGERS/OUT/0/DELAY",
+        "Description": "Trigger delay, controls the fine delay of the trigger output. The resolution is 78 ps.",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "s"
+    },
+    "/DEV8018/TRIGGERS/OUT/1/SOURCE": {
+        "Node": "/DEV8018/TRIGGERS/OUT/1/SOURCE",
+        "Description": "Assign a signal to a marker.",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None",
+        "Options": {
+            "0": "Off."
+        }
+    },
+    "/DEV8018/TRIGGERS/OUT/1/PULSEWIDTH": {
+        "Node": "/DEV8018/TRIGGERS/OUT/1/PULSEWIDTH",
+        "Description": "",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "s"
+    },
+    "/DEV8018/TRIGGERS/OUT/1/DELAY": {
+        "Node": "/DEV8018/TRIGGERS/OUT/1/DELAY",
+        "Description": "Trigger delay, controls the fine delay of the trigger output. The resolution is 78 ps.",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "s"
+    },
+    "/DEV8018/TRIGGERS/OUT/2/SOURCE": {
+        "Node": "/DEV8018/TRIGGERS/OUT/2/SOURCE",
+        "Description": "Assign a signal to a marker.",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None",
+        "Options": {
+            "0": "Off."
+        }
+    },
+    "/DEV8018/TRIGGERS/OUT/2/PULSEWIDTH": {
+        "Node": "/DEV8018/TRIGGERS/OUT/2/PULSEWIDTH",
+        "Description": "",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "s"
+    },
+    "/DEV8018/TRIGGERS/OUT/2/DELAY": {
+        "Node": "/DEV8018/TRIGGERS/OUT/2/DELAY",
+        "Description": "Trigger delay, controls the fine delay of the trigger output. The resolution is 78 ps.",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "s"
+    },
+    "/DEV8018/TRIGGERS/OUT/3/SOURCE": {
+        "Node": "/DEV8018/TRIGGERS/OUT/3/SOURCE",
+        "Description": "Assign a signal to a marker.",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None",
+        "Options": {
+            "0": "Off."
+        }
+    },
+    "/DEV8018/TRIGGERS/OUT/3/PULSEWIDTH": {
+        "Node": "/DEV8018/TRIGGERS/OUT/3/PULSEWIDTH",
+        "Description": "",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "s"
+    },
+    "/DEV8018/TRIGGERS/OUT/3/DELAY": {
+        "Node": "/DEV8018/TRIGGERS/OUT/3/DELAY",
+        "Description": "Trigger delay, controls the fine delay of the trigger output. The resolution is 78 ps.",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "s"
+    },
+    "/DEV8018/TRIGGERS/OUT/4/SOURCE": {
+        "Node": "/DEV8018/TRIGGERS/OUT/4/SOURCE",
+        "Description": "Assign a signal to a marker.",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None",
+        "Options": {
+            "0": "Off."
+        }
+    },
+    "/DEV8018/TRIGGERS/OUT/4/PULSEWIDTH": {
+        "Node": "/DEV8018/TRIGGERS/OUT/4/PULSEWIDTH",
+        "Description": "",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "s"
+    },
+    "/DEV8018/TRIGGERS/OUT/4/DELAY": {
+        "Node": "/DEV8018/TRIGGERS/OUT/4/DELAY",
+        "Description": "Trigger delay, controls the fine delay of the trigger output. The resolution is 78 ps.",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "s"
+    },
+    "/DEV8018/TRIGGERS/OUT/5/SOURCE": {
+        "Node": "/DEV8018/TRIGGERS/OUT/5/SOURCE",
+        "Description": "Assign a signal to a marker.",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None",
+        "Options": {
+            "0": "Off."
+        }
+    },
+    "/DEV8018/TRIGGERS/OUT/5/PULSEWIDTH": {
+        "Node": "/DEV8018/TRIGGERS/OUT/5/PULSEWIDTH",
+        "Description": "",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "s"
+    },
+    "/DEV8018/TRIGGERS/OUT/5/DELAY": {
+        "Node": "/DEV8018/TRIGGERS/OUT/5/DELAY",
+        "Description": "Trigger delay, controls the fine delay of the trigger output. The resolution is 78 ps.",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "s"
+    },
+    "/DEV8018/TRIGGERS/OUT/6/SOURCE": {
+        "Node": "/DEV8018/TRIGGERS/OUT/6/SOURCE",
+        "Description": "Assign a signal to a marker.",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None",
+        "Options": {
+            "0": "Off."
+        }
+    },
+    "/DEV8018/TRIGGERS/OUT/6/PULSEWIDTH": {
+        "Node": "/DEV8018/TRIGGERS/OUT/6/PULSEWIDTH",
+        "Description": "",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "s"
+    },
+    "/DEV8018/TRIGGERS/OUT/6/DELAY": {
+        "Node": "/DEV8018/TRIGGERS/OUT/6/DELAY",
+        "Description": "Trigger delay, controls the fine delay of the trigger output. The resolution is 78 ps.",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "s"
+    },
+    "/DEV8018/TRIGGERS/OUT/7/SOURCE": {
+        "Node": "/DEV8018/TRIGGERS/OUT/7/SOURCE",
+        "Description": "Assign a signal to a marker.",
+        "Properties": "Read, Write, Setting",
+        "Type": "Integer (64 bit)",
+        "Unit": "None",
+        "Options": {
+            "0": "Off."
+        }
+    },
+    "/DEV8018/TRIGGERS/OUT/7/PULSEWIDTH": {
+        "Node": "/DEV8018/TRIGGERS/OUT/7/PULSEWIDTH",
+        "Description": "",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "s"
+    },
+    "/DEV8018/TRIGGERS/OUT/7/DELAY": {
+        "Node": "/DEV8018/TRIGGERS/OUT/7/DELAY",
+        "Description": "Trigger delay, controls the fine delay of the trigger output. The resolution is 78 ps.",
+        "Properties": "Read, Write, Setting",
+        "Type": "Double",
+        "Unit": "s"
     }
 }
