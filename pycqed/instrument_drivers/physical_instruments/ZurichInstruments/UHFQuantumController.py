@@ -1089,10 +1089,8 @@ setTrigger(0);"""
             alpha=1, phi_skew=0):
         f_sampling = 1.8e9
         samples = RO_pulse_length*f_sampling
-        sample_idxs = np.arange(int(samples))
-        Iwave = np.cos(2 * np.pi * sample_idxs * f_RO_mod / f_sampling +
-                       phi_skew * np.pi / 180)
-        Qwave = -np.sin(2 * np.pi * sample_idxs * f_RO_mod / f_sampling)
+
+        wave = RO_amp*np.ones(int(samples))
 
         filter_samples = int(filter_sigma*nr_sigma*f_sampling)
         filter_sample_idxs = np.arange(filter_samples)
@@ -1100,11 +1098,13 @@ setTrigger(0);"""
                         (filter_sigma*f_sampling)**2)
         filter /= filter.sum()
 
-        Iwave = np.convolve(Iwave, filter, mode='full')
-        Qwave = np.convolve(Qwave, filter, mode='full')
+        waveFiltered = np.convolve(wave, filter, mode='full')
 
-        Iwave = RO_amp * alpha * Iwave
-        Qwave = RO_amp * Qwave
+        Iwave = alpha * waveFiltered * np.cos(2 * np.pi *
+                np.arange(len(waveFiltered)) * f_RO_mod / f_sampling +
+                phi_skew * np.pi / 180)
+        Qwave = -waveFiltered * np.sin(2 * np.pi *
+                np.arange(len(waveFiltered)) * f_RO_mod / f_sampling)
 
         self.awg_sequence_acquisition_and_pulse(Iwave, Qwave)
 

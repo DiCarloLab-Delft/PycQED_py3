@@ -12,6 +12,8 @@ import pycqed.measurement.waveform_control.fluxpulse_predistortion as \
 from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import \
     get_pulse_dict_from_pars
 import pycqed.instrument_drivers.meta_instrument.device_object as device
+import pycqed.measurement.multi_qubit_module as mqm
+
 station = None
 kernel_dir = 'kernels/'
 # You need to explicitly set this before running any functions from this module
@@ -1976,7 +1978,8 @@ def n_qubit_tomo_seq(
         qubits, prep_sequence=None,
         prep_name=None,
         rots_basis=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
-        upload=True, verbose=False, return_seq=False):
+        upload=True, verbose=False, return_seq=False,
+        preselection=False, ro_spacing=1e-6):
     """
 
     """
@@ -1984,8 +1987,11 @@ def n_qubit_tomo_seq(
     qubit_names = [qubit.name for qubit in qubits]
 
     operation_dict = {
-        'RO mux': device.get_multiplexed_readout_pulse_dictionary(qubits)
+        'RO mux': mqm.get_multiplexed_readout_pulse_dictionary(qubits),
+        'RO mux_presel': mqm.get_multiplexed_readout_pulse_dictionary(qubits)
     }
+    operation_dict['RO mux_presel']['pulse_delay'] = -ro_spacing
+    operation_dict['RO mux_presel']['refpoint'] = 'start'
 
     for qb in qubits:
         operation_dict.update(qb.get_operation_dict())
@@ -2002,6 +2008,8 @@ def n_qubit_tomo_seq(
     for i, tomography_sequence in enumerate(tomography_sequences):
         pulse_list = [operation_dict[pulse] for pulse in prep_sequence]
         tomography_sequence.append('RO mux')
+        if preselection:
+            tomography_sequence.append('RO mux_presel')
         pulse_list.extend([operation_dict[pulse] for pulse in
                            tomography_sequence])
         el_list.append(multi_pulse_elt(i, station, pulse_list, trigger=True,
@@ -2040,8 +2048,8 @@ def get_tomography_pulses(*qubit_names, basis_pulses=('I', 'X180', 'Y90',
         tomo_sequences = tomo_sequences_new
     return tomo_sequences
 
-def n_qubit_ref_seq(qubits, ref_desc,
-        upload=True, verbose=False, return_seq=False):
+def n_qubit_ref_seq(qubits, ref_desc, upload=True, verbose=False,
+                    return_seq=False, preselection=False, ro_spacing=1e-6):
     """
         Calibration points for arbitrary combinations
 
@@ -2055,8 +2063,11 @@ def n_qubit_ref_seq(qubits, ref_desc,
     qubit_names = [qubit.name for qubit in qubits]
 
     operation_dict = {
-        'RO mux': device.get_multiplexed_readout_pulse_dictionary(qubits)
+        'RO mux': mqm.get_multiplexed_readout_pulse_dictionary(qubits),
+        'RO mux_presel': mqm.get_multiplexed_readout_pulse_dictionary(qubits)
     }
+    operation_dict['RO mux_presel']['pulse_delay'] = -ro_spacing
+    operation_dict['RO mux_presel']['refpoint'] = 'start'
 
     for qb in qubits:
         operation_dict.update(qb.get_operation_dict())
@@ -2073,6 +2084,8 @@ def n_qubit_ref_seq(qubits, ref_desc,
     for i, calibration_sequence in enumerate(calibration_sequences):
         pulse_list = []
         calibration_sequence.append('RO mux')
+        if preselection:
+            calibration_sequence.append('RO mux_presel')
         pulse_list.extend(
             [operation_dict[pulse] for pulse in calibration_sequence])
         el_list.append(multi_pulse_elt(i, station, pulse_list, trigger=True,
@@ -2093,8 +2106,8 @@ def n_qubit_ref_seq(qubits, ref_desc,
         return seq_name
 
 
-def n_qubit_ref_all_seq(qubits,
-                          upload=True, verbose=False, return_seq=False):
+def n_qubit_ref_all_seq(qubits, upload=True, verbose=False, return_seq=False,
+                        preselection=False, ro_spacing=1e-6):
     """
         Calibration points for all combinations
     """
@@ -2103,7 +2116,8 @@ def n_qubit_ref_all_seq(qubits,
                            ref_desc=itertools.product(["I", "X180"],
                                                       repeat=len(qubits)),
                            upload=upload, verbose=verbose,
-                           return_seq=return_seq)
+                           return_seq=return_seq, preselection=preselection,
+                           ro_spacing=ro_spacing)
 
 
 
