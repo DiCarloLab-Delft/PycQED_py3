@@ -676,7 +676,7 @@ def measure_two_qubit_parity(qb0, qb1, qb2, feedback_delay, f_LO, nreps=1,
                              upload=True, MC=None, prep_sequence=None,
                              tomography_basis=(
                                  'I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
-                             reset=True):
+                             reset=True, preselection=False, ro_spacing=1e-6):
     """
     Important things to check when running the experiment:
         Is the readout separation commensurate with 225 MHz?
@@ -697,9 +697,11 @@ def measure_two_qubit_parity(qb0, qb1, qb2, feedback_delay, f_LO, nreps=1,
     sf = awg_swf2.two_qubit_parity(qb0, qb1, qb2, feedback_delay=feedback_delay,
                                    prep_sequence=prep_sequence, reset=reset,
                                    tomography_basis=tomography_basis,
-                                   upload=upload, verbose=False)
+                                   upload=upload, verbose=False,
+                                   preselection=preselection,
+                                   ro_spacing=ro_spacing)
 
-    nr_readouts = 2*len(tomography_basis)**2
+    nr_readouts = (3 if preselection else 2)*len(tomography_basis)**2
     nr_shots = 4095 - 4095 % nr_readouts
     df = get_multiplexed_readout_detector_functions(
         qubits, nr_shots=nr_shots)['int_log_det']

@@ -1876,7 +1876,8 @@ def n_qubit_reset(qubit_names, operation_dict, reset_cycle_time, nr_resets=1,
 def two_qubit_parity_measurement(
         q0, q1, q2, feedback_delay=900e-9, prep_sequence=None, reset=True,
         tomography_basis=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
-        upload=True, verbose=False, return_seq=False):
+        upload=True, verbose=False, return_seq=False, preselection=False,
+        ro_spacing=1e-6):
     """
 
     |              elem 1               |  elem 2  | elem 3
@@ -1901,8 +1902,12 @@ def two_qubit_parity_measurement(
     q2n = q2.name
 
     operation_dict = {
-        'RO mux': device.get_multiplexed_readout_pulse_dictionary([q0, q1, q2])
+        'RO mux': mqm.get_multiplexed_readout_pulse_dictionary([q0, q1, q2]),
+        'RO mux_presel': mqm.get_multiplexed_readout_pulse_dictionary([q0, q1, q2])
     }
+    operation_dict['RO mux_presel']['pulse_delay'] = \
+        -ro_spacing - operation_dict['RO mux']['length']
+    operation_dict['RO mux_presel']['refpoint'] = 'start'
 
     operation_dict.update({
         'I_fb': {'pulse_type': 'SquarePulse',
@@ -1929,6 +1934,8 @@ def two_qubit_parity_measurement(
     pulse_sequence.append('Y90 ' + q1n)
     pulse_sequence.append('RO ' + q1n)
     pulse_sequence.append('I_fb')
+    if preselection:
+        pulse_sequence.append('RO mux_presel')
     pulse_list = [operation_dict[pulse] for pulse in pulse_sequence]
     el_main = multi_pulse_elt(0, station, pulse_list, trigger=True, name='main')
     el_list.append(el_main)
