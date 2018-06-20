@@ -437,17 +437,17 @@ class QuantumEfficiencyAnalysis(ba.BaseDataAnalysis):
 
         if self.options_dict.get('subplots', True):
             for k in ['amp_vs_dephasing_coherence_fitted',
-                      'amp_vs_dephasing_coherence_not_fitted',
+                      # 'amp_vs_dephasing_coherence_not_fitted',
                       'amp_vs_dephasing_fit',
                       'amp_vs_SNR_scatter_fitted',
-                      'amp_vs_SNR_scatter_not_fitted',
+                      # 'amp_vs_SNR_scatter_not_fitted',
                       'amp_vs_SNR_fit',]:
                 self.plot_dicts[k]['ax_id'] = 'snr_analysis'
                 self.plot_dicts[k]['ylabel'] = 'SNR, coherence'
                 self.plot_dicts[k]['yunit'] = '(-)'
-                self.plot_dicts[k]['title'] = ''
-                #self.plot_dicts[k]['title'] = r'$\eta = (%.4f \pm %.4f)$ %%' % (
-                #    100 * self.fit_dicts['eta'], 100 * self.fit_dicts['u_eta'])
+                # self.plot_dicts[k]['title'] = ''
+                self.plot_dicts[k]['title'] = r'$\eta = (%.4f \pm %.4f)$ %%' % (
+                   100 * self.fit_dicts['eta'], 100 * self.fit_dicts['u_eta'])
                 #+ title
 
             #self.plot_dicts['amp_vs_dephasing_fit']['color'] = 'red'
@@ -521,15 +521,23 @@ class DephasingAnalysis(ba.BaseDataAnalysis):
                     'box_props': 'fancy',
                     'text_string': fit_text,
         }
+
+
+        'dirty hack to rescale y-axis in the plots'
+        b=self.fit_res['coherence_fit']
+        scale_amp=b.best_values['scale']
+                
+
         self.plot_dicts[name + 'amp_vs_dephasing_fit'] = {
             'plotfn': self.plot_fit,
+            'plot_normed':True,
             'ax_id': name + 'amp_vs_dephasing',
             'zorder': 5,
             'fit_res': self.fit_res['coherence_fit'],
             'xvals': amps,
             'marker': '',
             'linestyle': '-',
-            'ylabel': r'Coherence, $\left| \rho_{01} \right|$',
+            'ylabel': r'Relative contrast', #r'Coherence, $\left| \rho_{01} \right|$'
             'yunit': '',
             'xlabel': 'scaling amplitude',
             'xunit': 'rel. amp.',
@@ -546,7 +554,7 @@ class DephasingAnalysis(ba.BaseDataAnalysis):
                 'ax_id': name + 'amp_vs_dephasing',
                 'zorder': 0,
                 'xvals': amps[fit_mask],
-                'yvals': self.proc_data_dict['coherence'][fit_mask],
+                'yvals': self.proc_data_dict['coherence'][fit_mask]/scale_amp,
                 'marker': 'o',
                 'linestyle': '',
                 'setlabel': 'coherence data (used in fitting)',
@@ -876,3 +884,5 @@ class SSROAnalysisSingleScans(SSROAnalysis):
         folder = os.path.join(a_tools.datadir, d, f)
         self.raw_data_dict['folder'] = [folder]
         self.options_dict['analysis_result_file'] = os.path.join(folder, f + '.hdf5')
+
+

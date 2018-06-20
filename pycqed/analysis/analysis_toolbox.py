@@ -434,7 +434,6 @@ def get_data_from_ma_v2(ma, param_names, numeric_params=None):
         if numeric_params is not None:
             if param in numeric_params:
                 data[param] = np.double(data[param])
-    print(data)
     return data
 
 

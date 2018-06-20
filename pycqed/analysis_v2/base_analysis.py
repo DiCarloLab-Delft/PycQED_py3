@@ -1171,6 +1171,7 @@ class BaseDataAnalysis(object):
 
         model = pdict['fit_res'].model
         plot_init = pdict.get('plot_init', False)  # plot the initial guess
+        plot_normed = pdict.get('plot_normed', False)
         pdict['marker'] = pdict.get('marker', '')  # different default
         plot_linestyle_init = pdict.get('init_linestyle', '--')
         plot_numpoints = pdict.get('num_points', 1000)
@@ -1186,6 +1187,9 @@ class BaseDataAnalysis(object):
                                      plot_numpoints)
         pdict['yvals'] = model.eval(pdict['fit_res'].params,
                                     **{independent_var: pdict['xvals']})
+        if plot_normed:
+            pdict['yvals']=pdict['yvals']/pdict['yvals'][0]
+
         self.plot_line(pdict, axs)
 
         if plot_init:

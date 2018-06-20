@@ -19,7 +19,7 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                  options_dict: dict = None, extract_only: bool = False, auto: bool = True,
                  close_figs: bool = True, do_fitting: bool = True,
                  tau_key='Analysis.Fitted Params F|1>.tau.value',
-                 tau_std_key='Analysis.Fitted Params F|1>.tau.stderr', use_chisqr = False
+                 tau_std_key='Analysis.Fitted Params F|1>.tau.stderr', use_chisqr = False,
                  plot_versus_dac=True,
                  dac_key='Instrument settings.fluxcurrent.Q',
                  plot_versus_frequency=True,

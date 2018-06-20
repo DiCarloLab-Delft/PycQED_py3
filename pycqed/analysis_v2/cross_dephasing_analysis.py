@@ -30,7 +30,8 @@ class CrossDephasingAnalysis(ba.BaseDataAnalysis):
                  label_pattern: str = 'ro_amp_sweep_dephasing_trgt_{TQ}_measured_{RQ}',
                  options_dict: dict = None,
                  extract_only: bool = False, auto: bool = True,
-                 close_figs: bool = True, do_fitting: bool = True):
+                 close_figs: bool = True, do_fitting: bool = True,
+                 relative_contrast=False):
 
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label_pattern,
