@@ -295,12 +295,25 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
                  sliding_pulse_duration=220e-9,
                  freq_to_amp=None, amp_to_freq=None,
                  phase_cut :float=180,
+                 ch_amp_key: str='Snapshot/instruments/AWG8_8005'
+                 '/parameters/awgs_0_outputs_1_amplitude',
+                 ch_range_key: str='Snapshot/instruments/AWG8_8005'
+                 '/parameters/sigouts_0_range',
+                 waveform_amp_key: str='Snapshot/instruments/FL_LutMan_QR'
+                 '/parameters/sq_amp',
                  close_figs: bool = True,
                  f_demod: float=0, demodulate: bool=False, auto=True):
         if options_dict is None:
             options_dict = dict()
         super().__init__(t_start=t_start, t_stop=t_stop, label=label,
                          options_dict=options_dict, close_figs=close_figs)
+
+
+        self.ch_amp_key = ch_amp_key
+        # ch_range_keycan also be set to `None`, then the value will
+        # default to 1 (no rescaling)
+        self.ch_range_key = ch_range_key
+        self.waveform_amp_key = waveform_amp_key
 
         self.freq_to_amp = freq_to_amp
         self.amp_to_freq = amp_to_freq
@@ -326,6 +339,16 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
         # FIXME: this is hardcoded and should be an argument in options dict
         amp_key = 'Snapshot/instruments/AWG8_8005/parameters/awgs_0_outputs_1_amplitude'
         amp = a.data_file[amp_key].attrs['value']
+
+
+        ch_amp = a.data_file[self.ch_amp_key].attrs['value']
+        if self.ch_range_key is None:
+            ch_range = 2  # corresponds to a scale factor of 1
+        else:
+            ch_range = a.data_file[self.ch_range_key].attrs['value']
+        waveform_amp = a.data_file[self.waveform_amp_key].attrs['value']
+        amp = ch_amp*ch_range/2*waveform_amp
+
 
         self.raw_data_dict['amp'] = amp
         self.raw_data_dict['phases'] = a.measured_values[0]
