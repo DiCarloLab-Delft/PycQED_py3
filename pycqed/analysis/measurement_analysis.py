@@ -703,8 +703,8 @@ class MeasurementAnalysis(object):
         ax.xaxis.offsetText.set_fontsize(self.font_size)
         ax.yaxis.offsetText.set_fontsize(self.font_size)
         if ticks_around:
-            ax.xaxis.set_tick_params(labeltop='off', top='on', direction='in')
-            ax.yaxis.set_tick_params(labeltop='off', top='on', direction='in')
+            ax.xaxis.set_tick_params(labeltop=False, top=True, direction='in')
+            ax.yaxis.set_tick_params(labeltop=False, top=True, direction='in')
         ax.tick_params(axis='both', labelsize=self.font_size,
                        length=self.tick_length, width=self.tick_width)
 
@@ -1217,7 +1217,7 @@ class TD_Analysis(MeasurementAnalysis):
         self.add_dataset_to_analysisgroup('Corrected data',
                                           self.corr_data)
         self.analysis_group.attrs.create('corrected data based on',
-                                         'calibration points'.encode('utf-8'))
+                                        'calibration points'.encode('utf-8'))
 
         # Plotting
         if self.make_fig:
@@ -6890,8 +6890,8 @@ class Three_Tone_Spectroscopy_Analysis(MeasurementAnalysis):
                      verticalalignment='top',
                      horizontalalignment='right',
                      bbox=self.box_props)
-        self.save_fig(fig1, figname=ax1.get_title(), **kw)
-        self.save_fig(fig2, figname=ax2.get_title(), **kw)
+        self.save_fig(fig1, figname=fig1_title, **kw)
+        self.save_fig(fig2, figname=fig2_title, **kw)
         self.finish()
 
     def fit_twin_lorentz(self, x, data,
@@ -7939,6 +7939,7 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
                  cmap='viridis',
                  filt_func_a=None, filt_func_x0=None, filt_func_y0=None,
                  filter_idx_low=[], filter_idx_high=[], filter_threshold=15e6,
+                 force_keep_idx_low=[], force_keep_idx_high=[],
                  f1_guess=None, f2_guess=None, cross_flux_guess=None,
                  g_guess=30e6, coupling_label='g',
                  break_before_fitting=False,
@@ -7948,20 +7949,22 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         self.get_naming_and_values_2D()
 
         flux = self.Y[:, 0]
-        peaks_low, peaks_high = self.find_peaks()
-        self.f, self.ax = self.make_unfiltered_figure(peaks_low, peaks_high,
+        self.peaks_low, self.peaks_high = self.find_peaks()
+        self.f, self.ax = self.make_unfiltered_figure(self.peaks_low, self.peaks_high,
                                                       transpose=transpose, cmap=cmap,
                                                       add_title=add_title,
                                                       xlabel=xlabel, ylabel=ylabel)
 
-        filtered_dat = self.filter_data(flux, peaks_low, peaks_high,
+        self.filtered_dat = self.filter_data(flux, self.peaks_low, self.peaks_high,
                                         a=filt_func_a, x0=filt_func_x0,
                                         y0=filt_func_y0,
                                         filter_idx_low=filter_idx_low,
                                         filter_idx_high=filter_idx_high,
+                                        force_keep_idx_low=force_keep_idx_low, 
+                                        force_keep_idx_high=force_keep_idx_high,
                                         filter_threshold=filter_threshold)
         filt_flux_low, filt_flux_high, filt_peaks_low, filt_peaks_high, \
-        filter_func = filtered_dat
+        filter_func = self.filtered_dat
 
         self.f, self.ax = self.make_filtered_figure(filt_flux_low, filt_flux_high,
                                                     filt_peaks_low, filt_peaks_high, filter_func,
@@ -8002,6 +8005,7 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
 
     def filter_data(self, flux, peaks_low, peaks_high, a, x0=None, y0=None,
                     filter_idx_low=[], filter_idx_high=[],
+                    force_keep_idx_low=[], force_keep_idx_high=[],
                     filter_threshold=15e5):
         """
         Filters the input data in three steps.
@@ -8009,7 +8013,9 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
             2. separate data in two branches using a line and filter data on the
                 wrong side of the line.
             3. remove any data with indices specified by hand
+            4. Keep any data with indeces specified by hand (will overwrite removal)
         """
+
         if a is None:
             a = -1 * (max(peaks_high) - min(peaks_low)) / (max(flux) - min(flux))
         if x0 is None:
@@ -8023,7 +8029,8 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         filter_mask_high = ~dm_tools.get_outliers(peaks_high, filter_threshold)
         filter_mask_high = np.where(
             peaks_high < filter_func(flux), False, filter_mask_high)
-        filter_mask_high[-2] = False  # hand remove 1 datapoint
+        filter_mask_high[filter_idx_high] = False  # hand remove 1 datapoint
+        filter_mask_high[force_keep_idx_high] = True
 
         filt_flux_high = flux[filter_mask_high]
         filt_peaks_high = peaks_high[filter_mask_high]
@@ -8032,7 +8039,8 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         filter_mask_low = ~dm_tools.get_outliers(peaks_low, filter_threshold)
         filter_mask_low = np.where(
             peaks_low > filter_func(flux), False, filter_mask_low)
-        filter_mask_low[[0, -1]] = False  # hand remove 2 datapoints
+        filter_mask_low[filter_idx_low] = False  # hand remove 2 datapoints
+        filter_mask_low[force_keep_idx_low] = True  
 
         filt_flux_low = flux[filter_mask_low]
         filt_peaks_low = peaks_low[filter_mask_low]
@@ -8180,7 +8188,7 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         if f1_guess is None:
             f1_guess = np.mean(total_freqs) - g_guess
 
-        c2_guess = 0.
+        c2_guess = (f2_guess - f1_guess) / cross_flux_guess
         if f2_guess is None:
             # The factor *1000* is a magic number but seems to give a
             # reasonable guess that converges well.
@@ -8189,7 +8197,7 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
 
             f2_guess = cross_flux_guess * (c1_guess - c2_guess) + f1_guess
         else:
-            c1_guess = c2_guess + (f2_guess - f1_guess) / cross_flux_guess
+            c1_guess = (f2_guess - f1_guess) / cross_flux_guess
 
         av_crossing_model.set_param_hint(
             'g', min=0., max=0.5e9, value=g_guess, vary=True)
@@ -8198,9 +8206,9 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         av_crossing_model.set_param_hint(
             'f_center2', min=0., max=20.0e9, value=f2_guess, vary=True)
         av_crossing_model.set_param_hint(
-            'c1', min=-1.0e9, max=1.0e9, value=c1_guess, vary=True)
+            'c1', min=-1.0e12, max=1.0e12, value=c1_guess, vary=True)
         av_crossing_model.set_param_hint(
-            'c2', min=-1.0e9, max=1.0e9, value=c2_guess, vary=True)
+            'c2', min=-1.0e12, max=1.0e12, value=c2_guess, vary=True)
         params = av_crossing_model.make_params()
         fit_res = av_crossing_model.fit(data=np.array(total_freqs),
                                         flux=np.array(total_flux),

@@ -1,6 +1,7 @@
 from .base_lutman import Base_LutMan
 import numpy as np
 import logging
+from scipy.optimize import minimize
 from copy import copy
 from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter
 from qcodes.utils import validators as vals
@@ -135,10 +136,10 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         self.add_parameter(
             'cfg_operating_mode',
             initial_value='Codeword_normal',
-            vals=vals.Enum('Codeword_normal',
-                           'CW_single_01', 'CW_single_02',
-                           'CW_single_03', 'CW_single_04',
-                           'CW_single_05', 'CW_single_06'),
+            vals=vals.Enum('Codeword_normal'),
+                           # 'CW_single_01', 'CW_single_02',
+                           # 'CW_single_03', 'CW_single_04',
+                           # 'CW_single_05', 'CW_single_06'),
             docstring='Used to determine what program to load in the AWG8. '
             'If set to "Codeword_normal" it does codeword triggering, '
             'other modes exist to play only a specific single waveform.',
@@ -352,10 +353,22 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                            vals=vals.Numbers(),
                            parameter_class=ManualParameter)
 
+        self.add_parameter(
+            'czd_net_integral', docstring='Used determine what the integral of'
+            ' the CZ waveform should evaluate to. This is realized by adding'
+            ' an offset to the phase correction pulse.\nBy setting this '
+            'parameter to np.nan no offset correction is performed.',
+           initial_value=0,
+           unit='dac value * samples',
+           vals=vals.MultiType(vals.Numbers(), NP_NANs()),
+           parameter_class=ManualParameter)
+
+
         self.add_parameter('czd_double_sided',
                            initial_value=False,
                            vals=vals.Bool(),
                            parameter_class=ManualParameter)
+
 
         self.add_parameter('mcz_nr_of_repeated_gates',
                            initial_value=1, vals=vals.PermissiveInts(1, 40),
@@ -496,9 +509,18 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             return waveform
 
     def _get_phase_corr_offset(self):
-        net_charge = np.sum(self._wave_dict['cz'])
+        wf_integral = np.sum(self._wave_dict['cz'])
         corr_samples = self.sampling_rate()*self.cz_phase_corr_length()
-        offset = -net_charge/corr_samples
+
+        if np.isnan(self.czd_net_integral()):
+            offset = 0
+        else:
+            offset = (self.czd_net_integral()-wf_integral)/corr_samples
+        if abs(offset)>0.4:
+            # if this warning is raised, it is recommended to play with
+            # the cz_lenght ratio parameter.
+            logging.warning('net-zero offset ({:.2f}) larger than 0.4'.format(
+                            offset))
         return offset
 
     def _gen_phase_corr(self, phase_corr_amp: float = None,
@@ -513,36 +535,41 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         an "idle" pulse.
 
         """
-        if phase_corr_amp is None:
-            phase_corr_amp = self.cz_phase_corr_amp()
+        raise NotImplementedError("Method is deprecated")
+        # if phase_corr_amp is None:
+        #     phase_corr_amp = self.cz_phase_corr_amp()
 
-        if not self.czd_double_sided():
-            phase_corr_wf = wf.single_channel_block(
-                amp=phase_corr_amp, length=self.cz_phase_corr_length(),
-                sampling_rate=self.sampling_rate(), delay=0)
-            return phase_corr_wf
+        # if not self.czd_double_sided():
+        #     phase_corr_wf = wf.single_channel_block(
+        #         amp=phase_corr_amp, length=self.cz_phase_corr_length(),
+        #         sampling_rate=self.sampling_rate(), delay=0)
+        #     return phase_corr_wf
 
-        else:
-            block = wf.single_channel_block(
-                amp=phase_corr_amp,
-                length=self.cz_phase_corr_length()/2,
-                sampling_rate=self.sampling_rate(), delay=0)
+        # else:
+        #     block = wf.single_channel_block(
+        #         amp=phase_corr_amp,
+        #         length=self.cz_phase_corr_length()/2,
+        #         sampling_rate=self.sampling_rate(), delay=0)
 
-            if cz_offset_comp:
-                phase_corr_offset = self._get_phase_corr_offset()
-            else:
-                phase_corr_offset = 0
+        #     if cz_offset_comp:
+        #         phase_corr_offset = self._get_phase_corr_offset()
+        #     else:
+        #         phase_corr_offset = 0
 
-            phase_corr_wf = np.concatenate(
-                [block, -1*block]) + phase_corr_offset
-            return phase_corr_wf
+        #     phase_corr_wf = np.concatenate(
+        #         [block, -1*block]) + phase_corr_offset
+        #     return phase_corr_wf
 
     def _gen_cz_z(self, regenerate_cz=True):
         if regenerate_cz:
             self._wave_dict['cz'] = self._gen_cz()
-        phase_corr = self._gen_phase_corr(cz_offset_comp=False)
-        # CZ with phase correction
-        cz_z = np.concatenate([self._wave_dict['cz'], phase_corr])
+
+        # Commented out snippet is old (deprecated ) phase corr 19/6/2018 MAR
+        # phase_corr = self._gen_phase_corr(cz_offset_comp=True)
+        # # CZ with phase correction
+        # cz_z = np.concatenate([self._wave_dict['cz'], phase_corr])
+
+        cz_z = self._get_phase_corrected_pulse(base_wf=self._wave_dict['cz'])
 
         return cz_z
 
@@ -560,7 +587,13 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             sample_start_idx = int(self.mcz_gate_separation() *
                                    self.sampling_rate())*i
             sq = self._wave_dict['square']
-            waveform[sample_start_idx:sample_start_idx+len(sq)] += sq
+            try:
+                waveform[sample_start_idx:sample_start_idx+len(sq)] += sq
+            except ValueError as e:
+                logging.warning('Could not add square pulse {} in {}'.format(
+                    i, self.name))
+                logging.warning(e)
+                break
         return waveform
 
     def _gen_multi_cz(self, regenerate_cz=True):
@@ -578,7 +611,13 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             cz_z = self._wave_dict['cz_z']
             sample_start_idx = int(self.mcz_gate_separation() *
                                    self.sampling_rate())*i
-            waveform[sample_start_idx:sample_start_idx+len(cz_z)] += cz_z
+            try:
+                waveform[sample_start_idx:sample_start_idx+len(cz_z)] += cz_z
+            except ValueError as e:
+                logging.warning('Could not add cz_z pulse {} in {}'.format(
+                    i, self.name))
+                logging.warning(e)
+                break
         # CZ with phase correction
         return waveform
 
@@ -639,36 +678,146 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
     def _gen_idle_z(self, regenerate_cz=True):
         if regenerate_cz:
             self._wave_dict['cz'] = self._gen_cz()
-        phase_corr = self._gen_phase_corr()
-        # Only apply phase correction component after idle for duration of CZ
-        return np.concatenate(
-            [np.zeros(len(self._wave_dict['cz'])), phase_corr])
+        # phase_corr = self._gen_phase_corr()
+        # # Only apply phase correction component after idle for duration of CZ
+        # return np.concatenate(
+        #     [np.zeros(len(self._wave_dict['cz'])), phase_corr])
+        idle_z = self._get_phase_corrected_pulse(
+            base_wf=np.zeros(len(self._wave_dict['cz'])))
+
+        return idle_z
+
+
 
     def _gen_multi_idle_z(self, regenerate_cz=False):
         """
         Composite waveform containing multiple cz gates
         """
         if regenerate_cz:
-            self._wave_dict['cz'] = self._gen_cz()
-
+            self._wave_dict['idle_z'] = self._gen_cz(regenerate_cz=regenerate_cz)
+        idle_z = self._wave_dict['idle_z']
         max_nr_samples = int(self.cfg_max_wf_length()*self.sampling_rate())
 
         waveform = np.zeros(max_nr_samples)
         for i in range(self.mcz_nr_of_repeated_gates()):
             # if self.mcz_identical_phase_corr():
-            phase_corr = self._gen_phase_corr(cz_offset_comp=False)
+            # phase_corr = self._gen_phase_corr(cz_offset_comp=False)
             # else:
             #     phase_corr = wf.single_channel_block(
             #         amp=self.get('mcz_phase_corr_amp_{}'.format(i+1)),
             #         length=self.cz_phase_corr_length(),
             #         sampling_rate=self.sampling_rate(), delay=0)
-            cz_z = np.concatenate([np.zeros(len(self._wave_dict['cz'])),
-                                   phase_corr])
+            # idle_z = np.concatenate([np.zeros(len(self._wave_dict['cz'])),
+            #                        phase_corr])
             sample_start_idx = int(self.mcz_gate_separation() *
                                    self.sampling_rate())*i
-            waveform[sample_start_idx:sample_start_idx+len(cz_z)] += cz_z
+            try:
+                waveform[sample_start_idx:sample_start_idx+len(idle_z)] += idle_z
+            except ValueError as e:
+                logging.warning('Could not add idle_z pulse {} in {}'.format(
+                    i, self.name))
+                logging.warning(e)
+                break
         # CZ with phase correction
         return waveform
+
+
+    ###########################################################
+    #  Waveform generation net-zero phase correction methods  #
+    ###########################################################
+    def _calc_modified_wf(self, base_wf, a_i, corr_samples):
+
+        if not np.isnan(self.czd_net_integral()):
+            curr_int = np.sum(base_wf)
+            corr_int = self.czd_net_integral()-curr_int
+            corr_pulse = phase_corr_triangle(int_val=corr_int, nr_samples=corr_samples)
+            if np.max(corr_pulse)> 0.5:
+                logging.warning('net-zero integral correction({:.2f}) larger than 0.4'.format(
+                    np.max(corr_pulse)))
+        else:
+            corr_pulse= np.zeros(corr_samples)
+
+        corr_pulse += phase_corr_sine_series(a_i, corr_samples)
+
+        modified_wf = np.concatenate([base_wf, corr_pulse])
+        return modified_wf
+
+
+
+    def _phase_corr_cost_func(self, base_wf, a_i, corr_samples,
+                              print_result=False):
+        """
+        The cost function of the cz_z waveform is designed to meet
+        the following criteria
+        1. Net-zero character of waveform
+            Integral of wf = 0
+        2. Single qubit phase correction
+            Integral of phase_corr_part**2 = desired constant
+        3. Target_wf ends at 0
+        4. No-distortions present after cutting of waveform
+            predistorted_wf ends at 0 smoothly (as many derivatives as possible 0)
+
+        5. Minimize the maximum amplitude
+            Prefer small non-violent pulses
+        """
+        # samples to quanitify leftover distoritons
+        tail_samples = 500
+
+        target_wf = self._calc_modified_wf(
+                base_wf, a_i=a_i, corr_samples=corr_samples)
+        k0 = self.instr_distortion_kernel.get_instr()
+        predistorted_wf = k0.distort_waveform(target_wf,
+                                              len(target_wf)+tail_samples)
+
+        # 2. Phase correction pulse
+        phase_corr_int = np.sum(
+            target_wf[len(base_wf):len(base_wf)+corr_samples]**2)/corr_samples
+        cv_2 = ((phase_corr_int - self.cz_phase_corr_amp()**2)*1000)**2
+
+        # 4. No-distortions present after cutting of waveform
+        cv_4 = np.sum(abs(predistorted_wf[-tail_samples+50:]))*20
+        # 5. no violent waveform
+        cv_5 = np.max(abs(target_wf)*100)**2
+
+        cost_val = cv_2 + cv_4+cv_5
+
+    #     if print_result:
+    #         print("Cost function value")
+
+    # #         print("cv_1 net_zero_character: {:.6f}".format(cv_1))
+    #         print("cv_2 phase corr pulse  : {:.6f}".format(cv_2))
+    # #         print("cv_3 ends at 0         : {:.6f}".format(cv_3))
+    #         print("cv_4 distortions tail  : {:.6f}".format(cv_4))
+    #         print("cv_5 non violent       : {:.6f}".format(cv_5))
+
+        return cost_val
+
+
+
+    def _get_phase_corrected_pulse(self, base_wf):
+        """
+        Takes the second part of the phase correction pulse and modifies it such
+        that the pulse is optimally canceled.
+
+        It should be noted that this is a simple numerical optimization and not a
+        proper analytic inverse.
+        """
+        corr_samples = int(self.cz_phase_corr_length()*self.sampling_rate())
+
+        res_obj = minimize(lambda x: self._phase_corr_cost_func(
+            base_wf, a_i=x, corr_samples=corr_samples),
+        [0]*1, method='COBYLA')
+
+        self._phase_corr_cost_func(
+            base_wf, a_i=res_obj.x,
+            corr_samples=corr_samples, print_result=True)
+
+
+        modified_wf =self._calc_modified_wf(base_wf, a_i=res_obj.x,
+                                            corr_samples=corr_samples)
+
+        return modified_wf
+
 
     #################################
     #  Waveform loading methods     #
@@ -734,6 +883,10 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         # Uploading the codeword program if required
         if self._program_hash_differs() or force_load_sequencer_program:
+            # FIXME: List of conditions in which reloading is required
+            # - program hash differs
+            # - max waveform length has changed
+            # N.B. these other conditions need to be included here.
             # This ensures only the channels that are relevant get reconfigured
             awg_nr = (self.cfg_awg_channel()-1)//2
             self._upload_codeword_program(awg_nr)
@@ -860,6 +1013,8 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                 self._wave_dict_dist[waveform_name] = waveform
 
         waveform = self._wave_dict_dist[waveform_name]
+        codeword = self.LutMap()[waveform_name]
+        self.AWG.get_instr().set(codeword, waveform)
 
         if self.instr_partner_lutman() is None:
             logging.warning('no partner lutman specified')
@@ -1007,6 +1162,8 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         dac_val_axis.axvspan(1, 1000, facecolor='.5', alpha=0.5)
         dac_val_axis.axvspan(-1000, -1, facecolor='.5', alpha=0.5)
+        # get figure is here in case an axis object was passed as input
+        f = ax.get_figure()
         f.subplots_adjust(right=.7)
         if show:
             plt.show()
@@ -1110,3 +1267,34 @@ class QWG_Flux_LutMan(AWG8_Flux_LutMan):
         channel_amp = AWG.get('ch{}_amp'.format(awg_ch))
         scale_factor = channel_amp
         return scale_factor
+
+#########################################################################
+# Convenience functions below
+#########################################################################
+def phase_corr_triangle(int_val, nr_samples):
+    """
+    Creates an offset triangle with desired integrated value
+    """
+    x = np.arange(nr_samples)
+    # nr_samples+1 is because python counting starts at 0
+    b = 2*int_val/(nr_samples+1)
+    a = -b/nr_samples
+    y = a*x+b
+    return y
+
+
+
+def phase_corr_sine_series(a_i, nr_samples):
+    """
+    Phase correction pulse as a fourier sine series.
+
+    The integeral (sum) of this waveform is
+    gauranteed to be equal to zero (within rounding error)
+    by the choice of function.
+    """
+    x = np.linspace(0, 2*np.pi, nr_samples)
+    s = np.zeros(nr_samples)
+
+    for i, a in enumerate(a_i):
+        s+= a*np.sin((i+1)*x)
+    return s

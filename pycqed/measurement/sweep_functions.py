@@ -888,6 +888,21 @@ class lutman_par_dB_attenuation_UHFQC(Soft_Sweep):
             self.LutMan.UHFQC.acquisition_arm(single=self.single)
 
 
+class par_dB_attenuation_UHFQC_AWG_direct(Soft_Sweep):
+    def __init__(self, UHFQC, **kw):
+        self.set_kw()
+        self.name = "UHFQC attenuation"
+        self.parameter_name = "UHFQC attenuation"
+        self.unit = 'dB'
+        self.sweep_control = 'soft'
+        self.UHFQC = UHFQC
+
+    def set_parameter(self, val):
+        UHFQC.awgs_0_outputs_1_amplitude(10**(val/20))
+        UHFQC.awgs_0_outputs_0_amplitude(10**(val/20))
+       
+
+
 class lutman_par_UHFQC_dig_trig(Soft_Sweep):
     def __init__(self, LutMan, LutMan_parameter, single=True, run=False,**kw):
         self.set_kw()
@@ -1062,95 +1077,20 @@ class two_par_joint_sweep(Soft_Sweep):
 
 class FLsweep(Soft_Sweep):
     """
-    Special sweep function for AWG8 flux pulses, includes "hack" program
-    required because of bad triggering of DIO pulses.
+    Special sweep function for AWG8 flux pulses.
     """
-    def __init__(self, lm, par, waveform_name, realtime_loading=True,
-                 other_waveform=None, **kw):
-        super().__init__(**kw)
+    def __init__(self, lm, par, waveform_name):
+        super().__init__()
         self.lm = lm
         self.par = par
         self.waveform_name = waveform_name
         self.parameter_name = par.name
         self.unit = par.unit
         self.name = par.name
-        self.realtime_loading = realtime_loading
-        self.other_waveform = other_waveform
-
-    def prepare(self):
-        pass
-        # awg_hack_program = """
-        # while (1) {
-        #   waitDIOTrigger();
-        #   playWave("dev8005_wave_ch1_cw002", "dev8005_wave_ch2_cw002");
-        # }
-        # """
-        # awg_hack_program_cz = """
-        # while (1) {
-        #   waitDIOTrigger();
-        #   playWave("dev8005_wave_ch1_cw001", "dev8005_wave_ch2_cw001");
-        # }
-        # """
-        # awg_hack_program_multi_cz = """
-        # while (1) {
-        #   waitDIOTrigger();
-        #   playWave("dev8005_wave_ch1_cw004", "dev8005_wave_ch2_cw004");
-        # }
-        # """
-        # awg_hack_program_custom_wf = """
-        # while (1) {
-        #   waitDIOTrigger();
-        #   playWave("dev8005_wave_ch1_cw004", "dev8005_wave_ch2_cw004");
-        # }
-        # """
-        # awg = self.lm.AWG.get_instr()
-        # self.lm.load_waveform_onto_AWG_lookuptable(
-        #     self.waveform_name, regenerate_waveforms=True)
-        # if 'multi' in self.waveform_name:
-        #     awg.configure_awg_from_string(0, awg_hack_program_multi_cz)
-        # elif 'z' in self.waveform_name:
-        #     awg.configure_awg_from_string(0, awg_hack_program_cz)
-        # elif 'custom' in self.waveform_name:
-        #     awg.configure_awg_from_string(0, awg_hack_program_custom_wf)
-
-        # else:
-        #     awg.configure_awg_from_string(0, awg_hack_program)
-
-        # awg.configure_codeword_protocol()
-        # awg.start()
 
     def set_parameter(self, val):
         self.par(val)
-        # if self.realtime_loading:
         self.lm.load_waveform_realtime(self.waveform_name)
-        # else:
-        #     awg = self.lm.AWG.get_instr()
-        #     awg_hack_program = """
-        #     while (1) {
-        #       waitDIOTrigger();
-        #       playWave("dev8005_wave_ch1_cw002", "dev8005_wave_ch2_cw002");
-        #     }
-        #     """
-        #     awg_hack_program_cz = """
-        #     while (1) {
-        #       waitDIOTrigger();
-        #       playWave("dev8005_wave_ch1_cw001", "dev8005_wave_ch2_cw001");
-        #     }
-        #     """
-        #     awg_hack_program_multi_cz = """
-        #     while (1) {
-        #       waitDIOTrigger();
-        #       playWave("dev8005_wave_ch1_cw004", "dev8005_wave_ch2_cw004");
-        #     }
-        #     """
-        #     self.lm.load_waveform_onto_AWG_lookuptable(
-        #         self.waveform_name, regenerate_waveforms=True)
-        #     if 'z' in self.waveform_name:
-        #         awg.configure_awg_from_string(0, awg_hack_program_cz)
-        #     else:
-        #         awg.configure_awg_from_string(0, awg_hack_program)
-        #     awg.configure_codeword_protocol()
-        #     awg.start()
 
 
 class FLsweep_QWG(Soft_Sweep):
