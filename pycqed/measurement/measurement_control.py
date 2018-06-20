@@ -1656,4 +1656,6 @@ class KeyboardFinish(KeyboardInterrupt):
     Indicates that the user safely aborts/finishes the experiment.
     Used to finish the experiment without raising an exception.
     """
+
+    # FIXME: replace with version from pycqed/utilities/general
     pass

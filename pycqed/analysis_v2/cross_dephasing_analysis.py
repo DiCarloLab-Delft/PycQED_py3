@@ -15,14 +15,18 @@ import os
 from pycqed.analysis import analysis_toolbox as a_tools
 
 import numpy as np
-import matplotlib.pyplot as plt
 import numpy.ma
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 
 class CrossDephasingAnalysis(ba.BaseDataAnalysis):
     '''
-    Analyses measurement-induced Dephasing of qubits
+    Analyses measurement-induced Dephasing of qubits.
+
+    options_dict options:
+     - The inherited options from BaseDataAnalysis
+     - The inherited options from DephasingAnalysis
+     -
     '''
 
     def __init__(self, qubit_labels: list,
@@ -52,6 +56,7 @@ class CrossDephasingAnalysis(ba.BaseDataAnalysis):
                                                 t_stop=t_stop,
                                                 label=label, options_dict=d,
                                                 auto=False, extract_only=True)
+                #TODO: add option to use DephasingAnalysisSingleScans instead
 
         if auto:
             self.run_analysis()
@@ -84,21 +89,34 @@ class CrossDephasingAnalysis(ba.BaseDataAnalysis):
         self.fit_res = OrderedDict()
         self.fit_dicts['sigmas'] = np.array(
             [[None] * len(qubit_labels)] * len(qubit_labels), dtype=float)
+        self.fit_dicts['sigmas_phase'] = np.array(
+            [[None] * len(qubit_labels)] * len(qubit_labels), dtype=float)
         self.fit_dicts['sigmas_norm'] = np.array(
             [[None] * len(qubit_labels)] * len(qubit_labels), dtype=float)
         self.fit_dicts['deph_norm'] = np.array(
             [[None] * len(qubit_labels)] * len(qubit_labels), dtype=float)
-        self.fit_res['coherence_fit'] = np.array(
-            [[None] * len(qubit_labels)] * len(qubit_labels), dtype=object)
+        #self.fit_res['coherence_fit'] = np.array(
+        #    [[None] * len(qubit_labels)] * len(qubit_labels), dtype=object)
+
 
         for i, tq in enumerate(qubit_labels):
             for j, rq in enumerate(qubit_labels):
                 ra = self.ra[i, j]
                 ra.run_analysis()
-                self.fit_res['coherence_fit'] = ra.fit_res['coherence_fit']
-                self.fit_dicts['sigmas'][i, j] = ra.fit_dicts['coherence_fit']['sigma']
+
+        for i, tq in enumerate(qubit_labels):
+            c = self.ra[i, i].fit_res['coherence_phase_fit'].params['c'].value
+            for j, rq in enumerate(qubit_labels):
+                ra = self.ra[i, j]
+                df = ra.fit_res['coherence_fit']
+                dpf = ra.fit_res['coherence_phase_fit']
+                self.fit_res['coherence_fit_'+tq+'_'+rq] = df
+                self.fit_dicts['sigmas'][i, j] = df.params['sigma'].value
+                s = dpf.params['s'].value
+                self.fit_dicts['sigmas_phase'][i, j] = 1/(s*np.sqrt(-c))
             self.fit_dicts['sigmas_norm'][i,:] = self.fit_dicts['sigmas'][i,:] / self.fit_dicts['sigmas'][i, i]
             self.fit_dicts['deph_norm'][i,:] = self.fit_dicts['sigmas'][i, i] / self.fit_dicts['sigmas'][i,:]
+
 
     def prepare_plots(self):
         pt = '\n'
@@ -110,7 +128,17 @@ class CrossDephasingAnalysis(ba.BaseDataAnalysis):
             'xvals': self.qubit_labels, 'xlabel': 'Dephased Qubit', 'xunit': '',
             'zvals': self.fit_dicts['sigmas'],
             'zlabel': r'Dephasing Gauss width $\sigma$',
-            #'plotsize': self.options_dict.get('plotsize', None),
+            'plotsize': self.options_dict.get('plotsize', None),
+            'cmap': self.options_dict.get('cmap', 'YlGn_r'),
+        }
+        self.plot_dicts['sigmas_phase'] = {
+            'plotfn': self.plot_labeled_2d,
+            'title': 'Sigmas concluded from Phase' + pt + t,
+            'yvals': self.qubit_labels, 'ylabel': 'Targeted Qubit', 'yunit': '',
+            'xvals': self.qubit_labels, 'xlabel': 'Dephased Qubit', 'xunit': '',
+            'zvals': self.fit_dicts['sigmas_phase'],
+            'zlabel': r'Dephasing Gauss width $\bar{\sigma}$',
+            'plotsize': self.options_dict.get('plotsize', None),
             'cmap': self.options_dict.get('cmap', 'YlGn_r'),
         }
         self.plot_dicts['sigmas_norm'] = {

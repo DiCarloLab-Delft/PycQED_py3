@@ -1160,6 +1160,9 @@ class CCLight_Transmon(Qubit):
 
     def calibrate_mixer_skewness_drive(self, MC=None,
                                        mixer_channels: list=['G', 'D'],
+                                       x0: list =[1.0, 0.0],
+                                       cma_stds: list=[.15, 10],
+                                       maxfevals: int=250,
                                        update: bool =True)-> bool:
         '''
         Calibrates the mixer skewness and updates values in the qubit object.
@@ -1217,12 +1220,12 @@ class CCLight_Transmon(Qubit):
                 # Codeword 10 is hardcoded in the generate CCL config
                 prepare_function_kwargs={'waveform_name': 'square', 'wf_nr': 10})
             ad_func_pars = {'adaptive_function': cma.fmin,
-                            'x0': [1.0, 0.0],
+                            'x0': x0,
                             'sigma0': 1,
                             'minimize': True,
                             'noise_handler': cma.NoiseHandler(N=2),
-                            'options': {'cma_stds': [.15, 10],
-                                        'maxfevals': 250}}  # Should be enough for mixer skew
+                            'options': {'cma_stds': cma_stds,
+                                        'maxfevals': maxfevals}}  # Should be enough for mixer skew
 
             MC.set_sweep_functions([alpha, phi])
             MC.set_detector_function(detector)  # sets test_detector

@@ -20,6 +20,7 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                  close_figs: bool = True, do_fitting: bool = True,
                  tau_key='Analysis.Fitted Params F|1>.tau.value',
                  tau_std_key='Analysis.Fitted Params F|1>.tau.stderr',
+                 use_chisqr = False,
                  plot_versus_dac=True,
                  dac_key='Instrument settings.fluxcurrent.Q',
                  plot_versus_frequency=True,
@@ -54,10 +55,26 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                          close_figs=close_figs,
                          extract_only=extract_only)
         # self.single_timestamp = False
-        self.params_dict = {'tau': tau_key,
-                            'tau_stderr': tau_std_key,
-                            }
-        self.numeric_params = ['tau', 'tau_stderr']
+        if use_chisqr:
+            if 'F|1>' in tau_key:
+                chisquared_key = 'Analysis.Fitted Params F|1>.chisqr'
+            elif 'raw' in tau_key:
+                chisquared_key = 'Analysis.Fitted Params raw w0.chisqr'
+            elif 'corr_data' in tau_key:
+                chisquared_key = 'Analysis.Fitted Params corr_data.chisqr'
+            self.params_dict = {'tau': tau_key,
+                                'tau_stderr': tau_std_key,
+                                'chisquared' : chisquared_key
+                                }
+            self.numeric_params = ['tau', 'tau_stderr', 'chisquared']
+        else:
+            self.params_dict = {'tau': tau_key,
+                                'tau_stderr': tau_std_key,
+                                # 'chisquared' : chisquared_key
+                                }
+            self.numeric_params = ['tau', 'tau_stderr'] #, 'chisquared'
+
+
 
         self.plot_versus_dac = plot_versus_dac
         if plot_versus_dac:
@@ -71,6 +88,7 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
 
         if auto:
             self.run_analysis()
+        # return self.proc_data_dict
 
     def extract_data(self):
         # load data
@@ -227,7 +245,7 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                  plot_versus_frequency: bool = True,
                  frequency_key_pattern: str = 'Instrument settings.{Q}.freq_qubit',
                  res_freq: list = None, res_Qc: list = None, chi_shift: list = None,
-                 do_fitting: bool = True, close_figs: bool = True,
+                 do_fitting: bool = True, close_figs: bool = True, use_chisqr = False,
                  ):
         '''
         Plots and Analyses the coherence times (i.e. T1, T2 OR T2*) of one or several measurements.
@@ -298,11 +316,13 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
         tau_keys = tau_keys or {
             self.T1: 'Analysis.Fitted Params F|1>.tau.value',
             self.T2: 'Analysis.Fitted Params corr_data.tau.value',
+            # self.T2: 'Analysis.Fitted Params raw w0.tau.value',
             self.T2_star: 'Analysis.Fitted Params raw w0.tau.value',
         }
         tau_std_keys = tau_std_keys or {
             self.T1: 'Analysis.Fitted Params F|1>.tau.stderr',
             self.T2: 'Analysis.Fitted Params corr_data.tau.stderr',
+            # self.T2: 'Analysis.Fitted Params raw w0.tau.stderr',
             self.T2_star: 'Analysis.Fitted Params raw w0.tau.stderr',
         }
 
@@ -380,6 +400,7 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                     frequency_key=freq_key,
                     options_dict=options_dict,
                     close_figs=close_figs,
+                    use_chisqr = use_chisqr
                 )
 
         if auto:
@@ -425,15 +446,18 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
         scheme = list(scheme)
         other = [None] * len(scheme)
         for i, o in enumerate(other_mess):
-            j = scheme.index(float(scheme_mess[i]))
-            other[j] = o
+            try:
+                j = scheme.index(float(scheme_mess[i]))
+                other[j] = o
+            except:
+                pass
         return other
 
     def process_data(self):
         for qubit in self.all_analysis:
             self.proc_data_dict[qubit] = {}
             qo = self.all_analysis[qubit]
-
+            # print(qo.keys())
             # collect all dac values
             all_dac = np.array([])
             for typ in qo:
@@ -452,24 +476,50 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
 
                 sorted_taus = self._put_data_into_scheme(scheme=all_dac, scheme_mess=d['dac'],
                                                          other_mess=d['tau'])
-                sorted_taus = np.array(sorted_taus)
-                self.proc_data_dict[qubit][typ]['all_dac_sorted_tau'] = sorted_taus
-                mask = (sorted_taus == None)
-                self.proc_data_dict[qubit][typ]['all_dac_sorted_tau_mask'] = mask
-                qubit_mask = (qubit_mask * 1 + mask * 1) == 2
 
+                sorted_taus = np.array(sorted_taus)
+                # sorted_chis = self._put_data_into_scheme(scheme=all_dac, scheme_mess=d['dac'],
+                                                         # other_mess=d['chisquared'])
+                # sorted_chis = np.array(sorted_chis)
+                # thold = 0.5
+                # mask = sorted_chis > thold
+                # self.proc_data_dict[qubit][typ]['all_dac_sorted_chisquared_mask'] = mask
+                # qubit_mask = (qubit_mask * 1 + mask * 1) == 2
+
+                self.proc_data_dict[qubit][typ]['all_dac_sorted_tau'] = sorted_taus
+                mask = np.equal(sorted_taus, None)
+                self.proc_data_dict[qubit][typ]['all_dac_sorted_tau_mask'] = mask
+                # print('premask', qubit_mask, mask)
+                qubit_mask = (qubit_mask * 1 + mask * 1) == 2
+                self.proc_data_dict[qubit]['all_dac']= all_dac[~qubit_mask]
+                # print(qubit_mask)
+                # self.option_dict.get('shall i')
+                    # if yes, sort chi^2
+                    # mask = np.where self.option_dict.get('threshold')
+                    # qubit_mask = (qubit_mask * 1 + mask * 1) == 2
+
+
+                self.proc_data_dict[qubit][typ]['qubit_mask'] = qubit_mask
             self.proc_data_dict[qubit]['all_mask'] = qubit_mask
 
             # Calculate gamma = 1/Tau where appropriate
             for typ in qo:
                 sorted_taus = self.proc_data_dict[qubit][typ]['all_dac_sorted_tau']
-                self.proc_data_dict[qubit][typ]['all_dac_sorted_gamma'] = 1.0 / sorted_taus[~qubit_mask]
+                mask = np.equal(sorted_taus, None)
+                # print(typ)
+                # print('sortedtau', sorted_taus)
+                # print('mask', mask)
+                # print('qubitmask', self.proc_data_dict[qubit][typ]['qubit_mask'])
+                # print('calc', sorted_taus[~self.proc_data_dict[qubit][typ]['qubit_mask']])
+                self.proc_data_dict[qubit][typ]['all_dac_sorted_gamma'] = 1.0 / sorted_taus[~mask]
 
+            # print(self.raw_data_dict['timestamps'])
             gamma_1 = self.proc_data_dict[qubit][self.T1]['all_dac_sorted_gamma']
             gamma_ramsey = self.proc_data_dict[qubit][self.T2_star]['all_dac_sorted_gamma']
             gamma_echo = self.proc_data_dict[qubit][self.T2]['all_dac_sorted_gamma']
             gamma_phi_ramsey = (gamma_ramsey - gamma_1 / 2.0)
             gamma_phi_echo = (gamma_echo - gamma_1 / 2.0)
+            # print('gamma', gamma_ramsey, gamma_echo, gamma_phi_ramsey, gamma_phi_echo)
             self.proc_data_dict[qubit]['gamma_phi_ramsey'] = gamma_phi_ramsey
             self.proc_data_dict[qubit]['gamma_phi_echo'] = gamma_phi_echo
 
@@ -508,7 +558,7 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
 
                 # Make the PSD fit, if we have enough data
                 exclusion_mask = self.proc_data_dict[qubit]['all_mask']
-                masked_dac = all_dac[~exclusion_mask]
+                masked_dac = all_dac #[~exclusion_mask]
                 if len(masked_dac) > 4:
                     # Fit gamma vs sensitivity
                     sensitivity = self.fit_res[qubit]['sorted_sensitivity']
@@ -828,7 +878,7 @@ def fit_frequencies(dac, freq):
     arch_model.set_param_hint('dac0', value=0.1, min=0)
 
     arch_model.make_params()
-
+    # print('freq, dac', freq, dac)
     fit_result_arch = arch_model.fit(freq, dac=dac)
     return fit_result_arch
 
@@ -839,6 +889,7 @@ def residual_Gamma(pars_dict, sensitivity, Gamma_phi_ramsey, Gamma_phi_echo):
     intercept = pars_dict['intercept']
 
     gamma_values_ramsey = slope_ramsey * np.abs(sensitivity) + intercept
+    # print(len(Gamma_phi_ramsey), len(gamma_values_ramsey))
     residual_ramsey = Gamma_phi_ramsey - gamma_values_ramsey
 
     gamma_values_echo = slope_echo * np.abs(sensitivity) + intercept

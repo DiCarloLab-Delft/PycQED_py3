@@ -292,7 +292,8 @@ class DeviceCCL(Instrument):
             integration_length=q0.ro_acq_integration_length(),
             single_int_avg=single_int_avg,
             seg_per_point=seg_per_point)
-        d.value_names = [qnames[0], qnames[1],
+        d.value_names = ['{} ch{}'.format(qnames[0], w0),
+                         '{} ch{}'.format(qnames[1], w1),
                          'Corr ({}, {})'.format(qnames[0], qnames[1])]
         return d
 
@@ -564,11 +565,18 @@ class DeviceCCL(Instrument):
                                         wait_time_ns: int=0,
                                         label='',
                                         flux_codeword='fl_cw_01',
+                                        nr_of_repeated_gates:int =1,
+                                        fixed_max_nr_of_repeated_gates: int=None,
                                         verbose=True, disable_metadata=False):
         """
         Measures the "conventional cost function" for the CZ gate that
         is a conditional oscillation.
         """
+
+        for q in [q0, q1]:
+            fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
+            # fl_lutman.cfg_operating_mode('CW_single_01')
+
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
 
@@ -581,11 +589,13 @@ class DeviceCCL(Instrument):
 
         # These are hardcoded angles in the mw_lutman for the AWG8
         angles = np.arange(0, 341, 20)
-        p = mqo.conditional_oscillation_seq(q0idx, q1idx,
-                                            platf_cfg=self.cfg_openql_platform_fn(),
-                                            angles=angles, wait_time=wait_time_ns,
-                                            flux_codeword=flux_codeword,
-                                            CZ_disabled=False)
+        p = mqo.conditional_oscillation_seq(
+            q0idx, q1idx, platf_cfg=self.cfg_openql_platform_fn(),
+            angles=angles, wait_time_after=wait_time_ns,
+            flux_codeword=flux_codeword,
+            nr_of_repeated_gates=nr_of_repeated_gates,
+            fixed_max_nr_of_repeated_gates=fixed_max_nr_of_repeated_gates,
+            CZ_disabled=False)
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr(),
                              parameter_name='Phase', unit='deg')
@@ -733,7 +743,7 @@ class DeviceCCL(Instrument):
     def measure_msmt_induced_dephasing_matrix(self, qubits: list,
                                               analyze=True, MC=None,
                                               prepare_for_timedomain=True,
-                                              n_amps_rel: int=None,
+                                              amps_rel=np.linspace(0, 1, 25),
                                               verbose=True,
                                               get_quantum_eff: bool=False,
                                               dephasing_sequence='ramsey'):
@@ -780,7 +790,7 @@ class DeviceCCL(Instrument):
 
                 # Slight differences if diagonal element
                 if target_qubit == measured_qubit:
-                    amps_rel = np.linspace(0, 1, n_amps_rel)
+                    amps_rel = amps_rel
                     mqp = None
                     list_target_qubits = None
                 else:
@@ -789,7 +799,7 @@ class DeviceCCL(Instrument):
                     #                target_qubit.ro_pulse_amp())
                     #amp_max = max(t_amp_max, measured_qubit.ro_pulse_amp())
                     #amps_rel = np.linspace(0, 0.49/(amp_max), n_amps_rel)
-                    amps_rel = np.linspace(0, 1, n_amps_rel)
+                    amps_rel = amps_rel
                     mqp = self.cfg_openql_platform_fn()
                     list_target_qubits = [target_qubit,]
 
@@ -846,9 +856,6 @@ class DeviceCCL(Instrument):
         The spectator qubit (q_spec) performs a ramsey experiment over
         the flux pulse.
         """
-
-        if prepare_for_timedomain:
-            self.prepare_for_timedomain()
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -859,13 +866,24 @@ class DeviceCCL(Instrument):
         q_specidx = self.find_instrument(q_spec).cfg_qubit_nr()
 
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
+        fl_lutman_spec = self.find_instrument(
+            q_spec).instr_LutMan_Flux.get_instr()
 
         if waveform_name == 'square':
             length_par = fl_lutman.sq_length
+            # fl_lutman.cfg_operating_mode('CW_single_02')
+            # fl_lutman_spec.cfg_operating_mode('CW_single_02')
+
         elif waveform_name == 'cz_z':
-            length_par = fl_lutman.cz_length,
+            length_par = fl_lutman.cz_length
+            # fl_lutman.cfg_operating_mode('CW_single_01')
+            # fl_lutman_spec.cfg_operating_mode('CW_single_01')
+
         else:
             raise ValueError('Waveform shape not understood')
+
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
 
         awg = fl_lutman.AWG.get_instr()
         using_QWG = (awg.__class__.__name__ == 'QuTech_AWG_Module')
@@ -886,7 +904,6 @@ class DeviceCCL(Instrument):
             amp_par = awg.parameters['awgs_{}_outputs_{}_amplitude'.format(
                 awg_nr, ch_pair)]
             sw = swf.FLsweep(fl_lutman, length_par,
-                             realtime_loading=True,
                              waveform_name=waveform_name)
             flux_cw = 2
 
@@ -920,7 +937,7 @@ class DeviceCCL(Instrument):
 
     def measure_cryoscope(self, q0: str, times,
                           MC=None,
-                          experiment_name='Cryoscope',
+                          label='Cryoscope',
                           waveform_name: str='square',
                           max_delay: float='auto',
                           prepare_for_timedomain: bool=True):
@@ -934,7 +951,7 @@ class DeviceCCL(Instrument):
             times   (array):
                 array of measurment times
 
-            experiment_name (str):
+            label (str):
                 used to label the experiment
 
             waveform_name (str {"square", "custom_wf"}) :
@@ -950,8 +967,7 @@ class DeviceCCL(Instrument):
                 calls self.prepare_for_timedomain on start
         """
 
-        if prepare_for_timedomain:
-            self.prepare_for_timedomain()
+
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -970,15 +986,23 @@ class DeviceCCL(Instrument):
 
         if waveform_name == 'square':
             sw = swf.FLsweep(fl_lutman, fl_lutman.sq_length,
-                             realtime_loading=True,
                              waveform_name='square')
+            # fl_lutman.cfg_operating_mode('CW_single_02')
+            # fl_lutman.instr_partner_lutman.get_instr().cfg_operating_mode(
+            #     'CW_single_02')
+
         elif waveform_name == 'custom_wf':
             sw = swf.FLsweep(fl_lutman, fl_lutman.custom_wf_length,
-                             realtime_loading=True,
                              waveform_name='custom_wf')
+            # fl_lutman.cfg_operating_mode('CW_single_05')
+            # (fl_lutman.instr_partner_lutman.get_instr()
+            #     .cfg_operating_mode('CW_single_05'))
         else:
             raise ValueError('waveform_name "{}" should be either '
                              '"square" or "custom_wf"'.format(waveform_name))
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+
         MC.set_sweep_function(sw)
         MC.set_sweep_points(times)
         d = self.get_int_avg_det(values_per_point=2,
@@ -986,7 +1010,7 @@ class DeviceCCL(Instrument):
                                  single_int_avg=True,
                                  always_prepare=True)
         MC.set_detector_function(d)
-        MC.run(experiment_name)
+        MC.run(label)
 
     ########################################################
     # Calibration methods
@@ -995,8 +1019,8 @@ class DeviceCCL(Instrument):
     def calibrate_mux_RO(self,
                          calibrate_optimal_weights=True,
                          verify_optimal_weights=False,
-                         update: bool=True,
-                         update_threshold: bool=True,
+                         # option should be here but is currently not implementd
+                         # update_threshold: bool=True,
                          update_cross_talk_matrix: bool=False)-> bool:
         """
         Calibrates multiplexed Readout.
@@ -1060,7 +1084,6 @@ class DeviceCCL(Instrument):
         q0idx = self.find_instrument(q0).cfg_qubit_nr()
         q1idx = self.find_instrument(q1).cfg_qubit_nr()
         fl_lutman_q0 = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
-        fl_lutman_q1 = self.find_instrument(q1).instr_LutMan_Flux.get_instr()
 
         p = mqo.conditional_oscillation_seq(q0idx, q1idx,
                                             platf_cfg=self.cfg_openql_platform_fn(),
@@ -1071,17 +1094,8 @@ class DeviceCCL(Instrument):
         CC.eqasm_program(p.filename)
         CC.start()
 
-        # other waveform is required for real-time reloading as the other
-        # waveform is normally overwritten
-        if waveform == 'cz_z':
-            other_waveform = fl_lutman_q1._wave_dict_dist['idle_z']
-        else:
-            other_waveform = fl_lutman_q1._wave_dict_dist['cz_z']
-        self.other_waveform = other_waveform
-
         s = swf.FLsweep(fl_lutman_q0, fl_lutman_q0.cz_phase_corr_amp,
-                        waveform, realtime_loading=True,
-                        other_waveform=other_waveform)
+                        waveform)
 
         d = self.get_correlation_detector(single_int_avg=True, seg_per_point=2)
         d.detector_control = 'hard'
