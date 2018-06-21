@@ -1002,7 +1002,7 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
             self.abs_vals = np.sqrt(self.measured_values[0,:]**2 + self.measured_values[1,:]**2)
         result,est,test_data = opt.neural_network_opt(None, self.meas_grid,
                                         self.abs_vals,
-                                        hidden_layer_sizes = self.hidden_layers,
+                                        hidden_layer_sizes = self.hidden_layer_sizes,
                                         alpha= self.alpha,
                                         solver='lbfgs',
                                         estimator=self.estimator_name,

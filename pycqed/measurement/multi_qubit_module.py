@@ -11,6 +11,7 @@ import pycqed.measurement.pulse_sequences.fluxing_sequences as fsqs
 import pycqed.measurement.detector_functions as det
 import pycqed.measurement.composite_detector_functions as cdet
 import pycqed.analysis.measurement_analysis as ma
+import pycqed.analysis_v2.readout_analysis as ra
 import pycqed.analysis.tomography as tomo
 from pycqed.measurement.optimization import nelder_mead
 import pycqed.instrument_drivers.meta_instrument.device_object as device
@@ -347,14 +348,69 @@ def tomo2Q_cphase_cardinal(cardinal_state, device, qS_name, qCZ_name, CPhase=Tru
     # return tomo_swf.seq
 
 
-def multiplexed_pulse(qubits, f_LO, upload=True, plot_filename=None):
+
+def multiplexed_pulse(readouts, f_LO, upload=True, plot_filename=False):
     """
     Sets up a frequency-multiplexed pulse on the awg-sequencer of the UHFQC.
     Updates the qubit ro_pulse_type parameter. This needs to be reverted if
     thq qubit object is to update its readout pulse later on.
 
     Args:
-        qubits: A list of qubits to do a pulse for.
+        readouts: A list of different readouts. For each readout the list
+                  contains the qubit objects that are read out in that readout.
+        f_LO: The LO frequency that will be used.
+        upload: Whether to update the hardware instrument settings.
+
+    Returns:
+        The generated pulse waveform.
+    """
+
+    if not hasattr(readouts[0], '__iter__'):
+        readouts = [readouts]
+
+    fs = 1.8e9
+
+    readout_pulses = []
+    for qubits in readouts:
+        qb_pulses = {}
+        maxlen = 0
+        for qb in qubits:
+            qb.f_RO_mod(qb.f_RO() - f_LO)
+            samples = int(qb.RO_pulse_length() * fs)
+            tbase = np.linspace(0, samples / fs, samples, endpoint=False)
+            pulse = qb.RO_amp() * np.exp(
+                -2j * np.pi * qb.f_RO_mod() * tbase)
+            qb_pulses[qb.name] = pulse
+            if pulse.size > maxlen:
+                maxlen = pulse.size
+
+        pulse = np.zeros(maxlen, dtype=np.complex)
+        for p in qb_pulses.values():
+            pulse += np.pad(p, (0, maxlen - p.size), mode='constant',
+                            constant_values=0)
+        readout_pulses.append(pulse)
+
+    if upload:
+        UHFQC = readouts[0][0].UHFQC
+        if len(readout_pulses) == 1:
+            UHFQC.awg_sequence_acquisition_and_pulse(
+                Iwave=np.real(pulse).copy(), Qwave=np.imag(pulse).copy())
+        else:
+            UHFQC.awg_sequence_acquisition_and_pulse_multi_segment(readout_pulses)
+        DC_LO = readouts[0][0].readout_DC_LO
+        UC_LO = readouts[0][0].readout_UC_LO
+        DC_LO.frequency(f_LO)
+        UC_LO.frequency(f_LO)
+
+def multiplexed_pulse(readouts, f_LO, upload=True):
+    """
+    Sets up a frequency-multiplexed pulse on the awg-sequencer of the UHFQC.
+    Updates the qubit ro_pulse_type parameter. This needs to be reverted if
+    thq qubit object is to update its readout pulse later on.
+
+    Args:
+        readouts: A list of different readouts. For each readout the list
+                  contains the qubit objects that are read out in that readout.
         f_LO: The LO frequency that will be used.
         upload: Whether to update the hardware instrument settings.
         plot_filename: The file to save the plot of the multiplexed pulse PSD. 
@@ -364,80 +420,61 @@ def multiplexed_pulse(qubits, f_LO, upload=True, plot_filename=None):
     Returns:
         The generated pulse waveform.
     """
-
+    if not hasattr(readouts[0], '__iter__'):
+        readouts = [readouts]
     fs = 1.8e9
 
-    pulses = {}
-    maxlen = 0
 
-    for qb in qubits:
-        #qb.RO_pulse_type('Multiplexed_pulse_UHFQC')
-        qb.f_RO_mod(qb.f_RO() - f_LO)
-        samples = int(qb.RO_pulse_length() * fs)
-        pulse = qb.RO_amp()*np.ones(samples)
+    readout_pulses = []
+    for qubits in readouts:
+        qb_pulses = {}
+        maxlen = 0
 
-        if qb.ro_pulse_shape() == 'gaussian_filtered':
-            filter_sigma = qb.ro_pulse_filter_sigma()
-            nr_sigma = qb.ro_pulse_nr_sigma()
-            filter_samples = int(filter_sigma*nr_sigma*fs)
-            filter_sample_idxs = np.arange(filter_samples)
-            filter = np.exp(-0.5*(filter_sample_idxs - filter_samples/2)**2 /
-                            (filter_sigma*fs)**2)
-            filter /= filter.sum()
-            pulse = np.convolve(pulse, filter, mode='full')
-        elif qb.ro_pulse_shape() == 'square':
-            pass
-        else:
-            raise ValueError('Unsupported pulse type for {}: {}' \
-                             .format(qb.name, qb.ro_pulse_shape()))
-
-        tbase = np.linspace(0, len(pulse) / fs, len(pulse), endpoint=False)
-        pulse = pulse * np.exp(-2j * np.pi * qb.f_RO_mod() * tbase)
-
-        pulses[qb.name] = pulse
-        if pulse.size > maxlen:
-            maxlen = pulse.size
-
-    pulse = np.zeros(maxlen, dtype=np.complex)
-    for p in pulses.values():
-        pulse += np.pad(p, (0, maxlen - p.size), mode='constant',
-                        constant_values=0)
-
-    if plot_filename is not False:
-        pulse_fft = np.fft.fft(
-            np.pad(pulse, (1000, 1000), mode='constant', constant_values=0))
-        pulse_fft = np.fft.fftshift(pulse_fft)
-        fbase = np.fft.fftfreq(pulse_fft.size, 1 / fs)
-        fbase = np.fft.fftshift(fbase)
-        fbase = f_LO - fbase
-        y = 20 * np.log10(np.abs(pulse_fft))
-        plt.plot(fbase / 1e9, y, '-', lw=0.7)
-        ymin, ymax = np.max(y) - 40, np.max(y) + 5
-        plt.ylim(ymin, ymax)
-        plt.vlines(f_LO / 1e9, ymin, ymax, colors='0.5', linestyles='dotted',
-                   lw=0.7, )
-        plt.text(f_LO / 1e9, ymax, 'LO', rotation=90, va='top', ha='right')
         for qb in qubits:
-            plt.vlines([qb.f_RO() / 1e9, 2 * f_LO / 1e9 - qb.f_RO() / 1e9],
-                       ymin, ymax, colors='0.5', linestyles=['solid', 'dotted'],
-                       lw=0.7)
-            plt.text(qb.f_RO() / 1e9, ymax, qb.name, rotation=90, va='top',
-                     ha='right')
-            plt.text(2 * f_LO / 1e9 - qb.f_RO() / 1e9, ymax, qb.name,
-                     rotation=90, va='top', ha='right')
+            #qb.RO_pulse_type('Multiplexed_pulse_UHFQC')
+            qb.f_RO_mod(qb.f_RO() - f_LO)
+            samples = int(qb.RO_pulse_length() * fs)
+            pulse = qb.RO_amp()*np.ones(samples)
 
-        plt.ylabel('power (dB)')
-        plt.xlabel('frequency (GHz)')
-        if isinstance(plot_filename, str):
-            plt.savefig(plot_filename, bbox_inches='tight')
-        plt.show()
+            if qb.ro_pulse_shape() == 'gaussian_filtered':
+                filter_sigma = qb.ro_pulse_filter_sigma()
+                nr_sigma = qb.ro_pulse_nr_sigma()
+                filter_samples = int(filter_sigma*nr_sigma*fs)
+                filter_sample_idxs = np.arange(filter_samples)
+                filter = np.exp(-0.5*(filter_sample_idxs - filter_samples/2)**2 /
+                                (filter_sigma*fs)**2)
+                filter /= filter.sum()
+                pulse = np.convolve(pulse, filter, mode='full')
+            elif qb.ro_pulse_shape() == 'square':
+                pass
+            else:
+                raise ValueError('Unsupported pulse type for {}: {}' \
+                                 .format(qb.name, qb.ro_pulse_shape()))
+
+            tbase = np.linspace(0, len(pulse) / fs, len(pulse), endpoint=False)
+            pulse = pulse * np.exp(-2j * np.pi * qb.f_RO_mod() * tbase)
+
+            qb_pulses[qb.name] = pulse
+            if pulse.size > maxlen:
+                maxlen = pulse.size
+
+        pulse = np.zeros(maxlen, dtype=np.complex)
+        for p in qb_pulses.values():
+            pulse += np.pad(p, (0, maxlen - p.size), mode='constant',
+                            constant_values=0)
+        readout_pulses.append(pulse)
 
     if upload:
-        UHFQC = qubits[0].UHFQC
-        UHFQC.awg_sequence_acquisition_and_pulse(np.real(pulse).copy(),
-                                                 np.imag(pulse).copy())
-        LO = qubits[0].readout_DC_LO
-        LO.frequency(f_LO)
+        UHFQC = readouts[0][0].UHFQC
+        if len(readout_pulses) == 1:
+            UHFQC.awg_sequence_acquisition_and_pulse(
+                Iwave=np.real(pulse).copy(), Qwave=np.imag(pulse).copy())
+        else:
+            UHFQC.awg_sequence_acquisition_and_pulse_multi_segment(readout_pulses)
+        DC_LO = readouts[0][0].readout_DC_LO
+        UC_LO = readouts[0][0].readout_UC_LO
+        DC_LO.frequency(f_LO)
+        UC_LO.frequency(f_LO)
 
 
 def get_multiplexed_readout_pulse_dictionary(qubits):
@@ -456,6 +493,15 @@ def get_multiplexed_readout_pulse_dictionary(qubits):
             'pulse_delay': qubits[0].RO_pulse_delay(),
             'pulse_type': 'Multiplexed_UHFQC_pulse',
             'target_qubit': ','.join([qb.name for qb in qubits])}
+
+
+def get_operation_dict(qubits):
+    operation_dict = {'RO mux':
+                          get_multiplexed_readout_pulse_dictionary(qubits)}
+    for qb in qubits:
+        operation_dict.update(qb.get_operation_dict())
+    return operation_dict
+
 
 def get_multiplexed_readout_detector_functions(qubits, nr_averages=2**10,
                                                nr_shots=4095, UHFQC=None,
@@ -560,11 +606,10 @@ def calculate_minimal_readout_spacing(qubits, ro_slack=10e-9, drive_pulses=0):
 
 def measure_multiplexed_readout(qubits, f_LO, nreps=4, liveplot=False,
                                 RO_spacing=None, preselection=True, MC=None,
-                                plot_filename=False, thresholds=None,
-                                thresholded=False, analyse=True):
+                                thresholds=None, thresholded=False,
+                                analyse=True):
 
-    multiplexed_pulse(qubits, f_LO, upload=True,
-                              plot_filename=plot_filename)
+    multiplexed_pulse(qubits, f_LO, upload=True)
 
     for qb in qubits:
         if MC is None:
@@ -581,7 +626,7 @@ def measure_multiplexed_readout(qubits, f_LO, nreps=4, liveplot=False,
         RO_spacing = UHFQC.quex_wint_delay()*2/1.8e9
         RO_spacing += UHFQC.quex_wint_length()/1.8e9
         RO_spacing += 50e-9  # for slack
-        RO_spacing = np.ceil(RO_spacing*225e6/3)/225e9*3
+        RO_spacing = np.ceil(RO_spacing*225e6/3)/225e6*3
 
     sf = awg_swf2.n_qubit_off_on(
         [qb.get_drive_pars() for qb in qubits],
@@ -617,7 +662,7 @@ def measure_multiplexed_readout(qubits, f_LO, nreps=4, liveplot=False,
         channel_map = {qb.name: qb.int_log_det.value_names[0] for qb in qubits}
 
         ra.Multiplexed_Readout_Analysis(options_dict=dict(
-            n_readouts=8,
+            n_readouts=(2 if preselection else 1)*2**len(qubits),
             thresholds=thresholds,
             channel_map=channel_map
         ))
@@ -672,7 +717,7 @@ def measure_active_reset(qubits, reset_cycle_time, nr_resets=1, nreps=1,
     MC.soft_avg(prev_avg)
 
 
-def measure_two_qubit_parity(qb0, qb1, qb2, feedback_delay, f_LO, nreps=1,
+def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO, nreps=1,
                              upload=True, MC=None, prep_sequence=None,
                              tomography_basis=(
                                  'I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
@@ -682,7 +727,10 @@ def measure_two_qubit_parity(qb0, qb1, qb2, feedback_delay, f_LO, nreps=1,
         Is the readout separation commensurate with 225 MHz?
     """
 
-    multiplexed_pulse([(qb1,), (qb0, qb1, qb2)], f_LO)
+    if preselection:
+        multiplexed_pulse([(qb0, qb1, qb2), (qb1,), (qb0, qb1, qb2)], f_LO)
+    else:
+        multiplexed_pulse([(qb1,), (qb0, qb1, qb2)], f_LO)
 
     qubits = [qb0, qb1, qb2]
     for qb in qubits:
@@ -694,12 +742,14 @@ def measure_two_qubit_parity(qb0, qb1, qb2, feedback_delay, f_LO, nreps=1,
     for qb in qubits:
         qb.prepare_for_timedomain(multiplexed=True)
 
-    sf = awg_swf2.two_qubit_parity(qb0, qb1, qb2, feedback_delay=feedback_delay,
-                                   prep_sequence=prep_sequence, reset=reset,
-                                   tomography_basis=tomography_basis,
-                                   upload=upload, verbose=False,
-                                   preselection=preselection,
-                                   ro_spacing=ro_spacing)
+    sf = awg_swf2.parity_correction(qb0.name, qb1.name, qb2.name,
+                                    operation_dict=get_operation_dict(qubits),
+                                    feedback_delay=feedback_delay,
+                                    prep_sequence=prep_sequence, reset=reset,
+                                    tomography_basis=tomography_basis,
+                                    upload=upload, verbose=False,
+                                    preselection=preselection,
+                                    ro_spacing=ro_spacing)
 
     nr_readouts = (3 if preselection else 2)*len(tomography_basis)**2
     nr_shots = 4095 - 4095 % nr_readouts
@@ -743,18 +793,22 @@ def measure_tomography(qubits, prep_sequence, state_name, f_LO,
         ro_spacing = calculate_minimal_readout_spacing(qubits, ro_slack,
                                                            drive_pulses=1)
 
-    seq_tomo, elts_tomo = mqs.n_qubit_tomo_seq(qubits,
-                                            prep_sequence=prep_sequence,
-                                            rots_basis=rots_basis,
-                                            return_seq=True,
-                                            upload=False,
-                                            preselection=preselection,
-                                            ro_spacing=ro_spacing)
+    qubit_names = [qb.name for qb in qubits]
+
+    seq_tomo, elts_tomo = mqs.n_qubit_tomo_seq(qubit_names,
+                                               get_operation_dict(qubits),
+                                               prep_sequence=prep_sequence,
+                                               rots_basis=rots_basis,
+                                               return_seq=True,
+                                               upload=False,
+                                               preselection=preselection,
+                                               ro_spacing=ro_spacing)
     seq = seq_tomo
     elts = elts_tomo
 
     if use_cal_points:
-        seq_cal, elts_cal = mqs.n_qubit_ref_all_seq(qubits,
+        seq_cal, elts_cal = mqs.n_qubit_ref_all_seq(qubit_names,
+                                                    get_operation_dict(qubits),
                                                     return_seq=True,
                                                     upload=False,
                                                     preselection=preselection,

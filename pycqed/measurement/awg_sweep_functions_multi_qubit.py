@@ -403,15 +403,17 @@ class three_qubit_GHZ_tomo(swf.Hard_Sweep):
                 upload=self.upload)
 
 
-class two_qubit_parity(swf.Hard_Sweep):
-    def __init__(self, q0, q1, q2, feedback_delay, prep_sequence=None,
+class parity_correction(swf.Hard_Sweep):
+    def __init__(self, q0n, q1n, q2n, operation_dict, feedback_delay,
+                 prep_sequence=None,
                  tomography_basis=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
                  reset=True, upload=True, verbose=False, preselection=False,
                  ro_spacing=1e-6):
         super().__init__()
-        self.q0 = q0
-        self.q1 = q1
-        self.q2 = q2
+        self.q0n = q0n
+        self.q1n = q1n
+        self.q2n = q2n
+        self.operation_dict = operation_dict
         self.feedback_delay = feedback_delay
         self.tomography_basis = tomography_basis
         self.prep_sequence = prep_sequence
@@ -426,8 +428,9 @@ class two_qubit_parity(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         if self.upload:
-            sqs2.two_qubit_parity_measurement(
-                self.q0, self.q1, self.q2,
+            sqs2.parity_correction_seq(
+                self.q0n, self.q1n, self.q2n,
+                self.operation_dict,
                 feedback_delay=self.feedback_delay,
                 prep_sequence=self.prep_sequence,
                 tomography_basis=self.tomography_basis,

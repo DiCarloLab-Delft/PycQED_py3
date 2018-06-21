@@ -775,7 +775,8 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
             combination_list = list(itertools.product([False, True],
                                                       repeat=len(qubits)))
             preselection_condition = dict(zip(
-                [(qb, 1) for qb in qubits],  # keys contain shift
+                [(qb, self.options_dict.get('preselection_shift', 1))
+                 for qb in qubits],  # keys contain shift
                 combination_list[0]  # first comb has all ground
             ))
             self.observables = odict()
@@ -971,6 +972,8 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
         If the calibration segments are passed, there must be a calibration
         segments for each of the computational basis states of the Hilber space.
         If there are no calibration segments, perfect readout is assumed.
+
+        The calling class must filter out the relevant data segments by itself!
         """
         try:
             preselection_obs_idx = list(self.observables.keys()).index('pre')
@@ -984,9 +987,7 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
             tomography_qubits = qubits
         d = 2**len(tomography_qubits)
         data = self.proc_data_dict['probability_table']
-        if self.use_preselection:
-            data = data[1::2, observabele_idxs]
-        data = data.T
+        data = data.T[observabele_idxs]
         if not 'cal_points' in self.options_dict:
             Fsingle = {None: np.array([[1, 0], [0, 1]]),
                        True: np.array([[0, 0], [0, 1]]),
@@ -1013,11 +1014,6 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
         else:
             means, covars = \
                 self.calibration_point_means_and_channel_covariations()
-            cal_points_list = self.proc_data_dict['cal_points_list']
-            data_idx = np.arange(data.shape[1])
-            data_idx = np.setdiff1d(data_idx,
-                                    (np.array(cal_points_list)//2).flatten())
-            data = data[:, data_idx]
             Fs = [np.diag(ms) for ms in means.T]
             return data, Fs, covars
 

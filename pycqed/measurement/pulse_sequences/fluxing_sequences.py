@@ -1564,9 +1564,9 @@ def Ramsey_with_flux_pulse_meas_seq(thetas, qb, X90_separation, verbose=False,
 
     pulses = get_pulse_dict_from_pars(pulse_pars)
     flux_pulse = operation_dict["flux "+qb_name]
-    # # Used for checking dynamic phase compensation
+    # Used for checking dynamic phase compensation
     # if flux_pulse['amplitude'] != 0:
-    #     flux_pulse['basis_rotation'] = {qb_name: -17.556436967796024}
+    #     flux_pulse['basis_rotation'] = {qb_name: 101.88163602959781}
 
     flux_pulse['refpoint'] = 'end'
     X90_2 = deepcopy(pulses['X90'])

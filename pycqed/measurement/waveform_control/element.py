@@ -104,8 +104,8 @@ class Element:
         add_spacing = self.pulsar.inter_element_spacing() - \
                       self.pulsar.get('{}_inter_element_deadtime'.format(c))
         samples += int(np.ceil(add_spacing / self._clock(c)))
-        samples = max(samples, self.pulsar.get('{}_min_length'.format(c)) *
-                               self._clock(c))
+        samples = max(samples, int(self.pulsar.get('{}_min_length'.format(c)) *
+                               self._clock(c)))
         while samples % self.pulsar.get('{}_granularity'.format(c)) != 0:
             samples += 1
         return samples

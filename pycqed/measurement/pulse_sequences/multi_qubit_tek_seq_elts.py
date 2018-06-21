@@ -11,8 +11,6 @@ import pycqed.measurement.waveform_control.fluxpulse_predistortion as \
     fluxpulse_predistortion
 from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import \
     get_pulse_dict_from_pars
-import pycqed.instrument_drivers.meta_instrument.device_object as device
-import pycqed.measurement.multi_qubit_module as mqm
 
 station = None
 kernel_dir = 'kernels/'
@@ -1610,158 +1608,6 @@ def two_qubit_tomo_bell_qudev_seq(bell_state,
     return seq, el_list
 
 
-def three_qubit_GHZ_tomo_seq(qubits,
-                             RO_pars,
-                             CZ_qubit_dict,
-                             basis_pulses=None,
-                             cal_state_repeats=2,
-                             spacing=100e-9,
-                             verbose=False,
-                             upload=True):
-    '''
-              |spacing|spacing|
-    |q0> --Y90--------*--------------------------------------|======|
-                      |
-    |q1> --Y90s-------*--------mY90--------*-----------------| tomo |
-                                           |
-    |q2> --Y90s----------------------------*--------mY90-----|======|
-                                   |spacing|spacing|
-    Args:
-        qubits (list or tuple): list of 3 qubits
-        RO_pars (dict): RO pulse pars for multiplexed RO on the qubits
-        CZ_qubit_dict(dict):  dict of the following form:
-            {'qbc0': qb_control_name_CZ0,
-             'qbt0': qb_target_name_CZ0,
-             'qbc1': qb_control_name_CZ1,
-             'qbt1': qb_target_name_CZ1}
-            where CZ0, and CZ1 refer to the first and second CZ applied.
-            (We start counting from zero because we are programmers.)
-        basis_pulses (tuple): tomo pulses to be applied on each qubit
-            default: ('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90')
-        cal_state_repeats (int): number of times to repeat each cal state
-        spacing (float): spacing before and after CZ pulse; see diagram above
-        verbose (bool): print runtime info
-        upload (bool): whether to upload sequence to AWG or not
-    Returns:
-        seq: Sequence object
-        el_list: list of elements
-
-    OLD concept:
-    idxs_CZ_qubits: list of tuples indicating the qbc, qbt for the 2 CZ gates.
-    For example idxs_CZ_qubits = [(0,1), (1,2)] indicates that qb0 is the
-    control qubit and qb1 is the target in the CZ between qb0-qb1, and that qb1
-    is the control qubit and qb2 is the target in the CZ between qb1-qb2.
-    '''
-
-    if station is None:
-        logging.warning('No station specified.')
-    if basis_pulses is None:
-        basis_pulses = ('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90')
-        logging.warning('basis_pulses not specified. Using the'
-                        'following basis:\n{}'.format(basis_pulses))
-
-    sequencer_config = station.sequencer_config
-    seq_name = 'three_qubit_GHZ_state_seq'
-    seq = sequence.Sequence(seq_name)
-    el_list = []
-
-    qubit0 = qubits[0]
-    qubit1 = qubits[1]
-    qubit2 = qubits[2]
-
-    qubit_names = [qb.name for qb in qubits]
-    qbc0 = qubits[qubit_names.index(CZ_qubit_dict['qbc0'])]
-    qbt0 = qubits[qubit_names.index(CZ_qubit_dict['qbt0'])]
-    qbc1 = qubits[qubit_names.index(CZ_qubit_dict['qbc1'])]
-    qbt1 = qubits[qubit_names.index(CZ_qubit_dict['qbt1'])]
-
-    operation_dict = {'RO': RO_pars}
-    operation_dict.update(qubit0.get_operation_dict())
-    operation_dict.update(qubit1.get_operation_dict())
-    operation_dict.update(qubit2.get_operation_dict())
-
-    # add spacer pulses and ICZ pulses
-    ##### very specific to GHZ preparation! #####
-    for qb in qubits:
-        spacerpulse = {'pulse_type': 'SquarePulse',
-                       'channel': RO_pars['acq_marker_channel'],
-                       'amplitude': 0.0,
-                       'length': spacing,
-                       'pulse_delay': 0,
-                       'target_qubit': qb.name}
-        operation_dict.update({'spacer ' + qb.name: spacerpulse})
-
-        for i, CZ_op in enumerate(['CZ ' + qbt0.name + ' ' + qbc0.name,
-                                   'CZ ' + qbt1.name + ' ' + qbc1.name]):
-            operation_dict['ICZ' + str(i) + ' ' + qb.name] = \
-                deepcopy(operation_dict['I ' + qb.name])
-            operation_dict['ICZ' + str(i) + ' ' + qb.name]['sigma'] = \
-                operation_dict[CZ_op]['length']
-            operation_dict['ICZ' + str(i) + ' ' + qb.name]['nr_sigma'] = 1
-
-    # make all pulses for qubit1 and qubit2 be simultaneous with qubit0
-    for pulse_names in operation_dict:
-        if operation_dict[pulse_names]['target_qubit'] != qubit0.name:
-            operation_dict[pulse_names]['refpoint'] = 'start'
-
-    base_pulse_list = \
-        ['Y90 ' + qubit0.name, 'Y90 ' + qubit1.name, 'Y90 ' + qubit2.name,
-         'spacer '+qbc0.name, 'spacer ' + qbt0.name, 'spacer ' + qubit2.name,
-         'CZ '+qbt0.name+' '+qbc0.name, 'ICZ0 '+qbt0.name, 'ICZ0 '+qubit2.name,
-         'spacer '+qbc0.name, 'spacer ' + qbt0.name, 'spacer '+ qubit2.name,
-         'I ' + qubit0.name, 'mY90 ' + qubit1.name, 'I ' + qubit2.name,
-         'spacer ' + qubit0.name, 'spacer '+qbc1.name, 'spacer '+ qbt1.name,
-         'ICZ1 '+qubit0.name, 'CZ '+qbt1.name+' '+qbc1.name, 'ICZ1 '+qbt1.name,
-         'spacer ' + qubit0.name, 'spacer '+qbc1.name, 'spacer '+ qbt1.name,
-         'I ' + qubit0.name, 'I ' + qubit1.name, 'mY90 ' + qubit2.name]
-
-    tomo_pulses = get_tomography_pulses(*[qubit0.name, qubit1.name, qubit2.name],
-                                        basis_pulses=basis_pulses)
-
-    pulse_list = len(tomo_pulses)*['']
-    for i, t in enumerate(tomo_pulses):
-        pulse_list[i] = base_pulse_list + t
-
-    # Add cal points
-    cal_base_pulse_list = \
-        ['I ' + qubit0.name, 'I ' + qubit1.name, 'I ' + qubit2.name,
-         'spacer ' + qbc0.name, 'spacer ' + qbt0.name, 'spacer ' + qubit2.name,
-         'ICZ0 ' + qbc0.name, 'ICZ0 ' + qbt0.name, 'ICZ0 ' + qubit2.name,
-         'spacer ' + qbc0.name, 'spacer ' + qbt0.name, 'spacer ' + qubit2.name,
-         'I ' + qubit0.name, 'I ' + qubit1.name, 'I ' + qubit2.name,
-         'spacer ' + qubit0.name, 'spacer ' + qbc1.name, 'spacer '+ qbt1.name,
-         'ICZ1 ' + qubit0.name, 'ICZ1 ' + qbc1.name, 'ICZ1 ' + qbt1.name,
-         'spacer ' + qubit0.name, 'spacer ' + qbc1.name, 'spacer '+ qbt1.name,
-         'I ' + qubit0.name, 'I ' + qubit1.name, 'I ' + qubit2.name]
-    # use get_tomography_pulses with basis_pulses = (I, X180) to get
-    # all combinations of cal points
-    cal_pulses = get_tomography_pulses(*[qubit0.name, qubit1.name, qubit2.name],
-                                       basis_pulses=('I', 'X180'))
-
-    for i, cal_p in enumerate(cal_pulses):
-        cal_pulses[i] = cal_base_pulse_list + cal_p
-
-    # Repeat each cal point measurement cal_state_repeats times
-    cal_pulses= [list(i) for i in np.repeat(np.asarray(cal_pulses),
-                                            cal_state_repeats, axis=0)]
-    for cal_p in cal_pulses:
-        pulse_list += [cal_p]
-
-    for i, pulse_list in enumerate(pulse_list):
-        pulses = []
-        for p in pulse_list:
-            pulses += [operation_dict[p]]
-        pulses += [RO_pars]
-        el = multi_pulse_elt(i, station, pulses, sequencer_config)
-        el_list.append(el)
-        seq.append_element(el, trigger_wait=True)
-
-    if upload:
-        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
-
-    return seq, el_list
-
-
 def n_qubit_reset(qubit_names, operation_dict, reset_cycle_time, nr_resets=1,
                   return_seq=False, verbose=False, codeword_indices=None,
                   upload=True):
@@ -1873,8 +1719,8 @@ def n_qubit_reset(qubit_names, operation_dict, reset_cycle_time, nr_resets=1,
     else:
         return seq_name
 
-def two_qubit_parity_measurement(
-        q0, q1, q2, feedback_delay=900e-9, prep_sequence=None, reset=True,
+def parity_correction_seq(
+        q0n, q1n, q2n, operation_dict, feedback_delay=900e-9, prep_sequence=None, reset=True,
         tomography_basis=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
         upload=True, verbose=False, return_seq=False, preselection=False,
         ro_spacing=1e-6):
@@ -1897,28 +1743,22 @@ def two_qubit_parity_measurement(
             measure all observables of the two qubits X/Y/Z
     """
 
-    q0n = q0.name
-    q1n = q1.name
-    q2n = q2.name
-
-    operation_dict = {
-        'RO mux': mqm.get_multiplexed_readout_pulse_dictionary([q0, q1, q2]),
-        'RO mux_presel': mqm.get_multiplexed_readout_pulse_dictionary([q0, q1, q2])
-    }
+    operation_dict['RO mux_presel'] = operation_dict['RO mux'].copy()
     operation_dict['RO mux_presel']['pulse_delay'] = \
         -ro_spacing - operation_dict['RO mux']['length']
     operation_dict['RO mux_presel']['refpoint'] = 'start'
-
-    operation_dict.update({
-        'I_fb': {'pulse_type': 'SquarePulse',
-                 'channel': operation_dict['RO mux']['acq_marker_channel'],
-                 'amplitude': 0.0,
-                 'length': feedback_delay,
-                 'pulse_delay': 0}
-    })
-    operation_dict.update(q0.get_operation_dict())
-    operation_dict.update(q1.get_operation_dict())
-    operation_dict.update(q2.get_operation_dict())
+    operation_dict['I_fb'] = {
+        'pulse_type': 'SquarePulse',
+        'channel': operation_dict['RO mux']['acq_marker_channel'],
+        'amplitude': 0.0,
+        'length': feedback_delay,
+        'pulse_delay': 0}
+    operation_dict['RO presel_dummy'] = {
+        'pulse_type': 'SquarePulse',
+        'channel': operation_dict['RO mux']['acq_marker_channel'],
+        'amplitude': 0.0,
+        'length': ro_spacing + feedback_delay,
+        'pulse_delay': 0}
 
     if prep_sequence is None:
         prep_sequence = ['Y90 ' + q0n, 'Y90s ' + q2n]
@@ -1936,6 +1776,7 @@ def two_qubit_parity_measurement(
     pulse_sequence.append('I_fb')
     if preselection:
         pulse_sequence.append('RO mux_presel')
+        pulse_sequence.append('RO presel_dummy')
     pulse_list = [operation_dict[pulse] for pulse in pulse_sequence]
     el_main = multi_pulse_elt(0, station, pulse_list, trigger=True, name='main')
     el_list.append(el_main)
@@ -1982,7 +1823,7 @@ def two_qubit_parity_measurement(
 
 
 def n_qubit_tomo_seq(
-        qubits, prep_sequence=None,
+        qubit_names, operation_dict, prep_sequence=None,
         prep_name=None,
         rots_basis=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
         upload=True, verbose=False, return_seq=False,
@@ -1991,17 +1832,9 @@ def n_qubit_tomo_seq(
 
     """
 
-    qubit_names = [qubit.name for qubit in qubits]
-
-    operation_dict = {
-        'RO mux': mqm.get_multiplexed_readout_pulse_dictionary(qubits),
-        'RO mux_presel': mqm.get_multiplexed_readout_pulse_dictionary(qubits)
-    }
+    operation_dict['RO mux_presel'] = operation_dict['RO mux'].copy()
     operation_dict['RO mux_presel']['pulse_delay'] = -ro_spacing
     operation_dict['RO mux_presel']['refpoint'] = 'start'
-
-    for qb in qubits:
-        operation_dict.update(qb.get_operation_dict())
 
     if prep_sequence is None:
         prep_sequence = ['Y90 ' + qubit_names[0]]
@@ -2055,8 +1888,9 @@ def get_tomography_pulses(*qubit_names, basis_pulses=('I', 'X180', 'Y90',
         tomo_sequences = tomo_sequences_new
     return tomo_sequences
 
-def n_qubit_ref_seq(qubits, ref_desc, upload=True, verbose=False,
-                    return_seq=False, preselection=False, ro_spacing=1e-6):
+def n_qubit_ref_seq(qubit_names, operation_dict, ref_desc, upload=True,
+                    verbose=False, return_seq=False, preselection=False,
+                    ro_spacing=1e-6):
     """
         Calibration points for arbitrary combinations
 
@@ -2067,17 +1901,9 @@ def n_qubit_ref_seq(qubits, ref_desc, upload=True, verbose=False,
                 name of the state as key, and list of pulses names as values.
     """
 
-    qubit_names = [qubit.name for qubit in qubits]
-
-    operation_dict = {
-        'RO mux': mqm.get_multiplexed_readout_pulse_dictionary(qubits),
-        'RO mux_presel': mqm.get_multiplexed_readout_pulse_dictionary(qubits)
-    }
+    operation_dict['RO mux_presel'] = operation_dict['RO mux'].copy()
     operation_dict['RO mux_presel']['pulse_delay'] = -ro_spacing
     operation_dict['RO mux_presel']['refpoint'] = 'start'
-
-    for qb in qubits:
-        operation_dict.update(qb.get_operation_dict())
 
     # create the elements
     el_list = []
@@ -2113,20 +1939,18 @@ def n_qubit_ref_seq(qubits, ref_desc, upload=True, verbose=False,
         return seq_name
 
 
-def n_qubit_ref_all_seq(qubits, upload=True, verbose=False, return_seq=False,
+def n_qubit_ref_all_seq(qubit_names, operation_dict, upload=True, verbose=False, return_seq=False,
                         preselection=False, ro_spacing=1e-6):
     """
         Calibration points for all combinations
     """
 
-    return n_qubit_ref_seq(qubits,
+    return n_qubit_ref_seq(qubit_names, operation_dict,
                            ref_desc=itertools.product(["I", "X180"],
-                                                      repeat=len(qubits)),
+                                                      repeat=len(qubit_names)),
                            upload=upload, verbose=verbose,
                            return_seq=return_seq, preselection=preselection,
                            ro_spacing=ro_spacing)
-
-
 
 
 

@@ -1816,11 +1816,11 @@ class QuDev_transmon(Qubit):
                                           **kwargs):
         if MC is None:
             MC = self.MC
-        alpha = kwargs.pop('alpha',1e-2)
-        beta = kwargs.pop('beta',0.)
-        gamma = kwargs.pop('gamma',1.)
-        std_devs = kwargs.pop('std_devs',[0.1,10])
-        iters = kwargs.pop('iters',5000)
+        alpha = kwargs.pop('alpha', 1e-2)
+        beta = kwargs.pop('beta', 0.)
+        gamma = kwargs.pop('gamma', 1.)
+        std_devs = kwargs.pop('std_devs', [0.1,10])
+        iters = kwargs.pop('iters', 5000)
         self.prepare_for_mixer_calibration(suppress='drive sideband')
 
         #Could make sample size variable (maxiter) for better adapting)
@@ -1840,7 +1840,7 @@ class QuDev_transmon(Qubit):
             logging.error('The function argument meas_grid is not 2D. Tuples of '
                           '[alpha,phi] values for skewness calibration.')
 
-        s1 =  awg_swf.mixer_skewness_calibration_swf(
+        s1 = awg_swf.mixer_skewness_calibration_swf(
                                  pulseIch=self.pulse_I_channel(),
                                  pulseQch=self.pulse_Q_channel(),
                                  alpha=meas_grid[0],
