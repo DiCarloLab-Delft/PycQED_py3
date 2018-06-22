@@ -1043,6 +1043,7 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
             self.abs_vals = deepcopy(self.measured_values[0,:])
         else:
             self.abs_vals = np.sqrt(self.measured_values[0,:]**2 + self.measured_values[1,:]**2)
+
         result,est,test_vals,opti_flag\
                                   = opt.neural_network_opt(None, self.meas_grid,
                                           self.abs_vals,
@@ -1060,7 +1061,7 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
         self.opti_flag = opti_flag
         self.accuracy = est.evaluate(self.test_grid,self.test_target)
 
-        return result,est,test_vals
+        return result,est,test_data
 
     def make_figures(self, **kw):
 

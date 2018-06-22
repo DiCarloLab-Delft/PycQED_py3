@@ -28,6 +28,7 @@ from pycqed.utilities.general import int2base
 
 from matplotlib.colors import LinearSegmentedColormap as lscmap
 
+odict = OrderedDict
 
 class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
 
@@ -724,215 +725,6 @@ class Singleshot_Readout_Analysis(ba.BaseDataAnalysis):
                         'text_string': fit_text,
                     }
 
-class Multiplexed_Readout_Analysis(ba.BaseDataAnalysis):
-    """
-    For two qubits, to make an n-qubit mux readout experiment.
-    we should vectorize this analysis
-
-    TODO: This needs to be rewritten/debugged!
-    Suggestion:
-        Use N*(N-1)/2 instances of Singleshot_Readout_Analysis,
-          run them without saving the plots and then merge together the
-          plot_dicts as in the cross_dephasing_analysis.
-    """
-
-    def __init__(self, t_start: str=None, t_stop: str=None,
-                 label: str='',
-                 data_file_path: str=None,
-                 options_dict: dict=None, extract_only: bool=False,
-                 nr_of_qubits: int = 2,
-                 qubit_names: list=None,
-                 do_fitting: bool=True, auto=True):
-        """
-        Inherits from BaseDataAnalysis.
-        Extra arguments of interest
-            qubit_names (list) : used to label the experiments, names of the
-                qubits. LSQ is last name in the list. If not specified will
-                set qubit_names to [qN, ..., q1, q0]
-
-
-        """
-        self.nr_of_qubits = nr_of_qubits
-        if qubit_names is None:
-            self.qubit_names = list(reversed(['q{}'.format(i)
-                                              for i in range(nr_of_qubits)]))
-        else:
-            self.qubit_names = qubit_names
-
-        super().__init__(t_start=t_start, t_stop=t_stop,
-                         label=label,
-                         data_file_path=data_file_path,
-                         options_dict=options_dict,
-                         extract_only=extract_only, do_fitting=do_fitting)
-        self.single_timestamp = False
-        self.params_dict = {
-            'measurementstring': 'measurementstring',
-            'measured_values': 'measured_values',
-            'value_names': 'value_names',
-            'value_units': 'value_units'}
-
-        self.numeric_params = []
-        if auto:
-            self.run_analysis()
-
-    def process_data(self):
-        """
-        Responsible for creating the histograms based on the raw data
-        """
-        # Determine the shape of the data to extract wheter to rotate or not
-        nr_bins = self.options_dict.get('nr_bins', 100)
-
-        # self.proc_data_dict['shots_0'] = [''] * nr_expts
-        # self.proc_data_dict['shots_1'] = [''] * nr_expts
-
-        #################################################################
-        #  Separating data into shots for the different prepared states #
-        #################################################################
-        self.proc_data_dict['nr_of_qubits'] = self.nr_of_qubits
-        self.proc_data_dict['qubit_names'] = self.qubit_names
-
-        self.proc_data_dict['ch_names'] = self.raw_data_dict['value_names'][0]
-
-        for ch_name, shots in self.raw_data_dict['measured_values_ord_dict'].items():
-            self.proc_data_dict[ch_name] = shots[0]  # only 1 dataset
-            self.proc_data_dict[ch_name +
-                                ' all'] = self.proc_data_dict[ch_name]
-            min_sh = np.min(self.proc_data_dict[ch_name])
-            max_sh = np.max(self.proc_data_dict[ch_name])
-            self.proc_data_dict['nr_shots'] = len(self.proc_data_dict[ch_name])
-
-            base = 2
-            number_of_experiments = base ** self.nr_of_qubits
-
-            combinations = [int2base(
-                i, base=base, fixed_length=self.nr_of_qubits) for i in
-                range(number_of_experiments)]
-            self.proc_data_dict['combinations'] = combinations
-
-            for i, comb in enumerate(combinations):
-                # No post selection implemented yet
-                self.proc_data_dict['{} {}'.format(ch_name, comb)] = \
-                    self.proc_data_dict[ch_name][i::number_of_experiments]
-                #####################################
-                #  Binning data into 1D histograms  #
-                #####################################
-                hist_name = 'hist {} {}'.format(
-                    ch_name, comb)
-                self.proc_data_dict[hist_name] = np.histogram(
-                    self.proc_data_dict['{} {}'.format(
-                        ch_name, comb)],
-                    bins=nr_bins, range=(min_sh, max_sh))
-                #  Cumulative histograms #
-                chist_name = 'c'+hist_name
-                # the cumulative histograms are normalized to ensure the right
-                # fidelities can be calculated
-                self.proc_data_dict[chist_name] = np.cumsum(
-                    self.proc_data_dict[hist_name][0])/(
-                    np.sum(self.proc_data_dict[hist_name][0]))
-
-            self.proc_data_dict['bin_centers {}'.format(ch_name)] = (
-                self.proc_data_dict[hist_name][1][:-1] +
-                self.proc_data_dict[hist_name][1][1:]) / 2
-
-            self.proc_data_dict['binsize {}'.format(ch_name)] = (
-                self.proc_data_dict[hist_name][1][1] -
-                self.proc_data_dict[hist_name][1][0])
-
-        #####################################################################
-        # Combining histograms of all different combinations and calc Fid.
-        ######################################################################
-        for ch_idx, ch_name in enumerate(self.proc_data_dict['ch_names']):
-            # Create labels for the specific combinations
-            comb_str_0, comb_str_1, comb_str_2 = get_arb_comb_xx_label(
-                self.proc_data_dict['nr_of_qubits'], qubit_idx=ch_idx)
-
-            # Initialize the arrays
-            self.proc_data_dict['hist {} {}'.format(ch_name, comb_str_0)] = \
-                [np.zeros(nr_bins), np.zeros(nr_bins+1)]
-            self.proc_data_dict['hist {} {}'.format(ch_name, comb_str_1)] = \
-                [np.zeros(nr_bins), np.zeros(nr_bins+1)]
-            zero_hist = self.proc_data_dict['hist {} {}'.format(
-                ch_name, comb_str_0)]
-            one_hist = self.proc_data_dict['hist {} {}'.format(
-                ch_name, comb_str_1)]
-
-            # Fill them with data from the relevant combinations
-            for i, comb in enumerate(self.proc_data_dict['combinations']):
-                if comb[-(ch_idx+1)] == '0':
-                    zero_hist[0] += self.proc_data_dict[
-                        'hist {} {}'.format(ch_name, comb)][0]
-                    zero_hist[1] = self.proc_data_dict[
-                        'hist {} {}'.format(ch_name, comb)][1]
-                elif comb[-(ch_idx+1)] == '1':
-                    one_hist[0] += self.proc_data_dict[
-                        'hist {} {}'.format(ch_name, comb)][0]
-                    one_hist[1] = self.proc_data_dict[
-                        'hist {} {}'.format(ch_name, comb)][1]
-                elif comb[-(ch_idx+1)] == '2':
-                    # Fixme add two state binning
-                    raise NotImplementedError()
-
-            chist_0 = np.cumsum(zero_hist[0])/(np.sum(zero_hist[0]))
-            chist_1 = np.cumsum(one_hist[0])/(np.sum(one_hist[0]))
-
-            self.proc_data_dict['chist {} {}'.format(ch_name, comb_str_0)] \
-                = chist_0
-            self.proc_data_dict['chist {} {}'.format(ch_name, comb_str_1)] \
-                = chist_1
-            ###########################################################
-            #  Threshold and fidelity based on cumulative histograms  #
-
-            qubit_name = self.proc_data_dict['qubit_names'][-(ch_idx+1)]
-            centers = self.proc_data_dict['bin_centers {}'.format(ch_name)]
-            fid, th = get_assignement_fid_from_cumhist(chist_0, chist_1,
-                                                       centers)
-            self.proc_data_dict['F_ass_raw {}'.format(qubit_name)] = fid
-            self.proc_data_dict['threshold_raw {}'.format(qubit_name)] = th
-
-    def prepare_plots(self):
-        # N.B. If the log option is used we should manually set the
-        # yscale to go from .5 to the current max as otherwise the fits
-        # mess up the log plots.
-        # log_hist = self.options_dict.get('log_hist', False)
-
-        for ch_idx, ch_name in enumerate(self.proc_data_dict['ch_names']):
-            q_name = self.proc_data_dict['qubit_names'][-(ch_idx+1)]
-            th_raw = self.proc_data_dict['threshold_raw {}'.format(q_name)]
-            F_raw = self.proc_data_dict['F_ass_raw {}'.format(q_name)]
-
-            self.plot_dicts['histogram_{}'.format(ch_name)] = {
-                'plotfn': make_mux_ssro_histogram,
-                'data_dict': self.proc_data_dict,
-                'ch_name': ch_name,
-                'title': (self.timestamps[0] + ' \n' +
-                          'SSRO histograms {}'.format(ch_name))}
-
-            thresholds = [th_raw]
-            threshold_labels = ['thresh. raw']
-
-            self.plot_dicts['comb_histogram_{}'.format(q_name)] = {
-                'plotfn': make_mux_ssro_histogram_combined,
-                'data_dict': self.proc_data_dict,
-                'ch_name': ch_name,
-                'thresholds': thresholds,
-                'threshold_labels': threshold_labels,
-                'qubit_idx': ch_idx,
-                'title': (self.timestamps[0] + ' \n' +
-                          'Combined SSRO histograms {}'.format(q_name))}
-
-            fid_threshold_msg = 'Summary {}\n'.format(q_name)
-            fid_threshold_msg += r'$F_{A}$-raw: ' + '{:.3f} \n'.format(F_raw)
-            fid_threshold_msg += r'thresh. raw: ' + '{:.3f} \n'.format(th_raw)
-
-            self.plot_dicts['fid_threshold_msg_{}'.format(q_name)] = {
-                'plotfn': self.plot_text,
-                'xpos': 1.05,
-                'ypos': .9,
-                'horizontalalignment': 'left',
-                'text_string': fid_threshold_msg,
-                'ax_id': 'comb_histogram_{}'.format(q_name)}
-
-
 class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
     """
     Extracts table of counts from multiplexed single shot readout experiment.
@@ -969,6 +761,7 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
         self.n_readouts = options_dict['n_readouts']
         self.thresholds = options_dict['thresholds']
         self.channel_map = options_dict['channel_map']
+        self.use_preselection = options_dict.get('use_preselection', False)
         qubits = list(self.channel_map.keys())
 
         self.readout_names = options_dict.get('readout_names', None)
@@ -977,14 +770,29 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
             None
 
         self.observables = options_dict.get('observables', None)
+
         if self.observables is None:
             combination_list = list(itertools.product([False, True],
                                                       repeat=len(qubits)))
-            self.observables = {}
+            preselection_condition = dict(zip(
+                [(qb, self.options_dict.get('preselection_shift', 1))
+                 for qb in qubits],  # keys contain shift
+                combination_list[0]  # first comb has all ground
+            ))
+            self.observables = odict()
+
+            # add preselection condition also as an observable
+            if self.use_preselection:
+                self.observables["pre"] = preselection_condition
+            # add all combinations
             for i, states in enumerate(combination_list):
                 name = ''.join(['e' if s else 'g' for s in states])
                 obs_name = '$\| ' + name + '\\rangle$'
                 self.observables[obs_name] = dict(zip(qubits, states))
+                # add preselection condition
+                if self.use_preselection:
+                    self.observables[obs_name].update(preselection_condition)
+
         self.single_timestamp = False
 
         self.params_dict = {
@@ -1097,7 +905,7 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
 
 
     def prepare_plots(self):
-        self.prepare_plot_prob_table()
+        self.prepare_plot_prob_table(self.use_preselection)
 
     def prepare_plot_prob_table(self, only_odd=False):
         # colormap which has a lot of contrast for small and large values
@@ -1164,13 +972,22 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
         If the calibration segments are passed, there must be a calibration
         segments for each of the computational basis states of the Hilber space.
         If there are no calibration segments, perfect readout is assumed.
+
+        The calling class must filter out the relevant data segments by itself!
         """
+        try:
+            preselection_obs_idx = list(self.observables.keys()).index('pre')
+        except ValueError:
+            preselection_obs_idx = None
+        observabele_idxs = [i for i in range(len(self.observables))
+                            if i != preselection_obs_idx]
+
         qubits = list(self.channel_map.keys())
         if tomography_qubits is None:
             tomography_qubits = qubits
         d = 2**len(tomography_qubits)
         data = self.proc_data_dict['probability_table']
-        data = data.T
+        data = data.T[observabele_idxs]
         if not 'cal_points' in self.options_dict:
             Fsingle = {None: np.array([[1, 0], [0, 1]]),
                        True: np.array([[0, 0], [0, 1]]),
@@ -1197,16 +1014,17 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
         else:
             means, covars = \
                 self.calibration_point_means_and_channel_covariations()
-            cal_points_list = self.proc_data_dict['cal_points_list']
-            data_idx = np.arange(data.shape[1])
-            data_idx = np.setdiff1d(data_idx,
-                                    np.array(cal_points_list).flatten())
-            data = data[:, data_idx]
             Fs = [np.diag(ms) for ms in means.T]
             return data, Fs, covars
 
     def calibration_point_means_and_channel_covariations(self):
-        observables = list(self.observables.values())
+        observables = [v for k, v in self.observables.items() if k != 'pre']
+        try:
+            preselection_obs_idx = list(self.observables.keys()).index('pre')
+        except ValueError:
+            preselection_obs_idx = None
+        observabele_idxs = [i for i in range(len(self.observables))
+                            if i != preselection_obs_idx]
 
         # calculate the mean for each reference state and each observable
         try:
@@ -1232,8 +1050,9 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
                                         'single reference state: {} and {}'
                                         .format(readout_list, cal_point_chs))
             cal_readouts.update(cal_point[0])
+
             val_list = [self.proc_data_dict['probability_table'][idx_ro]
-                        for idx_ro in cal_point[0]]
+                        [observabele_idxs] for idx_ro in cal_point[0]]
             means[i] = np.mean(val_list, axis=0)
 
         # find the means for all the products of the operators and the average
@@ -1259,7 +1078,7 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
         for (i, j), k in prod_obs_idxs.items():
             obs_products[:, i, j] = prod_prob_table[:, k]
         covars = -np.array([np.outer(ro, ro) for ro in self.proc_data_dict[
-            'probability_table']]) + obs_products
+            'probability_table'][:,observabele_idxs]]) + obs_products
         covars = np.mean(covars[list(cal_readouts)], 0)
 
         return means, covars

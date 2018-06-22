@@ -1861,6 +1861,7 @@ class QuDev_transmon(Qubit):
                                           **kwargs):
         if MC is None:
             MC = self.MC
+
         alpha = kwargs.get('alpha',1e-2)
         beta = kwargs.get('beta',0.)
         gamma = kwargs.get('gamma',1.)
@@ -1885,7 +1886,6 @@ class QuDev_transmon(Qubit):
         elif meas_grid.ndim !=2:
             logging.error('The function argument meas_grid is not 2D. Tuples of '
                           '[alpha,phi] values for skewness calibration.')
-
         s1 = awg_swf.mixer_skewness_calibration_swf(
                                  pulseIch=self.pulse_I_channel(),
                                  pulseQch=self.pulse_Q_channel(),
@@ -1920,6 +1920,7 @@ class QuDev_transmon(Qubit):
         # phi and alpha are the coefficients that go in the predistortion matrix
         alpha = a.optimization_result[0]
         phi = a.optimization_result[1]
+
         two_rounds_sub =  not a.opti_flag and two_rounds
         if not a.opti_flag: #in case the optimization did not converge, rerun with
                         #different data means.
@@ -1929,8 +1930,10 @@ class QuDev_transmon(Qubit):
         if two_rounds:
             meas_grid = np.array([np.random.normal(alpha,
                                                    c*std_devs[0],
+                                                   c*std_devs[0],
                                                    n_meas),
                                   np.random.normal(phi,
+                                                   c*std_devs[1],
                                                    c*std_devs[1],
                                                    n_meas)])
             self.calibrate_drive_mixer_skewness_NN(MC=MC, update=update,

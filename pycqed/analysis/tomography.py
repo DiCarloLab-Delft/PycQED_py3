@@ -1280,17 +1280,22 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                 theta_vec = np.linspace(0., 2*np.pi, 1001)
                 fid_vec = np.zeros(theta_vec.shape)
                 for i, theta in enumerate(theta_vec):
-                    fid_vec[i] = calc_fid2_bell(self.operators_mle,
+                    fid_vec[i] = calc_fid2_bell(self.rho_2,
                                                 self.target_bell, theta)
                 msg += str('\nMAX Fidelity {:.3f} at \n  ' + self.q0_label
                         + '={:.1f} deg and\n  ' + self.q1_label
                         + '={:.1f} deg').format(self.best_fidelity,
                                self.fit_res.best_values['angle_LSQ']*180./np.pi,
                                self.fit_res.best_values['angle_MSQ']*180./np.pi)
-            ax.text(txt_x_pos, .6, msg)
-
-        msg = 'Purity: {:.3f}\nFidelity: {:.3f}'.format(
-            purity, self.fidelity_mle)
+        #     ax.text(txt_x_pos, .6, msg)
+        #
+        # msg = 'Purity: {:.3f}\nFidelity: {:.3f}'.format(
+        #     purity, self.fidelity_mle)
+        ax.text(0.05, 0.95, msg,
+                transform=ax.transAxes,
+                fontsize=self.font_size,
+                verticalalignment='top',
+                horizontalalignment='left')
         if self.target_bell is not None:
             theta_vec_qb0 = np.linspace(0., 2*np.pi, 50)
             theta_vec_qb1 = np.linspace(0., 2*np.pi, 50)
@@ -1308,19 +1313,15 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
                         theta0, theta1,
                         fidelity_type='standard')
 
-            msg += '\nMAX Fidelity {:.3f} \n  at {:.1f} deg'.format(
-                np.max(fid_vec),
-                theta_vec_qb0[np.argmax(fid_vec)]*180./np.pi)
+            # msg += '\nMAX Fidelity {:.3f} \n  at {:.1f} deg'.format(
+            #     np.max(fid_vec),
+            #     theta_vec_qb0[np.argmax(fid_vec)]*180./np.pi)
         # msg += str('\nMAX Fidelity {:.3f}: \n  ' + self.q0_label
         #         + '={:.1f} deg \n  ' + self.q1_label
         #         + '={:.1f} deg').format(self.best_fidelity,
         #                self.fit_res.best_values['angle_LSQ']*180./np.pi,
         #                self.fit_res.best_values['angle_MSQ']*180./np.pi)
-        ax.text(0.05, 0.95, msg,
-                transform=ax.transAxes,
-                fontsize=self.font_size,
-                verticalalignment='top',
-                horizontalalignment='left')
+
 
         # print same message but with fidelity_standard
         msg = 'Standard formula'
