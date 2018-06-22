@@ -408,6 +408,15 @@ def neural_network_opt(fun, training_grid, target_values = None,
     #minimize network predictor with on bounded set, approximate gradient
     res = fmin_l_bfgs_b(estimator_wrapper, x_ini,bounds=bounds,approx_grad=True)
     result = res[0]
+    opti_flag = True
+    for it in range(n_features):
+        if not opti_flag:
+            break
+        if np.abs(result[it]) >= 2*np.std(training_grid,0)[it]:
+            opti_flag = False
+    if not opti_flag:
+        print('optimization most likely failed. Results outside 2-sigma surrounding'
+              'of at least one data feature mean value! Values will still be updated.')
     amp = res[1]
     #Rescale values
     for it in range(output_dim):
@@ -416,7 +425,7 @@ def neural_network_opt(fun, training_grid, target_values = None,
         result[it] = result[it]*input_feature_ext[it]+input_feature_means[it]
     print('minimization results: ',result,'::',amp)
 
-    return np.array(result), est, [test_grid,test_values]
+    return np.array(result), est, [test_grid,test_values],opti_flag
 
 
 

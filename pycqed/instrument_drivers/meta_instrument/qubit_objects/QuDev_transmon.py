@@ -1537,7 +1537,7 @@ class QuDev_transmon(Qubit):
             ma.MeasurementAnalysis(TwoD=True, auto=True, close_fig=close_fig,
                                    qb_name=self.name)
 
-    def calibrate_drive_mixer_NN(self,MC=None, update=True,trigger_sep=5e-6,
+    def calibrate_drive_mixer_carrier_NN2(self,MC=None, update=True,trigger_sep=5e-6,
                                  x0=(0., 0.),amplitude=0.1,
                                  estimator='DNN_Regressor_tf',
                                  n_meas=100,two_rounds=False,
@@ -1805,7 +1805,52 @@ class QuDev_transmon(Qubit):
         MC.set_detector_function(self.int_avg_det_spec)
         self.AWG.start()
         MC.run('mw_uc_spectrum' + self.msmt_suffix)
-        ma.MeasurementAnalysis(plot_args=dict(log=True, marker=''))
+        a = ma.MeasurementAnalysis(plot_args=dict(log=True, marker=''))
+
+        return a
+
+
+    def calibrate_drive_mixer_NN(self,if_freqs, MC=None,
+                                                amplitude=0.1,
+                                                update=True,
+                                                meas_grid=None,
+                                                n_meas=100,
+                                                trigger_sep=5e-6,
+                                                two_rounds=False,
+                                                estimator='DNN_Regressor_tf',
+                                                hidden_layers = [30,30],
+                                                x0=(0., 0.),
+                                                **kwargs):
+        '''
+        Running a complete drive mixer calibration with spectrum measurements before
+        and after calibration. Evaluating then the calibration performance by plotting
+        the dB values of Power ratio between before and after spectrum.
+        For detailed info inspect implementations of the below used methods.
+        '''
+        ma1 = self.measure_drive_mixer_spectrum(if_freqs,MC=MC,
+                                                amplitude=amplitude,
+                                                trigger_sep=trigger_sep)
+        self.calibrate_drive_mixer_carrier_NN2(MC=MC,update=update,x0=x0,
+                                                meas_grid=meas_grid,
+                                                trigger_sep=trigger_sep,
+                                                estimator=estimator,
+                                                n_meas=n_meas,
+                                                two_rounds=two_rounds,
+                                                hidden_layers=hidden_layers,
+                                                **kwargs)
+        self.calibrate_drive_mixer_skewness_NN(MC=MC,update=update,
+                                                meas_grid=meas_grid,
+                                                trigger_sep=trigger_sep,
+                                                estimator=estimator,
+                                                n_meas=n_meas,
+                                                two_rounds=two_rounds,
+                                                hidden_layers=hidden_layers,
+                                                **kwargs)
+        ma2 = self.measure_drive_mixer_spectrum(if_freqs,MC=MC,
+                                                amplitude=amplitude,
+                                                trigger_sep=trigger_sep)
+        ma.Mixer_calibration_evaluation(ma1,ma2)
+
 
     def calibrate_drive_mixer_skewness_NN(self, MC=None, update=True,
                                           meas_grid=None,n_meas=100,
@@ -1816,11 +1861,12 @@ class QuDev_transmon(Qubit):
                                           **kwargs):
         if MC is None:
             MC = self.MC
-        alpha = kwargs.pop('alpha',1e-2)
-        beta = kwargs.pop('beta',0.)
-        gamma = kwargs.pop('gamma',1.)
-        std_devs = kwargs.pop('std_devs',[0.1,10])
-        iters = kwargs.pop('iters',5000)
+        alpha = kwargs.get('alpha',1e-2)
+        beta = kwargs.get('beta',0.)
+        gamma = kwargs.get('gamma',1.)
+        std_devs = kwargs.get('std_devs',[0.1,10])
+        iters = kwargs.get('iters',5000)
+        c = kwargs.pop('second_round_std_scale',0.3)
         self.prepare_for_mixer_calibration(suppress='drive sideband')
 
         #Could make sample size variable (maxiter) for better adapting)
@@ -1840,7 +1886,7 @@ class QuDev_transmon(Qubit):
             logging.error('The function argument meas_grid is not 2D. Tuples of '
                           '[alpha,phi] values for skewness calibration.')
 
-        s1 =  awg_swf.mixer_skewness_calibration_swf(
+        s1 = awg_swf.mixer_skewness_calibration_swf(
                                  pulseIch=self.pulse_I_channel(),
                                  pulseQch=self.pulse_Q_channel(),
                                  alpha=meas_grid[0],
@@ -1867,29 +1913,37 @@ class QuDev_transmon(Qubit):
                         }
         MC.run(name='drive_skewness_calibration' + self.msmt_suffix)
 
-        if not two_rounds:
-            a = ma.OptimizationAnalysisNN(label='drive_skewness_calibration',
-                                          ad_func_pars=ad_func_pars,
-                                          meas_grid=meas_grid)
+        a = ma.OptimizationAnalysisNN(label='drive_skewness_calibration',
+                                      ad_func_pars=ad_func_pars,
+                                      meas_grid=meas_grid,
+                                      two_rounds = two_rounds)
         # phi and alpha are the coefficients that go in the predistortion matrix
         alpha = a.optimization_result[0]
         phi = a.optimization_result[1]
-        if update and not two_rounds:
-            self.alpha(alpha)
-            self.phi_skew(phi)
+        two_rounds_sub =  not a.opti_flag and two_rounds
+        if not a.opti_flag: #in case the optimization did not converge, rerun with
+                        #different data means.
+            two_rounds = True   #this leads to not being able to make two iterations if first didnt converge
+            c = 1.
+
         if two_rounds:
             meas_grid = np.array([np.random.normal(alpha,
-                                                   0.3*std_devs[0],
+                                                   c*std_devs[0],
                                                    n_meas),
                                   np.random.normal(phi,
-                                                   0.3*std_devs[1],
+                                                   c*std_devs[1],
                                                    n_meas)])
             self.calibrate_drive_mixer_skewness_NN(MC=MC, update=update,
                                                    meas_grid=meas_grid,
                                                    n_meas=n_meas,
                                                    amplitude=amplitude,
                                                    trigger_sep=trigger_sep,
-                                                   two_rounds = False,**kwargs)
+                                                   two_rounds=two_rounds_sub,
+                                                   second_round_std_scale=0.3,
+                                                   **kwargs)
+        if update and not two_rounds:
+            self.alpha(alpha)
+            self.phi_skew(phi)
 
         return alpha, phi
 
