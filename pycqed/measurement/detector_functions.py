@@ -1648,12 +1648,10 @@ class UHFQC_integrated_average_detector(Hard_Detector):
 
         data_raw = self.UHFQC.acquisition_poll(
             samples=self.nr_sweep_points, arm=False, acquisition_time=0.01)
-
         # the self.channels should be the same as data_raw.keys().
         # this is to be tested (MAR 26-9-2017)
         data = np.array([data_raw[key]
                          for key in sorted(data_raw.keys())])*self.scaling_factor
-
         # Corrects offsets after crosstalk suppression matrix in UFHQC
         if self.result_logging_mode == 'lin_trans':
             for i, channel in enumerate(self.channels):
@@ -2527,7 +2525,6 @@ class UHFQC_mixer_skewness_det(UHFQC_integrated_average_detector):
             print('phi_skew: {:.3f}'.format(self.phi_skew()))
         cal_elts.mixer_calibration_sequence(
                 self.RO_trigger_separation, self.amplitude, None,
-                self.RO_pars,
                 self.RO_pars,
                 self.pulseIch, self.pulseQch, f_pulse_mod=self.f_mod,
                 phi_skew=self.phi_skew(), alpha=self.alpha()

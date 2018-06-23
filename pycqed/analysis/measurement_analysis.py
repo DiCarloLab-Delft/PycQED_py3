@@ -192,6 +192,7 @@ class MeasurementAnalysis(object):
                 figname = (figname + '.' + plot_format)
             self.savename = os.path.abspath(os.path.join(
                 self.folder, figname))
+            print(self.savename,'::loc')
             if fig_tight:
                 try:
                     fig.tight_layout()
@@ -937,19 +938,24 @@ class MeasurementAnalysis(object):
 class Mixer_calibration_evaluation(MeasurementAnalysis):
 
     def __init__(self, ma1: MeasurementAnalysis,ma2: MeasurementAnalysis,**kw):
+        super().__init__(auto=False)
         self.sweep_pts1 = ma1.sweep_points
         self.sweep_pts2 = ma2.sweep_points
-        if self.sweep_pts1 != self.sweep_pts2:
+        if not np.array_equal(self.sweep_pts1,self.sweep_pts2):
             logging.error('mixer spectrum sweep points different! Evaluating '
                             'on interval with equal sweep points')
-        self.meas_vals1 = ma1.measured_values
-        self.meas_vals2 = ma2.measured_values
+        self.meas_vals1 = ma1.measured_values[0]
+        self.meas_vals2 = ma2.measured_values[0]
         print(ma1.value_names,': ma1 value names')
         print(ma2.value_names,': ma2 value names')
         #MAYBE some preprocessing necessary (Get power levels)
         self.signal_ratio = self.get_signal_ratio_db()
+        print(self.signal_ratio,': signal_ratio')
         self.make_figures(**kw)
     def get_signal_ratio_db(self):
+        for it in range(len(self.meas_vals2)):
+            print(self.meas_vals1[it],':1')
+            print(self.meas_vals2[it],':2')
         return 10.*np.log10(self.meas_vals2/self.meas_vals1)
 
     def make_figures(self,**kw):
@@ -1019,7 +1025,7 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
         self.meas_grid = kw.pop('meas_grid')
         self.ad_func_pars = kw.pop('ad_func_pars')
         self.two_rounds = kw.pop('two_rounds',False)
-        self.hidden_layer_sizes = self.ad_func_pars.pop('hidden_layers',[10.,10.])
+        self.hidden_layers = self.ad_func_pars.pop('hidden_layers',[10.,10.])
         self.alpha = self.ad_func_pars.pop('alpha',1e-2)
         self.estimator_name = self.ad_func_pars.pop('estimator','DNN_Regressor_tf')
         self.beta = self.ad_func_pars.pop('beta',0.)
@@ -1047,7 +1053,7 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
         result,est,test_vals,opti_flag\
                                   = opt.neural_network_opt(None, self.meas_grid,
                                           self.abs_vals,
-                                          hidden_layer_sizes = self.hidden_layers,
+                                          hidden_layers = self.hidden_layers,
                                           alpha= self.alpha,
                                           solver='lbfgs',
                                           estimator=self.estimator_name,
@@ -1059,9 +1065,11 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
         self.test_grid = test_vals[0]
         self.test_target = test_vals[1]
         self.opti_flag = opti_flag
+        self.estimator = est
         self.accuracy = est.evaluate(self.test_grid,self.test_target)
+        self.optimization_result = result
 
-        return result,est,test_data
+        return result,est,test_vals
 
     def make_figures(self, **kw):
 
@@ -1074,7 +1082,6 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
 
         pre_proc_dict = self.estimator.pre_proc_dict
         output_scale = pre_proc_dict.get('output',{}).get('scaling',1.)
-        print(output_scale)
         output_means = pre_proc_dict.get('output',{}).get('centering',0.)
         input_scale = pre_proc_dict.get('input',{}).get('scaling',1.)
         input_means = pre_proc_dict.get('input',{}).get('centering',0.)

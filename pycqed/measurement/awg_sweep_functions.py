@@ -87,6 +87,9 @@ class mixer_skewness_calibration_swf(swf.Hard_Sweep):
                  amplitude=0.1, RO_trigger_separation=5e-6,
                  verbose=False,  data_points=1, upload=True):
         super().__init__()
+        self.name = 'mixer_skewness_calibration_swf'
+        self.parameter_name = 'alpha'
+        self.unit = 'a.u'
         self.pulseIch = pulseIch
         self.pulseQch = pulseQch
         self.alpha = alpha
@@ -123,6 +126,9 @@ class arbitrary_variable_swf(swf.Hard_Sweep):
     def __init__(self,control=None,parameter = None):
 
         super().__init__()
+        self.name = 'arbitrary_variable_swf'
+        self.parameter_name = 'phi_skew'
+        self.unit = 'Deg'
         if control is not None:
             if not hasattr(control,'children'):
                 control.children = [self]

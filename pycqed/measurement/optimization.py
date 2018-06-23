@@ -292,7 +292,7 @@ def center_and_scale(X,y):
 
 
 def neural_network_opt(fun, training_grid, target_values = None,
-                       hidden_layer_sizes=[10, 10],
+                       hidden_layers=[10, 10],
                        alpha= 0.0001, solver='lbfgs',estimator='DNN_Regressor_tf',
                        iters = 200, beta=0.9 , gamma=1., test_size=0.1):
     """
@@ -303,7 +303,7 @@ def neural_network_opt(fun, training_grid, target_values = None,
                        number of datapoints in the training set.
         target_values: The target values measured during data acquisition by a
                        hard sweep over the traning grid.
-        hidden_layer_sizes: List of tuples containing the number of units for every
+        hidden_layers: List of tuples containing the number of units for every
                             hidden layer of the network. E.g (5,5) would be a
                             network with two hidden layers with 5 units each.
                             Crossvalidation is used to determine the best
@@ -340,7 +340,7 @@ def neural_network_opt(fun, training_grid, target_values = None,
     else:
         #if the sweep is adaptive, acquire data points by applying fun
         first_value = fun(training_grid[0])
-        output_dim = len(first_value)
+        output_dim = np.size(first_value)
         target_values = np.zeros((n_samples,output_dim))
         target_values[0,:] = first_value
         for i in range(1,n_samples):
@@ -365,7 +365,7 @@ def neural_network_opt(fun, training_grid, target_values = None,
     ###    and MLPR instance and fit a model functione to fun()     ###
     ##################################################################
     def mlpr():
-        est = ml.MLP_Regressor_scikit(hidden_layers=hidden_layer_sizes,
+        est = ml.MLP_Regressor_scikit(hidden_layers=hidden_layers,
                                    output_dim=output_dim,
                                    n_feature=n_samples,
                                    alpha=[alpha],
@@ -375,7 +375,7 @@ def neural_network_opt(fun, training_grid, target_values = None,
         return est
 
     def dnnr():
-        est = ml.DNN_Regressor_tf(hidden_layers=hidden_layer_sizes,
+        est = ml.DNN_Regressor_tf(hidden_layers=hidden_layers,
                                output_dim=output_dim,
                                n_feature=n_features,
                                alpha=alpha,

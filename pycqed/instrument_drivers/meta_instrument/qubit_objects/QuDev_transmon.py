@@ -1558,6 +1558,7 @@ class QuDev_transmon(Qubit):
         mode = kwargs.pop('mode','carrier')
         detector = self.int_avg_det_spec
         if mode=='carrier':
+            self.prepare_for_mixer_calibration(suppress='drive LO')
             cal_elts.mixer_calibration_sequence(
                 trigger_sep, 0, RO_pars=self.get_RO_pars(),
                 pulse_I_channel=self.pulse_I_channel(),
@@ -1611,7 +1612,7 @@ class QuDev_transmon(Qubit):
 
         MC.set_sweep_functions(S)
         MC.set_sweep_points(meas_grid.T)
-        MC.set_detector_function(detector)
+        MC.set_detector_function(det.IndexDetector(detector, 0))
         ad_func_pars = {'hidden_layers': hidden_layers,
                         'iters':5000,
                         'alphas': alpha,
@@ -1621,7 +1622,7 @@ class QuDev_transmon(Qubit):
                         'beta': beta,
                         'gamma': gamma
                         }
-        MC.run(name='drive_skewness_calibration' + self.msmt_suffix)
+        MC.run(name='drive_carrier_calibration' + self.msmt_suffix)
 
         if not two_rounds:
             if mode=='carrier':
@@ -1634,8 +1635,8 @@ class QuDev_transmon(Qubit):
                 if update:
                     self.pulse_I_offset(ch_1_min)
                     self.pulse_Q_offset(ch_2_min)
-            #elif mode=='complete':
-            #    return
+
+        return ch_1_min,ch_2_min
 
     def calibrate_drive_mixer_carrier_NN(self, MC=None, update=True, x0=(0., 0.),
                                              trigger_sep=5e-6,
@@ -1830,7 +1831,7 @@ class QuDev_transmon(Qubit):
         ma1 = self.measure_drive_mixer_spectrum(if_freqs,MC=MC,
                                                 amplitude=amplitude,
                                                 trigger_sep=trigger_sep)
-        self.calibrate_drive_mixer_carrier_NN2(MC=MC,update=update,x0=x0,
+        self.calibrate_drive_mixer_carrier_NN(MC=MC,update=update,x0=x0,
                                                 meas_grid=meas_grid,
                                                 trigger_sep=trigger_sep,
                                                 estimator=estimator,
@@ -1924,16 +1925,14 @@ class QuDev_transmon(Qubit):
         two_rounds_sub =  not a.opti_flag and two_rounds
         if not a.opti_flag: #in case the optimization did not converge, rerun with
                         #different data means.
-            two_rounds = True   #this leads to not being able to make two iterations if first didnt converge
+            #two_rounds = True   #this leads to not being able to make two iterations if first didnt converge
             c = 1.
 
         if two_rounds:
             meas_grid = np.array([np.random.normal(alpha,
                                                    c*std_devs[0],
-                                                   c*std_devs[0],
                                                    n_meas),
                                   np.random.normal(phi,
-                                                   c*std_devs[1],
                                                    c*std_devs[1],
                                                    n_meas)])
             self.calibrate_drive_mixer_skewness_NN(MC=MC, update=update,
