@@ -527,6 +527,7 @@ class BaseDataAnalysis(object):
 
         # Check weather there is any data to save
         if hasattr(self, 'fit_res') and self.fit_res is not None:
+            # Find the file to save to
             fn = self.options_dict.get('analysis_result_file', False)
             if fn == False:
                 fn = a_tools.measurement_filename(a_tools.get_folder(self.timestamps[0]))
@@ -539,11 +540,13 @@ class BaseDataAnalysis(object):
             if self.verbose:
                 print('Saving fitting results to %s' % fn)
 
+            # Save data to file
             with h5py.File(fn, 'a') as data_file:
                 try:
                     analysis_group = data_file.create_group('Analysis')
                 except ValueError:
-                    # If the analysis group already exists.
+                    # If the analysis group already exists, re-use it
+                    # (as not to overwrite previous/other fits)
                     analysis_group = data_file['Analysis']
 
                 # Iterate over all the fit result dicts as not to overwrite old/other analysis
@@ -566,7 +569,7 @@ class BaseDataAnalysis(object):
             for k in obj:
                 obj[k] = BaseDataAnalysis._convert_dict_rec(obj[k])
         except TypeError:
-            if isinstance(obj, lmfit.model.ModelResult):
+            if isinstance(obj, lmfit.model.ModelResult) or isinstance(obj, lmfit.minimizer.MinimizerResult):
                 obj = BaseDataAnalysis._flatten_lmfit_modelresult(obj)
             else:
                 obj = str(obj)
@@ -574,7 +577,8 @@ class BaseDataAnalysis(object):
 
     @staticmethod
     def _flatten_lmfit_modelresult(model):
-        assert type(model) is lmfit.model.ModelResult
+        assert (type(model) is lmfit.model.ModelResult or
+                type(model) is lmfit.minimizer.MinimizerResult)
         dic = OrderedDict()
         dic['success'] = model.success
         dic['message'] = model.message
@@ -1170,7 +1174,12 @@ class BaseDataAnalysis(object):
             return
 
         model = pdict['fit_res'].model
+        #TODO: make this work for type(model) is lmfit.minimizer.MinimizerResult
+        assert (type(model) is lmfit.model.Model or type(model) is lmfit.model.ModelResult),\
+            'The passed item in "fit_res" needs to be a fitting model, but is '+ str(type(model))
+
         plot_init = pdict.get('plot_init', False)  # plot the initial guess
+        plot_normed = pdict.get('plot_normed', False)
         pdict['marker'] = pdict.get('marker', '')  # different default
         plot_linestyle_init = pdict.get('init_linestyle', '--')
         plot_numpoints = pdict.get('num_points', 1000)
@@ -1186,6 +1195,9 @@ class BaseDataAnalysis(object):
                                      plot_numpoints)
         pdict['yvals'] = model.eval(pdict['fit_res'].params,
                                     **{independent_var: pdict['xvals']})
+        if plot_normed:
+            pdict['yvals']=pdict['yvals']/pdict['yvals'][0]
+
         self.plot_line(pdict, axs)
 
         if plot_init:

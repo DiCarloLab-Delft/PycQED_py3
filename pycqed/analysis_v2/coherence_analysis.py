@@ -19,7 +19,8 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                  options_dict: dict = None, extract_only: bool = False, auto: bool = True,
                  close_figs: bool = True, do_fitting: bool = True,
                  tau_key='Analysis.Fitted Params F|1>.tau.value',
-                 tau_std_key='Analysis.Fitted Params F|1>.tau.stderr', use_chisqr = False
+                 tau_std_key='Analysis.Fitted Params F|1>.tau.stderr',
+                 use_chisqr = False,
                  plot_versus_dac=True,
                  dac_key='Instrument settings.fluxcurrent.Q',
                  plot_versus_frequency=True,
@@ -496,7 +497,7 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
                     # if yes, sort chi^2
                     # mask = np.where self.option_dict.get('threshold')
                     # qubit_mask = (qubit_mask * 1 + mask * 1) == 2
-                    
+
 
                 self.proc_data_dict[qubit][typ]['qubit_mask'] = qubit_mask
             self.proc_data_dict[qubit]['all_mask'] = qubit_mask

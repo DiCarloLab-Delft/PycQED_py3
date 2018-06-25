@@ -535,36 +535,41 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         an "idle" pulse.
 
         """
-        if phase_corr_amp is None:
-            phase_corr_amp = self.cz_phase_corr_amp()
+        raise NotImplementedError("Method is deprecated")
+        # if phase_corr_amp is None:
+        #     phase_corr_amp = self.cz_phase_corr_amp()
 
-        if not self.czd_double_sided():
-            phase_corr_wf = wf.single_channel_block(
-                amp=phase_corr_amp, length=self.cz_phase_corr_length(),
-                sampling_rate=self.sampling_rate(), delay=0)
-            return phase_corr_wf
+        # if not self.czd_double_sided():
+        #     phase_corr_wf = wf.single_channel_block(
+        #         amp=phase_corr_amp, length=self.cz_phase_corr_length(),
+        #         sampling_rate=self.sampling_rate(), delay=0)
+        #     return phase_corr_wf
 
-        else:
-            block = wf.single_channel_block(
-                amp=phase_corr_amp,
-                length=self.cz_phase_corr_length()/2,
-                sampling_rate=self.sampling_rate(), delay=0)
+        # else:
+        #     block = wf.single_channel_block(
+        #         amp=phase_corr_amp,
+        #         length=self.cz_phase_corr_length()/2,
+        #         sampling_rate=self.sampling_rate(), delay=0)
 
-            if cz_offset_comp:
-                phase_corr_offset = self._get_phase_corr_offset()
-            else:
-                phase_corr_offset = 0
+        #     if cz_offset_comp:
+        #         phase_corr_offset = self._get_phase_corr_offset()
+        #     else:
+        #         phase_corr_offset = 0
 
-            phase_corr_wf = np.concatenate(
-                [block, -1*block]) + phase_corr_offset
-            return phase_corr_wf
+        #     phase_corr_wf = np.concatenate(
+        #         [block, -1*block]) + phase_corr_offset
+        #     return phase_corr_wf
 
     def _gen_cz_z(self, regenerate_cz=True):
         if regenerate_cz:
             self._wave_dict['cz'] = self._gen_cz()
-        phase_corr = self._gen_phase_corr(cz_offset_comp=True)
-        # CZ with phase correction
-        cz_z = np.concatenate([self._wave_dict['cz'], phase_corr])
+
+        # Commented out snippet is old (deprecated ) phase corr 19/6/2018 MAR
+        # phase_corr = self._gen_phase_corr(cz_offset_comp=True)
+        # # CZ with phase correction
+        # cz_z = np.concatenate([self._wave_dict['cz'], phase_corr])
+
+        cz_z = self._get_phase_corrected_pulse(base_wf=self._wave_dict['cz'])
 
         return cz_z
 
@@ -673,35 +678,41 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
     def _gen_idle_z(self, regenerate_cz=True):
         if regenerate_cz:
             self._wave_dict['cz'] = self._gen_cz()
-        phase_corr = self._gen_phase_corr()
-        # Only apply phase correction component after idle for duration of CZ
-        return np.concatenate(
-            [np.zeros(len(self._wave_dict['cz'])), phase_corr])
+        # phase_corr = self._gen_phase_corr()
+        # # Only apply phase correction component after idle for duration of CZ
+        # return np.concatenate(
+        #     [np.zeros(len(self._wave_dict['cz'])), phase_corr])
+        idle_z = self._get_phase_corrected_pulse(
+            base_wf=np.zeros(len(self._wave_dict['cz'])))
+
+        return idle_z
+
+
 
     def _gen_multi_idle_z(self, regenerate_cz=False):
         """
         Composite waveform containing multiple cz gates
         """
         if regenerate_cz:
-            self._wave_dict['cz'] = self._gen_cz()
-
+            self._wave_dict['idle_z'] = self._gen_cz(regenerate_cz=regenerate_cz)
+        idle_z = self._wave_dict['idle_z']
         max_nr_samples = int(self.cfg_max_wf_length()*self.sampling_rate())
 
         waveform = np.zeros(max_nr_samples)
         for i in range(self.mcz_nr_of_repeated_gates()):
             # if self.mcz_identical_phase_corr():
-            phase_corr = self._gen_phase_corr(cz_offset_comp=False)
+            # phase_corr = self._gen_phase_corr(cz_offset_comp=False)
             # else:
             #     phase_corr = wf.single_channel_block(
             #         amp=self.get('mcz_phase_corr_amp_{}'.format(i+1)),
             #         length=self.cz_phase_corr_length(),
             #         sampling_rate=self.sampling_rate(), delay=0)
-            cz_z = np.concatenate([np.zeros(len(self._wave_dict['cz'])),
-                                   phase_corr])
+            # idle_z = np.concatenate([np.zeros(len(self._wave_dict['cz'])),
+            #                        phase_corr])
             sample_start_idx = int(self.mcz_gate_separation() *
                                    self.sampling_rate())*i
             try:
-                waveform[sample_start_idx:sample_start_idx+len(cz_z)] += cz_z
+                waveform[sample_start_idx:sample_start_idx+len(idle_z)] += idle_z
             except ValueError as e:
                 logging.warning('Could not add idle_z pulse {} in {}'.format(
                     i, self.name))
@@ -770,14 +781,14 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         cost_val = cv_2 + cv_4+cv_5
 
-        if print_result:
-            print("Cost function value")
+    #     if print_result:
+    #         print("Cost function value")
 
-    #         print("cv_1 net_zero_character: {:.6f}".format(cv_1))
-            print("cv_2 phase corr pulse  : {:.6f}".format(cv_2))
-    #         print("cv_3 ends at 0         : {:.6f}".format(cv_3))
-            print("cv_4 distortions tail  : {:.6f}".format(cv_4))
-            print("cv_5 non violent       : {:.6f}".format(cv_5))
+    # #         print("cv_1 net_zero_character: {:.6f}".format(cv_1))
+    #         print("cv_2 phase corr pulse  : {:.6f}".format(cv_2))
+    # #         print("cv_3 ends at 0         : {:.6f}".format(cv_3))
+    #         print("cv_4 distortions tail  : {:.6f}".format(cv_4))
+    #         print("cv_5 non violent       : {:.6f}".format(cv_5))
 
         return cost_val
 
@@ -805,7 +816,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         modified_wf =self._calc_modified_wf(base_wf, a_i=res_obj.x,
                                             corr_samples=corr_samples)
 
-        return modified_wf, res_obj
+        return modified_wf
 
 
     #################################
