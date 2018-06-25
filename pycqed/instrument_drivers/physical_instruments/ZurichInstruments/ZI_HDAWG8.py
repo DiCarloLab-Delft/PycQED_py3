@@ -635,7 +635,7 @@ class ZI_HDAWG8(ZI_base_instrument):
                 self.set('sigouts_{}_direct'.format(ch), 1)
                 self.set('sigouts_{}_range'.format(ch), .8)
 
-    def run_realtime_predistortion(self, channel, hpc_tau = None, exp_coefs = []):
+    def run_realtime_predistortion(self, channel, hpc_tau = None, exp_coefs = None):
         """
         Turns on real-time predistorition on the HDAWG device.
         Arguments:
@@ -685,24 +685,25 @@ class ZI_HDAWG8(ZI_base_instrument):
         self._dev.daq.setInt(node_path + 'EXPS/*/ENABLE', 0)
 
         # If requested, set the EXP timeconstant and amplitude and reenable the EXP filter
-        for i, c in enumerate(exp_coefs):
-            # Set timeconstant of the first EXP filter
-            self._dev.daq.setDouble(node_path + 'EXPS/{:d}/TIMECONSTANT'.format(i), c['tau'])
-            # Set amplitude of the first EXP filter
-            self._dev.daq.setDouble(node_path + 'EXPS/{:d}/AMPLITUDE'.format(i), c['amp'])
-            # Read back the set timeconstant
-            time.sleep(0.1)
-            hw_info['exp_coefs'].append({
-                    'tau' : self._dev.daq.getDouble(node_path + 'EXPS/{:d}/TIMECONSTANT'.format(i)),
-                    'amp' : self._dev.daq.getDouble(node_path + 'EXPS/{:d}/AMPLITUDE'.format(i))
-                })
-            # Enable the corresponding EXP filter
-            self._dev.daq.setInt(node_path + 'EXPS/{:d}/ENABLE'.format(i), 1)
-            # Increase the delay by the amount of clock cycles the EXP filter needs
-            # FIXME: in the future, this number should be provided by the firmware
-            hw_info['delay_clk_cycles'] += 14
+        if exp_coefs is not None:
+            for i, c in enumerate(exp_coefs):
+                # Set timeconstant of the first EXP filter
+                self._dev.daq.setDouble(node_path + 'EXPS/{:d}/TIMECONSTANT'.format(i), c['tau'])
+                # Set amplitude of the first EXP filter
+                self._dev.daq.setDouble(node_path + 'EXPS/{:d}/AMPLITUDE'.format(i), c['amp'])
+                # Read back the set timeconstant
+                time.sleep(0.1)
+                hw_info['exp_coefs'].append({
+                        'tau' : self._dev.daq.getDouble(node_path + 'EXPS/{:d}/TIMECONSTANT'.format(i)),
+                        'amp' : self._dev.daq.getDouble(node_path + 'EXPS/{:d}/AMPLITUDE'.format(i))
+                    })
+                # Enable the corresponding EXP filter
+                self._dev.daq.setInt(node_path + 'EXPS/{:d}/ENABLE'.format(i), 1)
+                # Increase the delay by the amount of clock cycles the EXP filter needs
+                # FIXME: in the future, this number should be provided by the firmware
+                hw_info['delay_clk_cycles'] += 14
 
-        if (hpc_tau is not None) or len(exp_coefs) > 0:
+        if (hpc_tau is not None) or (exp_coefs is not None):
             # Enable the real-time pre-distortion output compensation
             self._dev.daq.setInt(node_path + 'ENABLE', 1)
             # Increase the delay by the static delay of the filter chain
