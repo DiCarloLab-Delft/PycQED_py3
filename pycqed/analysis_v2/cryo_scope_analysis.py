@@ -294,7 +294,7 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
                  options_dict: dict=None,
                  sliding_pulse_duration=220e-9,
                  freq_to_amp=None, amp_to_freq=None,
-                 phase_cut :float=180,
+                 phase_cut :float=0,
                  ch_amp_key: str='Snapshot/instruments/AWG8_8005'
                  '/parameters/awgs_0_outputs_1_amplitude',
                  ch_range_key: str='Snapshot/instruments/AWG8_8005'
