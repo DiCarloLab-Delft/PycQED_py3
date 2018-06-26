@@ -62,7 +62,7 @@ def set_ylabel(axis, label, unit=None, **kw):
 
 
 SI_PREFIXES_2 = dict(zip(range(-24, 25, 3), 'yzafpnμm kMGTPEZY'))
-SI_PREFIXES_2[0] = ""
+# SI_PREFIXES_2[0] = ""
 #SI_PREFIXES = 'yzafpnμm kMGTPEZY'
 
 SI_UNITS = 'm,s,g,W,J,V,A,F,T,Hz,Ohm,S,N,C,px,b,B,K,Bar,Vpeak,Vpp,Vp,Vrms'.split(',')
@@ -88,27 +88,6 @@ def SI_prefix_and_scale_factor(val, unit=None):
             pass
 
     return 1, unit if unit is not None else ""
-
-    validtypes = (float, int, np.integer, np.floating)
-    if unit in SI_UNITS and isinstance(val, validtypes):
-        if val == 0:
-            prefix_power = 0
-        else:
-            # The defined prefixes go down to -24 but this is below
-            # the numerical precision of python
-            prefix_power = np.clip(-15, (np.log10(abs(val))//3 * 3), 24)
-        # Determine SI prefix, number 8 corresponds to no prefix
-        SI_prefix_idx = int(prefix_power/3 + 8)
-        prefix = SI_PREFIXES[SI_prefix_idx]
-        # Convert the unit
-        scale_factor = 10**-prefix_power
-        unit = prefix+unit
-    else:
-        scale_factor = 1
-
-    if unit is None:
-        unit = ''  # to ensure proper return value
-    return scale_factor, unit
 
 
 def SI_val_to_msg_str(val: float, unit: str=None, return_type=str):
