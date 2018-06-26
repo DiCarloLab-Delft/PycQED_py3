@@ -516,17 +516,14 @@ class DephasingAnalysis(ba.BaseDataAnalysis):
     def prepare_fitting(self):
         self.fit_dicts = OrderedDict()
         coherence = self.proc_data_dict['coherence']
-        phase = self.proc_data_dict['phase']
         amps = self.proc_data_dict['scaling_amp']
 
         mask = self.proc_data_dict['fitting_mask']
         amps = amps[mask]
         coherence = coherence[mask]
-        phase = phase[mask]
 
         def gaussian(x, sigma, scale):
             return scale * np.exp(-(x) ** 2 / (2 * sigma ** 2))
-
 
         gmodel = lmfit.models.Model(gaussian)
         gmodel.set_param_hint('sigma', value=0.5, min=0, max=10)
@@ -567,7 +564,7 @@ class DephasingAnalysis(ba.BaseDataAnalysis):
 
         def fit_phase(amps, phase):
             params = lmfit.Parameters()
-            params.add('s', value=30, min=0.01, max=100, vary=True)
+            params.add('s', value=3/sigma, min=0.01, max=200, vary=True)
             i = max(int(round(len(phase)/10)), 1)
             fit_offset = self.options_dict.get('fit_phase_offset', False)
             dpo = self.options_dict.get('default_phase_offset', 180)
@@ -579,27 +576,30 @@ class DephasingAnalysis(ba.BaseDataAnalysis):
             res = mini.minimize(method='differential_evolution')
 
             if not fit_offset:
-                return res
+                return res, res
 
             params2 = lmfit.Parameters()
-            params2.add('s', value=res.params['s'].value, min=0.01, max=100, vary=True)
+            params2.add('s', value=res.params['s'].value, min=0.01, max=200, vary=False)
             params2.add('b', value=res.params['b'].value, min=0, max=360, vary=True)
             params2.add('c', expr=cexp)
             mini2 = lmfit.Minimizer(minimizer_function, params=params2, fcn_args=(amps, phase))
             res2 = mini2.minimize(method='differential_evolution')
 
             if res.chisqr < res2.chisqr:
-                return res
+                return res, res
             else:
-                return res2
+                return res2, res
 
-        res = fit_phase(amps, phase)
+        res, res_old = fit_phase(amps, phase)
         self.fit_res['coherence_phase_fit'] = res
 
         fit_amps = np.linspace(min(amps), max(amps), 300)
-        fit_phase = square(x=fit_amps, s=res.params['s'], b=res.params['b'])
+        fit_phase = square(x=fit_amps, s=res.params['s'].value, b=res.params['b'].value)
+        guess_phase = square(x=fit_amps, s=res_old.params['s'].init_value,
+                             b=res_old.params['b'].init_value)
         self.proc_data_dict['coherence_phase_fit'] = {'amps': fit_amps,
-                                                      'phase': fit_phase}
+                                                      'phase': fit_phase,
+                                                      'phase_guess' : guess_phase}
 
     def prepare_plots(self):
         t = self.timestamps[0]
@@ -609,7 +609,7 @@ class DephasingAnalysis(ba.BaseDataAnalysis):
         fit_text = "$\sigma = %.3f \pm %.3f$" % (
                         self.fit_res['coherence_fit'].params['sigma'].value,
                         self.fit_res['coherence_fit'].params['sigma'].stderr)
-        fit_text += '$c=%.5f$'%(phase_fit_params['c'].value)
+        fit_text += '\n$c=%.5f$'%(phase_fit_params['c'].value)
         self.plot_dicts['text_msg_amp_vs_dephasing'] = {
                     'ax_id': 'amp_vs_dephasing',
                     # 'ypos': 0.15,
@@ -625,6 +625,7 @@ class DephasingAnalysis(ba.BaseDataAnalysis):
 
         self.plot_dicts['amp_vs_dephasing_fit'] = {
             'plotfn': self.plot_fit,
+            #'plot_init' : True,
             'ax_id': 'amp_vs_dephasing',
             'plot_normed':True,
             'zorder': 5,
@@ -666,6 +667,23 @@ class DephasingAnalysis(ba.BaseDataAnalysis):
             'setlabel': 'phase fit',
             'color': 'red',
         }
+        if self.options_dict.get('plot_guess', False):
+            self.plot_dicts['amp_vs_dephasing_phase_fit_guess'] = {
+                'plotfn': self.plot_line,
+                'ax_id': 'amp_vs_dephasing_phase',
+                'zorder': 1,
+                'xvals': self.proc_data_dict['coherence_phase_fit']['amps'],
+                'yvals': self.proc_data_dict['coherence_phase_fit']['phase_guess'],
+                'marker': '',
+                'linestyle': '-',
+                'ylabel': r'Phase',
+                'yunit': 'Deg.',
+                'xlabel': 'scaling amplitude',
+                'xunit': 'rel. amp.',
+                'setlabel': 'phase fit (guess)',
+                'color': 'lightgray',
+                'alpha' : 0.1,
+            }
 
         fit_mask = self.proc_data_dict['fitting_mask']
         fit_mask_inv = self.proc_data_dict['fitting_mask_inv']
