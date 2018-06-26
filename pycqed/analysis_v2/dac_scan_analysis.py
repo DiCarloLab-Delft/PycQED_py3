@@ -223,10 +223,15 @@ class FluxFrequency(ba.BaseDataAnalysis):
         else:
             s = 'Resonator'
 
-        twoDPlot = {'plotfn': self.plot_colorx,
+        ext = self.options_dict.get('qubit_freq', None) is not None
+        for ax in ['amplitude', 'phase', 'distance']:
+            z = self.proc_data_dict['%s_values' % ax]
+
+            td = {'plotfn': self.plot_colorx,
                     'zorder': 0,
                     'xvals': x,
                     'yvals': y,
+                    'zvals': z,
                     'title': 'Flux Current ' + s + ' Sweep',
                     'xlabel': current_label,
                     'xunit': current_unit,
@@ -240,32 +245,6 @@ class FluxFrequency(ba.BaseDataAnalysis):
                     'plot_transpose': self.options_dict.get('plot_transpose', False),
                     }
 
-        scatter = {
-            'plotfn': self.plot_line,
-            'zorder': 5,
-            'xvals': self.proc_data_dict['dac_values'],
-            'yvals': self.proc_data_dict['fit_frequencies'],
-            'marker': 'x',
-            'linestyle': 'None',
-        }
-
-        if self.do_fitting:
-            fit_result = self.fit_result['dac_arc']
-            fit = {
-                'plotfn': self.plot_fit,
-                'zorder': 10,
-                'fit_res': fit_result,
-                'xvals': self.proc_data_dict['dac_values'] * cm,
-                'yvals': self.proc_data_dict['fit_frequencies'],
-                'marker': '',
-                'linestyle': '-',
-            }
-
-        ext = self.options_dict.get('qubit_freq', None) is not None
-        for ax in ['amplitude', 'phase', 'distance']:
-            z = self.proc_data_dict['%s_values' % ax]
-            td = deepcopy(twoDPlot)
-            td['zvals'] = z
             unit = ' (a.u.)'
             if ax == 'phase':
                 if self.options_dict.get('phase_in_rad', False):
@@ -280,14 +259,29 @@ class FluxFrequency(ba.BaseDataAnalysis):
             self.plot_dicts[ax] = td
 
             if self.options_dict.get('show_fitted_peaks', True):
-                sc = deepcopy(scatter)
+                sc = {
+                    'plotfn': self.plot_line,
+                    'zorder': 5,
+                    'xvals': self.proc_data_dict['dac_values'],
+                    'yvals': self.proc_data_dict['fit_frequencies'],
+                    'marker': 'x',
+                    'linestyle': 'None',
+                }
                 sc['ax_id'] = ax
                 self.plot_dicts[ax + '_scatter'] = sc
 
             if self.do_fitting:
-                f = deepcopy(fit)
-                f['ax_id'] = ax
-                self.plot_dicts[ax + '_fit'] = f
+                fit_result = self.fit_result['dac_arc']
+                self.plot_dicts[ax + '_fit'] = {
+                    'plotfn': self.plot_fit,
+                    'ax_id': ax,
+                    'zorder': 10,
+                    'fit_res': fit_result,
+                    'xvals': self.proc_data_dict['dac_values'] * cm,
+                    'yvals': self.proc_data_dict['fit_frequencies'],
+                    'marker': '',
+                    'linestyle': '-',
+                }
 
             if hasattr(self, 'fit_dicts') and self.options_dict.get('print_fit_result_plot', True):
                 dac_fit_text = ''
