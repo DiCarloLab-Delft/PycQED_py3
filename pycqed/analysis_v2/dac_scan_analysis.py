@@ -9,7 +9,6 @@ from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis.fitting_models import Qubit_dac_to_freq, Resonator_dac_to_freq, Qubit_dac_arch_guess, \
     Resonator_dac_arch_guess
 import lmfit
-from copy import deepcopy
 
 
 class FluxFrequency(ba.BaseDataAnalysis):
@@ -329,13 +328,27 @@ class FluxFrequency(ba.BaseDataAnalysis):
                     'do_legend': True,
                     'setlabel': k,
                 }
-                t = deepcopy(temp_dict)
-                t['ax_id'] = 'temperature_dac_relation'
-                self.plot_dicts['temperature_' + k + '_dac_relation'] = t
+                temp_dict['ax_id'] = 'temperature_dac_relation'
+                self.plot_dicts['temperature_' + k + '_dac_relation'] = temp_dict
 
-                t = deepcopy(temp_dict)
-                t['xvals'] = self.proc_data_dict['datetime']
-                t['ax_id'] = 'temperature_time_relation'
-                t['xlabel'] = r'Time in Delft'
-                t['xunit'] = ''
-                self.plot_dicts['temperature_' + k + '_time_relation'] = t
+                # Do not attempt to use deepcopy, that will use huge amounts of RAM!
+                temp_dict2 = {
+                    'plotfn': self.plot_line,
+                    'xvals': x,
+                    'yvals': self.proc_data_dict[k],
+                    'title': 'Fridge Temperature during Flux Current Sweep',
+                    'xlabel': r'Flux bias current, I',
+                    'xunit': 'A',
+                    'ylabel': r'Temperature',
+                    'yunit': 'K',
+                    'marker': 'x',
+                    'linestyle': '-',
+                    'do_legend': True,
+                    'setlabel': k,
+                }
+
+                temp_dict2['xvals'] = self.proc_data_dict['datetime']
+                temp_dict2['ax_id'] = 'temperature_time_relation'
+                temp_dict2['xlabel'] = r'Time in Delft'
+                temp_dict2['xunit'] = ''
+                self.plot_dicts['temperature_' + k + '_time_relation'] = temp_dict2
