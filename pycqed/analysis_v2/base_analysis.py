@@ -1175,8 +1175,9 @@ class BaseDataAnalysis(object):
 
         model = pdict['fit_res'].model
         #TODO: make this work for type(model) is lmfit.minimizer.MinimizerResult
-        assert (type(model) is lmfit.model.Model or type(model) is lmfit.model.ModelResult),\
-            'The passed item in "fit_res" needs to be a fitting model, but is '+ str(type(model))
+        assert (isinstance(model, lmfit.model.Model) or
+                    isinstance(model, lmfit.model.ModelResult),
+            'The passed item in "fit_res" needs to be a fitting model, but is {}'.format(type(model)))
 
         plot_init = pdict.get('plot_init', False)  # plot the initial guess
         plot_normed = pdict.get('plot_normed', False)
