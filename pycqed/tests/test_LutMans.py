@@ -1,7 +1,8 @@
 import unittest
 import numpy as np
 import pycqed.instrument_drivers.virtual_instruments.virtual_AWG8 as v8
-from pycqed.instrument_drivers.meta_instrument import kernel_object as ko
+from pycqed.instrument_drivers.meta_instrument import lfilt_kernel_object as lko
+
 from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman as mwl
 from pycqed.instrument_drivers.meta_instrument.LutMans import flux_lutman as flm
 from pycqed.measurement.waveform_control_CC import waveform as wf
@@ -203,8 +204,10 @@ class Test_Flux_LutMan(unittest.TestCase):
         self.AWG = v8.VirtualAWG8('DummyAWG8')
 
         self.fluxlutman = flm.AWG8_Flux_LutMan('fluxlutman_main')
-        self.k0 = ko.DistortionKernel('k0')
+        self.k0 = lko.LinDistortionKernel('k0')
         self.fluxlutman.instr_distortion_kernel(self.k0.name)
+
+
         self.fluxlutman.AWG(self.AWG.name)
         self.fluxlutman.sampling_rate(2.4e9)
         self.fluxlutman.cz_theta_f(80)
