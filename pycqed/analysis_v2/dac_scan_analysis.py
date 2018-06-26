@@ -9,6 +9,7 @@ from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis.fitting_models import Qubit_dac_to_freq, Resonator_dac_to_freq, Qubit_dac_arch_guess, \
     Resonator_dac_arch_guess
 import lmfit
+from collections import OrderedDict
 
 
 class FluxFrequency(ba.BaseDataAnalysis):
@@ -24,6 +25,25 @@ class FluxFrequency(ba.BaseDataAnalysis):
                  extract_fitparams: bool = True,
                  temp_keys: dict = None,
                  ):
+        """
+
+        (inherited from BaseDataAnalysis)
+        :param options_dict: - fit_guess (dict): allows to specify parameters for the inital guess.
+                             - plot_guess (bool): if True plot the guess as well
+                             - dac_key (str): string for extracting the DAC values
+                                    (e.g. 'Instrument settings.fluxcurrent.Q')
+                             - amp_key (str): string for extracting the measured amplitude values
+                             - phase_key (str): string for extracting the measured phase values
+                             - fitparams_key (str): string for extracting the fitted frequency values
+                             - phase_in_rad (bool)
+                             - s21_normalize_per_dac (bool)
+                             - s21_normalize_global (bool)
+                             - s21_percentile (float)
+                             - plot_vs_flux (bool): plot against flux quanta rather than current?
+                             - (inherited from BaseDataAnalysis)
+        :param is_spectroscopy:
+        :param temp_keys:
+        """
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
                          data_file_path=data_file_path,
@@ -114,6 +134,9 @@ class FluxFrequency(ba.BaseDataAnalysis):
             corr_f = self.options_dict.get('fitparams_corr_fact', 1)
             self.proc_data_dict['fit_frequencies'] = self.raw_data_dict['fitparams'][sorted_indices] * corr_f
 
+        if np.max(self.proc_data_dict['fit_frequencies']) < 1e9:
+            self.proc_data_dict['fit_frequencies'] = self.proc_data_dict['fit_frequencies']*1e9
+
         if self.temperature_plots:
             for k in self.temp_keys:
                 self.proc_data_dict[k] = np.array(self.raw_data_dict[k][sorted_indices], dtype=float)
@@ -136,32 +159,40 @@ class FluxFrequency(ba.BaseDataAnalysis):
 
                 # Fixme: save peaks
 
-    def run_fitting(self):
-        # This is not the proper way to do this!
-        # TODO: move this to prepare_fitting and write the fit_dicts dict accordingly
-        self.fit_dicts = {}
-        self.fit_result = {}
+    def prepare_fitting(self):
+        self.fit_dicts = OrderedDict()
 
         dac_vals = self.proc_data_dict['dac_values']
         freq_vals = self.proc_data_dict['fit_frequencies']
 
-        f_q = self.options_dict.get('qubit_freq', None)
+        guess = self.options_dict.get('fit_guess', {})
+        f_q = guess.get('f_max_qubit', self.options_dict.get('f_max_qubit', None))
+        guess['f_max_qubit'] = f_q
         ext = f_q is not None
         if self.is_spectroscopy:
             fitmod = lmfit.Model(Qubit_dac_to_freq)
             fitmod.guess = Qubit_dac_arch_guess.__get__(fitmod, fitmod.__class__)
-            fitmod.guess(freq=freq_vals, dac_voltage=dac_vals)
         else:
             if f_q is None and self.verbose:
-                print('Specify qubit_freq in the options_dict to obtain a better fit!')
+                print('Specify f_max_qubit in the options_dict to obtain a better fit!')
                 # Todo: provide alternative fit?
             fitmod = lmfit.Model(Resonator_dac_to_freq)
             fitmod.guess = Resonator_dac_arch_guess.__get__(fitmod, fitmod.__class__)
-            fitmod.guess(freq=freq_vals, dac_voltage=dac_vals, f_max_qubit=f_q)
 
-        fit_result = fitmod.fit(freq_vals, dac_voltage=dac_vals)
+#        fit_result = fitmod.fit(freq_vals, dac_voltage=dac_vals)
 
-        self.fit_result['dac_arc'] = fit_result
+
+        self.fit_dicts['dac_arc'] = {
+            'model': fitmod,
+            'fit_xvals': {'dac_voltage': dac_vals},
+            'fit_yvals': {'data': freq_vals},
+            'guessfn_pars' : {'values': guess}
+        }
+
+
+    def analyze_fit_results(self):
+        fit_result = self.fit_res['dac_arc']
+
         EC = fit_result.params['E_c']
         if self.is_spectroscopy:
             f0 = fit_result.params['f_max']
@@ -170,28 +201,30 @@ class FluxFrequency(ba.BaseDataAnalysis):
 
         # TODO: This is very dirty code! Derived values like E_J should be set as
         # fitmod.set_param_hint('E_J', expr='(f0 ** 2 + 2 * EC * f0 + EC ** 2) / (8 * EC)', vary=False)
-        # And fit_dicts is used completely wrong (see above).
-        self.fit_dicts['E_C'] = EC.value
-        self.fit_dicts['E_J'] = (f0.value ** 2 + 2 * EC.value * f0.value + EC.value ** 2) / (8 * EC.value)
-        self.fit_dicts['f_sweet_spot'] = f0.value
-        self.fit_dicts['dac_sweet_spot'] = fit_result.params['dac_sweet_spot'].value
-        self.fit_dicts['dac_per_phi0'] = fit_result.params['V_per_phi0'].value
-        self.fit_dicts['asymmetry'] = fit_result.params['asymmetry'].value
+        # And fit_res_dicts should not be used!
+        self.fit_res_dicts = {}
+        self.fit_res_dicts['E_C'] = EC.value
+        self.fit_res_dicts['E_J'] = (f0.value ** 2 + 2 * EC.value * f0.value + EC.value ** 2) / (8 * EC.value)
+        self.fit_res_dicts['f_sweet_spot'] = f0.value
+        self.fit_res_dicts['dac_sweet_spot'] = fit_result.params['dac_sweet_spot'].value
+        self.fit_res_dicts['dac_per_phi0'] = fit_result.params['V_per_phi0'].value
+        self.fit_res_dicts['asymmetry'] = fit_result.params['asymmetry'].value
 
-        self.fit_dicts['E_C_std'] = EC.stderr
-        self.fit_dicts['E_J_std'] = -1  # (f0 ** 2 + 2 * EC * f0 + EC ** 2) / (8 * EC)
-        self.fit_dicts['f_sweet_spot_std'] = f0.stderr
-        self.fit_dicts['dac_sweet_spot_std'] = fit_result.params['dac_sweet_spot'].stderr
-        self.fit_dicts['dac_per_phi0_std'] = fit_result.params['V_per_phi0'].stderr
-        self.fit_dicts['asymmetry_std'] = fit_result.params['asymmetry'].stderr
+        self.fit_res_dicts['E_C_std'] = EC.stderr
+        self.fit_res_dicts['E_J_std'] = -1  # (f0 ** 2 + 2 * EC * f0 + EC ** 2) / (8 * EC)
+        self.fit_res_dicts['f_sweet_spot_std'] = f0.stderr
+        self.fit_res_dicts['dac_sweet_spot_std'] = fit_result.params['dac_sweet_spot'].stderr
+        self.fit_res_dicts['dac_per_phi0_std'] = fit_result.params['V_per_phi0'].stderr
+        self.fit_res_dicts['asymmetry_std'] = fit_result.params['asymmetry'].stderr
 
         if not self.is_spectroscopy:
             g = fit_result.params['coupling']
             fr = fit_result.params['f_0_res']
-            self.fit_dicts['coupling'] = g.value
-            self.fit_dicts['coupling_std'] = g.stderr
-            self.fit_dicts['f_0_res'] = fr.value
-            self.fit_dicts['f_0_res_std'] = fr.stderr
+            self.fit_res_dicts['coupling'] = g.value
+            self.fit_res_dicts['coupling_std'] = g.stderr
+            self.fit_res_dicts['f_0_res'] = fr.value
+            self.fit_res_dicts['f_0_res_std'] = fr.stderr
+
 
     def prepare_plots(self):
         plot_vs_flux = self.options_dict.get('plot_vs_flux', False)
@@ -201,7 +234,7 @@ class FluxFrequency(ba.BaseDataAnalysis):
 
         flux_factor = 1
         if plot_vs_flux:
-            flux_factor = self.fit_result['dac_arc'].params['V_per_phi0']
+            flux_factor = self.fit_res_dicts['dac_arc'].params['V_per_phi0']
 
         if plot_vs_flux:
             cm = flux_factor
@@ -270,15 +303,17 @@ class FluxFrequency(ba.BaseDataAnalysis):
                 self.plot_dicts[ax + '_scatter'] = sc
 
             if self.do_fitting:
-                fit_result = self.fit_result['dac_arc']
+                fit_result = self.fit_res['dac_arc']
                 self.plot_dicts[ax + '_fit'] = {
                     'plotfn': self.plot_fit,
+                    'plot_init': self.options_dict.get('plot_guess', False),
                     'ax_id': ax,
                     'zorder': 10,
                     'fit_res': fit_result,
                     'xvals': self.proc_data_dict['dac_values'] * cm,
                     'yvals': self.proc_data_dict['fit_frequencies'],
                     'marker': '',
+                    'setlabel' : 'Fit',
                     'linestyle': '-',
                 }
 
@@ -286,26 +321,26 @@ class FluxFrequency(ba.BaseDataAnalysis):
                 dac_fit_text = ''
                 # if ext or self.is_spectroscopy:
                 dac_fit_text += '$E_C/2 \pi = %.2f(\pm %.3f)$ MHz\n' % (
-                    self.fit_dicts['E_C'] * 1e-6, self.fit_dicts['E_C_std'] * 1e-6)
+                    self.fit_res_dicts['E_C'] * 1e-6, self.fit_res_dicts['E_C_std'] * 1e-6)
                 dac_fit_text += '$E_J/\hbar = %.2f$ GHz\n' % (
-                        self.fit_dicts['E_J'] * 1e-9)  # , self.fit_dicts['E_J_std'] * 1e-9
+                        self.fit_res_dicts['E_J'] * 1e-9)  # , self.fit_res_dicts['E_J_std'] * 1e-9
                 dac_fit_text += '$\omega_{ss}/2 \pi = %.2f(\pm %.3f)$ GHz\n' % (
-                    self.fit_dicts['f_sweet_spot'] * 1e-9, self.fit_dicts['f_sweet_spot_std'] * 1e-9)
+                    self.fit_res_dicts['f_sweet_spot'] * 1e-9, self.fit_res_dicts['f_sweet_spot_std'] * 1e-9)
                 dac_fit_text += '$I_{ss}/2 \pi = %.2f(\pm %.3f)$ mA\n' % (
-                    self.fit_dicts['dac_sweet_spot'] * custom_multiplier * 1e3,
-                    self.fit_dicts['dac_sweet_spot_std'] * custom_multiplier * 1e3)
+                    self.fit_res_dicts['dac_sweet_spot'] * custom_multiplier * 1e3,
+                    self.fit_res_dicts['dac_sweet_spot_std'] * custom_multiplier * 1e3)
                 dac_fit_text += '$I/\Phi_0 = %.2f(\pm %.3f)$ mA/$\Phi_0$' % (
-                    self.fit_dicts['dac_per_phi0'] * custom_multiplier * 1e3,
-                    self.fit_dicts['dac_per_phi0_std'] * custom_multiplier * 1e3)
+                    self.fit_res_dicts['dac_per_phi0'] * custom_multiplier * 1e3,
+                    self.fit_res_dicts['dac_per_phi0_std'] * custom_multiplier * 1e3)
 
                 if not self.is_spectroscopy:
                     dac_fit_text += '\n$g/2 \pi = %.2f(\pm %.3f)$ MHz\n' % (
-                        self.fit_dicts['coupling'] * 1e-6, self.fit_dicts['coupling_std'] * 1e-6)
+                        self.fit_res_dicts['coupling'] * 1e-6, self.fit_res_dicts['coupling_std'] * 1e-6)
                     dac_fit_text += '$\omega_{r,0}/2 \pi = %.2f(\pm %.3f)$ GHz' % (
-                        self.fit_dicts['f_0_res'] * 1e-9, self.fit_dicts['f_0_res_std'] * 1e-9)
+                        self.fit_res_dicts['f_0_res'] * 1e-9, self.fit_res_dicts['f_0_res_std'] * 1e-9)
                 self.plot_dicts['text_msg_' + ax] = {
                     'ax_id': ax,
-                    # 'ypos': 0.15,
+                    'ypos': 0.18,
                     'plotfn': self.plot_text,
                     'box_props': 'fancy',
                     'text_string': dac_fit_text,
