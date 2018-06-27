@@ -21,13 +21,13 @@ gst_exp_filepath = join(pq.__path__[0], 'measurement', 'gate_set_tomography',
                         'template_data_files')
 
 
-
 # used to map pygsti gates to openQL gates
 # for now (Jan 2018) only contains basic pygsti gates
 gatemap = {'i': 'i',
-          'x': 'rx90',
-          'y': 'ry90',
-          'cphase': 'fl_cw_01'}
+           'x': 'rx90',
+           'y': 'ry90',
+           'cphase': 'fl_cw_01'}
+
 
 def pygsti_expList_from_dataset(dataset_filename: str):
     """
@@ -53,10 +53,10 @@ def pygsti_expList_from_dataset(dataset_filename: str):
     return expList
 
 
-def openql_program_from_pygsti_expList(pygsti_gateset, program_name: str,
+def openql_program_from_pygsti_expList(expList, program_name: str,
                                        qubits: list,
                                        platf_cfg: str,
-                                       start_idx:int=0,
+                                       start_idx: int=0,
                                        recompile=True):
     platf = Platform('OpenQL_Platform', platf_cfg)
     p = Program(pname=program_name,
@@ -66,7 +66,7 @@ def openql_program_from_pygsti_expList(pygsti_gateset, program_name: str,
     p.filename = join(p.output_dir, p.name + '.qisa')
     if oqh.check_recompilation_needed(p.filename, platf_cfg, recompile):
 
-        for i, gatestring in enumerate(pygsti_gateset):
+        for i, gatestring in enumerate(expList):
             kernel_name = 'G {} {}'.format(i, gatestring)
             k = openql_kernel_from_gatestring(
                 gatestring=gatestring, qubits=qubits,
@@ -75,14 +75,14 @@ def openql_program_from_pygsti_expList(pygsti_gateset, program_name: str,
         with suppress_stdout():
             p.compile()
 
-    p.sweep_points = np.arange(len(pygsti_gateset), dtype=float)+ start_idx
+    p.sweep_points = np.arange(len(expList), dtype=float) + start_idx
     p.set_sweep_points(p.sweep_points, len(p.sweep_points))
 
     return p
 
 
 def openql_kernel_from_gatestring(gatestring, qubits: list,
-                                  kernel_name:str, platf):
+                                  kernel_name: str, platf):
     """
     Generates an openQL kernel for a pygsti gatestring.
     """
@@ -91,7 +91,7 @@ def openql_kernel_from_gatestring(gatestring, qubits: list,
         k.prepz(q)
 
     for gate in gatestring:
-        assert gate[0] == 'G' # for valid pyGSTi gatestrings
+        assert gate[0] == 'G'  # for valid pyGSTi gatestrings
         if len(gate[1:]) == 1:
             # 1Q pygsti format e.g.,: Gi  or Gy
             k.gate(gatemap[gate[1]], qubits[0])
@@ -114,61 +114,122 @@ def openql_kernel_from_gatestring(gatestring, qubits: list,
     return k
 
 
+def split_expList(expList, max_nr_of_instr: int=8000,
+                  verbose: bool=True):
+    """
+    Splits a pygsti expList into sub lists to facilitate running on the CCL
+    and not running into the instruction limit.
 
+    Assumptions made:
+        - there is a fixed instruction overhead per program
+        - there is a fixed instruction overhead per kernel (measurement + init)
+        - every gate (in the gatestring) consists of a single instruction
+    """
+    fixed_program_overhad = 12 + 3  # declare registers + infinite loop
+    kernel_overhead = 4  # prepz wait and measure
+
+    instr_cnt = 0
+    instr_cnt += fixed_program_overhad
+
+    # Determine where to split the expLists
+    cutting_indices = [0]
+    for i, gatestring in enumerate(expList):
+        instr_cnt += kernel_overhead
+        instr_cnt += len(gatestring)
+        if instr_cnt > max_nr_of_instr:
+            cutting_indices.append(i)
+            instr_cnt = fixed_program_overhad
+
+    # Create the expSubLists, a list contain expList objects for each part
+    expSubLists = []
+    if len(cutting_indices) == 1:
+        expSubLists.append(expList)
+    else:
+        for exp_num, start_idx in enumerate(cutting_indices[:-1]):
+            stop_idx = cutting_indices[exp_num+1]
+            expSubLists.append(expList[start_idx:stop_idx])
+
+    if verbose:
+        print("Splitted expList into {} sub lists".format(len(expSubLists)))
+    return expSubLists
+
+
+##############################################################################
+# End of helper functions
+##############################################################################
 
 def single_qubit_gst(q0: int, platf_cfg: str,
                      maxL: int=256,
-                     lite_germs:bool = True,
-                     recompile=True):
+                     lite_germs: bool = True,
+                     recompile=True,
+                     verbose: bool=True):
     """
     Generates the QISA and QASM programs for full 2Q GST.
-    """
-    MAX_EXPLIST_SIZE = 3000 # UHFQC shot limit
-    DBG = True # debugging
 
+    Args:
+        q0 (int)        : target qubit
+        platf_cfg (str) : string specifying config filename
+        maxL (int)      : specifies the maximum germ length,
+                          must be power of 2.
+        lite_germs(bool): if True uses "lite" germs
+        recompile:      True -> compiles the program,
+                        'as needed' -> compares program to timestamp of config
+                            and existence, if required recompile.
+                        False -> compares program to timestamp of config.
+                            if compilation is required raises a ValueError
+
+                        If the program is more recent than the config
+                        it returns an empty OpenQL program object with
+                        the intended filename that can be used to upload the
+                        previously compiled file.
+        verbose (bool)  : if True prints extra debug info
+
+
+    Returns:
+        programs (list) : list of OpenQL program objects
+
+    """
     # grab the experiment list file
     if lite_germs:
         fp = join(gst_exp_filepath, 'std1Q_XYI_lite_maxL{}.txt'.format(maxL))
     else:
         fp = join(gst_exp_filepath, 'std1Q_XYI_maxL{}.txt'.format(maxL))
-    # parse the file into expList object
-    print('Converting dataset to expList')
+
+    if verbose:
+        print('Converting dataset to expList')
     t0 = time.time()
     expList = pygsti_expList_from_dataset(fp)
-    print("converting to expList took {:.2f}".format(time.time()-t0))
+    if verbose:
+        print("Converted dataset to expList in {:.2f}s".format(time.time()-t0))
     # divide into smaller experiment lists
     programs = []
 
-
-    cutting_indices = [0, 3000, 5500, 7000, 9000]
     t0 = time.time()
-    print('Generating {} GST programs'.format(len(cutting_indices)-1))
+    if verbose:
+        print('Generating GST programs')
 
-    for exp_num, start_idx in enumerate(cutting_indices[:-1]):
-        stop_idx = cutting_indices[exp_num+1]
-        el = expList[start_idx:stop_idx]
+    expSubLists = split_expList(expList, verbose=verbose)
 
-    # exp_num = int(np.ceil(len(expList)/MAX_EXPLIST_SIZE))# amount of experiments
-    # for exp_i in range(exp_num-1): # loop over the experiments except the last one
-        # make smaller experiment list
-        # el = expList[exp_i*MAX_EXPLIST_SIZE:(exp_i+1)*MAX_EXPLIST_SIZE]
-        # if DBG: print('dbg {}, {}'.format(exp_i*MAX_EXPLIST_SIZE,(exp_i+1)*MAX_EXPLIST_SIZE)) # dbg
+    start_idx = 0
+    for exp_num, expSubList in enumerate(expSubLists):
+        stop_idx = start_idx + len(expSubList)
 
         # turn into openql program
         p = openql_program_from_pygsti_expList(
-            el, 'std1Q_XYI {} {} {}-{}'.format(lite_germs, maxL,
-                                               start_idx, stop_idx),
-            qubits=[2, 0],
+            expSubList, 'std1Q_XYI {} {} {}-{}'.format(
+                lite_germs, maxL, start_idx, stop_idx),
+            qubits=[q0],
             start_idx=start_idx,
             platf_cfg=platf_cfg, recompile=recompile)
         # append to list of programs
         programs.append(p)
-        print('Generated {} GST programs in {:.1f}s'.format(
-              exp_num+1, time.time()-t0), end='\r')
+        start_idx += len(expSubList)
+        if verbose:
+            print('Generated {} GST programs in {:.1f}s'.format(
+                  exp_num+1, time.time()-t0), end='\r')
 
-    print('Succesfully generated {} GST programs in {:.1f}s'.format(
-        len(cutting_indices)-1, time.time()-t0))
-
+    print('Generated {} GST programs in {:.1f}s'.format(
+          exp_num+1, time.time()-t0))
 
     return programs
 
@@ -191,8 +252,8 @@ def full_2q_gst(q0: int, q1: int, platf_cfg: str, recompile=True):
     Generates the QISA and QASM programs for full 2Q GST.
     """
 
-    MAX_EXPLIST_SIZE = 3000 # UHFQC shot limit
-    DBG = True # debugging
+    MAX_EXPLIST_SIZE = 3000  # UHFQC shot limit
+    DBG = True  # debugging
 
     # grab the experiment list file
     fp = join(gst_exp_filepath, 'Explist_2Q_XYCphase.txt')
@@ -203,7 +264,6 @@ def full_2q_gst(q0: int, q1: int, platf_cfg: str, recompile=True):
     print("converting to expList took {:.2f}".format(time.time()-t0))
     # divide into smaller experiment lists
     programs = []
-
 
     cutting_indices = [0, 3000, 5500, 7000, 9000]
     t0 = time.time()
