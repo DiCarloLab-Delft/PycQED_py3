@@ -1067,7 +1067,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         comp_wf = np.concatenate([wf, delay_samples, -1*wf])
         return comp_wf
 
-    def distort_waveform(self, waveform):
+    def distort_waveform(self, waveform, inverse=False):
         """
         Modifies the ideal waveform to correct for distortions and correct
         fine delays.
@@ -1084,8 +1084,11 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             distorted_waveform = k.distort_waveform(
                 waveform,
                 length_samples=int(
-                    self.cfg_max_wf_length()*self.sampling_rate()))
+                    self.cfg_max_wf_length()*self.sampling_rate()),
+                inverse=inverse)
         else:  # old kernel object does not have this method
+            if inverse:
+                raise NotImplementedError()
             distorted_waveform = k.convolve_kernel(
                 [k.kernel(), waveform],
                 length_samples=int(self.cfg_max_wf_length() *

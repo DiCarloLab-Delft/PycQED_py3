@@ -64,8 +64,17 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
             self.raw_data_dict['measured_values_I'] = OrderedDict()
             self.raw_data_dict['measured_values_X'] = OrderedDict()
             for i, val_name in enumerate(a.value_names):
+
+                invalid_idxs = np.where((a.measured_values[0] == 0) &
+                                        (a.measured_values[1] == 0))[0]
+                a.measured_values[:, invalid_idxs] = \
+                    np.array([[np.nan]*len(invalid_idxs)]*2)
+
                 binned_yvals = np.reshape(
                     a.measured_values[i], (len(bins), -1), order='F')
+
+
+
                 self.raw_data_dict['binned_vals'][val_name] = binned_yvals
                 self.raw_data_dict['cal_pts_zero'][val_name] =\
                     binned_yvals[-6:-4, :].flatten()
@@ -92,20 +101,20 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
             self.proc_data_dict[key] = OrderedDict()
 
         for val_name in self.raw_data_dict['value_names']:
-            V0 = np.mean(
+            V0 = np.nanmean(
                 self.raw_data_dict['cal_pts_zero'][val_name])
-            V1 = np.mean(
+            V1 = np.nanmean(
                 self.raw_data_dict['cal_pts_one'][val_name])
-            V2 = np.mean(
+            V2 = np.nanmean(
                 self.raw_data_dict['cal_pts_two'][val_name])
 
             self.proc_data_dict['V0'][val_name] = V0
             self.proc_data_dict['V1'][val_name] = V1
             self.proc_data_dict['V2'][val_name] = V2
 
-            SI = np.mean(
+            SI = np.nanmean(
                 self.raw_data_dict['measured_values_I'][val_name], axis=1)
-            SX = np.mean(
+            SX = np.nanmean(
                 self.raw_data_dict['measured_values_X'][val_name], axis=1)
             self.proc_data_dict['SI'][val_name] = SI
             self.proc_data_dict['SX'][val_name] = SX
@@ -231,7 +240,7 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
                 r'$\pm$' + '{:.3f}%\n'.format(fr_dec.params['L1'].stderr*100))
             text_msg += (
                 '$L_2$:   ' + '{:.3f}'.format(fr_dec.params['L2'].value*100) +
-                r'$\pm$' + '{:.3f}%\n'.format(fr_dec.params['L2'].stderr*100))
+                r'$\pm$' + '{:.3f}%'.format(fr_dec.params['L2'].stderr*100))
         except Exception as e:
             logging.warning(e)
             text_msg = ''
@@ -245,7 +254,7 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
             self.plot_dicts['binned_data_{}'.format(val_name)] = {
                 'plotfn': self.plot_line,
                 'xvals': self.raw_data_dict['bins'],
-                'yvals': np.mean(self.raw_data_dict['binned_vals'][val_name], axis=1),
+                'yvals': np.nanmean(self.raw_data_dict['binned_vals'][val_name], axis=1),
                 'yerr':  sem(self.raw_data_dict['binned_vals'][val_name], axis=1),
                 'xlabel': 'Number of Cliffrods',
                 'xunit': '#',
@@ -513,7 +522,7 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
             self.plot_dicts['binned_data_{}'.format(val_name)] = {
                 'plotfn': self.plot_line,
                 'xvals': self.proc_data_dict['bins'],
-                'yvals': np.mean(self.proc_data_dict['binned_vals'][val_name], axis=1),
+                'yvals': np.nanmean(self.proc_data_dict['binned_vals'][val_name], axis=1),
                 'yerr':  sem(self.proc_data_dict['binned_vals'][val_name], axis=1),
                 'xlabel': 'Number of Cliffrods',
                 'xunit': '#',
@@ -765,6 +774,11 @@ def logisticreg_classifier_machinelearning(shots_0, shots_1, shots_2):
         zip(list(shots_2.values())[0],
             list(shots_2.values())[1])))
 
+
+    shots_0 = shots_0[~np.isnan(shots_0[:, 0])]
+    shots_1 = shots_1[~np.isnan(shots_1[:, 0])]
+    shots_2 = shots_2[~np.isnan(shots_2[:, 0])]
+
     X = np.concatenate([shots_0, shots_1, shots_2])
     Y = np.concatenate([0*np.ones(shots_0.shape[0]),
                         1*np.ones(shots_1.shape[0]),
@@ -786,14 +800,10 @@ def plot_classifier_decission_boundary(shots_0, shots_1, shots_2,
     """
     grid_points = 200
 
-    x_min = np.min([shots_0[0], shots_1[0], shots_2[0]])
-    x_max = np.max([shots_0[0], shots_1[0], shots_2[0]])
-    y_min = np.min([shots_0[1], shots_1[1], shots_2[1]])
-    y_max = np.max([shots_0[1], shots_1[1], shots_2[1]])
-    # xr = abs(X[:, 0].min() - X[:, 0].max())
-    # yr = abs(Y[:, 0].min() - Y[:, 0].max())
-    # x_min, x_max = X[:, 0].min() - .5, X[:, 0].max() + .5
-    # y_min, y_max = X[:, 1].min() - .5, X[:, 1].max() + .5
+    x_min = np.nanmin([shots_0[0], shots_1[0], shots_2[0]])
+    x_max = np.nanmax([shots_0[0], shots_1[0], shots_2[0]])
+    y_min = np.nanmin([shots_0[1], shots_1[1], shots_2[1]])
+    y_max = np.nanmax([shots_0[1], shots_1[1], shots_2[1]])
     xx, yy = np.meshgrid(np.linspace(x_min, x_max, grid_points),
                          np.linspace(y_min, y_max, grid_points))
     Z = classifier.predict(np.c_[xx.ravel(), yy.ravel()])
@@ -818,7 +828,7 @@ def plot_rb_decay_woods_gambetta(ncl, M0, X1, ax, ax1, title='', **kw):
     ax.set_ylim(-.05, 1.05)
     ax1.set_ylim(min(min(.97*X1), .92), 1.01)
     ax.set_ylabel(r'$M_0$ probability')
-    ax1.set_ylabel(r'$X_1$ probability')
+    ax1.set_ylabel(r'$X_1$ population')
     ax1.set_xlabel('Number of Cliffords')
     ax.set_title(title)
 

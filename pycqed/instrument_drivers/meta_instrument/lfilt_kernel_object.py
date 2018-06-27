@@ -54,7 +54,21 @@ class LinDistortionKernel(Instrument):
                 return filt_id
         raise ValueError('No empty filter')
 
-    def distort_waveform(self, waveform, length_samples: int=None):
+    def distort_waveform(self, waveform, length_samples: int=None,
+                         inverse: bool=False):
+        """
+        Distorts a waveform using the models specified in the Kernel Object.
+        Args:
+            waveform (array)    : waveform to be distorted
+            lenght_samples (int): number of samples after which to cut of wf
+            inverse (bool)      : if True apply the inverse of the waveform.
+
+        Returns:
+            y_sig (array)       : waveform with distortion filters applied
+
+        N.B. the bounce correction does not have an inverse implemented
+            (June 2018) MAR
+        """
         if length_samples is not None:
             extra_samples = length_samples - len(waveform)
             if extra_samples >= 0:
@@ -74,20 +88,26 @@ class LinDistortionKernel(Instrument):
                     if model == 'high-pass':
                         y_sig = kf.bias_tee_correction(
                             y_sig, sampling_rate=self.cfg_sampling_rate(),
+                            inverse=inverse,
                             **filt['params'])
                     elif model == 'exponential':
                         y_sig = kf.exponential_decay_correction(
                             y_sig, sampling_rate=self.cfg_sampling_rate(),
+                            inverse=inverse,
                             **filt['params'])
                     elif model == 'bounce':
                         y_sig = kf.bounce_correction(
                             y_sig, sampling_rate=self.cfg_sampling_rate(),
+                            inverse=inverse,
                             **filt['params'])
                     else:
                         raise KeyError('Model {} not recognized'.format(model))
                 else:
                     raise NotImplementedError()
-        y_sig *= self.cfg_gain_correction()
+        if inverse:
+            y_sig /= self.cfg_gain_correction()
+        else:
+            y_sig *= self.cfg_gain_correction()
         return y_sig
 
     def print_overview(self):
