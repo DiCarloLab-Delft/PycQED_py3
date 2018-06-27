@@ -26,8 +26,15 @@ class FluxFrequency(ba.BaseDataAnalysis):
                  temp_keys: dict = None,
                  ):
         """
+        Class for analysing DAC archs (Qubit or Resonator Frequency vs. DAC current
+        or Flux). Fitting is not super stable, so it might be adviseable to manually
+        specify a fit_guess dict (inside the options_dict).
+        TODO: Implement a rejection/filtering mechanism for outliers (of the fitted frequencies)
+        TODO: Use the already implemented peak finder (see process_data)
+        TODO: Allow to pass a custom peak finder
+        TODO: Allow to not specify the fitparams_key parameter and solely rely on internal fitting
+        TODO: Make guess functions better
 
-        (inherited from BaseDataAnalysis)
         :param options_dict: - fit_guess (dict): allows to specify parameters for the inital guess.
                              - plot_guess (bool): if True plot the guess as well
                              - dac_key (str): string for extracting the DAC values
@@ -40,9 +47,10 @@ class FluxFrequency(ba.BaseDataAnalysis):
                              - s21_normalize_global (bool)
                              - s21_percentile (float)
                              - plot_vs_flux (bool): plot against flux quanta rather than current?
-                             - (inherited from BaseDataAnalysis)
-        :param is_spectroscopy:
-        :param temp_keys:
+                             - (+inherited from BaseDataAnalysis)
+        :param is_spectroscopy: (bool) Spectoscropy or Resonator measurement?
+        :param temp_keys: (dict) dict of strings for extracting temperatures for each DAC value
+        (+params inherited from BaseDataAnalysis)
         """
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
