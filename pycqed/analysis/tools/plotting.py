@@ -6,7 +6,8 @@ import matplotlib.pyplot as plt
 import matplotlib
 from matplotlib import cm
 import numpy as np
-
+import matplotlib.colors as col
+import hsluv
 
 def set_xlabel(axis, label, unit=None, **kw):
     """
@@ -83,7 +84,7 @@ def SI_prefix_and_scale_factor(val, unit=None):
         try:
             with np.errstate(all="ignore"):
                 prefix_power = np.log10(abs(val))//3 * 3
-            return 10 ** -prefix_power, SI_PREFIXES_2[prefix_power] + unit 
+            return 10 ** -prefix_power, SI_PREFIXES_2[prefix_power] + unit
         except (KeyError, TypeError):
             pass
 
@@ -94,19 +95,19 @@ def SI_val_to_msg_str(val: float, unit: str=None, return_type=str):
     """
     Takes in a value  with optional unit and returns a string tuple consisting
     of (value_str, unit) where the value and unit are rescaled according to
-    SI prefixes, IF the unit is an SI unit (according to the comprehensive list 
+    SI prefixes, IF the unit is an SI unit (according to the comprehensive list
     of SI units in this file ;).
 
     the value_str is of the type specified in return_type (str) by default.
     """
-    
+
     sc, new_unit = SI_prefix_and_scale_factor(val, unit)
     try:
         new_val = sc*val
     except TypeError:
         return return_type(val), unit
 
-    return return_type(new_val), new_unit 
+    return return_type(new_val), new_unit
 
 
 def data_to_table_png(data: list, filename: str, title: str='',
@@ -346,10 +347,20 @@ def autolabel_barplot(ax, rects, rotation=90):
 
 
 
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.colors as col
-import hsluv # install via pip
+def set_axeslabel_color(ax, color):
+    '''
+    Ad hoc function to set the labels, ticks, ticklabels and title to a color.
+
+    This is useful when e.g., making a presentation on a dark background
+    '''
+    ax.tick_params(color=color)
+    plt.setp(ax.get_xticklabels(), color=color)
+    plt.setp(ax.get_yticklabels(), color=color)
+    plt.setp(ax.yaxis.get_label(), color=color)
+    plt.setp(ax.xaxis.get_label(), color=color)
+    plt.setp(ax.title, color=color)
+
+
 
 ##### generate custom colormaps
 def make_segmented_cmap():
