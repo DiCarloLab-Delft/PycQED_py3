@@ -130,6 +130,7 @@ $RECYCLE.BIN/
 *.txt
 *.png
 pycqed/measurement/openql_experiments/output/*
+*.qmap
 
 # data files
 # test data files should be explicitly added by hand (overriding .gitignore)

@@ -853,7 +853,7 @@ def FluxTimingCalibration_2q(q0, q1, buffer_time1, times, platf_cfg: str):
     return p
 
 
-def FastFeedbackControl(lantecy, qubit_idx: int, platf_cfg: str):
+def FastFeedbackControl(latency, qubit_idx: int, platf_cfg: str):
     """
     Single qubit sequence to test fast feedback control (fast conditional
     execution).
@@ -861,7 +861,7 @@ def FastFeedbackControl(lantecy, qubit_idx: int, platf_cfg: str):
     Output directory is set as an attribute to the program for convenience.
 
     Input pars:
-        lantecy:        the waiting time between measurement and the feedback
+        latency:        the waiting time between measurement and the feedback
                           pulse, which should be longer than the feedback
                           latency.
         feedback:       if apply
@@ -881,7 +881,7 @@ def FastFeedbackControl(lantecy, qubit_idx: int, platf_cfg: str):
     k.gate('rx90', qubit_idx)
     # k.gate('rx180', qubit_idx)
     k.measure(qubit_idx)
-    wait_nanoseconds = int(round(lantecy/1e-9))
+    wait_nanoseconds = int(round(latency/1e-9))
     k.gate("wait", [qubit_idx], wait_nanoseconds)
     k.gate("i", qubit_idx)
     k.measure(qubit_idx)
@@ -893,7 +893,7 @@ def FastFeedbackControl(lantecy, qubit_idx: int, platf_cfg: str):
     k.gate('rx90', qubit_idx)
     # k.gate('rx180', qubit_idx)
     k.measure(qubit_idx)
-    wait_nanoseconds = int(round(lantecy/1e-9))
+    wait_nanoseconds = int(round(latency/1e-9))
     k.gate("wait", [qubit_idx], wait_nanoseconds)
     k.gate('C0rx180', qubit_idx)  # fast feedback control here
     k.measure(qubit_idx)
@@ -904,7 +904,7 @@ def FastFeedbackControl(lantecy, qubit_idx: int, platf_cfg: str):
     k.gate('rx90', qubit_idx)
     # k.gate('rx180', qubit_idx)
     k.measure(qubit_idx)
-    wait_nanoseconds = int(round(lantecy/1e-9))
+    wait_nanoseconds = int(round(latency/1e-9))
     k.gate("wait", [qubit_idx], wait_nanoseconds)
     k.gate('C1rx180', qubit_idx)  # fast feedback control here
     k.measure(qubit_idx)

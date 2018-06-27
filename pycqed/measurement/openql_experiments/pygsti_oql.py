@@ -17,7 +17,8 @@ base_qasm_path = join(dirname(__file__), 'qasm_files')
 output_dir = join(dirname(__file__), 'output')
 ql.set_output_dir(output_dir)
 
-gst_exp_filepath = join(pq.__path__[0], 'measurement', 'gate_set_tomography')
+gst_exp_filepath = join(pq.__path__[0], 'measurement', 'gate_set_tomography',
+                        'template_data_files')
 
 
 
@@ -111,6 +112,65 @@ def openql_kernel_from_gatestring(gatestring, qubits: list,
     k.gate('wait', qubits, 0)
 
     return k
+
+
+
+
+def single_qubit_gst(q0: int, platf_cfg: str,
+                     maxL: int=256,
+                     lite_germs:bool = True,
+                     recompile=True):
+    """
+    Generates the QISA and QASM programs for full 2Q GST.
+    """
+    MAX_EXPLIST_SIZE = 3000 # UHFQC shot limit
+    DBG = True # debugging
+
+    # grab the experiment list file
+    if lite_germs:
+        fp = join(gst_exp_filepath, 'std1Q_XYI_lite_maxL{}.txt'.format(maxL))
+    else:
+        fp = join(gst_exp_filepath, 'std1Q_XYI_maxL{}.txt'.format(maxL))
+    # parse the file into expList object
+    print('Converting dataset to expList')
+    t0 = time.time()
+    expList = pygsti_expList_from_dataset(fp)
+    print("converting to expList took {:.2f}".format(time.time()-t0))
+    # divide into smaller experiment lists
+    programs = []
+
+
+    cutting_indices = [0, 3000, 5500, 7000, 9000]
+    t0 = time.time()
+    print('Generating {} GST programs'.format(len(cutting_indices)-1))
+
+    for exp_num, start_idx in enumerate(cutting_indices[:-1]):
+        stop_idx = cutting_indices[exp_num+1]
+        el = expList[start_idx:stop_idx]
+
+    # exp_num = int(np.ceil(len(expList)/MAX_EXPLIST_SIZE))# amount of experiments
+    # for exp_i in range(exp_num-1): # loop over the experiments except the last one
+        # make smaller experiment list
+        # el = expList[exp_i*MAX_EXPLIST_SIZE:(exp_i+1)*MAX_EXPLIST_SIZE]
+        # if DBG: print('dbg {}, {}'.format(exp_i*MAX_EXPLIST_SIZE,(exp_i+1)*MAX_EXPLIST_SIZE)) # dbg
+
+        # turn into openql program
+        p = openql_program_from_pygsti_expList(
+            el, 'std1Q_XYI {} {} {}-{}'.format(lite_germs, maxL,
+                                               start_idx, stop_idx),
+            qubits=[2, 0],
+            start_idx=start_idx,
+            platf_cfg=platf_cfg, recompile=recompile)
+        # append to list of programs
+        programs.append(p)
+        print('Generated {} GST programs in {:.1f}s'.format(
+              exp_num+1, time.time()-t0), end='\r')
+
+    print('Succesfully generated {} GST programs in {:.1f}s'.format(
+        len(cutting_indices)-1, time.time()-t0))
+
+
+    return programs
 
 
 def poor_mans_2q_gst(q0: int, q1: int, platf_cfg: str,):
