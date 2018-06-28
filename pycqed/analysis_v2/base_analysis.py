@@ -1313,8 +1313,24 @@ class BaseDataAnalysis(object):
                         pass
             axs.axvline(x=x, **d)
 
+    def plot_errorbar(self, x, y, yerr, title, xlabel='', xunit='',
+                      marker='o',
+                      ylabel='', yunit='', ax=None, **kw):
+        """
+        FIXME, move to base data analysis class
+        """
+        if ax is None:
+            f, ax = plt.subplots()
 
-def plot_scatter_errorbar(self, ax_id, xdata, ydata, xerr=None, yerr=None, pdict=None):
+        ax.errorbar(x, y, yerr, marker=marker)
+        ax.set_title(title)
+        set_xlabel(ax, xlabel, xunit)
+        set_ylabel(ax, ylabel, yunit)
+
+
+
+def plot_scatter_errorbar(self, ax_id, xdata, ydata,
+                          xerr=None, yerr=None, pdict=None):
     pdict = pdict or {}
 
     pds = {

@@ -17,6 +17,8 @@ from pycqed.analysis.tools.plot_interpolation import interpolate_heatmap
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis import measurement_analysis as ma_old
 from pycqed.analysis.analysis_toolbox import color_plot
+from scipy.stats import sem
+
 
 class Basic1DAnalysis(ba.BaseDataAnalysis):
     """
@@ -57,7 +59,6 @@ class Basic1DAnalysis(ba.BaseDataAnalysis):
             self.params_dict['x2'] = x2
             self.numeric_params = ["x2"]
 
-        
         if auto:
             self.run_analysis()
 
@@ -76,11 +77,11 @@ class Basic1DAnalysis(ba.BaseDataAnalysis):
             yvals = self.raw_data_dict['measured_values_ord_dict'][val_name]
 
             if self.options_dict.get('average_sets', False):
-                xvals =  self.raw_data_dict['xvals'][0]
+                xvals = self.raw_data_dict['xvals'][0]
                 yvals = np.mean(yvals, axis=0)
                 setlabel = ['Averaged data']
             else:
-                xvals =  self.raw_data_dict['xvals']
+                xvals = self.raw_data_dict['xvals']
 
             if len(np.shape(yvals)) == 1:
                 do_legend = False
@@ -104,6 +105,96 @@ class Basic1DAnalysis(ba.BaseDataAnalysis):
                           self.raw_data_dict['measurementstring'][0]),
                 'do_legend': do_legend,
                 'legend_pos': 'upper right'}
+
+
+class Basic1DBinnedAnalysis(ba.BaseDataAnalysis):
+    """
+    Basic 1D analysis.
+
+    Creates a line plot for every parameter measured in a set of datafiles.
+    Creates a single plot for each parameter measured.
+
+    Supported options_dict keys
+        x2 (str)  : name of a parameter that is varied if multiple datasets
+                    are combined.
+        average_sets (bool)  : if True averages all datasets together.
+            requires shapes of the different datasets to be the same.
+    """
+
+    def __init__(self, t_start: str=None, t_stop: str=None,
+                 label: str='', data_file_path: str=None,
+                 options_dict: dict=None, extract_only: bool=False,
+                 do_fitting: bool=True, auto=True):
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                         label=label,
+                         data_file_path=data_file_path,
+                         options_dict=options_dict,
+                         extract_only=extract_only, do_fitting=do_fitting)
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        self.raw_data_dict = OrderedDict()
+        self.timestamps = a_tools.get_timestamps_in_range(
+            self.t_start, self.t_stop,
+            label=self.labels)
+        self.raw_data_dict['timestamps'] = self.timestamps
+
+        self.timestamp = self.timestamps[0]
+        a = ma_old.MeasurementAnalysis(
+            timestamp=self.timestamp, auto=False, close_file=False)
+        a.get_naming_and_values()
+
+        self.raw_data_dict['xvals'] = a.sweep_points
+        self.raw_data_dict['xlabel'] = a.parameter_names[0]
+        self.raw_data_dict['xunit'] = a.parameter_units[0]
+
+        self.raw_data_dict['bins'] = a.data_file['Experimental Data']['Experimental Metadata']['bins'].value
+        self.raw_data_dict['measured_values'] = a.measured_values
+        self.raw_data_dict['value_names'] = a.value_names
+        self.raw_data_dict['value_units'] = a.value_units
+        self.raw_data_dict['measurementstring'] = a.measurementstring
+        self.raw_data_dict['folder'] = a.folder
+        a.finish()
+
+    def process_data(self):
+        self.proc_data_dict = deepcopy(self.raw_data_dict)
+        bins = self.proc_data_dict['bins']
+
+        self.proc_data_dict['binned_values'] = []
+        self.proc_data_dict['binned_values_stderr'] = []
+        for i, y in enumerate(self.proc_data_dict['measured_values']):
+            if len(y) % len(bins) != 0:
+                missing_vals = missing_vals = int(len(bins)-len(y) % len(bins))
+                y_ext = np.concatenate([y, np.ones(missing_vals)*np.nan])
+            else:
+                y_ext = y
+
+            y_binned = np.nanmean(y_ext.reshape((len(bins), -1),
+                                                order='F'), axis=1)
+            y_binned_stderr = sem(
+                y_ext.reshape((len(bins), -1), order='F'), axis=1,
+                nan_policy='omit')
+            self.proc_data_dict['binned_values'].append(y_binned)
+            self.proc_data_dict['binned_values_stderr'].append(y_binned_stderr)
+
+    def prepare_plots(self):
+        # assumes that value names are unique in an experiment
+        # pass
+        for i, val_name in enumerate(self.raw_data_dict['value_names']):
+
+            self.plot_dicts['binned_{}'.format(val_name)] = {
+                'plotfn': 'plot_errorbar',
+                'xlabel': self.proc_data_dict['xlabel'],
+                'xunit': self.proc_data_dict['xunit'],
+                'ylabel': self.proc_data_dict['value_names'][i],
+
+                'yunit': self.proc_data_dict['value_units'][i],
+                'x': self.proc_data_dict['bins'],
+                'y': self.proc_data_dict['binned_values'][i],
+                'yerr': self.proc_data_dict['binned_values_stderr'][i],
+                'marker': 'o',
+                'title': "{}\nBinned {}".format(self.timestamp, val_name)}
 
 
 class Basic2DAnalysis(Basic1DAnalysis):
@@ -166,7 +257,7 @@ class Basic2DInterpolatedAnalysis(ba.BaseDataAnalysis):
                  label: str = '', data_file_path: str = None,
                  close_figs: bool = True, options_dict: dict = None,
                  extract_only: bool = False, do_fitting: bool = False,
-                 auto:bool=True, interp_method='linear'):
+                 auto: bool=True, interp_method='linear'):
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
                          data_file_path=data_file_path,
@@ -176,7 +267,6 @@ class Basic2DInterpolatedAnalysis(ba.BaseDataAnalysis):
         self.interp_method = interp_method
         if auto:
             self.run_analysis()
-
 
     def extract_data(self):
         self.raw_data_dict = OrderedDict()
@@ -190,8 +280,7 @@ class Basic2DInterpolatedAnalysis(ba.BaseDataAnalysis):
             timestamp=self.timestamp, auto=False, close_file=False)
         a.get_naming_and_values()
 
-
-        for idx, lab  in enumerate(['x', 'y']):
+        for idx, lab in enumerate(['x', 'y']):
             self.raw_data_dict[lab] = a.sweep_points[idx]
             self.raw_data_dict['{}label'.format(lab)] = a.parameter_names[idx]
             self.raw_data_dict['{}unit'.format(lab)] = a.parameter_units[idx]
@@ -199,10 +288,9 @@ class Basic2DInterpolatedAnalysis(ba.BaseDataAnalysis):
         self.raw_data_dict['measured_values'] = a.measured_values
         self.raw_data_dict['value_names'] = a.value_names
         self.raw_data_dict['value_units'] = a.value_units
-        self.raw_data_dict['measurementstring'] =a.measurementstring
+        self.raw_data_dict['measurementstring'] = a.measurementstring
         self.raw_data_dict['folder'] = a.folder
         a.finish()
-
 
     def process_data(self):
         self.proc_data_dict = deepcopy(self.raw_data_dict)
@@ -216,7 +304,6 @@ class Basic2DInterpolatedAnalysis(ba.BaseDataAnalysis):
             self.proc_data_dict['interpolated_values'].append(z_int)
         self.proc_data_dict['x_int'] = x_int
         self.proc_data_dict['y_int'] = y_int
-
 
     def prepare_plots(self):
         # assumes that value names are unique in an experiment
