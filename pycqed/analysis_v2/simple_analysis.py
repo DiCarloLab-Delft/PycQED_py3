@@ -108,19 +108,6 @@ class Basic1DAnalysis(ba.BaseDataAnalysis):
 
 
 class Basic1DBinnedAnalysis(ba.BaseDataAnalysis):
-    """
-    Basic 1D analysis.
-
-    Creates a line plot for every parameter measured in a set of datafiles.
-    Creates a single plot for each parameter measured.
-
-    Supported options_dict keys
-        x2 (str)  : name of a parameter that is varied if multiple datasets
-                    are combined.
-        average_sets (bool)  : if True averages all datasets together.
-            requires shapes of the different datasets to be the same.
-    """
-
     def __init__(self, t_start: str=None, t_stop: str=None,
                  label: str='', data_file_path: str=None,
                  options_dict: dict=None, extract_only: bool=False,
@@ -149,7 +136,8 @@ class Basic1DBinnedAnalysis(ba.BaseDataAnalysis):
         self.raw_data_dict['xlabel'] = a.parameter_names[0]
         self.raw_data_dict['xunit'] = a.parameter_units[0]
 
-        self.raw_data_dict['bins'] = a.data_file['Experimental Data']['Experimental Metadata']['bins'].value
+        self.raw_data_dict['bins'] = a.data_file['Experimental Data']\
+            ['Experimental Metadata']['bins'].value
         self.raw_data_dict['measured_values'] = a.measured_values
         self.raw_data_dict['value_names'] = a.value_names
         self.raw_data_dict['value_units'] = a.value_units
