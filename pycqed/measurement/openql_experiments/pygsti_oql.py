@@ -216,8 +216,8 @@ def single_qubit_gst(q0: int, platf_cfg: str,
 
         # turn into openql program
         p = openql_program_from_pygsti_expList(
-            expSubList, 'std1Q_XYI {} {} {}-{}'.format(
-                lite_germs, maxL, start_idx, stop_idx),
+            expSubList, 'std1Q_XYI q{} {} {} {}-{}'.format(
+                q0, lite_germs, maxL, start_idx, stop_idx),
             qubits=[q0],
             start_idx=start_idx,
             platf_cfg=platf_cfg, recompile=recompile)
