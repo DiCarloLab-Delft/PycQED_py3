@@ -91,7 +91,10 @@ class GST_SingleQubit_DataExtraction(ba.BaseDataAnalysis):
         print("Nr bins:", len(bins))
         print("Nr gatestrings", len(expList))
         # Filter out uncompleted iterations
-        shots_1 = shots_1[:-(len(shots_1) % len(expList))]
+        missing_shots = (len(shots_1) % len(expList))
+        if missing_shots !=0:
+            shots_1 = shots_1[:-missing_shots]
+
         shots_0 = 1 - shots_1
         counts_1 = np.sum(shots_1.reshape(
             (len(expList), -1),
@@ -100,6 +103,9 @@ class GST_SingleQubit_DataExtraction(ba.BaseDataAnalysis):
         counts_0 = np.sum(shots_0.reshape(
             (len(expList), -1),
             order='F'), axis=1)
+
+        self.proc_data_dict['counts_0'] = counts_0
+        self.proc_data_dict['counts_1'] = counts_1
 
         # writing to pygsti dataset
         ds = pygsti.objects.DataSet(outcomeLabels=['0', '1'])
@@ -113,37 +119,3 @@ class GST_SingleQubit_DataExtraction(ba.BaseDataAnalysis):
         pygsti.io.write_dataset(
             os.path.join(self.raw_data_dict['folder'], ds_name), ds)
         self.proc_data_dict['dataset'] = ds
-
-        # for i, y in enumerate(self.proc_data_dict['measured_values']):
-        #     if len(y) % len(bins) != 0:
-        #         y_ext = y[:-(len(y) % len(bins))]
-        #     else:
-        #         y_ext = y
-
-        #     y_binned = np.nanmean(y_ext.reshape((len(bins), -1),
-        #                                         order='F'), axis=1)
-        #     y_binned_stderr = sem(
-        #         y_ext.reshape((len(bins), -1), order='F'), axis=1,
-        #         nan_policy='omit')
-        #     self.proc_data_dict['binned_values'].append(y_binned)
-        #     self.proc_data_dict['binned_values_stderr'].append(y_binned_stderr)
-
-        #     y_sum = np.sum(y_ext.reshape((len(bins), -1), order='F'), axis=1)
-
-    # def prepare_plots(self):
-    #     # assumes that value names are unique in an experiment
-    #     # pass
-    #     for i, val_name in enumerate(self.raw_data_dict['value_names']):
-
-    #         self.plot_dicts['binned_{}'.format(val_name)] = {
-    #             'plotfn': 'plot_errorbar',
-    #             'xlabel': self.proc_data_dict['xlabel'],
-    #             'xunit': self.proc_data_dict['xunit'],
-    #             'ylabel': self.proc_data_dict['value_names'][i],
-
-    #             'yunit': self.proc_data_dict['value_units'][i],
-    #             'x': self.proc_data_dict['bins'],
-    #             'y': self.proc_data_dict['binned_values'][i],
-    #             'yerr': self.proc_data_dict['binned_values_stderr'][i],
-    #             'marker': 'o',
-    #             'title': "{}\nBinned {}".format(self.timestamp, val_name)}
