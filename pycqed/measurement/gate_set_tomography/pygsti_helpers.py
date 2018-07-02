@@ -1,18 +1,11 @@
-import time
-import numpy as np
 import pygsti
-from os.path import join, dirname
-import openql.openql as ql
-from pycqed.utilities.general import suppress_stdout
+from os.path import join
 import pycqed as pq
-from openql.openql import Program, Kernel, Platform
-from pycqed.measurement.openql_experiments import openql_helpers as oqh
-
-
 
 
 gst_exp_filepath = join(pq.__path__[0], 'measurement', 'gate_set_tomography',
                         'template_data_files')
+
 
 def pygsti_expList_from_dataset(dataset_filename: str):
     """
