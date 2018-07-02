@@ -2,6 +2,7 @@ import copy
 import math
 import logging
 import numpy as np
+import matplotlib.pyplot as plt
 from abc import ABCMeta, abstractmethod
 
 #from neupy.algorithms import GRNN as grnn
@@ -265,12 +266,20 @@ class Polynomial_Regression(Estimator):
         A = np.zeros((data_shape[0],1+self.ndim*data_shape[1]))
         A[:,0] = np.ones((data_shape[0]))
         for it in range(self.ndim):
-            A[:,1+it*data_shape[1]:1+(it+1)*data_shape[1]] = X**it
+            A[:,1+it*data_shape[1]:1+(it+1)*data_shape[1]] = X**(it+1)
         return A
 
     def fit(self,x_train,y_train):
         self._polyReg = LinearRegression(fit_intercept=False)
         self._polyReg.fit(self.poly_features_transform(x_train),y_train)
+
+        x = np.transpose(np.array([np.linspace(-1,1,50)]))
+        plt.figure()
+        plt.plot(np.linspace(-1,1,50),
+                 self.predict(x)
+                 )
+        plt.plot(x_train[:,0], y_train, 'o')
+        plt.show()
 
     def predict(self,samples):
         if not isinstance(samples,np.ndarray):
@@ -278,7 +287,7 @@ class Polynomial_Regression(Estimator):
         return self._polyReg.predict(self.poly_features_transform(samples))
 
     def evaluate(self,x,y):
-        pred = self._polyReg.predict(x)
+        pred = self.predict(x)
         acc = 1. - np.linalg.norm(pred-y)**2 \
                    / np.linalg.norm(y-np.mean(y,axis=0))**2
         return acc

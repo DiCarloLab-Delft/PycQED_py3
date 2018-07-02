@@ -328,10 +328,18 @@ def neural_network_opt(fun, training_grid, target_values = None,
     ###          create measurement data from test_grid         ###
     ###############################################################
 
+    print(np.shape(training_grid))
+
     training_grid = np.transpose(training_grid)
     #get input dimension, training grid contains parameters as row!! vectors
+    if len(np.shape(training_grid)) == 1:
+        training_grid = np.transpose(np.array([training_grid]))
     n_samples = np.size(training_grid,0)
     n_features = np.size(training_grid,1)
+
+    print(np.shape(training_grid))
+
+    # np.size(training_grid,1)
 
     if fun is None:
         target_values = np.transpose(np.array([target_values]))
@@ -351,9 +359,18 @@ def neural_network_opt(fun, training_grid, target_values = None,
     input_feature_means,input_feature_ext,\
     output_feature_means,output_feature_ext \
                  = center_and_scale(training_grid,target_values)
+    # training_grid = np.transpose(training_grid)
+    # target_values = np.transpose(target_values)
+    print(np.shape(training_grid))
+    print(np.shape(target_values))
     training_grid, test_grid,target_values,test_values = \
                                         train_test_split(training_grid,target_values,
                                                          test_size=test_size)
+    # training_grid = np.transpose(training_grid)
+    # target_values = np.transpose(target_values)
+    # test_grid = np.transpose(test_grid)
+    # test_values = np.transpose(test_values)
+
     #Save the preprocessing information in order to be able to rescale the values later.
     pre_processing_dict ={'output': {'scaling': output_feature_ext,
                                      'centering':output_feature_means},
@@ -431,7 +448,7 @@ def neural_network_opt(fun, training_grid, target_values = None,
         result[it] = result[it]*input_feature_ext[it]+input_feature_means[it]
     print('minimization results: ',result,'::',amp)
 
-    return np.array(result), est, [test_grid,test_values],opti_flag
+    return np.array(result), est, [test_grid,test_values] ,opti_flag
 
 
 

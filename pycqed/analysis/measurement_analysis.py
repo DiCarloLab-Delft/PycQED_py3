@@ -1058,7 +1058,7 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
             self.abs_vals = np.sqrt(self.measured_values[0,:]**2 + self.measured_values[1,:]**2)
 
         if self.round==0 and self.parameter_names[1]=='phi_skew':
-            self.meas_grid = np.array(self.meas_grid[:,1])
+            self.meas_grid = np.array(self.meas_grid[1,:])
         result,est,test_vals,opti_flag\
                                   = opt.neural_network_opt(None, self.meas_grid,
                                           self.abs_vals,
@@ -1105,16 +1105,16 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
         upper_x = np.max(self.sweep_points[0])+np.std(self.sweep_points[0])
         lower_y = np.min(self.sweep_points[1])-np.std(self.sweep_points[1])
         upper_y = np.max(self.sweep_points[1])+np.std(self.sweep_points[1])
-        x_mesh = np.linspace(lower_x,upper_x,200)
-        y_mesh = np.linspace(lower_y,upper_y,200)
+        x_mesh = (np.linspace(lower_x,upper_x,200)-input_means[0])/input_scale[0]
+        y_mesh = (np.linspace(lower_y,upper_y,200)-input_means[1])/input_scale[1]
         Xm,Ym = np.meshgrid(x_mesh,y_mesh)
         Zm = np.zeros_like(Xm)
         for k in range(np.size(x_mesh)):
             for l in range(np.size(y_mesh)):
                 Zm[k,l] = self.estimator.predict([[Xm[k,l],Ym[k,l]],])
         Zm = Zm*output_scale + output_means
-        # Xm = Xm*input_scale[0] + input_means[0]
-        # Ym = Ym*input_scale[1] + input_means[1]
+        Xm = Xm*input_scale[0] + input_means[0]
+        Ym = Ym*input_scale[1] + input_means[1]
         #Landscape plot of network
         #In case we use tensorflow, add a learning curve plot
         if self.estimator_name=='DNN_Regressor_tf':
@@ -1148,7 +1148,7 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
             figname1 += ';'
             base_figname += self.value_names[i]
         textstr = 'Optimization converged to: \n'
-        base_figname += '_it_'+self.round
+        base_figname += '_it_'+str(self.round)
         for i in range(len(self.parameter_names)):
                textstr+='%s: %.3g %s' % (self.parameter_names[i],
                                          self.optimization_result[i],
@@ -1185,7 +1185,7 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
         base_figname = 'optimization of '
         for i in range(len(self.value_names)):
             base_figname+= self.value_names[i]
-        base_figname += '_it_'+self.round
+        base_figname += '_it_'+str(self.round)
         if np.shape(self.sweep_points)[0] == 2:
             f, ax = plt.subplots()
             a_tools.color_plot_interpolated(
