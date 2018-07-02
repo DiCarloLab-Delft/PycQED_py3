@@ -11,6 +11,7 @@ from openql.openql import Program, Kernel, Platform
 from pycqed.measurement.openql_experiments import openql_helpers as oqh
 from pycqed.measurement.gate_set_tomography.pygsti_helpers import \
     pygsti_expList_from_dataset, gst_exp_filepath, split_expList
+import logging
 
 base_qasm_path = join(dirname(__file__), 'qasm_files')
 output_dir = join(dirname(__file__), 'output')
@@ -166,12 +167,167 @@ def single_qubit_gst(q0: int, platf_cfg: str,
     return programs, exp_list_fn
 
 
+def two_qubit_gst(qubits: list, platf_cfg: str,
+                  maxL: int=256,
+                  lite_germs: bool = True,
+                  recompile=True,
+                  verbose: bool=True):
+    """
+    Generates the QISA and QASM programs for full 2Q GST.
+
+    Args:
+        qubits (list)   : list of target qubits as integers, LSQ is last entry
+                          in the list.
+        platf_cfg (str) : string specifying config filename
+        maxL (int)      : specifies the maximum germ length,
+                          must be power of 2.
+        lite_germs(bool): if True uses "lite" germs
+        recompile:      True -> compiles the program,
+                        'as needed' -> compares program to timestamp of config
+                            and existence, if required recompile.
+                        False -> compares program to timestamp of config.
+                            if compilation is required raises a ValueError
+
+                        If the program is more recent than the config
+                        it returns an empty OpenQL program object with
+                        the intended filename that can be used to upload the
+                        previously compiled file.
+        verbose (bool)  : if True prints extra debug info
+
+
+    Returns:
+        programs (list) : list of OpenQL program objects
+
+    """
+    # grab the experiment list file
+    if lite_germs:
+        exp_list_fn = 'std2Q_XYCPHASE_lite_maxL{}.txt'.format(maxL)
+    else:
+        exp_list_fn = 'std2Q_XYCPHASE_maxL{}.txt'.format(maxL)
+    exp_list_fp = join(gst_exp_filepath, exp_list_fn)
+
+    if verbose:
+        print('Converting dataset to expList')
+    t0 = time.time()
+    expList = pygsti_expList_from_dataset(exp_list_fp)
+    if verbose:
+        print("Converted dataset to expList in {:.2f}s".format(time.time()-t0))
+    # divide into smaller experiment lists
+    programs = []
+
+    t0 = time.time()
+    if verbose:
+        print('Generating GST programs')
+
+    expSubLists = split_expList(expList, verbose=verbose)
+
+    start_idx = 0
+    for exp_num, expSubList in enumerate(expSubLists):
+        stop_idx = start_idx + len(expSubList)
+
+        # turn into openql program
+        p = openql_program_from_pygsti_expList(
+            expSubList, 'std2Q_XYCPHASE q{}q{} {} {} {}-{}'.format(
+                qubits[0], qubits[1], lite_germs, maxL, start_idx, stop_idx),
+            qubits=qubits,
+            start_idx=start_idx,
+            platf_cfg=platf_cfg, recompile=recompile)
+        # append to list of programs
+        programs.append(p)
+        start_idx += len(expSubList)
+        if verbose:
+            print('Generated {} GST programs in {:.1f}s'.format(
+                  exp_num+1, time.time()-t0), end='\r')
+
+    print('Generated {} GST programs in {:.1f}s'.format(
+          exp_num+1, time.time()-t0))
+
+    return programs, exp_list_fn
+
+
+def single_qubit_gst(q0: int, platf_cfg: str,
+                     maxL: int=256,
+                     lite_germs: bool = True,
+                     recompile=True,
+                     verbose: bool=True):
+    """
+    Generates the QISA and QASM programs for full 2Q GST.
+
+    Args:
+        q0 (int)        : target qubit
+        platf_cfg (str) : string specifying config filename
+        maxL (int)      : specifies the maximum germ length,
+                          must be power of 2.
+        lite_germs(bool): if True uses "lite" germs
+        recompile:      True -> compiles the program,
+                        'as needed' -> compares program to timestamp of config
+                            and existence, if required recompile.
+                        False -> compares program to timestamp of config.
+                            if compilation is required raises a ValueError
+
+                        If the program is more recent than the config
+                        it returns an empty OpenQL program object with
+                        the intended filename that can be used to upload the
+                        previously compiled file.
+        verbose (bool)  : if True prints extra debug info
+
+
+    Returns:
+        programs (list) : list of OpenQL program objects
+
+    """
+    # grab the experiment list file
+    if lite_germs:
+        exp_list_fn = 'std1Q_XYI_lite_maxL{}.txt'.format(maxL)
+    else:
+        exp_list_fn = 'std1Q_XYI_maxL{}.txt'.format(maxL)
+    exp_list_fp = join(gst_exp_filepath, exp_list_fn)
+
+    if verbose:
+        print('Converting dataset to expList')
+    t0 = time.time()
+    expList = pygsti_expList_from_dataset(exp_list_fp)
+    if verbose:
+        print("Converted dataset to expList in {:.2f}s".format(time.time()-t0))
+    # divide into smaller experiment lists
+    programs = []
+
+    t0 = time.time()
+    if verbose:
+        print('Generating GST programs')
+
+    expSubLists = split_expList(expList, verbose=verbose)
+
+    start_idx = 0
+    for exp_num, expSubList in enumerate(expSubLists):
+        stop_idx = start_idx + len(expSubList)
+
+        # turn into openql program
+        p = openql_program_from_pygsti_expList(
+            expSubList, 'std1Q_XYI q{} {} {} {}-{}'.format(
+                q0, lite_germs, maxL, start_idx, stop_idx),
+            qubits=[q0],
+            start_idx=start_idx,
+            platf_cfg=platf_cfg, recompile=recompile)
+        # append to list of programs
+        programs.append(p)
+        start_idx += len(expSubList)
+        if verbose:
+            print('Generated {} GST programs in {:.1f}s'.format(
+                  exp_num+1, time.time()-t0), end='\r')
+
+    print('Generated {} GST programs in {:.1f}s'.format(
+          exp_num+1, time.time()-t0))
+
+    return programs, exp_list_fn
+
+
 def poor_mans_2q_gst(q0: int, q1: int, platf_cfg: str,):
     """
     Generates the QISA and QASM programs for poor_mans_GST, this is 2Q GST
     without the repetitions of any gate.
     """
-
+    logging.warning("DEPRECATION WARNING poor_mans_2q_gst")
     fp = join(gst_exp_filepath, 'PoorMans_2Q_GST.txt')
     expList = pygsti_expList_from_dataset(fp)
     p = openql_program_from_pygsti_expList(
@@ -183,6 +339,8 @@ def full_2q_gst(q0: int, q1: int, platf_cfg: str, recompile=True):
     """
     Generates the QISA and QASM programs for full 2Q GST.
     """
+
+    logging.warning("DEPRECATION WARNING full_2q_gst")
 
     MAX_EXPLIST_SIZE = 3000  # UHFQC shot limit
     DBG = True  # debugging
