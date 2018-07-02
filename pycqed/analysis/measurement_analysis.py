@@ -956,7 +956,7 @@ class Mixer_calibration_evaluation(MeasurementAnalysis):
         for it in range(len(self.meas_vals2)):
             print(self.meas_vals1[it],':1')
             print(self.meas_vals2[it],':2')
-        return 10.*np.log10(self.meas_vals2/self.meas_vals1)
+        return 20.*np.log10(self.meas_vals2/self.meas_vals1)
 
     def make_figures(self,**kw):
         base_figname = 'mixer_spectrum_comparison'
@@ -964,17 +964,18 @@ class Mixer_calibration_evaluation(MeasurementAnalysis):
         ax1.set_ylabel('power ratio [dB]')
         ax1.plot(self.sweep_pts1,self.signal_ratio,color='goldenrod',
                  linestyle='solid',
-                 label='signal ratio $10\log\left(\frac{P_1}{P_0}\right)$')
+                 label='signal ratio') # $10\log\left(\frac{P_1}{P_0}\right)$')
         ax1.grid(True)
-        ax1.tick_params('y',labelcolor='goldenrod')
+        ax1.tick_params('y',color='goldenrod')
         ax2 = ax1.twinx()
         ax2.set_ylabel('##meas_value Units go Here##')
-        ax2.plot(self.sweep_pts1,self.meas_vals1,color='blue',linestyle='solid',
-                 label='pre calibration power spectrum',alpha=0.7)
         ax2.plot(self.sweep_pts2,self.meas_vals2,color='green',linestyle='solid',
-                 label='post calibration power spectrum',alpha=0.7)
-        ax2.tick_params('y',labelcolor='blue')
+                 label='post calibration power spectrum',alpha=0.3)
+        ax2.plot(self.sweep_pts1,self.meas_vals1,color='blue',linestyle='solid',
+                 label='pre calibration power spectrum',alpha=0.3)
+        ax2.tick_params('y',color='blue')
         ax1.legend(loc='best')
+        ax2.legend(loc='best')
         self.save_fig(f, figname=base_figname,**kw)
 
 
@@ -3051,8 +3052,8 @@ class QScale_Analysis(TD_Analysis):
             (self.fit_res[1].params['slope'].stderr)**2)
 
         optimal_qscale_stddev = np.sqrt(
-            (intercept_diff_std/slope_diff_mean)**2 +
-            (intercept_diff_mean*slope_diff_std/(slope_diff_std**2))**2)
+            ((intercept_diff_mean*slope_diff_std)**2 +
+             (slope_diff_mean*intercept_diff_std)**2)/(slope_diff_mean**4))
         # sqrt_quantity = intercept_diff_std_squared/((intercept_diff_mean)**2) + \
         #                 slope_diff_std_squared/((slope_diff_mean)**2) - \
         #                 2*cov_qscale_squared/(intercept_diff_mean*slope_diff_mean)
