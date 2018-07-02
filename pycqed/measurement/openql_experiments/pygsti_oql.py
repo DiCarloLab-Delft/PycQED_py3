@@ -4,22 +4,17 @@ OpenQL sequence.
 """
 import time
 import numpy as np
-import pygsti
 from os.path import join, dirname
 import openql.openql as ql
 from pycqed.utilities.general import suppress_stdout
-import pycqed as pq
 from openql.openql import Program, Kernel, Platform
 from pycqed.measurement.openql_experiments import openql_helpers as oqh
-
+from pycqed.measurement.gate_set_tomography.pygsti_helpers import \
+    pygsti_expList_from_dataset, gst_exp_filepath, split_expList
 
 base_qasm_path = join(dirname(__file__), 'qasm_files')
 output_dir = join(dirname(__file__), 'output')
 ql.set_output_dir(output_dir)
-
-gst_exp_filepath = join(pq.__path__[0], 'measurement', 'gate_set_tomography',
-                        'template_data_files')
-
 
 # used to map pygsti gates to openQL gates
 # for now (Jan 2018) only contains basic pygsti gates
@@ -27,30 +22,6 @@ gatemap = {'i': 'i',
            'x': 'rx90',
            'y': 'ry90',
            'cphase': 'fl_cw_01'}
-
-
-def pygsti_expList_from_dataset(dataset_filename: str):
-    """
-    Takes a pygsti dataset file and extracts the experiment list from it.
-    The expList is a list containing pygsti GateString objects.
-
-    Args:
-        dataset_filename (str) : filename of the dataset to read
-    returns:
-        expList (list): a list of pygsti GateString objects.
-    """
-    with open(dataset_filename, 'r') as f:
-        rawLines = f.readlines()
-    # lines[1:]
-
-    lines = []
-    for line in rawLines:
-        lines.append(line.split(' ')[0])
-    expList = [
-        pygsti.objects.GateString(None, stringRepresentation=line)
-        for line in lines[1:]]
-
-    return expList
 
 
 def openql_program_from_pygsti_expList(expList, program_name: str,
@@ -114,46 +85,6 @@ def openql_kernel_from_gatestring(gatestring, qubits: list,
     return k
 
 
-def split_expList(expList, max_nr_of_instr: int=8000,
-                  verbose: bool=True):
-    """
-    Splits a pygsti expList into sub lists to facilitate running on the CCL
-    and not running into the instruction limit.
-
-    Assumptions made:
-        - there is a fixed instruction overhead per program
-        - there is a fixed instruction overhead per kernel (measurement + init)
-        - every gate (in the gatestring) consists of a single instruction
-    """
-    fixed_program_overhad = 12 + 3  # declare registers + infinite loop
-    kernel_overhead = 4  # prepz wait and measure
-
-    instr_cnt = 0
-    instr_cnt += fixed_program_overhad
-
-    # Determine where to split the expLists
-    cutting_indices = [0]
-    for i, gatestring in enumerate(expList):
-        instr_cnt += kernel_overhead
-        instr_cnt += len(gatestring)
-        if instr_cnt > max_nr_of_instr:
-            cutting_indices.append(i)
-            instr_cnt = fixed_program_overhad
-
-    # Create the expSubLists, a list contain expList objects for each part
-    expSubLists = []
-    if len(cutting_indices) == 1:
-        expSubLists.append(expList)
-    else:
-        for exp_num, start_idx in enumerate(cutting_indices[:-1]):
-            stop_idx = cutting_indices[exp_num+1]
-            expSubLists.append(expList[start_idx:stop_idx])
-
-    if verbose:
-        print("Splitted expList into {} sub lists".format(len(expSubLists)))
-    return expSubLists
-
-
 ##############################################################################
 # End of helper functions
 ##############################################################################
@@ -191,14 +122,15 @@ def single_qubit_gst(q0: int, platf_cfg: str,
     """
     # grab the experiment list file
     if lite_germs:
-        fp = join(gst_exp_filepath, 'std1Q_XYI_lite_maxL{}.txt'.format(maxL))
+        exp_list_fn = 'std1Q_XYI_lite_maxL{}.txt'.format(maxL)
     else:
-        fp = join(gst_exp_filepath, 'std1Q_XYI_maxL{}.txt'.format(maxL))
+        exp_list_fn = 'std1Q_XYI_maxL{}.txt'.format(maxL)
+    exp_list_fp = join(gst_exp_filepath, exp_list_fn)
 
     if verbose:
         print('Converting dataset to expList')
     t0 = time.time()
-    expList = pygsti_expList_from_dataset(fp)
+    expList = pygsti_expList_from_dataset(exp_list_fp)
     if verbose:
         print("Converted dataset to expList in {:.2f}s".format(time.time()-t0))
     # divide into smaller experiment lists
@@ -231,7 +163,7 @@ def single_qubit_gst(q0: int, platf_cfg: str,
     print('Generated {} GST programs in {:.1f}s'.format(
           exp_num+1, time.time()-t0))
 
-    return programs
+    return programs, exp_list_fn
 
 
 def poor_mans_2q_gst(q0: int, q1: int, platf_cfg: str,):
