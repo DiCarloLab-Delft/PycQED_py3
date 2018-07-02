@@ -6,7 +6,6 @@ import pycqed.analysis_v2.base_analysis as ba
 from pycqed.analysis import analysis_toolbox as a_tools
 from pycqed.analysis import measurement_analysis as ma_old
 import pygsti
-from scipy.stats import sem
 from pycqed.measurement.gate_set_tomography.pygsti_helpers import \
     gst_exp_filepath, pygsti_expList_from_dataset
 

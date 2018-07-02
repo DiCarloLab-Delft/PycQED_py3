@@ -65,6 +65,9 @@ def split_expList(expList, max_nr_of_instr: int=8000,
         for exp_num, start_idx in enumerate(cutting_indices[:-1]):
             stop_idx = cutting_indices[exp_num+1]
             expSubLists.append(expList[start_idx:stop_idx])
+        # Final slice is not by default included in the experiment list
+        expSubLists.append(expList[cutting_indices[-1]:])
+
 
     if verbose:
         print("Splitted expList into {} sub lists".format(len(expSubLists)))
