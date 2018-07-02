@@ -1906,12 +1906,15 @@ class QuDev_transmon(Qubit):
                                           meas_grid=meas_grid,
                                           two_rounds = two_rounds,
                                           round=runs)
+            if runs==0:
+                phi = a.optimization_result[0]
+            else:
+                alpha = a.optimization_result[0]
+                phi = a.optimization_result[1]
         # phi and alpha are the coefficients that go in the predistortion matrix
-            alpha = a.optimization_result[0]
-            phi = a.optimization_result[1]
-        if update:
-            self.alpha(alpha)
-            self.phi_skew(phi)
+            if update:
+                self.alpha(alpha)
+                self.phi_skew(phi)
 
         return alpha,phi
 
