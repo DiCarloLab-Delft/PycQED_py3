@@ -6,10 +6,13 @@ try:
     from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
     import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
     from pycqed.measurement.openql_experiments import clifford_rb_oql as cl_oql
+    from pycqed.measurement.openql_experiments import pygsti_oql
+
 except ImportError:
     logging.warning('Could not import OpenQL')
     sqo = None
     mqo = None
+    pygsti_oql = None
 
 from pycqed.utilities.general import gen_sweep_pts
 from .qubit_object import Qubit
@@ -1712,7 +1715,7 @@ class CCLight_Transmon(Qubit):
             return a
         else:
             return [np.array(t, dtype=np.float64) for t in transients]
-    
+
     def measure_dispersive_shift_pulsed(self, freqs, MC=None, analyze: bool=True,
                                         prepare: bool=True):
         # docstring from parent class
@@ -2775,6 +2778,87 @@ class CCLight_Transmon(Qubit):
         if analyze:
             a = ma.Rabi_Analysis(close_main_fig=close_fig, label='ef_rabi')
             return a
+
+    def measure_1Q_gst(self,
+                       shots_per_meas: int,
+                       maxL: int=256,
+                       MC=None,
+                       recompile='as needed',
+                       prepare_for_timedomain: bool=True):
+        """
+        Performs single qubit Gate Set Tomography experiment of the StdXYI gateset.
+
+        Requires optimal weights and a calibrated digitized readout.
+
+        Args:
+            shots_per_meas (int):
+            maxL (int)          : specifies the maximum germ length,
+                                  must be power of 2.
+            lite_germs(bool)    : if True uses "lite" germs
+
+
+        """
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        ########################################
+        # Readout settings that have to be set #
+        ########################################
+
+        old_weight_type = self.ro_acq_weight_type()
+        old_digitized = self.ro_acq_digitized()
+        self.ro_acq_weight_type('optimal')
+        self.ro_acq_digitized(True)
+
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+        else:
+            self.prepare_readout()
+        MC.soft_avg(1)
+        # set back the settings
+        self.ro_acq_weight_type(old_weight_type)
+        self.ro_acq_digitized(old_digitized)
+
+        ########################################
+        # Readout settings that have to be set #
+        ########################################
+
+        programs, exp_list_fn = pygsti_oql.single_qubit_gst(q0=self.cfg_qubit_nr(),
+                                                            maxL=maxL,
+                                                            platf_cfg=self.cfg_openql_platform_fn(),
+                                                            recompile=recompile)
+
+        counter_param = ManualParameter('name_ctr', initial_value=0)
+
+        s = swf.OpenQL_Sweep(openql_program=programs[0],
+                             CCL=self.instr_CC.get_instr())
+        d = self.int_log_det
+
+        # poor man's GST contains 731 distinct gatestrings
+
+        sweep_points = np.concatenate([p.sweep_points for p in programs])
+        nr_of_meas = len(sweep_points)
+        print('nr_of_meas:', nr_of_meas)
+
+        prepare_function_kwargs = {
+            'counter_param': counter_param,
+            'programs': programs,
+            'CC': self.instr_CC.get_instr(),
+            'detector': d}
+        # hacky as heck
+        d.prepare_function_kwargs = prepare_function_kwargs
+        d.prepare_function = oqh.load_range_of_oql_programs_varying_nr_shots
+
+        shots = np.tile(sweep_points, shots_per_meas)
+
+        MC.soft_avg(1)
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(shots)
+        MC.set_detector_function(d)
+        MC.run('Single_qubit_GST_L{}_{}'.format(maxL, self.msmt_suffix),
+               exp_metadata={'bins': sweep_points,
+                             'gst_exp_list_filename': exp_list_fn})
+        a = ma2.GST_SingleQubit_DataExtraction(label='Single_qubit_GST')
 
     def create_dep_graph(self):
         dag = AutoDepGraph_DAG(name=self.name+' DAG')
