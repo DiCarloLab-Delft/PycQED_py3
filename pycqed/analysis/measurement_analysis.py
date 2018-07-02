@@ -192,6 +192,7 @@ class MeasurementAnalysis(object):
                 figname = (figname + '.' + plot_format)
             self.savename = os.path.abspath(os.path.join(
                 self.folder, figname))
+            print(self.savename,'::loc')
             if fig_tight:
                 try:
                     fig.tight_layout()
@@ -937,26 +938,27 @@ class MeasurementAnalysis(object):
 class Mixer_calibration_evaluation(MeasurementAnalysis):
 
     def __init__(self, ma1: MeasurementAnalysis,ma2: MeasurementAnalysis,**kw):
+        super().__init__(auto=False)
         self.ma_before = ma1
         self.ma_after = ma2
         self.sweep_pts1 = ma1.sweep_points
         self.sweep_pts2 = ma2.sweep_points
-        if self.sweep_pts1 != self.sweep_pts2:
+        if not np.array_equal(self.sweep_pts1,self.sweep_pts2):
             logging.error('mixer spectrum sweep points different! Evaluating '
                             'on interval with equal sweep points')
-        self.meas_vals1 = ma1.measured_values
-        self.meas_vals2 = ma2.measured_values
+        self.meas_vals1 = ma1.measured_values[0]
+        self.meas_vals2 = ma2.measured_values[0]
         print(ma1.value_names,': ma1 value names')
         print(ma2.value_names,': ma2 value names')
         #MAYBE some preprocessing necessary (Get power levels)
         self.signal_ratio = self.get_signal_ratio_db()
+        print(self.signal_ratio,': signal_ratio')
         self.make_figures(**kw)
 
     def get_signal_ratio_db(self):
         return 20.*np.log10(self.meas_vals2/self.meas_vals1)
 
     def make_figures(self,**kw):
-
         base_figname = 'mixer_peak_suppression'
         f,ax1 = plt.subplots()
         ax1.set_ylabel('power ratio [dB]')
@@ -965,7 +967,9 @@ class Mixer_calibration_evaluation(MeasurementAnalysis):
                  linestyle='solid',
                  label=r'signal ratio $20\log\left(\frac{V_1}{V_0}\right)$')
         ax1.grid(True)
+        ax2.tick_params('y',labelcolor='blue')
         ax1.legend(loc='best')
+        ax2.legend(loc='best')
         self.save_fig(f, figname=base_figname,**kw)
 
         base_figname = 'mixer_spectrum_comparison'
@@ -979,6 +983,7 @@ class Mixer_calibration_evaluation(MeasurementAnalysis):
         ax1.set_xlabel('frequencies [GHz]')
         ax1.legend(loc='best')
         self.save_fig(f, figname=base_figname,**kw)
+
 
 class OptimizationAnalysis_v2(MeasurementAnalysis):
 
@@ -1024,8 +1029,8 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
         self.meas_grid = kw.pop('meas_grid')
         self.ad_func_pars = kw.pop('ad_func_pars')
         self.two_rounds = kw.pop('two_rounds',False)
+        self.hidden_layers = self.ad_func_pars.pop('hidden_layers',[10.,10.])
         self.round = kw.pop('round',0)
-        self.hidden_layer_sizes = self.ad_func_pars.pop('hidden_layers',[10.,10.])
         self.alpha = self.ad_func_pars.pop('alpha',1e-2)
         self.estimator_name = self.ad_func_pars.pop('estimator','DNN_Regressor_tf')
         self.beta = self.ad_func_pars.pop('beta',0.)
@@ -1039,6 +1044,7 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
         # test_vals =    self.train_NN(**kw)
         #self.test_data = test_vals[:2]
         self.train_NN(**kw)
+
         if self.round > int(self.two_rounds):     #only create figures in the last iteration
             self.make_figures(**kw)
         if close_file:
@@ -1056,7 +1062,7 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
         result,est,test_vals,opti_flag\
                                   = opt.neural_network_opt(None, self.meas_grid,
                                           self.abs_vals,
-                                          hidden_layer_sizes = self.hidden_layers,
+                                          hidden_layers = self.hidden_layers,
                                           alpha= self.alpha,
                                           solver='lbfgs',
                                           estimator=self.estimator_name,
@@ -1071,6 +1077,7 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
         self.opti_flag = opti_flag
         self.estimator = est
         self.accuracy = est.evaluate(self.test_grid,self.test_target)
+        self.optimization_result = result
 
         return result,est,test_vals
 
@@ -1085,7 +1092,6 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
 
         pre_proc_dict = self.estimator.pre_proc_dict
         output_scale = pre_proc_dict.get('output',{}).get('scaling',1.)
-        print(output_scale)
         output_means = pre_proc_dict.get('output',{}).get('centering',0.)
         input_scale = pre_proc_dict.get('input',{}).get('scaling',1.)
         input_means = pre_proc_dict.get('input',{}).get('centering',0.)
@@ -3057,8 +3063,6 @@ class QScale_Analysis(TD_Analysis):
             (self.fit_res[1].params['slope'].stderr)**2)
 
         optimal_qscale_stddev = np.sqrt(
-            (intercept_diff_std/slope_diff_mean)**2 +
-            (intercept_diff_mean*slope_diff_std/(slope_diff_std**2))**2)
         # sqrt_quantity = intercept_diff_std_squared/((intercept_diff_mean)**2) + \
         #                 slope_diff_std_squared/((slope_diff_mean)**2) - \
         #                 2*cov_qscale_squared/(intercept_diff_mean*slope_diff_mean)

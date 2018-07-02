@@ -5,7 +5,6 @@ import numpy as np
 from abc import ABCMeta, abstractmethod
 
 #from neupy.algorithms import GRNN as grnn
-from sklearn.model_selection import GridSearchCV as gcv, train_test_split
 from sklearn.neural_network import MLPRegressor as mlpr
 from sklearn.linear_model import LinearRegression
 #from neupy.algorithms import GRNN as grnn

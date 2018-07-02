@@ -1568,6 +1568,7 @@ class QuDev_transmon(Qubit):
 
         for runs in range(2+int(two_rounds)):
             self.prepare_for_mixer_calibration(suppress='drive LO')
+            self.prepare_for_mixer_calibration(suppress='drive LO')
             cal_elts.mixer_calibration_sequence(
                     trigger_sep, 0, RO_pars=self.get_RO_pars(),
                     pulse_I_channel=self.pulse_I_channel(),
@@ -1613,6 +1614,7 @@ class QuDev_transmon(Qubit):
             self.pulse_Q_offset(ch_2_min)
 
         return ch_1_min,ch_2_min
+
 
     def calibrate_drive_mixer_carrier_NN(self, MC=None, update=True, x0=(0., 0.),
                                              trigger_sep=5e-6,
@@ -1807,22 +1809,27 @@ class QuDev_transmon(Qubit):
         ma1 = self.measure_drive_mixer_spectrum(if_freqs,MC=MC,
                                                 amplitude=amplitude,
                                                 trigger_sep=trigger_sep)
-        self.calibrate_drive_mixer_carrier_NN2(MC=MC,update=update,x0=x0,
-                                                meas_grid=meas_grid,
-                                                trigger_sep=trigger_sep,
-                                                estimator=estimator,
-                                                n_meas=n_meas,
-                                                two_rounds=two_rounds,
-                                                hidden_layers=hidden_layers,
-                                                **kwargs)
-        self.calibrate_drive_mixer_skewness_NN(MC=MC,update=update,
-                                                meas_grid=meas_grid,
-                                                trigger_sep=trigger_sep,
-                                                estimator=estimator,
-                                                n_meas=n_meas,
-                                                two_rounds=two_rounds,
-                                                hidden_layers=hidden_layers,
-                                                **kwargs)
+        #self.calibrate_drive_mixer_carrier_NN(MC=MC,update=update,x0=x0,
+        #                                        meas_grid=meas_grid,
+        #                                        trigger_sep=trigger_sep,
+        #                                        estimator=estimator,
+        #                                        n_meas=n_meas,
+        #                                        two_rounds=two_rounds,
+        #                                        hidden_layers=hidden_layers,
+        #                                        **kwargs)
+        self.calibrate_drive_mixer_carrier(MC=MC, update=update, x0=x0,
+                                           initial_stepsize=0.01, trigger_sep=trigger_sep)
+        self.calibrate_drive_mixer_skewness(MC=MC, update=update,
+                                            amplitude=amplitude, trigger_sep=trigger_sep,
+                                            initial_stepsize=None)
+        #self.calibrate_drive_mixer_skewness_NN(MC=MC,update=update,
+        #                                        meas_grid=meas_grid,
+        #                                        trigger_sep=trigger_sep,
+        #                                        estimator=estimator,
+        #                                        n_meas=n_meas,
+        #                                        two_rounds=two_rounds,
+        #                                        hidden_layers=hidden_layers,
+        #                                        **kwargs)
         ma2 = self.measure_drive_mixer_spectrum(if_freqs,MC=MC,
                                                 amplitude=amplitude,
                                                 trigger_sep=trigger_sep)
@@ -1984,7 +1991,7 @@ class QuDev_transmon(Qubit):
         two_rounds_sub =  not a.opti_flag and two_rounds
         if not a.opti_flag: #in case the optimization did not converge, rerun with
                         #different data means.
-            two_rounds = True   #this leads to not being able to make two iterations if first didnt converge
+            #two_rounds = True   #this leads to not being able to make two iterations if first didnt converge
             c = 1.
 
         if two_rounds:
@@ -2083,8 +2090,8 @@ class QuDev_transmon(Qubit):
         # FIXME: Make a proper analysis class for this (Ants, 04.12.2017)
         if measure:
             self.measure_transients(MC, analyze=True, **kw)
-        MAon = ma.MeasurementAnalysis(label='timetrace_on')
-        MAoff = ma.MeasurementAnalysis(label='timetrace_off')
+        MAon = ma.MeasurementAnalysis(label='timetrace_on_'+self.name)
+        MAoff = ma.MeasurementAnalysis(label='timetrace_off_'+self.name)
         don = MAon.measured_values[0] + 1j * MAon.measured_values[1]
         doff = MAoff.measured_values[0] + 1j * MAoff.measured_values[1]
         if update:
@@ -2645,10 +2652,10 @@ class QuDev_transmon(Qubit):
 
             f0 = SpecA.fitted_freq
             if update:
-                self.f_qubit(f0)
-            if analyze_ef:
-                f0_ef = 2*SpecA.fitted_freq_gf_over_2 - f0
-                if update:
+                if not analyze_ef:
+                    self.f_qubit(f0)
+                else:
+                    f0_ef = 2*SpecA.fitted_freq_gf_over_2 - f0
                     self.f_ef_qubit(f0_ef)
             if analyze_ef:
                 return f0, f0_ef
@@ -3956,7 +3963,8 @@ class QuDev_transmon(Qubit):
                        return_population_loss=False,
                        upload_AWGs='all',
                        upload_channels='all',
-                       prepare_for_timedomain=True
+                       prepare_for_timedomain=True,
+                       upload=True
                        ):
         '''
         method to measure the phase acquired during a flux pulse conditioned on the state
@@ -4015,7 +4023,8 @@ class QuDev_transmon(Qubit):
                 upload_channels=upload_channels
             )
             s2 = awg_swf.Flux_pulse_CPhase_meas_2D(self, qb_target, s1,
-                                                   sweep_mode='amplitude')
+                                                   sweep_mode='amplitude',
+                                                   upload=upload)
             if prepare_for_timedomain:
                 qb_target.prepare_for_timedomain()
                 self.prepare_for_timedomain()

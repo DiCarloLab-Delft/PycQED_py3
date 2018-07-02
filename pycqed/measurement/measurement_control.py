@@ -406,7 +406,6 @@ class MeasurementControl(Instrument):
 
         # used for next iteration
         self.last_sweep_pts = x
-
         datasetshape = self.dset.shape
         # self.iteration = datasetshape[0] + 1
 
