@@ -111,12 +111,14 @@ class Basic1DBinnedAnalysis(ba.BaseDataAnalysis):
     def __init__(self, t_start: str=None, t_stop: str=None,
                  label: str='', data_file_path: str=None,
                  options_dict: dict=None, extract_only: bool=False,
+                 close_figs=False,
                  do_fitting: bool=True, auto=True):
         super().__init__(t_start=t_start, t_stop=t_stop,
                          label=label,
                          data_file_path=data_file_path,
                          options_dict=options_dict,
-                         extract_only=extract_only, do_fitting=do_fitting)
+                         extract_only=extract_only, close_figs=False,
+                         do_fitting=do_fitting)
         if auto:
             self.run_analysis()
 

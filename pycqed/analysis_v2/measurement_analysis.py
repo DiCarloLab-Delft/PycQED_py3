@@ -31,9 +31,10 @@ import pycqed.analysis_v2.quantum_efficiency_analysis as qea
 reload(qea)
 import pycqed.analysis_v2.cross_dephasing_analysis as cda
 reload(cda)
-import  pycqed.analysis_v2.randomized_benchmarking_analysis as rba
+import pycqed.analysis_v2.randomized_benchmarking_analysis as rba
 reload(rba)
-
+import pycqed.analysis_v2.gate_set_tomography_analysis as gsa
+reload(gsa)
 
 from pycqed.analysis_v2.base_analysis import *
 from pycqed.analysis_v2.simple_analysis import (
@@ -65,3 +66,4 @@ from pycqed.analysis_v2.cross_dephasing_analysis import CrossDephasingAnalysis
 from pycqed.analysis_v2.randomized_benchmarking_analysis import (
     RandomizedBenchmarking_SingleQubit_Analysis,
     RandomizedBenchmarking_TwoQubit_Analysis)
+from pycqed.analysis_v2.gate_set_tomography_analysis import GST_SingleQubit_DataExtraction
