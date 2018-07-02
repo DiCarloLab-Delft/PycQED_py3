@@ -95,26 +95,26 @@ def decompose_clifford_seq_n_qubits(clifford_sequence_list, gate_decomp='HZ'):
             [gate_decomposition[clifford_sequence_array[idx0][idx1]] for
              idx0 in range(clifford_sequence_array.shape[0])])
 
-        # add extra I pulses to make each Clifford decomposition
-        # have the same total duration
-        nr_finite_duration_pulses = [len([y for y in x if 'Z' not in y]) for
-                                     x in decomposed_seq_temp]
-        for i, pulse_list in enumerate(decomposed_seq_temp):
-            if nr_finite_duration_pulses[i] < max(nr_finite_duration_pulses):
-                diff_finite_duration_pulses = max(nr_finite_duration_pulses) - \
-                                              nr_finite_duration_pulses[i]
-                pulse_list = pulse_list + ['I']*diff_finite_duration_pulses
-            decomposed_seq_temp[i] = pulse_list
-
-        # if all qubits receive same number of finite duration pulses in their
-        # respective Cl_i, patch with Z0 pulses until all qubits receive the
-        # same total nr of pulses
-        pulse_list_lengths = [len(j) for j in decomposed_seq_temp]
-        for i, pulse_list in enumerate(decomposed_seq_temp):
-            if pulse_list_lengths[i]<max(pulse_list_lengths):
-                nr_Z0_to_add = max(pulse_list_lengths)-pulse_list_lengths[i]
-                pulse_list = pulse_list + ['Z0']*nr_Z0_to_add
-            decomposed_seq_temp[i] = pulse_list
+        # # add extra I pulses to make each Clifford decomposition
+        # # have the same total duration
+        # nr_finite_duration_pulses = [len([y for y in x if 'Z' not in y]) for
+        #                              x in decomposed_seq_temp]
+        # for i, pulse_list in enumerate(decomposed_seq_temp):
+        #     if nr_finite_duration_pulses[i] < max(nr_finite_duration_pulses):
+        #         diff_finite_duration_pulses = max(nr_finite_duration_pulses) - \
+        #                                       nr_finite_duration_pulses[i]
+        #         pulse_list = pulse_list + ['I']*diff_finite_duration_pulses
+        #     decomposed_seq_temp[i] = pulse_list
+        #
+        # # if all qubits receive same number of finite duration pulses in their
+        # # respective Cl_i, patch with Z0 pulses until all qubits receive the
+        # # same total nr of pulses
+        # pulse_list_lengths = [len(j) for j in decomposed_seq_temp]
+        # for i, pulse_list in enumerate(decomposed_seq_temp):
+        #     if pulse_list_lengths[i]<max(pulse_list_lengths):
+        #         nr_Z0_to_add = max(pulse_list_lengths)-pulse_list_lengths[i]
+        #         pulse_list = pulse_list + ['Z0']*nr_Z0_to_add
+        #     decomposed_seq_temp[i] = pulse_list
 
         decomposed_seq.extend(decomposed_seq_temp)
 
@@ -168,8 +168,8 @@ def randomized_benchmarking_sequence(n_cl, desired_net_cl=0,
 
     If IRB, pass in interleaved_gate as string. Example: 'X180'.
     '''
-    logging.warning("deprecation warning, only exists for testing "
-                    "equivalence to new function.")
+    # logging.warning("deprecation warning, only exists for testing "
+    #                 "equivalence to new function.")
 
     if seed is None:
         rb_cliffords = np.random.randint(0, 24, int(n_cl))

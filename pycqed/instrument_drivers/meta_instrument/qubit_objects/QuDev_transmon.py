@@ -1848,7 +1848,7 @@ class QuDev_transmon(Qubit):
         alpha = kwargs.get('alpha',1e-2)
         beta = kwargs.get('beta',0.)
         gamma = kwargs.get('gamma',1.)
-        std_devs = kwargs.get('std_devs',[0.1,10])
+        std_devs = kwargs.get('std_devs',[0.2,5])
         iters = kwargs.get('iters',5000)
         c = kwargs.pop('second_round_std_scale',0.3)
         #Could make sample size variable (maxiter) for better adapting)
@@ -1913,7 +1913,8 @@ class QuDev_transmon(Qubit):
                 phi = a.optimization_result[1]
         # phi and alpha are the coefficients that go in the predistortion matrix
             if update:
-                self.alpha(alpha)
+                if runs>=0:
+                    self.alpha(alpha)
                 self.phi_skew(phi)
 
         return alpha,phi

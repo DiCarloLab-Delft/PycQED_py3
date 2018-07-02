@@ -1074,7 +1074,6 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_list, RO_pars,
         return_seq (bool): if True, returns seq, element list;
             if False, returns only seq_name
     """
-    print(spacing)
     # get number of qubits
     n = len(qubit_list)
 
@@ -1128,9 +1127,9 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_list, RO_pars,
                 op_dict['ICZ ' + qb.name]['sigma'] = \
                     qbc.get_operation_dict()[
                         'CZ ' + qbt.name + ' ' + qbc.name]['length']
-        if qb_nr != 0:
-            for pulse_names in op_dict:
-                op_dict[pulse_names]['refpoint'] = 'start'
+        # if qb_nr != 0:
+        for pulse_names in op_dict:
+            op_dict[pulse_names]['refpoint'] = 'simultaneous'
         pulse_dict.update(op_dict)
 
     if CxC_RB:
@@ -1222,38 +1221,68 @@ def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_list, RO_pars,
                 for k in range(n):
                     pulse_keys_by_qubit.append([x for l in pulse_keys_w_suffix[k::n]
                                                 for x in l])
+                # make all qb sequences the same length
+                max_len = 0
+                for pl in pulse_keys_by_qubit:
+                    if len(pl) > max_len:
+                        max_len = len(pl)
+                for ii, pl in enumerate(pulse_keys_by_qubit):
+                    if len(pl) < max_len:
+                        pl += (max_len-len(pl))*['I ' + qubit_list[ii].name]
 
                 pulse_list = []
                 for j in range(len(pulse_keys_by_qubit[0])):
                     for k in range(n):
-                        pulse_list.append(pulse_dict[pulse_keys_by_qubit[k][j]])
+                        pulse_list.append(deepcopy(pulse_dict[pulse_keys_by_qubit[k][j]]))
 
-                # if qb0 has a Z_pulse, remove the 'refpoint' key in the pulse pars
-                # dict of the next qubit which has an SSB pulse
-                Zp0_idxs = [] # indices of the Z pulses on qb0
-                for w, px in enumerate(pulse_list):
-                    if (px['target_qubit'] == qubit_list[0].name and
-                                px['pulse_type'] == 'Z_pulse'):
-                        Zp0_idxs.append(w)
-                if len(Zp0_idxs)>0:
-                    for y in Zp0_idxs:
-                        #look at the pulses applied on qb1...qbn
-                        qubit_length_pulse_list = pulse_list[y+1:y+n]
-                        # for each pulse in pulse_list where qb0 has a Z pulse,
-                        # look at the n-1 entries (qubits) and save the indices
-                        # of all SSB pulse parameters
-                        SSB_after_Z_on_qb0 = [y+1+qubit_length_pulse_list.index(j)
-                                              for j in qubit_length_pulse_list
-                                              if j['pulse_type'] != 'Z_pulse']
-                        if len(SSB_after_Z_on_qb0)>0:
-                            # if SSB pulses were found, delete the 'refpoint' entry
-                            # in the first qb after qb0 that has an SSB pulse
-                            first_SSB = next(y+1+qubit_length_pulse_list.index(j)
-                                             for j in qubit_length_pulse_list
-                                             if j['pulse_type'] != 'Z_pulse')
-                            temp_SSB_pulse = deepcopy(pulse_list[first_SSB])
-                            temp_SSB_pulse.pop('refpoint')
-                            pulse_list[first_SSB] = temp_SSB_pulse
+                refpoint = []
+                # firstssb = False
+
+                for p in pulse_list:
+                    p['refpoint'] = 'end'
+
+                a = [iii for iii in pulse_list if
+                     iii['pulse_type']=='SSB_DRAG_pulse']
+                a[0]['refpoint'] = 'end'
+                refpoint = [a[0]['target_qubit']]
+
+                for p in a[1:]:
+                    if p['target_qubit'] not in refpoint:
+                        p['refpoint'] = 'start'
+                        refpoint.append(p['target_qubit'])
+                    else:
+                        p['refpoint'] = 'end'
+                        refpoint = [p['target_qubit']]
+                    # print(p['target_qubit'])
+                    # print(p['refpoint'])
+                    # print(refpoint)
+
+                # # if qb0 has a Z_pulse, remove the 'refpoint' key in the pulse pars
+                # # dict of the next qubit which has an SSB pulse
+                # Zp0_idxs = [] # indices of the Z pulses on qb0
+                # for w, px in enumerate(pulse_list):
+                #     if (px['target_qubit'] == qubit_list[0].name and
+                #                 px['pulse_type'] == 'Z_pulse'):
+                #         Zp0_idxs.append(w)
+                # if len(Zp0_idxs)>0:
+                #     for y in Zp0_idxs:
+                #         #look at the pulses applied on qb1...qbn
+                #         qubit_length_pulse_list = pulse_list[y+1:y+n]
+                #         # for each pulse in pulse_list where qb0 has a Z pulse,
+                #         # look at the n-1 entries (qubits) and save the indices
+                #         # of all SSB pulse parameters
+                #         SSB_after_Z_on_qb0 = [y+1+qubit_length_pulse_list.index(j)
+                #                               for j in qubit_length_pulse_list
+                #                               if j['pulse_type'] != 'Z_pulse']
+                #         if len(SSB_after_Z_on_qb0)>0:
+                #             # if SSB pulses were found, delete the 'refpoint' entry
+                #             # in the first qb after qb0 that has an SSB pulse
+                #             first_SSB = next(y+1+qubit_length_pulse_list.index(j)
+                #                              for j in qubit_length_pulse_list
+                #                              if j['pulse_type'] != 'Z_pulse')
+                #             temp_SSB_pulse = deepcopy(pulse_list[first_SSB])
+                #             temp_SSB_pulse.pop('refpoint')
+                #             pulse_list[first_SSB] = temp_SSB_pulse
 
                 # add RO pulse pars at the end
                 pulse_list += [RO_pars]
@@ -1720,7 +1749,8 @@ def n_qubit_reset(qubit_names, operation_dict, reset_cycle_time, nr_resets=1,
         return seq_name
 
 def parity_correction_seq(
-        q0n, q1n, q2n, operation_dict, feedback_delay=900e-9, prep_sequence=None, reset=True,
+        q0n, q1n, q2n, operation_dict, feedback_delay=900e-9,
+        prep_sequence=None, reset=True, nr_echo_pulses=4,
         tomography_basis=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
         upload=True, verbose=False, return_seq=False, preselection=False,
         ro_spacing=1e-6):
@@ -1737,6 +1767,9 @@ def parity_correction_seq(
     required elements:
         prep_sequence:
             contains everything up to the first readout
+        Echo decoupling elements
+            contains nr_echo_pulses X180 equally-spaced pulses on q0n, q2n
+            FOR THIS TO WORK, ALL QUBITS MUST HAVE THE SAME PI-PULSE LENGTH
         feedback x 2 (for the two readout results):
             contains conditional Y80 on q1 and q2
         tomography x 6**2:
@@ -1773,7 +1806,7 @@ def parity_correction_seq(
     pulse_sequence.append('CZ ' + q1n + ' ' + q2n)
     pulse_sequence.append('Y90 ' + q1n)
     pulse_sequence.append('RO ' + q1n)
-    pulse_sequence.append('I_fb')
+    # pulse_sequence.append('I_fb')
     if preselection:
         pulse_sequence.append('RO mux_presel')
         pulse_sequence.append('RO presel_dummy')
@@ -1781,16 +1814,44 @@ def parity_correction_seq(
     el_main = multi_pulse_elt(0, station, pulse_list, trigger=True, name='main')
     el_list.append(el_main)
 
+    # decoupling elements - during I_fb + fb elements
+    DRAG_length = deepcopy(operation_dict['X180 '+q0n]['nr_sigma']) * \
+                  deepcopy(operation_dict['X180 '+q0n]['sigma'])
+    start_end_delay = (feedback_delay - nr_echo_pulses*DRAG_length)/8
+    operation_dict['I_echo'] = {
+        'pulse_type': 'SquarePulse',
+        'channel': operation_dict['RO mux']['acq_marker_channel'],
+        'amplitude': 0.0,
+        'length': start_end_delay,
+        'pulse_delay': 0}
+    Echo_pulse_delay = start_end_delay
+    echo_sequences = get_decoupling_pulses(q0n, q2n,
+                                           nr_pulses=nr_echo_pulses)
+    pulse_list = []
+    for i, echo_sequence in enumerate(echo_sequences):
+        for pulse in echo_sequence:
+            single_op_dict = deepcopy(operation_dict[pulse])
+            single_op_dict['pulse_delay'] = \
+                (start_end_delay if i == 0 else Echo_pulse_delay)
+            pulse_list.append(single_op_dict)
+    pulse_list.append(operation_dict['I_echo'])
+    el_echo = multi_pulse_elt(0, station, pulse_list, trigger=False,
+                              name='echo',
+                              previous_element=el_main)
+
+    el_list.append(el_echo)
+
     # feedback elements
     fb_sequence_0 = ['I ' + q2n]
     fb_sequence_1 = ['X180 ' + q2n] if reset else ['I ' + q2n]
     pulse_list = [operation_dict[pulse] for pulse in fb_sequence_0]
     el_list.append(multi_pulse_elt(0, station, pulse_list, name='feedback_0',
-                                   trigger=False, previous_element=el_main))
+                                   trigger=False, previous_element=el_echo))
     pulse_list = [operation_dict[pulse] for pulse in fb_sequence_1]
     el_fb = multi_pulse_elt(1, station, pulse_list, name='feedback_1',
-                            trigger=False, previous_element=el_main)
+                            trigger=False, previous_element=el_echo)
     el_list.append(el_fb)
+
 
     # tomography elements
     tomography_sequences = get_tomography_pulses(q0n, q2n,
@@ -1887,6 +1948,20 @@ def get_tomography_pulses(*qubit_names, basis_pulses=('I', 'X180', 'Y90',
                 tomo_sequences_new.append(sequence + [pulse+qb])
         tomo_sequences = tomo_sequences_new
     return tomo_sequences
+
+def get_decoupling_pulses(*qubit_names, nr_pulses=4):
+    echo_sequences = []
+    for pulse in nr_pulses*['X180']:
+        echo_sequences_new = []
+        for i, qb in enumerate(qubit_names):
+            if i == 0:
+                qb = ' ' + qb
+            else:
+                qb = 's ' + qb
+            echo_sequences_new.append(pulse+qb)
+        echo_sequences.append(echo_sequences_new)
+
+    return echo_sequences
 
 def n_qubit_ref_seq(qubit_names, operation_dict, ref_desc, upload=True,
                     verbose=False, return_seq=False, preselection=False,

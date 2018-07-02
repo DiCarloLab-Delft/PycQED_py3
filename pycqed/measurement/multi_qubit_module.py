@@ -349,59 +349,6 @@ def tomo2Q_cphase_cardinal(cardinal_state, device, qS_name, qCZ_name, CPhase=Tru
 
 
 
-def multiplexed_pulse(readouts, f_LO, upload=True, plot_filename=False):
-    """
-    Sets up a frequency-multiplexed pulse on the awg-sequencer of the UHFQC.
-    Updates the qubit ro_pulse_type parameter. This needs to be reverted if
-    thq qubit object is to update its readout pulse later on.
-
-    Args:
-        readouts: A list of different readouts. For each readout the list
-                  contains the qubit objects that are read out in that readout.
-        f_LO: The LO frequency that will be used.
-        upload: Whether to update the hardware instrument settings.
-
-    Returns:
-        The generated pulse waveform.
-    """
-
-    if not hasattr(readouts[0], '__iter__'):
-        readouts = [readouts]
-
-    fs = 1.8e9
-
-    readout_pulses = []
-    for qubits in readouts:
-        qb_pulses = {}
-        maxlen = 0
-        for qb in qubits:
-            qb.f_RO_mod(qb.f_RO() - f_LO)
-            samples = int(qb.RO_pulse_length() * fs)
-            tbase = np.linspace(0, samples / fs, samples, endpoint=False)
-            pulse = qb.RO_amp() * np.exp(
-                -2j * np.pi * qb.f_RO_mod() * tbase)
-            qb_pulses[qb.name] = pulse
-            if pulse.size > maxlen:
-                maxlen = pulse.size
-
-        pulse = np.zeros(maxlen, dtype=np.complex)
-        for p in qb_pulses.values():
-            pulse += np.pad(p, (0, maxlen - p.size), mode='constant',
-                            constant_values=0)
-        readout_pulses.append(pulse)
-
-    if upload:
-        UHFQC = readouts[0][0].UHFQC
-        if len(readout_pulses) == 1:
-            UHFQC.awg_sequence_acquisition_and_pulse(
-                Iwave=np.real(pulse).copy(), Qwave=np.imag(pulse).copy())
-        else:
-            UHFQC.awg_sequence_acquisition_and_pulse_multi_segment(readout_pulses)
-        DC_LO = readouts[0][0].readout_DC_LO
-        UC_LO = readouts[0][0].readout_UC_LO
-        DC_LO.frequency(f_LO)
-        UC_LO.frequency(f_LO)
-
 def multiplexed_pulse(readouts, f_LO, upload=True):
     """
     Sets up a frequency-multiplexed pulse on the awg-sequencer of the UHFQC.
@@ -413,7 +360,7 @@ def multiplexed_pulse(readouts, f_LO, upload=True):
                   contains the qubit objects that are read out in that readout.
         f_LO: The LO frequency that will be used.
         upload: Whether to update the hardware instrument settings.
-        plot_filename: The file to save the plot of the multiplexed pulse PSD. 
+        plot_filename: The file to save the plot of the multiplexed pulse PSD.
             If `None` or `True`, plot is only shown, and not saved. If `False`,
             no plot is generated.
 
@@ -1005,7 +952,7 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
         qb.RO_acq_averages(nr_averages)
         qb.prepare_for_timedomain(multiplexed=True)
 
-    multiplexed_pulse(qubits, f_LO, upload=True, plot_filename=True)
+    multiplexed_pulse(qubits, f_LO, upload=True)
     RO_pars = get_multiplexed_readout_pulse_dictionary(qubits)
 
     if len(qubits) == 2:
@@ -1024,6 +971,7 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
         hard_sweep_points = np.arange(nr_seeds)
         hard_sweep_func = \
             awg_swf2.two_qubit_Simultaneous_RB_fixed_length(
+                nr_seeds_array=np.arange(nr_seeds),
                 qubit_list=qubits, RO_pars=RO_pars,
                 nr_cliffords_value=nr_cliffords[0], CxC_RB=CxC_RB,
                 idx_for_RB=idx_for_RB, upload=False,
@@ -1042,17 +990,22 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
                     raise ValueError('For an experiment with more than two '
                                      'qubits, nr_cliffords must int or float.')
 
-        # k = 4095//nr_seeds
+        k = 4095//nr_seeds
+        nr_shots = 4095 - 4095 % nr_seeds
+        # k = 3200//nr_seeds
+        # nr_shots = 3200 - 3200 % nr_seeds
 
         det_func = get_multiplexed_readout_detector_functions(
             qubits, UHFQC=UHFQC, pulsar=pulsar,
-            nr_shots=nr_seeds)[key+'_log_det']
+            nr_shots=nr_shots)[key+'_log_det']
 
         #
-        #  hard_sweep_points = np.tile(np.arange(nr_seeds), k)
-        hard_sweep_points = np.arange(nr_seeds)
+        hard_sweep_points = np.tile(np.arange(nr_seeds), k)
+
+        # hard_sweep_points = np.arange(nr_seeds)
         hard_sweep_func = \
             awg_swf2.two_qubit_Simultaneous_RB_fixed_length(
+                nr_seeds_array=np.arange(nr_seeds),
                 qubit_list=qubits, RO_pars=RO_pars,
                 nr_cliffords_value=nr_cliffords, CxC_RB=CxC_RB,
                 idx_for_RB=idx_for_RB, upload=True,
@@ -1061,8 +1014,8 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
                 verbose=verbose, CZ_info_dict=CZ_info_dict,
                 cal_points=cal_points)
 
-        # soft_sweep_points = np.arange(nr_averages//k)
-        soft_sweep_points = np.arange(nr_averages)
+        soft_sweep_points = np.arange(nr_averages//k)
+        # soft_sweep_points = np.arange(nr_averages)
         soft_sweep_func = swf.None_Sweep()
 
     if cal_points:
@@ -1176,7 +1129,7 @@ def measure_two_qubit_tomo_Bell(bell_state, qb_c, qb_t, f_LO,
     if num_flux_pulses != 0:
         label += '_' + str(num_flux_pulses) + 'preFluxPulses'
 
-    multiplexed_pulse(qubits, f_LO, upload=True, plot_filename=True)
+    multiplexed_pulse(qubits, f_LO, upload=True)
     RO_pars = get_multiplexed_readout_pulse_dictionary(qubits)
 
 
@@ -1285,7 +1238,7 @@ def measure_three_qubit_tomo_GHZ(qubits, f_LO,
     for qb in qubits:
         qb.prepare_for_timedomain(multiplexed=True)
 
-    multiplexed_pulse(qubits, f_LO, upload=True, plot_filename=True)
+    multiplexed_pulse(qubits, f_LO, upload=True)
     RO_pars = get_multiplexed_readout_pulse_dictionary(qubits)
 
     det_func = get_multiplexed_readout_detector_functions(

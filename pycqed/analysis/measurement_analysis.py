@@ -3062,7 +3062,7 @@ class QScale_Analysis(TD_Analysis):
             np.sqrt((self.fit_res[2].params['slope'].stderr)**2 + \
             (self.fit_res[1].params['slope'].stderr)**2)
 
-        optimal_qscale_stddev = np.sqrt(
+        optimal_qscale_stddev = np.sqrt() #!!!!!
         # sqrt_quantity = intercept_diff_std_squared/((intercept_diff_mean)**2) + \
         #                 slope_diff_std_squared/((slope_diff_mean)**2) - \
         #                 2*cov_qscale_squared/(intercept_diff_mean*slope_diff_mean)

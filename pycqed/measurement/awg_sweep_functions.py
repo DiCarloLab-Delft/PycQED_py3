@@ -2240,7 +2240,8 @@ class Flux_pulse_CPhase_meas_hard_swf(swf.Hard_Sweep):
 
 class Flux_pulse_CPhase_meas_2D(swf.Soft_Sweep):
 
-    def __init__(self, qb_control, qb_target, hard_sweep, sweep_mode='amplitude'):
+    def __init__(self, qb_control, qb_target, hard_sweep,
+                 sweep_mode='amplitude', upload=True):
         '''
             Flexible soft sweep function class for 2D CPhase
             experiments that can either sweep the amplitude or
@@ -2267,13 +2268,14 @@ class Flux_pulse_CPhase_meas_2D(swf.Soft_Sweep):
         self.hard_sweep = hard_sweep
         self.qb_control = qb_control
         self.qb_target = qb_target
+        self.upload = upload
 
     def prepare(self):
         pass
 
     def set_parameter(self, val, **kw):
 
-        self.hard_sweep.upload = True
+        self.hard_sweep.upload = self.upload
 
         if self.sweep_mode == 'length':
             self.qb_control.flux_pulse_length(val)

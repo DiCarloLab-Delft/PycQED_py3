@@ -211,7 +211,9 @@ class two_qubit_Simultaneous_RB_sequence_lengths(swf.Soft_Sweep):
 
 class two_qubit_Simultaneous_RB_fixed_length(swf.Hard_Sweep):
 
-    def __init__(self, qubit_list, RO_pars, nr_cliffords_value, #int
+    def __init__(self, qubit_list, RO_pars,
+                 nr_seeds_array, #array
+                 nr_cliffords_value, #int
                  gate_decomposition='HZ', interleaved_gate=None,
                  upload=True, return_seq=False, seq_name=None,
                  CxC_RB=True, idx_for_RB=0, interleave_CZ=True,
@@ -223,6 +225,7 @@ class two_qubit_Simultaneous_RB_fixed_length(swf.Hard_Sweep):
         self.RO_pars = RO_pars
         self.upload = upload
         self.nr_cliffords_value = nr_cliffords_value
+        self.nr_seeds_array = nr_seeds_array
         self.CxC_RB = CxC_RB
         self.seq_name = seq_name
         self.return_seq = return_seq
@@ -246,7 +249,7 @@ class two_qubit_Simultaneous_RB_fixed_length(swf.Hard_Sweep):
                 nr_cliffords_value=self.nr_cliffords_value,
                 gate_decomposition=self.gate_decomposition,
                 interleaved_gate=self.interleaved_gate,
-                nr_seeds=self.sweep_points,
+                nr_seeds=self.nr_seeds_array,
                 CxC_RB=self.CxC_RB,
                 idx_for_RB=self.idx_for_RB,
                 seq_name=self.seq_name,
