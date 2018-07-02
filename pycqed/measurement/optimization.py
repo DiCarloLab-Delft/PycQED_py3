@@ -294,7 +294,7 @@ def center_and_scale(X,y):
 def neural_network_opt(fun, training_grid, target_values = None,
                        hidden_layer_sizes=[10, 10],
                        alpha= 0.0001, solver='lbfgs',estimator='DNN_Regressor_tf',
-                       iters = 200, beta=0.9 , gamma=1., test_size=0.1):
+                       iters = 200, beta=0.9 , gamma=1., test_size=0.1,ndim=2):
     """
     parameters:
         fun:           Function that can be used to get data points
@@ -390,10 +390,16 @@ def neural_network_opt(fun, training_grid, target_values = None,
         est.fit(training_grid,target_values)
         return est
 
+    def polyreg():
+        est = ml.Polynomial_Regression(ndim=ndim, pre_proc_dict=pre_processing_dict)
+        est.fit(training_grid,target_values)
+        return est
+
 
     estimators = {'MLP_Regressor_scikit': mlpr, #defines all current estimators currently implemented
                   'DNN_Regressor_tf': dnnr,
-                  'GRNN_neupy': grnn}
+                  'GRNN_neupy': grnn,
+                  'Polynomial_Regression_scikit': polyreg}
 
     est = estimators[estimator]()       #create and fit instance of the chosen estimator
 

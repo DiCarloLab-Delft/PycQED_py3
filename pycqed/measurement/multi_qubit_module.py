@@ -1327,7 +1327,6 @@ def cphase_gate_tuneup(qb_control, qb_target,
                        MC_optimization=None,
                        MC_detector=None,
                        maxiter=50,
-                       name='cphase_tuneup',
                        spacing=20e-9,
                        ramsey_phases=None):
 

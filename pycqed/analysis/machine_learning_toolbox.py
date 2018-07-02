@@ -7,6 +7,7 @@ from abc import ABCMeta, abstractmethod
 #from neupy.algorithms import GRNN as grnn
 from sklearn.model_selection import GridSearchCV as gcv, train_test_split
 from sklearn.neural_network import MLPRegressor as mlpr
+from sklearn.linear_model import LinearRegression
 #from neupy.algorithms import GRNN as grnn
 try:
 	import tensorflow as tf
@@ -244,6 +245,45 @@ class DNN_Regressor_tf(Estimator):
         #return self._session.run(predictions, {self._x: [samples]})
         return self._session.run(predictions, {self._x: samples})
 
+class Polynomial_Regression(Estimator):
+    '''
+    Estimator for a Polynomial regression of degree 'ndim"
+    '''
+    def __init__(self,ndim=2,mixed=False,pre_proc_dict=None):
+
+        super().__init__(name='Polynomial_Regression_scikit',
+                         pre_proc_dict=pre_proc_dict,type='Regressor')
+        self._polyReg = None
+        self.ndim = ndim
+        self.mixed = mixed
+
+    def poly_features_transform(self,X):
+        if X.ndim==1:
+            data_shape = [len(X),1]
+        else:
+            data_shape = np.shape(X)
+        #so far does not support fits with mixed polynomials
+        A = np.zeros((data_shape[0],1+self.ndim*data_shape[1]))
+        A[:,0] = np.ones((data_shape[0]))
+        for it in range(self.ndim):
+            A[:,1+it*data_shape[1]:1+(it+1)*data_shape[1]] = X**it
+        return A
+
+    def fit(self,x_train,y_train):
+        self._polyReg = LinearRegression(fit_intercept=False)
+        self._polyReg.fit(self.poly_features_transform(x_train),y_train)
+
+    def predict(self,samples):
+        if not isinstance(samples,np.ndarray):
+            samples = np.array(samples)
+        return self._polyReg.predict(self.poly_features_transform(samples))
+
+    def evaluate(self,x,y):
+        pred = self._polyReg.predict(x)
+        acc = 1. - np.linalg.norm(pred-y)**2 \
+                   / np.linalg.norm(y-np.mean(y,axis=0))**2
+        return acc
+
 class GRNN_neupy(Estimator):
     '''
     Generalized Regression Neural Network implementation from neupy
@@ -253,7 +293,7 @@ class GRNN_neupy(Estimator):
     def __init__(self,std=None,gamma=1.,verbose =False,
                  pre_proc_dict=None):
 
-        super.__init__(name='GRNN_neupy',pre_proc_dict=pre_proc_dict,
+        super().__init__(name='GRNN_neupy',pre_proc_dict=pre_proc_dict,
                        type='Regressor')
         self._std = std
         self._gamma = gamma

@@ -937,6 +937,8 @@ class MeasurementAnalysis(object):
 class Mixer_calibration_evaluation(MeasurementAnalysis):
 
     def __init__(self, ma1: MeasurementAnalysis,ma2: MeasurementAnalysis,**kw):
+        self.ma_before = ma1
+        self.ma_after = ma2
         self.sweep_pts1 = ma1.sweep_points
         self.sweep_pts2 = ma2.sweep_points
         if self.sweep_pts1 != self.sweep_pts2:
@@ -949,31 +951,34 @@ class Mixer_calibration_evaluation(MeasurementAnalysis):
         #MAYBE some preprocessing necessary (Get power levels)
         self.signal_ratio = self.get_signal_ratio_db()
         self.make_figures(**kw)
+
     def get_signal_ratio_db(self):
-        return 10.*np.log10(self.meas_vals2/self.meas_vals1)
+        return 20.*np.log10(self.meas_vals2/self.meas_vals1)
 
     def make_figures(self,**kw):
-        base_figname = 'mixer_spectrum_comparison'
+
+        base_figname = 'mixer_peak_suppression'
         f,ax1 = plt.subplots()
         ax1.set_ylabel('power ratio [dB]')
+        ax1.set_xlabel('frequency [GHz]')
         ax1.plot(self.sweep_pts1,self.signal_ratio,color='goldenrod',
                  linestyle='solid',
-                 label='signal ratio $10\log\left(\frac{P_1}{P_0}\right)$')
+                 label=r'signal ratio $20\log\left(\frac{V_1}{V_0}\right)$')
         ax1.grid(True)
-        ax1.tick_params('y',labelcolor='goldenrod')
-        ax2 = ax1.twinx()
-        ax2.set_ylabel('##meas_value Units go Here##')
-        ax2.plot(self.sweep_pts1,self.meas_vals1,color='blue',linestyle='solid',
-                 label='pre calibration power spectrum',alpha=0.7)
-        ax2.plot(self.sweep_pts2,self.meas_vals2,color='green',linestyle='solid',
-                 label='post calibration power spectrum',alpha=0.7)
-        ax2.tick_params('y',labelcolor='blue')
         ax1.legend(loc='best')
         self.save_fig(f, figname=base_figname,**kw)
 
-
-
-
+        base_figname = 'mixer_spectrum_comparison'
+        f,ax1 = plt.subplots()
+        ax1.set_ylabel('voltage levels [dBm]')
+        ax1.plot(self.sweep_pts1,self.meas_vals1,color='blue',linestyle='solid',
+                 label='pre calibration',alpha=0.5)
+        ax1.plot(self.sweep_pts2,self.meas_vals2,color='green',linestyle='solid',
+                 label='post calibration',alpha=1.0)
+        ax1.grid(True)
+        ax1.set_xlabel('frequencies [GHz]')
+        ax1.legend(loc='best')
+        self.save_fig(f, figname=base_figname,**kw)
 
 class OptimizationAnalysis_v2(MeasurementAnalysis):
 
@@ -1019,12 +1024,14 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
         self.meas_grid = kw.pop('meas_grid')
         self.ad_func_pars = kw.pop('ad_func_pars')
         self.two_rounds = kw.pop('two_rounds',False)
+        self.round = kw.pop('round',0)
         self.hidden_layer_sizes = self.ad_func_pars.pop('hidden_layers',[10.,10.])
         self.alpha = self.ad_func_pars.pop('alpha',1e-2)
         self.estimator_name = self.ad_func_pars.pop('estimator','DNN_Regressor_tf')
         self.beta = self.ad_func_pars.pop('beta',0.)
         self.gamma = self.ad_func_pars.pop('gamma',1.)
         self.iters = self.ad_func_pars.pop('iters',200)
+        self.ndim = self.ad_func_pars.pop('ndim',2)
         self.accuracy= -np.infty
         #already rescaled to original average,interval.
         # self.optimization_result,\
@@ -1032,7 +1039,7 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
         # test_vals =    self.train_NN(**kw)
         #self.test_data = test_vals[:2]
         self.train_NN(**kw)
-        if not self.two_rounds:     #only create figures in the second iteration
+        if self.round > int(self.two_rounds):     #only create figures in the last iteration
             self.make_figures(**kw)
         if close_file:
             self.data_file.close()
@@ -1044,6 +1051,8 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
         else:
             self.abs_vals = np.sqrt(self.measured_values[0,:]**2 + self.measured_values[1,:]**2)
 
+        if self.round==0 and self.parameter_names[1]=='phi_skew':
+            self.meas_grid = np.array(self.meas_grid[:,1])
         result,est,test_vals,opti_flag\
                                   = opt.neural_network_opt(None, self.meas_grid,
                                           self.abs_vals,
@@ -1053,15 +1062,17 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
                                           estimator=self.estimator_name,
                                           iters = self.iters,
                                           beta=self.beta,
-                                          gamma=1.)
+                                          gamma=1.,
+                                          ndim=self.ndim)
         #test_grid and test_target values. Centered and scaled to [-1,1] since
         #only used for performance estimation of estimator
         self.test_grid = test_vals[0]
         self.test_target = test_vals[1]
         self.opti_flag = opti_flag
+        self.estimator = est
         self.accuracy = est.evaluate(self.test_grid,self.test_target)
 
-        return result,est,test_data
+        return result,est,test_vals
 
     def make_figures(self, **kw):
 
@@ -1131,6 +1142,7 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
             figname1 += ';'
             base_figname += self.value_names[i]
         textstr = 'Optimization converged to: \n'
+        base_figname += '_it_'+self.round
         for i in range(len(self.parameter_names)):
                textstr+='%s: %.3g %s' % (self.parameter_names[i],
                                          self.optimization_result[i],
@@ -1167,6 +1179,7 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
         base_figname = 'optimization of '
         for i in range(len(self.value_names)):
             base_figname+= self.value_names[i]
+        base_figname += '_it_'+self.round
         if np.shape(self.sweep_points)[0] == 2:
             f, ax = plt.subplots()
             a_tools.color_plot_interpolated(
