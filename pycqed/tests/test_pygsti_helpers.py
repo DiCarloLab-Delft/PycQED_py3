@@ -27,7 +27,6 @@ class Test_pygsti_helpers(unittest.TestCase):
         for i, gs in enumerate(explist[-10:]):
             self.assertEqual(gs.str, expected_finalpart[i])
 
-
     def test_split_expList(self):
         dataset_filename = os.path.join(gst_exp_filepath,
                                         'std1Q_XYI_lite_maxL256.txt')
