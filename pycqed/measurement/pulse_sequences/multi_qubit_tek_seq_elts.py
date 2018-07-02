@@ -1807,49 +1807,49 @@ def parity_correction_seq(
     pulse_sequence.append('Y90 ' + q1n)
     pulse_sequence.append('RO ' + q1n)
     # pulse_sequence.append('I_fb')
-    if preselection:
-        pulse_sequence.append('RO mux_presel')
-        pulse_sequence.append('RO presel_dummy')
-    pulse_list = [operation_dict[pulse] for pulse in pulse_sequence]
-    el_main = multi_pulse_elt(0, station, pulse_list, trigger=True, name='main')
-    el_list.append(el_main)
 
-    # decoupling elements - during I_fb + fb elements
-    DRAG_length = deepcopy(operation_dict['X180 '+q0n]['nr_sigma']) * \
-                  deepcopy(operation_dict['X180 '+q0n]['sigma'])
-    start_end_delay = (feedback_delay - nr_echo_pulses*DRAG_length)/8
-    operation_dict['I_echo'] = {
-        'pulse_type': 'SquarePulse',
-        'channel': operation_dict['RO mux']['acq_marker_channel'],
-        'amplitude': 0.0,
-        'length': start_end_delay,
-        'pulse_delay': 0}
-    Echo_pulse_delay = start_end_delay
-    echo_sequences = get_decoupling_pulses(q0n, q2n,
-                                           nr_pulses=nr_echo_pulses)
-    pulse_list = []
-    for i, echo_sequence in enumerate(echo_sequences):
-        for pulse in echo_sequence:
+    pulse_list = [operation_dict[pulse] for pulse in pulse_sequence]
+
+    if nr_echo_pulses > 0:
+        DRAG_length = deepcopy(operation_dict['X180 '+q0n]['nr_sigma']) * \
+                      deepcopy(operation_dict['X180 '+q0n]['sigma'])
+        start_end_delay = (feedback_delay - nr_echo_pulses*DRAG_length) / \
+                          2 / nr_echo_pulses
+        if start_end_delay < 0:
+            logging.error("Dynamical decoupling pulses don't fit into the "
+                          "feedback delay time")
+        operation_dict['I_echo'] = {
+            'pulse_type': 'SquarePulse',
+            'channel': operation_dict['RO mux']['acq_marker_channel'],
+            'amplitude': 0.0,
+            'length': start_end_delay,
+            'pulse_delay': 0}
+        echo_pulse_delay = 2*start_end_delay
+        echo_sequence = get_decoupling_pulses(q0n, q2n,
+                                               nr_pulses=nr_echo_pulses)
+        for i, pulse in enumerate(echo_sequence):
             single_op_dict = deepcopy(operation_dict[pulse])
             single_op_dict['pulse_delay'] = \
-                (start_end_delay if i == 0 else Echo_pulse_delay)
+                (start_end_delay if i == 0 else echo_pulse_delay)
             pulse_list.append(single_op_dict)
-    pulse_list.append(operation_dict['I_echo'])
-    el_echo = multi_pulse_elt(0, station, pulse_list, trigger=False,
-                              name='echo',
-                              previous_element=el_main)
+        pulse_list.append(operation_dict['I_echo'])
 
-    el_list.append(el_echo)
+    if preselection:
+        pulse_list.append(operation_dict['RO mux_presel'])
+        pulse_list.append(operation_dict['RO presel_dummy'])
+
+    el_main = multi_pulse_elt(0, station, pulse_list, trigger=True, name='main')
+    el_list.append(el_main)
 
     # feedback elements
     fb_sequence_0 = ['I ' + q2n]
     fb_sequence_1 = ['X180 ' + q2n] if reset else ['I ' + q2n]
     pulse_list = [operation_dict[pulse] for pulse in fb_sequence_0]
     el_list.append(multi_pulse_elt(0, station, pulse_list, name='feedback_0',
-                                   trigger=False, previous_element=el_echo))
+                                   trigger=False, previous_element=el_main))
     pulse_list = [operation_dict[pulse] for pulse in fb_sequence_1]
     el_fb = multi_pulse_elt(1, station, pulse_list, name='feedback_1',
-                            trigger=False, previous_element=el_echo)
+                            trigger=False, previous_element=el_main)
     el_list.append(el_fb)
 
 
@@ -1950,17 +1950,16 @@ def get_tomography_pulses(*qubit_names, basis_pulses=('I', 'X180', 'Y90',
     return tomo_sequences
 
 def get_decoupling_pulses(*qubit_names, nr_pulses=4):
+    if nr_pulses % 2 != 0:
+        logging.warning('Odd number of dynamical decoupling pulses')
     echo_sequences = []
     for pulse in nr_pulses*['X180']:
-        echo_sequences_new = []
         for i, qb in enumerate(qubit_names):
             if i == 0:
                 qb = ' ' + qb
             else:
                 qb = 's ' + qb
-            echo_sequences_new.append(pulse+qb)
-        echo_sequences.append(echo_sequences_new)
-
+            echo_sequences.append(pulse+qb)
     return echo_sequences
 
 def n_qubit_ref_seq(qubit_names, operation_dict, ref_desc, upload=True,
