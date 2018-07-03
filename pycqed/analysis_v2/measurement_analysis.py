@@ -66,4 +66,5 @@ from pycqed.analysis_v2.cross_dephasing_analysis import CrossDephasingAnalysis
 from pycqed.analysis_v2.randomized_benchmarking_analysis import (
     RandomizedBenchmarking_SingleQubit_Analysis,
     RandomizedBenchmarking_TwoQubit_Analysis)
-from pycqed.analysis_v2.gate_set_tomography_analysis import GST_SingleQubit_DataExtraction
+from pycqed.analysis_v2.gate_set_tomography_analysis import \
+    GST_SingleQubit_DataExtraction, GST_TwoQubit_DataExtraction
