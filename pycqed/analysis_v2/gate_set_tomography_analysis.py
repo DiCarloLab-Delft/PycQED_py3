@@ -209,7 +209,7 @@ class GST_TwoQubit_DataExtraction(ba.BaseDataAnalysis):
         shots_q1 = shots_q1[:-(len(shots_q1) % len(expList))]
 
         # LSQ (q0) is last entry in list
-        shots_00 = (1-shots_q1) *(1-shots_q0)
+        shots_00 = (1-shots_q1) * (1-shots_q0)
         shots_01 = (1-shots_q1) * (shots_q0)
         shots_10 = (shots_q1) * (1-shots_q0)
         shots_11 = (shots_q1) * (shots_q0)
