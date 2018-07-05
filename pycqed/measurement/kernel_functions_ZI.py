@@ -9,6 +9,7 @@ This implements three basic filters and a rounding function
 
 """
 import logging
+import textwrap
 import numpy as np
 from scipy import signal
 
@@ -98,7 +99,7 @@ def bounce_correction(ysig, tau:float, amp: float,
 #################################################################
 
 
-def coef_round(value):
+def coef_round(value, force_bshift=None):
     """
     hardware friendly
     rounds coefficients to hardware-compatible pseudo-float
@@ -116,8 +117,11 @@ def coef_round(value):
         new_value = 0.
         # to simplify the cores we allow 4 discrete shifts by 4 bits: 0, -4, -8
         # and -12
-        bshift = np.max(
-            [np.min([np.floor(-np.log2(np.abs(value))/4.)*4., 12.]), 0.])
+        if force_bshift is None:
+            bshift = np.max(
+                [np.min([np.floor(-np.log2(np.abs(value))/4.)*4., 12.]), 0.])
+        else:
+            bshift = force_bshift
         # 18 bits within the multiplication itself
         scaling = np.power(2, 18+bshift)
         new_value = np.round(value*scaling) / scaling
@@ -193,46 +197,8 @@ def multipath_filter2(sig, alpha, k, paths):
     duf = duf[0:sig.size]
     return sig + k * (duf - sig)
 
-def multipath_first_order_bounce_correction(sig, delay, amp, paths = 8, bufsize = 128):
-    """
-    This function simulates a possible FPGA implementation of a first-order bounce correction filter (only one reflection considered).
-    The signal (sig) is assumed to be a numpy array representing a waveform with sampling rate 2.4 GSa/s.
-
-    Args:
-        sig:   The signal to be filtered as a numpy array
-        delay: The delay is specified in number of samples. It needs to be an integer.
-        amp:   The amplitude of the bounce specified relative to the amplitude of the input signal.
-               The amplitude is constrained to be smaller than 1. The amplitude is represented as a 18-bit fixed point number on the FPGA.
-        paths: The number of parallel paths on the FPGA
-
-    Returns:
-        sigout: Numpy array representing the output signal of the filter
-    """
-    if not 1 <= delay < bufsize-8:
-        raise ValueError(textwrap.dedent("""
-            The maximum delay needs to be less than 120 (bufsize-8) samples to save hardware resources.
-            The delay needs to be at least 1 sample.")
-            """))
-    if not -1 < amp < 1:
-        raise ValueError("The amplitude needs to be between -1 and 1.")
-
-    sigout = np.zeros(len(sig))
-    buffer = np.zeros(bufsize)
-
-    amp_hw = coef_round(amp)
-
-    # iterate in steps of eight samples through the input signal to simulate the implementation with parallel paths on the FPGA
-    for i in range(0, len(sig), paths):
-        buffer[:-paths] = buffer[paths:]
-        upper_ind = min(i+paths, len(sig))
-        n_samples = upper_ind - i
-        buffer[-paths-1:-paths+n_samples-1] = sig[i:upper_ind]
-        sigout[i:upper_ind] = sig[i:upper_ind] - amp_hw*buffer[-delay-paths-1:-delay-paths+n_samples-1]
-    return sigout
-
-def first_order_bounce_corr(sig, delay, amp, sampling_rate):
-    """ This function provides a wrapper to call the multipath_first_order_bounce_correction
-    using natural units.
+def first_order_bounce_corr(sig, delay, amp, awg_sample_rate, scope_sample_rate = None, bufsize=256):
+    """ This function simulates the real-time bounce correction.
 
     Args:
         sig:           The signal to be filtered as a numpy array.
@@ -243,10 +209,43 @@ def first_order_bounce_corr(sig, delay, amp, sampling_rate):
     Returns:
         sigout: Numpy array representing the output signal of the filter
     """
-    delay_n_samples = round(sampling_rate*delay)
-    if not delay_n_samples >= 1:
-        raise ValueError("The delay need to be at least one sample.")
-    sigout = multipath_first_order_bounce_correction(sig, delay_n_samples, amp)
+    delay_n_samples = int(round(awg_sample_rate*delay))
+    if not 1 <= delay_n_samples < bufsize-8:
+        raise ValueError(textwrap.dedent("""
+            The maximum delay needs to be less than {:d} (bufsize-8) AWG samples to save hardware resources.
+            The delay needs to be at least 1 AWG sample.")
+            """.format(bufsize-8)))
+    if not -1 < amp < 1:
+        raise ValueError("The amplitude needs to be between -1 and 1.")
+
+    # The scope sampling rate is equal to the AWG sampling rate by default.
+    if scope_sample_rate is None:
+        scope_sample_rate = awg_sample_rate
+
+    # Reserve buffer space for bounce compensation
+    shift_reg = np.zeros(delay_n_samples)
+
+    awg_sample_incr = awg_sample_rate/scope_sample_rate
+
+    previous_awg_sample_cnt = 0
+    present_awg_sample_cnt = 0
+
+    amp_hw = coef_round(amp, force_bshift=0)
+
+    sigout = np.zeros(len(sig))
+
+    for i, s in enumerate(sig):
+        # Compute output signal
+        sigout[i] = s + amp_hw*shift_reg[-1]
+
+        present_awg_sample_cnt += awg_sample_incr
+        awg_sample_diff = int(present_awg_sample_cnt) - previous_awg_sample_cnt
+        if awg_sample_diff >= 1:
+            # Update shift register with present scope sample
+            shift_reg[awg_sample_diff:] = shift_reg[:-awg_sample_diff]
+            shift_reg[:awg_sample_diff] = s*np.ones(awg_sample_diff)
+            previous_awg_sample_cnt = int(present_awg_sample_cnt)
+
     return sigout
 
 def first_order_bounce_kern(delay, amp, sampling_rate):
@@ -262,9 +261,9 @@ def first_order_bounce_kern(delay, amp, sampling_rate):
     """
     delay_n_samples = round(sampling_rate*delay)
     if not delay_n_samples >= 1:
-        raise ValueError("The delay need to be at least one sample.")
+        raise ValueError("The delay needs to be at least one sample.")
     kern = np.zeros(delay_n_samples+1)
-    kern[0] = 1
+    kern[0] = 1.0
     kern[-1] = amp
     return kern
 
