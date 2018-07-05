@@ -46,6 +46,12 @@ class ZI_base_instrument(Instrument):
                 # min/max not implemented yet for ZI auto docstrings #352
                 par_kw['vals'] = vals.Ints()
 
+            elif par['Type'] == 'Integer (enumerated)':
+                par_kw['set_cmd'] = self._gen_set_func(self._dev.seti, parfunc)
+                par_kw['get_cmd'] = self._gen_get_func(self._dev.geti, parfunc)
+                # min/max not implemented yet for ZI auto docstrings #352
+                par_kw['vals'] = vals.Ints()
+
             elif par['Type'] == 'Double':
                 par_kw['set_cmd'] = self._gen_set_func(self._dev.setd, parfunc)
                 par_kw['get_cmd'] = self._gen_get_func(self._dev.getd, parfunc)
@@ -58,12 +64,28 @@ class ZI_base_instrument(Instrument):
                 # min/max not implemented yet for ZI auto docstrings #352
                 par_kw['vals'] = vals.Arrays()
 
+            elif par['Type'] == 'String':
+                par_kw['set_cmd'] = self._gen_set_func(self._dev.sets, parfunc)
+                par_kw['get_cmd'] = self._gen_get_func(self._dev.gets, parfunc)
+                par_kw['vals'] = vals.Strings()
+
             elif par['Type'] == 'CoreString':
                 par_kw['get_cmd'] = self._gen_get_func(self._dev.getd, parfunc)
                 par_kw['set_cmd'] = None  # Not implemented
                 par_kw['vals'] = vals.Strings()
 
+            elif par['Type'] == 'ZICntSample':
+                par_kw['get_cmd'] = None  # Not implemented
+                par_kw['set_cmd'] = None  # Not implemented
+                par_kw['vals'] = None # Not implemented
+
+            elif par['Type'] == 'ZITriggerSample':
+                par_kw['get_cmd'] = None  # Not implemented
+                par_kw['set_cmd'] = None  # Not implemented
+                par_kw['vals'] = None # Not implemented
+
             else:
+                print(par['Type'])
                 raise NotImplementedError
 
             # If not readable/writable the methods are removed after the type
