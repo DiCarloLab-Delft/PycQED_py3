@@ -92,7 +92,7 @@ class GST_SingleQubit_DataExtraction(ba.BaseDataAnalysis):
         print("Nr gatestrings", len(expList))
         # Filter out uncompleted iterations
         missing_shots = (len(shots_1) % len(expList))
-        if missing_shots !=0:
+        if missing_shots != 0:
             shots_1 = shots_1[:-missing_shots]
 
         shots_0 = 1 - shots_1
@@ -116,9 +116,10 @@ class GST_SingleQubit_DataExtraction(ba.BaseDataAnalysis):
         ds.done_adding_data()
 
         ds_name = self.measurementstring+self.timestamp+'_counts.txt'
-        pygsti.io.write_dataset(
-            os.path.join(self.raw_data_dict['folder'], ds_name), ds)
+        dataset_fp = os.path.join(self.raw_data_dict['folder'], ds_name)
+        pygsti.io.write_dataset(dataset_fp, ds)
         self.proc_data_dict['dataset'] = ds
+        self.proc_data_dict['dataset_fp'] = dataset_fp
 
 
 class GST_TwoQubit_DataExtraction(ba.BaseDataAnalysis):
@@ -164,8 +165,7 @@ class GST_TwoQubit_DataExtraction(ba.BaseDataAnalysis):
         self.raw_data_dict['xlabel'] = a.parameter_names[0]
         self.raw_data_dict['xunit'] = a.parameter_units[0]
 
-        self.raw_data_dict['bins'] = a.data_file['Experimental Data']\
-            ['Experimental Metadata']['bins'].value
+        self.raw_data_dict['bins'] = a.data_file['Experimental Data']['Experimental Metadata']['bins'].value
 
         if self.gst_exp_list_filepath == None:
             gst_exp_list_filename = a.data_file['Experimental Data'][
@@ -205,8 +205,9 @@ class GST_TwoQubit_DataExtraction(ba.BaseDataAnalysis):
         print("Nr bins:", len(bins))
         print("Nr gatestrings", len(expList))
         # Filter out uncompleted iterations
-        shots_q0 = shots_q0[:-(len(shots_q0) % len(expList))]
-        shots_q1 = shots_q1[:-(len(shots_q1) % len(expList))]
+        if (len(shots_q0) % len(expList))!= 0 :
+            shots_q0 = shots_q0[:-(len(shots_q0) % len(expList))]
+            shots_q1 = shots_q1[:-(len(shots_q1) % len(expList))]
 
         # LSQ (q0) is last entry in list
         shots_00 = (1-shots_q1) * (1-shots_q0)
@@ -215,24 +216,27 @@ class GST_TwoQubit_DataExtraction(ba.BaseDataAnalysis):
         shots_11 = (shots_q1) * (shots_q0)
 
         counts_00 = np.sum(np.reshape(shots_00, (len(expList),
-            len(shots_00)//len(expList)), order='F'), axis=1)
+                                                 len(shots_00)//len(expList)), order='F'), axis=1)
         counts_01 = np.sum(np.reshape(shots_01, (len(expList),
-            len(shots_01)//len(expList)), order='F'), axis=1)
+                                                 len(shots_01)//len(expList)), order='F'), axis=1)
         counts_10 = np.sum(np.reshape(shots_10, (len(expList),
-            len(shots_10)//len(expList)), order='F'), axis=1)
+                                                 len(shots_10)//len(expList)), order='F'), axis=1)
         counts_11 = np.sum(np.reshape(shots_11, (len(expList),
-            len(shots_11)//len(expList)), order='F'), axis=1)
+                                                 len(shots_11)//len(expList)), order='F'), axis=1)
 
         # writing to pygsti dataset
         outcomeLabels = [('00',), ('01',), ('10',), ('11',)]
         ds = pygsti.objects.DataSet(outcomeLabels=outcomeLabels)
         for i, gateString in enumerate(expList):
             ds.add_count_dict(gateString,
-                {'00': counts_00[i], '01': counts_01[i],
-                 '10': counts_10[i], '11': counts_11[i]})
+                              {'00': counts_00[i], '01': counts_01[i],
+                               '10': counts_10[i], '11': counts_11[i]})
         ds.done_adding_data()
 
         ds_name = self.measurementstring+self.timestamp+'_counts.txt'
-        pygsti.io.write_dataset(
-            os.path.join(self.raw_data_dict['folder'], ds_name), ds)
+        dataset_fp = os.path.join(self.raw_data_dict['folder'], ds_name)
+        pygsti.io.write_dataset(dataset_fp, ds)
         self.proc_data_dict['dataset'] = ds
+        self.proc_data_dict['dataset_fp'] = dataset_fp
+
+
