@@ -4590,275 +4590,275 @@
         "Type": "Double",
         "Unit": "Hz"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/BCS/0/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/BOUNCES/0/AMPLITUDE": {
         "Description": "Sets the amplitude of the bounce correction (BC) filter. The bounce amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/BCS/0/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/BOUNCES/0/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/BCS/0/DELAY": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/BOUNCES/0/DELAY": {
         "Description": "Sets the delay of the bounce correction (BC) filter.",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/BCS/0/DELAY",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/BOUNCES/0/DELAY",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/BCS/0/ENABLE": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/BOUNCES/0/ENABLE": {
         "Description": "Enables (1) or disables (0) the bounce correction (BC) filter.",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/BCS/0/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/BOUNCES/0/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/BCS/0/STATUS": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/BOUNCES/0/STATUS": {
         "Description": "Indicates the status of the bounce correction (BC) filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/BCS/0/STATUS",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/BOUNCES/0/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/0/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/0/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/0/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/0/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/0/ENABLE": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/0/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/0/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/0/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/0/STATUS": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/0/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/0/STATUS",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/0/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/0/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/0/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/0/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/0/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/1/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/1/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/1/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/1/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/1/ENABLE": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/1/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/1/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/1/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/1/STATUS": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/1/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/1/STATUS",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/1/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/1/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/1/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/1/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/1/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/2/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/2/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/2/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/2/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/2/ENABLE": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/2/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/2/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/2/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/2/STATUS": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/2/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/2/STATUS",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/2/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/2/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/2/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/2/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/2/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/3/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/3/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/3/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/3/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/3/ENABLE": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/3/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/3/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/3/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/3/STATUS": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/3/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/3/STATUS",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/3/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/3/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/3/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/3/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/3/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/4/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/4/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/4/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/4/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/4/ENABLE": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/4/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/4/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/4/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/4/STATUS": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/4/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/4/STATUS",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/4/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/4/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/4/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/4/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/4/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/5/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/5/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/5/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/5/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/5/ENABLE": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/5/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/5/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/5/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/5/STATUS": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/5/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/5/STATUS",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/5/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/5/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/5/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/5/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/5/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/6/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/6/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/6/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/6/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/6/ENABLE": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/6/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/6/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/6/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/6/STATUS": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/6/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/6/STATUS",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/6/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/6/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/6/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/6/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/6/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/7/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/7/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/7/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/7/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/7/ENABLE": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/7/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/7/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/7/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/7/STATUS": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/7/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/7/STATUS",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/7/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/7/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/7/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPS/7/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/EXPONENTIALS/7/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/HPCS/0/ENABLE": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/HIGHPASS/0/ENABLE": {
         "Description": "Enables (1) or disables (0) the high-pass compensation (HPC) filter.",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/HPCS/0/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/HIGHPASS/0/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/HPCS/0/STATUS": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/HIGHPASS/0/STATUS": {
         "Description": "Indicates the status of the high-pass compensation (HPC) filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/HPCS/0/STATUS",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/HIGHPASS/0/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/0/COMPENSATIONS/HPCS/0/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/0/COMPENSATIONS/HIGHPASS/0/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the high-pass compensation (HPC) filter.",
-        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/HPCS/0/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/0/COMPENSATIONS/HIGHPASS/0/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
@@ -4923,275 +4923,275 @@
         "Type": "Double",
         "Unit": "V"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/BCS/0/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/BOUNCES/0/AMPLITUDE": {
         "Description": "Sets the amplitude of the bounce correction (BC) filter. The bounce amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/BCS/0/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/BOUNCES/0/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/BCS/0/DELAY": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/BOUNCES/0/DELAY": {
         "Description": "Sets the delay of the bounce correction (BC) filter.",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/BCS/0/DELAY",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/BOUNCES/0/DELAY",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/BCS/0/ENABLE": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/BOUNCES/0/ENABLE": {
         "Description": "Enables (1) or disables (0) the bounce correction (BC) filter.",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/BCS/0/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/BOUNCES/0/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/BCS/0/STATUS": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/BOUNCES/0/STATUS": {
         "Description": "Indicates the status of the bounce correction (BC) filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/BCS/0/STATUS",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/BOUNCES/0/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/0/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/0/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/0/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/0/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/0/ENABLE": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/0/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/0/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/0/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/0/STATUS": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/0/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/0/STATUS",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/0/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/0/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/0/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/0/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/0/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/1/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/1/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/1/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/1/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/1/ENABLE": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/1/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/1/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/1/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/1/STATUS": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/1/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/1/STATUS",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/1/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/1/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/1/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/1/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/1/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/2/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/2/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/2/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/2/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/2/ENABLE": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/2/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/2/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/2/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/2/STATUS": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/2/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/2/STATUS",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/2/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/2/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/2/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/2/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/2/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/3/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/3/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/3/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/3/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/3/ENABLE": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/3/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/3/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/3/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/3/STATUS": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/3/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/3/STATUS",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/3/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/3/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/3/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/3/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/3/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/4/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/4/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/4/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/4/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/4/ENABLE": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/4/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/4/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/4/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/4/STATUS": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/4/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/4/STATUS",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/4/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/4/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/4/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/4/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/4/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/5/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/5/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/5/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/5/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/5/ENABLE": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/5/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/5/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/5/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/5/STATUS": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/5/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/5/STATUS",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/5/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/5/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/5/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/5/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/5/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/6/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/6/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/6/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/6/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/6/ENABLE": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/6/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/6/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/6/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/6/STATUS": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/6/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/6/STATUS",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/6/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/6/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/6/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/6/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/6/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/7/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/7/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/7/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/7/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/7/ENABLE": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/7/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/7/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/7/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/7/STATUS": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/7/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/7/STATUS",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/7/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/7/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/7/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPS/7/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/EXPONENTIALS/7/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/HPCS/0/ENABLE": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/HIGHPASS/0/ENABLE": {
         "Description": "Enables (1) or disables (0) the high-pass compensation (HPC) filter.",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/HPCS/0/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/HIGHPASS/0/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/HPCS/0/STATUS": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/HIGHPASS/0/STATUS": {
         "Description": "Indicates the status of the high-pass compensation (HPC) filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/HPCS/0/STATUS",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/HIGHPASS/0/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/1/COMPENSATIONS/HPCS/0/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/1/COMPENSATIONS/HIGHPASS/0/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the high-pass compensation (HPC) filter.",
-        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/HPCS/0/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/1/COMPENSATIONS/HIGHPASS/0/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
@@ -5256,275 +5256,275 @@
         "Type": "Double",
         "Unit": "V"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/BCS/0/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/BOUNCES/0/AMPLITUDE": {
         "Description": "Sets the amplitude of the bounce correction (BC) filter. The bounce amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/BCS/0/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/BOUNCES/0/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/BCS/0/DELAY": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/BOUNCES/0/DELAY": {
         "Description": "Sets the delay of the bounce correction (BC) filter.",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/BCS/0/DELAY",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/BOUNCES/0/DELAY",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/BCS/0/ENABLE": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/BOUNCES/0/ENABLE": {
         "Description": "Enables (1) or disables (0) the bounce correction (BC) filter.",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/BCS/0/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/BOUNCES/0/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/BCS/0/STATUS": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/BOUNCES/0/STATUS": {
         "Description": "Indicates the status of the bounce correction (BC) filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/BCS/0/STATUS",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/BOUNCES/0/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/0/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/0/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/0/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/0/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/0/ENABLE": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/0/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/0/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/0/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/0/STATUS": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/0/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/0/STATUS",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/0/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/0/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/0/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/0/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/0/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/1/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/1/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/1/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/1/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/1/ENABLE": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/1/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/1/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/1/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/1/STATUS": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/1/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/1/STATUS",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/1/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/1/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/1/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/1/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/1/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/2/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/2/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/2/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/2/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/2/ENABLE": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/2/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/2/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/2/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/2/STATUS": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/2/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/2/STATUS",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/2/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/2/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/2/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/2/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/2/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/3/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/3/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/3/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/3/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/3/ENABLE": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/3/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/3/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/3/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/3/STATUS": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/3/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/3/STATUS",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/3/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/3/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/3/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/3/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/3/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/4/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/4/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/4/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/4/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/4/ENABLE": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/4/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/4/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/4/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/4/STATUS": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/4/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/4/STATUS",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/4/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/4/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/4/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/4/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/4/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/5/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/5/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/5/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/5/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/5/ENABLE": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/5/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/5/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/5/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/5/STATUS": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/5/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/5/STATUS",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/5/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/5/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/5/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/5/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/5/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/6/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/6/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/6/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/6/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/6/ENABLE": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/6/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/6/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/6/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/6/STATUS": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/6/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/6/STATUS",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/6/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/6/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/6/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/6/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/6/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/7/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/7/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/7/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/7/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/7/ENABLE": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/7/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/7/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/7/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/7/STATUS": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/7/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/7/STATUS",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/7/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/7/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/7/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPS/7/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/EXPONENTIALS/7/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/HPCS/0/ENABLE": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/HIGHPASS/0/ENABLE": {
         "Description": "Enables (1) or disables (0) the high-pass compensation (HPC) filter.",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/HPCS/0/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/HIGHPASS/0/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/HPCS/0/STATUS": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/HIGHPASS/0/STATUS": {
         "Description": "Indicates the status of the high-pass compensation (HPC) filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/HPCS/0/STATUS",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/HIGHPASS/0/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/2/COMPENSATIONS/HPCS/0/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/2/COMPENSATIONS/HIGHPASS/0/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the high-pass compensation (HPC) filter.",
-        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/HPCS/0/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/2/COMPENSATIONS/HIGHPASS/0/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
@@ -5589,275 +5589,275 @@
         "Type": "Double",
         "Unit": "V"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/BCS/0/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/BOUNCES/0/AMPLITUDE": {
         "Description": "Sets the amplitude of the bounce correction (BC) filter. The bounce amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/BCS/0/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/BOUNCES/0/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/BCS/0/DELAY": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/BOUNCES/0/DELAY": {
         "Description": "Sets the delay of the bounce correction (BC) filter.",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/BCS/0/DELAY",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/BOUNCES/0/DELAY",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/BCS/0/ENABLE": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/BOUNCES/0/ENABLE": {
         "Description": "Enables (1) or disables (0) the bounce correction (BC) filter.",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/BCS/0/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/BOUNCES/0/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/BCS/0/STATUS": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/BOUNCES/0/STATUS": {
         "Description": "Indicates the status of the bounce correction (BC) filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/BCS/0/STATUS",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/BOUNCES/0/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/0/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/0/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/0/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/0/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/0/ENABLE": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/0/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/0/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/0/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/0/STATUS": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/0/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/0/STATUS",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/0/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/0/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/0/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/0/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/0/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/1/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/1/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/1/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/1/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/1/ENABLE": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/1/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/1/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/1/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/1/STATUS": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/1/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/1/STATUS",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/1/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/1/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/1/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/1/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/1/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/2/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/2/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/2/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/2/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/2/ENABLE": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/2/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/2/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/2/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/2/STATUS": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/2/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/2/STATUS",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/2/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/2/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/2/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/2/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/2/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/3/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/3/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/3/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/3/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/3/ENABLE": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/3/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/3/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/3/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/3/STATUS": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/3/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/3/STATUS",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/3/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/3/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/3/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/3/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/3/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/4/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/4/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/4/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/4/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/4/ENABLE": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/4/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/4/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/4/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/4/STATUS": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/4/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/4/STATUS",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/4/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/4/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/4/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/4/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/4/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/5/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/5/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/5/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/5/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/5/ENABLE": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/5/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/5/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/5/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/5/STATUS": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/5/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/5/STATUS",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/5/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/5/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/5/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/5/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/5/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/6/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/6/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/6/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/6/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/6/ENABLE": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/6/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/6/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/6/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/6/STATUS": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/6/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/6/STATUS",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/6/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/6/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/6/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/6/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/6/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/7/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/7/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/7/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/7/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/7/ENABLE": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/7/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/7/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/7/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/7/STATUS": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/7/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/7/STATUS",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/7/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/7/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/7/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPS/7/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/EXPONENTIALS/7/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/HPCS/0/ENABLE": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/HIGHPASS/0/ENABLE": {
         "Description": "Enables (1) or disables (0) the high-pass compensation (HPC) filter.",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/HPCS/0/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/HIGHPASS/0/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/HPCS/0/STATUS": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/HIGHPASS/0/STATUS": {
         "Description": "Indicates the status of the high-pass compensation (HPC) filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/HPCS/0/STATUS",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/HIGHPASS/0/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/3/COMPENSATIONS/HPCS/0/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/3/COMPENSATIONS/HIGHPASS/0/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the high-pass compensation (HPC) filter.",
-        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/HPCS/0/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/3/COMPENSATIONS/HIGHPASS/0/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
@@ -5922,275 +5922,275 @@
         "Type": "Double",
         "Unit": "V"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/BCS/0/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/BOUNCES/0/AMPLITUDE": {
         "Description": "Sets the amplitude of the bounce correction (BC) filter. The bounce amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/BCS/0/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/BOUNCES/0/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/BCS/0/DELAY": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/BOUNCES/0/DELAY": {
         "Description": "Sets the delay of the bounce correction (BC) filter.",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/BCS/0/DELAY",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/BOUNCES/0/DELAY",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/BCS/0/ENABLE": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/BOUNCES/0/ENABLE": {
         "Description": "Enables (1) or disables (0) the bounce correction (BC) filter.",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/BCS/0/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/BOUNCES/0/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/BCS/0/STATUS": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/BOUNCES/0/STATUS": {
         "Description": "Indicates the status of the bounce correction (BC) filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/BCS/0/STATUS",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/BOUNCES/0/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/0/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/0/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/0/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/0/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/0/ENABLE": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/0/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/0/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/0/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/0/STATUS": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/0/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/0/STATUS",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/0/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/0/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/0/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/0/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/0/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/1/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/1/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/1/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/1/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/1/ENABLE": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/1/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/1/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/1/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/1/STATUS": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/1/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/1/STATUS",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/1/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/1/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/1/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/1/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/1/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/2/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/2/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/2/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/2/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/2/ENABLE": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/2/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/2/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/2/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/2/STATUS": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/2/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/2/STATUS",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/2/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/2/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/2/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/2/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/2/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/3/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/3/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/3/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/3/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/3/ENABLE": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/3/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/3/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/3/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/3/STATUS": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/3/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/3/STATUS",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/3/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/3/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/3/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/3/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/3/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/4/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/4/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/4/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/4/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/4/ENABLE": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/4/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/4/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/4/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/4/STATUS": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/4/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/4/STATUS",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/4/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/4/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/4/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/4/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/4/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/5/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/5/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/5/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/5/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/5/ENABLE": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/5/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/5/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/5/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/5/STATUS": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/5/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/5/STATUS",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/5/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/5/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/5/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/5/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/5/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/6/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/6/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/6/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/6/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/6/ENABLE": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/6/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/6/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/6/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/6/STATUS": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/6/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/6/STATUS",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/6/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/6/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/6/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/6/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/6/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/7/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/7/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/7/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/7/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/7/ENABLE": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/7/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/7/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/7/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/7/STATUS": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/7/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/7/STATUS",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/7/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/7/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/7/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPS/7/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/EXPONENTIALS/7/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/HPCS/0/ENABLE": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/HIGHPASS/0/ENABLE": {
         "Description": "Enables (1) or disables (0) the high-pass compensation (HPC) filter.",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/HPCS/0/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/HIGHPASS/0/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/HPCS/0/STATUS": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/HIGHPASS/0/STATUS": {
         "Description": "Indicates the status of the high-pass compensation (HPC) filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/HPCS/0/STATUS",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/HIGHPASS/0/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/4/COMPENSATIONS/HPCS/0/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/4/COMPENSATIONS/HIGHPASS/0/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the high-pass compensation (HPC) filter.",
-        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/HPCS/0/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/4/COMPENSATIONS/HIGHPASS/0/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
@@ -6255,275 +6255,275 @@
         "Type": "Double",
         "Unit": "V"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/BCS/0/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/BOUNCES/0/AMPLITUDE": {
         "Description": "Sets the amplitude of the bounce correction (BC) filter. The bounce amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/BCS/0/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/BOUNCES/0/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/BCS/0/DELAY": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/BOUNCES/0/DELAY": {
         "Description": "Sets the delay of the bounce correction (BC) filter.",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/BCS/0/DELAY",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/BOUNCES/0/DELAY",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/BCS/0/ENABLE": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/BOUNCES/0/ENABLE": {
         "Description": "Enables (1) or disables (0) the bounce correction (BC) filter.",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/BCS/0/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/BOUNCES/0/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/BCS/0/STATUS": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/BOUNCES/0/STATUS": {
         "Description": "Indicates the status of the bounce correction (BC) filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/BCS/0/STATUS",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/BOUNCES/0/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/0/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/0/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/0/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/0/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/0/ENABLE": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/0/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/0/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/0/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/0/STATUS": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/0/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/0/STATUS",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/0/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/0/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/0/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/0/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/0/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/1/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/1/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/1/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/1/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/1/ENABLE": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/1/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/1/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/1/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/1/STATUS": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/1/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/1/STATUS",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/1/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/1/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/1/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/1/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/1/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/2/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/2/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/2/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/2/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/2/ENABLE": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/2/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/2/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/2/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/2/STATUS": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/2/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/2/STATUS",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/2/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/2/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/2/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/2/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/2/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/3/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/3/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/3/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/3/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/3/ENABLE": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/3/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/3/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/3/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/3/STATUS": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/3/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/3/STATUS",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/3/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/3/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/3/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/3/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/3/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/4/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/4/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/4/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/4/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/4/ENABLE": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/4/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/4/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/4/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/4/STATUS": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/4/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/4/STATUS",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/4/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/4/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/4/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/4/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/4/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/5/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/5/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/5/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/5/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/5/ENABLE": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/5/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/5/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/5/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/5/STATUS": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/5/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/5/STATUS",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/5/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/5/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/5/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/5/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/5/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/6/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/6/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/6/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/6/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/6/ENABLE": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/6/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/6/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/6/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/6/STATUS": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/6/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/6/STATUS",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/6/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/6/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/6/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/6/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/6/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/7/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/7/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/7/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/7/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/7/ENABLE": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/7/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/7/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/7/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/7/STATUS": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/7/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/7/STATUS",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/7/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/7/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/7/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPS/7/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/EXPONENTIALS/7/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/HPCS/0/ENABLE": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/HIGHPASS/0/ENABLE": {
         "Description": "Enables (1) or disables (0) the high-pass compensation (HPC) filter.",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/HPCS/0/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/HIGHPASS/0/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/HPCS/0/STATUS": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/HIGHPASS/0/STATUS": {
         "Description": "Indicates the status of the high-pass compensation (HPC) filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/HPCS/0/STATUS",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/HIGHPASS/0/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/5/COMPENSATIONS/HPCS/0/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/5/COMPENSATIONS/HIGHPASS/0/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the high-pass compensation (HPC) filter.",
-        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/HPCS/0/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/5/COMPENSATIONS/HIGHPASS/0/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
@@ -6588,275 +6588,275 @@
         "Type": "Double",
         "Unit": "V"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/BCS/0/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/BOUNCES/0/AMPLITUDE": {
         "Description": "Sets the amplitude of the bounce correction (BC) filter. The bounce amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/BCS/0/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/BOUNCES/0/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/BCS/0/DELAY": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/BOUNCES/0/DELAY": {
         "Description": "Sets the delay of the bounce correction (BC) filter.",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/BCS/0/DELAY",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/BOUNCES/0/DELAY",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/BCS/0/ENABLE": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/BOUNCES/0/ENABLE": {
         "Description": "Enables (1) or disables (0) the bounce correction (BC) filter.",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/BCS/0/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/BOUNCES/0/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/BCS/0/STATUS": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/BOUNCES/0/STATUS": {
         "Description": "Indicates the status of the bounce correction (BC) filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/BCS/0/STATUS",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/BOUNCES/0/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/0/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/0/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/0/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/0/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/0/ENABLE": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/0/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/0/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/0/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/0/STATUS": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/0/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/0/STATUS",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/0/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/0/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/0/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/0/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/0/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/1/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/1/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/1/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/1/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/1/ENABLE": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/1/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/1/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/1/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/1/STATUS": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/1/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/1/STATUS",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/1/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/1/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/1/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/1/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/1/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/2/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/2/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/2/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/2/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/2/ENABLE": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/2/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/2/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/2/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/2/STATUS": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/2/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/2/STATUS",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/2/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/2/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/2/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/2/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/2/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/3/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/3/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/3/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/3/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/3/ENABLE": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/3/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/3/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/3/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/3/STATUS": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/3/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/3/STATUS",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/3/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/3/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/3/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/3/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/3/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/4/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/4/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/4/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/4/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/4/ENABLE": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/4/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/4/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/4/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/4/STATUS": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/4/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/4/STATUS",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/4/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/4/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/4/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/4/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/4/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/5/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/5/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/5/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/5/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/5/ENABLE": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/5/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/5/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/5/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/5/STATUS": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/5/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/5/STATUS",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/5/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/5/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/5/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/5/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/5/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/6/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/6/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/6/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/6/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/6/ENABLE": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/6/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/6/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/6/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/6/STATUS": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/6/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/6/STATUS",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/6/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/6/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/6/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/6/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/6/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/7/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/7/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/7/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/7/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/7/ENABLE": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/7/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/7/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/7/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/7/STATUS": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/7/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/7/STATUS",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/7/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/7/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/7/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPS/7/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/EXPONENTIALS/7/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/HPCS/0/ENABLE": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/HIGHPASS/0/ENABLE": {
         "Description": "Enables (1) or disables (0) the high-pass compensation (HPC) filter.",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/HPCS/0/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/HIGHPASS/0/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/HPCS/0/STATUS": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/HIGHPASS/0/STATUS": {
         "Description": "Indicates the status of the high-pass compensation (HPC) filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/HPCS/0/STATUS",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/HIGHPASS/0/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/6/COMPENSATIONS/HPCS/0/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/6/COMPENSATIONS/HIGHPASS/0/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the high-pass compensation (HPC) filter.",
-        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/HPCS/0/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/6/COMPENSATIONS/HIGHPASS/0/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
@@ -6921,275 +6921,275 @@
         "Type": "Double",
         "Unit": "V"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/BCS/0/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/BOUNCES/0/AMPLITUDE": {
         "Description": "Sets the amplitude of the bounce correction (BC) filter. The bounce amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/BCS/0/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/BOUNCES/0/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/BCS/0/DELAY": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/BOUNCES/0/DELAY": {
         "Description": "Sets the delay of the bounce correction (BC) filter.",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/BCS/0/DELAY",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/BOUNCES/0/DELAY",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/BCS/0/ENABLE": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/BOUNCES/0/ENABLE": {
         "Description": "Enables (1) or disables (0) the bounce correction (BC) filter.",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/BCS/0/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/BOUNCES/0/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/BCS/0/STATUS": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/BOUNCES/0/STATUS": {
         "Description": "Indicates the status of the bounce correction (BC) filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/BCS/0/STATUS",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/BOUNCES/0/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/0/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/0/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/0/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/0/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/0/ENABLE": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/0/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/0/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/0/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/0/STATUS": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/0/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/0/STATUS",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/0/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/0/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/0/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/0/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/0/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/1/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/1/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/1/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/1/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/1/ENABLE": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/1/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/1/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/1/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/1/STATUS": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/1/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/1/STATUS",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/1/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/1/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/1/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/1/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/1/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/2/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/2/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/2/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/2/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/2/ENABLE": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/2/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/2/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/2/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/2/STATUS": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/2/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/2/STATUS",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/2/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/2/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/2/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/2/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/2/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/3/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/3/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/3/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/3/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/3/ENABLE": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/3/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/3/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/3/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/3/STATUS": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/3/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/3/STATUS",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/3/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/3/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/3/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/3/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/3/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/4/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/4/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/4/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/4/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/4/ENABLE": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/4/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/4/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/4/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/4/STATUS": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/4/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/4/STATUS",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/4/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/4/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/4/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/4/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/4/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/5/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/5/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/5/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/5/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/5/ENABLE": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/5/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/5/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/5/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/5/STATUS": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/5/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/5/STATUS",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/5/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/5/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/5/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/5/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/5/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/6/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/6/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/6/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/6/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/6/ENABLE": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/6/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/6/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/6/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/6/STATUS": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/6/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/6/STATUS",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/6/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/6/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/6/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/6/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/6/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/7/AMPLITUDE": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/7/AMPLITUDE": {
         "Description": "Sets the amplitude of the exponential (EXP) overshoot compensation filter. The overshoot amplitude is specified relative to the signal amplitude.",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/7/AMPLITUDE",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/7/AMPLITUDE",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/7/ENABLE": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/7/ENABLE": {
         "Description": "Enables (1) or disables (0) the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/7/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/7/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/7/STATUS": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/7/STATUS": {
         "Description": "Indicates the status of the exponential (EXP) overshoot compensation filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/7/STATUS",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/7/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/7/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/7/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the exponential (EXP) overshoot compensation filter.",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPS/7/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/EXPONENTIALS/7/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/HPCS/0/ENABLE": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/HIGHPASS/0/ENABLE": {
         "Description": "Enables (1) or disables (0) the high-pass compensation (HPC) filter.",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/HPCS/0/ENABLE",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/HIGHPASS/0/ENABLE",
         "Properties": "Read, Write",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/HPCS/0/STATUS": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/HIGHPASS/0/STATUS": {
         "Description": "Indicates the status of the high-pass compensation (HPC) filter. 0 = normal, 1 = overflow",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/HPCS/0/STATUS",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/HIGHPASS/0/STATUS",
         "Properties": "Read",
         "Type": "Integer (64 bit)",
         "Unit": "None"
     },
-    "/DEV8018/SIGOUTS/7/COMPENSATIONS/HPCS/0/TIMECONSTANT": {
+    "/DEV8018/SIGOUTS/7/COMPENSATIONS/HIGHPASS/0/TIMECONSTANT": {
         "Description": "Sets the characteristic time constant of the high-pass compensation (HPC) filter.",
-        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/HPCS/0/TIMECONSTANT",
+        "Node": "/DEV8018/SIGOUTS/7/COMPENSATIONS/HIGHPASS/0/TIMECONSTANT",
         "Properties": "Read, Write",
         "Type": "Double",
         "Unit": "s"
