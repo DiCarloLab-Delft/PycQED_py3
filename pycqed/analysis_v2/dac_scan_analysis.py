@@ -325,7 +325,7 @@ class FluxFrequency(ba.BaseDataAnalysis):
                     'linestyle': '-',
                 }
 
-            if hasattr(self, 'fit_dicts') and self.options_dict.get('print_fit_result_plot', True):
+            if hasattr(self, 'fit_dicts') and hasattr(self, 'fit_res_dicts') and self.options_dict.get('print_fit_result_plot', True):
                 dac_fit_text = ''
                 # if ext or self.is_spectroscopy:
                 dac_fit_text += '$E_C/2 \pi = %.2f(\pm %.3f)$ MHz\n' % (
