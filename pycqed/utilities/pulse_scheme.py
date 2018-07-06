@@ -108,8 +108,8 @@ def interval(ax, start, stop, height=1.5, label=None, labelHeight=None,
     ax.add_patch(arrow)
 
     if vlines:
-        ax.plot([start, start], [0, labelHeight], '--', color=color)
-        ax.plot([stop, stop], [0, labelHeight], '--', color=color)
+        ax.plot([start, start], [0, height], '--', color=color)
+        ax.plot([stop, stop], [0, height], '--', color=color)
 
     if label is not None:
         ax.text((start + stop) / 2, labelHeight, label, color=color,

@@ -7,6 +7,7 @@ try:
     import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
     from pycqed.measurement.openql_experiments import clifford_rb_oql as cl_oql
     from pycqed.measurement.openql_experiments import pygsti_oql
+    from pycqed.measurement.openql_experiments import openql_helpers as oqh
 
 except ImportError:
     logging.warning('Could not import OpenQL')
@@ -1159,8 +1160,6 @@ class CCLight_Transmon(Qubit):
 
         return True
 
-
-
     def calibrate_mixer_skewness_drive(self, MC=None,
                                        mixer_channels: list=['G', 'D'],
                                        x0: list =[1.0, 0.0],
@@ -1192,7 +1191,7 @@ class CCLight_Transmon(Qubit):
         CCL.eqasm_program(p.filename)
         CCL.start()
 
-        ##### Open the VSM channel
+        # Open the VSM channel
         VSM = self.instr_VSM.get_instr()
         ch_in = self.mw_vsm_ch_in()
         # module 8 is hardcoded for use mixer calls (signal hound)
@@ -1200,7 +1199,6 @@ class CCLight_Transmon(Qubit):
         VSM.set('mod8_ch{}_marker_state'.format(ch_in), 'on')
         VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 2.0)
         VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 2.0)
-
 
         mw_lutman = self.instr_LutMan_MW.get_instr()
         mw_lutman.mixer_apply_predistortion_matrix(True)
@@ -1234,7 +1232,8 @@ class CCLight_Transmon(Qubit):
             MC.set_detector_function(detector)  # sets test_detector
             MC.set_adaptive_function_parameters(ad_func_pars)
             MC.run(
-                name='Spurious_sideband_{}{}'.format(mixer_ch, self.msmt_suffix),
+                name='Spurious_sideband_{}{}'.format(
+                    mixer_ch, self.msmt_suffix),
                 mode='adaptive')
             # For the figure
             ma.OptimizationAnalysis_v2()
@@ -1246,7 +1245,6 @@ class CCLight_Transmon(Qubit):
                 self.set('mw_{}_mixer_phi'.format(mixer_ch), phi)
 
         return True
-
 
     def calibrate_mixer_skewness_RO(self, update=True):
         '''
@@ -1383,9 +1381,8 @@ class CCLight_Transmon(Qubit):
             ma.TwoD_Analysis(label='Resonator_power_scan',
                              close_fig=close_fig, normalize=True)
 
-
     def measure_photon_number_splitting(self, freqs, powers, MC=None,
-                                analyze: bool=True, close_fig: bool=True):
+                                        analyze: bool=True, close_fig: bool=True):
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -1410,7 +1407,7 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_points_2D(powers)
         self.int_avg_det_single._set_real_imag(False)
         MC.set_detector_function(self.int_avg_det_single)
-        label='Photon_number_splitting'
+        label = 'Photon_number_splitting'
         MC.run(name=label+self.msmt_suffix, mode='2D')
         spec_source.off()
         if analyze:
@@ -1743,7 +1740,6 @@ class CCLight_Transmon(Qubit):
             MC.run(name='Resonator_scan_'+pulse_comb+self.msmt_suffix)
             if analyze:
                 ma.MeasurementAnalysis()
-
 
     def calibrate_optimal_weights(self, MC=None, verify: bool=True,
                                   analyze: bool=True, update: bool=True,
@@ -2779,7 +2775,7 @@ class CCLight_Transmon(Qubit):
             a = ma.Rabi_Analysis(close_main_fig=close_fig, label='ef_rabi')
             return a
 
-    def measure_1Q_gst(self,
+    def measure_gst_1Q(self,
                        shots_per_meas: int,
                        maxL: int=256,
                        MC=None,
@@ -2823,10 +2819,11 @@ class CCLight_Transmon(Qubit):
         # Readout settings that have to be set #
         ########################################
 
-        programs, exp_list_fn = pygsti_oql.single_qubit_gst(q0=self.cfg_qubit_nr(),
-                                                            maxL=maxL,
-                                                            platf_cfg=self.cfg_openql_platform_fn(),
-                                                            recompile=recompile)
+        programs, exp_list_fn = pygsti_oql.single_qubit_gst(
+            q0=self.cfg_qubit_nr(),
+            maxL=maxL,
+            platf_cfg=self.cfg_openql_platform_fn(),
+            recompile=recompile)
 
         counter_param = ManualParameter('name_ctr', initial_value=0)
 
@@ -2859,6 +2856,7 @@ class CCLight_Transmon(Qubit):
                exp_metadata={'bins': sweep_points,
                              'gst_exp_list_filename': exp_list_fn})
         a = ma2.GST_SingleQubit_DataExtraction(label='Single_qubit_GST')
+        return a
 
     def create_dep_graph(self):
         dag = AutoDepGraph_DAG(name=self.name+' DAG')
@@ -3003,7 +3001,6 @@ class CCLight_Transmon(Qubit):
         print(optimization_M_amps)
         print(optimization_M_amp_down0s)
         print(optimization_M_amp_down1s)
-
 
         RO_lutman = self.instr_LutMan_RO.get_instr()
         if sequence == 'ramsey':
