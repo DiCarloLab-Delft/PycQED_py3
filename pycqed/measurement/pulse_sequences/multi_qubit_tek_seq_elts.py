@@ -1896,6 +1896,12 @@ def n_qubit_tomo_seq(
     operation_dict['RO mux_presel'] = operation_dict['RO mux'].copy()
     operation_dict['RO mux_presel']['pulse_delay'] = -ro_spacing
     operation_dict['RO mux_presel']['refpoint'] = 'start'
+    operation_dict['RO presel_dummy'] = {
+        'pulse_type': 'SquarePulse',
+        'channel': operation_dict['RO mux']['acq_marker_channel'],
+        'amplitude': 0.0,
+        'length': ro_spacing,
+        'pulse_delay': 0}
 
     if prep_sequence is None:
         prep_sequence = ['Y90 ' + qubit_names[0]]
@@ -1911,6 +1917,7 @@ def n_qubit_tomo_seq(
         tomography_sequence.append('RO mux')
         if preselection:
             tomography_sequence.append('RO mux_presel')
+            tomography_sequence.append('RO presel_dummy')
         pulse_list.extend([operation_dict[pulse] for pulse in
                            tomography_sequence])
         el_list.append(multi_pulse_elt(i, station, pulse_list, trigger=True,
@@ -1978,21 +1985,39 @@ def n_qubit_ref_seq(qubit_names, operation_dict, ref_desc, upload=True,
     operation_dict['RO mux_presel'] = operation_dict['RO mux'].copy()
     operation_dict['RO mux_presel']['pulse_delay'] = -ro_spacing
     operation_dict['RO mux_presel']['refpoint'] = 'start'
+    operation_dict['RO presel_dummy'] = {
+        'pulse_type': 'SquarePulse',
+        'channel': operation_dict['RO mux']['acq_marker_channel'],
+        'amplitude': 0.0,
+        'length': ro_spacing,
+        'pulse_delay': 0}
 
     # create the elements
     el_list = []
 
     # calibration elements
+    # calibration_sequences = []
+    # for pulses in ref_desc:
+    #     calibration_sequences.append(
+    #         [pulse+' '+qb for qb, pulse in zip(qubit_names, pulses)])
+
     calibration_sequences = []
     for pulses in ref_desc:
-        calibration_sequences.append(
-            [pulse+' '+qb for qb, pulse in zip(qubit_names, pulses)])
+        calibration_sequence_new = []
+        for i, pulse in enumerate(pulses):
+            if i == 0:
+                qb = ' ' + qubit_names[i]
+            else:
+                qb = 's ' + qubit_names[i]
+            calibration_sequence_new.append(pulse+qb)
+        calibration_sequences.append(calibration_sequence_new)
 
     for i, calibration_sequence in enumerate(calibration_sequences):
         pulse_list = []
         calibration_sequence.append('RO mux')
         if preselection:
             calibration_sequence.append('RO mux_presel')
+            calibration_sequence.append('RO presel_dummy')
         pulse_list.extend(
             [operation_dict[pulse] for pulse in calibration_sequence])
         el_list.append(multi_pulse_elt(i, station, pulse_list, trigger=True,
@@ -2013,7 +2038,8 @@ def n_qubit_ref_seq(qubit_names, operation_dict, ref_desc, upload=True,
         return seq_name
 
 
-def n_qubit_ref_all_seq(qubit_names, operation_dict, upload=True, verbose=False, return_seq=False,
+def n_qubit_ref_all_seq(qubit_names, operation_dict, upload=True, verbose=False,
+                        return_seq=False,
                         preselection=False, ro_spacing=1e-6):
     """
         Calibration points for all combinations

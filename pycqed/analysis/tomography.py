@@ -559,7 +559,7 @@ def fidelity_from_standard_formula(bell_state, rho, state_rotation=None):
     state_rotation(qutip Quantum object): a rotation matrix to rotate
         the bell state
     """
-    bell_state_map = {0:'01', 1:'00' , 2:'11', 3:'10'}
+    bell_state_map = {0: '01', 1: '00', 2: '11', 3: '10'}
     qtp_bell_state = bell_state_map[bell_state]
 
     if state_rotation is None:
@@ -863,7 +863,7 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         self.get_naming_and_values()
         # hard coded number of segments for a 2 qubit state tomography
         # constraint imposed by UHFLI
-        self.nr_segments = 64
+        self.nr_segments = 40#64
         self.exp_name = os.path.split(self.folder)[-1][7:]
         if self.single_shots:
             self.shots_q0 = np.zeros(
@@ -902,20 +902,35 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
             # avg_h12 = kw.pop('avg_h12', None)
 
         # Binning all the points required for the tomo
-        h1_00 = np.mean(avg_h1[36:36+7])
-        h1_01 = np.mean(avg_h1[43:43+7])
-        h1_10 = np.mean(avg_h1[50:50+7])
-        h1_11 = np.mean(avg_h1[57:])
+        # h1_00 = np.mean(avg_h1[36:36+7])
+        # h1_01 = np.mean(avg_h1[43:43+7])
+        # h1_10 = np.mean(avg_h1[50:50+7])
+        # h1_11 = np.mean(avg_h1[57:])
+        #
+        # h2_00 = np.mean(avg_h2[36:36+7])
+        # h2_01 = np.mean(avg_h2[43:43+7])
+        # h2_10 = np.mean(avg_h2[50:50+7])
+        # h2_11 = np.mean(avg_h2[57:])
+        #
+        # h12_00 = np.mean(avg_h12[36:36+7])
+        # h12_01 = np.mean(avg_h12[43:43+7])
+        # h12_10 = np.mean(avg_h12[50:50+7])
+        # h12_11 = np.mean(avg_h12[57:])
 
-        h2_00 = np.mean(avg_h2[36:36+7])
-        h2_01 = np.mean(avg_h2[43:43+7])
-        h2_10 = np.mean(avg_h2[50:50+7])
-        h2_11 = np.mean(avg_h2[57:])
+        h1_00 = np.mean(avg_h1[-4])
+        h1_01 = np.mean(avg_h1[-3])
+        h1_10 = np.mean(avg_h1[-2])
+        h1_11 = np.mean(avg_h1[-1])
 
-        h12_00 = np.mean(avg_h12[36:36+7])
-        h12_01 = np.mean(avg_h12[43:43+7])
-        h12_10 = np.mean(avg_h12[50:50+7])
-        h12_11 = np.mean(avg_h12[57:])
+        h2_00 = np.mean(avg_h2[-4])
+        h2_01 = np.mean(avg_h2[-3])
+        h2_10 = np.mean(avg_h2[-2])
+        h2_11 = np.mean(avg_h2[-1])
+
+        h12_00 = np.mean(avg_h12[-4])
+        h12_01 = np.mean(avg_h12[-3])
+        h12_10 = np.mean(avg_h12[-2])
+        h12_11 = np.mean(avg_h12[-1])
 
         # std_arr = np.array( std_h2_00, std_h2_01, std_h2_10,
         # std_h2_11, std_h12_00, std_h12_01, std_h12_10, std_h12_11])
@@ -942,69 +957,97 @@ class Tomo_Multiplexed(ma.MeasurementAnalysis):
         # dived by scalefactor
 
         # key for next step
-        h1_00 = np.mean(avg_h1[36:36+7])
-        h1_01 = np.mean(avg_h1[43:43+7])
-        h1_10 = np.mean(avg_h1[50:50+7])
-        h1_11 = np.mean(avg_h1[57:])
+        # h1_00 = np.mean(avg_h1[36:36+7])
+        # h1_01 = np.mean(avg_h1[43:43+7])
+        # h1_10 = np.mean(avg_h1[50:50+7])
+        # h1_11 = np.mean(avg_h1[57:])
+        #
+        # h2_00 = np.mean(avg_h2[36:36+7])
+        # h2_01 = np.mean(avg_h2[43:43+7])
+        # h2_10 = np.mean(avg_h2[50:50+7])
+        # h2_11 = np.mean(avg_h2[57:])
+        #
+        # h12_00 = np.mean(avg_h12[36:36+7])
+        # h12_01 = np.mean(avg_h12[43:43+7])
+        # h12_10 = np.mean(avg_h12[50:50+7])
+        # h12_11 = np.mean(avg_h12[57:])
+        h1_00 = np.mean(avg_h1[-4])
+        h1_01 = np.mean(avg_h1[-3])
+        h1_10 = np.mean(avg_h1[-2])
+        h1_11 = np.mean(avg_h1[-1])
 
-        h2_00 = np.mean(avg_h2[36:36+7])
-        h2_01 = np.mean(avg_h2[43:43+7])
-        h2_10 = np.mean(avg_h2[50:50+7])
-        h2_11 = np.mean(avg_h2[57:])
+        h2_00 = np.mean(avg_h2[-4])
+        h2_01 = np.mean(avg_h2[-3])
+        h2_10 = np.mean(avg_h2[-2])
+        h2_11 = np.mean(avg_h2[-1])
 
-        h12_00 = np.mean(avg_h12[36:36+7])
-        h12_01 = np.mean(avg_h12[43:43+7])
-        h12_10 = np.mean(avg_h12[50:50+7])
-        h12_11 = np.mean(avg_h12[57:])
+        h12_00 = np.mean(avg_h12[-4])
+        h12_01 = np.mean(avg_h12[-3])
+        h12_10 = np.mean(avg_h12[-2])
+        h12_11 = np.mean(avg_h12[-1])
 
-        std_h1_00 = np.std(avg_h1[36:36+7])
-        std_h1_01 = np.std(avg_h1[43:43+7])
-        std_h1_10 = np.std(avg_h1[50:50+7])
-        std_h1_11 = np.std(avg_h1[57:])
+        # std_h1_00 = np.std(avg_h1[36:36+7])
+        # std_h1_01 = np.std(avg_h1[43:43+7])
+        # std_h1_10 = np.std(avg_h1[50:50+7])
+        # std_h1_11 = np.std(avg_h1[57:])
+        #
+        # std_h2_00 = np.std(avg_h2[36:36+7])
+        # std_h2_01 = np.std(avg_h2[43:43+7])
+        # std_h2_10 = np.std(avg_h2[50:50+7])
+        # std_h2_11 = np.std(avg_h2[57:])
+        #
+        # std_h12_00 = np.std(avg_h12[36:36+7])
+        # std_h12_01 = np.std(avg_h12[43:43+7])
+        # std_h12_10 = np.std(avg_h12[50:50+7])
+        # std_h12_11 = np.std(avg_h12[57:])
 
-        std_h2_00 = np.std(avg_h2[36:36+7])
-        std_h2_01 = np.std(avg_h2[43:43+7])
-        std_h2_10 = np.std(avg_h2[50:50+7])
-        std_h2_11 = np.std(avg_h2[57:])
-
-        std_h12_00 = np.std(avg_h12[36:36+7])
-        std_h12_01 = np.std(avg_h12[43:43+7])
-        std_h12_10 = np.std(avg_h12[50:50+7])
-        std_h12_11 = np.std(avg_h12[57:])
-
-        std_h1 = np.mean([std_h1_00, std_h1_01, std_h1_10, std_h1_11])
-        std_h2 = np.mean([std_h2_00, std_h2_01, std_h2_10, std_h2_11])
-        std_h12 = np.mean([std_h12_00, std_h12_01, std_h12_10, std_h12_11])
-        std_arr = np.array([std_h1_00, std_h1_01, std_h1_10, std_h1_11, std_h2_00, std_h2_01,
-                            std_h2_10, std_h2_11, std_h12_00, std_h12_01, std_h12_10, std_h12_11])
-
-        # plt.plot([std_h1, std_h2, std_h12])
-        # plt.plot(std_arr)
-        # plt.show()
-
-        fac = np.mean([std_h1, std_h2, std_h12])
-        avg_h1 *= fac/std_h1
-        avg_h2 *= fac/std_h2
-        avg_h12 *= fac/std_h12
+        # std_h1 = np.mean([std_h1_00, std_h1_01, std_h1_10, std_h1_11])
+        # std_h2 = np.mean([std_h2_00, std_h2_01, std_h2_10, std_h2_11])
+        # std_h12 = np.mean([std_h12_00, std_h12_01, std_h12_10, std_h12_11])
+        # std_arr = np.array([std_h1_00, std_h1_01, std_h1_10, std_h1_11, std_h2_00, std_h2_01,
+        #                     std_h2_10, std_h2_11, std_h12_00, std_h12_01, std_h12_10, std_h12_11])
+        #
+        # # plt.plot([std_h1, std_h2, std_h12])
+        # # plt.plot(std_arr)
+        # # plt.show()
+        #
+        # fac = np.mean([std_h1, std_h2, std_h12])
+        # avg_h1 *= fac/std_h1
+        # avg_h2 *= fac/std_h2
+        # avg_h12 *= fac/std_h12
 
         self.avg_h1 = avg_h1
         self.avg_h2 = avg_h2
         self.avg_h12 = avg_h12
 
-        h1_00 = np.mean(avg_h1[36:36+7])
-        h1_01 = np.mean(avg_h1[43:43+7])
-        h1_10 = np.mean(avg_h1[50:50+7])
-        h1_11 = np.mean(avg_h1[57:])
+        # h1_00 = np.mean(avg_h1[36:36+7])
+        # h1_01 = np.mean(avg_h1[43:43+7])
+        # h1_10 = np.mean(avg_h1[50:50+7])
+        # h1_11 = np.mean(avg_h1[57:])
+        #
+        # h2_00 = np.mean(avg_h2[36:36+7])
+        # h2_01 = np.mean(avg_h2[43:43+7])
+        # h2_10 = np.mean(avg_h2[50:50+7])
+        # h2_11 = np.mean(avg_h2[57:])
+        #
+        # h12_00 = np.mean(avg_h12[36:36+7])
+        # h12_01 = np.mean(avg_h12[43:43+7])
+        # h12_10 = np.mean(avg_h12[50:50+7])
+        # h12_11 = np.mean(avg_h12[57:])
+        h1_00 = np.mean(avg_h1[-4])
+        h1_01 = np.mean(avg_h1[-3])
+        h1_10 = np.mean(avg_h1[-2])
+        h1_11 = np.mean(avg_h1[-1])
 
-        h2_00 = np.mean(avg_h2[36:36+7])
-        h2_01 = np.mean(avg_h2[43:43+7])
-        h2_10 = np.mean(avg_h2[50:50+7])
-        h2_11 = np.mean(avg_h2[57:])
+        h2_00 = np.mean(avg_h2[-4])
+        h2_01 = np.mean(avg_h2[-3])
+        h2_10 = np.mean(avg_h2[-2])
+        h2_11 = np.mean(avg_h2[-1])
 
-        h12_00 = np.mean(avg_h12[36:36+7])
-        h12_01 = np.mean(avg_h12[43:43+7])
-        h12_10 = np.mean(avg_h12[50:50+7])
-        h12_11 = np.mean(avg_h12[57:])
+        h12_00 = np.mean(avg_h12[-4])
+        h12_01 = np.mean(avg_h12[-3])
+        h12_10 = np.mean(avg_h12[-2])
+        h12_11 = np.mean(avg_h12[-1])
 
         self.plot_TV_mode(avg_h1, avg_h2, avg_h12)
         #############################

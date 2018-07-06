@@ -1601,6 +1601,7 @@ class QuDev_transmon(Qubit):
                             'beta': beta,
                             'gamma': gamma,
                             'ndim': 2}
+            self.AWG.start()
             MC.run(name='drive_skewness_calibration' + self.msmt_suffix)
             a = ma.OptimizationAnalysisNN(label='drive_carrier_calibration',
                                           meas_grid=meas_grid,
@@ -1857,9 +1858,9 @@ class QuDev_transmon(Qubit):
                 logging.error('std_devs passed in kwargs of "calibrate_drive_'
                               'mixer_NN is of length: ',len(std_devs),
                               '. Requires length 2 instead.')
-        detector = self.int_avg_det_spec
+        detector = self.int_avg_det
 
-        for runs in range(2+int(two_rounds)):
+        for runs in range(1,2+int(two_rounds)):
             self.prepare_for_mixer_calibration(suppress='drive sideband')
             if runs==0:
                 meas_grid = np.array([0.6*np.random.rand(n_meas)+0.4,

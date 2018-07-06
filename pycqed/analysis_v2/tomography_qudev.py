@@ -165,10 +165,36 @@ def fidelity(rho1: qtp.Qobj, rho2: qtp.Qobj) -> float:
 
     F = Tr(√((√rho1) rho2 √(rho1)))^2
     """
+
     rho1 = convert_to_density_matrix(rho1)
     rho2 = convert_to_density_matrix(rho2)
+
     return (rho1.sqrtm()*rho2*rho1.sqrtm()).sqrtm().tr().real ** 2
 
+def max_fidelity(rho1: qtp.Qobj, rho2: qtp.Qobj, thetas1, thetas2):
+
+    fid_vec = np.zeros((len(thetas1), len(thetas2)))
+    rho1 = qtp.Qobj(rho1, dims=[[2, 2], [2, 2]], shape=(4, 4))
+    target_bell = qtp.Qobj(rho2.flatten(), dims=[[2, 2], [1, 1]], shape=(4, 1))
+
+    for i, theta1 in enumerate(thetas1):
+        for j, theta2 in enumerate(thetas2):
+            state_rotation = qtp.tensor(qtp.rotation(qtp.sigmaz(), theta1),
+                                        qtp.rotation(qtp.sigmaz(), theta2))
+            target_state = state_rotation*target_bell
+            fid_vec[i][j] = float(
+                np.real((target_state.dag()*rho1*target_state).data[0, 0]))
+
+
+    idxs_f_max = np.unravel_index(np.argmax(fid_vec),
+                                  dims=(len(thetas1),
+                                        len(thetas1)))
+
+    max_F = 100*np.max(fid_vec)
+    phase1 = thetas1[idxs_f_max[0]]*180./np.pi
+    phase2 = thetas2[idxs_f_max[1]]*180./np.pi
+
+    return max_F, phase1, phase2
 
 def concurrence(rho):
     """

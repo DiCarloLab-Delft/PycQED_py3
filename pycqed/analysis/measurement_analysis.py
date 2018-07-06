@@ -1030,7 +1030,7 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
         self.ad_func_pars = kw.pop('ad_func_pars')
         self.two_rounds = kw.pop('two_rounds',False)
         self.hidden_layers = self.ad_func_pars.pop('hidden_layers',[10.,10.])
-        self.round = kw.pop('round',0)
+        self.round = kw.pop('round',1)
         self.alpha = self.ad_func_pars.pop('alpha',1e-2)
         self.estimator_name = self.ad_func_pars.pop('estimator','DNN_Regressor_tf')
         self.beta = self.ad_func_pars.pop('beta',0.)
@@ -3062,7 +3062,9 @@ class QScale_Analysis(TD_Analysis):
             np.sqrt((self.fit_res[2].params['slope'].stderr)**2 + \
             (self.fit_res[1].params['slope'].stderr)**2)
 
-        optimal_qscale_stddev = np.sqrt() #!!!!!
+        optimal_qscale_stddev = np.sqrt(
+            (intercept_diff_std/slope_diff_mean)**2 +
+            (intercept_diff_mean*slope_diff_std/(slope_diff_std**2))**2)
         # sqrt_quantity = intercept_diff_std_squared/((intercept_diff_mean)**2) + \
         #                 slope_diff_std_squared/((slope_diff_mean)**2) - \
         #                 2*cov_qscale_squared/(intercept_diff_mean*slope_diff_mean)

@@ -11,6 +11,7 @@ from pycqed.measurement.waveform_control import element as element
 import pycqed.measurement.waveform_control.pulse_library as pl
 import pycqed.measurement.waveform_control.pulse as bpl  # base pulse lib
 
+
 def multi_pulse_elt(i, station, pulse_list, sequencer_config=None, name=None,
                     trigger=True, previous_element=None):
     """

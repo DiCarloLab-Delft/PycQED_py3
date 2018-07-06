@@ -8,7 +8,7 @@ from abc import ABCMeta, abstractmethod
 #from neupy.algorithms import GRNN as grnn
 from sklearn.neural_network import MLPRegressor as mlpr
 from sklearn.linear_model import LinearRegression
-#from neupy.algorithms import GRNN as grnn
+from neupy.algorithms import GRNN as grnn
 try:
 	import tensorflow as tf
 except Exception:
@@ -319,7 +319,7 @@ class GRNN_neupy(Estimator):
                 y_train.reshape((np.size(y_train),y_train.ndim))
         if self._std is None:
             std_x = 0.
-            for it in x_train.ndim:
+            for it in range(x_train.ndim):
                 std_x += np.std(x_train[:,it])
             std_x = self._gamma*std_x/x_train.ndim
             self._std = std_x

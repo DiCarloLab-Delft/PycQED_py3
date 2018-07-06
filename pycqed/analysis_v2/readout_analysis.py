@@ -775,7 +775,7 @@ class MultiQubit_SingleShot_Analysis(ba.BaseDataAnalysis):
             combination_list = list(itertools.product([False, True],
                                                       repeat=len(qubits)))
             preselection_condition = dict(zip(
-                [(qb, self.options_dict.get('preselection_shift', 1))
+                [(qb, self.options_dict.get('preselection_shift', -1))
                  for qb in qubits],  # keys contain shift
                 combination_list[0]  # first comb has all ground
             ))

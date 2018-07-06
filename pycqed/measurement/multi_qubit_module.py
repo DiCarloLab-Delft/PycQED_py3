@@ -724,7 +724,7 @@ def measure_tomography(qubits, prep_sequence, state_name, f_LO,
                        ro_slack=10e-9,
                        thresholded=False,
                        liveplot=True,
-                       nreps=1):
+                       nreps=1, run=False):
     exp_metadata = {}
 
     for qb in qubits:
@@ -821,9 +821,11 @@ def measure_tomography(qubits, prep_sequence, state_name, f_LO,
     MC.set_sweep_function_2D(swf.None_Sweep())
     MC.set_sweep_points_2D(np.arange(nreps))
     MC.set_detector_function(df)
-    MC.run_2D('{}_tomography_ssro_{}'.format(state_name, '-'.join(
-        [qb.name for qb in qubits])), exp_metadata=exp_metadata)
+    if run:
+        MC.run_2D('{}_tomography_ssro_{}'.format(state_name, '-'.join(
+            [qb.name for qb in qubits])), exp_metadata=exp_metadata)
 
+    return elts
 
 def measure_n_qubit_simultaneous_randomized_benchmarking(
         qubits, f_LO,
@@ -1062,7 +1064,8 @@ def measure_two_qubit_tomo_Bell(bell_state, qb_c, qb_t, f_LO,
                                 num_flux_pulses=0, verbose=False,
                                 nr_averages=1024, soft_avgs=1,
                                 MC=None, UHFQC=None, pulsar=None,
-                                upload=True, label=None, run=True):
+                                upload=True, label=None, run=True,
+                                used_channels=None):
     """
                  |spacing|spacing|
     |qCZ> --gate1--------*--------after_pulse-----| tomo |
@@ -1119,7 +1122,6 @@ def measure_two_qubit_tomo_Bell(bell_state, qb_c, qb_t, f_LO,
         MC = qb_c.MC
         logging.warning("Unspecified MC object. Using qb_c.MC.")
 
-
     Bell_state_dict = {'0': 'phiMinus', '1': 'phiPlus',
                        '2': 'psiMinus', '3': 'psiPlus'}
     if label is None:
@@ -1138,6 +1140,7 @@ def measure_two_qubit_tomo_Bell(bell_state, qb_c, qb_t, f_LO,
 
     corr_det = get_multiplexed_readout_detector_functions(
         qubits, nr_averages=nr_averages, UHFQC=UHFQC,
+        used_channels=used_channels,
         pulsar=pulsar, correlations=correlations)['int_corr_det']
 
     tomo_Bell_swf_func = awg_swf2.tomo_Bell(
