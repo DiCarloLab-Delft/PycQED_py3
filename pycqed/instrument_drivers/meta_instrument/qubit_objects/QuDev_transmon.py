@@ -1556,7 +1556,7 @@ class QuDev_transmon(Qubit):
         beta = kwargs.pop('beta',0.)
         gamma = kwargs.pop('gamma',1.)
         iters = kwargs.pop('iters',5000)
-        c = kwargs.pop('second_round_std_scale',0.3)
+        c = kwargs.pop('second_round_std_scale',0.4)
         ch_1_min = x0[0]            #might be redundant
         ch_2_min = x0[1]
         if isinstance(std_devs,list) or isinstance(std_devs,np.ndarray):
@@ -1568,15 +1568,15 @@ class QuDev_transmon(Qubit):
 
         for runs in range(2+int(two_rounds)):
             self.prepare_for_mixer_calibration(suppress='drive LO')
-            self.prepare_for_mixer_calibration(suppress='drive LO')
             cal_elts.mixer_calibration_sequence(
                     trigger_sep, 0, RO_pars=self.get_RO_pars(),
                     pulse_I_channel=self.pulse_I_channel(),
                     pulse_Q_channel=self.pulse_Q_channel())
             if runs==0:
-                meas_grid = np.array([0.2*np.random.rand(n_meas)-0.1,
-                                      0.2*np.random.rand(n_meas)-0.1])
-                est ='Polynomial_Regression_scikit'
+                data_points = int(np.floor(0.5*n_meas))
+                meas_grid = np.array([1.5*np.random.rand(data_points)-1.,
+                                      1.5*np.random.rand(data_points)-1.])
+                est =estimator
             elif runs==1:
                 meas_grid = np.array([ch_1_min+np.random.normal(0.0,std_devs[0],n_meas),
                                       ch_2_min+np.random.normal(0.0,std_devs[1],n_meas)])
@@ -1591,7 +1591,7 @@ class QuDev_transmon(Qubit):
             S = [chI_par,chQ_par]
             MC.set_sweep_functions(S)
             MC.set_sweep_points(meas_grid.T)
-            MC.set_detector_function(detector)
+            MC.set_detector_function(det.IndexDetector(detector, 0))
             ad_func_pars = {'hidden_layers': hidden_layers,
                             'iters':5000,
                             'alphas': alpha,
@@ -1603,6 +1603,7 @@ class QuDev_transmon(Qubit):
                             'ndim': 2}
             self.AWG.start()
             MC.run(name='drive_skewness_calibration' + self.msmt_suffix)
+            self.AWG.stop()
             a = ma.OptimizationAnalysisNN(label='drive_carrier_calibration',
                                           meas_grid=meas_grid,
                                           ad_func_pars=ad_func_pars,
@@ -1851,7 +1852,7 @@ class QuDev_transmon(Qubit):
         gamma = kwargs.get('gamma',1.)
         std_devs = kwargs.get('std_devs',[0.2,5])
         iters = kwargs.get('iters',5000)
-        c = kwargs.pop('second_round_std_scale',0.3)
+        c = kwargs.pop('second_round_std_scale',0.4)
         #Could make sample size variable (maxiter) for better adapting)
         if isinstance(std_devs,list) or isinstance(std_devs,np.ndarray):
             if(len(std_devs) != 2 ):
@@ -1859,20 +1860,25 @@ class QuDev_transmon(Qubit):
                               'mixer_NN is of length: ',len(std_devs),
                               '. Requires length 2 instead.')
         detector = self.int_avg_det
+        alpha_ = self.alpha()
+        phi_ = self.phi_skew()
 
-        for runs in range(1,2+int(two_rounds)):
+        for runs in range(2+int(two_rounds)):
             self.prepare_for_mixer_calibration(suppress='drive sideband')
             if runs==0:
-                meas_grid = np.array([0.6*np.random.rand(n_meas)+0.4,
-                                      80.*np.random.rand(n_meas)-40.])
-                est= 'Polynomial_Regression_scikit'
+                data_points = int(np.floor(0.5*n_meas))
+                meas_grid = np.array([0.6*np.random.rand(data_points)+0.6,
+                                      70.*np.random.rand(data_points)-50.])
+                est= estimator
             elif runs==1:
-                meas_grid = np.array([np.random.normal(self.alpha(),std_devs[0],n_meas),
-                                      np.random.normal(self.phi_skew(),std_devs[1],n_meas)])
+                data_points = n_meas
+                meas_grid = np.array([np.random.normal(alpha_,std_devs[0],data_points),
+                                      np.random.normal(phi_,std_devs[1],data_points)])
                 est= estimator
             else:
-                meas_grid = np.array([np.random.normal(self.alpha(),c*std_devs[0],n_meas),
-                                      np.random.normal(self.phi_skew(),c*std_devs[1],n_meas)])
+                data_points = n_meas
+                meas_grid = np.array([np.random.normal(alpha_,c*std_devs[0],data_points),
+                                      np.random.normal(phi_,c*std_devs[1],data_points)])
                 est= estimator
 
             s1 = awg_swf.mixer_skewness_calibration_swf(
@@ -1886,7 +1892,7 @@ class QuDev_transmon(Qubit):
                 amplitude=amplitude,
                 RO_trigger_separation=trigger_sep,
                 verbose=False,
-                data_points=n_meas,
+                data_points=data_points,
                 upload=True)
             s2 = awg_swf.arbitrary_variable_swf()
             MC.set_sweep_functions([s1,s2])
@@ -1907,18 +1913,16 @@ class QuDev_transmon(Qubit):
                                           meas_grid=meas_grid,
                                           two_rounds = two_rounds,
                                           round=runs)
-            if runs==0:
-                phi = a.optimization_result[0]
-            else:
-                alpha = a.optimization_result[0]
-                phi = a.optimization_result[1]
+
+            alpha_ = a.optimization_result[0]
+            phi_ = a.optimization_result[1]
         # phi and alpha are the coefficients that go in the predistortion matrix
             if update:
                 if runs>=0:
-                    self.alpha(alpha)
-                self.phi_skew(phi)
+                    self.alpha(alpha_)
+                self.phi_skew(phi_)
 
-        return alpha,phi
+        return alpha_,phi_
 
 
     def calibrate_drive_mixer_skewness_NN(self, MC=None, update=True,

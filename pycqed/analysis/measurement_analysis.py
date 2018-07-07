@@ -1045,7 +1045,7 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
         #self.test_data = test_vals[:2]
         self.train_NN(**kw)
 
-        if self.round > int(self.two_rounds):     #only create figures in the last iteration
+        if self.round > int(self.two_rounds) or self.round==0:     #only create figures in the last iteration
             self.make_figures(**kw)
         if close_file:
             self.data_file.close()
@@ -1057,8 +1057,6 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
         else:
             self.abs_vals = np.sqrt(self.measured_values[0,:]**2 + self.measured_values[1,:]**2)
 
-        if self.round==0 and self.parameter_names[1]=='phi_skew':
-            self.meas_grid = np.array(self.meas_grid[1,:])
         result,est,test_vals,opti_flag\
                                   = opt.neural_network_opt(None, self.meas_grid,
                                           self.abs_vals,
@@ -1068,7 +1066,7 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
                                           estimator=self.estimator_name,
                                           iters = self.iters,
                                           beta=self.beta,
-                                          gamma=1.,
+                                          gamma=self.gamma,
                                           ndim=self.ndim)
         #test_grid and test_target values. Centered and scaled to [-1,1] since
         #only used for performance estimation of estimator
@@ -1166,9 +1164,9 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
   #                 fig1_type
         levels = np.linspace(np.min(Zm),np.max(Zm),30)
         CP = ax1.contourf(Xm,Ym,Zm,levels,extend='both')
-        ax1.scatter(self.optimization_result[0],self.optimization_result[0],
+        ax1.scatter(self.optimization_result[0],self.optimization_result[1],
                  marker='o',c='white',label='network minimum')
-        ax1.scatter(self.sweep_points[0,:],self.sweep_points[1,:],
+        ax1.scatter(self.sweep_points[0],self.sweep_points[1],
                  marker='o',c='r',label='training data',s=10)
         ax1.scatter(self.test_grid[:,0],self.test_grid[:,1],
                     marker='o',c='y',label='test data',s=10)
@@ -1178,7 +1176,7 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
         cbar = plt.colorbar(CP,ax=ax1,orientation='vertical')
         cbar.ax.set_ylabel(self.ylabels[0],fontsize=fontsize)
         ax1.legend(loc='upper left',framealpha=0.75,fontsize=fontsize)
-        ax1.set_title(self.timestamp_string + ' ' + figname1)
+        ax1.set_title(figname1)
         self.save_fig(fig1,figname=savename1,**kw)
 
         #interpolation plot with only measurement points

@@ -273,13 +273,13 @@ class Polynomial_Regression(Estimator):
         self._polyReg = LinearRegression(fit_intercept=False)
         self._polyReg.fit(self.poly_features_transform(x_train),y_train)
 
-        x = np.transpose(np.array([np.linspace(-1,1,50)]))
-        plt.figure()
-        plt.plot(np.linspace(-1,1,50),
-                 self.predict(x)
-                 )
-        plt.plot(x_train[:,0], y_train, 'o')
-        plt.show()
+        #x = np.transpose(np.array([np.linspace(-1,1,50)]))
+        # plt.figure()
+        # plt.plot(np.linspace(-1,1,50),
+        #          self.predict(x)
+        #          )
+        # plt.plot(x_train[:,0], y_train, 'o')
+        # plt.show()
 
     def predict(self,samples):
         if not isinstance(samples,np.ndarray):
@@ -325,7 +325,8 @@ class GRNN_neupy(Estimator):
             self._std = std_x
         else:
             self._std = self._gamma*self._std
-        self._grnn = grnn(self._std)
+        self._grnn = grnn(std=self._std)
+        print('GRNN initialized with std: ',self._std)
         self._grnn.train(x_train,y_train)
 
     def predict(self,samples):
