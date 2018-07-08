@@ -1056,7 +1056,6 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
             self.abs_vals = deepcopy(self.measured_values[0,:])
         else:
             self.abs_vals = np.sqrt(self.measured_values[0,:]**2 + self.measured_values[1,:]**2)
-
         result,est,test_vals,opti_flag\
                                   = opt.neural_network_opt(None, self.meas_grid,
                                           self.abs_vals,

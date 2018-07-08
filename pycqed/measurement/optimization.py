@@ -293,7 +293,7 @@ def center_and_scale(X,y):
 
 def neural_network_opt(fun, training_grid, target_values = None,
                        hidden_layers=[10, 10],
-                       alpha= 0.0001, solver='lbfgs',estimator='DNN_Regressor_tf',
+                       alpha= 0.0001, solver='lbfgs',estimator='GRNN_neupy',
                        iters = 200, beta=0.9 , gamma=1., test_size=0.1,ndim=2):
     """
     parameters:
@@ -328,16 +328,12 @@ def neural_network_opt(fun, training_grid, target_values = None,
     ###          create measurement data from test_grid         ###
     ###############################################################
 
-    print(np.shape(training_grid))
-
     training_grid = np.transpose(training_grid)
     #get input dimension, training grid contains parameters as row!! vectors
     if len(np.shape(training_grid)) == 1:
         training_grid = np.transpose(np.array([training_grid]))
     n_samples = np.size(training_grid,0)
     n_features = np.size(training_grid,1)
-
-    print(np.shape(training_grid))
 
     # np.size(training_grid,1)
 
@@ -361,8 +357,6 @@ def neural_network_opt(fun, training_grid, target_values = None,
                  = center_and_scale(training_grid,target_values)
     # training_grid = np.transpose(training_grid)
     # target_values = np.transpose(target_values)
-    print(np.shape(training_grid))
-    print(np.shape(target_values))
     training_grid, test_grid,target_values,test_values = \
                                         train_test_split(training_grid,target_values,
                                                          test_size=test_size)
