@@ -1773,7 +1773,7 @@ class QuDev_transmon(Qubit):
                                           two_rounds=False,
                                           estimator='GRNN_neupy',
                                           hidden_layers = [30,30],
-                                          first_round_limits =[]
+                                          first_round_limits =[0.6,1.2,-50,35],
                                           **kwargs):
         if not len(first_round_limits)==4:
             logging.error('--Input variable <first_round_limits> in function call '
@@ -1784,8 +1784,8 @@ class QuDev_transmon(Qubit):
             MC = self.MC
         alpha = kwargs.get('alpha',1e-2)
         beta = kwargs.get('beta',0.)
-        gamma = kwargs.get('gamma',1.)
-        std_devs = kwargs.get('std_devs',[0.2,8.])
+        gamma = kwargs.get('gamma',0.5)
+        std_devs = kwargs.get('std_devs',[0.3,10.])
         iters = kwargs.get('iters',3000)
         c = kwargs.pop('second_round_std_scale',0.4)
         #Could make sample size variable (maxiter) for better adapting)

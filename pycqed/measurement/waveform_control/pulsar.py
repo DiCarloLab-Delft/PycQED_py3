@@ -461,6 +461,7 @@ class HDAWG8Pulsar:
 
             # here we want to use a timeout value longer than the obj.timeout()
             # as programming the AWGs takes more time than normal communications
+
             obj.configure_awg_from_string(awg_nr, awg_str, timeout=180)
 
             obj.set('awgs_{}_dio_valid_polarity'.format(awg_nr),
