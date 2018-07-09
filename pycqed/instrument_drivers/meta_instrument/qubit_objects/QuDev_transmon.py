@@ -1773,7 +1773,13 @@ class QuDev_transmon(Qubit):
                                           two_rounds=False,
                                           estimator='GRNN_neupy',
                                           hidden_layers = [30,30],
+                                          first_round_limits =[]
                                           **kwargs):
+        if not len(first_round_limits)==4:
+            logging.error('--Input variable <first_round_limits> in function call '
+                          '<calibrate_drive_mixer_skewness_NN> needs to be a list '
+                          'or 1D array of length 4.\n'
+                          'found length',len(first_round_limits),' object instead!--')
         if MC is None:
             MC = self.MC
         alpha = kwargs.get('alpha',1e-2)
@@ -1795,9 +1801,13 @@ class QuDev_transmon(Qubit):
         for runs in range(2+int(two_rounds)):
             self.prepare_for_mixer_calibration(suppress='drive sideband')
             if runs==0:
+                alpha_low = first_round_limits[0]
+                alpha_high = first_round_limits[1]
+                phi_low = first_round_limits[2]
+                phi_high = first_round_limits[3]
                 data_points = int(np.floor(0.5*n_meas))
-                meas_grid = np.array([0.6*np.random.rand(data_points)+0.6,
-                                      70.*np.random.rand(data_points)-50.])
+                meas_grid = np.array([(alpha_high-alpha_low)*np.random.rand(data_points)+alpha_low,
+                                      (phi_high-phi_low)*np.random.rand(data_points)+phi_low])
                 est= estimator
             elif runs==1:
                 data_points = n_meas
