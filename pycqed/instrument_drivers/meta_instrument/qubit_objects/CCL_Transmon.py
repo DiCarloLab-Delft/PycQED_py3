@@ -1848,6 +1848,7 @@ class CCLight_Transmon(Qubit):
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='rabi_'+self.msmt_suffix)
         ma.MeasurementAnalysis()
+        ma.Rabi_Analysis(label='rabi_')
         return True
 
     def measure_rabi_channel_amp(self, MC=None, amps=np.linspace(0, 1, 31),
