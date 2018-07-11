@@ -972,7 +972,7 @@ class ziShellDevice:
             while timeout > 0.0:
                 tmp = self.daq.poll(0.1, 500, 4, True)
                 if path in tmp:
-                    return tmp[path]['value'][0]
+                    return tmp[path][0]
                 else:
                     timeout -= 0.1
             return None
