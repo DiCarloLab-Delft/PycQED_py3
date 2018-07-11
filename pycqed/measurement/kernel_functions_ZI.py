@@ -98,6 +98,14 @@ def bounce_correction(ysig, tau:float, amp: float,
 #              hardware friendly functions                      #
 #################################################################
 
+# Delay a signal by d clock cycles.
+# This is done by adding d zero entries to the front of the signal array, and by removing the last d entries.
+def sigdelay(sig, d):
+    # delays the signal sig by d clock cycles. The argument d must be an integer.
+    s = np.zeros(sig.shape);
+    s[d:] = sig[:-d];
+    return s;
+
 
 def coef_round(value, force_bshift=None):
     """
@@ -197,7 +205,7 @@ def multipath_filter2(sig, alpha, k, paths):
     duf = duf[0:sig.size]
     return sig + k * (duf - sig)
 
-def first_order_bounce_corr(sig, delay, amp, awg_sample_rate, scope_sample_rate = None, bufsize=256):
+def first_order_bounce_corr(sig, delay, amp, awg_sample_rate, scope_sample_rate = None, bufsize=256, sim_hw_delay = False):
     """ This function simulates the real-time bounce correction.
 
     Args:
@@ -210,11 +218,11 @@ def first_order_bounce_corr(sig, delay, amp, awg_sample_rate, scope_sample_rate 
         sigout: Numpy array representing the output signal of the filter
     """
     delay_n_samples = int(round(awg_sample_rate*delay))
-    if not 1 <= delay_n_samples < bufsize-8:
+    if not 1 <= delay_n_samples < bufsize - 8:
         raise ValueError(textwrap.dedent("""
             The maximum delay needs to be less than {:d} (bufsize-8) AWG samples to save hardware resources.
             The delay needs to be at least 1 AWG sample.")
-            """.format(bufsize-8)))
+            """.format(bufsize - 8)))
     if not -1 < amp < 1:
         raise ValueError("The amplitude needs to be between -1 and 1.")
 
@@ -246,7 +254,69 @@ def first_order_bounce_corr(sig, delay, amp, awg_sample_rate, scope_sample_rate 
             shift_reg[:awg_sample_diff] = s*np.ones(awg_sample_diff)
             previous_awg_sample_cnt = int(present_awg_sample_cnt)
 
+    if sim_hw_delay:
+        sigout = sigdelay(sigout, int(round(8*(4+5)/awg_sample_incr)))
+
     return sigout
+
+
+# def first_order_bounce_corr_with_interpolation(sig, delay, amp, awg_sample_rate, scope_sample_rate = None, bufsize=256):
+#     """ This function simulates the real-time bounce correction.
+
+#     Args:
+#         sig:           The signal to be filtered as a numpy array.
+#         delay:         The delay of the bounce in seconds.
+#         amp:           The amplitude of the bounce.
+#         sampling_rate: The sampling rate in Hz.
+
+#     Returns:
+#         sigout: Numpy array representing the output signal of the filter
+#     """
+#     delay_n_samples = int(np.floor(awg_sample_rate*delay))
+#     interpolation_fraction = awg_sample_rate*delay - delay_n_samples
+#     print(interpolation_fraction)
+#     if not 1 <= delay_n_samples < bufsize - 8:
+#         raise ValueError(textwrap.dedent("""
+#             The maximum delay needs to be less than {:d} (bufsize-8) AWG samples to save hardware resources.
+#             The delay needs to be at least 1 AWG sample.")
+#             """.format(bufsize - 8)))
+#     if not -1 < amp < 1:
+#         raise ValueError("The amplitude needs to be between -1 and 1.")
+
+#     # The scope sampling rate is equal to the AWG sampling rate by default.
+#     if scope_sample_rate is None:
+#         scope_sample_rate = awg_sample_rate
+
+#     # Reserve buffer space for bounce compensation.
+#     shift_reg = np.zeros(delay_n_samples + 1)
+#     delay_reg = 0.0
+
+#     awg_sample_incr = awg_sample_rate/scope_sample_rate
+
+#     previous_awg_sample_cnt = 0
+#     present_awg_sample_cnt = 0
+
+#     amp_hw = coef_round(amp, force_bshift=0)
+
+#     sigout = np.zeros(len(sig))
+
+#     for i, s in enumerate(sig):
+#         # Compute output signal
+#         interpolation = (1-interpolation_fraction)*shift_reg[-1] + interpolation_fraction*delay_reg
+#         sigout[i] = s + amp_hw*interpolation
+
+#         present_awg_sample_cnt += awg_sample_incr
+#         awg_sample_diff = int(present_awg_sample_cnt) - previous_awg_sample_cnt
+#         if awg_sample_diff >= 1:
+#             # Update the delay register used in the interpolation.
+#             delay_reg = shift_reg[-1]
+
+#             # Update shift register with present scope sample.
+#             shift_reg[awg_sample_diff:] = shift_reg[:-awg_sample_diff]
+#             shift_reg[:awg_sample_diff] = s*np.ones(awg_sample_diff)
+#             previous_awg_sample_cnt = int(present_awg_sample_cnt)
+
+#     return sigout
 
 def first_order_bounce_kern(delay, amp, sampling_rate):
     """ This function computes the filter kernel for first-order bounce (only one reflection considered).
