@@ -1163,7 +1163,7 @@ class CCLight_Transmon(Qubit):
     def calibrate_mixer_skewness_drive(self, MC=None,
                                        mixer_channels: list=['G', 'D'],
                                        x0: list =[1.0, 0.0],
-                                       cma_stds: list=[.15, 10],
+                                       cma_stds: list=[.15, 5],
                                        maxfevals: int=250,
                                        update: bool =True)-> bool:
         '''
