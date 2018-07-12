@@ -32,7 +32,6 @@ class ZI_HDAWG8(ZI_base_instrument):
             port            (int) the port to connect to
         '''
         t0 = time.time()
-        self._num_channels = 8
         self._num_codewords = num_codewords
 
         if os.name == 'nt':
@@ -66,9 +65,19 @@ class ZI_HDAWG8(ZI_base_instrument):
                             " {} not found".format(self._d_file_name))
         self.add_ZIshell_device_methods_to_instrument()
 
+        dev_type = self.get('features_devtype')
+        if dev_type == 'HDAWG8':
+            self._num_channels = 8
+        elif dev_type == 'HDAWG4':
+            self._num_channels = 4
+        else:
+            self._num_channels = 8
+            logging.warning('Unknown device type. Assuming eight channels.')
+
         self._add_codeword_parameters()
         self._add_extra_parameters()
         self.connect_message(begin_time=t0)
+
 
     def _add_extra_parameters(self):
         self.add_parameter('timeout', unit='s',
@@ -144,14 +153,14 @@ class ZI_HDAWG8(ZI_base_instrument):
         """
         Stops the program on all AWG's part of this AWG8 unit
         """
-        for i in range(4):
+        for i in range(int(self._num_channels/2)):
             self.set('awgs_{}_enable'.format(i), 0)
 
     def start(self):
         """
         Starts the program on all AWG's part of this AWG8 unit
         """
-        for i in range(4):
+        for i in range(int(self._num_channels/2)):
             self.set('awgs_{}_enable'.format(i), 1)
 
     def _check_protocol(self, awg):
@@ -582,7 +591,7 @@ class ZI_HDAWG8(ZI_base_instrument):
 
         # Configure the DIO interface for triggering on
 
-        for awg_nr in range(4):
+        for awg_nr in range(int(self._num_channels/2)):
                 # This is the bit index of the valid bit,
             self.set('awgs_{}_dio_valid_index'.format(awg_nr), 31)
             # Valid polarity is 'high' (hardware value 2),
