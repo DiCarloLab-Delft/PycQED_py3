@@ -294,16 +294,31 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
                  options_dict: dict=None,
                  sliding_pulse_duration=220e-9,
                  freq_to_amp=None, amp_to_freq=None,
+                 phase_cut :float=0,
+                 ch_amp_key: str='Snapshot/instruments/AWG8_8005'
+                 '/parameters/awgs_0_outputs_1_amplitude',
+                 ch_range_key: str='Snapshot/instruments/AWG8_8005'
+                 '/parameters/sigouts_0_range',
+                 waveform_amp_key: str='Snapshot/instruments/FL_LutMan_QR'
+                 '/parameters/sq_amp',
+                 close_figs: bool = True,
                  f_demod: float=0, demodulate: bool=False, auto=True):
         if options_dict is None:
             options_dict = dict()
         super().__init__(t_start=t_start, t_stop=t_stop, label=label,
-                         options_dict=options_dict)
+                         options_dict=options_dict, close_figs=close_figs)
+
+
+        self.ch_amp_key = ch_amp_key
+        # ch_range_keycan also be set to `None`, then the value will
+        # default to 1 (no rescaling)
+        self.ch_range_key = ch_range_key
+        self.waveform_amp_key = waveform_amp_key
 
         self.freq_to_amp = freq_to_amp
         self.amp_to_freq = amp_to_freq
         self.sliding_pulse_duration = sliding_pulse_duration
-
+        self.phase_cut = phase_cut
         if auto:
             self.run_analysis()
 
@@ -325,6 +340,16 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
         amp_key = 'Snapshot/instruments/AWG8_8005/parameters/awgs_0_outputs_1_amplitude'
         amp = a.data_file[amp_key].attrs['value']
 
+
+        ch_amp = a.data_file[self.ch_amp_key].attrs['value']
+        if self.ch_range_key is None:
+            ch_range = 2  # corresponds to a scale factor of 1
+        else:
+            ch_range = a.data_file[self.ch_range_key].attrs['value']
+        waveform_amp = a.data_file[self.waveform_amp_key].attrs['value']
+        amp = ch_amp*ch_range/2*waveform_amp
+
+
         self.raw_data_dict['amp'] = amp
         self.raw_data_dict['phases'] = a.measured_values[0]
         self.raw_data_dict['times'] = a.sweep_points
@@ -335,10 +360,13 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
         a.finish()
 
     def process_data(self):
-        phase = np.nanmean(np.unwrap(self.raw_data_dict['phases'][::-1],
-                                     discont=180, axis=1)[::-1], axis=1)
-        phase_err = sem(np.unwrap(self.raw_data_dict['phases'],
-                                  discont=180, axis=1), axis=1)
+        phi_cut=self.phase_cut
+        phases_shifted = (self.raw_data_dict['phases']+phi_cut)%360-phi_cut
+
+        phase = np.nanmean(np.unwrap(phases_shifted[::-1],
+                                     discont=0, axis=1)[::-1], axis=1)
+        phase_err = sem(np.unwrap(phases_shifted,
+                                  discont=0, axis=1), axis=1)
 
         self.proc_data_dict['phase'] = phase
         self.proc_data_dict['phase_err'] = phase_err
@@ -394,7 +422,8 @@ def make_phase_plot(t, phase, phase_err, title,  ylim=None, ax=None, **kw):
     ax.axhline(mean_phase_tail-5, ls='--', c='grey', linewidth=0.5)
     ax.legend()
     if ylim is None:
-        ax.set_ylim(mean_phase_tail-60, mean_phase_tail+40)
+        ax.set_ylim(np.min([mean_phase_tail-60, np.min(phase)]),
+                    np.max([mean_phase_tail+40, np.max(phase)]))
     else:
         ax.set_ylim(ylim[0], ylim[1])
 

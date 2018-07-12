@@ -97,13 +97,19 @@ class CCL(SCPI):
 
         self.qisa_opcode(qmap_fn)
 
-    def stop(self):
+    def stop(self, getOperationComplete=True):
         self.run(0),
         self.enable(0)
+        # Introduced to work around AWG8 triggering issue
+        if getOperationComplete:
+            self.getOperationComplete()
 
-    def start(self):
+    def start(self, getOperationComplete=True):
         self.enable(1)
         self.run(1)
+        # Introduced to work around AWG8 triggering issue
+        if getOperationComplete:
+            self.getOperationComplete()
 
 
     def add_standard_parameters(self):

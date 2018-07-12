@@ -11,11 +11,13 @@ from matplotlib.ticker import MaxNLocator
 import matplotlib.patches as mpatches
 from pycqed.utilities.general import is_more_rencent
 
+
 def clocks_to_s(time, clock_cycle=20e-9):
     """
     Converts a time in clocks to a time in s
     """
     return time*clock_cycle
+
 
 def infer_tqisa_filename(qisa_fn: str):
     """
@@ -115,7 +117,8 @@ def find_operation_idx_in_time_tuples(time_tuples, target_op: str):
             target_indices.append(i)
     return (target_indices)
 
-def get_operation_tuples(time_tuples: list, target_op:str):
+
+def get_operation_tuples(time_tuples: list, target_op: str):
     """
     Returns a list of tuples that perform a specific operation
 
@@ -126,13 +129,12 @@ def get_operation_tuples(time_tuples: list, target_op:str):
         time_tuples_op          : time_tuples containing target_op
     """
     op_indices = find_operation_idx_in_time_tuples(time_tuples,
-                                               target_op=target_op)
+                                                   target_op=target_op)
 
     time_tuples_op = []
     for op_idx in op_indices:
         time_tuples_op.append(time_tuples[op_idx])
     return time_tuples_op
-
 
 
 def split_time_tuples_on_operation(time_tuples, split_op: str):
@@ -241,7 +243,6 @@ def plot_time_tuples_split(time_tuples, ax=None, time_unit='s',
     return ax
 
 
-
 #############################################################################
 # File modifications
 #############################################################################
@@ -267,7 +268,6 @@ def flux_pulse_replacement(qisa_fn: str):
 
     """
 
-
     ttuple = get_timetuples(qisa_fn)
     grouped_timetuples = split_time_tuples_on_operation(ttuple, 'meas')
 
@@ -275,8 +275,6 @@ def flux_pulse_replacement(qisa_fn: str):
     for i, tt in enumerate(grouped_timetuples):
         fl_time_tuples = substract_time_offset(get_operation_tuples(tt, 'fl'))
         grouped_fl_tuples.append(fl_time_tuples)
-
-
 
     with open(qisa_fn, 'r') as source_qisa_file:
         lines = source_qisa_file.readlines()
@@ -292,9 +290,6 @@ def flux_pulse_replacement(qisa_fn: str):
                 # cw 00 is a dummy pulse that should not trigger the AWG8
                 new_l = l.replace(cw, 'fl_cw_00')
             lines[line_nr] = new_l
-
-
-
 
     mod_qisa_fn = qisa_fn[:-5]+'_mod.qisa'
     with open(mod_qisa_fn, 'w') as mod_qisa_file:
@@ -327,21 +322,20 @@ def check_recompilation_needed(program_fn: str, platf_cfg: str,
             if is_more_rencent(program_fn, platf_cfg):
                 return False
             else:
-                return True # compilation is required
+                return True  # compilation is required
         except FileNotFoundError:
             # File doesn't exist means compilation is required
             return True
 
-    elif recompile == False: # if False
+    elif recompile == False:  # if False
         if is_more_rencent(program_fn, platf_cfg):
             return False
         else:
             raise ValueError('OpenQL config has changed more recently '
                              'than program.')
     else:
-        raise NotImplementedError('recompile should be True, False or "as needed"')
-
-
+        raise NotImplementedError(
+            'recompile should be True, False or "as needed"')
 
 
 def load_range_of_oql_programs(programs, counter_param, CC):
@@ -352,6 +346,7 @@ def load_range_of_oql_programs(programs, counter_param, CC):
     program = programs[counter_param()]
     counter_param((counter_param()+1) % len(programs))
     CC.eqasm_program(program.filename)
+
 
 def load_range_of_oql_programs_varying_nr_shots(programs, counter_param, CC,
                                                 detector):

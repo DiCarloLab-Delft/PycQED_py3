@@ -595,7 +595,7 @@ class Intersect_Analysis(Single_Qubit_TimeDomainAnalysis):
                 'line_kws': {'alpha': .5, 'color':'gray',
                             'markersize':15},
                 'marker': 'o',
-                'setlabel': 'Intercept: {:.1f} {}'.format(ic, ic_unit),
+                'setlabel': 'Intercept: {:.3f} {}'.format(ic, ic_unit),
                 'do_legend': True}
 
     def get_intersect(self):
@@ -746,6 +746,7 @@ class Oscillation_Analysis(ba.BaseDataAnalysis):
     def __init__(self, t_start: str=None, t_stop: str=None,
                  data_file_path: str=None,
                  label: str='',
+                 ch_idx: int=0,
                  options_dict: dict=None, extract_only: bool=False,
                  do_fitting: bool=True, auto=True):
         super().__init__(t_start=t_start, t_stop=t_stop,
@@ -754,7 +755,7 @@ class Oscillation_Analysis(ba.BaseDataAnalysis):
                          options_dict=options_dict,
                          extract_only=extract_only, do_fitting=do_fitting)
         self.single_timestamp = False
-
+        self.ch_idx = ch_idx
         self.params_dict = {'xlabel': 'sweep_name',
                             'xunit': 'sweep_unit',
                             'xvals': 'sweep_points',
@@ -769,7 +770,7 @@ class Oscillation_Analysis(ba.BaseDataAnalysis):
 
     def process_data(self):
         self.proc_data_dict = OrderedDict()
-        idx = 1
+        idx = self.ch_idx
 
         self.proc_data_dict['yvals'] = list(self.raw_data_dict['measured_values_ord_dict'].values())[idx][0]
         self.proc_data_dict['ylabel'] = self.raw_data_dict['value_names'][0][idx]

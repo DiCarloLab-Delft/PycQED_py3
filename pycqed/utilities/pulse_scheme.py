@@ -29,14 +29,20 @@ def new_pulse_subplot(fig, *args, **kwargs):
 
 
 def mwPulse(ax, pos, width=1.5, amp=1, label=None, phase=0, labelHeight=1.3,
-            color='C0'):
+            color='C0', modulation='normal'):
     '''
     Draw a microwave pulse: Gaussian envelope with modulation.
     '''
     x = np.linspace(pos, pos + width, 100)
     envPos = amp * np.exp(-(x - (pos + width / 2))**2 / (width / 4)**2)
     envNeg = -amp * np.exp(-(x - (pos + width / 2))**2 / (width / 4)**2)
-    mod = envPos * np.sin(2 * np.pi * 3 / width * x + phase)
+
+    if modulation == 'normal':
+        mod = envPos * np.sin(2 * np.pi * 3 / width * x + phase)
+    elif modulation == 'high':
+        mod = envPos * np.sin(5 * np.pi * 3 / width * x + phase)
+    else:
+        raise ValueError()
 
     ax.plot(x, envPos, '--', color=color)
     ax.plot(x, envNeg, '--', color=color)
@@ -102,9 +108,47 @@ def interval(ax, start, stop, height=1.5, label=None, labelHeight=None,
     ax.add_patch(arrow)
 
     if vlines:
-        ax.plot([start, start], [0, labelHeight], '--', color=color)
-        ax.plot([stop, stop], [0, labelHeight], '--', color=color)
+        ax.plot([start, start], [0, height], '--', color=color)
+        ax.plot([stop, stop], [0, height], '--', color=color)
 
     if label is not None:
         ax.text((start + stop) / 2, labelHeight, label, color=color,
                 horizontalalignment='center')
+
+def interval_vertical(ax, start, stop, position, label=None, labelHeight=None,
+                      color='k', arrowstyle='<|-|>', labeloffset:float = 0,
+                      horizontalalignment='center'):
+    '''
+    Draw an arrow to indicate an interval.
+    '''
+    if labelHeight is None:
+        labelHeight = (start+stop)/2
+
+    arrow = matplotlib.patches.FancyArrowPatch(
+        posA=(position, start), posB=(position, stop), arrowstyle=arrowstyle,
+        color=color, mutation_scale=7)
+    ax.add_patch(arrow)
+
+    if label is not None:
+        ax.text(position+labeloffset, labelHeight, label, color=color,
+                horizontalalignment=horizontalalignment)
+
+
+def meter(ax, x0, y0, w=1.1, h=.8, color='black', fillcolor=None):
+    """
+    Draws a measurement meter on the specified position.
+    """
+    if fillcolor==None:
+        fill=False
+    else:
+        fill = True
+    p1 = matplotlib.patches.Rectangle(
+        (x0-w/2, y0-h/2), w, h, facecolor=fillcolor, edgecolor=color,
+        fill=fill, zorder=5)
+    ax.add_patch(p1)
+    p0 = matplotlib.patches.Wedge(
+        (x0,y0-h/4), .35, theta1=40, theta2=180-40, color=color, lw=2,
+        width =.01, zorder=5)
+    ax.add_patch(p0)
+    ax.arrow(x0, y0-h/4, dx=.5*np.cos(np.deg2rad(70)),
+             dy=.5*np.sin(np.deg2rad(60)), width=.03, color=color, zorder=5)

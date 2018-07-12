@@ -677,7 +677,16 @@ class MeasurementControl(Instrument):
                             # can be specified in MC.run(exp_metadata['bins'])
                             if self.plotting_bins is not None:
                                 x = self.plotting_bins
-                                y = np.mean(y.reshape(
+                                if len(y) % len(x) != 0:
+                                    # nan's are appended if shapes do not match
+                                    missing_vals = missing_vals = \
+                                        int(len(x)-len(y) % len(x))
+                                    y_ext = np.concatenate([
+                                        y, np.ones(missing_vals)*np.nan])
+                                else:
+                                    y_ext = y
+
+                                y = np.nanmean(y_ext.reshape(
                                     (len(self.plotting_bins), -1),
                                     order='F'), axis=1)
 
@@ -1656,4 +1665,6 @@ class KeyboardFinish(KeyboardInterrupt):
     Indicates that the user safely aborts/finishes the experiment.
     Used to finish the experiment without raising an exception.
     """
+
+    # FIXME: replace with version from pycqed/utilities/general
     pass

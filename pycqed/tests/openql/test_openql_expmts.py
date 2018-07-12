@@ -8,7 +8,8 @@ try:
     from pycqed.measurement.openql_experiments import clifford_rb_oql as rb_oql
     from pycqed.measurement.openql_experiments.generate_CCL_cfg import  \
         generate_config
-    from pycqed.measurement.openql_experiments.pygsti_oql import poor_mans_2q_gst
+    from pycqed.measurement.openql_experiments.pygsti_oql import \
+        poor_mans_2q_gst, single_qubit_gst
     from openql import openql as ql
 
     rootDir = os.path.dirname(os.path.realpath(__file__))
@@ -88,9 +89,7 @@ try:
                                         nr_cliffords=nr_cliffords, nr_seeds=3)
 
         def test_fast_feedback_control(self):
-            sqo.FastFeedbackControl(time=200e-9, feedback=False,
-                                    qubit_idx=0, platf_cfg=config_fn)
-            sqo.FastFeedbackControl(time=200e-9, feedback=True,
+            sqo.FastFeedbackControl(latency=200e-9,
                                     qubit_idx=0, platf_cfg=config_fn)
 
     class Test_multi_qubit_seqs_CCL(unittest.TestCase):
@@ -126,6 +125,13 @@ try:
         def test_poor_mans_2q_gst(self):
             p = poor_mans_2q_gst(q0=0, q1=2, platf_cfg=config_fn)
             self.assertEqual(len(p.sweep_points), 731)
+
+        def test_single_qubit_gst(self):
+            programs = single_qubit_gst(0, config_fn,
+                                        maxL=256, lite_germs=True,
+                                        recompile=True)
+
+
 
     class Test_cliff_rb_oql(unittest.TestCase):
         def test_single_qubit_rb_seq(self):

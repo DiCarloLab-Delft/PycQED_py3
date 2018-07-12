@@ -18,7 +18,8 @@ from scipy import signal
 from pycqed.measurement.kernel_functions import bounce_kernel
 
 
-def bias_tee_correction(ysig, tau: float, sampling_rate: float=1):
+def bias_tee_correction(ysig, tau: float, sampling_rate: float=1,
+                        inverse:bool=False):
     """
     Corrects for a bias tee correction using a linear IIR filter with time
     constant tau.
@@ -28,13 +29,16 @@ def bias_tee_correction(ysig, tau: float, sampling_rate: float=1):
     b = [1, -1]
     a = [(k+1)/k, -(k-1)/k]
 
-    # hint: to get the inverse just use the filter with (b, a, ysig)
-    filtered_signal = signal.lfilter(a, b, ysig)
+    if inverse:
+        filtered_signal = signal.lfilter(b, a, ysig)
+    else:
+        filtered_signal = signal.lfilter(a, b, ysig)
     return filtered_signal
 
 
 def exponential_decay_correction(ysig, tau: float, amp: float,
-                                 sampling_rate: float=1):
+                                 sampling_rate: float=1,
+                                 inverse: bool=False):
     """
     Corrects for an exponential decay using a linear IIR filter.
 
@@ -67,14 +71,16 @@ def exponential_decay_correction(ysig, tau: float, amp: float,
     b = [1, -(1-alpha)]
     # if alpha > 0.03 the filter can be unstable.
 
-    # hint: to get the inverse just use the filter with (a, b, ysig)
-    filtered_signal = signal.lfilter(a, b, ysig)
+    if inverse:
+        filtered_signal = signal.lfilter(b, a, ysig)
+    else:
+        filtered_signal = signal.lfilter(a, b, ysig)
     return filtered_signal
 
 
-
 def bounce_correction(ysig, tau:float, amp: float,
-                      sampling_rate:float = 1):
+                      sampling_rate:float = 1,
+                      inverse: bool=False):
     """
     Corrects for a bounce
 
@@ -89,8 +95,12 @@ def bounce_correction(ysig, tau:float, amp: float,
 
     # kernel is cut of after 8*tau, this menas that it will only correct
     # bounces up to 8th order, this is good for coefficients << 1
-    kern = bounce_kernel(amp, time=tau, length=8*tau, sampling_rate=sampling_rate)
-    filter_signal = np.convolve(ysig, kern, mode='full')
+    kern = bounce_kernel(amp, time=tau, length=8*tau,
+                         sampling_rate=sampling_rate)
+    if inverse:
+        raise NotImplemented
+    else:
+        filter_signal = np.convolve(ysig, kern, mode='full')
     return filter_signal[:len(ysig)]
 
 

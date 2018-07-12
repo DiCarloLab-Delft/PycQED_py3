@@ -294,14 +294,22 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
 
     def _add_channel_params(self):
         super()._add_channel_params()
-        self.add_parameter('channel_amp',
-                           unit='a.u.',
-                           vals=vals.Numbers(0, 1),
-                           set_cmd=self._set_channel_amp,
-                           get_cmd=self._get_channel_amp,
-                           docstring=('using the channel amp as additional'
-                                      'parameter to allow rabi-type experiments without'
-                                      'wave reloading. Should not be using VSM'))
+        self.add_parameter(
+            'channel_amp', unit='a.u.', vals=vals.Numbers(0, 1),
+            set_cmd=self._set_channel_amp, get_cmd=self._get_channel_amp,
+            docstring=('using the channel amp as additional'
+                       'parameter to allow rabi-type experiments without'
+                       'wave reloading. Should not be using VSM'))
+
+        self.add_parameter(
+            '_awgs_mw_sequencer_program_expected_hash',
+            docstring='crc32 hash of the awg8 sequencer program. '
+            'This parameter is used to dynamically determine '
+            'if the program needs to be uploaded. The initial_value is'
+            ' None, indicating that the program needs to be uploaded.'
+            ' After the first program is uploaded, the value is set.',
+            parameter_class=ManualParameter, initial_value=None,
+            vals=vals.Ints())
 
     def _set_channel_amp(self, val):
         AWG = self.AWG.get_instr()
@@ -322,7 +330,8 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
         return vals[0]
 
     def load_waveforms_onto_AWG_lookuptable(
-            self, regenerate_waveforms: bool=True, stop_start: bool = True):
+            self, regenerate_waveforms: bool=True, stop_start: bool = True,
+            force_load_sequencer_program: bool=False):
         """
         Loads all waveforms specified in the LutMap to an AWG.
 
@@ -330,19 +339,113 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
             regenerate_waveforms (bool): if True calls
                 generate_standard_waveforms before uploading.
             stop_start           (bool): if True stops and starts the AWG.
+
+
+        Because of realtime loading vs the DIO sequencer program the uploading
+        flow for the AWG8 is slightly different.
         """
         super().load_waveforms_onto_AWG_lookuptable(
             regenerate_waveforms=regenerate_waveforms,
             stop_start=stop_start)
         # Uploading the codeword program (again) is needed to link the new
         # waveforms.
+        if self._program_hash_differs() or force_load_sequencer_program:
+            # This ensures only the channels that are relevant get reconfigured
+            if 'channel_GI' in self.parameters:
+                awgs = [self.channel_GI()//2, self.channel_DI()//2]
+            else:
+                awgs = [self.channel_I()]
+            # Add if statemetn based on the hash here
+            self.AWG.get_instr().upload_codeword_program(awgs=awgs)
 
-        # This ensures only the channels that are relevant get reconfigured
+        for waveform_name in self.LutMap().keys():
+            self.load_waveform_realtime(
+                waveform_name=waveform_name,
+                wf_nr=None, regenerate_waveforms=False)
+
+        self._update_expected_program_hash()
+
+    def load_waveform_realtime(self, waveform_name: str,
+                               wf_nr: int = None,
+                               regenerate_waveforms: bool=True):
+        """
+        Loads a waveform using the realtime memory manipulation.
+
+        Args:
+            waveform_name:        (str) : name of the waveform
+            wf_nr                 (int) : what codeword to load the pulse onto
+                if set to None, will determine awg_nr based on self.LutMap
+            regenerate_waveforms (bool) : if True regenerates all waveforms
+
+        """
+        if regenerate_waveforms:
+            self.generate_standard_waveforms()
+
+        I, Q = self._wave_dict[waveform_name]
+
+        if wf_nr is None:
+            wf_nr = int(self.LutMap()[waveform_name][0][-3:])
+
+        AWG = self.AWG.get_instr()
+
+        awg_nr = self.channel_I()//2
+        AWG.upload_waveform_realtime(I, Q, awg_nr, wf_nr=wf_nr)
+
+    def _program_hash_differs(self)-> bool:
+        """
+        Args:
+            --
+        Returns:
+            hash_different (bool): returns True if one of the hashes does not
+                correspond to the expected hash.
+
+        Compares current AWG sequencer program hash for the relevant channels
+        with the expected program hash and, returns True if one ore more
+        hashes do not match, indicating that uploading the programs is
+        required.
+        """
+        hash_differs = False
         if 'channel_GI' in self.parameters:
-            awgs = [self.channel_GI()//2, self.channel_DI()//2]
+            for ch in ['G', 'D']:
+                awg_nr = self.get('channel_{}I'.format(ch))//2
+                hash = self.AWG.get_instr().get(
+                    'awgs_{}_sequencer_program_crc32_hash'.format(awg_nr))
+                expected_hash = self.get(
+                    '_awgs_mw{}_sequencer_program_expected_hash'.format(ch))
+                if hash != expected_hash:
+                    hash_differs = True
+
         else:
-            awgs = [self.channel_I()]
-        self.AWG.get_instr().upload_codeword_program(awgs=awgs)
+            awg_nr = self.channel_I()//2
+            hash = self.AWG.get_instr().get(
+                'awgs_{}_sequencer_program_crc32_hash'.format(awg_nr))
+            expected_hash = self.get(
+                '_awgs_mw_sequencer_program_expected_hash')
+            if hash != expected_hash:
+                hash_differs = True
+        return hash_differs
+
+    def _update_expected_program_hash(self):
+        """
+        Updates the expected AWG sequencer program hash with the current
+        hash of the sequencer program. This is intended to be called after
+        setting the hash.
+        """
+        if 'channel_GI' in self.parameters:
+            for ch in ['G', 'D']:
+                awg_nr = self.get('channel_{}I'.format(ch))//2
+                hash = self.AWG.get_instr().get(
+                    'awgs_{}_sequencer_program_crc32_hash'.format(awg_nr))
+                self.set(
+                    '_awgs_mw{}_sequencer_program_expected_hash'.format(ch),
+                    hash)
+        else:
+            awg_nr = self.channel_I()//2
+            hash = self.AWG.get_instr().get(
+                'awgs_{}_sequencer_program_crc32_hash'.format(awg_nr))
+            self.set(
+                '_awgs_mw_sequencer_program_expected_hash',
+                hash)
 
 
 class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
@@ -393,34 +496,50 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
         return self._wave_dict
 
     def _add_channel_params(self):
-        # FIXME: add parameter channel amp that sets the ouput amplitude of
-        # all channels used for this pulse
-        self.add_parameter('channel_GI',
-                           parameter_class=ManualParameter,
-                           vals=vals.Numbers(1, self._num_channels))
-        self.add_parameter('channel_GQ',
-                           parameter_class=ManualParameter,
-                           vals=vals.Numbers(1, self._num_channels))
-        self.add_parameter('channel_DI',
-                           parameter_class=ManualParameter,
-                           vals=vals.Numbers(1, self._num_channels))
-        self.add_parameter('channel_DQ',
-                           parameter_class=ManualParameter,
-                           vals=vals.Numbers(1, self._num_channels))
-        self.add_parameter('channel_amp',
-                           unit='a.u.',
-                           vals=vals.Numbers(0, 1),
-                           set_cmd=self._set_channel_amp,
-                           get_cmd=self._get_channel_amp,
-                           docstring=('using the channel amp as additional'
-                                      'parameter to allow rabi-type experiments without'
-                                      'wave reloading. Should not be using VSM'))
+        self.add_parameter(
+            'channel_amp', unit='a.u.', vals=vals.Numbers(0, 1),
+            set_cmd=self._set_channel_amp,
+            get_cmd=self._get_channel_amp,
+            docstring=('using the channel amp as additional'
+                       'parameter to allow rabi-type experiments without'
+                       'wave reloading. Should not be using VSM'))
+
+        for ch in ['GI', 'GQ', 'DI', 'DQ']:
+            self.add_parameter(
+                'channel_{}'.format(ch), parameter_class=ManualParameter,
+                vals=vals.Numbers(1, self._num_channels))
+
+        for ch in ['G', 'D']:
+            self.add_parameter(
+                '_awgs_mw{}_sequencer_program_expected_hash'.format(ch),
+                docstring='crc32 hash of the awg8 sequencer program. '
+                'This parameter is used to dynamically determine '
+                'if the program needs to be uploaded. The initial_value is'
+                ' None, indicating that the program needs to be uploaded.'
+                ' After the first program is uploaded, the value is set.',
+                parameter_class=ManualParameter, initial_value=None,
+                vals=vals.Ints())
 
     def load_waveform_realtime(self, waveform_name: str,
-                               wf_nr: int = None):
+                               wf_nr: int = None,
+                               regenerate_waveforms: bool=True):
+        """
+        Loads a waveform using the realtime memory manipulation.
 
-        self.generate_standard_waveforms()
+        Args:
+            waveform_name:        (str) : name of the waveform
+            wf_nr                 (int) : what codeword to load the pulse onto
+                if set to None, will determine awg_nr based on self.LutMap
+            regenerate_waveforms (bool) : if True regenerates all waveforms
+
+        """
+        if regenerate_waveforms:
+            self.generate_standard_waveforms()
+
         GI, GQ, DI, DQ = self._wave_dict[waveform_name]
+
+        if wf_nr is None:
+            wf_nr = int(self.LutMap()[waveform_name][0][-3:])
 
         AWG = self.AWG.get_instr()
 
@@ -428,7 +547,6 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
         awg_nr_D = self.channel_DI()//2
         AWG.upload_waveform_realtime(GI, GQ, awg_nr_G, wf_nr=wf_nr)
         AWG.upload_waveform_realtime(DI, DQ, awg_nr_D, wf_nr=wf_nr)
-
 
     def _set_channel_amp(self, val):
         AWG = self.AWG.get_instr()
