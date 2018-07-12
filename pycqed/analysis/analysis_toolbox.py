@@ -420,6 +420,7 @@ def get_data_from_ma_v2(ma, param_names, numeric_params=None):
                     temp = ma.data_file
                 else:
                     extract_param = False
+                    print(ma.folder)
                     warnings.warn(
                         'The data file attribute %s does not exist or hasn''t been coded for extraction.' % (param))
                 if extract_param:
@@ -433,7 +434,6 @@ def get_data_from_ma_v2(ma, param_names, numeric_params=None):
         if numeric_params is not None:
             if param in numeric_params:
                 data[param] = np.double(data[param])
-
     return data
 
 
@@ -739,6 +739,7 @@ def get_timestamps_in_range(timestamp_start, timestamp_end=None,
                       for dirname in all_measdirs]
         timestamps.reverse()
         all_timestamps += timestamps
+    # print(folder, exact_label_match, all_timestamps, datetime_start, datetime_end, days_delta, all_measdirs)
     # Ensures the order of the timestamps is ascending
     all_timestamps.sort()
     return all_timestamps
@@ -1626,6 +1627,8 @@ def datetime_from_timestamp(timestamp):
             return datetime.datetime.strptime(timestamp, "%Y%m%d%H%M%S")
         elif len(timestamp) == 15:
             return datetime.datetime.strptime(timestamp, "%Y%m%d_%H%M%S")
+        else:
+            raise ValueError
     except Exception as e:
         print('Invalid timestamp :"{}"'.format(timestamp))
         raise e
@@ -1861,8 +1864,10 @@ def linecut_plot(x, y, z, fig, ax,
     z must be a 2D array with shape(len(x),len(y)).
     '''
     colormap = plt.cm.get_cmap('RdYlBu')
-    plt.gca().set_color_cycle([colormap(i) for i in np.linspace(
+    ax.set_prop_cycle('color', [colormap(i) for i in np.linspace(
                               0, 0.9, len(y))])
+
+
     for i in range(len(y)):
         label = '{}: {:.4g} {}'.format(
             y_name, y[i], y_unit)

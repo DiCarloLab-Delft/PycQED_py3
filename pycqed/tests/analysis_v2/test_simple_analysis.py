@@ -39,3 +39,6 @@ class Test_SimpleAnalysis(unittest.TestCase):
         exp_list_keys = ['Cost function value', 'Conditional phase',
                          'offset difference']
         self.assertEqual(fig_keys, exp_list_keys)
+
+    def test_1D_binned_analysis(self):
+        a=ma.Basic1DBinnedAnalysis(label='120543_Single_qubit_GST_QL')

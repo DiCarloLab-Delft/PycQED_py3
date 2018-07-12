@@ -92,7 +92,7 @@ def TwinLorentzFunc(f, A_gf_over_2, A, f0_gf_over_2, f0,
 def Qubit_dac_to_freq(dac_voltage, f_max, E_c,
                       dac_sweet_spot, V_per_phi0=None,
                       dac_flux_coefficient=None,
-                      asymmetry=0):
+                      asymmetry=0, **kwargs):
     '''
     The cosine Arc model for uncalibrated flux for asymmetric qubit.
 
@@ -122,7 +122,7 @@ def Resonator_dac_to_freq(dac_voltage, f_max_qubit, f_0_res,
                           E_c, dac_sweet_spot,
                           coupling, V_per_phi0=None,
                           dac_flux_coefficient=None,
-                          asymmetry=0):
+                          asymmetry=0, **kwargs):
     qubit_freq = Qubit_dac_to_freq(dac_voltage=dac_voltage, f_max=f_max_qubit, E_c=E_c,
                                    dac_sweet_spot=dac_sweet_spot, V_per_phi0=V_per_phi0,
                                    dac_flux_coefficient=dac_flux_coefficient,
@@ -668,12 +668,23 @@ def arc_guess(freq, dac, dd=0.1):
     return fmax, fmin, dac[dac_ss_index], arc_len
 
 
-def Resonator_dac_arch_guess(model, freq, dac_voltage, f_max_qubit: float = None, E_c: float = None):
-    fmax, fmin, dac_ss, period = arc_guess(freq=freq, dac=dac_voltage)
-    coup_guess = 15e6
+def Resonator_dac_arch_guess(model, data, dac_voltage,
+                             E_c: float = None, values=None):
+    if values is None:
+        values = {}
+
+    fmax, fmin, dac_ss, period = arc_guess(freq=data, dac=dac_voltage)
 
     # todo make better f_res guess
-    f_res = np.mean(freq)  # - (coup_guess ** 2 / (f_max_qubit - fmax))
+    f_res = np.mean(data)  # - (coup_guess ** 2 / (f_max_qubit - fmax))
+    f_res = values.get('f_res', f_res)
+    f_max_qubit = values.get('f_max_qubit', None)
+    dac_ss = values.get('dac_sweet_spot', dac_ss)
+    period = values.get('V_per_phi0', period)
+    EC = values.get('E_c', 260e6)
+    coup_guess = values.get('coup_guess', 15e6)
+    asymmetry = values.get('asymmetry', 0)
+
     f_max_qubit_vary = f_max_qubit is None
     f_max_qubit = f_max_qubit or f_res - 500e6
 
@@ -681,22 +692,29 @@ def Resonator_dac_arch_guess(model, freq, dac_voltage, f_max_qubit: float = None
     model.set_param_hint('f_max_qubit', value=f_max_qubit, min=3e9, max=8.5e9, vary=f_max_qubit_vary)
     model.set_param_hint('dac_sweet_spot', value=dac_ss, min=(dac_ss - 0.005) / 2, max=2 * (dac_ss + 0.005))
     model.set_param_hint('V_per_phi0', value=period, min=(period - 0.005) / 3, max=5 * (period + 0.005))
-    model.set_param_hint('asymmetry', value=0, max=1, min=-1)
+    model.set_param_hint('asymmetry', value=asymmetry, max=1, min=-1)
     model.set_param_hint('coupling', value=coup_guess, min=1e6, max=80e6)
-    E_c = E_c or 260e6
-    model.set_param_hint('E_c', value=E_c, min=50e6, max=400e6)
+    model.set_param_hint('E_c', value=EC, min=50e6, max=400e6)
 
     params = model.make_params()
     return params
 
 
-def Qubit_dac_arch_guess(model, freq, dac_voltage):
-    fmax, fmin, dac_ss, period = arc_guess(freq=freq, dac=dac_voltage)
+def Qubit_dac_arch_guess(model, data, dac_voltage, values=None):
+    if values is None:
+        values = {}
+    fmax, fmin, dac_ss, period = arc_guess(freq=data, dac=dac_voltage)
+    fmax = values.get('f_max', fmax)
+    dac_ss = values.get('dac_sweet_spot', dac_ss)
+    period = values.get('V_per_phi0', period)
+    EC = values.get('E_c', 260e6)
+    asymmetry = values.get('asymmetry', 0)
+
     model.set_param_hint('f_max', value=fmax, min=0.7 * fmax, max=1.3 * fmax)
     model.set_param_hint('dac_sweet_spot', value=dac_ss, min=(dac_ss - 0.005) / 2, max=2 * (dac_ss + 0.005))
     model.set_param_hint('V_per_phi0', value=period, min=(period - 0.005) / 3, max=5 * (period + 0.005))
-    model.set_param_hint('asymmetry', value=0, max=1, min=-1)
-    model.set_param_hint('E_c', value=260e6, min=50e6, max=400e6)
+    model.set_param_hint('asymmetry', value=asymmetry, max=1, min=-1)
+    model.set_param_hint('E_c', value=EC, min=50e6, max=400e6)
 
     params = model.make_params()
     return params

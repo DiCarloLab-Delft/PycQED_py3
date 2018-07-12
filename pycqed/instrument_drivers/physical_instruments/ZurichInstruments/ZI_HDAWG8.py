@@ -6,6 +6,7 @@ from . import zishell_NH as zs
 from qcodes.utils import validators as vals
 from .ZI_base_instrument import ZI_base_instrument
 from qcodes.instrument.parameter import ManualParameter
+from zlib import crc32
 
 import ctypes
 from ctypes.wintypes import MAX_PATH
@@ -90,6 +91,12 @@ class ZI_HDAWG8(ZI_base_instrument):
                 ' pins are used in for which AWG numbers.'),
             parameter_class=ManualParameter)
 
+        for i in range(4):
+            self.add_parameter(
+                'awgs_{}_sequencer_program_crc32_hash'.format(i),
+                parameter_class=ManualParameter,
+                initial_value=0, vals=vals.Ints())
+
     def snapshot_base(self, update=False, params_to_skip_update=None):
         if params_to_skip_update is None:
             params_to_skip_update = self._params_to_skip_update
@@ -106,10 +113,22 @@ class ZI_HDAWG8(ZI_base_instrument):
         self.restart_device = self._dev.restart_device
         self.poll = self._dev.poll
         self.sync = self._dev.sync
-        self.configure_awg_from_string = self._dev.configure_awg_from_string
         self.read_from_scope = self._dev.read_from_scope
         self.restart_scope_module = self._dev.restart_scope_module
         self.restart_awg_module = self._dev.restart_awg_module
+
+    def configure_awg_from_string(self, awg_nr: int, program_string: str,
+                                  timeout: float=15):
+        """
+        Uploads a program string to one of the AWGs of the AWG8.
+        Also
+        """
+        self._dev.configure_awg_from_string(awg_nr=awg_nr,
+                                            program_string=program_string,
+                                            timeout=timeout)
+        hash = crc32(program_string.encode('utf-8'))
+        self.set('awgs_{}_sequencer_program_crc32_hash'.format(awg_nr),
+                 hash)
 
     def get_idn(self):
         idn_dict = {'vendor': 'ZurichInstruments',
@@ -609,7 +628,8 @@ class ZI_HDAWG8(ZI_base_instrument):
                 # FIXME: this is a protocol that does identical flux pulses
                 # on each channel.
                 self.set('awgs_{}_dio_mask_value'.format(awg_nr), 2**3-1)
-                self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 3)
+                # self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 3)
+                self.set('awgs_{}_dio_mask_shift'.format(awg_nr), 0)
 
         ####################################################
         # Turn on device

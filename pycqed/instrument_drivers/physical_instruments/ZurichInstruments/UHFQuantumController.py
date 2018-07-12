@@ -245,10 +245,12 @@ class UHFQC(Instrument):
         for i in range(0, self.nr_integration_channels):
             self.set('quex_rot_{0}_real'.format(i), 1.0)
             self.set('quex_rot_{0}_imag'.format(i), 0.0)
+            # remove offsets to weight function
+            self.set('quex_trans_offset_weightfunction_{}'.format(i), 0.0)
 
         # No cross-coupling in the matrix multiplication (identity matrix)
         for i in range(0, self.nr_integration_channels):
-            for j in range(0,):
+            for j in range(0, self.nr_integration_channels):
                 if i == j:
                     self.set('quex_trans_{0}_col_{1}_real'.format(i, j), 1)
                 else:

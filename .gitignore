@@ -114,6 +114,9 @@ $RECYCLE.BIN/
 # Pycqed specific files
 # ======================
 
+# Multiprocessing dask generated files
+*dask-worker-space*
+
 # code generated qasm files
 *.qasm
 # micro instruction assembly files
@@ -127,6 +130,7 @@ $RECYCLE.BIN/
 *.txt
 *.png
 pycqed/measurement/openql_experiments/output/*
+*.qmap
 
 # data files
 # test data files should be explicitly added by hand (overriding .gitignore)
