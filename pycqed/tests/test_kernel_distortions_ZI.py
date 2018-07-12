@@ -25,17 +25,22 @@ class Test_Kernel_functions_ZI(unittest.TestCase):
 
     def compute_distorted_waveform(self):
         a = ZI_kf.first_order_bounce_kern(self.bounce_delay, self.bounce_amp, self.sampling_rate)
-        self.distorted_waveform = signal.lfilter(a, 1.0, self.ideal_waveform)
+        self.distorted_waveform = signal.lfilter([1.0], a, self.ideal_waveform)
 
     def test_first_order_bounce_correction(self):
         hw_corr = ZI_kf.first_order_bounce_corr(self.distorted_waveform, self.bounce_delay, self.bounce_amp, self.sampling_rate)
-        ainv1 = ZI_kf.first_order_bounce_kern(self.bounce_delay, -self.bounce_amp, self.sampling_rate)
-        first_order_corr = signal.lfilter(ainv1, 1, self.distorted_waveform)
-        np.testing.assert_almost_equal(hw_corr, first_order_corr, 4)
+        b = ZI_kf.first_order_bounce_kern(self.bounce_delay, ZI_kf.coef_round(self.bounce_amp, force_bshift=0), self.sampling_rate)
+        first_order_corr = signal.lfilter(b, 1.0, self.distorted_waveform)
+        np.testing.assert_almost_equal(hw_corr, first_order_corr, 6)
 
     def test_ideal_bounce_correction(self):
-        a    = ZI_kf.first_order_bounce_kern(self.bounce_delay, self.bounce_amp, self.sampling_rate)
-        ainv = ZI_kf.ideal_inverted_fir_kernel(a, zero_padding=100)
-        ideal_corr = signal.lfilter(ainv, 1, self.distorted_waveform)
-        np.testing.assert_almost_equal(ideal_corr, self.ideal_waveform, 4)
+        # Construct impulse response
+        impulse = np.zeros(len(self.time))
+        zero_ind = np.argmin(np.abs(self.time))
+        impulse[zero_ind] = 1.0
+        a = ZI_kf.first_order_bounce_kern(self.bounce_delay, self.bounce_amp, self.sampling_rate)
+        impulse_response = signal.lfilter([1.0], a, impulse)
+        b_inv = ZI_kf.ideal_inverted_fir_kernel(impulse_response, zero_ind)
+        ideal_corr = signal.lfilter(b_inv, 1.0, self.distorted_waveform)
+        np.testing.assert_almost_equal(ideal_corr, self.ideal_waveform, 6)
 

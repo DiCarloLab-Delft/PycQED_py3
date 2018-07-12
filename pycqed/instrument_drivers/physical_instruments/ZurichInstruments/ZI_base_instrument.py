@@ -53,6 +53,7 @@ class ZI_base_instrument(Instrument):
                 par_kw['vals'] = vals.Ints(min_value=0,
                                            max_value=len(par["Options"]))
 
+
             elif par['Type'] == 'Double':
                 par_kw['set_cmd'] = self._gen_set_func(self._dev.setd, parfunc)
                 par_kw['get_cmd'] = self._gen_get_func(self._dev.getd, parfunc)
@@ -65,28 +66,29 @@ class ZI_base_instrument(Instrument):
                 # min/max not implemented yet for ZI auto docstrings #352
                 par_kw['vals'] = vals.Arrays()
 
+            elif par['Type'] == 'String':
+                par_kw['set_cmd'] = self._gen_set_func(self._dev.sets, parfunc)
+                par_kw['get_cmd'] = self._gen_get_func(self._dev.gets, parfunc)
+                par_kw['vals'] = vals.Strings()
+
             elif par['Type'] == 'CoreString':
                 par_kw['get_cmd'] = self._gen_get_func(self._dev.getd, parfunc)
                 par_kw['set_cmd'] = None  # Not implemented
                 par_kw['vals'] = vals.Strings()
 
-            elif par['Type'] in ['ZICntSample', 'ZITriggerSample']:
-                # FIXME: this is a hack to work around datatypes added in the
-                # new AWGv1 driver, these parameters should be integrated
-                # properly. MAR July 2018
-                pass
+            elif par['Type'] == 'ZICntSample':
+                par_kw['get_cmd'] = None  # Not implemented
+                par_kw['set_cmd'] = None  # Not implemented
+                par_kw['vals'] = None # Not implemented
 
+            elif par['Type'] == 'ZITriggerSample':
+                par_kw['get_cmd'] = None  # Not implemented
+                par_kw['set_cmd'] = None  # Not implemented
+                par_kw['vals'] = None # Not implemented
             else:
-                # raise NotImplementedError(
-                #     "Parameter '{}' of type '{}' not supported".format(
-                #         parname, par['Type']))
-                # FIXME: this is a hack to work around datatypes added in the
-                # new AWGv1 driver, these parameters should be integrated
-                # properly. MAR July 2018
-                logging.warning(
+                raise NotImplementedError(
                     "Parameter '{}' of type '{}' not supported".format(
                         parname, par['Type']))
-
 
             # If not readable/writable the methods are removed after the type
             # dependent loop to keep this more readable.
