@@ -959,12 +959,11 @@ class CCLight_Transmon(Qubit):
                         self.mw_mixer_offs_GQ())
                 MW_LutMan.channel_amp(self.mw_amp180())
             else:
-                # case with VSM (both QWG and AWG8)
+                # case without VSM (both QWG and AWG8)
                 MW_LutMan.mw_amp180(self.mw_amp180())
-                MW_LutMan.G_mixer_phi(self.mw_G_mixer_phi())
-                MW_LutMan.G_mixer_alpha(self.mw_G_mixer_alpha())
-                MW_LutMan.D_mixer_phi(self.mw_D_mixer_phi())
-                MW_LutMan.D_mixer_alpha(self.mw_D_mixer_alpha())
+                MW_LutMan.mixer_phi(self.mw_G_mixer_phi())
+                MW_LutMan.mixer_alpha(self.mw_G_mixer_alpha())
+
                 # N.B. This part is AWG8 specific
                 AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()-1),
                         self.mw_mixer_offs_GI())

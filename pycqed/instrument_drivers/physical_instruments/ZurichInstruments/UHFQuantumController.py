@@ -940,7 +940,7 @@ setTrigger(0);"""
         join = False
         n = 0
         while n < len(array):
-            string += '{:.3f}'.format(array[n])
+            string += '{:.8f}'.format(array[n])
             if ((n+1) % 1024 != 0) and n < len(array)-1:
                 string += ','
 

@@ -11,6 +11,21 @@
             }
         },
         {
+            "docstring": "This parameter sets the period of the grid to which the action releasing the run signal is aligned. Acceptable value range: [1, 65535], which is [20 ns, 1310700 ns].",
+            "get_cmd": "QUTech:RunGridPeriod?",
+            "label": "Run Grid Period",
+            "name": "run_grid_period",
+            "set_cmd": "QUTech:RunGridPeriod {}",
+            "unit": "20 ns",
+            "vals": {
+                "range": [
+                    1,
+                    65534
+                ],
+                "type": "Non_Neg_Number"
+            }
+        },
+        {
             "docstring": "This parameter modifies the enable register of the processor. Make sure to enable first before running! Valid input: 1 = enable, 0 = disable",
             "get_cmd": "QUTech:ENable?",
             "label": "Enable Proc",
@@ -370,12 +385,12 @@
         }
     ],
     "version": {
-        "Embedded Software Build Time": "19/03/2018-12:05:58",
-        "Embedded Software Version": "0.2.2",
-        "Firmware Build Time": "23/01/2018-16:25:20",
-        "Kernel Module Build Time": "18/12/2017-00:56:35",
-        "Kernel Module Version": "0.2.0",
-        "firmware": "0.5.2",
+        "Embedded Software Build Time": "22/05/2018-17:50:18",
+        "Embedded Software Version": "0.3.0",
+        "Firmware Build Time": "23/05/2018-07:30:08",
+        "Kernel Module Build Time": "22/05/2018-15:36:21",
+        "Kernel Module Version": "0.3.0",
+        "firmware": "0.7.0",
         "model": "CCL1",
         "serial": "CCLight2",
         "vendor": "QuTech"
