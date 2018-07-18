@@ -27,6 +27,8 @@ def single_flux_pulse_seq(qubit_indices: tuple,
 
     for i in range(7):
         k.gate('CW_00', i)
+
+    k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0)
     k.gate('fl_cw_02', qubit_indices[0], qubit_indices[1])
     p.add_kernel(k)
     with suppress_stdout():
@@ -464,6 +466,7 @@ def residual_coupling_sequence(times, q0: int, q1: int, platf_cfg: str):
 
 
 def Cryoscope(qubit_idx: int, buffer_time1=0, buffer_time2=0,
+              flux_cw: str='fl_cw_02',
               platf_cfg: str=''):
     """
     Single qubit Ramsey sequence.
@@ -489,7 +492,7 @@ def Cryoscope(qubit_idx: int, buffer_time1=0, buffer_time2=0,
     k.prepz(qubit_idx)
     k.gate('rx90', qubit_idx)
     k.gate("wait", [qubit_idx], buffer_nanoseconds1)
-    k.gate('fl_cw_02', 2, 0)
+    k.gate(flux_cw, 2, 0)
     k.gate("wait", [qubit_idx], buffer_nanoseconds2)
     k.gate('rx90', qubit_idx)
     k.measure(qubit_idx)
@@ -499,7 +502,7 @@ def Cryoscope(qubit_idx: int, buffer_time1=0, buffer_time2=0,
     k.prepz(qubit_idx)
     k.gate('rx90', qubit_idx)
     k.gate("wait", [qubit_idx], buffer_nanoseconds1)
-    k.gate('fl_cw_02', 2, 0)
+    k.gate(flux_cw, 2, 0)
     k.gate("wait", [qubit_idx], buffer_nanoseconds2)
     k.gate('ry90', qubit_idx)
     k.measure(qubit_idx)
