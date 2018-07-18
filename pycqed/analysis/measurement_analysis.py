@@ -7944,17 +7944,22 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
                  g_guess=30e6, coupling_label=r'$J_1/2\pi$',
                  break_before_fitting=False,
                  add_title=True,
-                 xlabel=None, ylabel='Frequency (GHz)', **kw):
+                 xlabel=None, ylabel='Frequency (GHz)', 
+                 weight_function_magn=0,
+                 use_distance=True,
+                 **kw):
         super().__init__(timestamp=timestamp, label=label, **kw)
         self.get_naming_and_values_2D()
-        # measured_magns
-        # measured_phases = self.measured_values[1]
-        # rad = [(i * np.pi/180) for i in phases]
-        # real = [mags[j] * np.cos(i) for j, i in enumerate(rad)]
-        # imag = [mags[j] * np.sin(i) for j, i in enumerate(rad)]
+        measured_magns = np.transpose(self.measured_values[weight_function_magn])
+        measured_phases = np.transpose(self.measured_values[1+weight_function_magn])
+        rad = [(i * np.pi/180) for i in measured_phases]
+        real = [measured_magns[j] * np.cos(i) for j, i in enumerate(rad)]
+        imag = [measured_magns[j] * np.sin(i) for j, i in enumerate(rad)]
+        dists = [a_tools.calculate_distance_ground_state(real[i],imag[i], normalize=True) for i in range(len(real))]
 
-        # dists = [a_tools.calculate_distance_ground_state(real[i],imag[i], normalize=True) for i in range(len(real))]
-        # self.S21dist = a_tools.calculate_distance_ground_state()
+        self.S21dist = dists
+        if use_distance:
+            self.Z[0]=np.array(self.S21dist)
         flux = self.Y[:, 0]
         self.peaks_low, self.peaks_high = self.find_peaks()
         self.f, self.ax = self.make_unfiltered_figure(self.peaks_low, self.peaks_high,
