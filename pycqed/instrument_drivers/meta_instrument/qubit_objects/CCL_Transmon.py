@@ -1450,7 +1450,7 @@ class CCLight_Transmon(Qubit):
 
     def measure_qubit_frequency_dac_scan(self, freqs, dac_values,
                                          pulsed=True, MC=None,
-                                         analyze=True, close_fig=True):
+                                         analyze=True, fluxChan=None, close_fig=True):
         if not pulsed:
             logging.warning('CCL transmon can only perform '
                             'pulsed spectrocsopy')
@@ -1472,7 +1472,10 @@ class CCLight_Transmon(Qubit):
         else:
             # Assume the flux is controlled using an SPI rack
             fluxcontrol = self.instr_FluxCtrl.get_instr()
-            dac_par = fluxcontrol.parameters[(self.cfg_dc_flux_ch())]
+            if fluxChan==None:
+                dac_par = fluxcontrol.parameters[(self.cfg_dc_flux_ch())]
+            else:
+                dac_par = fluxcontrol.parameters[(fluxChan)]
 
         spec_source = self.instr_spec_source.get_instr()
         spec_source.on()
@@ -1491,9 +1494,14 @@ class CCLight_Transmon(Qubit):
         if not pulsed:
             logging.warning('CCL transmon can only perform '
                             'pulsed spectrocsopy')
+        UHFQC = self.instr_acquisition.get_instr()
         self.prepare_for_continuous_wave()
         if MC is None:
             MC = self.instr_MC.get_instr()
+                # Starting specmode if set in config
+        if self.cfg_spec_mode():
+            UHFQC.spec_mode_on(IF=self.ro_freq_mod(),
+                               ro_amp=self.ro_pulse_amp())
 
         # Snippet here to create and upload the CCL instructions
         CCL = self.instr_CC.get_instr()
@@ -1513,6 +1521,10 @@ class CCLight_Transmon(Qubit):
         self.int_avg_det_single._set_real_imag(False)
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='spectroscopy_'+self.msmt_suffix)
+                # Stopping specmode
+        if self.cfg_spec_mode():
+            UHFQC.spec_mode_off()
+            self._prep_ro_pulse(upload=True)
         if analyze:
             ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
 
@@ -1633,6 +1645,8 @@ class CCLight_Transmon(Qubit):
                 self.instr_LO_mw.get_instr().off()
             elif 'on' in pulse_comb.lower():
                 self.instr_LO_mw.get_instr().on()
+            else:
+                raise ValueError("pulse_comb {} not understood: Only 'on' and 'off' allowed.".format(pulse_comb))
 
             s = swf.OpenQL_Sweep(openql_program=p,
                                  CCL=self.instr_CC.get_instr(),
@@ -3148,7 +3162,7 @@ class CCLight_Transmon(Qubit):
                 label_dephasing='_ro_amp_sweep_dephasing'+self.msmt_suffix,
                 label_ssro='_ro_amp_sweep_SNR'+self.msmt_suffix)
 
-            qea.run_analysis()
+            # qea.run_analysis()
             eta = qea.fit_dicts['eta']
             u_eta = qea.fit_dicts['u_eta']
 
