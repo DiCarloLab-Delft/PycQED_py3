@@ -118,10 +118,7 @@ where xy is the row and x'y' is the column
 '''
 
 
-def plot(x_plot,y_plot_vec,title='No title',xlabel='No xlabel',ylabel='No ylabel',legend_labels=list(),yscale='linear'):
-
-	if isinstance(x_plot,list):
-		x_plot=np.array(x_plot)
+def plot(x_plot_vec,y_plot_vec,title='No title',xlabel='No xlabel',ylabel='No ylabel',legend_labels=list(),yscale='linear'):
 
 	if isinstance(y_plot_vec,list):
 		y_length=len(y_plot_vec)
@@ -138,7 +135,14 @@ def plot(x_plot,y_plot_vec,title='No title',xlabel='No xlabel',ylabel='No ylabel
 		if isinstance(legend_labels[i],int):
 			legend_labels[i]=str(legend_labels[i])
 
-		plt.plot(x_plot, y_plot_vec[i], label=legend_labels[i])
+		if len(x_plot_vec)==1:
+			if isinstance(x_plot_vec,list):
+				x_plot_vec=np.array(x_plot_vec)
+			plt.plot(x_plot_vec, y_plot_vec[i], label=legend_labels[i])
+		else:
+			if isinstance(x_plot_vec[i],list):
+				x_plot_vec[i]=np.array(x_plot_vec[i])
+			plt.plot(x_plot_vec[i], y_plot_vec[i], label=legend_labels[i])
 
 	plt.legend()
 	plt.title(title)
@@ -740,6 +744,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         else:
             f_pulse = self.get_f_pulse_double_sided()
 
+        sim_step=1/self.fluxlutman.sampling_rate()
+
         # extract base frequency from the Hamiltonian
         w_q0 = np.real(self.H_0[1,1])
         eps_vec = f_pulse - w_q0
@@ -768,8 +774,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         voltage_frompoly_interp = interp1d(tlist,voltage_frompoly)
         impulse_response_interp = interp1d(self.fitted_stepresponse_ty[0],impulse_response)
 
-        tlist_convol1 = np.arange(0, self.fluxlutman.cz_length(),
-                           1/self.fluxlutman.sampling_rate())
+        tlist_convol1 = tlist
         tlist_convol2 = np.arange(0, self.fluxlutman.cz_length(),
                            1/self.fluxlutman.sampling_rate())
         voltage_frompoly_convol = voltage_frompoly_interp(tlist_convol1)
@@ -783,16 +788,27 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         #       xlabel='Time (ns)')
 
         convolved_voltage=scipy.signal.convolve(voltage_frompoly_convol,impulse_response_convol)/sum(impulse_response_convol)
-        print(np.size(convolved_voltage))
 
-        plot(x_plot=np.arange(np.size(convolved_voltage)),y_plot_vec=[convolved_voltage],
-        	  title='Pulse in voltage, length=130ns',
-              xlabel='Time (ns)',ylabel='Amplitude (V)')
+        # plot(x_plot_vec=[tlist_convol1*1e9,np.arange(np.size(convolved_voltage))*sim_step*1e9],
+        # 	  y_plot_vec=[voltage_frompoly_convol, convolved_voltage],
+        # 	  title='Pulse in voltage, length=130ns',
+        #       xlabel='Time (ns)',ylabel='Amplitude (V)',legend_labels=['Ideal','Distorted'])
 
+        def give_parabola(polynomial_coefficients,x):
+        	a=polynomial_coefficients[0]
+        	b=polynomial_coefficients[1]
+        	c=polynomial_coefficients[2]
+        	return a*x**2+b*x+c
 
+        convolved_detuning=give_parabola(self.polynomial_coefficients,convolved_voltage)
+        eps_vec_convolved=-convolved_detuning*(2*np.pi)
+        eps_vec_convolved=eps_vec_convolved[0:np.size(tlist_convol1)]
+        f_pulse_convolved=eps_vec_convolved+w_q0
 
-
-
+        # plot(x_plot_vec=[tlist_convol1*1e9,np.arange(np.size(convolved_voltage))*sim_step*1e9],
+        # 	  y_plot_vec=[detuning/1e9, convolved_detuning/1e9],
+        # 	  title='Pulse in terms of detuning, length=130ns',
+        #       xlabel='Time (ns)',ylabel='Detuning (GHz)',legend_labels=['Ideal','Distorted'])
 
 
         '''voltage_wave = Qubit_freq_to_dac(
@@ -803,9 +819,6 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         V_per_phi0=1)
         voltage_wave = np.nan_to_num(voltage_wave)'''
 
-
-
-        return
 
 
 
@@ -844,12 +857,12 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             return np.abs((w_q0/2)*np.sqrt(1-(omega/w_q0)**2))    # we actually return the absolute value because it's the only one who matters later
 
         if Tphi01_q0_interaction_point != 0:       # mode where the pure dephazing is amplitude-dependent
-            w_min = np.nanmin(f_pulse)        
+            w_min = np.nanmin(f_pulse_convolved)        
             omega_prime_min = omega_prime(w_min)
 
-            f_pulse=np.clip(f_pulse,0,w_q0)
-            f_pulse_prime = omega_prime(f_pulse)
-            Tphi01_q0_vec = Tphi01_q0_sweetspot - f_pulse_prime/omega_prime_min*(Tphi01_q0_sweetspot-Tphi01_q0_interaction_point)
+            f_pulse_convolved=np.clip(f_pulse_convolved,0,w_q0)
+            f_pulse_convolved_prime = omega_prime(f_pulse_convolved)
+            Tphi01_q0_vec = Tphi01_q0_sweetspot - f_pulse_convolved_prime/omega_prime_min*(Tphi01_q0_sweetspot-Tphi01_q0_interaction_point)
                      # we interpolate Tphi from the sweetspot to the interaction point (=worst point in terms of Tphi)
                      # by weighting depending on the derivative of f_pulse compared to the derivative at the interaction point
             c_ops = c_ops_interpolating(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1)
@@ -862,7 +875,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
         qoi = simulate_quantities_of_interest_superoperator(
             H_0=self.H_0,
-            tlist=tlist, c_ops=c_ops, eps_vec=eps_vec,
+            tlist=tlist, c_ops=c_ops, eps_vec=eps_vec_convolved,
             sim_step=1/self.fluxlutman.sampling_rate(), verbose=False)
 
         cost_func_val = -np.log10(1-qoi['avgatefid_compsubspace_pc'])   # new cost function: infidelity
@@ -880,7 +893,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             # E_c=self.fluxlutman.cz_E_c(),
             f_interaction=self.fluxlutman.cz_freq_interaction(),
             sampling_rate=self.fluxlutman.sampling_rate(),
-            return_unit='V')
+            return_unit='f01')
 
         # Generate the second CZ pulse. If the params are np.nan, default
         # to the main parameter
@@ -907,7 +920,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             J2=self.fluxlutman.cz_J2(),
             f_interaction=self.fluxlutman.cz_freq_interaction(),
             sampling_rate=self.fluxlutman.sampling_rate(),
-            return_unit='V')
+            return_unit='f01')
 
         # N.B. No amp scaling and offset present
         f_pulse = np.concatenate([half_CZ_A, half_CZ_B])
