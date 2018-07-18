@@ -1,7 +1,9 @@
 """
-17 July 2018
-Started working with qdots
+April 2018
+Simulates the trajectory implementing a CZ gate.
 
+June 2018
+Included noise in the simulation.
 """
 import time
 import numpy as np
@@ -12,84 +14,108 @@ from pycqed.measurement.waveform_control_CC import waveform as wf
 import scipy
 import matplotlib.pyplot as plt
 #np.set_printoptions(threshold=np.inf)
-eV_to_Hz = 1/4.1357e-15
+from pycqed.analysis.fitting_models import Qubit_freq_to_dac
 
 
-w_q1 = 18.4e9 * 2*np.pi
-w_q2 = 19.7e9 * 2*np.pi
-U_q1 = 3.5e-3 * eV_to_Hz * 2*np.pi      # meV converted to Hz
-U_q2 = 3.5e-3 * eV_to_Hz * 2*np.pi      # meV converted to Hz
-t_hopping = 0
+alpha_q0 = -285e6 * 2*np.pi
+alpha_q1 = -310e6 * 2*np.pi
+w_q0 = 5.11e9 * 2*np.pi  # Higher frequency qubit (fluxing) qubit
+w_q1 = 4.10e9 * 2*np.pi  # Lower frequency
 
+J = 2.9e6 * 2 * np.pi  # coupling strength
+
+
+# operators
+b = qtp.tensor(qtp.destroy(3), qtp.qeye(3))  # LSB is static qubit
+a = qtp.tensor(qtp.qeye(3), qtp.destroy(3))
+n_q0 = a.dag() * a
+n_q1 = b.dag() * b
 
 
 # caracteristic timescales for jump operators
-T1_q1=50e-3
-T1_q2=3.7e-3
-T2_q1_hahn_sweetspot = 19e-6
-T2_q2_hahn_sweetspot = 7e-6
+T1_q0=34e-6
+T1_q1=42e-6
+Tphi_q0_ket0toket0=0    # here useless parameters
+Tphi_q0_ket1toket1=0
+Tphi_q0_ket2toket2=0
+Tphi_q1_ket0toket0=0
+Tphi_q1_ket1toket1=0
+T2_q0=23e-6   # these two are the coherence times for q0 and q1 as qubits
+T2_q1=23e-6
+Tphi_q0_sigmaZ_01=1/(-1/(2*T1_q0)+1/T2_q0)     # extracting Tphi which is not the Tphi above
+Tphi_q0_sigmaZ_12=Tphi_q0_sigmaZ_01           # we will assume for the moment that the pure decoherence
+                                              # is caused by wiggles in the frequency, which cause
+                                              # a fluctuation half as large for 02 wrt 01 and 12
+                                              # (ignoring the anharmonicity)
+Tphi_q0_sigmaZ_02=Tphi_q0_sigmaZ_01/2
+Tphi_q1_sigmaZ_01=1/(-1/(2*T1_q1)+1/T2_q1)
 
 
 
 # Hamiltonian
-def coupled_qdots_hamiltonian(w_q1, w_q2, U_q1, U_q2, t_hopping):
+def coupled_transmons_hamiltonian(w_q0, w_q1, alpha_q0, alpha_q1, J):
     """
-    Hamiltonian of two coupled quantum dots.
-    The 4 qubit levels correspond to the (1,1) charge states.
-    Then there are the single states (0,2) and (2,0) involved.
-    We artificially use here 3 extra states to keep the structure of the code that was created for two qutrits
-           (dimension of the Hilbert space = 9).
-    The extra levels do not couple to the other ones.
+    Hamiltonian of two coupled anharmonic transmons.
+    Because the intention is to tune one qubit into resonance with the other,
+    the number of levels is limited.
+        q1 -> static qubit, 3-levels
+        q0 -> fluxing qubit, 3-levels
 
+    intended avoided crossing:
+        11 <-> 02     (q1 is the first qubit and q0 the second one)
+
+    N.B. the frequency of q0 is expected to be larger than that of q1
+        w_q0 > w_q1
+        and the anharmonicities alpha negative
     """
-    beta = (w_q1+w_q2)/2
-    Delta_v = (w_q1-w_q2)/2
 
-    crazy=beta*10000
-
-    # the ordering of basis states below is 00,01,02,10,11,12,20,21,22
-    H_0 = qtp.Qobj([[-beta, 0, 0, 0, 0, 0, 0, 0, 0],
-                     [0, -Delta_v, t_hopping, 0, 0, 0, t_hopping, 0, 0],
-                     [0, t_hopping, U_q2, -t_hopping, 0, 0, 0, 0, 0],
-                     [0, 0, -t_hopping, Delta_v, 0, 0, -t_hopping, 0, 0],
-                     [0, 0, 0, 0, beta, 0, 0, 0, 0],
-                     [0, 0, 0, 0, 0, crazy, 0, 0, 0],
-                     [0, t_hopping, 0, -t_hopping, 0, 0, U_q1, 0, 0],
-                     [0, 0, 0, 0, 0, 0, 0, crazy, 0],
-                     [0, 0, 0, 0, 0, 0, 0, 0, crazy]],
-                    type='oper',
-                    dims=[[3, 3], [3, 3]])
-
+    H_0 = w_q0 * n_q0 + w_q1 * n_q1 +  \
+        1/2*alpha_q0*(a.dag()*a.dag()*a*a) + 1/2*alpha_q1*(b.dag()*b.dag()*b*b) +\
+        J * (a.dag() + a) * (b + b.dag())
     return H_0
 
 
-H_0 = coupled_qdots_hamiltonian(w_q1=w_q1, w_q2=w_q2, U_q1=U_q1, U_q2=U_q2, t_hopping=t_hopping)
+H_0 = coupled_transmons_hamiltonian(w_q0=w_q0, w_q1=w_q1, alpha_q0=alpha_q0,alpha_q1=alpha_q1,J=J)
 
 
-H_c =      qtp.Qobj([[0, 0, 0, 0, 0, 0, 0, 0, 0],
-                     [0, 0, 0, 0, 0, 0, 0, 0, 0],
+# target in the case with no noise
+# note that the Hilbert space is H_q1 /otimes H_q0
+# so the ordering of basis states below is 00,01,02,10,11,12,20,21,22
+U_target = qtp.Qobj([[1, 0, 0, 0, 0, 0, 0, 0, 0],
+                     [0, 1, 0, 0, 0, 0, 0, 0, 0],
                      [0, 0, -1, 0, 0, 0, 0, 0, 0],
-                     [0, 0, 0, 0, 0, 0, 0, 0, 0],
-                     [0, 0, 0, 0, 0, 0, 0, 0, 0],
-                     [0, 0, 0, 0, 0, 0, 0, 0, 0],
-                     [0, 0, 0, 0, 0, 0, +1, 0, 0],
-                     [0, 0, 0, 0, 0, 0, 0, 0, 0],
-                     [0, 0, 0, 0, 0, 0, 0, 0, 0]],
+                     [0, 0, 0, 1, 0, 0, 0, 0, 0],
+                     [0, 0, 0, 0, -1, 0, 0, 0, 0],
+                     [0, 0, 0, 0, 0, 1, 0, 0, 0],
+                     [0, 0, 0, 0, 0, 0, 1, 0, 0],
+                     [0, 0, 0, 0, 0, 0, 0, 1, 0],
+                     [0, 0, 0, 0, 0, 0, 0, 0, 1]],
                     type='oper',
                     dims=[[3, 3], [3, 3]])
+#U_target._type = 'oper'
+U_target_diffdims = qtp.Qobj([[1, 0, 0, 0, 0, 0, 0, 0, 0],
+                     [0, 1, 0, 0, 0, 0, 0, 0, 0],
+                     [0, 0, -1, 0, 0, 0, 0, 0, 0],
+                     [0, 0, 0, 1, 0, 0, 0, 0, 0],
+                     [0, 0, 0, 0, -1, 0, 0, 0, 0],
+                     [0, 0, 0, 0, 0, 1, 0, 0, 0],
+                     [0, 0, 0, 0, 0, 0, 1, 0, 0],
+                     [0, 0, 0, 0, 0, 0, 0, 1, 0],
+                     [0, 0, 0, 0, 0, 0, 0, 0, 1]],
+                    type='oper',
+                    dims=[[9], [9]])     # otherwise average_gate_fidelity doesn't work
 
+# if there is noise the target is the corresponding superoperator
+U_super_target = qtp.to_super(U_target)
 
-def spectrum_of_interest(H_0,controlparameter,desiredlevels):
-	eigenvalues=list()
-	for i in range(len(desiredlevels)):
-		eigenvalues.append(list())
-	for eps in controlparameter:
-		H=H_0+eps*H_c
-		eigs=H.eigenenergies()
-		for i in desiredlevels:
-			eigenvalues[i].append(eigs[i]/(2*np.pi)/1e9)
-
-	return eigenvalues
+'''
+remember that qutip uses the Liouville (matrix) representation for superoperators,
+with column stacking.
+This means that 
+rho_{xy,x'y'}=rho[3*x+y,3*x'+y']
+rho_{xy,x'y'}=operator_to_vector(rho)[3*x+y+27*x'+9*y']				VERIFY
+where xy is the row and x'y' is the column
+'''
 
 
 def plot(x_plot,y_plot_vec,title='No title',xlabel='No xlabel',ylabel='No ylabel',legend_labels=list(),yscale='linear'):
@@ -121,53 +147,6 @@ def plot(x_plot,y_plot_vec,title='No title',xlabel='No xlabel',ylabel='No ylabel
 	plt.yscale(yscale)
 	plt.show()
 
-
-controlparameter=np.linspace(-5e-3*eV_to_Hz*2*np.pi,5e-3*eV_to_Hz*2*np.pi,1001)
-desiredlevels=np.arange(4)
-eigenvalues=spectrum_of_interest(H_0,controlparameter,desiredlevels)
-
-plot(x_plot=controlparameter/(2*np.pi)/eV_to_Hz*1e3,y_plot_vec=eigenvalues,title='First 6 energy levels for two qdots',
-	xlabel='Detuning epsilon (meV)',ylabel='Frequency (Hz)',legend_labels=desiredlevels)
-
-
-# target in the case with no noise
-# note that the Hilbert space is H_q1 /otimes H_q2 modulo the fact that we don't really have qutrits
-# the ordering of basis states below is 00,01,02,10,11,12,20,21,22
-U_target = qtp.Qobj([[1, 0, 0, 0, 0, 0, 0, 0, 0],
-                     [0, 1, 0, 0, 0, 0, 0, 0, 0],
-                     [0, 0, -1, 0, 0, 0, 0, 0, 0],      # - probaby not correct but see below
-                     [0, 0, 0, 1, 0, 0, 0, 0, 0],
-                     [0, 0, 0, 0, -1, 0, 0, 0, 0],      # only this minus matters for av_gatefid_compsubspace_pc
-                     [0, 0, 0, 0, 0, 1, 0, 0, 0],
-                     [0, 0, 0, 0, 0, 0, 1, 0, 0],
-                     [0, 0, 0, 0, 0, 0, 0, 1, 0],
-                     [0, 0, 0, 0, 0, 0, 0, 0, 1]],
-                    type='oper',
-                    dims=[[3, 3], [3, 3]])
-#U_target._type = 'oper'
-U_target_diffdims = qtp.Qobj([[1, 0, 0, 0, 0, 0, 0, 0, 0],
-                     [0, 1, 0, 0, 0, 0, 0, 0, 0],
-                     [0, 0, -1, 0, 0, 0, 0, 0, 0],
-                     [0, 0, 0, 1, 0, 0, 0, 0, 0],
-                     [0, 0, 0, 0, -1, 0, 0, 0, 0],
-                     [0, 0, 0, 0, 0, 1, 0, 0, 0],
-                     [0, 0, 0, 0, 0, 0, 1, 0, 0],
-                     [0, 0, 0, 0, 0, 0, 0, 1, 0],
-                     [0, 0, 0, 0, 0, 0, 0, 0, 1]],
-                    type='oper',
-                    dims=[[9], [9]])     # otherwise average_gate_fidelity doesn't work
-
-# if there is noise the target is the corresponding superoperator
-U_super_target = qtp.to_super(U_target)
-
-'''
-remember that qutip uses the Liouville (matrix) representation for superoperators,
-with column stacking.
-This means that 
-rho_{xy,x'y'}=rho[3*x+y,3*x'+y']
-rho_{xy,x'y'}=operator_to_vector(rho)[3*x+y+27*x'+9*y']
-where xy is the row and x'y' is the column
-'''
 
 
 def jump_operators(T1_q0,T1_q1,Tphi_q0_ket0toket0,Tphi_q0_ket1toket1,Tphi_q0_ket2toket2,Tphi_q1_ket0toket0,Tphi_q1_ket1toket1,
@@ -552,43 +531,31 @@ def pro_avfid_superoperator_phasecorrected(U,phases):
 
 
 
+'''
+# benchmark for phase correction
+gamma=2j*np.pi/3
+alpha=2j*np.pi
+beta=2j*np.pi/2
+phi=2j*np.pi/4
+delta=2j*np.pi/7
+Uphases= qtp.Qobj([[np.exp(gamma), 0, 0, 0, 0, 0],
+                     [0, np.exp(gamma+beta), 0, 0, 0, 0],
+                     [0, 0, np.exp(gamma+delta+phi), 0, 0, 0],
+                     [0, 0, 0, np.exp(gamma+alpha), 0, 0],
+                     [0, 0, 0, 0, np.exp(gamma+alpha+beta+phi), 0],
+                     [0, 0, 0, 0, 0, np.exp(gamma+alpha+delta)]],
+                    type='oper',
+                    dims=[[2, 3], [2, 3]])
+print(Uphases)
+phases=phases_from_superoperator(Uphases)
+print(phases)
+print(pro_avfid_superoperator_phasecorrected(Uphases,phases))
+print(pro_avfid_superoperator_compsubspace_phasecorrected(Uphases,
+	  leakage_from_superoperator(Uphases),phases))
+'''
+
+
 tlist = np.arange(0, 240e-9, 1/2.4e9)
-
-
-def time_evolution(sim_step,eps_vec,H_0,c_ops,initial_propagator):
-    '''scalefactor=1e6
-    tlist_sim=tlist_sim*scalefactor
-    eps_vec=eps_vec/scalefactor
-    H_0=H_0/scalefactor
-    if c_ops!=[]:       # c_ops is a list of either operators or lists where the first element is
-                                    # an operator and the second one is a list of the (time-dependent) coefficients
-        for c in range(len(c_ops)):
-            if isinstance(c_ops[c],list):
-                c_ops[c][1]=c_ops[c][1]/np.sqrt(scalefactor)
-            else:
-                c_ops[c]=c_ops[c]/np.sqrt(scalefactor)'''
-
-    exp_L_total=initial_propagator
-    '''
-    if isinstance(tlist_sim,list):
-        length_tlist=len(tlist_sim)
-    else:
-    	length_tlist=np.size(tlist_sim)'''
-    for eps in eps_vec:
-        H=H_0+eps*H_c    #(eps_vec[i+1]+eps_vec[i])/2
-        c_ops_temp=[]
-        if c_ops != []:
-            for c in range(len(c_ops)):
-                if isinstance(c_ops[c],list):
-                   c_ops_temp.append(c_ops[c][0]*c_ops[c][1][i])
-                else:
-                   c_ops_temp.append(c_ops[c])
-            liouville_exp_t=(qtp.liouvillian(H,c_ops_temp)*sim_step).expm()
-        else:
-        	liouville_exp_t=(-1j*H*sim_step).expm()
-        exp_L_total=liouville_exp_t*exp_L_total
-    return exp_L_total
-
 
 
 def simulate_quantities_of_interest_superoperator(H_0, tlist, c_ops, eps_vec,
@@ -737,37 +704,9 @@ def simulate_quantities_of_interest_superoperator(H_0, tlist, c_ops, eps_vec,
     return {'phi_cond': phi_cond, 'L1': L1, 'L2': L2, 'avgatefid_pc': avgatefid, 'avgatefid_compsubspace_pc': avgatefid_compsubspace}
 
 
-def simulate_quantities_of_interest_superoperator2(U_final):
-    """
-    Calculates the quantities of interest from the propagator U_final
-
-    Args:
-        U_final = propagator (either unitary or superoperator)
-
-    Returns
-        phi_cond (float):   conditional phase (deg)
-        L1      (float):    leakage
-        L2      (float):    seepage
-        avgatefid (float):  average gate fidelity in full space
-        avgatefid_compsubspace (float):  average gate fidelity only in the computational subspace
-
-    """
-
-    phases = phases_from_superoperator(U_final)
-    phi_cond = phases[-1]
-    L1 = leakage_from_superoperator(U_final)
-    L2 = seepage_from_superoperator(U_final)
-    avgatefid = pro_avfid_superoperator_phasecorrected(U_final,phases)
-    avgatefid_compsubspace = pro_avfid_superoperator_compsubspace_phasecorrected(U_final,L1,phases)     # leakage has to be taken into account, see Woods & Gambetta
-
-    return {'phi_cond': phi_cond, 'L1': L1, 'L2': L2, 'avgatefid_pc': avgatefid, 'avgatefid_compsubspace_pc': avgatefid_compsubspace}
-
-
-
-
 
 class CZ_trajectory_superoperator(det.Soft_Detector):
-    def __init__(self, H_0, fluxlutman, noise_parameters_CZ):
+    def __init__(self, H_0, fluxlutman, noise_parameters_CZ, polynomial_coefficients, fitted_stepresponse_ty):
         """
         Detector for simulating a CZ trajectory.
         Args:
@@ -780,6 +719,9 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         self.fluxlutman = fluxlutman
         self.H_0 = H_0
         self.noise_parameters_CZ = noise_parameters_CZ
+        self.polynomial_coefficients = polynomial_coefficients
+        self.fitted_stepresponse_ty=fitted_stepresponse_ty
+
 
     def acquire_data_point(self, **kw):
         tlist = (np.arange(0, self.fluxlutman.cz_length(),
@@ -801,6 +743,70 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         # extract base frequency from the Hamiltonian
         w_q0 = np.real(self.H_0[1,1])
         eps_vec = f_pulse - w_q0
+        detuning = -eps_vec/(2*np.pi)
+
+        def invert_parabola(polynomial_coefficients,y):
+        	a=polynomial_coefficients[0]
+        	b=polynomial_coefficients[1]
+        	c=polynomial_coefficients[2]
+        	return (-b+np.sqrt(b**2-4*a*(c-y)))/(2*a)
+
+        voltage_frompoly = invert_parabola(self.polynomial_coefficients,detuning)
+
+        # plot(x_plot=voltage_frompoly,y_plot_vec=[detuning],title='Arc',
+        #      xlabel='Amplitude (V)',ylabel='Detuning (GHz)')
+
+        impulse_response=np.gradient(self.fitted_stepresponse_ty[1])
+
+        # plot(x_plot=self.fitted_stepresponse_ty[0],y_plot_vec=[self.fitted_stepresponse_ty[1]],
+        # 	  title='Step response',
+        #       xlabel='Time (ns)')
+        # plot(x_plot=self.fitted_stepresponse_ty[0],y_plot_vec=[impulse_response],
+        # 	  title='Impulse response',
+        #       xlabel='Time (ns)')
+
+        voltage_frompoly_interp = interp1d(tlist,voltage_frompoly)
+        impulse_response_interp = interp1d(self.fitted_stepresponse_ty[0],impulse_response)
+
+        tlist_convol1 = np.arange(0, self.fluxlutman.cz_length(),
+                           1/self.fluxlutman.sampling_rate())
+        tlist_convol2 = np.arange(0, self.fluxlutman.cz_length(),
+                           1/self.fluxlutman.sampling_rate())
+        voltage_frompoly_convol = voltage_frompoly_interp(tlist_convol1)
+        impulse_response_convol = impulse_response_interp(tlist_convol2)
+
+        # plot(x_plot=tlist_convol*1e9,y_plot_vec=[voltage_frompoly_convol],
+        # 	  title='Pulse in voltage, length=130ns',
+        #       xlabel='Time (ns)',ylabel='Amplitude (V)')
+        # plot(x_plot=tlist_convol*1e9,y_plot_vec=[impulse_response_convol],
+        # 	  title='Impulse response',
+        #       xlabel='Time (ns)')
+
+        convolved_voltage=scipy.signal.convolve(voltage_frompoly_convol,impulse_response_convol)/sum(impulse_response_convol)
+        print(np.size(convolved_voltage))
+
+        plot(x_plot=np.arange(np.size(convolved_voltage)),y_plot_vec=[convolved_voltage],
+        	  title='Pulse in voltage, length=130ns',
+              xlabel='Time (ns)',ylabel='Amplitude (V)')
+
+
+
+
+
+
+
+        '''voltage_wave = Qubit_freq_to_dac(
+        frequency=f_pulse,
+        f_max=self.fluxlutman.cz_freq_01_max(),
+        E_c=250e6,
+        dac_sweet_spot=0,
+        V_per_phi0=1)
+        voltage_wave = np.nan_to_num(voltage_wave)'''
+
+
+
+        return
+
 
 
         T1_q0 = self.noise_parameters_CZ.T1_q0()
@@ -874,7 +880,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             # E_c=self.fluxlutman.cz_E_c(),
             f_interaction=self.fluxlutman.cz_freq_interaction(),
             sampling_rate=self.fluxlutman.sampling_rate(),
-            return_unit='f01')
+            return_unit='V')
 
         # Generate the second CZ pulse. If the params are np.nan, default
         # to the main parameter
@@ -901,7 +907,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             J2=self.fluxlutman.cz_J2(),
             f_interaction=self.fluxlutman.cz_freq_interaction(),
             sampling_rate=self.fluxlutman.sampling_rate(),
-            return_unit='f01')
+            return_unit='V')
 
         # N.B. No amp scaling and offset present
         f_pulse = np.concatenate([half_CZ_A, half_CZ_B])
