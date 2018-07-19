@@ -4,6 +4,9 @@ Simulates the trajectory implementing a CZ gate.
 
 June 2018
 Included noise in the simulation.
+
+July 2018
+Added distortions to simulation.
 """
 import time
 import numpy as np
@@ -14,15 +17,7 @@ from pycqed.measurement.waveform_control_CC import waveform as wf
 import scipy
 import matplotlib.pyplot as plt
 #np.set_printoptions(threshold=np.inf)
-from pycqed.analysis.fitting_models import Qubit_freq_to_dac
 
-
-alpha_q0 = -285e6 * 2*np.pi
-alpha_q1 = -310e6 * 2*np.pi
-w_q0 = 5.11e9 * 2*np.pi  # Higher frequency qubit (fluxing) qubit
-w_q1 = 4.10e9 * 2*np.pi  # Lower frequency
-
-J = 2.9e6 * 2 * np.pi  # coupling strength
 
 
 # operators
@@ -31,6 +26,22 @@ a = qtp.tensor(qtp.qeye(3), qtp.destroy(3))
 n_q0 = a.dag() * a
 n_q1 = b.dag() * b
 
+H_coupling = (a.dag() + a) * (b + b.dag())
+H_c = n_q0
+
+
+scalefactor=1e6
+
+w_bus=7e9 * 2*np.pi / scalefactor
+
+
+'''
+alpha_q0 = -285e6 * 2*np.pi
+alpha_q1 = -310e6 * 2*np.pi
+w_q0 = 5.11e9 * 2*np.pi  # Higher frequency qubit (fluxing) qubit
+w_q1 = 4.10e9 * 2*np.pi  # Lower frequency
+
+J = 2.9e6 * 2 * np.pi  # coupling strength
 
 # caracteristic timescales for jump operators
 T1_q0=34e-6
@@ -49,6 +60,7 @@ Tphi_q0_sigmaZ_12=Tphi_q0_sigmaZ_01           # we will assume for the moment th
                                               # (ignoring the anharmonicity)
 Tphi_q0_sigmaZ_02=Tphi_q0_sigmaZ_01/2
 Tphi_q1_sigmaZ_01=1/(-1/(2*T1_q1)+1/T2_q1)
+'''
 
 
 
@@ -75,7 +87,22 @@ def coupled_transmons_hamiltonian(w_q0, w_q1, alpha_q0, alpha_q1, J):
     return H_0
 
 
-H_0 = coupled_transmons_hamiltonian(w_q0=w_q0, w_q1=w_q1, alpha_q0=alpha_q0,alpha_q1=alpha_q1,J=J)
+def hamiltonian_timedependent(H_0,eps):
+	w_q0=np.real(H_0[1,1])
+	w_q1=np.real(H_0[3,3])
+	alpha_q0=np.real(H_0[2,2])-2*w_q0
+	J=np.real(H_0[1,3])
+
+	delta_q1=w_q1-w_bus
+	delta_q0_interactionpoint=(w_q1-alpha_q0)-w_bus
+	delta_q0=(w_q0+eps)-w_bus
+
+	J_new = J / ((delta_q1+delta_q0_interactionpoint)/(delta_q1*delta_q0_interactionpoint)) * (delta_q1+delta_q0)/(delta_q1*delta_q0)
+
+	return H_0+eps*H_c+(J_new-J)*H_coupling
+
+
+#H_0 = coupled_transmons_hamiltonian(w_q0=w_q0, w_q1=w_q1, alpha_q0=alpha_q0,alpha_q1=alpha_q1,J=J)
 
 
 # target in the case with no noise
@@ -535,31 +562,7 @@ def pro_avfid_superoperator_phasecorrected(U,phases):
 
 
 
-'''
-# benchmark for phase correction
-gamma=2j*np.pi/3
-alpha=2j*np.pi
-beta=2j*np.pi/2
-phi=2j*np.pi/4
-delta=2j*np.pi/7
-Uphases= qtp.Qobj([[np.exp(gamma), 0, 0, 0, 0, 0],
-                     [0, np.exp(gamma+beta), 0, 0, 0, 0],
-                     [0, 0, np.exp(gamma+delta+phi), 0, 0, 0],
-                     [0, 0, 0, np.exp(gamma+alpha), 0, 0],
-                     [0, 0, 0, 0, np.exp(gamma+alpha+beta+phi), 0],
-                     [0, 0, 0, 0, 0, np.exp(gamma+alpha+delta)]],
-                    type='oper',
-                    dims=[[2, 3], [2, 3]])
-print(Uphases)
-phases=phases_from_superoperator(Uphases)
-print(phases)
-print(pro_avfid_superoperator_phasecorrected(Uphases,phases))
-print(pro_avfid_superoperator_compsubspace_phasecorrected(Uphases,
-	  leakage_from_superoperator(Uphases),phases))
-'''
-
-
-tlist = np.arange(0, 240e-9, 1/2.4e9)
+#tlist = np.arange(0, 240e-9, 1/2.4e9)
 
 
 def simulate_quantities_of_interest_superoperator(H_0, tlist, c_ops, eps_vec,
@@ -586,7 +589,7 @@ def simulate_quantities_of_interest_superoperator(H_0, tlist, c_ops, eps_vec,
 
     """
 
-    scalefactor=1e6  # otherwise qtp.propagator in parallel mode doesn't work
+    
     # time is multiplied by scalefactor and frequency is divided by it
     tlist=tlist*scalefactor
     eps_vec=eps_vec/scalefactor
@@ -599,7 +602,6 @@ def simulate_quantities_of_interest_superoperator(H_0, tlist, c_ops, eps_vec,
                 c_ops[c][1]=c_ops[c][1]/np.sqrt(scalefactor)
             else:
                 c_ops[c]=c_ops[c]/np.sqrt(scalefactor)
-    H_c = n_q0
 
 
     '''								# step of 1/sampling_rate=1/2.4e9=0.4 ns seems good by itself
@@ -649,7 +651,7 @@ def simulate_quantities_of_interest_superoperator(H_0, tlist, c_ops, eps_vec,
 
     exp_L_total=1
     for i in range(len(tlist)):
-        H=H_0+eps_vec[i]*H_c
+        H=hamiltonian_timedependent(H_0,eps_vec[i])
         c_ops_temp=[]
         for c in range(len(c_ops)):
             if isinstance(c_ops[c],list):
@@ -727,7 +729,6 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                                                                 # as a function of time (=t)
 
 
-
     def acquire_data_point(self, **kw):
         tlist = (np.arange(0, self.fluxlutman.cz_length(),
                            1/self.fluxlutman.sampling_rate()))
@@ -747,13 +748,27 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         else:
             f_pulse,amp = self.get_f_pulse_double_sided()
 
+
         sim_step=1/self.fluxlutman.sampling_rate()
 
         # extract base frequency from the Hamiltonian
         w_q0 = np.real(self.H_0[1,1])
+        #w_q1=np.real(self.H_0[3,3])
+        #alpha_q0=np.real(self.H_0[2,2])-2*w_q0
 
         eps_vec = f_pulse - w_q0
         detuning = -eps_vec/(2*np.pi)     # we express detuning in terms of frequency
+
+        '''J_new=list()
+        for eps in eps_vec:
+        	H=hamiltonian_timedependent(self.H_0,eps)
+        	J_new.append(np.real(H[1,3]))
+        plot(x_plot_vec=[tlist*1e9],
+            	  y_plot_vec=[np.array(J_new)/(2*np.pi)/1e6],
+            	  title='Coupling during pulse',
+                  xlabel='Time (ns)',ylabel='J (MHz)',legend_labels=['J(t)'])'''
+
+
 
         '''    ####### functions that were used to convert from detuning to voltage but now we use 
                        functions from fluxlutman which are the same as those used in the experiment
@@ -822,10 +837,10 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
             convolved_detuning_new=give_parabola(self.fluxlutman.polycoeffs_freq_conv(),convolved_amp)
 
-            plot(x_plot_vec=[tlist*1e9,np.arange(np.size(convolved_amp))*sim_step*1e9],
-            	  y_plot_vec=[detuning/1e9, convolved_detuning_new/1e9],
-            	  title='Net-zero, Pulse_length=240ns',
-                  xlabel='Time (ns)',ylabel='Detuning (GHz)',legend_labels=['Ideal','Distorted'])
+            # plot(x_plot_vec=[tlist*1e9,np.arange(np.size(convolved_amp))*sim_step*1e9],
+            # 	  y_plot_vec=[detuning/1e9, convolved_detuning_new/1e9],
+            # 	  title='Net-zero, Pulse_length=240ns',
+            #       xlabel='Time (ns)',ylabel='Detuning (GHz)',legend_labels=['Ideal','Distorted'])
 
 
             eps_vec_convolved_new=-convolved_detuning_new*(2*np.pi)
