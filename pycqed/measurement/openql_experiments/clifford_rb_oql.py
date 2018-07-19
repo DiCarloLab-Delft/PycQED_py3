@@ -82,7 +82,7 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
 
             p = cl_oql.randomized_benchmarking(
                 qubits=[0, 1],          # simultaneous RB on both qubits
-                max_clifford_idx=512,   # to ensure only SQ Cliffords are drawn
+                max_clifford_idx = 576, # to ensure only SQ Cliffords are drawn
 
                 nr_cliffords=[2, 4, 8, 16, 32, 128, 512, 1024],
                 nr_seeds=1,  # for CCL memory reasons

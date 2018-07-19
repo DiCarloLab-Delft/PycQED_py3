@@ -175,9 +175,16 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
         # d1 = dimensionality of computational subspace
         fit_mod_rb.set_param_hint('d1', value=self.d1, vary=False)
         fit_mod_rb.set_param_hint('L1', value=L1, vary=False)
+
+        # Note that all derived quantities are expressed directly in
         fit_mod_rb.set_param_hint(
             'F', expr='1/d1*((d1-1)*lambda_2+1-L1)', vary=True)
-        fit_mod_rb.set_param_hint('F_g', expr='F**(1/1.875)')
+        fit_mod_rb.set_param_hint('eps',
+                                  expr='1-(1/d1*((d1-1)*lambda_2+1-L1))')
+        fit_mod_rb.set_param_hint(
+            'F_g', expr='(1/d1*((d1-1)*lambda_2+1-L1))**(1/1.875)')
+        fit_mod_rb.set_param_hint(
+            'eps_g', expr='1-(1/d1*((d1-1)*lambda_2+1-L1))**(1/1.875)')
 
         params = fit_mod_rb.make_params()
         try:
@@ -207,7 +214,12 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
         fit_mod_rb_simple.set_param_hint('L1', value=L1, vary=False)
         fit_mod_rb_simple.set_param_hint(
             'F', expr='1/d1*((d1-1)*lambda_2+1-L1)', vary=True)
-        fit_mod_rb_simple.set_param_hint('F_g', expr='F**(1/1.875)')
+        fit_mod_rb_simple.set_param_hint('eps',
+                                  expr='1-(1/d1*((d1-1)*lambda_2+1-L1))')
+        fit_mod_rb_simple.set_param_hint(
+            'F_g', expr='(1/d1*((d1-1)*lambda_2+1-L1))**(1/1.875)')
+        fit_mod_rb_simple.set_param_hint(
+            'eps_g', expr='1-(1/d1*((d1-1)*lambda_2+1-L1))**(1/1.875)')
 
         params = fit_mod_rb_simple.make_params()
         try:
@@ -224,26 +236,31 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
 
             self.fit_res['rb_decay_simple'] = {}
 
-        try:
-            fr_rb = self.fit_res['rb_decay']
-            fr_rb_simple = self.fit_res['rb_decay_simple']
-            fr_dec = self.fit_res['leakage_decay']
-            text_msg= 'Summary: \n'
-            text_msg += (
-                r'$\bar{F}$:' + '    {:.3f}'.format(fr_rb_simple.params['F'].value*100)
-                + r'$\pm$' + '{:.3f}%\n'.format(fr_rb_simple.params['F'].stderr*100))
-            text_msg += (
-                r'$\bar{F_{X_1}}$:' + '  {:.3f}'.format(fr_rb.params['F'].value*100)
-                + r'$\pm$' + '{:.3f}%\n'.format(fr_rb.params['F'].stderr*100))
-            text_msg += (
-                '$L_1$:   ' + '{:.3f}'.format(fr_dec.params['L1'].value*100) +
-                r'$\pm$' + '{:.3f}%\n'.format(fr_dec.params['L1'].stderr*100))
-            text_msg += (
-                '$L_2$:   ' + '{:.3f}'.format(fr_dec.params['L2'].value*100) +
-                r'$\pm$' + '{:.3f}%'.format(fr_dec.params['L2'].stderr*100))
-        except Exception as e:
-            logging.warning(e)
-            text_msg = ''
+        # try:
+        fr_rb = self.fit_res['rb_decay']
+        fr_rb_simple = self.fit_res['rb_decay_simple']
+        fr_dec = self.fit_res['leakage_decay']
+        text_msg = 'Summary: \n'
+        # text_msg += (
+        #     r'$\bar{F}$:' + '    {:.3f}'.format(fr_rb_simple.params['F'].value*100)
+        #     + r'$\pm$' + '{:.3f}%\n'.format(fr_rb_simple.params['F'].stderr*100))
+        text_msg += (
+            r'$\epsilon$:' + '    {:.4f}'.format(fr_rb_simple.params['eps'].value)
+            + r'$\pm$' + '{:.4f}\n'.format(fr_rb_simple.params['eps'].stderr))
+
+
+        text_msg += (
+            r'$\epsilon_{X_1}$:' + '  {:.4f}'.format(fr_rb.params['eps'].value)
+            + r'$\pm$' + '{:.4f}\n'.format(fr_rb.params['eps'].stderr))
+        text_msg += (
+            '$L_1$:   ' + '{:.4f}'.format(fr_dec.params['L1'].value) +
+            r'$\pm$' + '{:.4f}\n'.format(fr_dec.params['L1'].stderr))
+        text_msg += (
+            '$L_2$:   ' + '{:.4f}'.format(fr_dec.params['L2'].value) +
+            r'$\pm$' + '{:.4f}'.format(fr_dec.params['L2'].stderr))
+        # except Exception as e:
+        #     logging.warning(e)
+        #     text_msg = ''
 
         self.proc_data_dict['rb_msg'] = text_msg
 

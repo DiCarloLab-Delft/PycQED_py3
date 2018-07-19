@@ -10,6 +10,7 @@ from pycqed.analysis.fitting_models import Qubit_dac_to_freq, Resonator_dac_to_f
     Resonator_dac_arch_guess
 import lmfit
 from collections import OrderedDict
+from copy import deepcopy, copy
 
 
 class FluxFrequency(ba.BaseDataAnalysis):
@@ -152,8 +153,11 @@ class FluxFrequency(ba.BaseDataAnalysis):
         # Smooth data and find peeks
         smooth = self.options_dict.get('smoothing', False)
         freqs = self.proc_data_dict['frequency_values']
+        # self.proc_data_dict['peaks'] = {}
         for k in ['amplitude_values', 'phase_values', 'distance_values']:
             self.proc_data_dict[k + '_smooth'] = {}
+            # peaklist_x = []
+            # peaklist_z = []
             for i, dac_value in enumerate(self.proc_data_dict['dac_values']):
                 peaks_x, peaks_z, smoothed_z = a_tools.peak_finder_v3(freqs[i],
                                                                       self.proc_data_dict[k][i],
@@ -163,8 +167,11 @@ class FluxFrequency(ba.BaseDataAnalysis):
                                                                           'smoothing_win_len',
                                                                           False),
                                                                       factor=self.options_dict.get('data_factor', 1))
+                # print(dac_value, peaks_x, peaks_z)
+                # peaklist_x.append(list(peaks_x))
+                # peaklist_z.append(peaks_z)
                 self.proc_data_dict[k + '_smooth'][i] = smoothed_z
-
+                # self.proc_data_dict['peaks'][k[:-7]] = np.array([peaklist_x, peaklist_z])
                 # Fixme: save peaks
 
     def prepare_fitting(self):
@@ -172,6 +179,8 @@ class FluxFrequency(ba.BaseDataAnalysis):
 
         dac_vals = self.proc_data_dict['dac_values']
         freq_vals = self.proc_data_dict['fit_frequencies']
+        if max(freq_vals) < 1e9:
+            freq_vals *= 1e9
 
         guess = self.options_dict.get('fit_guess', {})
         f_q = guess.get('f_max_qubit', self.options_dict.get('f_max_qubit', None))
@@ -249,7 +258,7 @@ class FluxFrequency(ba.BaseDataAnalysis):
         else:
             cm = custom_multiplier
 
-        current_label = 'Flux bias current, I'
+        current_label = self.params_dict['dac'].split('.')[-1]
         current_unit = 'A'
         if plot_vs_flux:
             current_label = 'Flux'
@@ -263,6 +272,7 @@ class FluxFrequency(ba.BaseDataAnalysis):
         else:
             s = 'Resonator'
 
+        self.qubit_name = self.raw_data_dict['measurementstring'][0].split("_")[2]
         ext = self.options_dict.get('qubit_freq', None) is not None
         for ax in ['amplitude', 'phase', 'distance']:
             z = self.proc_data_dict['%s_values' % ax]
@@ -272,7 +282,7 @@ class FluxFrequency(ba.BaseDataAnalysis):
                     'xvals': x,
                     'yvals': y,
                     'zvals': z,
-                    'title': 'Flux Current ' + s + ' Sweep',
+                    'title': 'Flux Current ' + s + ' Sweep\nqubit %s\nTimestamp %s -> %s'%(self.qubit_name,self.t_start, self.t_stop),
                     'xlabel': current_label,
                     'xunit': current_unit,
                     'ylabel': r'Frequency',
@@ -296,7 +306,7 @@ class FluxFrequency(ba.BaseDataAnalysis):
                     unit = ' (norm.)'
             td['zlabel'] = ax + unit
             td['ax_id'] = ax
-            self.plot_dicts[ax] = td
+            self.plot_dicts[ax+'_2D'] = td
 
             if self.options_dict.get('show_fitted_peaks', True):
                 sc = {
