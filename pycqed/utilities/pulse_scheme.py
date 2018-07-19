@@ -94,6 +94,17 @@ def ramZPulse(ax, pos, width=2.5, s=0.1, amp=1.5, sep=1.5, color='C1'):
     return pos + width
 
 
+def modZPulse(ax, pos, width=2.5, s=0.1, amp=1.5, sep=1.5, color='C1'):
+    '''
+    Draw a modulated Z pulse.
+    '''
+
+
+    return pos + width
+
+
+
+
 def interval(ax, start, stop, height=1.5, label=None, labelHeight=None,
              vlines=True, color='k', arrowstyle='<|-|>'):
     '''
