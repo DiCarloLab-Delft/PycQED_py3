@@ -136,9 +136,9 @@ def plot(x_plot_vec,y_plot_vec,title='No title',xlabel='No xlabel',ylabel='No yl
 			legend_labels[i]=str(legend_labels[i])
 
 		if len(x_plot_vec)==1:
-			if isinstance(x_plot_vec,list):
-				x_plot_vec=np.array(x_plot_vec)
-			plt.plot(x_plot_vec, y_plot_vec[i], label=legend_labels[i])
+			if isinstance(x_plot_vec[0],list):
+				x_plot_vec[0]=np.array(x_plot_vec[0])
+			plt.plot(x_plot_vec[0], y_plot_vec[i], label=legend_labels[i])
 		else:
 			if isinstance(x_plot_vec[i],list):
 				x_plot_vec[i]=np.array(x_plot_vec[i])
@@ -710,7 +710,7 @@ def simulate_quantities_of_interest_superoperator(H_0, tlist, c_ops, eps_vec,
 
 
 class CZ_trajectory_superoperator(det.Soft_Detector):
-    def __init__(self, H_0, fluxlutman, noise_parameters_CZ, polynomial_coefficients, fitted_stepresponse_ty):
+    def __init__(self, H_0, fluxlutman, noise_parameters_CZ, fitted_stepresponse_ty):
         """
         Detector for simulating a CZ trajectory.
         Args:
@@ -723,8 +723,9 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         self.fluxlutman = fluxlutman
         self.H_0 = H_0
         self.noise_parameters_CZ = noise_parameters_CZ
-        self.polynomial_coefficients = polynomial_coefficients
-        self.fitted_stepresponse_ty=fitted_stepresponse_ty
+        self.fitted_stepresponse_ty=fitted_stepresponse_ty      # list of 2 elements: stepresponse (=y)
+                                                                # as a function of time (=t)
+
 
 
     def acquire_data_point(self, **kw):
@@ -740,84 +741,99 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                 J2=self.fluxlutman.cz_J2(),
                 f_interaction=self.fluxlutman.cz_freq_interaction(),
                 sampling_rate=self.fluxlutman.sampling_rate(),
-                return_unit='f01')
+                return_unit='f01')    # return in terms of omega
+            amp = self.fluxlutman.detuning_to_amp((self.fluxlutman.cz_freq_01_max() - f_pulse)/(2*np.pi))
+                     # transform detuning frequency to (positive) amplitude
         else:
-            f_pulse = self.get_f_pulse_double_sided()
+            f_pulse,amp = self.get_f_pulse_double_sided()
 
         sim_step=1/self.fluxlutman.sampling_rate()
 
         # extract base frequency from the Hamiltonian
         w_q0 = np.real(self.H_0[1,1])
-        eps_vec = f_pulse - w_q0
-        detuning = -eps_vec/(2*np.pi)
 
-        def invert_parabola(polynomial_coefficients,y):
+        eps_vec = f_pulse - w_q0
+        detuning = -eps_vec/(2*np.pi)     # we express detuning in terms of frequency
+
+        '''    ####### functions that were used to convert from detuning to voltage but now we use 
+                       functions from fluxlutman which are the same as those used in the experiment
+        def invert_parabola(polynomial_coefficients,y):    # useless
         	a=polynomial_coefficients[0]
         	b=polynomial_coefficients[1]
         	c=polynomial_coefficients[2]
         	return (-b+np.sqrt(b**2-4*a*(c-y)))/(2*a)
 
-        voltage_frompoly = invert_parabola(self.polynomial_coefficients,detuning)
-
-        # plot(x_plot=voltage_frompoly,y_plot_vec=[detuning],title='Arc',
-        #      xlabel='Amplitude (V)',ylabel='Detuning (GHz)')
-
-        impulse_response=np.gradient(self.fitted_stepresponse_ty[1])
-
-        # plot(x_plot=self.fitted_stepresponse_ty[0],y_plot_vec=[self.fitted_stepresponse_ty[1]],
-        # 	  title='Step response',
-        #       xlabel='Time (ns)')
-        # plot(x_plot=self.fitted_stepresponse_ty[0],y_plot_vec=[impulse_response],
-        # 	  title='Impulse response',
-        #       xlabel='Time (ns)')
+        voltage_frompoly = invert_parabola(self.fluxlutman.polycoeffs_freq_conv(),detuning)
 
         voltage_frompoly_interp = interp1d(tlist,voltage_frompoly)
-        impulse_response_interp = interp1d(self.fitted_stepresponse_ty[0],impulse_response)
 
-        tlist_convol1 = tlist
-        tlist_convol2 = np.arange(0, self.fluxlutman.cz_length(),
-                           1/self.fluxlutman.sampling_rate())
         voltage_frompoly_convol = voltage_frompoly_interp(tlist_convol1)
-        impulse_response_convol = impulse_response_interp(tlist_convol2)
-
-        # plot(x_plot=tlist_convol*1e9,y_plot_vec=[voltage_frompoly_convol],
-        # 	  title='Pulse in voltage, length=130ns',
-        #       xlabel='Time (ns)',ylabel='Amplitude (V)')
-        # plot(x_plot=tlist_convol*1e9,y_plot_vec=[impulse_response_convol],
-        # 	  title='Impulse response',
-        #       xlabel='Time (ns)')
 
         convolved_voltage=scipy.signal.convolve(voltage_frompoly_convol,impulse_response_convol)/sum(impulse_response_convol)
+        
+        convolved_detuning=give_parabola(self.fluxlutman.polycoeffs_freq_conv(),convolved_voltage)
 
-        # plot(x_plot_vec=[tlist_convol1*1e9,np.arange(np.size(convolved_voltage))*sim_step*1e9],
-        # 	  y_plot_vec=[voltage_frompoly_convol, convolved_voltage],
-        # 	  title='Pulse in voltage, length=130ns',
-        #       xlabel='Time (ns)',ylabel='Amplitude (V)',legend_labels=['Ideal','Distorted'])
-
-        def give_parabola(polynomial_coefficients,x):
-        	a=polynomial_coefficients[0]
-        	b=polynomial_coefficients[1]
-        	c=polynomial_coefficients[2]
-        	return a*x**2+b*x+c
-
-        convolved_detuning=give_parabola(self.polynomial_coefficients,convolved_voltage)
         eps_vec_convolved=-convolved_detuning*(2*np.pi)
         eps_vec_convolved=eps_vec_convolved[0:np.size(tlist_convol1)]
         f_pulse_convolved=eps_vec_convolved+w_q0
-
-        # plot(x_plot_vec=[tlist_convol1*1e9,np.arange(np.size(convolved_voltage))*sim_step*1e9],
-        # 	  y_plot_vec=[detuning/1e9, convolved_detuning/1e9],
-        # 	  title='Pulse in terms of detuning, length=130ns',
-        #       xlabel='Time (ns)',ylabel='Detuning (GHz)',legend_labels=['Ideal','Distorted'])
+        
+        '''
 
 
-        '''voltage_wave = Qubit_freq_to_dac(
-        frequency=f_pulse,
-        f_max=self.fluxlutman.cz_freq_01_max(),
-        E_c=250e6,
-        dac_sweet_spot=0,
-        V_per_phi0=1)
-        voltage_wave = np.nan_to_num(voltage_wave)'''
+        if self.noise_parameters_CZ.distortions():
+            impulse_response=np.gradient(self.fitted_stepresponse_ty[1])
+
+            # plot(x_plot_vec=[self.fitted_stepresponse_ty[0]],y_plot_vec=[self.fitted_stepresponse_ty[1]],
+            # 	  title='Step response',
+            #       xlabel='Time (ns)')
+            # plot(x_plot_vec=[self.fitted_stepresponse_ty[0]],y_plot_vec=[impulse_response],
+            # 	  title='Impulse response',
+            #       xlabel='Time (ns)')
+
+            # use interpolation to be sure that amp and impulse_response have the same delta_t separating two values
+            amp_interp = interp1d(tlist,amp)
+            impulse_response_interp = interp1d(self.fitted_stepresponse_ty[0],impulse_response)
+
+            tlist_convol1 = tlist
+            tlist_convol2 = np.arange(0, self.fluxlutman.cz_length(),
+                               1/self.fluxlutman.sampling_rate())
+            amp_convol = amp_interp(tlist_convol1)
+            impulse_response_convol = impulse_response_interp(tlist_convol2)
+
+            # plot(x_plot_vec=[tlist_convol1*1e9],y_plot_vec=[amp_convol],
+            # 	  title='Pulse in voltage, length=240ns',
+            #       xlabel='Time (ns)',ylabel='Amplitude (V)')
+            # plot(x_plot_vec=[tlist_convol*1e9],y_plot_vec=[impulse_response_convol],
+            # 	  title='Impulse response',
+            #       xlabel='Time (ns)')
+
+            convolved_amp=scipy.signal.convolve(amp_convol,impulse_response_convol)/sum(impulse_response_convol)
+
+            # plot(x_plot_vec=[tlist_convol1*1e9,np.arange(np.size(convolved_amp))*sim_step*1e9],
+            # 	  y_plot_vec=[amp_convol, convolved_amp],
+            # 	  title='Net-zero, Pulse_length=240ns',
+            #       xlabel='Time (ns)',ylabel='Amplitude (V)',legend_labels=['Ideal','Distorted'])
+
+            def give_parabola(polynomial_coefficients,x):
+            	a=polynomial_coefficients[0]
+            	b=polynomial_coefficients[1]
+            	c=polynomial_coefficients[2]
+            	return a*x**2+b*x+c
+
+            convolved_detuning_new=give_parabola(self.fluxlutman.polycoeffs_freq_conv(),convolved_amp)
+
+            plot(x_plot_vec=[tlist*1e9,np.arange(np.size(convolved_amp))*sim_step*1e9],
+            	  y_plot_vec=[detuning/1e9, convolved_detuning_new/1e9],
+            	  title='Net-zero, Pulse_length=240ns',
+                  xlabel='Time (ns)',ylabel='Detuning (GHz)',legend_labels=['Ideal','Distorted'])
+
+
+            eps_vec_convolved_new=-convolved_detuning_new*(2*np.pi)
+            eps_vec_convolved_new=eps_vec_convolved_new[0:np.size(tlist_convol1)]
+            f_pulse_convolved_new=eps_vec_convolved_new+w_q0
+        else:
+        	eps_vec_convolved_new=eps_vec
+        	f_pulse_convolved_new=f_pulse
 
 
 
@@ -857,12 +873,12 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             return np.abs((w_q0/2)*np.sqrt(1-(omega/w_q0)**2))    # we actually return the absolute value because it's the only one who matters later
 
         if Tphi01_q0_interaction_point != 0:       # mode where the pure dephazing is amplitude-dependent
-            w_min = np.nanmin(f_pulse_convolved)        
+            w_min = np.nanmin(f_pulse_convolved_new)        
             omega_prime_min = omega_prime(w_min)
 
-            f_pulse_convolved=np.clip(f_pulse_convolved,0,w_q0)
-            f_pulse_convolved_prime = omega_prime(f_pulse_convolved)
-            Tphi01_q0_vec = Tphi01_q0_sweetspot - f_pulse_convolved_prime/omega_prime_min*(Tphi01_q0_sweetspot-Tphi01_q0_interaction_point)
+            f_pulse_convolved_new=np.clip(f_pulse_convolved_new,0,w_q0)
+            f_pulse_convolved_new_prime = omega_prime(f_pulse_convolved_new)
+            Tphi01_q0_vec = Tphi01_q0_sweetspot - f_pulse_convolved_new_prime/omega_prime_min*(Tphi01_q0_sweetspot-Tphi01_q0_interaction_point)
                      # we interpolate Tphi from the sweetspot to the interaction point (=worst point in terms of Tphi)
                      # by weighting depending on the derivative of f_pulse compared to the derivative at the interaction point
             c_ops = c_ops_interpolating(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1)
@@ -875,7 +891,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
         qoi = simulate_quantities_of_interest_superoperator(
             H_0=self.H_0,
-            tlist=tlist, c_ops=c_ops, eps_vec=eps_vec_convolved,
+            tlist=tlist, c_ops=c_ops, eps_vec=eps_vec_convolved_new,
             sim_step=1/self.fluxlutman.sampling_rate(), verbose=False)
 
         cost_func_val = -np.log10(1-qoi['avgatefid_compsubspace_pc'])   # new cost function: infidelity
@@ -883,6 +899,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         return cost_func_val, qoi['phi_cond'], qoi['L1']*100, qoi['L2']*100, qoi['avgatefid_pc']*100, qoi['avgatefid_compsubspace_pc']*100
 
     def get_f_pulse_double_sided(self):
+
         half_CZ_A = wf.martinis_flux_pulse(
             length=self.fluxlutman.cz_length()*self.fluxlutman.czd_length_ratio(),
             lambda_2=self.fluxlutman.cz_lambda_2(),
@@ -894,6 +911,10 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             f_interaction=self.fluxlutman.cz_freq_interaction(),
             sampling_rate=self.fluxlutman.sampling_rate(),
             return_unit='f01')
+        half_amp_A = self.fluxlutman.detuning_to_amp(
+        	                      (self.fluxlutman.cz_freq_01_max() - half_CZ_A)/(2*np.pi))
+                                  # first half is mapped to positive voltage
+                                  # NOTE: negative part of the flux arc is ignored
 
         # Generate the second CZ pulse. If the params are np.nan, default
         # to the main parameter
@@ -922,6 +943,13 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             sampling_rate=self.fluxlutman.sampling_rate(),
             return_unit='f01')
 
+        half_amp_B = self.fluxlutman.detuning_to_amp(
+                (self.fluxlutman.cz_freq_01_max() - half_CZ_B)/(2*np.pi), positive_branch=False)
+                                  # second half is mapped to negative voltage
+                                  # NOTE: negative part of the flux arc is ignored
+
+
         # N.B. No amp scaling and offset present
         f_pulse = np.concatenate([half_CZ_A, half_CZ_B])
-        return f_pulse
+        amp = np.concatenate([half_amp_A, half_amp_B])
+        return f_pulse,amp

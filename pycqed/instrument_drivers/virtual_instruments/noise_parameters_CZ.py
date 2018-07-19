@@ -37,6 +37,10 @@ class NoiseParametersCZ(Instrument):
                            label='T2 fluxing qubit at the interaction point (minimal T2). T2 (or better Tphi) at intermediate points is interpolated based on the derivative of the cosine',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers(), initial_value=10e-6)
+        self.add_parameter('distortions',           # it's not the best point to save it but it seemed the best one
+                           initial_value=True,
+                           vals=vals.Bool(),
+                           parameter_class=ManualParameter)
 
 
 
