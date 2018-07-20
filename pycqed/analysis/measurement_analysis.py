@@ -8121,9 +8121,11 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         if add_title:
             ax.set_title(self.timestamp_string + title)
 
-        pl_tools.flex_colormesh_plot_vs_xy(self.X[0] * 1e-9, flux, self.Z[0],
+        colorplot = pl_tools.flex_colormesh_plot_vs_xy(self.X[0] * 1e-9, flux, self.Z[0],
                                            ax=ax, transpose=transpose,
                                            cmap=cmap)
+        f.colorbar(colorplot['cmap'], ax=colorplot['ax'])
+
         ax.plot(filt_flux_high, filt_peaks_high * 1e-9,
                 'o', fillstyle='none', markeredgewidth=1., c='r',
                 label='upper branch peaks')

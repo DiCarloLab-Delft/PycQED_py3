@@ -401,7 +401,7 @@ class CCLight_Transmon(Qubit):
 
         self.add_parameter('spec_pulse_length',
                            label='Pulsed spec pulse duration',
-                           unit='s', vals=vals.Numbers(20e-9, 20e-6),
+                           unit='s', vals=vals.Numbers(0e-9, 20e-6),
                            # FIXME validator: should be multiple of 20e-9
                            initial_value=500e-9,
                            parameter_class=ManualParameter)
@@ -446,6 +446,7 @@ class CCLight_Transmon(Qubit):
                 'Flux bias offset corresponding to the sweetspot'),
             vals=vals.Numbers(), initial_value=0,
             parameter_class=ManualParameter)
+        #? not used anywhere
         self.add_parameter(
             'fl_dc_ch',  docstring=(
                 'Flux bias channel'),
