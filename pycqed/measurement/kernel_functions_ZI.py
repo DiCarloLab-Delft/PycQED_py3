@@ -19,7 +19,7 @@ from pycqed.measurement.kernel_functions import bounce_kernel
 
 
 def bias_tee_correction(ysig, tau: float, sampling_rate: float=1,
-                        inverse:bool=False):
+                        inverse: bool=False):
     """
     Corrects for a bias tee correction using a linear IIR filter with time
     constant tau.
@@ -78,8 +78,8 @@ def exponential_decay_correction(ysig, tau: float, amp: float,
     return filtered_signal
 
 
-def bounce_correction(ysig, tau:float, amp: float,
-                      sampling_rate:float = 1,
+def bounce_correction(ysig, tau: float, amp: float,
+                      sampling_rate: float = 1,
                       inverse: bool=False):
     """
     Corrects for a bounce
@@ -112,9 +112,9 @@ def bounce_correction(ysig, tau:float, amp: float,
 # This is done by adding d zero entries to the front of the signal array, and by removing the last d entries.
 def sigdelay(sig, d):
     # delays the signal sig by d clock cycles. The argument d must be an integer.
-    s = np.zeros(sig.shape);
-    s[d:] = sig[:-d];
-    return s;
+    s = np.zeros(sig.shape)
+    s[d:] = sig[:-d]
+    return s
 
 
 def coef_round(value, force_bshift=None):
@@ -215,7 +215,10 @@ def multipath_filter2(sig, alpha, k, paths):
     duf = duf[0:sig.size]
     return sig + k * (duf - sig)
 
-def first_order_bounce_corr(sig, delay, amp, awg_sample_rate, scope_sample_rate = None, bufsize=256, sim_hw_delay = False):
+
+def first_order_bounce_corr(sig, delay, amp, awg_sample_rate,
+                            scope_sample_rate=None, bufsize=256,
+                            sim_hw_delay=False):
     """ This function simulates the real-time bounce correction.
 
     Args:
@@ -230,11 +233,11 @@ def first_order_bounce_corr(sig, delay, amp, awg_sample_rate, scope_sample_rate 
     delay_n_samples = int(round(awg_sample_rate*delay))
     if not 1 <= delay_n_samples < bufsize - 8:
         raise ValueError(textwrap.dedent("""
-            The maximum delay needs to be less than {:d} (bufsize-8) AWG samples to save hardware resources.
+            The maximum delay ("{}"/ {:.2f}ns)needs to be less than {:d} (bufsize-8) AWG samples to save hardware resources.
             The delay needs to be at least 1 AWG sample.")
-            """.format(bufsize - 8)))
+            """.format(delay_n_samples, delay*1e9, bufsize - 8)))
     if not -1 < amp < 1:
-        raise ValueError("The amplitude needs to be between -1 and 1.")
+        raise ValueError("The amplitude ({}) needs to be between -1 and 1.".format(amp))
 
     # The scope sampling rate is equal to the AWG sampling rate by default.
     if scope_sample_rate is None:
@@ -346,6 +349,7 @@ def first_order_bounce_kern(delay, amp, sampling_rate):
     kern[0] = 1.0
     kern[-1] = amp
     return kern
+
 
 def ideal_inverted_fir_kernel(impulse_response, zero_ind=0, zero_padding=0):
     """

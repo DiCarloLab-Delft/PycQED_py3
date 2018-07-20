@@ -7941,13 +7941,25 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
                  filter_idx_low=[], filter_idx_high=[], filter_threshold=15e6,
                  force_keep_idx_low=[], force_keep_idx_high=[],
                  f1_guess=None, f2_guess=None, cross_flux_guess=None,
-                 g_guess=30e6, coupling_label='g',
+                 g_guess=30e6, coupling_label=r'$J_1/2\pi$',
                  break_before_fitting=False,
                  add_title=True,
-                 xlabel=None, ylabel='Frequency (GHz)', **kw):
+                 xlabel=None, ylabel='Frequency (GHz)', 
+                 weight_function_magn=0,
+                 use_distance=True,
+                 **kw):
         super().__init__(timestamp=timestamp, label=label, **kw)
         self.get_naming_and_values_2D()
+        measured_magns = np.transpose(self.measured_values[weight_function_magn])
+        measured_phases = np.transpose(self.measured_values[1+weight_function_magn])
+        rad = [(i * np.pi/180) for i in measured_phases]
+        real = [measured_magns[j] * np.cos(i) for j, i in enumerate(rad)]
+        imag = [measured_magns[j] * np.sin(i) for j, i in enumerate(rad)]
+        dists = [a_tools.calculate_distance_ground_state(real[i],imag[i], normalize=True) for i in range(len(real))]
 
+        self.S21dist = dists
+        if use_distance:
+            self.Z[0]=np.array(self.S21dist)
         flux = self.Y[:, 0]
         self.peaks_low, self.peaks_high = self.find_peaks()
         self.f, self.ax = self.make_unfiltered_figure(self.peaks_low, self.peaks_high,
@@ -8112,11 +8124,13 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
     def make_fit_figure(self,
                         filt_flux_low, filt_flux_high,
                         filt_peaks_low, filt_peaks_high, fit_res,
-                        transpose, cmap, coupling_label='g',
+                        transpose, cmap, coupling_label=r'$J_1/2\pi$',
                         xlabel=None, ylabel='Frequency (GHz)',
                         add_title=True):
         flux = self.Y[:, 0]
-        title = ' avoided crossing fit'
+        title_name = ' avoided crossing fit'
+        extratitle = '\n%s'%(self.folder.split('\\')[-1][7:])
+        title = title_name + extratitle
         f, ax = plt.subplots()
         if add_title:
             ax.set_title(self.timestamp_string + title)
@@ -8152,7 +8166,7 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
             fit_res.params['g'] * 1e-6, fit_res.params['g'].stderr * 1e-6)
         ax.text(.6, .8, g_legend, transform=ax.transAxes, color='white')
         # ax.legend() # looks ugly, better after matplotlib update?
-        f.savefig(os.path.join(self.folder, title + '.png'), format='png',
+        f.savefig(os.path.join(self.folder, title_name + '.png'), format='png',
                   dpi=600)
         return f, ax
 

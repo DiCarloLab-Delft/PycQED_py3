@@ -429,7 +429,6 @@ class QuantumEfficiencyAnalysis(ba.BaseDataAnalysis):
         for d in self.ssro.plot_dicts:
             dicts[d] = self.ssro.plot_dicts[d]
 
-
         if self.options_dict.get('subplots', True):
             self.plot_dicts = deepcopy(dicts)
 
@@ -570,7 +569,7 @@ class DephasingAnalysis(ba.BaseDataAnalysis):
             dpo = self.options_dict.get('default_phase_offset', 180)
             phase_guess = np.mean(phase[0:i]) if fit_offset else dpo
 
-            params.add('b', value=phase_guess, vary=False)
+            params.add('b', value=phase_guess, min=0, max=360, vary=True)
             params.add('c', expr=cexp)
             mini = lmfit.Minimizer(minimizer_function, params=params, fcn_args=(amps, phase))
             res = mini.minimize(method='differential_evolution')
@@ -610,6 +609,7 @@ class DephasingAnalysis(ba.BaseDataAnalysis):
                         self.fit_res['coherence_fit'].params['sigma'].value,
                         self.fit_res['coherence_fit'].params['sigma'].stderr)
         fit_text += '\n$c=%.5f$'%(phase_fit_params['c'].value)
+
         self.plot_dicts['text_msg_amp_vs_dephasing'] = {
                     'ax_id': 'amp_vs_dephasing',
                     # 'ypos': 0.15,
