@@ -179,6 +179,45 @@ def multipath_filter(sig, alpha, k, paths):
     return sig + k * (duf - sig)
 
 
+# def multipath_filter2(sig, alpha, k, paths=8):
+#     """
+#     hardware friendly
+#     exponential moving average correction filter with pipeline simulation
+#     """
+#     ppl = 4
+#     tpl = np.ones((paths, ))
+#     hw_alpha = alpha*float(paths*ppl)
+
+#     duf = tpl * 0.
+#     # due to the pipelining, there are actually ppl interleaved filters
+#     acc = np.zeros((ppl, ))
+
+#     # first create an array of averaged path values
+#     du = []
+#     for i in np.arange(0, sig.size, paths):
+#         du = np.append(du, np.mean(sig[i:(i+paths)]))
+
+#     # loop through the average bases
+#     for i in np.arange(0, du.size, ppl):
+#         # loop through the individual sub-filters
+#         for j in np.arange(0, ppl):
+#             # first calculate the filter input as an average of the previous
+#             # path averages
+#             ss = 0
+#             for l in np.arange(0, ppl):
+#                 # if statement checks for elements existing in the waveform
+#                 # Hack by MAR and NH July 2018
+#                 if i+j-l >= 0 and i+j-l < len(du):
+#                     ss = ss + du[i+j-l]
+#             ss = ss / float(ppl)
+#             # then process it by the filter
+#             acc[j] = acc[j] + hw_alpha*(ss - acc[j])
+#             # and add the filter output to the signal correction vector
+#             duf = np.append(duf, tpl * acc[j])
+#     duf = duf[0:sig.size]
+#     return sig + k * (duf - sig)
+
+
 def multipath_filter2(sig, alpha, k, paths):
     """
     hardware friendly
@@ -191,6 +230,11 @@ def multipath_filter2(sig, alpha, k, paths):
     duf = tpl * 0.
     # due to the pipelining, there are actually ppl interleaved filters
     acc = np.zeros((ppl, ))
+
+    # make sure our vector has a length that is a multiple of 32
+    extra = int(32*np.ceil(sig.size/32)-sig.size)
+    if extra > 0:
+        sig = np.append(sig, extra*[sig[-1]])
 
     # first create an array of averaged path values
     du = []
@@ -207,6 +251,7 @@ def multipath_filter2(sig, alpha, k, paths):
             for l in np.arange(0, ppl):
                 if i+j-l >= 0:
                     ss = ss + du[i+j-l]
+
             ss = ss / float(ppl)
             # then process it by the filter
             acc[j] = acc[j] + hw_alpha*(ss - acc[j])
