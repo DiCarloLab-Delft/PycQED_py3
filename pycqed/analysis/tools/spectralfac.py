@@ -6,7 +6,8 @@ class SpectralFactorization:
 
     eps = 1e-12
 
-    def __init__(self, power_spectrum, delta_f, zero_padding=0):
+    def __init__(self, power_spectrum, delta_f, zero_padding=0,
+                 suppress_small_elements_warning: bool=False):
         """
         Calculate the minimum-phase causal wavelet of a given power spectrum.
 
@@ -36,9 +37,10 @@ class SpectralFactorization:
         self.zero_padding = zero_padding
 
         if any(self.power_spectrum < self.eps):
-            logging.warning(
-                "Some elements of power spectrum are too small, setting to zero"
-            )
+            if not suppress_small_elements_warning:
+                logging.warning(
+                    "Some elements of power spectrum are too small, setting to zero"
+                )
             self.power_spectrum[self.power_spectrum<self.eps]=self.eps
             # self.power_spectrum = np.max(self.power_spectrum, self.eps)
 
@@ -93,3 +95,4 @@ class SpectralFactorization:
 
         # integrate to get step response
         self.step_response = np.cumsum(self.impulse_response) * self.delta_t
+
