@@ -25,7 +25,7 @@ def set_xlabel(axis, label, unit=None, **kw):
         scale_factor, unit = SI_prefix_and_scale_factor(
             val=max(abs(xticks)), unit=unit)
         formatter = matplotlib.ticker.FuncFormatter(
-            lambda x, pos: round(x*scale_factor, ndigits=3))
+            lambda x, pos: '{:.3g}'.format(x*scale_factor))
 
         axis.xaxis.set_major_formatter(formatter)
 
@@ -51,7 +51,7 @@ def set_ylabel(axis, label, unit=None, **kw):
         scale_factor, unit = SI_prefix_and_scale_factor(
             val=max(abs(yticks)), unit=unit)
         formatter = matplotlib.ticker.FuncFormatter(
-            lambda x, pos: round(x*scale_factor, ndigits=3))
+            lambda x, pos: '{:.3g}'.format(x*scale_factor))
 
         axis.yaxis.set_major_formatter(formatter)
 
