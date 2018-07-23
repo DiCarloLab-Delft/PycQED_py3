@@ -354,7 +354,7 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
             if 'channel_GI' in self.parameters:
                 awgs = [self.channel_GI()//2, self.channel_DI()//2]
             else:
-                awgs = [self.channel_I()]
+                awgs = [self.channel_I()//2]
             # Add if statemetn based on the hash here
             self.AWG.get_instr().upload_codeword_program(awgs=awgs)
 

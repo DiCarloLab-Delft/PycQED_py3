@@ -1012,6 +1012,23 @@ class CCLight_Transmon(Qubit):
     # CCL_transmon specifc calibrate_ methods below
     ####################################################
 
+    def calibrate_mw_pulse_amplitude_coarse(self,
+                                         amps=None,
+                                         close_fig=True, verbose=False,
+                                         MC=None, update=True,
+                                         take_fit_I=False):
+        """
+        Calibrates the pulse amplitude using a single rabi oscillation
+        """
+        self.measure_rabi(amps=amps, MC=MC, analyze=False)
+        a = ma.Rabi_Analysis(close_fig=close_fig, label='rabi')
+        if self.cfg_with_vsm():
+            self.mw_vsm_G_amp(a.rabi_amplitudes['piPulse'])
+        else: 
+            self.instr_LutMan_MW.get_instr().channel_amp(a.rabi_amplitudes['piPulse'])
+            #self.mw_amp180(a.rabi_amplitudes['piPulse'])
+        return True
+
     def calibrate_mw_vsm_delay(self):
         """
         Uploads a sequence for calibrating the vsm delay.
@@ -1155,8 +1172,21 @@ class CCLight_Transmon(Qubit):
                     self.mw_mixer_offs_GQ(offset_Q)
 
             else:
-                raise NotImplementedError(
-                    'VSM-less case not implemented without QWG.')
+                awg_ch = self.mw_awg_ch()
+                AWG.stop()
+                AWG.set('sigouts_{}_on'.format(awg_ch-1), 1)
+                AWG.set('sigouts_{}_on'.format(awg_ch+0), 1)
+                chGI_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch-1)]
+                chGQ_par = AWG.parameters['sigouts_{}_offset'.format(awg_ch+0)]
+                offset_I, offset_Q = mixer_carrier_cancellation(
+                    SH=self.instr_SH.get_instr(),
+                    source=self.instr_LO_mw.get_instr(),
+                    MC=self.instr_MC.get_instr(),
+                    chI_par=chGI_par, chQ_par=chGQ_par,
+                    label='Mixer_offsets_drive'+self.msmt_suffix)
+                if update:
+                    self.mw_mixer_offs_GI(offset_I)
+                    self.mw_mixer_offs_GQ(offset_Q)
 
         return True
 
@@ -1806,14 +1836,18 @@ class CCLight_Transmon(Qubit):
                 no_figs=no_figs, update_threshold=update_threshold)
         return True
 
-    def measure_rabi(self, MC=None, amps=np.linspace(0.2, 2.0, 31),
+    def measure_rabi(self, MC=None, amps=None,
                      analyze=True, close_fig=True, real_imag=True,
                      prepare_for_timedomain=True, all_modules=False):
         if self.cfg_with_vsm():
+            if amps==None:
+                amps=np.linspace(0.2, 2.0, 31)
             self.measure_rabi_vsm(MC, amps,
                                   analyze, close_fig, real_imag,
                                   prepare_for_timedomain, all_modules)
         else:
+            if amps==None:
+                amps=np.linspace(0., 1.0, 31)
             self.measure_rabi_channel_amp(MC, amps,
                                           analyze, close_fig, real_imag,
                                           prepare_for_timedomain, all_modules)
@@ -1861,7 +1895,6 @@ class CCLight_Transmon(Qubit):
         self.int_avg_det_single._set_real_imag(real_imag)
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='rabi_'+self.msmt_suffix)
-        ma.MeasurementAnalysis()
         ma.Rabi_Analysis(label='rabi_')
         return True
 
@@ -1888,9 +1921,10 @@ class CCLight_Transmon(Qubit):
         self.int_avg_det_single._set_real_imag(real_imag)
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='rabi_'+self.msmt_suffix)
-        ma.MeasurementAnalysis()
+        a=ma.Rabi_Analysis(label='rabi_')
+
+        # FIXME: this should not be in here, sould be part of calibrate pulse amps coarse
         if update_mw_lutman:
-            a = ma.Rabi_Analysis(label='rabi')
             MW_LutMan.channel_amp(a.rabi_amplitudes['piPulse'])
             if using_QWG:
                 self.mw_amp180(a.rabi_amplitudes['piPulse'])
