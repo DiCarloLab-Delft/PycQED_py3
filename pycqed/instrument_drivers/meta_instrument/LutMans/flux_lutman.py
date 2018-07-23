@@ -1011,6 +1011,8 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             if self.cfg_distort():
                 waveform = self.distort_waveform(waveform)
                 self._wave_dict_dist[waveform_name] = waveform
+            else:
+                self._wave_dict_dist[waveform_name] = waveform
 
         waveform = self._wave_dict_dist[waveform_name]
         codeword = self.LutMap()[waveform_name]

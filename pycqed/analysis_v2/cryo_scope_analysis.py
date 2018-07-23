@@ -24,7 +24,7 @@ class RamZFluxArc(ba.BaseDataAnalysis):
     This analysis only implements the second variant (as of Feb 2018)
     """
 
-    def __init__(self, t_start: str, t_stop: str, label='arc',
+    def __init__(self, t_start: str=None, t_stop: str=None, label='arc',
                  options_dict: dict=None,
                  ch_amp_key: str='Snapshot/instruments/AWG8_8005'
                  '/parameters/awgs_0_outputs_1_amplitude',
@@ -130,15 +130,15 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
     """
 
     def __init__(
-            self, t_start: str,
+            self, t_start: str=None,
             t_stop: str =None,
-            label='cryoscope',
+            label='Cryoscope',
             derivative_window_length: float=5e-9,
             norm_window_size: int=31,
             nyquist_order: int =0,
-            ch_amp_key: str='Snapshot/instruments/AWG8_8005'
+            ch_amp_key: str='Snapshot/instruments/AWG8_8027'
         '/parameters/awgs_0_outputs_1_amplitude',
-            ch_range_key: str='Snapshot/instruments/AWG8_8005'
+            ch_range_key: str='Snapshot/instruments/AWG8_8027'
         '/parameters/sigouts_0_range',
             polycoeffs_freq_conv: Union[list, str] =
         'Snapshot/instruments/FL_LutMan_QR/parameters/polycoeffs_freq_conv/value',
