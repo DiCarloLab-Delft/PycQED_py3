@@ -1563,7 +1563,7 @@ class Rabi_Analysis(TD_Analysis):
         separate_fits     (default=False)
             if True, runs the original Rabi analysis routine which fits the
             I and Q points separately
-        NoCalPoints       (default=4)
+        NoCalPoints       (default=0)
             Number of calibration points
         for_ef            (default=False)
             analyze for EF transition
@@ -1656,7 +1656,7 @@ class Rabi_Analysis(TD_Analysis):
             #Set up fit parameters and perform fit
             cos_mod.set_param_hint('amplitude',
                                    value=amp_guess,
-                                   vary=False)
+                                   vary=True)
             cos_mod.set_param_hint('phase',
                                    value=0,
                                    vary=False)
