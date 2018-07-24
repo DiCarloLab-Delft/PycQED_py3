@@ -751,6 +751,9 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         else:
             f_pulse,amp = self.get_f_pulse_double_sided()
 
+        # Note: amp is never used without the distortions, so do not do vary voltage_scaling otherwise !!!
+        amp=amp*self.noise_parameters_CZ.voltage_scaling_factor()
+
 
         sim_step=1/self.fluxlutman.sampling_rate()
 
