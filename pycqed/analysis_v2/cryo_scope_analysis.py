@@ -132,7 +132,7 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
     def __init__(
             self, t_start: str=None,
             t_stop: str =None,
-            label='Cryoscope',
+            label='',
             derivative_window_length: float=5e-9,
             norm_window_size: int=31,
             nyquist_order: int =0,
