@@ -713,6 +713,14 @@ def simulate_quantities_of_interest_superoperator(H_0, tlist, c_ops, eps_vec,
     return {'phi_cond': phi_cond, 'L1': L1, 'L2': L2, 'avgatefid_pc': avgatefid, 'avgatefid_compsubspace_pc': avgatefid_compsubspace}
 
 
+def compute_lambda1(theta_f,theta_i,lambda_3):
+    return (theta_f*(2*np.pi)/360 - theta_i) / (2 + 2 * lambda_3)
+def fix_theta_f(lambda_3,theta_i):
+    lambda_1target=1
+    return (theta_i+2*(lambda_1target+lambda_3))*360/(2*np.pi)
+
+
+
 
 class CZ_trajectory_superoperator(det.Soft_Detector):
     def __init__(self, H_0, fluxlutman, noise_parameters_CZ, fitted_stepresponse_ty):
@@ -735,35 +743,49 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
     def acquire_data_point(self, **kw):
         tlist = (np.arange(0, self.fluxlutman.cz_length(),
                            1/self.fluxlutman.sampling_rate()))
+
         if not self.fluxlutman.czd_double_sided():
+            theta_i = np.arctan(2*self.fluxlutman.cz_J2() / (self.fluxlutman.cz_freq_01_max() - self.fluxlutman.cz_freq_interaction()))
+            theta_f=fix_theta_f(self.fluxlutman.cz_lambda_3(),theta_i)
+
             f_pulse = wf.martinis_flux_pulse(
                 length=self.fluxlutman.cz_length(),
                 lambda_2=self.fluxlutman.cz_lambda_2(),
                 lambda_3=self.fluxlutman.cz_lambda_3(),
-                theta_f=self.fluxlutman.cz_theta_f(),
+                theta_f=theta_f,     #self.fluxlutman.cz_theta_f(),
                 f_01_max=self.fluxlutman.cz_freq_01_max(),
                 J2=self.fluxlutman.cz_J2(),
                 f_interaction=self.fluxlutman.cz_freq_interaction(),
                 sampling_rate=self.fluxlutman.sampling_rate(),
                 return_unit='f01')    # return in terms of omega
-            amp = self.fluxlutman.detuning_to_amp((self.fluxlutman.cz_freq_01_max() - f_pulse)/(2*np.pi))
+
+            #amp = self.fluxlutman.detuning_to_amp((self.fluxlutman.cz_freq_01_max() - f_pulse)/(2*np.pi))
                      # transform detuning frequency to (positive) amplitude
+            
         else:
             f_pulse,amp = self.get_f_pulse_double_sided()
 
-        # Note: amp is never used without the distortions, so do not do vary voltage_scaling otherwise !!!
-        amp=amp*self.noise_parameters_CZ.voltage_scaling_factor()
-
-
+        
         sim_step=1/self.fluxlutman.sampling_rate()
 
         # extract base frequency from the Hamiltonian
         w_q0 = np.real(self.H_0[1,1])
-        #w_q1=np.real(self.H_0[3,3])
-        #alpha_q0=np.real(self.H_0[2,2])-2*w_q0
+        w_q1=np.real(self.H_0[3,3])
+        alpha_q0=np.real(self.H_0[2,2])-2*w_q0
 
         eps_vec = f_pulse - w_q0
         detuning = -eps_vec/(2*np.pi)     # we express detuning in terms of frequency
+
+
+        
+        Vo=1/np.arccos(((w_q1-alpha_q0)/(w_q0-alpha_q0))**2)
+        amp=Vo*np.arccos(((f_pulse-alpha_q0)/(w_q0-alpha_q0))**2)
+        # transformations used to match with Leo's simulations
+        # we scale the amplitude and then recompute the pulse in detuning
+        amp=amp*self.noise_parameters_CZ.voltage_scaling_factor()
+        eps_vec_convolved_new= (w_q0-alpha_q0)*np.sqrt(np.cos(amp/Vo))+alpha_q0 - w_q0
+        f_pulse_convolved_new=eps_vec_convolved_new+w_q0
+
 
         '''J_new=list()
         for eps in eps_vec:
@@ -852,9 +874,9 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             eps_vec_convolved_new=-convolved_detuning_new*(2*np.pi)
             eps_vec_convolved_new=eps_vec_convolved_new[0:np.size(tlist_convol1)]
             f_pulse_convolved_new=eps_vec_convolved_new+w_q0
-        else:
-        	eps_vec_convolved_new=eps_vec
-        	f_pulse_convolved_new=f_pulse
+        # else:
+        # 	eps_vec_convolved_new=eps_vec
+        # 	f_pulse_convolved_new=f_pulse
 
 
 
@@ -915,7 +937,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             tlist=tlist, c_ops=c_ops, eps_vec=eps_vec_convolved_new,
             sim_step=1/self.fluxlutman.sampling_rate(), verbose=False)
 
-        cost_func_val = -np.log10(1-qoi['avgatefid_compsubspace_pc'])   # new cost function: infidelity
+        cost_func_val = np.abs(qoi['phi_cond']-180)   # new cost function: infidelity
         #np.abs(qoi['phi_cond']-180) + qoi['L1']*100 * 5
         return cost_func_val, qoi['phi_cond'], qoi['L1']*100, qoi['L2']*100, qoi['avgatefid_pc']*100, qoi['avgatefid_compsubspace_pc']*100
 
