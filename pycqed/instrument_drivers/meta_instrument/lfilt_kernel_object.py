@@ -152,10 +152,10 @@ class LinDistortionKernel(Instrument):
                         if nr_real_time_bounce_models > 1:
                             raise ValueError()
                     else:
-                        y_sig = kf.bounce_correction(
-                            y_sig, sampling_rate=self.cfg_sampling_rate(),
-                            inverse=inverse,
-                            **filt['params'])
+                        y_sig = kf.first_order_bounce_corr(
+                            sig=y_sig, delay=filt['params']['tau'],
+                            amp=filt['params']['amp'], awg_sample_rate=2.4e9)
+
                 else:
                     raise KeyError('Model {} not recognized'.format(model))
 

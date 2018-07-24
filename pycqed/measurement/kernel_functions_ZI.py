@@ -108,6 +108,43 @@ def bounce_correction(ysig, tau: float, amp: float,
 #              hardware friendly functions                      #
 #################################################################
 
+
+def exponential_decay_correction_hw_friendly(ysig, tau: float, amp: float,
+                                             sampling_rate: float=1,
+                                             inverse: bool=False):
+    """
+    Corrects for an exponential decay using "multipath_filter2".
+
+    Fitting should be done to the following function:
+        y = gc*(1 + amp *exp(-t/tau))
+    where gc is a gain correction factor that is ignored in the corrections.
+    """
+
+    alpha = 1 - np.exp(-1/(sampling_rate*tau*(1+amp)))
+    # N.B. The if statement from the conventional "linear" filter is
+    # completely gone. This black magic needs to be understood. MAR July 2018
+    # k = amp/(1+amp-alpha)
+    if amp >= 0.0:
+        # compensating overshoot by a low-pass filter
+        # correction filter y[n] = (1-k)*x[n] + k*u[n] = x[n] + k*(u[n]-x[n])
+        # where u[n] = u[n-1] + alpha*(x[n] - u[n-1])
+        k = amp/(1+amp-alpha)
+    else:
+        # compensating low-pass by an overshoot
+        # correction filter y[n] = (1+k)*x[n] - k*u[n] = x[n] - k*(u[n]-x[n])
+        # where u[n] = u[n-1] + alpha*(x[n] - u[n-1])
+        # the correction filter differs just in the sign of k, so allow the k to be negative here
+        k = amp/(1+amp)/(1-alpha)
+
+
+    filtered_signal = multipath_filter2(sig=ysig, alpha=alpha, k=k, paths=8)
+
+    if inverse:
+        raise NotImplementedError()
+    # ensure that the lenght of the returned signal is the same as the input
+    return filtered_signal[:len(ysig)]
+
+
 # Delay a signal by d clock cycles.
 # This is done by adding d zero entries to the front of the signal array, and by removing the last d entries.
 def sigdelay(sig, d):
@@ -179,44 +216,6 @@ def multipath_filter(sig, alpha, k, paths):
     return sig + k * (duf - sig)
 
 
-# def multipath_filter2(sig, alpha, k, paths=8):
-#     """
-#     hardware friendly
-#     exponential moving average correction filter with pipeline simulation
-#     """
-#     ppl = 4
-#     tpl = np.ones((paths, ))
-#     hw_alpha = alpha*float(paths*ppl)
-
-#     duf = tpl * 0.
-#     # due to the pipelining, there are actually ppl interleaved filters
-#     acc = np.zeros((ppl, ))
-
-#     # first create an array of averaged path values
-#     du = []
-#     for i in np.arange(0, sig.size, paths):
-#         du = np.append(du, np.mean(sig[i:(i+paths)]))
-
-#     # loop through the average bases
-#     for i in np.arange(0, du.size, ppl):
-#         # loop through the individual sub-filters
-#         for j in np.arange(0, ppl):
-#             # first calculate the filter input as an average of the previous
-#             # path averages
-#             ss = 0
-#             for l in np.arange(0, ppl):
-#                 # if statement checks for elements existing in the waveform
-#                 # Hack by MAR and NH July 2018
-#                 if i+j-l >= 0 and i+j-l < len(du):
-#                     ss = ss + du[i+j-l]
-#             ss = ss / float(ppl)
-#             # then process it by the filter
-#             acc[j] = acc[j] + hw_alpha*(ss - acc[j])
-#             # and add the filter output to the signal correction vector
-#             duf = np.append(duf, tpl * acc[j])
-#     duf = duf[0:sig.size]
-#     return sig + k * (duf - sig)
-
 
 def multipath_filter2(sig, alpha, k, paths):
     """
@@ -264,7 +263,8 @@ def multipath_filter2(sig, alpha, k, paths):
 def first_order_bounce_corr(sig, delay, amp, awg_sample_rate,
                             scope_sample_rate=None, bufsize=256,
                             sim_hw_delay=False):
-    """ This function simulates the real-time bounce correction.
+    """
+    This function simulates the real-time bounce correction.
 
     Args:
         sig:           The signal to be filtered as a numpy array.
@@ -282,7 +282,8 @@ def first_order_bounce_corr(sig, delay, amp, awg_sample_rate,
             The delay needs to be at least 1 AWG sample.")
             """.format(delay_n_samples, delay*1e9, bufsize - 8)))
     if not -1 < amp < 1:
-        raise ValueError("The amplitude ({}) needs to be between -1 and 1.".format(amp))
+        raise ValueError(
+            "The amplitude ({}) needs to be between -1 and 1.".format(amp))
 
     # The scope sampling rate is equal to the AWG sampling rate by default.
     if scope_sample_rate is None:
