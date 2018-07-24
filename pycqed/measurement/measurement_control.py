@@ -110,6 +110,7 @@ class MeasurementControl(Instrument):
         self._persist_dat = None
         self._persist_xlabs = None
         self._persist_ylabs = None
+        self._analysis_display = None
 
     ##############################################
     # Functions used to control the measurements #
@@ -501,6 +502,9 @@ class MeasurementControl(Instrument):
                 delattr(self, attr)
             except AttributeError:
                 pass
+
+        if self._analysis_display is not None:
+            self._analysis_display.update()
 
     ###################
     # 2D-measurements #
@@ -1483,6 +1487,9 @@ class MeasurementControl(Instrument):
         """
         return {'vendor': 'PycQED', 'model': 'MeasurementControl',
                 'serial': '', 'firmware': '2.0'}
+
+    def analysis_display(self, ad):
+        self._analysis_display = ad
 
 
 class KeyboardFinish(KeyboardInterrupt):
