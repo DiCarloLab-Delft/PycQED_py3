@@ -41,6 +41,10 @@ class NoiseParametersCZ(Instrument):
                            initial_value=True,
                            vals=vals.Bool(),
                            parameter_class=ManualParameter)
+        self.add_parameter('voltage_scaling_factor', unit='a.u.',
+                           label='scaling factor for the voltage for a CZ pulse',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(), initial_value=1.0)
 
 
 
