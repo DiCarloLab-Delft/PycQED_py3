@@ -198,6 +198,19 @@ class CCLight_Transmon(Qubit):
                            vals=vals.Arrays(),
                            label='Optimized weights for Q channel',
                            parameter_class=ManualParameter)
+
+
+
+        # FIXME!: Dirty hack because of qusurf issue #63, added 2 hardcoded
+        # delay samples in the optimized weights
+        self.add_parameter('ro_acq_weight_func_delay_samples_hack',
+                           vals=vals.Ints(),
+                           initial_value=0,
+                           label='weight function delay samples',
+                           parameter_class=ManualParameter)
+
+
+
         self.add_parameter(
             'ro_acq_delay',  unit='s',
             label='Readout acquisition delay',
@@ -844,12 +857,27 @@ class CCLight_Transmon(Qubit):
                 else:
                     # When optimal weights are used, only the RO I weight
                     # channel is used
+
+
+                    # FIXME!: Dirty hack because of qusurf issue #63, adds
+                    # delay samples in the optimized weights
+                    opt_WI = self.ro_acq_weight_func_I()
+                    opt_WQ = self.ro_acq_weight_func_Q()
+                    del_sampl = self.ro_acq_weight_func_delay_samples_hack()
+                    if del_sampl > 0:
+                        zeros = np.zeros(abs(del_sampl))
+                        opt_WI = np.concatenate([opt_WI[abs(del_sampl):], zeros])
+                        opt_WQ = np.concatenate([opt_WQ[abs(del_sampl):], zeros])
+                    elif del_sampl< 0:
+                        zeros = np.zeros(abs(del_sampl))
+                        opt_WI = np.concatenate([zeros, opt_WI[:-abs(del_sampl)]])
+                        opt_WQ = np.concatenate([zeros, opt_WQ[:-abs(del_sampl)]])
+                    else:
+                        pass
                     UHFQC.set('quex_wint_weights_{}_real'.format(
-                        self.ro_acq_weight_chI()),
-                        self.ro_acq_weight_func_I())
+                        self.ro_acq_weight_chI()), opt_WI)
                     UHFQC.set('quex_wint_weights_{}_imag'.format(
-                        self.ro_acq_weight_chI()),
-                        self.ro_acq_weight_func_Q())
+                        self.ro_acq_weight_chI()), opt_WQ)
                     UHFQC.set('quex_rot_{}_real'.format(
                         self.ro_acq_weight_chI()), 1.0)
                     UHFQC.set('quex_rot_{}_imag'.format(
@@ -857,11 +885,9 @@ class CCLight_Transmon(Qubit):
                     if self.ro_acq_weight_type() == 'optimal IQ':
                         print('setting the optimal Q')
                         UHFQC.set('quex_wint_weights_{}_real'.format(
-                            self.ro_acq_weight_chQ()),
-                            self.ro_acq_weight_func_I())
+                            self.ro_acq_weight_chQ()), opt_WI)
                         UHFQC.set('quex_wint_weights_{}_imag'.format(
-                            self.ro_acq_weight_chQ()),
-                            self.ro_acq_weight_func_Q())
+                            self.ro_acq_weight_chQ()), opt_WQ)
                         UHFQC.set('quex_rot_{}_real'.format(
                             self.ro_acq_weight_chQ()), 1.0)
                         UHFQC.set('quex_rot_{}_imag'.format(
@@ -1840,14 +1866,10 @@ class CCLight_Transmon(Qubit):
                      analyze=True, close_fig=True, real_imag=True,
                      prepare_for_timedomain=True, all_modules=False):
         if self.cfg_with_vsm():
-            if amps==None:
-                amps=np.linspace(0.2, 2.0, 31)
             self.measure_rabi_vsm(MC, amps,
                                   analyze, close_fig, real_imag,
                                   prepare_for_timedomain, all_modules)
         else:
-            if amps==None:
-                amps=np.linspace(0., 1.0, 31)
             self.measure_rabi_channel_amp(MC, amps,
                                           analyze, close_fig, real_imag,
                                           prepare_for_timedomain, all_modules)
