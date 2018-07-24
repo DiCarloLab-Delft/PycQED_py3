@@ -765,9 +765,12 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         target_wf = self._calc_modified_wf(
                 base_wf, a_i=a_i, corr_samples=corr_samples)
-        k0 = self.instr_distortion_kernel.get_instr()
-        predistorted_wf = k0.distort_waveform(target_wf,
-                                              len(target_wf)+tail_samples)
+        if self.cfg_distort():
+            k0 = self.instr_distortion_kernel.get_instr()
+            predistorted_wf = k0.distort_waveform(target_wf,
+                                                  len(target_wf)+tail_samples)
+        else:
+            predistorted_wf = target_wf
 
         # 2. Phase correction pulse
         phase_corr_int = np.sum(
@@ -842,6 +845,10 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         if self.cfg_distort():
             waveform = self.distort_waveform(waveform)
             self._wave_dict_dist[waveform_name] = waveform
+        else:
+            waveform = self._append_zero_samples(waveform)
+            self._wave_dict_dist[waveform_name] = waveform
+
         self.AWG.get_instr().set(codeword, waveform)
 
     def load_waveforms_onto_AWG_lookuptable(
@@ -927,6 +934,17 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             awg.configure_codeword_protocol()
             awg.start()
 
+    def _append_zero_samples(self, waveform):
+        """
+        Helper method to ensure waveforms have the desired length
+        """
+        length_samples = int(self.sampling_rate()*self.cfg_max_wf_length())
+        extra_samples = length_samples - len(waveform)
+        if extra_samples >= 0:
+            y_sig = np.concatenate([waveform, np.zeros(extra_samples)])
+        else:
+            y_sig = waveform[:extra_samples]
+        return y_sig
 
     def _update_expected_program_hash(self):
         """
@@ -986,6 +1004,10 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         if self.cfg_distort():
             waveform = self.distort_waveform(waveform)
             self._wave_dict_dist[waveform_name] = waveform
+        else:
+            waveform = self._append_zero_samples(waveform)
+            self._wave_dict_dist[waveform_name] = waveform
+
         self.AWG.get_instr().set(codeword, waveform)
 
     def load_waveform_realtime(self, waveform_name: str,
@@ -1012,6 +1034,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                 waveform = self.distort_waveform(waveform)
                 self._wave_dict_dist[waveform_name] = waveform
             else:
+                waveform = self._append_zero_samples(waveform)
                 self._wave_dict_dist[waveform_name] = waveform
 
         waveform = self._wave_dict_dist[waveform_name]
@@ -1205,6 +1228,9 @@ class QWG_Flux_LutMan(AWG8_Flux_LutMan):
 
         if self.cfg_distort():
             waveform = self.distort_waveform(waveform)
+            self._wave_dict_dist[waveform_name] = waveform
+        else:
+            waveform = self._append_zero_samples(waveform)
             self._wave_dict_dist[waveform_name] = waveform
         self.AWG.get_instr().stop()
         self.AWG.get_instr().set(codeword, waveform)
