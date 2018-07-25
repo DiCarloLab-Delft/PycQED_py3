@@ -233,6 +233,12 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         return scale_factor
 
     def get_amp_to_dac_val_scale_factor(self):
+        if self.get_dac_val_to_amp_scalefactor() ==0: 
+        	# Give a warning and don't raise an error as things should not 
+        	# break because of this. 
+            logging.warning('AWG amp to dac scale factor is 0, check "{}" '
+            	'output amplitudes'.format(self.AWG()))
+            return 1
         return 1/self.get_dac_val_to_amp_scalefactor()
 
     def set_default_lutmap(self):

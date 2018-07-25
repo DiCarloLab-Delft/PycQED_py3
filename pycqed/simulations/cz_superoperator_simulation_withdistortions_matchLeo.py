@@ -778,12 +778,12 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 
         
-        Vo=1/np.arccos(((w_q1-alpha_q0)/(w_q0-alpha_q0))**2)
+        Vo=1/np.arccos(((w_q1-2*alpha_q0)/(w_q0-alpha_q0))**2)
         amp=Vo*np.arccos(((f_pulse-alpha_q0)/(w_q0-alpha_q0))**2)
         # transformations used to match with Leo's simulations
         # we scale the amplitude and then recompute the pulse in detuning
         amp=amp*self.noise_parameters_CZ.voltage_scaling_factor()
-        eps_vec_convolved_new= (w_q0-alpha_q0)*np.sqrt(np.cos(amp/Vo))+alpha_q0 - w_q0
+        eps_vec_convolved_new= (w_q0-0*alpha_q0)*np.sqrt(np.cos(amp/Vo))+0*alpha_q0 - w_q0
         f_pulse_convolved_new=eps_vec_convolved_new+w_q0
 
 
