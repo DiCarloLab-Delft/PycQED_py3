@@ -295,9 +295,9 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
                  sliding_pulse_duration=220e-9,
                  freq_to_amp=None, amp_to_freq=None,
                  phase_cut :float=0,
-                 ch_amp_key: str='Snapshot/instruments/AWG8_8005'
+                 ch_amp_key: str='Snapshot/instruments/AWG8_8027'
                  '/parameters/awgs_0_outputs_1_amplitude',
-                 ch_range_key: str='Snapshot/instruments/AWG8_8005'
+                 ch_range_key: str='Snapshot/instruments/AWG8_8027'
                  '/parameters/sigouts_0_range',
                  waveform_amp_key: str='Snapshot/instruments/FL_LutMan_QR'
                  '/parameters/sq_amp',
@@ -336,10 +336,6 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
         a = ma_old.TwoD_Analysis(timestamp=self.timestamps[0], auto=True,
                                  close_file=False)
         a.get_naming_and_values_2D()
-        # FIXME: this is hardcoded and should be an argument in options dict
-        amp_key = 'Snapshot/instruments/AWG8_8005/parameters/awgs_0_outputs_1_amplitude'
-        amp = a.data_file[amp_key].attrs['value']
-
 
         ch_amp = a.data_file[self.ch_amp_key].attrs['value']
         if self.ch_range_key is None:

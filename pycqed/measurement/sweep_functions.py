@@ -900,7 +900,7 @@ class par_dB_attenuation_UHFQC_AWG_direct(Soft_Sweep):
     def set_parameter(self, val):
         UHFQC.awgs_0_outputs_1_amplitude(10**(val/20))
         UHFQC.awgs_0_outputs_0_amplitude(10**(val/20))
-       
+
 
 
 class lutman_par_UHFQC_dig_trig(Soft_Sweep):
@@ -1090,7 +1090,8 @@ class FLsweep(Soft_Sweep):
 
     def set_parameter(self, val):
         self.par(val)
-        self.lm.load_waveform_realtime(self.waveform_name)
+        self.lm.load_waveform_realtime(self.waveform_name,
+                                       regenerate_waveforms=True)
 
 
 class FLsweep_QWG(Soft_Sweep):
