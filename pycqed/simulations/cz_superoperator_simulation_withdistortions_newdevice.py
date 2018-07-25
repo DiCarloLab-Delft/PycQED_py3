@@ -32,7 +32,7 @@ H_c = n_q0
 
 scalefactor=1e6
 
-w_bus=8.27e9 * 2*np.pi / scalefactor
+w_bus=8.08e9 * 2*np.pi / scalefactor
 
 
 '''
@@ -816,7 +816,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             impulse_response_interp = interp1d(self.fitted_stepresponse_ty[0],impulse_response)
 
             tlist_convol1 = tlist
-            tlist_convol2 = np.arange(0, self.fitted_stepresponse_ty[0][-1],
+            tlist_convol2 = np.arange(0, self.fluxlutman.cz_length(),
                                1/self.fluxlutman.sampling_rate())
             amp_convol = amp_interp(tlist_convol1)
             impulse_response_convol = impulse_response_interp(tlist_convol2)
