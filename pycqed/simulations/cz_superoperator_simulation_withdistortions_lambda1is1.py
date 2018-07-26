@@ -32,6 +32,8 @@ H_c = n_q0
 
 scalefactor=1e6
 
+w_bus=8.27e9 * 2*np.pi / scalefactor
+
 
 '''
 alpha_q0 = -285e6 * 2*np.pi
@@ -63,7 +65,7 @@ Tphi_q1_sigmaZ_01=1/(-1/(2*T1_q1)+1/T2_q1)
 
 
 # Hamiltonian
-def coupled_transmons_hamiltonian(w_q0, w_q1, alpha_q0, alpha_q1, J, w_bus):
+def coupled_transmons_hamiltonian(w_q0, w_q1, alpha_q0, alpha_q1, J):
     """
     Hamiltonian of two coupled anharmonic transmons.
     Because the intention is to tune one qubit into resonance with the other,
@@ -78,30 +80,24 @@ def coupled_transmons_hamiltonian(w_q0, w_q1, alpha_q0, alpha_q1, J, w_bus):
         w_q0 > w_q1
         and the anharmonicities alpha negative
     """
-    eps=0
-    delta_q1=w_q1-w_bus
-    delta_q0_interactionpoint=(w_q1-alpha_q0)-w_bus
-    delta_q0=(w_q0+eps)-w_bus
-
-    J_new = J / ((delta_q1+delta_q0_interactionpoint)/(delta_q1*delta_q0_interactionpoint)) * (delta_q1+delta_q0)/(delta_q1*delta_q0)
 
     H_0 = w_q0 * n_q0 + w_q1 * n_q1 +  \
         1/2*alpha_q0*(a.dag()*a.dag()*a*a) + 1/2*alpha_q1*(b.dag()*b.dag()*b*b) +\
-        J_new * (a.dag() + a) * (b + b.dag())
+        J * (a.dag() + a) * (b + b.dag())
     return H_0
 
 
-def hamiltonian_timedependent(H_0,eps,w_bus):
+def hamiltonian_timedependent(H_0,eps):
 	w_q0=np.real(H_0[1,1])
 	w_q1=np.real(H_0[3,3])
 	alpha_q0=np.real(H_0[2,2])-2*w_q0
 	J=np.real(H_0[1,3])
 
 	delta_q1=w_q1-w_bus
-	delta_q0_sweetspot=(w_q0)-w_bus
+	delta_q0_interactionpoint=(w_q1-alpha_q0)-w_bus
 	delta_q0=(w_q0+eps)-w_bus
 
-	J_new = J / ((delta_q1+delta_q0_sweetspot)/(delta_q1*delta_q0_sweetspot)) * (delta_q1+delta_q0)/(delta_q1*delta_q0)
+	J_new = J / ((delta_q1+delta_q0_interactionpoint)/(delta_q1*delta_q0_interactionpoint)) * (delta_q1+delta_q0)/(delta_q1*delta_q0)
 
 	return H_0+eps*H_c+(J_new-J)*H_coupling
 
@@ -569,25 +565,7 @@ def pro_avfid_superoperator_phasecorrected(U,phases):
 #tlist = np.arange(0, 240e-9, 1/2.4e9)
 
 
-def matrix_change_of_variables(H_0):
-    eigs,eigvectors=H_0.eigenstates()
-
-    eigvectors_ordered_according2basis = []
-    eigvectors_ordered_according2basis.append(eigvectors[0].full())   # 00 state
-    eigvectors_ordered_according2basis.append(eigvectors[2].full())   # 01 state
-    eigvectors_ordered_according2basis.append(eigvectors[5].full())   # 02 state
-    eigvectors_ordered_according2basis.append(eigvectors[1].full())   # 10 state
-    eigvectors_ordered_according2basis.append(eigvectors[4].full())   # 11 state
-    eigvectors_ordered_according2basis.append(eigvectors[7].full())   # 12 state
-    eigvectors_ordered_according2basis.append(eigvectors[3].full())   # 20 state
-    eigvectors_ordered_according2basis.append(eigvectors[6].full())   # 21 state
-    eigvectors_ordered_according2basis.append(eigvectors[8].full())   # 22 state
-
-    S=np.hstack(eigvectors_ordered_according2basis)
-    return S
-
-
-def simulate_quantities_of_interest_superoperator(H_0, tlist, c_ops, w_bus, eps_vec,
+def simulate_quantities_of_interest_superoperator(H_0, tlist, c_ops, eps_vec,
                                     sim_step,
                                     verbose: bool=True):
     """
@@ -617,7 +595,6 @@ def simulate_quantities_of_interest_superoperator(H_0, tlist, c_ops, w_bus, eps_
     eps_vec=eps_vec/scalefactor
     sim_step=sim_step*scalefactor
     H_0=H_0/scalefactor
-    w_bus=w_bus/scalefactor
     if c_ops!=[]:       # c_ops is a list of either operators or lists where the first element is
                                     # an operator and the second one is a list of the (time-dependent) coefficients
         for c in range(len(c_ops)):
@@ -674,7 +651,7 @@ def simulate_quantities_of_interest_superoperator(H_0, tlist, c_ops, w_bus, eps_
 
     exp_L_total=1
     for i in range(len(tlist)):
-        H=hamiltonian_timedependent(H_0,eps_vec[i],w_bus)
+        H=hamiltonian_timedependent(H_0,eps_vec[i])
         if c_ops != []:
             c_ops_temp=[]
             for c in range(len(c_ops)):
@@ -707,12 +684,6 @@ def simulate_quantities_of_interest_superoperator(H_0, tlist, c_ops, w_bus, eps_
     '''
 
     U_final = exp_L_total
-
-    # We change the basis of U_final to the basis of eigenvectors of H_0
-    # The columns of S are the eigenvectors of H_0, appropriately ordered
-    S = qtp.Qobj(matrix_change_of_variables(H_0),dims=[[3, 3], [3, 3]])
-    U_final = S*U_final*S.dag()
-
     phases = phases_from_superoperator(U_final)
     phi_cond = phases[-1]
     L1 = leakage_from_superoperator(U_final)
@@ -742,15 +713,6 @@ def simulate_quantities_of_interest_superoperator(H_0, tlist, c_ops, w_bus, eps_
     return {'phi_cond': phi_cond, 'L1': L1, 'L2': L2, 'avgatefid_pc': avgatefid, 'avgatefid_compsubspace_pc': avgatefid_compsubspace}
 
 
-def spectrum(H_0,eps_vec):
-    eigenvalues=[[],[],[],[],[],[],[],[],[]]
-    for Omega in eps_vec:
-        H=H_0+Omega*H_c
-        eigs=H.eigenenergies()
-        for i in range(len(eigs)):
-            eigenvalues[i].append(eigs[i])
-    return eigenvalues
-
 def fix_theta_f(lambda_3,theta_i):
     lambda_1target=1
     return (theta_i+2*(lambda_1target+lambda_3))*360/(2*np.pi)
@@ -763,9 +725,6 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         Args:
             fluxlutman (instr): an instrument that contains the parameters
                 required to generate the waveform for the trajectory.
-            noise_parameters_CZ: instrument that contains the noise parameters
-            fitted_stepresponse_ty: list of two elements, corresponding to the time t 
-                                    and the step response in volts along the y axis
         """
         super().__init__()
         self.value_names = ['Cost func', 'Cond phase', 'L1', 'L2', 'avgatefid_pc', 'avgatefid_compsubspace_pc']
@@ -778,38 +737,20 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 
     def acquire_data_point(self, **kw):
-
-        '''# BENCHMARK FOR HOW THE COUPLING IMPACTS THE HAMILTONIAN PARAMETERS
-        eigs,eigvectors = self.H_0.eigenstates()
-        eigs=eigs/(2*np.pi)
-        print('omegaA =',eigs[1])
-        print('omegaB =',eigs[2])
-        print(eigs[4]-eigs[1]-eigs[2])
-        print('etaA =',eigs[3]-2*eigs[1])
-        print('etaB =',eigs[5]-2*eigs[2])
-        print(eigvectors[4],'\n fidelity with 1 /otimes 1=',np.abs(eigvectors[4].dag().overlap(qtp.basis(9,4)))**2)
-        print(eigvectors[5],'\n fidelity with 0 /otimes 2=',np.abs(eigvectors[5].dag().overlap(qtp.basis(9,2)))**2)
-        '''
-
-        sim_step=1/self.fluxlutman.sampling_rate()
-        subdivisions_of_simstep=4
-        sim_step_new=sim_step/subdivisions_of_simstep      # waveform is generated according to sampling rate of AWG,
-                                                 # but we can use a different step for simulating the time evolution
         tlist = (np.arange(0, self.fluxlutman.cz_length(),
-                           sim_step))
-        tlist_new = (np.arange(0, self.fluxlutman.cz_length(),
-                           sim_step_new))
-        
-        #theta_i = np.arctan(2*self.fluxlutman.cz_J2() / (self.fluxlutman.cz_freq_01_max() - self.fluxlutman.cz_freq_interaction()))
-        #theta_f=fix_theta_f(self.fluxlutman.cz_lambda_3(),theta_i)
-        #theta_i=theta_i*360/(2*np.pi)
+                           1/self.fluxlutman.sampling_rate()))
 
+        theta_i = np.arctan(2*self.fluxlutman.cz_J2() / (self.fluxlutman.cz_freq_01_max() - self.fluxlutman.cz_freq_interaction()))
+        theta_f=fix_theta_f(self.fluxlutman.cz_lambda_3(),theta_i)
+        # theta_i=theta_i*360/(2*np.pi)
+        # print(theta_i,theta_f)
+        
         if not self.fluxlutman.czd_double_sided():
             f_pulse = wf.martinis_flux_pulse(
                 length=self.fluxlutman.cz_length(),
                 lambda_2=self.fluxlutman.cz_lambda_2(),
                 lambda_3=self.fluxlutman.cz_lambda_3(),
-                theta_f=self.fluxlutman.cz_theta_f(),
+                theta_f=theta_f,#self.fluxlutman.cz_theta_f(),
                 f_01_max=self.fluxlutman.cz_freq_01_max(),
                 J2=self.fluxlutman.cz_J2(),
                 f_interaction=self.fluxlutman.cz_freq_interaction(),
@@ -820,23 +761,11 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         else:
             f_pulse,amp = self.get_f_pulse_double_sided()
 
-        # For better accuracy in simulations, redefine f_pulse and amp in trems of sim_step_new
-        tlist_temp=np.concatenate((tlist,np.array([self.fluxlutman.cz_length()])))
-        f_pulse_temp=np.concatenate((f_pulse,np.array([f_pulse[-1]])))
-        amp_temp=np.concatenate((amp,np.array([amp[-1]])))
-        f_pulse_interp=interp1d(tlist_temp,f_pulse_temp)
-        amp_interp=interp1d(tlist_temp,amp_temp)
-        f_pulse=f_pulse_interp(tlist_new)
-        amp=amp_interp(tlist_new)
-
-        # plot(x_plot_vec=[tlist_new*1e9],
-        #           y_plot_vec=[f_pulse/(2*np.pi)/1e9],
-        #           title='Freq. of fluxing qubit during pulse',
-        #           xlabel='Time (ns)',ylabel='Freq. (GHz)',legend_labels=['omega_B(t)'])
-
-
+        # Note: amp is never used without the distortions, so do not do vary voltage_scaling otherwise !!!
         amp=amp*self.noise_parameters_CZ.voltage_scaling_factor()
 
+
+        sim_step=1/self.fluxlutman.sampling_rate()
 
         # extract base frequency from the Hamiltonian
         w_q0 = np.real(self.H_0[1,1])
@@ -844,20 +773,20 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         #alpha_q0=np.real(self.H_0[2,2])-2*w_q0
 
         eps_vec = f_pulse - w_q0
-        #detuning = -eps_vec/(2*np.pi)     # we express detuning in terms of frequency
+        detuning = -eps_vec/(2*np.pi)     # we express detuning in terms of frequency
 
-        '''#BENCHMARK TO CHECK HOW THE COUPLING VARIES AS A FUNCTION OF DETUNING
-        J_new=list()
+        '''J_new=list()
         for eps in eps_vec:
         	H=hamiltonian_timedependent(self.H_0,eps)
         	J_new.append(np.real(H[1,3]))
-        plot(x_plot_vec=[tlist_new*1e9],
+        plot(x_plot_vec=[tlist*1e9],
             	  y_plot_vec=[np.array(J_new)/(2*np.pi)/1e6],
             	  title='Coupling during pulse',
                   xlabel='Time (ns)',ylabel='J (MHz)',legend_labels=['J(t)'])'''
 
 
-        '''   USELESS   ####### functions that were used to convert from detuning to voltage but now we use 
+
+        '''    ####### functions that were used to convert from detuning to voltage but now we use 
                        functions from fluxlutman which are the same as those used in the experiment
         def invert_parabola(polynomial_coefficients,y):    # useless
         	a=polynomial_coefficients[0]
@@ -893,13 +822,13 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             #       xlabel='Time (ns)')
 
             # use interpolation to be sure that amp and impulse_response have the same delta_t separating two values
-            #amp_interp = interp1d(tlist,amp)      # amp is now managed already above
+            amp_interp = interp1d(tlist,amp)
             impulse_response_interp = interp1d(self.fitted_stepresponse_ty[0],impulse_response)
 
-            tlist_convol1 = tlist_new
+            tlist_convol1 = tlist
             tlist_convol2 = np.arange(0, self.fitted_stepresponse_ty[0][-1],
-                               sim_step_new)
-            #amp_convol = amp_interp(tlist_convol1)
+                               1/self.fluxlutman.sampling_rate())
+            amp_convol = amp_interp(tlist_convol1)
             impulse_response_convol = impulse_response_interp(tlist_convol2)
 
             # plot(x_plot_vec=[tlist_convol1*1e9],y_plot_vec=[amp_convol],
@@ -934,13 +863,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             eps_vec_convolved_new=eps_vec_convolved_new[0:np.size(tlist_convol1)]
             f_pulse_convolved_new=eps_vec_convolved_new+w_q0
         else:
-            if self.noise_parameters_CZ.voltage_scaling_factor() == 1.0:
-        	    eps_vec_convolved_new=eps_vec
-        	    f_pulse_convolved_new=f_pulse
-            else:
-                detuning_new=give_parabola(self.fluxlutman.polycoeffs_freq_conv(),amp)
-                eps_vec_convolved_new=-detuning_new*(2*np.pi)
-                f_pulse_convolved_new=eps_vec_convolved_new+w_q0
+        	eps_vec_convolved_new=eps_vec
+        	f_pulse_convolved_new=f_pulse
 
 
 
@@ -949,7 +873,6 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         T1_q1 = self.noise_parameters_CZ.T1_q1()
         T2_q0_sweetspot = self.noise_parameters_CZ.T2_q0_sweetspot()
         T2_q0_interaction_point = self.noise_parameters_CZ.T2_q0_interaction_point()
-        T2_q0_amplitude_dependent = self.noise_parameters_CZ.T2_q0_amplitude_dependent()
         T2_q1 = self.noise_parameters_CZ.T2_q1()
 
         def Tphi_from_T1andT2(T1,T2):
@@ -971,43 +894,35 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 
 
-        if T2_q0_amplitude_dependent != np.array([-1]):     # CHANGE ITTTTT
-            # something like: 
-            # - map f_pulse to T2 via polycoefficients OR interpolate dataset of T2 vs frequency/detuning
-            # - compute Tphi01 from T2
+        def omega_prime(omega):                                   # derivative of f_pulse
+            '''
+            frequency is w = w_0 * cos(phi_e/2)    where phi_e is the external flux through the SQUID.
+            So the derivative wrt phi_e is
+                 w_prime = - w_0/2 sin(phi_e/2) = - w_0/2 * sqrt(1-cos(phi_e/2)**2) = - w_0/2 * sqrt(1-(w/w_0)**2)
+            Note: no need to know what phi_e is.
+            '''
+            return np.abs((w_q0/2)*np.sqrt(1-(omega/w_q0)**2))    # we actually return the absolute value because it's the only one who matters later
 
+        if Tphi01_q0_interaction_point != 0:       # mode where the pure dephazing is amplitude-dependent
+            w_min = np.nanmin(f_pulse_convolved_new)        
+            omega_prime_min = omega_prime(w_min)
+
+            f_pulse_convolved_new=np.clip(f_pulse_convolved_new,0,w_q0)
+            f_pulse_convolved_new_prime = omega_prime(f_pulse_convolved_new)
+            Tphi01_q0_vec = Tphi01_q0_sweetspot - f_pulse_convolved_new_prime/omega_prime_min*(Tphi01_q0_sweetspot-Tphi01_q0_interaction_point)
+                     # we interpolate Tphi from the sweetspot to the interaction point (=worst point in terms of Tphi)
+                     # by weighting depending on the derivative of f_pulse compared to the derivative at the interaction point
             c_ops = c_ops_interpolating(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1)
-
-        else:
-            def omega_prime(omega):                                   # derivative of f_pulse
-                '''
-                frequency is w = w_0 * cos(phi_e/2)    where phi_e is the external flux through the SQUID.
-                So the derivative wrt phi_e is
-                     w_prime = - w_0/2 sin(phi_e/2) = - w_0/2 * sqrt(1-cos(phi_e/2)**2) = - w_0/2 * sqrt(1-(w/w_0)**2)
-                Note: no need to know what phi_e is.
-                '''
-                return np.abs((w_q0/2)*np.sqrt(1-(omega/w_q0)**2))    # we actually return the absolute value because it's the only one who matters later
-
-            if Tphi01_q0_interaction_point != 0:       # mode where the pure dephazing is amplitude-dependent
-                w_min = np.nanmin(f_pulse_convolved_new)        
-                omega_prime_min = omega_prime(w_min)
-
-                f_pulse_convolved_new=np.clip(f_pulse_convolved_new,0,w_q0)
-                f_pulse_convolved_new_prime = omega_prime(f_pulse_convolved_new)
-                Tphi01_q0_vec = Tphi01_q0_sweetspot - f_pulse_convolved_new_prime/omega_prime_min*(Tphi01_q0_sweetspot-Tphi01_q0_interaction_point)
-                         # we interpolate Tphi from the sweetspot to the interaction point (=worst point in terms of Tphi)
-                         # by weighting depending on the derivative of f_pulse compared to the derivative at the interaction point
-                c_ops = c_ops_interpolating(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1)
-            else:                                       # mode where the collapse operators are time-independent, and possibly are 0
-                c_ops=jump_operators(T1_q0,T1_q1,0,0,0,0,0,
-                        Tphi01_q0_sweetspot,Tphi01_q0_sweetspot,Tphi01_q0_sweetspot/2,Tphi01_q1,Tphi01_q1,Tphi01_q1/2)
+        else:                                       # mode where the collapse operators are time-independent, and possibly are 0
+            c_ops=jump_operators(T1_q0,T1_q1,0,0,0,0,0,
+                    Tphi01_q0_sweetspot,Tphi01_q0_sweetspot,Tphi01_q0_sweetspot/2,Tphi01_q1,Tphi01_q1,Tphi01_q1/2)
 
 
 
         qoi = simulate_quantities_of_interest_superoperator(
             H_0=self.H_0,
-            tlist=tlist_new, c_ops=c_ops, w_bus=self.noise_parameters_CZ.w_bus(), eps_vec=eps_vec_convolved_new,
-            sim_step=sim_step_new, verbose=False)
+            tlist=tlist, c_ops=c_ops, eps_vec=eps_vec_convolved_new,
+            sim_step=1/self.fluxlutman.sampling_rate(), verbose=False)
 
         cost_func_val = -np.log10(1-qoi['avgatefid_compsubspace_pc'])   # new cost function: infidelity
         #np.abs(qoi['phi_cond']-180) + qoi['L1']*100 * 5
