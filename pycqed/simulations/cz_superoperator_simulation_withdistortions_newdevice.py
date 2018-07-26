@@ -569,6 +569,24 @@ def pro_avfid_superoperator_phasecorrected(U,phases):
 #tlist = np.arange(0, 240e-9, 1/2.4e9)
 
 
+def matrix_change_of_variables(H_0):
+    eigs,eigvectors=H_0.eigenstates()
+
+    eigvectors_ordered_according2basis = []
+    eigvectors_ordered_according2basis.append(eigvectors[0].full())   # 00 state
+    eigvectors_ordered_according2basis.append(eigvectors[2].full())   # 01 state
+    eigvectors_ordered_according2basis.append(eigvectors[5].full())   # 02 state
+    eigvectors_ordered_according2basis.append(eigvectors[1].full())   # 10 state
+    eigvectors_ordered_according2basis.append(eigvectors[4].full())   # 11 state
+    eigvectors_ordered_according2basis.append(eigvectors[7].full())   # 12 state
+    eigvectors_ordered_according2basis.append(eigvectors[3].full())   # 20 state
+    eigvectors_ordered_according2basis.append(eigvectors[6].full())   # 21 state
+    eigvectors_ordered_according2basis.append(eigvectors[8].full())   # 22 state
+
+    S=np.hstack(eigvectors_ordered_according2basis)
+    return S
+
+
 def simulate_quantities_of_interest_superoperator(H_0, tlist, c_ops, w_bus, eps_vec,
                                     sim_step,
                                     verbose: bool=True):
@@ -689,6 +707,12 @@ def simulate_quantities_of_interest_superoperator(H_0, tlist, c_ops, w_bus, eps_
     '''
 
     U_final = exp_L_total
+
+    # We change the basis of U_final to the basis of eigenvectors of H_0
+    # The columns of S are the eigenvectors of H_0, appropriately ordered
+    S = qtp.Qobj(matrix_change_of_variables(H_0),dims=[[3, 3], [3, 3]])
+    U_final = S*U_final*S.dag()
+
     phases = phases_from_superoperator(U_final)
     phi_cond = phases[-1]
     L1 = leakage_from_superoperator(U_final)
@@ -727,7 +751,9 @@ def spectrum(H_0,eps_vec):
             eigenvalues[i].append(eigs[i])
     return eigenvalues
 
-
+def fix_theta_f(lambda_3,theta_i):
+    lambda_1target=1
+    return (theta_i+2*(lambda_1target+lambda_3))*360/(2*np.pi)
 
 
 class CZ_trajectory_superoperator(det.Soft_Detector):
@@ -753,6 +779,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
     def acquire_data_point(self, **kw):
 
+        '''# BENCHMARK FOR HOW THE COUPLING IMPACTS THE HAMILTONIAN PARAMETERS
         eigs,eigvectors = self.H_0.eigenstates()
         eigs=eigs/(2*np.pi)
         print('omegaA =',eigs[1])
@@ -762,6 +789,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         print('etaB =',eigs[5]-2*eigs[2])
         print(eigvectors[4],'\n fidelity with 1 /otimes 1=',np.abs(eigvectors[4].dag().overlap(qtp.basis(9,4)))**2)
         print(eigvectors[5],'\n fidelity with 0 /otimes 2=',np.abs(eigvectors[5].dag().overlap(qtp.basis(9,2)))**2)
+        '''
 
         sim_step=1/self.fluxlutman.sampling_rate()
         subdivisions_of_simstep=4
@@ -774,6 +802,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         
         #theta_i = np.arctan(2*self.fluxlutman.cz_J2() / (self.fluxlutman.cz_freq_01_max() - self.fluxlutman.cz_freq_interaction()))
         #theta_i=theta_i*360/(2*np.pi)
+        #theta_f=fix_theta_f(self.fluxlutman.cz_lambda_3(),theta_i)
+
 
         if not self.fluxlutman.czd_double_sided():
             f_pulse = wf.martinis_flux_pulse(
