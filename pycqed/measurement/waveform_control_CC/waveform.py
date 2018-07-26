@@ -370,7 +370,7 @@ def martinis_flux_pulse(length: float, lambda_2: float, lambda_3: float,
     theta_f = 2*np.pi*theta_f/360
     if theta_f < theta_i:
         raise ValueError(
-            'theta_f ({:2.f} deg) < theta_i ({:2.f} deg):'.format(
+            'theta_f ({:.2f} deg) < theta_i ({:.2f} deg):'.format(
                 theta_f/(2*np.pi)*360, theta_i/(2*np.pi)*360)
             + 'final coupling weaker than initial coupling')
 

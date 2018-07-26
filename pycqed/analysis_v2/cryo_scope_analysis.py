@@ -8,6 +8,7 @@ from pycqed.analysis.tools import cryoscope_tools as ct
 import pycqed.analysis_v2.base_analysis as ba
 import numpy as np
 from scipy.stats import sem
+import logging
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 from matplotlib import ticker
 from mpl_toolkits.axes_grid1.inset_locator import InsetPosition, mark_inset
@@ -295,9 +296,9 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
                  sliding_pulse_duration=220e-9,
                  freq_to_amp=None, amp_to_freq=None,
                  phase_cut :float=0,
-                 ch_amp_key: str='Snapshot/instruments/AWG8_8005'
+                 ch_amp_key: str='Snapshot/instruments/AWG8_8027'
                  '/parameters/awgs_0_outputs_1_amplitude',
-                 ch_range_key: str='Snapshot/instruments/AWG8_8005'
+                 ch_range_key: str='Snapshot/instruments/AWG8_8027'
                  '/parameters/sigouts_0_range',
                  waveform_amp_key: str='Snapshot/instruments/FL_LutMan_QR'
                  '/parameters/sq_amp',
@@ -336,10 +337,6 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
         a = ma_old.TwoD_Analysis(timestamp=self.timestamps[0], auto=True,
                                  close_file=False)
         a.get_naming_and_values_2D()
-        # FIXME: this is hardcoded and should be an argument in options dict
-        amp_key = 'Snapshot/instruments/AWG8_8005/parameters/awgs_0_outputs_1_amplitude'
-        amp = a.data_file[amp_key].attrs['value']
-
 
         ch_amp = a.data_file[self.ch_amp_key].attrs['value']
         if self.ch_range_key is None:
@@ -422,8 +419,13 @@ def make_phase_plot(t, phase, phase_err, title,  ylim=None, ax=None, **kw):
     ax.axhline(mean_phase_tail-5, ls='--', c='grey', linewidth=0.5)
     ax.legend()
     if ylim is None:
-        ax.set_ylim(np.min([mean_phase_tail-60, np.min(phase)]),
-                    np.max([mean_phase_tail+40, np.max(phase)]))
+        try:
+            ax.set_ylim(np.min([mean_phase_tail-60, np.min(phase)]),
+                        np.max([mean_phase_tail+40, np.max(phase)]))
+        except ValueError:
+            logging.warning("could not automatically determine axis limits.")
+            # This happens if there is less than 10 measurements and the
+            # "mean_phase_tail" is np.nan
     else:
         ax.set_ylim(ylim[0], ylim[1])
 

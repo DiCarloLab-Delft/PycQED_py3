@@ -687,7 +687,7 @@ class DeviceCCL(Instrument):
                                 analyze: bool=True, close_fig: bool=True,
                                 prepare_for_timedomain: bool=True, MC=None):
 
-        # FIXME: this is not done yet, needs testing and finishing -Filip July 2018 
+        # FIXME: this is not done yet, needs testing and finishing -Filip July 2018
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
         if MC is None:
@@ -1002,8 +1002,6 @@ class DeviceCCL(Instrument):
             prepare_for_timedomain (bool):
                 calls self.prepare_for_timedomain on start
         """
-
-
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -1012,30 +1010,31 @@ class DeviceCCL(Instrument):
 
         if max_delay == 'auto':
             max_delay = np.max(times) + 40e-9
-        p = mqo.Cryoscope(q0idx, buffer_time1=20e-9,
-                          buffer_time2=max_delay,
-                          platf_cfg=self.cfg_openql_platform_fn())
-        self.instr_CC.get_instr().eqasm_program(p.filename)
-        self.instr_CC.get_instr().start()
 
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
 
         if waveform_name == 'square':
             sw = swf.FLsweep(fl_lutman, fl_lutman.sq_length,
                              waveform_name='square')
-            # fl_lutman.cfg_operating_mode('CW_single_02')
-            # fl_lutman.instr_partner_lutman.get_instr().cfg_operating_mode(
-            #     'CW_single_02')
+            flux_cw = 'fl_cw_02'
 
         elif waveform_name == 'custom_wf':
             sw = swf.FLsweep(fl_lutman, fl_lutman.custom_wf_length,
                              waveform_name='custom_wf')
-            # fl_lutman.cfg_operating_mode('CW_single_05')
-            # (fl_lutman.instr_partner_lutman.get_instr()
-            #     .cfg_operating_mode('CW_single_05'))
+            flux_cw = 'fl_cw_05'
+
         else:
             raise ValueError('waveform_name "{}" should be either '
                              '"square" or "custom_wf"'.format(waveform_name))
+
+        p = mqo.Cryoscope(q0idx, buffer_time1=20e-9,
+                          buffer_time2=max_delay,
+                          flux_cw=flux_cw,
+                          platf_cfg=self.cfg_openql_platform_fn())
+        self.instr_CC.get_instr().eqasm_program(p.filename)
+        self.instr_CC.get_instr().start()
+
+
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
 

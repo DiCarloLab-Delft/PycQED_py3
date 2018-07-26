@@ -1827,8 +1827,7 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
                     # selects the lowest available free channel
                     self.channels += [ch]
                     correlation_channel = ch
-                    print('Using channel {} for correlation ({}, {}).'
-                          .format(ch, corr[0], corr[1]))
+
                     # correlation mode is turned on in the
                     # set_up_correlation_weights method
                     break
