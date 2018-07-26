@@ -1566,7 +1566,7 @@ def Ramsey_with_flux_pulse_meas_seq(thetas, qb, X90_separation, verbose=False,
     flux_pulse = operation_dict["flux "+qb_name]
     # Used for checking dynamic phase compensation
     # if flux_pulse['amplitude'] != 0:
-    #     flux_pulse['basis_rotation'] = {qb_name: 51.298}
+    #     flux_pulse['basis_rotation'] = {qb_name: -80.41028958782647}
 
     flux_pulse['refpoint'] = 'end'
     X90_2 = deepcopy(pulses['X90'])
@@ -1585,6 +1585,91 @@ def Ramsey_with_flux_pulse_meas_seq(thetas, qb, X90_separation, verbose=False,
         else:
             el = multi_pulse_elt(i, station,
                                  [pulses['X90'], flux_pulse, X90_2, RO_pars])
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
+
+
+def dynamic_phase_meas_seq(thetas, qb_name, CZ_pulse_name,
+                           flux_pulse_amp,
+                           operation_dict, verbose=False,
+                           upload=True, return_seq=False,
+                           cal_points=True):
+    '''
+    Performs a Ramsey with interleaved Flux pulse
+
+    Timings of sequence
+           <----- |fluxpulse|
+        |X90|  -------------------     |X90|  ---  |RO|
+                                     sweep phase
+
+    timing of the flux pulse relative to the center of the first X90 pulse
+
+    Args:
+        thetas: numpy array of phase shifts for the second pi/2 pulse
+        qb: qubit object (must have the methods get_operation_dict(),
+            get_drive_pars() etc.
+        CZ_pulse_name: str of the form
+            'CZ ' + qb_target.name + ' ' + qb_control.name
+        X90_separation: float (separation of the two pi/2 pulses for Ramsey
+        verbose: bool
+        upload: bool
+        return_seq: bool
+
+    Returns:
+        if return_seq:
+          seq: qcodes sequence
+          el_list: list of pulse elements
+        else:
+            seq_name: string
+    '''
+
+    # qb_name = qb.name
+    # operation_dict = qb.get_operation_dict()
+    # pulse_pars = qb.get_drive_pars()
+    # RO_pars = qb.get_RO_pars()
+    seq_name = 'Measurement_dynamic_phase'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+
+    # pulses = get_pulse_dict_from_pars(pulse_pars)
+    flux_pulse = deepcopy(operation_dict[CZ_pulse_name])
+    X90_2 = deepcopy(operation_dict['X90 ' + qb_name])
+    RO_pars = deepcopy(operation_dict['RO ' + qb_name])
+
+    # Used for checking dynamic phase compensation
+    # if flux_pulse['amplitude'] != 0:
+    #     flux_pulse['basis_rotation'] = {qb_name: -80.41028958782647}
+
+    # for j, amp in enumerate([0, flux_pulse_amp]):
+    #     flux_pulse['amplitude'] = amp
+    #     elt_name_offset = j*len(thetas)
+
+    flux_pulse['amplitude'] = flux_pulse_amp
+    for i, theta in enumerate(thetas):
+        if theta == thetas[-4]:
+            flux_pulse['amplitude'] = 0
+
+        X90_2['phase'] = theta*180/np.pi
+        if cal_points and (theta == thetas[-4] or theta == thetas[-3]):
+            el = multi_pulse_elt(i, station,
+                                 [operation_dict['I ' + qb_name],
+                                  RO_pars])
+        elif cal_points and (theta == thetas[-2] or theta == thetas[-1]):
+            el = multi_pulse_elt(i, station,
+                                 [operation_dict['X180 ' + qb_name],
+                                  RO_pars])
+        else:
+            el = multi_pulse_elt(i, station,
+                                 [operation_dict['X90 ' + qb_name],
+                                  flux_pulse, X90_2,
+                                  RO_pars])
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:

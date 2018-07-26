@@ -1753,7 +1753,7 @@ def parity_correction_seq(
         prep_sequence=None, reset=True, nr_echo_pulses=4,
         tomography_basis=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
         upload=True, verbose=False, return_seq=False, preselection=False,
-        ro_spacing=1e-6):
+        ro_spacing=1e-6, cpmg_scheme=True):
     """
 
     |              elem 1               |  elem 2  | elem 3
@@ -1778,8 +1778,11 @@ def parity_correction_seq(
 
     operation_dict['RO mux_presel'] = operation_dict['RO mux'].copy()
     operation_dict['RO mux_presel']['pulse_delay'] = \
-        -ro_spacing - operation_dict['RO mux']['length']
-    operation_dict['RO mux_presel']['refpoint'] = 'start'
+        -ro_spacing - operation_dict['RO mux']['length'] - feedback_delay
+    # used when nr_echo_pulses == 0:
+    # operation_dict['RO mux_presel']['refpoint'] = 'start'
+    # used when nr_echo_pulses != 0:
+    operation_dict['RO mux_presel']['refpoint'] = 'end'
     operation_dict['I_fb'] = {
         'pulse_type': 'SquarePulse',
         'channel': operation_dict['RO mux']['acq_marker_channel'],
@@ -1794,45 +1797,107 @@ def parity_correction_seq(
         'pulse_delay': 0}
 
     if prep_sequence is None:
-        prep_sequence = ['Y90 ' + q0n, 'Y90s ' + q2n]
+        # prep_sequence = ['Y90 ' + q0n, 'Y90s ' + q2n]
+        prep_sequence = ['Y90 ' + q0n, 'mY90s ' + q1n]
 
     # create the elements
     el_list = []
 
     # main (first) element
     pulse_sequence = deepcopy(prep_sequence)
-    pulse_sequence.append('mY90s ' + q1n)
-    pulse_sequence.append('CZ ' + q1n + ' ' + q0n)
-    pulse_sequence.append('CZ ' + q1n + ' ' + q2n)
-    pulse_sequence.append('Y90 ' + q1n)
-    pulse_sequence.append('RO ' + q1n)
+    # w/o Echo pulses between CZ gates
+    # pulse_sequence.append('mY90s ' + q1n)
+    # pulse_sequence.append('CZ ' + q1n + ' ' + q0n)
+    # pulse_sequence.append('CZ ' + q1n + ' ' + q2n)
+    # pulse_sequence.append('Y90 ' + q1n)
+    # pulse_sequence.append('RO ' + q1n)
+
+    # used when nr_echo_pulses == 0
     # pulse_sequence.append('I_fb')
+
+    # with Echo pulses between CZ gates
+    pulse_sequence.append('CZ ' + q1n + ' ' + q0n)
+    pulse_sequence.append('Y180 ' + q0n)
+    pulse_sequence.append('Y90s ' + q2n)
+    pulse_sequence.append('CZ ' + q1n + ' ' + q2n)
+    pulse_sequence.append('Y180 ' + q0n)
+    pulse_sequence.append('Y90s ' + q1n)
+    pulse_sequence.append('RO ' + q1n)
 
     pulse_list = [operation_dict[pulse] for pulse in pulse_sequence]
 
     if nr_echo_pulses > 0:
+        echo_sequence = get_decoupling_pulses(q0n, q2n,
+                                              nr_pulses=nr_echo_pulses)
+
         DRAG_length = deepcopy(operation_dict['X180 '+q0n]['nr_sigma']) * \
                       deepcopy(operation_dict['X180 '+q0n]['sigma'])
-        start_end_delay = (feedback_delay - nr_echo_pulses*DRAG_length) / \
-                          2 / nr_echo_pulses
-        if start_end_delay < 0:
-            logging.error("Dynamical decoupling pulses don't fit into the "
-                          "feedback delay time")
-        operation_dict['I_echo'] = {
-            'pulse_type': 'SquarePulse',
-            'channel': operation_dict['RO mux']['acq_marker_channel'],
-            'amplitude': 0.0,
-            'length': start_end_delay,
-            'pulse_delay': 0}
-        echo_pulse_delay = 2*start_end_delay
-        echo_sequence = get_decoupling_pulses(q0n, q2n,
-                                               nr_pulses=nr_echo_pulses)
-        for i, pulse in enumerate(echo_sequence):
-            single_op_dict = deepcopy(operation_dict[pulse])
-            single_op_dict['pulse_delay'] = \
-                (start_end_delay if i == 0 else echo_pulse_delay)
-            pulse_list.append(single_op_dict)
+        total_echo_pulses_length = feedback_delay + \
+                                   operation_dict['RO mux']['length']
+        if cpmg_scheme:
+            start_end_delay = (total_echo_pulses_length
+                               - nr_echo_pulses*DRAG_length) / \
+                              2 / nr_echo_pulses
+            echo_pulse_delay = 2*start_end_delay
+
+            if start_end_delay < 0:
+                logging.error("Dynamical decoupling pulses don't fit into the "
+                              "feedback delay time")
+            operation_dict['I_echo'] = {
+                'pulse_type': 'SquarePulse',
+                'channel': operation_dict['RO mux']['acq_marker_channel'],
+                'amplitude': 0.0,
+                'length': start_end_delay,
+                'pulse_delay': 0}
+
+            for i, pulse in enumerate(echo_sequence):
+                single_op_dict = deepcopy(operation_dict[pulse])
+                if 's' not in pulse:
+                    single_op_dict['pulse_delay'] = \
+                        (start_end_delay if i == 0 else echo_pulse_delay)
+                    if i == 0:
+                        single_op_dict['refpoint'] = 'start'
+                pulse_list.append(single_op_dict)
+
+        else:
+            pulse_positions_func = lambda idx, N: np.sin(np.pi*idx/(2*N+2))**2
+            pulse_delays_func = (lambda idx, N: total_echo_pulses_length*(
+                pulse_positions_func(idx, N) -
+                pulse_positions_func(idx-1, N)) -
+                    ((0.5 if idx == 1 else 1)*DRAG_length))
+
+            # total_delays = np.sum([pulse_delays_func(j, nr_echo_pulses)
+            #                        for j in np.arange(1, nr_echo_pulses+1)] +
+            #                       [pulse_delays_func(1, nr_echo_pulses)])
+            if nr_echo_pulses*DRAG_length > total_echo_pulses_length:
+                raise ValueError("Dynamical decoupling pulses don't fit "
+                                 "into the feedback delay time")
+
+            operation_dict['I_echo'] = {
+                'pulse_type': 'SquarePulse',
+                'channel': operation_dict['RO mux']['acq_marker_channel'],
+                'amplitude': 0.0,
+                'length': pulse_delays_func(1, nr_echo_pulses),
+                'pulse_delay': 0}
+
+            echo_idx = 0
+            for i, pulse in enumerate(echo_sequence):
+                single_op_dict = deepcopy(operation_dict[pulse])
+                if 's' not in pulse:
+                    echo_idx += 1
+                    single_op_dict['pulse_delay'] = \
+                        pulse_delays_func(echo_idx, nr_echo_pulses)
+                    if i == 0:
+                        single_op_dict['refpoint'] = 'start'
+                pulse_list.append(single_op_dict)
+
         pulse_list.append(operation_dict['I_echo'])
+
+    # else:
+    #     pulse_sequence.append('I_fb')
+    #     operation_dict['RO mux_presel']['refpoint'] = 'start'
+    #     operation_dict['RO mux_presel']['pulse_delay'] = \
+    #         -ro_spacing - operation_dict['RO mux']['length']
 
     if preselection:
         pulse_list.append(operation_dict['RO mux_presel'])
@@ -1905,6 +1970,20 @@ def n_qubit_tomo_seq(
 
     if prep_sequence is None:
         prep_sequence = ['Y90 ' + qubit_names[0]]
+
+    # ######### add an I pulse of custom length
+    # feedback_delay = 86*40e-9/3 - 100e-9
+    # operation_dict['I_fb'] = {
+    #     'pulse_type': 'SquarePulse',
+    #     'channel': operation_dict['RO mux']['acq_marker_channel'],
+    #     'amplitude': 0.0,
+    #     'length': feedback_delay,
+    #     'pulse_delay': 0,
+    #     'refpoint': 'end'}
+    # prep_sequence += ['I_fb']
+    # operation_dict['RO mux_presel']['pulse_delay'] = \
+    #     -ro_spacing - operation_dict['RO mux']['length'] - feedback_delay
+    # operation_dict['RO presel_dummy']['length'] = ro_spacing + feedback_delay
 
     # create the elements
     el_list = []
@@ -2052,5 +2131,13 @@ def n_qubit_ref_all_seq(qubit_names, operation_dict, upload=True, verbose=False,
                            return_seq=return_seq, preselection=preselection,
                            ro_spacing=ro_spacing)
 
+#### Multi-qubit time-domain
+def n_qubit_Rabi_seq(
+        qubit_names, operation_dict, prep_sequence=None,
+        prep_name=None,
+        rots_basis=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
+        upload=True, verbose=False, return_seq=False,
+        preselection=False, ro_spacing=1e-6):
 
+    pass
 

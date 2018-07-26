@@ -297,6 +297,10 @@ def standard_qubit_pulses_to_rotations(pulse_list: List[Tuple]) \
         'mX90': qtp.rotation(qtp.sigmax(), -np.pi/2),
         'Y90': qtp.rotation(qtp.sigmay(), np.pi/2),
         'mY90': qtp.rotation(qtp.sigmay(), -np.pi/2),
+        'Z90': qtp.rotation(qtp.sigmaz(), np.pi/2),
+        'mZ90': qtp.rotation(qtp.sigmaz(), -np.pi/2),
+        'Z180': qtp.rotation(qtp.sigmaz(), np.pi),
+        'mZ180': qtp.rotation(qtp.sigmaz(), -np.pi),
     }
     rotations = [qtp.tensor(*[standard_pulses[pulse] for pulse in qb_pulses])
                  for qb_pulses in pulse_list]

@@ -352,7 +352,7 @@ class QuDev_transmon(Qubit):
 
     def prepare_for_continuous_wave(self):
         self.heterodyne.auto_seq_loading(True)
-        self.heterodyne._awg_seq_parameters_changed = True
+        self.heterodyne._awg_seq_parameters_changed = False
         self.heterodyne._UHFQC_awg_parameters_changed = True
         if self.cw_source is not None:
             self.cw_source.off()
@@ -364,6 +364,25 @@ class QuDev_transmon(Qubit):
             self.readout_DC_LO.pulsemod_state('Off')
         if self.readout_UC_LO is not None:
             self.readout_UC_LO.pulsemod_state('Off')
+
+        if self.ro_pulse_shape() == 'square':
+            self.UHFQC.awg_sequence_acquisition_and_pulse_SSB(
+                f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
+                RO_pulse_length=self.RO_pulse_length(),
+                alpha=self.ro_alpha(), phi_skew=self.ro_phi_skew())
+        elif self.ro_pulse_shape() == 'gaussian_filtered':
+            self.UHFQC.awg_sequence_acquisition_and_pulse_SSB_gaussian_filtered(
+                f_RO_mod=self.f_RO_mod(), RO_amp=self.RO_amp(),
+                RO_pulse_length=self.RO_pulse_length(),
+                filter_sigma=self.ro_pulse_filter_sigma(),
+                nr_sigma=self.ro_pulse_nr_sigma(),
+                alpha=self.ro_alpha(), phi_skew=self.ro_phi_skew())
+        else:
+            raise ValueError('Invalid ro pulse shape.')
+        self.readout_UC_LO.on()
+
+        self.update_detector_functions()
+        self.set_readout_weights()
 
 
     def prepare_for_pulsed_spec(self):
@@ -388,6 +407,9 @@ class QuDev_transmon(Qubit):
         self.readout_UC_LO.pulsemod_state('Off')
         self.readout_UC_LO.frequency(f_RO - self.f_RO_mod())
         self.readout_UC_LO.on()
+
+        self.update_detector_functions()
+        self.set_readout_weights()
 
         self.heterodyne.auto_seq_loading(False)
         # self.heterodyne._awg_seq_parameters_changed = False
@@ -577,96 +599,107 @@ class QuDev_transmon(Qubit):
                 self.UHFQC.set('quex_rot_{}_imag'.format(c1), 1)
 
     def measure_resonator_spectroscopy(self, freqs=None, MC=None,
+                                       RO_marker_length=5e-9,
+                                       trigger_separation=3e-6,
+                                       upload=True,
                                        analyze=True, close_fig=True):
         """ Varies the frequency of the microwave source to the resonator and
         measures the transmittance """
         if freqs is None:
             raise ValueError("Unspecified frequencies for measure_resonator_"
                              "spectroscopy")
-        if np.any(freqs<500e6):
+        if np.any(freqs < 500e6):
             logging.warning(('Some of the values in the freqs array might be '
                              'too small. The units should be Hz.'))
 
         if MC is None:
             MC = self.MC
 
-        previous_freq = self.heterodyne.frequency()
-
         self.prepare_for_continuous_wave()
-        MC.set_sweep_function(pw.wrap_par_to_swf(
-            self.heterodyne.frequency))
-        MC.set_sweep_points(freqs)
-        demod_mode = 'single' if self.heterodyne.single_sideband_demod() \
-            else 'double'
-        MC.set_detector_function(det.Heterodyne_probe(
-            self.heterodyne,
-            trigger_separation=self.heterodyne.trigger_separation(),
-            demod_mode=demod_mode))
-        MC.run(name='resonator_scan'+self.msmt_suffix)
 
-        self.heterodyne.frequency(previous_freq)
+        MC.set_sweep_function(awg_swf.Resonator_spectroscopy(
+            RO_MWG=self.readout_UC_LO,
+            RO_IF=self.f_RO_mod(),
+            RO_channel=self.RO_acq_marker_channel(),
+            marker_interval=trigger_separation,
+            marker_length=RO_marker_length,
+            upload=upload))
+        MC.set_sweep_points(freqs)
+        MC.set_detector_function(self.int_avg_det_spec)
+
+        self.AWG.start()
+        MC.run(name='resonator_scan'+self.msmt_suffix)
+        self.AWG.stop()
 
         if analyze:
-            ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
-                                   qb_name=self.name)
+                ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
+                                       qb_name=self.name)
 
     def measure_resonator_spectroscopy_flux_sweep(self, freqs, voltages,
+            trigger_separation=3e-6, RO_marker_length=5e-9, upload=True,
             flux_parameter=None, MC=None, analyze=True, close_fig=True):
         if MC is None:
             MC = self.MC
         if flux_parameter is None:
             flux_parameter = self.dc_flux_parameter()
+
         self.prepare_for_continuous_wave()
-        MC.set_sweep_function(self.heterodyne.frequency)
+        MC.set_sweep_function(awg_swf.Resonator_spectroscopy(
+            RO_MWG=self.readout_UC_LO,
+            RO_IF=self.f_RO_mod(),
+            RO_channel=self.RO_acq_marker_channel(),
+            marker_interval=trigger_separation,
+            marker_length=RO_marker_length,
+            upload=upload))
         MC.set_sweep_points(freqs)
         MC.set_sweep_function_2D(flux_parameter)
         MC.set_sweep_points_2D(voltages)
-        demod_mode = 'single' if self.heterodyne.single_sideband_demod() \
-            else 'double'
-        MC.set_detector_function(det.Heterodyne_probe(
-            self.heterodyne,
-            trigger_separation=self.heterodyne.trigger_separation(),
-            demod_mode=demod_mode))
+        MC.set_detector_function(self.int_avg_det_spec)
+        self.AWG.start()
         MC.run_2D(name='resonator_spectoscopy_flux_sweep' + self.msmt_suffix)
+        self.AWG.stop()
+
         if analyze:
             ma.TwoD_Analysis(label='resonator_spectoscopy_flux_sweep',
                              close_fig=close_fig, close_file=True,
                              qb_name=self.name)
-            # ma.MeasurementAnalysis(TwoD=True, close_fig=close_fig)
+
 
     def measure_qubit_spectroscopy_flux_sweep(self, freqs, voltages,
             flux_parameter=None, pulsed=True, MC=None, analyze=True,
-                                                  close_fig=True):
+            close_fig=True, upload=True):
+
         if MC is None:
             MC = self.MC
         if flux_parameter is None:
             flux_parameter = self.dc_flux_parameter()
+
         if pulsed:
             self.prepare_for_pulsed_spec()
             spec_pars = self.get_spec_pars()
             RO_pars = self.get_RO_pars()
-            self.cw_source.on()
-            sq.Pulsed_spec_seq(spec_pars, RO_pars)
+            sq.Pulsed_spec_ro_markers_seq(spec_pars, RO_pars, upload=upload)
+
             MC.set_sweep_function(self.cw_source.frequency)
             MC.set_sweep_points(freqs)
             MC.set_sweep_function_2D(flux_parameter)
             MC.set_sweep_points_2D(voltages)
-            demod_mode = 'single' if self.heterodyne.single_sideband_demod() \
-                else 'double'
-            MC.set_detector_function(det.Heterodyne_probe(
-                self.heterodyne,
-                trigger_separation=self.heterodyne.trigger_separation(),
-                demod_mode=demod_mode))
+            MC.set_detector_function(self.int_avg_det_spec)
+
+            self.cw_source.on()
             self.AWG.start()
             MC.run_2D(name='qubit_spectroscopy_flux_sweep' + self.msmt_suffix)
-            self.cw_source.off()
+
         else:
             raise NotImplementedError()
+
+        self.cw_source.off()
+        self.AWG.stop()
+
         if analyze:
             ma.TwoD_Analysis(label='qubit_spectroscopy_flux_sweep',
                              close_fig=close_fig, close_file=True,
                              qb_name=self.name)
-            # ma.MeasurementAnalysis(TwoD=True, close_fig=close_fig)
 
 
     def measure_homodyne_acqusition_delay(self, delays=None, MC=None,
@@ -705,14 +738,16 @@ class QuDev_transmon(Qubit):
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
+
     def measure_spectroscopy(self, freqs=None, pulsed=False, MC=None,
+                             trigger_separation=3e-6, RO_marker_length=5e-9,
                              analyze=True, close_fig=True,upload=True,
                              label=None):
         """ Varies qubit drive frequency and measures the resonator
         transmittance """
         if freqs is None:
             raise ValueError("Unspecified frequencies for measure_spectroscopy")
-        if np.any(freqs<500e6):
+        if np.any(freqs < 500e6):
             logging.warning(('Some of the values in the freqs array might be '
                              'too small. The units should be Hz.'))
 
@@ -724,21 +759,11 @@ class QuDev_transmon(Qubit):
             if label is None:
                 label = 'spectroscopy'+self.msmt_suffix
 
-            self.heterodyne.frequency(self.f_RO())
             self.prepare_for_continuous_wave()
-            self.cw_source.on()
-
-            MC.set_sweep_function(pw.wrap_par_to_swf(self.cw_source.frequency))
-            MC.set_sweep_points(freqs)
-            demod_mode = 'single' if self.heterodyne.single_sideband_demod() \
-                else 'double'
-            MC.set_detector_function(det.Heterodyne_probe(
-                self.heterodyne,
-                trigger_separation=self.heterodyne.trigger_separation(),
-                demod_mode=demod_mode))
-            MC.run(name=label)
-
-            self.cw_source.off()
+            sq.Resonator_spec_seq(RO_channel=self.RO_acq_marker_channel(),
+                                  marker_length=RO_marker_length,
+                                  marker_interval=trigger_separation,
+                                  upload=upload)
 
         else:
 
@@ -746,32 +771,27 @@ class QuDev_transmon(Qubit):
                 label = 'pulsed_spec'+self.msmt_suffix
 
             self.prepare_for_pulsed_spec()
-
             spec_pars = self.get_spec_pars()
             RO_pars = self.get_RO_pars()
+            sq.Pulsed_spec_seq(spec_pars=spec_pars,
+                               RO_pars=RO_pars,
+                               upload=upload)
 
-            self.cw_source.on()
+        self.cw_source.on()
+        self.AWG.start()
 
-            sq.Pulsed_spec_seq(spec_pars, RO_pars, upload=upload)
+        MC.set_sweep_function(self.cw_source.frequency)
+        MC.set_sweep_points(freqs)
+        MC.set_detector_function(self.int_avg_det_spec)
+        MC.run(name=label)
 
-            self.AWG.start()
-
-            MC.set_sweep_function(self.cw_source.frequency)
-            MC.set_sweep_points(freqs)
-            demod_mode = 'single' if self.heterodyne.single_sideband_demod() \
-                else 'double'
-            MC.set_detector_function(det.Heterodyne_probe(
-                self.heterodyne,
-                trigger_separation=self.heterodyne.trigger_separation(),
-                demod_mode=demod_mode))
-            MC.run(name=label)
-
-            self.cw_source.off()
-
+        self.cw_source.off()
+        self.AWG.stop()
 
         if analyze:
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig,
                                    qb_name=self.name)
+
 
     def measure_rabi(self, amps=None, MC=None, analyze=True,
              close_fig=True, cal_points=True, no_cal_points=2,
@@ -1339,13 +1359,12 @@ class QuDev_transmon(Qubit):
             ma.MeasurementAnalysis(auto=True, close_fig=close_fig)
 
     def measure_randomized_benchmarking(self, nr_cliffords=None, nr_seeds=50,
-                                        thresholded=False, RO_pars=None,
+                                        thresholded=True, RO_pars=None,
                                         MC=None, close_fig=True,
                                         upload=False, analyze=True,
                                         gate_decomp='HZ', label=None,
-                                        cal_points=True,
-                                        interleaved_gate=None,
-                                        det_func=None):
+                                        cal_points=False, run=True,
+                                        interleaved_gate=None):
         '''
         Performs a randomized benchmarking experiment on 1 qubit.
         type(nr_cliffords) == array
@@ -1391,7 +1410,7 @@ class QuDev_transmon(Qubit):
         RB_sweepfunction = awg_swf.Randomized_Benchmarking_one_length(
             pulse_pars=self.get_drive_pars(), RO_pars=RO_pars,
             cal_points=cal_points, gate_decomposition=gate_decomp,
-            nr_cliffords_value=nr_cliffords[0], upload=upload,
+            nr_cliffords_value=nr_cliffords[0], upload=False,
             interleaved_gate=interleaved_gate)
 
         RB_sweepfunction_2D = awg_swf.Randomized_Benchmarking_nr_cliffords(
@@ -1401,15 +1420,14 @@ class QuDev_transmon(Qubit):
         MC.set_sweep_points(sweep_points1D)
         MC.set_sweep_function_2D(RB_sweepfunction_2D)
         MC.set_sweep_points_2D(nr_cliffords)
-        if det_func is None:
-            if thresholded:
-                MC.set_detector_function(self.dig_avg_det)
-            else:
-                MC.set_detector_function(self.int_avg_det)
-        else:
-            MC.set_detector_function(det_func)
 
-        MC.run(label, mode='2D')
+        if thresholded:
+            MC.set_detector_function(self.dig_avg_det)
+        else:
+            MC.set_detector_function(self.int_avg_det)
+
+        if run:
+            MC.run(label, mode='2D')
 
         if analyze:
             # ma.TwoD_Analysis(label=label,
@@ -1772,8 +1790,8 @@ class QuDev_transmon(Qubit):
                                           amplitude=0.1,trigger_sep=5e-6,
                                           two_rounds=False,
                                           estimator='GRNN_neupy',
-                                          hidden_layers = [30,30],
-                                          first_round_limits =[0.6,1.2,-50,35],
+                                          hidden_layers=[30, 30],
+                                          first_round_limits=[0.6, 1.2, -50, 35],
                                           **kwargs):
         if not len(first_round_limits)==4:
             logging.error('--Input variable <first_round_limits> in function call '
@@ -1800,7 +1818,7 @@ class QuDev_transmon(Qubit):
 
         for runs in range(2+int(two_rounds)):
             self.prepare_for_mixer_calibration(suppress='drive sideband')
-            if runs==0:
+            if runs == 0:
                 alpha_low = first_round_limits[0]
                 alpha_high = first_round_limits[1]
                 phi_low = first_round_limits[2]
@@ -1808,17 +1826,17 @@ class QuDev_transmon(Qubit):
                 data_points = int(np.floor(0.5*n_meas))
                 meas_grid = np.array([(alpha_high-alpha_low)*np.random.rand(data_points)+alpha_low,
                                       (phi_high-phi_low)*np.random.rand(data_points)+phi_low])
-                est= estimator
-            elif runs==1:
+                est = estimator
+            elif runs == 1:
                 data_points = n_meas
                 meas_grid = np.array([np.random.normal(alpha_,std_devs[0],data_points),
                                       np.random.normal(phi_,std_devs[1],data_points)])
-                est= estimator
+                est = estimator
             else:
                 data_points = n_meas
                 meas_grid = np.array([np.random.normal(alpha_,c*std_devs[0],data_points),
                                       np.random.normal(phi_,c*std_devs[1],data_points)])
-                est= estimator
+                est = estimator
 
             s1 = awg_swf.mixer_skewness_calibration_swf(
                 pulseIch=self.pulse_I_channel(),
@@ -2380,6 +2398,7 @@ class QuDev_transmon(Qubit):
         return d
 
     def find_frequency(self, freqs, method='cw_spectroscopy', update=False,
+                       trigger_separation=3e-6, RO_marker_length=5e-9,
                        MC=None, close_fig=True, analyze_ef=False, analyze=True,
                        upload=True, label=None,
                        **kw):
@@ -2471,7 +2490,10 @@ class QuDev_transmon(Qubit):
             if analyze_ef:
                 label = 'high_power_' + label
 
-            self.measure_spectroscopy(freqs, pulsed=False, MC=MC, label=label,
+            self.measure_spectroscopy(freqs, pulsed=False,
+                                      trigger_separation=trigger_separation,
+                                      RO_marker_length=RO_marker_length,
+                                      MC=MC, label=label,
                                       close_fig=close_fig)
         else:
             if label is None:
@@ -2797,21 +2819,16 @@ class QuDev_transmon(Qubit):
             return
 
     def find_RB_gate_fidelity(self, nr_cliffords, label=None, nr_seeds=10,
-                              MC=None, cal_points=True, gate_decomposition='HZ',
-                              thresholded=False,
-                              no_cal_points=None, close_fig=True,
-                              upload=True, det_func=None, **kw):
+                              MC=None, cal_points=False,
+                              gate_decomposition='HZ',
+                              thresholded=True, close_fig=True,
+                              upload=True,
+                              run=True, **kw):
 
-        for_ef = kw.pop('for_ef', False)
-        last_ge_pulse = kw.pop('last_ge_pulse', False)
         analyze = kw.pop('analyze', True)
-        show = kw.pop('show', False)
         interleaved_gate = kw.pop('interleaved_gate', None)
         T1 = kw.pop('T1', None)
         T2 = kw.pop('T1', None)
-
-        if det_func is None:
-            det_func = self.int_avg_det
 
         if T1 is None and self.T1() is not None:
             T1 = self.T1()
@@ -2828,21 +2845,6 @@ class QuDev_transmon(Qubit):
                                        list(range(0, nr_cliffords[0]+1,
                                                   every_other))])
 
-        # if not update:
-        #     logging.warning("Does not automatically update the qubit "
-        #                     "parameter. Set update=True if you want this!")
-
-        if (cal_points) and (no_cal_points is None):
-            logging.warning('no_cal_points is None. Defaults to 4 if for_ef==False,'
-                            'or to 6 if for_ef==True.')
-            if for_ef:
-                no_cal_points = 6
-            else:
-                no_cal_points = 4
-
-        if not cal_points:
-            no_cal_points = 0
-
         if MC is None:
             MC = self.MC
 
@@ -2851,34 +2853,22 @@ class QuDev_transmon(Qubit):
 
         if label is None:
             if interleaved_gate is None:
-                if for_ef:
-                    label = 'RB_2nd_{}_{}_seeds_{}_cliffords'.format(
-                        gate_decomposition, nr_seeds,
-                        nr_cliffords[-1]) + self.msmt_suffix
-                else:
-                    label = 'RB_{}_{}_seeds_{}_cliffords'.format(
-                        gate_decomposition, nr_seeds,
-                        nr_cliffords[-1]) + self.msmt_suffix
+                label = 'RB_{}_{}_seeds_{}_cliffords'.format(
+                    gate_decomposition, nr_seeds,
+                    nr_cliffords[-1]) + self.msmt_suffix
             else:
-                if for_ef:
-                    label = 'IRB_2nd_{}_{}_{}_seeds_{}_cliffords'.format(
-                        interleaved_gate, gate_decomposition,
-                        nr_seeds, nr_cliffords[-1]) \
-                            + self.msmt_suffix
-                else:
-                    label = 'IRB_{}_{}_{}_seeds_{}_cliffords'.format(
-                        interleaved_gate, gate_decomposition,
-                        nr_seeds, nr_cliffords[-1]) \
-                            + self.msmt_suffix
+                label = 'IRB_{}_{}_{}_seeds_{}_cliffords'.format(
+                    interleaved_gate, gate_decomposition,
+                    nr_seeds, nr_cliffords[-1]) \
+                        + self.msmt_suffix
 
         if thresholded:
-            label += '_thresh'
-            if int(self.UHFQC.get('quex_thres_{}_level'.format(
-                    self.RO_acq_weight_function_I()))) == 0:
+            if self.UHFQC.get('quex_thres_{}_level'.format(
+                    self.RO_acq_weight_function_I())) == 0.0:
                 raise ValueError('The threshold value is not set.')
 
         #Perform measurement
-        self.measure_randomized_benchmarking(nr_cliffords=nr_cliffords,
+        MC_temp = self.measure_randomized_benchmarking(nr_cliffords=nr_cliffords,
                                              nr_seeds=nr_seeds, MC=MC,
                                              close_fig=close_fig,
                                              gate_decomp=gate_decomposition,
@@ -2887,21 +2877,25 @@ class QuDev_transmon(Qubit):
                                              label=label,
                                              analyze=analyze,
                                              upload=upload,
-                                             interleaved_gate=interleaved_gate,
-                                             det_func=det_func)
+                                             run=run,
+                                             interleaved_gate=interleaved_gate)
 
         #Analysis
         if analyze:
             pulse_delay = self.gauss_sigma() * self.nr_sigma()
-            RB_Analysis = rbma.RandomizedBenchmarking_Analysis(label=label,
-                                         qb_name=self.name,
-                                         T1=T1, T2=T2, pulse_delay=pulse_delay,
-                                         NoCalPoints=no_cal_points,
-                                         for_ef=for_ef, show=show,
-                                         gate_decomp=gate_decomposition,
-                                         last_ge_pulse=last_ge_pulse, **kw)
+            if interleaved_gate is None:
+                rbma.RandomizedBenchmarking_Analysis(label=label,
+                                 qb_name=self.name,
+                                 T1=T1, T2=T2, pulse_delay=pulse_delay,
+                                 gate_decomp=gate_decomposition)
+            else:
+                rbma.Interleaved_RB_Analysis(
+                    folders_dict={interleaved_gate:
+                                      a_tools.latest_data(contains=label)},
+                    qb_name=self.name,
+                    gate_decomp=gate_decomposition)
 
-        return RB_Analysis
+        # return MC_temp
 
     def find_frequency_T2_ramsey(self, times, artificial_detuning=0,
                                  upload=True, MC=None, label=None,
@@ -3775,14 +3769,10 @@ class QuDev_transmon(Qubit):
 
         if analyze:
             MA = ma.Dynamic_phase_Analysis(
-                    label=label,
-                    X90_separation=X90_separation,
+                    TwoD=True,
                     flux_pulse_amp=flux_pulse_amp,
                     flux_pulse_length=flux_pulse_length,
-                    gauss_sigma=self.gauss_sigma(),
-                    nr_gauss_sigma=self.nr_sigma(),
-                    qb_name=self.name,
-                    auto=False, **kw)
+                    qb_name=self.name, **kw)
 
             dynamic_phase = MA.dyn_phase
             print('fitted dynamic phase on {}: {:0.3f} [deg]'.format(self.name,

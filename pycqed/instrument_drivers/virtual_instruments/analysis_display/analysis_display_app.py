@@ -121,9 +121,10 @@ class AnalysisDisplayApp:
         ts = self._current_timestamp()
         if ts is None:
             return None
-        else:
-            return a_tools.get_folder(
-                a_tools.get_timestamps_in_range(ts, label='')[1])
+        tss = a_tools.get_timestamps_in_range(ts, label='')
+        if len(tss) < 2:
+            return None
+        return a_tools.get_folder(tss[1])
 
     def _get_images_in_current_folder(self):
         return list(sorted([fn for fn in os.listdir(self._current_folder())
@@ -166,8 +167,8 @@ class AnalysisDisplayApp:
     def set_data_path(self, data_path):
         a_tools.datadir = data_path
 
-    def update(self):
-        if self.autoloadCheckbox.isChecked():
+    def update(self, force=False):
+        if self.autoloadCheckbox.isChecked() or force:
             self.filename(a_tools.latest_data())
             self.filename(self._next_file())
 

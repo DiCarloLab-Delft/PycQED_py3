@@ -10184,10 +10184,10 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
 
 
 
-class Dynamic_phase_Analysis(Fluxpulse_Ramsey_2D_Analysis):
+class Dynamic_phase_Analysis(MeasurementAnalysis):
 
-    def __init__(self, X90_separation=None, flux_pulse_amp=None,
-                 flux_pulse_length=None,
+    def __init__(self, flux_pulse_amp=None,
+                 flux_pulse_length=None, TwoD=False,
                  qb_name=None, label='Dynamic_phase_analysis', **kw):
 
         kw['label'] = label
@@ -10195,96 +10195,177 @@ class Dynamic_phase_Analysis(Fluxpulse_Ramsey_2D_Analysis):
         kw['close_file'] = False
 
         self.flux_pulse_amp = flux_pulse_amp
+        self.flux_pulse_length = flux_pulse_length
 
-        super(self.__class__, self).__init__(qb_name=qb_name,
-                                             X90_separation=X90_separation,
-                                             flux_pulse_length=flux_pulse_length,
-                                             run_default_super=False,
-                                             **kw)
-
-        self.run_default_analysis(**kw)
+        super().__init__(qb_name=qb_name, TwoD=TwoD, **kw)
 
 
-    def run_default_analysis(self, close_file=True, **kw):
+    def run_default_analysis(self, close_file=True, TwoD=False, **kw):
 
-        show = kw.pop('show', False)
-        # super().run_default_analysis(show=show,
-        #                              close_file=close_file,
-        #                              close_main_fig=True,
-        #                              save_fig=False, **kw)
+        super().run_default_analysis(close_file=close_file,
+                                     close_main_fig=True,
+                                     save_fig=False, **kw)
 
-        self.get_naming_and_values_2D()
+        self.NoCalPoints = kw.pop('NoCalPoints', 4)
+        self.phases = {}
+        self.fit_res = {}
+        self.fig, self.ax = plt.subplots()
 
-        length_single = len(self.sweep_points)
-        phases = {}
+        if TwoD:
+            self.twoD_sweep_analysis(**kw)
+        else:
+            self.oneD_sweep_analysis(**kw)
 
         textstr = ''
-        self.fig = plt.figure()
-        self.ax = self.fig.add_subplot(111)
-
-        for index, i in enumerate(np.arange(0, len(self.sweep_points_2D)* \
-                length_single, length_single)):
-
-            if i==0:
-                label = 'no flux pulse'
-            else:
-                label = 'with flux pulse'
-
-            data_slice = self.data[:, i:i+length_single-1]
-            thetas = data_slice[0]
-
-            ampls = a_tools.rotate_and_normalize_data_no_cal_points(
-                np.array([data_slice[2], data_slice[3]]))
-
-            # fit to cosine
-            fit_res = self.fit_single_cos(thetas, ampls,
-                                        print_fit_results=False)
-
-            # plot
-            self.ax.plot(thetas, ampls, 'o-', label=label)
-
-            thetas_fine = np.linspace(thetas[0], thetas[-1], len(thetas)*100)
-            if fit_res.best_values['amplitude']>0:
-                data_fit_fine = fit_mods.CosFunc(thetas_fine,
-                                                 **fit_res.best_values)
-            else:
-                fit_res_temp = deepcopy(fit_res)
-                fit_res_temp.best_values['amplitude'] = \
-                    -fit_res_temp.best_values['amplitude']
-                data_fit_fine = fit_mods.CosFunc(thetas_fine,
-                                                 **fit_res_temp.best_values)
-
-            self.ax.plot(thetas_fine, data_fit_fine, 'r')
-
-            self.ax.set_title('dynamic phase msmt {} at {}ns {}mV {}'.format(
-                self.qb_name, self.flux_pulse_length,
-                self.flux_pulse_amp, self.timestamp_string))
-            self.ax.set_xlabel(r'Phase of 2nd pi/2 pulse, $\theta$[rad]')
-            self.ax.set_ylabel('Response (V)')
-
-            self.ax.legend()
-            phases[self.sweep_points_2D[index]] = \
-                fit_res.best_values['phase']*180/np.pi
+        for label in self.labels:
             textstr += 'phase_{} = {:0.3f} deg\n'.format(label,
-                          phases[self.sweep_points_2D[index]])
+                                                         self.phases[label])
 
-        self.dyn_phase = phases[self.sweep_points_2D[1]] - \
-            phases[self.sweep_points_2D[0]]
+        self.dyn_phase = self.phases['with flux pulse'] - \
+                         self.phases['no flux pulse']
 
-        textstr += 'dyn_phase_{} = {:0.3f} deg'.format(self.qb_name, self.dyn_phase)
+        textstr += 'dyn_phase_{} = {:0.3f} deg'.format(self.qb_name,
+                                                       self.dyn_phase)
         self.fig.text(0.5, -0.05, textstr, transform=self.ax.transAxes,
-                fontsize=self.font_size, verticalalignment='top',
-                horizontalalignment='center', bbox=self.box_props)
+                      fontsize=self.font_size, verticalalignment='top',
+                      horizontalalignment='center', bbox=self.box_props)
 
         plt.savefig(self.folder+'\\cos_fit.png', dpi=300, bbox_inches='tight')
 
-        if show:
+        if kw.pop('show', False):
             plt.show()
 
-        if close_file:
+        if kw.pop('close_file', True):
             self.data_file.close()
 
-        return self.dyn_phase
+    def oneD_sweep_analysis(self, **kw):
+
+        self.labels = ['with flux pulse', 'no flux pulse']
+        cal_points = kw.pop('cal_points', True)
+
+        self.get_naming_and_values()
+        length_single = int(len(self.sweep_points)/2)
+        thetas = self.sweep_points[0:length_single-self.NoCalPoints]
+        if cal_points:
+            cal_points_idxs = [[-4, -3], [-2, -1]]
+
+        for i, length in enumerate([0, length_single]):
+            dict_label = self.labels[i]
+
+            if len(self.measured_values) == 1:
+                measured_values = self.data[1][
+                                  i*length_single:(i+1)*length_single]
+                self.ampls = a_tools.normalize_data_v3(
+                    measured_values, cal_zero_points=cal_points_idxs[0],
+                    cal_one_points=cal_points_idxs[1])[0:-self.NoCalPoints]
+
+            else:
+                measured_values = np.zeros((len(self.measured_values),
+                                            length_single))
+                for j in range(len(self.measured_values)):
+                    measured_values[j] = self.data[j+1][
+                                         i*length_single:(i+1)*length_single]
+
+                self.ampls = a_tools.rotate_and_normalize_data(
+                    measured_values, cal_zero_points=cal_points_idxs[0],
+                    cal_one_points=cal_points_idxs[1])[0][0:-self.NoCalPoints]
+            self.fit_and_plot(thetas=thetas, ampls=self.ampls,
+                              ax=self.ax, dict_label=dict_label, **kw)
+
+    def twoD_sweep_analysis(self, **kw):
+        self.labels = ['no flux pulse', 'with flux pulse']
+        self.get_naming_and_values_2D()
+        length_single = len(self.sweep_points)
+        textstr = ''
+
+        for index, i in enumerate(np.arange(0, len(self.sweep_points_2D) *
+                length_single, length_single)):
+
+            dict_label = self.labels[index]
+            data_slice = self.data[:, i:i+length_single-1]
+            thetas = data_slice[0]
+
+            self.ampls = a_tools.rotate_and_normalize_data_no_cal_points(
+                np.array([data_slice[2], data_slice[3]]))
+
+            self.fit_and_plot(thetas=thetas, ampls=self.ampls,
+                              ax=self.ax, dict_label=dict_label, **kw)
+
+    def fit_and_plot(self, thetas, ampls, ax, dict_label, **kw):
+
+        print_fit_results = kw.pop('print_fit_results', False)
+        # fit to cosine
+        fit_res = self.fit_single_cos(thetas, ampls,
+                                    print_fit_results=print_fit_results)
+
+        # plot
+        ax.plot(thetas, ampls, 'o-', label=dict_label)
+
+        thetas_fine = np.linspace(thetas[0], thetas[-1], len(thetas)*100)
+        if fit_res.best_values['amplitude'] > 0:
+            data_fit_fine = fit_mods.CosFunc(thetas_fine,
+                                             **fit_res.best_values)
+        else:
+            fit_res_temp = deepcopy(fit_res)
+            fit_res_temp.best_values['amplitude'] = \
+                -fit_res_temp.best_values['amplitude']
+            data_fit_fine = fit_mods.CosFunc(thetas_fine,
+                                             **fit_res_temp.best_values)
+
+        ax.plot(thetas_fine, data_fit_fine, 'r')
+
+        ax.set_title('dynamic phase msmt {} at {:0.1f}ns {:0.4f}V {}'.format(
+            self.qb_name, self.flux_pulse_length*1e9,
+            self.flux_pulse_amp, self.timestamp_string))
+        ax.set_xlabel(r'Phase of 2nd pi/2 pulse, $\theta$[rad]')
+        ax.set_ylabel('Response (V)')
+
+        ax.legend()
+        self.fit_res[dict_label] = fit_res
+        self.phases[dict_label] = fit_res.best_values['phase']*180/np.pi
+
+    def fit_single_cos(self, thetas, ampls,
+                       print_fit_results=True, phase_guess=0,
+                       cal_points=False):
+
+        cos_mod = fit_mods.CosModel
+        average = np.mean(ampls)
+
+        diff = 0.5*(max(ampls) -
+                    min(ampls))
+        amp_guess = -diff
+        # offset guess
+        offset_guess = average
+
+        # Set up fit parameters and perform fit
+        cos_mod.set_param_hint('amplitude',
+                               value=amp_guess,
+                               vary=True)
+        cos_mod.set_param_hint('phase',
+                               value=phase_guess,
+                               vary=True)
+        cos_mod.set_param_hint('frequency',
+                               value=1./(2*np.pi),
+                               vary=False)
+        cos_mod.set_param_hint('offset',
+                               value=offset_guess,
+                               vary=True)
+        self.params = cos_mod.make_params()
+        fit_res = cos_mod.fit(data=ampls,
+                              t=thetas,
+                              params=self.params)
+
+        if fit_res.chisqr > 0.35:
+            logging.warning('Fit did not converge, chi-square > 0.35')
+
+        if print_fit_results:
+            print(fit_res.fit_report())
+
+        if fit_res.best_values['amplitude'] < 0.:
+            fit_res.best_values['phase'] += np.pi
+            fit_res.best_values['amplitude'] *= -1
+
+        return fit_res
 
 
 class FluxPulse_Scope_Analysis(MeasurementAnalysis):

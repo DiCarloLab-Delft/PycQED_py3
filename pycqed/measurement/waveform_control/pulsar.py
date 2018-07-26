@@ -333,6 +333,13 @@ class HDAWG8Pulsar:
         if not isinstance(obj, HDAWG8Pulsar._supportedAWGtypes):
             return super()._program_awg(obj, sequence, el_wfs, loop)
 
+        # delete previous cache files
+        obj._delete_chache_files()
+        print('Previous AWG8 cache files have been deleted.')
+        # delete old csv files
+        obj._delete_csv_files()
+        print('Previous AWG8 csv files have been deleted.')
+
         for awg_nr in [0, 1, 2, 3]:
             ch1id = 'ch{}'.format(awg_nr * 2 + 1)
             ch2id = 'ch{}'.format(awg_nr * 2 + 2)
@@ -358,14 +365,18 @@ class HDAWG8Pulsar:
                         # thus it would be better to restructure the code
                         # and hash before evaluating numerically - JH
                         wfhashable = tuple(cid_wf)
-                        if wfhashable in unique_waveforms:
-                            # we already have such a waveform
-                            wf_name_map[wfname] = \
-                                unique_waveforms[wfhashable]
-                        else:
-                            # new waveform for this subAWG
-                            unique_waveforms[wfhashable] = wfname
-                            wf_name_map[wfname] = wfname
+                        # if wfhashable in unique_waveforms:
+                        #     # we already have such a waveform
+                        #     wf_name_map[wfname] = \
+                        #         unique_waveforms[wfhashable]
+                        # else:
+                        #     # new waveform for this subAWG
+                        #     unique_waveforms[wfhashable] = wfname
+                        #     wf_name_map[wfname] = wfname
+
+                        # add all waveforms
+                        unique_waveforms[wfname] = wfhashable
+                        wf_name_map[wfname] = wfname
 
                         if len(cid_wf) > 0 and cid_wf[0] != 0.:
                             elements_with_non_zero_first_points.append(el)
@@ -452,7 +463,8 @@ class HDAWG8Pulsar:
             awg_str = header + waveform_table + main_loop + footer
 
             # write the waveforms to csv files
-            for data, wfname in unique_waveforms.items():
+            # for data, wfname in unique_waveforms.items():
+            for wfname, data in unique_waveforms.items():
                 obj._write_csv_waveform(simplify_name(wfname), np.array(data))
 
             print("Programming {} vawg{} sequence '{}' ({} "
@@ -461,7 +473,6 @@ class HDAWG8Pulsar:
 
             # here we want to use a timeout value longer than the obj.timeout()
             # as programming the AWGs takes more time than normal communications
-
             obj.configure_awg_from_string(awg_nr, awg_str, timeout=180)
 
             obj.set('awgs_{}_dio_valid_polarity'.format(awg_nr),
@@ -471,6 +482,7 @@ class HDAWG8Pulsar:
             for ch in range(8):
                 cname = self._id_channel('ch{}'.format(ch + 1), obj.name)
                 obj.set('sigouts_{}_on'.format(ch), self.get(cname + '_active'))
+
 
         return awg_str
 
@@ -499,21 +511,21 @@ class HDAWG8Pulsar:
         Returns:
             string for playing back an element
         """
-        repeat_open_str = '\trepeat ({}) {{\n'.format(
+        repeat_open_str = 'repeat ({}) {{\n'.format(
             reps) if reps != 1 else ''
         # trigger_str = '\t\twaitWave();\n\t\twaitDigTrigger(1);\n' if wait \
         #     else '\t\twaitWave();\n'
-        trigger_str = '\t\twaitDigTrigger(1);\n' if wait else ''
+        trigger_str = 'waitDigTrigger(1);\n' if wait else ''
         if name1 is None and name2 is None:
-            play_str = '\t\twaitWave();\n' \
-                       '\t\tplayWaveDIO();\n'
+            play_str = 'waitWave();\n' \
+                       'playWaveDIO();\n'
         elif name1 is None:
-            play_str = '\t\tplayWave(2, {});\n'.format(name2)
+            play_str = 'playWave(2, {});\n'.format(name2)
         elif name2 is None:
-            play_str = '\t\tplayWave(1, {});\n'.format(name1)
+            play_str = 'playWave(1, {});\n'.format(name1)
         else:
-            play_str = '\t\tplayWave({}, {});\n'.format(name1, name2)
-        repeat_close_str = '\t}\n' if reps != 1 else ''
+            play_str = 'playWave({}, {});\n'.format(name1, name2)
+        repeat_close_str = '}\n' if reps != 1 else ''
         return repeat_open_str + trigger_str + play_str + repeat_close_str
 
     def _HDAWG8_active_AWGs(self, obj):

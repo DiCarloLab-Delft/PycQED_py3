@@ -66,7 +66,88 @@ def Pulsed_spec_seq(spec_pars, RO_pars, upload=True, return_seq=False):
         seq.append_element(el, trigger_wait=True)
     if upload:
         station.pulsar.program_awgs(seq, *el_list, verbose=False)
-    return seq, el_list
+
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq
+
+
+def Pulsed_spec_ro_markers_seq(spec_pars, RO_pars,
+                               upload=True,
+                               return_seq=False):
+    '''
+    Pulsed spectroscopy sequence using the tektronix.
+    Input pars:
+        spec_pars:      dict containing spectroscopy pars
+        RO_pars:        dict containing RO pars
+    '''
+
+    seq_name = 'Pulsed_spec'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+
+    # Nr of pulse reps is set to ensure max nr of pulses and end 10us before
+    # next trigger comes in. Assumes 200us trigger period, also works for
+    # faster trigger rates.
+    # period = spec_pars['pulse_delay'] + RO_pars['pulse_delay']
+    period = RO_pars['length'] + RO_pars['pulse_delay']
+    nr_of_pulse_reps = int((200e-6-10e-6)//period)
+
+    pulse_list = [spec_pars, RO_pars]*nr_of_pulse_reps
+    el = multi_pulse_elt(0, station, pulse_list)
+    el_list.append(el)
+    seq.append_element(el, trigger_wait=True)
+
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, verbose=False)
+
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq
+
+
+def Resonator_spec_seq(RO_channel='AWG1_ch3_m2', marker_length=5e-9,
+                       marker_interval=3e-6,
+                       upload=True, return_seq=False):
+
+    seq_name = 'Resonator_spec_seq'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+
+    RO_trig = {
+        'pulse_type': 'SquarePulse',
+        'channel': RO_channel,
+        'amplitude': 1,
+        'length': marker_length,
+        'pulse_delay': marker_interval,
+        'refpoint': 'start'}
+
+    I_pulse = deepcopy(RO_trig)
+    I_pulse['amplitude'] = 0
+    I_pulse['length'] = marker_interval-marker_length
+    pulse_list = [I_pulse]
+
+    RO_trig_first = deepcopy(RO_trig)
+    RO_trig_first['refpoint'] = 'end'
+    RO_trig_first['pulse_delay'] = 0
+    pulse_list += [RO_trig_first]
+
+    number_of_pulses = int(200*1e-6/marker_interval)
+    pulse_list += [RO_trig]*(number_of_pulses-1)
+
+    el = multi_pulse_elt(0, station, pulse_list)
+    el_list.append(el)
+    seq.append_element(el, trigger_wait=True)
+
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, verbose=False)
+
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq
 
 
 def photon_number_splitting_seq(spec_pars, RO_pars, disp_pars, upload=True, return_seq=False):
@@ -341,9 +422,9 @@ def T1_seq(times,
         return seq_name
 
 
-def Ramsey_seq(times, pulse_pars, RO_pars,
+def Ramsey_seq_Echo(times, pulse_pars, RO_pars, nr_echo_pulses=4,
                artificial_detuning=None,
-               cal_points=True,
+               cal_points=True, cpmg_scheme=True,
                verbose=False,
                upload=True, return_seq=False):
     '''
@@ -356,7 +437,7 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
         artificial_detuning: artificial_detuning (Hz) implemented using phase
         cal_points:          whether to use calibration points or not
     '''
-    if np.any(times>1e-3):
+    if np.any(times > 1e-3):
         logging.warning('The values in the times array might be too large.'
                         'The units should be seconds.')
 
@@ -366,6 +447,209 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
     # First extract values from input, later overwrite when generating
     # waveforms
     pulses = get_pulse_dict_from_pars(pulse_pars)
+
+    pulse_pars_x2 = deepcopy(pulses['X90'])
+    pulse_pars_x2['refpoint'] = 'start'
+
+    X180_pulse = deepcopy(pulses['X180'])
+    Echo_pulses = nr_echo_pulses*[X180_pulse]
+    DRAG_length = pulse_pars['nr_sigma']*pulse_pars['sigma']
+
+    for i, tau in enumerate(times):
+        if artificial_detuning is not None:
+            Dphase = ((tau-times[0]) * artificial_detuning * 360) % 360
+            pulse_pars_x2['phase'] = Dphase
+
+        if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
+            el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+        elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
+            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+        else:
+            X90_separation = tau - DRAG_length
+            if cpmg_scheme:
+                print('cpmg')
+                echo_pulse_delay = (X90_separation - nr_echo_pulses*DRAG_length) / \
+                                   nr_echo_pulses
+                if echo_pulse_delay < 0:
+                    pulse_pars_x2['pulse_delay'] = tau
+                    pulse_dict_list = [pulses['X90'], pulse_pars_x2, RO_pars]
+                else:
+                    pulse_dict_list = [pulses['X90']]
+                    start_end_delay = echo_pulse_delay/2
+                    for p_nr, pulse_dict in enumerate(Echo_pulses):
+                        pd = deepcopy(pulse_dict)
+                        pd['refpoint'] = 'end'
+                        pd['pulse_delay'] = \
+                            (start_end_delay if p_nr == 0 else echo_pulse_delay)
+                        pulse_dict_list.append(pd)
+
+                    pulse_pars_x2['refpoint'] = 'end'
+                    pulse_pars_x2['pulse_delay'] = start_end_delay
+                    pulse_dict_list += [pulse_pars_x2, RO_pars]
+            else:
+                print('UDD')
+                pulse_positions_func = \
+                    lambda idx, N: np.sin(np.pi*idx/(2*N+2))**2
+                pulse_delays_func = (lambda idx, N: X90_separation*(
+                    pulse_positions_func(idx, N) -
+                    pulse_positions_func(idx-1, N)) -
+                                ((0.5 if idx == 1 else 1)*DRAG_length))
+
+                if nr_echo_pulses*DRAG_length > X90_separation:
+                    pulse_pars_x2['pulse_delay'] = tau
+                    pulse_dict_list = [pulses['X90'], pulse_pars_x2, RO_pars]
+                else:
+                    pulse_dict_list = [pulses['X90']]
+                    for p_nr, pulse_dict in enumerate(Echo_pulses):
+                        pd = deepcopy(pulse_dict)
+                        pd['refpoint'] = 'end'
+                        pd['pulse_delay'] = pulse_delays_func(
+                            p_nr+1, nr_echo_pulses)
+                        pulse_dict_list.append(pd)
+
+                    pulse_pars_x2['refpoint'] = 'end'
+                    pulse_pars_x2['pulse_delay'] = pulse_delays_func(
+                        1, nr_echo_pulses)
+                    pulse_dict_list += [pulse_pars_x2, RO_pars]
+
+            el = multi_pulse_elt(i, station, pulse_dict_list)
+
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
+
+
+def Ramsey_seq_cont_drive(times, pulse_pars, RO_pars,
+                          artificial_detuning=None,
+                          cal_points=True,
+                          verbose=False,
+                          upload=True, return_seq=False, **kw):
+    '''
+    Ramsey sequence for a single qubit using the tektronix.
+    SSB_Drag pulse is used for driving, simple modualtion used for RO
+    Input pars:
+        times:               array of times between (start of) pulses (s)
+        pulse_pars:          dict containing the pulse parameters
+        RO_pars:             dict containing the RO parameters
+        artificial_detuning: artificial_detuning (Hz) implemented using phase
+        cal_points:          whether to use calibration points or not
+    '''
+    if np.any(times > 1e-3):
+        logging.warning('The values in the times array might be too large.'
+                        'The units should be seconds.')
+
+    seq_name = 'Ramsey_sequence'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+    # First extract values from input, later overwrite when generating
+    # waveforms
+    pulses = get_pulse_dict_from_pars(pulse_pars)
+
+    pulse_pars_x2 = deepcopy(pulses['X90'])
+
+    DRAG_length = pulse_pars['nr_sigma']*pulse_pars['sigma']
+    cont_drive_ampl = 0.1 * pulse_pars['amplitude']
+    X180_pulse = deepcopy(pulses['X180'])
+    cos_pulse = {'pulse_type': 'CosPulse_gauss_rise',
+                 'channel': X180_pulse['I_channel'],
+                 'frequency': X180_pulse['mod_frequency'],
+                 'length': 0,
+                 'phase': X180_pulse['phi_skew'],
+                 'amplitude': cont_drive_ampl * X180_pulse['alpha'],
+                 'pulse_delay': 0,
+                 'refpoint': 'end'}
+    sin_pulse = {'pulse_type': 'CosPulse_gauss_rise',
+                 'channel': X180_pulse['Q_channel'],
+                 'frequency': X180_pulse['mod_frequency'],
+                 'length': 0,
+                 'phase': 90,
+                 'amplitude': cont_drive_ampl * X180_pulse['alpha'],
+                 'pulse_delay': 0,
+                 'refpoint': 'simultaneous'}
+
+    for i, tau in enumerate(times):
+
+        if artificial_detuning is not None:
+            Dphase = ((tau-times[0]) * artificial_detuning * 360) % 360
+            pulse_pars_x2['phase'] = Dphase
+
+        if cal_points and (i == (len(times)-4) or i == (len(times)-3)):
+            el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+        elif cal_points and (i == (len(times)-2) or i == (len(times)-1)):
+            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+        else:
+            X90_separation = tau - DRAG_length
+            if X90_separation > 0:
+                pulse_pars_x2['refpoint'] = 'end'
+                cos_pls1 = deepcopy(cos_pulse)
+                sin_pls1 = deepcopy(sin_pulse)
+                cos_pls1['length'] = X90_separation/2
+                sin_pls1['length'] = X90_separation/2
+                cos_pls2 = deepcopy(cos_pls1)
+                sin_pls2 = deepcopy(sin_pls1)
+                cos_pls2['amplitude'] = -cos_pls1['amplitude']
+                cos_pls2['pulse_type'] = 'CosPulse_gauss_fall'
+                sin_pls2['amplitude'] = -sin_pls1['amplitude']
+                sin_pls2['pulse_type'] = 'CosPulse_gauss_fall'
+
+                pulse_dict_list = [pulses['X90'], cos_pls1, sin_pls1,
+                                   cos_pls2, sin_pls2, pulse_pars_x2, RO_pars]
+            else:
+                pulse_pars_x2['refpoint'] = 'start'
+                pulse_pars_x2['pulse_delay'] = tau
+                pulse_dict_list = [pulses['X90'], pulse_pars_x2, RO_pars]
+
+            el = multi_pulse_elt(i, station, pulse_dict_list)
+
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
+
+
+def Ramsey_seq(times, pulse_pars, RO_pars,
+               artificial_detuning=None,
+               cal_points=True,
+               verbose=False,
+               upload=True, return_seq=False, **kw):
+    '''
+    Ramsey sequence for a single qubit using the tektronix.
+    SSB_Drag pulse is used for driving, simple modualtion used for RO
+    Input pars:
+        times:               array of times between (start of) pulses (s)
+        pulse_pars:          dict containing the pulse parameters
+        RO_pars:             dict containing the RO parameters
+        artificial_detuning: artificial_detuning (Hz) implemented using phase
+        cal_points:          whether to use calibration points or not
+    '''
+    if np.any(times > 1e-3):
+        logging.warning('The values in the times array might be too large.'
+                        'The units should be seconds.')
+
+    seq_name = 'Ramsey_sequence'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+    # First extract values from input, later overwrite when generating
+    # waveforms
+    pulses = get_pulse_dict_from_pars(pulse_pars)
+
+    # pulses['I_fb'] = {
+    #     'pulse_type': 'SquarePulse',
+    #     'channel': RO_pars['acq_marker_channel'],
+    #     'amplitude': 0.0,
+    #     'length': 1e-6,
+    #     'pulse_delay': 0}
 
     pulse_pars_x2 = deepcopy(pulses['X90'])
     pulse_pars_x2['refpoint'] = 'start'
@@ -388,7 +672,6 @@ def Ramsey_seq(times, pulse_pars, RO_pars,
         seq.append_element(el, trigger_wait=True)
     if upload:
         station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
-
 
     if return_seq:
         return seq, el_list
@@ -1047,19 +1330,26 @@ def Rising_seq(amps, pulse_pars, RO_pars, n=1, post_msmt_delay=3e-6,
 
 
 def custom_seq(seq_func, sweep_points, pulse_pars, RO_pars,
-               upload=True, return_seq=False):
+               upload=True, return_seq=False, cal_points=True):
 
     seq_name = 'Custom_sequence'
     seq = sequence.Sequence(seq_name)
     el_list = []
     pulses = get_pulse_dict_from_pars(pulse_pars)
 
-    for i in sweep_points:
-        pulse_keys_list = seq_func(i, sweep_points)
+    for i, sp in enumerate(sweep_points):
+        pulse_keys_list = seq_func(i, sp)
         pulse_list = [pulses[key] for key in pulse_keys_list]
         pulse_list += [RO_pars]
 
-        el = multi_pulse_elt(i, station, pulse_list)
+        if cal_points and (i == (len(sweep_points)-4) or
+                                   i == (len(sweep_points)-3)):
+            el = multi_pulse_elt(i, station, [pulses['I'], RO_pars])
+        elif cal_points and (i == (len(sweep_points)-2) or
+                                     i == (len(sweep_points)-1)):
+            el = multi_pulse_elt(i, station, [pulses['X180'], RO_pars])
+        else:
+            el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
     if upload:

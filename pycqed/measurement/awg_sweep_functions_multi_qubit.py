@@ -408,7 +408,7 @@ class three_qubit_GHZ_tomo(swf.Hard_Sweep):
 
 class parity_correction(swf.Hard_Sweep):
     def __init__(self, q0n, q1n, q2n, operation_dict, feedback_delay,
-                 prep_sequence=None,
+                 prep_sequence=None, nr_echo_pulses=4, cpmg_scheme=True,
                  tomography_basis=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
                  reset=True, upload=True, verbose=False, preselection=False,
                  ro_spacing=1e-6):
@@ -420,6 +420,8 @@ class parity_correction(swf.Hard_Sweep):
         self.feedback_delay = feedback_delay
         self.tomography_basis = tomography_basis
         self.prep_sequence = prep_sequence
+        self.nr_echo_pulses = nr_echo_pulses
+        self.cpmg_scheme = cpmg_scheme
         self.preselection = preselection
         self.ro_spacing = ro_spacing
         self.reset = reset
@@ -440,5 +442,7 @@ class parity_correction(swf.Hard_Sweep):
                 reset=self.reset,
                 verbose=self.verbose,
                 preselection=self.preselection,
-                ro_spacing=self.ro_spacing
+                ro_spacing=self.ro_spacing,
+                nr_echo_pulses=self.nr_echo_pulses,
+                cpmg_scheme=self.cpmg_scheme
                 )

@@ -14,7 +14,7 @@ class AnalysisDisplay:
         # start the app
         self.app = self.ada.AnalysisDisplayApp(filename)
         self.app.set_data_path(a_tools.datadir)
-        self.update()
+        self.update(force=True)
 
-    def update(self):
-        self.app.update()
+    def update(self, force=False):
+        self.app.update(force=force)

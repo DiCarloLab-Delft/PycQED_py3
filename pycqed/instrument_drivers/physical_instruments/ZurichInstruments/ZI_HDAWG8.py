@@ -336,8 +336,8 @@ class ZI_HDAWG8(ZI_base_instrument):
         filename = os.path.join(
             self.lab_one_webserver_path, 'awg', 'waves',
             self._devname+'_'+wf_name+'.csv')
-        with open(filename, 'w') as f:
-            np.savetxt(filename, waveform, delimiter=",")
+        # with open(filename, 'w') as f:
+        np.savetxt(filename, waveform, delimiter=",")
 
     def _read_csv_waveform(self, wf_name: str):
         filename = os.path.join(
@@ -350,6 +350,19 @@ class ZI_HDAWG8(ZI_base_instrument):
             logging.warning(e)
             print(e)
             return None
+
+    def _delete_chache_files(self):
+        cache_dir = os.path.join(self.lab_one_webserver_path,
+                                 'awg', 'waves', '.cache')
+        for f in os.listdir(cache_dir):
+            os.remove(os.path.join(cache_dir, f))
+
+    def _delete_csv_files(self):
+        csv_dir = os.path.join(self.lab_one_webserver_path,
+                                 'awg', 'waves')
+        for f in os.listdir(csv_dir):
+            if f.endswith(".csv"):
+                os.remove(os.path.join(csv_dir, f))
 
     # Note: This was added for debugging by NielsH.
     # If we do not need it for a few days we should remove it. (2/10/2017)

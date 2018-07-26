@@ -1265,6 +1265,12 @@ class StateTomographyAnalysis(ba.BaseDataAnalysis):
         if 'data_filter' in self.options_dict:
             data = self.options_dict['data_filter'](data.T).T
 
+        data = data.T
+        for i, v in enumerate(data):
+            data[i] = v / v.sum()
+        data = data.T
+
+
         Fs = self.options_dict.get('meas_operators', Fs)
         Fs = [qtp.Qobj(F) for F in Fs]
         d = Fs[0].shape[0]

@@ -4,6 +4,7 @@
 # author: Wolfgang Pfaff
 
 import numpy as np
+import scipy as scipy
 from copy import deepcopy
 
 
@@ -149,6 +150,78 @@ class CosPulse(Pulse):
         return self.amplitude * np.cos(2 * np.pi *
                                        (self.frequency * tvals +
                                         self.phase / 360.))
+
+class CosPulse_gauss_rise(Pulse):
+
+    def __init__(self, channel, name='cos pulse', **kw):
+        Pulse.__init__(self, name)
+
+        self.channel = channel  # this is just for convenience, internally
+        self.channels.append(channel)
+        # this is the part the sequencer element wants to communicate with
+        self.frequency = kw.pop('frequency', 1e6)
+        self.amplitude = kw.pop('amplitude', 0.)
+        self.length = kw.pop('length', 0.)
+        self.phase = kw.pop('phase', 0.)
+        self.tau = kw.pop('tau', 1e-9)
+
+    def __call__(self, **kw):
+        self.frequency = kw.pop('frequency', self.frequency)
+        self.amplitude = kw.pop('amplitude', self.amplitude)
+        self.length = kw.pop('length', self.length)
+        self.phase = kw.pop('phase', self.phase)
+
+        return self
+
+    def chan_wf(self, chan, tvals):
+        tau = self.tau
+        amp_rel = 0*tvals
+        t0 = tvals[0]
+        for i, t in enumerate(tvals):
+            if (t-t0) < 10*tau:
+                amp_rel[i] = 0.5 + 0.5 * scipy.special.erf(((t-t0)-5*tau)/tau)
+            else:
+                amp_rel[i] = 1
+
+        return self.amplitude * amp_rel * np.cos(2 * np.pi *
+                                       (self.frequency * tvals +
+                                        self.phase / 360.))
+
+class CosPulse_gauss_fall(Pulse):
+
+    def __init__(self, channel, name='cos pulse', **kw):
+        Pulse.__init__(self, name)
+
+        self.channel = channel  # this is just for convenience, internally
+        self.channels.append(channel)
+        # this is the part the sequencer element wants to communicate with
+        self.frequency = kw.pop('frequency', 1e6)
+        self.amplitude = kw.pop('amplitude', 0.)
+        self.length = kw.pop('length', 0.)
+        self.phase = kw.pop('phase', 0.)
+        self.tau = kw.pop('tau', 1-9)
+
+    def __call__(self, **kw):
+        self.frequency = kw.pop('frequency', self.frequency)
+        self.amplitude = kw.pop('amplitude', self.amplitude)
+        self.length = kw.pop('length', self.length)
+        self.phase = kw.pop('phase', self.phase)
+
+        return self
+
+    def chan_wf(self, chan, tvals):
+        tau = self.tau
+        amp_rel = 0*tvals
+        tend = tvals[-1]
+        for i, t in enumerate(tvals):
+            if (tend-t) < 10*tau:
+                amp_rel[i] = 0.5 + 0.5 * scipy.special.erf(((tend-t)-5*tau)/tau)
+            else:
+                amp_rel[i] = 1
+
+        return self.amplitude * amp_rel * np.cos(2 * np.pi *
+                                                 (self.frequency * tvals +
+                                                  self.phase / 360.))
 
 
 class LinearPulse(Pulse):

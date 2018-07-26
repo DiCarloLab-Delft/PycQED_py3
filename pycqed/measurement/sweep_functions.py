@@ -148,7 +148,7 @@ class None_Sweep(Soft_Sweep):
 
     def set_parameter(self, val):
         '''
-        Set the parameter(s) to be sweeped. Differs per sweep function
+        Set the parameter(s) to be swept. Differs per sweep function
         '''
         pass
 

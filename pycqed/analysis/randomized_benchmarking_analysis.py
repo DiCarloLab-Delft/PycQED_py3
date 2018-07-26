@@ -95,7 +95,6 @@ class RandomizedBenchmarking_Analysis(ma.TD_Analysis):
         qb_RO_channel = kw.pop('qb_RO_channel', None)
         find_empirical_variance = kw.get('find_empirical_variance',
                                          True)
-        print(find_empirical_variance)
         if self.cal_points is None:
             self.cal_points = [list(range(-4, -2)), list(range(-2, 0))]
 
@@ -112,7 +111,7 @@ class RandomizedBenchmarking_Analysis(ma.TD_Analysis):
             else:
                 ch = 0
 
-            logging.warning('Data is assumed to be thresholded!')
+            print('Data is assumed to be thresholded!')
             self.n_cl = np.unique(self.sweep_points_2D)
             self.nr_seeds = self.sweep_points.size
 
@@ -298,7 +297,6 @@ class RandomizedBenchmarking_Analysis(ma.TD_Analysis):
                  plot_results=False, **kw):
 
         find_empirical_variance = kw.pop('find_empirical_variance', True)
-        print(find_empirical_variance)
         RBModel = lmfit.Model(fit_mods.RandomizedBenchmarkingDecay)
         # RBModel = fit_mods.RBModel
         RBModel.set_param_hint('Amplitude', value=0)#-0.5)
@@ -326,7 +324,7 @@ class RandomizedBenchmarking_Analysis(ma.TD_Analysis):
 
         self.conf_level = kw.pop('conf_level', 0.68)
         if find_empirical_variance:
-            print('epsilon ', self.epsilon)
+            # print('epsilon ', self.epsilon)
             fit_res = RBModel.fit(data, numCliff=numCliff, params=params,
                                   scale_covar=False, weights=1/self.epsilon)
         else:

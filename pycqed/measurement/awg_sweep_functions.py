@@ -1016,6 +1016,65 @@ class Butterfly(swf.Hard_Sweep):
                               post_msmt_delay=self.post_msmt_delay,
                               RO_pars=self.RO_pars, initialize=self.initialize)
 
+
+class Resonator_spectroscopy(swf.Soft_Sweep):
+
+    def __init__(self, RO_channel, RO_MWG, RO_IF,
+                 marker_interval=3e-6, marker_length=5e-9,
+                 upload=True):
+
+        super().__init__()
+        self.RO_channel = RO_channel
+        self.marker_interval = marker_interval
+        self.marker_length = marker_length
+        self.upload = upload
+        self.RO_MWG = RO_MWG
+        self.RO_IF = RO_IF
+        self.parameter_name = 'RO frequency'
+        self.unit = 'Hz'
+        self.name = 'Resonator_spectroscopy'
+
+        self.prepare(upload=self.upload)
+
+    def prepare(self, upload=False, **kw):
+        if upload:
+            sqs.Resonator_spec_seq(RO_channel=self.RO_channel,
+                                   marker_interval=self.marker_interval,
+                                   marker_length=self.marker_length,
+                                   upload=True)
+
+    def set_parameter(self, val):
+        self.RO_MWG.frequency(val - self.RO_IF)
+
+
+class Qubit_spectroscopy(swf.Soft_Sweep):
+
+    def __init__(self, spec_pars, RO_pars,
+                 drive_MWG, drive_IF,
+                 upload=True):
+
+        super().__init__()
+        self.spec_pars = spec_pars
+        self.RO_pars = RO_pars
+        self.drive_MWG = drive_MWG
+        self.drive_IF = drive_IF
+        self.upload = upload
+        self.parameter_name = 'Drive frequency'
+        self.unit = 'Hz'
+        self.name = 'Qubit_spectroscopy'
+
+        self.prepare(upload=self.upload)
+
+    def prepare(self, upload=False, **kw):
+        if upload:
+            sqs.Pulsed_spec_seq(spec_pars=self.spec_pars,
+                                RO_pars=self.RO_pars,
+                                upload=upload)
+
+    def set_parameter(self, val):
+        self.drive_MWG.frequency(val)
+
+
 class Randomized_Benchmarking_nr_cliffords(swf.Soft_Sweep):
 
     def __init__(self, sweep_control='soft',
@@ -1913,7 +1972,42 @@ class Load_Sequence_Tek(swf.Hard_Sweep):
 
 
 
+class Dynamic_phase(swf.Hard_Sweep):
 
+    def __init__(self, qb_name, CZ_pulse_name, flux_pulse_amp,
+                 operation_dict,
+                 upload=True, cal_points=True):
+        '''
+        Ramsey type measurement with interleaved fluxpulse
+        for more detailed description see fsqs.Ramsey_with_flux_pulse_meas_seq(..)
+        sequence function
+
+        inputs:
+            qb: qubit object
+            X90_separation (float): separation of the pi/2 pulses
+            upload (bool): if False, sequences are NOT uploaded onto the AWGs
+        '''
+        super().__init__()
+        # self.thetas = thetas
+        self.qb_name = qb_name
+        self.CZ_pulse_name = CZ_pulse_name
+        self.flux_pulse_amp = flux_pulse_amp
+        self.operation_dict = operation_dict
+        self.upload = upload
+        self.cal_points = cal_points
+
+        self.name = 'Dynamic_phase'
+        self.parameter_name = 'theta'
+        self.unit = 'rad'
+
+    def prepare(self, **kw):
+        if self.upload:
+            fsqs.dynamic_phase_meas_seq(thetas=self.sweep_points,
+                                        qb_name=self.qb_name,
+                                        CZ_pulse_name=self.CZ_pulse_name,
+                                        flux_pulse_amp=self.flux_pulse_amp,
+                                        operation_dict=self.operation_dict,
+                                        cal_points=self.cal_points)
 
 class Ramsey_interleaved_fluxpulse_sweep(swf.Hard_Sweep):
 
@@ -2394,7 +2488,37 @@ class Custom_single_qubit_swf(swf.Hard_Sweep):
 
     def prepare(self, **kw):
         if self.upload:
-            sqs.custom_seq(seq_func = self.seq_func,
+            sqs.custom_seq(seq_func=self.seq_func,
                            sweep_points=self.sweep_points,
                            pulse_pars=self.pulse_pars,
                            RO_pars=self.RO_pars, upload=True)
+
+class Ramsey_decoupling_swf(swf.Hard_Sweep):
+
+    def __init__(self, seq_func, pulse_pars, RO_pars,
+                 artificial_detuning=None, nr_echo_pulses=4,
+                 cpmg_scheme=True,
+                 upload=True, cal_points=True):
+        super().__init__()
+        self.seq_func = seq_func
+        self.pulse_pars = pulse_pars
+        self.RO_pars = RO_pars
+        self.upload = upload
+        self.cal_points = cal_points
+        self.artificial_detuning = artificial_detuning
+        self.nr_echo_pulses = nr_echo_pulses
+        self.cpmg_scheme = cpmg_scheme
+
+        self.name = 'Ramsey_decoupling'
+        self.parameter_name = 't'
+        self.unit = 's'
+
+    def prepare(self, **kw):
+        if self.upload:
+            self.seq_func(times=self.sweep_points,
+                          pulse_pars=self.pulse_pars,
+                          RO_pars=self.RO_pars,
+                          artificial_detuning=self.artificial_detuning,
+                          cal_points=self.cal_points,
+                          nr_echo_pulses=self.nr_echo_pulses,
+                          cpmg_scheme=self.cpmg_scheme)

@@ -606,7 +606,7 @@ def measure_multiplexed_readout(qubits, f_LO, nreps=4, liveplot=False,
         [qb.name for qb in qubits])))
 
     if analyse and thresholds is not None:
-        channel_map = {qb.name: qb.int_log_det.value_names[0] for qb in qubits}
+        channel_map = {qb.name: df.value_names[0] for qb in qubits}
 
         ra.Multiplexed_Readout_Analysis(options_dict=dict(
             n_readouts=(2 if preselection else 1)*2**len(qubits),
@@ -666,6 +666,7 @@ def measure_active_reset(qubits, reset_cycle_time, nr_resets=1, nreps=1,
 
 def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO, nreps=1,
                              upload=True, MC=None, prep_sequence=None,
+                             nr_echo_pulses=4, cpmg_scheme=True,
                              tomography_basis=(
                                  'I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
                              reset=True, preselection=False, ro_spacing=1e-6):
@@ -693,6 +694,8 @@ def measure_parity_correction(qb0, qb1, qb2, feedback_delay, f_LO, nreps=1,
                                     operation_dict=get_operation_dict(qubits),
                                     feedback_delay=feedback_delay,
                                     prep_sequence=prep_sequence, reset=reset,
+                                    nr_echo_pulses=nr_echo_pulses,
+                                    cpmg_scheme=cpmg_scheme,
                                     tomography_basis=tomography_basis,
                                     upload=upload, verbose=False,
                                     preselection=preselection,
@@ -724,7 +727,8 @@ def measure_tomography(qubits, prep_sequence, state_name, f_LO,
                        ro_slack=10e-9,
                        thresholded=False,
                        liveplot=True,
-                       nreps=1, run=False):
+                       nreps=1, run=True,
+                       upload=True):
     exp_metadata = {}
 
     for qb in qubits:
@@ -812,7 +816,8 @@ def measure_tomography(qubits, prep_sequence, state_name, f_LO,
     exp_metadata["channel_map"] = channel_map
     exp_metadata["use_preselection"] = preselection
 
-    station.pulsar.program_awgs(seq, *elts)
+    if upload:
+        station.pulsar.program_awgs(seq, *elts)
 
     MC.live_plot_enabled(liveplot)
     MC.soft_avg(1)
@@ -939,7 +944,7 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
         print(V_th_a)
         if V_th_a is None:
             logging.warning('Threshold values were not specified. Make sure '
-                            'you have set the them!.')
+                            'you have set them!.')
         else:
             th_vals = {}
             for qb in qubits:
