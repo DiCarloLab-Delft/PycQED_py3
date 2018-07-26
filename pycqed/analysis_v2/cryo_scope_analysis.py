@@ -8,6 +8,7 @@ from pycqed.analysis.tools import cryoscope_tools as ct
 import pycqed.analysis_v2.base_analysis as ba
 import numpy as np
 from scipy.stats import sem
+import logging
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 from matplotlib import ticker
 from mpl_toolkits.axes_grid1.inset_locator import InsetPosition, mark_inset
@@ -418,8 +419,13 @@ def make_phase_plot(t, phase, phase_err, title,  ylim=None, ax=None, **kw):
     ax.axhline(mean_phase_tail-5, ls='--', c='grey', linewidth=0.5)
     ax.legend()
     if ylim is None:
-        ax.set_ylim(np.min([mean_phase_tail-60, np.min(phase)]),
-                    np.max([mean_phase_tail+40, np.max(phase)]))
+        try:
+            ax.set_ylim(np.min([mean_phase_tail-60, np.min(phase)]),
+                        np.max([mean_phase_tail+40, np.max(phase)]))
+        except ValueError:
+            logging.warning("could not automatically determine axis limits.")
+            # This happens if there is less than 10 measurements and the
+            # "mean_phase_tail" is np.nan
     else:
         ax.set_ylim(ylim[0], ylim[1])
 
