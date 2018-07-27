@@ -679,15 +679,9 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         return waveform
 
-    def _gen_idle_z(self, regenerate_cz=True):
-        if regenerate_cz:
-            self._wave_dict['cz'] = self._gen_cz()
-        # phase_corr = self._gen_phase_corr()
-        # # Only apply phase correction component after idle for duration of CZ
-        # return np.concatenate(
-        #     [np.zeros(len(self._wave_dict['cz'])), phase_corr])
+    def _gen_idle_z(self):
         idle_z = self._get_phase_corrected_pulse(
-            base_wf=np.zeros(len(self._wave_dict['cz'])))
+            base_wf=np.zeros(int(self.cz_length()*self.sampling_rate()+1)))
 
         return idle_z
 
