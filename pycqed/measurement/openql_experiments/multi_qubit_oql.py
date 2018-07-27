@@ -608,7 +608,8 @@ def Chevron_hack(qubit_idx: int, qubit_idx_spec,
 
 
 def Chevron(qubit_idx: int, qubit_idx_spec: int,
-            buffer_time, buffer_time2, flux_cw: int, platf_cfg: str):
+            buffer_time, buffer_time2, flux_cw: int, platf_cfg: str,
+            target_qubit_sequence: str='ramsey'):
     """
     Writes output files to the directory specified in openql.
     Output directory is set as an attribute to the program for convenience.
@@ -620,13 +621,22 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int,
         buffer_time2  :
 
         platf_cfg:      filename of the platform config file
+        target_qubit_sequence: selects whether to run a ramsey sequence on
+        	a target qubit ('ramsey'), keep it in gorund state ('ground')
+        	or excite it iat the beginning of the sequnce ('excited') 
     Returns:
         p:              OpenQL Program object containing
 
 
     Circuit:
         q0    -x180-flux-x180-RO-
-        qspec --x90-----------RO-
+        qspec --x90-----------RO- (target_qubit_sequence='ramsey')
+
+        q0    -x180-flux-x180-RO-
+        qspec -x180-----------RO- (target_qubit_sequence='excited')
+
+        q0    -x180-flux-x180-RO-
+        qspec ----------------RO- (target_qubit_sequence='ground')
 
     """
     platf = Platform('OpenQL_Platform', platf_cfg)
@@ -640,12 +650,25 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int,
 
     k = Kernel("Chevron", p=platf)
     k.prepz(qubit_idx)
-    k.gate('rx90', qubit_idx_spec)
+    
+    if target_qubit_sequence=='ramsey':
+    	k.gate('rx90', qubit_idx_spec)
+    elif target_qubit_sequence == 'excited':
+    	k.gate('rx180', qubit_idx_spec)
+    elif target_qubit_sequence=='ground':
+    	k.gate('i', qubit_idx_spec)
+    else:
+    	k.gate('i', qubit_idx_spec)
+    	logging.warning('target_qubit_sequence not recognized.'
+    		'Keeping target qubit in a ground state.')
     k.gate('rx180', qubit_idx)
+    
     k.gate("wait", [qubit_idx], buffer_nanoseconds)
     k.gate('fl_cw_{:02}'.format(flux_cw), 2, 0)
+    
     k.gate('wait', [qubit_idx], buffer_nanoseconds2)
     k.gate('rx180', qubit_idx)
+    
     k.measure(qubit_idx)
     k.measure(qubit_idx_spec)
     k.gate("wait", [qubit_idx, qubit_idx_spec], 0)

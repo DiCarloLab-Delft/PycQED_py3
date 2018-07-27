@@ -879,6 +879,7 @@ class DeviceCCL(Instrument):
                         adaptive_sampling=False,
                         adaptive_sampling_pts=None,
                         prepare_for_timedomain=True, MC=None,
+                        target_qubit_sequence: str='ramsey',
                         waveform_name='square'):
         """
         Measure a chevron by flux pulsing q0.
@@ -886,6 +887,9 @@ class DeviceCCL(Instrument):
         back at the end.
         The spectator qubit (q_spec) performs a ramsey experiment over
         the flux pulse.
+        target_qubit_sequence selects whether target qubit should run ramsey
+        squence ('ramsey'), stay in ground state ('ground'), or be flipped
+        to the excited state ('excited')
         """
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -941,7 +945,8 @@ class DeviceCCL(Instrument):
         p = mqo.Chevron(q0idx, q_specidx, buffer_time=40e-9,
                         buffer_time2=max(lengths)+40e-9,
                         flux_cw=flux_cw,
-                        platf_cfg=self.cfg_openql_platform_fn())
+                        platf_cfg=self.cfg_openql_platform_fn(),
+                        target_qubit_sequence=target_qubit_sequence)
         self.instr_CC.get_instr().eqasm_program(p.filename)
         self.instr_CC.get_instr().start()
 

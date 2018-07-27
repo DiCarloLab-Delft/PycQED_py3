@@ -800,8 +800,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         tlist_new = (np.arange(0, self.fluxlutman.cz_length(),
                            sim_step_new))
         
-        #theta_i = np.arctan(2*self.fluxlutman.cz_J2() / (self.fluxlutman.cz_freq_01_max() - self.fluxlutman.cz_freq_interaction()))
-        #theta_f=fix_theta_f(self.fluxlutman.cz_lambda_3(),theta_i)
+        theta_i = np.arctan(2*self.fluxlutman.cz_J2() / (self.fluxlutman.cz_freq_01_max() - self.fluxlutman.cz_freq_interaction()))
+        theta_f=fix_theta_f(self.fluxlutman.cz_lambda_3(),theta_i)
         #theta_i=theta_i*360/(2*np.pi)
 
         if not self.fluxlutman.czd_double_sided():
@@ -809,7 +809,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                 length=self.fluxlutman.cz_length(),
                 lambda_2=self.fluxlutman.cz_lambda_2(),
                 lambda_3=self.fluxlutman.cz_lambda_3(),
-                theta_f=self.fluxlutman.cz_theta_f(),
+                theta_f=theta_f,#self.fluxlutman.cz_theta_f(),
                 f_01_max=self.fluxlutman.cz_freq_01_max(),
                 J2=self.fluxlutman.cz_J2(),
                 f_interaction=self.fluxlutman.cz_freq_interaction(),
@@ -881,6 +881,12 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         
         '''
 
+        def give_parabola(polynomial_coefficients,x):
+            a=polynomial_coefficients[0]
+            b=polynomial_coefficients[1]
+            c=polynomial_coefficients[2]
+            return a*x**2+b*x+c
+
 
         if self.noise_parameters_CZ.distortions():
             impulse_response=np.gradient(self.fitted_stepresponse_ty[1])
@@ -915,12 +921,6 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             # 	  y_plot_vec=[amp_convol, convolved_amp],
             # 	  title='Net-zero, Pulse_length=240ns',
             #       xlabel='Time (ns)',ylabel='Amplitude (V)',legend_labels=['Ideal','Distorted'])
-
-            def give_parabola(polynomial_coefficients,x):
-            	a=polynomial_coefficients[0]
-            	b=polynomial_coefficients[1]
-            	c=polynomial_coefficients[2]
-            	return a*x**2+b*x+c
 
             convolved_detuning_new=give_parabola(self.fluxlutman.polycoeffs_freq_conv(),convolved_amp)
 

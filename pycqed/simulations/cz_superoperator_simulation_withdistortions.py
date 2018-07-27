@@ -713,6 +713,10 @@ def simulate_quantities_of_interest_superoperator(H_0, tlist, c_ops, eps_vec,
     return {'phi_cond': phi_cond, 'L1': L1, 'L2': L2, 'avgatefid_pc': avgatefid, 'avgatefid_compsubspace_pc': avgatefid_compsubspace}
 
 
+def fix_theta_f(lambda_3,theta_i):
+    lambda_1target=1
+    return (theta_i+2*(lambda_1target+lambda_3))*360/(2*np.pi)
+
 
 class CZ_trajectory_superoperator(det.Soft_Detector):
     def __init__(self, H_0, fluxlutman, noise_parameters_CZ, fitted_stepresponse_ty):
@@ -735,6 +739,12 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
     def acquire_data_point(self, **kw):
         tlist = (np.arange(0, self.fluxlutman.cz_length(),
                            1/self.fluxlutman.sampling_rate()))
+
+        # theta_i = np.arctan(2*self.fluxlutman.cz_J2() / (self.fluxlutman.cz_freq_01_max() - self.fluxlutman.cz_freq_interaction()))
+        # theta_f=fix_theta_f(self.fluxlutman.cz_lambda_3(),theta_i)
+        # theta_i=theta_i*360/(2*np.pi)
+        # print(theta_i,theta_f)
+        
         if not self.fluxlutman.czd_double_sided():
             f_pulse = wf.martinis_flux_pulse(
                 length=self.fluxlutman.cz_length(),
