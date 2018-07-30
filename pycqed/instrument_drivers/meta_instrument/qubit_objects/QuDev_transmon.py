@@ -1573,6 +1573,7 @@ class QuDev_transmon(Qubit):
         alpha = kwargs.pop('alpha',1e-3)
         beta = kwargs.pop('beta',0.)
         gamma = kwargs.pop('gamma',0.6)
+        n_fold = kwargs.get('n_fold',5)
         iters = kwargs.pop('iters',5000)
         c = kwargs.pop('second_round_std_scale',0.3)
         ch_1_min = x0[0]            #might be redundant
@@ -1618,7 +1619,8 @@ class QuDev_transmon(Qubit):
                             'iters': iters,
                             'beta': beta,
                             'gamma': gamma,
-                            'ndim': 2}
+                            'ndim': 2,
+                            'nfold':n_fold}
             self.AWG.start()
             MC.run(name='drive_carrier_calibration' + self.msmt_suffix)
             self.AWG.stop()
@@ -1804,6 +1806,7 @@ class QuDev_transmon(Qubit):
         beta = kwargs.get('beta',0.)
         gamma = kwargs.get('gamma',0.5)
         std_devs = kwargs.get('std_devs',[0.3,10.])
+        n_fold = kwargs.get('n_fold',5)
         iters = kwargs.get('iters',3000)
         c = kwargs.pop('second_round_std_scale',0.4)
         #Could make sample size variable (maxiter) for better adapting)
@@ -1862,7 +1865,8 @@ class QuDev_transmon(Qubit):
                             'iters': iters,
                             'beta': beta,
                             'gamma': gamma,
-                            'ndim':2}
+                            'ndim':2,
+                            'nfold':n_fold}
             MC.run(name='drive_skewness_calibration' + self.msmt_suffix)
 
             a = ma.OptimizationAnalysisNN(label='drive_skewness_calibration',
@@ -1879,7 +1883,7 @@ class QuDev_transmon(Qubit):
                     self.alpha(alpha_)
                 self.phi_skew(phi_)
 
-        return alpha_,phi_
+        return alpha_,phi_,a
 
 
     def calibrate_drive_mixer_skewness(self, MC=None, update=True,

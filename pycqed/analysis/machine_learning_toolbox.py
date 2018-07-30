@@ -234,10 +234,10 @@ class DNN_Regressor_tf(Estimator):
         return _accuracy
 
     def evaluate(self,logits_test=np.array([]),y_test=np.array([])):
-        _accuracy = 1 - \
+        self.score = 1 - \
             np.linalg.norm((y_test-logits_test)**2) \
             /np.linalg.norm((y_test-np.linalg.norm(y_test)**2))
-        return _accuracy
+        return self.score
 
 
     def predict(self, samples):
@@ -288,9 +288,10 @@ class Polynomial_Regression(Estimator):
 
     def evaluate(self,x,y):
         pred = self.predict(x)
-        acc = 1. - np.linalg.norm(pred-y)**2 \
+        self.score= 1. - np.linalg.norm(pred-y)**2 \
                    / np.linalg.norm(y-np.mean(y,axis=0))**2
-        return acc
+        return self.score
+
 
 class GRNN_neupy(Estimator):
     '''
@@ -337,14 +338,59 @@ class GRNN_neupy(Estimator):
 
     def evaluate(self,x,y):
         pred = self._grnn.predict(x)
-        acc = 1. - np.linalg.norm(pred-y)**2 \
+        self.score = 1. - np.linalg.norm(pred-y)**2 \
                    / np.linalg.norm(y-np.mean(y,axis=0))**2
-        return acc
+        return self.core
 
+class CrossValidationEstimator(Estimator):
+
+    def __init__(self,estimator : Estimator,n_fold=5):
+        self.estimator = estimator
+        self.n_fold = n_fold
+        self.gen_error_emp = None
+        self.batch_errors = None
+
+    def fit(self,x_train,y_train):
+        if not isinstance(x_train,np.ndarray):
+            x_train = np.array(x_train)
+            if x_train.ndim == 1:
+                x_train.reshape((np.size(x_train),x_train.ndim))
+        if not isinstance(y_train,np.ndarray):
+            y_train = np.array(y_train)
+            if y_train.ndim == 1:
+                y_train.reshape((np.size(y_train),y_train.ndim))
+        sample_number = np.shape(x_train)[0]
+        if sample_number != np.shape(y_train)[0]:
+            logging.error('training and target values have different first dimension'
+                          '. Sample number missmatch.')
+        reminder = sample_number % self.n_fold
+        batch_size = int((sample_number-reminder)/self.n_fold)
+        self.batch_errors = []
+        for it in range(0,sample_number-reminder,batch_size):
+
+            test_batch = x_train[it:it+batch_size-1,:]
+            train_batch = np.concatenate(x_train[:it,:],x_train[it+batch_size:,:],
+                                         axis=0)
+            test_target = y_train[it:it+batch_size-1,:]
+            train_target = np.concatenate(y_train[:it,:],y_train[it+batch_size:,:],
+                                          axis=0)
+            self.estimator.fit(train_batch,train_target)
+            self.batch_errors.append(self.estimator.evaluate(test_batch,test_target))
+
+
+        self.estimator.fit(x_train,y_train) #refit estimator on training data
+        self.score = np.mean(self.batch_errors)
+        self.std_error_emp = np.std(self.batch_errors)
+
+    def predict(self,data):
+        if not isinstance(data,np.ndarray):
+            data = np.array(data)
+        return self.estimator.predict(data)
 
     def evaluate(self,x,y):
+        return self.estimator.evaluate(x,y)
 
-        pred = self._grnn.predict(x)
-        acc = 1. - np.linalg.norm(pred-y)**2 \
-                   /np.linalg.norm(y-np.mean(y,axis=0))**2
-        return acc
+    def get_std_error(self):
+        return self.std_error_emp
+
+

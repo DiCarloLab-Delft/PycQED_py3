@@ -959,31 +959,27 @@ class Mixer_calibration_evaluation(MeasurementAnalysis):
         return 20.*np.log10(self.meas_vals2/self.meas_vals1)
 
     def make_figures(self,**kw):
-        base_figname = 'mixer_peak_suppression'
-        f,ax1 = plt.subplots()
+        base_figname = self.ma_after.timestamp_string+'_mixer_peak_suppression'
+        f,[ax1,ax2] = plt.subplots(2,1)
+        ax1.set_title('mixer peak suppression')
         ax1.set_ylabel('power ratio [dB]')
         ax1.set_xlabel('frequency [GHz]')
+        ax2.set_xlabel('frequencies [GHz]')
+        ax2.set_ylabel('power ratio[db]')
         ax1.plot(self.sweep_pts1,self.signal_ratio,color='goldenrod',
                  linestyle='solid',
                  label=r'signal ratio $20\log\left(\frac{V_1}{V_0}\right)$')
         ax1.grid(True)
-        ax2.tick_params('y',labelcolor='blue')
+        ax2.grid(True)
         ax1.legend(loc='best')
         ax2.legend(loc='best')
-        self.save_fig(f, figname=base_figname,**kw)
-
-        base_figname = 'mixer_spectrum_comparison'
-        f,ax1 = plt.subplots()
-        ax1.set_ylabel('voltage levels [dBm]')
-        ax1.plot(self.sweep_pts1,self.meas_vals1,color='blue',linestyle='solid',
+        ax2.plot(self.sweep_pts1,20*np.log10(self.meas_vals1),
+                 color='blue',linestyle='solid',
                  label='pre calibration',alpha=0.5)
-        ax1.plot(self.sweep_pts2,self.meas_vals2,color='green',linestyle='solid',
+        ax2.plot(self.sweep_pts2,20*np.log10(self.meas_vals2),
+                 color='green',linestyle='solid',
                  label='post calibration',alpha=1.0)
-        ax1.grid(True)
-        ax1.set_xlabel('frequencies [GHz]')
-        ax1.legend(loc='best')
         self.save_fig(f, figname=base_figname,**kw)
-
 
 class OptimizationAnalysis_v2(MeasurementAnalysis):
 
@@ -1032,11 +1028,12 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
         self.hidden_layers = self.ad_func_pars.pop('hidden_layers',[10.,10.])
         self.round = kw.pop('round',1)
         self.alpha = self.ad_func_pars.pop('alpha',1e-2)
-        self.estimator_name = self.ad_func_pars.pop('estimator','DNN_Regressor_tf')
+        self.estimator_name = self.ad_func_pars.pop('estimator','GRNN_neupy')
         self.beta = self.ad_func_pars.pop('beta',0.)
         self.gamma = self.ad_func_pars.pop('gamma',1.)
         self.iters = self.ad_func_pars.pop('iters',200)
         self.ndim = self.ad_func_pars.pop('ndim',2)
+        self.n_fold = self.ad_func_pars.pop('n_fold',5)
         self.accuracy= -np.infty
         #already rescaled to original average,interval.
         # self.optimization_result,\
@@ -1056,7 +1053,7 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
             self.abs_vals = deepcopy(self.measured_values[0,:])
         else:
             self.abs_vals = np.sqrt(self.measured_values[0,:]**2 + self.measured_values[1,:]**2)
-        result,est,test_vals,opti_flag\
+        result,est,opti_flag\
                                   = opt.neural_network_opt(None, self.meas_grid,
                                           self.abs_vals,
                                           hidden_layers = self.hidden_layers,
@@ -1066,17 +1063,16 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
                                           iters = self.iters,
                                           beta=self.beta,
                                           gamma=self.gamma,
-                                          ndim=self.ndim)
+                                          ndim=self.ndim,
+                                          n_fold = self.n_fold)
         #test_grid and test_target values. Centered and scaled to [-1,1] since
         #only used for performance estimation of estimator
-        self.test_grid = test_vals[0]
-        self.test_target = test_vals[1]
         self.opti_flag = opti_flag
         self.estimator = est
-        self.accuracy = est.evaluate(self.test_grid,self.test_target)
+        # self.accuracy = est.evaluate(self.test_grid,self.test_target)
         self.optimization_result = result
 
-        return result,est,test_vals
+        return result,est
 
     def make_figures(self, **kw):
 
@@ -1150,8 +1146,9 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
                textstr+='%s: %.3g %s' % (self.parameter_names[i],
                                          self.optimization_result[i],
                                          self.parameter_units[i])
-               if not i== len(self.parameter_names)-1:
-                   textstr+='\n'
+               # if not i== len(self.parameter_names)-1:
+               #     textstr+='\n'
+        textstr+='empirical error: '+str(self.estimator.score)
         ax1.text(0.98, 0.05, textstr,
              transform=ax1.transAxes,
              fontsize=11, verticalalignment='bottom',
@@ -1167,8 +1164,8 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
                  marker='o',c='white',label='network minimum')
         ax1.scatter(self.sweep_points[0],self.sweep_points[1],
                  marker='o',c='r',label='training data',s=10)
-        ax1.scatter(self.test_grid[:,0],self.test_grid[:,1],
-                    marker='o',c='y',label='test data',s=10)
+        # ax1.scatter(self.test_grid[:,0],self.test_grid[:,1],
+        #             marker='o',c='y',label='test data',s=10)
         ax1.tick_params(axis='both',which='minor',labelsize=14)
         ax1.set_ylabel(self.parameter_labels[1],fontsize=fontsize)
         ax1.set_xlabel(self.parameter_labels[0],fontsize=fontsize)

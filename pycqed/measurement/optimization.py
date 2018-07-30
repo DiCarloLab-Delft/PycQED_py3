@@ -294,7 +294,8 @@ def center_and_scale(X,y):
 def neural_network_opt(fun, training_grid, target_values = None,
                        hidden_layers=[10, 10],
                        alpha= 0.0001, solver='lbfgs',estimator='GRNN_neupy',
-                       iters = 200, beta=0.9 , gamma=1., test_size=0.1,ndim=2):
+                       iters = 200, beta=0.9 , gamma=1., test_size=0.1,ndim=2,
+                       **kwargs):
     """
     parameters:
         fun:           Function that can be used to get data points
@@ -327,7 +328,7 @@ def neural_network_opt(fun, training_grid, target_values = None,
     ###############################################################
     ###          create measurement data from test_grid         ###
     ###############################################################
-
+    n_fold = kwargs.get('n_fold',5)
     training_grid = np.transpose(training_grid)
     #get input dimension, training grid contains parameters as row!! vectors
     if len(np.shape(training_grid)) == 1:
@@ -355,15 +356,11 @@ def neural_network_opt(fun, training_grid, target_values = None,
     input_feature_means,input_feature_ext,\
     output_feature_means,output_feature_ext \
                  = center_and_scale(training_grid,target_values)
-    # training_grid = np.transpose(training_grid)
-    # target_values = np.transpose(target_values)
-    training_grid, test_grid,target_values,test_values = \
-                                        train_test_split(training_grid,target_values,
-                                                         test_size=test_size)
-    # training_grid = np.transpose(training_grid)
-    # target_values = np.transpose(target_values)
-    # test_grid = np.transpose(test_grid)
-    # test_values = np.transpose(test_values)
+
+    # training_grid, test_grid,target_values,test_values = \
+    #                                     train_test_split(training_grid,target_values,
+    #                                                      test_size=test_size)
+
 
     #Save the preprocessing information in order to be able to rescale the values later.
     pre_processing_dict ={'output': {'scaling': output_feature_ext,
@@ -398,14 +395,14 @@ def neural_network_opt(fun, training_grid, target_values = None,
 
     def grnn():
         est = ml.GRNN_neupy(gamma=gamma, pre_proc_dict=pre_processing_dict)
-        est.fit(training_grid,target_values)
-        return est
+        cv_est = ml.CrossValidationEstimator(est,n_fold=n_fold)
+        cv_est.fit(training_grid,target_values)
+        return cv_est
 
     def polyreg():
         est = ml.Polynomial_Regression(ndim=ndim, pre_proc_dict=pre_processing_dict)
         est.fit(training_grid,target_values)
         return est
-
 
     estimators = {'MLP_Regressor_scikit': mlpr, #defines all current estimators currently implemented
                   'DNN_Regressor_tf': dnnr,
@@ -442,7 +439,7 @@ def neural_network_opt(fun, training_grid, target_values = None,
         result[it] = result[it]*input_feature_ext[it]+input_feature_means[it]
     print('minimization results: ',result,'::',amp)
 
-    return np.array(result), est, [test_grid,test_values] ,opti_flag
+    return np.array(result), est,opti_flag
 
 
 
