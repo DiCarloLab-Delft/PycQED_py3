@@ -622,8 +622,8 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int,
 
         platf_cfg:      filename of the platform config file
         target_qubit_sequence: selects whether to run a ramsey sequence on
-        	a target qubit ('ramsey'), keep it in gorund state ('ground')
-        	or excite it iat the beginning of the sequnce ('excited') 
+            a target qubit ('ramsey'), keep it in gorund state ('ground')
+            or excite it iat the beginning of the sequnce ('excited') 
     Returns:
         p:              OpenQL Program object containing
 
@@ -652,15 +652,15 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int,
     k.prepz(qubit_idx)
     
     if target_qubit_sequence=='ramsey':
-    	k.gate('rx90', qubit_idx_spec)
+        k.gate('rx90', qubit_idx_spec)
     elif target_qubit_sequence == 'excited':
-    	k.gate('rx180', qubit_idx_spec)
+        k.gate('rx180', qubit_idx_spec)
     elif target_qubit_sequence=='ground':
-    	k.gate('i', qubit_idx_spec)
+        k.gate('i', qubit_idx_spec)
     else:
-    	k.gate('i', qubit_idx_spec)
-    	logging.warning('target_qubit_sequence not recognized.'
-    		'Keeping target qubit in a ground state.')
+        k.gate('i', qubit_idx_spec)
+        logging.warning('target_qubit_sequence not recognized.'
+            'Keeping target qubit in a ground state.')
     k.gate('rx180', qubit_idx)
     
     k.gate("wait", [qubit_idx], buffer_nanoseconds)
@@ -680,6 +680,80 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int,
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
+
+
+
+def two_qubit_ramsey(times, qubit_idx: int, qubit_idx_spec: int,
+            platf_cfg: str, target_qubit_sequence: str='excited'):
+    """
+    Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
+
+    Input pars:
+        times:          the list of waiting times for each Ramsey element
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        qubit_idx_spec: int specifying the spectator qubit
+
+        platf_cfg:      filename of the platform config file
+        target_qubit_sequence: selects whether to run a ramsey sequence on
+            a target qubit ('ramsey'), keep it in gorund state ('ground')
+            or excite it iat the beginning of the sequnce ('excited') 
+    Returns:
+        p:              OpenQL Program object containing
+
+
+    Circuit:
+        q0    --x90-wait-x90-RO-
+        qspec --x90----------RO- (target_qubit_sequence='ramsey')
+
+        q0    --x90-wait-x90-RO-
+        qspec -x180----------RO- (target_qubit_sequence='excited')
+
+        q0    --x90-wait-x90-RO-
+        qspec ---------------RO- (target_qubit_sequence='ground')
+
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="two_qubit_ramsey", nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    for i, time in enumerate(times):
+        k = Kernel("two_qubit_ramsey", p=platf)
+        k.prepz(qubit_idx)
+        
+        if target_qubit_sequence=='ramsey':
+            k.gate('rx90', qubit_idx_spec)
+        elif target_qubit_sequence == 'excited':
+            k.gate('rx180', qubit_idx_spec)
+        elif target_qubit_sequence=='ground':
+            k.gate('i', qubit_idx_spec)
+        else:
+            k.gate('i', qubit_idx_spec)
+            logging.warning('target_qubit_sequence not recognized.'
+                'Keeping target qubit in a ground state.')
+        k.gate('rx90', qubit_idx)
+        
+        wait_nanoseconds = int(round(time/1e-9))
+        k.gate("wait", [qubit_idx, qubit_idx_spec], wait_nanoseconds)
+
+        k.gate('i', qubit_idx_spec)
+        k.gate('rx90', qubit_idx)
+        
+        k.measure(qubit_idx)
+        k.measure(qubit_idx_spec)
+        k.gate("wait", [qubit_idx, qubit_idx_spec], 0)
+        p.add_kernel(k)
+
+    # adding the calibration points
+    add_two_q_cal_points(p, platf, qubit_idx, qubit_idx_spec, reps_per_cal_pt=2)
+
+    with suppress_stdout():
+        p.compile()
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
 
 
 def two_qubit_tomo_bell(bell_state, q0, q1,

@@ -2154,6 +2154,7 @@ class CCLight_Transmon(Qubit):
             if using_VSM:
                 parameter_list = ["freq_qubit",
                                 "mw_vsm_G_amp",
+                                "mw_vsm_D_amp"]
             else:
                 parameter_list = ["freq_qubit",
                               	"mw_channel_amp",
