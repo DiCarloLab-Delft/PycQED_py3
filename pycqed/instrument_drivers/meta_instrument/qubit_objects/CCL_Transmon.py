@@ -2148,10 +2148,16 @@ class CCLight_Transmon(Qubit):
         if nested_MC is None:
             nested_MC = self.instr_nested_MC.get_instr()
 
+        using_VSM = self.cfg_with_vsm()
+
         if parameter_list is None:
-            parameter_list = ["freq_qubit",
-                              "mw_vsm_G_amp",
-                              "mw_vsm_D_amp"]
+            if using_VSM:
+                parameter_list = ["freq_qubit",
+                                "mw_vsm_G_amp",
+            else:
+                parameter_list = ["freq_qubit",
+                              	"mw_channel_amp",
+                              	"mw_motzoi"]
 
         nested_MC.set_sweep_functions([
             self.__getattr__(p) for p in parameter_list])
@@ -2638,8 +2644,10 @@ class CCLight_Transmon(Qubit):
                 swf_func = swf.QWG_lutman_par(LutMan=MW_LutMan,
                                               LutMan_parameter=MW_LutMan.mw_motzoi)
             else:
-                raise NotImplementedError(
-                    'VSM-less case not implemented without QWG.')
+                if motzoi_amps is None:
+                    motzoi_amps = np.linspace(-.3, .3, 31)
+                swf_func = swf.lutman_par(LutMan=MW_LutMan,
+                                          LutMan_parameter=MW_LutMan.mw_motzoi)
 
         MC.set_sweep_function(swf_func)
         MC.set_sweep_points(motzoi_amps)
