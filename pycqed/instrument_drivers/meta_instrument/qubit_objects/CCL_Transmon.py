@@ -1048,9 +1048,8 @@ class CCLight_Transmon(Qubit):
         a = ma.Rabi_Analysis(close_fig=close_fig, label='rabi')
         if self.cfg_with_vsm():
             self.mw_vsm_G_amp(a.rabi_amplitudes['piPulse'])
-        else: 
-            self.instr_LutMan_MW.get_instr().channel_amp(a.rabi_amplitudes['piPulse'])
-            #self.mw_amp180(a.rabi_amplitudes['piPulse'])
+
+            self.mw_channel_amp(a.rabi_amplitudes['piPulse'])
         return True
 
     def calibrate_mw_vsm_delay(self):
@@ -1941,12 +1940,6 @@ class CCLight_Transmon(Qubit):
         self.int_avg_det_single._set_real_imag(real_imag)
         MC.set_detector_function(self.int_avg_det_single)
         MC.run(name='rabi_'+self.msmt_suffix)
-        a=ma.Rabi_Analysis(label='rabi_')
-
-        # FIXME: this should not be in here, sould be part of calibrate pulse amps coarse
-        if update_mw_lutman:
-            MW_LutMan.channel_amp(a.rabi_amplitudes['piPulse'])
-            self.mw_amp180(a.rabi_amplitudes['piPulse'])
         return True
 
     def measure_allxy(self, MC=None,
