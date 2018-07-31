@@ -45,10 +45,10 @@ class NoiseParametersCZ(Instrument):
                            label='scaling factor for the voltage for a CZ pulse',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers(), initial_value=1.0)
-        self.add_parameter('T2_q0_amplitude_dependent', unit='a.u.',
-                           label='fitcoefficients giving T2_q0 as a function of detuning',
+        self.add_parameter('T2_q0_amplitude_dependent', unit='Hz, a.u., s',
+                           label='fitcoefficients giving T2echo_q0 as a function of frequency_q0: gc, amp, tau. Function is gc+gc*amp*np.exp(-x/tau)',
                            parameter_class=ManualParameter,
-                           vals=vals.Arrays(), initial_value=np.array([-1]))
+                           vals=vals.Arrays(), initial_value=np.array([-1,-1,-1]))
         self.add_parameter('w_bus', unit='Hz',
                            label='omega of the bus resonator',
                            parameter_class=ManualParameter,

@@ -972,10 +972,13 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 
 
-        if T2_q0_amplitude_dependent != np.array([-1]):     # CHANGE ITTTTT
-            # something like: 
-            # - map f_pulse to T2 via polycoefficients OR interpolate dataset of T2 vs frequency/detuning
-            # - compute Tphi01 from T2
+        if T2_q0_amplitude_dependent[0] != -1:
+
+            def expT2(x,gc,amp,tau):
+                return gc+gc*amp*np.exp(-x/tau)
+
+            T2_q0_vec=expT2(f_pulse_convolved_new/(2*np.pi),T2_q0_amplitude_dependent[0],T2_q0_amplitude_dependent[1],T2_q0_amplitude_dependent[2])
+            Tphi01_q0_vec = Tphi_from_T1andT2(T1_q0,T2_q0_vec)
 
             c_ops = c_ops_interpolating(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1)
 
@@ -990,6 +993,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                 return np.abs((w_q0/2)*np.sqrt(1-(omega/w_q0)**2))    # we actually return the absolute value because it's the only one who matters later
 
             if Tphi01_q0_interaction_point != 0:       # mode where the pure dephazing is amplitude-dependent
+
                 w_min = np.nanmin(f_pulse_convolved_new)        
                 omega_prime_min = omega_prime(w_min)
 
@@ -999,6 +1003,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                          # we interpolate Tphi from the sweetspot to the interaction point (=worst point in terms of Tphi)
                          # by weighting depending on the derivative of f_pulse compared to the derivative at the interaction point
                 c_ops = c_ops_interpolating(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1)
+
             else:                                       # mode where the collapse operators are time-independent, and possibly are 0
                 c_ops=jump_operators(T1_q0,T1_q1,0,0,0,0,0,
                         Tphi01_q0_sweetspot,Tphi01_q0_sweetspot,Tphi01_q0_sweetspot/2,Tphi01_q1,Tphi01_q1,Tphi01_q1/2)
