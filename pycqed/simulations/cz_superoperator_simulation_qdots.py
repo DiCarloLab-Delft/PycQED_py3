@@ -12,22 +12,59 @@ from pycqed.measurement.waveform_control_CC import waveform as wf
 import scipy
 import matplotlib.pyplot as plt
 #np.set_printoptions(threshold=np.inf)
-eV_to_Hz = 1/4.1357e-15
-
-
-w_q1 = 18.4e9 * 2*np.pi
-w_q2 = 19.7e9 * 2*np.pi
-U_q1 = 3.5e-3 * eV_to_Hz * 2*np.pi      # meV converted to Hz
-U_q2 = 3.5e-3 * eV_to_Hz * 2*np.pi      # meV converted to Hz
-t_hopping = 0
 
 
 
-# caracteristic timescales for jump operators
-T1_q1=50e-3
-T1_q2=3.7e-3
-T2_q1_hahn_sweetspot = 19e-6
-T2_q2_hahn_sweetspot = 7e-6
+# eV_to_Hz = 1/4.1357e-15
+
+# w_q1 = 18.4e9 * 2*np.pi
+# w_q2 = 19.7e9 * 2*np.pi
+# U_q1 = 3.5e-3 * eV_to_Hz * 2*np.pi      # meV converted to Hz
+# U_q2 = 3.5e-3 * eV_to_Hz * 2*np.pi      # meV converted to Hz
+# t_hopping = 210e6 * 2*np.pi
+
+
+# # caracteristic timescales for jump operators
+# T1_q1=50e-3
+# T1_q2=3.7e-3
+# T2_q1_hahn_sweetspot = 19e-6
+# T2_q2_hahn_sweetspot = 7e-6
+
+
+
+def plot(x_plot_vec,y_plot_vec,title='No title',xlabel='No xlabel',ylabel='No ylabel',legend_labels=list(),yscale='linear'):
+
+	if isinstance(y_plot_vec,list):
+		y_length=len(y_plot_vec)
+	else:
+		y_length=np.size(y_plot_vec)
+
+	if legend_labels==[]:
+		legend_labels=np.arange(y_length)
+
+	for i in range(y_length):
+
+		if isinstance(y_plot_vec[i],list):
+			y_plot_vec[i]=np.array(y_plot_vec[i])
+		if isinstance(legend_labels[i],int):
+			legend_labels[i]=str(legend_labels[i])
+
+		if len(x_plot_vec)==1:
+			if isinstance(x_plot_vec[0],list):
+				x_plot_vec[0]=np.array(x_plot_vec[0])
+			plt.plot(x_plot_vec[0], y_plot_vec[i], label=legend_labels[i])
+		else:
+			if isinstance(x_plot_vec[i],list):
+				x_plot_vec[i]=np.array(x_plot_vec[i])
+			plt.plot(x_plot_vec[i], y_plot_vec[i], label=legend_labels[i])
+
+	plt.legend()
+	plt.title(title)
+	plt.xlabel(xlabel)
+	plt.ylabel(ylabel)
+	plt.yscale(yscale)
+	#plt.ylim(-25,75)
+	plt.show()
 
 
 
@@ -63,7 +100,7 @@ def coupled_qdots_hamiltonian(w_q1, w_q2, U_q1, U_q2, t_hopping):
     return H_0
 
 
-H_0 = coupled_qdots_hamiltonian(w_q1=w_q1, w_q2=w_q2, U_q1=U_q1, U_q2=U_q2, t_hopping=t_hopping)
+# H_0 = coupled_qdots_hamiltonian(w_q1=w_q1, w_q2=w_q2, U_q1=U_q1, U_q2=U_q2, t_hopping=t_hopping)
 
 
 H_c =      qtp.Qobj([[0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -79,6 +116,8 @@ H_c =      qtp.Qobj([[0, 0, 0, 0, 0, 0, 0, 0, 0],
                     dims=[[3, 3], [3, 3]])
 
 
+# BENCHMARK OF THE SPECTRUM OF H_0
+
 def spectrum_of_interest(H_0,controlparameter,desiredlevels):
 	eigenvalues=list()
 	for i in range(len(desiredlevels)):
@@ -91,43 +130,43 @@ def spectrum_of_interest(H_0,controlparameter,desiredlevels):
 
 	return eigenvalues
 
+# controlparameter=np.linspace(-4e-3*eV_to_Hz*2*np.pi,4e-3*eV_to_Hz*2*np.pi,1001)
+# desiredlevels=np.arange(6)
+# eigenvalues=spectrum_of_interest(H_0,controlparameter,desiredlevels)
 
-def plot(x_plot,y_plot_vec,title='No title',xlabel='No xlabel',ylabel='No ylabel',legend_labels=list(),yscale='linear'):
-
-	if isinstance(x_plot,list):
-		x_plot=np.array(x_plot)
-
-	if isinstance(y_plot_vec,list):
-		y_length=len(y_plot_vec)
-	else:
-		y_length=np.size(y_plot_vec)
-
-	if legend_labels==[]:
-		legend_labels=np.arange(y_length)
-
-	for i in range(y_length):
-
-		if isinstance(y_plot_vec[i],list):
-			y_plot_vec[i]=np.array(y_plot_vec[i])
-		if isinstance(legend_labels[i],int):
-			legend_labels[i]=str(legend_labels[i])
-
-		plt.plot(x_plot, y_plot_vec[i], label=legend_labels[i])
-
-	plt.legend()
-	plt.title(title)
-	plt.xlabel(xlabel)
-	plt.ylabel(ylabel)
-	plt.yscale(yscale)
-	plt.show()
+# plot(x_plot_vec=[controlparameter/(2*np.pi)/eV_to_Hz*1e3],y_plot_vec=eigenvalues,title='First 6 energy levels for two qdots',
+#   	xlabel='Detuning epsilon (meV)',ylabel='Frequency (GHz)',legend_labels=desiredlevels)
 
 
-controlparameter=np.linspace(-5e-3*eV_to_Hz*2*np.pi,5e-3*eV_to_Hz*2*np.pi,1001)
-desiredlevels=np.arange(4)
-eigenvalues=spectrum_of_interest(H_0,controlparameter,desiredlevels)
 
-plot(x_plot=controlparameter/(2*np.pi)/eV_to_Hz*1e3,y_plot_vec=eigenvalues,title='First 6 energy levels for two qdots',
-	xlabel='Detuning epsilon (meV)',ylabel='Frequency (Hz)',legend_labels=desiredlevels)
+
+# BENCHMARK FORMULAS TO COMPUTE THE TIME TO DO A CZ
+
+def gap_and_eigenvectors(H_0,Omega):
+    H=H_0+Omega*H_c
+    eigs,eigvectors=H.eigenstates()
+    E_00=eigs[0]
+    E_10=eigs[1]
+    E_01=eigs[2]
+    E_11=eigs[3]
+    #E_02=eigs[4]
+    gap=np.abs(E_11-E_01-E_10+E_00)
+    return gap
+
+def compute_cz_time(H_0,epsilon):
+	gap=gap_and_eigenvectors(H_0,epsilon)
+	return np.pi/gap
+
+# cz_time=list()
+# epsilon_range=np.linspace(3.0e-3*eV_to_Hz*2*np.pi,3.4e-3*eV_to_Hz*2*np.pi)
+# for epsilon in epsilon_range:
+# 	cz_time.append(compute_cz_time(H_0,epsilon)*1e9)
+# #print(cz_time[0],cz_time[-1])
+
+# plot(x_plot_vec=[epsilon_range/(2*np.pi)/eV_to_Hz*1e3],y_plot_vec=[cz_time],title='Time to do a CZ',
+#    	xlabel='Detuning epsilon (meV)',ylabel='Time (ns)')
+
+
 
 
 # target in the case with no noise
@@ -172,6 +211,8 @@ where xy is the row and x'y' is the column
 
 def jump_operators(T1_q0,T1_q1,Tphi_q0_ket0toket0,Tphi_q0_ket1toket1,Tphi_q0_ket2toket2,Tphi_q1_ket0toket0,Tphi_q1_ket1toket1,
 					Tphi_q0_sigmaZ_01,Tphi_q0_sigmaZ_12,Tphi_q0_sigmaZ_02,Tphi_q1_sigmaZ_01,Tphi_q1_sigmaZ_12,Tphi_q1_sigmaZ_02):
+	b = qtp.tensor(qtp.destroy(3), qtp.qeye(3))  # LSB is static qubit
+	a = qtp.tensor(qtp.qeye(3), qtp.destroy(3))
     # time independent case
 	c_ops=[]
 	if T1_q0 != 0:
@@ -555,7 +596,7 @@ def pro_avfid_superoperator_phasecorrected(U,phases):
 tlist = np.arange(0, 240e-9, 1/2.4e9)
 
 
-def time_evolution(sim_step,eps_vec,H_0,c_ops,initial_propagator):
+def time_evolution_squarepulse(H,c_ops,time,initial_propagator=1):
     '''scalefactor=1e6
     tlist_sim=tlist_sim*scalefactor
     eps_vec=eps_vec/scalefactor
@@ -574,21 +615,37 @@ def time_evolution(sim_step,eps_vec,H_0,c_ops,initial_propagator):
         length_tlist=len(tlist_sim)
     else:
     	length_tlist=np.size(tlist_sim)'''
-    for eps in eps_vec:
-        H=H_0+eps*H_c    #(eps_vec[i+1]+eps_vec[i])/2
-        c_ops_temp=[]
-        if c_ops != []:
-            for c in range(len(c_ops)):
-                if isinstance(c_ops[c],list):
-                   c_ops_temp.append(c_ops[c][0]*c_ops[c][1][i])
-                else:
-                   c_ops_temp.append(c_ops[c])
-            liouville_exp_t=(qtp.liouvillian(H,c_ops_temp)*sim_step).expm()
-        else:
-        	liouville_exp_t=(-1j*H*sim_step).expm()
-        exp_L_total=liouville_exp_t*exp_L_total
+    c_ops_temp=list()
+    if c_ops != []:
+        for c in range(len(c_ops)):
+            if isinstance(c_ops[c],list):
+               c_ops_temp.append(c_ops[c][0]*c_ops[c][1][i])
+            else:
+               c_ops_temp.append(c_ops[c])
+        liouville_exp_t=(qtp.liouvillian(H,c_ops_temp)*time).expm()
+    else:
+    	liouville_exp_t=(-1j*H*time).expm()
+    exp_L_total=liouville_exp_t*exp_L_total
+
     return exp_L_total
 
+
+def matrix_change_of_variables(H_0):
+    eigs,eigvectors=H_0.eigenstates()
+
+    eigvectors_ordered_according2basis = []
+    eigvectors_ordered_according2basis.append(eigvectors[0].full())   # 00 state
+    eigvectors_ordered_according2basis.append(eigvectors[2].full())   # 01 state
+    eigvectors_ordered_according2basis.append(eigvectors[4].full())   # 02 state
+    eigvectors_ordered_according2basis.append(eigvectors[1].full())   # 10 state
+    eigvectors_ordered_according2basis.append(eigvectors[3].full())   # 11 state
+    eigvectors_ordered_according2basis.append(eigvectors[7].full())   # 12 state
+    eigvectors_ordered_according2basis.append(eigvectors[5].full())   # 20 state
+    eigvectors_ordered_according2basis.append(eigvectors[6].full())   # 21 state
+    eigvectors_ordered_according2basis.append(eigvectors[8].full())   # 22 state
+
+    S=np.hstack(eigvectors_ordered_according2basis)
+    return S
 
 
 def simulate_quantities_of_interest_superoperator(H_0, tlist, c_ops, eps_vec,
@@ -628,7 +685,6 @@ def simulate_quantities_of_interest_superoperator(H_0, tlist, c_ops, eps_vec,
                 c_ops[c][1]=c_ops[c][1]/np.sqrt(scalefactor)
             else:
                 c_ops[c]=c_ops[c]/np.sqrt(scalefactor)
-    H_c = n_q0
 
 
     '''								# step of 1/sampling_rate=1/2.4e9=0.4 ns seems good by itself
@@ -782,6 +838,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         self.noise_parameters_CZ = noise_parameters_CZ
 
     def acquire_data_point(self, **kw):
+        '''
         tlist = (np.arange(0, self.fluxlutman.cz_length(),
                            1/self.fluxlutman.sampling_rate()))
         if not self.fluxlutman.czd_double_sided():
@@ -801,12 +858,14 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         # extract base frequency from the Hamiltonian
         w_q0 = np.real(self.H_0[1,1])
         eps_vec = f_pulse - w_q0
+        '''
+
 
 
         T1_q0 = self.noise_parameters_CZ.T1_q0()
         T1_q1 = self.noise_parameters_CZ.T1_q1()
         T2_q0_sweetspot = self.noise_parameters_CZ.T2_q0_sweetspot()
-        T2_q0_interaction_point = self.noise_parameters_CZ.T2_q0_interaction_point()
+        #T2_q0_interaction_point = self.noise_parameters_CZ.T2_q0_interaction_point()
         T2_q1 = self.noise_parameters_CZ.T2_q1()
 
         def Tphi_from_T1andT2(T1,T2):
@@ -816,54 +875,43 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             Tphi01_q0_sweetspot=Tphi_from_T1andT2(T1_q0,T2_q0_sweetspot)
         else:
             Tphi01_q0_sweetspot=0
-        if T2_q0_interaction_point != 0:
-            Tphi01_q0_interaction_point=Tphi_from_T1andT2(T1_q0,T2_q0_interaction_point)
-        else:
-            Tphi01_q0_interaction_point=0
+        # if T2_q0_interaction_point != 0:
+        #     Tphi01_q0_interaction_point=Tphi_from_T1andT2(T1_q0,T2_q0_interaction_point)
+        # else:
+        #     Tphi01_q0_interaction_point=0
         # Tphi01=Tphi12=2*Tphi02
         if T2_q1 != 0:
             Tphi01_q1 = Tphi_from_T1andT2(T1_q1,T2_q1)
         else:
             Tphi01_q1=0
 
-
-
-        def omega_prime(omega):                                   # derivative of f_pulse
-            '''
-            frequency is w = w_0 * cos(phi_e/2)    where phi_e is the external flux through the SQUID.
-            So the derivative wrt phi_e is
-                 w_prime = - w_0/2 sin(phi_e/2) = - w_0/2 * sqrt(1-cos(phi_e/2)**2) = - w_0/2 * sqrt(1-(w/w_0)**2)
-            Note: no need to know what phi_e is.
-            '''
-            return np.abs((w_q0/2)*np.sqrt(1-(omega/w_q0)**2))    # we actually return the absolute value because it's the only one who matters later
-
-        if Tphi01_q0_interaction_point != 0:       # mode where the pure dephazing is amplitude-dependent
-            w_min = np.nanmin(f_pulse)        
-            omega_prime_min = omega_prime(w_min)
-
-            f_pulse=np.clip(f_pulse,0,w_q0)
-            f_pulse_prime = omega_prime(f_pulse)
-            Tphi01_q0_vec = Tphi01_q0_sweetspot - f_pulse_prime/omega_prime_min*(Tphi01_q0_sweetspot-Tphi01_q0_interaction_point)
-                     # we interpolate Tphi from the sweetspot to the interaction point (=worst point in terms of Tphi)
-                     # by weighting depending on the derivative of f_pulse compared to the derivative at the interaction point
-            c_ops = c_ops_interpolating(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1)
-        else:                                       # mode where the collapse operators are time-independent, and possibly are 0
-            c_ops=jump_operators(T1_q0,T1_q1,0,0,0,0,0,
-                    Tphi01_q0_sweetspot,Tphi01_q0_sweetspot,Tphi01_q0_sweetspot/2,Tphi01_q1,Tphi01_q1,Tphi01_q1/2)
+        #collapse operators are given in the basis of H_0
+        c_ops=jump_operators(T1_q0,T1_q1,0,0,0,0,0,
+                    Tphi01_q0_sweetspot,0,Tphi01_q0_sweetspot/2,Tphi01_q1,0,Tphi01_q1/2)
 
 
 
 
-        qoi = simulate_quantities_of_interest_superoperator(
-            H_0=self.H_0,
-            tlist=tlist, c_ops=c_ops, eps_vec=eps_vec,
-            sim_step=1/self.fluxlutman.sampling_rate(), verbose=False)
+        epsilon=self.noise_parameters_CZ.detuning() * 1e-3*eV_to_Hz*2*np.pi
+        H=self.H_0+epsilon*H_c
+
+        #We transform H in the basis of H_0 (collapse operators already expressed in that bais),
+        #so that the time evolution is already expressed in the correct basis
+        S = qtp.Qobj(matrix_change_of_variables(self.H_0),dims=[[3, 3], [3, 3]])
+        H=S*H*S.dag()
+
+        cz_time_ideal=compute_cz_time(self.H_0,epsilon)                           #time to acquire a 180 degrees conditional phase
+        time=cz_time_ideal+self.noise_parameters_CZ.cz_time_offset() * 1e-9
+        
+        U_final=time_evolution_squarepulse(H,c_ops,time,initial_propagator=1)
+        qoi = simulate_quantities_of_interest_superoperator2(U_final)
+
 
         cost_func_val = -np.log10(1-qoi['avgatefid_compsubspace_pc'])   # new cost function: infidelity
         #np.abs(qoi['phi_cond']-180) + qoi['L1']*100 * 5
         return cost_func_val, qoi['phi_cond'], qoi['L1']*100, qoi['L2']*100, qoi['avgatefid_pc']*100, qoi['avgatefid_compsubspace_pc']*100
 
-    def get_f_pulse_double_sided(self):
+    '''def get_f_pulse_double_sided(self):
         half_CZ_A = wf.martinis_flux_pulse(
             length=self.fluxlutman.cz_length()*self.fluxlutman.czd_length_ratio(),
             lambda_2=self.fluxlutman.cz_lambda_2(),
@@ -905,4 +953,4 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
         # N.B. No amp scaling and offset present
         f_pulse = np.concatenate([half_CZ_A, half_CZ_B])
-        return f_pulse
+        return f_pulse'''

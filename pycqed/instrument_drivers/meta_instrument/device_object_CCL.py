@@ -971,6 +971,53 @@ class DeviceCCL(Instrument):
             MC.run('Chevron {} {}'.format(q0, q_spec), mode='adaptive')
 
 
+
+    def measure_two_qubit_ramsey(self, q0: str, q_spec: str,
+                        times,
+                        prepare_for_timedomain=True, MC=None,
+                        target_qubit_sequence: str='excited'):
+        """
+        Measure a ramsey on q0 while setting the q_spec
+        to excited state ('excited'), ground state ('ground') or 
+        superposition ('ramsey')
+        """
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        assert q0 in self.qubits()
+        assert q_spec in self.qubits()
+
+        q0idx = self.find_instrument(q0).cfg_qubit_nr()
+        q_specidx = self.find_instrument(q_spec).cfg_qubit_nr()
+
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+
+        p = mqo.two_qubit_ramsey(times, q0idx, q_specidx,
+                        platf_cfg=self.cfg_openql_platform_fn(),
+                        target_qubit_sequence=target_qubit_sequence)
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr(),
+                             parameter_name='Time', unit='s')
+
+#        self.instr_CC.get_instr().eqasm_program(p.filename)
+#        self.instr_CC.get_instr().start()
+
+        dt = times[1] - times[0]
+        times = np.concatenate((times,
+                                [times[-1]+k*dt for k in range(1,9)] ))
+
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(times)
+
+        d = self.get_correlation_detector()
+        MC.set_detector_function(d)
+
+        MC.run('Two_qubit_ramsey_{}_{}_{}'.format(q0, q_spec,
+                    target_qubit_sequence), mode='1D')
+        ma.MeasurementAnalysis()    
+
+
     def measure_cryoscope(self, q0: str, times,
                           MC=None,
                           label='Cryoscope',

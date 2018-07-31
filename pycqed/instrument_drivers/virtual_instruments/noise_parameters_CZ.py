@@ -52,7 +52,17 @@ class NoiseParametersCZ(Instrument):
         self.add_parameter('w_bus', unit='Hz',
                            label='omega of the bus resonator',
                            parameter_class=ManualParameter,
-                           vals=vals.Numbers(), initial_value=8.08e9*2*np.pi)
+                           vals=vals.Numbers(), initial_value=8.08e9*2*np.pi)     
+
+        # for qdots simulations
+        self.add_parameter('detuning', unit='meV',
+                           label='detuning in meV between the two valleys of the dots',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(), initial_value=0)
+        self.add_parameter('cz_time_offset', unit='ns',
+                           label='how much we want the length of a square pulse to differ from the length needed to do a CZ without noise',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(), initial_value=0)
 
 
 
