@@ -986,8 +986,9 @@ class CCLight_Transmon(Qubit):
                         self.mw_mixer_offs_GQ())
                 MW_LutMan.channel_amp(self.mw_amp180())
             else:
-                # case without VSM (both QWG and AWG8)
-                MW_LutMan.mw_amp180(self.mw_amp180())
+                # case without VSM (and AWG8)
+                MW_LutMan.mw_amp180(1)
+                MW_LutMan.channel_amp(self.mw_amp180())
                 MW_LutMan.mixer_phi(self.mw_G_mixer_phi())
                 MW_LutMan.mixer_alpha(self.mw_G_mixer_alpha())
 
@@ -996,10 +997,7 @@ class CCLight_Transmon(Qubit):
                         self.mw_mixer_offs_GI())
                 AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()+0),
                         self.mw_mixer_offs_GQ())
-                AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()+1),
-                        self.mw_mixer_offs_DI())
-                AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()+2),
-                        self.mw_mixer_offs_DQ())
+
 
         # 4. reloads the waveforms
         if do_prepare:
@@ -1948,8 +1946,7 @@ class CCLight_Transmon(Qubit):
         # FIXME: this should not be in here, sould be part of calibrate pulse amps coarse
         if update_mw_lutman:
             MW_LutMan.channel_amp(a.rabi_amplitudes['piPulse'])
-            if using_QWG:
-                self.mw_amp180(a.rabi_amplitudes['piPulse'])
+            self.mw_amp180(a.rabi_amplitudes['piPulse'])
         return True
 
     def measure_allxy(self, MC=None,
