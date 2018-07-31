@@ -1919,7 +1919,7 @@ class CCLight_Transmon(Qubit):
 
     def measure_rabi_channel_amp(self, MC=None, amps=np.linspace(0, 1, 31),
                                  analyze=True, close_fig=True, real_imag=True,
-                                 prepare_for_timedomain=True, update_mw_lutman=False):
+                                 prepare_for_timedomain=True):
         MW_LutMan = self.instr_LutMan_MW.get_instr()
         using_QWG = (MW_LutMan.AWG.get_instr(
         ).__class__.__name__ == 'QuTech_AWG_Module')
