@@ -316,6 +316,13 @@ class CCLight_Transmon(Qubit):
                            vals=vals.Numbers(min_value=0, max_value=1.0),
                            parameter_class=ManualParameter)
 
+        self.add_parameter('mw_channel_amp',
+                            label='amplitude of the AWG channels I and Q',
+                            unit='',
+                            initial_value=.5,
+                            vals=vals.Numbers(min_value=0,max_value=1.0),
+                            parameter_class=ManualParameter)
+
         self.add_parameter('mw_ef_amp',
                            label='Pi-pulse amplitude ef-transition', unit='V',
                            initial_value=.4,
@@ -988,6 +995,7 @@ class CCLight_Transmon(Qubit):
             else:
                 # case without VSM (both QWG and AWG8)
                 MW_LutMan.mw_amp180(self.mw_amp180())
+                MW_LutMan.channel_amp(self.mw_channel_amp())
                 MW_LutMan.mixer_phi(self.mw_G_mixer_phi())
                 MW_LutMan.mixer_alpha(self.mw_G_mixer_alpha())
 
@@ -1050,8 +1058,8 @@ class CCLight_Transmon(Qubit):
         a = ma.Rabi_Analysis(close_fig=close_fig, label='rabi')
         if self.cfg_with_vsm():
             self.mw_vsm_G_amp(a.rabi_amplitudes['piPulse'])
-        else: 
-            self.instr_LutMan_MW.get_instr().channel_amp(a.rabi_amplitudes['piPulse'])
+        else:
+            self.mw_channel_amp(a.rabi_amplitudes['piPulse'])
             #self.mw_amp180(a.rabi_amplitudes['piPulse'])
         return True
 
