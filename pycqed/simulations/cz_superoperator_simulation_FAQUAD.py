@@ -13,7 +13,7 @@ from scipy.interpolate import interp1d
 from pycqed.measurement.waveform_control_CC import waveform as wf
 import scipy
 import matplotlib.pyplot as plt
-np.set_printoptions(threshold=np.inf)
+#np.set_printoptions(threshold=np.inf)
 
 
 
@@ -124,6 +124,41 @@ rho_{xy,x'y'}=rho[3*x+y,3*x'+y']
 rho_{xy,x'y'}=operator_to_vector(rho)[3*x+y+27*x'+9*y']				VERIFY
 where xy is the row and x'y' is the column
 '''
+
+
+def plot(x_plot_vec,y_plot_vec,title='No title',xlabel='No xlabel',ylabel='No ylabel',legend_labels=list(),yscale='linear'):
+
+    if isinstance(y_plot_vec,list):
+        y_length=len(y_plot_vec)
+    else:
+        y_length=np.size(y_plot_vec)
+
+    if legend_labels==[]:
+        legend_labels=np.arange(y_length)
+
+    for i in range(y_length):
+
+        if isinstance(y_plot_vec[i],list):
+            y_plot_vec[i]=np.array(y_plot_vec[i])
+        if isinstance(legend_labels[i],int):
+            legend_labels[i]=str(legend_labels[i])
+
+        if len(x_plot_vec)==1:
+            if isinstance(x_plot_vec[0],list):
+                x_plot_vec[0]=np.array(x_plot_vec[0])
+            plt.plot(x_plot_vec[0], y_plot_vec[i], label=legend_labels[i])
+        else:
+            if isinstance(x_plot_vec[i],list):
+                x_plot_vec[i]=np.array(x_plot_vec[i])
+            plt.plot(x_plot_vec[i], y_plot_vec[i], label=legend_labels[i])
+
+    plt.legend()
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.yscale(yscale)
+    plt.show()
+
 
 
 def jump_operators(T1_q0,T1_q1,Tphi_q0_ket0toket0,Tphi_q0_ket1toket1,Tphi_q0_ket2toket2,Tphi_q1_ket0toket0,Tphi_q1_ket1toket1,
@@ -535,6 +570,24 @@ print(pro_avfid_superoperator_compsubspace_phasecorrected(Uphases,
 #tlist = np.arange(0, 240e-9, 1/2.4e9)
 
 
+def matrix_change_of_variables(H_0):
+    eigs,eigvectors=H_0.eigenstates()
+
+    eigvectors_ordered_according2basis = []
+    eigvectors_ordered_according2basis.append(eigvectors[0].full())   # 00 state
+    eigvectors_ordered_according2basis.append(eigvectors[2].full())   # 01 state
+    eigvectors_ordered_according2basis.append(eigvectors[5].full())   # 02 state
+    eigvectors_ordered_according2basis.append(eigvectors[1].full())   # 10 state
+    eigvectors_ordered_according2basis.append(eigvectors[4].full())   # 11 state
+    eigvectors_ordered_according2basis.append(eigvectors[7].full())   # 12 state
+    eigvectors_ordered_according2basis.append(eigvectors[3].full())   # 20 state
+    eigvectors_ordered_according2basis.append(eigvectors[6].full())   # 21 state
+    eigvectors_ordered_according2basis.append(eigvectors[8].full())   # 22 state
+
+    S=np.hstack(eigvectors_ordered_according2basis)
+    return S
+
+
 def time_evolution(sim_step,eps_vec,H_0,c_ops,initial_propagator):
     '''scalefactor=1e6
     tlist_sim=tlist_sim*scalefactor
@@ -549,6 +602,8 @@ def time_evolution(sim_step,eps_vec,H_0,c_ops,initial_propagator):
                 c_ops[c]=c_ops[c]/np.sqrt(scalefactor)'''
 
     exp_L_total=initial_propagator
+
+    #S = qtp.Qobj(matrix_change_of_variables(H_0),dims=[[3, 3], [3, 3]])
     '''
     if isinstance(tlist_sim,list):
         length_tlist=len(tlist_sim)
@@ -556,6 +611,7 @@ def time_evolution(sim_step,eps_vec,H_0,c_ops,initial_propagator):
     	length_tlist=np.size(tlist_sim)'''
     for eps in eps_vec:
         H=H_0+eps*H_c    #(eps_vec[i+1]+eps_vec[i])/2
+        #H=S*H*S.dag()
         c_ops_temp=[]
         if c_ops != []:
             for c in range(len(c_ops)):
@@ -951,7 +1007,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
         s_span=(0,1)
         Omega0=np.array([Omega_initial,])
-        t_eval=np.linspace(0,1,100001)
+        t_eval=np.linspace(0,1,1001)
         def rhs_diffequ(t,Omega):
             dH_over_dOmega=H_c
             gap,psi11,psi02=gap_and_eigenvectors(self.H_0,Omega[0])
@@ -1048,8 +1104,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         eigs_H0,eigvectors_H0=self.H_0.eigenstates()
 
 
-        subdivisions_of_simstep=40   # 40 is good
-        rampuptime=np.arange(1,252,1)
+        subdivisions_of_simstep=1   # 40 is good
+        rampuptime=np.arange(1,25002,1000)
 
         adiabatic_infidelities=[[],[],[],[],[],[],[],[],[],[]]
         variances=[[],[],[],[],[],[],[],[],[]]
@@ -1061,7 +1117,12 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         leakage=[]
         avgateinfidpc=[]
 
+        print('how many rampup times =',np.size(rampuptime))
+
         for nsimsteps_rampup in rampuptime:
+
+            t0=time.time()
+
             tlist_sim=np.linspace(0,1,nsimsteps_rampup*subdivisions_of_simstep)
             eps_vec_FAQUAD=rampup_forward(tlist_sim)
             sim_step_temp=sim_step/subdivisions_of_simstep
@@ -1100,6 +1161,39 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             leakage.append(qoi['L1'])
             avgateinfidpc.append(1-qoi['avgatefid_compsubspace_pc'])
 
+            t1=time.time()
+            print("1rampup time =",t1-t0)
+
+
+
+        x_plot = rampuptime*sim_step
+        #x_plot_b = 1-solution.t[::-1]
+        for i in range(10):
+           y_plot_a = np.array(adiabatic_infidelities[i])
+        #y_plot_b = solution.y[0][::-1]
+           plt.plot(x_plot, y_plot_a, label='FAQUAD {}'.format(i))
+        #plt.plot(x_plot_b, y_plot_b, label='Geller-Martinis')
+        plt.legend()
+        plt.title("Rampup only")
+        plt.xlabel("Rampup time (ns)")
+        plt.ylabel("Infidelity per state")
+        plt.yscale('log')
+        plt.show()
+
+
+        x_plot = rampuptime*sim_step
+        #x_plot_b = 1-solution.t[::-1]
+        for i in range(1,9,1):
+           y_plot_a = np.array(variances[i])
+        #y_plot_b = solution.y[0][::-1]
+           plt.plot(x_plot, y_plot_a, label='FAQUAD {}'.format(i))
+        #plt.plot(x_plot_b, y_plot_b, label='Geller-Martinis')
+        plt.legend()
+        plt.title("Rampup only")
+        plt.xlabel("Rampup time (ns)")
+        plt.ylabel("Variance of H_0 over Av_value")
+        plt.yscale('log')
+        plt.show()
 
 
         x_plot = rampuptime*sim_step
@@ -1110,7 +1204,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
            plt.plot(x_plot, y_plot_a, label='FAQUAD {}'.format(i))
         #plt.plot(x_plot_b, y_plot_b, label='Geller-Martinis')
         plt.legend()
-        plt.title("Rampup+rampdown no flat")
+        plt.title("Rampup+rampdown")
         plt.xlabel("Rampup time (ns)")
         plt.ylabel("Infidelity per state")
         plt.yscale('log')
@@ -1125,14 +1219,14 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
            plt.plot(x_plot, y_plot_a, label='FAQUAD {}'.format(i))
         #plt.plot(x_plot_b, y_plot_b, label='Geller-Martinis')
         plt.legend()
-        plt.title("Rampup+rampdown no flat")
+        plt.title("Rampup+rampdown")
         plt.xlabel("Rampup time (ns)")
         plt.ylabel("Variance of H_0 over Av_value")
         plt.yscale('log')
         plt.show()
 
 
-        x_plot = rampuptime*sim_step
+        '''x_plot = rampuptime*sim_step
         #x_plot_b = 1-solution.t[::-1]
         for i in range(10):
            y_plot_a = np.array(phases_updown[i])
@@ -1144,7 +1238,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         plt.xlabel("Rampup time (ns)")
         plt.ylabel("Phases acquired")
         #plt.yscale('log')
-        plt.show()
+        plt.show()'''
 
 
         #----------------------------------------------
