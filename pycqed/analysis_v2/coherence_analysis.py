@@ -334,7 +334,7 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
         labels = labels or {
             self.T1: '_T1' + s,
             self.T2: '_echo' + s,
-            self.T2_star: '_ramsey' + s,
+            self.T2_star: '_Ramsey' + s,
         }
 
         assert (len(tau_keys) == len(labels))

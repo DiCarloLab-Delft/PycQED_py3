@@ -1037,7 +1037,7 @@ class CCLight_Transmon(Qubit):
     ####################################################
 
     def calibrate_mw_pulse_amplitude_coarse(self,
-                                         amps=None,
+                                         amps=np.linspace(0,1,31),
                                          close_fig=True, verbose=False,
                                          MC=None, update=True,
                                          take_fit_I=False):
@@ -1869,7 +1869,7 @@ class CCLight_Transmon(Qubit):
         else:
             self.measure_rabi_channel_amp(MC, amps,
                                           analyze, close_fig, real_imag,
-                                          prepare_for_timedomain, all_modules)
+                                          prepare_for_timedomain)
 
     def measure_rabi_vsm(self, MC=None, amps=np.linspace(0.2, 2.0, 31),
                          analyze=True, close_fig=True, real_imag=True,
