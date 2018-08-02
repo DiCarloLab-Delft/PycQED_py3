@@ -79,7 +79,7 @@ def generate_marker_element_with_RF_mod(
 def generate_and_upload_marker_sequence(
         marker_length, marker_interval, RF_mod=False, IF=None, mod_amp=None,
         acq_marker_channels='ch4_marker1,ch4_marker2,ch3_marker2,ch3_marker1',
-        I_channel='ch3', Q_channel='ch4'):
+        I_channel='ch3', Q_channel='ch4', trigger_wait=False):
     seq_name = 'Heterodyne_marker_seq_RF_mod'
     seq = sequence.Sequence(seq_name)
     el_list = []
@@ -94,7 +94,7 @@ def generate_and_upload_marker_sequence(
                 i, marker_length, marker_interval,
                 acq_marker_channels=acq_marker_channels)
         el_list.append(el)
-        seq.append_element(el, trigger_wait=False) # Ensures a continuously running sequence
+        seq.append_element(el, trigger_wait=trigger_wait) # Ensures a continuously running sequence
     station.pulsar.program_awgs(seq, *el_list, verbose=False)
     return seq_name
 

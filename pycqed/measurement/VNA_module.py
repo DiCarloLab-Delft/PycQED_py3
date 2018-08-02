@@ -242,7 +242,7 @@ def acquire_disjoint_frequency_traces(file_name, list_freq_ranges,
                                              power=power,
                                              bandwidth=bandwidth,
                                              measure=measure)
-    packing_mmts(file_name, labels=file_name, N=len(list_freq_ranges))
+    packing_mmts(file_name, labels=file_name+'__', N=len(list_freq_ranges))
 
 def packing_mmts(file_name, labels, N):
     # imports data

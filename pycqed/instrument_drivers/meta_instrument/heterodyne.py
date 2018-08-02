@@ -61,6 +61,10 @@ class HeterodyneInstrument(Instrument):
                            label='Single sideband demodulation',
                            parameter_class=ManualParameter,
                            initial_value=single_sideband_demod)
+        self.add_parameter('external_trigger', vals=vals.Bool(),
+                           label='wait for external trigger',
+                           parameter_class=ManualParameter,
+                           initial_value=False)
         self.add_parameter('acquisition_instr', vals=vals.Strings(),
                            label='Acquisition instrument',
                            set_cmd=self._set_acquisition_instr,
@@ -113,7 +117,7 @@ class HeterodyneInstrument(Instrument):
                 self._awg_seq_filename = \
                     st_seqs.generate_and_upload_marker_sequence(
                         5e-9, self.trigger_separation(), RF_mod=False,
-                        acq_marker_channels=self.acq_marker_channels())
+                        acq_marker_channels=self.acq_marker_channels(), trigger_wait=self.external_trigger())
                 self._awg_seq_parameters_changed = False
 
         # Preparing the acquisition instruments

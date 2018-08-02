@@ -1,5 +1,12 @@
 # Dictionaries used in setup.
 
+# The commands necessary to get your mac address:
+# Start a command line with iPython
+# from uuid import getnode
+# getnode()       <- this is the number you need
+# In order to double-check with hex mac-address of ipconfig \all, run this:
+# mac_address = ("".join(c + "-" if i % 2 else c for i, c in \
+                                    # enumerate(hex(uuid.getnode())[2:].zfill(12)))[:-1]).upper()
 mac_dict = {'203178706891063': 'CDickel_Desktop',
             '203308017140376': 'Adriaans_Macbook',
             '963460802314': 'La_Ferrari',
@@ -7,7 +14,7 @@ mac_dict = {'203178706891063': 'CDickel_Desktop',
             '215977245841658': 'La_Maserati_JrJr',
             '215977245830009': 'La_Vespa',
             '13795386264098': 'Serwans_Laptop',
-            '963460956772': 'La_Ducati',
+            '215977245834050': 'La_Ducati',
             '203050745808564': 'La_Ducati_Jr',
             '57277341811788': 'Simulation_PC',
             '272774795670508': 'Nathans_Laptop',
@@ -17,7 +24,6 @@ mac_dict = {'203178706891063': 'CDickel_Desktop',
             '167746772714689': 'Xiang_PC',
             '180725258210527': 'Niels_macbook',
             '109952948723616': 'Ramiro_Desktop',
-            '215977245834050': 'Xiang_PC',
             '23213':'Malay_Laptop',
             '31054844829911': 'Sjoerd_laptop',
             '26830024075025': 'Qudev_testbench',
@@ -40,8 +46,8 @@ data_dir_dict = {'tud276606_FPGA_PC': 'D:\Experiments/CBox_Testing/Data',
                  'La_Vespa': 'D:\\Experiments\\161111_LaVespa_Intel_HR\\Data',
                  'Xiang_PC': 'D:\\data\\IntelDemo',
                  'Serwans_Laptop': 'W:/tnw/NS/qt/Serwan/MuxMon/',
-                 'La_Ducati': 'D:\\Experiments\\1803_NW_TwoAxis\\Data',
-                 'La_Ducati_Jr': 'D:\Experiments/1611_Starmon/Data',
+                 'La_Ducati': 'D:\\Experiments\\1807_VIPmon_2\\Data',
+                 'La_Ducati_Jr': 'D:\\Experiments\\1805_NW_Cheesymon_P4\\Data',
                  'Simulation_PC': 'D:\Experiments/testSingleShotFidelityAnalysis/Data',
                  'Ramiro_Desktop': r'D:\\Repositories\\PhD_RS\\data_local',
                  # 'Ramiro_Desktop': r'\\131.180.82.81\\Experiments\\1702_Starmon\\data',
@@ -53,9 +59,9 @@ data_dir_dict = {'tud276606_FPGA_PC': 'D:\Experiments/CBox_Testing/Data',
                 # 'Florian_Desktop': r'\\131.180.82.190\\Experiments\\1605_NWv7A2\\Data' # To Maserati
                  # 'Florian_Desktop': r'\\TUD277620\\Experiments\\1704_NWv74_Magnet\\Data' # To Ducati
                  # 'Luthi_Desktop': r'\\TUD277620\\Experiments\\1607_NWv7A4_Magnet\\Data' # To Ducati Old
-                 'Luthi_Desktop': r'\\TUD277620\Experiments\mag_niet\Data',
+                 'Luthi_Desktop': r'\\TUD277620\\Experiments\\1805_NW_Cheesymon_P4\\Data',
                  'Thijs_laptop' : 'C:\\Users\\Thijs\\Documents\\TUDelft\\PhD\\Data',
-                 'Thijs_Desktop': r'\\TUD277620\Experiments\\1803_NW_TwoAxis\Data',
+                 'Thijs_Desktop': r'\\TUD277620\\Experiments\\1805_NW_Cheesymon_P4\\Data',
                  'LaAprilia_1' : r'D:\Experiments\\1802_IntelS7Airbridges'
                  #'LaAprilia_1' : r'D:\Experiments\1802_Argon\Data'
                  }

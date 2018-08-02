@@ -1161,7 +1161,7 @@ class Tektronix_driven_transmon(CBox_driven_transmon):
                      'channel': self.spec_pulse_marker_channel.get(),
                      'f_pulse_mod': self.f_pulse_mod.get()}
 
-        RO_pars['pulse_delay'] += spec_pars['length']
+        # RO_pars['pulse_delay'] += spec_pars['length'] Why is this here??
         spec_pars['pulse_delay'] = (RO_pars['length'] +
                                     self.spec_pulse_depletion_time.get())
         return spec_pars, RO_pars

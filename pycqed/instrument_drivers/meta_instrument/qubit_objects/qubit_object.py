@@ -294,6 +294,7 @@ class Qubit(Instrument):
 
     def find_frequency(self, method='spectroscopy', pulsed=False,
                        steps=[1, 3, 10, 30, 100, 300, 1000],
+                       artificial_periods=2.5,
                        freqs=None,
                        f_span=100e6,
                        use_max=False,
@@ -329,7 +330,8 @@ class Qubit(Instrument):
                 # TODO: add updating and fitting
         elif method.lower() == 'ramsey':
             return self.calibrate_frequency_ramsey(
-                steps=steps, verbose=verbose, update=update,
+                steps=steps, artificial_periods=artificial_periods,
+                verbose=verbose, update=update,
                 close_fig=close_fig)
         return self.freq_qubit()
 
@@ -414,6 +416,7 @@ class Qubit(Instrument):
 
     def calibrate_frequency_ramsey(self,
                                    steps=[1, 1, 3, 10, 30, 100, 300, 1000],
+                                   artificial_periods = 2.5,
                                    stepsize:float =20e-9,
                                    verbose: bool=True, update: bool=True,
                                    close_fig: bool=True):
@@ -432,7 +435,7 @@ class Qubit(Instrument):
         for n in steps:
             times = np.arange(self.mw_gauss_width()*4,
                               50*n*stepsize, n*stepsize)
-            artificial_detuning = 2.5/times[-1]
+            artificial_detuning = artificial_periods/times[-1]
             self.measure_ramsey(times,
                                 artificial_detuning=artificial_detuning,
                                 freq_qubit=cur_freq,
@@ -769,6 +772,7 @@ class Transmon(Qubit):
         raise NotImplementedError()
 
     def calibrate_frequency_ramsey(self, steps=[1, 1, 3, 10, 30, 100, 300, 1000],
+                                   artificial_periods=2.5,
                                    stepsize=None, verbose=True, update=True,
                                    close_fig=True):
         if stepsize is None:
@@ -778,7 +782,7 @@ class Transmon(Qubit):
         for n in steps:
             times = np.arange(self.pulse_delay.get(),
                               50*n*stepsize, n*stepsize)
-            artificial_detuning = 2.5/times[-1]
+            artificial_detuning = artificial_periods/times[-1]
             self.measure_ramsey(times,
                                 artificial_detuning=artificial_detuning,
                                 f_qubit=cur_freq,
@@ -816,6 +820,7 @@ class Transmon(Qubit):
 
     def find_frequency(self, method='spectroscopy', pulsed=False,
                        steps=[1, 3, 10, 30, 100, 300, 1000],
+                       artificial_periods = 2.5,
                        freqs=None,
                        f_span=100e6,
                        use_max=False,
@@ -853,8 +858,8 @@ class Transmon(Qubit):
                 # TODO: add updating and fitting
         elif method.lower() == 'ramsey':
             return self.calibrate_frequency_ramsey(
-                steps=steps, verbose=verbose, update=update,
-                close_fig=close_fig)
+                steps=steps, artificial_periods=artificial_periods,
+                verbose=verbose, update=update, close_fig=close_fig)
         return self.f_qubit()
 
     def find_frequency_pulsed(self):
