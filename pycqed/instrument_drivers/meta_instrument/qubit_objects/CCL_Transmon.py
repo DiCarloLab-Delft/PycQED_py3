@@ -1213,100 +1213,100 @@ class CCLight_Transmon(Qubit):
 
         return True
 
-def calibrate_mixer_skewness_drive(self, MC=None,
-                                       mixer_channels: list=['G', 'D'],
-                                       x0: list =[1.0, 0.0],
-                                       cma_stds: list=[.15, 10],
-                                       maxfevals: int=250,
-                                       update: bool =True)-> bool:
-        '''
-        Calibrates the mixer skewness and updates values in the qubit object.
-        Args:
-            MC : instance of Measurement Control
-            mixer_channels: list of strings indicating what channels to
-                calibrate
-            update: if True updates values in the qubit object.
-        return:
-            success (bool) : returns True if succesful. Currently always
-                returns True (i.e., no sanity check implemented)
-        '''
+    def calibrate_mixer_skewness_drive(self, MC=None,
+                                           mixer_channels: list=['G', 'D'],
+                                           x0: list =[1.0, 0.0],
+                                           cma_stds: list=[.15, 10],
+                                           maxfevals: int=250,
+                                           update: bool =True)-> bool:
+            '''
+            Calibrates the mixer skewness and updates values in the qubit object.
+            Args:
+                MC : instance of Measurement Control
+                mixer_channels: list of strings indicating what channels to
+                    calibrate
+                update: if True updates values in the qubit object.
+            return:
+                success (bool) : returns True if succesful. Currently always
+                    returns True (i.e., no sanity check implemented)
+            '''
 
-        # turn relevant channels on
-        if MC == None:
-            MC = self.instr_MC.get_instr()
+            # turn relevant channels on
+            if MC == None:
+                MC = self.instr_MC.get_instr()
 
-        # Load the sequence
-        CCL = self.instr_CC.get_instr()
-        p = sqo.CW_tone(
-            qubit_idx=self.cfg_qubit_nr(),
-            platf_cfg=self.cfg_openql_platform_fn())
-        CCL.eqasm_program(p.filename)
-        CCL.start()
+            # Load the sequence
+            CCL = self.instr_CC.get_instr()
+            p = sqo.CW_tone(
+                qubit_idx=self.cfg_qubit_nr(),
+                platf_cfg=self.cfg_openql_platform_fn())
+            CCL.eqasm_program(p.filename)
+            CCL.start()
 
-        if self.cfg_with_vsm():
-          # Open the VSM channel
-          VSM = self.instr_VSM.get_instr()
-          ch_in = self.mw_vsm_ch_in()
-          # module 8 is hardcoded for use mixer calls (signal hound)
-          VSM.set('mod8_marker_source'.format(ch_in), 'int')
-          VSM.set('mod8_ch{}_marker_state'.format(ch_in), 'on')
-          VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 2.0)
-          VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 2.0)
-        else:
-          mixer_channels=['G']
-
-        mw_lutman = self.instr_LutMan_MW.get_instr()
-        mw_lutman.mixer_apply_predistortion_matrix(True)
-        # # Define the parameters that will be varied
-        for mixer_ch in mixer_channels:
             if self.cfg_with_vsm():
-                alpha = mw_lutman.parameters['{}_mixer_alpha'.format(mixer_ch)]
-                phi = mw_lutman.parameters['{}_mixer_phi'.format(mixer_ch)]
-                if mixer_ch == 'G':
-                    mw_lutman.sq_G_amp(.5)
-                    mw_lutman.sq_D_amp(0)
-                elif mixer_ch == 'D':
-                    mw_lutman.sq_G_amp(0)
-                    mw_lutman.sq_D_amp(.5)
+              # Open the VSM channel
+              VSM = self.instr_VSM.get_instr()
+              ch_in = self.mw_vsm_ch_in()
+              # module 8 is hardcoded for use mixer calls (signal hound)
+              VSM.set('mod8_marker_source'.format(ch_in), 'int')
+              VSM.set('mod8_ch{}_marker_state'.format(ch_in), 'on')
+              VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 2.0)
+              VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 2.0)
             else:
-                alpha = mw_lutman.parameters['mixer_alpha']
-                phi = mw_lutman.parameters['mixer_phi']
-                mw_lutman.sq_amp(.5)
+              mixer_channels=['G']
+
+            mw_lutman = self.instr_LutMan_MW.get_instr()
+            mw_lutman.mixer_apply_predistortion_matrix(True)
+            # # Define the parameters that will be varied
+            for mixer_ch in mixer_channels:
+                if self.cfg_with_vsm():
+                    alpha = mw_lutman.parameters['{}_mixer_alpha'.format(mixer_ch)]
+                    phi = mw_lutman.parameters['{}_mixer_phi'.format(mixer_ch)]
+                    if mixer_ch == 'G':
+                        mw_lutman.sq_G_amp(.5)
+                        mw_lutman.sq_D_amp(0)
+                    elif mixer_ch == 'D':
+                        mw_lutman.sq_G_amp(0)
+                        mw_lutman.sq_D_amp(.5)
+                else:
+                    alpha = mw_lutman.parameters['mixer_alpha']
+                    phi = mw_lutman.parameters['mixer_phi']
+                    mw_lutman.sq_amp(.5)
 
 
-            spurious_sideband_freq = self.freq_qubit() - 2*self.mw_freq_mod()
-            detector = det.Signal_Hound_fixed_frequency(
-                self.instr_SH.get_instr(), spurious_sideband_freq,
-                prepare_for_each_point=True,
-                Navg=5,
-                prepare_function=mw_lutman.load_waveform_realtime,
-                # Codeword 10 is hardcoded in the generate CCL config
-                prepare_function_kwargs={'waveform_name': 'square', 'wf_nr': 10})
-            ad_func_pars = {'adaptive_function': cma.fmin,
-                            'x0': x0,
-                            'sigma0': 1,
-                            'minimize': True,
-                            'noise_handler': cma.NoiseHandler(N=2),
-                            'options': {'cma_stds': cma_stds,
-                                        'maxfevals': maxfevals}}  # Should be enough for mixer skew
+                spurious_sideband_freq = self.freq_qubit() - 2*self.mw_freq_mod()
+                detector = det.Signal_Hound_fixed_frequency(
+                    self.instr_SH.get_instr(), spurious_sideband_freq,
+                    prepare_for_each_point=True,
+                    Navg=5,
+                    prepare_function=mw_lutman.load_waveform_realtime,
+                    # Codeword 10 is hardcoded in the generate CCL config
+                    prepare_function_kwargs={'waveform_name': 'square', 'wf_nr': 10})
+                ad_func_pars = {'adaptive_function': cma.fmin,
+                                'x0': x0,
+                                'sigma0': 1,
+                                'minimize': True,
+                                'noise_handler': cma.NoiseHandler(N=2),
+                                'options': {'cma_stds': cma_stds,
+                                            'maxfevals': maxfevals}}  # Should be enough for mixer skew
 
-            MC.set_sweep_functions([alpha, phi])
-            MC.set_detector_function(detector)  # sets test_detector
-            MC.set_adaptive_function_parameters(ad_func_pars)
-            MC.run(
-                name='Spurious_sideband_{}{}'.format(
-                    mixer_ch, self.msmt_suffix),
-                mode='adaptive')
-            # For the figure
-            ma.OptimizationAnalysis_v2()
-            a = ma.OptimizationAnalysis(auto=True, label='Spurious_sideband')
-            alpha = a.optimization_result[0][0]
-            phi = a.optimization_result[0][1]
-            if update:
-                self.set('mw_{}_mixer_alpha'.format(mixer_ch), alpha)
-                self.set('mw_{}_mixer_phi'.format(mixer_ch), phi)
+                MC.set_sweep_functions([alpha, phi])
+                MC.set_detector_function(detector)  # sets test_detector
+                MC.set_adaptive_function_parameters(ad_func_pars)
+                MC.run(
+                    name='Spurious_sideband_{}{}'.format(
+                        mixer_ch, self.msmt_suffix),
+                    mode='adaptive')
+                # For the figure
+                ma.OptimizationAnalysis_v2()
+                a = ma.OptimizationAnalysis(auto=True, label='Spurious_sideband')
+                alpha = a.optimization_result[0][0]
+                phi = a.optimization_result[0][1]
+                if update:
+                    self.set('mw_{}_mixer_alpha'.format(mixer_ch), alpha)
+                    self.set('mw_{}_mixer_phi'.format(mixer_ch), phi)
 
-        return True
+            return True
 
     def calibrate_mixer_skewness_RO(self, update=True):
         '''
