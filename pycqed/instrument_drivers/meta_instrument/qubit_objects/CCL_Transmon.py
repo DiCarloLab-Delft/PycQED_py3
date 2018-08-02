@@ -377,6 +377,10 @@ class CCLight_Transmon(Qubit):
                            vals=vals.Numbers(-125, 45),
                            initial_value=0, unit='deg',
                            parameter_class=ManualParameter)
+        self.add_parameter('mw_channel_amp',
+                           vals=vals.Numbers(0, 1),
+                           initial_value=1, unit='V',
+                           parameter_class=ManualParameter)
 
     def _set_mw_vsm_delay(self, val):
         # sort of a pseudo Manual Parameter
@@ -970,8 +974,9 @@ class CCLight_Transmon(Qubit):
                 AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()+2),
                         self.mw_mixer_offs_DQ())
         else:
+            MW_LutMan.mw_amp180(1)
+            MW_LutMan.channel_amp(self.mw_channel_amp())
             if using_QWG:
-                MW_LutMan.mw_amp180(1)
                 # case without VSM and with QWG
                 if ((self.mw_G_mixer_phi() != self.mw_D_mixer_phi())
                         or (self.mw_G_mixer_alpha() != self.mw_D_mixer_alpha())):
@@ -984,11 +989,9 @@ class CCLight_Transmon(Qubit):
                         self.mw_mixer_offs_GI())
                 AWG.set('ch{}_offset'.format(MW_LutMan.channel_Q()),
                         self.mw_mixer_offs_GQ())
-                MW_LutMan.channel_amp(self.mw_amp180())
             else:
                 # case without VSM (and AWG8)
-                MW_LutMan.mw_amp180(1)
-                MW_LutMan.channel_amp(self.mw_amp180())
+
                 MW_LutMan.mixer_phi(self.mw_G_mixer_phi())
                 MW_LutMan.mixer_alpha(self.mw_G_mixer_alpha())
 
@@ -1048,7 +1051,7 @@ class CCLight_Transmon(Qubit):
         a = ma.Rabi_Analysis(close_fig=close_fig, label='rabi')
         if self.cfg_with_vsm():
             self.mw_vsm_G_amp(a.rabi_amplitudes['piPulse'])
-
+        else:
             self.mw_channel_amp(a.rabi_amplitudes['piPulse'])
         return True
 
