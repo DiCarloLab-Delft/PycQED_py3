@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 from scipy.special import erfc
 import lmfit
 import logging
+from pycqed.analysis import analysis_toolbox as a_tools
+from pycqed.analysis.tools import data_manipulation as dm_tools
 
 
 #################################
@@ -374,6 +376,57 @@ def PolyBgHangerFuncAmplitude(f, f0, Q, Qe, A, theta, poly_coeffs):
     return np.abs((1. + np.polyval(poly_coeffs, (f / 1.e9 - f0) / f0)) *
                   HangerFuncAmplitude(f, f0, Q, Qe, A, theta))
 
+
+def SlopedHangerFuncAmplitudeGuess(data, f, fit_window=None):
+    xvals = f
+    # print(f)
+    # print(np.squeeze(data))
+    peaks = a_tools.peak_finder(xvals, data)
+      # Search for peak
+    if peaks['dip'] is not None:    # look for dips first
+        f0 = peaks['dip']
+        amplitude_factor = -1.
+    elif peaks['peak'] is not None:  # then look for peaks
+        f0 = peaks['peak']
+        amplitude_factor = 1.
+    else:                                 # Otherwise take center of range
+        f0 = np.median(xvals)
+        amplitude_factor = -1.
+
+    min_index = np.argmin(data)
+    max_index = np.argmax(data)
+    min_frequency = xvals[min_index]
+    max_frequency = xvals[max_index]
+
+    amplitude_guess = max(dm_tools.reject_outliers(data))
+
+    # Creating parameters and estimations
+    S21min = (min(dm_tools.reject_outliers(data)) /
+              max(dm_tools.reject_outliers(data)))
+
+    Q = f0 / abs(min_frequency - max_frequency)
+
+    Qe = abs(Q / abs(1 - S21min))
+    guess_dict = {'f0': {'value': f0*1e-9,
+                         'min': min(xvals)*1e-9,
+                         'max': max(xvals)*1e-9},
+                  'A': {'value': amplitude_guess},
+                  'Q': {'value': Q,
+                        'min': 1,
+                        'max': 50e6},
+                  'Qe': {'value': Qe,
+                         'min': 1,
+                         'max': 50e6},
+                  'Qi': {'expr': 'abs(1./(1./Q-1./Qe*cos(theta)))',
+                         'vary': False},
+                  'Qc': {'expr': 'Qe/cos(theta)',
+                         'vary': False},
+                  'theta': {'value': 0,
+                            'min': -np.pi/2,
+                            'max': np.pi/2},
+                  'slope': {'value':0,
+                            'vary':True}}
+    return guess_dict
 
 def SlopedHangerFuncAmplitude(f, f0, Q, Qe, A, theta, slope):
     # This is the function for a hanger (lambda/4 resonator) which takes into

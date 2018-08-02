@@ -13,8 +13,11 @@ from pycqed.analysis.tools import data_manipulation as dm_tools
 from pycqed.analysis import fitting_models as fit_mods
 import lmfit
 
+from importlib import reload  # Useful for reloading while testing
+
 import importlib
 importlib.reload(ba)
+importlib.reload(fit_mods)
 
 
 class Spectroscopy(ba.BaseDataAnalysis):
@@ -38,7 +41,7 @@ class Spectroscopy(ba.BaseDataAnalysis):
                             'freq': 'sweep_points',
                             'amp': 'amp',
                             'phase': 'phase'}
-        
+
         self.options_dict.get('xwidth', None)
         # {'xlabel': 'sweep_name',
         # 'xunit': 'sweep_unit',
@@ -479,7 +482,7 @@ class ResonatorSpectroscopy(Spectroscopy):
                 fmin = f0 - df
                 fmax = f0 + df
                 indices = np.logical_or(x < fmin * 1e9, x > fmax * 1e9)
-                
+
                 x_filtered.append(x[indices])
                 y_filtered.append(y[indices])
             self.background = pd.concat([pd.Series(y_filtered[tt], index=x_filtered[tt])

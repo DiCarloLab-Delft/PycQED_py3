@@ -22,9 +22,9 @@ from qcodes.utils import validators as vals
 from qcodes.plots.colors import color_cycle
 
 # Used for adaptive sampling
-from adaptive.learner import BaseLearner
-from adaptive import runner
-# from adaptive import BlockingRunner
+# from adaptive.learner import BaseLearner
+# from adaptive import runner
+## from adaptive import BlockingRunner
 
 try:
     import msvcrt  # used on windows to catch keyboard input

@@ -24,6 +24,8 @@ import lmfit
 import h5py
 from pycqed.measurement.hdf5_data import write_dict_to_hdf5
 
+from importlib import reload  # Useful for reloading while testing
+
 
 class BaseDataAnalysis(object):
     """
@@ -138,10 +140,13 @@ class BaseDataAnalysis(object):
         # These options determine what data to extract #
         ################################################
         scan_label = self.options_dict.get('scan_label', label)
+        if scan_label is None:
+            scan_label = ''
         if type(scan_label) is not list:
             self.labels = [scan_label]
         else:
             self.labels = scan_label
+
 
         # Initialize to None such that the attribute always exists.
         self.data_file_path = None
@@ -199,6 +204,8 @@ class BaseDataAnalysis(object):
         ####################################################
         self.extract_only = extract_only
         self.do_fitting = do_fitting
+        if self.do_fitting:
+            self.fit_dicts = OrderedDict()
 
         self.verbose = self.options_dict.get('verbose', False)
         self.auto_keys = self.options_dict.get('auto_keys', None)
