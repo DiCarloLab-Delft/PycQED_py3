@@ -1213,15 +1213,14 @@ class CCLight_Transmon(Qubit):
 
         return True
 
-    def calibrate_mixer_skewness_drive(self, MC=None,
+def calibrate_mixer_skewness_drive(self, MC=None,
                                        mixer_channels: list=['G', 'D'],
                                        x0: list =[1.0, 0.0],
-                                       cma_stds: list=[.15, 5],
+                                       cma_stds: list=[.15, 10],
                                        maxfevals: int=250,
                                        update: bool =True)-> bool:
         '''
         Calibrates the mixer skewness and updates values in the qubit object.
-
         Args:
             MC : instance of Measurement Control
             mixer_channels: list of strings indicating what channels to
@@ -1244,27 +1243,37 @@ class CCLight_Transmon(Qubit):
         CCL.eqasm_program(p.filename)
         CCL.start()
 
-        # Open the VSM channel
-        VSM = self.instr_VSM.get_instr()
-        ch_in = self.mw_vsm_ch_in()
-        # module 8 is hardcoded for use mixer calls (signal hound)
-        VSM.set('mod8_marker_source'.format(ch_in), 'int')
-        VSM.set('mod8_ch{}_marker_state'.format(ch_in), 'on')
-        VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 2.0)
-        VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 2.0)
+        if self.cfg_with_vsm():
+          # Open the VSM channel
+          VSM = self.instr_VSM.get_instr()
+          ch_in = self.mw_vsm_ch_in()
+          # module 8 is hardcoded for use mixer calls (signal hound)
+          VSM.set('mod8_marker_source'.format(ch_in), 'int')
+          VSM.set('mod8_ch{}_marker_state'.format(ch_in), 'on')
+          VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 2.0)
+          VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 2.0)
+        else:
+          mixer_channels=['G']
 
         mw_lutman = self.instr_LutMan_MW.get_instr()
         mw_lutman.mixer_apply_predistortion_matrix(True)
         # # Define the parameters that will be varied
         for mixer_ch in mixer_channels:
-            if mixer_ch == 'G':
-                mw_lutman.sq_G_amp(.5)
-                mw_lutman.sq_D_amp(0)
-            elif mixer_ch == 'D':
-                mw_lutman.sq_G_amp(0)
-                mw_lutman.sq_D_amp(.5)
-            alpha = mw_lutman.parameters['{}_mixer_alpha'.format(mixer_ch)]
-            phi = mw_lutman.parameters['{}_mixer_phi'.format(mixer_ch)]
+            if self.cfg_with_vsm():
+                alpha = mw_lutman.parameters['{}_mixer_alpha'.format(mixer_ch)]
+                phi = mw_lutman.parameters['{}_mixer_phi'.format(mixer_ch)]
+                if mixer_ch == 'G':
+                    mw_lutman.sq_G_amp(.5)
+                    mw_lutman.sq_D_amp(0)
+                elif mixer_ch == 'D':
+                    mw_lutman.sq_G_amp(0)
+                    mw_lutman.sq_D_amp(.5)
+            else:
+                alpha = mw_lutman.parameters['mixer_alpha']
+                phi = mw_lutman.parameters['mixer_phi']
+                mw_lutman.sq_amp(.5)
+
+
             spurious_sideband_freq = self.freq_qubit() - 2*self.mw_freq_mod()
             detector = det.Signal_Hound_fixed_frequency(
                 self.instr_SH.get_instr(), spurious_sideband_freq,
