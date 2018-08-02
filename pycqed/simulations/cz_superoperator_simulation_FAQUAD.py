@@ -650,7 +650,7 @@ def simulate_quantities_of_interest_superoperator(H_0, tlist, c_ops, eps_vec,
 
     """
 
-    scalefactor=1e6  # otherwise qtp.propagator in parallel mode doesn't work
+    scalefactor=1  # otherwise qtp.propagator in parallel mode doesn't work
     # time is multiplied by scalefactor and frequency is divided by it
     tlist=tlist*scalefactor
     eps_vec=eps_vec/scalefactor
@@ -901,19 +901,25 @@ def variance(H,ket):
 
 
 def compute_variances(H,U_final,eigvectors_H0):
-	dim=len(eigvectors_H0)
+    dim=len(eigvectors_H0)
 
-	columns=[]
-	for i in range(dim):
-		ket_i=eigvectors_H0[i]			# ordering of eigenstates is 00,10,01,20,11,02,21,12,22
-		phi_i=U_final*ket_i
-		columns.append(phi_i)
+    columns=[]
+    for i in range(dim):
+        ket_i=eigvectors_H0[i]			# ordering of eigenstates is 00,10,01,20,11,02,21,12,22
+        phi_i=U_final*ket_i
+        columns.append(phi_i)
 
-	variances=[]
-	for i in range(dim):
-	    variances.append(variance(H,columns[i]))
+    variances=[]
+    for i in range(dim):
+        variances.append(variance(H,columns[i]))
 
-	return variances
+    av_var=0
+    for i in range(dim):
+        av_var+=variances[i]
+        av_var=av_var/dim
+    variances.append(av_var)
+
+    return variances
 
 
 def spectrum(H_0,eps_vec):
@@ -943,6 +949,17 @@ def compute_phases(U_final,eigvectors_H0):
 	phases.append(cond_phase)
 
 	return phases
+
+
+def compute_cz_time(missing_phase,H):
+    eigs,eigvectors=H.eigenstates()
+    E_00=eigs[0]
+    E_10=eigs[1]
+    E_01=eigs[2]
+    E_11=eigs[4]
+    #E_02=eigs[4]
+    gap=E_11-E_01-E_10+E_00
+    return -missing_phase/360*(2*np.pi)/gap
 
 
 
@@ -991,15 +1008,16 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         J2=self.fluxlutman.cz_J2()
         fundam_speedlimit=np.pi/(2*J2)
 
+
+
+
         Omega_initial=0
         Omega_final=w_q1-alpha_q0-w_q0
 
-
-        scalefactor=1e9
+        scalefactor=1
         sim_step=sim_step*scalefactor
         Omega_final=Omega_final/scalefactor
         self.H_0=self.H_0/scalefactor
-
 
         
         ctilde=fix_ctilde(self.H_0,Omega_initial,Omega_final)
@@ -1007,7 +1025,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
         s_span=(0,1)
         Omega0=np.array([Omega_initial,])
-        t_eval=np.linspace(0,1,1001)
+        #t_eval=np.linspace(0,1,1001)
         def rhs_diffequ(t,Omega):
             dH_over_dOmega=H_c
             gap,psi11,psi02=gap_and_eigenvectors(self.H_0,Omega[0])
@@ -1015,7 +1033,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             if scalprod==0:
                 scalprod=1e-10
             return np.array([ctilde[0]*gap**2/scalprod,])
-        solution=scipy.integrate.solve_ivp(fun=rhs_diffequ, t_span=s_span, y0=Omega0,rtol=1e-8,atol=1e-14,t_eval=t_eval)
+        solution=scipy.integrate.solve_ivp(fun=rhs_diffequ, t_span=s_span, y0=Omega0,rtol=1e-8,atol=1e-14)
 
 
 
@@ -1104,18 +1122,29 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         eigs_H0,eigvectors_H0=self.H_0.eigenstates()
 
 
-        subdivisions_of_simstep=1   # 40 is good
+        subdivisions_of_simstep=10   # 40 is good, 10 is acceptable. No less
         rampuptime=np.arange(1,25002,1000)
 
         adiabatic_infidelities=[[],[],[],[],[],[],[],[],[],[]]
-        variances=[[],[],[],[],[],[],[],[],[]]
+        variances=[[],[],[],[],[],[],[],[],[],[]]
 
         adiabatic_infidelities_updown=[[],[],[],[],[],[],[],[],[],[]]
-        variances_updown=[[],[],[],[],[],[],[],[],[]]
+        variances_updown=[[],[],[],[],[],[],[],[],[],[]]
         phases_updown=[[],[],[],[],[],[],[],[],[],[]]
         cond_phases=[]
         leakage=[]
         avgateinfidpc=[]
+
+        adiabatic_infidelities_full=[[],[],[],[],[],[],[],[],[],[]]
+        variances_full=[[],[],[],[],[],[],[],[],[],[]]
+        phases_full=[[],[],[],[],[],[],[],[],[],[]]
+        cond_phases_full=[]
+        leakage_full=[]
+        avgateinfidpc_full=[]
+
+
+        S = qtp.Qobj(matrix_change_of_variables(self.H_0),dims=[[3, 3], [3, 3]])
+
 
         print('how many rampup times =',np.size(rampuptime))
 
@@ -1136,7 +1165,6 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             infids=compute_adiabatic_infidelities(U_final,eigvectors,eigvectors_H0)
             varsH=compute_variances(H,U_final,eigvectors_H0)
 
-
             #eps_vec_FAQUAD_down=rampup_backwards(tlist_sim)
             #initial_propagator=1
             #U_final_down=time_evolution(sim_step_temp,eps_vec_FAQUAD_down,self.H_0,c_ops,initial_propagator)
@@ -1148,25 +1176,48 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             varsH_updown=compute_variances(self.H_0,U_final_updown,eigvectors_H0)
             ph_updown=compute_phases(U_final_updown,eigvectors_H0)
 
+
+            qoi = simulate_quantities_of_interest_superoperator2(S*U_final_updown*S.dag())
+            cond_phases.append(qoi['phi_cond'])
+            leakage.append(qoi['L1'])
+            avgateinfidpc.append(1-qoi['avgatefid_compsubspace_pc'])
+
+
+
+            missing_phase=(180-qoi['phi_cond']) % 360
+            missing_delta_t=compute_cz_time(missing_phase,H)
+            U_flat=(-1j*H*missing_delta_t).expm()
+            U_full=U_final.trans()*U_flat*U_final
+
+            infids_full=compute_adiabatic_infidelities(U_full,eigvectors_H0,eigvectors_H0)
+            varsH_full=compute_variances(self.H_0,U_full,eigvectors_H0)
+            ph_full=compute_phases(U_full,eigvectors_H0)
+
             for i in range(9+1):
                 adiabatic_infidelities[i].append(infids[i])
                 adiabatic_infidelities_updown[i].append(infids_updown[i])
                 phases_updown[i].append(ph_updown[i])
-            for i in range(9):    
+                adiabatic_infidelities_full[i].append(infids_full[i])
+                phases_full[i].append(ph_full[i])
+            for i in range(9+1):    
                 variances[i].append(varsH[i])
                 variances_updown[i].append(varsH_updown[i])
+                variances_full[i].append(varsH_full[i])
 
-            qoi = simulate_quantities_of_interest_superoperator2(U_final_updown)
-            cond_phases.append(qoi['phi_cond'])
-            leakage.append(qoi['L1'])
-            avgateinfidpc.append(1-qoi['avgatefid_compsubspace_pc'])
+            qoi_full = simulate_quantities_of_interest_superoperator2(S*U_full*S.dag())
+            cond_phases_full.append(qoi_full['phi_cond'])
+            leakage_full.append(qoi_full['L1'])
+            avgateinfidpc_full.append(1-qoi_full['avgatefid_compsubspace_pc'])
+            
 
             t1=time.time()
             print("1rampup time =",t1-t0)
 
 
 
-        x_plot = rampuptime*sim_step
+        ### only rampup
+
+        x_plot = rampuptime*sim_step*1e9
         #x_plot_b = 1-solution.t[::-1]
         for i in range(10):
            y_plot_a = np.array(adiabatic_infidelities[i])
@@ -1181,9 +1232,9 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         plt.show()
 
 
-        x_plot = rampuptime*sim_step
+        x_plot = rampuptime*sim_step*1e9
         #x_plot_b = 1-solution.t[::-1]
-        for i in range(1,9,1):
+        for i in range(1,10,1):
            y_plot_a = np.array(variances[i])
         #y_plot_b = solution.y[0][::-1]
            plt.plot(x_plot, y_plot_a, label='FAQUAD {}'.format(i))
@@ -1196,7 +1247,9 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         plt.show()
 
 
-        x_plot = rampuptime*sim_step
+        ### rampup + rampdown
+
+        x_plot = rampuptime*sim_step*1e9
         #x_plot_b = 1-solution.t[::-1]
         for i in range(10):
            y_plot_a = np.array(adiabatic_infidelities_updown[i])
@@ -1211,9 +1264,9 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         plt.show()
 
 
-        x_plot = rampuptime*sim_step
+        x_plot = rampuptime*sim_step*1e9
         #x_plot_b = 1-solution.t[::-1]
-        for i in range(1,9,1):
+        for i in range(1,10,1):
            y_plot_a = np.array(variances_updown[i])
         #y_plot_b = solution.y[0][::-1]
            plt.plot(x_plot, y_plot_a, label='FAQUAD {}'.format(i))
@@ -1226,7 +1279,52 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         plt.show()
 
 
-        '''x_plot = rampuptime*sim_step
+        ### rampup + flat + rampdown
+
+        x_plot = rampuptime*sim_step*1e9
+        #x_plot_b = 1-solution.t[::-1]
+        for i in range(10):
+           y_plot_a = np.array(adiabatic_infidelities_full[i])
+        #y_plot_b = solution.y[0][::-1]
+           plt.plot(x_plot, y_plot_a, label='FAQUAD {}'.format(i))
+        #plt.plot(x_plot_b, y_plot_b, label='Geller-Martinis')
+        plt.legend()
+        plt.title("Rampup+flat+rampdown")
+        plt.xlabel("Rampup time (ns)")
+        plt.ylabel("Infidelity per state")
+        plt.yscale('log')
+        plt.show()
+
+
+        x_plot = rampuptime*sim_step*1e9
+        #x_plot_b = 1-solution.t[::-1]
+        for i in range(1,10,1):
+           y_plot_a = np.array(variances_full[i])
+        #y_plot_b = solution.y[0][::-1]
+           plt.plot(x_plot, y_plot_a, label='FAQUAD {}'.format(i))
+        #plt.plot(x_plot_b, y_plot_b, label='Geller-Martinis')
+        plt.legend()
+        plt.title("Rampup+flat+rampdown")
+        plt.xlabel("Rampup time (ns)")
+        plt.ylabel("Variance of H_0 over Av_value")
+        plt.yscale('log')
+        plt.show()
+
+
+        ### comparison
+
+        plot(x_plot_vec=[rampuptime*sim_step*1e9],
+                  y_plot_vec=[adiabatic_infidelities[9],adiabatic_infidelities_updown[9],adiabatic_infidelities_full[9]],
+                  title='Comparison infidelities',
+                  xlabel='Rampup time (ns)',ylabel='Infidelity per state',legend_labels=['up','updown','full'],yscale='log')
+
+        plot(x_plot_vec=[rampuptime*sim_step*1e9],
+                  y_plot_vec=[variances[9],variances_updown[9],variances_full[9]],
+                  title='Comparison variances',
+                  xlabel='Rampup time (ns)',ylabel='Variance of H_0 over Av_value',legend_labels=['up','updown','full'],yscale='log')
+
+
+        '''x_plot = rampuptime*sim_step*1e9
         #x_plot_b = 1-solution.t[::-1]
         for i in range(10):
            y_plot_a = np.array(phases_updown[i])
@@ -1244,46 +1342,20 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         #----------------------------------------------
 
 
-        x_plot = rampuptime*sim_step
-        #x_plot_b = 1-solution.t[::-1]
-        y_plot_a = np.array(cond_phases)
-        #y_plot_b = solution.y[0][::-1]
-        plt.plot(x_plot, y_plot_a)
-        #plt.plot(x_plot_b, y_plot_b, label='Geller-Martinis')
-        #plt.legend()
-        plt.title("Rampup+rampdown no flat")
-        plt.xlabel("Rampup time (ns)")
-        plt.ylabel("Cond_phase (deg)")
-        #plt.yscale('log')
-        plt.show()
+        plot(x_plot_vec=[rampuptime*sim_step*1e9],
+                  y_plot_vec=[cond_phases,cond_phases_full],
+                  title='Conditional phase',
+                  xlabel='Rampup time (ns)',ylabel='Cond_phase (deg)',legend_labels=['updown','full'])
 
+        plot(x_plot_vec=[rampuptime*sim_step*1e9],
+                  y_plot_vec=[leakage,leakage_full],
+                  title='Leakage',
+                  xlabel='Rampup time (ns)',ylabel='Leakage',legend_labels=['updown','full'],yscale='log')
 
-        x_plot = rampuptime*sim_step
-        #x_plot_b = 1-solution.t[::-1]
-        y_plot_a = np.array(leakage)
-        #y_plot_b = solution.y[0][::-1]
-        plt.plot(x_plot, y_plot_a)
-        #plt.plot(x_plot_b, y_plot_b, label='Geller-Martinis')
-        #plt.legend()
-        plt.title("Rampup+rampdown no flat")
-        plt.xlabel("Rampup time (ns)")
-        plt.ylabel("Leakage")
-        plt.yscale('log')
-        plt.show()
-
-
-        x_plot = rampuptime*sim_step
-        #x_plot_b = 1-solution.t[::-1]
-        y_plot_a = np.array(avgateinfidpc)
-        #y_plot_b = solution.y[0][::-1]
-        plt.plot(x_plot, y_plot_a)
-        #plt.plot(x_plot_b, y_plot_b, label='Geller-Martinis')
-        #plt.legend()
-        plt.title("Rampup+rampdown no flat")
-        plt.xlabel("Rampup time (ns)")
-        plt.ylabel("Av_gate_infid_comp_pc")
-        plt.yscale('log')
-        plt.show()
+        plot(x_plot_vec=[rampuptime*sim_step*1e9],
+                  y_plot_vec=[avgateinfidpc,avgateinfidpc_full],
+                  title='Average gate infidelity',
+                  xlabel='Rampup time (ns)',ylabel='Av_gate_infid_comp_pc',legend_labels=['updown','full'],yscale='log')
 
 
 
