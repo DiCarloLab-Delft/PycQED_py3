@@ -2568,7 +2568,8 @@ class CCLight_Transmon(Qubit):
         return a
 
     def measure_flipping(self, number_of_flips=np.arange(20), equator=True,
-                         MC=None, analyze=True, close_fig=True, update=True):
+                         MC=None, analyze=True, close_fig=True, update=True,
+                         ax='x',angle='180'):
 
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -2586,7 +2587,8 @@ class CCLight_Transmon(Qubit):
         self.prepare_for_timedomain()
         p = sqo.flipping(number_of_flips=nf, equator=equator,
                          qubit_idx=self.cfg_qubit_nr(),
-                         platf_cfg=self.cfg_openql_platform_fn())
+                         platf_cfg=self.cfg_openql_platform_fn(),
+                         ax=ax,angle=angle)
         s = swf.OpenQL_Sweep(openql_program=p,
                              unit='#',
                              CCL=self.instr_CC.get_instr())
@@ -2594,7 +2596,7 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_function(s)
         MC.set_sweep_points(nf)
         MC.set_detector_function(d)
-        MC.run('flipping'+self.msmt_suffix)
+        MC.run('flipping_'+ax+angle+self.msmt_suffix)
         if analyze:
             a = ma2.FlippingAnalysis(
                 options_dict={'scan_label': 'flipping'})
