@@ -316,6 +316,13 @@ class CCLight_Transmon(Qubit):
                            vals=vals.Numbers(min_value=0, max_value=1.0),
                            parameter_class=ManualParameter)
 
+        self.add_parameter('mw_channel_amp',
+                           label='AWG8 channel amplitude',
+                           unit='',
+                           initial_value=.5,
+                           vals=vals.Numbers(min_value=0, max_value=1.0),
+                           parameter_class=ManualParameter)
+
         self.add_parameter('mw_ef_amp',
                            label='Pi-pulse amplitude ef-transition', unit='V',
                            initial_value=.4,
@@ -926,6 +933,7 @@ class CCLight_Transmon(Qubit):
         MW_LutMan.set_default_lutmap()
         MW_LutMan.mw_amp90_scale(self.mw_amp90_scale())
         MW_LutMan.mw_gauss_width(self.mw_gauss_width())
+        MW_LutMan.channel_amp(self.mw_channel_amp())
         MW_LutMan.mw_motzoi(self.mw_motzoi())
         MW_LutMan.mw_modulation(self.mw_freq_mod())
         MW_LutMan.spec_amp(self.spec_amp())
@@ -988,7 +996,7 @@ class CCLight_Transmon(Qubit):
             else:
                 # case without VSM (and AWG8)
                 MW_LutMan.mw_amp180(1)
-                MW_LutMan.channel_amp(self.mw_amp180())
+                MW_LutMan.channel_amp(self.mw_channel_amp())
                 MW_LutMan.mixer_phi(self.mw_G_mixer_phi())
                 MW_LutMan.mixer_alpha(self.mw_G_mixer_alpha())
 
@@ -1048,7 +1056,7 @@ class CCLight_Transmon(Qubit):
         a = ma.Rabi_Analysis(close_fig=close_fig, label='rabi')
         if self.cfg_with_vsm():
             self.mw_vsm_G_amp(a.rabi_amplitudes['piPulse'])
-
+        else:
             self.mw_channel_amp(a.rabi_amplitudes['piPulse'])
         return True
 
@@ -2631,8 +2639,10 @@ class CCLight_Transmon(Qubit):
                 swf_func = swf.QWG_lutman_par(LutMan=MW_LutMan,
                                               LutMan_parameter=MW_LutMan.mw_motzoi)
             else:
-                raise NotImplementedError(
-                    'VSM-less case not implemented without QWG.')
+                if motzoi_amps is None:
+                    motzoi_amps = np.linspace(-.3, .3, 31)
+                swf_func = swf.lutman_par(LutMan=MW_LutMan,
+                                          LutMan_parameter=MW_LutMan.mw_motzoi)
 
         MC.set_sweep_function(swf_func)
         MC.set_sweep_points(motzoi_amps)
