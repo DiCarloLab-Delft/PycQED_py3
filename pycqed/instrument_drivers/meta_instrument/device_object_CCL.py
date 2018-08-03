@@ -975,7 +975,8 @@ class DeviceCCL(Instrument):
     def measure_two_qubit_ramsey(self, q0: str, q_spec: str,
                         times,
                         prepare_for_timedomain=True, MC=None,
-                        target_qubit_sequence: str='excited'):
+                        target_qubit_sequence: str='excited',
+                        chunk_size: int=None,):
         """
         Measure a ramsey on q0 while setting the q_spec
         to excited state ('excited'), ground state ('ground') or 
@@ -1011,11 +1012,12 @@ class DeviceCCL(Instrument):
         MC.set_sweep_points(times)
 
         d = self.get_correlation_detector()
+        #d.chunk_size = chunk_size
         MC.set_detector_function(d)
 
         MC.run('Two_qubit_ramsey_{}_{}_{}'.format(q0, q_spec,
                     target_qubit_sequence), mode='1D')
-        ma.MeasurementAnalysis()    
+        ma.MeasurementAnalysis()  
 
 
     def measure_cryoscope(self, q0: str, times,
