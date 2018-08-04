@@ -231,7 +231,7 @@ class BaseDataAnalysis(object):
             self.plot(key_list='auto')  # make the plots
 
         if self.options_dict.get('save_figs', False):
-            self.save_figures(close_figs=self.options_dict.get('close_figs', False))
+            self.save_figures(close_figs=self.options_dict.get('close_figs', True))
 
     def get_timestamps(self):
         """
@@ -481,8 +481,8 @@ class BaseDataAnalysis(object):
         '''
         This function does the fitting and saving of the parameters
         based on the fit_dict options.
-        Only model fitting is implemented here. Minimizing fitting should
-        be implemented here.
+        Only model fitting is implemented here.
+        Minimizing fitting is being worked on.
         '''
         self.fit_res = {}
         for key, fit_dict in self.fit_dicts.items():
@@ -492,40 +492,69 @@ class BaseDataAnalysis(object):
             fit_yvals = fit_dict['fit_yvals']
             fit_xvals = fit_dict['fit_xvals']
 
+            fitting_type = fit_dict.get('fitting_type', 'model')
+
             model = fit_dict.get('model', None)
             if model is None:
                 fit_fn = fit_dict.get('fit_fn', None)
                 model = fit_dict.get('model', lmfit.Model(fit_fn))
             fit_guess_fn = fit_dict.get('fit_guess_fn', None)
-            if fit_guess_fn is None and fit_dict.get('fit_guess', True):
+            if fit_guess_fn is None and fit_dict.get('fit_guess', False):
                 fit_guess_fn = model.guess
+
 
             if guess_pars is None:
                 if fit_guess_fn is not None:
+                    if fitting_type is 'minimize':
+                        guess_pars = fit_guess_fn(**fit_yvals, **fit_xvals, **guessfn_pars)
+                        params = lmfit.Parameters()
+                        for gd_key, val in guess_pars.items():
+                            params.add(gd_key)
+                            for attr, attr_val in val.items():
+                                setattr(params[gd_key], attr, attr_val)
+
                     # a fit function should return lmfit parameter objects
                     # but can also work by returning a dictionary of guesses
-                    guess_pars = fit_guess_fn(**fit_yvals, **fit_xvals, **guessfn_pars)
-                    if not isinstance(guess_pars, lmfit.Parameters):
-                        for gd_key, val in list(guess_pars.items()):
-                            model.set_param_hint(gd_key, **val)
-                        guess_pars = model.make_params()
+                    elif fitting_type is 'model':
+                        guess_pars = fit_guess_fn(**fit_yvals, **fit_xvals, **guessfn_pars)
+                        if not isinstance(guess_pars, lmfit.Parameters):
+                            for gd_key, val in list(guess_pars.items()):
+                                model.set_param_hint(gd_key, **val)
+                            guess_pars = model.make_params()
 
-                    if guess_dict is not None:
-                        for gd_key, val in guess_dict.items():
-                            for attr, attr_val in val.items():
-                                # e.g. setattr(guess_pars['frequency'], 'value', 20e6)
-                                setattr(guess_pars[gd_key], attr, attr_val)
-                    # A guess can also be specified as a dictionary.
-                    # additionally this can be used to overwrite values
-                    # from the guess functions.
+                        # A guess can also be specified as a dictionary.
+                        # additionally this can be used to overwrite values
+                        # from the guess functions.
                 elif guess_dict is not None:
-                    for key, val in list(guess_dict.items()):
-                        model.set_param_hint(key, **val)
-                    guess_pars = model.make_params()
-            fit_dict['fit_res'] = model.fit(**fit_xvals, **fit_yvals,
-                                            params=guess_pars)
+                    if fitting_type is 'minimize':
+                        params = lmfit.Parameters()
+                        for key, val in list(guess_dict.items()):
+                        # for key, val in guess_dict.items():
+                            params.add(key)
+                            for attr, attr_val in val.items():
+                                setattr(params[key], attr, attr_val)
+                    elif fitting_type is 'model':
+                        for key, val in list(guess_dict.items()):
+                            model.set_param_hint(key, **val)
+                        guess_pars = model.make_params()
+            else:
+                if fitting_type is 'minimize':
+                    raise NotImplementedError('Conversion from guess_pars to params with lmfit.Parameters() needs to be implemented')
+            if fitting_type is 'model':
+                fit_dict['fit_res'] = model.fit(**fit_xvals, **fit_yvals,
+                                                params=guess_pars)
+                self.fit_res[key] = fit_dict['fit_res']
 
-            self.fit_res[key] = fit_dict['fit_res']
+            elif fitting_type is 'minimize':
+                fit_dict['fit_res'] = lmfit.minimize(fcn=_complex_residual_function,
+                        params=params,
+                        args=(fit_fn, fit_xvals, fit_yvals))
+                fit_dict['fit_res'].initial_params = params
+                fit_dict['fit_res'].userkws = fit_xvals
+                fit_dict['fit_res'].fit_fn = fit_fn
+                self.fit_res[key] = fit_dict['fit_res']
+
+
 
     def save_fit_results(self):
         """
@@ -1180,43 +1209,77 @@ class BaseDataAnalysis(object):
             logging.warning('fit_res is an empty dictionary, cannot plot.')
             return
 
-        model = pdict['fit_res'].model
-        #TODO: make this work for type(model) is lmfit.minimizer.MinimizerResult
-        assert (isinstance(model, lmfit.model.Model) or
-                    isinstance(model, lmfit.model.ModelResult),
-            'The passed item in "fit_res" needs to be a fitting model, but is {}'.format(type(model)))
-
         plot_init = pdict.get('plot_init', False)  # plot the initial guess
         plot_normed = pdict.get('plot_normed', False)
         pdict['marker'] = pdict.get('marker', '')  # different default
         plot_linestyle_init = pdict.get('init_linestyle', '--')
         plot_numpoints = pdict.get('num_points', 1000)
 
-        if len(model.independent_vars) == 1:
-            independent_var = model.independent_vars[0]
-        else:
-            raise ValueError('Fit can only be plotted if the model function'
-                             ' has one independent variable.')
 
-        x_arr = pdict['fit_res'].userkws[independent_var]
-        pdict['xvals'] = np.linspace(np.min(x_arr), np.max(x_arr),
-                                     plot_numpoints)
-        pdict['yvals'] = model.eval(pdict['fit_res'].params,
-                                    **{independent_var: pdict['xvals']})
+        if hasattr(pdict['fit_res'],'model'):
+            model = pdict['fit_res'].model
+            assert (isinstance(model, lmfit.model.Model) or
+                        isinstance(model, lmfit.model.ModelResult),
+                'The passed item in "fit_res" needs to be a fitting model, but is {}'.format(type(model)))
+
+            if len(model.independent_vars) == 1:
+                independent_var = model.independent_vars[0]
+            else:
+                raise ValueError('Fit can only be plotted if the model function'
+                                 ' has one independent variable.')
+            x_arr = pdict['fit_res'].userkws[independent_var]
+            pdict['xvals'] = np.linspace(np.min(x_arr), np.max(x_arr),
+                                         plot_numpoints)
+            pdict['yvals'] = model.eval(pdict['fit_res'].params,
+                                        **{independent_var: pdict['xvals']})
+        else:
+            '''
+            This is the case for the minimizier fit
+            '''
+
+            fit_xvals = pdict['fit_res'].userkws
+            if len(fit_xvals.keys()) == 1:
+                independent_var = list(fit_xvals.keys())[0]
+            else:
+                raise ValueError('Fit can only be plotted if the model function'
+                                 ' has one independent variable.')
+            x_arr = pdict['fit_res'].userkws[independent_var]
+            pdict['xvals'] = np.linspace(np.min(x_arr), np.max(x_arr),
+                                         plot_numpoints)
+            fit_fn = pdict['fit_res'].fit_fn
+            output = fit_fn(**pdict['fit_res'].params,
+                            **{independent_var: pdict['xvals']})
+            output_mod_fn = pdict.get('output_mod_fn', None)
+            if output_mod_fn is not None:
+                pdict['yvals'] = output_mod_fn(output)
+            else:
+                pdict['yvals'] = output
+
         if plot_normed:
             pdict['yvals']=pdict['yvals']/pdict['yvals'][0]
 
         self.plot_line(pdict, axs)
 
         if plot_init:
-            # The initial guess
             pdict_init = copy.copy(pdict)
             pdict_init['linestyle'] = plot_linestyle_init
-            pdict_init['yvals'] = model.eval(
-                **pdict['fit_res'].init_values,
-                **{independent_var: pdict['xvals']})
+            if hasattr(pdict_init['fit_res'],'model'):
+                # The initial guess
+                pdict_init['yvals'] = model.eval(
+                    **pdict_init['fit_res'].init_values,
+                    **{independent_var: pdict_init['xvals']})
+            else:
+                output = fit_fn(**pdict_init['fit_res'].initial_params,
+                            **{independent_var: pdict_init['xvals']})
+                output_mod_fn = pdict_init.get('output_mod_fn', None)
+                if output_mod_fn is not None:
+                    pdict_init['yvals'] = output_mod_fn(output)
+                else:
+                    pdict_init['yvals'] = output
+
             pdict_init['setlabel'] += ' init'
             self.plot_line(pdict_init, axs)
+
 
     def plot_text(self, pdict, axs):
         """
@@ -1409,3 +1472,21 @@ def _merge_dict_rec(dict_a: dict, dict_b: dict):
         if k not in dict_a:
             dict_a[k] = dict_b[k]
     return dict_a
+
+
+def _complex_residual_function(pars, fit_function, x, data):
+    '''
+    Residual of a complex function with complex results dictionary data and
+    real input values dictionary 'x'
+    data should be of the format data = {'data':[np.array]}
+    x should be of the format x = {'x':[np.array}} where x is the variable
+    name in the function fit_function
+    For resonators 'x' is the the frequency, 'data' the complex transmission
+    '''
+
+    cmp_values = fit_function(**x, **pars)
+
+    res = cmp_values-data['data']
+    res = np.append(res.real, res.imag)
+
+    return res
