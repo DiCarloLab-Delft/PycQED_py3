@@ -832,6 +832,78 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
     return p
 
 
+def two_qubit_tomo_bell_by_waiting(bell_state, q0, q1,
+                        platf_cfg, wait_time: int=20):
+    '''
+    Two qubit (bell) state tomography. There are no flux pulses applied,
+    only waiting time. It is supposed to take advantage of residual ZZ to
+    generate entanglement.
+
+    Args:
+        bell_state      (int): index of prepared bell state
+        q0, q1          (str): names of the target qubits
+        wait_time       (int): waiting time in which residual ZZ acts
+                                    on qubits
+    '''
+    tomo_gates = ['i', 'rx180', 'ry90', 'rym90', 'rx90', 'rxm90']
+
+    # Choose a bell state and set the corresponding preparation pulses
+    if bell_state == 0:  # |Phi_m>=|00>-|11>
+        prep_pulse_q0, prep_pulse_q1 = 'ry90', 'ry90'
+    elif bell_state % 10 == 1:  # |Phi_p>=|00>+|11>
+        prep_pulse_q0, prep_pulse_q1 = 'rym90', 'ry90'
+    elif bell_state % 10 == 2:  # |Psi_m>=|01>-|10>
+        prep_pulse_q0, prep_pulse_q1 = 'ry90', 'rym90'
+    elif bell_state % 10 == 3:  # |Psi_p>=|01>+|10>
+        prep_pulse_q0, prep_pulse_q1 = 'rym90', 'rym90'
+    else:
+        raise ValueError('Bell state {} is not defined.'.format(bell_state))
+
+    # Recovery pulse is the same for all Bell states
+    after_pulse_q1 = 'rym90'
+
+    # # Define compensation pulses
+    # # FIXME: needs to be added
+    # print('Warning: not using compensation pulses.')
+
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="two_qubit_tomo_bell",
+                nqubits=platf.get_qubit_number(),
+                p=platf)
+    for p_q1 in tomo_gates:
+        for p_q0 in tomo_gates:
+            k = Kernel("BellTomo_{}{}_{}{}".format(
+                       q1, p_q1, q0, p_q0
+                       ), p=platf)
+            # next experiment
+            k.prepz(q0)  # to ensure enough separation in timing
+            k.prepz(q1)  # to ensure enough separation in timing
+            # pre-rotations
+            k.gate(prep_pulse_q0, q0)
+            k.gate(prep_pulse_q1, q1)
+            # FIXME hardcoded edge because of
+            # brainless "directed edge recources" in compiler
+            if wait_time>0:
+                    k.wait([q0,q1], wait_time)
+            # tomo pulses
+            k.gate(p_q1, q0)
+            k.gate(p_q0, q1)
+            # measure
+            k.measure(q0)
+            k.measure(q1)
+            # sync barrier before tomo
+            # k.gate("wait", [q0, q1], 0)
+            k.gate("wait", [2, 0], 0)
+            p.add_kernel(k)
+    # 7 repetitions is because of assumptions in tomo analysis
+    p = add_two_q_cal_points(p, platf=platf, q0=q0, q1=q1, reps_per_cal_pt=7)
+    with suppress_stdout():
+        p.compile()
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
+
 def two_qubit_DJ(q0, q1, platf_cfg):
     '''
     Two qubit Deutsch-Josza.
