@@ -121,6 +121,7 @@ def exponential_decay_correction_hw_friendly(ysig, tau: float, amp: float,
     """
 
     alpha = 1 - np.exp(-1/(sampling_rate*tau*(1+amp)))
+
     # N.B. The if statement from the conventional "linear" filter is
     # completely gone. This black magic needs to be understood. MAR July 2018
     # k = amp/(1+amp-alpha)
@@ -135,7 +136,6 @@ def exponential_decay_correction_hw_friendly(ysig, tau: float, amp: float,
         # where u[n] = u[n-1] + alpha*(x[n] - u[n-1])
         # the correction filter differs just in the sign of k, so allow the k to be negative here
         k = amp/(1+amp)/(1-alpha)
-
 
     filtered_signal = multipath_filter2(sig=ysig, alpha=alpha, k=k, paths=8)
 
@@ -217,14 +217,21 @@ def multipath_filter(sig, alpha, k, paths):
 
 
 
-def multipath_filter2(sig, alpha, k, paths):
+def multipath_filter2(sig, alpha, k, paths,
+                      hw_rounding: bool=True,
+                      ppl = 4):
     """
     hardware friendly
     exponential moving average correction filter with pipeline simulation
     """
-    ppl = 4
+
     tpl = np.ones((paths, ))
     hw_alpha = alpha*float(paths*ppl)
+    hw_k = k
+
+    if hw_rounding:
+        hw_alpha = coef_round(hw_alpha)
+        hw_k = coef_round(hw_k)
 
     duf = tpl * 0.
     # due to the pipelining, there are actually ppl interleaved filters
@@ -257,7 +264,7 @@ def multipath_filter2(sig, alpha, k, paths):
             # and add the filter output to the signal correction vector
             duf = np.append(duf, tpl * acc[j])
     duf = duf[0:sig.size]
-    return sig + k * (duf - sig)
+    return sig + hw_k * (duf - sig)
 
 
 def first_order_bounce_corr(sig, delay, amp, awg_sample_rate,
