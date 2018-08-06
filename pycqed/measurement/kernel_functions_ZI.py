@@ -217,14 +217,21 @@ def multipath_filter(sig, alpha, k, paths):
 
 
 
-def multipath_filter2(sig, alpha, k, paths):
+def multipath_filter2(sig, alpha, k, paths,
+                      hw_rounding: bool=True,
+                      ppl = 4):
     """
     hardware friendly
     exponential moving average correction filter with pipeline simulation
     """
-    ppl = 4
+
     tpl = np.ones((paths, ))
     hw_alpha = alpha*float(paths*ppl)
+    hw_k = k
+
+    if hw_rounding:
+        hw_alpha = coef_round(hw_alpha)
+        hw_k = coef_round(hw_k)
 
     duf = tpl * 0.
     # due to the pipelining, there are actually ppl interleaved filters
@@ -257,7 +264,7 @@ def multipath_filter2(sig, alpha, k, paths):
             # and add the filter output to the signal correction vector
             duf = np.append(duf, tpl * acc[j])
     duf = duf[0:sig.size]
-    return sig + k * (duf - sig)
+    return sig + hw_k * (duf - sig)
 
 
 def first_order_bounce_corr(sig, delay, amp, awg_sample_rate,
