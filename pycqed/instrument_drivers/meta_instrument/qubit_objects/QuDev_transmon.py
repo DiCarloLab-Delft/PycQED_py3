@@ -1555,8 +1555,9 @@ class QuDev_transmon(Qubit):
             ma.MeasurementAnalysis(TwoD=True, auto=True, close_fig=close_fig,
                                    qb_name=self.name)
 
-    def calibrate_drive_mixer_carrier_NN(self,MC=None, update=True,trigger_sep=5e-6,
-                                 x0=(0., 0.),amplitude=0.1,
+    def calibrate_drive_mixer_carrier_NN(self,MC=None, update=True,make_fig=True,
+                                 trigger_sep=5e-6,
+                                 amplitude=0.1,
                                  estimator='GRNN_neupy',
                                  n_meas=100,two_rounds=False,
                                  hidden_layers = [30,30],**kwargs):
@@ -1576,8 +1577,9 @@ class QuDev_transmon(Qubit):
         n_fold = kwargs.get('n_fold',5)
         iters = kwargs.pop('iters',5000)
         c = kwargs.pop('second_round_std_scale',0.3)
-        ch_1_min = x0[0]            #might be redundant
-        ch_2_min = x0[1]
+        first_round_limits = kwargs.pop('first_round_limits',[-1.,0.5,-1.,0.5])
+        ch_1_min =0.         #might be redundant
+        ch_2_min =0.
         if isinstance(std_devs,list) or isinstance(std_devs,np.ndarray):
             if(len(std_devs) != 2 ):
                 logging.error('std_devs passed in kwargs of "calibrate_drive_'
@@ -1592,10 +1594,14 @@ class QuDev_transmon(Qubit):
                     pulse_I_channel=self.pulse_I_channel(),
                     pulse_Q_channel=self.pulse_Q_channel())
             if runs==0:
+                ch1_low = first_round_limits[0]
+                ch1_high = first_round_limits[1]
+                ch2_low = first_round_limits[2]
+                ch2_high = first_round_limits[3]
                 data_points = int(np.floor(0.5*n_meas))
-                meas_grid = np.array([1.5*np.random.rand(data_points)-1.,
-                                      1.5*np.random.rand(data_points)-1.])
-                est =estimator
+                meas_grid = np.array([(ch1_high-ch1_low)*np.random.rand(data_points)+ch1_low,
+                                      (ch2_high-ch2_low)*np.random.rand(data_points)+ch2_low])
+                est = estimator
             elif runs==1:
                 meas_grid = np.array([ch_1_min+np.random.normal(0.0,std_devs[0],n_meas),
                                       ch_2_min+np.random.normal(0.0,std_devs[1],n_meas)])
@@ -1627,7 +1633,7 @@ class QuDev_transmon(Qubit):
             a = ma.OptimizationAnalysisNN(label='drive_carrier_calibration',
                                           meas_grid=meas_grid,
                                           ad_func_pars=ad_func_pars,
-                                          round=runs)
+                                          round=runs,make_fig=make_fig)
             ch_1_min = a.optimization_result[0]
             ch_2_min = a.optimization_result[1]
 
@@ -1635,7 +1641,7 @@ class QuDev_transmon(Qubit):
             self.pulse_I_offset(ch_1_min)
             self.pulse_Q_offset(ch_2_min)
 
-        return ch_1_min,ch_2_min
+        return ch_1_min,ch_2_min,a
 
 
     def calibrate_drive_mixer_carrier(self, MC=None, update=True, x0=(0., 0.),
@@ -1741,15 +1747,15 @@ class QuDev_transmon(Qubit):
 
 
     def calibrate_drive_mixer_NN(self,if_freqs, MC=None,
-                                                amplitude=0.1,
+                                                amplitude=0.5,
                                                 update=True,
+                                                make_fig=True,
                                                 meas_grid=None,
                                                 n_meas=100,
-                                                trigger_sep=5e-6,
+                                                trigger_sep=4e-6,
                                                 two_rounds=False,
-                                                estimator='DNN_Regressor_tf',
+                                                estimator='GRNN_neupy',
                                                 hidden_layers = [30,30],
-                                                x0=(0., 0.),
                                                 **kwargs):
         '''
         Running a complete drive mixer calibration with spectrum measurements before
@@ -1757,37 +1763,32 @@ class QuDev_transmon(Qubit):
         the dB values of Power ratio between before and after spectrum.
         For detailed info inspect implementations of the below used methods.
         '''
+        self.RO_acq_integration_length(0.5e-6)
+        print('RO_acq_int_len set to: ',self.RO_acq_integration_length())
         ma1 = self.measure_drive_mixer_spectrum(if_freqs,MC=MC,
                                                 amplitude=amplitude,
                                                 trigger_sep=trigger_sep)
-        #self.calibrate_drive_mixer_carrier_NN(MC=MC,update=update,x0=x0,
-        #                                        meas_grid=meas_grid,
-        #                                        trigger_sep=trigger_sep,
-        #                                        estimator=estimator,
-        #                                        n_meas=n_meas,
-        #                                        two_rounds=two_rounds,
-        #                                        hidden_layers=hidden_layers,
-        #                                        **kwargs)
-        self.calibrate_drive_mixer_carrierNN(MC=MC, update=update, x0=x0,
-                                           initial_stepsize=0.01, trigger_sep=trigger_sep)
-        self.calibrate_drive_mixer_skewnessNN(MC=MC, update=update,
-                                            amplitude=amplitude, trigger_sep=trigger_sep,
-                                            initial_stepsize=None)
-        #self.calibrate_drive_mixer_skewness_NN(MC=MC,update=update,
-        #                                        meas_grid=meas_grid,
-        #                                        trigger_sep=trigger_sep,
-        #                                        estimator=estimator,
-        #                                        n_meas=n_meas,
-        #                                        two_rounds=two_rounds,
-        #                                        hidden_layers=hidden_layers,
-        #                                        **kwargs)
+        self.RO_acq_integration_length(2e-6)
+        print('RO_acq_int_len set to: ',self.RO_acq_integration_length())
+        self.calibrate_drive_mixer_carrier_NN(MC=MC, update=update,estimator=estimator,
+                                              trigger_sep=trigger_sep)
+        self.calibrate_drive_mixer_skewness_NN(MC=MC, update=update,estimator=estimator,
+                                               amplitude=amplitude, trigger_sep=trigger_sep,
+                                               initial_stepsize=None)
+        self.RO_acq_integration_length(0.5e-6)
+        print('RO_acq_int_len set to: ',self.RO_acq_integration_length())
         ma2 = self.measure_drive_mixer_spectrum(if_freqs,MC=MC,
                                                 amplitude=amplitude,
                                                 trigger_sep=trigger_sep)
-        ma.Mixer_calibration_evaluation(ma1,ma2)
+        left_sb_f = self.drive_LO.frequency()+self.f_pulse_mod()-self.f_RO_mod()
+        lo_f = self.drive_LO.frequency()-self.f_RO_mod()
+        right_sb_f = self.drive_LO.frequency()-self.f_pulse_mod()-self.f_RO_mod()
+        ma.Mixer_calibration_evaluation(ma1,ma2,voltage_peaks=[left_sb_f,lo_f,right_sb_f],
+                                        make_fig=make_fig)
 
+        return ma1,ma2
 
-    def calibrate_drive_mixer_skewness_NN(self, MC=None, update=True,
+    def calibrate_drive_mixer_skewness_NN(self, MC=None, update=True,make_fig=True,
                                           meas_grid=None,n_meas=100,
                                           amplitude=0.1,trigger_sep=5e-6,
                                           two_rounds=False,
@@ -1873,14 +1874,13 @@ class QuDev_transmon(Qubit):
                                           ad_func_pars=ad_func_pars,
                                           meas_grid=meas_grid,
                                           two_rounds = two_rounds,
-                                          round=runs)
+                                          round=runs,make_fig=make_fig)
 
             alpha_ = a.optimization_result[0]
             phi_ = a.optimization_result[1]
         # phi and alpha are the coefficients that go in the predistortion matrix
             if update:
-                if runs>=0:
-                    self.alpha(alpha_)
+                self.alpha(alpha_)
                 self.phi_skew(phi_)
 
         return alpha_,phi_,a

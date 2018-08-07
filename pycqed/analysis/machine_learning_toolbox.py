@@ -8,6 +8,7 @@ from abc import ABCMeta, abstractmethod
 #from neupy.algorithms import GRNN as grnn
 from sklearn.neural_network import MLPRegressor as mlpr
 from sklearn.linear_model import LinearRegression
+from sklearn.cluster import KMeans as KMeans
 from neupy.algorithms import GRNN as grnn
 try:
 	import tensorflow as tf
@@ -322,11 +323,8 @@ class GRNN_neupy(Estimator):
             std_x = 0.
             for it in range(x_train.ndim):
                 std_x += np.std(x_train[:,it])
-            std_x = self._gamma*std_x/x_train.ndim
-            self._std = std_x
-        else:
-            self._std = self._gamma*self._std
-        self._grnn = grnn(std=self._std)
+            self._std = std_x/x_train.ndim
+        self._grnn = grnn(std=self._gamma*self._std)
         print('GRNN initialized with std: ',self._std)
         self._grnn.train(x_train,y_train)
 
@@ -340,13 +338,16 @@ class GRNN_neupy(Estimator):
         pred = self._grnn.predict(x)
         self.score = 1. - np.linalg.norm(pred-y)**2 \
                    / np.linalg.norm(y-np.mean(y,axis=0))**2
-        return self.core
+        return self.score
 
 class CrossValidationEstimator(Estimator):
 
     def __init__(self,estimator : Estimator,n_fold=5):
+        super().__init__(name='CV_Estimator_Wrapper',
+                         type='Wrapper')
         self.estimator = estimator
         self.n_fold = n_fold
+        self.pre_proc_dict = self.estimator.pre_proc_dict
         self.gen_error_emp = None
         self.batch_errors = None
 
@@ -369,10 +370,10 @@ class CrossValidationEstimator(Estimator):
         for it in range(0,sample_number-reminder,batch_size):
 
             test_batch = x_train[it:it+batch_size-1,:]
-            train_batch = np.concatenate(x_train[:it,:],x_train[it+batch_size:,:],
+            train_batch = np.concatenate((x_train[:it,:],x_train[it+batch_size:,:]),
                                          axis=0)
             test_target = y_train[it:it+batch_size-1,:]
-            train_target = np.concatenate(y_train[:it,:],y_train[it+batch_size:,:],
+            train_target = np.concatenate((y_train[:it,:],y_train[it+batch_size:,:]),
                                           axis=0)
             self.estimator.fit(train_batch,train_target)
             self.batch_errors.append(self.estimator.evaluate(test_batch,test_target))
@@ -380,6 +381,9 @@ class CrossValidationEstimator(Estimator):
 
         self.estimator.fit(x_train,y_train) #refit estimator on training data
         self.score = np.mean(self.batch_errors)
+        # if self.score <= 0.8:
+        #     logging.warning('Cross Validation finished with average score: ',self.score,
+        #                     '. Most likely unstable predictions. Try larger training data set.')
         self.std_error_emp = np.std(self.batch_errors)
 
     def predict(self,data):
@@ -394,3 +398,33 @@ class CrossValidationEstimator(Estimator):
         return self.std_error_emp
 
 
+
+class K_means_scikit(Estimator):
+
+    def __init__(self,n_clusters=4,pre_proc_dict=None):
+
+        super().__init__(name='K_means_scikit',type='Clustering',
+                         pre_proc_dict=pre_proc_dict)
+        self.n_clusters=n_clusters
+        self.cluster_centers = None
+        self.labels = None
+
+    def fit(self,X_train):
+
+        if not isinstance(X_train,np.ndarray):
+            x_train = np.array(X_train)
+            if x_train.ndim == 1:
+                x_train.reshape((np.size(X_train),X_train.ndim))
+        self._kmeans = KMeans(n_clusters=self.n_clusters)
+        self._kmeans.fit(X_train)
+        self.labels = self._kmeans.labels_
+        self.cluster_centers = self._kmeans.cluster_centers_
+
+    def predict(self,data):
+        return self._kmeans.predict(data)
+
+    def evaluate(self,data):
+        return self._kmeans.score(data)
+
+    def get_labels(self):
+        return self.labels

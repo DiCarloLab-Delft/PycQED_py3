@@ -37,7 +37,7 @@ from pycqed.analysis.fit_toolbox import functions as func
 from pprint import pprint
 from math import floor
 from pycqed.measurement import optimization as opt
-
+from pycqed.analysis import machine_learning_toolbox as mlt
 import pycqed.analysis.tools.plotting as pl_tools
 from pycqed.analysis.tools.plotting import (set_xlabel, set_ylabel,
                                             data_to_table_png,
@@ -943,44 +943,98 @@ class Mixer_calibration_evaluation(MeasurementAnalysis):
         self.ma_after = ma2
         self.sweep_pts1 = ma1.sweep_points
         self.sweep_pts2 = ma2.sweep_points
+        self.v_peaks = kw.pop('voltage_peaks',None)
+        self.make_fig = kw.pop('make_fig',True)
         if not np.array_equal(self.sweep_pts1,self.sweep_pts2):
             logging.error('mixer spectrum sweep points different! Evaluating '
                             'on interval with equal sweep points')
         self.meas_vals1 = ma1.measured_values[0]
         self.meas_vals2 = ma2.measured_values[0]
-        print(ma1.value_names,': ma1 value names')
-        print(ma2.value_names,': ma2 value names')
         #MAYBE some preprocessing necessary (Get power levels)
         self.signal_ratio = self.get_signal_ratio_db()
-        print(self.signal_ratio,': signal_ratio')
-        self.make_figures(**kw)
+        self.post_process_data(**kw)
+        if self.make_fig:
+            self.make_figures(**kw)
 
     def get_signal_ratio_db(self):
         return 20.*np.log10(self.meas_vals2/self.meas_vals1)
 
     def make_figures(self,**kw):
         base_figname = self.ma_after.timestamp_string+'_mixer_peak_suppression'
-        f,[ax1,ax2] = plt.subplots(2,1)
-        ax1.set_title('mixer peak suppression')
+        f,[ax1,ax2] = plt.subplots(2,1,figsize=(10,8))
+        plt.subplots_adjust(hspace = 3.5)
+        ax1.set_title('Mixer Peak Suppression',y=1.4)
         ax1.set_ylabel('power ratio [dB]')
         ax1.set_xlabel('frequency [GHz]')
         ax2.set_xlabel('frequencies [GHz]')
-        ax2.set_ylabel('power ratio[db]')
+        ax2.set_ylabel('Magn (Vpeak)[V]')
         ax1.plot(self.sweep_pts1,self.signal_ratio,color='goldenrod',
                  linestyle='solid',
-                 label=r'signal ratio $20\log\left(\frac{V_1}{V_0}\right)$')
+                 label=r'signal ratio $20\,\log_{10}\left(\frac{V_1}{V_0}\right)$')
+        for j,i in enumerate(self.peak_inds):
+            print(i[0])
+            print(self.signal_ratio[i[0]])
+            print(np.min(self.signal_ratio))
+            print(np.max(np.log10(self.meas_vals1)))
+            print(np.min(np.log10(self.meas_vals1)))
+
+            ax1.scatter(self.sweep_pts1[i[0]],
+                        self.signal_ratio[i[0]],
+                        color='black',s=30)
+            ax1.axvline(x=self.sweep_pts1[i[0]],
+                        ymax=1.-(np.max(self.signal_ratio)-self.signal_ratio[i[0]])/
+                              (np.max(self.signal_ratio)-np.min(self.signal_ratio)),
+                        ymin=0.,color='black',linestyle='dashed',
+                        linewidth=0.9)
+            ax2.axvline(x=self.sweep_pts1[i[0]],ymax=1.,
+                        ymin=0.,color='black',linestyle='dashed',
+                        linewidth=0.9)
+            if j==(len(self.peak_inds)-1):
+                ax1.axvline(x=self.sweep_pts1[i[0]],
+                            ymax=1.-(np.max(self.signal_ratio)-self.signal_ratio[i[0]])/
+                                  (np.max(self.signal_ratio)-np.min(self.signal_ratio)),
+                            ymin=0.,color='black',linestyle='dashed',
+                            linewidth=0.9,label='Suppressed Voltage Peaks')
+                ax2.axvline(x=self.sweep_pts1[i[0]],ymax=1.,
+                            ymin=0.,color='black',linestyle='dashed',
+                            linewidth=0.9,label='Peak locations')
+
         ax1.grid(True)
         ax2.grid(True)
-        ax1.legend(loc='best')
-        ax2.legend(loc='best')
-        ax2.plot(self.sweep_pts1,20*np.log10(self.meas_vals1),
+        ax1.legend(loc='upper center',bbox_to_anchor=(0.5,1.305),framealpha=1.,ncol=2)
+        ax2.semilogy(self.sweep_pts1,self.meas_vals1,
                  color='blue',linestyle='solid',
                  label='pre calibration',alpha=0.5)
-        ax2.plot(self.sweep_pts2,20*np.log10(self.meas_vals2),
+        ax2.semilogy(self.sweep_pts2,self.meas_vals2,
                  color='green',linestyle='solid',
                  label='post calibration',alpha=1.0)
+        ax2.legend(loc='upper center',bbox_to_anchor=(0.5,1.24),framealpha=1.,ncol=3)
         self.save_fig(f, figname=base_figname,**kw)
 
+    def post_process_data(self,**kw):
+
+        #PEAK SUPPRESSIONS:
+        sweep_pts_spacing1 = self.sweep_pts1[1]-self.sweep_pts1[0]
+        sweep_pts_spacing2 = self.sweep_pts2[1]-self.sweep_pts2[0]
+        if sweep_pts_spacing1 != sweep_pts_spacing2:
+            logging.warning('pre and post mixer spectrum was not measured with '
+                            'the same frequency spacing!')
+        ind_left_sb = np.where(np.abs((self.sweep_pts1-self.v_peaks[0])) < sweep_pts_spacing1)
+        ind_lo_f = np.where(np.abs((self.sweep_pts1-self.v_peaks[1])) < sweep_pts_spacing1)
+        ind_right_sb = np.where(np.abs((self.sweep_pts1-self.v_peaks[2])) < sweep_pts_spacing1)
+        self.peak_inds = [ind_left_sb,ind_lo_f,ind_right_sb]
+        print(self.peak_inds)
+        left_sb_supp = self.meas_vals2[ind_left_sb]/self.meas_vals1[ind_left_sb]
+        left_sb_supp = 20*np.log10(left_sb_supp)
+        lo_supp = self.meas_vals2[ind_lo_f]/self.meas_vals1[ind_lo_f]
+        lo_supp = 20*np.log10(lo_supp)
+        right_sb_supp = self.meas_vals2[ind_right_sb]/self.meas_vals1[ind_right_sb]
+        right_sb_supp = 20*np.log10(right_sb_supp)
+        left_sb_amp = self.meas_vals2[ind_left_sb]
+        lo_amp = self.meas_vals2[ind_lo_f]
+        right_sb_amp = self.meas_vals2[ind_right_sb]
+        self.supp_values = [left_sb_supp,lo_supp,right_sb_supp]
+        self.opt_amp_vals = [left_sb_amp,lo_amp,right_sb_amp]
 class OptimizationAnalysis_v2(MeasurementAnalysis):
 
     def run_default_analysis(self, close_file=True, **kw):
@@ -1035,6 +1089,7 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
         self.ndim = self.ad_func_pars.pop('ndim',2)
         self.n_fold = self.ad_func_pars.pop('n_fold',5)
         self.accuracy= -np.infty
+        self.make_fig = kw.pop('make_fig',True)
         #already rescaled to original average,interval.
         # self.optimization_result,\
         # self.estimator,\
@@ -1043,7 +1098,8 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
         self.train_NN(**kw)
 
         if self.round > int(self.two_rounds) or self.round==0:     #only create figures in the last iteration
-            self.make_figures(**kw)
+            if self.make_fig:
+                self.make_figures(**kw)
         if close_file:
             self.data_file.close()
         return self.optimization_result
@@ -1088,8 +1144,8 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
         output_means = pre_proc_dict.get('output',{}).get('centering',0.)
         input_scale = pre_proc_dict.get('input',{}).get('scaling',1.)
         input_means = pre_proc_dict.get('input',{}).get('centering',0.)
-        for i in range(self.test_grid.ndim):
-            self.test_grid[:,i] = self.test_grid[:,i]*input_scale[i] + input_means[i]
+        # for i in range(self.test_grid.ndim):
+        #     self.test_grid[:,i] = self.test_grid[:,i]*input_scale[i] + input_means[i]
 
             #create contour plot
         fig1 = plt.figure(figsize=(10,8))
@@ -1146,9 +1202,8 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
                textstr+='%s: %.3g %s' % (self.parameter_names[i],
                                          self.optimization_result[i],
                                          self.parameter_units[i])
-               # if not i== len(self.parameter_names)-1:
-               #     textstr+='\n'
-        textstr+='empirical error: '+str(self.estimator.score)
+               textstr+='\n'
+        textstr+='Empirical error: '+'%.2f' % ((1.-self.estimator.score)*100.) +'%'
         ax1.text(0.98, 0.05, textstr,
              transform=ax1.transAxes,
              fontsize=11, verticalalignment='bottom',
@@ -1157,15 +1212,13 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
              alpha=0.75, boxstyle='round'))
         figname1+= self.estimator_name+' fitted landscape'
         savename1 = self.timestamp_string + '_' + base_figname
-  #                 fig1_type
+
         levels = np.linspace(np.min(Zm),np.max(Zm),30)
         CP = ax1.contourf(Xm,Ym,Zm,levels,extend='both')
         ax1.scatter(self.optimization_result[0],self.optimization_result[1],
                  marker='o',c='white',label='network minimum')
         ax1.scatter(self.sweep_points[0],self.sweep_points[1],
                  marker='o',c='r',label='training data',s=10)
-        # ax1.scatter(self.test_grid[:,0],self.test_grid[:,1],
-        #             marker='o',c='y',label='test data',s=10)
         ax1.tick_params(axis='both',which='minor',labelsize=14)
         ax1.set_ylabel(self.parameter_labels[1],fontsize=fontsize)
         ax1.set_xlabel(self.parameter_labels[0],fontsize=fontsize)
