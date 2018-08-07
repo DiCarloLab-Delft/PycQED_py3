@@ -1640,7 +1640,6 @@ class QuDev_transmon(Qubit):
         if update:
             self.pulse_I_offset(ch_1_min)
             self.pulse_Q_offset(ch_2_min)
-
         return ch_1_min,ch_2_min,a
 
 
