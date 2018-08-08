@@ -183,6 +183,18 @@ class QuTechVSMModule(SCPI):
             #                        vals=validators.OnOff())
 
     def add_calibration_parameters(self):
+        # First add a function so a user can poll if calibration data has
+        # been set correctly in the VSM in order to correctly use the 
+        # orthogonalized parameters
+        self.add_parameter(
+                            'getCalibrationDataAvailable',
+                            docstring='Use this to check if the calibration data has been '\
+                                      'set correctly in the VSM. Outputs an integer 0 (False), 1 (True)',
+                            get_cmd='CALIBRATIONDATAPATH' + '?',
+                            get_parser=int,
+                            vals=validators.Ints(0,1)
+                        )
+
         # Raw attenuationa and phase
         #  Two input pulses
         for pulse in ('gaussian', 'derivative'):
