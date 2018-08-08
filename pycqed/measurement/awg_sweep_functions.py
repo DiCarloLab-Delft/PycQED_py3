@@ -2204,6 +2204,39 @@ class Chevron_ampl_swf(swf.Soft_Sweep):
         pass
 
 
+class Chevron_freq_swf(swf.Soft_Sweep):
+
+    def __init__(self, qb_control, qb_target, hard_sweep):
+        '''
+        Sweep function class (soft sweep) for 2D Chevron experiment where
+        the amplitude of the fluxpulse is swept. Used in combination with
+        the Chevron_length_hard_swf class.
+
+        Args:
+           qb_control (QuDev_Transmon): control qubit (fluxed qubit)
+           qb_target (QuDev_Transmon): target qubit (non-fluxed qubit)
+           hard_sweep: hard sweep function (fast axis sweep function)
+        '''
+        super().__init__()
+        self.name = 'Chevron flux pulse frequency sweep'
+        self.parameter_name = 'Fluxpulse frequency'
+        self.unit = 'Hz'
+        self.hard_sweep = hard_sweep
+        self.qb_control = qb_control
+        self.qb_target = qb_target
+
+    def prepare(self):
+        pass
+
+    def set_parameter(self, val, **kw):
+        self.qb_control.flux_pulse_frequency(val)
+        self.hard_sweep.upload = True
+        self.hard_sweep.prepare()
+
+    def finish(self):
+        pass
+
+
 class Chevron_ampl_fast_swf(swf.Soft_Sweep):
 
     def __init__(self, qb_control, qb_target, AWG, pulsar, channel=None):

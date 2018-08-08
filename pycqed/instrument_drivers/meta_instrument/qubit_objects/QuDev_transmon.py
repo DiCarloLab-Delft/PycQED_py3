@@ -292,12 +292,16 @@ class QuDev_transmon(Qubit):
         # add flux pulse parameters
         self.add_operation('flux')
         self.add_pulse_parameter('flux', 'flux_pulse_type', 'pulse_type',
-                                 initial_value='SquarePulse',
-                                 vals=vals.Enum('SquarePulse'))
+                                 initial_value='CosPulse',
+                                 vals=vals.Enum('CosPulse'))
         self.add_pulse_parameter('flux', 'flux_pulse_channel', 'channel',
                                  initial_value=None, vals=vals.Strings())
         self.add_pulse_parameter('flux', 'flux_pulse_amp', 'amplitude',
                                  initial_value=None, vals=vals.Numbers())
+        self.add_pulse_parameter('flux', 'flux_pulse_freq', 'frequency',
+                                 initial_value=0, vals=vals.Numbers())
+        self.add_pulse_parameter('flux', 'flux_pulse_phase', 'phase',
+                                 initial_value=0, vals=vals.Numbers())
         self.add_pulse_parameter('flux', 'flux_pulse_length', 'length',
                                  initial_value=None, vals=vals.Numbers())
         self.add_pulse_parameter('flux', 'flux_pulse_delay', 'pulse_delay',
@@ -1372,7 +1376,7 @@ class QuDev_transmon(Qubit):
         '''
 
         if nr_cliffords is None:
-            raise ValueError("Unspecified nr_cliffords for measure_echo")
+            raise ValueError("Unspecified nr_cliffords.")
 
         self.prepare_for_timedomain()
 
@@ -1613,7 +1617,7 @@ class QuDev_transmon(Qubit):
 
             chI_par = self.AWG.parameters['{}_offset'.format(self.pulse_I_channel())]
             chQ_par = self.AWG.parameters['{}_offset'.format(self.pulse_Q_channel())]
-            S = [chI_par,chQ_par]
+            S = [chI_par, chQ_par]
             MC.set_sweep_functions(S)
             MC.set_sweep_points(meas_grid.T)
             MC.set_detector_function(det.IndexDetector(detector, 0))
@@ -1856,7 +1860,7 @@ class QuDev_transmon(Qubit):
                 data_points=data_points,
                 upload=True)
             s2 = awg_swf.arbitrary_variable_swf()
-            MC.set_sweep_functions([s1,s2])
+            MC.set_sweep_functions([s1, s2])
             MC.set_sweep_points(meas_grid.T)
             MC.set_detector_function(detector)
             ad_func_pars = {'hidden_layers': hidden_layers,
@@ -2752,8 +2756,8 @@ class QuDev_transmon(Qubit):
             logging.warning("Does not automatically update the qubit "
                             "T1 parameter. Set update=True if you want this!")
         if np.any(times>1e-3):
-            logging.warning('Some of the values in the times array might be too '
-                            'large.The units should be seconds.')
+            raise ValueError('Some of the values in the times array might be too '
+                            'large. The units should be seconds.')
 
         if (cal_points) and (no_cal_points is None):
             logging.warning('no_cal_points is None. Defaults to 4 if for_ef==False,'
@@ -3992,11 +3996,15 @@ def add_CZ_pulse(qbc, qbt):
                                 initial_value=qbt.name,
                                 vals=vals.Enum(qbt.name))
         qbc.add_pulse_parameter(op_name, ps_name + '_pulse_type', 'pulse_type',
-                                initial_value='BufferedSquarePulse',
-                                vals=vals.Enum('BufferedSquarePulse'))
+                                initial_value='BufferedCZPulse',
+                                vals=vals.Enum('BufferedCZPulse'))
         qbc.add_pulse_parameter(op_name, ps_name + '_channel', 'channel',
                                 initial_value='', vals=vals.Strings())
         qbc.add_pulse_parameter(op_name, ps_name + '_amp', 'amplitude',
+                                initial_value=0, vals=vals.Numbers())
+        qbc.add_pulse_parameter(op_name, ps_name + '_freq', 'frequency',
+                                initial_value=0, vals=vals.Numbers())
+        qbc.add_pulse_parameter(op_name, ps_name + '_phase', 'phase',
                                 initial_value=0, vals=vals.Numbers())
         qbc.add_pulse_parameter(op_name, ps_name + '_length', 'pulse_length',
                                 initial_value=0, vals=vals.Numbers(0))
