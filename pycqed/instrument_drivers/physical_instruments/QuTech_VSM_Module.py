@@ -184,7 +184,7 @@ class QuTechVSMModule(SCPI):
 
     def add_calibration_parameters(self):
         # First add a function so a user can poll if calibration data has
-        # been set correctly in the VSM in order to correctly use the 
+        # been set correctly in the VSM in order to correctly use the
         # orthogonalized parameters
         self.add_parameter(
                             'getCalibrationDataAvailable',
