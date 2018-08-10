@@ -346,11 +346,11 @@ def two_qubit_AllXY(q0: int, q1: int, platf_cfg: str,
         pulse_combinations = [val for val in pulse_combinations
                               for _ in (0, 1)]
 
-    if replace_q1_pulses_X180:
-        pulse_combinations_q1 = ['rx180' for val in pulse_combinations]
-
     pulse_combinations_q0 = pulse_combinations
     pulse_combinations_q1 = pulse_combinations_tiled
+
+    if replace_q1_pulses_X180:
+        pulse_combinations_q1 = [['rx180']*2 for val in pulse_combinations]
 
     i = 0
     for pulse_comb_q0, pulse_comb_q1 in zip(pulse_combinations_q0,

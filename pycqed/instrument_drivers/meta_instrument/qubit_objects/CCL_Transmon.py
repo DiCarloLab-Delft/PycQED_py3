@@ -1606,7 +1606,8 @@ class CCLight_Transmon(Qubit):
                      update: bool=True,
                      verbose: bool=True,
                      SNR_detector: bool=False,
-                     cal_residual_excitation: bool=False):
+                     cal_residual_excitation: bool=False,
+                     disable_metadata: bool=False):
         old_RO_digit = self.ro_acq_digitized()
         self.ro_acq_digitized(False)
         # docstring from parent class
@@ -1640,19 +1641,23 @@ class CCLight_Transmon(Qubit):
         d = self.int_log_det
         d.nr_shots = 4092
         MC.set_detector_function(d)
-        MC.run(
-            'SSRO{}'.format(self.msmt_suffix))
+        MC.run('SSRO{}'.format(self.msmt_suffix),
+            disable_snapshot_metadata=disable_metadata)
         MC.live_plot_enabled(old_plot_setting)
         if analyze:
             if SNR_detector:
                 if cal_residual_excitation:
-                    a = ma.SSRO_Analysis(rotate=True, label='SSRO', no_fits=False, close_fig=True,
-                                         peg=None, pge=None, timestamp=None, channels=d.value_names)
+                    a = ma.SSRO_Analysis(rotate=True, label='SSRO',
+                                        no_fits=False, close_fig=True,
+                                        peg=None, pge=None,
+                                        timestamp=None, channels=d.value_names)
                     self.peg = a.frac1_0
                     self.pge = 1-a.frac1_1
                 else:
-                    a = ma.SSRO_Analysis(rotate=True, label='SSRO', no_fits=False,
-                                         close_fig=True, peg=self.peg, pge=self.pge, channels=d.value_names)
+                    a = ma.SSRO_Analysis(rotate=True, label='SSRO',
+                                        no_fits=False, close_fig=True,
+                                        peg=self.peg, pge=self.pge,
+                                        channels=d.value_names)
                 return {'SNR': a.SNR, 'F_d': a.F_d, 'F_a': a.F_a}
 
             else:
@@ -1680,13 +1685,92 @@ class CCLight_Transmon(Qubit):
                             a.proc_data_dict['F_assignment_raw']) +
                             'Avg. Discrimination fidelity: \t{:.4f}'.format(
                             a.proc_data_dict['F_discr']))
-                    return (a.proc_data_dict['F_assignment_raw'],
-                            a.proc_data_dict['F_discr'])
+                    return {'SNR': a.fit_res['shots_all'].params['SNR'],
+                                'F_d': a.proc_data_dict['F_discr'],
+                                'F_a': a.proc_data_dict['F_assignment_raw'],
+                                'relaxation':a.proc_data_dict['measurement_induced_relaxation'],
+                                'excitation':a.proc_data_dict['residual_excitation']}
                 else:
                     a = ma.SSRO_Analysis(label='SSRO',
                                          channels=d.value_names,
                                          no_fits=no_figs, rotate=True)
-                    return a.F_a, a.F_d
+                    return {'SNR': a.SNR, 'F_d': a.F_d, 'F_a': a.F_a}
+
+    def measure_SSRO_frequency_amplitude_sweep(self, freqs=None, amps_rel=np.linspace(0,1,11),
+                    nr_shots=4092*4, nested_MC=None, analyze=True):
+        if nested_MC is None:
+            nested_MC = self.instr_nested_MC.get_instr()
+        if freqs is None:
+            freqs=np.linspace(self.ro_freq()-4e6, self.ro_freq()+2e6,11)
+        self.prepare_for_timedomain()
+        RO_lutman = self.instr_LutMan_RO.get_instr()
+        old_ro_prepare_state = self.cfg_prepare_ro_awg()
+        self.ro_acq_digitized(False)
+        self.cfg_prepare_ro_awg(False)
+
+        sweep_function = swf.lutman_par_depletion_pulse_global_scaling(
+            LutMan=RO_lutman,
+            resonator_numbers=[self.cfg_qubit_nr()],
+            optimization_M_amps=[self.ro_pulse_amp()],
+            optimization_M_amp_down0s=[self.ro_pulse_down_amp0()],
+            optimization_M_amp_down1s=[self.ro_pulse_down_amp1()],
+            upload=True
+        )
+        d = det.Function_Detector(
+            self.measure_ssro,
+            msmt_kw={
+                'nr_shots': nr_shots,
+                'analyze': True, 'SNR_detector': True,
+                'cal_residual_excitation': True,
+                'prepare': False,
+                'disable_metadata': True
+            },
+            result_keys=['SNR', 'F_d', 'F_a']
+        )
+        nested_MC.set_sweep_function(swf.Heterodyne_Frequency_Sweep_simple(
+            MW_LO_source=self.instr_LO_ro.get_instr(),
+            IF=self.ro_freq_mod()))
+        nested_MC.set_sweep_points(freqs)
+        nested_MC.set_detector_function(d)
+        nested_MC.set_sweep_function_2D(sweep_function)
+        nested_MC.set_sweep_points_2D(amps_rel)
+        label = 'SSRO_freq_amp_sweep' + self.msmt_suffix
+        nested_MC.run(label, mode='2D')
+
+        self.cfg_prepare_ro_awg(old_ro_prepare_state)
+
+        if analyze:
+            ma.TwoD_Analysis(label=label, plot_all=False, auto=True)
+
+    def measure_SSRO_pulse_length_sweep(self, lengths=np.arange(100e-9,1501e-9,100e-9), 
+                    nr_shots=4092*4, nested_MC=None, analyze=True, label_suffix: str=''):
+        if nested_MC is None:
+            nested_MC = self.instr_nested_MC.get_instr()
+        self.ro_acq_digitized(False)
+        self.prepare_for_timedomain()
+        RO_lutman = self.instr_LutMan_RO.get_instr()
+        
+        sweep_function = swf.lutman_par_UHFQC_dig_trig(
+            LutMan=RO_lutman,
+            LutMan_parameter=RO_lutman['M_length_R{}'.format(self.cfg_qubit_nr())]
+        )
+
+        d = det.Function_Detector(
+            self.calibrate_optimal_weights,
+            msmt_kw={
+                'analyze': True,
+                },
+            result_keys=['SNR', 'F_d', 'F_a', 'relaxation', 'excitation']
+        )
+        # nested_MC.set_sweep_function(sweep_function)
+        nested_MC.set_sweep_function(self.ro_pulse_length)
+        nested_MC.set_sweep_points(lengths)
+        nested_MC.set_detector_function(d)
+        label = 'SSRO_length_sweep' + self.msmt_suffix + label_suffix
+        nested_MC.run(label)
+
+        if analyze:
+            ma.MeasurementAnalysis(label=label, plot_all=False, auto=True)
 
     def measure_transients(self, MC=None, analyze: bool=True,
                            cases=('off', 'on'),
@@ -1830,7 +1914,9 @@ class CCLight_Transmon(Qubit):
                                   no_figs: bool=False,
                                   update_threshold: bool=True,
                                   optimal_IQ: bool=False,
-                                  measure_transients_CCL_switched: bool=False)->bool:
+                                  measure_transients_CCL_switched: bool=False,
+                                  prepare: bool=True,
+                                  )->bool:
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -1872,8 +1958,10 @@ class CCLight_Transmon(Qubit):
             else:
                 self.ro_acq_weight_type('optimal')
         if verify:
-            self.measure_ssro(
-                no_figs=no_figs, update_threshold=update_threshold)
+            ssro_dict= self.measure_ssro(
+                no_figs=no_figs, update_threshold=update_threshold,
+                prepare=prepare)
+            return ssro_dict
         return True
 
     def measure_rabi(self, MC=None, amps=None,
