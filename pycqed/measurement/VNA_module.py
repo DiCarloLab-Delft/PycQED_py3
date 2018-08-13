@@ -1,5 +1,6 @@
 import numpy as np
 from pycqed.analysis import measurement_analysis as ma
+from pycqed.analysis_v2 import measurement_analysis as ma2
 from pycqed.measurement import sweep_functions as swf
 from pycqed.measurement import detector_functions as det
 
@@ -11,7 +12,8 @@ def acquire_single_linear_frequency_span(file_name, start_freq=None,
                                          stop_freq=None, center_freq=None,
                                          span=None, nr_avg=1, sweep_mode='auto',
                                          nbr_points=101, power=-20,
-                                         bandwidth=100, measure='S21'):
+                                         bandwidth=100, measure='S21',
+                                         options_dict=None):
     """
     Acquires a single trace from the VNA.
     Inputs:
@@ -66,6 +68,7 @@ def acquire_single_linear_frequency_span(file_name, start_freq=None,
     MC_instr.run(name=file_name)
     # ma.Homodyne_Analysis(auto=True, label=file_name, fitting_model='hanger')
     # ma.VNA_Analysis(auto=True, label=file_name)
+    # ma2.VNA_Analysis(auto=True, label=file_name, options_dict=options_dict)
 
 
 def acquire_current_trace(file_name):

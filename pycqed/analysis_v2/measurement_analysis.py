@@ -38,3 +38,4 @@ from pycqed.analysis_v2.syndrome_analysis import (
 from pycqed.analysis_v2.cryo_scope_analysis import *
 from pycqed.analysis_v2.cryo_scope_analysis_v2 import RamZFluxArc
 from pycqed.analysis_v2.distortions_analysis import Scope_Trace_analysis
+from pycqed.analysis_v2.spectroscopy_analysis import Spectroscopy, ResonatorSpectroscopy, VNA_analysis, complex_spectroscopy
