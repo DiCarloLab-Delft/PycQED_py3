@@ -50,6 +50,7 @@ from .SCPI import SCPI
 from qcodes.instrument.base import Instrument
 from qcodes import validators
 from qcodes.instrument.parameter import ManualParameter
+from datetime import datetime
 
 
 class QuTechVSMModule(SCPI):
@@ -60,7 +61,17 @@ class QuTechVSMModule(SCPI):
         self.channels = [1, 2, 3, 4]
 
         self.add_parameters()
+        self.sync_time_and_add_parameter()
         self.connect_message()
+
+    def sync_time_and_add_parameter(self):
+        doc_description = 'Parameter to sync the time from user computer to VSM'
+        self.add_parameter('sync_time',
+                           docstring=doc_description,
+                           set_cmd='SYSTEM'+':TIME {}',
+                           vals=validators.Strings())
+        current_time_str = datetime.now().strftime('%YT%mT%dT%HT%MT%S')
+        self.sync_time(current_time_str)
 
     def add_parameters(self):
         self.add_temperature_parameters()
