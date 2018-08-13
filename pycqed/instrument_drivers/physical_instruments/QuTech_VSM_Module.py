@@ -61,17 +61,9 @@ class QuTechVSMModule(SCPI):
         self.channels = [1, 2, 3, 4]
 
         self.add_parameters()
-        self.sync_time_and_add_parameter()
+        self._sync_time_and_add_parameter()
         self.connect_message()
 
-    def sync_time_and_add_parameter(self):
-        doc_description = 'Parameter to sync the time from user computer to VSM'
-        self.add_parameter('sync_time',
-                           docstring=doc_description,
-                           set_cmd='SYSTEM'+':TIME {}',
-                           vals=validators.Strings())
-        current_time_str = datetime.now().strftime('%YT%mT%dT%HT%MT%S')
-        self.sync_time(current_time_str)
 
     def add_parameters(self):
         self.add_temperature_parameters()
@@ -300,6 +292,14 @@ class QuTechVSMModule(SCPI):
                                        get_parser=float,
                                        vals=validators.Numbers(-125,45))
 
+    def _sync_time_and_add_parameter(self):
+        doc_description = 'Parameter to sync the time from user computer to VSM'
+        self.add_parameter('sync_time',
+                           docstring=doc_description,
+                           set_cmd='SYSTEM'+':TIME {}',
+                           vals=validators.Strings())
+        current_time_str = datetime.now().strftime('%YT%mT%dT%HT%MT%S')
+        self.sync_time(current_time_str)
 
 
 class Dummy_QuTechVSMModule(QuTechVSMModule):
@@ -316,6 +316,8 @@ class Dummy_QuTechVSMModule(QuTechVSMModule):
         self.add_parameters()
         self._address = 'Dummy'
         self._terminator = '\n'
+        current_time_str = datetime.now().strftime('%YT%mT%dT%HT%MT%S')
+        self.sync_time(current_time_str)
 
         self.IDN({'driver': str(self.__class__), 'model': self.name,
                   'serial': 'Dummy', 'vendor': '', 'firmware': ''})
