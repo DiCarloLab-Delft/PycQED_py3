@@ -2009,6 +2009,7 @@ class Dynamic_phase(swf.Hard_Sweep):
                                         operation_dict=self.operation_dict,
                                         cal_points=self.cal_points)
 
+
 class Ramsey_interleaved_fluxpulse_sweep(swf.Hard_Sweep):
 
     def __init__(self, qb, X90_separation, upload=True):
@@ -2132,6 +2133,81 @@ class Chevron_length_hard_swf(swf.Hard_Sweep):
                 qb_target=self.qb_target, spacing=self.spacing,
                 cal_points=self.cal_points
                 )
+
+
+class Chevron_length_swf_new(swf.Hard_Sweep):
+
+    def __init__(self, lengths, flux_pulse_amp, qb_name_c, qb_name_t,
+                 CZ_pulse_name, operation_dict, readout_qbt=None,
+                 verbose=False, cal_points=False,
+                 upload=True, return_seq=False):
+        '''
+        Sweep function class for a single slice of the Chevron experiment where
+        the length of the fluxpulse is swept (hard sweep).
+        For details on the experiment see documentation of
+        'fsqs.Chevron_length_seq(...)'''
+
+        super().__init__()
+        self.lengths = lengths
+        self.flux_pulse_amp = flux_pulse_amp
+        self.qb_name_c = qb_name_c
+        self.qb_name_t = qb_name_t
+        self.readout_qbt = readout_qbt
+        self.CZ_pulse_name = CZ_pulse_name
+        self.operation_dict = operation_dict
+        self.upload = upload
+        self.cal_points = cal_points
+        self.verbose = verbose
+        self.return_seq = return_seq
+
+        self.name = 'Chevron flux pulse length sweep'
+        self.parameter_name = 'Fluxpulse length'
+        self.unit = 's'
+
+    def prepare(self, upload_all=True, **kw):
+        if self.upload:
+            fsqs.Chevron_length_seq(
+                lengths=self.lengths,
+                flux_pulse_amp=self.flux_pulse_amp,
+                qb_name_c=self.qbc_name,
+                qb_name_t=self.qbt_name,
+                upload_all=upload_all,
+                CZ_pulse_name=self.CZ_pulse_name,
+                operation_dict=self.operation_dict,
+                verbose=self.verbose, cal_points=self.cal_points,
+                upload=self.upload, return_seq=self.return_seq)
+
+
+class Chevron_ampl_swf_new(swf.Soft_Sweep):
+
+    def __init__(self, hard_sweep):
+        '''
+        Sweep function class (soft sweep) for 2D Chevron experiment where
+        the amplitude of the fluxpulse is swept. Used in combination with
+        the Chevron_length_hard_swf class.
+
+        Args:
+           qb_control (QuDev_Transmon): control qubit (fluxed qubit)
+           qb_target (QuDev_Transmon): target qubit (non-fluxed qubit)
+           hard_sweep: hard sweep function (fast axis sweep function)
+        '''
+        super().__init__()
+        self.name = 'Chevron flux pulse amplitude sweep'
+        self.parameter_name = 'Fluxpulse amplitude'
+        self.unit = 'V'
+        self.hard_sweep = hard_sweep
+        self.is_first_sweeppoint = True
+
+    def prepare(self):
+        pass
+
+    def set_parameter(self, val, **kw):
+        self.hard_sweep.flux_pulse_amp(val)
+        self.hard_sweep.prepare(upload_all=self.is_first_sweeppoint)
+        self.is_first_sweeppoint = False
+
+    def finish(self):
+        pass
 
 
 class Chevron_ampl_hard_swf(swf.Hard_Sweep):

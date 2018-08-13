@@ -1684,3 +1684,59 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
                                         'updated.'%e)
 
 
+def measure_chevron(qbc, qbt, qbr, lengths, amplitudes,
+                    cal_points=True, upload=True,
+                    verbose=False, return_seq=False,
+                    max_nr_elts=240, MC=None, soft_averages=1):
+
+    if MC is None:
+        MC = qbc.MC
+
+    operation_dict = get_operation_dict([qbc, qbt, qbr])
+    CZ_pulse_name = 'CZ ' + qbt.name + ' ' + qbc.name
+
+    for qb in [qbc, qbt, qbr]:
+        qb.prepare_for_timedomain()
+
+    # if cal_points:
+    #     step = np.abs(lengths[-1] - lengths[-2])
+    #     lengths = np.concatenate(
+    #         [lengths, [lengths[-1]+step, lengths[-1]+2*step,
+    #                    lengths[-1]+3*step, lengths[-1]+4*step]])
+    # sweep_points = np.tile(lengths, len(amplitudes))
+    # mps_sweep_points = np.repeat(amplitudes, len(lengths))
+    #
+    # sweep_points_1D = sweep_points
+    # if len(sweep_points) > max_nr_elts:
+    #
+    #     nr_lengths_arr_in_max_elts = max_nr_elts // len(lengths)
+    #     nr_sweep_pts_in_1D = nr_lengths_arr_in_max_elts*len(lengths)
+    #
+    #     sweep_points_1D = sweep_points[0:nr_sweep_pts_in_1D]
+
+    flux_channel = operation_dict[CZ_pulse_name]['channel']
+    flux_AWG = flux_channel[0:4]
+    flux_channel = flux_channel[5::]
+
+    sf1 = awg_swf.Chevron_length_swf_new(
+                lengths=lengths,
+                flux_pulse_amp=amplitudes[0],
+                qb_name_c=qbc.name,
+                qb_name_t=qbt.name,
+                readout_qbt=qbr.name,
+                CZ_pulse_name=CZ_pulse_name,
+                operation_dict=operation_dict,
+                verbose=verbose, cal_points=cal_points,
+                upload=False, return_seq=return_seq)
+
+    sf2 = awg_swf.Chevron_ampl_swf_new(hard_sweep=sf1,
+                                       upload_channel=flux_channel,
+                                       upload_AWG=flux_AWG,
+                                       upload=upload)
+
+    MC.soft_avg(soft_averages)
+    MC.set_sweep_function(sf1)
+    MC.set_sweep_points(lengths)
+    MC.set_sweep_function_2D(sf2)
+    MC.set_sweep_points_2D(amplitudes)
+    MC.set_detector_function(qbr.int_avg_det)

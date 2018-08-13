@@ -1759,6 +1759,82 @@ def Chevron_flux_pulse_length_seq(lengths, qb_control, qb_target, spacing=50e-9,
         return seq_name
 
 
+def Chevron_length_seq_new(lengths, flux_pulse_amp,
+                       qbc_name, qbt_name, qbr_name,
+                       CZ_pulse_name, operation_dict,
+                       upload_all=True,
+                       verbose=False, cal_points=False,
+                       upload=True, return_seq=False):
+
+    '''
+    chevron sequence (sweep of the flux pulse length)
+
+    Timings of sequence
+                                  <-- length -->
+    qb_control:    |X180|  ---   |  fluxpulse   |
+
+    qb_target:     |X180|  --------------------------------------  |RO|
+
+    args:
+        lengths: np.array containing the lengths of the fluxpulses
+        flux_pulse_amp: namplitude of the fluxpulse
+        qb_name_c: control qubit name
+        qb_name_t: target qubit name
+        CZ_pulse_name: name of CZ pulse in the pulse dict
+        operation_dict: contains operation dicts of both qubits
+
+    '''
+
+    seq_name = 'Chevron_length_sequence'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+
+    RO_pulse = operation_dict['RO ' + qbr_name]
+    CZ_pulse = operation_dict[CZ_pulse_name]
+    max_length = np.max(lengths)
+
+    CZ_pulse['amplitude'] = flux_pulse_amp
+    if upload_all:
+        upload_AWGs = 'all'
+        upload_channels = 'all'
+    else:
+        upload_AWGs = station.pulsar.get(CZ_pulse['channel'] + '_AWG')
+        upload_channels = [station.pulsar.get(CZ_pulse['channel'] + '_id')]
+
+    for i, length in enumerate(lengths):
+        RO_pulse['pulse_delay'] = max_length - length
+        CZ_pulse['length'] = length
+
+        if cal_points and (i == (len(lengths)-4) or i == (len(lengths)-3)):
+            el = multi_pulse_elt(i, station, [RO_pulse])
+        elif cal_points and (i == (len(lengths)-2) or i == (len(lengths)-1)):
+            CZ_pulse['amplitude'] = 0
+            el = multi_pulse_elt(i, station,
+                                 [operation_dict['X180 ' + qbc_name],
+                                  operation_dict['X180s ' + qbt_name],
+                                  CZ_pulse,
+                                  RO_pulse])
+        else:
+            el = multi_pulse_elt(i, station,
+                                 [operation_dict['X180 ' + qbc_name],
+                                  operation_dict['X180s ' + qbt_name],
+                                  CZ_pulse,
+                                  RO_pulse])
+
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list,
+                                    AWGs=upload_AWGs,
+                                    channels=upload_channels,
+                                    verbose=verbose)
+
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq_name
+
 
 def Chevron_flux_pulse_ampl_seq(ampls, qb_control,
                                 qb_target, spacing=50e-9,
