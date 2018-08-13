@@ -317,7 +317,7 @@ class Dummy_QuTechVSMModule(QuTechVSMModule):
         self._address = 'Dummy'
         self._terminator = '\n'
         current_time_str = datetime.now().strftime('%YT%mT%dT%HT%MT%S')
-        self.sync_time(current_time_str)
+        self._sync_time_and_add_parameter()
 
         self.IDN({'driver': str(self.__class__), 'model': self.name,
                   'serial': 'Dummy', 'vendor': '', 'firmware': ''})
