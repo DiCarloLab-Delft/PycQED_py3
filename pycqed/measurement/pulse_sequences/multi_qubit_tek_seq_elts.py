@@ -2132,12 +2132,162 @@ def n_qubit_ref_all_seq(qubit_names, operation_dict, upload=True, verbose=False,
                            ro_spacing=ro_spacing)
 
 #### Multi-qubit time-domain
-def n_qubit_Rabi_seq(
-        qubit_names, operation_dict, prep_sequence=None,
-        prep_name=None,
-        rots_basis=('I', 'X180', 'Y90', 'mY90', 'X90', 'mX90'),
-        upload=True, verbose=False, return_seq=False,
-        preselection=False, ro_spacing=1e-6):
+def general_multi_qubit_seq(
+        sweep_params,
+        sweep_points,
+        qb_names,
+        operation_dict,   # of all qubits
+        cal_points=True,
+        no_cal_points=4,
+        upload=False,
+        return_seq=False,
+        verbose=False):
 
-    pass
+    """
+    sweep_params = {
+	        Pulse_type: (pulse_pars)
+        }
+    Ex:
+        # Rabi
+        sweep_params = (
+	        ('X180', {'pulse_pars': {'amplitude': (lambda sp: sp),
+	                 'repeat': 3}}), # for n-rabi; leave out if normal rabi
+	    )
 
+	    # Ramsey
+        sweep_params = (
+            ('X90', {}),
+            ('X90', {'pulse_pars': {'refpoint': 'start',
+                    'pulse_delay': (lambda sp: sp),
+                    'phase': (lambda sp:
+                        ((sp-sweep_points[0]) * 1.1 * 360) % 360)}}),
+        )
+
+        # T1
+	    sweep_params = (
+	        ('X180', {}),
+	        ('RO_mux', {'pulse_pars': {'pulse_delay': (lambda sp: sp)}})
+        )
+
+        # Echo
+        sweep_params = (
+            ('X90', {}),
+            ('X180', {'pulse_pars': {'refpoint': 'start',
+                                     'pulse_delay': (lambda sp: sp/2)}}),
+            ('X90', {'pulse_pars': {
+                'refpoint': 'start',
+                'pulse_delay': (lambda sp: sp/2),
+                'phase': (lambda sp:
+                          ((sp-sweep_points[0]) * artificial_detuning *
+                           360) % 360)}})
+
+        )
+
+        # QScale
+        sweep_params = (
+            ('X90', {'pulse_pars': {'motzoi': (lambda sp: sp)},
+                     'condition': (lambda i: i%3==0)}),
+            ('X180', {'pulse_pars': {'motzoi': (lambda sp: sp)},
+                     'condition': (lambda i: i%3==0)}),
+            ('X90', {'pulse_pars': {'motzoi': (lambda sp: sp)},
+                     'condition': (lambda i: i%3==1)}),
+            ('Y180', {'pulse_pars': {'motzoi': (lambda sp: sp)},
+                     'condition': (lambda i: i%3==1)}),
+            ('X90', {'pulse_pars': {'motzoi': (lambda sp: sp)},
+                     'condition': (lambda i: i%3==2)}),
+            ('mY180', {'pulse_pars': {'motzoi': (lambda sp: sp)},
+                     'condition': (lambda i: i%3==2)}),
+            ('RO', {})
+        )
+    """
+
+    seq_name = 'TD_sequence'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+
+    for i, sp in enumerate(sweep_points):
+        pulse_list = []
+        if cal_points and no_cal_points==4 and \
+                (i == (len(sweep_points)-4) or i == (len(sweep_points)-3)):
+            for qb_name in qb_names:
+                qbn = ' ' + qb_name
+                if qb_name != qb_names[0]:
+                    qbn = 's ' + qb_name
+                pulse_list += [operation_dict['I' + qbn]]
+        elif cal_points and no_cal_points==4 and \
+                (i == (len(sweep_points)-2) or i == (len(sweep_points)-1)):
+            for qb_name in qb_names:
+                qbn = ' ' + qb_name
+                if qb_name != qb_names[0]:
+                    qbn = 's ' + qb_name
+                pulse_list += [ operation_dict['X180' + qbn]]
+        elif cal_points and no_cal_points==2 and \
+                (i == (len(sweep_points)-2) or i == (len(sweep_points)-1)):
+            for qb_name in qb_names:
+                qbn = ' ' + qb_name
+                if qb_name != qb_names[0]:
+                    qbn = 's ' + qb_name
+                pulse_list += [operation_dict['I' + qbn]]
+        else:
+            for sweep_tuple in sweep_params:
+                pulse_key = [x for x in sweep_tuple if isinstance(x, str)][0]
+                params_dict = [x for x in sweep_tuple if isinstance(x, dict)][0]
+                proceed = True
+
+                if 'condition' in params_dict:
+                    if not params_dict['condition'](i):
+                        proceed = False
+
+                if proceed:
+                    if 'mux' in pulse_key:
+                        print(pulse_key)
+                        pulse_pars_dict = deepcopy(operation_dict[pulse_key])
+                        if 'pulse_pars' in params_dict:
+                            for pulse_par_name, pulse_par in \
+                                    params_dict['pulse_pars'].items():
+                                if hasattr(pulse_par, '__call__'):
+                                    pulse_pars_dict[pulse_par_name] = \
+                                        pulse_par(sp)
+                                else:
+                                    pulse_pars_dict[pulse_par_name] = \
+                                        pulse_par
+                        pulse_list += [pulse_pars_dict]
+                    else:
+                        print(pulse_key)
+                        for qb_name in qb_names:
+                            print(qb_name)
+                            pulse_pars_dict = deepcopy(operation_dict[
+                                                           pulse_key + ' ' + qb_name])
+                            if 'pulse_pars' in params_dict:
+                                for pulse_par_name, pulse_par in \
+                                        params_dict['pulse_pars'].items():
+                                    if hasattr(pulse_par, '__call__'):
+                                        pulse_pars_dict[pulse_par_name] = \
+                                            pulse_par(sp)
+                                    else:
+                                        pulse_pars_dict[pulse_par_name] = \
+                                            pulse_par
+                            if qb_name != qb_names[0]:
+                                pulse_pars_dict['refpoint'] = 'simultaneous'
+
+                            pulse_list += [pulse_pars_dict]
+
+        if 'repeat' in params_dict:
+            n = params_dict['repeat']
+            pulse_list += (n-1)*pulse_list
+
+        if not np.any([p['operation_type'] == 'RO' for p in pulse_list]):
+            print('in add mux')
+            pulse_list += [operation_dict['RO mux']]
+        el = multi_pulse_elt(i, station, pulse_list)
+
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq

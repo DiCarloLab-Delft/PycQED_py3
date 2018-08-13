@@ -446,3 +446,34 @@ class parity_correction(swf.Hard_Sweep):
                 nr_echo_pulses=self.nr_echo_pulses,
                 cpmg_scheme=self.cpmg_scheme
                 )
+
+
+class calibrate_n_qubits(swf.Hard_Sweep):
+    def __init__(self, sweep_params, qubit_names, operation_dict,
+                 cal_points=True, no_cal_points=4,
+                 parameter_name='sample', unit='#',
+                 upload=False, return_seq=False):
+
+        super().__init__()
+        self.sweep_params = sweep_params
+        self.qubit_names = qubit_names
+        self.operation_dict = operation_dict
+        self.cal_points = cal_points
+        self.no_cal_points = no_cal_points
+        self.upload = upload
+        self.return_seq = return_seq
+        self.parameter_name = parameter_name
+        self.unit = unit
+
+    def prepare(self, **kw):
+        if self.upload:
+            sqs2.general_multi_qubit_seq(sweep_params=self.sweep_params,
+                                         sweep_points=self.sweep_points,
+                                         qb_names=self.qubit_names,
+                                         operation_dict=self.operation_dict,
+                                         thresholded=False,
+                                         cal_points=self.cal_points,
+                                         no_cal_points=self.no_cal_points,
+                                         upload=self.upload,
+                                         return_seq=self.return_seq)
+
