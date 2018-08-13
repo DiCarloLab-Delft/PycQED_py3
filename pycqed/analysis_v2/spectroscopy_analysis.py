@@ -297,7 +297,7 @@ class VNA_analysis(complex_spectroscopy):
     def __init__(self, t_start,
                  options_dict=None,
                  t_stop=None,
-                 do_fitting=False,
+                 do_fitting=True,
                  extract_only=False,
                  auto=True):
         super(VNA_analysis, self).__init__(t_start, t_stop=t_stop,
