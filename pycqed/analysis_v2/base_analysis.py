@@ -477,12 +477,13 @@ class BaseDataAnalysis(object):
         # initialize everything to an empty dict if not overwritten
         self.fit_dicts = OrderedDict()
 
+
     def run_fitting(self):
         '''
         This function does the fitting and saving of the parameters
         based on the fit_dict options.
-        Only model fitting is implemented here.
-        Minimizing fitting is being worked on.
+        Only model fitting is implemented here. Minimizing fitting should
+        be implemented here.
         '''
         self.fit_res = {}
         for key, fit_dict in self.fit_dicts.items():
@@ -499,9 +500,9 @@ class BaseDataAnalysis(object):
                 fit_fn = fit_dict.get('fit_fn', None)
                 model = fit_dict.get('model', lmfit.Model(fit_fn))
             fit_guess_fn = fit_dict.get('fit_guess_fn', None)
-            if fit_guess_fn is None and fit_dict.get('fit_guess', False):
-                fit_guess_fn = model.guess
-
+            if fit_guess_fn is None:
+                if  fitting_type == 'model' and fit_dict.get('fit_guess', True):
+                    fit_guess_fn = model.guess
 
             if guess_pars is None:
                 if fit_guess_fn is not None:
@@ -512,7 +513,6 @@ class BaseDataAnalysis(object):
                             params.add(gd_key)
                             for attr, attr_val in val.items():
                                 setattr(params[gd_key], attr, attr_val)
-
                     # a fit function should return lmfit parameter objects
                     # but can also work by returning a dictionary of guesses
                     elif fitting_type is 'model':
@@ -521,15 +521,18 @@ class BaseDataAnalysis(object):
                             for gd_key, val in list(guess_pars.items()):
                                 model.set_param_hint(gd_key, **val)
                             guess_pars = model.make_params()
-
-                        # A guess can also be specified as a dictionary.
-                        # additionally this can be used to overwrite values
-                        # from the guess functions.
+                                                ####
+                        if guess_dict is not None:
+                             for gd_key, val in guess_dict.items():
+                                 for attr, attr_val in val.items():
+                                     # e.g. setattr(guess_pars['frequency'], 'value', 20e6)
+                                     setattr(guess_pars[gd_key], attr, attr_val)
+                        ####
                 elif guess_dict is not None:
                     if fitting_type is 'minimize':
                         params = lmfit.Parameters()
                         for key, val in list(guess_dict.items()):
-                        # for key, val in guess_dict.items():
+                         # for key, val in guess_dict.items():
                             params.add(key)
                             for attr, attr_val in val.items():
                                 setattr(params[key], attr, attr_val)
@@ -553,6 +556,7 @@ class BaseDataAnalysis(object):
                 fit_dict['fit_res'].userkws = fit_xvals
                 fit_dict['fit_res'].fit_fn = fit_fn
                 self.fit_res[key] = fit_dict['fit_res']
+
 
 
 
