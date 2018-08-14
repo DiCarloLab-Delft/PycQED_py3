@@ -331,7 +331,7 @@ class CCLight_Transmon(Qubit):
                            parameter_class=ManualParameter)
         self.add_parameter('mw_vsm_marker_source',
                            label='VSM switch state',
-                           initial_value='ext',
+                           initial_value='int',
                            vals=vals.Enum('ext', 'int'),
                            parameter_class=ManualParameter)
 
@@ -1040,14 +1040,20 @@ class CCLight_Transmon(Qubit):
     ####################################################
 
     def calibrate_mw_pulse_amplitude_coarse(self,
-                                         amps=np.linspace(0,1,31),
+                                         amps=None,
                                          close_fig=True, verbose=False,
                                          MC=None, update=True,
-                                         take_fit_I=False):
+                                         all_modules=False):
         """
         Calibrates the pulse amplitude using a single rabi oscillation
         """
-        self.measure_rabi(amps=amps, MC=MC, analyze=False)
+        if amps is None:
+            if self.cfg_with_vsm():
+                amps = np.linspace(0.2,2,31)
+            else:
+                amps = np.linspace(0,1,31)
+
+        self.measure_rabi(amps=amps, MC=MC, analyze=False, all_modules=all_modules)
         a = ma.Rabi_Analysis(close_fig=close_fig, label='rabi')
         if self.cfg_with_vsm():
             self.mw_vsm_G_amp(a.rabi_amplitudes['piPulse'])
