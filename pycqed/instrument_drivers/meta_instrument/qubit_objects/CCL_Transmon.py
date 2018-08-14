@@ -384,10 +384,7 @@ class CCLight_Transmon(Qubit):
                            vals=vals.Numbers(-125, 45),
                            initial_value=0, unit='deg',
                            parameter_class=ManualParameter)
-        self.add_parameter('mw_channel_amp',
-                           vals=vals.Numbers(0, 1),
-                           initial_value=1, unit='V',
-                           parameter_class=ManualParameter)
+
 
     def _set_mw_vsm_delay(self, val):
         # sort of a pseudo Manual Parameter
