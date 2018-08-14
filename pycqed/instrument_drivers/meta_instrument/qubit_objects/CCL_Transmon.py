@@ -999,12 +999,8 @@ class CCLight_Transmon(Qubit):
                         self.mw_mixer_offs_GQ())
             else:
                 # case without VSM (and AWG8)
-<<<<<<< HEAD
-
-=======
                 MW_LutMan.mw_amp180(1)
                 MW_LutMan.channel_amp(self.mw_channel_amp())
->>>>>>> 427a0ddc00a2c17109b73999d60a8d2fb0d6bb5b
                 MW_LutMan.mixer_phi(self.mw_G_mixer_phi())
                 MW_LutMan.mixer_alpha(self.mw_G_mixer_alpha())
 
