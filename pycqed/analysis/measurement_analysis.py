@@ -7945,13 +7945,14 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
                  break_before_fitting=False,
                  add_title=True,
                  xlabel=None, ylabel='Frequency (GHz)', 
-                 weight_function_magn=0,
-                 use_distance=True,
+                 weight_function_magn_phase=[0,1],
+                 use_distance=True, slope=-1,
                  **kw):
         super().__init__(timestamp=timestamp, label=label, **kw)
         self.get_naming_and_values_2D()
-        measured_magns = np.transpose(self.measured_values[weight_function_magn])
-        measured_phases = np.transpose(self.measured_values[1+weight_function_magn])
+
+        measured_magns = np.transpose(self.measured_values[weight_function_magn_phase[0]])
+        measured_phases = np.transpose(self.measured_values[weight_function_magn_phase[1]])
         rad = [(i * np.pi/180) for i in measured_phases]
         real = [measured_magns[j] * np.cos(i) for j, i in enumerate(rad)]
         imag = [measured_magns[j] * np.sin(i) for j, i in enumerate(rad)]
@@ -7960,7 +7961,9 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         self.S21dist = dists
         if use_distance:
             self.Z[0]=np.array(self.S21dist)
-        flux = self.Y[:, 0]
+        else:
+            self.Z[0]=measured_magns
+        flux = self.Y[:, 0] *1e3 #Convert to mA
         self.peaks_low, self.peaks_high = self.find_peaks()
         self.f, self.ax = self.make_unfiltered_figure(self.peaks_low, self.peaks_high,
                                                       transpose=transpose, cmap=cmap,
@@ -7974,7 +7977,8 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
                                         filter_idx_high=filter_idx_high,
                                         force_keep_idx_low=force_keep_idx_low, 
                                         force_keep_idx_high=force_keep_idx_high,
-                                        filter_threshold=filter_threshold)
+                                        filter_threshold=filter_threshold, 
+                                        slope=slope)
         filt_flux_low, filt_flux_high, filt_peaks_low, filt_peaks_high, \
         filter_func = self.filtered_dat
 
@@ -7999,6 +8003,13 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
                                                coupling_label=coupling_label,
                                                transpose=transpose, cmap=cmap,
                                                xlabel=xlabel, ylabel=ylabel)
+        self.f, self.ax = self.make_base_figure(filt_flux_low, filt_flux_high,
+                                               filt_peaks_low, filt_peaks_high,
+                                               add_title=add_title,
+                                               fit_res=self.fit_res,
+                                               coupling_label=coupling_label,
+                                               transpose=transpose, cmap=cmap,
+                                               xlabel=xlabel, ylabel=ylabel)
 
     def run_default_analysis(self, **kw):
         # I'm doing this in the init in this function
@@ -8009,7 +8020,10 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         peaks = np.zeros((len(self.X), 2))
         for i in range(len(self.X)):
             p_dict = a_tools.peak_finder_v2(self.X[i], self.Z[0][i])
-            peaks[i, :] = np.sort(p_dict[:2])
+            try:
+                peaks[i, :] = np.sort(p_dict[:2])
+            except:
+                pass
 
         peaks_low = peaks[:, 0]
         peaks_high = peaks[:, 1]
@@ -8018,7 +8032,7 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
     def filter_data(self, flux, peaks_low, peaks_high, a, x0=None, y0=None,
                     filter_idx_low=[], filter_idx_high=[],
                     force_keep_idx_low=[], force_keep_idx_high=[],
-                    filter_threshold=15e5):
+                    filter_threshold=15e5, slope=-1):
         """
         Filters the input data in three steps.
             1. remove outliers using the dm_tools.get_outliers function
@@ -8029,7 +8043,7 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         """
 
         if a is None:
-            a = -1 * (max(peaks_high) - min(peaks_low)) / (max(flux) - min(flux))
+            a = slope* (max(peaks_high) - min(peaks_low)) / (max(flux) - min(flux))
         if x0 is None:
             x0 = np.mean(flux)
         if y0 is None:
@@ -8063,7 +8077,7 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
     def make_unfiltered_figure(self, peaks_low, peaks_high, transpose, cmap,
                                xlabel=None, ylabel='Frequency (GHz)',
                                add_title=True):
-        flux = self.Y[:, 0]
+        flux = self.Y[:, 0]*1e3 #Convert to mA
         title = ' unfiltered avoided crossing'
         f, ax = plt.subplots()
         if add_title:
@@ -8093,7 +8107,7 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
                              transpose, cmap,
                              xlabel=None, ylabel='Frequency (GHz)',
                              add_title=True):
-        flux = self.Y[:, 0]
+        flux = self.Y[:, 0]*1e3 #Convert to mA
         title = ' filtered avoided crossing'
         f, ax = plt.subplots()
         if add_title:
@@ -8111,6 +8125,7 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
 
         # self.ylabel because the axes are transposed
         xlabel = self.ylabel if xlabel is None else xlabel
+        xlabel = xlabel.split(' ')[0] + '(mA)'
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
         ax.set_ylim(min(self.X[0] * 1e-9), max(self.X[0] * 1e-9))
@@ -8127,19 +8142,16 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
                         transpose, cmap, coupling_label=r'$J_1/2\pi$',
                         xlabel=None, ylabel='Frequency (GHz)',
                         add_title=True):
-        flux = self.Y[:, 0]
+        flux = self.Y[:, 0]*1e3 #Convert to mA
         title_name = ' avoided crossing fit'
         extratitle = '\n%s'%(self.folder.split('\\')[-1][7:])
         title = title_name + extratitle
         f, ax = plt.subplots()
         if add_title:
             ax.set_title(self.timestamp_string + title)
-
-        colorplot = pl_tools.flex_colormesh_plot_vs_xy(self.X[0] * 1e-9, flux, self.Z[0],
+        pl_tools.flex_colormesh_plot_vs_xy(self.X[0] * 1e-9, flux, self.Z[0],
                                            ax=ax, transpose=transpose,
                                            cmap=cmap)
-        f.colorbar(colorplot['cmap'], ax=colorplot['ax'])
-
         ax.plot(filt_flux_high, filt_peaks_high * 1e-9,
                 'o', fillstyle='none', markeredgewidth=1., c='r',
                 label='upper branch peaks')
@@ -8149,6 +8161,8 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
 
         # self.ylabel because the axes are transposed
         xlabel = self.ylabel if xlabel is None else xlabel
+        # convert label to mA
+        xlabel = xlabel.split(' ')[0] + '(mA)'
         ax.set_xlabel(xlabel)
         ax.set_ylabel(ylabel)
         ax.set_ylim(min(self.X[0] * 1e-9), max(self.X[0] * 1e-9))
@@ -8164,7 +8178,39 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
         g_legend = r'{} = {:.2f}$\pm${:.2f} MHz'.format(
             coupling_label,
             fit_res.params['g'] * 1e-6, fit_res.params['g'].stderr * 1e-6)
+        print('crossed freq = ',fit_res.params['f_center2'])
         ax.text(.6, .8, g_legend, transform=ax.transAxes, color='white')
+        # ax.legend() # looks ugly, better after matplotlib update?
+        f.savefig(os.path.join(self.folder, title_name + '.png'), format='png',
+                  dpi=600)
+        return f, ax
+
+    def make_base_figure(self,
+                        filt_flux_low, filt_flux_high,
+                        filt_peaks_low, filt_peaks_high, fit_res,
+                        transpose, cmap, coupling_label=r'$J_1/2\pi$',
+                        xlabel=None, ylabel='Frequency (GHz)',
+                        add_title=True):
+        flux = self.Y[:, 0]*1e3 #Convert to mA
+        title_name = ' avoided crossing raw plot'
+        extratitle = '\n%s'%(self.folder.split('\\')[-1][7:])
+        title = title_name + extratitle
+        f, ax = plt.subplots()
+        if add_title:
+            ax.set_title(self.timestamp_string + title)
+        pl_tools.flex_colormesh_plot_vs_xy(self.X[0] * 1e-9, flux, self.Z[0],
+                                           ax=ax, transpose=transpose,
+                                           cmap=cmap)
+
+        # self.ylabel because the axes are transposed
+        xlabel = self.ylabel if xlabel is None else xlabel
+        # convert label to mA
+        xlabel = xlabel.split(' ')[0] + '(mA)'
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        ax.set_ylim(min(self.X[0] * 1e-9), max(self.X[0] * 1e-9))
+        ax.set_xlim(min(flux), max(flux))
+
         # ax.legend() # looks ugly, better after matplotlib update?
         f.savefig(os.path.join(self.folder, title_name + '.png'), format='png',
                   dpi=600)
@@ -8176,12 +8222,9 @@ class AvoidedCrossingAnalysis(MeasurementAnalysis):
                              model='direct'):
         '''
         Fits the avoided crossing to a direct or mediated coupling model.
-
         models are located in
             fitMods.avoided_crossing_direct_coupling
             fitMods.avoided_crossing_mediated_coupling
-
-
         '''
 
         total_freqs = np.concatenate([lower_freqs, upper_freqs])
