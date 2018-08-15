@@ -1,7 +1,7 @@
 import time
 import logging
 import numpy as np
-from autodepgraph.graph_v2 import AutoDepGraph_DAG
+from autodepgraph import AutoDepGraph_DAG
 try:
     from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
     import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
@@ -1749,14 +1749,14 @@ class CCLight_Transmon(Qubit):
         if analyze:
             ma.TwoD_Analysis(label=label, plot_all=False, auto=True)
 
-    def measure_SSRO_pulse_length_sweep(self, lengths=np.arange(100e-9,1501e-9,100e-9), 
+    def measure_SSRO_pulse_length_sweep(self, lengths=np.arange(100e-9,1501e-9,100e-9),
                     nr_shots=4092*4, nested_MC=None, analyze=True, label_suffix: str=''):
         if nested_MC is None:
             nested_MC = self.instr_nested_MC.get_instr()
         self.ro_acq_digitized(False)
         self.prepare_for_timedomain()
         RO_lutman = self.instr_LutMan_RO.get_instr()
-        
+
         sweep_function = swf.lutman_par_UHFQC_dig_trig(
             LutMan=RO_lutman,
             LutMan_parameter=RO_lutman['M_length_R{}'.format(self.cfg_qubit_nr())]
