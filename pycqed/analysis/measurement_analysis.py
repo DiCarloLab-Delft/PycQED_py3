@@ -937,8 +937,8 @@ class MeasurementAnalysis(object):
 
 class Mixer_calibration_evaluation(MeasurementAnalysis):
 
-    def __init__(self, ma1: MeasurementAnalysis,ma2: MeasurementAnalysis,**kw):
-        super().__init__(auto=False)
+    def __init__(self, ma1: MeasurementAnalysis,ma2: MeasurementAnalysis,folder=None,**kw):
+        super().__init__(auto=False,folder=folder)
         self.ma_before = ma1
         self.ma_after = ma2
         self.sweep_pts1 = ma1.sweep_points
@@ -1067,6 +1067,8 @@ class OptimizationAnalysis_v2(MeasurementAnalysis):
 
 
 class OptimizationAnalysisNN(MeasurementAnalysis):
+    def __init__(self,folder=None,**kw):
+        super().__init__(folder=folder,**kw)
 
     def run_default_analysis(self, close_file=True, show=False, plot_all=False, **kw):
 
@@ -1076,15 +1078,17 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
                 ['MC'].attrs['optimization_method']
         except:
             optimization_method = 'Numerical'
-        self.meas_grid = kw.pop('meas_grid')
-        self.ad_func_pars = kw.pop('ad_func_pars')
+        self.meas_grid = kw.pop('meas_grid',None)
+        if self.meas_grid is None:
+            self.meas_grid = np.array([self.sweep_points[0],self.sweep_points[1]])
+        self.ad_func_pars = kw.pop('ad_func_pars',{})
         self.two_rounds = kw.pop('two_rounds',False)
         self.hidden_layers = self.ad_func_pars.pop('hidden_layers',[10.,10.])
         self.round = kw.pop('round',1)
         self.alpha = self.ad_func_pars.pop('alpha',1e-2)
         self.estimator_name = self.ad_func_pars.pop('estimator','GRNN_neupy')
         self.beta = self.ad_func_pars.pop('beta',0.)
-        self.gamma = self.ad_func_pars.pop('gamma',1.)
+        self.gamma = self.ad_func_pars.pop('gamma',0.5)
         self.iters = self.ad_func_pars.pop('iters',200)
         self.ndim = self.ad_func_pars.pop('ndim',2)
         self.n_fold = self.ad_func_pars.pop('n_fold',5)

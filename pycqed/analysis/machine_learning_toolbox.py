@@ -17,7 +17,7 @@ except Exception:
 
 
 class Estimator(metaclass=ABCMeta):
-    '''
+    """
     BASIC ESTIMATOR CLASS
 
     Defines the basic functionality of an estimator.
@@ -44,7 +44,7 @@ class Estimator(metaclass=ABCMeta):
        same distribution as the data used for training.(E.g by using a train-test-split)
     -- _name: The internal name of this estimator.
     -- _type: General type of the estimator. E.g Regression, classification
-    '''
+    """
     def __init__(self,name='estimator',pre_proc_dict=None,type=None):
         self.pre_proc_dict = pre_proc_dict
         self.score = None
@@ -53,41 +53,41 @@ class Estimator(metaclass=ABCMeta):
 
     @abstractmethod
     def fit(self,data,target):
-        '''
+        """
         data: Data drawn from the distribution to be fitted by this estimator
         target: data from the target distribution in supervised models
-        '''
+        """
         pass
 
     @abstractmethod
     def fit(self,data):
-        '''
+        """
         data: Data drawn from the distribution to be fitted by this estimator
-        '''
+        """
         pass
 
     @abstractmethod
     def predict(self,data):
-        '''
+        """
         data: Data drawn from the fitted distribution to be predicted
-        '''
+        """
         pass
 
     @abstractmethod
     def evaluate(self,data,target):
-        '''
+        """
         -Evaluating the preformance of the estimator by comparing the predictions
          of data with the target values with some reasonable distance measure.
 
         data: Data drawn from the fitted distribution to be predicted
         target: The target values associated with the data input.
-        '''
+        """
         pass
 
 class MLP_Regressor_scikit(Estimator):
 
     def __init__(self,hidden_layers=[10],output_dim=1,n_feature=1, alpha=0.5,
-                 activation='relu',pre_proc_dict=None):
+                 activation='relu',pre_proc_dict=None,**kw):
 
         super().__init__(name='MLP_Regressor_scikit',pre_proc_dict=pre_proc_dict,
                        type='Regressor')
@@ -100,22 +100,22 @@ class MLP_Regressor_scikit(Estimator):
                           hidden_layer_sizes=self._hidden_layers,
                           activation=self.activation,
                           alpha=self.alpha,
-                          max_iter=5000)
+                          max_iter=5000,**kw)
         self.score = -np.infty
 
     def fit(self, x_train, y_train):
-
         self.mlpr_.fit(x_train, y_train)
         self.score = self.evaluate(x_train,y_train)
         print('MLP_Regressor scikit trained with '+
-              self.score+' accuracy on training set.')
+              str(self.score)+' accuracy on training set.')
 
     def predict(self, x_pred):
-        '''
+        """
         Has to be callable by scipy optimizers such as fmin(). I.e input has
         has to be wrapped to a list for the estimators predict method.
-        '''
-        return self.mlpr_.predict(x_pred)
+        """
+        out = self.mlpr_.predict(x_pred)
+        return out
 
     def evaluate(self,x,y):
         self.score = self.mlpr_.score(x,y)
@@ -125,14 +125,14 @@ class MLP_Regressor_scikit(Estimator):
         print("Training score of ANN: "+str(self.score))
 
 class DNN_Regressor_tf(Estimator):
-    '''
+    """
         alpha: learning rate for gradient descent
         beta: L1 regression multiplier. 0. --> regression disabled
         -loss function used: squared loss l(y,y_pred)=||y - y_pred||**2
         -accuracy measure: coefficient of determination:
          R_acc = 1-sum((y-y_pred)**2)/sum((y-mean(y))**2)
         -optimizer: tf.GradientDescentOptimizer
-    '''
+    """
     def __init__(self, hidden_layers=[10], output_dim=1, alpha = 0.5,
                  beta=1., n_feature = 1, iters = 200, pre_proc_dict = None):
 
@@ -195,6 +195,7 @@ class DNN_Regressor_tf(Estimator):
         x = tf.placeholder(tf.float32, [None, self._n_feature])
         y = tf.placeholder(tf.float32, [None, self._output_dim])
         logits, reg_terms = self.network(x)
+        self.learning_acc = []
 
         loss = self.loss(logits, y) + tf.reduce_sum(reg_terms)
         print(loss)
@@ -235,9 +236,10 @@ class DNN_Regressor_tf(Estimator):
         return _accuracy
 
     def evaluate(self,logits_test=np.array([]),y_test=np.array([])):
+        y_pred = self.predict(logits_test)
         self.score = 1 - \
-            np.linalg.norm((y_test-logits_test)**2) \
-            /np.linalg.norm((y_test-np.linalg.norm(y_test)**2))
+            np.linalg.norm((y_test-y_pred)**2) \
+            /np.linalg.norm((y_test-np.mean(y_test,axis=0)**2))
         return self.score
 
 
@@ -247,9 +249,9 @@ class DNN_Regressor_tf(Estimator):
         return self._session.run(predictions, {self._x: samples})
 
 class Polynomial_Regression(Estimator):
-    '''
+    """
     Estimator for a Polynomial regression of degree 'ndim"
-    '''
+    """
     def __init__(self,ndim=2,mixed=False,pre_proc_dict=None):
 
         super().__init__(name='Polynomial_Regression_scikit',
@@ -295,11 +297,11 @@ class Polynomial_Regression(Estimator):
 
 
 class GRNN_neupy(Estimator):
-    '''
+    """
     Generalized Regression Neural Network implementation from neupy
         gamma: scaling factor for the standard dev. input.
                1.--> use std (or -if None- the regular std dev of the input data)
-    '''
+    """
     def __init__(self,std=None,gamma=1.,verbose =False,
                  pre_proc_dict=None):
 
@@ -329,7 +331,6 @@ class GRNN_neupy(Estimator):
         self._grnn.train(x_train,y_train)
 
     def predict(self,samples):
-
         if not isinstance(samples,np.ndarray):
             samples = np.array(samples)
         return self._grnn.predict(samples)
@@ -376,7 +377,9 @@ class CrossValidationEstimator(Estimator):
             train_target = np.concatenate((y_train[:it,:],y_train[it+batch_size:,:]),
                                           axis=0)
             self.estimator.fit(train_batch,train_target)
-            self.batch_errors.append(self.estimator.evaluate(test_batch,test_target))
+            batch_error = self.estimator.evaluate(test_batch,test_target)
+            print('batch accuracy: ',batch_error)
+            self.batch_errors.append(batch_error)
 
 
         self.estimator.fit(x_train,y_train) #refit estimator on training data
@@ -389,7 +392,8 @@ class CrossValidationEstimator(Estimator):
     def predict(self,data):
         if not isinstance(data,np.ndarray):
             data = np.array(data)
-        return self.estimator.predict(data)
+        out = self.estimator.predict(data)
+        return out
 
     def evaluate(self,x,y):
         return self.estimator.evaluate(x,y)

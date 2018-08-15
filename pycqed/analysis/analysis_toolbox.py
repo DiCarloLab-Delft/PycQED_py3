@@ -803,7 +803,7 @@ def get_folder(timestamp=None, older_than=None, label='',
                suppress_printing=True, **kw):
 
     if timestamp is not None:
-        folder = data_from_time(timestamp)
+        folder = data_from_time(timestamp,**kw)
         if not suppress_printing:
             print('loaded file from folder "%s" using timestamp "%s"' % (
                 folder, timestamp))

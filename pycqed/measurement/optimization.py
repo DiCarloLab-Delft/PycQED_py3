@@ -245,8 +245,8 @@ def SPSA(fun, x0,
 def center_and_scale(X,y):
     '''
     Preprocessing of Data. Mainly transform the data to mean 0 and interval [-1,1]
-    :param X: training data list of parameters (each equally long)
-    :param y: validation data list of parameters (each equally long)
+    :param X: training data list of parameters (each equally long). Standing vector!
+    :param y: validation data list of parameters (each equally long).Standing vector!
     :output:
         :X: rescaled and centered training data
         :y: rescaled and centered test data
@@ -255,11 +255,20 @@ def center_and_scale(X,y):
         :input_feature_ext: abs(max-min) of initial training data parameters
         :output_feature_ext: abs(max-min) of initial validation data parameters
     '''
+    if not isinstance(X,np.ndarray):
+        X = np.array(X).T
+    if X.ndim == 1:
+        X = np.array([X]).T
+    if not isinstance(y,np.ndarray):
+        y = np.array(y).T
+    if y.ndim == 1:
+        y = np.array([y]).T
     input_feature_means = np.zeros(np.size(X,1))       #saving means of training
     output_feature_means = np.zeros(np.size(y,1))     #and target features
     input_feature_ext= np.zeros(np.size(X,1))
     output_feature_ext = np.zeros(np.size(y,1))
-    if len(np.shape(X))==1:
+
+    if  np.size(X,1)==1:
         input_feature_means= [np.mean(X)]
         input_feature_ext = [np.max(X) \
                              -np.min(X)]
@@ -281,11 +290,11 @@ def center_and_scale(X,y):
         y /= output_feature_ext   #rescale to [-1,1]
     else:
         for it in range(np.size(y,1)):
-            output_feature_means[it]= np.mean(y)
-            output_feature_ext[it] = np.max(y) \
-                                     -np.min(y)
-            y -= output_feature_means[it] #offset to mean 0
-            y /= output_feature_ext[it]   #rescale to [-1,1]
+            output_feature_means[it]= np.mean(y[:,it])
+            output_feature_ext[it] = np.max(y[:,it]) \
+                                     -np.min(y[:,it])
+            y[:,it] -= output_feature_means[it] #offset to mean 0
+            y[:,it] /= output_feature_ext[it]   #rescale to [-1,1]
     return X,y,\
            input_feature_means,input_feature_ext,\
            output_feature_means,output_feature_ext
