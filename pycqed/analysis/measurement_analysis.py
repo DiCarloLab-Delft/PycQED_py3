@@ -684,8 +684,6 @@ class MeasurementAnalysis(object):
                                  self.measurementstring + '\n' +
                                  self.timestamp_string)
         plot_the_title = kw.get('plot_the_title', True)
-        xlabel = kw.get('xlabel', None)
-        ylabel = kw.get('ylabel', None)
 
         # ax.set_title(self.plot_title)
         if plot_the_title:
@@ -1413,7 +1411,7 @@ class TD_Analysis(MeasurementAnalysis):
     def __init__(self, NoCalPoints=4, center_point=31, make_fig=True,
                  zero_coord=None, one_coord=None, cal_points=None,
                  rotate_and_normalize=True, plot_cal_points=True,
-                 for_ef=False, qb_name=None, **kw):
+                 for_ef=False, qb_name=None, RO_channel=0, **kw):
         self.NoCalPoints = NoCalPoints
         self.normalized_values = []
         self.normalized_cal_vals = []
@@ -1426,6 +1424,7 @@ class TD_Analysis(MeasurementAnalysis):
         self.center_point = center_point
         self.plot_cal_points = plot_cal_points
         self.for_ef = for_ef
+        self.RO_channel = RO_channel
 
         super().__init__(qb_name=qb_name, **kw)
 
@@ -1614,7 +1613,7 @@ class TD_Analysis(MeasurementAnalysis):
             cal_one_points = None
 
         # Rotate and normalize data
-        if len(self.measured_values) == 1:
+        if len(self.measured_values) == 1 or self.RO_channel != 0:
             # Only one quadrature was measured
             if cal_zero_points is None and cal_one_points is None:
                 # a_tools.normalize_data_v3 does not work with 0 cal_points. Use
@@ -1623,11 +1622,14 @@ class TD_Analysis(MeasurementAnalysis):
                                 ' for 0 cal_points. Setting NoCalPoints to 4.')
                 self.NoCalPoints = 4
                 calsteps = 4
-                cal_zero_points = list(range(NoPts - int(self.NoCalPoints),
-                                             int(NoPts - int(self.NoCalPoints) / 2)))
-                cal_one_points = list(range(int(NoPts - int(self.NoCalPoints) / 2), NoPts))
+                cal_zero_points = \
+                    list(range(NoPts - int(self.NoCalPoints),
+                             int(NoPts - int(self.NoCalPoints) / 2)))
+                cal_one_points = \
+                    list(range(int(NoPts - int(self.NoCalPoints) / 2), NoPts))
             self.corr_data = a_tools.normalize_data_v3(
-                self.measured_values[0], cal_zero_points, cal_one_points)
+                self.measured_values[self.RO_channel],
+                cal_zero_points, cal_one_points)
         else:
             if (calsteps == 6) and (not last_ge_pulse):
                 # For this case we pass in the calibration data, not the indices
@@ -2887,12 +2889,18 @@ class QScale_Analysis(TD_Analysis):
                                      save_fig=False, **kw)
 
         # Only the unfolding part here is unique to this analysis
-        self.sweep_points_xX = self.sweep_points[:-self.NoCalPoints:3]
-        self.sweep_points_xY = self.sweep_points[1:-self.NoCalPoints:3]
-        self.sweep_points_xmY = self.sweep_points[2:-self.NoCalPoints:3]
-        self.corr_data_xX = self.normalized_values[:-self.NoCalPoints:3]
-        self.corr_data_xY = self.normalized_values[1:-self.NoCalPoints:3]
-        self.corr_data_xmY = self.normalized_values[2:-self.NoCalPoints:3]
+        self.sweep_points_xX = self.sweep_points[
+                               :len(self.sweep_points)-self.NoCalPoints:3]
+        self.sweep_points_xY = self.sweep_points[
+                               1:len(self.sweep_points)-self.NoCalPoints:3]
+        self.sweep_points_xmY = self.sweep_points[
+                                2:len(self.sweep_points)-self.NoCalPoints:3]
+        self.corr_data_xX = self.normalized_values[
+                            :len(self.sweep_points)-self.NoCalPoints:3]
+        self.corr_data_xY = self.normalized_values[
+                            1:len(self.sweep_points)-self.NoCalPoints:3]
+        self.corr_data_xmY = self.normalized_values[
+                             2:len(self.sweep_points)-self.NoCalPoints:3]
 
         self.fit_data(**kw)
 
@@ -2921,9 +2929,10 @@ class QScale_Analysis(TD_Analysis):
         # Unique in that it has hardcoded names and points to plot
         show_guess = kw.pop('show_guess', False)
 
-        x_fine = np.linspace(min(self.sweep_points[:-self.NoCalPoints]),
-                             max(self.sweep_points[:-self.NoCalPoints]),
-                             1000)
+        x_fine = np.linspace(
+            min(self.sweep_points[:len(self.sweep_points)-self.NoCalPoints]),
+            max(self.sweep_points[:len(self.sweep_points)-self.NoCalPoints]),
+            1000)
 
         # Get old values
         instr_set = self.data_file['Instrument settings']
@@ -4357,7 +4366,8 @@ class T1_Analysis(TD_Analysis):
 
         # Guess for params
         fit_mods.ExpDecayModel.set_param_hint('amplitude',
-                                              value=1,
+                                              value=np.max(
+                                                  self.normalized_data_points),
                                               min=0,
                                               max=2)
         fit_mods.ExpDecayModel.set_param_hint('tau',
@@ -4499,7 +4509,7 @@ class Ramsey_Analysis(TD_Analysis):
         kw['label'] = label
         kw['h5mode'] = 'r+'
         self.phase_sweep_only = phase_sweep_only
-        self.artificial_detuning = kw.pop('artificial_detuning', 0) 
+        self.artificial_detuning = kw.pop('artificial_detuning', 0)
         if self.artificial_detuning == 0:
             logging.warning('Artificial detuning is unknown. Defaults to %s MHz. '
                             'New qubit frequency might be incorrect.'
@@ -4537,7 +4547,7 @@ class Ramsey_Analysis(TD_Analysis):
             damped_osc_mod.set_param_hint('phase',
                                           value=0, vary=True)
             damped_osc_mod.set_param_hint('amplitude',
-                                          value=0.5*(max(self.normalized_data_points)-min(self.normalized_data_points)),
+                                          value=0.5*(max(y)-min(y)),
                                           min=0.0, max=4.0)
             fixed_tau=1e9
             damped_osc_mod.set_param_hint('tau',
@@ -4625,9 +4635,9 @@ class Ramsey_Analysis(TD_Analysis):
                     self.params = damped_osc_mod.make_params()
 
                     fit_res_lst += [damped_osc_mod.fit(
-                                    data=y,
-                                    t=x,
-                                    params=self.params)]
+                        data=y,
+                        t=x,
+                        params=self.params)]
 
                 chisqr_lst = [fit_res.chisqr for fit_res in fit_res_lst]
                 fit_res = fit_res_lst[np.argmin(chisqr_lst)]
@@ -4685,14 +4695,14 @@ class Ramsey_Analysis(TD_Analysis):
                                self.units)
 
             textstr += ('\n$\Delta f$ = %.5g $ \pm$ (%.5g) MHz'
-                       % ((self.qubit_frequency - self.qubit_freq_spec) * 1e-6,
-                          fit_res.params['frequency'].stderr * 1e-6) +
-                       '\n$f_{Ramsey}$ = %.5g $ \pm$ (%.5g) MHz'
-                       % (fit_res.params['frequency'].value*1e-6,
-                          fit_res.params['frequency'].stderr*1e-6))
+                        % ((self.qubit_frequency - self.qubit_freq_spec) * 1e-6,
+                           fit_res.params['frequency'].stderr * 1e-6) +
+                        '\n$f_{Ramsey}$ = %.5g $ \pm$ (%.5g) MHz'
+                        % (fit_res.params['frequency'].value*1e-6,
+                           fit_res.params['frequency'].stderr*1e-6))
             textstr += T2_star_str
             textstr += ('\nartificial detuning = %.2g MHz'
-                       % (art_det * 1e-6))
+                        % (art_det * 1e-6))
 
             fig.text(0.5, 0, textstr, fontsize=self.font_size,
                      transform=ax.transAxes,
@@ -4788,14 +4798,14 @@ class Ramsey_Analysis(TD_Analysis):
                                       var_name=self.value_names[0])
         self.save_computed_parameters(self.T2_star_gauss,
                                       var_name=(self.value_names[0]+
-                                      ' gaussian decay'))
+                                                ' gaussian decay'))
 
         self.save_computed_parameters({'qubit_freq': self.qubit_frequency},
                                       var_name=self.value_names[0])
         self.save_computed_parameters({'qubit_freq_gauss':
                                            self.qubit_frequency_gauss},
                                       var_name=(self.value_names[0]+
-                                               ' gaussian decay'))
+                                                ' gaussian decay'))
 
         #Print the T2_star values on screen
         unit = self.parameter_units[0][-1]
@@ -4803,12 +4813,12 @@ class Ramsey_Analysis(TD_Analysis):
             print('New qubit frequency exp = {:.7f} (GHz)'.format(
                 self.qubit_frequency * 1e-9) +
                   '\t\tqubit frequency stderr = {:.7f} (MHz)'.format(
-                self.ramsey_freq['freq_stderr']*1e-6)+
-                '\nT2* exp = {:.5f} '.format(
-                self.T2_star['T2_star']*self.scale) +'('+'μ'+unit+')'+
-                '\t\tT2* stderr = {:.5f} '.format(
-                self.T2_star['T2_star_stderr']*self.scale) +
-                '('+'μ'+unit+')')
+                      self.ramsey_freq['freq_stderr']*1e-6)+
+                  '\nT2* exp = {:.5f} '.format(
+                      self.T2_star['T2_star']*self.scale) +'('+'μ'+unit+')'+
+                  '\t\tT2* stderr = {:.5f} '.format(
+                      self.T2_star['T2_star_stderr']*self.scale) +
+                  '('+'μ'+unit+')')
 
         if close_file:
             self.data_file.close()
@@ -4818,8 +4828,9 @@ class Ramsey_Analysis(TD_Analysis):
     def one_art_det_analysis(self, **kw):
 
         # Perform fit and save fitted parameters
-        self.fit_res = self.fit_Ramsey(x=self.sweep_points[:-self.NoCalPoints],
-                                       y=self.normalized_data_points, **kw)
+        self.fit_res = self.fit_Ramsey(
+            x=self.sweep_points[:len(self.sweep_points)-self.NoCalPoints],
+            y=self.normalized_data_points, **kw)
         self.save_fitted_parameters(self.fit_res,
                                     var_name=self.value_names[0])
         self.save_fitted_parameters(self.fit_results_dict['gaussian'],
@@ -4869,10 +4880,14 @@ class Ramsey_Analysis(TD_Analysis):
 
         # Extract the data for each ramsey
         len_art_det = len(self.artificial_detuning)
-        sweep_pts_1 = self.sweep_points[0:-self.NoCalPoints:len_art_det]
-        sweep_pts_2 = self.sweep_points[1:-self.NoCalPoints:len_art_det]
-        ramsey_data_1 = self.normalized_values[0:-self.NoCalPoints:len_art_det]
-        ramsey_data_2 = self.normalized_values[1:-self.NoCalPoints:len_art_det]
+        sweep_pts_1 = self.sweep_points[
+                      0:len(self.sweep_points)-self.NoCalPoints:len_art_det]
+        sweep_pts_2 = self.sweep_points[
+                      1:len(self.sweep_points)-self.NoCalPoints:len_art_det]
+        ramsey_data_1 = self.normalized_values[
+                        0:len(self.sweep_points)-self.NoCalPoints:len_art_det]
+        ramsey_data_2 = self.normalized_values[
+                        1:len(self.sweep_points)-self.NoCalPoints:len_art_det]
 
         # Perform fit
         fit_res_1 = self.fit_Ramsey(x=sweep_pts_1,
@@ -5009,7 +5024,7 @@ class Ramsey_Analysis(TD_Analysis):
             #save figure
             fig_name_suffix = kw.pop('fig_name_suffix', 'Ramsey_fit')
             self.save_fig(self.fig, figname=(self.measurementstring+
-                                            '_'+fig_name_suffix), **kw)
+                                             '_'+fig_name_suffix), **kw)
 
     def get_measured_freq(self, fit_res, **kw):
         freq = fit_res.params['frequency'].value
@@ -7044,18 +7059,18 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                                         xlabel=self.sweep_name,
                                         x_unit=self.sweep_unit[0],
                                         ylabel='S21 distance (arb.units)',
-                                        label=False,
+                                        label='',
                                         save=False)
 
         # plot Lorentzian with the fit results
         ax_dist.plot(self.sweep_points, self.fit_res.best_fit,
-                     'r-', linewidth=self.line_width)
+                     'r-', linewidth=self.line_width, label='')
 
         # Plot a point for each plot at the chosen best fit f0 frequency (f_ge)
         f0 = self.fit_res.params['f0'].value
         f0_idx = a_tools.nearest_idx(self.sweep_points, f0)
         ax_dist.plot(f0, self.fit_res.best_fit[f0_idx], 'o',
-                     ms=self.marker_size_special)
+                     ms=self.marker_size_special, label=r'$f_{ge,fit}$')
 
         if analyze_ef:
             # plot the ef/2 point as well
@@ -7065,7 +7080,15 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                                                    f0_gf_over_2)
             ax_dist.plot(f0_gf_over_2,
                          self.fit_res.best_fit[f0_gf_over_2_idx],
-                         'o', ms=self.marker_size_special)
+                         'o', ms=self.marker_size_special,
+                         label=r'$f_{gf/2,fit}$')
+            # plot point at the f_gf_half guess value
+            ax_dist.plot(self.fit_res.init_values['f0_gf_over_2'],
+                         self.fit_res.best_fit[f0_gf_over_2_idx],
+                         'o', ms=self.marker_size_special,
+                         label=r'$f_{gf/2,guess}$')
+            ax_dist.legend(frameon=False)
+
         if show_guess:
             # plot Lorentzian with initial guess
             ax_dist.plot(self.sweep_points, self.fit_res.init_fit,
@@ -7087,6 +7110,7 @@ class Qubit_Spectroscopy_Analysis(MeasurementAnalysis):
                         '\nkappa0={:.4f} MHz $\pm$ ({:.2f}) MHz\n' \
                         'f0_gf/2={:.5f} GHz $\pm$ ({:.2f}) MHz ' \
                         '\nold f0_gf/2={:.5f} GHz' \
+                        '\nguess f0_gf/2={:.5f} GHz' \
                         '\nkappa_gf={:.4f} MHz $\pm$ ({:.2f}) MHz'.format(
                     self.fit_res.params['f0'].value * scale,
                     self.fit_res.params['f0'].stderr / 1e6,

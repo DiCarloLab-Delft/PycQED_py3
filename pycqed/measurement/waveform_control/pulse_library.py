@@ -380,6 +380,47 @@ class BufferedSquarePulse(Pulse):
                (tvals >= tvals[0] + self.buffer_length_start) * \
                (tvals < tvals[0] + self.buffer_length_start + self.pulse_length)
 
+
+class BufferedCZPulse(Pulse):
+    def __init__(self, channel=None, channels=None,
+                 name='buffered square pulse', **kw):
+        super().__init__(name)
+        if channel is None and channels is None:
+            raise ValueError('Must specify either channel or channels')
+        elif channels is None:
+            self.channels.append(channel)
+        else:
+            self.channels = channels
+        self.amplitude = kw.pop('amplitude', 0)
+        self.frequency = kw.pop('frequency', 0)
+        self.phase = kw.pop('phase', 0.)
+
+        self.pulse_length = kw.pop('pulse_length', 0)
+        self.buffer_length_start = kw.pop('buffer_length_start', 0)
+        self.buffer_length_end = kw.pop('buffer_length_end', 0)
+        self.length = self.pulse_length + self.buffer_length_start + \
+                      self.buffer_length_end
+
+    def __call__(self, **kw):
+        self.amplitude = kw.pop('amplitude', self.amplitude)
+        self.pulse_length = kw.pop('pulse_length', self.pulse_length)
+        self.buffer_length_start = kw.pop('buffer_length_start',
+                                          self.buffer_length_start)
+        self.buffer_length_end = kw.pop('buffer_length_end',
+                                        self.buffer_length_end)
+        self.length = self.pulse_length + self.buffer_length_start + \
+                      self.buffer_length_end
+        self.channels = kw.pop('channels', self.channels)
+        self.channels.append(self.channel)
+        return self
+
+    def chan_wf(self, chan, tvals):
+        return self.amplitude * np.cos(2*np.pi*(self.frequency*tvals +
+                                                self.phase / 360.)) * \
+               (tvals >= tvals[0] + self.buffer_length_start) * \
+               (tvals < tvals[0] + self.buffer_length_start + self.pulse_length)
+
+
 class MartinisFluxPulse(Pulse):
 
     def __init__(self, channel=None, channels=None, name='Martinis flux pulse',
