@@ -335,6 +335,9 @@ def hanger_func_complex_SI(f, f0, Q, Qe,
         phi_0:  phase to account for propagation delay from sample
         slope:  slope of signal around the resonance
 
+    The complex hanger function that has a list of parameters as input
+    is now called hanger_func_complex_SI_pars
+
     '''
     slope_corr = (1+slope*(f-f0)/f0)
     propagation_delay_corr = np.exp(1j * (phi_v * f + phi_0))
@@ -346,7 +349,8 @@ def hanger_func_complex_SI(f, f0, Q, Qe,
 
 def hanger_func_complex_SI_pars(f,pars):
     '''
-    This function is used in the minimization fitting which requires parameters
+    This function is used in the minimization fitting which requires parameters.
+    It calls the function hanger_func_complex_SI, see there for details.
     '''
 
     f0 = pars['f0']
