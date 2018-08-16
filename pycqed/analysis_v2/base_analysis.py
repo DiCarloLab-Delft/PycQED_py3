@@ -137,6 +137,8 @@ class BaseDataAnalysis(object):
         # These options determine what data to extract #
         ################################################
         scan_label = self.options_dict.get('scan_label', label)
+        if scan_label is None:
+            scan_label = ''
         if type(scan_label) is not list:
             self.labels = [scan_label]
         else:
