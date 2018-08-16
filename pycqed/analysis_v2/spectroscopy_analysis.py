@@ -18,7 +18,7 @@ class Spectroscopy(ba.BaseDataAnalysis):
     def __init__(self, t_start: str,
                  t_stop: str = None,
                  options_dict: dict = None,
-                 label: str = None,
+                 label: str = '',
                  extract_only: bool = False,
                  auto: bool = True,
                  do_fitting: bool = False):
