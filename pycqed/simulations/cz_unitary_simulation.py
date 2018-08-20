@@ -91,7 +91,7 @@ def phases_from_unitary(U):
     phi_10 = np.rad2deg(np.angle(U[3, 3]))
     phi_11 = np.rad2deg(np.angle(U[4, 4]))
 
-    phi_cond = (phi_11 - phi_01 - phi_10 - phi_00) % 360
+    phi_cond = (phi_11 - phi_01 - phi_10 + phi_00) % 360
 
     return phi_00, phi_01, phi_10, phi_11, phi_cond
 
@@ -204,7 +204,7 @@ def simulate_quantities_of_interest(H_0, tlist, eps_vec,
     def eps_t(t, args=None):
         return eps_interp(t)
 
-    H_c = n_q1
+    H_c = n_q0
     H_t = [H_0, [H_c, eps_t]]
 
     tlist_sim = (np.arange(0, np.max(tlist), sim_step))
@@ -254,8 +254,8 @@ class CZ_trajectory(det.Soft_Detector):
             f_pulse = self.get_f_pulse_double_sided()
 
         # extract base frequency from the Hamiltonian
-        w_q1 = np.real(self.H_0[3,3])
-        eps_vec = f_pulse - w_q1
+        w_q0 = np.real(self.H_0[1,1])
+        eps_vec = f_pulse - w_q0
 
         qoi = simulate_quantities_of_interest(
             H_0=self.H_0,

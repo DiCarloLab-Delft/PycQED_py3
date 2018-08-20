@@ -47,22 +47,36 @@ AWG8 = ZI_HDAWG8.ZI_HDAWG8('AWG8_8006', device='dev8006')
 #  2. Starting AWG8 test program in CCL  #
 ##########################################
 
-# AWG_type = 'microwave'
-AWG_type = 'flux'
+AWG_type = 'microwave'
+# AWG_type = 'flux'
 
 if AWG_type == 'microwave':
     example_fp = os.path.abspath(
         os.path.join(pq.__path__[0], '..', 'examples', 'CCLight_example',
                      'qisa_test_assembly', 'consecutive_cws_double.qisa'))
+
+    sequence_length = 32
+    staircase_sequence = range(1, sequence_length)
+    expected_sequence = [(0, list(staircase_sequence)),
+                         (1, list(staircase_sequence)),
+                         (2, list(reversed(staircase_sequence))),
+                         (3, list(reversed(staircase_sequence)))]
+
 elif AWG_type == 'flux':
     example_fp = os.path.abspath(os.path.join(pq.__path__[0], '..',
                                               'examples', 'CCLight_example',
-                                              'qisa_test_assembly', 'consecutive_cws_flux.qisa'))
+                                              'qisa_test_assembly',
+                                              'consecutive_cws_flux.qisa'))
+    sequence_length = 8
+    staircase_sequence = np.arange(1, sequence_length)
+    expected_sequence = [(0, list(staircase_sequence)),
+                         (1, list(staircase_sequence)),
+                         (2, list(staircase_sequence)),
+                         (3, list(staircase_sequence))]
 
 print(example_fp)
 CCL.eqasm_program(example_fp)
 CCL.start()
-
 
 
 ##########################################
@@ -70,8 +84,6 @@ CCL.start()
 ##########################################
 
 # This creates a staircase pattern
-import numpy as np
-
 waveform_type = 'square'
 # waveform_type = 'sin'
 
@@ -101,8 +113,7 @@ AWG8.configure_codeword_protocol()
 AWG8.upload_codeword_program()
 
 
-success = AWG8.calibrate_dio_protocol()
-
+AWG8.calibrate_dio_protocol(expected_sequence, True)
 
 #######################################################################
 #  4. Verifying the DIO calibration with back to back staircase       #

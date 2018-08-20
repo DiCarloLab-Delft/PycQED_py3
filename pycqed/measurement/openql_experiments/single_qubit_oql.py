@@ -123,11 +123,19 @@ def pulsed_spec_seq(qubit_idx: int, spec_pulse_length: float,
 
 
 def flipping(qubit_idx: int, number_of_flips, platf_cfg: str,
-             equator: bool=False, cal_points: bool=True):
+             equator: bool=False, cal_points: bool=True,
+             ax: str='x', angle: str='180'):
     """
     Generates a flipping sequence that performs multiple pi-pulses
     Basic sequence:
         - (X)^n - RO
+        or
+        - (Y)^n - RO
+        or
+        - (X90)^2n - RO
+        or
+        - (Y90)^2n - RO
+
 
     Input pars:
         qubit_idx:      int specifying the target qubit (starting at 0)
@@ -152,13 +160,28 @@ def flipping(qubit_idx: int, number_of_flips, platf_cfg: str,
             k.measure(qubit_idx)
         elif cal_points and (i == (len(number_of_flips)-2) or
                              i == (len(number_of_flips)-1)):
-            k.x(qubit_idx)
+            if ax=='y':
+                k.y(qubit_idx)
+            else:
+                k.x(qubit_idx)
             k.measure(qubit_idx)
         else:
             if equator:
-                k.gate('rx90', qubit_idx)
+                if ax=='y':
+                    k.gate('ry90', qubit_idx)
+                else:
+                    k.gate('rx90', qubit_idx)
             for j in range(n):
-                k.x(qubit_idx)
+                if ax=='y' and angle=='90':
+                    k.gate('ry90', qubit_idx)
+                    k.gate('ry90', qubit_idx)
+                elif ax=='y' and angle=='180':
+                    k.y(qubit_idx)
+                elif angle=='90':
+                    k.gate('rx90', qubit_idx)
+                    k.gate('rx90', qubit_idx)
+                else:
+                    k.x(qubit_idx)
             k.measure(qubit_idx)
         p.add_kernel(k)
 

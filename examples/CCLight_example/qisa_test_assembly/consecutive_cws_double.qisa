@@ -11,7 +11,7 @@ LDI  r4, 150
 LDI r3, 2
 SUB r3, r4, r3
 Loop:
-    qwait 500
+    qwait 10
 
     bs 2 CW_01 s0 | CW_31 s2
     bs 2 CW_02 s0 | CW_30 s2
@@ -45,7 +45,7 @@ Loop:
     bs 2 CW_30 s0 | CW_02 s2
     bs 2 CW_31 s0 | CW_01 s2
     bs 2 CW_01 s6
-    qwait 500
+    qwait 10
     bs 1 MeasZ s0
     BR always, loop
     NOP

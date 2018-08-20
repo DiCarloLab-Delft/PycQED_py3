@@ -562,6 +562,8 @@ class DeviceCCL(Instrument):
 
     def measure_conditional_oscillation(self, q0: str, q1: str,
                                         prepare_for_timedomain=True, MC=None,
+                                        CZ_disabled: bool=False,
+                                        CZ_duration: int=260,
                                         wait_time_ns: int=0,
                                         label='',
                                         flux_codeword='fl_cw_01',
@@ -595,7 +597,7 @@ class DeviceCCL(Instrument):
             flux_codeword=flux_codeword,
             nr_of_repeated_gates=nr_of_repeated_gates,
             fixed_max_nr_of_repeated_gates=fixed_max_nr_of_repeated_gates,
-            CZ_disabled=False)
+            CZ_disabled=CZ_disabled, CZ_duration=CZ_duration)
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr(),
                              parameter_name='Phase', unit='deg')
@@ -678,6 +680,37 @@ class DeviceCCL(Instrument):
         MC.set_sweep_points(np.arange(42))
         MC.set_detector_function(d)
         MC.run('TwoQubitAllXY_{}_{}{}'.format(q0, q1, self.msmt_suffix))
+        if analyze:
+            a = ma.MeasurementAnalysis(close_main_fig=close_fig)
+        return a
+
+    def measure_residual_ZZ_coupling(self, q0: str, q1: str,
+                                times=np.linspace(0,10e-6,26),
+                                analyze: bool=True, close_fig: bool=True,
+                                prepare_for_timedomain: bool=True, MC=None):
+
+        # FIXME: this is not done yet, needs testing and finishing -Filip July 2018
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        assert q0 in self.qubits()
+        assert q1 in self.qubits2_prep()
+
+        q0idx = self.find_instrument(q0).cfg_qubit_nr()
+        q1idx = self.find_instrument(q1).cfg_qubit_nr()
+
+        p = mqo.residual_coupling_sequence(times, q0idx, q1idx,
+                                self.cfg_openql_platform_fn())
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr())
+
+        d = self.get_correlation_detector()
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(times)
+        MC.set_detector_function(d)
+        MC.run('Residual_ZZ_{}_{}{}'.format(q0, q1, self.msmt_suffix))
         if analyze:
             a = ma.MeasurementAnalysis(close_main_fig=close_fig)
         return a
@@ -848,6 +881,7 @@ class DeviceCCL(Instrument):
                         adaptive_sampling=False,
                         adaptive_sampling_pts=None,
                         prepare_for_timedomain=True, MC=None,
+                        target_qubit_sequence: str='ramsey',
                         waveform_name='square'):
         """
         Measure a chevron by flux pulsing q0.
@@ -855,6 +889,9 @@ class DeviceCCL(Instrument):
         back at the end.
         The spectator qubit (q_spec) performs a ramsey experiment over
         the flux pulse.
+        target_qubit_sequence selects whether target qubit should run ramsey
+        squence ('ramsey'), stay in ground state ('ground'), or be flipped
+        to the excited state ('excited')
         """
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -910,7 +947,8 @@ class DeviceCCL(Instrument):
         p = mqo.Chevron(q0idx, q_specidx, buffer_time=40e-9,
                         buffer_time2=max(lengths)+40e-9,
                         flux_cw=flux_cw,
-                        platf_cfg=self.cfg_openql_platform_fn())
+                        platf_cfg=self.cfg_openql_platform_fn(),
+                        target_qubit_sequence=target_qubit_sequence)
         self.instr_CC.get_instr().eqasm_program(p.filename)
         self.instr_CC.get_instr().start()
 
@@ -933,6 +971,55 @@ class DeviceCCL(Instrument):
                  'goal':lambda l: l.npoints>adaptive_sampling_pts,
                  'bounds':(amps, lengths)})
             MC.run('Chevron {} {}'.format(q0, q_spec), mode='adaptive')
+
+
+
+    def measure_two_qubit_ramsey(self, q0: str, q_spec: str,
+                        times,
+                        prepare_for_timedomain=True, MC=None,
+                        target_qubit_sequence: str='excited',
+                        chunk_size: int=None,):
+        """
+        Measure a ramsey on q0 while setting the q_spec
+        to excited state ('excited'), ground state ('ground') or 
+        superposition ('ramsey')
+        """
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+
+        assert q0 in self.qubits()
+        assert q_spec in self.qubits()
+
+        q0idx = self.find_instrument(q0).cfg_qubit_nr()
+        q_specidx = self.find_instrument(q_spec).cfg_qubit_nr()
+
+        if prepare_for_timedomain:
+            self.prepare_for_timedomain()
+
+        p = mqo.two_qubit_ramsey(times, q0idx, q_specidx,
+                        platf_cfg=self.cfg_openql_platform_fn(),
+                        target_qubit_sequence=target_qubit_sequence)
+        s = swf.OpenQL_Sweep(openql_program=p,
+                             CCL=self.instr_CC.get_instr(),
+                             parameter_name='Time', unit='s')
+
+#        self.instr_CC.get_instr().eqasm_program(p.filename)
+#        self.instr_CC.get_instr().start()
+
+        dt = times[1] - times[0]
+        times = np.concatenate((times,
+                                [times[-1]+k*dt for k in range(1,9)] ))
+
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(times)
+
+        d = self.get_correlation_detector()
+        #d.chunk_size = chunk_size
+        MC.set_detector_function(d)
+
+        MC.run('Two_qubit_ramsey_{}_{}_{}'.format(q0, q_spec,
+                    target_qubit_sequence), mode='1D')
+        ma.MeasurementAnalysis()  
 
 
     def measure_cryoscope(self, q0: str, times,
@@ -966,8 +1053,6 @@ class DeviceCCL(Instrument):
             prepare_for_timedomain (bool):
                 calls self.prepare_for_timedomain on start
         """
-
-
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -976,30 +1061,31 @@ class DeviceCCL(Instrument):
 
         if max_delay == 'auto':
             max_delay = np.max(times) + 40e-9
-        p = mqo.Cryoscope(q0idx, buffer_time1=20e-9,
-                          buffer_time2=max_delay,
-                          platf_cfg=self.cfg_openql_platform_fn())
-        self.instr_CC.get_instr().eqasm_program(p.filename)
-        self.instr_CC.get_instr().start()
 
         fl_lutman = self.find_instrument(q0).instr_LutMan_Flux.get_instr()
 
         if waveform_name == 'square':
             sw = swf.FLsweep(fl_lutman, fl_lutman.sq_length,
                              waveform_name='square')
-            # fl_lutman.cfg_operating_mode('CW_single_02')
-            # fl_lutman.instr_partner_lutman.get_instr().cfg_operating_mode(
-            #     'CW_single_02')
+            flux_cw = 'fl_cw_02'
 
         elif waveform_name == 'custom_wf':
             sw = swf.FLsweep(fl_lutman, fl_lutman.custom_wf_length,
                              waveform_name='custom_wf')
-            # fl_lutman.cfg_operating_mode('CW_single_05')
-            # (fl_lutman.instr_partner_lutman.get_instr()
-            #     .cfg_operating_mode('CW_single_05'))
+            flux_cw = 'fl_cw_05'
+
         else:
             raise ValueError('waveform_name "{}" should be either '
                              '"square" or "custom_wf"'.format(waveform_name))
+
+        p = mqo.Cryoscope(q0idx, buffer_time1=20e-9,
+                          buffer_time2=max_delay,
+                          flux_cw=flux_cw,
+                          platf_cfg=self.cfg_openql_platform_fn())
+        self.instr_CC.get_instr().eqasm_program(p.filename)
+        self.instr_CC.get_instr().start()
+
+
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
 

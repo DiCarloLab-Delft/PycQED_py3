@@ -27,6 +27,8 @@ def single_flux_pulse_seq(qubit_indices: tuple,
 
     for i in range(7):
         k.gate('CW_00', i)
+
+    k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0)
     k.gate('fl_cw_02', qubit_indices[0], qubit_indices[1])
     p.add_kernel(k)
     with suppress_stdout():
@@ -344,11 +346,11 @@ def two_qubit_AllXY(q0: int, q1: int, platf_cfg: str,
         pulse_combinations = [val for val in pulse_combinations
                               for _ in (0, 1)]
 
-    if replace_q1_pulses_X180:
-        pulse_combinations_q1 = ['rx180' for val in pulse_combinations]
-
     pulse_combinations_q0 = pulse_combinations
     pulse_combinations_q1 = pulse_combinations_tiled
+
+    if replace_q1_pulses_X180:
+        pulse_combinations_q1 = [['rx180']*2 for val in pulse_combinations]
 
     i = 0
     for pulse_comb_q0, pulse_comb_q1 in zip(pulse_combinations_q0,
@@ -464,6 +466,7 @@ def residual_coupling_sequence(times, q0: int, q1: int, platf_cfg: str):
 
 
 def Cryoscope(qubit_idx: int, buffer_time1=0, buffer_time2=0,
+              flux_cw: str='fl_cw_02',
               platf_cfg: str=''):
     """
     Single qubit Ramsey sequence.
@@ -489,7 +492,7 @@ def Cryoscope(qubit_idx: int, buffer_time1=0, buffer_time2=0,
     k.prepz(qubit_idx)
     k.gate('rx90', qubit_idx)
     k.gate("wait", [qubit_idx], buffer_nanoseconds1)
-    k.gate('fl_cw_02', 2, 0)
+    k.gate(flux_cw, 2, 0)
     k.gate("wait", [qubit_idx], buffer_nanoseconds2)
     k.gate('rx90', qubit_idx)
     k.measure(qubit_idx)
@@ -499,7 +502,7 @@ def Cryoscope(qubit_idx: int, buffer_time1=0, buffer_time2=0,
     k.prepz(qubit_idx)
     k.gate('rx90', qubit_idx)
     k.gate("wait", [qubit_idx], buffer_nanoseconds1)
-    k.gate('fl_cw_02', 2, 0)
+    k.gate(flux_cw, 2, 0)
     k.gate("wait", [qubit_idx], buffer_nanoseconds2)
     k.gate('ry90', qubit_idx)
     k.measure(qubit_idx)
@@ -605,7 +608,8 @@ def Chevron_hack(qubit_idx: int, qubit_idx_spec,
 
 
 def Chevron(qubit_idx: int, qubit_idx_spec: int,
-            buffer_time, buffer_time2, flux_cw: int, platf_cfg: str):
+            buffer_time, buffer_time2, flux_cw: int, platf_cfg: str,
+            target_qubit_sequence: str='ramsey'):
     """
     Writes output files to the directory specified in openql.
     Output directory is set as an attribute to the program for convenience.
@@ -617,13 +621,22 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int,
         buffer_time2  :
 
         platf_cfg:      filename of the platform config file
+        target_qubit_sequence: selects whether to run a ramsey sequence on
+            a target qubit ('ramsey'), keep it in gorund state ('ground')
+            or excite it iat the beginning of the sequnce ('excited') 
     Returns:
         p:              OpenQL Program object containing
 
 
     Circuit:
         q0    -x180-flux-x180-RO-
-        qspec --x90-----------RO-
+        qspec --x90-----------RO- (target_qubit_sequence='ramsey')
+
+        q0    -x180-flux-x180-RO-
+        qspec -x180-----------RO- (target_qubit_sequence='excited')
+
+        q0    -x180-flux-x180-RO-
+        qspec ----------------RO- (target_qubit_sequence='ground')
 
     """
     platf = Platform('OpenQL_Platform', platf_cfg)
@@ -637,12 +650,25 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int,
 
     k = Kernel("Chevron", p=platf)
     k.prepz(qubit_idx)
-    k.gate('rx90', qubit_idx_spec)
+    
+    if target_qubit_sequence=='ramsey':
+        k.gate('rx90', qubit_idx_spec)
+    elif target_qubit_sequence == 'excited':
+        k.gate('rx180', qubit_idx_spec)
+    elif target_qubit_sequence=='ground':
+        k.gate('i', qubit_idx_spec)
+    else:
+        k.gate('i', qubit_idx_spec)
+        logging.warning('target_qubit_sequence not recognized.'
+            'Keeping target qubit in a ground state.')
     k.gate('rx180', qubit_idx)
+    
     k.gate("wait", [qubit_idx], buffer_nanoseconds)
     k.gate('fl_cw_{:02}'.format(flux_cw), 2, 0)
+    
     k.gate('wait', [qubit_idx], buffer_nanoseconds2)
     k.gate('rx180', qubit_idx)
+    
     k.measure(qubit_idx)
     k.measure(qubit_idx_spec)
     k.gate("wait", [qubit_idx, qubit_idx_spec], 0)
@@ -654,6 +680,80 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int,
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
+
+
+
+def two_qubit_ramsey(times, qubit_idx: int, qubit_idx_spec: int,
+            platf_cfg: str, target_qubit_sequence: str='excited'):
+    """
+    Writes output files to the directory specified in openql.
+    Output directory is set as an attribute to the program for convenience.
+
+    Input pars:
+        times:          the list of waiting times for each Ramsey element
+        qubit_idx:      int specifying the target qubit (starting at 0)
+        qubit_idx_spec: int specifying the spectator qubit
+
+        platf_cfg:      filename of the platform config file
+        target_qubit_sequence: selects whether to run a ramsey sequence on
+            a target qubit ('ramsey'), keep it in gorund state ('ground')
+            or excite it iat the beginning of the sequnce ('excited') 
+    Returns:
+        p:              OpenQL Program object containing
+
+
+    Circuit:
+        q0    --x90-wait-x90-RO-
+        qspec --x90----------RO- (target_qubit_sequence='ramsey')
+
+        q0    --x90-wait-x90-RO-
+        qspec -x180----------RO- (target_qubit_sequence='excited')
+
+        q0    --x90-wait-x90-RO-
+        qspec ---------------RO- (target_qubit_sequence='ground')
+
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="two_qubit_ramsey", nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    for i, time in enumerate(times):
+        k = Kernel("two_qubit_ramsey", p=platf)
+        k.prepz(qubit_idx)
+        
+        if target_qubit_sequence=='ramsey':
+            k.gate('rx90', qubit_idx_spec)
+        elif target_qubit_sequence == 'excited':
+            k.gate('rx180', qubit_idx_spec)
+        elif target_qubit_sequence=='ground':
+            k.gate('i', qubit_idx_spec)
+        else:
+            k.gate('i', qubit_idx_spec)
+            logging.warning('target_qubit_sequence not recognized.'
+                'Keeping target qubit in a ground state.')
+        k.gate('rx90', qubit_idx)
+        
+        wait_nanoseconds = int(round(time/1e-9))
+        k.gate("wait", [qubit_idx, qubit_idx_spec], wait_nanoseconds)
+
+        k.gate('i', qubit_idx_spec)
+        k.gate('rx90', qubit_idx)
+        
+        k.measure(qubit_idx)
+        k.measure(qubit_idx_spec)
+        k.gate("wait", [qubit_idx, qubit_idx_spec], 0)
+        p.add_kernel(k)
+
+    # adding the calibration points
+    add_two_q_cal_points(p, platf, qubit_idx, qubit_idx_spec, reps_per_cal_pt=2)
+
+    with suppress_stdout():
+        p.compile()
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
 
 
 def two_qubit_tomo_bell(bell_state, q0, q1,
@@ -713,6 +813,78 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
             k.gate('fl_cw_01', 2, 0)
             # after-rotations
             k.gate(after_pulse_q1, q1)
+            # tomo pulses
+            k.gate(p_q1, q0)
+            k.gate(p_q0, q1)
+            # measure
+            k.measure(q0)
+            k.measure(q1)
+            # sync barrier before tomo
+            # k.gate("wait", [q0, q1], 0)
+            k.gate("wait", [2, 0], 0)
+            p.add_kernel(k)
+    # 7 repetitions is because of assumptions in tomo analysis
+    p = add_two_q_cal_points(p, platf=platf, q0=q0, q1=q1, reps_per_cal_pt=7)
+    with suppress_stdout():
+        p.compile()
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
+
+
+def two_qubit_tomo_bell_by_waiting(bell_state, q0, q1,
+                        platf_cfg, wait_time: int=20):
+    '''
+    Two qubit (bell) state tomography. There are no flux pulses applied,
+    only waiting time. It is supposed to take advantage of residual ZZ to
+    generate entanglement.
+
+    Args:
+        bell_state      (int): index of prepared bell state
+        q0, q1          (str): names of the target qubits
+        wait_time       (int): waiting time in which residual ZZ acts
+                                    on qubits
+    '''
+    tomo_gates = ['i', 'rx180', 'ry90', 'rym90', 'rx90', 'rxm90']
+
+    # Choose a bell state and set the corresponding preparation pulses
+    if bell_state == 0:  # |Phi_m>=|00>-|11>
+        prep_pulse_q0, prep_pulse_q1 = 'ry90', 'ry90'
+    elif bell_state % 10 == 1:  # |Phi_p>=|00>+|11>
+        prep_pulse_q0, prep_pulse_q1 = 'rym90', 'ry90'
+    elif bell_state % 10 == 2:  # |Psi_m>=|01>-|10>
+        prep_pulse_q0, prep_pulse_q1 = 'ry90', 'rym90'
+    elif bell_state % 10 == 3:  # |Psi_p>=|01>+|10>
+        prep_pulse_q0, prep_pulse_q1 = 'rym90', 'rym90'
+    else:
+        raise ValueError('Bell state {} is not defined.'.format(bell_state))
+
+    # Recovery pulse is the same for all Bell states
+    after_pulse_q1 = 'rym90'
+
+    # # Define compensation pulses
+    # # FIXME: needs to be added
+    # print('Warning: not using compensation pulses.')
+
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="two_qubit_tomo_bell",
+                nqubits=platf.get_qubit_number(),
+                p=platf)
+    for p_q1 in tomo_gates:
+        for p_q0 in tomo_gates:
+            k = Kernel("BellTomo_{}{}_{}{}".format(
+                       q1, p_q1, q0, p_q0
+                       ), p=platf)
+            # next experiment
+            k.prepz(q0)  # to ensure enough separation in timing
+            k.prepz(q1)  # to ensure enough separation in timing
+            # pre-rotations
+            k.gate(prep_pulse_q0, q0)
+            k.gate(prep_pulse_q1, q1)
+            # FIXME hardcoded edge because of
+            # brainless "directed edge recources" in compiler
+            if wait_time>0:
+                    k.wait([q0,q1], wait_time)
             # tomo pulses
             k.gate(p_q1, q0)
             k.gate(p_q0, q1)
@@ -966,24 +1138,29 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
             k.gate('rx90', q0)
             if not CZ_disabled:
                 for j in range(nr_of_repeated_gates):
-                    if j!=0:
+                    if j!=0 and wait_time_between>0:
                         k.gate('wait', [2, 0], wait_time_between)
                     k.gate(flux_codeword, 2, 0)
                 if fixed_max_nr_of_repeated_gates is not None:
                     for l in range(fixed_max_nr_of_repeated_gates-j):
-                        k.gate('wait', [2, 0], wait_time_between)
+                        if wait_time_between>0:
+                            k.gate('wait', [2, 0], wait_time_between)
                         k.gate('fl_cw_00', 2,0)
             else:
                 for j in range(nr_of_repeated_gates):
-                    if j!=0:
+                    if j!=0 and wait_time_between>0:
                         k.gate('wait', [2, 0], wait_time_between)
-                    k.gate('wait', [2, 0], CZ_duration)  # in ns
+                    if CZ_duration>0:
+                        k.gate('wait', [2, 0], CZ_duration)  # in ns
                 if fixed_max_nr_of_repeated_gates is not None:
                     for l in range(fixed_max_nr_of_repeated_gates-j):
-                        k.gate('wait', [2, 0], wait_time_between)
-                        k.gate('wait', [2, 0], CZ_duration)
+                        if wait_time_between>0:
+                            k.gate('wait', [2, 0], wait_time_between)
+                        if CZ_duration>0:
+                            k.gate('wait', [2, 0], CZ_duration)
             try:
-                k.gate('wait', [2, 0], (wait_time_after))
+                if wait_time_after>0:
+                    k.gate('wait', [2, 0], (wait_time_after))
             except Exception as e:
                 print('Wait time after-between',
                       (wait_time_after-wait_time_between))
@@ -1002,7 +1179,7 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
             # Implements a barrier to align timings
             # k.gate('wait', [q0, q1], 0)
             # hardcoded barrier because of openQL #104
-            k.gate('wait', [2, 0], 0)
+            # k.gate('wait', [2, 0], 0)
 
             p.add_kernel(k)
     if add_cal_points:

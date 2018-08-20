@@ -8,6 +8,7 @@ from pycqed.analysis.tools import cryoscope_tools as ct
 import pycqed.analysis_v2.base_analysis as ba
 import numpy as np
 from scipy.stats import sem
+import logging
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 from matplotlib import ticker
 from mpl_toolkits.axes_grid1.inset_locator import InsetPosition, mark_inset
@@ -24,7 +25,7 @@ class RamZFluxArc(ba.BaseDataAnalysis):
     This analysis only implements the second variant (as of Feb 2018)
     """
 
-    def __init__(self, t_start: str, t_stop: str, label='arc',
+    def __init__(self, t_start: str=None, t_stop: str=None, label='arc',
                  options_dict: dict=None,
                  ch_amp_key: str='Snapshot/instruments/AWG8_8005'
                  '/parameters/awgs_0_outputs_1_amplitude',
@@ -130,9 +131,9 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
     """
 
     def __init__(
-            self, t_start: str,
+            self, t_start: str=None,
             t_stop: str =None,
-            label='cryoscope',
+            label='',
             derivative_window_length: float=5e-9,
             norm_window_size: int=31,
             nyquist_order: int =0,
@@ -270,7 +271,6 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
             'plotfn': self.ca.plot_short_time_fft,
             'title': self.timestamp+'\nShort time Fourier Transform'}
 
-
         self.plot_dicts['zoomed_cryoscope_amplitude'] = {
             'plotfn': make_zoomed_cryoscope_fig,
             't': self.ca.time,
@@ -282,7 +282,8 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
     """
     Analysis for the sliding pulses experiment.
 
-    For noise reasons this is expected to be acquired as a TwoD in a single experiment.
+    For noise reasons this is expected to be acquired as a TwoD in a
+    single experiment.
     There exist two variant
         TwoD -> single experiment
         multiple 1D -> combination of several linescans
@@ -294,7 +295,7 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
                  options_dict: dict=None,
                  sliding_pulse_duration=220e-9,
                  freq_to_amp=None, amp_to_freq=None,
-                 phase_cut :float=0,
+                 phase_cut: float=0,
                  ch_amp_key: str='Snapshot/instruments/AWG8_8005'
                  '/parameters/awgs_0_outputs_1_amplitude',
                  ch_range_key: str='Snapshot/instruments/AWG8_8005'
@@ -307,7 +308,6 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
             options_dict = dict()
         super().__init__(t_start=t_start, t_stop=t_stop, label=label,
                          options_dict=options_dict, close_figs=close_figs)
-
 
         self.ch_amp_key = ch_amp_key
         # ch_range_keycan also be set to `None`, then the value will
@@ -336,10 +336,6 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
         a = ma_old.TwoD_Analysis(timestamp=self.timestamps[0], auto=True,
                                  close_file=False)
         a.get_naming_and_values_2D()
-        # FIXME: this is hardcoded and should be an argument in options dict
-        amp_key = 'Snapshot/instruments/AWG8_8005/parameters/awgs_0_outputs_1_amplitude'
-        amp = a.data_file[amp_key].attrs['value']
-
 
         ch_amp = a.data_file[self.ch_amp_key].attrs['value']
         if self.ch_range_key is None:
@@ -348,7 +344,6 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
             ch_range = a.data_file[self.ch_range_key].attrs['value']
         waveform_amp = a.data_file[self.waveform_amp_key].attrs['value']
         amp = ch_amp*ch_range/2*waveform_amp
-
 
         self.raw_data_dict['amp'] = amp
         self.raw_data_dict['phases'] = a.measured_values[0]
@@ -360,8 +355,8 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
         a.finish()
 
     def process_data(self):
-        phi_cut=self.phase_cut
-        phases_shifted = (self.raw_data_dict['phases']+phi_cut)%360-phi_cut
+        phi_cut = self.phase_cut
+        phases_shifted = (self.raw_data_dict['phases']+phi_cut) % 360-phi_cut
 
         phase = np.nanmean(np.unwrap(phases_shifted[::-1],
                                      discont=0, axis=1)[::-1], axis=1)
@@ -422,8 +417,13 @@ def make_phase_plot(t, phase, phase_err, title,  ylim=None, ax=None, **kw):
     ax.axhline(mean_phase_tail-5, ls='--', c='grey', linewidth=0.5)
     ax.legend()
     if ylim is None:
-        ax.set_ylim(np.min([mean_phase_tail-60, np.min(phase)]),
-                    np.max([mean_phase_tail+40, np.max(phase)]))
+        try:
+            ax.set_ylim(np.min([mean_phase_tail-60, np.min(phase)]),
+                        np.max([mean_phase_tail+40, np.max(phase)]))
+        except ValueError:
+            logging.warning("could not automatically determine axis limits.")
+            # This happens if there is less than 10 measurements and the
+            # "mean_phase_tail" is np.nan
     else:
         ax.set_ylim(ylim[0], ylim[1])
 
@@ -447,7 +447,6 @@ def make_amp_err_plot(t, amp, timestamp, ax=None, **kw):
     set_ylabel(ax, 'Normalized Amplitude')
 
 
-
 def make_zoomed_cryoscope_fig(t, amp, title, ax=None, **kw):
 
     # x = ca.time
@@ -457,11 +456,11 @@ def make_zoomed_cryoscope_fig(t, amp, title, ax=None, **kw):
     gc = np.mean(y[len(y)//5:4*len(y)//5])
 
     if ax is not None:
-        ax=ax
-        f=plt.gcf()
+        ax = ax
+        f = plt.gcf()
     else:
         f, ax = plt.subplots()
-    ax.plot(x,y/gc,  label='Signal')
+    ax.plot(x, y/gc,  label='Signal')
     ax.axhline(1.01, ls='--', c='grey', label=r'$\pm$1%')
     ax.axhline(0.99, ls='--', c='grey')
     ax.axhline(1.0, ls='-', c='grey', linewidth=.5)
@@ -476,12 +475,12 @@ def make_zoomed_cryoscope_fig(t, amp, title, ax=None, **kw):
 
     # Create a set of inset Axes: these should fill the bounding box allocated to
     # them.
-    ax2 = plt.axes([0,0,1,1])
+    ax2 = plt.axes([0, 0, 1, 1])
     # Manually set the position and relative size of the inset axes within ax1
     ip = InsetPosition(ax, [.29, .14, 0.65, .4])
     ax2.set_axes_locator(ip)
 
-    mark_inset(ax, ax2, 1,3, color='grey')
+    mark_inset(ax, ax2, 1, 3, color='grey')
     ax2.axhline(1.0, ls='-', c='grey', linewidth=.5)
     ax2.axhline(1.01, ls='--', c='grey', label=r'$\pm$1%')
     ax2.axhline(0.99, ls='--', c='grey')
@@ -489,7 +488,7 @@ def make_zoomed_cryoscope_fig(t, amp, title, ax=None, **kw):
     ax2.axhline(0.999, ls=':', c='grey')
     ax2.plot(x, y/gc, '-')
 
-    formatter = ticker.FuncFormatter(lambda x, pos: round(x*1e9,3))
+    formatter = ticker.FuncFormatter(lambda x, pos: round(x*1e9, 3))
     ax2.xaxis.set_major_formatter(formatter)
 
     ax2.set_ylim(0.998, 1.002)
@@ -498,4 +497,3 @@ def make_zoomed_cryoscope_fig(t, amp, title, ax=None, **kw):
 
     ax.set_title(title)
     ax.text(.02, .93, '(a)', color='black', transform=ax.transAxes)
-
