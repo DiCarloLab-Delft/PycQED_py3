@@ -59,6 +59,8 @@ class CCLight_Transmon(Qubit):
                            parameter_class=InstrumentRefParameter)
         self.add_parameter('instr_spec_source',
                            parameter_class=InstrumentRefParameter)
+        self.add_parameter('instr_spec_source_2',
+                           parameter_class=InstrumentRefParameter)
 
         # Control electronics
         self.add_parameter(
@@ -641,6 +643,8 @@ class CCLight_Transmon(Qubit):
         # source is turned on in measure spec when needed
         self.instr_LO_mw.get_instr().off()
         self.instr_spec_source.get_instr().off()
+        if self.instr_spec_source_2()!=None:
+            self.instr_spec_source_2.get_instr().off()
 
     def _prep_cw_spec(self):
         if self.cfg_with_vsm():
@@ -1604,6 +1608,99 @@ class CCLight_Transmon(Qubit):
             self._prep_ro_pulse(upload=True)
         if analyze:
             ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
+
+        #anharmonicity measurement, bus crossing and photon number splitting with the bus
+
+    def measure_anharmonicity(self, f_01, f_02=None, f_12=None, f_01_power=None, f_12_power=None, MC=None, spec_source_2=None):
+        '''
+        note measures anharmonicity of the transmon using three-tone spectroscopy. two usecases:
+        - provide f_02 from high-power spectroscopy of the 02-transition. It will calculate the 12 transition from it
+        - provide directly the 1-2 transition
+        '''
+        if (f_02 is None) and (f_01 is None):
+            raise ValueError("provide either and estimate of f_02 or f_12")
+        if f_12==None:    
+            f_anharmonicity=(f_01-f_02)*2
+            f_12=f_01-f_anharmonicity
+        if f_01_power==None:
+            f_01_power=self.spec_pow()
+        if f_12_power==None:
+            f_12_power=f_01_power
+        f_anharmonicity=(f_01-f_12)
+        print('f_anharmonicity estimations', f_anharmonicity)
+        print('f_12 estimations', f_12)
+        CCL = self.instr_CC.get_instr()
+        p = sqo.pulsed_spec_seq(
+            qubit_idx=self.cfg_qubit_nr(),
+            spec_pulse_length=self.spec_pulse_length(),
+            platf_cfg=self.cfg_openql_platform_fn())
+        CCL.eqasm_program(p.filename)
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        if spec_source_2 is None:
+            spec_source_2 = self.instr_spec_source_2.get_instr()
+        spec_source = self.instr_spec_source.get_instr()
+        freqs_q1=np.arange(f_01-12e6 ,f_01+12e6,0.7e6)
+        freqs_q2=np.arange(f_12-12e6 ,f_12+12e6,0.7e6)
+
+        self.prepare_for_continuous_wave()
+        self.int_avg_det_single._set_real_imag(False)
+        spec_source.on()
+        spec_source.power(f_01_power)
+
+        spec_source_2.on()
+        spec_source_2.power(f_12_power)
+        spec_source_2.frequency(f_12)
+        MC.set_sweep_function(wrap_par_to_swf(
+                              spec_source.frequency, retrieve_value=True))
+        MC.set_sweep_points(freqs_q1)
+        MC.set_sweep_function_2D(wrap_par_to_swf(
+                              spec_source_2.frequency, retrieve_value=True))
+        MC.set_sweep_points_2D(freqs_q2)
+        MC.set_detector_function(self.int_avg_det_single)
+        MC.run_2D(name='Three_tone_'+self.msmt_suffix)
+        ma.TwoD_Analysis(auto=True)
+        spec_source.off()
+        spec_source_2.off()
+        ma.Three_Tone_Spectroscopy_Analysis(label='Three_tone',  f01=f_01, f12=f_12)
+
+    def measure_photon_nr_splitting_from_bus(self, f_01, f_bus, powers=np.arange(-10,10,1), MC=None, spec_source_2=None):
+
+        freqs_1=np.arange(f_01-60e6 ,f_01+5e6,0.7e6)
+
+        self.prepare_for_continuous_wave()
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        CCL = self.instr_CC.get_instr()
+        if spec_source_2 is None:
+            spec_source_2 = self.instr_spec_source_2.get_instr()
+        spec_source = self.instr_spec_source.get_instr()
+        p = sqo.pulsed_spec_seq(
+            qubit_idx=self.cfg_qubit_nr(),
+            spec_pulse_length=self.spec_pulse_length(),
+            platf_cfg=self.cfg_openql_platform_fn())
+        CCL.eqasm_program(p.filename)
+        self.int_avg_det_single._set_real_imag(False)
+        spec_source.on()
+        spec_source.power(self.spec_pow())
+        spec_source_2.on()
+        spec_source_2.frequency(f_bus)
+
+        MC.set_sweep_function(wrap_par_to_swf(
+                              spec_source.frequency, retrieve_value=True))
+        MC.set_sweep_points(freqs_1)
+
+        MC.set_sweep_function_2D(wrap_par_to_swf(
+                              spec_source_2.power, retrieve_value=True))
+        MC.set_sweep_points_2D(powers)
+        MC.set_detector_function(self.int_avg_det_single)
+
+        MC.run_2D(name='Photon_nr_splitting'+self.msmt_suffix)
+
+        ma.TwoD_Analysis(auto=True)
+        spec_source.off()
+        spec_source_2.off()
+
 
     def measure_ssro(self, MC=None, analyze: bool=True, nr_shots: int=4092*4,
                      cases=('off', 'on'), update_threshold: bool=True,

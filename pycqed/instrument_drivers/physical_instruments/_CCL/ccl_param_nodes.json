@@ -385,12 +385,12 @@
         }
     ],
     "version": {
-        "Embedded Software Build Time": "22/05/2018-17:50:18",
-        "Embedded Software Version": "0.3.0",
-        "Firmware Build Time": "23/05/2018-07:30:08",
-        "Kernel Module Build Time": "22/05/2018-15:36:21",
-        "Kernel Module Version": "0.3.0",
-        "firmware": "0.7.0",
+        "Embedded Software Build Time": "02/08/2018-04:07:56",
+        "Embedded Software Version": "0.4.0",
+        "Firmware Build Time": "16/08/2018-13:54:07",
+        "Kernel Module Build Time": "02/08/2018-15:19:15",
+        "Kernel Module Version": "0.4.0",
+        "firmware": "0.7.4",
         "model": "CCL1",
         "serial": "CCLight2",
         "vendor": "QuTech"
