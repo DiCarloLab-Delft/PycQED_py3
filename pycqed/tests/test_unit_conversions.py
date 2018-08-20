@@ -18,7 +18,7 @@ class Test_SI_prefix_scale_factor(unittest.TestCase):
         unit = 'V'
         scale_factor, post_unit = SI_prefix_and_scale_factor(val=5, unit=unit)
         self.assertEqual(scale_factor, 1)
-        self.assertEqual(' '+unit, post_unit)
+        self.assertEqual(''+unit, post_unit)
 
         scale_factor, post_unit = SI_prefix_and_scale_factor(val=5000,
                                                              unit=unit)
