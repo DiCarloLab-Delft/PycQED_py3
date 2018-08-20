@@ -1950,7 +1950,7 @@ def plot_errorbars(x, y, ax=None, linewidth=2 ,markersize=2, marker='none'):
 
 
 def calculate_transmon_transitions(EC, EJ, asym=0, reduced_flux=0,
-                                   no_transitions=2, dim=None):
+                                   no_transitions=2, dim=None, ng=0):
     '''
     Calculates transmon energy levels from the full transmon qubit Hamiltonian.
     '''
@@ -1958,14 +1958,11 @@ def calculate_transmon_transitions(EC, EJ, asym=0, reduced_flux=0,
         dim = no_transitions*20
 
     EJphi = EJ*np.sqrt(asym**2 + (1-asym**2)*np.cos(np.pi*reduced_flux)**2)
-
-    Ham = 4*EC*np.diag(np.arange(-dim, dim+1)**2) - EJphi/2 * \
+    Ham = 4*EC*np.diag(np.arange(-dim-ng, dim-ng+1)**2) - EJphi/2 * \
         (np.eye(2*dim+1, k=+1) + np.eye(2*dim+1, k=-1))
     HamEigs = np.linalg.eigvalsh(Ham)
     HamEigs.sort()
-
     transitions = HamEigs[1:]-HamEigs[:-1]
-
     return transitions[:no_transitions]
 
 

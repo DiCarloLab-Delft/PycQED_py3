@@ -292,6 +292,18 @@ def mod_gauss_VSM(amp, sigma_length, f_modulation, axis='x', phase=0,
                                  Q_phase_delay=Q_phase_delay)
     return G_I_mod, G_Q_mod, D_I_mod, D_Q_mod
 
+def mod_square(amp, length, f_modulation,  phase=0,
+              motzoi=0, sampling_rate=1e9):
+    '''
+    Simple modulated gauss pulse. All inputs are in s and Hz.
+    '''
+    pulse_I, pulse_Q = block_pulse(amp, length=length,
+                                   sampling_rate=sampling_rate,
+                                   phase=phase)
+    pulse_I_mod, pulse_Q_mod = mod_pulse(pulse_I, pulse_Q, f_modulation,
+                                         sampling_rate=sampling_rate)
+    return pulse_I_mod, pulse_Q_mod
+
 
 def mod_square_VSM(amp_G, amp_D, length, f_modulation,
                    phase_G: float = 0, phase_D: float=0,
@@ -354,10 +366,14 @@ def martinis_flux_pulse(length: float, lambda_2: float, lambda_3: float,
                     eps=f12-f_bus
     """
     # Define number of samples and time points
+
+
     # Pulse is generated at a denser grid to allow for good interpolation
-    nr_samples = int(np.round((length)*sampling_rate * 10))
-    rounded_length = nr_samples/(10 * sampling_rate)
-    tau_step = 1/(10 * sampling_rate)  # denser points
+    # N.B. Not clear why interpolation is needed at all... -MAR July 2018
+    fine_sampling_factor = 1  # 10
+    nr_samples = int(np.round((length)*sampling_rate * fine_sampling_factor))
+    rounded_length = nr_samples/(fine_sampling_factor * sampling_rate)
+    tau_step = 1/(fine_sampling_factor * sampling_rate)  # denser points
     # tau is a virtual time/proper time
     taus = np.arange(0, rounded_length-tau_step/2, tau_step)
     # -tau_step/2 is to make sure final pt is excluded
@@ -370,7 +386,7 @@ def martinis_flux_pulse(length: float, lambda_2: float, lambda_3: float,
     theta_f = 2*np.pi*theta_f/360
     if theta_f < theta_i:
         raise ValueError(
-            'theta_f ({:2.f} deg) < theta_i ({:2.f} deg):'.format(
+            'theta_f ({:.2f} deg) < theta_i ({:.2f} deg):'.format(
                 theta_f/(2*np.pi)*360, theta_i/(2*np.pi)*360)
             + 'final coupling weaker than initial coupling')
 

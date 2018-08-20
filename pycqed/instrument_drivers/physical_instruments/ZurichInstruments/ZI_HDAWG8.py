@@ -32,7 +32,6 @@ class ZI_HDAWG8(ZI_base_instrument):
             port            (int) the port to connect to
         '''
         t0 = time.time()
-        self._num_channels = 8
         self._num_codewords = num_codewords
 
         if os.name == 'nt':
@@ -65,6 +64,15 @@ class ZI_HDAWG8(ZI_base_instrument):
             logging.warning("parameter file for data parameters"
                             " {} not found".format(self._d_file_name))
         self.add_ZIshell_device_methods_to_instrument()
+
+        dev_type = self.get('features_devtype')
+        if dev_type == 'HDAWG8':
+            self._num_channels = 8
+        elif dev_type == 'HDAWG4':
+            self._num_channels = 4
+        else:
+            self._num_channels = 8
+            logging.warning('Unknown device type. Assuming eight channels.')
 
         self._add_codeword_parameters()
         self._add_extra_parameters()
@@ -131,6 +139,7 @@ class ZI_HDAWG8(ZI_base_instrument):
                  hash)
 
     def get_idn(self):
+        # FIXME, update using new parameters for this purpose
         idn_dict = {'vendor': 'ZurichInstruments',
                     'model': self._dev.daq.getByte(
                         '/{}/features/devtype'.format(self._devname)),
@@ -144,171 +153,171 @@ class ZI_HDAWG8(ZI_base_instrument):
         """
         Stops the program on all AWG's part of this AWG8 unit
         """
-        for i in range(4):
+        for i in range(int(self._num_channels/2)):
             self.set('awgs_{}_enable'.format(i), 0)
 
     def start(self):
         """
         Starts the program on all AWG's part of this AWG8 unit
         """
-        for i in range(4):
+        for i in range(int(self._num_channels/2)):
             self.set('awgs_{}_enable'.format(i), 1)
 
-    def _check_protocol(self, awg):
-        # TODO: Add docstrings and make this more clear (Oct 2017)
-        mask = self._dev.geti('awgs/' + str(awg) + '/dio/mask/value') << self._dev.geti(
-            'awgs/' + str(awg) + '/dio/mask/shift')
-        strobe = 1 << self._dev.geti('awgs/' + str(awg) + '/dio/strobe/index')
-        valid = 1 << self._dev.geti('awgs/' + str(awg) + '/dio/valid/index')
-        #print('Codeword mask: {:08x}'.format(mask))
-        #print('Strobe mask  : {:08x}'.format(strobe))
-        #print('Valid mask   : {:08x}'.format(valid))
+    # def _check_protocol(self, awg):
+    #     # TODO: Add docstrings and make this more clear (Oct 2017)
+    #     mask = self._dev.geti('awgs/' + str(awg) + '/dio/mask/value') << self._dev.geti(
+    #         'awgs/' + str(awg) + '/dio/mask/shift')
+    #     strobe = 1 << self._dev.geti('awgs/' + str(awg) + '/dio/strobe/index')
+    #     valid = 1 << self._dev.geti('awgs/' + str(awg) + '/dio/valid/index')
+    #     #print('Codeword mask: {:08x}'.format(mask))
+    #     #print('Strobe mask  : {:08x}'.format(strobe))
+    #     #print('Valid mask   : {:08x}'.format(valid))
 
-        got_bits = 0
-        got_strobe_re = False
-        got_strobe_fe = False
-        got_valid_re = False
-        got_valid_fe = False
-        last_strobe = None
-        last_valid = None
-        strobe_low = 0
-        strobe_high = 0
-        count_low = False
-        count_high = False
-        count_ok = True
-        ok = 0
-        data = self._dev.getv('awgs/' + str(awg) + '/dio/data')
-        for n, d in enumerate(data):
-            curr_strobe = (d & strobe) != 0
-            curr_valid = (d & valid) != 0
+    #     got_bits = 0
+    #     got_strobe_re = False
+    #     got_strobe_fe = False
+    #     got_valid_re = False
+    #     got_valid_fe = False
+    #     last_strobe = None
+    #     last_valid = None
+    #     strobe_low = 0
+    #     strobe_high = 0
+    #     count_low = False
+    #     count_high = False
+    #     count_ok = True
+    #     ok = 0
+    #     data = self._dev.getv('awgs/' + str(awg) + '/dio/data')
+    #     for n, d in enumerate(data):
+    #         curr_strobe = (d & strobe) != 0
+    #         curr_valid = (d & valid) != 0
 
-            if count_high:
-                if curr_strobe:
-                    strobe_high += 1
-                else:
-                    if (strobe_low > 0) and (strobe_low != strobe_high):
-                        count_ok = False
+    #         if count_high:
+    #             if curr_strobe:
+    #                 strobe_high += 1
+    #             else:
+    #                 if (strobe_low > 0) and (strobe_low != strobe_high):
+    #                     count_ok = False
 
-            if count_low:
-                if not curr_strobe:
-                    strobe_low += 1
-                else:
-                    if (strobe_high > 0) and (strobe_low != strobe_high):
-                        count_ok = False
+    #         if count_low:
+    #             if not curr_strobe:
+    #                 strobe_low += 1
+    #             else:
+    #                 if (strobe_high > 0) and (strobe_low != strobe_high):
+    #                     count_ok = False
 
-            if (last_strobe != None):
-                if (curr_strobe and not last_strobe):
-                    got_strobe_re = True
-                    strobe_high = 0
-                    count_high = True
-                    count_low = False
-                    index_high = n
-                elif (not curr_strobe and last_strobe):
-                    got_strobe_fe = True
-                    strobe_low = 0
-                    count_low = True
-                    count_high = False
-                    index_low = n
+    #         if (last_strobe != None):
+    #             if (curr_strobe and not last_strobe):
+    #                 got_strobe_re = True
+    #                 strobe_high = 0
+    #                 count_high = True
+    #                 count_low = False
+    #                 index_high = n
+    #             elif (not curr_strobe and last_strobe):
+    #                 got_strobe_fe = True
+    #                 strobe_low = 0
+    #                 count_low = True
+    #                 count_high = False
+    #                 index_low = n
 
-            if (last_valid != None) and (curr_valid and not last_valid):
-                got_valid_re = True
-            if (last_valid != None) and (not curr_valid and last_valid):
-                got_valid_fe = True
+    #         if (last_valid != None) and (curr_valid and not last_valid):
+    #             got_valid_re = True
+    #         if (last_valid != None) and (not curr_valid and last_valid):
+    #             got_valid_fe = True
 
-            got_bits |= (d & mask)
-            last_strobe = curr_strobe
-            last_valid = curr_valid
+    #         got_bits |= (d & mask)
+    #         last_strobe = curr_strobe
+    #         last_valid = curr_valid
 
-        if got_bits != mask:
-            ok |= 1
-        if not got_strobe_re or not got_strobe_fe:
-            ok |= 2
-        if not got_valid_re or not got_valid_fe:
-            ok |= 4
-        if not count_ok:
-            ok |= 8
+    #     if got_bits != mask:
+    #         ok |= 1
+    #     if not got_strobe_re or not got_strobe_fe:
+    #         ok |= 2
+    #     if not got_valid_re or not got_valid_fe:
+    #         ok |= 4
+    #     if not count_ok:
+    #         ok |= 8
 
-        return ok
+    #     return ok
 
-    def _print_check_protocol_error_message(self, ok):
-        if ok & 1:
-            print('Did not see all codeword bits toggling')
-        if ok & 2:
-            print('Did not see toggle bit toggling')
-        if ok & 4:
-            print('Did not see valid bit toggling')
-        if ok & 8:
-            print('Toggle bit is not symmetrical')
+    # def _print_check_protocol_error_message(self, ok):
+    #     if ok & 1:
+    #         print('Did not see all codeword bits toggling')
+    #     if ok & 2:
+    #         print('Did not see toggle bit toggling')
+    #     if ok & 4:
+    #         print('Did not see valid bit toggling')
+    #     if ok & 8:
+    #         print('Toggle bit is not symmetrical')
 
-    def calibrate_dio(self):
-        # TODO: add docstrings to make it more clear
-        ok = True
-        print("Switching to internal clock")
-        self.set('system_extclk', 0)
-        time.sleep(1)
-        print("Switching to external clock")
-        self.set('system_extclk', 1)
-        time.sleep(1)
-        print("Calibrating internal DIO delays...")
-        for i in [1, 0, 2, 3]:  # strange order is necessary
-            print('  Calibrating AWG {} '.format(i), end='')
-            self._dev.seti('raw/awgs/*/dio/calib/start', 2)
-            time.sleep(1)
-            status = self._dev.geti('raw/awgs/' + str(i) + '/dio/calib/status')
-            if (status != 0):
-                print('[FAILURE]')
-                ok = False
-            else:
-                print('[SUCCESS]')
-        return ok
+    # def calibrate_dio(self):
+    #     # TODO: add docstrings to make it more clear
+    #     ok = True
+    #     print("Switching to internal clock")
+    #     self.set('system_extclk', 0)
+    #     time.sleep(1)
+    #     print("Switching to external clock")
+    #     self.set('system_extclk', 1)
+    #     time.sleep(1)
+    #     print("Calibrating internal DIO delays...")
+    #     for i in [1, 0, 2, 3]:  # strange order is necessary
+    #         print('  Calibrating AWG {} '.format(i), end='')
+    #         self._dev.seti('raw/awgs/*/dio/calib/start', 2)
+    #         time.sleep(1)
+    #         status = self._dev.geti('raw/awgs/' + str(i) + '/dio/calib/status')
+    #         if (status != 0):
+    #             print('[FAILURE]')
+    #             ok = False
+    #         else:
+    #             print('[SUCCESS]')
+    #     return ok
 
-    def calibrate_dio_protocol(self):
-        # TODO: add docstrings to make it more clear
-        print("Checking DIO protocol...")
-        done = 4*[False]
-        timeout = 5
-        while not all(done):
-            ok = True
-            for i in range(4):
-                print('  Checking AWG {} '.format(i), end='')
-                protocol = self._check_protocol(i)
-                if protocol != 0:
-                    ok = False
-                    done[i] = False
-                    print('[FAILURE]')
-                    self._print_check_protocol_error_message(protocol)
-                else:
-                    done[i] = True
-                    print('[SUCCESS]')
-            if not ok:
-                print(
-                    "  A problem was detected with the protocol. Will try to reinitialize the clock as it sometimes helps.")
-                self._dev.seti('awgs/*/enable', 0)
-                self._dev.seti('system/extclk', 0)
-                time.sleep(1)
-                self._dev.seti('system/extclk', 1)
-                time.sleep(1)
-                self._dev.seti('awgs/*/enable', 1)
-                timeout -= 1
-                if timeout <= 0:
-                    print("  Too many retries, aborting!")
-                    return False
+    # def calibrate_dio_protocol(self):
+    #     # TODO: add docstrings to make it more clear
+    #     print("Checking DIO protocol...")
+    #     done = 4*[False]
+    #     timeout = 5
+    #     while not all(done):
+    #         ok = True
+    #         for i in range(4):
+    #             print('  Checking AWG {} '.format(i), end='')
+    #             protocol = self._check_protocol(i)
+    #             if protocol != 0:
+    #                 ok = False
+    #                 done[i] = False
+    #                 print('[FAILURE]')
+    #                 self._print_check_protocol_error_message(protocol)
+    #             else:
+    #                 done[i] = True
+    #                 print('[SUCCESS]')
+    #         if not ok:
+    #             print(
+    #                 "  A problem was detected with the protocol. Will try to reinitialize the clock as it sometimes helps.")
+    #             self._dev.seti('awgs/*/enable', 0)
+    #             self._dev.seti('system/extclk', 0)
+    #             time.sleep(1)
+    #             self._dev.seti('system/extclk', 1)
+    #             time.sleep(1)
+    #             self._dev.seti('awgs/*/enable', 1)
+    #             timeout -= 1
+    #             if timeout <= 0:
+    #                 print("  Too many retries, aborting!")
+    #                 return False
 
-        ok = True
-        print("Calibrating DIO protocol delays...")
-        for i in range(4):
-            print('  Calibrating AWG {} '.format(i), end='')
-            self._dev.seti('raw/awgs/' + str(i) + '/dio/calib/start', 1)
-            time.sleep(1)
-            status = self._dev.geti('raw/awgs/' + str(i) + '/dio/calib/status')
-            protocol = self._check_protocol(i)
-            if (status != 0) or (protocol != 0):
-                print('[FAILURE]')
-                self._print_check_protocol_error_message(protocol)
-                ok = False
-            else:
-                print('[SUCCESS]')
-        return ok
+    #     ok = True
+    #     print("Calibrating DIO protocol delays...")
+    #     for i in range(4):
+    #         print('  Calibrating AWG {} '.format(i), end='')
+    #         self._dev.seti('raw/awgs/' + str(i) + '/dio/calib/start', 1)
+    #         time.sleep(1)
+    #         status = self._dev.geti('raw/awgs/' + str(i) + '/dio/calib/status')
+    #         protocol = self._check_protocol(i)
+    #         if (status != 0) or (protocol != 0):
+    #             print('[FAILURE]')
+    #             self._print_check_protocol_error_message(protocol)
+    #             ok = False
+    #         else:
+    #             print('[SUCCESS]')
+    #     return ok
 
     def _add_codeword_parameters(self):
         """
@@ -582,7 +591,7 @@ class ZI_HDAWG8(ZI_base_instrument):
 
         # Configure the DIO interface for triggering on
 
-        for awg_nr in range(4):
+        for awg_nr in range(int(self._num_channels/2)):
                 # This is the bit index of the valid bit,
             self.set('awgs_{}_dio_valid_index'.format(awg_nr), 31)
             # Valid polarity is 'high' (hardware value 2),
@@ -654,3 +663,349 @@ class ZI_HDAWG8(ZI_base_instrument):
             for ch in range(8):
                 self.set('sigouts_{}_direct'.format(ch), 1)
                 self.set('sigouts_{}_range'.format(ch), .8)
+
+    def _find_valid_delays(self, awg, expected_sequence, verbose=False):
+        """
+        The function loops through the possible delay settings on the DIO interface
+        and records and analyzes DIO data for each setting. It then determines whether
+        a given delay setting results in valid DIO protocol data being recorded.
+        In order for data to be correct, two conditions must be satisfied: First,
+        no timing violations are allowed, and, second, the sequence of codewords
+        detected on the interface must match the expected sequence.
+        """
+        if verbose:
+            print("INFO   : Finding valid delays for AWG {}".format(awg))
+        vld_mask = 1 << self._dev.geti('awgs/{}/dio/valid/index'.format(awg))
+        vld_polarity = self._dev.geti('awgs/{}/dio/valid/polarity'.format(awg))
+        strb_mask = 1 << self._dev.geti('awgs/{}/dio/strobe/index'.format(awg))
+        strb_slope = self._dev.geti('awgs/{}/dio/strobe/slope'.format(awg))
+        cw_mask = self._dev.geti('awgs/{}/dio/mask/value'.format(awg))
+        cw_shift = self._dev.geti('awgs/{}/dio/mask/shift'.format(awg))
+
+        if verbose:
+            print('INFO   : vld_mask     = 0x{:08x}'.format(vld_mask))
+            print('INFO   : vld_polarity =', vld_polarity)
+            print('INFO   : strb_mask    = 0x{:08x}'.format(strb_mask))
+            print('INFO   : strb_slope   =', strb_slope)
+            print('INFO   : cw_mask      = 0x{:08x}'.format(cw_mask))
+            print('INFO   : cw_shift     =', cw_shift)
+
+        valid_delays = []
+        for delay in range(0, 7):
+            if verbose:
+                print("INFO   : Testing delay {} on AWG {}...".format(delay, awg))
+            self._set_dio_delay(awg, strb_mask,
+                                (cw_mask << cw_shift) | vld_mask, delay)
+
+            data = self._dev.getv('awgs/' + str(awg) + '/dio/data')
+            codewords, timing_violations = _analyze_dio_data(
+                data, strb_mask, strb_slope, vld_mask, vld_polarity, cw_mask, cw_shift)
+            timeout_cnt = 0
+            while (cw_mask != 0) and len(codewords) == 0:
+                if timeout_cnt > 5:
+                    break
+                if verbose:
+                    print("WARNING: No codewords detected, trying again!")
+                data = self._dev.getv('awgs/' + str(awg) + '/dio/data')
+                codewords, timing_violations = _analyze_dio_data(
+                    data, strb_mask, strb_slope, vld_mask, vld_polarity, cw_mask, cw_shift)
+                timeout_cnt += 1
+
+            # Compare codewords against sequence
+            if (cw_mask != 0) and len(codewords) == 0:
+                if verbose:
+                    print(
+                        "WARNING: No codewords detected on AWG {} for delay {}".format(awg, delay))
+                continue
+
+            # Can't do nothing with timing violations
+            if timing_violations:
+                if verbose:
+                    print("WARNING: Timing violation detected on AWG {} for delay {}!".format(
+                        awg, delay))
+                continue
+
+            # Check against expected sequence
+            valid_sequence = True
+            for n, codeword in enumerate(codewords):
+                if n == 0:
+                    if codeword not in expected_sequence:
+                        if verbose:
+                            print("WARNING: Codeword {} with value {} not in expected sequence {}!".format(
+                                n, codeword, expected_sequence))
+                        if verbose:
+                            print(
+                                "INFO   : Detected codeword sequence: {}".format(codewords))
+                        valid_sequence = False
+                        break
+                    else:
+                        index = expected_sequence.index(codeword)
+                else:
+                    last_index = index
+                    index = (index + 1) % len(expected_sequence)
+                    if codeword != expected_sequence[index]:
+                        if verbose:
+                            print("WARNING: Codeword {} with value {} not expected to follow codeword {} in expected sequence {}!".format(
+                                n, codeword, expected_sequence[last_index], expected_sequence))
+                        if verbose:
+                            print(
+                                "INFO   : Detected codeword sequence: {}".format(codewords))
+                        valid_sequence = False
+                        break
+
+            # If we get to this point the delay is valid
+            if valid_sequence:
+                valid_delays.append(delay)
+
+        if verbose:
+            print("INFO   : Found valid delays of {}".format(list(valid_delays)))
+        return set(valid_delays)
+
+    def _set_dio_delay(self, awg, strb_mask, data_mask, delay):
+        """
+        The function sets the DIO delay for a given FPGA. The valid delay range is
+        0 to 6. The delays are created by either delaying the data bits or the strobe
+        bit. The data_mask input represents all bits that are part of the codeword or
+        the valid bit. The strb_mask input represents the bit that define the strobe.
+        """
+        if delay < 0:
+            print('WARNING: Clamping delay to 0')
+        if delay > 6:
+            print('WARNING: Clamping delay to 6')
+            delay = 6
+
+        strb_delay = 0
+        data_delay = 0
+        if delay > 3:
+            strb_delay = delay-3
+        else:
+            data_delay = 3-delay
+
+        for i in range(32):
+            self._dev.seti('awgs/{}/dio/delay/index'.format(awg), i)
+            if strb_mask & (1 << i):
+                self._dev.seti(
+                    'awgs/{}/dio/delay/value'.format(awg), strb_delay)
+            elif data_mask & (1 << i):
+                self._dev.seti(
+                    'awgs/{}/dio/delay/value'.format(awg), data_delay)
+            else:
+                self._dev.seti('awgs/{}/dio/delay/value'.format(awg), 0)
+
+    def ensure_symmetric_strobe(self, verbose=False):
+        done = False
+        good_shots = 0
+        bad_shots = 0
+        strb_bits = []
+        for awg in range(0, 4):
+            strb_bits.append(self._dev.geti(
+                'awgs/{}/dio/strobe/index'.format(awg)))
+        strb_bits = list(set(strb_bits))
+        if verbose:
+            print('INFO   : Analyzing strobe bits {}'.format(strb_bits))
+
+        while not done:
+            data = self._dev.getv('raw/dios/0/data')
+            if _is_dio_strb_symmetric(data, strb_bits):
+                if verbose:
+                    print('INFO   : Found good shot')
+                bad_shots = 0
+                good_shots += 1
+                if good_shots > 5:
+                    done = True
+            else:
+                if verbose:
+                    print('INFO   : Strobe bit(s) are not sampled symmetrically')
+                if verbose:
+                    print("INFO   :   Disabling AWG's")
+                enables = 4*[0]
+                for awg in range(0, 4):
+                    enables[awg] = self._dev.geti('awgs/{}/enable'.format(awg))
+                    self._dev.seti('awgs/{}/enable'.format(awg), 0)
+                if verbose:
+                    print("INFO   :   Switching to internal clock")
+                self.system_clocks_referenceclock_source(0)
+                time.sleep(5)
+                if verbose:
+                    print("INFO   :   Switching to external clock")
+                self.system_clocks_referenceclock_source(1)
+                time.sleep(5)
+                if verbose:
+                    print("INFO   :   Enabling AWG's")
+                for awg in range(0, 4):
+                    self._dev.seti('awgs/{}/enable'.format(awg), enables[awg])
+                good_shots = 0
+                bad_shots += 1
+                if bad_shots > 5:
+                    done = True
+
+        return (good_shots > 0) and (bad_shots == 0)
+
+    def calibrate_dio_protocol(self, awgs_and_sequences, verbose=False):
+        if verbose:
+            print("INFO   : Calibrating DIO delays")
+
+        if not self.ensure_symmetric_strobe(verbose):
+            if verbose:
+                print("ERROR  : Strobe is not symmetric!")
+            return False
+        else:
+            if verbose:
+                print("INFO   : Strobe is symmetric")
+
+        all_valid_delays = []
+        for awg, sequence in awgs_and_sequences:
+            valid_delays = self._find_valid_delays(awg, sequence, verbose)
+            if valid_delays:
+                all_valid_delays.append(valid_delays)
+            else:
+                if verbose:
+                    print(
+                        "ERROR  : Unable to find valid delays for AWG {}!".format(awg))
+                return False
+
+        # Figure out which delays are valid
+        combined_valid_delays = set.intersection(*all_valid_delays)
+        max_valid_delay = max(combined_valid_delays)
+
+        # Print information
+        if verbose:
+            print("INFO   : Valid delays are {}".format(combined_valid_delays))
+        if verbose:
+            print("INFO   : Setting delay to {}".format(max_valid_delay))
+
+        # And configure the delays
+        for awg, _ in awgs_and_sequences:
+            vld_mask = 1 << self._dev.geti(
+                'awgs/{}/dio/valid/index'.format(awg))
+            strb_mask = 1 << self._dev.geti(
+                'awgs/{}/dio/strobe/index'.format(awg))
+            cw_mask = self._dev.geti('awgs/{}/dio/mask/value'.format(awg))
+            cw_shift = self._dev.geti('awgs/{}/dio/mask/shift'.format(awg))
+            if verbose:
+                print("INFO   : Setting delay of AWG {}".format(awg))
+            self._set_dio_delay(
+                awg, strb_mask,
+                (cw_mask << cw_shift) | vld_mask, max_valid_delay)
+
+        return True
+
+
+##############################################################################
+#
+##############################################################################
+
+
+def _get_edges(value, last_value, mask):
+    """
+    Given two integer values representing a current and a past value,
+    and a bit mask, this function will return two
+    integer values representing the bits with rising (re) and falling (fe)
+    edges.
+    """
+    changed = value ^ last_value
+    re = changed & value & mask
+    fe = changed & ~value & mask
+    return re, fe
+
+
+def _is_dio_strb_symmetric(data, bits):
+    count_ok = True
+
+    for bit in bits:
+        strobe_mask = 1 << bit
+        count_low = False
+        count_high = False
+        strobe_low = 0
+        strobe_high = 0
+        last_strobe = None
+        for n, d in enumerate(data):
+            curr_strobe = (d & strobe_mask) != 0
+
+            if count_high:
+                if curr_strobe:
+                    strobe_high += 1
+                else:
+                    if (strobe_low > 0) and (strobe_low != strobe_high):
+                        count_ok = False
+                        break
+
+            if count_low:
+                if not curr_strobe:
+                    strobe_low += 1
+                else:
+                    if (strobe_high > 0) and (strobe_low != strobe_high):
+                        count_ok = False
+                        break
+
+            if (last_strobe != None):
+                if (curr_strobe and not last_strobe):
+                    strobe_high = 0
+                    count_high = True
+                    count_low = False
+                elif (not curr_strobe and last_strobe):
+                    strobe_low = 0
+                    count_low = True
+                    count_high = False
+
+            last_strobe = curr_strobe
+
+        if not count_ok:
+            break
+
+    return count_ok
+
+
+def _analyze_dio_data(data, strb_mask, strb_slope, vld_mask, vld_polarity, cw_mask, cw_shift):
+    """
+    Analyzes a list of integer values that represent samples recorded on the DIO interface.
+    The function needs information about the protocol used on the DIO interface. Based
+    on this information the function will return two lists: the detected codewords
+    and the positions where 'timing violations' are found. The codewords are sampled
+    according to the protocol configuration. Timing violations occur when a codeword
+    bit or the valid bit changes value at the same time as the strobe signal.
+    """
+    timing_violations = []
+    codewords = []
+    last_d = None
+    for n, d in enumerate(data):
+        if n > 0:
+            strb_re = False
+            strb_fe = False
+            if strb_slope == 0:
+                strb_re = True
+                strb_fe = True
+            elif strb_slope == 1:
+                strb_re, _ = _get_edges(d, last_d, strb_mask)
+            elif strb_slope == 2:
+                _, strb_fe = _get_edges(d, last_d, strb_mask)
+            else:
+                strb_re, strb_fe = _get_edges(d, last_d, strb_mask)
+
+            vld_re = False
+            vld_fe = False
+            if vld_polarity != 0:
+                vld_re, vld_fe = _get_edges(d, last_d, vld_mask)
+
+            d_re = False
+            d_fe = False
+            if cw_mask != 0:
+                d_re, d_fe = _get_edges(d, last_d, cw_mask << cw_shift)
+
+            vld_active = ((vld_polarity & 1) and ((d & vld_mask) == 0)) or (
+                (vld_polarity & 2) and ((d & vld_mask) != 0))
+            codeword = (d >> cw_shift) & cw_mask
+
+            # Check for timing violation on vld
+            if (strb_re or strb_fe) and (vld_re or vld_fe):
+                timing_violations.append(n)
+            elif (strb_re or strb_fe) and (d_re or d_fe):
+                timing_violations.append(n)
+
+            # Get the codewords
+            if (strb_re or strb_fe) and vld_active:
+                codewords.append(codeword)
+
+        last_d = d
+
+    return codewords, timing_violations
