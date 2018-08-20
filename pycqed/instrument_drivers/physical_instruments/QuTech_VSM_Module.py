@@ -50,6 +50,7 @@ from .SCPI import SCPI
 from qcodes.instrument.base import Instrument
 from qcodes import validators
 from qcodes.instrument.parameter import ManualParameter
+from datetime import datetime
 
 
 class QuTechVSMModule(SCPI):
@@ -60,7 +61,9 @@ class QuTechVSMModule(SCPI):
         self.channels = [1, 2, 3, 4]
 
         self.add_parameters()
+        self._sync_time_and_add_parameter()
         self.connect_message()
+
 
     def add_parameters(self):
         self.add_temperature_parameters()
@@ -183,6 +186,18 @@ class QuTechVSMModule(SCPI):
             #                        vals=validators.OnOff())
 
     def add_calibration_parameters(self):
+        # First add a function so a user can poll if calibration data has
+        # been set correctly in the VSM in order to correctly use the
+        # orthogonalized parameters
+        self.add_parameter(
+                            'getCalibrationDataAvailable',
+                            docstring='Use this to check if the calibration data has been '\
+                                      'set correctly in the VSM. Outputs an integer 0 (False), 1 (True)',
+                            get_cmd='CALIBRATIONDATAPATH' + '?',
+                            get_parser=int,
+                            vals=validators.Ints(0,1)
+                        )
+
         # Raw attenuationa and phase
         #  Two input pulses
         for pulse in ('gaussian', 'derivative'):
@@ -277,6 +292,14 @@ class QuTechVSMModule(SCPI):
                                        get_parser=float,
                                        vals=validators.Numbers(-125,45))
 
+    def _sync_time_and_add_parameter(self):
+        doc_description = 'Parameter to sync the time from user computer to VSM'
+        self.add_parameter('sync_time',
+                           docstring=doc_description,
+                           set_cmd='SYSTEM'+':TIME {}',
+                           vals=validators.Strings())
+        current_time_str = datetime.now().strftime('%YT%mT%dT%HT%MT%S')
+        self.sync_time(current_time_str)
 
 
 class Dummy_QuTechVSMModule(QuTechVSMModule):
@@ -293,6 +316,7 @@ class Dummy_QuTechVSMModule(QuTechVSMModule):
         self.add_parameters()
         self._address = 'Dummy'
         self._terminator = '\n'
+        self._sync_time_and_add_parameter()
 
         self.IDN({'driver': str(self.__class__), 'model': self.name,
                   'serial': 'Dummy', 'vendor': '', 'firmware': ''})
