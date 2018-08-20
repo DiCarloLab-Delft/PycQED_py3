@@ -106,7 +106,7 @@ def modZPulse(ax, pos, width=2.5, s=0.1, amp=1.5, sep=1.5, color='C1'):
 
 
 def interval(ax, start, stop, height=1.5, label=None, labelHeight=None,
-             vlines=True, color='k', arrowstyle='<|-|>'):
+             vlines=True, color='k', arrowstyle='<|-|>', **plot_kws):
     '''
     Draw an arrow to indicate an interval.
     '''
@@ -115,12 +115,12 @@ def interval(ax, start, stop, height=1.5, label=None, labelHeight=None,
 
     arrow = matplotlib.patches.FancyArrowPatch(
         posA=(start, height), posB=(stop, height), arrowstyle=arrowstyle,
-        color=color, mutation_scale=7)
+        color=color, mutation_scale=7, **plot_kws)
     ax.add_patch(arrow)
 
     if vlines:
-        ax.plot([start, start], [0, height], '--', color=color)
-        ax.plot([stop, stop], [0, height], '--', color=color)
+        ax.plot([start, start], [0, height], '--', color=color, **plot_kws)
+        ax.plot([stop, stop], [0, height], '--', color=color, **plot_kws)
 
     if label is not None:
         ax.text((start + stop) / 2, labelHeight, label, color=color,
