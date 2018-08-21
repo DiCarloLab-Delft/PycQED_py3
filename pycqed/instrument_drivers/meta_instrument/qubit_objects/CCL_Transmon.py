@@ -1611,13 +1611,16 @@ class CCLight_Transmon(Qubit):
 
         #anharmonicity measurement, bus crossing and photon number splitting with the bus
 
-    def measure_anharmonicity(self, f_01, f_02=None, f_12=None, f_01_power=None, f_12_power=None, MC=None, spec_source_2=None):
+    def measure_anharmonicity(self, f_01, f_02=None, f_12=None, f_01_power=None,
+                                    f_12_power=None, MC=None, spec_source_2=None):
         '''
-        note measures anharmonicity of the transmon using three-tone spectroscopy. two usecases:
-        - provide f_02 from high-power spectroscopy of the 02-transition. It will calculate the 12 transition from it
+        note measures anharmonicity of the transmon using three-tone
+        spectroscopy. two usecases:
+        - provide f_02 from high-power spectroscopy of the 02-transition.
+                                    It will calculate the 12 transition from it
         - provide directly the 1-2 transition
         '''
-        if (f_02 is None) and (f_01 is None):
+        if (f_02 is None) and (f_12 is None):
             raise ValueError("provide either and estimate of f_02 or f_12")
         if f_12==None:    
             f_anharmonicity=(f_01-f_02)*2
@@ -1664,9 +1667,10 @@ class CCLight_Transmon(Qubit):
         spec_source_2.off()
         ma.Three_Tone_Spectroscopy_Analysis(label='Three_tone',  f01=f_01, f12=f_12)
 
-    def measure_photon_nr_splitting_from_bus(self, f_01, f_bus, powers=np.arange(-10,10,1), MC=None, spec_source_2=None):
+    def measure_photon_nr_splitting_from_bus(self, f_bus, freqs_01=None, powers=np.arange(-10,10,1), MC=None, spec_source_2=None):
 
-        freqs_1=np.arange(f_01-60e6 ,f_01+5e6,0.7e6)
+        if freqs_01 is None:
+            freqs_01=np.arange(self.freq_qubit()-60e6 ,self.freq_qubit()+5e6,0.7e6)
 
         self.prepare_for_continuous_wave()
         if MC is None:
@@ -1688,7 +1692,7 @@ class CCLight_Transmon(Qubit):
 
         MC.set_sweep_function(wrap_par_to_swf(
                               spec_source.frequency, retrieve_value=True))
-        MC.set_sweep_points(freqs_1)
+        MC.set_sweep_points(freqs_01)
 
         MC.set_sweep_function_2D(wrap_par_to_swf(
                               spec_source_2.power, retrieve_value=True))
