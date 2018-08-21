@@ -70,6 +70,7 @@ def _rotation_decomposition(ax, angle):
 
 
 def generate_config(filename: str,
+                    qubits_active: list = None,
                     mw_pulse_duration: int = 20,
                     flux_pulse_duration: int = 40,
                     ro_duration: int = 800,
@@ -180,7 +181,7 @@ def generate_config(filename: str,
     )
 
     qubits = ['q0', 'q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7']
-    qubits_active = ['q0', 'q2']
+    qubits_active = qubits_active or ['q0', 'q2']
     flux_tuples = [("q2", "q0"), ("q0", "q2"),
                    ("q0", "q3"), ("q3", "q0"),
                    ("q3", "q1"), ("q1", "q3"),
