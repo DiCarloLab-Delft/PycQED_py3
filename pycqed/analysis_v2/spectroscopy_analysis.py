@@ -13,12 +13,16 @@ from pycqed.analysis.tools import data_manipulation as dm_tools
 from pycqed.analysis import fitting_models as fit_mods
 import lmfit
 
+import importlib
+importlib.reload(ba)
+
+
 class Spectroscopy(ba.BaseDataAnalysis):
 
     def __init__(self, t_start: str,
                  t_stop: str = None,
                  options_dict: dict = None,
-                 label: str = '',
+                 label: str = None,
                  extract_only: bool = False,
                  auto: bool = True,
                  do_fitting: bool = False):
@@ -34,7 +38,7 @@ class Spectroscopy(ba.BaseDataAnalysis):
                             'freq': 'sweep_points',
                             'amp': 'amp',
                             'phase': 'phase'}
-
+        
         self.options_dict.get('xwidth', None)
         # {'xlabel': 'sweep_name',
         # 'xunit': 'sweep_unit',
@@ -124,7 +128,6 @@ class Spectroscopy(ba.BaseDataAnalysis):
                                       'xlabel': proc_data_dict['freq_label'],
                                       'ylabel': proc_data_dict['amp_label'],
                                       'yrange': proc_data_dict['amp_range'],
-                                      'do_legend':True,
                                       'plotsize': plotsize
                                       }
             self.plot_dicts['phase'] = {'plotfn': plot_fn,
@@ -134,7 +137,6 @@ class Spectroscopy(ba.BaseDataAnalysis):
                                         'xlabel': proc_data_dict['freq_label'],
                                         'ylabel': proc_data_dict['phase_label'],
                                         'yrange': proc_data_dict['phase_range'],
-                                        'do_legend':True,
                                         'plotsize': plotsize
                                         }
         else:
@@ -208,7 +210,7 @@ class complex_spectroscopy(Spectroscopy):
         self.proc_data_dict['amp_label'] = 'Transmission amplitude (V rms)'
         self.proc_data_dict['phase_label'] = 'Transmission phase (degrees)'
         if len(self.raw_data_dict['timestamps']) == 1:
-            self.proc_data_dict['plot_phase'] = np.unwrap(self.proc_data_dict['plot_phase'],discont=np.pi)
+            self.proc_data_dict['plot_phase'] = np.unwrap(np.pi / 180. * self.proc_data_dict['plot_phase']) * 180 / np.pi
             self.proc_data_dict['plot_xlabel'] = 'Readout Frequency (Hz)'
         else:
             pass
@@ -216,14 +218,14 @@ class complex_spectroscopy(Spectroscopy):
             self.raw_data_dict['measured_values'][0][2]]
         self.raw_data_dict['imag'] = [
             self.raw_data_dict['measured_values'][0][3]]
-        self.proc_data_dict['real'] = np.array(self.raw_data_dict['real'][0])
-        self.proc_data_dict['imag'] = np.array(self.raw_data_dict['imag'][0])
+        self.proc_data_dict['real'] = self.raw_data_dict['real'][0]
+        self.proc_data_dict['imag'] = self.raw_data_dict['imag'][0]
         self.proc_data_dict['plot_real'] = self.proc_data_dict['real']
         self.proc_data_dict['plot_imag'] = self.proc_data_dict['imag']
         self.proc_data_dict['real_label'] = 'Real{S21} (V rms)'
         self.proc_data_dict['imag_label'] = 'Imag{S21} (V rms)'
         if len(self.raw_data_dict['timestamps']) == 1:
-            self.proc_data_dict['plot_phase'] = np.unwrap(self.proc_data_dict['plot_phase'],discont=np.pi)
+            self.proc_data_dict['plot_phase'] = np.unwrap(np.pi / 180. * self.proc_data_dict['plot_phase']) * 180 / np.pi
             self.proc_data_dict['plot_xlabel'] = 'Frequency (Hz)'
         else:
             pass
@@ -247,9 +249,7 @@ class complex_spectroscopy(Spectroscopy):
                                        'xlabel': proc_data_dict['freq_label'],
                                        'ylabel': proc_data_dict['real_label'],
                                        'yrange': proc_data_dict['amp_range'],
-                                       'setlabel':'real',
-                                       'plotsize': plotsize,
-                                       'do_legend':True
+                                       'plotsize': plotsize
                                        }
             self.plot_dicts['imag'] = {'plotfn': plot_fn,
                                        'xvals': proc_data_dict['plot_frequency'],
@@ -258,9 +258,7 @@ class complex_spectroscopy(Spectroscopy):
                                        'xlabel': proc_data_dict['freq_label'],
                                        'ylabel': proc_data_dict['imag_label'],
                                        'yrange': proc_data_dict['amp_range'],
-                                       'setlabel':'imag',
-                                       'plotsize': plotsize,
-                                       'do_legend':True
+                                       'plotsize': plotsize
                                        }
             pdict_names = ['amp', 'phase', 'real', 'imag']
 
@@ -290,7 +288,7 @@ class VNA_analysis(complex_spectroscopy):
     def __init__(self, t_start,
                  options_dict=None,
                  t_stop=None,
-                 do_fitting=True,
+                 do_fitting=False,
                  extract_only=False,
                  auto=True):
         super(VNA_analysis, self).__init__(t_start, t_stop=t_stop,
@@ -305,46 +303,14 @@ class VNA_analysis(complex_spectroscopy):
     def prepare_plots(self):
         super(VNA_analysis, self).prepare_plots()
         if self.do_fitting:
-            self.plot_dicts['reso_fit_amp'] = {
+            self.plot_dicts['reso_fit'] = {
                 'ax_id': 'amp',
                 'plotfn': self.plot_fit,
                 'fit_res': self.fit_dicts['reso_fit']['fit_res'],
-                'output_mod_fn':np.abs,
                 'plot_init': self.options_dict['plot_init'],
                 'setlabel': 'hanger',
                 'line_kws': {'color': 'r'},
                 'do_legend': True}
-
-            self.plot_dicts['reso_fit_real'] = {
-                'ax_id': 'real',
-                'plotfn': self.plot_fit,
-                'fit_res': self.fit_dicts['reso_fit']['fit_res'],
-                'output_mod_fn':np.real,
-                'plot_init': self.options_dict['plot_init'],
-                'setlabel': 'hanger',
-                'line_kws': {'color': 'r'},
-                'do_legend': True}
-
-            self.plot_dicts['reso_fit_imag'] = {
-                'ax_id': 'imag',
-                'plotfn': self.plot_fit,
-                'fit_res': self.fit_dicts['reso_fit']['fit_res'],
-                'output_mod_fn':np.imag,
-                'plot_init': self.options_dict['plot_init'],
-                'setlabel': 'hanger',
-                'line_kws': {'color': 'r'},
-                'do_legend': True}
-
-            self.plot_dicts['reso_fit_phase'] = {
-                'ax_id': 'phase',
-                'plotfn': self.plot_fit,
-                'fit_res': self.fit_dicts['reso_fit']['fit_res'],
-                'output_mod_fn':lambda a: np.unwrap(np.angle(a)),
-                'plot_init': self.options_dict['plot_init'],
-                'setlabel': 'hanger',
-                'line_kws': {'color': 'r'},
-                'do_legend': True}
-
 
     def prepare_fitting(self):
         # Fitting function for one data trace. The fitted data can be
@@ -376,59 +342,32 @@ class VNA_analysis(complex_spectroscopy):
             fit_fn = fit_mods.Lorentzian
             # TODO LorentzianGuess
         elif fitting_model == 'complex':
-            ## TODO makes something that returns guesspars
+            raise NotImplementedError(
+                'This functions guess function is not coded up yet')
+            # hanger_fit = VNA_analysis(self.timestamps,
+            #                              do_fitting= True,
+            #                              options_dict= {'fit_options':
+            #                                             {'model':'hanger'}},
+            #                              extract_only= True)
+            # hanger_fit_res = hanger_fit.fit_dicts['reso_fit']['fit_res']
+            # complex_guess = hanger_fit_res.best_values
 
-            hanger_fit = VNA_analysis(self.timestamps,
-                                         do_fitting= True,
-                                         options_dict= {'fit_options':
-                                                        {'model':'hanger'}},
-                                         extract_only= True)
-            hanger_fit_res = hanger_fit.fit_dicts['reso_fit']['fit_res']
+            # delta_phase = np.unwrap(self.proc_data_dict['plot_phase'])[-1] - /
+            #               np.unwrap(self.proc_data_dict['plot_phase'])[0]
+            # delta_freq = self.proc_data_dict['plot_frequency'][-1] - /
+            #              self.proc_data_dict['plot_frequency'][0]
+            # phase_v = delta_phase/delta_freq
+            # fit_fn = fit_mods.SlopedHangerFuncComplex2
 
-            complex_guess = {key:{'value':val} for key,val in hanger_fit_res.best_values.items()}
-            complex_guess['f0'] = {'value':complex_guess['f0']['value']*1e9,
-                        'min':self.proc_data_dict['plot_frequency'][0],
-                        'max':self.proc_data_dict['plot_frequency'][-1]}
-            complex_guess['Q'] = {'value':complex_guess['Q']['value'],
-                        'min':complex_guess['Q']['value']*0.5,
-                        'max':complex_guess['Q']['value']*2.}
-
-            '''
-            Here we estimate the phase velocity and the initial phase based
-            on the first and last 5% of data points in the scan
-            '''
-            num_fit_points = int(len(self.proc_data_dict['plot_frequency'])/20.)
-            phase_data = np.hstack([np.unwrap(self.proc_data_dict['plot_phase'])[:num_fit_points],
-                            np.unwrap(self.proc_data_dict['plot_phase'][-num_fit_points:])])
-            freq_data = np.hstack([self.proc_data_dict['plot_frequency'][:num_fit_points],
-                            self.proc_data_dict['plot_frequency'][-num_fit_points:]])
-            lin_pars = np.polyfit(freq_data,phase_data,1)
-            phase_v, phase_0 = lin_pars
-
-            if np.sign(phase_v)==-1:
-                min_phase_v = -1.05*np.abs(phase_v)
-                max_phase_v = -0.95*np.abs(phase_v)
-            else:
-                min_phase_v = 0.95*np.abs(phase_v)
-                max_phase_v = 1.05*np.abs(phase_v)
-            complex_guess['phi_v'] = {'value':phase_v,'min':min_phase_v,
-                                            'max':max_phase_v}
-            complex_guess['phi_0'] = {'value':phase_0%(2*np.pi), 'min':0,
-                                            'max':2*np.pi}
-
-            fit_fn = fit_mods.hanger_func_complex_SI
-
-
+            # TODO HangerFuncComplexGuess
 
         if len(self.raw_data_dict['timestamps']) == 1:
             if fitting_model == 'complex':
-                ### do the initial guess
-                complex_data = np.add(self.proc_data_dict['real'],1.j*self.proc_data_dict['imag'])
                 self.fit_dicts['reso_fit'] = {'fit_fn': fit_fn,
-                                              'guess_dict':complex_guess,
-                                              'fit_yvals': {'data': complex_data},
-                                              'fit_xvals': {'f': self.proc_data_dict['plot_frequency']},
-                                              'fitting_type':'minimize'}
+                                              'fit_guess_fn': fit_guess_fn,
+                                              'fit_yvals': {'data': self.proc_data_dict['plot_amp']},
+                                              'fit_xvals': {'f': self.proc_data_dict['plot_frequency']}
+                                              }
             else:
                 self.fit_dicts['reso_fit'] = {'fit_fn': fit_fn,
                                               'fit_guess_fn': fit_guess_fn,
@@ -467,7 +406,7 @@ class ResonatorSpectroscopy(Spectroscopy):
         self.proc_data_dict['amp_label'] = 'Transmission amplitude (V rms)'
         self.proc_data_dict['phase_label'] = 'Transmission phase (degrees)'
         if len(self.raw_data_dict['timestamps']) == 1:
-            self.proc_data_dict['plot_phase'] = np.unwrap(self.proc_data_dict['plot_phase'],discont=3.141592653589793)
+            self.proc_data_dict['plot_phase'] = np.unwrap(np.pi / 180. * self.proc_data_dict['plot_phase']) * 180 / np.pi
             self.proc_data_dict['plot_xlabel'] = 'Readout Frequency (Hz)'
         else:
             pass
@@ -540,7 +479,7 @@ class ResonatorSpectroscopy(Spectroscopy):
                 fmin = f0 - df
                 fmax = f0 + df
                 indices = np.logical_or(x < fmin * 1e9, x > fmax * 1e9)
-
+                
                 x_filtered.append(x[indices])
                 y_filtered.append(y[indices])
             self.background = pd.concat([pd.Series(y_filtered[tt], index=x_filtered[tt])

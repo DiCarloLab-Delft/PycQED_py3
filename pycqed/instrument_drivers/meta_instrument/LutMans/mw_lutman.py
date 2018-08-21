@@ -494,8 +494,7 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
         self.LutMap(LutMap)
 
     def _add_waveform_parameters(self):
-        super(AWG8_MW_LutMan, self)._add_waveform_parameters()
-        # Base_MW_LutMan._add_waveform_parameters(self)
+        super()._add_waveform_parameters()
         # Parameters for a square pulse
         self.add_parameter('sq_G_amp', unit='frac', vals=vals.Numbers(-1, 1),
                            parameter_class=ManualParameter,
@@ -506,7 +505,7 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
 
     def generate_standard_waveforms(self):
 
-        wave_dict = super(AWG8_MW_LutMan, self).generate_standard_waveforms(
+        wave_dict = super().generate_standard_waveforms(
             apply_predistortion_matrix=False)
         wave_dict['square'] = wf.mod_square_VSM(
             amp_G=self.sq_G_amp(), amp_D=self.sq_D_amp(),

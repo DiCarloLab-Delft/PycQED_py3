@@ -3,8 +3,6 @@ import matplotlib.pyplot as plt
 from scipy.special import erfc
 import lmfit
 import logging
-from pycqed.analysis import analysis_toolbox as a_tools
-from pycqed.analysis.tools import data_manipulation as dm_tools
 
 
 #################################
@@ -312,10 +310,33 @@ def HangerFuncAmplitude(f, f0, Q, Qe, A, theta):
     return abs(A * (1. - Q / Qe * np.exp(1.j * theta) / (1. + 2.j * Q * (f / 1.e9 - f0) / f0)))
 
 
+def HangerFuncComplex(f, pars):
+    '''
+    This is the complex function for a hanger which DOES NOT
+    take into account a possible slope
+    Input:
+        f = frequency
+        pars = parameters dictionary
+               f0, Q, Qe, A, theta, phi_v, phi_0
 
-def hanger_func_complex_SI(f, f0, Q, Qe,
-                           A, theta, phi_v, phi_0,
-                           slope =1):
+    Author: Stefano Poletto
+    '''
+    f0 = pars['f0']
+    Q = pars['Q']
+    Qe = pars['Qe']
+    A = pars['A']
+    theta = pars['theta']
+    phi_v = pars['phi_v']
+    phi_0 = pars['phi_0']
+
+    S21 = A * (1 - Q / Qe * np.exp(1j * theta) / (1 + 2.j * Q * (f / 1.e9 - f0) / f0)) * \
+          np.exp(1j * (phi_v * f + phi_0))
+
+    return S21
+
+def hanger_func_complex_SI(f: float, f0: float, Ql: float, Qe: float,
+                           A: float, theta: float, phi_v: float, phi_0: float,
+                           alpha:float =1):
     '''
     This is the complex function for a hanger (lamda/4 resonator).
     See equation 3.1 of the Asaad master thesis.
@@ -328,41 +349,21 @@ def hanger_func_complex_SI(f, f0, Q, Qe,
         f   : frequency
         f0  : resonance frequency
         A   : background transmission amplitude
-        Q  : loaded quality factor
+        Ql  : loaded quality factor
         Qe  : extrinsic quality factor
         theta:  phase of Qe (in rad)
         phi_v:  phase to account for propagation delay to sample
         phi_0:  phase to account for propagation delay from sample
-        slope:  slope of signal around the resonance
-
-    The complex hanger function that has a list of parameters as input
-    is now called hanger_func_complex_SI_pars
+        alpha:  slope of signal around the resonance
 
     '''
-    slope_corr = (1+slope*(f-f0)/f0)
+    slope_corr = (1+alpha*(f-f0)/f0)
     propagation_delay_corr = np.exp(1j * (phi_v * f + phi_0))
-    hanger_contribution = (1 - Q / Qe * np.exp(1j * theta)/
-                               (1 + 2.j * Q * (f  - f0) / f0))
+    hanger_contribution = (1 - Ql / Qe * np.exp(1j * theta)/
+                               (1 + 2.j * Ql * (f  - f0) / f0))
     S21 = A *  slope_corr * hanger_contribution * propagation_delay_corr
 
     return S21
-
-def hanger_func_complex_SI_pars(f,pars):
-    '''
-    This function is used in the minimization fitting which requires parameters.
-    It calls the function hanger_func_complex_SI, see there for details.
-    '''
-
-    f0 = pars['f0']
-    Ql = pars['Ql']
-    Qe = pars['Qe']
-    A = pars['A']
-    theta = pars['theta']
-    phi_v = pars['phi_v']
-    phi_0 = pars['phi_0']
-    alpha = pars['alpha']
-    return hanger_func_complex_SI(f, f0, Ql, Qe,
-                           A, theta, phi_v, phi_0, alpha)
 
 
 
@@ -372,7 +373,6 @@ def PolyBgHangerFuncAmplitude(f, f0, Q, Qe, A, theta, poly_coeffs):
     # NOT DEBUGGED
     return np.abs((1. + np.polyval(poly_coeffs, (f / 1.e9 - f0) / f0)) *
                   HangerFuncAmplitude(f, f0, Q, Qe, A, theta))
-
 
 
 def SlopedHangerFuncAmplitude(f, f0, Q, Qe, A, theta, slope):
@@ -592,112 +592,6 @@ def exp_dec_guess(model, data, t):
 
     params = model.make_params()
     return params
-
-
-
-def SlopedHangerFuncAmplitudeGuess(data, f, fit_window=None):
-    xvals = f
-    peaks = a_tools.peak_finder(xvals, data)
-      # Search for peak
-    if peaks['dip'] is not None:    # look for dips first
-        f0 = peaks['dip']
-        amplitude_factor = -1.
-    elif peaks['peak'] is not None:  # then look for peaks
-        f0 = peaks['peak']
-        amplitude_factor = 1.
-    else:                                 # Otherwise take center of range
-        f0 = np.median(xvals)
-        amplitude_factor = -1.
-
-    min_index = np.argmin(data)
-    max_index = np.argmax(data)
-    min_frequency = xvals[min_index]
-    max_frequency = xvals[max_index]
-
-    amplitude_guess = max(dm_tools.reject_outliers(data))
-
-    # Creating parameters and estimations
-    S21min = (min(dm_tools.reject_outliers(data)) /
-              max(dm_tools.reject_outliers(data)))
-
-    Q = f0 / abs(min_frequency - max_frequency)
-
-    Qe = abs(Q / abs(1 - S21min))
-    guess_dict = {'f0': {'value': f0*1e-9,
-                         'min': min(xvals)*1e-9,
-                         'max': max(xvals)*1e-9},
-                  'A': {'value': amplitude_guess},
-                  'Q': {'value': Q,
-                        'min': 1,
-                        'max': 50e6},
-                  'Qe': {'value': Qe,
-                         'min': 1,
-                         'max': 50e6},
-                  'Qi': {'expr': 'abs(1./(1./Q-1./Qe*cos(theta)))',
-                         'vary': False},
-                  'Qc': {'expr': 'Qe/cos(theta)',
-                         'vary': False},
-                  'theta': {'value': 0,
-                            'min': -np.pi/2,
-                            'max': np.pi/2},
-                  'slope': {'value':0,
-                            'vary':True}}
-    return guess_dict
-
-
-
-def hanger_func_complex_SI_Guess(data, f, fit_window=None):
-    ## This is complete garbage, just to get some return value
-    xvals = f
-    abs_data = np.abs(data)
-    peaks = a_tools.peak_finder(xvals, abs_data)
-      # Search for peak
-    if peaks['dip'] is not None:    # look for dips first
-        f0 = peaks['dip']
-        amplitude_factor = -1.
-    elif peaks['peak'] is not None:  # then look for peaks
-        f0 = peaks['peak']
-        amplitude_factor = 1.
-    else:                                 # Otherwise take center of range
-        f0 = np.median(xvals)
-        amplitude_factor = -1.
-
-    min_index = np.argmin(abs_data)
-    max_index = np.argmax(abs_data)
-    min_frequency = xvals[min_index]
-    max_frequency = xvals[max_index]
-
-    amplitude_guess = max(dm_tools.reject_outliers(abs_data))
-
-    # Creating parameters and estimations
-    S21min = (min(dm_tools.reject_outliers(abs_data)) /
-              max(dm_tools.reject_outliers(abs_data)))
-
-    Q = f0 / abs(min_frequency - max_frequency)
-
-    Qe = abs(Q / abs(1 - S21min))
-    guess_dict = {'f0': {'value': f0*1e-9,
-                         'min': min(xvals)*1e-9,
-                         'max': max(xvals)*1e-9},
-                  'A': {'value': amplitude_guess},
-                  'Qe': {'value': Qe,
-                         'min': 1,
-                         'max': 50e6},
-                  'Ql': {'value': Q,
-                         'min': 1,
-                         'max': 50e6},
-                  'theta': {'value': 0,
-                            'min': -np.pi/2,
-                            'max': np.pi/2},
-                  'alpha': {'value':0,
-                            'vary':True},
-                  'phi_0': {'value':0,
-                            'vary':True},
-                  'phi_v': {'value':0,
-                            'vary':True}}
-
-    return guess_dict
-
 
 
 def group_consecutives(vals, step=1):
@@ -1119,7 +1013,7 @@ DoubleExpDampOscModel = lmfit.Model(DoubleExpDampOscFunc)
 HangerAmplitudeModel = lmfit.Model(HangerFuncAmplitude)
 SlopedHangerAmplitudeModel = lmfit.Model(SlopedHangerFuncAmplitude)
 PolyBgHangerAmplitudeModel = lmfit.Model(PolyBgHangerFuncAmplitude)
-HangerComplexModel = lmfit.Model(hanger_func_complex_SI)
+HangerComplexModel = lmfit.Model(HangerFuncComplex)
 SlopedHangerComplexModel = lmfit.Model(SlopedHangerFuncComplex)
 QubitFreqDacModel = lmfit.Model(QubitFreqDac)
 QubitFreqFluxModel = lmfit.Model(QubitFreqFlux)

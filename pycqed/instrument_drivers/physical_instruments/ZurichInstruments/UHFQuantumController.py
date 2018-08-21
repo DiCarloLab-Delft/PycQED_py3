@@ -272,8 +272,8 @@ class UHFQC(Instrument):
         # detect when the measurement is complete, and then manually fetch the results using the 'get'
         # command. Disabling the automatic result readout speeds up the operation a bit, since we avoid
         # sending the same data twice.
-        # self.quex_iavg_readout(0)
-        # self.quex_rl_readout(0)
+        self.quex_iavg_readout(0)
+        self.quex_rl_readout(0)
 
         # The custom firmware will feed through the signals on Signal Input 1 to Signal Output 1 and Signal Input 2 to Signal Output 2
         # when the AWG is OFF. For most practical applications this is not really useful. We, therefore, disable the generation of

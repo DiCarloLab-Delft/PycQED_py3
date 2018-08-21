@@ -111,6 +111,7 @@ class CCL(SCPI):
         if getOperationComplete:
             self.getOperationComplete()
 
+
     def add_standard_parameters(self):
         """
         Function to automatically generate the CC-Light specific functions
@@ -507,9 +508,6 @@ class dummy_CCL(CCL):
 
     def get_idn(self):
         return {'driver': str(self.__class__), 'name': self.name}
-
-    def getOperationComplete(self):
-        return True
 
     def add_standard_parameters(self):
         """

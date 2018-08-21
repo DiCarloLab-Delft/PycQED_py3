@@ -73,6 +73,8 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
                 binned_yvals = np.reshape(
                     a.measured_values[i], (len(bins), -1), order='F')
 
+
+
                 self.raw_data_dict['binned_vals'][val_name] = binned_yvals
                 self.raw_data_dict['cal_pts_zero'][val_name] =\
                     binned_yvals[-6:-4, :].flatten()
@@ -179,16 +181,10 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
             'F', expr='1/d1*((d1-1)*lambda_2+1-L1)', vary=True)
         fit_mod_rb.set_param_hint('eps',
                                   expr='1-(1/d1*((d1-1)*lambda_2+1-L1))')
-        # Only valid for single qubit RB assumption equal error rates
         fit_mod_rb.set_param_hint(
             'F_g', expr='(1/d1*((d1-1)*lambda_2+1-L1))**(1/1.875)')
         fit_mod_rb.set_param_hint(
             'eps_g', expr='1-(1/d1*((d1-1)*lambda_2+1-L1))**(1/1.875)')
-        # Only valid for two qubit RB assumption all error in CZ
-        fit_mod_rb.set_param_hint(
-            'F_cz', expr='(1/d1*((d1-1)*lambda_2+1-L1))**(1/1.5)')
-        fit_mod_rb.set_param_hint(
-            'eps_cz', expr='1-(1/d1*((d1-1)*lambda_2+1-L1))**(1/1.5)')
 
         params = fit_mod_rb.make_params()
         try:
@@ -204,14 +200,13 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
 
             self.fit_res['rb_decay'] = {}
 
+
         fit_mod_rb_simple = lmfit.Model(full_rb_decay, independent_vars='m')
         fit_mod_rb_simple.set_param_hint('A', value=.5, min=0, vary=True)
         fit_mod_rb_simple.set_param_hint('B', value=0, vary=False)
-        fit_mod_rb_simple.set_param_hint(
-            'C', value=.5, min=0, max=1, vary=True)
+        fit_mod_rb_simple.set_param_hint('C', value=.5, min=0, max=1, vary=True)
 
-        fit_mod_rb_simple.set_param_hint(
-            'lambda_1', value=lambda_1, vary=False)
+        fit_mod_rb_simple.set_param_hint('lambda_1', value=lambda_1, vary=False)
         fit_mod_rb_simple.set_param_hint('lambda_2', value=.95, vary=True)
 
         # d1 = dimensionality of computational subspace
@@ -219,18 +214,12 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
         fit_mod_rb_simple.set_param_hint('L1', value=L1, vary=False)
         fit_mod_rb_simple.set_param_hint(
             'F', expr='1/d1*((d1-1)*lambda_2+1-L1)', vary=True)
-        fit_mod_rb_simple.set_param_hint(
-            'eps', expr='1-(1/d1*((d1-1)*lambda_2+1-L1))')
-        # Only valid for single qubit RB assumption equal error rates
+        fit_mod_rb_simple.set_param_hint('eps',
+                                  expr='1-(1/d1*((d1-1)*lambda_2+1-L1))')
         fit_mod_rb_simple.set_param_hint(
             'F_g', expr='(1/d1*((d1-1)*lambda_2+1-L1))**(1/1.875)')
         fit_mod_rb_simple.set_param_hint(
             'eps_g', expr='1-(1/d1*((d1-1)*lambda_2+1-L1))**(1/1.875)')
-        # Only valid for two qubit RB assumption all error in CZ
-        fit_mod_rb_simple.set_param_hint(
-            'F_cz', expr='(1/d1*((d1-1)*lambda_2+1-L1))**(1/1.5)')
-        fit_mod_rb_simple.set_param_hint(
-            'eps_cz', expr='1-(1/d1*((d1-1)*lambda_2+1-L1))**(1/1.5)')
 
         params = fit_mod_rb_simple.make_params()
         try:
@@ -256,9 +245,9 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
         #     r'$\bar{F}$:' + '    {:.3f}'.format(fr_rb_simple.params['F'].value*100)
         #     + r'$\pm$' + '{:.3f}%\n'.format(fr_rb_simple.params['F'].stderr*100))
         text_msg += (
-            r'$\epsilon$:' +
-            '    {:.4f}'.format(fr_rb_simple.params['eps'].value)
+            r'$\epsilon$:' + '    {:.4f}'.format(fr_rb_simple.params['eps'].value)
             + r'$\pm$' + '{:.4f}\n'.format(fr_rb_simple.params['eps'].stderr))
+
 
         text_msg += (
             r'$\epsilon_{X_1}$:' + '  {:.4f}'.format(fr_rb.params['eps'].value)
@@ -390,6 +379,8 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
             'do_legend': True,
             'color': 'C2',
         }
+
+
 
         self.plot_dicts['rb_text'] = {
             'plotfn': self.plot_text,
@@ -589,6 +580,7 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
             'title': ' {}'.format(val_name_q1),
             'ax_id': 'rb_pops_q1'}
 
+
         self.plot_dicts['cal_points_hexbin_q0'] = {
             'plotfn': plot_cal_points_hexbin,
             'shots_0': (self.proc_data_dict['cal_pts_x0'][val_names[0]],
@@ -647,7 +639,7 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
             'fit_res': self.fit_res['leakage_decay'],
             'setlabel': 'Leakage fit',
             'do_legend': True,
-            'color': 'C2',
+            'color':'C2',
         }
         self.plot_dicts['fit_rb_simple'] = {
             'plotfn': self.plot_fit,
@@ -662,7 +654,7 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
             'fit_res': self.fit_res['rb_decay'],
             'setlabel': 'Full RB fit',
             'do_legend': True,
-            'color': 'C2',
+            'color':'C2',
         }
 
         self.plot_dicts['rb_text'] = {
@@ -670,7 +662,6 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
             'text_string': self.proc_data_dict['rb_msg'],
             'xpos': 1.05, 'ypos': .6, 'ax_id': 'main_rb_decay',
             'horizontalalignment': 'left'}
-
 
 def plot_cal_points_hexbin(shots_0,
                            shots_1,
@@ -799,6 +790,7 @@ def logisticreg_classifier_machinelearning(shots_0, shots_1, shots_2):
     shots_2 = np.array(list(
         zip(list(shots_2.values())[0],
             list(shots_2.values())[1])))
+
 
     shots_0 = shots_0[~np.isnan(shots_0[:, 0])]
     shots_1 = shots_1[~np.isnan(shots_1[:, 0])]

@@ -184,4 +184,4 @@ class Test_Conditional_Oscillation_Analysis(unittest.TestCase):
              0.4883159957574066,
              0.0084430446197739737])
 
-        np.testing.assert_almost_equal(extracted, expected, decimal=3)
+        np.testing.assert_almost_equal(extracted, expected)

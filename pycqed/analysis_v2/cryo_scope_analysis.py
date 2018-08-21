@@ -137,9 +137,9 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
             derivative_window_length: float=5e-9,
             norm_window_size: int=31,
             nyquist_order: int =0,
-            ch_amp_key: str='Snapshot/instruments/AWG8_8005'
+            ch_amp_key: str='Snapshot/instruments/AWG8_8027'
         '/parameters/awgs_0_outputs_1_amplitude',
-            ch_range_key: str='Snapshot/instruments/AWG8_8005'
+            ch_range_key: str='Snapshot/instruments/AWG8_8027'
         '/parameters/sigouts_0_range',
             polycoeffs_freq_conv: Union[list, str] =
         'Snapshot/instruments/FL_LutMan_QR/parameters/polycoeffs_freq_conv/value',
@@ -271,6 +271,7 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
             'plotfn': self.ca.plot_short_time_fft,
             'title': self.timestamp+'\nShort time Fourier Transform'}
 
+
         self.plot_dicts['zoomed_cryoscope_amplitude'] = {
             'plotfn': make_zoomed_cryoscope_fig,
             't': self.ca.time,
@@ -282,8 +283,7 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
     """
     Analysis for the sliding pulses experiment.
 
-    For noise reasons this is expected to be acquired as a TwoD in a
-    single experiment.
+    For noise reasons this is expected to be acquired as a TwoD in a single experiment.
     There exist two variant
         TwoD -> single experiment
         multiple 1D -> combination of several linescans
@@ -295,10 +295,10 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
                  options_dict: dict=None,
                  sliding_pulse_duration=220e-9,
                  freq_to_amp=None, amp_to_freq=None,
-                 phase_cut: float=0,
-                 ch_amp_key: str='Snapshot/instruments/AWG8_8005'
+                 phase_cut :float=0,
+                 ch_amp_key: str='Snapshot/instruments/AWG8_8027'
                  '/parameters/awgs_0_outputs_1_amplitude',
-                 ch_range_key: str='Snapshot/instruments/AWG8_8005'
+                 ch_range_key: str='Snapshot/instruments/AWG8_8027'
                  '/parameters/sigouts_0_range',
                  waveform_amp_key: str='Snapshot/instruments/FL_LutMan_QR'
                  '/parameters/sq_amp',
@@ -308,6 +308,7 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
             options_dict = dict()
         super().__init__(t_start=t_start, t_stop=t_stop, label=label,
                          options_dict=options_dict, close_figs=close_figs)
+
 
         self.ch_amp_key = ch_amp_key
         # ch_range_keycan also be set to `None`, then the value will
@@ -345,6 +346,7 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
         waveform_amp = a.data_file[self.waveform_amp_key].attrs['value']
         amp = ch_amp*ch_range/2*waveform_amp
 
+
         self.raw_data_dict['amp'] = amp
         self.raw_data_dict['phases'] = a.measured_values[0]
         self.raw_data_dict['times'] = a.sweep_points
@@ -355,8 +357,8 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
         a.finish()
 
     def process_data(self):
-        phi_cut = self.phase_cut
-        phases_shifted = (self.raw_data_dict['phases']+phi_cut) % 360-phi_cut
+        phi_cut=self.phase_cut
+        phases_shifted = (self.raw_data_dict['phases']+phi_cut)%360-phi_cut
 
         phase = np.nanmean(np.unwrap(phases_shifted[::-1],
                                      discont=0, axis=1)[::-1], axis=1)
@@ -447,6 +449,7 @@ def make_amp_err_plot(t, amp, timestamp, ax=None, **kw):
     set_ylabel(ax, 'Normalized Amplitude')
 
 
+
 def make_zoomed_cryoscope_fig(t, amp, title, ax=None, **kw):
 
     # x = ca.time
@@ -456,11 +459,11 @@ def make_zoomed_cryoscope_fig(t, amp, title, ax=None, **kw):
     gc = np.mean(y[len(y)//5:4*len(y)//5])
 
     if ax is not None:
-        ax = ax
-        f = plt.gcf()
+        ax=ax
+        f=plt.gcf()
     else:
         f, ax = plt.subplots()
-    ax.plot(x, y/gc,  label='Signal')
+    ax.plot(x,y/gc,  label='Signal')
     ax.axhline(1.01, ls='--', c='grey', label=r'$\pm$1%')
     ax.axhline(0.99, ls='--', c='grey')
     ax.axhline(1.0, ls='-', c='grey', linewidth=.5)
@@ -475,12 +478,12 @@ def make_zoomed_cryoscope_fig(t, amp, title, ax=None, **kw):
 
     # Create a set of inset Axes: these should fill the bounding box allocated to
     # them.
-    ax2 = plt.axes([0, 0, 1, 1])
+    ax2 = plt.axes([0,0,1,1])
     # Manually set the position and relative size of the inset axes within ax1
     ip = InsetPosition(ax, [.29, .14, 0.65, .4])
     ax2.set_axes_locator(ip)
 
-    mark_inset(ax, ax2, 1, 3, color='grey')
+    mark_inset(ax, ax2, 1,3, color='grey')
     ax2.axhline(1.0, ls='-', c='grey', linewidth=.5)
     ax2.axhline(1.01, ls='--', c='grey', label=r'$\pm$1%')
     ax2.axhline(0.99, ls='--', c='grey')
@@ -488,7 +491,7 @@ def make_zoomed_cryoscope_fig(t, amp, title, ax=None, **kw):
     ax2.axhline(0.999, ls=':', c='grey')
     ax2.plot(x, y/gc, '-')
 
-    formatter = ticker.FuncFormatter(lambda x, pos: round(x*1e9, 3))
+    formatter = ticker.FuncFormatter(lambda x, pos: round(x*1e9,3))
     ax2.xaxis.set_major_formatter(formatter)
 
     ax2.set_ylim(0.998, 1.002)
@@ -497,3 +500,4 @@ def make_zoomed_cryoscope_fig(t, amp, title, ax=None, **kw):
 
     ax.set_title(title)
     ax.text(.02, .93, '(a)', color='black', transform=ax.transAxes)
+

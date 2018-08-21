@@ -3668,7 +3668,7 @@ class SSRO_Analysis(MeasurementAnalysis):
 
         axarray[0].set_title('2D histogram, pi pulse')
         im1 = axarray[0].imshow(np.transpose(H1), interpolation='nearest',
-                                origin='low', aspect='auto',
+                                origin='low',
                                 extent=[xedges1[0], xedges1[-1],
                                         yedges1[0], yedges1[-1]], cmap=cmap)
 
@@ -3684,7 +3684,7 @@ class SSRO_Analysis(MeasurementAnalysis):
         # plotting 2D histograms of mmts with no pulse
         axarray[1].set_title('2D histogram, no pi pulse')
         im0 = axarray[1].imshow(np.transpose(H0), interpolation='nearest',
-                                origin='low', aspect='auto',
+                                origin='low',
                                 extent=[xedges0[0], xedges0[-1], yedges0[0],
                                         yedges0[-1]], cmap=cmap)
 

@@ -47,7 +47,7 @@ class DecouplingAnalysis:
 
         # extracts the data
         for i, q_label in enumerate(self.qubit_scan_labels):
-            opt_dict = {'scan_label': '_spectroscopy_'+q_label,
+            opt_dict = {'scan_label': '__qubit_'+q_label,
                        'exact_label_match':True}
 
             self.spec_scans[i] = RA.quick_analysis(t_start=self.scan_start,
