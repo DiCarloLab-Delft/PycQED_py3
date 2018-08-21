@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.colors as col
 import hsluv
 
+
 def set_xlabel(axis, label, unit=None, **kw):
     """
     Takes in an axis object and add a unit aware label to it.
@@ -61,12 +62,13 @@ def set_ylabel(axis, label, unit=None, **kw):
     return axis
 
 
+SI_PREFIXES = dict(zip(range(-24, 25, 3), 'yzafpnμm kMGTPEZY'))
+SI_PREFIXES[0] = ""
 
-SI_PREFIXES_2 = dict(zip(range(-24, 25, 3), 'yzafpnμm kMGTPEZY'))
-# SI_PREFIXES_2[0] = ""
-#SI_PREFIXES = 'yzafpnμm kMGTPEZY'
+# N.B. not all of these are SI units, however, all of these support SI prefixes
+SI_UNITS = 'm,s,g,W,J,V,A,F,T,Hz,Ohm,S,N,C,px,b,B,K,Bar,Vpeak,Vpp,Vp,Vrms'.split(
+    ',')
 
-SI_UNITS = 'm,s,g,W,J,V,A,F,T,Hz,Ohm,S,N,C,px,b,B,K,Bar,Vpeak,Vpp,Vp,Vrms'.split(',')
 
 def SI_prefix_and_scale_factor(val, unit=None):
     """
@@ -84,7 +86,12 @@ def SI_prefix_and_scale_factor(val, unit=None):
         try:
             with np.errstate(all="ignore"):
                 prefix_power = np.log10(abs(val))//3 * 3
-            return 10 ** -prefix_power, SI_PREFIXES_2[prefix_power] + unit
+                prefix = SI_PREFIXES[prefix_power]
+                # Greek symbols not supported in tex
+                if plt.rcParams['text.usetex'] and prefix == 'μ':
+                    prefix = r'$\mu$'
+
+            return 10 ** -prefix_power,  prefix + unit
         except (KeyError, TypeError):
             pass
 
@@ -276,7 +283,6 @@ def flex_colormesh_plot_vs_xy(xvals, yvals, zvals, ax=None,
     xvals = np.array(xvals)
     yvals = np.array(yvals)
 
-
     # First, we need to sort the data as otherwise we get odd plotting
     # artefacts. An example is e.g., plotting a fourier transform
     sorted_x_arguments = xvals.argsort()
@@ -346,7 +352,6 @@ def autolabel_barplot(ax, rects, rotation=90):
                 ha='center', va='bottom', rotation=rotation)
 
 
-
 def set_axeslabel_color(ax, color):
     '''
     Ad hoc function to set the labels, ticks, ticklabels and title to a color.
@@ -361,8 +366,7 @@ def set_axeslabel_color(ax, color):
     plt.setp(ax.title, color=color)
 
 
-
-##### generate custom colormaps
+# generate custom colormaps
 def make_segmented_cmap():
     white = '#ffffff'
     black = '#000000'
@@ -372,21 +376,24 @@ def make_segmented_cmap():
         'anglemap', [black, red, white, blue, black], N=256, gamma=1)
     return anglemap
 
-def make_anglemap( N = 256, use_hpl = True ):
-    h = np.ones(N) # hue
-    h[:N//2] = 11.6 # red
-    h[N//2:] = 258.6 # blue
-    s = 100 # saturation
-    l = np.linspace(0, 100, N//2) # luminosity
-    l = np.hstack( (l,l[::-1] ) )
 
-    colorlist = np.zeros((N,3))
+def make_anglemap(N=256, use_hpl=True):
+    h = np.ones(N)  # hue
+    h[:N//2] = 11.6  # red
+    h[N//2:] = 258.6  # blue
+    s = 100  # saturation
+    l = np.linspace(0, 100, N//2)  # luminosity
+    l = np.hstack((l, l[::-1]))
+
+    colorlist = np.zeros((N, 3))
     for ii in range(N):
         if use_hpl:
-            colorlist[ii,:] = hsluv.hpluv_to_rgb( (h[ii], s, l[ii]) )
+            colorlist[ii, :] = hsluv.hpluv_to_rgb((h[ii], s, l[ii]))
         else:
-            colorlist[ii,:] = hsluv.hsluv_to_rgb( (h[ii], s, l[ii]) )
-    colorlist[colorlist > 1] = 1 # correct numeric errors
+            colorlist[ii, :] = hsluv.hsluv_to_rgb((h[ii], s, l[ii]))
+    colorlist[colorlist > 1] = 1  # correct numeric errors
     colorlist[colorlist < 0] = 0
-    return col.ListedColormap( colorlist )
-hsluv_anglemap = make_anglemap( use_hpl = False )
+    return col.ListedColormap(colorlist)
+
+
+hsluv_anglemap = make_anglemap(use_hpl=False)

@@ -29,7 +29,7 @@ def new_pulse_subplot(fig, *args, **kwargs):
 
 
 def mwPulse(ax, pos, width=1.5, amp=1, label=None, phase=0, labelHeight=1.3,
-            color='C0', modulation='normal'):
+            color='C0', modulation='normal', **plot_kws):
     '''
     Draw a microwave pulse: Gaussian envelope with modulation.
     '''
@@ -44,19 +44,19 @@ def mwPulse(ax, pos, width=1.5, amp=1, label=None, phase=0, labelHeight=1.3,
     else:
         raise ValueError()
 
-    ax.plot(x, envPos, '--', color=color)
-    ax.plot(x, envNeg, '--', color=color)
-    ax.plot(x, mod, '-', color=color)
+    ax.plot(x, envPos, '--', color=color, **plot_kws)
+    ax.plot(x, envNeg, '--', color=color, **plot_kws)
+    ax.plot(x, mod, '-', color=color, **plot_kws)
 
     if label is not None:
         ax.text(pos + width / 2, labelHeight, label,
-                horizontalalignment='center', color=color)
+                horizontalalignment='right', color=color)
 
     return pos + width
 
 
 def fluxPulse(ax, pos, width=2.5, s=.1, amp=1.5, label=None, labelHeight=1.7,
-              color='C1'):
+              color='C1', **plot_kws):
     '''
     Draw a smooth flux pulse, where the rising and falling edges are given by
     Fermi-Dirac functions.
@@ -67,7 +67,7 @@ def fluxPulse(ax, pos, width=2.5, s=.1, amp=1.5, label=None, labelHeight=1.7,
                (np.exp((x - (pos + width - 5.5 * s)) / s) + 1))
 
     ax.fill_between(x, y, color=color, alpha=0.3)
-    ax.plot(x, y, color=color)
+    ax.plot(x, y, color=color, **plot_kws)
 
     if label is not None:
         ax.text(pos + width / 2, labelHeight, label,
@@ -106,7 +106,7 @@ def modZPulse(ax, pos, width=2.5, s=0.1, amp=1.5, sep=1.5, color='C1'):
 
 
 def interval(ax, start, stop, height=1.5, label=None, labelHeight=None,
-             vlines=True, color='k', arrowstyle='<|-|>'):
+             vlines=True, color='k', arrowstyle='<|-|>', **plot_kws):
     '''
     Draw an arrow to indicate an interval.
     '''
@@ -115,12 +115,12 @@ def interval(ax, start, stop, height=1.5, label=None, labelHeight=None,
 
     arrow = matplotlib.patches.FancyArrowPatch(
         posA=(start, height), posB=(stop, height), arrowstyle=arrowstyle,
-        color=color, mutation_scale=7)
+        color=color, mutation_scale=7, **plot_kws)
     ax.add_patch(arrow)
 
     if vlines:
-        ax.plot([start, start], [0, height], '--', color=color)
-        ax.plot([stop, stop], [0, height], '--', color=color)
+        ax.plot([start, start], [0, height], '--', color=color, **plot_kws)
+        ax.plot([stop, stop], [0, height], '--', color=color, **plot_kws)
 
     if label is not None:
         ax.text((start + stop) / 2, labelHeight, label, color=color,
