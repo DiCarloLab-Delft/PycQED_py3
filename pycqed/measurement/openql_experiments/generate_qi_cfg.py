@@ -79,7 +79,11 @@ def generate_config(filename: str,
                     ro_latency: int = 0,
                     mw_latency: int = 0,
                     fl_latency: int = 0,
-                    init_duration: int = 200000):
+                    init_duration: int = 200000,
+                    simulation_t1=3e7,
+                    simulation_t2=1e7,
+                    simulation_frac1_0=0.0001,
+                    simulation_frac1_1=0.9999):
     """
     Generates a configuration file for OpenQL for use with the CCLight.
     Args:
@@ -175,7 +179,7 @@ def generate_config(filename: str,
         decompositions_aliases
     )
 
-    # qubits = ['q0', 'q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7']
+    qubits = ['q0', 'q1', 'q2', 'q3', 'q4', 'q5', 'q6', 'q7']
     qubits_active = ['q0', 'q2']
     flux_tuples = [("q2", "q0"), ("q0", "q2"),
                    ("q0", "q3"), ("q3", "q0"),
@@ -429,6 +433,16 @@ def generate_config(filename: str,
                     "cc_light_left_codeword": cw_flux,
                     "cc_light_opcode": 128+cw_flux
                 }
+
+    cfg['simulation_settings'] = {'error_models': {}}
+    for qubit in qubits:
+        cfg['simulation_settings']['error_models'][qubit] = {
+            'error_model': 't1t2',
+            't1': simulation_t1,
+            't2': simulation_t2,
+            'frac1_0': simulation_frac1_0,
+            'frac1_1': simulation_frac1_1,
+        }
 
     with open(filename, 'w') as f:
         json.dump(cfg, f, indent=4)
