@@ -562,6 +562,8 @@ class DeviceCCL(Instrument):
 
     def measure_conditional_oscillation(self, q0: str, q1: str,
                                         prepare_for_timedomain=True, MC=None,
+                                        CZ_disabled: bool=False,
+                                        CZ_duration: int=260,
                                         wait_time_ns: int=0,
                                         label='',
                                         flux_codeword='fl_cw_01',
@@ -595,7 +597,7 @@ class DeviceCCL(Instrument):
             flux_codeword=flux_codeword,
             nr_of_repeated_gates=nr_of_repeated_gates,
             fixed_max_nr_of_repeated_gates=fixed_max_nr_of_repeated_gates,
-            CZ_disabled=False)
+            CZ_disabled=CZ_disabled, CZ_duration=CZ_duration)
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr(),
                              parameter_name='Phase', unit='deg')
