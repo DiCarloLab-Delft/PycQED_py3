@@ -1094,14 +1094,14 @@ class CCLight_Transmon(Qubit):
         print('CCL program is running. Parameter "mw_vsm_delay" can now be '
               'calibrated by hand.')
 
-    def calibrate_motzoi(self, MC=None, verbose=True, update=True):
+    def calibrate_motzoi(self, MC=None, verbose=True, update=True, motzois=None):
         """
         Calibrates the motzoi VSM amplitude prameter
         """
         using_VSM = self.cfg_with_vsm()
-        if using_VSM:
+        if using_VSM and motzois is None:
             motzois = gen_sweep_pts(start=0.2, stop=2.0, num=31)
-        else:
+        elif motzois is None:
             motzois = gen_sweep_pts(center=0, span=.3, num=31)
 
         # large range
