@@ -1519,7 +1519,7 @@ class CCLight_Transmon(Qubit):
         else:
             # Assume the flux is controlled using an SPI rack
             fluxcontrol = self.instr_FluxCtrl.get_instr()
-            dac_par = fluxcontrol.parameters[(self.cfg_dc_flux_ch())]
+            dac_par =  fluxcontrol.parameters[(self.cfg_dc_flux_ch())]
 
         MC.set_sweep_function_2D(dac_par)
         MC.set_sweep_points_2D(dac_values)
@@ -1531,7 +1531,9 @@ class CCLight_Transmon(Qubit):
 
     def measure_qubit_frequency_dac_scan(self, freqs, dac_values,
                                          pulsed=True, MC=None,
-                                         analyze=True, fluxChan=None, close_fig=True):
+                                         analyze=True, fluxChan=None, close_fig=True,
+                                         nested_resonator_calibration=False,
+                                         resonator_freqs=None):
         if not pulsed:
             logging.warning('CCL transmon can only perform '
                             'pulsed spectrocsopy')
@@ -1562,6 +1564,10 @@ class CCLight_Transmon(Qubit):
         spec_source.on()
         MC.set_sweep_function(spec_source.frequency)
         MC.set_sweep_points(freqs)
+        if nested_resonator_calibration:
+            dac_par = swf.Nested_resonator_tracker(qubit=self, 
+                nested_MC=self.instr_nested_MC.get_instr(), freqs=resonator_freqs,
+                par=dac_par)
         MC.set_sweep_function_2D(dac_par)
         MC.set_sweep_points_2D(dac_values)
         self.int_avg_det_single._set_real_imag(False)
