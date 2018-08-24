@@ -110,15 +110,15 @@ class LinDistortionKernel(Instrument):
                     if ('real-time' in filt.keys() and filt['real-time']):
                         AWG = self.instr_AWG.get_instr()
 
-                        AWG.set('sigouts_{}_compensations_exponentials'
+                        AWG.set('sigouts_{}_precompensation_exponentials'
                                 '_{}_timeconstant'.format(
                                     self.cfg_awg_channel()-1, nr_real_time_exp_models),
                                 filt['params']['tau'])
-                        AWG.set('sigouts_{}_compensations_exponentials'
+                        AWG.set('sigouts_{}_precompensation_exponentials'
                                 '_{}_amplitude'.format(
                                     self.cfg_awg_channel()-1, nr_real_time_exp_models),
                                 filt['params']['amp'])
-                        AWG.set('sigouts_{}_compensations_exponentials'
+                        AWG.set('sigouts_{}_precompensation_exponentials'
                                 '_{}_enable'.format(self.cfg_awg_channel()-1,
                                                     nr_real_time_exp_models),
                                 1)
@@ -135,15 +135,15 @@ class LinDistortionKernel(Instrument):
                     if ('real-time' in filt.keys() and filt['real-time']):
                         AWG = self.instr_AWG.get_instr()
 
-                        AWG.set('sigouts_{}_compensations_bounces'
+                        AWG.set('sigouts_{}_precompensation_bounces'
                                 '_{}_delay'.format(
                                     self.cfg_awg_channel()-1, nr_real_time_bounce_models),
                                 filt['params']['tau'])
-                        AWG.set('sigouts_{}_compensations_bounces'
+                        AWG.set('sigouts_{}_precompensation_bounces'
                                 '_{}_amplitude'.format(
                                     self.cfg_awg_channel()-1, nr_real_time_bounce_models),
                                 filt['params']['amp'])
-                        AWG.set('sigouts_{}_compensations_bounces'
+                        AWG.set('sigouts_{}_precompensation_bounces'
                                 '_{}_enable'.format(self.cfg_awg_channel()-1,
                                                     nr_real_time_bounce_models),
                                 1)
