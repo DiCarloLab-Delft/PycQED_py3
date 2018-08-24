@@ -196,31 +196,37 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
         self.raw_data_dict['amps'] = []
         self.raw_data_dict['data'] = []
 
-        a = ma_old.MeasurementAnalysis(
-            timestamp=self.timestamp, auto=False, close_file=False)
-        a.get_naming_and_values()
+        for i, timestamp in enumerate(self.timestamps):
+            a = ma_old.MeasurementAnalysis(
+                timestamp=timestamp, auto=False, close_file=False)
+            a.get_naming_and_values()
+            if i == 0:
+                ch_amp = a.data_file[self.ch_amp_key].attrs['value']
+                if self.ch_range_key is None:
+                    ch_range = 2  # corresponds to a scale factor of 1
+                else:
+                    ch_range = a.data_file[self.ch_range_key].attrs['value']
+                amp = ch_amp*ch_range/2
+                # read conversion polynomial from the datafile if not provided as input
+                if isinstance(self.polycoeffs_freq_conv, str):
+                    self.polycoeffs_freq_conv = np.array(
+                        a.data_file[self.polycoeffs_freq_conv])
+                    print(np.array(self.polycoeffs_freq_conv))
 
-        ch_amp = a.data_file[self.ch_amp_key].attrs['value']
-        if self.ch_range_key is None:
-            ch_range = 2  # corresponds to a scale factor of 1
-        else:
-            ch_range = a.data_file[self.ch_range_key].attrs['value']
-        amp = ch_amp*ch_range/2
-        # amp = ch_amp
+                self.raw_data_dict['data'] =\
+                    a.measured_values[self.ch_idx_cos] + \
+                    1j * a.measured_values[self.ch_idx_sin]
 
-        # read conversion polynomial from the datafile if not provided as input
-        if isinstance(self.polycoeffs_freq_conv, str):
-            self.polycoeffs_freq_conv = np.array(
-                a.data_file[self.polycoeffs_freq_conv])
-            print(np.array(self.polycoeffs_freq_conv))
+                # hacky but required for data saving
+                self.raw_data_dict['folder'] = a.folder
+                self.raw_data_dict['amps'].append(amp)
 
-        self.raw_data_dict['data'] = a.measured_values[self.ch_idx_cos] + 1j * \
-            a.measured_values[self.ch_idx_sin]
-
-        # hacky but required for data saving
-        self.raw_data_dict['folder'] = a.folder
-        self.raw_data_dict['amps'].append(amp)
-        a.finish()
+            else:
+                # If multiple datasets are used, shapes must match
+                self.raw_data_dict['data'] +=\
+                    a.measured_values[self.ch_idx_cos] + \
+                    1j * a.measured_values[self.ch_idx_sin]
+            a.finish()
 
         self.raw_data_dict['times'] = a.sweep_points
         self.raw_data_dict['timestamps'] = self.timestamps
@@ -243,39 +249,44 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
 
     def prepare_plots(self):
         # pass
+        if len(self.timestamps)>1:
+            t_stamp_id = '{}-{}'.format(self.timestamps[0], self.timestamps[1])
+        else:
+            t_stamp_id = self.timestamps[0]
+
         self.plot_dicts['raw_data'] = {
             'plotfn': self.ca.plot_raw_data,
-            'title': self.timestamp+'\nRaw cryoscope data'}
+            'title': t_stamp_id+'\nRaw cryoscope data'}
 
         self.plot_dicts['demod_data'] = {
             'plotfn': self.ca.plot_demodulated_data,
-            'title': self.timestamp+'\nDemodulated data'}
+            'title': t_stamp_id+'\nDemodulated data'}
 
         self.plot_dicts['norm_data_circ'] = {
             'plotfn': self.ca.plot_normalized_data_circle,
-            'title': self.timestamp+'\nNormalized cryoscope data'}
+            'title': t_stamp_id+'\nNormalized cryoscope data'}
 
         self.plot_dicts['demod_phase'] = {
             'plotfn': self.ca.plot_phase,
-            'title': self.timestamp+'\nDemodulated phase'}
+            'title': t_stamp_id+'\nDemodulated phase'}
 
         self.plot_dicts['frequency_detuning'] = {
             'plotfn': self.ca.plot_frequency,
-            'title': self.timestamp+'\nDetuning frequency'}
+            'title': t_stamp_id+'\nDetuning frequency'}
 
         self.plot_dicts['cryoscope_amplitude'] = {
             'plotfn': self.ca.plot_amplitude,
-            'title': self.timestamp+'\nCryoscope amplitude'}
+            'title': t_stamp_id+'\nCryoscope amplitude'}
 
         self.plot_dicts['short_time_fft'] = {
             'plotfn': self.ca.plot_short_time_fft,
-            'title': self.timestamp+'\nShort time Fourier Transform'}
+            'title': t_stamp_id+'\nShort time Fourier Transform'}
 
         self.plot_dicts['zoomed_cryoscope_amplitude'] = {
             'plotfn': make_zoomed_cryoscope_fig,
             't': self.ca.time,
             'amp': self.ca.get_amplitudes(),
-            'title': self.timestamp+'\n Zoomed cryoscope amplitude'}
+            'title': t_stamp_id+'\n Zoomed cryoscope amplitude'}
 
 
 class SlidingPulses_Analysis(ba.BaseDataAnalysis):
