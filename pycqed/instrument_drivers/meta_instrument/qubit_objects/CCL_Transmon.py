@@ -1565,7 +1565,7 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_function(spec_source.frequency)
         MC.set_sweep_points(freqs)
         if nested_resonator_calibration:
-            dac_par = swf.Nested_resonator_tracker(qubit=self, 
+            dac_par = swf.Nested_resonator_tracker(qubit=self,
                 nested_MC=self.instr_nested_MC.get_instr(), freqs=resonator_freqs,
                 par=dac_par)
         MC.set_sweep_function_2D(dac_par)
@@ -1628,7 +1628,7 @@ class CCLight_Transmon(Qubit):
         '''
         if (f_02 is None) and (f_12 is None):
             raise ValueError("provide either and estimate of f_02 or f_12")
-        if f_12==None:    
+        if f_12==None:
             f_anharmonicity=(f_01-f_02)*2
             f_12=f_01-f_anharmonicity
         if f_01_power==None:
@@ -2868,7 +2868,8 @@ class CCLight_Transmon(Qubit):
     def measure_single_qubit_randomized_benchmarking(
             self, nr_cliffords=2**np.arange(12), nr_seeds=100,
             MC=None,
-            recompile: bool ='as needed', prepare_for_timedomain: bool=True):
+            recompile: bool ='as needed', prepare_for_timedomain: bool=True,
+            ignore_f_cal_pts:bool=False):
         """
         Measures randomized benchmarking decay including second excited state
         population.
@@ -2952,7 +2953,7 @@ class CCLight_Transmon(Qubit):
         MC.run('RB_{}seeds'.format(nr_seeds)+self.msmt_suffix,
                exp_metadata={'bins': sweep_points})
 
-        a = ma2.RandomizedBenchmarking_SingleQubit_Analysis(label='RB_')
+        a = ma2.RandomizedBenchmarking_SingleQubit_Analysis(label='RB_', ignore_f_cal_pts=ignore_f_cal_pts)
         return a
 
     def measure_randomized_benchmarking_old(self, nr_cliffords=2**np.arange(12),
