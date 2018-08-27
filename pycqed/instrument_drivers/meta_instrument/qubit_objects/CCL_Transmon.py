@@ -1,7 +1,7 @@
 import time
 import logging
 import numpy as np
-from autodepgraph.graph_v2 import AutoDepGraph_DAG
+from autodepgraph import AutoDepGraph_DAG
 try:
     from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
     import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
@@ -58,6 +58,8 @@ class CCLight_Transmon(Qubit):
         self.add_parameter('instr_LO_mw',
                            parameter_class=InstrumentRefParameter)
         self.add_parameter('instr_spec_source',
+                           parameter_class=InstrumentRefParameter)
+        self.add_parameter('instr_spec_source_2',
                            parameter_class=InstrumentRefParameter)
 
         # Control electronics
@@ -316,6 +318,13 @@ class CCLight_Transmon(Qubit):
                            vals=vals.Numbers(min_value=0, max_value=1.0),
                            parameter_class=ManualParameter)
 
+        self.add_parameter('mw_channel_amp',
+                           label='AWG8 channel amplitude',
+                           unit='',
+                           initial_value=.5,
+                           vals=vals.Numbers(min_value=0, max_value=1.0),
+                           parameter_class=ManualParameter)
+
         self.add_parameter('mw_ef_amp',
                            label='Pi-pulse amplitude ef-transition', unit='V',
                            initial_value=.4,
@@ -331,7 +340,7 @@ class CCLight_Transmon(Qubit):
                            parameter_class=ManualParameter)
         self.add_parameter('mw_vsm_marker_source',
                            label='VSM switch state',
-                           initial_value='ext',
+                           initial_value='int',
                            vals=vals.Enum('ext', 'int'),
                            parameter_class=ManualParameter)
 
@@ -377,6 +386,7 @@ class CCLight_Transmon(Qubit):
                            vals=vals.Numbers(-125, 45),
                            initial_value=0, unit='deg',
                            parameter_class=ManualParameter)
+
 
     def _set_mw_vsm_delay(self, val):
         # sort of a pseudo Manual Parameter
@@ -633,6 +643,8 @@ class CCLight_Transmon(Qubit):
         # source is turned on in measure spec when needed
         self.instr_LO_mw.get_instr().off()
         self.instr_spec_source.get_instr().off()
+        if self.instr_spec_source_2()!=None:
+            self.instr_spec_source_2.get_instr().off()
 
     def _prep_cw_spec(self):
         if self.cfg_with_vsm():
@@ -926,6 +938,7 @@ class CCLight_Transmon(Qubit):
         MW_LutMan.set_default_lutmap()
         MW_LutMan.mw_amp90_scale(self.mw_amp90_scale())
         MW_LutMan.mw_gauss_width(self.mw_gauss_width())
+        MW_LutMan.channel_amp(self.mw_channel_amp())
         MW_LutMan.mw_motzoi(self.mw_motzoi())
         MW_LutMan.mw_modulation(self.mw_freq_mod())
         MW_LutMan.spec_amp(self.spec_amp())
@@ -970,8 +983,9 @@ class CCLight_Transmon(Qubit):
                 AWG.set('sigouts_{}_offset'.format(self.mw_awg_ch()+2),
                         self.mw_mixer_offs_DQ())
         else:
+            MW_LutMan.mw_amp180(1)
+            MW_LutMan.channel_amp(self.mw_channel_amp())
             if using_QWG:
-                MW_LutMan.mw_amp180(1)
                 # case without VSM and with QWG
                 if ((self.mw_G_mixer_phi() != self.mw_D_mixer_phi())
                         or (self.mw_G_mixer_alpha() != self.mw_D_mixer_alpha())):
@@ -984,11 +998,10 @@ class CCLight_Transmon(Qubit):
                         self.mw_mixer_offs_GI())
                 AWG.set('ch{}_offset'.format(MW_LutMan.channel_Q()),
                         self.mw_mixer_offs_GQ())
-                MW_LutMan.channel_amp(self.mw_amp180())
             else:
                 # case without VSM (and AWG8)
                 MW_LutMan.mw_amp180(1)
-                MW_LutMan.channel_amp(self.mw_amp180())
+                MW_LutMan.channel_amp(self.mw_channel_amp())
                 MW_LutMan.mixer_phi(self.mw_G_mixer_phi())
                 MW_LutMan.mixer_alpha(self.mw_G_mixer_alpha())
 
@@ -1040,15 +1053,21 @@ class CCLight_Transmon(Qubit):
                                          amps=None,
                                          close_fig=True, verbose=False,
                                          MC=None, update=True,
-                                         take_fit_I=False):
+                                         all_modules=False):
         """
         Calibrates the pulse amplitude using a single rabi oscillation
         """
-        self.measure_rabi(amps=amps, MC=MC, analyze=False)
+        if amps is None:
+            if self.cfg_with_vsm():
+                amps = np.linspace(0.2,2,31)
+            else:
+                amps = np.linspace(0,1,31)
+
+        self.measure_rabi(amps=amps, MC=MC, analyze=False, all_modules=all_modules)
         a = ma.Rabi_Analysis(close_fig=close_fig, label='rabi')
         if self.cfg_with_vsm():
             self.mw_vsm_G_amp(a.rabi_amplitudes['piPulse'])
-
+        else:
             self.mw_channel_amp(a.rabi_amplitudes['piPulse'])
         return True
 
@@ -1075,14 +1094,14 @@ class CCLight_Transmon(Qubit):
         print('CCL program is running. Parameter "mw_vsm_delay" can now be '
               'calibrated by hand.')
 
-    def calibrate_motzoi(self, MC=None, verbose=True, update=True):
+    def calibrate_motzoi(self, MC=None, verbose=True, update=True, motzois=None):
         """
         Calibrates the motzoi VSM amplitude prameter
         """
         using_VSM = self.cfg_with_vsm()
-        if using_VSM:
+        if using_VSM and motzois is None:
             motzois = gen_sweep_pts(start=0.2, stop=2.0, num=31)
-        else:
+        elif motzois is None:
             motzois = gen_sweep_pts(center=0, span=.3, num=31)
 
         # large range
@@ -1214,90 +1233,99 @@ class CCLight_Transmon(Qubit):
         return True
 
     def calibrate_mixer_skewness_drive(self, MC=None,
-                                       mixer_channels: list=['G', 'D'],
-                                       x0: list =[1.0, 0.0],
-                                       cma_stds: list=[.15, 5],
-                                       maxfevals: int=250,
-                                       update: bool =True)-> bool:
-        '''
-        Calibrates the mixer skewness and updates values in the qubit object.
+                                           mixer_channels: list=['G', 'D'],
+                                           x0: list =[1.0, 0.0],
+                                           cma_stds: list=[.15, 10],
+                                           maxfevals: int=250,
+                                           update: bool =True)-> bool:
+            '''
+            Calibrates the mixer skewness and updates values in the qubit object.
+            Args:
+                MC : instance of Measurement Control
+                mixer_channels: list of strings indicating what channels to
+                    calibrate
+                update: if True updates values in the qubit object.
+            return:
+                success (bool) : returns True if succesful. Currently always
+                    returns True (i.e., no sanity check implemented)
+            '''
 
-        Args:
-            MC : instance of Measurement Control
-            mixer_channels: list of strings indicating what channels to
-                calibrate
-            update: if True updates values in the qubit object.
-        return:
-            success (bool) : returns True if succesful. Currently always
-                returns True (i.e., no sanity check implemented)
-        '''
+            # turn relevant channels on
+            if MC == None:
+                MC = self.instr_MC.get_instr()
 
-        # turn relevant channels on
-        if MC == None:
-            MC = self.instr_MC.get_instr()
+            # Load the sequence
+            CCL = self.instr_CC.get_instr()
+            p = sqo.CW_tone(
+                qubit_idx=self.cfg_qubit_nr(),
+                platf_cfg=self.cfg_openql_platform_fn())
+            CCL.eqasm_program(p.filename)
+            CCL.start()
 
-        # Load the sequence
-        CCL = self.instr_CC.get_instr()
-        p = sqo.CW_tone(
-            qubit_idx=self.cfg_qubit_nr(),
-            platf_cfg=self.cfg_openql_platform_fn())
-        CCL.eqasm_program(p.filename)
-        CCL.start()
+            if self.cfg_with_vsm():
+              # Open the VSM channel
+              VSM = self.instr_VSM.get_instr()
+              ch_in = self.mw_vsm_ch_in()
+              # module 8 is hardcoded for use mixer calls (signal hound)
+              VSM.set('mod8_marker_source'.format(ch_in), 'int')
+              VSM.set('mod8_ch{}_marker_state'.format(ch_in), 'on')
+              VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 2.0)
+              VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 2.0)
+            else:
+              mixer_channels=['G']
 
-        # Open the VSM channel
-        VSM = self.instr_VSM.get_instr()
-        ch_in = self.mw_vsm_ch_in()
-        # module 8 is hardcoded for use mixer calls (signal hound)
-        VSM.set('mod8_marker_source'.format(ch_in), 'int')
-        VSM.set('mod8_ch{}_marker_state'.format(ch_in), 'on')
-        VSM.set('mod8_ch{}_gaussian_amp'.format(ch_in), 2.0)
-        VSM.set('mod8_ch{}_derivative_amp'.format(ch_in), 2.0)
+            mw_lutman = self.instr_LutMan_MW.get_instr()
+            mw_lutman.mixer_apply_predistortion_matrix(True)
+            # # Define the parameters that will be varied
+            for mixer_ch in mixer_channels:
+                if self.cfg_with_vsm():
+                    alpha = mw_lutman.parameters['{}_mixer_alpha'.format(mixer_ch)]
+                    phi = mw_lutman.parameters['{}_mixer_phi'.format(mixer_ch)]
+                    if mixer_ch == 'G':
+                        mw_lutman.sq_G_amp(.5)
+                        mw_lutman.sq_D_amp(0)
+                    elif mixer_ch == 'D':
+                        mw_lutman.sq_G_amp(0)
+                        mw_lutman.sq_D_amp(.5)
+                else:
+                    alpha = mw_lutman.parameters['mixer_alpha']
+                    phi = mw_lutman.parameters['mixer_phi']
+                    mw_lutman.sq_amp(.5)
 
-        mw_lutman = self.instr_LutMan_MW.get_instr()
-        mw_lutman.mixer_apply_predistortion_matrix(True)
-        # # Define the parameters that will be varied
-        for mixer_ch in mixer_channels:
-            if mixer_ch == 'G':
-                mw_lutman.sq_G_amp(.5)
-                mw_lutman.sq_D_amp(0)
-            elif mixer_ch == 'D':
-                mw_lutman.sq_G_amp(0)
-                mw_lutman.sq_D_amp(.5)
-            alpha = mw_lutman.parameters['{}_mixer_alpha'.format(mixer_ch)]
-            phi = mw_lutman.parameters['{}_mixer_phi'.format(mixer_ch)]
-            spurious_sideband_freq = self.freq_qubit() - 2*self.mw_freq_mod()
-            detector = det.Signal_Hound_fixed_frequency(
-                self.instr_SH.get_instr(), spurious_sideband_freq,
-                prepare_for_each_point=True,
-                Navg=5,
-                prepare_function=mw_lutman.load_waveform_realtime,
-                # Codeword 10 is hardcoded in the generate CCL config
-                prepare_function_kwargs={'waveform_name': 'square', 'wf_nr': 10})
-            ad_func_pars = {'adaptive_function': cma.fmin,
-                            'x0': x0,
-                            'sigma0': 1,
-                            'minimize': True,
-                            'noise_handler': cma.NoiseHandler(N=2),
-                            'options': {'cma_stds': cma_stds,
-                                        'maxfevals': maxfevals}}  # Should be enough for mixer skew
 
-            MC.set_sweep_functions([alpha, phi])
-            MC.set_detector_function(detector)  # sets test_detector
-            MC.set_adaptive_function_parameters(ad_func_pars)
-            MC.run(
-                name='Spurious_sideband_{}{}'.format(
-                    mixer_ch, self.msmt_suffix),
-                mode='adaptive')
-            # For the figure
-            ma.OptimizationAnalysis_v2()
-            a = ma.OptimizationAnalysis(auto=True, label='Spurious_sideband')
-            alpha = a.optimization_result[0][0]
-            phi = a.optimization_result[0][1]
-            if update:
-                self.set('mw_{}_mixer_alpha'.format(mixer_ch), alpha)
-                self.set('mw_{}_mixer_phi'.format(mixer_ch), phi)
+                spurious_sideband_freq = self.freq_qubit() - 2*self.mw_freq_mod()
+                detector = det.Signal_Hound_fixed_frequency(
+                    self.instr_SH.get_instr(), spurious_sideband_freq,
+                    prepare_for_each_point=True,
+                    Navg=5,
+                    prepare_function=mw_lutman.load_waveform_realtime,
+                    # Codeword 10 is hardcoded in the generate CCL config
+                    prepare_function_kwargs={'waveform_name': 'square', 'wf_nr': 10})
+                ad_func_pars = {'adaptive_function': cma.fmin,
+                                'x0': x0,
+                                'sigma0': 1,
+                                'minimize': True,
+                                'noise_handler': cma.NoiseHandler(N=2),
+                                'options': {'cma_stds': cma_stds,
+                                            'maxfevals': maxfevals}}  # Should be enough for mixer skew
 
-        return True
+                MC.set_sweep_functions([alpha, phi])
+                MC.set_detector_function(detector)  # sets test_detector
+                MC.set_adaptive_function_parameters(ad_func_pars)
+                MC.run(
+                    name='Spurious_sideband_{}{}'.format(
+                        mixer_ch, self.msmt_suffix),
+                    mode='adaptive')
+                # For the figure
+                ma.OptimizationAnalysis_v2()
+                a = ma.OptimizationAnalysis(auto=True, label='Spurious_sideband')
+                alpha = a.optimization_result[0][0]
+                phi = a.optimization_result[0][1]
+                if update:
+                    self.set('mw_{}_mixer_alpha'.format(mixer_ch), alpha)
+                    self.set('mw_{}_mixer_phi'.format(mixer_ch), phi)
+
+            return True
 
     def calibrate_mixer_skewness_RO(self, update=True):
         '''
@@ -1491,7 +1519,7 @@ class CCLight_Transmon(Qubit):
         else:
             # Assume the flux is controlled using an SPI rack
             fluxcontrol = self.instr_FluxCtrl.get_instr()
-            dac_par = fluxcontrol.parameters[(self.cfg_dc_flux_ch())]
+            dac_par =  fluxcontrol.parameters[(self.cfg_dc_flux_ch())]
 
         MC.set_sweep_function_2D(dac_par)
         MC.set_sweep_points_2D(dac_values)
@@ -1503,7 +1531,9 @@ class CCLight_Transmon(Qubit):
 
     def measure_qubit_frequency_dac_scan(self, freqs, dac_values,
                                          pulsed=True, MC=None,
-                                         analyze=True, fluxChan=None, close_fig=True):
+                                         analyze=True, fluxChan=None, close_fig=True,
+                                         nested_resonator_calibration=False,
+                                         resonator_freqs=None):
         if not pulsed:
             logging.warning('CCL transmon can only perform '
                             'pulsed spectrocsopy')
@@ -1534,6 +1564,10 @@ class CCLight_Transmon(Qubit):
         spec_source.on()
         MC.set_sweep_function(spec_source.frequency)
         MC.set_sweep_points(freqs)
+        if nested_resonator_calibration:
+            dac_par = swf.Nested_resonator_tracker(qubit=self,
+                nested_MC=self.instr_nested_MC.get_instr(), freqs=resonator_freqs,
+                par=dac_par)
         MC.set_sweep_function_2D(dac_par)
         MC.set_sweep_points_2D(dac_values)
         self.int_avg_det_single._set_real_imag(False)
@@ -1581,6 +1615,103 @@ class CCLight_Transmon(Qubit):
         if analyze:
             ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
 
+        #anharmonicity measurement, bus crossing and photon number splitting with the bus
+
+    def measure_anharmonicity(self, f_01, f_02=None, f_12=None, f_01_power=None,
+                                    f_12_power=None, MC=None, spec_source_2=None):
+        '''
+        note measures anharmonicity of the transmon using three-tone
+        spectroscopy. two usecases:
+        - provide f_02 from high-power spectroscopy of the 02-transition.
+                                    It will calculate the 12 transition from it
+        - provide directly the 1-2 transition
+        '''
+        if (f_02 is None) and (f_12 is None):
+            raise ValueError("provide either and estimate of f_02 or f_12")
+        if f_12==None:
+            f_anharmonicity=(f_01-f_02)*2
+            f_12=f_01-f_anharmonicity
+        if f_01_power==None:
+            f_01_power=self.spec_pow()
+        if f_12_power==None:
+            f_12_power=f_01_power
+        f_anharmonicity=(f_01-f_12)
+        print('f_anharmonicity estimations', f_anharmonicity)
+        print('f_12 estimations', f_12)
+        CCL = self.instr_CC.get_instr()
+        p = sqo.pulsed_spec_seq(
+            qubit_idx=self.cfg_qubit_nr(),
+            spec_pulse_length=self.spec_pulse_length(),
+            platf_cfg=self.cfg_openql_platform_fn())
+        CCL.eqasm_program(p.filename)
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        if spec_source_2 is None:
+            spec_source_2 = self.instr_spec_source_2.get_instr()
+        spec_source = self.instr_spec_source.get_instr()
+        freqs_q1=np.arange(f_01-12e6 ,f_01+12e6,0.7e6)
+        freqs_q2=np.arange(f_12-12e6 ,f_12+12e6,0.7e6)
+
+        self.prepare_for_continuous_wave()
+        self.int_avg_det_single._set_real_imag(False)
+        spec_source.on()
+        spec_source.power(f_01_power)
+
+        spec_source_2.on()
+        spec_source_2.power(f_12_power)
+        spec_source_2.frequency(f_12)
+        MC.set_sweep_function(wrap_par_to_swf(
+                              spec_source.frequency, retrieve_value=True))
+        MC.set_sweep_points(freqs_q1)
+        MC.set_sweep_function_2D(wrap_par_to_swf(
+                              spec_source_2.frequency, retrieve_value=True))
+        MC.set_sweep_points_2D(freqs_q2)
+        MC.set_detector_function(self.int_avg_det_single)
+        MC.run_2D(name='Three_tone_'+self.msmt_suffix)
+        ma.TwoD_Analysis(auto=True)
+        spec_source.off()
+        spec_source_2.off()
+        ma.Three_Tone_Spectroscopy_Analysis(label='Three_tone',  f01=f_01, f12=f_12)
+
+    def measure_photon_nr_splitting_from_bus(self, f_bus, freqs_01=None, powers=np.arange(-10,10,1), MC=None, spec_source_2=None):
+
+        if freqs_01 is None:
+            freqs_01=np.arange(self.freq_qubit()-60e6 ,self.freq_qubit()+5e6,0.7e6)
+
+        self.prepare_for_continuous_wave()
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        CCL = self.instr_CC.get_instr()
+        if spec_source_2 is None:
+            spec_source_2 = self.instr_spec_source_2.get_instr()
+        spec_source = self.instr_spec_source.get_instr()
+        p = sqo.pulsed_spec_seq(
+            qubit_idx=self.cfg_qubit_nr(),
+            spec_pulse_length=self.spec_pulse_length(),
+            platf_cfg=self.cfg_openql_platform_fn())
+        CCL.eqasm_program(p.filename)
+        self.int_avg_det_single._set_real_imag(False)
+        spec_source.on()
+        spec_source.power(self.spec_pow())
+        spec_source_2.on()
+        spec_source_2.frequency(f_bus)
+
+        MC.set_sweep_function(wrap_par_to_swf(
+                              spec_source.frequency, retrieve_value=True))
+        MC.set_sweep_points(freqs_01)
+
+        MC.set_sweep_function_2D(wrap_par_to_swf(
+                              spec_source_2.power, retrieve_value=True))
+        MC.set_sweep_points_2D(powers)
+        MC.set_detector_function(self.int_avg_det_single)
+
+        MC.run_2D(name='Photon_nr_splitting'+self.msmt_suffix)
+
+        ma.TwoD_Analysis(auto=True)
+        spec_source.off()
+        spec_source_2.off()
+
+
     def measure_ssro(self, MC=None, analyze: bool=True, nr_shots: int=4092*4,
                      cases=('off', 'on'), update_threshold: bool=True,
                      prepare: bool=True, no_figs: bool=False,
@@ -1589,7 +1720,8 @@ class CCLight_Transmon(Qubit):
                      update: bool=True,
                      verbose: bool=True,
                      SNR_detector: bool=False,
-                     cal_residual_excitation: bool=False):
+                     cal_residual_excitation: bool=False,
+                     disable_metadata: bool=False):
         old_RO_digit = self.ro_acq_digitized()
         self.ro_acq_digitized(False)
         # docstring from parent class
@@ -1623,19 +1755,23 @@ class CCLight_Transmon(Qubit):
         d = self.int_log_det
         d.nr_shots = 4092
         MC.set_detector_function(d)
-        MC.run(
-            'SSRO{}'.format(self.msmt_suffix))
+        MC.run('SSRO{}'.format(self.msmt_suffix),
+            disable_snapshot_metadata=disable_metadata)
         MC.live_plot_enabled(old_plot_setting)
         if analyze:
             if SNR_detector:
                 if cal_residual_excitation:
-                    a = ma.SSRO_Analysis(rotate=True, label='SSRO', no_fits=False, close_fig=True,
-                                         peg=None, pge=None, timestamp=None, channels=d.value_names)
+                    a = ma.SSRO_Analysis(rotate=True, label='SSRO',
+                                        no_fits=False, close_fig=True,
+                                        peg=None, pge=None,
+                                        timestamp=None, channels=d.value_names)
                     self.peg = a.frac1_0
                     self.pge = 1-a.frac1_1
                 else:
-                    a = ma.SSRO_Analysis(rotate=True, label='SSRO', no_fits=False,
-                                         close_fig=True, peg=self.peg, pge=self.pge, channels=d.value_names)
+                    a = ma.SSRO_Analysis(rotate=True, label='SSRO',
+                                        no_fits=False, close_fig=True,
+                                        peg=self.peg, pge=self.pge,
+                                        channels=d.value_names)
                 return {'SNR': a.SNR, 'F_d': a.F_d, 'F_a': a.F_a}
 
             else:
@@ -1663,13 +1799,92 @@ class CCLight_Transmon(Qubit):
                             a.proc_data_dict['F_assignment_raw']) +
                             'Avg. Discrimination fidelity: \t{:.4f}'.format(
                             a.proc_data_dict['F_discr']))
-                    return (a.proc_data_dict['F_assignment_raw'],
-                            a.proc_data_dict['F_discr'])
+                    return {'SNR': a.fit_res['shots_all'].params['SNR'],
+                                'F_d': a.proc_data_dict['F_discr'],
+                                'F_a': a.proc_data_dict['F_assignment_raw'],
+                                'relaxation':a.proc_data_dict['measurement_induced_relaxation'],
+                                'excitation':a.proc_data_dict['residual_excitation']}
                 else:
                     a = ma.SSRO_Analysis(label='SSRO',
                                          channels=d.value_names,
                                          no_fits=no_figs, rotate=True)
-                    return a.F_a, a.F_d
+                    return {'SNR': a.SNR, 'F_d': a.F_d, 'F_a': a.F_a}
+
+    def measure_SSRO_frequency_amplitude_sweep(self, freqs=None, amps_rel=np.linspace(0,1,11),
+                    nr_shots=4092*4, nested_MC=None, analyze=True):
+        if nested_MC is None:
+            nested_MC = self.instr_nested_MC.get_instr()
+        if freqs is None:
+            freqs=np.linspace(self.ro_freq()-4e6, self.ro_freq()+2e6,11)
+        self.prepare_for_timedomain()
+        RO_lutman = self.instr_LutMan_RO.get_instr()
+        old_ro_prepare_state = self.cfg_prepare_ro_awg()
+        self.ro_acq_digitized(False)
+        self.cfg_prepare_ro_awg(False)
+
+        sweep_function = swf.lutman_par_depletion_pulse_global_scaling(
+            LutMan=RO_lutman,
+            resonator_numbers=[self.cfg_qubit_nr()],
+            optimization_M_amps=[self.ro_pulse_amp()],
+            optimization_M_amp_down0s=[self.ro_pulse_down_amp0()],
+            optimization_M_amp_down1s=[self.ro_pulse_down_amp1()],
+            upload=True
+        )
+        d = det.Function_Detector(
+            self.measure_ssro,
+            msmt_kw={
+                'nr_shots': nr_shots,
+                'analyze': True, 'SNR_detector': True,
+                'cal_residual_excitation': True,
+                'prepare': False,
+                'disable_metadata': True
+            },
+            result_keys=['SNR', 'F_d', 'F_a']
+        )
+        nested_MC.set_sweep_function(swf.Heterodyne_Frequency_Sweep_simple(
+            MW_LO_source=self.instr_LO_ro.get_instr(),
+            IF=self.ro_freq_mod()))
+        nested_MC.set_sweep_points(freqs)
+        nested_MC.set_detector_function(d)
+        nested_MC.set_sweep_function_2D(sweep_function)
+        nested_MC.set_sweep_points_2D(amps_rel)
+        label = 'SSRO_freq_amp_sweep' + self.msmt_suffix
+        nested_MC.run(label, mode='2D')
+
+        self.cfg_prepare_ro_awg(old_ro_prepare_state)
+
+        if analyze:
+            ma.TwoD_Analysis(label=label, plot_all=False, auto=True)
+
+    def measure_SSRO_pulse_length_sweep(self, lengths=np.arange(100e-9,1501e-9,100e-9),
+                    nr_shots=4092*4, nested_MC=None, analyze=True, label_suffix: str=''):
+        if nested_MC is None:
+            nested_MC = self.instr_nested_MC.get_instr()
+        self.ro_acq_digitized(False)
+        self.prepare_for_timedomain()
+        RO_lutman = self.instr_LutMan_RO.get_instr()
+
+        sweep_function = swf.lutman_par_UHFQC_dig_trig(
+            LutMan=RO_lutman,
+            LutMan_parameter=RO_lutman['M_length_R{}'.format(self.cfg_qubit_nr())]
+        )
+
+        d = det.Function_Detector(
+            self.calibrate_optimal_weights,
+            msmt_kw={
+                'analyze': True,
+                },
+            result_keys=['SNR', 'F_d', 'F_a', 'relaxation', 'excitation']
+        )
+        # nested_MC.set_sweep_function(sweep_function)
+        nested_MC.set_sweep_function(self.ro_pulse_length)
+        nested_MC.set_sweep_points(lengths)
+        nested_MC.set_detector_function(d)
+        label = 'SSRO_length_sweep' + self.msmt_suffix + label_suffix
+        nested_MC.run(label)
+
+        if analyze:
+            ma.MeasurementAnalysis(label=label, plot_all=False, auto=True)
 
     def measure_transients(self, MC=None, analyze: bool=True,
                            cases=('off', 'on'),
@@ -1813,7 +2028,9 @@ class CCLight_Transmon(Qubit):
                                   no_figs: bool=False,
                                   update_threshold: bool=True,
                                   optimal_IQ: bool=False,
-                                  measure_transients_CCL_switched: bool=False)->bool:
+                                  measure_transients_CCL_switched: bool=False,
+                                  prepare: bool=True,
+                                  )->bool:
         if MC is None:
             MC = self.instr_MC.get_instr()
 
@@ -1855,8 +2072,10 @@ class CCLight_Transmon(Qubit):
             else:
                 self.ro_acq_weight_type('optimal')
         if verify:
-            self.measure_ssro(
-                no_figs=no_figs, update_threshold=update_threshold)
+            ssro_dict= self.measure_ssro(
+                no_figs=no_figs, update_threshold=update_threshold,
+                prepare=prepare)
+            return ssro_dict
         return True
 
     def measure_rabi(self, MC=None, amps=None,
@@ -1869,7 +2088,7 @@ class CCLight_Transmon(Qubit):
         else:
             self.measure_rabi_channel_amp(MC, amps,
                                           analyze, close_fig, real_imag,
-                                          prepare_for_timedomain, all_modules)
+                                          prepare_for_timedomain)
 
     def measure_rabi_vsm(self, MC=None, amps=np.linspace(0.2, 2.0, 31),
                          analyze=True, close_fig=True, real_imag=True,
@@ -2551,7 +2770,8 @@ class CCLight_Transmon(Qubit):
         return a
 
     def measure_flipping(self, number_of_flips=np.arange(20), equator=True,
-                         MC=None, analyze=True, close_fig=True, update=True):
+                         MC=None, analyze=True, close_fig=True, update=True,
+                         ax='x',angle='180'):
 
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -2569,7 +2789,8 @@ class CCLight_Transmon(Qubit):
         self.prepare_for_timedomain()
         p = sqo.flipping(number_of_flips=nf, equator=equator,
                          qubit_idx=self.cfg_qubit_nr(),
-                         platf_cfg=self.cfg_openql_platform_fn())
+                         platf_cfg=self.cfg_openql_platform_fn(),
+                         ax=ax,angle=angle)
         s = swf.OpenQL_Sweep(openql_program=p,
                              unit='#',
                              CCL=self.instr_CC.get_instr())
@@ -2577,7 +2798,7 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_function(s)
         MC.set_sweep_points(nf)
         MC.set_detector_function(d)
-        MC.run('flipping'+self.msmt_suffix)
+        MC.run('flipping_'+ax+angle+self.msmt_suffix)
         if analyze:
             a = ma2.FlippingAnalysis(
                 options_dict={'scan_label': 'flipping'})
@@ -2620,8 +2841,10 @@ class CCLight_Transmon(Qubit):
                 swf_func = swf.QWG_lutman_par(LutMan=MW_LutMan,
                                               LutMan_parameter=MW_LutMan.mw_motzoi)
             else:
-                raise NotImplementedError(
-                    'VSM-less case not implemented without QWG.')
+                if motzoi_amps is None:
+                    motzoi_amps = np.linspace(-.3, .3, 31)
+                swf_func = swf.lutman_par(LutMan=MW_LutMan,
+                                          LutMan_parameter=MW_LutMan.mw_motzoi)
 
         MC.set_sweep_function(swf_func)
         MC.set_sweep_points(motzoi_amps)
@@ -2645,7 +2868,8 @@ class CCLight_Transmon(Qubit):
     def measure_single_qubit_randomized_benchmarking(
             self, nr_cliffords=2**np.arange(12), nr_seeds=100,
             MC=None,
-            recompile: bool ='as needed', prepare_for_timedomain: bool=True):
+            recompile: bool ='as needed', prepare_for_timedomain: bool=True,
+            ignore_f_cal_pts:bool=False):
         """
         Measures randomized benchmarking decay including second excited state
         population.
@@ -2729,7 +2953,7 @@ class CCLight_Transmon(Qubit):
         MC.run('RB_{}seeds'.format(nr_seeds)+self.msmt_suffix,
                exp_metadata={'bins': sweep_points})
 
-        a = ma2.RandomizedBenchmarking_SingleQubit_Analysis(label='RB_')
+        a = ma2.RandomizedBenchmarking_SingleQubit_Analysis(label='RB_', ignore_f_cal_pts=ignore_f_cal_pts)
         return a
 
     def measure_randomized_benchmarking_old(self, nr_cliffords=2**np.arange(12),

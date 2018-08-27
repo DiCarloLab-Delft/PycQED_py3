@@ -1145,3 +1145,29 @@ class FLsweep_QWG(Soft_Sweep):
         self.lm.load_waveform_onto_AWG_lookuptable(
             self.waveform_name, regenerate_waveforms=True)
         awg.start()
+
+
+class Nested_resonator_tracker(Soft_Sweep):
+    """
+    For resonator tr.
+    """
+    def __init__(self, qubit, nested_MC, par, freqs=None, **kw):
+        super().__init__(**kw)
+        self.qubit = qubit
+        self.freqs = freqs
+        self.par = par
+        self.nested_MC = nested_MC        
+        self.parameter_name = par.name
+        self.unit = par.unit
+        self.name = par.name
+
+    def set_parameter(self, val):
+        self.par(val)
+        self.qubit.find_resonator_frequency(freqs=self.freqs, MC=self.nested_MC)
+        self.qubit._prep_ro_sources()
+        spec_source = self.qubit.instr_spec_source.get_instr()
+        spec_source.on()
+
+
+
+

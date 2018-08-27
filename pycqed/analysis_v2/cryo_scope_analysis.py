@@ -137,9 +137,9 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
             derivative_window_length: float=5e-9,
             norm_window_size: int=31,
             nyquist_order: int =0,
-            ch_amp_key: str='Snapshot/instruments/AWG8_8027'
+            ch_amp_key: str='Snapshot/instruments/AWG8_8005'
         '/parameters/awgs_0_outputs_1_amplitude',
-            ch_range_key: str='Snapshot/instruments/AWG8_8027'
+            ch_range_key: str='Snapshot/instruments/AWG8_8005'
         '/parameters/sigouts_0_range',
             polycoeffs_freq_conv: Union[list, str] =
         'Snapshot/instruments/FL_LutMan_QR/parameters/polycoeffs_freq_conv/value',
@@ -196,31 +196,37 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
         self.raw_data_dict['amps'] = []
         self.raw_data_dict['data'] = []
 
-        a = ma_old.MeasurementAnalysis(
-            timestamp=self.timestamp, auto=False, close_file=False)
-        a.get_naming_and_values()
+        for i, timestamp in enumerate(self.timestamps):
+            a = ma_old.MeasurementAnalysis(
+                timestamp=timestamp, auto=False, close_file=False)
+            a.get_naming_and_values()
+            if i == 0:
+                ch_amp = a.data_file[self.ch_amp_key].attrs['value']
+                if self.ch_range_key is None:
+                    ch_range = 2  # corresponds to a scale factor of 1
+                else:
+                    ch_range = a.data_file[self.ch_range_key].attrs['value']
+                amp = ch_amp*ch_range/2
+                # read conversion polynomial from the datafile if not provided as input
+                if isinstance(self.polycoeffs_freq_conv, str):
+                    self.polycoeffs_freq_conv = np.array(
+                        a.data_file[self.polycoeffs_freq_conv])
+                    print(np.array(self.polycoeffs_freq_conv))
 
-        ch_amp = a.data_file[self.ch_amp_key].attrs['value']
-        if self.ch_range_key is None:
-            ch_range = 2  # corresponds to a scale factor of 1
-        else:
-            ch_range = a.data_file[self.ch_range_key].attrs['value']
-        amp = ch_amp*ch_range/2
-        # amp = ch_amp
+                self.raw_data_dict['data'] =\
+                    a.measured_values[self.ch_idx_cos] + \
+                    1j * a.measured_values[self.ch_idx_sin]
 
-        # read conversion polynomial from the datafile if not provided as input
-        if isinstance(self.polycoeffs_freq_conv, str):
-            self.polycoeffs_freq_conv = np.array(
-                a.data_file[self.polycoeffs_freq_conv])
-            print(np.array(self.polycoeffs_freq_conv))
+                # hacky but required for data saving
+                self.raw_data_dict['folder'] = a.folder
+                self.raw_data_dict['amps'].append(amp)
 
-        self.raw_data_dict['data'] = a.measured_values[self.ch_idx_cos] + 1j * \
-            a.measured_values[self.ch_idx_sin]
-
-        # hacky but required for data saving
-        self.raw_data_dict['folder'] = a.folder
-        self.raw_data_dict['amps'].append(amp)
-        a.finish()
+            else:
+                # If multiple datasets are used, shapes must match
+                self.raw_data_dict['data'] +=\
+                    a.measured_values[self.ch_idx_cos] + \
+                    1j * a.measured_values[self.ch_idx_sin]
+            a.finish()
 
         self.raw_data_dict['times'] = a.sweep_points
         self.raw_data_dict['timestamps'] = self.timestamps
@@ -243,47 +249,52 @@ class Cryoscope_Analysis(ba.BaseDataAnalysis):
 
     def prepare_plots(self):
         # pass
+        if len(self.timestamps)>1:
+            t_stamp_id = '{}-{}'.format(self.timestamps[0], self.timestamps[1])
+        else:
+            t_stamp_id = self.timestamps[0]
+
         self.plot_dicts['raw_data'] = {
             'plotfn': self.ca.plot_raw_data,
-            'title': self.timestamp+'\nRaw cryoscope data'}
+            'title': t_stamp_id+'\nRaw cryoscope data'}
 
         self.plot_dicts['demod_data'] = {
             'plotfn': self.ca.plot_demodulated_data,
-            'title': self.timestamp+'\nDemodulated data'}
+            'title': t_stamp_id+'\nDemodulated data'}
 
         self.plot_dicts['norm_data_circ'] = {
             'plotfn': self.ca.plot_normalized_data_circle,
-            'title': self.timestamp+'\nNormalized cryoscope data'}
+            'title': t_stamp_id+'\nNormalized cryoscope data'}
 
         self.plot_dicts['demod_phase'] = {
             'plotfn': self.ca.plot_phase,
-            'title': self.timestamp+'\nDemodulated phase'}
+            'title': t_stamp_id+'\nDemodulated phase'}
 
         self.plot_dicts['frequency_detuning'] = {
             'plotfn': self.ca.plot_frequency,
-            'title': self.timestamp+'\nDetuning frequency'}
+            'title': t_stamp_id+'\nDetuning frequency'}
 
         self.plot_dicts['cryoscope_amplitude'] = {
             'plotfn': self.ca.plot_amplitude,
-            'title': self.timestamp+'\nCryoscope amplitude'}
+            'title': t_stamp_id+'\nCryoscope amplitude'}
 
         self.plot_dicts['short_time_fft'] = {
             'plotfn': self.ca.plot_short_time_fft,
-            'title': self.timestamp+'\nShort time Fourier Transform'}
-
+            'title': t_stamp_id+'\nShort time Fourier Transform'}
 
         self.plot_dicts['zoomed_cryoscope_amplitude'] = {
             'plotfn': make_zoomed_cryoscope_fig,
             't': self.ca.time,
             'amp': self.ca.get_amplitudes(),
-            'title': self.timestamp+'\n Zoomed cryoscope amplitude'}
+            'title': t_stamp_id+'\n Zoomed cryoscope amplitude'}
 
 
 class SlidingPulses_Analysis(ba.BaseDataAnalysis):
     """
     Analysis for the sliding pulses experiment.
 
-    For noise reasons this is expected to be acquired as a TwoD in a single experiment.
+    For noise reasons this is expected to be acquired as a TwoD in a
+    single experiment.
     There exist two variant
         TwoD -> single experiment
         multiple 1D -> combination of several linescans
@@ -295,10 +306,10 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
                  options_dict: dict=None,
                  sliding_pulse_duration=220e-9,
                  freq_to_amp=None, amp_to_freq=None,
-                 phase_cut :float=0,
-                 ch_amp_key: str='Snapshot/instruments/AWG8_8027'
+                 phase_cut: float=0,
+                 ch_amp_key: str='Snapshot/instruments/AWG8_8005'
                  '/parameters/awgs_0_outputs_1_amplitude',
-                 ch_range_key: str='Snapshot/instruments/AWG8_8027'
+                 ch_range_key: str='Snapshot/instruments/AWG8_8005'
                  '/parameters/sigouts_0_range',
                  waveform_amp_key: str='Snapshot/instruments/FL_LutMan_QR'
                  '/parameters/sq_amp',
@@ -308,7 +319,6 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
             options_dict = dict()
         super().__init__(t_start=t_start, t_stop=t_stop, label=label,
                          options_dict=options_dict, close_figs=close_figs)
-
 
         self.ch_amp_key = ch_amp_key
         # ch_range_keycan also be set to `None`, then the value will
@@ -346,7 +356,6 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
         waveform_amp = a.data_file[self.waveform_amp_key].attrs['value']
         amp = ch_amp*ch_range/2*waveform_amp
 
-
         self.raw_data_dict['amp'] = amp
         self.raw_data_dict['phases'] = a.measured_values[0]
         self.raw_data_dict['times'] = a.sweep_points
@@ -357,8 +366,8 @@ class SlidingPulses_Analysis(ba.BaseDataAnalysis):
         a.finish()
 
     def process_data(self):
-        phi_cut=self.phase_cut
-        phases_shifted = (self.raw_data_dict['phases']+phi_cut)%360-phi_cut
+        phi_cut = self.phase_cut
+        phases_shifted = (self.raw_data_dict['phases']+phi_cut) % 360-phi_cut
 
         phase = np.nanmean(np.unwrap(phases_shifted[::-1],
                                      discont=0, axis=1)[::-1], axis=1)
@@ -449,7 +458,6 @@ def make_amp_err_plot(t, amp, timestamp, ax=None, **kw):
     set_ylabel(ax, 'Normalized Amplitude')
 
 
-
 def make_zoomed_cryoscope_fig(t, amp, title, ax=None, **kw):
 
     # x = ca.time
@@ -459,11 +467,11 @@ def make_zoomed_cryoscope_fig(t, amp, title, ax=None, **kw):
     gc = np.mean(y[len(y)//5:4*len(y)//5])
 
     if ax is not None:
-        ax=ax
-        f=plt.gcf()
+        ax = ax
+        f = plt.gcf()
     else:
         f, ax = plt.subplots()
-    ax.plot(x,y/gc,  label='Signal')
+    ax.plot(x, y/gc,  label='Signal')
     ax.axhline(1.01, ls='--', c='grey', label=r'$\pm$1%')
     ax.axhline(0.99, ls='--', c='grey')
     ax.axhline(1.0, ls='-', c='grey', linewidth=.5)
@@ -478,12 +486,12 @@ def make_zoomed_cryoscope_fig(t, amp, title, ax=None, **kw):
 
     # Create a set of inset Axes: these should fill the bounding box allocated to
     # them.
-    ax2 = plt.axes([0,0,1,1])
+    ax2 = plt.axes([0, 0, 1, 1])
     # Manually set the position and relative size of the inset axes within ax1
     ip = InsetPosition(ax, [.29, .14, 0.65, .4])
     ax2.set_axes_locator(ip)
 
-    mark_inset(ax, ax2, 1,3, color='grey')
+    mark_inset(ax, ax2, 1, 3, color='grey')
     ax2.axhline(1.0, ls='-', c='grey', linewidth=.5)
     ax2.axhline(1.01, ls='--', c='grey', label=r'$\pm$1%')
     ax2.axhline(0.99, ls='--', c='grey')
@@ -491,7 +499,7 @@ def make_zoomed_cryoscope_fig(t, amp, title, ax=None, **kw):
     ax2.axhline(0.999, ls=':', c='grey')
     ax2.plot(x, y/gc, '-')
 
-    formatter = ticker.FuncFormatter(lambda x, pos: round(x*1e9,3))
+    formatter = ticker.FuncFormatter(lambda x, pos: round(x*1e9, 3))
     ax2.xaxis.set_major_formatter(formatter)
 
     ax2.set_ylim(0.998, 1.002)
@@ -500,4 +508,3 @@ def make_zoomed_cryoscope_fig(t, amp, title, ax=None, **kw):
 
     ax.set_title(title)
     ax.text(.02, .93, '(a)', color='black', transform=ax.transAxes)
-

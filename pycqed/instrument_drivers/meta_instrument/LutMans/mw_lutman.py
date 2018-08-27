@@ -16,7 +16,7 @@ class Base_MW_LutMan(Base_LutMan):
 
     def set_default_lutmap(self):
         """
-        Set's the default lutmap for standard microwave drive pulses.
+        Set's the default lutmap for standard microwave drive pulses.ef
         """
         def_lm = self._def_lm
         LutMap = OrderedDict()
@@ -217,8 +217,62 @@ class Base_MW_LutMan(Base_LutMan):
 
     def load_ef_rabi_pulses_to_AWG_lookuptable(self, amps: list=None,
                                                mod_freqs: list=None):
-        # Currently (May 2018) only implemented in `AWG8_VSM_MW_LutMan` -MAR
-        raise NotImplementedError()
+        """
+        Special loading method that loads (up to) 18 pulses in
+        order to do a rabi on the ef (1-2) transition.
+
+        This method also generates the waveforms.
+
+        This method contains several steps 
+            1. determine what ef-pulses to generate 
+            2. generate a LutMap to use and upload the waveforms
+            3. generate the ef-pulses in a for-loop 
+            4. couple the waveforms to the AWG params
+            5. upload the codeword program that couples AWG parameters 
+        """
+
+        # 1. Determine what ef-pulses to generate 
+        if not isinstance(amps, Iterable) and (mod_freqs is None):
+            amps = [self.mw_ef_amp180()]
+        elif len(amps) == 1:
+            amps = [amps]*len(mod_freqs)
+
+        if (len(amps) > 18):
+            raise ValueError('max 18 amplitude values can be provided')
+
+        if mod_freqs == None:
+            mod_freqs = [self.mw_ef_modulation()]*len(amps)
+        elif len(mod_freqs) == 1:
+            mod_freqs = [mod_freqs]*len(amps)
+
+        # 2. Generate a LutMap for the ef-pulses 
+        for i, (amp, mod_freq) in enumerate(zip(amps, mod_freqs)):
+            cw_idx = i + 9
+            possible_channels = ('channel_GI', 'channel_GQ',
+                                'channel_DI', 'channel_DQ',
+                                'channel_I', 'channel_Q')
+            # 
+            codewords = ['wave_ch{}_cw{:03}'.format(self[ch](), cw_idx)
+                for ch in possible_channels if hasattr(self, ch)]
+
+            # 3. Generate the ef-pulses in the for loop 
+            self._wave_dict['ef_{}'.format(i)] = self.wf_func(
+                amp=amp, sigma_length=self.mw_gauss_width(),
+                f_modulation=mod_freq, sampling_rate=self.sampling_rate(),
+                phase=0,
+                motzoi=self.mw_motzoi())
+            # 4. Set the waveforms 
+            for cw, waveform in zip(codewords,
+                                    self._wave_dict['ef_{}'.format(i)]):
+                self.AWG.get_instr().set(cw, waveform)
+
+        # This ensures only the channels that are relevant get reconfigured
+        if 'channel_GI' in self.parameters:
+            awgs = [self.channel_GI()//2, self.channel_DI()//2]
+        else:
+            awgs = [self.channel_I()//2]
+        # 5. Upload the codeword program to ensure the pulses are loaded
+        self.AWG.get_instr().upload_codeword_program(awgs=awgs)
 
 
 class CBox_MW_LutMan(Base_MW_LutMan):
@@ -311,6 +365,14 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
             parameter_class=ManualParameter, initial_value=None,
             vals=vals.Ints())
 
+    def _add_waveform_parameters(self):
+        super()._add_waveform_parameters()
+        # Parameters for a square pulse
+        self.add_parameter('sq_amp', unit='frac', vals=vals.Numbers(-1, 1),
+                           parameter_class=ManualParameter,
+                           initial_value=0.5)
+
+
     def _set_channel_amp(self, val):
         AWG = self.AWG.get_instr()
         for awg_ch in [self.channel_I(), self.channel_Q()]:
@@ -328,6 +390,21 @@ class AWG8_MW_LutMan(Base_MW_LutMan):
                 AWG.get('awgs_{}_outputs_{}_amplitude'.format(awg_nr, ch_pair)))
         assert vals[0] == vals[1]
         return vals[0]
+
+    def generate_standard_waveforms(self):
+            wave_dict = super().generate_standard_waveforms(
+                apply_predistortion_matrix=False)
+            
+            wave_dict['square'] = wf.mod_square(
+                amp=self.sq_amp(),
+                length=self.mw_gauss_width()*4,  # to ensure same duration as mw
+                f_modulation=self.mw_modulation(),
+                sampling_rate=self.sampling_rate())
+
+            if self.mixer_apply_predistortion_matrix():
+                self._wave_dict = self.apply_mixer_predistortion_corrections(
+                    self._wave_dict)
+            return self._wave_dict
 
     def load_waveforms_onto_AWG_lookuptable(
             self, regenerate_waveforms: bool=True, stop_start: bool = True,
@@ -471,7 +548,8 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
         self.LutMap(LutMap)
 
     def _add_waveform_parameters(self):
-        super()._add_waveform_parameters()
+        super(AWG8_MW_LutMan, self)._add_waveform_parameters()
+        # Base_MW_LutMan._add_waveform_parameters(self)
         # Parameters for a square pulse
         self.add_parameter('sq_G_amp', unit='frac', vals=vals.Numbers(-1, 1),
                            parameter_class=ManualParameter,
@@ -482,7 +560,7 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
 
     def generate_standard_waveforms(self):
 
-        wave_dict = super().generate_standard_waveforms(
+        wave_dict = super(AWG8_MW_LutMan, self).generate_standard_waveforms(
             apply_predistortion_matrix=False)
         wave_dict['square'] = wf.mod_square_VSM(
             amp_G=self.sq_G_amp(), amp_D=self.sq_D_amp(),
@@ -600,52 +678,6 @@ class AWG8_VSM_MW_LutMan(AWG8_MW_LutMan):
             DI, DQ = np.dot(M_D, val[2:4])  # Mixer correction Derivative comp.
             wave_dict[key] = GI, GQ, DI, DQ
         return wave_dict
-
-    def load_ef_rabi_pulses_to_AWG_lookuptable(self, amps: list=None,
-                                               mod_freqs: list=None):
-        """
-        Special loading method that loads (up to) 18 pulses in
-        order to do a rabi on the ef (1-2) transition.
-
-        This method also generates the waveforms.
-        """
-
-        if not isinstance(amps, Iterable) and (mod_freqs is None):
-            amps = [self.mw_ef_amp180()]
-        elif len(amps) == 1:
-            amps = [amps]*len(mod_freqs)
-
-        if (len(amps) > 18):
-            raise ValueError('max 18 amplitude values can be provided')
-
-        if mod_freqs == None:
-            mod_freqs = [self.mw_ef_modulation()]*len(amps)
-        elif len(mod_freqs) == 1:
-            mod_freqs = [mod_freqs]*len(amps)
-
-        for i, (amp, mod_freq) in enumerate(zip(amps, mod_freqs)):
-            cw_idx = i + 9
-            codewords = (
-                'wave_ch{}_cw{:03}'.format(self.channel_GI(), cw_idx),
-                'wave_ch{}_cw{:03}'.format(self.channel_GQ(), cw_idx),
-                'wave_ch{}_cw{:03}'.format(self.channel_DI(), cw_idx),
-                'wave_ch{}_cw{:03}'.format(self.channel_DQ(), cw_idx))
-            self._wave_dict['ef_{}'.format(i)] = self.wf_func(
-                amp=amp, sigma_length=self.mw_gauss_width(),
-                f_modulation=mod_freq, sampling_rate=self.sampling_rate(),
-                phase=0,
-                motzoi=self.mw_motzoi())
-            for cw, waveform in zip(codewords,
-                                    self._wave_dict['ef_{}'.format(i)]):
-                self.AWG.get_instr().set(cw, waveform)
-
-        # This ensures only the channels that are relevant get reconfigured
-        if 'channel_GI' in self.parameters:
-            awgs = [self.channel_GI()//2, self.channel_DI()//2]
-        else:
-            awgs = [self.channel_I()]
-        self.AWG.get_instr().upload_codeword_program(awgs=awgs)
-
 
 class QWG_MW_LutMan_VQE(QWG_MW_LutMan):
     def __init__(self, name, **kw):

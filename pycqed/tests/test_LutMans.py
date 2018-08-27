@@ -206,7 +206,7 @@ class Test_Flux_LutMan(unittest.TestCase):
         self.fluxlutman = flm.AWG8_Flux_LutMan('fluxlutman_main')
         self.k0 = lko.LinDistortionKernel('k0')
         self.fluxlutman.instr_distortion_kernel(self.k0.name)
-
+        self.k0.instr_AWG(self.AWG.name)
 
         self.fluxlutman.AWG(self.AWG.name)
         self.fluxlutman.sampling_rate(2.4e9)
@@ -214,6 +214,7 @@ class Test_Flux_LutMan(unittest.TestCase):
         self.fluxlutman.cz_freq_01_max(6.8e9)
         self.fluxlutman.cz_J2(4.1e6)
         self.fluxlutman.cfg_awg_channel(1)
+        self.k0.cfg_awg_channel(self.fluxlutman.cfg_awg_channel())
         # self.fluxlutman.cz_E_c(250e6)
         self.fluxlutman.cz_freq_interaction(5.1e9)
         self.fluxlutman.cfg_max_wf_length(5e-6)
