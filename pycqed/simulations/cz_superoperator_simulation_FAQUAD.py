@@ -1122,8 +1122,9 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         eigs_H0,eigvectors_H0=self.H_0.eigenstates()
 
 
-        subdivisions_of_simstep=10   # 40 is good, 10 is acceptable. No less
-        rampuptime=np.arange(1,25002,1000)
+        subdivisions_of_simstep=20   # 40 is good, 10 is acceptable. No less
+        rampuptime=np.arange(1,2502,10)
+
 
         adiabatic_infidelities=[[],[],[],[],[],[],[],[],[],[]]
         variances=[[],[],[],[],[],[],[],[],[],[]]
@@ -1141,6 +1142,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         cond_phases_full=[]
         leakage_full=[]
         avgateinfidpc_full=[]
+
+        total_time=[]
 
 
         S = qtp.Qobj(matrix_change_of_variables(self.H_0),dims=[[3, 3], [3, 3]])
@@ -1208,6 +1211,9 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             cond_phases_full.append(qoi_full['phi_cond'])
             leakage_full.append(qoi_full['L1'])
             avgateinfidpc_full.append(1-qoi_full['avgatefid_compsubspace_pc'])
+
+
+            total_time.append(2*nsimsteps_rampup*sim_step+missing_delta_t)
             
 
             t1=time.time()
@@ -1346,6 +1352,11 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                   y_plot_vec=[cond_phases,cond_phases_full],
                   title='Conditional phase',
                   xlabel='Rampup time (ns)',ylabel='Cond_phase (deg)',legend_labels=['updown','full'])
+
+        plot(x_plot_vec=[rampuptime*sim_step*1e9],
+                  y_plot_vec=[np.array(total_time)*1e9],
+                  title='Total pulse time = 2*rampuptime + time_at_the_top',
+                  xlabel='Rampup time (ns)',ylabel='Total time (ns)',legend_labels=['full'])
 
         plot(x_plot_vec=[rampuptime*sim_step*1e9],
                   y_plot_vec=[leakage,leakage_full],

@@ -669,12 +669,16 @@ def simulate_quantities_of_interest_superoperator(H_0, tlist, c_ops, w_bus, eps_
     print('\n alternative propagator_new',t1-t0)
     '''
 
+    # We change the basis of H to the basis of eigenvectors of H_0
+    # The columns of S are the eigenvectors of H_0, appropriately ordered
+    S = qtp.Qobj(matrix_change_of_variables(H_0),dims=[[3, 3], [3, 3]])
 
     t0 = time.time()
 
     exp_L_total=1
     for i in range(len(tlist)):
         H=hamiltonian_timedependent(H_0,eps_vec[i],w_bus)
+        H=S*H*S.dag()
         if c_ops != []:
             c_ops_temp=[]
             for c in range(len(c_ops)):
@@ -707,11 +711,6 @@ def simulate_quantities_of_interest_superoperator(H_0, tlist, c_ops, w_bus, eps_
     '''
 
     U_final = exp_L_total
-
-    # We change the basis of U_final to the basis of eigenvectors of H_0
-    # The columns of S are the eigenvectors of H_0, appropriately ordered
-    S = qtp.Qobj(matrix_change_of_variables(H_0),dims=[[3, 3], [3, 3]])
-    U_final = S*U_final*S.dag()
 
     phases = phases_from_superoperator(U_final)
     phi_cond = phases[-1]
@@ -803,6 +802,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         #theta_i = np.arctan(2*self.fluxlutman.cz_J2() / (self.fluxlutman.cz_freq_01_max() - self.fluxlutman.cz_freq_interaction()))
         #theta_f=fix_theta_f(self.fluxlutman.cz_lambda_3(),theta_i)
         #theta_i=theta_i*360/(2*np.pi)
+        #self.fluxlutman.cz_theta_f(theta_f)
 
         if not self.fluxlutman.czd_double_sided():
             f_pulse = wf.martinis_flux_pulse(
@@ -843,7 +843,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         #w_q1=np.real(self.H_0[3,3])
         #alpha_q0=np.real(self.H_0[2,2])-2*w_q0
 
-        eps_vec = f_pulse - w_q0
+        #eps_vec = f_pulse - w_q0
         #detuning = -eps_vec/(2*np.pi)     # we express detuning in terms of frequency
 
         '''#BENCHMARK TO CHECK HOW THE COUPLING VARIES AS A FUNCTION OF DETUNING
@@ -881,6 +881,12 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         
         '''
 
+        def give_parabola(polynomial_coefficients,x):
+                a=polynomial_coefficients[0]
+                b=polynomial_coefficients[1]
+                c=polynomial_coefficients[2]
+                return a*x**2+b*x+c
+
 
         if self.noise_parameters_CZ.distortions():
             impulse_response=np.gradient(self.fitted_stepresponse_ty[1])
@@ -893,13 +899,13 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             #       xlabel='Time (ns)')
 
             # use interpolation to be sure that amp and impulse_response have the same delta_t separating two values
-            #amp_interp = interp1d(tlist,amp)      # amp is now managed already above
+            amp_interp = interp1d(tlist_new,amp)      # amp is now managed already above
             impulse_response_interp = interp1d(self.fitted_stepresponse_ty[0],impulse_response)
 
             tlist_convol1 = tlist_new
             tlist_convol2 = np.arange(0, self.fitted_stepresponse_ty[0][-1],
                                sim_step_new)
-            #amp_convol = amp_interp(tlist_convol1)
+            amp_convol = amp_interp(tlist_convol1)
             impulse_response_convol = impulse_response_interp(tlist_convol2)
 
             # plot(x_plot_vec=[tlist_convol1*1e9],y_plot_vec=[amp_convol],
@@ -916,12 +922,6 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             # 	  title='Net-zero, Pulse_length=240ns',
             #       xlabel='Time (ns)',ylabel='Amplitude (V)',legend_labels=['Ideal','Distorted'])
 
-            def give_parabola(polynomial_coefficients,x):
-            	a=polynomial_coefficients[0]
-            	b=polynomial_coefficients[1]
-            	c=polynomial_coefficients[2]
-            	return a*x**2+b*x+c
-
             convolved_detuning_new=give_parabola(self.fluxlutman.polycoeffs_freq_conv(),convolved_amp)
 
             # plot(x_plot_vec=[tlist*1e9,np.arange(np.size(convolved_amp))*sim_step*1e9],
@@ -934,13 +934,9 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             eps_vec_convolved_new=eps_vec_convolved_new[0:np.size(tlist_convol1)]
             f_pulse_convolved_new=eps_vec_convolved_new+w_q0
         else:
-            if self.noise_parameters_CZ.voltage_scaling_factor() == 1.0:
-        	    eps_vec_convolved_new=eps_vec
-        	    f_pulse_convolved_new=f_pulse
-            else:
-                detuning_new=give_parabola(self.fluxlutman.polycoeffs_freq_conv(),amp)
-                eps_vec_convolved_new=-detuning_new*(2*np.pi)
-                f_pulse_convolved_new=eps_vec_convolved_new+w_q0
+            detuning_new=give_parabola(self.fluxlutman.polycoeffs_freq_conv(),amp)
+            eps_vec_convolved_new=-detuning_new*(2*np.pi)
+            f_pulse_convolved_new=eps_vec_convolved_new+w_q0
 
 
 
@@ -971,10 +967,13 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 
 
-        if T2_q0_amplitude_dependent != np.array([-1]):     # CHANGE ITTTTT
-            # something like: 
-            # - map f_pulse to T2 via polycoefficients OR interpolate dataset of T2 vs frequency/detuning
-            # - compute Tphi01 from T2
+        if T2_q0_amplitude_dependent[0] != -1:
+
+            def expT2(x,gc,amp,tau):
+                return gc+gc*amp*np.exp(-x/tau)
+
+            T2_q0_vec=expT2(f_pulse_convolved_new/(2*np.pi),T2_q0_amplitude_dependent[0],T2_q0_amplitude_dependent[1],T2_q0_amplitude_dependent[2])
+            Tphi01_q0_vec = Tphi_from_T1andT2(T1_q0,T2_q0_vec)
 
             c_ops = c_ops_interpolating(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1)
 
