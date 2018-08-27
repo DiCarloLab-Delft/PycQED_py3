@@ -32,7 +32,12 @@ def _kraus_jsonify(kr_list):
 
 
 def _angle_pi_output(angle):
-    return "{:.1f}".format(angle*180)
+    deg = angle * 180
+    if abs(int(deg) - deg) < 1e-3:
+        out = "{}".format(int(deg))
+    else:
+        out = "{:.1f}".format(deg)
+    return out.replace('-', 'm')
 
 
 def _rotation_kraus(phi, theta):
@@ -44,9 +49,8 @@ def _cphase_kraus(theta):
 
 
 def _rotation_instruction(phi, theta):
-    return '{} {} {} {{}}'.format(_rot, _angle_pi_output(phi),
-                                  _angle_pi_output(theta)) \
-                         .replace('-', 'm')
+    return '{}_{}_{} {{}}'.format(_rot, _angle_pi_output(phi),
+                                  _angle_pi_output(theta))
 
 
 _rotation_expansions = {
@@ -60,11 +64,9 @@ _rotation_expansions = {
 
 
 def _rotation_decomposition(ax, angle):
-    key = 'R{} %0 {}'.format(ax.upper(), _angle_pi_output(angle)) \
-                       .replace('-', 'm')
-    value = ['{} {} {} %0'.format(_rot, _angle_pi_output(phi),
+    key = 'r{}{} %0'.format(ax.lower(), _angle_pi_output(angle))
+    value = ['{}_{}_{} %0'.format(_rot, _angle_pi_output(phi),
                                   _angle_pi_output(theta))
-                          .replace('-', 'm')
              for phi, theta in _rotation_expansions[ax](angle)]
     return (key, value)
 
@@ -128,15 +130,14 @@ def generate_config(filename: str,
     ))
 
     decompositions_aliases = {
-        "rx90 %0": ["{} 0.0 90.0 %0".format(_rot)],
-        "ry90 %0": ["{} 90.0 90.0 %0".format(_rot)],
-        "rx180 %0": ["{} 0.0 180.0 %0".format(_rot)],
-        "ry180 %0": ["{} 90.0 180.0 %0".format(_rot)],
+        "rx90 %0": ["{}_0_90 %0".format(_rot)],
+        "ry90 %0": ["{}_90_90 %0".format(_rot)],
+        "rx180 %0": ["{}_0_180 %0".format(_rot)],
+        "ry180 %0": ["{}_90_180 %0".format(_rot)],
         "x %0": ["rx180 %0"],
         "y %0": ["ry180 %0"],
         "roty90 %0": ["ry90 %0"],
         "cnot %0,%1": ["ry90 %1", "cz %0,%1", "ry90 %1"],
-        "CZ %0,%1": ["cz %0,%1"],
 
         # To support other forms of writing the same gates
         "x180 %0": ["rx180 %0"],
@@ -420,12 +421,7 @@ def generate_config(filename: str,
                     "latency": fl_latency,
                     "qubits": [ft[0], ft[1]],
                     "matrix": [[0.0, 1.0], [1.0, 0.0], [1.0, 0.0], [0.0, 0.0]],
-                    "kraus_repr": _kraus_jsonify([
-                        [[1., 0., 0., 0.],
-                         [0., 1., 0., 0.],
-                         [0., 0., 1., 0.],
-                         [0., 0., 0., -1.]]
-                    ]),
+                    "kraus_repr": _kraus_jsonify(_cphase_kraus(1.)),
                     "disable_optimization": True,
                     "type": "flux",
                     "cc_light_instr_type": "two_qubit_gate",
