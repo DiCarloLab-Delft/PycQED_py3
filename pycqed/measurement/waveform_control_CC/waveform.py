@@ -6,6 +6,14 @@
     Prerequisites:
     Usage:
     Bugs:
+
+Contains most basic waveforms, basic means having a few parameters and a
+straightforward translation to AWG amplitude, i.e., no knowledge of qubit
+parameters.
+
+Examples of waveforms that are too advanced are flux pulses that require
+knowledge of the flux sensitivity and interaction strengths and qubit
+frequencies. See e.g., "waveform_control_CC/waveforms_flux.py".
 '''
 
 import logging
@@ -360,7 +368,7 @@ def martinis_flux_pulse(length: float, lambda_2: float, lambda_3: float,
 
     """
     # Define number of samples and time points
-
+    logging.warning("Deprecated, use waveforms_flux.martinis_flux_pulse")
 
     # Pulse is generated at a denser grid to allow for good interpolation
     # N.B. Not clear why interpolation is needed at all... -MAR July 2018
@@ -377,7 +385,7 @@ def martinis_flux_pulse(length: float, lambda_2: float, lambda_3: float,
     f_interaction = f_q1 - anharmonicity_q0
     detuning_initial = f_q0 + anharmonicity_q0 - f_q1
     theta_i = np.arctan(2*J2 / detuning_initial)
-    
+
     # Converting angle to radians as that is used under the hood
     theta_f = 2*np.pi*theta_f/360
     if theta_f < theta_i:
@@ -427,7 +435,7 @@ def martinis_flux_pulse(length: float, lambda_2: float, lambda_3: float,
 
     # Convert to parametrization of f_01
     f_01_wave = delta_f_wave + f_interaction
-    
+
     return np.nan_to_num(f_01_wave)
     # why sometimes the last sample is nan is not known,
     # but we will surely figure it out someday.
