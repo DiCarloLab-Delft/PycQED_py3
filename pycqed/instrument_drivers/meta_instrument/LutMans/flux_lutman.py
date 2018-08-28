@@ -1,7 +1,6 @@
 from .base_lutman import Base_LutMan
 import numpy as np
 import logging
-from scipy.optimize import minimize
 from copy import copy
 from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter
 from qcodes.utils import validators as vals
@@ -70,11 +69,19 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         super().__init__(name, **kw)
         self._wave_dict_dist = dict()
         self.sampling_rate(2.4e9)
+        self._add_qubit_parameters()
 
-    def _add_cfg_parameters(self):
+    def _add_qubit_parameters(self):
+        """
+        Adds parameters responsible for keeping track of qubit frequencies,
+        coupling strengths etc.
 
+        N.B. Currently this is geared towards a 2-qubit device. Ideally,
+        these parameters would be extracted from the relevant qubit objects
+        in a way that does not violate the layers of abstraction.
+        """
         self.add_parameter(
-            'polycoeffs_freq_conv',
+            'q_polycoeffs_freq_01_det',
             docstring='coefficients of the polynomial used to convert '
             'amplitude in V to detuning in Hz. N.B. it is important to '
             'include both the AWG range and channel amplitude in the params.\n'
@@ -86,6 +93,53 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             # initial value is chosen to not raise errors
             initial_value=np.array([2e9, 0, 0]),
             parameter_class=ManualParameter)
+        self.add_parameter(
+            'q_polycoeffs_anharmonicity',
+            docstring='coefficients of the polynomial used to calculate '
+            'the anharmonicity (Hz) as a function of amplitude in V. '
+            'N.B. it is important to '
+            'include both the AWG range and channel amplitude in the params.\n',
+            vals=vals.Arrays(),
+            # initial value sets a flux independent anharmonicity of 300MHz
+            initial_value=np.array([0, 0, -300e6]),
+            parameter_class=ManualParameter)
+
+
+        self.add_parameter('q_freq_01', vals=vals.Numbers(),
+                           docstring='Current operating frequency of qubit',
+                           # initial value is chosen to not raise errors
+                           initial_value=6e9,
+                           unit='Hz', parameter_class=ManualParameter)
+
+        self.add_parameter('q_freq_10', vals=vals.Numbers(),
+                           docstring='Current operating frequency of qubit'
+                           ' with which a CZ gate can be performed.',
+                           # initial value is chosen to not raise errors
+                           initial_value=6e9,
+                           unit='Hz', parameter_class=ManualParameter)
+        self.add_parameter('cz_J2', vals=vals.Numbers(), unit='Hz',
+                           docstring='effective coupling between the 11 and '
+                           '02 states.',
+                           # initial value is chosen to not raise errors
+                           initial_value=15e6,
+                           parameter_class=ManualParameter)
+
+
+    def _add_cfg_parameters(self):
+
+        # self.add_parameter(
+        #     'polycoeffs_freq_conv',
+        #     docstring='coefficients of the polynomial used to convert '
+        #     'amplitude in V to detuning in Hz. N.B. it is important to '
+        #     'include both the AWG range and channel amplitude in the params.\n'
+        #     'In order to convert a set of cryoscope flux arc coefficients to '
+        #     ' units of Volts they can be rescaled using [c0*sc**2, c1*sc, c2]'
+        #     ' where sc is the desired scaling factor that includes the sq_amp '
+        #     'used and the range of the AWG (5 in amp mode).',
+        #     vals=vals.Arrays(),
+        #     # initial value is chosen to not raise errors
+        #     initial_value=np.array([2e9, 0, 0]),
+        #     parameter_class=ManualParameter)
 
         self.add_parameter('cfg_awg_channel',
                            initial_value=1,
@@ -323,19 +377,6 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             initial_value=np.nan,
             parameter_class=ManualParameter)
 
-        self.add_parameter('cz_freq_01_max', vals=vals.Numbers(),
-                           # initial value is chosen to not raise errors
-                           initial_value=6e9,
-                           unit='Hz', parameter_class=ManualParameter)
-        self.add_parameter('cz_J2', vals=vals.Numbers(), unit='Hz',
-                           # initial value is chosen to not raise errors
-                           initial_value=15e6,
-                           parameter_class=ManualParameter)
-        self.add_parameter('cz_freq_interaction', vals=vals.Numbers(),
-                           # initial value is chosen to not raise errors
-                           initial_value=5e9,
-                           unit='Hz',
-                           parameter_class=ManualParameter)
 
         self.add_parameter('cz_phase_corr_length', unit='s',
                            initial_value=5e-9, vals=vals.Numbers(),
