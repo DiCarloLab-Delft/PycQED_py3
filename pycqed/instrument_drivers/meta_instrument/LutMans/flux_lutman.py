@@ -323,18 +323,22 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             initial_value=np.nan,
             parameter_class=ManualParameter)
 
-        self.add_parameter('cz_freq_01_max', vals=vals.Numbers(),
+        self.add_parameter('cz_f_q0', vals=vals.Numbers(),
                            # initial value is chosen to not raise errors
                            initial_value=6e9,
                            unit='Hz', parameter_class=ManualParameter)
+        self.add_parameter('cz_f_q1', vals=vals.Numbers(),
+                           # initial value is chosen to not raise errors
+                           initial_value=6e9,
+                           unit='Hz', parameter_class=ManualParameter)
+        self.add_parameter('cz_anharmonicity_q0', vals=vals.Numbers(),
+                           # initial value is chosen to not raise errors
+                           initial_value=-300e6,
+                           unit='Hz', parameter_class=ManualParameter)
+
         self.add_parameter('cz_J2', vals=vals.Numbers(), unit='Hz',
                            # initial value is chosen to not raise errors
                            initial_value=15e6,
-                           parameter_class=ManualParameter)
-        self.add_parameter('cz_freq_interaction', vals=vals.Numbers(),
-                           # initial value is chosen to not raise errors
-                           initial_value=5e9,
-                           unit='Hz',
                            parameter_class=ManualParameter)
 
         self.add_parameter('cz_phase_corr_length', unit='s',
@@ -450,11 +454,11 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                 lambda_2=self.cz_lambda_2(),
                 lambda_3=self.cz_lambda_3(),
                 theta_f=self.cz_theta_f(),
-                f_01_max=self.cz_freq_01_max(),
+                f_q0=self.cz_f_q0(),
+                f_q1=self.cz_f_q1(),
+                anharmonicity_q0=self.cz_anharmonicity_q0(),
                 J2=self.cz_J2(),
-                f_interaction=self.cz_freq_interaction(),
-                sampling_rate=self.sampling_rate(),
-                return_unit='f01')
+                sampling_rate=self.sampling_rate())
             return dac_scale_factor*self.detuning_to_amp(
                 self.cz_freq_01_max() - CZ)
         else:
@@ -465,13 +469,11 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                 lambda_2=self.cz_lambda_2(),
                 lambda_3=self.cz_lambda_3(),
                 theta_f=self.cz_theta_f(),
-                f_01_max=self.cz_freq_01_max(),
-                # V_per_phi0=self.cz_V_per_phi0(),
+                f_q0=self.cz_f_q0(),
+                f_q1=self.cz_f_q1(),
+                anharmonicity_q0=self.cz_anharmonicity_q0(),
                 J2=self.cz_J2(),
-                # E_c=self.cz_E_c(),
-                f_interaction=self.cz_freq_interaction(),
-                sampling_rate=self.sampling_rate(),
-                return_unit='f01')
+                sampling_rate=self.sampling_rate())
             half_CZ_A = dac_scale_factor*self.detuning_to_amp(
                 self.cz_freq_01_max() - half_CZ_A)
 
@@ -493,16 +495,14 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
             half_CZ_B = wf.martinis_flux_pulse(
                 length=self.cz_length()*(1-self.czd_length_ratio()),
-                lambda_2=d_lambda_2,
-                lambda_3=d_lambda_3,
-                theta_f=d_theta_f,
-                f_01_max=self.cz_freq_01_max(),
-                # V_per_phi0=self.cz_V_per_phi0(),
+                lambda_2=self.cz_lambda_2(),
+                lambda_3=self.cz_lambda_3(),
+                theta_f=self.cz_theta_f(),
+                f_q0=self.cz_f_q0(),
+                f_q1=self.cz_f_q1(),
+                anharmonicity_q0=self.cz_anharmonicity_q0(),
                 J2=self.cz_J2(),
-                # E_c=self.cz_E_c(),
-                f_interaction=self.cz_freq_interaction(),
-                sampling_rate=self.sampling_rate(),
-                return_unit='f01')
+                sampling_rate=self.sampling_rate())
             half_CZ_B = dac_scale_factor*self.detuning_to_amp(
                 self.cz_freq_01_max() - half_CZ_B, positive_branch=False)
 
@@ -850,8 +850,8 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         self.AWG.get_instr().set(codeword, waveform)
 
     def load_waveforms_onto_AWG_lookuptable(
-            self, regenerate_waveforms: bool=True, stop_start: bool = True,
-            force_load_sequencer_program: bool=False):
+                    self, regenerate_waveforms: bool=True, stop_start: bool = True,
+                    force_load_sequencer_program: bool=False):
         """
         Loads all waveforms specified in the LutMap to an AWG for both this
         LutMap and the partner LutMap.
@@ -1135,7 +1135,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         samples = np.arange(len(dac_amps))
         amps = dac_amps*self.get_dac_val_to_amp_scalefactor()
         deltas = self.amp_to_detuning(amps)
-        freqs = self.cz_freq_01_max()-deltas
+        freqs = self.cz_f_q0()+self.cz_f_q1()-deltas
         ax.scatter(amps, freqs, c=samples, label='CZ trajectory')
         if show:
             plt.show()
@@ -1152,19 +1152,20 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             f, ax = plt.subplots()
         amps = np.linspace(-2.5, 2.5, 101)  # maximum voltage of AWG amp mode
         deltas = self.amp_to_detuning(amps)
-        freqs = self.cz_freq_01_max()-deltas
+        freqs_11 = self.cz_f_q0()+self.cz_f_q1()-deltas
+        freqs_20 = 2*self.cz_f_q0()-self.cz_anharmonicity_q0()-2*deltas
 
-        ax.plot(amps, freqs, label='$f_{01}$')
-        ax.axhline(self.cz_freq_interaction(), -5, 5,
-                   label='$f_{\mathrm{int.}}$:'+' {:.3f} GHz'.format(
-            self.cz_freq_interaction()*1e-9),
-            c='C1')
+        ax.plot(amps, freqs_11, label='$f_{01}$')
+        ax.plot(amps, freqs_20,
+                    label='$f_{\mathrm{int.}}$:'+' {:.3f} GHz'.format(
+                    (self.cz_f_q1()*2-self.cz_anharmonicity_q0())*1e-9),
+                    c='C1')
 
-        ax.axvline(0, 0, 1e10, linestyle='dotted', c='grey')
+        ax.axvline(0, 0, 2e10, linestyle='dotted', c='grey')
         ax.fill_between(
-            x=[-5, 5],
-            y1=[self.cz_freq_interaction()-self.cz_J2()]*2,
-            y2=[self.cz_freq_interaction()+self.cz_J2()]*2,
+            x=amps,
+            y1=freqs_20-self.cz_J2(),
+            y2=freqs_20+self.cz_J2(),
             label='$J_{\mathrm{2}}/2\pi$:'+' {:.3f} MHz'.format(
                 self.cz_J2()*1e-6),
             color='C1', alpha=0.25)
@@ -1178,7 +1179,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         set_xlabel(ax, 'AWG amplitude', 'V')
         set_ylabel(ax, 'Frequency', 'Hz')
         ax.set_xlim(-2.5, 2.5)
-        ax.set_ylim(3e9, np.max(freqs)+500e6)
+        ax.set_ylim(np.min(freqs_20)+500e6, np.max(freqs_20)+500e6)
 
         dac_val_axis = ax.twiny()
         dac_ax_lims = np.array(ax.get_xlim()) * \
