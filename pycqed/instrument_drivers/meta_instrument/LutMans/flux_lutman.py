@@ -94,7 +94,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             initial_value=np.array([2e9, 0, 0]),
             parameter_class=ManualParameter)
         self.add_parameter(
-            'q_polycoeffs_anharmonicity',
+            'q_polycoeffs_anharm',
             docstring='coefficients of the polynomial used to calculate '
             'the anharmonicity (Hz) as a function of amplitude in V. '
             'N.B. it is important to '
@@ -103,7 +103,6 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             # initial value sets a flux independent anharmonicity of 300MHz
             initial_value=np.array([0, 0, -300e6]),
             parameter_class=ManualParameter)
-
 
         self.add_parameter('q_freq_01', vals=vals.Numbers(),
                            docstring='Current operating frequency of qubit',
@@ -123,7 +122,6 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                            # initial value is chosen to not raise errors
                            initial_value=15e6,
                            parameter_class=ManualParameter)
-
 
     def _add_cfg_parameters(self):
 
@@ -214,7 +212,60 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
     def _get_cfg_operating_mode(self):
         return self._cfg_operating_mode
 
-    def amp_to_detuning(self, amp):
+
+    def get_polycoeffs_state(self, state: str):
+        """
+        Args:
+            state (str) : string of 2 numbers denoting the state. The numbers
+                correspond to the number of excitations in each qubits.
+                The LSQ (right) corresponds to the qubit being fluxed and
+                under control of this flux lutman.
+
+        Get's the polynomial coefficients that are used to calculate the
+        energy levels of specific states.
+        Note that avoided crossings are not taken into account here.
+
+
+        """
+        polycoeffs = np.zeros(3)
+        if state == '01':
+            polycoeffs += self.q_polycoeffs_freq_01_det()
+            polycoeffs[2] += self.q_freq_01()
+        elif state == '11':
+            polycoeffs += self.q_polycoeffs_freq_01_det()
+            polycoeffs[2] += self.q_freq_01() + self.q_freq_10()
+        elif state == '02':
+            polycoeffs += 2*self.q_polycoeffs_freq_01_det()
+            polycoeffs += self.q_polycoeffs_anharm()
+            polycoeffs[2] += 2*self.q_freq_01()
+        else:
+            raise NotImplementedError()
+        return polycoeffs
+
+
+    def amp_to_frequency(self, amp: float, state: str='01'):
+        """
+        Converts pulse amplitude in Volt to energy in Hz for a particular state
+        Args:
+            amp (float) : amplitude in Volt
+            state (str) : string of 2 numbers denoting the state. The numbers
+                correspond to the number of excitations in each qubits.
+                The LSQ (right) corresponds to the qubit being fluxed and
+                under control of this flux lutman.
+
+        N.B. this method assumes that the polycoeffs are with respect to the
+            amplitude in units of V, including rescaling due to the channel
+            amplitude and range settings of the AWG8.
+            See also `self.get_dac_val_to_amp_scalefactor`.
+
+                amp_Volts = amp_dac_val * channel_amp * channel_range
+        """
+        polycoeffs = self.get_polycoeffs_state(state=state)
+
+        return np.polyval(polycoeffs, amp)
+
+    def frequency_to_amp(self, freq: float, state:str='01',
+                         positive_branch=True):
         """
         Converts amplitude to detuning in Hz.
 
@@ -228,28 +279,12 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
                 amp_Volts = amp_dac_val * channel_amp * channel_range
         """
-        return np.polyval(self.polycoeffs_freq_conv(), amp)
-
-    def detuning_to_amp(self, freq, positive_branch=True):
-        """
-        Converts detuning in Hz to amplitude.
-
-        Requires "polycoeffs_freq_conv" to be set to the polynomial values
-        extracted from the cryoscope flux arc.
-
-
-        N.B. this method assumes that the polycoeffs are with respect to the
-            amplitude in units of V, including rescaling due to the channel
-            amplitude and range settings of the AWG8.
-            See also `self.get_dac_val_to_amp_scalefactor`.
-
-                amp_Volts = amp_dac_val * channel_amp * channel_range
-        """
         # recursive allows dealing with an array of freqs
         if isinstance(freq, (list, np.ndarray)):
             return np.array([self.detuning_to_amp(
                 f, positive_branch=positive_branch) for f in freq])
-        p = np.poly1d(self.polycoeffs_freq_conv())
+        polycoeffs = self.get_polycoeffs_state(state=state)
+        p = np.poly1d(polycoeffs)
         sols = (p-freq).roots
 
         # sols returns 2 solutions (for a 2nd order polynomial)
@@ -376,7 +411,6 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             unit='deg',
             initial_value=np.nan,
             parameter_class=ManualParameter)
-
 
         self.add_parameter('cz_phase_corr_length', unit='s',
                            initial_value=5e-9, vals=vals.Numbers(),
@@ -1182,6 +1216,14 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             plt.show()
         return ax
 
+    def plot_level_diagram(self, ax=None, show=True,
+                           plot_cz_trajectory=False):
+
+        if ax is None:
+            f, ax = plt.subplots()
+
+        return ax
+
     def plot_flux_arc(self, ax=None, show=True,
                       plot_cz_trajectory=False):
         """
@@ -1192,23 +1234,23 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         if ax is None:
             f, ax = plt.subplots()
         amps = np.linspace(-2.5, 2.5, 101)  # maximum voltage of AWG amp mode
-        deltas = self.amp_to_detuning(amps)
-        freqs = self.cz_freq_01_max()-deltas
+
+        freqs = self.amp_to_frequency(amps, state='01')
 
         ax.plot(amps, freqs, label='$f_{01}$')
-        ax.axhline(self.cz_freq_interaction(), -5, 5,
-                   label='$f_{\mathrm{int.}}$:'+' {:.3f} GHz'.format(
-            self.cz_freq_interaction()*1e-9),
-            c='C1')
+        # ax.axhline(self.cz_freq_interaction(), -5, 5,
+        #            label='$f_{\mathrm{int.}}$:'+' {:.3f} GHz'.format(
+        #     self.cz_freq_interaction()*1e-9),
+        #     c='C1')
 
         ax.axvline(0, 0, 1e10, linestyle='dotted', c='grey')
-        ax.fill_between(
-            x=[-5, 5],
-            y1=[self.cz_freq_interaction()-self.cz_J2()]*2,
-            y2=[self.cz_freq_interaction()+self.cz_J2()]*2,
-            label='$J_{\mathrm{2}}/2\pi$:'+' {:.3f} MHz'.format(
-                self.cz_J2()*1e-6),
-            color='C1', alpha=0.25)
+        # ax.fill_between(
+        #     x=[-5, 5],
+        #     y1=[self.cz_freq_interaction()-self.cz_J2()]*2,
+        #     y2=[self.cz_freq_interaction()+self.cz_J2()]*2,
+        #     label='$J_{\mathrm{2}}/2\pi$:'+' {:.3f} MHz'.format(
+        #         self.q_J2()*1e-6),
+        #     color='C1', alpha=0.25)
 
         title = ('Calibration visualization\n{}\nchannel {}'.format(
             self.AWG(), self.cfg_awg_channel()))

@@ -3,12 +3,11 @@ import numpy as np
 import pycqed.instrument_drivers.virtual_instruments.virtual_AWG8 as v8
 from pycqed.instrument_drivers.meta_instrument import lfilt_kernel_object as lko
 
-from pycqed.instrument_drivers.meta_instrument.LutMans import mw_lutman as mwl
-from pycqed.measurement.waveform_control_CC import waveform as wf
 from pycqed.instrument_drivers.meta_instrument.LutMans.base_lutman import \
     get_redundant_codewords
 
 from pycqed.instrument_drivers.meta_instrument.LutMans import flux_lutman as flm
+
 
 class Test_Flux_LutMan(unittest.TestCase):
 
@@ -57,7 +56,6 @@ class Test_Flux_LutMan(unittest.TestCase):
         self.fluxlutman_partner.polycoeffs_freq_conv(poly_coeffs)
         self.fluxlutman_partner.set_default_lutmap()
         self.fluxlutman_partner.instr_partner_lutman('fluxlutman_main')
-
 
     def test__program_hash_differs_AWG8_flux_lutman(self):
 
@@ -111,7 +109,6 @@ class Test_Flux_LutMan(unittest.TestCase):
 
     #     self.fluxlutman.cfg_operating_mode('Codeword_normal')
     #     self.fluxlutman.load_waveforms_onto_AWG_lookuptable()
-
 
     def test_plot_flux_arc(self):
         self.fluxlutman.plot_flux_arc(show=False, plot_cz_trajectory=True)
