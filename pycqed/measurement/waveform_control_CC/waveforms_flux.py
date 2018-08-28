@@ -10,7 +10,7 @@
 For more basic waveforms see e.g., waveforms.py
 '''
 import logging
-import scipy
+import scipy.interpolate
 import numpy as np
 
 
@@ -31,8 +31,8 @@ def martinis_flux_pulse(length: float,
         lambda_2    :   lambda coeffecients
         lambda_3    :
         lambda_3    :
-        theta_f     :   initial angle of interaction in degrees.
-        theta_f     :   final angle of the interaction in degrees.
+        theta_f     :   initial angle of interaction (rad).
+        theta_f     :   final angle of the interaction (rad).
         sampling_rate : sampling rate of AWG in (Hz)
 
     This waveform is generated in several steps
@@ -44,7 +44,7 @@ def martinis_flux_pulse(length: float,
     if theta_f < theta_i:
         raise ValueError(
             'theta_f ({:.2f} deg) < theta_i ({:.2f} deg):'.format(
-                theta_f/(2*np.pi)*360, theta_i/(2*np.pi)*360)
+                np.rad2deg(theta_f), np.rad2deg(theta_i))
             + 'final coupling weaker than initial coupling')
 
     # 1. Generate a time grid, may include fine sampling.
@@ -59,24 +59,22 @@ def martinis_flux_pulse(length: float,
     taus = np.arange(0, rounded_length-tau_step/2, tau_step)
     # -tau_step/2 is to make sure final pt is excluded
 
-    # Determine lambda_1 using the constraint set by eq 16 from Martinis 2014
     # lambda_1 is scaled such that the final ("center") angle is theta_f
+    # Determine lambda_1 using the constraint set by eq 16 from Martinis 2014
     lambda_1 = (theta_f - theta_i) / (2) - lambda_3
 
     # 2. Generate θ(τ) using eqs 15 and 16
     theta_wave = np.ones(nr_samples) * theta_i
     theta_wave += lambda_1 * (1 - np.cos(2 * np.pi * taus / rounded_length))
-    theta_wave += (lambda_1 * lambda_2 *
-                   (1 - np.cos(4 * np.pi * taus / rounded_length)))
-    theta_wave += (lambda_1 * lambda_3 *
-                   (1 - np.cos(6 * np.pi * taus / rounded_length)))
+    theta_wave += lambda_2 * (1 - np.cos(4 * np.pi * taus / rounded_length))
+    theta_wave += lambda_3 * (1 - np.cos(6 * np.pi * taus / rounded_length))
 
     # Clip wave to [theta_i, pi] to avoid poles in the wave expressed in freq
     theta_wave_clipped = np.clip(theta_wave, theta_i, np.pi-.01)
     if not np.array_equal(theta_wave, theta_wave_clipped):
         logging.warning(
             'Martinis flux wave form has been clipped to [{}, 180 deg]'
-            .format(theta_i))
+            .format(np.rad2deg(theta_i)))
 
     # 3. Transform from proper time τ to real time t using interpolation
     t = np.array([np.trapz(np.sin(theta_wave_clipped)[:i+1],
