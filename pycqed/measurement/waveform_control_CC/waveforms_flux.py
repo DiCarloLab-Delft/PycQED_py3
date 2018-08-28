@@ -106,9 +106,11 @@ def eps_to_theta(eps: float, g: float):
         ε: detuning
         g: coupling strength
     returns:
-        θ: interaction angle
+        θ: interaction angle (radian)
     """
-    theta = np.arctan(2*g / eps)
+    # Ignore divide by zero as it still gives a meaningful angle
+    with np.errstate(divide='ignore'):
+        theta = np.arctan(np.divide(2*g, eps))
     return theta
 
 
@@ -119,7 +121,7 @@ def theta_to_eps(theta: float, g: float):
         ε = 2g/tan(θ)
 
     args:
-        θ: interaction angle
+        θ: interaction angle (radian)
         ε: detuning
     returns:
         g: coupling strength

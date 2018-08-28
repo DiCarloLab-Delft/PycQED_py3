@@ -367,82 +367,83 @@ def martinis_flux_pulse(length: float, lambda_2: float, lambda_3: float,
     sampling_rate       (float) sampling rate of the AWG (Hz)
 
     """
-    # Define number of samples and time points
-    logging.warning("Deprecated, use waveforms_flux.martinis_flux_pulse")
+    raise NotImplementedError("This class is deprecated")
+#     # Define number of samples and time points
+#     logging.warning("Deprecated, use waveforms_flux.martinis_flux_pulse")
 
-    # Pulse is generated at a denser grid to allow for good interpolation
-    # N.B. Not clear why interpolation is needed at all... -MAR July 2018
-    fine_sampling_factor = 1  # 10
-    nr_samples = int(np.round((length)*sampling_rate * fine_sampling_factor))
-    rounded_length = nr_samples/(fine_sampling_factor * sampling_rate)
-    tau_step = 1/(fine_sampling_factor * sampling_rate)  # denser points
-    # tau is a virtual time/proper time
-    taus = np.arange(0, rounded_length-tau_step/2, tau_step)
-    # -tau_step/2 is to make sure final pt is excluded
+#     # Pulse is generated at a denser grid to allow for good interpolation
+#     # N.B. Not clear why interpolation is needed at all... -MAR July 2018
+#     fine_sampling_factor = 1  # 10
+#     nr_samples = int(np.round((length)*sampling_rate * fine_sampling_factor))
+#     rounded_length = nr_samples/(fine_sampling_factor * sampling_rate)
+#     tau_step = 1/(fine_sampling_factor * sampling_rate)  # denser points
+#     # tau is a virtual time/proper time
+#     taus = np.arange(0, rounded_length-tau_step/2, tau_step)
+#     # -tau_step/2 is to make sure final pt is excluded
 
-    # Derived parameters
-    f_initial = f_q0
-    f_interaction = f_q1 - anharmonicity_q0
-    detuning_initial = f_q0 + anharmonicity_q0 - f_q1
-    theta_i = np.arctan(2*J2 / detuning_initial)
+#     # Derived parameters
+#     f_initial = f_q0
+#     f_interaction = f_q1 - anharmonicity_q0
+#     detuning_initial = f_q0 + anharmonicity_q0 - f_q1
+#     theta_i = np.arctan(2*J2 / detuning_initial)
 
-    # Converting angle to radians as that is used under the hood
-    theta_f = 2*np.pi*theta_f/360
-    if theta_f < theta_i:
-        raise ValueError(
-            'theta_f ({:.2f} deg) < theta_i ({:.2f} deg):'.format(
-                theta_f/(2*np.pi)*360, theta_i/(2*np.pi)*360)
-            + 'final coupling weaker than initial coupling')
+#     # Converting angle to radians as that is used under the hood
+#     theta_f = 2*np.pi*theta_f/360
+#     if theta_f < theta_i:
+#         raise ValueError(
+#             'theta_f ({:.2f} deg) < theta_i ({:.2f} deg):'.format(
+#                 theta_f/(2*np.pi)*360, theta_i/(2*np.pi)*360)
+#             + 'final coupling weaker than initial coupling')
 
-    # lambda_1 is scaled such that the final ("center") angle is theta_f
-    lambda_1 = (theta_f - theta_i) / (2 + 2 * lambda_3)
+#     # lambda_1 is scaled such that the final ("center") angle is theta_f
+#     lambda_1 = (theta_f - theta_i) / (2 + 2 * lambda_3)
 
-    # Calculate the wave
-    theta_wave = np.ones(nr_samples) * theta_i
-    theta_wave += lambda_1 * (1 - np.cos(2 * np.pi * taus / rounded_length))
-    theta_wave += (lambda_1 * lambda_2 *
-                   (1 - np.cos(4 * np.pi * taus / rounded_length)))
-    theta_wave += (lambda_1 * lambda_3 *
-                   (1 - np.cos(6 * np.pi * taus / rounded_length)))
+#     # Calculate the wave
+#     theta_wave = np.ones(nr_samples) * theta_i
+#     theta_wave += lambda_1 * (1 - np.cos(2 * np.pi * taus / rounded_length))
+#     theta_wave += (lambda_1 * lambda_2 *
+#                    (1 - np.cos(4 * np.pi * taus / rounded_length)))
+#     theta_wave += (lambda_1 * lambda_3 *
+#                    (1 - np.cos(6 * np.pi * taus / rounded_length)))
 
-    # Clip wave to [theta_i, pi] to avoid poles in the wave expressed in freq
-    theta_wave_clipped = np.clip(theta_wave, theta_i, np.pi-.01)
-    if not np.array_equal(theta_wave, theta_wave_clipped):
-        logging.warning(
-            'Martinis flux wave form has been clipped to [{}, 180 deg]'
-            .format(theta_i))
+#     # Clip wave to [theta_i, pi] to avoid poles in the wave expressed in freq
+#     theta_wave_clipped = np.clip(theta_wave, theta_i, np.pi-.01)
+#     if not np.array_equal(theta_wave, theta_wave_clipped):
+#         logging.warning(
+#             'Martinis flux wave form has been clipped to [{}, 180 deg]'
+#             .format(theta_i))
 
-    # Transform from proper time to real time
-    t = np.array([np.trapz(np.sin(theta_wave_clipped)[:i+1], dx=1/(10*sampling_rate))
-                  for i in range(len(theta_wave_clipped))])
+#     # Transform from proper time to real time
+#     t = np.array([np.trapz(np.sin(theta_wave_clipped)[:i+1], dx=1/(10*sampling_rate))
+#                   for i in range(len(theta_wave_clipped))])
 
-    # Interpolate pulse at physical sampling distance
-    t_samples = np.arange(0, length, 1/sampling_rate)
-    # Scaling factor for time-axis to get correct pulse length again
-    scale = t[-1]/t_samples[-1]
-    interp_wave = scipy.interpolate.interp1d(
-        t/scale, theta_wave_clipped, bounds_error=False,
-        fill_value='extrapolate')(t_samples)
+#     # Interpolate pulse at physical sampling distance
+#     t_samples = np.arange(0, length, 1/sampling_rate)
+#     # Scaling factor for time-axis to get correct pulse length again
+#     scale = t[-1]/t_samples[-1]
+#     interp_wave = scipy.interpolate.interp1d(
+#         t/scale, theta_wave_clipped, bounds_error=False,
+#         fill_value='extrapolate')(t_samples)
 
-    # Return in the specified units
-    if return_unit == 'theta':
-        # Theta is returned in radians here
-        return np.nan_to_num(interp_wave)
+#     # Return in the specified units
+#     if return_unit == 'theta':
+#         # Theta is returned in radians here
+#         return np.nan_to_num(interp_wave)
 
-    # Convert to detuning between f_20 and f_11
-    # It is equal to detuning between f_11 and interaction point
-    delta_f_wave = 2 * J2 / np.tan(interp_wave)
+#     # Convert to detuning between f_20 and f_11
+#     # It is equal to detuning between f_11 and interaction point
+#     delta_f_wave = 2 * J2 / np.tan(interp_wave)
 
-    # Convert to parametrization of f_01
-    f_01_wave = delta_f_wave + f_interaction
+#     # Convert to parametrization of f_01
+#     f_01_wave = delta_f_wave + f_interaction
 
-    return np.nan_to_num(f_01_wave)
-    # why sometimes the last sample is nan is not known,
-    # but we will surely figure it out someday.
-    # (Brian and Adriaan, 14.11.2017)
-    # This may be caused by the fill_value of the interp_wave (~30 lines up)
-    # that was set to 0 instead of extrapolate. This caused
-    # the np.tan(interp_wave) to divide by zero. (MAR 10-05-2018)
-############################################################################
-#
-############################################################################
+#     return np.nan_to_num(f_01_wave)
+#     # why sometimes the last sample is nan is not known,
+#     # but we will surely figure it out someday.
+#     # (Brian and Adriaan, 14.11.2017)
+#     # This may be caused by the fill_value of the interp_wave (~30 lines up)
+#     # that was set to 0 instead of extrapolate. This caused
+#     # the np.tan(interp_wave) to divide by zero. (MAR 10-05-2018)
+# ############################################################################
+# #
+# ############################################################################
