@@ -329,12 +329,10 @@ def mod_square_VSM(amp_G, amp_D, length, f_modulation,
 
 def martinis_flux_pulse(length: float, lambda_2: float, lambda_3: float,
                         theta_f: float,
-                        f_01_max: float, J2: float,
-                        V_offset: float=0, V_per_phi0: float=1,
-                        E_c: float=250e6, f_bus: float =None,
-                        f_interaction: float =None,
-                        asymmetry: float =0, sampling_rate: float =1e9,
-                        return_unit: str='V'):
+                        f_q0: float,
+                        f_q1: float,
+                        anharmonicity_q0: float,
+                        sampling_rate: float =1e9):
     """
     Returns the pulse specified by Martinis and Geller
     Phys. Rev. A 90 022307 (2014).
@@ -344,26 +342,22 @@ def martinis_flux_pulse(length: float, lambda_2: float, lambda_3: float,
     note that the lambda coefficients are rescaled to ensure that the center
     of the pulse has a value corresponding to theta_f.
 
-    length          (float) lenght of the waveform (s)
+    length              (float) lenght of the waveform (s)
     lambda_2
     lambda_3
 
-    theta_f         (float) final angle of the interaction in degrees.
-                    Determines the Voltage for the center of the waveform.
+    theta_f             (float) final angle of the interaction in degrees.
+                        Determines the Voltage for the center of the waveform.
 
-    f_01_max        (float) qubit sweet spot frequency (Hz).
-    J2              (float) coupling between 11-02 (Hz),
-                    approx sqrt(2) J1 (the 10-01 coupling).
-    E_c             (float) Charging energy of the transmon (Hz).
-    f_bus           (float) frequency of the bus (Hz).
-    f_interaction   (float) interaction frequency (Hz).
-    asymmetry       (float) qubit asymmetry
+    f_q0                (float) frequency of the fluxed qubit (Hz).
+    f_q1                (float) frequency of the lower, not fluxed qubit (Hz)
+    anharmonicity_q0    (float) anharmonicity of the fluxed qubit (Hz)
+                        (negative for conventional transmon)
+    J2                  (float) coupling between 11-02 (Hz),
+                        approx sqrt(2) J1 (the 10-01 coupling).
 
-    sampling_rate   (float) sampling rate of the AWG (Hz)
-    return_unit     (enum: ['V', 'eps', 'f01', 'theta']) whether to return the
-                    pulse expressed in units of theta: the reference frame of
-                    the interaction, units of epsilon: detuning to the bus
-                    eps=f12-f_bus
+    sampling_rate       (float) sampling rate of the AWG (Hz)
+
     """
     # Define number of samples and time points
 
@@ -379,9 +373,11 @@ def martinis_flux_pulse(length: float, lambda_2: float, lambda_3: float,
     # -tau_step/2 is to make sure final pt is excluded
 
     # Derived parameters
-    if f_interaction is None:
-        f_interaction = f_bus + E_c
-    theta_i = np.arctan(2*J2 / (f_01_max - f_interaction))
+    f_initial = f_q0
+    f_interaction = f_q1 - anharmonicity_q0
+    detuning_initial = f_q0 + anharmonicity_q0 - f_q1
+    theta_i = np.arctan(2*J2 / detuning_initial)
+    
     # Converting angle to radians as that is used under the hood
     theta_f = 2*np.pi*theta_f/360
     if theta_f < theta_i:
@@ -409,8 +405,8 @@ def martinis_flux_pulse(length: float, lambda_2: float, lambda_3: float,
             .format(theta_i))
 
     # Transform from proper time to real time
-    t = np.array([np.trapz(np.sin(theta_wave)[:i+1], dx=1/(10*sampling_rate))
-                  for i in range(len(theta_wave))])
+    t = np.array([np.trapz(np.sin(theta_wave_clipped)[:i+1], dx=1/(10*sampling_rate))
+                  for i in range(len(theta_wave_clipped))])
 
     # Interpolate pulse at physical sampling distance
     t_samples = np.arange(0, length, 1/sampling_rate)
@@ -425,35 +421,20 @@ def martinis_flux_pulse(length: float, lambda_2: float, lambda_3: float,
         # Theta is returned in radians here
         return np.nan_to_num(interp_wave)
 
-    # Convert to detuning from f_interaction
+    # Convert to detuning between f_20 and f_11
+    # It is equal to detuning between f_11 and interaction point
     delta_f_wave = 2 * J2 / np.tan(interp_wave)
-    if return_unit == 'eps':
-        return np.nan_to_num(delta_f_wave)
 
     # Convert to parametrization of f_01
     f_01_wave = delta_f_wave + f_interaction
-    if return_unit == 'f01':
-        return np.nan_to_num(f_01_wave)
-
-    # Convert to voltage
-    voltage_wave = Qubit_freq_to_dac(
-        frequency=f_01_wave,
-        f_max=f_01_max,
-        E_c=E_c,
-        dac_sweet_spot=V_offset,
-        V_per_phi0=V_per_phi0,
-        asymmetry=asymmetry,
-        branch='positive')
-
+    
+    return np.nan_to_num(f_01_wave)
     # why sometimes the last sample is nan is not known,
     # but we will surely figure it out someday.
     # (Brian and Adriaan, 14.11.2017)
     # This may be caused by the fill_value of the interp_wave (~30 lines up)
     # that was set to 0 instead of extrapolate. This caused
     # the np.tan(interp_wave) to divide by zero. (MAR 10-05-2018)
-    voltage_wave = np.nan_to_num(voltage_wave)
-
-    return voltage_wave
 ############################################################################
 #
 ############################################################################
