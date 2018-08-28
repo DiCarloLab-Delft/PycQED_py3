@@ -231,15 +231,17 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         if state == '01':
             polycoeffs += self.q_polycoeffs_freq_01_det()
             polycoeffs[2] += self.q_freq_01()
-        elif state == '11':
-            polycoeffs += self.q_polycoeffs_freq_01_det()
-            polycoeffs[2] += self.q_freq_01() + self.q_freq_10()
         elif state == '02':
             polycoeffs += 2*self.q_polycoeffs_freq_01_det()
             polycoeffs += self.q_polycoeffs_anharm()
             polycoeffs[2] += 2*self.q_freq_01()
+        elif state == '10':
+            polycoeffs[2] += self.q_freq_10()
+        elif state == '11':
+            polycoeffs += self.q_polycoeffs_freq_01_det()
+            polycoeffs[2] += self.q_freq_01() + self.q_freq_10()
         else:
-            raise NotImplementedError()
+            raise NotImplementedError('State {} not recognized'.format(state))
         return polycoeffs
 
 
@@ -1236,8 +1238,15 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         amps = np.linspace(-2.5, 2.5, 101)  # maximum voltage of AWG amp mode
 
         freqs = self.amp_to_frequency(amps, state='01')
-
         ax.plot(amps, freqs, label='$f_{01}$')
+        freqs = self.amp_to_frequency(amps, state='02')
+        ax.plot(amps, freqs, label='$f_{02}$')
+        freqs = self.amp_to_frequency(amps, state='10')
+        ax.plot(amps, freqs, label='$f_{10}$')
+        freqs = self.amp_to_frequency(amps, state='11')
+        ax.plot(amps, freqs, label='$f_{11}$')
+
+
         # ax.axhline(self.cz_freq_interaction(), -5, 5,
         #            label='$f_{\mathrm{int.}}$:'+' {:.3f} GHz'.format(
         #     self.cz_freq_interaction()*1e-9),
