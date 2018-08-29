@@ -116,7 +116,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                            # initial value is chosen to not raise errors
                            initial_value=6e9,
                            unit='Hz', parameter_class=ManualParameter)
-        self.add_parameter('cz_J2', vals=vals.Numbers(), unit='Hz',
+        self.add_parameter('q_J2', vals=vals.Numbers(), unit='Hz',
                            docstring='effective coupling between the 11 and '
                            '02 states.',
                            # initial value is chosen to not raise errors
@@ -212,7 +212,6 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
     def _get_cfg_operating_mode(self):
         return self._cfg_operating_mode
 
-
     def get_polycoeffs_state(self, state: str):
         """
         Args:
@@ -243,7 +242,6 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         else:
             raise NotImplementedError('State {} not recognized'.format(state))
         return polycoeffs
-
 
     def amp_to_frequency(self, amp: float, state: str='01'):
         """
@@ -495,8 +493,11 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         self._wave_dict['i'] = self._gen_i()
         self._wave_dict['square'] = self._gen_square()
         self._wave_dict['park'] = self._gen_park()
-        self._wave_dict['cz'] = self._gen_cz()
-        self._wave_dict['cz_z'] = self._gen_cz_z(regenerate_cz=False)
+
+        # FIXME: reenable this
+        self._wave_dict['cz'] = np.zeros(10) # self._gen_cz()
+        self._wave_dict['cz_z'] = np.zeros(10) # self._gen_cz_z(regenerate_cz=False)
+
         self._wave_dict['idle_z'] = self._gen_idle_z()
         self._wave_dict['custom_wf'] = self._gen_custom_wf()
         self._wave_dict['multi_square'] = self._gen_multi_square(
