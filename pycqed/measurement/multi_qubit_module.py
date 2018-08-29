@@ -1372,6 +1372,7 @@ def cphase_gate_tuneup(qb_control, qb_target,
 
 def cphase_gate_tuneup_predictive(qbc, qbt, qbr,n_meas,flux_lengths=None,
                                   flux_amps=None,MC=None,
+                                  hyper_parameter_dict=None,
                                   spacing=20e-9,
                                   ramsey_phases=None):
 
@@ -1389,7 +1390,17 @@ def cphase_gate_tuneup_predictive(qbc, qbt, qbr,n_meas,flux_lengths=None,
         pulse_length_best_value, pulse_amplitude_best_value
 
     '''
-
+    if hyper_parameter_dict is None:
+        logging.warning('\n No hyperparameters passed to predictive mixer '
+                        'calibration routine. Default values for the estimator'
+                        'will be used!\n')
+        hyper_paramter_dict={'hidden_layers':[10],
+                             'learning_rate': 1e-3,
+                             'regularization_coefficient': 0.,
+                             'std_scaling':0.6,
+                             'learning_steps':5000,
+                             'cv_n_fold':5,
+                             'polynomial_dimension':2}
     if MC is None:
         MC= qbc.MC
     if flux_lengths is None:

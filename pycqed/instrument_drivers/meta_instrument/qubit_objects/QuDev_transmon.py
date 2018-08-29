@@ -1564,24 +1564,31 @@ class QuDev_transmon(Qubit):
                                  amplitude=0.1,
                                  estimator='GRNN_neupy',
                                  n_meas=100,two_rounds=False,
-                                 hidden_layers = [30,30],**kwargs):
+                                 hyper_parameter_dict=None,**kwargs):
         '''
         Prospect function to handle simultaneous optimization of carrier and
         skewness calibration.
         By default used for mixer carrier suppression.
         The carrier suppression makes use of the measure_soft_static method in MC
         '''
-
+        if hyper_parameter_dict is None:
+            logging.warning('\n No hyperparameters passed to predictive mixer '
+                            'calibration routine. Default values for the estimator'
+                            'will be used!\n')
+            hyper_paramter_dict={'hidden_layers':[10],
+                                 'learning_rate': 1e-3,
+                                 'regularization_coefficient': 0.,
+                                 'std_scaling':0.6,
+                                 'learning_steps':5000,
+                                 'cv_n_fold':5,
+                                 'polynomial_dimension':2}
         if MC is None:
             MC = self.MC
+
         std_devs = kwargs.pop('std_devs',[0.2,0.2])
-        alpha = kwargs.pop('alpha',1e-3)
-        beta = kwargs.pop('beta',0.)
-        gamma = kwargs.pop('gamma',0.6)
-        n_fold = kwargs.get('n_fold',5)
-        iters = kwargs.pop('iters',5000)
         c = kwargs.pop('second_round_std_scale',0.3)
         first_round_limits = kwargs.pop('first_round_limits',[-1.,0.5,-1.,0.5])
+
         ch_1_min =0.         #might be redundant
         ch_2_min =0.
         if isinstance(std_devs,list) or isinstance(std_devs,np.ndarray):
@@ -1621,22 +1628,14 @@ class QuDev_transmon(Qubit):
             MC.set_sweep_functions(S)
             MC.set_sweep_points(meas_grid.T)
             MC.set_detector_function(det.IndexDetector(detector, 0))
-            ad_func_pars = {'hidden_layers': hidden_layers,
-                            'iters':iters,
-                            'alphas': alpha,
-                            'minimize': True,
-                            'estimator': est,
-                            'iters': iters,
-                            'beta': beta,
-                            'gamma': gamma,
-                            'ndim': 2,
-                            'nfold':n_fold}
+
             self.AWG.start()
             MC.run(name='drive_carrier_calibration' + self.msmt_suffix)
             self.AWG.stop()
             a = ma.OptimizationAnalysisNN(label='drive_carrier_calibration',
                                           meas_grid=meas_grid,
-                                          ad_func_pars=ad_func_pars,
+                                          estimator=est,
+                                          hyper_parameter_dict=hyper_parameter_dict,
                                           round=runs,make_fig=make_fig)
             ch_1_min = a.optimization_result[0]
             ch_2_min = a.optimization_result[1]
@@ -1759,7 +1758,6 @@ class QuDev_transmon(Qubit):
                                                 trigger_sep=4e-6,
                                                 two_rounds=False,
                                                 estimator='GRNN_neupy',
-                                                hidden_layers = [30,30],
                                                 **kwargs):
         '''
         Running a complete drive mixer calibration with spectrum measurements before
@@ -1767,6 +1765,8 @@ class QuDev_transmon(Qubit):
         the dB values of Power ratio between before and after spectrum.
         For detailed info inspect implementations of the below used methods.
         '''
+
+
         self.RO_acq_integration_length(0.5e-6)
         print('RO_acq_int_len set to: ',self.RO_acq_integration_length())
         ma1 = self.measure_drive_mixer_spectrum(if_freqs,MC=MC,
@@ -1797,7 +1797,7 @@ class QuDev_transmon(Qubit):
                                           amplitude=0.1,trigger_sep=5e-6,
                                           two_rounds=False,
                                           estimator='GRNN_neupy',
-                                          hidden_layers=[30, 30],
+                                          hyper_parameter_dict=None,
                                           first_round_limits=[0.6, 1.2, -50, 35],
                                           **kwargs):
         if not len(first_round_limits)==4:
@@ -1805,14 +1805,22 @@ class QuDev_transmon(Qubit):
                           '<calibrate_drive_mixer_skewness_NN> needs to be a list '
                           'or 1D array of length 4.\n'
                           'found length',len(first_round_limits),' object instead!--')
+
+        if hyper_parameter_dict is None:
+            logging.warning('\n No hyperparameters passed to predictive mixer '
+                            'calibration routine. Default values for the estimator'
+                            'will be used!\n')
+            hyper_paramter_dict={'hidden_layers':[10],
+                                 'learning_rate': 1e-3,
+                                 'regularization_coefficient': 0.,
+                                 'std_scaling':0.6,
+                                 'learning_steps':5000,
+                                 'cv_n_fold':5,
+                                 'polynomial_dimension':2}
         if MC is None:
             MC = self.MC
-        alpha = kwargs.get('alpha',1e-2)
-        beta = kwargs.get('beta',0.)
-        gamma = kwargs.get('gamma',0.5)
+
         std_devs = kwargs.get('std_devs',[0.3,10.])
-        n_fold = kwargs.get('n_fold',5)
-        iters = kwargs.get('iters',3000)
         c = kwargs.pop('second_round_std_scale',0.4)
         #Could make sample size variable (maxiter) for better adapting)
         if isinstance(std_devs,list) or isinstance(std_devs,np.ndarray):
@@ -1863,22 +1871,14 @@ class QuDev_transmon(Qubit):
             MC.set_sweep_functions([s1, s2])
             MC.set_sweep_points(meas_grid.T)
             MC.set_detector_function(detector)
-            ad_func_pars = {'hidden_layers': hidden_layers,
-                            'alpha': alpha,
-                            'minimize': True,
-                            'estimator': est,
-                            'iters': iters,
-                            'beta': beta,
-                            'gamma': gamma,
-                            'ndim':2,
-                            'nfold':n_fold}
             MC.run(name='drive_skewness_calibration' + self.msmt_suffix)
 
             a = ma.OptimizationAnalysisNN(label='drive_skewness_calibration',
-                                          ad_func_pars=ad_func_pars,
-                                          meas_grid=meas_grid,
-                                          two_rounds = two_rounds,
-                                          round=runs,make_fig=make_fig)
+                                      hyper_parameter_dict=hyper_parameter_dict,
+                                      meas_grid=meas_grid,
+                                      estimator=est,
+                                      two_rounds = two_rounds,
+                                      round=runs,make_fig=make_fig)
 
             alpha_ = a.optimization_result[0]
             phi_ = a.optimization_result[1]

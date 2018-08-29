@@ -1075,24 +1075,13 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
         except:
             optimization_method = 'Numerical'
         self.meas_grid = kw.pop('meas_grid')
-        self.ad_func_pars = kw.pop('ad_func_pars')
+        self.hyper_parameter_dict = kw.pop('hyper_parameter_dict')
         self.two_rounds = kw.pop('two_rounds',False)
-        self.hidden_layers = self.ad_func_pars.pop('hidden_layers',[10.,10.])
         self.round = kw.pop('round',1)
-        self.alpha = self.ad_func_pars.pop('alpha',1e-2)
-        self.estimator_name = self.ad_func_pars.pop('estimator','GRNN_neupy')
-        self.beta = self.ad_func_pars.pop('beta',0.)
-        self.gamma = self.ad_func_pars.pop('gamma',1.)
-        self.iters = self.ad_func_pars.pop('iters',200)
-        self.ndim = self.ad_func_pars.pop('ndim',2)
-        self.n_fold = self.ad_func_pars.pop('n_fold',5)
+        self.estimator_name = kw.pop('estimator','GRNN_neupy')
         self.accuracy= -np.infty
         self.make_fig = kw.pop('make_fig',True)
-        #already rescaled to original average,interval.
-        # self.optimization_result,\
-        # self.estimator,\
-        # test_vals =    self.train_NN(**kw)
-        #self.test_data = test_vals[:2]
+
         self.train_NN(**kw)
 
         if self.round > int(self.two_rounds) or self.round==0:     #only create figures in the last iteration
@@ -1109,16 +1098,9 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
             self.abs_vals = np.sqrt(self.measured_values[0,:]**2 + self.measured_values[1,:]**2)
         result,est,opti_flag\
                                   = opt.neural_network_opt(None, self.meas_grid,
-                                          self.abs_vals,
-                                          hidden_layers = self.hidden_layers,
-                                          alpha= self.alpha,
-                                          solver='lbfgs',
-                                          estimator=self.estimator_name,
-                                          iters = self.iters,
-                                          beta=self.beta,
-                                          gamma=self.gamma,
-                                          ndim=self.ndim,
-                                          n_fold = self.n_fold)
+                                      self.abs_vals,
+                                      estimator=self.estimator_name,
+                                      hyper_paramter_dict=self.hyper_parameter_dict)
         #test_grid and test_target values. Centered and scaled to [-1,1] since
         #only used for performance estimation of estimator
         self.opti_flag = opti_flag
@@ -2692,6 +2674,59 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
         self.fit_result['exc_offset'] = fit_res.values['offset']
 
         # TODO: save fit params
+
+class CPhase_Predictive_Analysis(MeasurementAnalysis):
+
+    def __init__(self, lengths,amps,cphases,populations,estimator='GRNN_neupy',
+                 hyper_parameter_dict=None):
+
+        self.meas_grid = np.array([lengths,amps]).T
+        self.target_vals = np.array([populations,cphases]).T
+        self.estimator_name = estimator
+        self.hyper_parameter_dict= hyper_parameter_dict
+
+
+    def train_estimator(self):
+
+
+        result,est,opti_flag \
+            = opt.neural_network_opt(None, self.meas_grid,
+                                     self.target_vals,
+                                     estimator=self.estimator_name,
+                                     hyper_paramter_dict=self.hyper_parameter_dict)
+        self.opti_flag = opti_flag
+        self.estimator = est
+        self.optimization_result = result
+
+        return result,est
+
+    def make_figures(self,**kw):
+
+        #interpolation plot with only measurement points
+        base_figname = 'optimization of '
+        for i in range(len(self.value_names)):
+            base_figname+= self.value_names[i]
+        base_figname += '_it_'+str(self.round)
+        if np.shape(self.sweep_points)[0] == 2:
+            f, ax = plt.subplots()
+            a_tools.color_plot_interpolated(
+                x=self.sweep_points[0], y=self.sweep_points[1],
+                z=self.abs_vals, ax=ax,N_levels=25,
+                zlabel=self.ylabels[0])
+            ax.plot(self.sweep_points[0],
+                    self.sweep_points[1], 'o', c='grey')
+            ax.plot(self.optimization_result[0],
+                    self.optimization_result[1],
+                    'o', markersize=5, c='w')
+            plot_title = self.timestamp_string + '_' +self.measurementstring
+            ax.set_title(plot_title)
+            textstr = '%s ( %s )' % (self.parameter_names[0],
+                                     self.parameter_units[0])
+            set_xlabel(ax, textstr)
+            textstr = '%s ( %s )' % (self.parameter_names[1],
+                                     self.parameter_units[1])
+            set_ylabel(ax, textstr)
+            self.save_fig(f, figname=base_figname, **kw)
 
 
 class Motzoi_XY_analysis(TD_Analysis):

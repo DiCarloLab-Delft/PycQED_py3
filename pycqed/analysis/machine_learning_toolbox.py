@@ -85,23 +85,46 @@ class Estimator(metaclass=ABCMeta):
         pass
 
 class MLP_Regressor_scikit(Estimator):
+    '''
+    Ordinary neural network implementation from scikit-learn.
 
-    def __init__(self,hidden_layers=[10],output_dim=1,n_feature=1, alpha=0.5,
-                 activation='relu',pre_proc_dict=None):
+    Hyperparameters for this estimator:
+            regularization_coefficient: L1 regularization multiplier.
+                                        0. --> regularization disabled.
+            hidden_layers: network architecture. An input of [10,10] corresponds
+                           to a network with two hidden layers with 10 nodes each.
+                           additional to this, the network has input and output
+                           layers corresponding to the number of input features
+                           and output parameters. This is determined from the
+                           input training data.
+            activation_function: Activation function used throughout the network
+                                 possible functions are: 'relu'(default)
+                                                         'logistic'
+                                                         'tanh' ...
+    '''
+    def __init__(self,hyper_parameter_dict,output_dim=1,n_feature=1,
+                 pre_proc_dict=None):
 
         super().__init__(name='MLP_Regressor_scikit',pre_proc_dict=pre_proc_dict,
-                       type='Regressor')
-        self._hidden_layers = tuple(hidden_layers)
+                         type='Regressor')
+        self.hyper_parameter_dict = hyper_parameter_dict
         self.output_dim = output_dim
         self.n_feature = n_feature
-        self.alpha = alpha
-        self.activation = activation
+
+        self.extract_hyper_params_from_dict()
         self.mlpr_ = mlpr(solver='lbfgs',
                           hidden_layer_sizes=self._hidden_layers,
                           activation=self.activation,
                           alpha=self.alpha,
                           max_iter=5000)
         self.score = -np.infty
+
+    def extract_hyper_params_from_dict(self):
+        self._hidden_layers= self.hyper_parameter_dict.pop('hidden_layers',[10])
+        self._hidden_layers= tuple(self._hidden_layers)
+        self.alpha = self.hyper_parameter_dict.pop('regularization_coefficient',0.5)
+        self.activation = self.hyper_parameter_dict.pop('activation_function','relu')
+
 
     def fit(self, x_train, y_train):
 
@@ -126,26 +149,44 @@ class MLP_Regressor_scikit(Estimator):
 
 class DNN_Regressor_tf(Estimator):
     '''
-        alpha: learning rate for gradient descent
-        beta: L1 regression multiplier. 0. --> regression disabled
+    Ordinary neural network implementation in Tensorflow.
         -loss function used: squared loss l(y,y_pred)=||y - y_pred||**2
         -accuracy measure: coefficient of determination:
          R_acc = 1-sum((y-y_pred)**2)/sum((y-mean(y))**2)
         -optimizer: tf.GradientDescentOptimizer
+
+        Hyperparameters for this estimator:
+            learning_rate: learning rate for gradient descent
+            regularization_coefficient: L1 regularization multiplier.
+                                        0. --> regularization disabled.
+            hidden_layers: network architecture. An input of [10,10] corresponds
+                           to a network with two hidden layers with 10 nodes each.
+                           additional to this, the network has input and output
+                           layers corresponding to the number of input features
+                           and output parameters. This is defined by n_feature
+                           and output_dim.
+            learning_steps: Number of gradient descents performed. Can potentially
+                            be used for early stopping applications.
+
+
     '''
-    def __init__(self, hidden_layers=[10], output_dim=1, alpha = 0.5,
-                 beta=1., n_feature = 1, iters = 200, pre_proc_dict = None):
+    def __init__(self,hyper_parameter_dict,output_dim=1,n_feature = 1,
+                 pre_proc_dict = None):
 
         super().__init__(name='DNN_Regressor_tf',pre_proc_dict=pre_proc_dict,
                          type='Regressor')
+        self.hyper_parameter_dict=hyper_parameter_dict
         self._n_feature = n_feature
-        self._hidden_layers = hidden_layers
         self._output_dim = output_dim
         self._session = tf.Session()
-        self.alpha = alpha
-        self.beta = beta
-        self.iters = iters
         self.learning_acc = []
+        self.extract_hyper_params_from_dict()
+
+    def extract_hyper_params_from_dict(self):
+        self._hidden_layers= self.hyper_parameter_dict.pop('hidden_layers',[10])
+        self.alpha = self.hyper_parameter_dict.pop('learning_rate',0.5)
+        self.beta = self.hyper_parameter_dict.pop('regularization_coefficient',0.)
+        self.iters = self.hyper_parameter_dict.pop('learning_steps',200)
 
     def get_stddev(self, inp_dim, out_dim):
         std = 1.3 / math.sqrt(float(inp_dim) + float(out_dim))
@@ -248,15 +289,21 @@ class DNN_Regressor_tf(Estimator):
 
 class Polynomial_Regression(Estimator):
     '''
-    Estimator for a Polynomial regression of degree 'ndim"
+    Estimator for a Polynomial regression with degre as a hyperparameter
+
+        Hyperparameters for this estimator:
+            polynomail_dimension: degree of the regression polynomial
+
     '''
-    def __init__(self,ndim=2,mixed=False,pre_proc_dict=None):
+    def __init__(self,hyper_parameter_dict,pre_proc_dict=None):
 
         super().__init__(name='Polynomial_Regression_scikit',
                          pre_proc_dict=pre_proc_dict,type='Regressor')
         self._polyReg = None
-        self.ndim = ndim
-        self.mixed = mixed
+        self.extract_hyper_params_from_dict()
+
+    def extract_hyper_params_from_dict(self):
+        self.ndim = self.hyper_parameter_dict.pop('polynomial_dimension',1)
 
     def poly_features_transform(self,X):
         if X.ndim==1:
@@ -297,18 +344,29 @@ class Polynomial_Regression(Estimator):
 class GRNN_neupy(Estimator):
     '''
     Generalized Regression Neural Network implementation from neupy
-        gamma: scaling factor for the standard dev. input.
-               1.--> use std (or -if None- the regular std dev of the input data)
+    If the training data target values are multidimensional, for every paramter
+    in the target data, a new GRNN is initialized and trained.
+        Hyperparameters for this estimator:
+
+            gamma: list of scaling factors for the standard dev. input.
+                   1.--> use std (or -if None- the regular std dev of
+                   the input data)
     '''
-    def __init__(self,std=None,gamma=1.,verbose =False,
+    def __init__(self,hyper_paramter_dict,verbose =False,
                  pre_proc_dict=None):
 
         super().__init__(name='GRNN_neupy',pre_proc_dict=pre_proc_dict,
                        type='Regressor')
-        self._std = std
-        self._gamma = gamma
+        self.hyper_parameter_dict = hyper_paramter_dict
+        self.extract_hyper_params_from_dict()
         self._verbose = verbose
         self._grnn = None
+
+    def extract_hyper_params_from_dict(self):
+        self._std= self.hyper_parameter_dict.pop('standard_deviations',None)
+        self._gamma = self.hyper_parameter_dict.pop('std_scaling',[1.])
+        if not isinstance(self._gamma,list):
+            self._gamma = [self._gamma]
 
     def fit(self,x_train,y_train):
         if not isinstance(x_train,np.ndarray):
@@ -319,37 +377,69 @@ class GRNN_neupy(Estimator):
             y_train = np.array(y_train)
             if y_train.ndim == 1:
                 y_train.reshape((np.size(y_train),y_train.ndim))
+        if len(self._gamma) != y_train.ndim:
+            logging.warning('Hyperparameter gamma contains only '
+                            +str(len(self._gamma))+
+                            ' values while there are '+str(y_train.ndim)+ ' output'
+                            ' dimensions. Missing values are set to the value for'
+                            'the first parameter!')
+            while len(self._gamma) <= y_train.ndim:
+                self._gamma.append(self._gamma[0])
+
         if self._std is None:
             std_x = 0.
             for it in range(x_train.ndim):
                 std_x += np.std(x_train[:,it])
             self._std = std_x/x_train.ndim
-        self._grnn = grnn(std=self._gamma*self._std)
-        print('GRNN initialized with std: ',self._std)
-        self._grnn.train(x_train,y_train)
+        self._grnn = []
+        for it in range(y_train.ndim):
+            new_grnn =grnn(std=self._gamma[it]*self._std)
+            print('GRNN initialized with std: ',self._std)
+            new_grnn.train(x_train,y_train[:,it])
+            self._grnn.append(new_grnn)
 
     def predict(self,samples):
 
         if not isinstance(samples,np.ndarray):
             samples = np.array(samples)
-        return self._grnn.predict(samples)
+        predictions = []
+        for it in range(len(self._grnn)):
+            predictions.append(self._grnn[it].predict(samples))
+        return np.array(predictions)
 
     def evaluate(self,x,y):
-        pred = self._grnn.predict(x)
+        pred = self.predict(x)
         self.score = 1. - np.linalg.norm(pred-y)**2 \
                    / np.linalg.norm(y-np.mean(y,axis=0))**2
         return self.score
 
 class CrossValidationEstimator(Estimator):
+    '''
+    Estimator wrapper performing a n_fold Cross Validation
 
-    def __init__(self,estimator : Estimator,n_fold=5):
+    Hyperparameters for this estimator:
+        cv_n_fold : Number ov splittings of the training data
+                    E.g: for cv_n_fold = 5. the training data is split into 5
+                         equally sized partitions of which 4 are used for
+                         training and one for validation. The roles of the sets
+                         then switch until the estimator was tested on all
+                         partitions
+    '''
+
+
+
+    def __init__(self,hyper_parameter_dict,estimator : Estimator):
         super().__init__(name='CV_Estimator_Wrapper',
                          type='Wrapper')
         self.estimator = estimator
-        self.n_fold = n_fold
+        self.hyper_parameter_dict=hyper_parameter_dict
+        self.extract_hyper_params_from_dict()
         self.pre_proc_dict = self.estimator.pre_proc_dict
         self.gen_error_emp = None
         self.batch_errors = None
+
+    def extract_hyper_params_from_dict(self):
+        self.n_fold= self.hyper_parameter_dict.pop('cv_n_fold',1)
 
     def fit(self,x_train,y_train):
         if not isinstance(x_train,np.ndarray):
@@ -401,13 +491,17 @@ class CrossValidationEstimator(Estimator):
 
 class K_means_scikit(Estimator):
 
-    def __init__(self,n_clusters=4,pre_proc_dict=None):
+    def __init__(self,hyper_parameter_dictionary,pre_proc_dict=None):
 
         super().__init__(name='K_means_scikit',type='Clustering',
                          pre_proc_dict=pre_proc_dict)
-        self.n_clusters=n_clusters
+        self.hyper_parameter_dictionary = hyper_parameter_dictionary
+        self.extract_hyper_params_from_dict()
         self.cluster_centers = None
         self.labels = None
+
+    def extract_hyper_params_from_dict(self):
+        self.n_clusters= self.hyper_parameter_dict.pop('cluster_number',1)
 
     def fit(self,X_train):
 

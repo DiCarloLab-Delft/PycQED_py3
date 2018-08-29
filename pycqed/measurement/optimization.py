@@ -292,9 +292,8 @@ def center_and_scale(X,y):
 
 
 def neural_network_opt(fun, training_grid, target_values = None,
-                       hidden_layers=[10, 10],
-                       alpha= 0.0001, solver='lbfgs',estimator='GRNN_neupy',
-                       iters = 200, beta=0.9 , gamma=1., test_size=0.1,ndim=2,
+                       estimator='GRNN_neupy',hyper_parameter_dict=None,
+                       test_size=0.1,
                        **kwargs):
     """
     parameters:
@@ -328,7 +327,7 @@ def neural_network_opt(fun, training_grid, target_values = None,
     ###############################################################
     ###          create measurement data from test_grid         ###
     ###############################################################
-    n_fold = kwargs.get('n_fold',5)
+    n_fold = hyper_parameter_dict.get('cv_n_fold',5)
     training_grid = np.transpose(training_grid)
     #get input dimension, training grid contains parameters as row!! vectors
     if len(np.shape(training_grid)) == 1:
@@ -373,34 +372,32 @@ def neural_network_opt(fun, training_grid, target_values = None,
     ###    and MLPR instance and fit a model functione to fun()     ###
     ##################################################################
     def mlpr():
-        est = ml.MLP_Regressor_scikit(hidden_layers=hidden_layers,
-                                   output_dim=output_dim,
-                                   n_feature=n_samples,
-                                   alpha=[alpha],
-                                   pre_proc_dict=pre_processing_dict)
+        est = ml.MLP_Regressor_scikit(hyper_parameter_dict,
+                                      output_dim=output_dim,
+                                      n_feature=n_samples,
+                                      pre_proc_dict=pre_processing_dict)
         est.fit(training_grid, np.ravel(target_values))
         est.print_best_params()
         return est
 
     def dnnr():
-        est = ml.DNN_Regressor_tf(hidden_layers=hidden_layers,
+        est = ml.DNN_Regressor_tf(hyper_parameter_dict,
                                output_dim=output_dim,
                                n_feature=n_features,
-                               alpha=alpha,
-                               iters = iters,
-                               beta = beta,
                                pre_proc_dict=pre_processing_dict)
         est.fit(training_grid,target_values)
         return est
 
     def grnn():
-        est = ml.GRNN_neupy(gamma=gamma, pre_proc_dict=pre_processing_dict)
-        cv_est = ml.CrossValidationEstimator(est,n_fold=n_fold)
+        est = ml.GRNN_neupy(hyper_parameter_dict,
+                            pre_proc_dict=pre_processing_dict)
+        cv_est = ml.CrossValidationEstimator(hyper_parameter_dict,est)
         cv_est.fit(training_grid,target_values)
         return cv_est
 
     def polyreg():
-        est = ml.Polynomial_Regression(ndim=ndim, pre_proc_dict=pre_processing_dict)
+        est = ml.Polynomial_Regression(hyper_parameter_dict,
+                                       pre_proc_dict=pre_processing_dict)
         est.fit(training_grid,target_values)
         return est
 
