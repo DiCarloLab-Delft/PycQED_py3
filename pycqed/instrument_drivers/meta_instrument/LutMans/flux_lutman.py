@@ -338,6 +338,18 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         # imaginary part is ignored, instead sticking to closest real value
         return np.real(sol)
 
+    def calc_net_zero_length_ratio(self):
+        """
+        Determines the lenght ratio of the net-zero pulses based on the
+        parameter "czd_length_ratio"
+        """
+        if self.czd_length_ratio() != 'auto':
+            return self.czd_length_ratio()
+        else:
+            print('TODO')
+            raise NotImplementedError()
+
+
     def get_dac_val_to_amp_scalefactor(self):
         """
         Returns the scale factor to transform an amplitude in 'dac value' to an
@@ -430,7 +442,13 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         self.add_parameter('czd_length_ratio',
                            vals=vals.MultiType(vals.Numbers(0, 1),
                                                vals.Enum('auto')),
-                           initial_value='auto',
+                           initial_value=0.5,
+                           docstring='When using a net-zero pulse, this '
+                           'parameter is used to determine the length ratio'
+                           ' of the positive and negative parts of the pulse.'
+                           'If this is set to "auto", the ratio will be '
+                           'automatically determined to ensure the integral '
+                           'of the net-zero pulse is close to zero.',
                            parameter_class=ManualParameter)
         self.add_parameter(
             'czd_lambda_2',

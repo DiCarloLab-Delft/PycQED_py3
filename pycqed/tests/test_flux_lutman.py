@@ -334,6 +334,17 @@ class Test_Flux_LutMan(unittest.TestCase):
             uploaded_wf_instr = self.AWG.wave_ch1_cw003()
             np.testing.assert_array_almost_equal(uploaded_wf_lutman,
                                                  uploaded_wf_instr)
+    @unittest.expectedFailure
+    def test_length_ratio(self):
+        self.flux_lutman.czd_length_ratio(.5)
+        lr = self.fluxlutman.calc_net_zero_length_ratio()
+        self.assertEqual(lr, 0.5)
+
+        self.flux_lutman.czd_length_ratio('auto')
+        lr = self.fluxlutman.calc_net_zero_length_ratio()
+        # raises not implemented
+
+
 
     @classmethod
     def tearDownClass(self):

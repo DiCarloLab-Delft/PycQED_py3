@@ -24,7 +24,7 @@ def martinis_flux_pulse(length: float,
     Note that θ still needs to be transformed into detuning from the
     interaction and into AWG amplitude V(t).
 
-        θ = θ_i + Σ_{n=1}^N  (λ_n*(1-cos(n*2*pi*t/t_p))/2
+        θ(τ) = θ_i + Σ_{n=1}^N  (λ_n*(1-cos(n*2*pi*τ/τ_p))/2
 
     Args:
         length      :   lenght of the waveform (s)
@@ -38,7 +38,7 @@ def martinis_flux_pulse(length: float,
     This waveform is generated in several steps
         1. Generate a time grid, may include fine sampling.
         2. Generate θ(τ) using eqs 15 and 16
-        3. Transform from proper time τ to real time t using interpolation
+        3. Transform from proper time "τ" to real time "t" using interpolation
 
     """
     if theta_f < theta_i:
