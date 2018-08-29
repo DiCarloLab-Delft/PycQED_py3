@@ -51,7 +51,7 @@ class Test_Flux_LutMan(unittest.TestCase):
         self.fluxlutman_partner.set_default_lutmap()
         self.fluxlutman_partner.instr_partner_lutman('fluxlutman_main')
 
-    def test__program_hash_differs_AWG8_flux_lutman(self):
+    def test_program_hash_differs_AWG8_flux_lutman(self):
 
         # set to a random value to ensure different
         self.fluxlutman._awgs_fl_sequencer_program_expected_hash(351340)
@@ -96,7 +96,6 @@ class Test_Flux_LutMan(unittest.TestCase):
     def test_plot_level_diagram(self):
         self.fluxlutman.plot_level_diagram(show=False)
 
-    @unittest.expectedFailure
     def test_plot_cz_trajectory(self):
         self.fluxlutman.plot_cz_trajectory(show=False)
 
@@ -280,7 +279,7 @@ class Test_Flux_LutMan(unittest.TestCase):
 
     def test_generate_standard_flux_waveforms(self):
         self.fluxlutman.generate_standard_waveforms()
-        self.fluxlutman.render_wave('cz')
+
 
     def test_upload_and_distort(self):
         self.fluxlutman.load_waveforms_onto_AWG_lookuptable()

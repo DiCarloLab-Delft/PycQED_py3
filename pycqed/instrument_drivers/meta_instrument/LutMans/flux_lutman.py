@@ -483,7 +483,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             ' the CZ waveform should evaluate to. This is realized by adding'
             ' an offset to the phase correction pulse.\nBy setting this '
             'parameter to np.nan no offset correction is performed.',
-            initial_value=0,
+            initial_value=np.nan,
             unit='dac value * samples',
             vals=vals.MultiType(vals.Numbers(), NP_NANs()),
             parameter_class=ManualParameter)
@@ -563,6 +563,9 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         return np.zeros(42)
 
     def _gen_cz(self):
+        """
+        Generates the CZ waveform.
+        """
 
         dac_scale_factor = self.get_amp_to_dac_val_scale_factor()
         eps_i = self.calc_amp_to_eps(0, state_A='11', state_B='02')
@@ -1237,24 +1240,43 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
     #  Plotting methods            #
     #################################
 
-    def plot_cz_trajectory(self, ax=None, show=True):
+    def plot_cz_trajectory(self, axs=None, show=True,
+                           extra_plot_samples: int=50):
         """
         Plots the cz trajectory in frequency space.
         """
-        if ax is None:
-            f, ax = plt.subplots()
-        extra_samples = 10
+        if axs is None:
+            f, axs = plt.subplots(figsize=(5, 7), nrows=3, sharex=True)
         nr_plot_samples = int((self.cz_length()+self.cz_phase_corr_length()) *
-                              self.sampling_rate() + extra_samples)
+                              self.sampling_rate() + extra_plot_samples)
+
         dac_amps = self._wave_dict['cz_z'][:nr_plot_samples]
-        samples = np.arange(len(dac_amps))
-        amps = dac_amps*self.get_dac_val_to_amp_scalefactor()
-        deltas = self.amp_to_detuning(amps)
-        freqs = self.cz_freq_01_max()-deltas
-        ax.scatter(amps, freqs, c=samples, label='CZ trajectory')
+        t = np.arange(0, len(dac_amps))*1/self.sampling_rate()
+
+        CZ_amp = dac_amps*self.get_dac_val_to_amp_scalefactor()
+        CZ_eps = self.calc_amp_to_eps(CZ_amp, '11', '02')
+        CZ_theta = wfl.eps_to_theta(CZ_eps, self.q_J2())
+
+        axs[0].plot(t, np.rad2deg(CZ_theta), marker='.')
+        axs[0].fill_between(t, np.rad2deg(CZ_theta), color='C0', alpha=.5)
+        set_ylabel(axs[0], r'$\theta$', 'deg')
+
+        axs[1].plot(t, CZ_eps, marker='.')
+        axs[1].fill_between(t, CZ_eps, color='C0', alpha=.5)
+        set_ylabel(axs[1], r'$\epsilon_{11-02}$', 'Hz')
+
+        axs[2].plot(t, CZ_amp, marker='.')
+        axs[2].fill_between(t, CZ_amp, color='C0', alpha=.1)
+        set_xlabel(axs[2], 'Time', 's')
+        set_ylabel(axs[2], r'Amp.', 'V')
+        # axs[2].set_ylim(-1, 1)
+        axs[2].axhline(0, lw=.2, color='grey')
+        CZ_amp_pred = self.distort_waveform(CZ_amp)[:len(CZ_amp)]
+        axs[2].plot(t, CZ_amp_pred, marker='.')
+        axs[2].fill_between(t, CZ_amp_pred, color='C1', alpha=.3)
         if show:
             plt.show()
-        return ax
+        return axs
 
     def plot_level_diagram(self, ax=None, show=True):
         """
