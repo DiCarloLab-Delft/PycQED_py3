@@ -1687,7 +1687,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
 def measure_chevron(qbc, qbt, qbr, lengths, amplitudes,
                     cal_points=True, upload=True,
                     verbose=False, return_seq=False,
-                    max_nr_elts=240, MC=None, soft_averages=1):
+                    MC=None, soft_averages=1):
 
     if MC is None:
         MC = qbc.MC
@@ -1740,3 +1740,247 @@ def measure_chevron(qbc, qbt, qbr, lengths, amplitudes,
     MC.set_sweep_function_2D(sf2)
     MC.set_sweep_points_2D(amplitudes)
     MC.set_detector_function(qbr.int_avg_det)
+
+
+def measure_cphase_new( qbc, qbt, qbr, amps, lengths,
+                       phases=None,MC=None, cal_points=None, plot=False,
+                       return_population_loss=False,
+                       prepare_for_timedomain=True,
+                       upload=True):
+    '''
+    method to measure the phase acquired during a flux pulse conditioned on the state
+    of the control qubit (self).
+    In this measurement, the phase from two Ramsey type measurements
+    on qb_target is measured, once with the control qubit in the excited state and once
+    in the ground state. The conditional phase is calculated as the difference.
+
+
+    Args:
+        qb_target (QuDev_transmon): target qubit / non-fluxed qubit
+        amps (list): list or array of flux pulse amplitudes
+        lengths (list):  list or array of flux pulse lengths (must have same dimension as
+                         amps)
+        phases (array): phases used for the Ramsey type phase sweep
+        spacing (float): spacing between flux pulse and Ramsey pulses in s
+        MC (optional): measurement control
+        cal_points (bool): if True, calibration points are measured
+        plot (bool): if true, the phase fit is shown
+        return_population_loss: if true, the population loss (loss of contrast when having
+                                the control qubit in the excited state is returned)
+        upload_AWGs (list): list of the AWGs to be uploaded
+        upload_channels (list): list of channels to be uploaded
+        prepare_for_timedomain (bool): if False, the self.prepare_for_timedomain()
+                                       is NOT called
+
+    Returns:
+        cphases (numpy array): array of the conditional phases measured at
+                              (amps[i], lengths[i])
+    '''
+    if len(amps) != len(lengths):
+        logging.warning('amps and lengths must have the same '
+                        'dimension.')
+
+    if MC is None:
+        MC = qbc.MC
+    if phases is None:
+        phases = np.linspace(0, 2*np.pi, 16, endpoint=False)
+        phases = np.concatenate((phases,phases))
+
+    operation_dict = get_operation_dict([qbc, qbt, qbr])
+    CZ_pulse_name = 'CZ ' + qbt.name + ' ' + qbc.name
+
+    flux_channel = operation_dict[CZ_pulse_name]['channel']
+
+    cphase_all = []
+    population_loss_all = []
+
+    s1 = awg_swf.Flux_pulse_CPhase_meas_hard_swf_new(
+                                qbc.name,
+                                qbt.name,
+                                qbr.name,
+                                CZ_pulse_name,
+                                operation_dict,
+                                cal_points=cal_points,
+                                reference_measurement=True,
+                                upload=upload)
+    s2 = awg_swf.Flux_pulse_CPhase_phase_soft_swf(s1,sweep_param='length',
+                                                  upload=upload)
+    s3 = awg_swf.Flux_pulse_Cphase_soft_swf(s1,sweep_param='amplitude',
+                                    upload=upload)
+
+    if prepare_for_timedomain:
+        for qb in [qbc, qbt, qbr]:
+             qb.prepare_for_timedomain()
+
+    MC.set_sweep_functions([s1,s2,s3])
+    MC.set_sweep_points(phases)
+    MC.set_sweep_points_2D(np.array([lengths,amps]).T)
+    MC.set_detector_function(qbr.int_avg_det)
+    MC.run_2D('CPhase_measurement_{}_{}'.format(qbc.name,qbt.name))
+
+    # ma.TwoD_Analysis(close_file=True)
+    flux_pulse_ma = ma.Fluxpulse_Ramsey_2D_Analysis(
+        label='CPhase_measurement_{}_{}'.format(qbc.name,qbt.name),
+        qb_name=qbc.name, cal_points=cal_points,
+        reference_measurements=True, auto=False
+        )
+    fitted_phases, fitted_amps = \
+        flux_pulse_ma.fit_all(plot=False,
+                              cal_points=cal_points,
+                              return_ampl=True,
+                              )
+
+    fitted_phases_exited = fitted_phases[:: 2]
+    fitted_phases_ground = fitted_phases[1:: 2]
+
+    cphases = fitted_phases_exited - fitted_phases_ground
+
+    fitted_amps_exited = fitted_amps[:: 2]
+    fitted_amps_ground = fitted_amps[1:: 2]
+
+    pop_loss = np.abs(fitted_amps_ground - fitted_amps_exited) \
+               /fitted_amps_ground
+
+    cphase_all.append(cphases[0])
+    population_loss_all.append(pop_loss[0])
+
+    plot_title = 'fitted CPhase: {:.3f} deg at' \
+                 ' amp={:.2f}mV,' \
+                 ' length={:.3f}ns'.format(cphases[0]/np.pi*180,
+                                           amps[0]/1e-3, lengths[0]/1e-9)
+    flux_pulse_ma.fit_all(plot=plot,
+                          cal_points=cal_points,
+                          return_ampl=True,
+                          save_plot=True,
+                          plot_title=plot_title,
+                          only_cos_fits=True
+                          )
+    cphase_all = np.array(cphase_all)
+    population_loss_all = np.array(population_loss_all)
+    if return_population_loss:
+        return cphase_all, population_loss_all
+    else:
+        return cphase_all
+
+
+def measure_cphase_new2( qbc, qbt, qbr, amps, lengths,
+                        phases=None,MC=None, cal_points=None, plot=False,
+                        return_population_loss=False,
+                        prepare_for_timedomain=True,
+                        upload=True):
+    '''
+    method to measure the phase acquired during a flux pulse conditioned on the state
+    of the control qubit (self).
+    In this measurement, the phase from two Ramsey type measurements
+    on qb_target is measured, once with the control qubit in the excited state and once
+    in the ground state. The conditional phase is calculated as the difference.
+
+
+    Args:
+        qb_target (QuDev_transmon): target qubit / non-fluxed qubit
+        amps (list): list or array of flux pulse amplitudes
+        lengths (list):  list or array of flux pulse lengths (must have same dimension as
+                         amps)
+        phases (array): phases used for the Ramsey type phase sweep
+        spacing (float): spacing between flux pulse and Ramsey pulses in s
+        MC (optional): measurement control
+        cal_points (bool): if True, calibration points are measured
+        plot (bool): if true, the phase fit is shown
+        return_population_loss: if true, the population loss (loss of contrast when having
+                                the control qubit in the excited state is returned)
+        upload_AWGs (list): list of the AWGs to be uploaded
+        upload_channels (list): list of channels to be uploaded
+        prepare_for_timedomain (bool): if False, the self.prepare_for_timedomain()
+                                       is NOT called
+
+    Returns:
+        cphases (numpy array): array of the conditional phases measured at
+                              (amps[i], lengths[i])
+    '''
+    if len(amps) != len(lengths):
+        logging.warning('amps and lengths must have the same '
+                        'dimension.')
+
+    if MC is None:
+        MC = qbc.MC
+    if phases is None:
+        phases = np.linspace(0, 2*np.pi, 16, endpoint=False)
+        phases = np.concatenate((phases,phases))
+
+    operation_dict = get_operation_dict([qbc, qbt, qbr])
+    CZ_pulse_name = 'CZ ' + qbt.name + ' ' + qbc.name
+
+    flux_channel = operation_dict[CZ_pulse_name]['channel']
+
+    cphase_all = []
+    population_loss_all = []
+    reference_measurement = False
+    for i,phase in enumerate(phases):
+
+        if i >= int(len(phases)/2):
+            reference_measurement=True
+
+        s1 = awg_swf.Flux_pulse_CPhase_meas_hard_swf_new(
+            phase,
+            qbc.name,
+            qbt.name,
+            qbr.name,
+            CZ_pulse_name,
+            operation_dict,
+            cal_points=cal_points,
+            reference_measurement=reference_measurement,
+            upload=upload)
+        s2 = awg_swf.arbitrary_variable_swf() #This is just a dummy to make sure MC works
+
+        if prepare_for_timedomain:
+            for qb in [qbc, qbt, qbr]:
+                qb.prepare_for_timedomain()
+
+        MC.set_sweep_functions([s1,s2])
+        MC.set_sweep_points(np.array([lengths,amps]).T)
+        MC.set_detector_function(qbr.int_avg_det)
+        MC.run('CPhase_measurement_{}_{}'.format(qbc.name,qbt.name))
+
+    # ma.TwoD_Analysis(close_file=True)
+    flux_pulse_ma = ma.Fluxpulse_Ramsey_2D_Analysis(
+        label='CPhase_measurement_{}_{}'.format(qbc.name,qbt.name),
+        qb_name=qbc.name, cal_points=cal_points,
+        reference_measurements=True, auto=False
+    )
+    fitted_phases, fitted_amps = \
+        flux_pulse_ma.fit_all(plot=False,
+                              cal_points=cal_points,
+                              return_ampl=True,
+                              )
+
+    fitted_phases_exited = fitted_phases[:: 2]
+    fitted_phases_ground = fitted_phases[1:: 2]
+
+    cphases = fitted_phases_exited - fitted_phases_ground
+
+    fitted_amps_exited = fitted_amps[:: 2]
+    fitted_amps_ground = fitted_amps[1:: 2]
+
+    pop_loss = np.abs(fitted_amps_ground - fitted_amps_exited) \
+               /fitted_amps_ground
+
+    cphase_all.append(cphases[0])
+    population_loss_all.append(pop_loss[0])
+
+    plot_title = 'fitted CPhase: {:.3f} deg at' \
+                 ' amp={:.2f}mV,' \
+                 ' length={:.3f}ns'.format(cphases[0]/np.pi*180,
+                                           amps[0]/1e-3, lengths[0]/1e-9)
+    flux_pulse_ma.fit_all(plot=plot,
+                          cal_points=cal_points,
+                          return_ampl=True,
+                          save_plot=True,
+                          plot_title=plot_title,
+                          only_cos_fits=True
+                          )
+    cphase_all = np.array(cphase_all)
+    population_loss_all = np.array(population_loss_all)
+    if return_population_loss:
+        return cphase_all, population_loss_all
+    else:
+        return cphase_all

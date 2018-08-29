@@ -2166,7 +2166,7 @@ class Chevron_length_swf_new(swf.Hard_Sweep):
 
     def prepare(self, upload_all=True, **kw):
         if self.upload:
-            fsqs.Chevron_length_seq(
+            fsqs.Chevron_length_seq_new(
                 lengths=self.lengths,
                 flux_pulse_amp=self.flux_pulse_amp,
                 qb_name_c=self.qbc_name,
@@ -2423,6 +2423,7 @@ class Flux_pulse_CPhase_meas_hard_swf(swf.Hard_Sweep):
         elif sweep_mode == 'phase':
             self.unit = 'rad'
 
+
     def prepare(self, X90_phase=None, **kw):
 
         if X90_phase is not None:
@@ -2440,11 +2441,139 @@ class Flux_pulse_CPhase_meas_hard_swf(swf.Hard_Sweep):
                 upload_channels=self.upload_channels
             )
 
+class Flux_pulse_CPhase_hard_swf_new(swf.Hard_Sweep):
 
-class Flux_pulse_CPhase_meas_2D(swf.Soft_Sweep):
+    def __init__(self, qbc_name, qbt_name,qbr_name,CZ_pulse_name,
+                 operation_dict,max_flux_length,
+                 cal_points=False, upload=True,
+                 reference_measurement=False):
+        '''
+            Flexible sweep function class for a single slice of the CPhase
+            experiment (hard sweep) that can either sweep the amplitude or
+            length of the flux pulse or the phase of the second X90 pulse.
+            For details on the experiment see documentation of
+            'fsqs.flux_pulse_CPhase_seq(...)'
 
-    def __init__(self, qb_control, qb_target, hard_sweep,
-                 sweep_mode='amplitude', upload=True):
+        Args:
+            qb_control: instance of the qubit class (control qubit)
+            qb_target: instance of the qubit class (target qubit)
+            sweep_mode: string, either 'length', 'amplitude' or 'amplitude'
+            X90_phase: float, phase of the second X90 pulse in rad
+            spacing: float, spacing between first and second X90 pulse
+            measurement_mode (str): either 'excited_state', 'ground_state'
+            reference_measurement (bool): if True, appends a reference measurement
+                                          IMPORTANT: you need to double
+                                          the hard sweep points!
+                                          e.g. thetas = np.concatenate((thetas,thetas))
+        '''
+        super().__init__()
+        self.qbc_name = qbc_name
+        self.qbt_name = qbt_name
+        self.qbr_name = qbr_name
+        self.operation_dict = operation_dict
+        self.CZ_pulse_name = CZ_pulse_name
+        self.upload = upload
+        self.cal_points = cal_points
+        self.reference_measurement = reference_measurement
+        self.name = 'flux_pulse_CPhase_measurement_phase_sweep'
+        self.parameter_name ='phase'
+        self.max_flux_length = max_flux_length
+        self.flux_length=None
+        self.flux_amplitude=None
+        self.values_complete = False
+
+    def prepare(self,flux_params=None,**kw):
+        if flux_params is None:
+            return
+
+        if self.upload:
+            fsqs.flux_pulse_CPhase_seq_new(
+                phases=self.sweep_points,
+                flux_params=flux_params,
+                max_flux_length = self.max_flux_length,
+                qbc_name=self.qbc_name,
+                qbt_name=self.qbt_name,
+                qbr_name=self.qbr_name,
+                operation_dict=self.operation_dict,
+                CZ_pulse_name=self.CZ_pulse_name,
+                cal_points=self.cal_points,
+                reference_measurements=self.reference_measurements,
+                upload=self.upload
+                )
+
+    def set_parameter(self,val,**kw):
+        val_type = kw.pop('val_type',None)
+        if val_type is None:
+            logging.error('CPhase hard sweeps set_parameter method was called '
+                          'without a value type!')
+        elif val_type == 'length':
+            self.flux_length = val
+        elif val_type == 'amplitude':
+            self.flux_amplitude = val
+        else:
+            logging.error('CPhase hard sweep does not recognize value type handed'
+                          'by set_parameter() method!')
+        if self.flux_length is not None and self.flux_amplitude is not None:
+            self.prepare(flux_params=[self.flux_length,self.flux_amplitude])
+
+class Flux_pulse_CPhase_hard_swf_new2(swf.Hard_Sweep):
+
+    def __init__(self,X90_phase, qbc_name, qbt_name,qbr_name,CZ_pulse_name,
+                 operation_dict,cal_points=False, upload=True,
+                 reference_measurement=False):
+        '''
+            Flexible sweep function class for a single slice of the CPhase
+            experiment (hard sweep) that can either sweep the amplitude or
+            length of the flux pulse or the phase of the second X90 pulse.
+            For details on the experiment see documentation of
+            'fsqs.flux_pulse_CPhase_seq(...)'
+
+        Args:
+            qb_control: instance of the qubit class (control qubit)
+            qb_target: instance of the qubit class (target qubit)
+            sweep_mode: string, either 'length', 'amplitude' or 'amplitude'
+            X90_phase: float, phase of the second X90 pulse in rad
+            spacing: float, spacing between first and second X90 pulse
+            measurement_mode (str): either 'excited_state', 'ground_state'
+            reference_measurement (bool): if True, appends a reference measurement
+                                          IMPORTANT: you need to double
+                                          the hard sweep points!
+                                          e.g. thetas = np.concatenate((thetas,thetas))
+        '''
+        super().__init__()
+        self.qbc_name = qbc_name
+        self.qbt_name = qbt_name
+        self.qbr_name = qbr_name
+        self.X90_Phase = X90_phase
+        self.operation_dict = operation_dict
+        self.CZ_pulse_name = CZ_pulse_name
+        self.upload = upload
+        self.cal_points = cal_points
+        self.reference_measurement = reference_measurement
+        self.name = 'flux_pulse_CPhase_measurement_phase_sweep'
+        self.parameter_name ='phase'
+
+    def prepare(self,**kw):
+        if self.upload:
+            fsqs.flux_pulse_CPhase_seq_new2(
+                phases=self.sweep_points,
+                X90_phase=self.X90_Phase,
+                qbc_name=self.qbc_name,
+                qbt_name=self.qbt_name,
+                qbr_name=self.qbr_name,
+                operation_dict=self.operation_dict,
+                CZ_pulse_name=self.CZ_pulse_name,
+                cal_points=self.cal_points,
+                reference_measurements=self.reference_measurements,
+                upload=self.upload
+            )
+
+    def set_parameter(self,val):
+        pass
+
+class Flux_pulse_CPhase_soft_swf(swf.Soft_Sweep):
+
+    def __init__(self, hard_sweep, sweep_param='length',upload=True):
         '''
             Flexible soft sweep function class for 2D CPhase
             experiments that can either sweep the amplitude or
@@ -2453,24 +2582,16 @@ class Flux_pulse_CPhase_meas_2D(swf.Soft_Sweep):
             'fsqs.flux_pulse_CPhase_seq(...)'
 
         Args:
-            qb_control: instance of the qubit class (control qubit)
-            qb_target: instance of the qubit class (target qubit)
             hard_sweep: 1D hard sweep
-            sweep_mode: string, either 'length', 'amplitude' or 'amplitude'
         '''
         super().__init__()
-        self.name = 'flux_pulse_CPhase_measurement_{}_2D_sweep'.format(sweep_mode)
-        self.parameter_name = sweep_mode
-        self.sweep_mode = sweep_mode
-        if self.sweep_mode == 'length':
+        self.name = 'flux_pulse_CPhase_measurement_{}_2D_sweep'.format(sweep_param)
+        self.sweep_param = sweep_param
+        if sweep_param == 'length':
             self.unit = 's'
-        elif self.sweep_mode == 'amplitude':
+        elif sweep_param == 'amplitude':
             self.unit = 'V'
-        elif self.sweep_mode == 'phase':
-            self.unit = 'rad'
         self.hard_sweep = hard_sweep
-        self.qb_control = qb_control
-        self.qb_target = qb_target
         self.upload = upload
 
     def prepare(self):
@@ -2479,15 +2600,7 @@ class Flux_pulse_CPhase_meas_2D(swf.Soft_Sweep):
     def set_parameter(self, val, **kw):
 
         self.hard_sweep.upload = self.upload
-
-        if self.sweep_mode == 'length':
-            self.qb_control.flux_pulse_length(val)
-            self.hard_sweep.prepare()
-        elif self.sweep_mode == 'amplitude':
-            self.qb_control.flux_pulse_amp(val)
-            self.hard_sweep.prepare()
-        elif self.sweep_mode == 'phase':
-            self.hard_sweep.prepare(X90_phase=val)
+        self.hard_sweep.set_parameter(flux_val=val,val_type=self.sweep_param)
 
     def finish(self):
         pass

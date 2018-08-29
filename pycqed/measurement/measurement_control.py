@@ -522,8 +522,9 @@ class MeasurementControl(Instrument):
             x_tiled = np.tile(self.sweep_pts_x, self.ylen)
             # create outer loop
             self.sweep_pts_y = self.sweep_points_2D
-            y_rep = np.repeat(self.sweep_pts_y, self.xlen)
+            y_rep = np.repeat(self.sweep_pts_y, self.xlen,axis=0)
             c = np.column_stack((x_tiled, y_rep))
+            print('tiled swppts: ',c)
             self.set_sweep_points(c)
             self.initialize_plot_monitor_2D()
         return
@@ -537,7 +538,6 @@ class MeasurementControl(Instrument):
         Soft(ware) controlled sweep functions require soft detectors.
         Hard(ware) controlled sweep functions require hard detectors.
         '''
-
         self.tile_sweep_pts_for_2D()
         self.measure(**kw)
         return
