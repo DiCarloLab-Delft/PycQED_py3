@@ -2518,7 +2518,7 @@ class Flux_pulse_CPhase_hard_swf_new(swf.Hard_Sweep):
 
 class Flux_pulse_CPhase_hard_swf_new2(swf.Hard_Sweep):
 
-    def __init__(self,X90_phase, qbc_name, qbt_name,qbr_name,CZ_pulse_name,
+    def __init__(self,X90_phase, qbc_name, qbt_name, qbr_name,CZ_pulse_name,
                  operation_dict,cal_points=False, upload=True,
                  reference_measurement=False):
         '''

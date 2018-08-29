@@ -1370,6 +1370,46 @@ def cphase_gate_tuneup(qb_control, qb_target,
     return pulse_length_best_value, pulse_amplitude_best_value
 
 
+def cphase_gate_tuneup_predictive(qbc, qbt, qbr,n_meas,flux_lengths=None,
+                                  flux_amps=None,MC=None,
+                                  spacing=20e-9,
+                                  ramsey_phases=None):
+
+    '''
+    function that runs the nelder mead algorithm to optimize the CPhase gate
+    parameters (pulse lengths and pulse amplitude)
+
+    Args:
+        qb_control (QuDev_Transmon): control qubit (with flux pulses)
+        qb_target (QuDev_Transmon): target qubit
+        spacing (float): safety spacing between drive pulses and flux pulse
+        ramsey_phases (numpy array): phases used in the Ramsey measurement
+
+    Returns:
+        pulse_length_best_value, pulse_amplitude_best_value
+
+    '''
+
+    if MC is None:
+        MC= qbc.MC
+    if flux_lengths is None:
+        flux_lengths = np.random.normal(0.08,0.03,n_meas)
+    if flux_amps is None:
+        flux_amps = np.random.normal(0.1325,0.003,n_meas)
+
+    cphases, population_losses = measure_cphase_new2(qbc,qbt,qbr,
+                                                     flux_lengths,flux_amps,
+                                                     return_population_loss=True,
+                                                     plot=False,MC=MC)
+
+
+    a_pred = ma.Cphase_Predictive_Analysis(...) ##Not implemented
+    pulse_length_best_value = a_pred.optimization_result[0]
+    pulse_amplitude_best_value = a_pred.optimization_result[1]
+
+    return pulse_length_best_value, pulse_amplitude_best_value
+
+
 def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
                        artificial_detuning=None,
                        cal_points=True, no_cal_points=4, upload=True,
@@ -1863,7 +1903,7 @@ def measure_cphase_new( qbc, qbt, qbr, amps, lengths,
         return cphase_all
 
 
-def measure_cphase_new2( qbc, qbt, qbr, amps, lengths,
+def measure_cphase_new2( qbc, qbt, qbr, lengths, amps,
                         phases=None,MC=None, cal_points=None, plot=False,
                         return_population_loss=False,
                         prepare_for_timedomain=True,
