@@ -185,6 +185,54 @@ class Test_Flux_LutMan(unittest.TestCase):
         np.testing.assert_raises(AssertionError, np.testing.assert_array_equal,
                                  czA, czC)
 
+    def test_transition_freq_calc_01(self):
+        """
+        Tests methods used to determine energy levels and their conversion
+        to amplitude
+        """
+        freq_01 = self.fluxlutman.amp_to_frequency(amp=0, state='01')
+        freq_01_expected = self.fluxlutman.q_freq_01() + \
+            self.fluxlutman.q_polycoeffs_freq_01_det()[2]
+        self.assertEqual(freq_01, freq_01_expected)
+
+    def test_transition_freq_calc_02(self):
+        freq_02 = self.fluxlutman.amp_to_frequency(amp=0, state='02')
+        freq_02_expected = \
+            2*(self.fluxlutman.q_freq_01() +
+               self.fluxlutman.q_polycoeffs_freq_01_det()[2]) + \
+            self.fluxlutman.q_polycoeffs_anharm()[2]
+        self.assertEqual(freq_02, freq_02_expected)
+
+    def test_transition_freq_calc_10(self):
+        freq_10 = self.fluxlutman.amp_to_frequency(amp=0, state='10')
+        freq_10_expected = self.fluxlutman.q_freq_10()
+
+        self.assertEqual(freq_10, freq_10_expected)
+
+    def test_transition_freq_calc_11(self):
+        freq_11 = self.fluxlutman.amp_to_frequency(amp=0, state='11')
+        freq_11_expected = \
+            (self.fluxlutman.q_freq_01() +
+             self.fluxlutman.q_polycoeffs_freq_01_det()[2]) + \
+            self.fluxlutman.q_freq_10()
+
+        self.assertEqual(freq_11, freq_11_expected)
+
+    def test_transition_freq_inversion(self):
+        state = '02'
+        amps = np.linspace(.3, 1, 11)
+        freqs_02 = self.fluxlutman.amp_to_frequency(amp=amps, state=state)
+        amps_inv = self.fluxlutman.frequency_to_amp(freqs_02, state=state,
+                                                    positive_branch=True)
+        np.testing.assert_array_almost_equal(amps, amps_inv)
+
+        amps = np.linspace(-.3, -1, 11)
+        freqs_02 = self.fluxlutman.amp_to_frequency(amp=amps, state=state)
+        amps_inv = self.fluxlutman.frequency_to_amp(freqs_02, state=state,
+                                                    positive_branch=False)
+        np.testing.assert_array_almost_equal(amps, amps_inv)
+
+
     @unittest.expectedFailure
     def test_freq_amp_conversions(self):
 

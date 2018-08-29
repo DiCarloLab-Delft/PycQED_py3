@@ -82,16 +82,19 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         """
         self.add_parameter(
             'q_polycoeffs_freq_01_det',
-            docstring='coefficients of the polynomial used to convert '
-            'amplitude in V to detuning in Hz. N.B. it is important to '
+            docstring='Coefficients of the polynomial used to convert '
+            'amplitude in V to detuning in Hz. \nN.B. it is important to '
             'include both the AWG range and channel amplitude in the params.\n'
+            'N.B.2 Sign convention: positive detuning means frequency is '
+            'higher than current  frequency, negative detuning means its '
+            'smaller.\n'
             'In order to convert a set of cryoscope flux arc coefficients to '
             ' units of Volts they can be rescaled using [c0*sc**2, c1*sc, c2]'
             ' where sc is the desired scaling factor that includes the sq_amp '
             'used and the range of the AWG (5 in amp mode).',
             vals=vals.Arrays(),
             # initial value is chosen to not raise errors
-            initial_value=np.array([2e9, 0, 0]),
+            initial_value=np.array([-2e9, 0, 0]),
             parameter_class=ManualParameter)
         self.add_parameter(
             'q_polycoeffs_anharm',
@@ -264,7 +267,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         return np.polyval(polycoeffs, amp)
 
-    def frequency_to_amp(self, freq: float, state:str='01',
+    def frequency_to_amp(self, freq: float, state: str='01',
                          positive_branch=True):
         """
         Converts amplitude to detuning in Hz.
@@ -281,8 +284,8 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         """
         # recursive allows dealing with an array of freqs
         if isinstance(freq, (list, np.ndarray)):
-            return np.array([self.detuning_to_amp(
-                f, positive_branch=positive_branch) for f in freq])
+            return np.array([self.frequency_to_amp(
+                f, state=state, positive_branch=positive_branch) for f in freq])
         polycoeffs = self.get_polycoeffs_state(state=state)
         p = np.poly1d(polycoeffs)
         sols = (p-freq).roots
@@ -495,8 +498,8 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         self._wave_dict['park'] = self._gen_park()
 
         # FIXME: reenable this
-        self._wave_dict['cz'] = np.zeros(10) # self._gen_cz()
-        self._wave_dict['cz_z'] = np.zeros(10) # self._gen_cz_z(regenerate_cz=False)
+        self._wave_dict['cz'] = np.zeros(10)  # self._gen_cz()
+        self._wave_dict['cz_z'] = np.zeros(10)  # self._gen_cz_z(regenerate_cz=False)
 
         self._wave_dict['idle_z'] = self._gen_idle_z()
         self._wave_dict['custom_wf'] = self._gen_custom_wf()
