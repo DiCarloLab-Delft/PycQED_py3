@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 
 
 
-# eV_to_Hz = 1/4.1357e-15
+eV_to_Hz = 1/4.1357e-15
 
 # w_q1 = 18.4e9 * 2*np.pi
 # w_q2 = 19.7e9 * 2*np.pi
@@ -114,6 +114,21 @@ H_c =      qtp.Qobj([[0, 0, 0, 0, 0, 0, 0, 0, 0],
                      [0, 0, 0, 0, 0, 0, 0, 0, 0]],
                     type='oper',
                     dims=[[3, 3], [3, 3]])
+
+
+def H_hopping(t_hopping):
+    Ham = qtp.Qobj([[0, 0, 0, 0, 0, 0, 0, 0, 0],
+                     [0, 0, t_hopping, 0, 0, 0, t_hopping, 0, 0],
+                     [0, t_hopping, 0, -t_hopping, 0, 0, 0, 0, 0],
+                     [0, 0, -t_hopping, 0, 0, 0, -t_hopping, 0, 0],
+                     [0, 0, 0, 0, 0, 0, 0, 0, 0],
+                     [0, 0, 0, 0, 0, 0, 0, 0, 0],
+                     [0, t_hopping, 0, -t_hopping, 0, 0, 0, 0, 0],
+                     [0, 0, 0, 0, 0, 0, 0, 0, 0],
+                     [0, 0, 0, 0, 0, 0, 0, 0, 0]],
+                    type='oper',
+                    dims=[[3, 3], [3, 3]])
+    return Ham
 
 
 # BENCHMARK OF THE SPECTRUM OF H_0
@@ -823,7 +838,7 @@ def simulate_quantities_of_interest_superoperator2(U_final):
 
 
 class CZ_trajectory_superoperator(det.Soft_Detector):
-    def __init__(self, H_0, fluxlutman, noise_parameters_CZ):
+    def __init__(self, fluxlutman, noise_parameters_CZ):
         """
         Detector for simulating a CZ trajectory.
         Args:
@@ -834,8 +849,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         self.value_names = ['Cost func', 'Cond phase', 'L1', 'L2', 'avgatefid_pc', 'avgatefid_compsubspace_pc']
         self.value_units = ['a.u.', 'deg', '%', '%', '%', '%']
         self.fluxlutman = fluxlutman
-        self.H_0 = H_0
         self.noise_parameters_CZ = noise_parameters_CZ
+
 
     def acquire_data_point(self, **kw):
         '''
@@ -860,6 +875,27 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         eps_vec = f_pulse - w_q0
         '''
 
+        H_0 = coupled_qdots_hamiltonian(w_q1=self.noise_parameters_CZ.w_q1(), w_q2=self.noise_parameters_CZ.w_q2(),
+                                    U_q1=self.noise_parameters_CZ.U_q1(), U_q2=self.noise_parameters_CZ.U_q2(), 
+                                    t_hopping=self.noise_parameters_CZ.t_hopping()*1e6*2*np.pi)
+
+
+        '''# BENCHMARK OF CZ_LENGTH AS A FUNCTION OF T_HOPPING
+        timeCZ=[[],[],[]]
+        t_hopping_vec=np.linspace(100,400,31)
+        epsilon_vec=np.array([3.0,3.2,3.4])
+        for i in range(len(epsilon_vec)):
+            for t in t_hopping_vec:
+                H_0_temp = coupled_qdots_hamiltonian(w_q1=self.noise_parameters_CZ.w_q1(), w_q2=self.noise_parameters_CZ.w_q2(),
+                                        U_q1=self.noise_parameters_CZ.U_q1(), U_q2=self.noise_parameters_CZ.U_q2(), 
+                                        t_hopping=t*1e6*2*np.pi)
+                cz_time_ideal=compute_cz_time(H_0_temp,epsilon_vec[i] * 1e-3*eV_to_Hz*2*np.pi)
+                timeCZ[i].append(cz_time_ideal*1e9)
+
+        plot(x_plot_vec=[t_hopping_vec],
+                  y_plot_vec=timeCZ,
+                  title='CZ time as a function of t_hopping',
+                  xlabel='t_hopping (MHz)',ylabel='CZ time (ns)',legend_labels=['detuning 3.0 meV','detuning 3.2 meV','detuning 3.4 meV'])'''
 
 
         T1_q0 = self.noise_parameters_CZ.T1_q0()
@@ -893,18 +929,19 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 
         epsilon=self.noise_parameters_CZ.detuning() * 1e-3*eV_to_Hz*2*np.pi
-        H=self.H_0+epsilon*H_c
+        H=H_0+epsilon*H_c
 
         #We transform H in the basis of H_0 (collapse operators already expressed in that bais),
         #so that the time evolution is already expressed in the correct basis
-        S = qtp.Qobj(matrix_change_of_variables(self.H_0),dims=[[3, 3], [3, 3]])
+        S = qtp.Qobj(matrix_change_of_variables(H_0),dims=[[3, 3], [3, 3]])
         H=S*H*S.dag()
 
-        cz_time_ideal=compute_cz_time(self.H_0,epsilon)                           #time to acquire a 180 degrees conditional phase
-        time=cz_time_ideal+self.noise_parameters_CZ.cz_time_offset() * 1e-9
+        cz_time_ideal=compute_cz_time(H_0,epsilon)                           #time to acquire a 180 degrees conditional phase
+        time=cz_time_ideal #+self.noise_parameters_CZ.cz_time_offset() * 1e-9
         
         U_final=time_evolution_squarepulse(H,c_ops,time,initial_propagator=1)
         qoi = simulate_quantities_of_interest_superoperator2(U_final)
+        #print('avgatefid_compsubspace_pc',qoi['avgatefid_compsubspace_pc'])
 
 
         cost_func_val = -np.log10(1-qoi['avgatefid_compsubspace_pc'])   # new cost function: infidelity

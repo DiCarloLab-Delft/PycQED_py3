@@ -712,13 +712,16 @@ def simulate_quantities_of_interest_superoperator(H_0, tlist, c_ops, w_bus, eps_
 
     U_final = exp_L_total
 
-    phases = phases_from_superoperator(U_final)
+    phases = phases_from_superoperator(U_final)         # order is phi_00, phi_01, phi_10, phi_11, phi_02, phi_20, phi_cond
     phi_cond = phases[-1]
     L1 = leakage_from_superoperator(U_final)
     L2 = seepage_from_superoperator(U_final)
     avgatefid = pro_avfid_superoperator_phasecorrected(U_final,phases)
     avgatefid_compsubspace = pro_avfid_superoperator_compsubspace_phasecorrected(U_final,L1,phases)     # leakage has to be taken into account, see Woods & Gambetta
     print('avgatefid_compsubspace',avgatefid_compsubspace)
+
+    phase_q0 = phases[1]-phases[0]
+    phase_q1 = phases[2]-phases[0]
     
     '''
     U_final = exp_L_total_new
@@ -738,7 +741,7 @@ def simulate_quantities_of_interest_superoperator(H_0, tlist, c_ops, w_bus, eps_
     '''  
     
 
-    return {'phi_cond': phi_cond, 'L1': L1, 'L2': L2, 'avgatefid_pc': avgatefid, 'avgatefid_compsubspace_pc': avgatefid_compsubspace}
+    return {'phi_cond': phi_cond, 'L1': L1, 'L2': L2, 'avgatefid_pc': avgatefid, 'avgatefid_compsubspace_pc': avgatefid_compsubspace, 'phase_q0': phase_q0, 'phase_q1': phase_q1}
 
 
 def spectrum(H_0,eps_vec):
@@ -755,6 +758,8 @@ def fix_theta_f(lambda_3,theta_i):
     return (theta_i+2*(lambda_1target+lambda_3))*360/(2*np.pi)
 
 
+
+
 class CZ_trajectory_superoperator(det.Soft_Detector):
     def __init__(self, H_0, fluxlutman, noise_parameters_CZ, fitted_stepresponse_ty):
         """
@@ -767,8 +772,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                                     and the step response in volts along the y axis
         """
         super().__init__()
-        self.value_names = ['Cost func', 'Cond phase', 'L1', 'L2', 'avgatefid_pc', 'avgatefid_compsubspace_pc']
-        self.value_units = ['a.u.', 'deg', '%', '%', '%', '%']
+        self.value_names = ['Cost func', 'Cond phase', 'L1', 'L2', 'avgatefid_pc', 'avgatefid_compsubspace_pc', 'phase_q0', 'phase_q1']
+        self.value_units = ['a.u.', 'deg', '%', '%', '%', '%', 'deg', 'deg']
         self.fluxlutman = fluxlutman
         self.H_0 = H_0
         self.noise_parameters_CZ = noise_parameters_CZ
@@ -1010,7 +1015,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
         cost_func_val = -np.log10(1-qoi['avgatefid_compsubspace_pc'])   # new cost function: infidelity
         #np.abs(qoi['phi_cond']-180) + qoi['L1']*100 * 5
-        return cost_func_val, qoi['phi_cond'], qoi['L1']*100, qoi['L2']*100, qoi['avgatefid_pc']*100, qoi['avgatefid_compsubspace_pc']*100
+        return cost_func_val, qoi['phi_cond'], qoi['L1']*100, qoi['L2']*100, qoi['avgatefid_pc']*100, qoi['avgatefid_compsubspace_pc']*100, qoi['phase_q0'], qoi['phase_q1']
+
 
     def get_f_pulse_double_sided(self):
 

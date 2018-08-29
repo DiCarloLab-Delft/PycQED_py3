@@ -5,7 +5,7 @@ from qcodes.instrument.parameter import ManualParameter
 import numpy as np
 
 
-
+eV_to_Hz = 1/4.1357e-15
 
 
 class NoiseParametersCZ(Instrument):
@@ -63,6 +63,26 @@ class NoiseParametersCZ(Instrument):
                            label='how much we want the length of a square pulse to differ from the length needed to do a CZ without noise',
                            parameter_class=ManualParameter,
                            vals=vals.Numbers(), initial_value=0)
+        self.add_parameter('t_hopping', unit='MHz',
+                           label='t_hopping parameter in the hamiltonian',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(), initial_value=210)
+        self.add_parameter('w_q1', unit='Hz',
+                           label='NB: qdots',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(), initial_value=18.4e9 * 2*np.pi)
+        self.add_parameter('w_q2', unit='Hz',
+                           label='NB: qdots',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(), initial_value=19.7e9 * 2*np.pi)
+        self.add_parameter('U_q1', unit='eV',
+                           label='NB: qdots',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(), initial_value=3.5e-3 * eV_to_Hz * 2*np.pi)
+        self.add_parameter('U_q2', unit='eV',
+                           label='NB: qdots',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(), initial_value=3.5e-3 * eV_to_Hz * 2*np.pi)
 
 
 
