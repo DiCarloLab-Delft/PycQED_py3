@@ -128,20 +128,6 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
     def _add_cfg_parameters(self):
 
-        # self.add_parameter(
-        #     'polycoeffs_freq_conv',
-        #     docstring='coefficients of the polynomial used to convert '
-        #     'amplitude in V to detuning in Hz. N.B. it is important to '
-        #     'include both the AWG range and channel amplitude in the params.\n'
-        #     'In order to convert a set of cryoscope flux arc coefficients to '
-        #     ' units of Volts they can be rescaled using [c0*sc**2, c1*sc, c2]'
-        #     ' where sc is the desired scaling factor that includes the sq_amp '
-        #     'used and the range of the AWG (5 in amp mode).',
-        #     vals=vals.Arrays(),
-        #     # initial value is chosen to not raise errors
-        #     initial_value=np.array([2e9, 0, 0]),
-        #     parameter_class=ManualParameter)
-
         self.add_parameter('cfg_awg_channel',
                            initial_value=1,
                            vals=vals.Ints(1, 8),
@@ -246,7 +232,8 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             raise NotImplementedError('State {} not recognized'.format(state))
         return polycoeffs
 
-    def amp_to_frequency(self, amp: float, state: str='01'):
+
+    def calc_amp_to_freq(self, amp: float, state: str='01'):
         """
         Converts pulse amplitude in Volt to energy in Hz for a particular state
         Args:
@@ -267,7 +254,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         return np.polyval(polycoeffs, amp)
 
-    def frequency_to_amp(self, freq: float, state: str='01',
+    def calc_freq_to_amp(self, freq: float, state: str='01',
                          positive_branch=True):
         """
         Converts amplitude to detuning in Hz.
@@ -284,7 +271,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         """
         # recursive allows dealing with an array of freqs
         if isinstance(freq, (list, np.ndarray)):
-            return np.array([self.frequency_to_amp(
+            return np.array([self.calc_freq_to_amp(
                 f, state=state, positive_branch=positive_branch) for f in freq])
         polycoeffs = self.get_polycoeffs_state(state=state)
         p = np.poly1d(polycoeffs)
@@ -298,6 +285,35 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         # imaginary part is ignored, instead sticking to closest real value
         return np.real(sol)
+
+    def calc_amp_to_eps(self, amp: float,
+                        state_A: str='01', state_B: str='02'):
+        """
+        Calculates detuning between two levels as a function of pulse
+        amplitude in Volt.
+
+            f(V) = f_B (V) - f_A (V)
+
+        Args:
+            amp (float) : amplitude in Volt
+            state_A (str) : string of 2 numbers denoting the state. The numbers
+                correspond to the number of excitations in each qubits.
+                The LSQ (right) corresponds to the qubit being fluxed and
+                under control of this flux lutman.
+            state_B (str) :
+
+        N.B. this method assumes that the polycoeffs are with respect to the
+            amplitude in units of V, including rescaling due to the channel
+            amplitude and range settings of the AWG8.
+            See also `self.get_dac_val_to_amp_scalefactor`.
+
+                amp_Volts = amp_dac_val * channel_amp * channel_range
+        """
+        polycoeffs_A = self.get_polycoeffs_state(state=state_A)
+        polycoeffs_B = self.get_polycoeffs_state(state=state_B)
+        polycoeffs = polycoeffs_B - polycoeffs_A
+        return np.polyval(polycoeffs, amp)
+
 
     def get_dac_val_to_amp_scalefactor(self):
         """
@@ -1241,13 +1257,13 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             f, ax = plt.subplots()
         amps = np.linspace(-2.5, 2.5, 101)  # maximum voltage of AWG amp mode
 
-        freqs = self.amp_to_frequency(amps, state='01')
+        freqs = self.calc_amp_to_freq(amps, state='01')
         ax.plot(amps, freqs, label='$f_{01}$')
-        freqs = self.amp_to_frequency(amps, state='02')
+        freqs = self.calc_amp_to_freq(amps, state='02')
         ax.plot(amps, freqs, label='$f_{02}$')
-        freqs = self.amp_to_frequency(amps, state='10')
+        freqs = self.calc_amp_to_freq(amps, state='10')
         ax.plot(amps, freqs, label='$f_{10}$')
-        freqs = self.amp_to_frequency(amps, state='11')
+        freqs = self.calc_amp_to_freq(amps, state='11')
         ax.plot(amps, freqs, label='$f_{11}$')
 
 
