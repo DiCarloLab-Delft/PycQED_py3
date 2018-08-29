@@ -116,7 +116,6 @@ class Test_Flux_LutMan(unittest.TestCase):
         self.fluxlutman.czd_double_sided(False)
         self.fluxlutman.generate_standard_waveforms()
 
-    @unittest.expectedFailure
     def test_double_sided_cz_waveform(self):
         """
         This test mostly tests if the parameters have some effect.
@@ -243,7 +242,6 @@ class Test_Flux_LutMan(unittest.TestCase):
         freqs_11 = self.fluxlutman.calc_amp_to_freq(amp=amps, state=state_B)
         expected_eps = freqs_11 - freqs_02
         np.testing.assert_array_almost_equal(eps, expected_eps)
-
 
     def test_calc_detuning_freq_inversion(self):
         state_A = '02'

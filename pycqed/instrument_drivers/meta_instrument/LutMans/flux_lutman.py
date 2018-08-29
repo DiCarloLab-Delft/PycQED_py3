@@ -541,7 +541,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         # FIXME: reenable this
         self._wave_dict['cz'] = self._gen_cz()
-        self._wave_dict['cz_z'] = np.zeros(10)  # self._gen_cz_z(regenerate_cz=False)
+        self._wave_dict['cz_z'] = self._gen_cz_z(regenerate_cz=False)
 
         self._wave_dict['idle_z'] = self._gen_idle_z()
         self._wave_dict['custom_wf'] = self._gen_custom_wf()
@@ -567,6 +567,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         dac_scale_factor = self.get_amp_to_dac_val_scale_factor()
         eps_i = self.calc_amp_to_eps(0, state_A='11', state_B='02')
+        # beware theta in radian
         theta_i = wfl.eps_to_theta(eps_i, g=self.q_J2())
 
         if not self.czd_double_sided():
@@ -577,6 +578,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             CZ_eps = wfl.theta_to_eps(CZ_theta, g=self.q_J2())
             CZ_amp = self.calc_eps_to_amp(CZ_eps, state_A='11', state_B='02')
 
+            # convert amplitude in V to amplitude in awg dac value
             CZ = dac_scale_factor*CZ_amp
             return CZ
 
