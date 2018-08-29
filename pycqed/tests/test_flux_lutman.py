@@ -245,6 +245,25 @@ class Test_Flux_LutMan(unittest.TestCase):
         np.testing.assert_array_almost_equal(eps, expected_eps)
 
 
+    def test_calc_detuning_freq_inversion(self):
+        state_A = '02'
+        state_B = '11'
+
+        amps = np.linspace(.3, 1, 11)
+        freqs_02 = self.fluxlutman.calc_amp_to_eps(
+            amp=amps, state_A=state_A, state_B=state_B)
+        amps_inv = self.fluxlutman.calc_eps_to_amp(
+            freqs_02, state_A=state_A, state_B=state_B, positive_branch=True)
+        np.testing.assert_array_almost_equal(amps, amps_inv)
+
+        amps = np.linspace(-.3, -1, 11)
+        freqs_02 = self.fluxlutman.calc_amp_to_eps(
+            amp=amps, state_A=state_A, state_B=state_B)
+        amps_inv = self.fluxlutman.calc_eps_to_amp(
+            freqs_02, state_A=state_A, state_B=state_B, positive_branch=False)
+        np.testing.assert_array_almost_equal(amps, amps_inv)
+
+
 
 
     @unittest.expectedFailure

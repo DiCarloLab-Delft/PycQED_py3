@@ -216,7 +216,9 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         """
         polycoeffs = np.zeros(3)
-        if state == '01':
+        if state == '00':
+            pass
+        elif state == '01':
             polycoeffs += self.q_polycoeffs_freq_01_det()
             polycoeffs[2] += self.q_freq_01()
         elif state == '02':
@@ -257,10 +259,8 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
     def calc_freq_to_amp(self, freq: float, state: str='01',
                          positive_branch=True):
         """
-        Converts amplitude to detuning in Hz.
-
-        Requires "polycoeffs_freq_conv" to be set to the polynomial values
-        extracted from the cryoscope flux arc.
+        Calculates amplitude in Volt corresponding to the energy of a state
+        in Hz.
 
         N.B. this method assumes that the polycoeffs are with respect to the
             amplitude in units of V, including rescaling due to the channel
@@ -269,22 +269,9 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
                 amp_Volts = amp_dac_val * channel_amp * channel_range
         """
-        # recursive allows dealing with an array of freqs
-        if isinstance(freq, (list, np.ndarray)):
-            return np.array([self.calc_freq_to_amp(
-                f, state=state, positive_branch=positive_branch) for f in freq])
-        polycoeffs = self.get_polycoeffs_state(state=state)
-        p = np.poly1d(polycoeffs)
-        sols = (p-freq).roots
 
-        # sols returns 2 solutions (for a 2nd order polynomial)
-        if positive_branch:
-            sol = np.max(sols)
-        else:
-            sol = np.min(sols)
-
-        # imaginary part is ignored, instead sticking to closest real value
-        return np.real(sol)
+        return self.calc_eps_to_amp(eps=freq, state_B=state, state_A='00',
+                                    positive_branch=positive_branch)
 
     def calc_amp_to_eps(self, amp: float,
                         state_A: str='01', state_B: str='02'):
@@ -292,7 +279,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         Calculates detuning between two levels as a function of pulse
         amplitude in Volt.
 
-            f(V) = f_B (V) - f_A (V)
+            ε(V) = f_B (V) - f_A (V)
 
         Args:
             amp (float) : amplitude in Volt
@@ -313,6 +300,44 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         polycoeffs_B = self.get_polycoeffs_state(state=state_B)
         polycoeffs = polycoeffs_B - polycoeffs_A
         return np.polyval(polycoeffs, amp)
+
+    def calc_eps_to_amp(self, eps,
+                        state_A: str='01', state_B: str='02',
+                        positive_branch=True):
+        """
+        Calculates amplitude in Volt corresponding to an energy difference
+        between two states in Hz.
+            V(ε) = V(f_b - f_a)
+
+        N.B. this method assumes that the polycoeffs are with respect to the
+            amplitude in units of V, including rescaling due to the channel
+            amplitude and range settings of the AWG8.
+            See also `self.get_dac_val_to_amp_scalefactor`.
+
+                amp_Volts = amp_dac_val * channel_amp * channel_range
+        """
+        # recursive allows dealing with an array of freqs
+        if isinstance(eps, (list, np.ndarray)):
+            return np.array([self.calc_eps_to_amp(
+                eps=e, state_A=state_A, state_B=state_B,
+                positive_branch=positive_branch) for e in eps])
+
+        polycoeffs_A = self.get_polycoeffs_state(state=state_A)
+        polycoeffs_B = self.get_polycoeffs_state(state=state_B)
+        polycoeffs = polycoeffs_B - polycoeffs_A
+
+        p = np.poly1d(polycoeffs)
+        sols = (p-eps).roots
+
+        # sols returns 2 solutions (for a 2nd order polynomial)
+        if positive_branch:
+            sol = np.max(sols)
+        else:
+            sol = np.min(sols)
+
+        # imaginary part is ignored, instead sticking to closest real value
+        return np.real(sol)
+
 
 
     def get_dac_val_to_amp_scalefactor(self):
