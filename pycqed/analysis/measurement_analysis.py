@@ -1022,6 +1022,9 @@ class Mixer_calibration_evaluation(MeasurementAnalysis):
         ind_right_sb = np.where(np.abs((self.sweep_pts1-self.v_peaks[2])) < sweep_pts_spacing1)
         self.peak_inds = [ind_left_sb,ind_lo_f,ind_right_sb]
         print(self.peak_inds)
+        self.pre_calib_amps = [self.meas_vals1[ind_left_sb],
+                               self.meas_vals1[ind_lo_f],
+                               self.meas_vals1[ind_right_sb]]
         left_sb_supp = self.meas_vals2[ind_left_sb]/self.meas_vals1[ind_left_sb]
         left_sb_supp = 20*np.log10(left_sb_supp)
         lo_supp = self.meas_vals2[ind_lo_f]/self.meas_vals1[ind_lo_f]
