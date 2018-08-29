@@ -235,7 +235,6 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             raise NotImplementedError('State {} not recognized'.format(state))
         return polycoeffs
 
-
     def calc_amp_to_freq(self, amp: float, state: str='01'):
         """
         Converts pulse amplitude in Volt to energy in Hz for a particular state
@@ -339,8 +338,6 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         # imaginary part is ignored, instead sticking to closest real value
         return np.real(sol)
 
-
-
     def get_dac_val_to_amp_scalefactor(self):
         """
         Returns the scale factor to transform an amplitude in 'dac value' to an
@@ -430,8 +427,10 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                            initial_value=80,
                            parameter_class=ManualParameter)
 
-        self.add_parameter('czd_length_ratio', vals=vals.Numbers(0, 1),
-                           initial_value=0.5,
+        self.add_parameter('czd_length_ratio',
+                           vals=vals.MultiType(vals.Numbers(0, 1),
+                                               vals.Enum('auto')),
+                           initial_value='auto',
                            parameter_class=ManualParameter)
         self.add_parameter(
             'czd_lambda_2',
@@ -567,7 +566,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         dac_scale_factor = self.get_amp_to_dac_val_scale_factor()
         eps_i = self.calc_amp_to_eps(0, state_A='11', state_B='02')
-        # beware theta in radian
+        # Beware theta in radian!
         theta_i = wfl.eps_to_theta(eps_i, g=self.q_J2())
 
         if not self.czd_double_sided():
@@ -1257,59 +1256,68 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             plt.show()
         return ax
 
-    def plot_level_diagram(self, ax=None, show=True,
-                           plot_cz_trajectory=False):
-
-        if ax is None:
-            f, ax = plt.subplots()
-
-        return ax
-
-    def plot_flux_arc(self, ax=None, show=True,
-                      plot_cz_trajectory=False):
+    def plot_level_diagram(self, ax=None, show=True):
         """
-        Plots the flux arc as used in the lutman based on the polynomial
-        coefficients
+        Plots the level diagram as specified by the q_ parameters.
         """
 
         if ax is None:
             f, ax = plt.subplots()
+
         amps = np.linspace(-2.5, 2.5, 101)  # maximum voltage of AWG amp mode
 
         freqs = self.calc_amp_to_freq(amps, state='01')
         ax.plot(amps, freqs, label='$f_{01}$')
+        ax.text(0, self.calc_amp_to_freq(0, state='01'), '01', color='C0',
+                ha='left', va='bottom', clip_on=True)
+
         freqs = self.calc_amp_to_freq(amps, state='02')
         ax.plot(amps, freqs, label='$f_{02}$')
+        ax.text(0, self.calc_amp_to_freq(0, state='02'), '02', color='C1',
+                ha='left', va='bottom', clip_on=True)
+
         freqs = self.calc_amp_to_freq(amps, state='10')
         ax.plot(amps, freqs, label='$f_{10}$')
+        ax.text(0, self.calc_amp_to_freq(0, state='10'), '10', color='C2',
+                ha='left', va='bottom', clip_on=True)
+
         freqs = self.calc_amp_to_freq(amps, state='11')
         ax.plot(amps, freqs, label='$f_{11}$')
-
-
-        # ax.axhline(self.cz_freq_interaction(), -5, 5,
-        #            label='$f_{\mathrm{int.}}$:'+' {:.3f} GHz'.format(
-        #     self.cz_freq_interaction()*1e-9),
-        #     c='C1')
-
+        ax.text(0, self.calc_amp_to_freq(0, state='11'), '11', color='C3',
+                ha='left', va='bottom', clip_on=True)
         ax.axvline(0, 0, 1e10, linestyle='dotted', c='grey')
-        # ax.fill_between(
-        #     x=[-5, 5],
-        #     y1=[self.cz_freq_interaction()-self.cz_J2()]*2,
-        #     y2=[self.cz_freq_interaction()+self.cz_J2()]*2,
-        #     label='$J_{\mathrm{2}}/2\pi$:'+' {:.3f} MHz'.format(
-        #         self.q_J2()*1e-6),
-        #     color='C1', alpha=0.25)
+
+        amp_J2 = self.calc_eps_to_amp(0, state_A='11', state_B='02')
+        amp_J1 = self.calc_eps_to_amp(0, state_A='10', state_B='01')
+
+        ax.axvline(amp_J2, ls='--', lw=1, c='C4')
+        ax.axvline(amp_J1, ls='--', lw=1, c='C6')
+
+        f_11_02 = self.calc_amp_to_freq(amp_J2, state='11')
+        ax.plot([amp_J2], [f_11_02],
+                color='C4', marker='o', label='11-02')
+        ax.text(amp_J2, f_11_02,
+                '({:.3f},{:.2f})'.format(amp_J2, f_11_02*1e-9),
+                color='C4',
+                ha='left', va='bottom', clip_on=True)
+
+        f_10_01 = self.calc_amp_to_freq(amp_J1, state='01')
+
+        ax.plot([amp_J1], [f_10_01],
+                color='C5', marker='o', label='10-01')
+        ax.text(amp_J1, f_10_01,
+                '({:.3f},{:.2f})'.format(amp_J1, f_10_01*1e-9),
+                color='C5', ha='left', va='bottom', clip_on=True)
 
         title = ('Calibration visualization\n{}\nchannel {}'.format(
             self.AWG(), self.cfg_awg_channel()))
-        if plot_cz_trajectory:
-            self.plot_cz_trajectory(ax=ax, show=False)
-        leg = ax.legend(title=title, loc=(1.05, .7))
+        leg = ax.legend(title=title, loc=(1.05, .3))
         leg._legend_box.align = 'center'
         set_xlabel(ax, 'AWG amplitude', 'V')
         set_ylabel(ax, 'Frequency', 'Hz')
         ax.set_xlim(-2.5, 2.5)
-        ax.set_ylim(3e9, np.max(freqs)+500e6)
+
+        ax.set_ylim(0, self.calc_amp_to_freq(0, state='02')*1.1)
 
         dac_val_axis = ax.twiny()
         dac_ax_lims = np.array(ax.get_xlim()) * \

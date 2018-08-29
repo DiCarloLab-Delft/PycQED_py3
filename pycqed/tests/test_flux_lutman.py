@@ -93,20 +93,8 @@ class Test_Flux_LutMan(unittest.TestCase):
         self.assertEqual(self.AWG._realtime_w0[0], [.3])
         self.assertEqual(self.AWG._realtime_w1[0], [.5])
 
-    # Commented out because this mode is deprecated
-    # def test_operating_mode_program_loading(self):
-    #     self.fluxlutman.cfg_operating_mode('Codeword_normal')
-    #     self.fluxlutman.load_waveforms_onto_AWG_lookuptable()
-
-    #     self.fluxlutman.cfg_operating_mode('CW_single_02')
-    #     self.fluxlutman.load_waveforms_onto_AWG_lookuptable()
-
-    #     self.fluxlutman.cfg_operating_mode('Codeword_normal')
-    #     self.fluxlutman.load_waveforms_onto_AWG_lookuptable()
-
-    @unittest.expectedFailure
-    def test_plot_flux_arc(self):
-        self.fluxlutman.plot_flux_arc(show=False, plot_cz_trajectory=True)
+    def test_plot_level_diagram(self):
+        self.fluxlutman.plot_level_diagram(show=False)
 
     @unittest.expectedFailure
     def test_plot_cz_trajectory(self):
