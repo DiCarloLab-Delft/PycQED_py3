@@ -263,32 +263,6 @@ class Test_Flux_LutMan(unittest.TestCase):
             freqs_02, state_A=state_A, state_B=state_B, positive_branch=False)
         np.testing.assert_array_almost_equal(amps, amps_inv)
 
-
-
-
-    @unittest.expectedFailure
-    def test_freq_amp_conversions(self):
-
-        # Test the basic inversion
-        test_amps = np.linspace(0.1, .5, 11)
-        freqs = self.fluxlutman.amp_to_detuning(test_amps)
-        recovered_amps = self.fluxlutman.detuning_to_amp(freqs)
-        np.testing.assert_array_almost_equal(test_amps, recovered_amps)
-
-        # Test that the top of the parabola is given if asked for "impossible"
-        # solutions
-        recovered_amp = self.fluxlutman.detuning_to_amp(0)
-        self.assertAlmostEqual(recovered_amp, 0.082696256708720065)
-        recovered_amp = self.fluxlutman.detuning_to_amp(-5e9)
-        self.assertAlmostEqual(recovered_amp, 0.082696256708720065)
-
-        # Test negative branch of parabola
-        test_amps = np.linspace(-0.1, -.5, 11)
-        freqs = self.fluxlutman.amp_to_detuning(test_amps)
-        recovered_amps = self.fluxlutman.detuning_to_amp(
-            freqs, positive_branch=False)
-        np.testing.assert_array_almost_equal(test_amps, recovered_amps)
-
     def test_custom_wf(self):
         self.fluxlutman.generate_standard_waveforms()
 

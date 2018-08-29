@@ -6,6 +6,7 @@ from qcodes.instrument.parameter import ManualParameter, InstrumentRefParameter
 from qcodes.utils import validators as vals
 from pycqed.instrument_drivers.pq_parameters import NP_NANs
 from pycqed.measurement.waveform_control_CC import waveform as wf
+from pycqed.measurement.waveform_control_CC import waveforms_flux as wfl
 from pycqed.measurement.openql_experiments.openql_helpers import clocks_to_s
 from qcodes.plots.pyqtgraph import QtPlot
 import matplotlib.pyplot as plt
@@ -539,7 +540,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         self._wave_dict['park'] = self._gen_park()
 
         # FIXME: reenable this
-        self._wave_dict['cz'] = np.zeros(10)  # self._gen_cz()
+        self._wave_dict['cz'] = self._gen_cz()
         self._wave_dict['cz_z'] = np.zeros(10)  # self._gen_cz_z(regenerate_cz=False)
 
         self._wave_dict['idle_z'] = self._gen_idle_z()
@@ -565,37 +566,32 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
     def _gen_cz(self):
 
         dac_scale_factor = self.get_amp_to_dac_val_scale_factor()
+        eps_i = self.calc_amp_to_eps(0, state_A='11', state_B='02')
+        theta_i = wfl.eps_to_theta(eps_i, g=self.q_J2())
 
         if not self.czd_double_sided():
-            CZ = wf.martinis_flux_pulse(
-                length=self.cz_length(),
-                lambda_2=self.cz_lambda_2(),
-                lambda_3=self.cz_lambda_3(),
-                theta_f=self.cz_theta_f(),
-                f_01_max=self.cz_freq_01_max(),
-                J2=self.cz_J2(),
-                f_interaction=self.cz_freq_interaction(),
-                sampling_rate=self.sampling_rate(),
-                return_unit='f01')
-            return dac_scale_factor*self.detuning_to_amp(
-                self.cz_freq_01_max() - CZ)
+            CZ_theta = wfl.martinis_flux_pulse(
+                self.cz_length(), theta_i=theta_i,
+                theta_f=np.deg2rad(self.cz_theta_f()),
+                lambda_2=self.cz_lambda_2(), lambda_3=self.cz_lambda_3())
+            CZ_eps = wfl.theta_to_eps(CZ_theta, g=self.q_J2())
+            CZ_amp = self.calc_eps_to_amp(CZ_eps, state_A='11', state_B='02')
+
+            CZ = dac_scale_factor*CZ_amp
+            return CZ
+
         else:
             # Simple double sided CZ pulse implemented in most basic form.
             # repeats the same CZ gate twice and sticks it together.
-            half_CZ_A = wf.martinis_flux_pulse(
-                length=self.cz_length()*self.czd_length_ratio(),
-                lambda_2=self.cz_lambda_2(),
-                lambda_3=self.cz_lambda_3(),
-                theta_f=self.cz_theta_f(),
-                f_01_max=self.cz_freq_01_max(),
-                # V_per_phi0=self.cz_V_per_phi0(),
-                J2=self.cz_J2(),
-                # E_c=self.cz_E_c(),
-                f_interaction=self.cz_freq_interaction(),
-                sampling_rate=self.sampling_rate(),
-                return_unit='f01')
-            half_CZ_A = dac_scale_factor*self.detuning_to_amp(
-                self.cz_freq_01_max() - half_CZ_A)
+            CZ_theta_A = wfl.martinis_flux_pulse(
+                self.cz_length()/2, theta_i=theta_i,
+                theta_f=np.deg2rad(self.cz_theta_f()),
+                lambda_2=self.cz_lambda_2(), lambda_3=self.cz_lambda_3())
+            CZ_eps_A = wfl.theta_to_eps(CZ_theta_A, g=self.q_J2())
+            CZ_amp_A = self.calc_eps_to_amp(
+                CZ_eps_A, state_A='11', state_B='02', positive_branch=True)
+
+            CZ_A = dac_scale_factor*CZ_amp_A
 
             # Generate the second CZ pulse. If the params are np.nan, default
             # to the main parameter
@@ -613,24 +609,20 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             else:
                 d_lambda_3 = self.cz_lambda_3()
 
-            half_CZ_B = wf.martinis_flux_pulse(
-                length=self.cz_length()*(1-self.czd_length_ratio()),
-                lambda_2=d_lambda_2,
-                lambda_3=d_lambda_3,
-                theta_f=d_theta_f,
-                f_01_max=self.cz_freq_01_max(),
-                # V_per_phi0=self.cz_V_per_phi0(),
-                J2=self.cz_J2(),
-                # E_c=self.cz_E_c(),
-                f_interaction=self.cz_freq_interaction(),
-                sampling_rate=self.sampling_rate(),
-                return_unit='f01')
-            half_CZ_B = dac_scale_factor*self.detuning_to_amp(
-                self.cz_freq_01_max() - half_CZ_B, positive_branch=False)
+            CZ_theta_B = wfl.martinis_flux_pulse(
+                self.cz_length()/2, theta_i=theta_i,
+                theta_f=np.deg2rad(d_theta_f),
+                lambda_2=d_lambda_2, lambda_3=d_lambda_3)
+            CZ_eps_B = wfl.theta_to_eps(CZ_theta_B, g=self.q_J2())
+            CZ_amp_B = self.calc_eps_to_amp(
+                CZ_eps_B, state_A='11', state_B='02', positive_branch=False)
 
+            CZ_B = dac_scale_factor*CZ_amp_B
+
+            # Combine both halves of the double sided CZ gate
             amp_rat = self.czd_amp_ratio()
             waveform = np.concatenate(
-                [half_CZ_A, amp_rat*half_CZ_B + self.czd_amp_offset()])
+                [CZ_A, amp_rat*CZ_B + self.czd_amp_offset()])
 
             return waveform
 
