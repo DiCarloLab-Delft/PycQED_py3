@@ -13,17 +13,20 @@ from pycqed.analysis import measurement_analysis as ma
 from pycqed.analysis_v2 import measurement_analysis as ma2
 import networkx as nx
 import datetime
-from pycqed.measurement.openql_experiments import clifford_rb_oql as cl_oql
 from pycqed.utilities.general import check_keyboard_interrupt
-from pycqed.measurement.openql_experiments import openql_helpers as oqh
+
 
 try:
     from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
     import pycqed.measurement.openql_experiments.multi_qubit_oql as mqo
+    from pycqed.measurement.openql_experiments import clifford_rb_oql as cl_oql
+    from pycqed.measurement.openql_experiments import openql_helpers as oqh
 except ImportError:
     logging.warning('Could not import OpenQL')
     mqo = None
     sqo = None
+    cl_oql = None
+    oqh = None
 
 from pycqed.analysis import tomography as tomo
 
