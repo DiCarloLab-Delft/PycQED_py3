@@ -1845,7 +1845,7 @@ def measure_cphase_new( qbc, qbt, qbr, amps, lengths,
     cphase_all = []
     population_loss_all = []
 
-    s1 = awg_swf.Flux_pulse_CPhase_meas_hard_swf_new(
+    s1 = awg_swf.Flux_pulse_CPhase_hard_swf_new(
                                 qbc.name,
                                 qbt.name,
                                 qbr.name,
@@ -1971,7 +1971,7 @@ def measure_cphase_new2( qbc, qbt, qbr, lengths, amps,
         if i >= int(len(phases)/2):
             reference_measurement=True
 
-        s1 = awg_swf.Flux_pulse_CPhase_meas_hard_swf_new(
+        s1 = awg_swf.Flux_pulse_CPhase_hard_swf_new2(
             phase,
             qbc.name,
             qbt.name,
