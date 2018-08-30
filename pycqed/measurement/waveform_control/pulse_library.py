@@ -340,7 +340,7 @@ class SquareFluxPulse(Pulse):
 
 
 class MartinisFluxPulse(Pulse):
-    raise NotImplementedError()
+    pass
 
 
 class QWG_Codeword(Pulse):
