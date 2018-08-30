@@ -232,7 +232,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             polycoeffs += self.q_polycoeffs_freq_01_det()
             polycoeffs[2] += self.q_freq_01() + self.q_freq_10()
         else:
-            raise NotImplementedError('State {} not recognized'.format(state))
+            raise ValueError('State {} not recognized'.format(state))
         return polycoeffs
 
     def calc_amp_to_freq(self, amp: float, state: str='01'):

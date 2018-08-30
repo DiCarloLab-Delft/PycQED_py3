@@ -194,6 +194,10 @@ class Test_Flux_LutMan(unittest.TestCase):
         np.testing.assert_raises(AssertionError, np.testing.assert_array_equal,
                                  czA, czC)
 
+    def test_calc_amp_to_freq_unknown_state(self):
+        with self.assertRaises(ValueError):
+            self.fluxlutman.get_polycoeffs_state('22')
+
     def test_calc_amp_to_freq_01(self):
         """
         Tests methods used to determine energy levels and their conversion
@@ -303,7 +307,10 @@ class Test_Flux_LutMan(unittest.TestCase):
     def test_generate_standard_flux_waveforms(self):
         self.fluxlutman.generate_standard_waveforms()
 
-    def test_upload_and_distort(self):
+    def test_load_waveforms_onto_AWG_lookuptable(self):
+        self.fluxlutman.cfg_distort(True)
+        self.fluxlutman.load_waveforms_onto_AWG_lookuptable()
+        self.fluxlutman.cfg_distort(False)
         self.fluxlutman.load_waveforms_onto_AWG_lookuptable()
 
     def test_generate_composite(self):
@@ -373,6 +380,9 @@ class Test_Flux_LutMan(unittest.TestCase):
         np.testing.assert_almost_equal(integral, 0)
 
 
+    def test_render_wave(self):
+        self.fluxlutman.render_wave('cz_z', time_units='lut_index')
+        self.fluxlutman.render_wave('cz_z', time_units='s')
 
 
     @classmethod
