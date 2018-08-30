@@ -24,14 +24,14 @@ def martinis_flux_pulse(length: float,
     Note that θ still needs to be transformed into detuning from the
     interaction and into AWG amplitude V(t).
 
-        θ(τ) = θ_i + Σ_{n=1}^N  (λ_n*(1-cos(n*2*pi*τ/τ_p))/2
+        θ(τ) = θ_i + Σ_{n=1}^N  λ_n*(1-cos(n*2*pi*τ/τ_p))
 
     Args:
         length      :   lenght of the waveform (s)
         lambda_2    :   lambda coeffecients
         lambda_3    :
         lambda_3    :
-        theta_f     :   initial angle of interaction (rad).
+        theta_i     :   initial angle of interaction (rad).
         theta_f     :   final angle of the interaction (rad).
         sampling_rate : sampling rate of AWG in (Hz)
 
@@ -68,6 +68,7 @@ def martinis_flux_pulse(length: float,
     theta_wave += lambda_1 * (1 - np.cos(2 * np.pi * taus / rounded_length))
     theta_wave += lambda_2 * (1 - np.cos(4 * np.pi * taus / rounded_length))
     theta_wave += lambda_3 * (1 - np.cos(6 * np.pi * taus / rounded_length))
+    theta_wave += lambda_4 * (1 - np.cos(8 * np.pi * taus / rounded_length))
 
     # Clip wave to [theta_i, pi] to avoid poles in the wave expressed in freq
     theta_wave_clipped = np.clip(theta_wave, theta_i, np.pi-.01)
@@ -78,7 +79,7 @@ def martinis_flux_pulse(length: float,
 
     # 3. Transform from proper time τ to real time t using interpolation
     t = np.array([np.trapz(np.sin(theta_wave_clipped)[:i+1],
-                           dx=1/(10*sampling_rate))
+                           dx=1/(fine_sampling_factor*sampling_rate))
                   for i in range(len(theta_wave_clipped))])
 
     # Interpolate pulse at physical sampling distance
@@ -120,9 +121,9 @@ def theta_to_eps(theta: float, g: float):
 
     args:
         θ: interaction angle (radian)
-        ε: detuning
-    returns:
         g: coupling strength
+    returns:
+        ε: detuning
     """
     eps = 2 * g / np.tan(theta)
     return eps
