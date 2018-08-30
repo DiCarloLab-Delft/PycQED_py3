@@ -52,7 +52,11 @@ class NoiseParametersCZ(Instrument):
         self.add_parameter('w_bus', unit='Hz',
                            label='omega of the bus resonator',
                            parameter_class=ManualParameter,
-                           vals=vals.Numbers(), initial_value=8.08e9*2*np.pi)     
+                           vals=vals.Numbers(), initial_value=8.08e9)
+        self.add_parameter('alpha_q1', unit='Hz',
+                           label='anharmonicity of the static qubit',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(), initial_value=-262e6)     
 
         # for qdots simulations
         self.add_parameter('detuning', unit='meV',
