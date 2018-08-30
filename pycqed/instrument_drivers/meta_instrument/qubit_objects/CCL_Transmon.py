@@ -2004,6 +2004,7 @@ class CCLight_Transmon(Qubit):
         self.prepare_for_timedomain()
         # off/on switching is achieved by turning the MW source on and
         # off as this is much faster than recompiling/uploading
+        f_res=[]
         for i, pulse_comb in enumerate(['off', 'on']):
             p = sqo.off_on(
                 qubit_idx=self.cfg_qubit_nr(), pulse_comb=pulse_comb,
@@ -2022,7 +2023,10 @@ class CCLight_Transmon(Qubit):
             MC.run(name='Resonator_scan_'+pulse_comb+self.msmt_suffix)
             if analyze:
                 ma.MeasurementAnalysis()
-
+                a = ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=True)
+                f_res.append(a.fit_results.params['f0'].value*1e9)  # fit converts to Hz
+        print('dispersive shift is {} MHz'.format((f_res[1]-f_res[0])*1e-6))
+    
     def calibrate_optimal_weights(self, MC=None, verify: bool=True,
                                   analyze: bool=True, update: bool=True,
                                   no_figs: bool=False,
