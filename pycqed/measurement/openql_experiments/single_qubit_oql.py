@@ -5,7 +5,6 @@ from os.path import join, dirname
 import openql.openql as ql
 from openql.openql import Program, Kernel, Platform
 from pycqed.utilities.general import suppress_stdout
-# from pycqed.utilities.general import mopen
 from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
 
 
@@ -160,24 +159,24 @@ def flipping(qubit_idx: int, number_of_flips, platf_cfg: str,
             k.measure(qubit_idx)
         elif cal_points and (i == (len(number_of_flips)-2) or
                              i == (len(number_of_flips)-1)):
-            if ax=='y':
+            if ax == 'y':
                 k.y(qubit_idx)
             else:
                 k.x(qubit_idx)
             k.measure(qubit_idx)
         else:
             if equator:
-                if ax=='y':
+                if ax == 'y':
                     k.gate('ry90', qubit_idx)
                 else:
                     k.gate('rx90', qubit_idx)
             for j in range(n):
-                if ax=='y' and angle=='90':
+                if ax == 'y' and angle == '90':
                     k.gate('ry90', qubit_idx)
                     k.gate('ry90', qubit_idx)
-                elif ax=='y' and angle=='180':
+                elif ax == 'y' and angle == '180':
                     k.y(qubit_idx)
-                elif angle=='90':
+                elif angle == '90':
                     k.gate('rx90', qubit_idx)
                     k.gate('rx90', qubit_idx)
                 else:
@@ -324,7 +323,7 @@ def T1_second_excited_state(times, qubit_idx: int, platf_cfg: str):
 
     dt = times[1] - times[0]
     sweep_points = np.concatenate([np.repeat(times, 2),
-                                  times[-1]+dt*np.arange(6)+dt])
+                                   times[-1]+dt*np.arange(6)+dt])
     # attribute get's added to program to help finding the output files
     p.sweep_points = sweep_points
     p.output_dir = ql.get_output_dir()
@@ -451,7 +450,7 @@ def idle_error_rate_seq(nr_of_idle_gates,
             if post_select:
                 # adds an initialization measurement used to post-select
                 k.measure(qubit_idx)
-            if state =='1':
+            if state == '1':
                 k.gate('rx180', qubit_idx)
             elif state == '+':
                 k.gate('rym90', qubit_idx)
@@ -466,7 +465,7 @@ def idle_error_rate_seq(nr_of_idle_gates,
             # 3. Reading out in the proper basis
             if state == '+' and echo:
                 k.gate('rym90', qubit_idx)
-            elif state =='+':
+            elif state == '+':
                 k.gate('ry90', qubit_idx)
             k.measure(qubit_idx)
             p.add_kernel(k)
@@ -498,7 +497,6 @@ def single_elt_on(qubit_idx: int, platf_cfg: str):
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
-
 
 
 def off_on(qubit_idx: int, pulse_comb: str, initialize: bool, platf_cfg: str):
@@ -710,8 +708,8 @@ def randomized_benchmarking(qubit_idx: int, platf_cfg: str,
     return p
 
 
-def motzoi_XY(qubit_idx:int, platf_cfg: str,
-             program_name: str='motzoi_XY'):
+def motzoi_XY(qubit_idx: int, platf_cfg: str,
+              program_name: str='motzoi_XY'):
     '''
     Sequence used for calibrating the motzoi parameter.
     Consists of yX and xY
@@ -744,6 +742,7 @@ def motzoi_XY(qubit_idx:int, platf_cfg: str,
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
+
 
 def Ram_Z(qubit_name,
           wait_before=150e-9, wait_between=200e-9, clock_cycle=1e-9):
@@ -808,7 +807,7 @@ def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
 
     # don't use last 4 points if calibration points are used
     if cal_points:
-        times= times[:-4]
+        times = times[:-4]
     for t in times:
         t_nanoseconds = int(round(t/1e-9))
 
@@ -858,15 +857,14 @@ def FluxTimingCalibration_2q(q0, q1, buffer_time1, times, platf_cfg: str):
             k.gate("wait", [2, 0], buffer_nanoseconds1)
         k.gate('fl_cw_02', 2, 0)
         if t_nanoseconds > 10:
-            k.gate("wait", [2, 0 ], t_nanoseconds)
+            k.gate("wait", [2, 0], t_nanoseconds)
         #k.gate('rx180', q0)
         #k.gate('rx180', q1)
-        k.gate("wait",[2, 0 ], 1)
+        k.gate("wait", [2, 0], 1)
         k.measure(q0)
-        k.gate("wait",[2, 0 ], 1)
+        k.gate("wait", [2, 0], 1)
 
         p.add_kernel(k)
-
 
     with suppress_stdout():
         p.compile(verbose=False)
@@ -945,10 +943,10 @@ def FastFeedbackControl(latency, qubit_idx: int, platf_cfg: str):
 
 
 def ef_rabi_seq(q0: int,
-                   amps: list,
-                   platf_cfg: str,
-                   recovery_pulse: bool=True,
-                   add_cal_points: bool=True):
+                amps: list,
+                platf_cfg: str,
+                recovery_pulse: bool=True,
+                add_cal_points: bool=True):
     """
     Sequence used to calibrate pulses for 2nd excited state (ef/12 transition)
 
@@ -962,7 +960,7 @@ def ef_rabi_seq(q0: int,
         recovery_pulse (bool): if True adds a recovery pulse to enhance
             contrast in the measured signal.
     """
-    if len(amps)>18:
+    if len(amps) > 18:
         raise ValueError('Only 18 free codewords available for amp pulses')
     platf = Platform('OpenQL_Platform', platf_cfg)
     p = Program(pname="ef_rabi_seq",
@@ -991,11 +989,10 @@ def ef_rabi_seq(q0: int,
 
     if add_single_qubit_cal_points:
         cal_pts_idx = [amps[-1]+.1, amps[-1]+.15,
-                        amps[-1]+.2, amps[-1]+.25]
+                       amps[-1]+.2, amps[-1]+.25]
     else:
         cal_pts_idx = []
 
     p.sweep_points = np.concatenate([amps, cal_pts_idx])
     p.set_sweep_points(p.sweep_points, len(p.sweep_points))
     return p
-

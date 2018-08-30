@@ -623,7 +623,7 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int,
         platf_cfg:      filename of the platform config file
         target_qubit_sequence: selects whether to run a ramsey sequence on
             a target qubit ('ramsey'), keep it in gorund state ('ground')
-            or excite it iat the beginning of the sequnce ('excited') 
+            or excite it iat the beginning of the sequnce ('excited')
     Returns:
         p:              OpenQL Program object containing
 
@@ -650,7 +650,7 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int,
 
     k = Kernel("Chevron", p=platf)
     k.prepz(qubit_idx)
-    
+
     if target_qubit_sequence=='ramsey':
         k.gate('rx90', qubit_idx_spec)
     elif target_qubit_sequence == 'excited':
@@ -662,13 +662,13 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int,
         logging.warning('target_qubit_sequence not recognized.'
             'Keeping target qubit in a ground state.')
     k.gate('rx180', qubit_idx)
-    
+
     k.gate("wait", [qubit_idx], buffer_nanoseconds)
     k.gate('fl_cw_{:02}'.format(flux_cw), 2, 0)
-    
+
     k.gate('wait', [qubit_idx], buffer_nanoseconds2)
     k.gate('rx180', qubit_idx)
-    
+
     k.measure(qubit_idx)
     k.measure(qubit_idx_spec)
     k.gate("wait", [qubit_idx, qubit_idx_spec], 0)
@@ -697,7 +697,7 @@ def two_qubit_ramsey(times, qubit_idx: int, qubit_idx_spec: int,
         platf_cfg:      filename of the platform config file
         target_qubit_sequence: selects whether to run a ramsey sequence on
             a target qubit ('ramsey'), keep it in gorund state ('ground')
-            or excite it iat the beginning of the sequnce ('excited') 
+            or excite it iat the beginning of the sequnce ('excited')
     Returns:
         p:              OpenQL Program object containing
 
@@ -720,7 +720,7 @@ def two_qubit_ramsey(times, qubit_idx: int, qubit_idx_spec: int,
     for i, time in enumerate(times):
         k = Kernel("two_qubit_ramsey", p=platf)
         k.prepz(qubit_idx)
-        
+
         if target_qubit_sequence=='ramsey':
             k.gate('rx90', qubit_idx_spec)
         elif target_qubit_sequence == 'excited':
@@ -732,13 +732,13 @@ def two_qubit_ramsey(times, qubit_idx: int, qubit_idx_spec: int,
             logging.warning('target_qubit_sequence not recognized.'
                 'Keeping target qubit in a ground state.')
         k.gate('rx90', qubit_idx)
-        
+
         wait_nanoseconds = int(round(time/1e-9))
         k.gate("wait", [qubit_idx, qubit_idx_spec], wait_nanoseconds)
 
         k.gate('i', qubit_idx_spec)
         k.gate('rx90', qubit_idx)
-        
+
         k.measure(qubit_idx)
         k.measure(qubit_idx_spec)
         k.gate("wait", [qubit_idx, qubit_idx_spec], 0)
@@ -1749,3 +1749,83 @@ def two_qubit_VQE(q0: int, q1: int, platf_cfg: str):
     p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
+
+
+def sliding_flux_pulses_seq(
+        qubits: list, platf_cfg: str,
+        angles=np.arange(0, 360, 20), wait_time: int=0,
+        flux_codeword_a: str='fl_cw_01', flux_codeword_b: str='fl_cw_01',
+        add_cal_points: bool=True):
+    """
+    Experiment to measure effect flux pulses on each other.
+
+    Timing of the sequence:
+        q0:   -- flux_a -- wait -- X90 -- flux_b -- Rphi90 -- RO
+        q1:   -- flux_a --      --     -- flux_b --        -- RO
+
+    N.B. q1 only exists to satisfy flux tuples notion in CCL
+    N.B.2 flux-tuples are now hardcoded to always be tuple [2,0] again
+        because of OpenQL.
+
+    Args:
+        qubits      : list of qubits, LSQ (q0) is last entry in list
+        platf_cfg   : openQL platform config
+        angles      : angles along which to do recovery pulses
+        wait_time   : time in ns after the first flux pulse and before the
+            first microwave pulse.
+        flux_codeword_a : flux codeword of the stimulus (1st) pulse
+        flux_codeword_b : flux codeword of the spectator (2nd) pulse
+        add_cal_points : if True adds calibration points at the end
+    """
+
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="sliding_flux_pulses_seq",
+                nqubits=platf.get_qubit_number(),
+                p=platf)
+    k = Kernel("sliding_flux_pulses_seq", p=platf)
+    q0 = qubits[-1]
+    q1 = qubits[-2]
+
+    for i, angle in enumerate(angles):
+
+        cw_idx = angle//20 + 9
+
+        k.prepz(q0)
+        k.gate(flux_codeword_a, [2, 0])
+        # hardcoded because of flux_tuples, [q1, q0])
+        k.gate('wait', [q0, q1], wait_time)
+        k.gate('rx90', q0)
+        k.gate(flux_codeword_b, [2, 0])
+        k.gate('wait', [q0, q1], 60)
+        # hardcoded because of flux_tuples, [q1, q0])
+        # hardcoded angles, must be uploaded to AWG
+        if angle == 90:
+            # special because the cw phase pulses go in mult of 20 deg
+            k.gate('ry90', q0)
+        else:
+            k.gate('cw_{:02}'.format(cw_idx), q0)
+        k.measure(q0)
+        k.measure(q1)
+        # Implements a barrier to align timings
+        # k.gate('wait', [q0, q1], 0)
+        # hardcoded barrier because of openQL #104
+        k.gate('wait', [2, 0], 0)
+    p.add_kernel(k)
+
+    if add_cal_points:
+        p = add_two_q_cal_points(p, platf=platf, q0=q0, q1=q1)
+    with suppress_stdout():
+        p.compile()
+    # attribute get's added to program to help finding the output files
+    p.output_dir = ql.get_output_dir()
+    p.filename = join(p.output_dir, p.name + '.qisa')
+
+    if add_cal_points:
+        cal_pts_idx = [361, 362, 363, 364]
+    else:
+        cal_pts_idx = []
+
+    p.sweep_points = np.concatenate([angles, cal_pts_idx])
+    p.set_sweep_points(p.sweep_points, len(p.sweep_points))
+    return p
+
