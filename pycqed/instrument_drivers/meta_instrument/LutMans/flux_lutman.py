@@ -341,13 +341,23 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
     def calc_net_zero_length_ratio(self):
         """
         Determines the lenght ratio of the net-zero pulses based on the
-        parameter "czd_length_ratio"
+        parameter "czd_length_ratio".
+
+        If czd_length_ratio is set to auto, uses the interaction amplitudes
+        to determine the scaling of lengths. Note that this is a coarse
+        approximation.
         """
         if self.czd_length_ratio() != 'auto':
             return self.czd_length_ratio()
         else:
-            print('TODO')
-            raise NotImplementedError()
+            amp_J2_pos = self.calc_eps_to_amp(0, state_A='11', state_B='02',
+                                              positive_branch=True)
+            amp_J2_neg = self.calc_eps_to_amp(0, state_A='11', state_B='02',
+                                              positive_branch=False)
+
+            # lr chosen to satisfy (amp_pos*lr + amp_neg*(1-lr) = 0 )
+            lr = - amp_J2_neg/(amp_J2_pos-amp_J2_neg)
+            return lr
 
 
     def get_dac_val_to_amp_scalefactor(self):
@@ -372,10 +382,10 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         # channel range of 5 corresponds to -2.5V to +2.5V
         channel_range_pp = AWG.get('sigouts_{}_range'.format(awg_ch))
         # direct_mode = AWG.get('sigouts_{}_direct'.format(awg_ch))
-        scale_factor = channel_amp*(channel_range_pp/2)
-        return scale_factor
+        scalefactor = channel_amp*(channel_range_pp/2)
+        return scalefactor
 
-    def get_amp_to_dac_val_scale_factor(self):
+    def get_amp_to_dac_val_scalefactor(self):
         if self.get_dac_val_to_amp_scalefactor() == 0:
                 # Give a warning and don't raise an error as things should not
                 # break because of this.
@@ -585,7 +595,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         Generates the CZ waveform.
         """
 
-        dac_scale_factor = self.get_amp_to_dac_val_scale_factor()
+        dac_scalefactor = self.get_amp_to_dac_val_scalefactor()
         eps_i = self.calc_amp_to_eps(0, state_A='11', state_B='02')
         # Beware theta in radian!
         theta_i = wfl.eps_to_theta(eps_i, g=self.q_J2())
@@ -599,21 +609,23 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             CZ_amp = self.calc_eps_to_amp(CZ_eps, state_A='11', state_B='02')
 
             # convert amplitude in V to amplitude in awg dac value
-            CZ = dac_scale_factor*CZ_amp
+            CZ = dac_scalefactor*CZ_amp
             return CZ
 
         else:
             # Simple double sided CZ pulse implemented in most basic form.
             # repeats the same CZ gate twice and sticks it together.
+            length_ratio = self.calc_net_zero_length_ratio()
+
             CZ_theta_A = wfl.martinis_flux_pulse(
-                self.cz_length()/2, theta_i=theta_i,
+                self.cz_length()*length_ratio, theta_i=theta_i,
                 theta_f=np.deg2rad(self.cz_theta_f()),
                 lambda_2=self.cz_lambda_2(), lambda_3=self.cz_lambda_3())
             CZ_eps_A = wfl.theta_to_eps(CZ_theta_A, g=self.q_J2())
             CZ_amp_A = self.calc_eps_to_amp(
                 CZ_eps_A, state_A='11', state_B='02', positive_branch=True)
 
-            CZ_A = dac_scale_factor*CZ_amp_A
+            CZ_A = dac_scalefactor*CZ_amp_A
 
             # Generate the second CZ pulse. If the params are np.nan, default
             # to the main parameter
@@ -632,14 +644,14 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                 d_lambda_3 = self.cz_lambda_3()
 
             CZ_theta_B = wfl.martinis_flux_pulse(
-                self.cz_length()/2, theta_i=theta_i,
+                self.cz_length()*(1-length_ratio), theta_i=theta_i,
                 theta_f=np.deg2rad(d_theta_f),
                 lambda_2=d_lambda_2, lambda_3=d_lambda_3)
             CZ_eps_B = wfl.theta_to_eps(CZ_theta_B, g=self.q_J2())
             CZ_amp_B = self.calc_eps_to_amp(
                 CZ_eps_B, state_A='11', state_B='02', positive_branch=False)
 
-            CZ_B = dac_scale_factor*CZ_amp_B
+            CZ_B = dac_scalefactor*CZ_amp_B
 
             # Combine both halves of the double sided CZ gate
             amp_rat = self.czd_amp_ratio()
@@ -1299,13 +1311,17 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
     def plot_level_diagram(self, ax=None, show=True):
         """
         Plots the level diagram as specified by the q_ parameters.
+            1. Plotting levels
+            2. Annotating feature of interest
+            3. Adding legend etc.
+            4. Add a twin x-axis to denote scale in dac amplitude
+
         """
 
         if ax is None:
             f, ax = plt.subplots()
-
-        amps = np.linspace(-2.5, 2.5, 101)  # maximum voltage of AWG amp mode
-
+        # 1. Plotting levels
+        amps = np.linspace(-2.5, 2.5, 101)  # maximum voltage of AWG in amp mode
         freqs = self.calc_amp_to_freq(amps, state='01')
         ax.plot(amps, freqs, label='$f_{01}$')
         ax.text(0, self.calc_amp_to_freq(0, state='01'), '01', color='C0',
@@ -1325,6 +1341,8 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         ax.plot(amps, freqs, label='$f_{11}$')
         ax.text(0, self.calc_amp_to_freq(0, state='11'), '11', color='C3',
                 ha='left', va='bottom', clip_on=True)
+
+        # 2. Annotating feature of interest
         ax.axvline(0, 0, 1e10, linestyle='dotted', c='grey')
 
         amp_J2 = self.calc_eps_to_amp(0, state_A='11', state_B='02')
@@ -1349,6 +1367,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                 '({:.3f},{:.2f})'.format(amp_J1, f_10_01*1e-9),
                 color='C5', ha='left', va='bottom', clip_on=True)
 
+        # 3. Adding legend etc.
         title = ('Calibration visualization\n{}\nchannel {}'.format(
             self.AWG(), self.cfg_awg_channel()))
         leg = ax.legend(title=title, loc=(1.05, .3))
@@ -1359,9 +1378,10 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
 
         ax.set_ylim(0, self.calc_amp_to_freq(0, state='02')*1.1)
 
+        # 4. Add a twin x-axis to denote scale in dac amplitude
         dac_val_axis = ax.twiny()
         dac_ax_lims = np.array(ax.get_xlim()) * \
-            self.get_amp_to_dac_val_scale_factor()
+            self.get_amp_to_dac_val_scalefactor()
         dac_val_axis.set_xlim(dac_ax_lims)
         set_xlabel(dac_val_axis, 'AWG amplitude', 'dac')
 
@@ -1473,8 +1493,8 @@ class QWG_Flux_LutMan(AWG8_Flux_LutMan):
         awg_ch = self.cfg_awg_channel()
 
         channel_amp = AWG.get('ch{}_amp'.format(awg_ch))
-        scale_factor = channel_amp
-        return scale_factor
+        scalefactor = channel_amp
+        return scalefactor
 
 #########################################################################
 # Convenience functions below

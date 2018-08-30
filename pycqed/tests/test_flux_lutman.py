@@ -13,12 +13,27 @@ class Test_Flux_LutMan(unittest.TestCase):
 
     @classmethod
     def setUpClass(self):
+        # gets called at initialization of test class
         self.AWG = v8.VirtualAWG8('DummyAWG8')
 
         self.fluxlutman = flm.AWG8_Flux_LutMan('fluxlutman_main')
         self.k0 = lko.LinDistortionKernel('k0')
+        self.fluxlutman_partner = flm.AWG8_Flux_LutMan('fluxlutman_partner')
+
+    @classmethod
+    def setUp(self):
+        # gets called before every test method
         self.fluxlutman.instr_distortion_kernel(self.k0.name)
         self.k0.instr_AWG(self.AWG.name)
+
+        self.k0.filter_model_00(
+            {'model': 'exponential', 'params': {'tau': 1e-8, 'amp': -0.08}})
+        self.k0.filter_model_01(
+            {'model': 'exponential', 'params': {'tau': 6e-9, 'amp': -0.01}})
+        self.k0.filter_model_02(
+            {'model': 'exponential', 'params': {'tau': 1.8e-9, 'amp': -0.1}})
+        self.k0.filter_model_03(
+            {'model': 'exponential', 'params': {'tau': 1.e-9, 'amp': -0.1}})
 
         self.fluxlutman.AWG(self.AWG.name)
         self.fluxlutman.sampling_rate(2.4e9)
@@ -32,8 +47,8 @@ class Test_Flux_LutMan(unittest.TestCase):
         self.k0.cfg_awg_channel(self.fluxlutman.cfg_awg_channel())
         self.fluxlutman.cfg_max_wf_length(5e-6)
 
-        poly_coeffs = np.array([1.95027142e+09,  -3.22560292e+08,
-                                5.25834946e+07])
+        poly_coeffs = -np.array([1.95027142e+09,  -3.22560292e+08,
+                                 5.25834946e+07])
         self.fluxlutman.q_polycoeffs_freq_01_det(poly_coeffs)
         self.fluxlutman.q_polycoeffs_anharm(np.array([0, 0, -300e6]))
 
@@ -42,7 +57,6 @@ class Test_Flux_LutMan(unittest.TestCase):
 
         ################################################
 
-        self.fluxlutman_partner = flm.AWG8_Flux_LutMan('fluxlutman_partner')
         self.fluxlutman_partner.instr_distortion_kernel(self.k0.name)
         self.fluxlutman_partner.AWG(self.AWG.name)
         self.fluxlutman_partner.sampling_rate(2.4e9)
@@ -50,6 +64,14 @@ class Test_Flux_LutMan(unittest.TestCase):
         self.fluxlutman_partner.cfg_max_wf_length(5e-6)
         self.fluxlutman_partner.set_default_lutmap()
         self.fluxlutman_partner.instr_partner_lutman('fluxlutman_main')
+
+        self.AWG.awgs_0_outputs_0_amplitude(1)
+        self.AWG.sigouts_0_range(5)
+
+        self.fluxlutman.czd_amp_ratio(1.)
+        self.fluxlutman.czd_lambda_2(np.nan)
+        self.fluxlutman.czd_lambda_3(np.nan)
+        self.fluxlutman.czd_theta_f(np.nan)
 
     def test_program_hash_differs_AWG8_flux_lutman(self):
 
@@ -80,7 +102,7 @@ class Test_Flux_LutMan(unittest.TestCase):
         sf = self.fluxlutman.get_dac_val_to_amp_scalefactor()
         self.assertEqual(sf, 0.2*0.8/2)
 
-        sc_inv = self.fluxlutman.get_amp_to_dac_val_scale_factor()
+        sc_inv = self.fluxlutman.get_amp_to_dac_val_scalefactor()
         self.assertEqual(sc_inv, 1/sf)
 
         self.fluxlutman.cfg_awg_channel(1)
@@ -88,12 +110,13 @@ class Test_Flux_LutMan(unittest.TestCase):
     def test_partner_lutman_loading(self):
         self.fluxlutman.sq_amp(.3)
         self.fluxlutman_partner.sq_amp(.5)
+        self.k0.reset_kernels()
         self.fluxlutman.load_waveform_realtime('square')
-
         self.assertEqual(self.AWG._realtime_w0[0], [.3])
         self.assertEqual(self.AWG._realtime_w1[0], [.5])
 
     def test_plot_level_diagram(self):
+        self.AWG.awgs_0_outputs_0_amplitude(.73)
         self.fluxlutman.plot_level_diagram(show=False)
 
     def test_plot_cz_trajectory(self):
@@ -280,7 +303,6 @@ class Test_Flux_LutMan(unittest.TestCase):
     def test_generate_standard_flux_waveforms(self):
         self.fluxlutman.generate_standard_waveforms()
 
-
     def test_upload_and_distort(self):
         self.fluxlutman.load_waveforms_onto_AWG_lookuptable()
 
@@ -334,15 +356,22 @@ class Test_Flux_LutMan(unittest.TestCase):
             uploaded_wf_instr = self.AWG.wave_ch1_cw003()
             np.testing.assert_array_almost_equal(uploaded_wf_lutman,
                                                  uploaded_wf_instr)
-    @unittest.expectedFailure
+
     def test_length_ratio(self):
-        self.flux_lutman.czd_length_ratio(.5)
+        self.fluxlutman.czd_length_ratio(.5)
         lr = self.fluxlutman.calc_net_zero_length_ratio()
         self.assertEqual(lr, 0.5)
 
-        self.flux_lutman.czd_length_ratio('auto')
+        self.fluxlutman.czd_length_ratio('auto')
+
+        amp_J2_pos = self.fluxlutman.calc_eps_to_amp(
+            0, state_A='11', state_B='02', positive_branch=True)
+        amp_J2_neg = self.fluxlutman.calc_eps_to_amp(
+            0, state_A='11', state_B='02', positive_branch=False)
         lr = self.fluxlutman.calc_net_zero_length_ratio()
-        # raises not implemented
+        integral = lr*amp_J2_pos + (1-lr)*amp_J2_neg
+        np.testing.assert_almost_equal(integral, 0)
+
 
 
 
