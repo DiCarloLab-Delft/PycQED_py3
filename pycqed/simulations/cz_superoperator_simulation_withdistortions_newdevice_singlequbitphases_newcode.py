@@ -323,6 +323,8 @@ def rotating_frame_transformation(U, t: float,
 
     """
     U_RF = (1j*w_q0*n_q0*t).expm() * (1j*w_q1*n_q1*t).expm()
+    if U.type=='super':
+    	U_RF=qtp.to_super(U_RF)
 
     U_prime = U_RF * U  
     """ U_RF only on one side because that's the operator that
@@ -347,7 +349,9 @@ def rotating_frame_transformation_new(U, t: float, H):
         w_q1 (float): freq of frame for q1
 
     """
-    U_RF = qtp.to_super((1j*H*t).expm())
+    U_RF = (1j*H*t).expm()     #wrong: it shouldn't affect avgatefid_compsubspace though
+    if U.type=='super':
+    	U_RF=qtp.to_super(U_RF)
 
     U_prime = U_RF * U  
     """ U_RF only on one side because that's the operator that
@@ -356,6 +360,29 @@ def rotating_frame_transformation_new(U, t: float, H):
     In case we would need to rotate in the new picture the jump operators as well !
     """
     return U_prime
+
+
+def correct_reference(U,w_q1,w_q0,t):
+    # w_qi should include already the 2*pi factor. Moreover they and t should be in the same scale
+    phase_to_correct_q1 = w_q1*t
+    phase_to_correct_q0 = w_q0*t
+
+    Ucorrection = qtp.Qobj([[1, 0, 0, 0, 0, 0, 0, 0, 0],
+                     [0, np.exp(1j*phase_to_correct_q0), 0, 0, 0, 0, 0, 0, 0],
+                     [0, 0, 1, 0, 0, 0, 0, 0, 0],
+                     [0, 0, 0, np.exp(1j*phase_to_correct_q1), 0, 0, 0, 0, 0],
+                     [0, 0, 0, 0, np.exp(1j*(phase_to_correct_q0+phase_to_correct_q1)), 0, 0, 0, 0],
+                     [0, 0, 0, 0, 0, np.exp(1j*phase_to_correct_q1), 0, 0, 0],
+                     [0, 0, 0, 0, 0, 0, 1, 0, 0],
+                     [0, 0, 0, 0, 0, 0, 0, np.exp(1j*phase_to_correct_q0), 0],
+                     [0, 0, 0, 0, 0, 0, 0, 0, 1]],
+                    type='oper',
+                    dims=[[3, 3], [3, 3]])
+
+    if U.type=='oper':
+        return Ucorrection*U
+    elif U.type=='super':
+        return qtp.to_super(Ucorrection)*U
 
 
 def phases_from_superoperator(U):
@@ -784,6 +811,7 @@ def simulate_quantities_of_interest_superoperator(tlist, c_ops, noise_parameters
     '''
 
     U_final = exp_L_total
+    #U_final=rotating_frame_transformation_new(U_final, fluxlutman.cz_length()*scalefactor, S*H_0*S.dag())
 
     phases = phases_from_superoperator(U_final)         # order is phi_00, phi_01, phi_10, phi_11, phi_02, phi_20, phi_cond
     phi_cond = phases[-1]
@@ -793,9 +821,12 @@ def simulate_quantities_of_interest_superoperator(tlist, c_ops, noise_parameters
     avgatefid_compsubspace = pro_avfid_superoperator_compsubspace_phasecorrected(U_final,L1,phases)     # leakage has to be taken into account, see Woods & Gambetta
     print('avgatefid_compsubspace',avgatefid_compsubspace)
 
-    U_final_rotatingframe=rotating_frame_transformation_new(U_final, fluxlutman.cz_length(), S*H_0*S.dag())
-    avgatefid_compsubspace_notphasecorrected = pro_avfid_superoperator_compsubspace(U_final_rotatingframe,L1)
+    H_twoqubits = coupled_transmons_hamiltonian_new(w_q0=fluxlutman.q_freq_01(), w_q1=fluxlutman.q_freq_10(), 
+    	                                            alpha_q0=-2*fluxlutman.q_freq_01(), alpha_q1=-2*fluxlutman.q_freq_10(), J=0)
+    U_final=rotating_frame_transformation_new(U_final, fluxlutman.cz_length()*scalefactor, S*H_twoqubits*S.dag())
+    avgatefid_compsubspace_notphasecorrected = pro_avfid_superoperator_compsubspace(U_final,L1)
 
+    phases = phases_from_superoperator(U_final)         # order is phi_00, phi_01, phi_10, phi_11, phi_02, phi_20, phi_cond
     phase_q0 = phases[1]-phases[0]
     phase_q1 = phases[2]-phases[0]
     
