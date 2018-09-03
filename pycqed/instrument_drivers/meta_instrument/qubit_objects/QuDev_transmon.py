@@ -3996,16 +3996,16 @@ def add_CZ_pulse(qbc, qbt):
                                 initial_value=qbt.name,
                                 vals=vals.Enum(qbt.name))
         qbc.add_pulse_parameter(op_name, ps_name + '_pulse_type', 'pulse_type',
-                                initial_value='BufferedCZPulse',
-                                vals=vals.Enum('BufferedCZPulse'))
+                                initial_value='BufferedSquarePulse',
+                                vals=vals.Enum('BufferedSquarePulse'))
         qbc.add_pulse_parameter(op_name, ps_name + '_channel', 'channel',
                                 initial_value='', vals=vals.Strings())
         qbc.add_pulse_parameter(op_name, ps_name + '_amp', 'amplitude',
                                 initial_value=0, vals=vals.Numbers())
-        qbc.add_pulse_parameter(op_name, ps_name + '_freq', 'frequency',
-                                initial_value=0, vals=vals.Numbers())
-        qbc.add_pulse_parameter(op_name, ps_name + '_phase', 'phase',
-                                initial_value=0, vals=vals.Numbers())
+        # qbc.add_pulse_parameter(op_name, ps_name + '_freq', 'frequency',
+        #                         initial_value=0, vals=vals.Numbers())
+        # qbc.add_pulse_parameter(op_name, ps_name + '_phase', 'phase',
+        #                         initial_value=0, vals=vals.Numbers())
         qbc.add_pulse_parameter(op_name, ps_name + '_length', 'pulse_length',
                                 initial_value=0, vals=vals.Numbers(0))
         qbc.add_pulse_parameter(op_name, ps_name + '_buf_start',

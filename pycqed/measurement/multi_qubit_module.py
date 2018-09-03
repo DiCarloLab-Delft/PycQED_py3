@@ -1915,7 +1915,7 @@ def measure_cphase_new( qbc, qbt, qbr, amps, lengths,
 
 
 def measure_cphase_new2( qbc, qbt, qbr, lengths, amps,
-                        phases=None,MC=None, cal_points=None, plot=False,
+                        phases=None,MC=None, cal_points=False, plot=False,
                         return_population_loss=False,
                         prepare_for_timedomain=True,
                         upload=True):
@@ -1952,6 +1952,7 @@ def measure_cphase_new2( qbc, qbt, qbr, lengths, amps,
         logging.warning('amps and lengths must have the same '
                         'dimension.')
 
+    len_amp_pairs = np.array([lengths,amps]).T
     if MC is None:
         MC = qbc.MC
     if phases is None:
@@ -1971,16 +1972,16 @@ def measure_cphase_new2( qbc, qbt, qbr, lengths, amps,
         if i >= int(len(phases)/2):
             reference_measurement=True
 
-        s1 = awg_swf.Flux_pulse_CPhase_hard_swf_new2(
-            phase,
-            qbc.name,
-            qbt.name,
-            qbr.name,
-            CZ_pulse_name,
-            operation_dict,
-            cal_points=cal_points,
-            reference_measurement=reference_measurement,
-            upload=upload)
+        s1 = awg_swf.Flux_pulse_CPhase_hard_swf_new2(len_amp_pairs,
+                                    phase,
+                                    qbc.name,
+                                    qbt.name,
+                                    qbr.name,
+                                    CZ_pulse_name,
+                                    operation_dict,
+                                    cal_points=cal_points,
+                                    reference_measurement=reference_measurement,
+                                    upload=upload)
         s2 = awg_swf.arbitrary_variable_swf() #This is just a dummy to make sure MC works
 
         if prepare_for_timedomain:
@@ -1988,7 +1989,7 @@ def measure_cphase_new2( qbc, qbt, qbr, lengths, amps,
                 qb.prepare_for_timedomain()
 
         MC.set_sweep_functions([s1,s2])
-        MC.set_sweep_points(np.array([lengths,amps]).T)
+        MC.set_sweep_points(len_amp_pairs)
         MC.set_detector_function(qbr.int_avg_det)
         MC.run('CPhase_measurement_{}_{}'.format(qbc.name,qbt.name))
 

@@ -2518,9 +2518,9 @@ class Flux_pulse_CPhase_hard_swf_new(swf.Hard_Sweep):
 
 class Flux_pulse_CPhase_hard_swf_new2(swf.Hard_Sweep):
 
-    def __init__(self,X90_phase, qbc_name, qbt_name, qbr_name,CZ_pulse_name,
-                 operation_dict,cal_points=False, upload=True,
-                 reference_measurement=False):
+    def __init__(self, len_amp_pairs, X90_phase, qbc_name, qbt_name,
+                 qbr_name, CZ_pulse_name, operation_dict, cal_points=False,
+                 upload=True, reference_measurement=False):
         '''
             Flexible sweep function class for a single slice of the CPhase
             experiment (hard sweep) that can either sweep the amplitude or
@@ -2535,15 +2535,18 @@ class Flux_pulse_CPhase_hard_swf_new2(swf.Hard_Sweep):
             X90_phase: float, phase of the second X90 pulse in rad
             spacing: float, spacing between first and second X90 pulse
             measurement_mode (str): either 'excited_state', 'ground_state'
-            reference_measurement (bool): if True, appends a reference measurement
+            reference_measurement (bool): if True, appends a reference
+                                          measurement.
                                           IMPORTANT: you need to double
                                           the hard sweep points!
-                                          e.g. thetas = np.concatenate((thetas,thetas))
+                                          e.g. thetas =
+                                          np.concatenate((thetas,thetas))
         '''
         super().__init__()
         self.qbc_name = qbc_name
         self.qbt_name = qbt_name
         self.qbr_name = qbr_name
+        self.len_amp_pairs = len_amp_pairs
         self.X90_Phase = X90_phase
         self.operation_dict = operation_dict
         self.CZ_pulse_name = CZ_pulse_name
@@ -2556,15 +2559,15 @@ class Flux_pulse_CPhase_hard_swf_new2(swf.Hard_Sweep):
     def prepare(self,**kw):
         if self.upload:
             fsqs.flux_pulse_CPhase_seq_new2(
-                phases=self.sweep_points,
-                X90_phase=self.X90_Phase,
+                len_amp_pairs=self.len_amp_pairs,
+                X90_Phase=self.X90_Phase,
                 qbc_name=self.qbc_name,
                 qbt_name=self.qbt_name,
                 qbr_name=self.qbr_name,
                 operation_dict=self.operation_dict,
                 CZ_pulse_name=self.CZ_pulse_name,
                 cal_points=self.cal_points,
-                reference_measurements=self.reference_measurements,
+                reference_measurement=self.reference_measurement,
                 upload=self.upload
             )
 
