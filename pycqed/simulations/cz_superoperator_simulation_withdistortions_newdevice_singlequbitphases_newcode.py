@@ -714,16 +714,16 @@ def simulate_quantities_of_interest_superoperator(tlist, c_ops, noise_parameters
 
     
     # time is multiplied by scalefactor and frequency is divided by it
-    tlist=tlist*scalefactor
-    sim_step=sim_step*scalefactor
-    H_0=H_0/scalefactor
-    if c_ops!=[]:       # c_ops is a list of either operators or lists where the first element is
-                                    # an operator and the second one is a list of the (time-dependent) coefficients
-        for c in range(len(c_ops)):
-            if isinstance(c_ops[c],list):
-                c_ops[c][1]=c_ops[c][1]/np.sqrt(scalefactor)
-            else:
-                c_ops[c]=c_ops[c]/np.sqrt(scalefactor)
+    # tlist=tlist*scalefactor
+    # sim_step=sim_step*scalefactor
+    # H_0=H_0/scalefactor
+    # if c_ops!=[]:       # c_ops is a list of either operators or lists where the first element is
+    #                                 # an operator and the second one is a list of the (time-dependent) coefficients
+    #     for c in range(len(c_ops)):
+    #         if isinstance(c_ops[c],list):
+    #             c_ops[c][1]=c_ops[c][1]/np.sqrt(scalefactor)
+    #         else:
+    #             c_ops[c]=c_ops[c]/np.sqrt(scalefactor)
 
 
     '''								# step of 1/sampling_rate=1/2.4e9=0.4 ns seems good by itself
@@ -771,14 +771,16 @@ def simulate_quantities_of_interest_superoperator(tlist, c_ops, noise_parameters
     # We change the basis of H to the basis of eigenvectors of H_0
     # The columns of S are the eigenvectors of H_0, appropriately ordered
     S = qtp.Qobj(matrix_change_of_variables(H_0),dims=[[3, 3], [3, 3]])
+    H_0=S.dag()*H_0*S
+    #S = qtp.tensor(qtp.qeye(3),qtp.qeye(3))
 
     t0 = time.time()
 
     exp_L_total=1
     for i in range(len(tlist)):
         H=calc_hamiltonian(amp[i],fluxlutman,noise_parameters_CZ)
-        H=H/scalefactor
-        H=S*H*S.dag()
+        #H=H/scalefactor
+        H=S.dag()*H*S
         if c_ops != []:
             c_ops_temp=[]
             for c in range(len(c_ops)):
@@ -821,10 +823,25 @@ def simulate_quantities_of_interest_superoperator(tlist, c_ops, noise_parameters
     avgatefid_compsubspace = pro_avfid_superoperator_compsubspace_phasecorrected(U_final,L1,phases)     # leakage has to be taken into account, see Woods & Gambetta
     print('avgatefid_compsubspace',avgatefid_compsubspace)
 
-    H_twoqubits = coupled_transmons_hamiltonian_new(w_q0=fluxlutman.q_freq_01(), w_q1=fluxlutman.q_freq_10(), 
-    	                                            alpha_q0=-2*fluxlutman.q_freq_01(), alpha_q1=-2*fluxlutman.q_freq_10(), J=0)
-    U_final=rotating_frame_transformation_new(U_final, fluxlutman.cz_length()*scalefactor, S*H_twoqubits*S.dag())
+    #w_q0 = fluxlutman.q_freq_01()
+    w_q0 = (H_0[1,1]-H_0[0,0]) / (2*np.pi)
+    #w_q1 = fluxlutman.q_freq_10()
+    w_q1 = (H_0[3,3]-H_0[0,0]) / (2*np.pi)
+    H_twoqubits = coupled_transmons_hamiltonian_new(w_q0=w_q0, w_q1=w_q1, 
+    	                                            alpha_q0=-2*w_q0, alpha_q1=-2*w_q1, J=0) * (2*np.pi)
+
+    # cz_length = fluxlutman.cz_length()
+    # U_check = (1j*H_twoqubits*cz_length).expm() * (-1j*H_0*cz_length).expm()
+    # phases_check = phases_from_superoperator(U_check)
+    # print(phases_check)
+
+    U_final=rotating_frame_transformation_new(U_final, fluxlutman.cz_length(), H_twoqubits)
     avgatefid_compsubspace_notphasecorrected = pro_avfid_superoperator_compsubspace(U_final,L1)
+
+    # L1_bis = leakage_from_superoperator(U_final)
+    # phi_cond_bis = phases_from_superoperator(U_final)[-1]
+    # print('leakage',L1-L1_bis)
+    # print('phi_cond',phi_cond-phi_cond_bis)
 
     phases = phases_from_superoperator(U_final)         # order is phi_00, phi_01, phi_10, phi_11, phi_02, phi_20, phi_cond
     phase_q0 = phases[1]-phases[0]
@@ -942,7 +959,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         amp=amp_interp(tlist_new)
 
         # plot(x_plot_vec=[tlist_new*1e9],
-        #           y_plot_vec=[f_pulse/1e9],
+        #           y_plot_vec=[amp],
         #           title='Freq. of fluxing qubit during pulse',
         #           xlabel='Time (ns)',ylabel='Freq. (GHz)',legend_labels=['omega_B(t)'])
 
