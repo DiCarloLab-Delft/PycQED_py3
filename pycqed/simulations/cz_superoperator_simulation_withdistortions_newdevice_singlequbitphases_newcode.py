@@ -870,12 +870,12 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         if self.noise_parameters_CZ.distortions():
             impulse_response=np.gradient(self.fitted_stepresponse_ty[1])
 
-            plot(x_plot_vec=[np.array(self.fitted_stepresponse_ty[0])*1e9],y_plot_vec=[self.fitted_stepresponse_ty[1]],
-            	  title='Step response',
-                  xlabel='Time (ns)')
-            plot(x_plot_vec=[np.array(self.fitted_stepresponse_ty[0])*1e9],y_plot_vec=[impulse_response],
-            	  title='Impulse response',
-                  xlabel='Time (ns)')
+            # plot(x_plot_vec=[np.array(self.fitted_stepresponse_ty[0])*1e9],y_plot_vec=[self.fitted_stepresponse_ty[1]],
+            # 	  title='Step response',
+            #       xlabel='Time (ns)')
+            # plot(x_plot_vec=[np.array(self.fitted_stepresponse_ty[0])*1e9],y_plot_vec=[impulse_response],
+            # 	  title='Impulse response',
+            #       xlabel='Time (ns)')
 
             # use interpolation to be sure that amp and impulse_response have the same delta_t separating two values
             amp_interp = interp1d(tlist_new,amp)
@@ -889,10 +889,10 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
             convolved_amp=scipy.signal.convolve(amp_convol,impulse_response_convol)/sum(impulse_response_convol)
 
-            plot(x_plot_vec=[tlist_convol1*1e9,np.arange(np.size(convolved_amp))*sim_step_new*1e9],
-            	  y_plot_vec=[amp_convol, convolved_amp],
-            	  title='Pulse_length= {} ns'.format(self.fluxlutman.cz_length()*1e9),
-                  xlabel='Time (ns)',ylabel='Amplitude (V)',legend_labels=['Ideal','Distorted'])
+            # plot(x_plot_vec=[tlist_convol1*1e9,np.arange(np.size(convolved_amp))*sim_step_new*1e9],
+            # 	  y_plot_vec=[amp_convol, convolved_amp],
+            # 	  title='Pulse_length= {} ns'.format(self.fluxlutman.cz_length()*1e9),
+            #       xlabel='Time (ns)',ylabel='Amplitude (V)',legend_labels=['Ideal','Distorted'])
 
             amp_final=convolved_amp[0:np.size(tlist_convol1)]
             f_pulse_convolved_new=self.fluxlutman.calc_amp_to_freq(convolved_amp,'01')
@@ -909,6 +909,9 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 
 
+
+        # Noise
+        c_ops=[]
 
         T1_q0 = self.noise_parameters_CZ.T1_q0()
         T1_q1 = self.noise_parameters_CZ.T1_q1()
