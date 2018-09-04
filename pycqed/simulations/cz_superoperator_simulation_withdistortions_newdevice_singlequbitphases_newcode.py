@@ -858,40 +858,27 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         f_pulse=f_pulse_interp(tlist_new)
         amp=amp_interp(tlist_new)
 
-        plot(x_plot_vec=[tlist_new*1e9],
-                  y_plot_vec=[f_pulse/1e9],
-                  title='Freq. of fluxing qubit during pulse',
-                  xlabel='Time (ns)',ylabel='Freq. (GHz)',legend_labels=['omega_B(t)'])
+        # plot(x_plot_vec=[tlist_new*1e9],
+        #           y_plot_vec=[f_pulse/1e9],
+        #           title='Freq. of fluxing qubit during pulse',
+        #           xlabel='Time (ns)',ylabel='Freq. (GHz)',legend_labels=['omega_B(t)'])
 
-
-        amp=amp*self.noise_parameters_CZ.voltage_scaling_factor()
-
-
-
-        '''#BENCHMARK TO CHECK HOW THE COUPLING VARIES AS A FUNCTION OF DETUNING
-        J_new=list()
-        for eps in eps_vec:
-        	H=hamiltonian_timedependent(self.H_0,eps)
-        	J_new.append(np.real(H[1,3]))
-        plot(x_plot_vec=[tlist_new*1e9],
-            	  y_plot_vec=[np.array(J_new)/(2*np.pi)/1e6],
-            	  title='Coupling during pulse',
-                  xlabel='Time (ns)',ylabel='J (MHz)',legend_labels=['J(t)'])'''
+        amp=amp*self.noise_parameters_CZ.voltage_scaling_factor()       # recommended to change discretely the scaling factor
 
 
 
         if self.noise_parameters_CZ.distortions():
             impulse_response=np.gradient(self.fitted_stepresponse_ty[1])
 
-            # plot(x_plot_vec=[self.fitted_stepresponse_ty[0]],y_plot_vec=[self.fitted_stepresponse_ty[1]],
-            # 	  title='Step response',
-            #       xlabel='Time (ns)')
-            # plot(x_plot_vec=[self.fitted_stepresponse_ty[0]],y_plot_vec=[impulse_response],
-            # 	  title='Impulse response',
-            #       xlabel='Time (ns)')
+            plot(x_plot_vec=[np.array(self.fitted_stepresponse_ty[0])*1e9],y_plot_vec=[self.fitted_stepresponse_ty[1]],
+            	  title='Step response',
+                  xlabel='Time (ns)')
+            plot(x_plot_vec=[np.array(self.fitted_stepresponse_ty[0])*1e9],y_plot_vec=[impulse_response],
+            	  title='Impulse response',
+                  xlabel='Time (ns)')
 
             # use interpolation to be sure that amp and impulse_response have the same delta_t separating two values
-            amp_interp = interp1d(tlist_new,amp)      # amp is now managed already above
+            amp_interp = interp1d(tlist_new,amp)
             impulse_response_interp = interp1d(self.fitted_stepresponse_ty[0],impulse_response)
 
             tlist_convol1 = tlist_new
@@ -900,40 +887,25 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             amp_convol = amp_interp(tlist_convol1)
             impulse_response_convol = impulse_response_interp(tlist_convol2)
 
-            # plot(x_plot_vec=[tlist_convol1*1e9],y_plot_vec=[amp_convol],
-            # 	  title='Pulse in voltage, length=240ns',
-            #       xlabel='Time (ns)',ylabel='Amplitude (V)')
-            # plot(x_plot_vec=[tlist_convol*1e9],y_plot_vec=[impulse_response_convol],
-            # 	  title='Impulse response',
-            #       xlabel='Time (ns)')
-
             convolved_amp=scipy.signal.convolve(amp_convol,impulse_response_convol)/sum(impulse_response_convol)
 
-            # plot(x_plot_vec=[tlist_convol1*1e9,np.arange(np.size(convolved_amp))*sim_step*1e9],
-            # 	  y_plot_vec=[amp_convol, convolved_amp],
-            # 	  title='Net-zero, Pulse_length=240ns',
-            #       xlabel='Time (ns)',ylabel='Amplitude (V)',legend_labels=['Ideal','Distorted'])
+            plot(x_plot_vec=[tlist_convol1*1e9,np.arange(np.size(convolved_amp))*sim_step_new*1e9],
+            	  y_plot_vec=[amp_convol, convolved_amp],
+            	  title='Pulse_length= {} ns'.format(self.fluxlutman.cz_length()*1e9),
+                  xlabel='Time (ns)',ylabel='Amplitude (V)',legend_labels=['Ideal','Distorted'])
 
-            #convolved_detuning_new=self.fluxlutman.calc_amp_to_eps(convolved_amp,state_A='11',state_B='02')
-
-            # plot(x_plot_vec=[tlist*1e9,np.arange(np.size(convolved_amp))*sim_step*1e9],
-            # 	  y_plot_vec=[detuning/1e9, convolved_detuning_new/1e9],
-            # 	  title='Net-zero, Pulse_length=240ns',
-            #       xlabel='Time (ns)',ylabel='Detuning (GHz)',legend_labels=['Ideal','Distorted'])
-
-
-            #eps_vec_convolved_new=convolved_detuning_new
-            #eps_vec_convolved_new=eps_vec_convolved_new[0:np.size(tlist_convol1)]
-
-            convolved_amp=convolved_amp[0:np.size(tlist_convol1)]
+            amp_final=convolved_amp[0:np.size(tlist_convol1)]
             f_pulse_convolved_new=self.fluxlutman.calc_amp_to_freq(convolved_amp,'01')
 
-        else:
-            #detuning_new=self.fluxlutman.calc_amp_to_eps(amp,state_A='11',state_B='02')
-            #eps_vec_convolved_new=detuning_new
-            f_pulse_convolved_new=self.fluxlutman.calc_amp_to_freq(amp,'01')
+            plot(x_plot_vec=[tlist_convol1*1e9],
+                  y_plot_vec=[amp_convol, amp_final],
+                  title='Pulse_length= {} ns'.format(self.fluxlutman.cz_length()*1e9),
+                  xlabel='Time (ns)',ylabel='Amplitude (V)',legend_labels=['Ideal','Distorted'])
 
-            convolved_amp=amp
+        else:
+            amp_final=amp
+            f_pulse_convolved_new=self.fluxlutman.calc_amp_to_freq(amp_final,'01')
+
 
 
 
@@ -964,10 +936,10 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 
 
-        if T2_q0_amplitude_dependent[0] != -1:
+        if T2_q0_amplitude_dependent[0] != -1:    # preferred way to handle T2 amplitude-dependent
 
             def expT2(x,gc,amp,tau):
-                return gc+gc*amp*np.exp(-x/tau)
+                return gc+gc*amp*np.exp(-x/tau)         # formula used to fit the experimental data
 
             T2_q0_vec=expT2(f_pulse_convolved_new,T2_q0_amplitude_dependent[0],T2_q0_amplitude_dependent[1],T2_q0_amplitude_dependent[2])
             Tphi01_q0_vec = Tphi_from_T1andT2(T1_q0,T2_q0_vec)
@@ -1002,7 +974,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
         qoi = simulate_quantities_of_interest_superoperator(
             tlist=tlist_new, c_ops=c_ops, noise_parameters_CZ=self.noise_parameters_CZ, 
-            fluxlutman=self.fluxlutman, amp=convolved_amp,
+            fluxlutman=self.fluxlutman, amp=amp_final,
             sim_step=sim_step_new, verbose=False)
 
         cost_func_val = -np.log10(1-qoi['avgatefid_compsubspace_pc'])   # new cost function: infidelity
