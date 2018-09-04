@@ -1834,29 +1834,28 @@ def measure_cphase_new( qbc, qbt, qbr, amps, lengths,
     if MC is None:
         MC = qbc.MC
     if phases is None:
-        phases = np.linspace(0, 2*np.pi, 16, endpoint=False)
+        phases = np.linspace(0, 2*np.pi, 2, endpoint=False)
         phases = np.concatenate((phases,phases))
 
     operation_dict = get_operation_dict([qbc, qbt, qbr])
     CZ_pulse_name = 'CZ ' + qbt.name + ' ' + qbc.name
-
-    flux_channel = operation_dict[CZ_pulse_name]['channel']
-
+    max_flux_length = np.max(lengths)
     cphase_all = []
     population_loss_all = []
 
-    s1 = awg_swf.Flux_pulse_CPhase_hard_swf_new(
-                                qbc.name,
-                                qbt.name,
-                                qbr.name,
-                                CZ_pulse_name,
-                                operation_dict,
-                                cal_points=cal_points,
-                                reference_measurement=True,
-                                upload=upload)
-    s2 = awg_swf.Flux_pulse_CPhase_phase_soft_swf(s1,sweep_param='length',
+    s1 = awg_swf.Flux_pulse_CPhase_hard_swf_new(phases,
+                                                qbc.name,
+                                                qbt.name,
+                                                qbr.name,
+                                                CZ_pulse_name,
+                                                operation_dict,
+                                                max_flux_length,
+                                                cal_points=cal_points,
+                                                reference_measurements=True,
+                                                upload=upload)
+    s2 = awg_swf.Flux_pulse_CPhase_soft_swf(s1,sweep_param='length',
                                                   upload=upload)
-    s3 = awg_swf.Flux_pulse_Cphase_soft_swf(s1,sweep_param='amplitude',
+    s3 = awg_swf.Flux_pulse_CPhase_soft_swf(s1,sweep_param='amplitude',
                                     upload=upload)
 
     if prepare_for_timedomain:
@@ -1956,7 +1955,7 @@ def measure_cphase_new2( qbc, qbt, qbr, lengths, amps,
     if MC is None:
         MC = qbc.MC
     if phases is None:
-        phases = np.linspace(0, 2*np.pi, 16, endpoint=False)
+        phases = np.linspace(0, 2*np.pi, 1, endpoint=False) #######
         phases = np.concatenate((phases,phases))
 
     operation_dict = get_operation_dict([qbc, qbt, qbr])

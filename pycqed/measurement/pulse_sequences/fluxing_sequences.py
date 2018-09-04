@@ -2093,7 +2093,7 @@ def fluxpulse_scope_sequence(delays, qb, verbose=False,
         return seq_name
 
 
-def flux_pulse_CPhase_seq_new(sweep_points,flux_params,max_flux_length,
+def flux_pulse_CPhase_seq_new(phases,flux_params,max_flux_length,
                               qbc_name, qbt_name,qbr_name,
                               operation_dict,
                               CZ_pulse_name,
@@ -2130,7 +2130,6 @@ def flux_pulse_CPhase_seq_new(sweep_points,flux_params,max_flux_length,
                                       e.g. thetas = np.concatenate((thetas,thetas))
     '''
 
-
     seq_name = 'Chevron_length_sequence'
     seq = sequence.Sequence(seq_name)
     el_list = []
@@ -2138,44 +2137,43 @@ def flux_pulse_CPhase_seq_new(sweep_points,flux_params,max_flux_length,
     # addit_AWGs = []
 
     RO_pulse = operation_dict['RO ' + qbr_name]
-    RO_pulse['pulse_delay'] = max_flux_length - flux_params[0]
+    RO_pulse['pulse_delay'] = max_flux_length - flux_params[1]
 
-    X180_control = operation_dict['X180'+qbc_name]
+    X180_control = operation_dict['X180 ' + qbc_name]
 
-    X90_target = operation_dict['X90 '+qbt_name]
+    X90_target = operation_dict['X90 ' + qbt_name]
 
-    upload_channels = [station.pulsar.get(X90_target['I_channel'] + '_id'), \
-                       station.pulsar.get(X90_target['Q_channel'] + '_id')]
-    upload_AWGs = [station.pulsar.get(X90_target['I_channel'] + '_AWG'), \
-                   station.pulsar.get(X90_target['Q_channel'] + '_AWG')]
-    reference_channels = [station.pulsar.get(X180_control['I_channel'] + '_id'), \
-                          station.pulsar.get(X180_control['Q_channel'] + '_id')]
-    reference_AWGs = [station.pulsar.get(X180_control['I_channel'] + '_AWG'), \
-                      station.pulsar.get(X180_control['Q_channel'] + '_AWG')]
+    # upload_channels = [station.pulsar.get(X90_target['I_channel'] + '_id'), \
+    #                    station.pulsar.get(X90_target['Q_channel'] + '_id')]
+    # upload_AWGs = [station.pulsar.get(X90_target['I_channel'] + '_AWG'), \
+    #                station.pulsar.get(X90_target['Q_channel'] + '_AWG')]
+    # reference_channels = [station.pulsar.get(X180_control['I_channel'] + '_id'), \
+    #                       station.pulsar.get(X180_control['Q_channel'] + '_id')]
+    # reference_AWGs = [station.pulsar.get(X180_control['I_channel'] + '_AWG'), \
+    #                   station.pulsar.get(X180_control['Q_channel'] + '_AWG')]
 
     CZ_pulse = operation_dict[CZ_pulse_name]
     CZ_pulse['amplitude'] = flux_params[0]
     CZ_pulse['pulse_length'] = flux_params[1]
 
-    upload_channels += [station.pulsar.get(CZ_pulse['channel'] + '_AWG')]
-    upload_AWGs += [station.pulsar.get(CZ_pulse['channel'] + '_id')]
+    # upload_channels += [station.pulsar.get(CZ_pulse['channel'] + '_AWG')]
+    # upload_AWGs += [station.pulsar.get(CZ_pulse['channel'] + '_id')]
 
-    if reference_measurements:
-        upload_channels+= reference_channels
-        upload_AWGs += reference_AWGs
+    # if reference_measurements:
+    #     upload_channels+= reference_channels
+    #     upload_AWGs += reference_AWGs
 
-    for i, phase in enumerate(sweep_points):
+    for i, phase in enumerate(phases):
 
         X90_target['phase'] = phase*180/np.pi
-
-        if reference_measurements and i >= int(len(sweep_points)/2):
+        if reference_measurements and i >= int(len(phases)/2):
             X180_control['amplitude'] = 0
 
-        if cal_points and (i == (len(sweep_points)-4)
-                           or i == (len(sweep_points)-3)):
+        if cal_points and (i == (len(phases)-4)
+                           or i == (len(phases)-3)):
             el = multi_pulse_elt(i, station, [RO_pulse])
-        elif cal_points and (i == (len(sweep_points)-2)
-                             or i == (len(sweep_points)-1)):
+        elif cal_points and (i == (len(phases)-2)
+                             or i == (len(phases)-1)):
             CZ_pulse['amplitude'] = 0
             el = multi_pulse_elt(i, station,
                                  [X180_control,
@@ -2193,11 +2191,11 @@ def flux_pulse_CPhase_seq_new(sweep_points,flux_params,max_flux_length,
         seq.append_element(el, trigger_wait=True)
 
     if upload:
-        print('uploading channels: ',upload_channels)
-        print('of AWGs: ',upload_AWGs)
+        # print('uploading channels: ',upload_channels)
+        # print('of AWGs: ',upload_AWGs)
         station.pulsar.program_awgs(seq, *el_list,
-                                    AWGs=upload_AWGs,
-                                    channels=upload_channels,
+                                    AWGs='all',
+                                    channels='all',
                                     verbose=verbose)
     if return_seq:
         return seq, el_list
@@ -2242,13 +2240,16 @@ def flux_pulse_CPhase_seq_new2(len_amp_pairs, X90_Phase,
                                       e.g. thetas = np.concatenate((thetas,thetas))
     '''
 
-    seq_name_init = 'Chevron_initial_upload_sequence'
-    seq_init = sequence.Sequence(seq_name_init)
     seq_name = 'Chevron_length_sequence'
     seq = sequence.Sequence(seq_name)
     el_list = []
 
     RO_pulse = operation_dict['RO ' + qbr_name]
+
+    # RO_channels = [RO_pulse['acq_marker_channel'],
+    #                RO_pulse['RO_pulse_marker_channel']]
+    # RO_AWGs = [station.pulsar.get(RO_pulse['acq_marker_channel'] + '_AWG'),
+    #            station.pulsar.get(RO_pulse['RO_pulse_marker_channel'] + '_AWG')]
 
     X180_control = operation_dict['X180 '+qbc_name]
 
@@ -2260,19 +2261,20 @@ def flux_pulse_CPhase_seq_new2(len_amp_pairs, X90_Phase,
     X90_target_2 = operation_dict['X90 '+qbt_name]
     X90_target_2['phase'] = X90_Phase*180/np.pi
 
-    target_channels = [X90_target_2['I_channel'] ,X90_target_2['Q_channel']]
-    target_AWGs = [station.pulsar.get(X90_target_2['I_channel'] + '_AWG'), \
-                   station.pulsar.get(X90_target_2['Q_channel'] + '_AWG')]
-    control_channels = [X180_control['I_channel'], X180_control['Q_channel']]
-    control_AWGs = [station.pulsar.get(X180_control['I_channel'] + '_AWG'), \
-                      station.pulsar.get(X180_control['Q_channel'] + '_AWG')]
+    # target_channels = [X90_target_2['I_channel'] ,X90_target_2['Q_channel']]
+    # target_AWGs = [station.pulsar.get(X90_target_2['I_channel'] + '_AWG'), \
+    #                station.pulsar.get(X90_target_2['Q_channel'] + '_AWG')]
+    # control_channels = [X180_control['I_channel'], X180_control['Q_channel']]
+    # control_AWGs = [station.pulsar.get(X180_control['I_channel'] + '_AWG'), \
+    #                   station.pulsar.get(X180_control['Q_channel'] + '_AWG')]
 
     max_length = np.max(len_amp_pairs[:,0])
 
     CZ_pulse = operation_dict[CZ_pulse_name]
 
-    CZ_channels = [CZ_pulse['channel']]
-    CZ_AWGs = [station.pulsar.get(CZ_pulse['channel'] + '_AWG')]
+    # CZ_channels = [CZ_pulse['channel']]
+    # CZ_AWGs = [station.pulsar.get(CZ_pulse['channel'] + '_AWG')]
+
 
 
     for i, vals in enumerate(len_amp_pairs):
@@ -2302,36 +2304,19 @@ def flux_pulse_CPhase_seq_new2(len_amp_pairs, X90_Phase,
                                   CZ_pulse, X90_target_2,
                                   RO_pulse])
 
-        if i == 0:
-            seq_init.append_element(el,trigger_wait=True)
-            if upload:
-                station.pulsar.program_awgs(seq_init, el,
-                                            AWGs=CZ_AWGs+target_AWGs+
-                                                 control_AWGs,
-                                            channels=CZ_channels+
-                                                     target_channels+
-                                                     control_channels,
-                                            verbose=verbose)
-        else:
-            el_list.append(el)
-            seq.append_element(el, trigger_wait=True)
 
-    # for it,el in enumerate(el_list):
-    #     print('it: ',it,' , ',el)
-    # print(seq)
+    el_list.append(el)
+    seq.append_element(el, trigger_wait=True)
+
 
     if upload:
-        print('uploading channels: ',CZ_channels)
-        print('of AWGs: ',CZ_AWGs)
+        # print('uploading channels: ',CZ_channels+RO_channels+
+        #       control_channels+target_channels)
+        # print('of AWGs: ',CZ_AWGs+RO_AWGs+control_AWGs+target_AWGs)
         station.pulsar.program_awgs(seq, *el_list,
-                                    AWGs=CZ_AWGs,
-                                    channels=CZ_channels,
+                                    channels='all',
+                                    AWGs='all',
                                     verbose=verbose)
-
-        # station.pulsar.program_awgs(seq, *el_list,
-        #                             AWGs='all',
-        #                             channels='all',
-        #                             verbose=verbose)
     if return_seq:
         return seq, el_list
     else:
