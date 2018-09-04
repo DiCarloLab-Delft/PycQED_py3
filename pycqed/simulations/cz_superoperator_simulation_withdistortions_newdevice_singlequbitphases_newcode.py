@@ -17,7 +17,7 @@ from pycqed.measurement.waveform_control_CC import waveforms_flux as wfl
 import scipy
 import matplotlib.pyplot as plt
 import logging
-np.set_printoptions(threshold=np.inf)
+#np.set_printoptions(threshold=np.inf)
 
 
 
@@ -897,10 +897,10 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             amp_final=convolved_amp[0:np.size(tlist_convol1)]
             f_pulse_convolved_new=self.fluxlutman.calc_amp_to_freq(convolved_amp,'01')
 
-            plot(x_plot_vec=[tlist_convol1*1e9],
-                  y_plot_vec=[amp_convol, amp_final],
-                  title='Pulse_length= {} ns'.format(self.fluxlutman.cz_length()*1e9),
-                  xlabel='Time (ns)',ylabel='Amplitude (V)',legend_labels=['Ideal','Distorted'])
+            # plot(x_plot_vec=[tlist_convol1*1e9],
+            #       y_plot_vec=[amp_convol, amp_final],
+            #       title='Pulse_length= {} ns'.format(self.fluxlutman.cz_length()*1e9),
+            #       xlabel='Time (ns)',ylabel='Amplitude (V)',legend_labels=['Ideal','Distorted'])
 
         else:
             amp_final=amp
@@ -911,8 +911,6 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 
         # Noise
-        c_ops=[]
-
         T1_q0 = self.noise_parameters_CZ.T1_q0()
         T1_q1 = self.noise_parameters_CZ.T1_q1()
         T2_q0_sweetspot = self.noise_parameters_CZ.T2_q0_sweetspot()
@@ -970,8 +968,11 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                          # by weighting depending on the derivative of f_pulse compared to the derivative at the interaction point
                 c_ops = c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1)
             else:                                       # mode where the collapse operators are time-independent, and possibly are 0
-                c_ops=jump_operators(T1_q0,T1_q1,0,0,0,0,0,
-                        Tphi01_q0_sweetspot,Tphi01_q0_sweetspot,Tphi01_q0_sweetspot/2,Tphi01_q1,Tphi01_q1,Tphi01_q1/2)
+                if T1_q1 != 0:
+                    c_ops=jump_operators(T1_q0,T1_q1,0,0,0,0,0,
+                      Tphi01_q0_sweetspot,Tphi01_q0_sweetspot,Tphi01_q0_sweetspot/2,Tphi01_q1,Tphi01_q1,Tphi01_q1/2)
+                else:
+                	c_ops=[]
 
 
 
