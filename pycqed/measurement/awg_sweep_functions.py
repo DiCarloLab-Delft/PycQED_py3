@@ -2499,14 +2499,16 @@ class Flux_pulse_CPhase_hard_swf_new(swf.Hard_Sweep):
                 CZ_pulse_name=self.CZ_pulse_name,
                 cal_points=self.cal_points,
                 reference_measurements=self.reference_measurements,
-                upload=self.upload
+                upload= not self.upload,
+                return_seq= True
                 )
 
     def set_parameter(self,flux_val,**kw):
         val_type = kw.pop('val_type',None)
         if val_type is None:
-            logging.error('CPhase hard sweeps set_parameter method was called '
+            logging.warning('CPhase hard sweep set_parameter method was called '
                           'without a value type!')
+            return
         elif val_type == 'length':
             self.flux_length = flux_val
         elif val_type == 'amplitude':
@@ -2515,7 +2517,7 @@ class Flux_pulse_CPhase_hard_swf_new(swf.Hard_Sweep):
             logging.error('CPhase hard sweep does not recognize value type handed'
                           'by set_parameter() method!')
         if self.flux_length is not None and self.flux_amplitude is not None:
-            self.prepare(flux_params=[self.flux_length,self.flux_amplitude])
+            self.prepare(flux_params=[self.flux_amplitude,self.flux_length])
 
 class Flux_pulse_CPhase_hard_swf_new2(swf.Hard_Sweep):
 
@@ -2559,7 +2561,7 @@ class Flux_pulse_CPhase_hard_swf_new2(swf.Hard_Sweep):
 
     def prepare(self,**kw):
         if self.upload:
-            fsqs.flux_pulse_CPhase_seq_new2(
+         fsqs.flux_pulse_CPhase_seq_new2(
                 len_amp_pairs=self.len_amp_pairs,
                 X90_Phase=self.X90_Phase,
                 qbc_name=self.qbc_name,

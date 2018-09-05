@@ -2136,12 +2136,16 @@ def flux_pulse_CPhase_seq_new(phases,flux_params,max_flux_length,
     # addit_channels = []
     # addit_AWGs = []
 
+    flux_amplitude = flux_params[0]
+    flux_length = flux_params[1]
+
     RO_pulse = operation_dict['RO ' + qbr_name]
-    RO_pulse['pulse_delay'] = max_flux_length - flux_params[1]
+    RO_pulse['pulse_delay'] = max_flux_length - flux_length
 
     X180_control = operation_dict['X180 ' + qbc_name]
 
-    X90_target = operation_dict['X90 ' + qbt_name]
+    X90_target_2 = operation_dict['X90 ' + qbt_name]
+    X90_target  =operation_dict['X90s '+ qbt_name]
 
     # upload_channels = [station.pulsar.get(X90_target['I_channel'] + '_id'), \
     #                    station.pulsar.get(X90_target['Q_channel'] + '_id')]
@@ -2153,8 +2157,8 @@ def flux_pulse_CPhase_seq_new(phases,flux_params,max_flux_length,
     #                   station.pulsar.get(X180_control['Q_channel'] + '_AWG')]
 
     CZ_pulse = operation_dict[CZ_pulse_name]
-    CZ_pulse['amplitude'] = flux_params[0]
-    CZ_pulse['pulse_length'] = flux_params[1]
+    CZ_pulse['amplitude'] = flux_amplitude
+    CZ_pulse['pulse_length'] = flux_length
 
     # upload_channels += [station.pulsar.get(CZ_pulse['channel'] + '_AWG')]
     # upload_AWGs += [station.pulsar.get(CZ_pulse['channel'] + '_id')]
@@ -2165,7 +2169,7 @@ def flux_pulse_CPhase_seq_new(phases,flux_params,max_flux_length,
 
     for i, phase in enumerate(phases):
 
-        X90_target['phase'] = phase*180/np.pi
+        X90_target_2['phase'] = phase*180/np.pi
         if reference_measurements and i >= int(len(phases)/2):
             X180_control['amplitude'] = 0
 
@@ -2177,16 +2181,15 @@ def flux_pulse_CPhase_seq_new(phases,flux_params,max_flux_length,
             CZ_pulse['amplitude'] = 0
             el = multi_pulse_elt(i, station,
                                  [X180_control,
-                                  operation_dict['X90s ' + qbt_name],
-                                  CZ_pulse, X90_target,
+                                  X90_target,
+                                  CZ_pulse, X90_target_2,
                                   RO_pulse])
         else:
             el = multi_pulse_elt(i, station,
                                  [X180_control,
-                                  operation_dict['X90s ' + qbt_name],
-                                  CZ_pulse, X90_target,
+                                  X90_target,
+                                  CZ_pulse, X90_target_2,
                                   RO_pulse])
-
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
 

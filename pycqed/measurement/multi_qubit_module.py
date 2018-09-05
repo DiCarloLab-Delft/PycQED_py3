@@ -15,7 +15,6 @@ import pycqed.analysis_v2.readout_analysis as ra
 import pycqed.analysis.tomography as tomo
 from pycqed.measurement.optimization import nelder_mead
 import pycqed.instrument_drivers.meta_instrument.device_object as device
-
 import qcodes as qc
 station = qc.station
 
@@ -1834,7 +1833,7 @@ def measure_cphase_new( qbc, qbt, qbr, amps, lengths,
     if MC is None:
         MC = qbc.MC
     if phases is None:
-        phases = np.linspace(0, 2*np.pi, 2, endpoint=False)
+        phases = np.linspace(0, 2*np.pi, 8, endpoint=False)
         phases = np.concatenate((phases,phases))
 
     operation_dict = get_operation_dict([qbc, qbt, qbr])
@@ -1842,6 +1841,9 @@ def measure_cphase_new( qbc, qbt, qbr, amps, lengths,
     max_flux_length = np.max(lengths)
     cphase_all = []
     population_loss_all = []
+
+    import time
+    t0= time.time()
 
     s1 = awg_swf.Flux_pulse_CPhase_hard_swf_new(phases,
                                                 qbc.name,
@@ -1851,69 +1853,74 @@ def measure_cphase_new( qbc, qbt, qbr, amps, lengths,
                                                 operation_dict,
                                                 max_flux_length,
                                                 cal_points=cal_points,
-                                                reference_measurements=True,
+                                                reference_measurements=False, #########################
                                                 upload=upload)
-    s2 = awg_swf.Flux_pulse_CPhase_soft_swf(s1,sweep_param='length',
+    s2 = awg_swf.Flux_pulse_CPhase_soft_swf(s1,sweep_param='amplitude',
                                                   upload=upload)
-    s3 = awg_swf.Flux_pulse_CPhase_soft_swf(s1,sweep_param='amplitude',
+    s3 = awg_swf.Flux_pulse_CPhase_soft_swf(s1,sweep_param='length',
                                     upload=upload)
 
     if prepare_for_timedomain:
         for qb in [qbc, qbt, qbr]:
              qb.prepare_for_timedomain()
-
+    t0 = time.time()
     MC.set_sweep_functions([s1,s2,s3])
     MC.set_sweep_points(phases)
-    MC.set_sweep_points_2D(np.array([lengths,amps]).T)
+    #Here the order of the parameters matters! Paramters must be
+    #set in the same order as their sweepfunctions!
+    MC.set_sweep_points_2D(np.array([amps,lengths]).T)
     MC.set_detector_function(qbr.int_avg_det)
     MC.run_2D('CPhase_measurement_{}_{}'.format(qbc.name,qbt.name))
 
+    t1 = time.time()
+    print('Routine 1 with ',len(amps)*len(phases),' sweeppoints in T=',t1-t0,' s.')
+    return t1-t0
     # ma.TwoD_Analysis(close_file=True)
-    flux_pulse_ma = ma.Fluxpulse_Ramsey_2D_Analysis(
-        label='CPhase_measurement_{}_{}'.format(qbc.name,qbt.name),
-        qb_name=qbc.name, cal_points=cal_points,
-        reference_measurements=True, auto=False
-        )
-    fitted_phases, fitted_amps = \
-        flux_pulse_ma.fit_all(plot=False,
-                              cal_points=cal_points,
-                              return_ampl=True,
-                              )
+    # flux_pulse_ma = ma.Fluxpulse_Ramsey_2D_Analysis(
+    #     label='CPhase_measurement_{}_{}'.format(qbc.name,qbt.name),
+    #     qb_name=qbc.name, cal_points=cal_points,
+    #     reference_measurements=True, auto=False
+    #     )
+    # fitted_phases, fitted_amps = \
+    #     flux_pulse_ma.fit_all(plot=False,
+    #                           cal_points=cal_points,
+    #                           return_ampl=True,
+    #                           )
+    #
+    # fitted_phases_exited = fitted_phases[:: 2]
+    # fitted_phases_ground = fitted_phases[1:: 2]
+    #
+    # cphases = fitted_phases_exited - fitted_phases_ground
+    #
+    # fitted_amps_exited = fitted_amps[:: 2]
+    # fitted_amps_ground = fitted_amps[1:: 2]
+    #
+    # pop_loss = np.abs(fitted_amps_ground - fitted_amps_exited) \
+    #            /fitted_amps_ground
+    #
+    # cphase_all.append(cphases[0])
+    # population_loss_all.append(pop_loss[0])
+    #
+    # plot_title = 'fitted CPhase: {:.3f} deg at' \
+    #              ' amp={:.2f}mV,' \
+    #              ' length={:.3f}ns'.format(cphases[0]/np.pi*180,
+    #                                        amps[0]/1e-3, lengths[0]/1e-9)
+    # flux_pulse_ma.fit_all(plot=plot,
+    #                       cal_points=cal_points,
+    #                       return_ampl=True,
+    #                       save_plot=True,
+    #                       plot_title=plot_title,
+    #                       only_cos_fits=True
+    #                       )
+    # cphase_all = np.array(cphase_all)
+    # population_loss_all = np.array(population_loss_all)
+    # if return_population_loss:
+    #     return cphase_all, population_loss_all
+    # else:
+    #     return cphase_all
 
-    fitted_phases_exited = fitted_phases[:: 2]
-    fitted_phases_ground = fitted_phases[1:: 2]
 
-    cphases = fitted_phases_exited - fitted_phases_ground
-
-    fitted_amps_exited = fitted_amps[:: 2]
-    fitted_amps_ground = fitted_amps[1:: 2]
-
-    pop_loss = np.abs(fitted_amps_ground - fitted_amps_exited) \
-               /fitted_amps_ground
-
-    cphase_all.append(cphases[0])
-    population_loss_all.append(pop_loss[0])
-
-    plot_title = 'fitted CPhase: {:.3f} deg at' \
-                 ' amp={:.2f}mV,' \
-                 ' length={:.3f}ns'.format(cphases[0]/np.pi*180,
-                                           amps[0]/1e-3, lengths[0]/1e-9)
-    flux_pulse_ma.fit_all(plot=plot,
-                          cal_points=cal_points,
-                          return_ampl=True,
-                          save_plot=True,
-                          plot_title=plot_title,
-                          only_cos_fits=True
-                          )
-    cphase_all = np.array(cphase_all)
-    population_loss_all = np.array(population_loss_all)
-    if return_population_loss:
-        return cphase_all, population_loss_all
-    else:
-        return cphase_all
-
-
-def measure_cphase_new2( qbc, qbt, qbr, lengths, amps,
+def measure_cphase_new2( qbc, qbt, qbr, amps, lengths,
                         phases=None,MC=None, cal_points=False, plot=False,
                         return_population_loss=False,
                         prepare_for_timedomain=True,
@@ -1955,21 +1962,23 @@ def measure_cphase_new2( qbc, qbt, qbr, lengths, amps,
     if MC is None:
         MC = qbc.MC
     if phases is None:
-        phases = np.linspace(0, 2*np.pi, 1, endpoint=False) #######
+        phases = np.linspace(0, 2*np.pi, 8, endpoint=False)
         phases = np.concatenate((phases,phases))
 
     operation_dict = get_operation_dict([qbc, qbt, qbr])
     CZ_pulse_name = 'CZ ' + qbt.name + ' ' + qbc.name
 
-    flux_channel = operation_dict[CZ_pulse_name]['channel']
-
     cphase_all = []
     population_loss_all = []
     reference_measurement = False
+
+    import time
+    t0 = time.time()
+
     for i,phase in enumerate(phases):
 
         if i >= int(len(phases)/2):
-            reference_measurement=True
+            reference_measurement=False
 
         s1 = awg_swf.Flux_pulse_CPhase_hard_swf_new2(len_amp_pairs,
                                     phase,
@@ -1993,45 +2002,48 @@ def measure_cphase_new2( qbc, qbt, qbr, lengths, amps,
         MC.run('CPhase_measurement_{}_{}'.format(qbc.name,qbt.name))
 
     # ma.TwoD_Analysis(close_file=True)
-    flux_pulse_ma = ma.Fluxpulse_Ramsey_2D_Analysis(
-        label='CPhase_measurement_{}_{}'.format(qbc.name,qbt.name),
-        qb_name=qbc.name, cal_points=cal_points,
-        reference_measurements=True, auto=False
-    )
-    fitted_phases, fitted_amps = \
-        flux_pulse_ma.fit_all(plot=False,
-                              cal_points=cal_points,
-                              return_ampl=True,
-                              )
-
-    fitted_phases_exited = fitted_phases[:: 2]
-    fitted_phases_ground = fitted_phases[1:: 2]
-
-    cphases = fitted_phases_exited - fitted_phases_ground
-
-    fitted_amps_exited = fitted_amps[:: 2]
-    fitted_amps_ground = fitted_amps[1:: 2]
-
-    pop_loss = np.abs(fitted_amps_ground - fitted_amps_exited) \
-               /fitted_amps_ground
-
-    cphase_all.append(cphases[0])
-    population_loss_all.append(pop_loss[0])
-
-    plot_title = 'fitted CPhase: {:.3f} deg at' \
-                 ' amp={:.2f}mV,' \
-                 ' length={:.3f}ns'.format(cphases[0]/np.pi*180,
-                                           amps[0]/1e-3, lengths[0]/1e-9)
-    flux_pulse_ma.fit_all(plot=plot,
-                          cal_points=cal_points,
-                          return_ampl=True,
-                          save_plot=True,
-                          plot_title=plot_title,
-                          only_cos_fits=True
-                          )
-    cphase_all = np.array(cphase_all)
-    population_loss_all = np.array(population_loss_all)
-    if return_population_loss:
-        return cphase_all, population_loss_all
-    else:
-        return cphase_all
+    t1 = time.time()
+    print('Routine 2 with ',len(amps)*len(phases),' sweeppoints in T=',t1-t0,' s.')
+    return t1-t0
+    # flux_pulse_ma = ma.Fluxpulse_Ramsey_2D_Analysis(
+    #     label='CPhase_measurement_{}_{}'.format(qbc.name,qbt.name),
+    #     qb_name=qbc.name, cal_points=cal_points,
+    #     reference_measurements=True, auto=False
+    # )
+    # fitted_phases, fitted_amps = \
+    #     flux_pulse_ma.fit_all(plot=False,
+    #                           cal_points=cal_points,
+    #                           return_ampl=True,
+    #                           )
+    #
+    # fitted_phases_exited = fitted_phases[:: 2]
+    # fitted_phases_ground = fitted_phases[1:: 2]
+    #
+    # cphases = fitted_phases_exited - fitted_phases_ground
+    #
+    # fitted_amps_exited = fitted_amps[:: 2]
+    # fitted_amps_ground = fitted_amps[1:: 2]
+    #
+    # pop_loss = np.abs(fitted_amps_ground - fitted_amps_exited) \
+    #            /fitted_amps_ground
+    #
+    # cphase_all.append(cphases[0])
+    # population_loss_all.append(pop_loss[0])
+    #
+    # plot_title = 'fitted CPhase: {:.3f} deg at' \
+    #              ' amp={:.2f}mV,' \
+    #              ' length={:.3f}ns'.format(cphases[0]/np.pi*180,
+    #                                        amps[0]/1e-3, lengths[0]/1e-9)
+    # flux_pulse_ma.fit_all(plot=plot,
+    #                       cal_points=cal_points,
+    #                       return_ampl=True,
+    #                       save_plot=True,
+    #                       plot_title=plot_title,
+    #                       only_cos_fits=True
+    #                       )
+    # cphase_all = np.array(cphase_all)
+    # population_loss_all = np.array(population_loss_all)
+    # if return_population_loss:
+    #     return cphase_all, population_loss_all
+    # else:
+    #     return cphase_all
