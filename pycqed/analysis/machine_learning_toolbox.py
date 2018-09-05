@@ -405,10 +405,12 @@ class GRNN_neupy(Estimator):
         predictions = []
         for it in range(len(self._grnn)):
             predictions.append(self._grnn[it].predict(samples))
-        return np.array(predictions)
+        return predictions
 
     def evaluate(self,x,y):
         pred = self.predict(x)
+        print('Pred: ',pred,'\n')
+        print('Y: ',y,'\n')
         self.score = 1. - np.linalg.norm(pred-y)**2 \
                    / np.linalg.norm(y-np.mean(y,axis=0))**2
         return self.score
