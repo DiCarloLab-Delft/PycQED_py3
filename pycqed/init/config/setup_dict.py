@@ -1,7 +1,8 @@
 # Dictionaries used in setup.
 
 mac_dict = {'203178706891063': 'CDickel_Desktop',
-            '203308017140376': 'Adriaans_Macbook',
+            # '203308017140376': 'Adriaans_Macbook',
+            '54976059179008': 'Adriaans_Macbook',
             '963460802314': 'La_Ferrari',
             '46390847648': 'TUD277449',
             '215977245841658': 'La_Maserati_JrJr',
