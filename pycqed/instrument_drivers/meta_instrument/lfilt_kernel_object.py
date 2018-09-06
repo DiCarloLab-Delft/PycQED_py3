@@ -60,6 +60,28 @@ class LinDistortionKernel(Instrument):
                 return filt_id
         raise ValueError('No empty filter')
 
+    def set_realtime_distortions_zero(self):
+        """
+        Turns off all used real-time distortion filters by setting their
+        amplitude to zero. This method of disabling is used so as not to
+        change the latency that is introduced.
+        """
+        max_exp_filters = 5
+        AWG = self.instr_AWG.get_instr()
+
+        # set exp_filters to 0
+        for i in range(max_exp_filters):
+            AWG.set(
+                'sigouts_{}_precompensation_exponentials_{}_amplitude'.format(
+                    self.cfg_awg_channel()-1, i), 0)
+        # set bounce filters to 0
+        AWG.set(
+            'sigouts_{}_precompensation_bounces_{}_enable'.format(
+                self.cfg_awg_channel()-1, 0), 0)
+
+        # set bias-tee filters to 0
+        pass  # Currently broken
+
     def distort_waveform(self, waveform, length_samples: int=None,
                          inverse: bool=False):
         """
@@ -84,6 +106,8 @@ class LinDistortionKernel(Instrument):
         else:
             y_sig = waveform
 
+        # Specific real-time filters are turned on below
+        self.set_realtime_distortions_zero()
         nr_real_time_exp_models = 0
         nr_real_time_hp_models = 0
         nr_real_time_bounce_models = 0
@@ -110,15 +134,15 @@ class LinDistortionKernel(Instrument):
                     if ('real-time' in filt.keys() and filt['real-time']):
                         AWG = self.instr_AWG.get_instr()
 
-                        AWG.set('sigouts_{}_compensations_exponentials'
+                        AWG.set('sigouts_{}_precompensation_exponentials'
                                 '_{}_timeconstant'.format(
                                     self.cfg_awg_channel()-1, nr_real_time_exp_models),
                                 filt['params']['tau'])
-                        AWG.set('sigouts_{}_compensations_exponentials'
+                        AWG.set('sigouts_{}_precompensation_exponentials'
                                 '_{}_amplitude'.format(
                                     self.cfg_awg_channel()-1, nr_real_time_exp_models),
                                 filt['params']['amp'])
-                        AWG.set('sigouts_{}_compensations_exponentials'
+                        AWG.set('sigouts_{}_precompensation_exponentials'
                                 '_{}_enable'.format(self.cfg_awg_channel()-1,
                                                     nr_real_time_exp_models),
                                 1)
@@ -135,15 +159,15 @@ class LinDistortionKernel(Instrument):
                     if ('real-time' in filt.keys() and filt['real-time']):
                         AWG = self.instr_AWG.get_instr()
 
-                        AWG.set('sigouts_{}_compensations_bounces'
+                        AWG.set('sigouts_{}_precompensation_bounces'
                                 '_{}_delay'.format(
                                     self.cfg_awg_channel()-1, nr_real_time_bounce_models),
                                 filt['params']['tau'])
-                        AWG.set('sigouts_{}_compensations_bounces'
+                        AWG.set('sigouts_{}_precompensation_bounces'
                                 '_{}_amplitude'.format(
                                     self.cfg_awg_channel()-1, nr_real_time_bounce_models),
                                 filt['params']['amp'])
-                        AWG.set('sigouts_{}_compensations_bounces'
+                        AWG.set('sigouts_{}_precompensation_bounces'
                                 '_{}_enable'.format(self.cfg_awg_channel()-1,
                                                     nr_real_time_bounce_models),
                                 1)

@@ -1950,21 +1950,135 @@ def plot_errorbars(x, y, ax=None, linewidth=2 ,markersize=2, marker='none'):
 
 
 def calculate_transmon_transitions(EC, EJ, asym=0, reduced_flux=0,
-                                   no_transitions=2, dim=None, ng=0):
+                                   no_transitions=2, dim=None, ng=0,
+                                   return_injs=False):
     '''
     Calculates transmon energy levels from the full transmon qubit Hamiltonian.
     '''
     if dim is None:
-        dim = no_transitions*20
+        dim = no_transitions*10
 
     EJphi = EJ*np.sqrt(asym**2 + (1-asym**2)*np.cos(np.pi*reduced_flux)**2)
     Ham = 4*EC*np.diag(np.arange(-dim-ng, dim-ng+1)**2) - EJphi/2 * \
         (np.eye(2*dim+1, k=+1) + np.eye(2*dim+1, k=-1))
-    HamEigs = np.linalg.eigvalsh(Ham)
-    HamEigs.sort()
-    transitions = HamEigs[1:]-HamEigs[:-1]
-    return transitions[:no_transitions]
 
+    if return_injs:
+        HamEigs, HamEigVs = np.linalg.eigh(Ham)
+        # HamEigs.sort()
+        transitions = HamEigs[1:]-HamEigs[:-1]
+        charge_number_operator = np.diag(np.arange(-dim-ng, dim-ng+1))
+        injs = np.zeros([dim, dim])
+        for i in range(dim):
+            for j in range(dim):
+                vect_i = np.matrix(HamEigVs[:,i])
+                vect_j = np.matrix(HamEigVs[:,j])
+                injs[i, j] = vect_i*(charge_number_operator*vect_j.getH())
+        return transitions[:no_transitions], injs
+
+    else:
+        HamEigs = np.linalg.eigvalsh(Ham)
+        HamEigs.sort()
+        transitions = HamEigs[1:]-HamEigs[:-1]
+        return transitions[:no_transitions]
+
+
+def calculate_transmon_and_resonator_transitions(EC, EJ, f_r, g_01,
+                                   dim=None, ng=0, f_01=None, f_12=None,
+                                            g_12_approximation=1):
+    '''
+    Calculates transmon energy levels and resonator from the full transmon qubit Hamiltonian.
+    '''
+
+    #calculate the bare transmon transitions, hardcoded to three levels only
+    [f_01, f_12], injs = calculate_transmon_transitions(EC, EJ, asym=0, reduced_flux=0,
+                                            no_transitions=2, dim=dim, ng=ng,
+                                            return_injs=True)
+
+    #problem can be cut up in th 0, 1 and 2-excitation manifold with E_ij, i excitations in the qubit and j of the resonator
+    try:
+        E00 = 0
+        g_01 = np.abs(g_01)
+        H1 = np.array([[f_01,   g_01],
+                       [g_01,   f_r]])
+        E10, E01 = np.linalg.eigvalsh(H1)
+        g_12_transmon = abs(g_01*injs[1,2]/injs[0,1])
+        g_12_resonator = abs(g_01*np.sqrt(2))
+        # print('g_12_correction',g_12_transmon/g_12_resonator)
+        H2 = np.array([[f_01+f_12,  g_12_transmon,       0],
+                       [g_12_transmon,       f_01+f_r,   g_12_resonator],
+                       [0,          g_12_resonator,       2*f_r]])
+        E20, E11, E02 = np.linalg.eigvalsh(H2)
+        #print(EC/1e6, EJ/1e9, f_r/1e9, g_01/1e6, f_01/1e9, f_12/1e9)
+    except np.linalg.LinAlgError:
+        print(EC/1e6, EJ/1e9, f_r/1e9, g_01/1e6, f_01/1e9, f_12/1e9)
+
+
+
+    f_01_d = E10 - E00
+    f_12_d = E20 - E10
+    f_r_d = E01 - E00
+    f_01_res_shifted = E11 - E01
+    f_r_qubit_shifted = E11 - E10
+
+    return f_01_d, f_12_d, f_r_d, f_01_res_shifted, f_r_qubit_shifted
+
+
+
+
+def fit_EC_EJ_g_f_res_ng(flux_01, f_01, flux_12, f_12, flux_r, f_r, ng=0, asym=0):
+    '''
+    Fits EC, EJ, g and f_res from a list of f01, f12 and f resonators 
+    as a function of thier respective flux settings by numerical optimization.
+    for initial guess it takes the maximum of the inputs
+    '''
+    from scipy import optimize
+    # initial guesses
+    g_01_ss_guess = 300e6
+    EC_guess = np.max(f_01)-np.max(f_12)
+    print('EC_guess',EC_guess/1e6)
+    EJmax_guess = (np.max(f_01)+EC_guess)**2/(8*EC_guess)
+    
+    f_r_guess = np.min(f_r)
+    asym_guess = 0.1
+
+    def g01(g_01_ss, EC, EJ, EJmax):
+        return (EJ/EC)**(1/4)/(EJmax/EC)**(1/4)*g_01_ss
+
+    def penaltyfn (params):
+        EC, EJmax, f_r_bare, g_01_ss, asym = params
+        # calculate f01s
+        f01s = []
+        for fl in flux_01:
+            EJ = EJmax*np.sqrt(asym**2 + (1-asym**2)*np.cos(np.pi*fl)**2)
+            g_01 = g01(g_01_ss, EC, EJ, EJmax)
+            f01s.append(calculate_transmon_and_resonator_transitions(EC, EJ, f_r_bare, g_01, ng=ng)[0])
+        f01s = np.array(f01s)
+        # calculate f12s
+        f12s = []
+        for fl in flux_12:
+            EJ = EJmax*np.sqrt(asym**2 + (1-asym**2)*np.cos(np.pi*fl)**2)
+            g_01 = g01(g_01_ss, EC, EJ, EJmax)
+            f12s.append(calculate_transmon_and_resonator_transitions(EC, EJ, f_r_bare, g_01, ng=ng)[1])
+        f12s = np.array(f12s)
+        # calculate f_rs
+        f_rs = []
+        for fl in flux_r:
+            EJ = EJmax*np.sqrt(asym**2 + (1-asym**2)*np.cos(np.pi*fl)**2)
+            g_01 = g01(g_01_ss, EC, EJ, EJmax)
+            f_rs.append(calculate_transmon_and_resonator_transitions(EC, EJ, f_r_bare, g_01, ng=ng)[2])
+        f_rs = np.array(f_rs)
+
+        penalty_01 = f_01 - f01s
+        penalty_12 = f_12 - f12s
+        penalty_alpha = (f_01-f_12)-(f01s-f12s)
+        penalty_r = f_r - f_rs
+        return np.concatenate((penalty_01, penalty_12, penalty_alpha*20,  penalty_r*15))
+
+    (EC0, EJmax, fres, g_01_ss, asym), success = optimize.leastsq(penaltyfn, (EC_guess, EJmax_guess, f_r_guess, g_01_ss_guess, asym_guess))
+    print(success)
+    print('with', EC0, EJmax, fres, g_01_ss, asym)
+
+    return EC0, EJmax, fres, g_01_ss, asym
 
 def fit_EC_EJ(f01, f12):
     '''

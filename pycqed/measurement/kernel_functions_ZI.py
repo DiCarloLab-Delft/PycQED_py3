@@ -219,7 +219,7 @@ def multipath_filter(sig, alpha, k, paths):
 
 def multipath_filter2(sig, alpha, k, paths,
                       hw_rounding: bool=True,
-                      ppl = 4):
+                      ppl = 2):
     """
     hardware friendly
     exponential moving average correction filter with pipeline simulation
@@ -237,8 +237,8 @@ def multipath_filter2(sig, alpha, k, paths,
     # due to the pipelining, there are actually ppl interleaved filters
     acc = np.zeros((ppl, ))
 
-    # make sure our vector has a length that is a multiple of 32
-    extra = int(32*np.ceil(sig.size/32)-sig.size)
+    # make sure our vector has a length that is a multiple of ppl*paths
+    extra = int(ppl*paths*np.ceil(sig.size/ppl/paths)-sig.size)
     if extra > 0:
         sig = np.append(sig, extra*[sig[-1]])
 

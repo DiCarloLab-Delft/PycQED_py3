@@ -12,7 +12,6 @@ import matplotlib.pyplot as plt
 import matplotlib.pylab as pl
 from matplotlib.colors import ListedColormap
 from sklearn import linear_model
-import time
 from matplotlib import colors as c
 
 
@@ -20,7 +19,24 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
     def __init__(self, t_start: str=None, t_stop: str=None, label='',
                  options_dict: dict=None, auto=True, close_figs=True,
                  classification_method='rates', rates_ch_idx: int =1,
+                 ignore_f_cal_pts: bool=False,
                  ):
+        """
+        Analysis for single qubit randomized benchmarking.
+        For basic options see docstring of BaseDataAnalysis
+
+        Args:
+            classification_method ["rates", ]   sets method to determine
+                populations of g,e and f states. Currently only supports "rates"
+                    rates: uses calibration points and rate equation from
+                        Asaad et al. to determine populations
+            rates_ch_idx (int) : sets the channel from which to use the data
+                for the rate equations
+            ignore_f_cal_pts (bool) : if True, ignores the f-state calibration
+                points and instead makes the approximation that the f-state
+                looks the same as the e-state in readout. This is useful when
+                the ef-pulse is not calibrated.
+        """
         if options_dict is None:
             options_dict = dict()
         super().__init__(t_start=t_start, t_stop=t_stop, label=label,
@@ -30,6 +46,7 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
         self.classification_method = classification_method
         self.rates_ch_idx = rates_ch_idx
         self.d1 = 2
+        self.ignore_f_cal_pts = ignore_f_cal_pts
         if auto:
             self.run_analysis()
 
@@ -73,15 +90,19 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
                 binned_yvals = np.reshape(
                     a.measured_values[i], (len(bins), -1), order='F')
 
-
-
                 self.raw_data_dict['binned_vals'][val_name] = binned_yvals
                 self.raw_data_dict['cal_pts_zero'][val_name] =\
                     binned_yvals[-6:-4, :].flatten()
                 self.raw_data_dict['cal_pts_one'][val_name] =\
                     binned_yvals[-4:-2, :].flatten()
-                self.raw_data_dict['cal_pts_two'][val_name] =\
-                    binned_yvals[-2:, :].flatten()
+
+                if self.ignore_f_cal_pts:
+                    self.raw_data_dict['cal_pts_two'][val_name] =\
+                        self.raw_data_dict['cal_pts_one'][val_name]
+                else:
+                    self.raw_data_dict['cal_pts_two'][val_name] =\
+                        binned_yvals[-2:, :].flatten()
+
                 self.raw_data_dict['measured_values_I'][val_name] =\
                     binned_yvals[:-6:2, :]
                 self.raw_data_dict['measured_values_X'][val_name] =\
@@ -149,6 +170,9 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
         leak_mod.set_param_hint('lambda_1', value=.99, vary=True)
         leak_mod.set_param_hint('L1', expr='(1-A)*(1-lambda_1)')
         leak_mod.set_param_hint('L2', expr='A*(1-lambda_1)')
+        leak_mod.set_param_hint('L1_cz', expr='1-(1-(1-A)*(1-lambda_1))**(1/1.5)')
+        leak_mod.set_param_hint('L2_cz', expr='1-(1-(A*(1-lambda_1)))**(1/1.5)')
+
         params = leak_mod.make_params()
         try:
             fit_res_leak = leak_mod.fit(data=self.proc_data_dict['X1'],
@@ -164,9 +188,35 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
             L1 = 0
             self.fit_res['leakage_decay'] = {}
 
+        fit_res_rb = self.fit_rb_decay(lambda_1=lambda_1, L1=L1, simple=False)
+        self.fit_res['rb_decay'] = fit_res_rb
+        fit_res_rb_simple = self.fit_rb_decay(lambda_1=1, L1=0, simple=True)
+        self.fit_res['rb_decay_simple'] = fit_res_rb_simple
+
+        fr_rb = self.fit_res['rb_decay'].params
+        fr_rb_simple = self.fit_res['rb_decay_simple'].params
+        fr_dec = self.fit_res['leakage_decay'].params
+
+        text_msg = 'Summary: \n'
+        text_msg += format_value_string(r'$\epsilon_{\mathrm{simple}}$',
+                                        fr_rb_simple['eps'], '\n')
+        text_msg += format_value_string(r'$\epsilon_{X_1}$',
+                                        fr_rb['eps'], '\n')
+        text_msg += format_value_string(r'$L_1$', fr_dec['L1'], '\n')
+        text_msg += format_value_string(r'$L_2$', fr_dec['L2'], '\n')
+
+        self.proc_data_dict['rb_msg'] = text_msg
+
+    def fit_rb_decay(self, lambda_1: float, L1: float, simple: bool=False):
+        """
+        Fits the data
+        """
         fit_mod_rb = lmfit.Model(full_rb_decay, independent_vars='m')
         fit_mod_rb.set_param_hint('A', value=.5, min=0, vary=True)
-        fit_mod_rb.set_param_hint('B', value=.1, min=0, vary=True)
+        if simple:
+            fit_mod_rb.set_param_hint('B', value=0, vary=False)
+        else:
+            fit_mod_rb.set_param_hint('B', value=.1, min=0, vary=True)
         fit_mod_rb.set_param_hint('C', value=.4, min=0, max=1, vary=True)
 
         fit_mod_rb.set_param_hint('lambda_1', value=lambda_1, vary=False)
@@ -181,88 +231,23 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
             'F', expr='1/d1*((d1-1)*lambda_2+1-L1)', vary=True)
         fit_mod_rb.set_param_hint('eps',
                                   expr='1-(1/d1*((d1-1)*lambda_2+1-L1))')
+        # Only valid for single qubit RB assumption equal error rates
         fit_mod_rb.set_param_hint(
             'F_g', expr='(1/d1*((d1-1)*lambda_2+1-L1))**(1/1.875)')
         fit_mod_rb.set_param_hint(
             'eps_g', expr='1-(1/d1*((d1-1)*lambda_2+1-L1))**(1/1.875)')
+        # Only valid for two qubit RB assumption all error in CZ
+        fit_mod_rb.set_param_hint(
+            'F_cz', expr='(1/d1*((d1-1)*lambda_2+1-L1))**(1/1.5)')
+        fit_mod_rb.set_param_hint(
+            'eps_cz', expr='1-(1/d1*((d1-1)*lambda_2+1-L1))**(1/1.5)')
 
         params = fit_mod_rb.make_params()
-        try:
-            fit_res_rb = fit_mod_rb.fit(data=self.proc_data_dict['M0'],
-                                        m=self.proc_data_dict['ncl'],
-                                        params=params)
+        fit_res_rb = fit_mod_rb.fit(data=self.proc_data_dict['M0'],
+                                    m=self.proc_data_dict['ncl'],
+                                    params=params)
 
-            self.fit_res['rb_decay'] = fit_res_rb
-        except Exception as e:
-            logging.warning("Fitting failed")
-            logging.warning(e)
-            lambda_1 = 1
-
-            self.fit_res['rb_decay'] = {}
-
-
-        fit_mod_rb_simple = lmfit.Model(full_rb_decay, independent_vars='m')
-        fit_mod_rb_simple.set_param_hint('A', value=.5, min=0, vary=True)
-        fit_mod_rb_simple.set_param_hint('B', value=0, vary=False)
-        fit_mod_rb_simple.set_param_hint('C', value=.5, min=0, max=1, vary=True)
-
-        fit_mod_rb_simple.set_param_hint('lambda_1', value=lambda_1, vary=False)
-        fit_mod_rb_simple.set_param_hint('lambda_2', value=.95, vary=True)
-
-        # d1 = dimensionality of computational subspace
-        fit_mod_rb_simple.set_param_hint('d1', value=self.d1, vary=False)
-        fit_mod_rb_simple.set_param_hint('L1', value=L1, vary=False)
-        fit_mod_rb_simple.set_param_hint(
-            'F', expr='1/d1*((d1-1)*lambda_2+1-L1)', vary=True)
-        fit_mod_rb_simple.set_param_hint('eps',
-                                  expr='1-(1/d1*((d1-1)*lambda_2+1-L1))')
-        fit_mod_rb_simple.set_param_hint(
-            'F_g', expr='(1/d1*((d1-1)*lambda_2+1-L1))**(1/1.875)')
-        fit_mod_rb_simple.set_param_hint(
-            'eps_g', expr='1-(1/d1*((d1-1)*lambda_2+1-L1))**(1/1.875)')
-
-        params = fit_mod_rb_simple.make_params()
-        try:
-            fit_res_rb_simple = fit_mod_rb_simple.fit(
-                data=self.proc_data_dict['M0'],
-                m=self.proc_data_dict['ncl'],
-                params=params)
-
-            self.fit_res['rb_decay_simple'] = fit_res_rb_simple
-        except Exception as e:
-            logging.warning("Fitting failed")
-            logging.warning(e)
-            lambda_1 = 1
-
-            self.fit_res['rb_decay_simple'] = {}
-
-        # try:
-        fr_rb = self.fit_res['rb_decay']
-        fr_rb_simple = self.fit_res['rb_decay_simple']
-        fr_dec = self.fit_res['leakage_decay']
-        text_msg = 'Summary: \n'
-        # text_msg += (
-        #     r'$\bar{F}$:' + '    {:.3f}'.format(fr_rb_simple.params['F'].value*100)
-        #     + r'$\pm$' + '{:.3f}%\n'.format(fr_rb_simple.params['F'].stderr*100))
-        text_msg += (
-            r'$\epsilon$:' + '    {:.4f}'.format(fr_rb_simple.params['eps'].value)
-            + r'$\pm$' + '{:.4f}\n'.format(fr_rb_simple.params['eps'].stderr))
-
-
-        text_msg += (
-            r'$\epsilon_{X_1}$:' + '  {:.4f}'.format(fr_rb.params['eps'].value)
-            + r'$\pm$' + '{:.4f}\n'.format(fr_rb.params['eps'].stderr))
-        text_msg += (
-            '$L_1$:   ' + '{:.4f}'.format(fr_dec.params['L1'].value) +
-            r'$\pm$' + '{:.4f}\n'.format(fr_dec.params['L1'].stderr))
-        text_msg += (
-            '$L_2$:   ' + '{:.4f}'.format(fr_dec.params['L2'].value) +
-            r'$\pm$' + '{:.4f}'.format(fr_dec.params['L2'].stderr))
-        # except Exception as e:
-        #     logging.warning(e)
-        #     text_msg = ''
-
-        self.proc_data_dict['rb_msg'] = text_msg
+        return fit_res_rb
 
     def prepare_plots(self):
         val_names = self.raw_data_dict['value_names']
@@ -380,8 +365,6 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
             'color': 'C2',
         }
 
-
-
         self.plot_dicts['rb_text'] = {
             'plotfn': self.plot_text,
             'text_string': self.proc_data_dict['rb_msg'],
@@ -394,6 +377,7 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
     def __init__(self, t_start: str=None, t_stop: str=None, label='',
                  options_dict: dict=None, auto=True, close_figs=True,
                  classification_method='rates', rates_ch_idxs: list =[0, 2],
+                 ignore_f_cal_pts: bool=False
                  ):
         if options_dict is None:
             options_dict = dict()
@@ -405,6 +389,7 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
         # used to determine how to determine 2nd excited state population
         self.classification_method = classification_method
         self.rates_ch_idxs = rates_ch_idxs
+        self.ignore_f_cal_pts = ignore_f_cal_pts
         if auto:
             self.run_analysis()
 
@@ -580,7 +565,6 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
             'title': ' {}'.format(val_name_q1),
             'ax_id': 'rb_pops_q1'}
 
-
         self.plot_dicts['cal_points_hexbin_q0'] = {
             'plotfn': plot_cal_points_hexbin,
             'shots_0': (self.proc_data_dict['cal_pts_x0'][val_names[0]],
@@ -639,7 +623,7 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
             'fit_res': self.fit_res['leakage_decay'],
             'setlabel': 'Leakage fit',
             'do_legend': True,
-            'color':'C2',
+            'color': 'C2',
         }
         self.plot_dicts['fit_rb_simple'] = {
             'plotfn': self.plot_fit,
@@ -654,7 +638,7 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
             'fit_res': self.fit_res['rb_decay'],
             'setlabel': 'Full RB fit',
             'do_legend': True,
-            'color':'C2',
+            'color': 'C2',
         }
 
         self.plot_dicts['rb_text'] = {
@@ -662,6 +646,7 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
             'text_string': self.proc_data_dict['rb_msg'],
             'xpos': 1.05, 'ypos': .6, 'ax_id': 'main_rb_decay',
             'horizontalalignment': 'left'}
+
 
 def plot_cal_points_hexbin(shots_0,
                            shots_1,
@@ -791,7 +776,6 @@ def logisticreg_classifier_machinelearning(shots_0, shots_1, shots_2):
         zip(list(shots_2.values())[0],
             list(shots_2.values())[1])))
 
-
     shots_0 = shots_0[~np.isnan(shots_0[:, 0])]
     shots_1 = shots_1[~np.isnan(shots_1[:, 0])]
     shots_2 = shots_2[~np.isnan(shots_2[:, 0])]
@@ -867,3 +851,17 @@ def full_rb_decay(A, B, C, lambda_1, lambda_2, m):
     Eq. (15) of Wood Gambetta 2018
     """
     return A + B*lambda_1**m+C*lambda_2**m
+
+
+def format_value_string(par_name: str, lmfit_par, end_char=''):
+    """
+    Formats an lmfit par to a  string of value with uncertainty.
+    """
+    val_string = par_name
+    val_string += ': {:.4f}'.format(lmfit_par.value)
+    if lmfit_par.stderr is not None:
+        val_string += r'$\pm$' + '{:.4f}'.format(lmfit_par.stderr)
+    else:
+        val_string += r'$\pm$' + 'NaN'
+    val_string += end_char
+    return val_string

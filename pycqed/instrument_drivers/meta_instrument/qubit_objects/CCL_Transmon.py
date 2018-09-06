@@ -59,6 +59,8 @@ class CCLight_Transmon(Qubit):
                            parameter_class=InstrumentRefParameter)
         self.add_parameter('instr_spec_source',
                            parameter_class=InstrumentRefParameter)
+        self.add_parameter('instr_spec_source_2',
+                           parameter_class=InstrumentRefParameter)
 
         # Control electronics
         self.add_parameter(
@@ -641,6 +643,8 @@ class CCLight_Transmon(Qubit):
         # source is turned on in measure spec when needed
         self.instr_LO_mw.get_instr().off()
         self.instr_spec_source.get_instr().off()
+        if self.instr_spec_source_2()!=None:
+            self.instr_spec_source_2.get_instr().off()
 
     def _prep_cw_spec(self):
         if self.cfg_with_vsm():
@@ -1090,14 +1094,14 @@ class CCLight_Transmon(Qubit):
         print('CCL program is running. Parameter "mw_vsm_delay" can now be '
               'calibrated by hand.')
 
-    def calibrate_motzoi(self, MC=None, verbose=True, update=True):
+    def calibrate_motzoi(self, MC=None, verbose=True, update=True, motzois=None):
         """
         Calibrates the motzoi VSM amplitude prameter
         """
         using_VSM = self.cfg_with_vsm()
-        if using_VSM:
+        if using_VSM and motzois is None:
             motzois = gen_sweep_pts(start=0.2, stop=2.0, num=31)
-        else:
+        elif motzois is None:
             motzois = gen_sweep_pts(center=0, span=.3, num=31)
 
         # large range
@@ -1515,7 +1519,7 @@ class CCLight_Transmon(Qubit):
         else:
             # Assume the flux is controlled using an SPI rack
             fluxcontrol = self.instr_FluxCtrl.get_instr()
-            dac_par = fluxcontrol.parameters[(self.cfg_dc_flux_ch())]
+            dac_par =  fluxcontrol.parameters[(self.cfg_dc_flux_ch())]
 
         MC.set_sweep_function_2D(dac_par)
         MC.set_sweep_points_2D(dac_values)
@@ -1527,7 +1531,9 @@ class CCLight_Transmon(Qubit):
 
     def measure_qubit_frequency_dac_scan(self, freqs, dac_values,
                                          pulsed=True, MC=None,
-                                         analyze=True, fluxChan=None, close_fig=True):
+                                         analyze=True, fluxChan=None, close_fig=True,
+                                         nested_resonator_calibration=False,
+                                         resonator_freqs=None):
         if not pulsed:
             logging.warning('CCL transmon can only perform '
                             'pulsed spectrocsopy')
@@ -1558,6 +1564,10 @@ class CCLight_Transmon(Qubit):
         spec_source.on()
         MC.set_sweep_function(spec_source.frequency)
         MC.set_sweep_points(freqs)
+        if nested_resonator_calibration:
+            dac_par = swf.Nested_resonator_tracker(qubit=self,
+                nested_MC=self.instr_nested_MC.get_instr(), freqs=resonator_freqs,
+                par=dac_par)
         MC.set_sweep_function_2D(dac_par)
         MC.set_sweep_points_2D(dac_values)
         self.int_avg_det_single._set_real_imag(False)
@@ -1604,6 +1614,103 @@ class CCLight_Transmon(Qubit):
             self._prep_ro_pulse(upload=True)
         if analyze:
             ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=close_fig)
+
+        #anharmonicity measurement, bus crossing and photon number splitting with the bus
+
+    def measure_anharmonicity(self, f_01, f_02=None, f_12=None, f_01_power=None,
+                                    f_12_power=None, MC=None, spec_source_2=None):
+        '''
+        note measures anharmonicity of the transmon using three-tone
+        spectroscopy. two usecases:
+        - provide f_02 from high-power spectroscopy of the 02-transition.
+                                    It will calculate the 12 transition from it
+        - provide directly the 1-2 transition
+        '''
+        if (f_02 is None) and (f_12 is None):
+            raise ValueError("provide either and estimate of f_02 or f_12")
+        if f_12==None:
+            f_anharmonicity=(f_01-f_02)*2
+            f_12=f_01-f_anharmonicity
+        if f_01_power==None:
+            f_01_power=self.spec_pow()
+        if f_12_power==None:
+            f_12_power=f_01_power
+        f_anharmonicity=(f_01-f_12)
+        print('f_anharmonicity estimations', f_anharmonicity)
+        print('f_12 estimations', f_12)
+        CCL = self.instr_CC.get_instr()
+        p = sqo.pulsed_spec_seq(
+            qubit_idx=self.cfg_qubit_nr(),
+            spec_pulse_length=self.spec_pulse_length(),
+            platf_cfg=self.cfg_openql_platform_fn())
+        CCL.eqasm_program(p.filename)
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        if spec_source_2 is None:
+            spec_source_2 = self.instr_spec_source_2.get_instr()
+        spec_source = self.instr_spec_source.get_instr()
+        freqs_q1=np.arange(f_01-12e6 ,f_01+12e6,0.7e6)
+        freqs_q2=np.arange(f_12-12e6 ,f_12+12e6,0.7e6)
+
+        self.prepare_for_continuous_wave()
+        self.int_avg_det_single._set_real_imag(False)
+        spec_source.on()
+        spec_source.power(f_01_power)
+
+        spec_source_2.on()
+        spec_source_2.power(f_12_power)
+        spec_source_2.frequency(f_12)
+        MC.set_sweep_function(wrap_par_to_swf(
+                              spec_source.frequency, retrieve_value=True))
+        MC.set_sweep_points(freqs_q1)
+        MC.set_sweep_function_2D(wrap_par_to_swf(
+                              spec_source_2.frequency, retrieve_value=True))
+        MC.set_sweep_points_2D(freqs_q2)
+        MC.set_detector_function(self.int_avg_det_single)
+        MC.run_2D(name='Three_tone_'+self.msmt_suffix)
+        ma.TwoD_Analysis(auto=True)
+        spec_source.off()
+        spec_source_2.off()
+        ma.Three_Tone_Spectroscopy_Analysis(label='Three_tone',  f01=f_01, f12=f_12)
+
+    def measure_photon_nr_splitting_from_bus(self, f_bus, freqs_01=None, powers=np.arange(-10,10,1), MC=None, spec_source_2=None):
+
+        if freqs_01 is None:
+            freqs_01=np.arange(self.freq_qubit()-60e6 ,self.freq_qubit()+5e6,0.7e6)
+
+        self.prepare_for_continuous_wave()
+        if MC is None:
+            MC = self.instr_MC.get_instr()
+        CCL = self.instr_CC.get_instr()
+        if spec_source_2 is None:
+            spec_source_2 = self.instr_spec_source_2.get_instr()
+        spec_source = self.instr_spec_source.get_instr()
+        p = sqo.pulsed_spec_seq(
+            qubit_idx=self.cfg_qubit_nr(),
+            spec_pulse_length=self.spec_pulse_length(),
+            platf_cfg=self.cfg_openql_platform_fn())
+        CCL.eqasm_program(p.filename)
+        self.int_avg_det_single._set_real_imag(False)
+        spec_source.on()
+        spec_source.power(self.spec_pow())
+        spec_source_2.on()
+        spec_source_2.frequency(f_bus)
+
+        MC.set_sweep_function(wrap_par_to_swf(
+                              spec_source.frequency, retrieve_value=True))
+        MC.set_sweep_points(freqs_01)
+
+        MC.set_sweep_function_2D(wrap_par_to_swf(
+                              spec_source_2.power, retrieve_value=True))
+        MC.set_sweep_points_2D(powers)
+        MC.set_detector_function(self.int_avg_det_single)
+
+        MC.run_2D(name='Photon_nr_splitting'+self.msmt_suffix)
+
+        ma.TwoD_Analysis(auto=True)
+        spec_source.off()
+        spec_source_2.off()
+
 
     def measure_ssro(self, MC=None, analyze: bool=True, nr_shots: int=4092*4,
                      cases=('off', 'on'), update_threshold: bool=True,
@@ -1897,6 +2004,7 @@ class CCLight_Transmon(Qubit):
         self.prepare_for_timedomain()
         # off/on switching is achieved by turning the MW source on and
         # off as this is much faster than recompiling/uploading
+        f_res=[]
         for i, pulse_comb in enumerate(['off', 'on']):
             p = sqo.off_on(
                 qubit_idx=self.cfg_qubit_nr(), pulse_comb=pulse_comb,
@@ -1915,7 +2023,10 @@ class CCLight_Transmon(Qubit):
             MC.run(name='Resonator_scan_'+pulse_comb+self.msmt_suffix)
             if analyze:
                 ma.MeasurementAnalysis()
-
+                a = ma.Homodyne_Analysis(label=self.msmt_suffix, close_fig=True)
+                f_res.append(a.fit_results.params['f0'].value*1e9)  # fit converts to Hz
+        print('dispersive shift is {} MHz'.format((f_res[1]-f_res[0])*1e-6))
+    
     def calibrate_optimal_weights(self, MC=None, verify: bool=True,
                                   analyze: bool=True, update: bool=True,
                                   no_figs: bool=False,
@@ -2761,7 +2872,8 @@ class CCLight_Transmon(Qubit):
     def measure_single_qubit_randomized_benchmarking(
             self, nr_cliffords=2**np.arange(12), nr_seeds=100,
             MC=None,
-            recompile: bool ='as needed', prepare_for_timedomain: bool=True):
+            recompile: bool ='as needed', prepare_for_timedomain: bool=True,
+            ignore_f_cal_pts:bool=False):
         """
         Measures randomized benchmarking decay including second excited state
         population.
@@ -2845,7 +2957,7 @@ class CCLight_Transmon(Qubit):
         MC.run('RB_{}seeds'.format(nr_seeds)+self.msmt_suffix,
                exp_metadata={'bins': sweep_points})
 
-        a = ma2.RandomizedBenchmarking_SingleQubit_Analysis(label='RB_')
+        a = ma2.RandomizedBenchmarking_SingleQubit_Analysis(label='RB_', ignore_f_cal_pts=ignore_f_cal_pts)
         return a
 
     def measure_randomized_benchmarking_old(self, nr_cliffords=2**np.arange(12),
