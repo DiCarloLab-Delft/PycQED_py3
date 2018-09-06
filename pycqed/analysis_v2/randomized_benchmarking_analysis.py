@@ -170,6 +170,9 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
         leak_mod.set_param_hint('lambda_1', value=.99, vary=True)
         leak_mod.set_param_hint('L1', expr='(1-A)*(1-lambda_1)')
         leak_mod.set_param_hint('L2', expr='A*(1-lambda_1)')
+        leak_mod.set_param_hint('L1_cz', expr='1-(1-(1-A)*(1-lambda_1))**(1/1.5)')
+        leak_mod.set_param_hint('L2_cz', expr='1-(1-(A*(1-lambda_1)))**(1/1.5)')
+
         params = leak_mod.make_params()
         try:
             fit_res_leak = leak_mod.fit(data=self.proc_data_dict['X1'],
