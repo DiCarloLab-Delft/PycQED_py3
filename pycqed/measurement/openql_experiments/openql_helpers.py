@@ -2,14 +2,60 @@
 
 """
 import re
+from os.path import join, dirname
 import numpy as np
 import json
 from shutil import copyfile
+from pycqed.utilities.general import suppress_stdout
 import matplotlib.pyplot as plt
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 from matplotlib.ticker import MaxNLocator
 import matplotlib.patches as mpatches
 from pycqed.utilities.general import is_more_rencent
+import openql.openql as ql
+from openql.openql import Program, Kernel, Platform
+
+
+output_dir = join(dirname(__file__), 'output')
+ql.set_output_dir(output_dir)
+
+
+def create_program(pname: str, platf_cfg: str):
+    """
+    Wrapper around the constructor of openQL "Program" class.
+
+    Args:
+        pname : Name of the program
+        platf_cfg : location of the platform configuration used to construct
+            the OpenQL Platform used.
+
+    In addition to instantiating the Program, this function
+        - creates a Platform based on the "platf_cfg" filename.
+        - Adds the platform as an attribute  "p.platf"
+        - Adds the output_dir as an attribute "p.output_dir"
+
+    """
+    platf = Platform('OpenQL_Platform', platf_cfg)
+    p = Program(pname="single_flux_pulse_seq",
+                nqubits=platf.get_qubit_number(),
+                p=platf)
+
+    p.platf = platf
+    p.output_dir = ql.get_output_dir()
+
+    return p
+
+
+def compile(p):
+    """
+    Wrapper around OpenQL Program.compile() method.
+    """
+    with suppress_stdout():
+        p.compile()
+    # attribute is added to program to help finding the output files
+
+    p.filename = join(p.output_dir, p.name + '.qisa')
+    return p
 
 
 def clocks_to_s(time, clock_cycle=20e-9):

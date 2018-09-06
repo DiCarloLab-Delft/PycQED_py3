@@ -1,15 +1,10 @@
-from os.path import join, dirname
+from os.path import join
 import numpy as np
 from pycqed.utilities.general import int2base
 import openql.openql as ql
 from pycqed.utilities.general import suppress_stdout
 from openql.openql import Program, Kernel, Platform
 from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
-
-
-base_qasm_path = join(dirname(__file__), 'qasm_files')
-output_dir = join(dirname(__file__), 'output')
-ql.set_output_dir(output_dir)
 
 
 def single_flux_pulse_seq(qubit_indices: tuple,

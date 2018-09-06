@@ -4,7 +4,7 @@ OpenQL sequence.
 """
 import time
 import numpy as np
-from os.path import join, dirname
+from os.path import join
 import openql.openql as ql
 from pycqed.utilities.general import suppress_stdout
 from openql.openql import Program, Kernel, Platform
@@ -13,9 +13,6 @@ from pycqed.measurement.gate_set_tomography.pygsti_helpers import \
     pygsti_expList_from_dataset, gst_exp_filepath, split_expList
 import logging
 
-base_qasm_path = join(dirname(__file__), 'qasm_files')
-output_dir = join(dirname(__file__), 'output')
-ql.set_output_dir(output_dir)
 
 # used to map pygsti gates to openQL gates
 # for now (Jan 2018) only contains basic pygsti gates

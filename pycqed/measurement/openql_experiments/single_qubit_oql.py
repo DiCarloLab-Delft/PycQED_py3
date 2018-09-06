@@ -1,16 +1,9 @@
-'''
-'''
 import numpy as np
-from os.path import join, dirname
+from os.path import join
 import openql.openql as ql
 from openql.openql import Program, Kernel, Platform
 from pycqed.utilities.general import suppress_stdout
 from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
-
-
-base_qasm_path = join(dirname(__file__), 'qasm_files')
-output_dir = join(dirname(__file__), 'output')
-ql.set_output_dir(output_dir)
 
 
 def CW_tone(qubit_idx: int, platf_cfg: str):

@@ -3,7 +3,7 @@ This file reads in a pygsti dataset file and converts it to a valid
 OpenQL sequence.
 """
 
-from os.path import join, dirname
+from os.path import join
 import openql.openql as ql
 from pycqed.utilities.general import suppress_stdout
 from openql.openql import Program, Kernel, Platform
@@ -16,9 +16,6 @@ from pycqed.measurement.randomized_benchmarking import randomized_benchmarking a
 from pycqed.measurement.openql_experiments import openql_helpers as oqh
 from pycqed.measurement.randomized_benchmarking.two_qubit_clifford_group \
     import SingleQubitClifford, TwoQubitClifford
-base_qasm_path = join(dirname(__file__), 'qasm_files')
-output_dir = join(dirname(__file__), 'output')
-ql.set_output_dir(output_dir)
 
 
 def randomized_benchmarking(qubits: list, platf_cfg: str,
