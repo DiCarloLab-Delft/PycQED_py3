@@ -981,7 +981,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             fluxlutman=self.fluxlutman, amp=amp_final,
             sim_step=sim_step_new, verbose=False)
 
-        cost_func_val = -np.log10(1-qoi['avgatefid_compsubspace_pc'])   # new cost function: infidelity
+        cost_func_val = (1-qoi['avgatefid_compsubspace_pc'])   # new cost function: infidelity WITHOUT -np.log10
+        													   # gives less resolution close to high fidelities but gives better idea of full landscape
 
         return cost_func_val, qoi['phi_cond'], qoi['L1']*100, qoi['L2']*100, qoi['avgatefid_pc']*100, \
                      qoi['avgatefid_compsubspace_pc']*100, qoi['phase_q0'], qoi['phase_q1'], \
