@@ -2,6 +2,7 @@ import unittest
 import os
 import pycqed as pq
 import pycqed.measurement.openql_experiments.openql_helpers as oqh
+import openql.openql as ql
 
 file_paths_root = os.path.join(pq.__path__[0], 'tests',
                                'openQL_test_files')
@@ -91,7 +92,6 @@ class Test_openql_helpers(unittest.TestCase):
 
         self.assertEqual(exp_lines, lines)
 
-
         expected_flux_tuples = [
             (0, 'fl_cw_01', {(2, 0)}, 601),
             (19, 'fl_cw_01', {(2, 0)}, 609),
@@ -114,3 +114,26 @@ class Test_openql_helpers(unittest.TestCase):
             (297, 'fl_cw_01', {(2, 0)}, 700)]
 
         self.assertEqual(expected_flux_tuples, grouped_fl_tuples[10])
+
+
+class Test_openql_compiler_helpers(unittest.TestCase):
+
+    def test_create_program(self):
+        curdir = os.path.dirname(__file__)
+        config_fn = os.path.join(curdir, 'test_cfg_CCL.json')
+        p = oqh.create_program('test_program', config_fn)
+        self.assertEqual(p.name, 'test_program')
+        self.assertEqual(p.output_dir, ql.get_option('output_dir'))
+
+    def test_compile(self):
+        """
+        Only tests the compile helper by compiling an empty file.
+        """
+        curdir = os.path.dirname(__file__)
+        config_fn = os.path.join(curdir, 'test_cfg_CCL.json')
+        p = oqh.create_program('test_program', config_fn)
+        p = oqh.compile(p)
+        fn_split = os.path.split(p.filename)
+
+        self.assertEqual(fn_split[0], ql.get_option('output_dir'))
+        self.assertEqual(fn_split[1], 'test_program.qisa')

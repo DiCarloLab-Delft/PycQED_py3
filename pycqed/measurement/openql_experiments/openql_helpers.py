@@ -17,17 +17,19 @@ from openql.openql import Program, Kernel, Platform
 
 
 output_dir = join(dirname(__file__), 'output')
-ql.set_output_dir(output_dir)
+ql.set_option('output_dir', output_dir)
 
 
-def create_program(pname: str, platf_cfg: str):
+def create_program(pname: str, platf_cfg: str, nregisters: int=0):
     """
     Wrapper around the constructor of openQL "Program" class.
 
     Args:
-        pname : Name of the program
-        platf_cfg : location of the platform configuration used to construct
-            the OpenQL Platform used.
+        pname       (str) : Name of the program
+        platf_cfg   (str) : location of the platform configuration used to
+            construct the OpenQL Platform used.
+        nregisters  (int) : the number of classical registers required in
+            the program.
 
     In addition to instantiating the Program, this function
         - creates a Platform based on the "platf_cfg" filename.
@@ -36,12 +38,14 @@ def create_program(pname: str, platf_cfg: str):
 
     """
     platf = Platform('OpenQL_Platform', platf_cfg)
-    p = Program(pname="single_flux_pulse_seq",
-                nqubits=platf.get_qubit_number(),
-                p=platf)
+    p = Program(pname,
+                platf,
+                platf.get_qubit_number(),
+                nregisters)
 
     p.platf = platf
-    p.output_dir = ql.get_output_dir()
+    p.output_dir = ql.get_option('output_dir')
+    p.name = p.name_
 
     return p
 
