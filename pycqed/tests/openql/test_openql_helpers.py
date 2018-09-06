@@ -125,6 +125,13 @@ class Test_openql_compiler_helpers(unittest.TestCase):
         self.assertEqual(p.name, 'test_program')
         self.assertEqual(p.output_dir, ql.get_option('output_dir'))
 
+    def test_create_kernel(self):
+        curdir = os.path.dirname(__file__)
+        config_fn = os.path.join(curdir, 'test_cfg_CCL.json')
+        p = oqh.create_program('test_program', config_fn)
+        k = oqh.create_kernel('my_kernel', p)
+        self.assertEqual(k.name, 'my_kernel')
+
     def test_compile(self):
         """
         Only tests the compile helper by compiling an empty file.

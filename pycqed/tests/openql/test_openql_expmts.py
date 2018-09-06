@@ -31,66 +31,7 @@ try:
             mqo.single_flux_pulse_seq(qubit_indices=(2, 0),
                                       platf_cfg=test_config_fn)
 
-    class Test_single_qubit_seqs_CCL(unittest.TestCase):
 
-        def test_vsm_timing_cal_sequence(self):
-            sqo.vsm_timing_cal_sequence(qubit_idx=1,
-                                        platf_cfg=config_fn)
-
-        def test_CW_RO_seq(self):
-            sqo.CW_RO_sequence(qubit_idx=0, platf_cfg=config_fn)
-
-        def test_pulsed_spec_seq(self):
-            sqo.pulsed_spec_seq(qubit_idx=0, spec_pulse_length=80e-9,
-                                platf_cfg=config_fn)
-
-        def test_allxy(self):
-            # Only test if it compiles
-            sqo.AllXY(qubit_idx=0, platf_cfg=config_fn)
-
-        def test_T1(self):
-            # Only test if it compiles
-            sqo.T1(times=np.arange(0, 1e-6, 20e-9),
-                   qubit_idx=0, platf_cfg=config_fn)
-
-        def test_Ramsey(self):
-            # Only test if it compiles
-            sqo.Ramsey(times=np.arange(0, 1e-6, 20e-9),
-                       qubit_idx=0, platf_cfg=config_fn)
-
-        def test_echo(self):
-            # Only test if it compiles
-            sqo.echo(times=np.arange(0, 2e-6, 40e-9),
-                     qubit_idx=0, platf_cfg=config_fn)
-
-        def test_single_elt_on(self):
-            sqo.single_elt_on(qubit_idx=0, platf_cfg=config_fn)
-
-        def test_flipping(self):
-            number_of_flips = np.arange(10)
-            sqo.flipping(qubit_idx=0, number_of_flips=number_of_flips,
-                         platf_cfg=config_fn)
-
-        def test_butterfly(self):
-            sqo.butterfly(qubit_idx=0, initialize=True,
-                          platf_cfg=config_fn)
-
-        def test_off_on(self):
-            sqo.off_on(0, pulse_comb='off', initialize=False,
-                       platf_cfg=config_fn)
-            sqo.off_on(0, pulse_comb='on', initialize=False,
-                       platf_cfg=config_fn)
-            sqo.off_on(0, pulse_comb='off_on', initialize=False,
-                       platf_cfg=config_fn)
-
-        def test_randomized_benchmarking(self):
-            nr_cliffords = 2**np.arange(10)
-            sqo.randomized_benchmarking(0, platf_cfg=config_fn,
-                                        nr_cliffords=nr_cliffords, nr_seeds=3)
-
-        def test_fast_feedback_control(self):
-            sqo.FastFeedbackControl(latency=200e-9,
-                                    qubit_idx=0, platf_cfg=config_fn)
 
     class Test_multi_qubit_seqs_CCL(unittest.TestCase):
 

@@ -3,9 +3,6 @@
 """
 import re
 from os.path import join, dirname
-import numpy as np
-import json
-from shutil import copyfile
 from pycqed.utilities.general import suppress_stdout
 import matplotlib.pyplot as plt
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
@@ -38,16 +35,30 @@ def create_program(pname: str, platf_cfg: str, nregisters: int=0):
 
     """
     platf = Platform('OpenQL_Platform', platf_cfg)
+    nqubits = platf.get_qubit_number()
     p = Program(pname,
                 platf,
-                platf.get_qubit_number(),
+                nqubits,
                 nregisters)
 
     p.platf = platf
     p.output_dir = ql.get_option('output_dir')
     p.name = p.name_
+    p.nqubits = platf.get_qubit_number()
+    p.nregisters = nregisters
 
     return p
+
+
+def create_kernel(kname: str, program):
+    """
+    Wrapper around constructor of openQL "Kernel" class.
+    """
+    k = Kernel(kname, program.platf, program.nqubits, program.nregisters)
+    k.qubit_count = k.qubit_count_
+    k.platform = k.platform_
+    k.name = k.name_
+    return k
 
 
 def compile(p):

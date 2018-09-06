@@ -5,25 +5,31 @@ from openql.openql import Program, Kernel, Platform
 from pycqed.utilities.general import suppress_stdout
 from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
 
+import pycqed.measurement.openql_experiments.openql_helpers as oqh
 
 def CW_tone(qubit_idx: int, platf_cfg: str):
     """
     Sequence to generate an "always on" pulse or "ContinuousWave" (CW) tone.
     This is a sequence that goes a bit against the paradigm of openql.
     """
-    platf = Platform('OpenQL_Platform', platf_cfg)
-    p = Program(pname="CW_tone",
-                nqubits=platf.get_qubit_number(),
-                p=platf)
+    p = oqh.create_program('CW_tone', platf_cfg)
+    # platf = Platform('OpenQL_Platform', platf_cfg)
+    # p = Program(pname="CW_tone",
+    #             nqubits=platf.get_qubit_number(),
+    #             p=platf)
+    k = oqh.create_kernel("Main", p)
 
-    k = Kernel("main", p=platf)
+    # k = Kernel("main", p=p.platf)
     for i in range(40):
-        k.gate('square', qubit_idx)
+        k.gate('square', [qubit_idx])
     p.add_kernel(k)
-    with suppress_stdout():
-        p.compile(verbose=False)
-    p.output_dir = ql.get_output_dir()
-    p.filename = join(p.output_dir, p.name + '.qisa')
+
+    p = oqh.compile(p)
+
+    # with suppress_stdout():
+    #     p.compile(verbose=False)
+    # p.output_dir = ql.get_output_dir()
+    # p.filename = join(p.output_dir, p.name + '.qisa')
     return p
 
 
