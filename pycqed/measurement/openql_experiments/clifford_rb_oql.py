@@ -25,6 +25,7 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                             nr_cliffords, nr_seeds: int,
                             net_cliffords: list=[0],
                             max_clifford_idx: int=11520,
+                            simultaneous_single_qubit_RB=False, 
                             initialize: bool=True,
                             interleaving_cliffords=[None],
                             program_name: str='randomized_benchmarking',
@@ -50,7 +51,7 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
         max_clifford_idx:   Set's the maximum clifford group index from which 
                         to sample random cliffords. 
                             Important clifford indices 
-                                24 -> Size of the single qubit Cl  group 
+                                24 -> Size of the single qubit Cl group 
                                 576  -> Size of the single qubit like class 
                                     contained in the two qubit Cl group
                                 11520 -> Size of the complete two qubit Cl group
@@ -92,8 +93,7 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
 
             p = cl_oql.randomized_benchmarking(
                 qubits=[0, 1],          # simultaneous RB on both qubits
-                max_clifford_idx = 576, # to ensure only SQ Cliffords are drawn
-
+                simultaneous_single_qubit_RB=True, 
                 nr_cliffords=[2, 4, 8, 16, 32, 128, 512, 1024],
                 nr_seeds=1,  # for CCL memory reasons
                 platf_cfg=qubit.cfg_openql_platform_fn(),
@@ -127,11 +127,17 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
         qubit_map = {'q0': qubits[0]}
         number_of_qubits = 1
         Cl = SingleQubitClifford
-    elif len(qubits) == 2:
+    elif len(qubits) == 2 and not simultaneous_single_qubit_RB:
         qubit_map = {'q0': qubits[0],
                      'q1': qubits[1]}
         number_of_qubits = 2
         Cl = TwoQubitClifford
+    elif len(qubits) == 2 and simultaneous_single_qubit_RB:
+        qubit_map = {'q0': qubits[0],
+                     'q1': qubits[1]}
+        # arguments used to generate 2 single qubit sequences
+        number_of_qubits = 1
+        Cl = SingleQubitClifford
     else:
         raise NotImplementedError()
 
@@ -144,25 +150,36 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                     if initialize:
                         for qubit_idx in qubit_map.values():
                             k.prepz(qubit_idx)
-
-                    cl_seq = rb.randomized_benchmarking_sequence(
-                        n_cl, number_of_qubits=number_of_qubits,
-                        desired_net_cl=net_clifford,
-                        max_clifford_idx=max_clifford_idx,
-                        interleaving_cl=interleaving_cl)
-                    for cl in cl_seq:
-                        # hacking in exception for benchmarking only CZ
-                        # (not as a member of CNOT group)
-                        if cl == -4368:
-                            gates = [('CZ', ['q0', 'q1'])]
-                        else:
-                            gates = Cl(cl).gate_decomposition
-                        for g, q in gates:
-                            if isinstance(q, str):
-                                k.gate(g, qubit_map[q])
-                            elif isinstance(q, list):
-                                # proper codeword
-                                k.gate(g, [qubit_map[q[0]], qubit_map[q[1]]])
+                    if not simultaneous_single_qubit_RB:
+                        cl_seq = rb.randomized_benchmarking_sequence(
+                            n_cl, number_of_qubits=number_of_qubits,
+                            desired_net_cl=net_clifford,
+                            max_clifford_idx=max_clifford_idx,
+                            interleaving_cl=interleaving_cl)
+                        for cl in cl_seq:
+                            # hacking in exception for benchmarking only CZ
+                            # (not as a member of CNOT group)
+                            if cl == -4368:
+                                gates = [('CZ', ['q0', 'q1'])]
+                            else:
+                                gates = Cl(cl).gate_decomposition
+                            for g, q in gates:
+                                if isinstance(q, str):
+                                    k.gate(g, qubit_map[q])
+                                elif isinstance(q, list):
+                                    # proper codeword
+                                    k.gate(g, [qubit_map[q[0]], qubit_map[q[1]]])
+                    elif simultaneous_single_qubit_RB: 
+                        for q_idx in qubits: 
+                            cl_seq = rb.randomized_benchmarking_sequence(
+                                n_cl, number_of_qubits=number_of_qubits,
+                                desired_net_cl=net_clifford,
+                                interleaving_cl=interleaving_cl)
+                            for cl in cl_seq:
+                                gates = Cl(cl).gate_decomposition
+                                for g, q in gates:
+                                    gates = Cl(cl).gate_decomposition
+                                    k.gate(g, q_idx)
 
                     # This hack is required to align multiplexed RO in openQL..
                     k.gate("wait",  list(qubit_map.values()), 0)
