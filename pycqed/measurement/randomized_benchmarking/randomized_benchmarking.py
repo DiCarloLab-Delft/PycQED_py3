@@ -140,6 +140,7 @@ def randomized_benchmarking_sequence(
     The old method exists to establish the equivalence between the two methods.
 
     """
+
     if number_of_qubits == 1:
         Cl = tqc.SingleQubitClifford
         group_size = np.min([24, max_clifford_idx])
@@ -166,7 +167,11 @@ def randomized_benchmarking_sequence(
     # Calculate the net clifford
     net_clifford = Cl(0)
     for idx in rb_clifford_indices:
-        cliff = Cl(idx)
+        # hacking in exception for benchmarking only CZ
+        # (not as a member of CNOT group)
+        # abs is to remove the sign that is used to treat CZ ac CZ
+        # and not member of CNOT-like set of gates
+        cliff = Cl(abs(idx))
         # order of operators applied in is right to left, therefore
         # the new operator is applied on the left side.
         net_clifford = cliff*net_clifford

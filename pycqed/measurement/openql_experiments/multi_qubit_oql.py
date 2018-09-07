@@ -1169,6 +1169,8 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
             if angle == 90:
                 # special because the cw phase pulses go in mult of 20 deg
                 k.gate('ry90', q0)
+            elif angle == 0:
+                k.gate('rx90', q0)
             else:
                 k.gate('cw_{:02}'.format(cw_idx), q0)
             if case == 'excitation':

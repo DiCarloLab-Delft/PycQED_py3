@@ -41,9 +41,19 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
         nr_seeds:       int  nr_seeds for which to generate RB seqs
         net_cliffords:  list of ints index of net clifford the sequence
                         should perform. See examples below on how to use this.
-                            0 -> Idx
-                            3 -> rx180
-                            3*24+3 -> {rx180 q0 | rx180 q1}
+                            Important clifford indices
+                                0 -> Idx
+                                3 -> rx180
+                                3*24+3 -> {rx180 q0 | rx180 q1}
+                                4368 -> CZ 
+
+        max_clifford_idx:   Set's the maximum clifford group index from which 
+                        to sample random cliffords. 
+                            Important clifford indices 
+                                24 -> Size of the single qubit Cl  group 
+                                576  -> Size of the single qubit like class 
+                                    contained in the two qubit Cl group
+                                11520 -> Size of the complete two qubit Cl group
 
         initialize:     if True initializes qubits to 0, disable for restless
             tuning
@@ -141,7 +151,12 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                         max_clifford_idx=max_clifford_idx,
                         interleaving_cl=interleaving_cl)
                     for cl in cl_seq:
-                        gates = Cl(cl).gate_decomposition
+                        # hacking in exception for benchmarking only CZ
+                        # (not as a member of CNOT group)
+                        if cl == -4368:
+                            gates = [('CZ', ['q0', 'q1'])]
+                        else:
+                            gates = Cl(cl).gate_decomposition
                         for g, q in gates:
                             if isinstance(q, str):
                                 k.gate(g, qubit_map[q])
