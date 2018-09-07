@@ -1,0 +1,36 @@
+FROM continuumio/miniconda3:latest
+MAINTAINER Viacheslav Ostroukh <V.Ostroukh@tudelft.nl>
+
+# make our environment sane
+ENV LANG C.UTF-8
+ENV LC_ALL C.UTF-8
+
+RUN apt-get update && \
+    apt-get install --yes \
+        gcc \
+        g++ \
+        swig && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN conda config --add channels conda-forge && \
+    conda update --all --yes && \
+    conda install --yes \
+        numpy \
+        scipy \
+        pytest \
+        six \
+        coverage \
+        matplotlib \
+        plotly \
+        pyserial \
+        cython \
+        pyqt && \
+    conda clean --all --yes && \
+    pip install --upgrade --no-cache-dir pip && \
+    pip install --no-cache-dir \
+        autodepgraph \
+        cma \
+        hsluv \
+        pygsti \
+        spirack
