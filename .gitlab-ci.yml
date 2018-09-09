@@ -1,0 +1,17 @@
+image:
+  name: gcr.io/kaniko-project/executor:debug
+  entrypoint: [""]
+
+before_script:
+  - mkdir -p /root/.docker
+  - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"gitlab-ci-token\", \"password\":\"$CI_JOB_TOKEN\"}}}" > /root/.docker/config.json
+  - cat /root/.docker/config.json
+  - export CI_REF=${CI_COMMIT_TAG:-latest}
+
+build docker base conda:
+  stage: build
+  script:
+    - /kaniko/executor
+      --context $CI_PROJECT_DIR
+      --dockerfile $CI_PROJECT_DIR/docker/Dockerfile.conda
+      --destination $CI_REGISTRY_IMAGE/base_conda:$CI_REF
