@@ -4,14 +4,31 @@ image:
 
 before_script:
   - mkdir -p /root/.docker
-  - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"gitlab-ci-token\", \"password\":\"$CI_JOB_TOKEN\"}}}" > /root/.docker/config.json
+  - |
+    echo "{\"auths\": {
+      \"$CI_REGISTRY\": {
+        \"username\":\"$CI_REGISTRY_USER\",
+        \"password\":\"$CI_REGISTRY_PASSWORD\"}
+      }
+    }" > /root/.docker/config.json
   - cat /root/.docker/config.json
   - export CI_REF=${CI_COMMIT_TAG:-latest}
 
-build docker base conda:
+.docker-base-conda-template:
   stage: build
   script:
     - /kaniko/executor
       --context $CI_PROJECT_DIR
-      --dockerfile $CI_PROJECT_DIR/docker/Dockerfile.conda
+      --dockerfile $CI_PROJECT_DIR/docker/Dockerfile.base_conda
       --destination $CI_REGISTRY_IMAGE/base_conda:$CI_REF
+
+build base conda image:on-schedule:
+  extends: .docker-base-conda-template
+  only:
+    variables:
+      - $SCHEDULE_FREQUENCY == "weekly"
+
+build base conda image:manual:
+  extends: .docker-base-conda-template
+  when: manual
+
