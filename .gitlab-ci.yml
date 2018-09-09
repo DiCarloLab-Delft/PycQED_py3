@@ -2,13 +2,20 @@ image:
   name: gcr.io/kaniko-project/executor:debug
   entrypoint: [""]
 
+stages:
+  - build
+  - test
+
+variables:
+  OPENQL_STABLE_TAG: "0.5"
+
 before_script:
   - mkdir -p /root/.docker
   - |
     echo "{\"auths\": {
       \"$CI_REGISTRY\": {
-        \"username\":\"$CI_REGISTRY_USER\",
-        \"password\":\"$CI_REGISTRY_PASSWORD\"}
+        \"username\": \"gitlab-ci-token\",
+        \"password\": \"$CI_BUILD_TOKEN\"}
       }
     }" > /root/.docker/config.json
   - cat /root/.docker/config.json
@@ -26,9 +33,58 @@ build base conda image:on-schedule:
   extends: .docker-base-conda-template
   only:
     variables:
+      # For weekly schedules
       - $SCHEDULE_FREQUENCY == "weekly"
+  # kaniko bug https://github.com/GoogleContainerTools/kaniko/issues/245
+  allow_failure: true
 
 build base conda image:manual:
   extends: .docker-base-conda-template
   when: manual
 
+.docker-conda-template:
+  stage: build
+  script:
+    - /kaniko/executor
+      --context $CI_PROJECT_DIR
+      --dockerfile $CI_PROJECT_DIR/docker/Dockerfile.conda
+      --destination $CI_REGISTRY_IMAGE/testing_conda:$CI_REF
+      --build-arg GITHUB_PULL_USER=$GITHUB_PULL_USER
+      --build-arg GITHUB_PULL_TOKEN=$GITHUB_PULL_TOKEN
+      --build-arg OPENQL_REVISION=$OPENQL_REVISION
+
+build stable conda image:master:
+  extends: .docker-conda-template
+  variables:
+    OPENQL_REVISION: $OPENQL_STABLE_TAG
+  only:
+    - master@dicarlolab/pycqed
+    - tags
+
+build stable conda image:manual:
+  extends: .docker-conda-template
+  variables:
+    OPENQL_REVISION: $OPEQL_STABLE_TAG
+  when: manual
+  # kaniko bug https://github.com/GoogleContainerTools/kaniko/issues/342
+  allow_failure: true
+
+build develop conda image:on-schedule:
+  extends: .docker-conda-template
+  variables:
+    CI_REF: "openql_develop"
+    OPENQL_REVISION: "develop"
+  only:
+    # for daily schedules
+    - schedules
+  # kaniko bug https://github.com/GoogleContainerTools/kaniko/issues/342
+  allow_failure: true
+
+build develop conda image:manual:
+  extends: .docker-conda-template
+  variables:
+    CI_REF: "openql_develop"
+    OPENQL_REVISION: "develop"
+  when: manual
+  # kaniko bug https://github.com/GoogleContainerTools/kaniko/issues/342
+  allow_failure: true

@@ -7,8 +7,10 @@ ENV LC_ALL C.UTF-8
 
 RUN apt-get update && \
     apt-get install --yes \
+        cmake \
         gcc \
         g++ \
+        make \
         swig && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*

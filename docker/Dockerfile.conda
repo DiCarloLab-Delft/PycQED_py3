@@ -1,0 +1,16 @@
+FROM registry.gitlab.com/dicarlolab/pycqed/base_conda:latest
+
+ARG GITHUB_PULL_USER
+ARG GITHUB_PULL_TOKEN
+ARG OPENQL_REVISION
+
+RUN mkdir /src && \
+    cd /src && \
+    git clone "https://$GITHUB_PULL_USER:$GITHUB_PULL_TOKEN@github.com/QE-Lab/OpenQL" openql && \
+    cd openql && \
+    git checkout $OPENQL_REVISION && \
+    python setup.py build && \
+    pip install . && \
+    cd / && \
+    rm -rf /src/openql
+
