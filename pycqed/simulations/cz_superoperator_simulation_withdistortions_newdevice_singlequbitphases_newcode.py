@@ -682,6 +682,41 @@ def calc_hamiltonian(amp,fluxlutman,noise_parameters_CZ):
 	return H
 
 
+def verify_phicond(U):          # benchmark to check that cond phase is computed correctly. Benchmark succeeded
+	# superoperator case
+	if U.type == 'oper':
+		U=qtp.to_super(U)
+	def calc_phi(U,list):
+		# lists of 4 matrix elements 0 or 1
+		number=3*list[0]+list[1]+list[2]*27+list[3]*9
+		phase=np.rad2deg(np.angle(U[number,number]))
+		return phase
+
+	phi_01=calc_phi(U,[0,1,0,0])
+	phi_10=calc_phi(U,[1,0,0,0])
+	phi_11=calc_phi(U,[1,1,0,0])
+	phi_cond = (phi_11-phi_01-phi_10) % 360
+	print(phi_cond)
+
+	phi_01=-calc_phi(U,[0,0,0,1])
+	phi_10=calc_phi(U,[1,0,0,1])
+	phi_11=calc_phi(U,[1,1,0,1])
+	phi_cond = (phi_11-phi_01-phi_10) % 360
+	print(phi_cond)
+
+	phi_01=-calc_phi(U,[0,0,1,0])
+	phi_10=calc_phi(U,[0,1,1,0])
+	phi_11=calc_phi(U,[1,1,1,0])
+	phi_cond = (phi_11-phi_01-phi_10) % 360
+	print(phi_cond)
+
+	phi_01=-calc_phi(U,[0,0,1,1])
+	phi_10=calc_phi(U,[0,1,1,1])
+	phi_11=-calc_phi(U,[1,0,1,1])
+	phi_cond = (phi_11-phi_01-phi_10) % 360
+	print(phi_cond)
+	return phi_cond
+
 
 
 def simulate_quantities_of_interest_superoperator(tlist, c_ops, noise_parameters_CZ, fluxlutman, amp,
@@ -799,6 +834,7 @@ def simulate_quantities_of_interest_superoperator(tlist, c_ops, noise_parameters
 
 
 
+
 class CZ_trajectory_superoperator(det.Soft_Detector):
     def __init__(self, fluxlutman, noise_parameters_CZ, fitted_stepresponse_ty):
         """
@@ -849,8 +885,13 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         else:
             f_pulse,amp = self.get_f_pulse_double_sided()
 
+        print(len(tlist),len(tlist_new),len(f_pulse))
+
         # For better accuracy in simulations, redefine f_pulse and amp in terms of sim_step_new
-        tlist_temp=np.concatenate((tlist,np.array([self.fluxlutman.cz_length()])))
+        if len(tlist) == len(amp):
+        	tlist_temp=np.concatenate((tlist,np.array([self.fluxlutman.cz_length()])))
+        else:
+        	tlist_temp=np.concatenate((tlist,np.array([self.fluxlutman.cz_length(),self.fluxlutman.cz_length()+sim_step])))
         f_pulse_temp=np.concatenate((f_pulse,np.array([f_pulse[-1]])))
         amp_temp=np.concatenate((amp,np.array([amp[-1]])))
         f_pulse_interp=interp1d(tlist_temp,f_pulse_temp)
@@ -981,7 +1022,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             fluxlutman=self.fluxlutman, amp=amp_final,
             sim_step=sim_step_new, verbose=False)
 
-        cost_func_val = -np.log10(1-qoi['avgatefid_compsubspace_pc'])   # new cost function: infidelity
+        cost_func_val = -np.log10(1-qoi['avgatefid_compsubspace_pc'])   
+
 
         return cost_func_val, qoi['phi_cond'], qoi['L1']*100, qoi['L2']*100, qoi['avgatefid_pc']*100, \
                      qoi['avgatefid_compsubspace_pc']*100, qoi['phase_q0'], qoi['phase_q1'], \
