@@ -51,7 +51,7 @@ build base image:manual:
   - /kaniko/executor
     --context $CI_PROJECT_DIR
     --dockerfile $CI_PROJECT_DIR/docker/Dockerfile.testing
-    --destination $CI_REGISTRY_IMAGE/testing:$CI_REF
+    --destination $CI_REGISTRY_IMAGE/testing:$DOCKER_TAG
     --build-arg GITHUB_PULL_USER=$GITHUB_PULL_USER
     --build-arg GITHUB_PULL_TOKEN=$GITHUB_PULL_TOKEN
     --build-arg OPENQL_REVISION=$OPENQL_REVISION
@@ -62,12 +62,13 @@ build base image:manual:
   variables:
     OPENQL_REVISION: $OPENQL_STABLE_TAG
     QCODES_REVISION: $QCODES_STABLE_TAG
+    DOCKER_TAG: $CI_REF
   # kaniko bug https://github.com/GoogleContainerTools/kaniko/issues/342
 
 .docker-testing-template-devel:
   extends: .docker-testing-template
   variables:
-    CI_REF: "develop"
+    DOCKER_TAG: "devel"
     OPENQL_REVISION: "develop"
     QCODES_REVISION: "master"
   # kaniko bug https://github.com/GoogleContainerTools/kaniko/issues/342
@@ -94,40 +95,39 @@ build develop testing image:manual:
 
 .run-tests-template:
   stage: test
-  image: registry.gitlab.com/dicarlolab/pycqed/base:latest
   variables:
     DISPLAY: ":99"
   before_script:
     - /etc/init.d/xvfb start
   script:
-    # since we have problems with docker image, we will install Qcodes and
-    # OpenQL here,
-    # BEGIN remove me later
-    - mkdir __git_repos__
-    - cd __git_repos__
-    - git clone "https://$GITHUB_PULL_USER:$GITHUB_PULL_TOKEN@github.com/QE-Lab/OpenQL" openql && \
-    - cd openql
-    - git checkout $OPENQL_REVISION
-    - python setup.py build
-    - pip install .
-    - cd ../..
-    - rm -rf __git_repos__ && \
-    - pip install --no-cache-dir git+https://github.com/QCoDeS/Qcodes.git@$QCODES_REVISION
-    # END remove me later
     - pip install .
     - py.test pycqed/tests --cov=pycqed --cov-report xml --cov-config=.coveragerc
 
 run tests stable:
+  image: registry.gitlab.com/dicarlolab/pycqed/testing:latest
   extends: .run-tests-template
   variables:
     OPENQL_REVISION: $OPENQL_STABLE_TAG
     QCODES_REVISION: $QCODES_STABLE_TAG
 
-run tests develop:
+run tests develop:on-schedule:
   extends: .run-tests-template
+  image: registry.gitlab.com/dicarlolab/pycqed/testing:devel
+  dependencies:
+    - build develop testing image:on-schedule
   variables:
     OPENQL_REVISION: "develop"
     QCODES_REVISION: "master"
   only:
     # daily
     - schedules
+
+run tests develop:manual:
+  extends: .run-tests-template
+  image: registry.gitlab.com/dicarlolab/pycqed/testing:devel
+  dependencies:
+    - build develop testing image:manual
+  variables:
+    OPENQL_REVISION: "develop"
+    QCODES_REVISION: "master"
+  when: manual
