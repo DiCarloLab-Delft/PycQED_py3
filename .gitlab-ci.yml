@@ -1,0 +1,133 @@
+image:
+  name: gcr.io/kaniko-project/executor:debug
+  entrypoint: [""]
+
+stages:
+  - build
+  - test
+
+variables:
+  OPENQL_STABLE_TAG: "0.5"
+  QCODES_STABLE_TAG: "v0.1.11"
+
+before_script:
+  - mkdir -p /root/.docker
+  - |
+    echo "{\"auths\": {
+      \"$CI_REGISTRY\": {
+        \"username\": \"gitlab-ci-token\",
+        \"password\": \"$CI_BUILD_TOKEN\"}
+      }
+    }" > /root/.docker/config.json
+  - cat /root/.docker/config.json
+  - export CI_REF=${CI_COMMIT_TAG:-latest}
+
+.docker-base-template:
+  stage: build
+  script:
+  - /kaniko/executor
+    --context $CI_PROJECT_DIR
+    --dockerfile $CI_PROJECT_DIR/docker/Dockerfile.base
+    --destination $CI_REGISTRY_IMAGE/base:$CI_REF
+
+build base image:on-schedule:
+  extends: .docker-base-template
+  only:
+    variables:
+    # For weekly schedules
+    - $SCHEDULE_FREQUENCY == "weekly"
+  # kaniko bug https://github.com/GoogleContainerTools/kaniko/issues/245
+  allow_failure: true
+
+build base image:manual:
+  extends: .docker-base-template
+  when: manual
+
+.docker-testing-template:
+  stage: build
+  # Script needs to get several arguments for Dockerfile, we pass them from
+  # environment for derivative jobs later
+  script:
+  - /kaniko/executor
+    --context $CI_PROJECT_DIR
+    --dockerfile $CI_PROJECT_DIR/docker/Dockerfile.testing
+    --destination $CI_REGISTRY_IMAGE/testing:$DOCKER_TAG
+    --build-arg GITHUB_PULL_USER=$GITHUB_PULL_USER
+    --build-arg GITHUB_PULL_TOKEN=$GITHUB_PULL_TOKEN
+    --build-arg OPENQL_REVISION=$OPENQL_REVISION
+    --build-arg QCODES_REVISION=$QCODES_REVISION
+
+.docker-testing-template-stable:
+  extends: .docker-testing-template
+  variables:
+    OPENQL_REVISION: $OPENQL_STABLE_TAG
+    QCODES_REVISION: $QCODES_STABLE_TAG
+    DOCKER_TAG: $CI_REF
+  # kaniko bug https://github.com/GoogleContainerTools/kaniko/issues/342
+
+.docker-testing-template-devel:
+  extends: .docker-testing-template
+  variables:
+    DOCKER_TAG: "devel"
+    OPENQL_REVISION: "develop"
+    QCODES_REVISION: "master"
+  # kaniko bug https://github.com/GoogleContainerTools/kaniko/issues/342
+
+build stable testing image:master:
+  extends: .docker-testing-template-stable
+  only:
+    - master@dicarlolab/pycqed
+    - tags
+
+build stable testing image:manual:
+  extends: .docker-testing-template-stable
+  when: manual
+
+build develop testing image:on-schedule:
+  extends: .docker-testing-template-devel
+  only:
+    # for daily schedules
+    - schedules
+
+build develop testing image:manual:
+  extends: .docker-testing-template-devel
+  when: manual
+
+.run-tests-template:
+  stage: test
+  variables:
+    DISPLAY: ":99"
+  before_script:
+    - /etc/init.d/xvfb start
+  script:
+    - pip install -e .
+    - py.test pycqed/tests --cov=pycqed --cov-report xml --cov-config=.coveragerc
+
+run tests stable:
+  image: registry.gitlab.com/dicarlolab/pycqed/testing:latest
+  extends: .run-tests-template
+  variables:
+    OPENQL_REVISION: $OPENQL_STABLE_TAG
+    QCODES_REVISION: $QCODES_STABLE_TAG
+
+run tests develop:on-schedule:
+  extends: .run-tests-template
+  image: registry.gitlab.com/dicarlolab/pycqed/testing:devel
+  dependencies:
+    - build develop testing image:on-schedule
+  variables:
+    OPENQL_REVISION: "develop"
+    QCODES_REVISION: "master"
+  only:
+    # daily
+    - schedules
+
+run tests develop:manual:
+  extends: .run-tests-template
+  image: registry.gitlab.com/dicarlolab/pycqed/testing:devel
+  dependencies:
+    - build develop testing image:manual
+  variables:
+    OPENQL_REVISION: "develop"
+    QCODES_REVISION: "master"
+  when: manual
