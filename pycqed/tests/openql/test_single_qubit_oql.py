@@ -57,10 +57,8 @@ try:
         def test_T1_second_excited_state(self):
             # Only test if it compiles
             p = sqo.T1_second_excited_state(times=np.arange(0, 1e-6, 20e-9),
-                       qubit_idx=0, platf_cfg=config_fn)
+                                            qubit_idx=0, platf_cfg=config_fn)
             self.assertEqual(p.name, 'T1_2nd_exc')
-
-
 
         def test_Ramsey(self):
             # Only test if it compiles
@@ -89,8 +87,6 @@ try:
                               platf_cfg=config_fn)
             self.assertEqual(p.name, 'butterfly')
 
-
-
         def test_off_on(self):
             p = sqo.off_on(0, pulse_comb='off', initialize=False,
                            platf_cfg=config_fn)
@@ -105,13 +101,11 @@ try:
                 p = sqo.off_on(0, pulse_comb='of', initialize=False,
                                platf_cfg=config_fn)
 
-
         def test_idle_error_rate_seq(self):
             p = sqo.idle_error_rate_seq(
                 [5, 8], ['0', '1', '+'], gate_duration_ns=20,
                 echo=False, qubit_idx=0, platf_cfg=config_fn)
             self.assertEqual(p.name, 'idle_error_rate')
-
 
         def test_idle_error_rate_seq_invalid_args(self):
             with self.assertRaises(ValueError):
@@ -128,7 +122,14 @@ try:
         def test_randomized_benchmarking(self):
             nr_cliffords = 2**np.arange(10)
             p = sqo.randomized_benchmarking(0, platf_cfg=config_fn,
+                                            program_name='test_RB',
                                             nr_cliffords=nr_cliffords, nr_seeds=3)
+            self.assertEqual(p.name, 'test_RB')
+
+        def test_motzoi_XY(self):
+            p = sqo.motzoi_XY(0, platf_cfg=config_fn,
+                              program_name='motzoi_test')
+            self.assertEqual(p.name, 'motzoi_test')
 
         # def test_fast_feedback_control(self):
         #     p = sqo.FastFeedbackControl(latency=200e-9,

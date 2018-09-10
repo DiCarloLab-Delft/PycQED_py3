@@ -600,13 +600,12 @@ def randomized_benchmarking(qubit_idx: int, platf_cfg: str,
     benchmarking.
     '''
     net_cliffords = [0, 3]  # Exists purely for the double curves mode
-    p = Program(pname=program_name, nqubits=platf.get_qubit_number(),
-                p=platf)
+    p = oqh.create_program(program_name, platf_cfg)
 
     i = 0
     for seed in range(nr_seeds):
         for j, n_cl in enumerate(nr_cliffords):
-            k = Kernel('RB_{}Cl_s{}'.format(n_cl, seed), p=platf)
+            k = oqh.create_kernel('RB_{}Cl_s{}'.format(n_cl, seed), p)
             if not restless:
                 k.prepz(qubit_idx)
             if cal_points and (j == (len(nr_cliffords)-4) or
@@ -625,14 +624,11 @@ def randomized_benchmarking(qubit_idx: int, platf_cfg: str,
                     n_cl, desired_net_cl=net_clifford)
                 # pulse_keys = rb.decompose_clifford_seq(cl_seq)
                 for cl in cl_seq:
-                    k.gate('cl_{}'.format(cl), qubit_idx)
+                    k.gate('cl_{}'.format(cl), [qubit_idx])
                 k.measure(qubit_idx)
             p.add_kernel(k)
-    with suppress_stdout():
-        p.compile(verbose=False)
-    # attribute get's added to program to help finding the output files
-    p.output_dir = ql.get_output_dir()
-    p.filename = join(p.output_dir, p.name + '.qisa')
+
+    p = oqh.compile(p)
     return p
 
 
@@ -647,27 +643,23 @@ def motzoi_XY(qubit_idx: int, platf_cfg: str,
     to be more easily compatible with standard detector functions and sweep pts
 
     '''
-    p = Program(pname=program_name, nqubits=platf.get_qubit_number(),
-                p=platf)
-    k = Kernel("yX", p=platf)
+    p = oqh.create_program(program_name, platf_cfg)
+
+    k = oqh.create_kernel("yX", p)
     k.prepz(qubit_idx)
-    k.gate('ry90', qubit_idx)
-    k.gate('rx180', qubit_idx)
+    k.gate('ry90', [qubit_idx])
+    k.gate('rx180', [qubit_idx])
     k.measure(qubit_idx)
     p.add_kernel(k)
 
-    k = Kernel("xY", p=platf)
+    k = oqh.create_kernel("xY", p)
     k.prepz(qubit_idx)
-    k.gate('rx90', qubit_idx)
-    k.gate('ry180', qubit_idx)
+    k.gate('rx90', [qubit_idx])
+    k.gate('ry180', [qubit_idx])
     k.measure(qubit_idx)
     p.add_kernel(k)
 
-    with suppress_stdout():
-        p.compile(verbose=False)
-    # attribute get's added to program to help finding the output files
-    p.output_dir = ql.get_output_dir()
-    p.filename = join(p.output_dir, p.name + '.qisa')
+    p = oqh.compile(p)
     return p
 
 
