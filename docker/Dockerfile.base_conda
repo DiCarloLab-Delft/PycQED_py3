@@ -11,23 +11,34 @@ RUN apt-get update && \
         gcc \
         g++ \
         make \
-        swig && \
+        swig \
+        xvfb && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 RUN conda config --add channels conda-forge && \
     conda update --all --yes && \
     conda install --yes \
-        numpy \
-        scipy \
-        pytest \
-        six \
         coverage \
-        matplotlib \
-        plotly \
-        pyserial \
         cython \
-        pyqt && \
+        h5py \
+        ipython \
+        ipywidgets \
+        jsonschema \
+        lmfit \
+        matplotlib \
+        numpy \
+        plotly \
+        pyqtgraph \
+        pyserial \
+        pyvisa \
+        pyzmq \
+        scipy \
+        six \
+        sip \
+        pyqt \
+        pytest \
+        qtpy && \
     conda clean --all --yes && \
     pip install --upgrade --no-cache-dir pip && \
     pip install --no-cache-dir \

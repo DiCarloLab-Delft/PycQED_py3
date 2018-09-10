@@ -8,6 +8,7 @@ stages:
 
 variables:
   OPENQL_STABLE_TAG: "0.5"
+  QCODES_STABLE_TAG: "v0.1.11"
 
 before_script:
   - mkdir -p /root/.docker
@@ -52,39 +53,84 @@ build base conda image:manual:
       --build-arg GITHUB_PULL_USER=$GITHUB_PULL_USER
       --build-arg GITHUB_PULL_TOKEN=$GITHUB_PULL_TOKEN
       --build-arg OPENQL_REVISION=$OPENQL_REVISION
+      --build-arg QCODES_REVISION=$QCODES_REVISION
 
-build stable conda image:master:
+.docker-conda-stable-template:
   extends: .docker-conda-template
   variables:
     OPENQL_REVISION: $OPENQL_STABLE_TAG
+    QCODES_REVISION: $QCODES_STABLE_TAG
+  # kaniko bug https://github.com/GoogleContainerTools/kaniko/issues/342
+  allow_failure: true
+
+.docker-conda-develop-template:
+  extends: .docker-conda-template
+  variables:
+    CI_REF: "develop"
+    OPENQL_REVISION: "develop"
+    QCODES_REVISION: "master"
+  # kaniko bug https://github.com/GoogleContainerTools/kaniko/issues/342
+  allow_failure: true
+
+build stable conda image:master:
+  extends: .docker-conda-stable-template
   only:
     - master@dicarlolab/pycqed
     - tags
 
 build stable conda image:manual:
-  extends: .docker-conda-template
-  variables:
-    OPENQL_REVISION: $OPEQL_STABLE_TAG
+  extends: .docker-conda-stable-template
   when: manual
-  # kaniko bug https://github.com/GoogleContainerTools/kaniko/issues/342
-  allow_failure: true
 
 build develop conda image:on-schedule:
-  extends: .docker-conda-template
-  variables:
-    CI_REF: "openql_develop"
-    OPENQL_REVISION: "develop"
+  extends: .docker-conda-develop-template
   only:
     # for daily schedules
     - schedules
-  # kaniko bug https://github.com/GoogleContainerTools/kaniko/issues/342
-  allow_failure: true
 
 build develop conda image:manual:
-  extends: .docker-conda-template
-  variables:
-    CI_REF: "openql_develop"
-    OPENQL_REVISION: "develop"
+  extends: .docker-conda-develop-template
   when: manual
-  # kaniko bug https://github.com/GoogleContainerTools/kaniko/issues/342
-  allow_failure: true
+
+.run-tests-template:
+  stage: test
+  image: registry.gitlab.com/dicarlolab/pycqed/base_conda:latest
+  variables:
+    DISPLAY: ":99"
+  before_script:
+    - /usr/bin/Xvfb :99 -screen 0 1280x1024x24 &
+    - sleep 3
+  script:
+    # since we have problems with docker image, we will install Qcodes and
+    # OpenQL here,
+    # BEGIN remove me later
+    - mkdir __git_repos__
+    - cd __git_repos__
+    - git clone "https://$GITHUB_PULL_USER:$GITHUB_PULL_TOKEN@github.com/QE-Lab/OpenQL" openql && \
+    - cd openql
+    - git checkout $OPENQL_REVISION
+    - python setup.py build
+    - pip install .
+    - cd ../..
+    - rm -rf __git_repos__/openql && \
+    - pip install --no-cache-dir git+https://github.com/QCoDeS/Qcodes.git@$QCODES_REVISION
+    # END remove me later
+    - pip install .
+    - py.test pycqed/tests --cov=pycqed --cov-report xml --cov-config=.coveragerc
+  after_script:
+    - killall Xvfb
+
+run tests stable:
+  extends: .run-tests-template
+  variables:
+    OPENQL_REVISION: $OPENQL_STABLE_TAG
+    QCODES_REVISION: $QCODES_STABLE_TAG
+
+run tests develop:
+  extends: .run-tests-template
+  variables:
+    OPENQL_REVISION: "develop"
+    QCODES_REVISION: "master"
+  only:
+    # daily
+    - schedules
