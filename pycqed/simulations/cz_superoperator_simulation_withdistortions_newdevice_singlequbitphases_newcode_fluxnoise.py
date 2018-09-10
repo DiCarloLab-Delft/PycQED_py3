@@ -870,6 +870,12 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         eps_i = self.fluxlutman.calc_amp_to_eps(0, state_A='11', state_B='02')
         self.theta_i = wfl.eps_to_theta(eps_i, g=self.fluxlutman.q_J2())           # Beware theta in radian!
 
+
+        # sample flux bias from a Gaussian, in units of the flux quantum
+        mean = 0
+        sigma = 4e-6    # 4e-6 is the same value as in the surface-17 paper of tom&brian
+        self.fluxbias = np.random.normal(mean,sigma)
+
         if not self.fluxlutman.czd_double_sided():
             thetawave = wfl.martinis_flux_pulse(
                 length=self.fluxlutman.cz_length(),
@@ -882,6 +888,15 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             amp = self.fluxlutman.calc_eps_to_amp(epsilon, state_A='11', state_B='02')
                      # transform detuning frequency to (positive) amplitude
             f_pulse = self.fluxlutman.calc_amp_to_freq(amp,'01')
+
+            omega_0 = self.fluxlutman.calc_amp_to_freq(0,'01')
+            f_pulse_new = f_pulse - np.pi/2*(omega_0**2/f_pulse**2-1) * self.fluxbias
+            amp = self.fluxlutman.calc_freq_to_amp(f_pulse,state='01')
+
+            # plot(x_plot_vec=[tlist*1e9],
+            #       y_plot_vec=[f_pulse/1e9,f_pulse_new/1e9],
+            #       title='Freq. of fluxing qubit w/o flux bias',
+            #       xlabel='Time (ns)',ylabel='Freq. (GHz)',legend_labels=['without','with'])
         else:
             f_pulse,amp = self.get_f_pulse_double_sided()
             
@@ -1043,6 +1058,10 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                      # transform detuning frequency to positive amplitude
         f_pulse_A = self.fluxlutman.calc_amp_to_freq(amp_A,'01')
 
+        omega_0 = self.fluxlutman.calc_amp_to_freq(0,'01')
+        f_pulse_A = f_pulse_A - np.pi/2*(omega_0**2/f_pulse_A**2-1) * self.fluxbias
+        amp_A = self.fluxlutman.calc_freq_to_amp(f_pulse_A,state='01')
+
 
         # Generate the second CZ pulse. If the params are np.nan, default
         # to the main parameter
@@ -1071,6 +1090,9 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         amp_B = self.fluxlutman.calc_eps_to_amp(epsilon_B, state_A='11', state_B='02', positive_branch=False)
                      # transform detuning frequency to negative amplitude
         f_pulse_B = self.fluxlutman.calc_amp_to_freq(amp_B,'01')
+
+        f_pulse_B = f_pulse_B - np.pi/2*(omega_0**2/f_pulse_B**2-1) * self.fluxbias * (-1)
+        amp_B = self.fluxlutman.calc_freq_to_amp(f_pulse_B,state='01',positive_branch=False)
 
 
         # N.B. No amp scaling and offset present
