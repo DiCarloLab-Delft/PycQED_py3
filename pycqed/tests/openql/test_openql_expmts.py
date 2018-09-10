@@ -1,6 +1,5 @@
 import os
 import unittest
-import numpy as np
 
 try:
     from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
@@ -17,7 +16,7 @@ try:
     config_fn = os.path.join(curdir, 'test_cfg_CCL.json')
 
     output_dir = os.path.join(curdir, 'test_output')
-    ql.set_output_dir(output_dir)
+    ql.set_option('output_dir', output_dir)
 
     class Test_configuration_files(unittest.TestCase):
 
@@ -26,10 +25,18 @@ try:
             generate_config(filename=test_config_fn,
                             mw_pulse_duration=20, ro_duration=300,
                             init_duration=200000)
+
             # If this compiles we conclude that the generated config is valid
+            # A single qubit sequence
             sqo.AllXY(qubit_idx=0, platf_cfg=test_config_fn)
+            # A sequence containing two-qubit gates
             mqo.single_flux_pulse_seq(qubit_indices=(2, 0),
                                       platf_cfg=test_config_fn)
+            # A sequence containing controlled operations
+            sqo.RTE(qubit_idx=0,
+                    sequence_type='echo', net_gate='pi', feedback=True,
+                    platf_cfg=test_config_fn)
+
 
 
 
@@ -85,6 +92,8 @@ try:
 
 
 except ImportError as e:
+    print(e)
+    raise(e)
     class TestMissingDependency(unittest.TestCase):
 
         @unittest.skip('Missing dependency - ' + str(e))

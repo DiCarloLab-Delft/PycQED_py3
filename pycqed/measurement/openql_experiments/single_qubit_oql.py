@@ -1,7 +1,7 @@
 import numpy as np
 from os.path import join
 import openql.openql as ql
-from openql.openql import Program, Kernel, Platform
+from openql.openql import Program, Kernel
 from pycqed.utilities.general import suppress_stdout
 from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
 
@@ -520,7 +520,9 @@ def RTE(qubit_idx: int, sequence_type: str, platf_cfg: str,
         qubit_idx             (int) :
         sequence_type ['echo'|'pi'] :
         net_gate         ['i'|'pi'] :
-        feedback             (bool) :
+        feedback             (bool) : if last measurement == 1, then apply
+            an extra pi-pulse. N.B. more options for fast feedback should be
+            added.
 
     N.B. there is some hardcoded stuff in here (such as rest times).
     It should be better documented what this is and what it does.
@@ -547,7 +549,7 @@ def RTE(qubit_idx: int, sequence_type: str, platf_cfg: str,
             raise ValueError('net_gate ({})should be "i" or "pi"'.format(
                 net_gate))
         if feedback:
-            k.gate('Crx180', [qubit_idx])
+            k.gate('C1rx180', [qubit_idx])
     elif sequence_type == 'pi':
         if net_gate == 'pi':
             k.gate('rx180', [qubit_idx])
@@ -557,7 +559,7 @@ def RTE(qubit_idx: int, sequence_type: str, platf_cfg: str,
             raise ValueError('net_gate ({})should be "i" or "pi"'.format(
                 net_gate))
         if feedback:
-            k.gate('Crx180', [qubit_idx])
+            k.gate('C1rx180', [qubit_idx])
     else:
         raise ValueError('sequence_type ({})should be "echo" or "pi"'.format(
             sequence_type))

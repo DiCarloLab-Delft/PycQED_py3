@@ -335,7 +335,7 @@ def generate_config(filename: str,
                 "cc_light_codeword": cw,
                 "cc_light_opcode": 8+cw}
 
-            cfg["instructions"]['C1'+instr.format(q)] = {
+            cfg["instructions"]['c1'+instr.format(q)] = {
                 "duration": mw_pulse_duration,
                 "latency": mw_latency,
                 "qubits": [q],
@@ -349,7 +349,7 @@ def generate_config(filename: str,
                 "cc_light_opcode": 32+8+cw,
                 "cc_light_cond": 1}  # 1 means : do if last meas. == 1
 
-            cfg["instructions"]['C0'+instr.format(q)] = {
+            cfg["instructions"]['c0'+instr.format(q)] = {
                 "duration": mw_pulse_duration,
                 "latency": mw_latency,
                 "qubits": [q],

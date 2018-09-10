@@ -1,6 +1,7 @@
 from os.path import join
 import numpy as np
 from pycqed.utilities.general import int2base
+import pycqed.measurement.openql_experiments.openql_helpers as oqh
 import openql.openql as ql
 from pycqed.utilities.general import suppress_stdout
 from openql.openql import Program, Kernel, Platform
@@ -9,28 +10,23 @@ from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
 
 def single_flux_pulse_seq(qubit_indices: tuple,
                           platf_cfg: str):
-    platf = Platform('OpenQL_Platform', platf_cfg)
-    p = Program(pname="single_flux_pulse_seq",
-                nqubits=platf.get_qubit_number(),
-                p=platf)
 
-    k = Kernel("main", p=platf)
+    p = oqh.create_program("single_flux_pulse_seq", platf_cfg)
+
+    k = oqh.create_kernel("main", p)
     for idx in qubit_indices:
         k.prepz(idx)  # to ensure enough separation in timing
         k.prepz(idx)  # to ensure enough separation in timing
         k.prepz(idx)  # to ensure enough separation in timing
 
     for i in range(7):
-        k.gate('CW_00', i)
+        k.gate('CW_00', [i])
 
     k.gate("wait", [0, 1, 2, 3, 4, 5, 6], 0)
-    k.gate('fl_cw_02', qubit_indices[0], qubit_indices[1])
+    k.gate('fl_cw_02', [qubit_indices[0], qubit_indices[1]])
     p.add_kernel(k)
-    with suppress_stdout():
-        p.compile()
-    # attribute is added to program to help finding the output files
-    p.output_dir = ql.get_output_dir()
-    p.filename = join(p.output_dir, p.name + '.qisa')
+
+    p = oqh.compile(p)
     return p
 
 
