@@ -4,8 +4,6 @@ import numpy as np
 
 try:
     from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
-    from pycqed.measurement.openql_experiments import multi_qubit_oql as mqo
-    from pycqed.measurement.openql_experiments import clifford_rb_oql as rb_oql
     from pycqed.measurement.openql_experiments.generate_CCL_cfg import  \
         generate_config
     from pycqed.measurement.openql_experiments.pygsti_oql import \
@@ -17,20 +15,20 @@ try:
     config_fn = os.path.join(curdir, 'test_cfg_CCL.json')
 
     output_dir = os.path.join(curdir, 'test_output')
-    # ql.set_output_dir(output_dir)
     ql.set_option('output_dir', output_dir)
-
 
     class Test_single_qubit_seqs_CCL(unittest.TestCase):
 
-
         def test_CW_tone(self):
-            sqo.CW_tone(qubit_idx=1,
-                                        platf_cfg=config_fn)
+            p = sqo.CW_tone(qubit_idx=1,
+                        platf_cfg=config_fn)
+            self.assertEqual(p.name, 'CW_tone')
 
-        # def test_vsm_timing_cal_sequence(self):
-        #     sqo.vsm_timing_cal_sequence(qubit_idx=1,
-        #                                 platf_cfg=config_fn)
+
+        def test_vsm_timing_cal_sequence(self):
+            p = sqo.vsm_timing_cal_sequence(qubit_idx=1,
+                                        platf_cfg=config_fn)
+            self.assertEqual(p.name, 'vsm_timing_cal_sequence')
 
         # def test_CW_RO_seq(self):
         #     sqo.CW_RO_sequence(qubit_idx=0, platf_cfg=config_fn)
@@ -93,4 +91,3 @@ except ImportError as e:
         @unittest.skip('Missing dependency - ' + str(e))
         def test_fail(self):
             pass
-

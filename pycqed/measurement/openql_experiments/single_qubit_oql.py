@@ -13,23 +13,11 @@ def CW_tone(qubit_idx: int, platf_cfg: str):
     This is a sequence that goes a bit against the paradigm of openql.
     """
     p = oqh.create_program('CW_tone', platf_cfg)
-    # platf = Platform('OpenQL_Platform', platf_cfg)
-    # p = Program(pname="CW_tone",
-    #             nqubits=platf.get_qubit_number(),
-    #             p=platf)
     k = oqh.create_kernel("Main", p)
-
-    # k = Kernel("main", p=p.platf)
     for i in range(40):
         k.gate('square', [qubit_idx])
     p.add_kernel(k)
-
     p = oqh.compile(p)
-
-    # with suppress_stdout():
-    #     p.compile(verbose=False)
-    # p.output_dir = ql.get_output_dir()
-    # p.filename = join(p.output_dir, p.name + '.qisa')
     return p
 
 
@@ -41,20 +29,12 @@ def vsm_timing_cal_sequence(qubit_idx: int, platf_cfg: str):
     This can be used as a reference.
 
     """
-    platf = Platform('OpenQL_Platform', platf_cfg)
-    p = Program(pname="vsm_timing_cal_sequence",
-                nqubits=platf.get_qubit_number(),
-                p=platf)
-
-    k = Kernel("main", p=platf)
+    p = oqh.create_program('vsm_timing_cal_sequence', platf_cfg)
+    k = oqh.create_kernel("Main", p)
     k.prepz(qubit_idx)  # to ensure enough separation in timing
-    k.gate('spec', qubit_idx)
+    k.gate('spec', [qubit_idx])
     p.add_kernel(k)
-    with suppress_stdout():
-        p.compile(verbose=False)
-    # attribute get's added to program to help finding the output files
-    p.output_dir = ql.get_output_dir()
-    p.filename = join(p.output_dir, p.name + '.qisa')
+    p = oqh.compile(p)
     return p
 
 
