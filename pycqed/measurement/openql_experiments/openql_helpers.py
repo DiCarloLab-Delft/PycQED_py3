@@ -2,6 +2,7 @@
 
 """
 import re
+import numpy as np
 from os.path import join, dirname
 from pycqed.utilities.general import suppress_stdout
 import matplotlib.pyplot as plt
@@ -71,6 +72,47 @@ def compile(p):
 
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
+
+
+#############################################################################
+# Calibration points
+#############################################################################
+def add_single_qubit_cal_points(p, qubit_idx,
+                                f_state_cal_pts: bool=False):
+    """
+    Adds single qubit calibration points to an OpenQL program
+
+    Args:
+        p
+        platf
+        qubit_idx
+    """
+
+    for i in np.arange(2):
+        k = create_kernel("cal_gr_"+str(i), program=p)
+        k.prepz(qubit_idx)
+        k.measure(qubit_idx)
+        p.add_kernel(k)
+
+    for i in np.arange(2):
+        k = create_kernel("cal_ex_"+str(i), program=p)
+        k.prepz(qubit_idx)
+        k.gate('rx180', [qubit_idx])
+        k.measure(qubit_idx)
+        p.add_kernel(k)
+    if f_state_cal_pts:
+        for i in np.arange(2):
+            k = create_kernel("cal_f_"+str(i), program=p)
+            k.prepz(qubit_idx)
+            k.gate('rx180', [qubit_idx])
+            k.gate('rx12', [qubit_idx])
+            k.measure(qubit_idx)
+            p.add_kernel(k)
+    return p
+
+#############################################################################
+# File modifications
+#############################################################################
 
 
 def clocks_to_s(time, clock_cycle=20e-9):

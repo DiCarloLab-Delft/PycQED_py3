@@ -144,3 +144,9 @@ class Test_openql_compiler_helpers(unittest.TestCase):
 
         self.assertEqual(fn_split[0], ql.get_option('output_dir'))
         self.assertEqual(fn_split[1], 'test_program.qisa')
+
+
+class Test_openql_calibration_point_helpers(unittest.TestCase):
+
+    def test_add_single_qubit_cal_points(self):
+        raise NotImplementedError()
