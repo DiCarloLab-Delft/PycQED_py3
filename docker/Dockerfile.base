@@ -55,6 +55,12 @@ RUN pip install --upgrade --no-cache-dir pip && \
         websockets \
         zhinst
 
+RUN pip install --no-cache-dir \
+        coverage \
+        pytest-cov \
+        coveralls \
+        codacy-coverage
+
 ADD docker/xvfb_init /etc/init.d/xvfb
 ADD docker/xvfb-daemon-run /usr/bin/xvfb-daemon-run
 RUN chmod a+x /etc/init.d/xvfb && \
