@@ -100,7 +100,7 @@ build develop testing image:manual:
   before_script:
     - /etc/init.d/xvfb start
   script:
-    - pip install .
+    - pip install -e .
     - py.test pycqed/tests --cov=pycqed --cov-report xml --cov-config=.coveragerc
 
 run tests stable:
