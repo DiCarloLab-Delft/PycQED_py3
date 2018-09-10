@@ -1,4 +1,4 @@
-FROM continuumio/miniconda3:latest
+FROM python:3.6-stretch
 MAINTAINER Viacheslav Ostroukh <V.Ostroukh@tudelft.nl>
 
 # make our environment sane
@@ -16,43 +16,43 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-RUN conda config --add channels conda-forge && \
-    conda update --all --yes && \
-    conda install --yes \
-        adaptive \
-        coverage \
-        cython \
-        h5py \
-        ipython \
-        ipywidgets \
-        jsonschema \
-        lmfit \
+RUN pip install --upgrade --no-cache-dir pip && \
+    pip install --no-cache-dir Cython \
         # required by qcodes-0.1.11
         "matplotlib<2.3" \
         # required by qcodes-0.1.11
         "numpy<1.14" \
         plotly \
-        pyqtgraph \
-        pyserial \
-        pyvisa \
-        pyzmq \
-        qutip \
+        PyQt5 \
         scipy \
-        six \
-        sip \
-        pandas \
-        pyqt \
-        pytest \
-        qtpy \
-        websockets && \
-    conda clean --all --yes && \
-    pip install --upgrade --no-cache-dir pip && \
+        pandas && \
     pip install --no-cache-dir \
+        adaptive \
         autodepgraph \
         cma \
+        coverage \
+        h5py \
         hsluv \
-        pygsti \
+        httplib2 \
+        ipython \
+        ipywidgets \
+        jsonschema \
+        lmfit \
+        networkx \
         spirack \
+        pyzmq \
+        pygsti \
+        pyqtgraph \
+        pyserial \
+        pytest \
+        pyvisa \
+        qutip \
+        qtpy \
+        six \
+        sip \
+        sklearn \
+        spirack \
+        websockets \
         zhinst
 
 ADD docker/xvfb_init /etc/init.d/xvfb

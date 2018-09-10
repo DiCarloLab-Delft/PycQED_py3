@@ -22,84 +22,83 @@ before_script:
   - cat /root/.docker/config.json
   - export CI_REF=${CI_COMMIT_TAG:-latest}
 
-.docker-base-conda-template:
+.docker-base-template:
   stage: build
   script:
-    - /kaniko/executor
-      --context $CI_PROJECT_DIR
-      --dockerfile $CI_PROJECT_DIR/docker/Dockerfile.base_conda
-      --destination $CI_REGISTRY_IMAGE/base_conda:$CI_REF
+  - /kaniko/executor
+    --context $CI_PROJECT_DIR
+    --dockerfile $CI_PROJECT_DIR/docker/Dockerfile.base
+    --destination $CI_REGISTRY_IMAGE/base:$CI_REF
 
-build base conda image:on-schedule:
-  extends: .docker-base-conda-template
+build base image:on-schedule:
+  extends: .docker-base-template
   only:
     variables:
-      # For weekly schedules
-      - $SCHEDULE_FREQUENCY == "weekly"
+    # For weekly schedules
+    - $SCHEDULE_FREQUENCY == "weekly"
   # kaniko bug https://github.com/GoogleContainerTools/kaniko/issues/245
   allow_failure: true
 
-build base conda image:manual:
-  extends: .docker-base-conda-template
+build base image:manual:
+  extends: .docker-base-template
   when: manual
 
-.docker-conda-template:
+.docker-testing-template:
   stage: build
+  # Script needs to get several arguments for Dockerfile, we pass them from
+  # environment for derivative jobs later
   script:
-    - /kaniko/executor
-      --context $CI_PROJECT_DIR
-      --dockerfile $CI_PROJECT_DIR/docker/Dockerfile.conda
-      --destination $CI_REGISTRY_IMAGE/testing_conda:$CI_REF
-      --build-arg GITHUB_PULL_USER=$GITHUB_PULL_USER
-      --build-arg GITHUB_PULL_TOKEN=$GITHUB_PULL_TOKEN
-      --build-arg OPENQL_REVISION=$OPENQL_REVISION
-      --build-arg QCODES_REVISION=$QCODES_REVISION
+  - /kaniko/executor
+    --context $CI_PROJECT_DIR
+    --dockerfile $CI_PROJECT_DIR/docker/Dockerfile.testing
+    --destination $CI_REGISTRY_IMAGE/testing:$CI_REF
+    --build-arg GITHUB_PULL_USER=$GITHUB_PULL_USER
+    --build-arg GITHUB_PULL_TOKEN=$GITHUB_PULL_TOKEN
+    --build-arg OPENQL_REVISION=$OPENQL_REVISION
+    --build-arg QCODES_REVISION=$QCODES_REVISION
 
-.docker-conda-stable-template:
-  extends: .docker-conda-template
+.docker-testing-template-stable:
+  extends: .docker-testing-template
   variables:
     OPENQL_REVISION: $OPENQL_STABLE_TAG
     QCODES_REVISION: $QCODES_STABLE_TAG
   # kaniko bug https://github.com/GoogleContainerTools/kaniko/issues/342
-  allow_failure: true
 
-.docker-conda-develop-template:
-  extends: .docker-conda-template
+.docker-testing-template-devel:
+  extends: .docker-testing-template
   variables:
     CI_REF: "develop"
     OPENQL_REVISION: "develop"
     QCODES_REVISION: "master"
   # kaniko bug https://github.com/GoogleContainerTools/kaniko/issues/342
-  allow_failure: true
 
-build stable conda image:master:
-  extends: .docker-conda-stable-template
+build stable testing image:master:
+  extends: .docker-testing-template-stable
   only:
     - master@dicarlolab/pycqed
     - tags
 
-build stable conda image:manual:
-  extends: .docker-conda-stable-template
+build stable testing image:manual:
+  extends: .docker-testing-template-stable
   when: manual
 
-build develop conda image:on-schedule:
-  extends: .docker-conda-develop-template
+build develop testing image:on-schedule:
+  extends: .docker-testing-template-devel
   only:
     # for daily schedules
     - schedules
 
-build develop conda image:manual:
-  extends: .docker-conda-develop-template
+build develop testing image:manual:
+  extends: .docker-testing-template-devel
   when: manual
 
 .run-tests-template:
   stage: test
-  image: registry.gitlab.com/dicarlolab/pycqed/base_conda:latest
+  image: registry.gitlab.com/dicarlolab/pycqed/base:latest
   variables:
     DISPLAY: ":99"
   before_script:
-    - /usr/bin/Xvfb :99 -screen 0 1280x1024x24 &
-    - sleep 3
+    - /etc/init.d/xvfb start
   script:
     # since we have problems with docker image, we will install Qcodes and
     # OpenQL here,
@@ -112,13 +111,11 @@ build develop conda image:manual:
     - python setup.py build
     - pip install .
     - cd ../..
-    - rm -rf __git_repos__/openql && \
+    - rm -rf __git_repos__ && \
     - pip install --no-cache-dir git+https://github.com/QCoDeS/Qcodes.git@$QCODES_REVISION
     # END remove me later
     - pip install .
     - py.test pycqed/tests --cov=pycqed --cov-report xml --cov-config=.coveragerc
-  after_script:
-    - killall Xvfb
 
 run tests stable:
   extends: .run-tests-template
