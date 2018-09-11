@@ -1,15 +1,15 @@
-import unittest
 import pycqed as pq
 import os
 from pycqed.analysis import measurement_analysis as ma
+from numpy.testing import assert_almost_equal
 
 
-class Test_SSRO_discrimination_analysis(unittest.TestCase):
+class TestSSRODiscriminationAnalysis:
 
     @classmethod
-    def setUpClass(self):
-        self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
-        ma.a_tools.datadir = self.datadir
+    def setup_class(cls):
+        cls.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
+        ma.a_tools.datadir = cls.datadir
 
     def test_butterfly_postselected(self):
         # Test the correct file is loaded
@@ -18,8 +18,8 @@ class Test_SSRO_discrimination_analysis(unittest.TestCase):
                                   threshold=0.5,
                                   digitize=False, case=True)
 
-        self.assertAlmostEqual(a.butterfly_coeffs['F_a_butterfly'],
-                               0.7998, places=3)
+        assert_almost_equal(a.butterfly_coeffs['F_a_butterfly'], 0.7998,
+                            decimal=3)
 
     def test_butterfly_simple(self):
         # Test the correct file is loaded
@@ -28,5 +28,5 @@ class Test_SSRO_discrimination_analysis(unittest.TestCase):
                                   threshold=0.5,
                                   digitize=False, case=True)
 
-        self.assertAlmostEqual(a.butterfly_coeffs['F_a_butterfly'],
-                               0.819, places=3)
+        assert_almost_equal(a.butterfly_coeffs['F_a_butterfly'], 0.819,
+                            decimal=3)
