@@ -150,3 +150,9 @@ class Test_openql_calibration_point_helpers(unittest.TestCase):
 
     def test_add_single_qubit_cal_points(self):
         raise NotImplementedError()
+
+    def test_add_two_q_cal_points(self):
+        raise NotImplementedError()
+
+    def test_add_multi_q_cal_points(self):
+        raise NotImplementedError()

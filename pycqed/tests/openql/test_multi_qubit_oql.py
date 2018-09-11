@@ -1,0 +1,132 @@
+import os
+import unittest
+import numpy as np
+
+try:
+    from pycqed.measurement.openql_experiments import multi_qubit_oql as mqo
+    from pycqed.measurement.openql_experiments.generate_CCL_cfg import  \
+        generate_config
+    from pycqed.measurement.openql_experiments.pygsti_oql import \
+        poor_mans_2q_gst, single_qubit_gst
+    from openql import openql as ql
+
+    rootDir = os.path.dirname(os.path.realpath(__file__))
+    curdir = os.path.dirname(__file__)
+    config_fn = os.path.join(curdir, 'test_cfg_CCL.json')
+
+    output_dir = os.path.join(curdir, 'test_output')
+    ql.set_option('output_dir', output_dir)
+
+    class Test_multi_qubit_oql(unittest.TestCase):
+
+        def test_single_flux_pulse_seq(self):
+            # N.B. edge 0,2 is still illegal...
+            p = mqo.single_flux_pulse_seq([2, 0], platf_cfg=config_fn)
+            self.assertEqual(p.name, 'single_flux_pulse_seq')
+
+        def test_flux_staircase_seq(self):
+            p = mqo.flux_staircase_seq(platf_cfg=config_fn)
+            self.assertEqual(p.name, 'flux_staircase_seq')
+
+        def test_multi_qubit_off_on(self):
+            p = mqo.multi_qubit_off_on(qubits=[0, 1, 4],
+                                       initialize=True,
+                                       second_excited_state=True,
+                                       platf_cfg=config_fn)
+            self.assertEqual(p.name, 'multi_qubit_off_on')
+
+        def test_Ramsey_msmt_induced_dephasing(self):
+            p = mqo.Ramsey_msmt_induced_dephasing([3, 5], angles=[20, 40, 80],
+                                                  platf_cfg=config_fn)
+            self.assertEqual(p.name, 'Ramsey_msmt_induced_dephasing')
+
+        def test_echo_msmt_induced_dephasing(self):
+            p = mqo.echo_msmt_induced_dephasing([3, 5], angles=[20, 40, 80],
+                                                platf_cfg=config_fn)
+            self.assertEqual(p.name, 'echo_msmt_induced_dephasing')
+
+        def test_two_qubit_off_on(self):
+            p = mqo.two_qubit_off_on(3, 5, platf_cfg=config_fn)
+            self.assertEqual(p.name, 'two_qubit_off_on')
+
+        def test_two_qubit_tomo_cardinal(self):
+            p = mqo.two_qubit_tomo_cardinal(cardinal=3,
+                                            q0=0, q1=1, platf_cfg=config_fn)
+            self.assertEqual(p.name, 'two_qubit_tomo_cardinal')
+
+        def test_two_qubit_AllXY(self):
+            p = mqo.two_qubit_AllXY(q0=0, q1=1, platf_cfg=config_fn,
+                                    sequence_type='sequential',
+                                    replace_q1_pulses_X180=False,
+                                    double_points=True)
+            self.assertEqual(p.name, 'two_qubit_AllXY')
+            p = mqo.two_qubit_AllXY(q0=0, q1=1, platf_cfg=config_fn,
+                                    sequence_type='simultaneous',
+                                    replace_q1_pulses_X180=False,
+                                    double_points=True)
+            self.assertEqual(p.name, 'two_qubit_AllXY')
+
+        def test_residual_coupling_sequence(self):
+            p = mqo.residual_coupling_sequence(
+                times=np.arange(0, 100e-9, 20e-9),
+                q0=0, q1=1, platf_cfg=config_fn)
+            self.assertEqual(p.name, 'residual_coupling_sequence')
+
+        def test_Cryoscope(self):
+            p = mqo.Cryoscope(
+                qubit_idx=0, platf_cfg=config_fn)
+            self.assertEqual(p.name, 'Cryoscope')
+
+        def test_CryoscopeGoogle(self):
+            p = mqo.CryoscopeGoogle(
+                qubit_idx=0, buffer_time1=50e-9,
+                times=np.arange(0, 100e-9, 20e-9),
+                platf_cfg=config_fn)
+            self.assertEqual(p.name, 'CryoscopeGoogle')
+
+        def test_Chevron_hack(self):
+            p = mqo.Chevron_hack(
+                qubit_idx=0, qubit_idx_spec=2,
+                buffer_time=0, buffer_time2=0,
+                platf_cfg=config_fn)
+            self.assertEqual(p.name, 'Chevron_hack')
+
+        def test_Chevron(self):
+            for target_qubit_sequence in ['ramsey', 'excited', 'ground']:
+                p = mqo.Chevron(
+                    qubit_idx=0,
+                    qubit_idx_spec=2,
+                    buffer_time=0, buffer_time2=0, flux_cw=2,
+                    target_qubit_sequence=target_qubit_sequence,
+                    platf_cfg=config_fn)
+                self.assertEqual(p.name, 'Chevron')
+
+        def test_two_qubit_ramsey(self):
+            for target_qubit_sequence in ['ramsey', 'excited', 'ground']:
+                p = mqo.two_qubit_ramsey(
+                    qubit_idx=0,
+                    times=np.arange(0, 100e-9, 20e-9),
+                    qubit_idx_spec=2,
+                    target_qubit_sequence=target_qubit_sequence,
+                    platf_cfg=config_fn)
+                self.assertEqual(p.name, 'two_qubit_ramsey')
+
+
+        def test_two_qubit_tomo_bell(self):
+            for bell_state in [0, 1, 2, 3]:
+                p = mqo.two_qubit_tomo_bell(
+                    q0=0,
+                    q1=2,
+                    bell_state=bell_state,
+                    platf_cfg=config_fn)
+                self.assertEqual(p.name, 'two_qubit_tomo_bell')
+
+
+
+except ImportError as e:
+
+    class Test_multi_qubit_oql(unittest.TestCase):
+
+        @unittest.skip('Missing dependency - ' + str(e))
+        def test_fail(self):
+            pass

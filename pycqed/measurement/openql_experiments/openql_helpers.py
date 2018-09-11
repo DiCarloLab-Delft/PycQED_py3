@@ -110,6 +110,76 @@ def add_single_qubit_cal_points(p, qubit_idx,
             p.add_kernel(k)
     return p
 
+
+def add_two_q_cal_points(p, q0: int, q1: int,
+                         reps_per_cal_pt: int =1):
+    """
+    Returns a list of kernels containing calibration points for two qubits
+
+    Args:
+        p               : OpenQL  program to add calibration points to
+        q0, q1          : ints of two qubits
+        reps_per_cal_pt : number of times to repeat each cal point
+    Returns:
+        kernel_list     : list containing kernels for the calibration points
+    """
+    kernel_list = []
+    combinations = (["00"]*reps_per_cal_pt +
+                    ["01"]*reps_per_cal_pt +
+                    ["10"]*reps_per_cal_pt +
+                    ["11"]*reps_per_cal_pt)
+    for i, comb in enumerate(combinations):
+        k = create_kernel('cal{}_{}'.format(i, comb), p)
+        k.prepz(q0)
+        k.prepz(q1)
+        if comb[0] == '1':
+            k.gate('rx180', [q0])
+        else:
+            k.gate('i', [q0])
+        if comb[1] == '1':
+            k.gate('rx180', [q1])
+        else:
+            k.gate('i', [q1])
+        # Used to ensure timing is aligned
+        k.gate('wait', [q0, q1], 0)
+        k.measure(q0)
+        k.measure(q1)
+        k.gate('wait', [q0, q1], 0)
+        kernel_list.append(k)
+        p.add_kernel(k)
+
+    return p
+
+
+def add_multi_q_cal_points(p, platf, qubits: list,
+                           combinations: list):
+    """
+    Adds calibration points based on a list of state combinations
+    """
+    kernel_list = []
+    for i, comb in enumerate(combinations):
+        k = Kernel('cal{}_{}'.format(i, comb), p=platf)
+        for q in qubits:
+            k.prepz(q)
+
+        for j, q in enumerate(qubits):
+            if comb[j] == '1':
+                k.gate('rx180', q)
+            elif comb[j] == '2':
+                k.gate('rx180', q)
+                k.gate('rx12', q)
+            else:
+                pass
+        # Used to ensure timing is aligned
+        k.gate('wait', qubits, 0)
+        for q in qubits:
+            k.measure(q)
+        k.gate('wait', qubits, 0)
+        kernel_list.append(k)
+        p.add_kernel(k)
+    return p
+
+
 #############################################################################
 # File modifications
 #############################################################################

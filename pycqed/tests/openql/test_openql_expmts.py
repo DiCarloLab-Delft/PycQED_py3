@@ -37,37 +37,6 @@ try:
                     sequence_type='echo', net_gate='pi', feedback=True,
                     platf_cfg=test_config_fn)
 
-
-
-
-    class Test_multi_qubit_seqs_CCL(unittest.TestCase):
-
-        def test_single_flux_pulse_seq(self):
-            mqo.single_flux_pulse_seq(qubit_indices=(2, 0),
-                                      platf_cfg=config_fn)
-
-        def test_flux_staircase_seq(self):
-            mqo.flux_staircase_seq(platf_cfg=config_fn)
-
-        def test_two_qubit_off_on(self):
-            mqo.two_qubit_off_on(q0=0, q1=1, platf_cfg=config_fn)
-
-        def test_two_qubit_tomo_cardinal(self):
-            mqo.two_qubit_tomo_cardinal(cardinal=3,
-                                        q0=0, q1=1, platf_cfg=config_fn)
-
-        def test_two_qubit_AllXY(self):
-            mqo.two_qubit_AllXY(q0=0, q1=1, platf_cfg=config_fn,
-                                sequence_type='sequential',
-                                replace_q1_pulses_X180=False,
-                                double_points=True)
-
-            mqo.two_qubit_AllXY(q0=0, q1=1, platf_cfg=config_fn,
-                                sequence_type='simultaneous',
-                                replace_q1_pulses_X180=False,
-                                double_points=True)
-
-
     class Test_pygsti_oql(unittest.TestCase):
 
         def test_poor_mans_2q_gst(self):
@@ -79,21 +48,20 @@ try:
                                         maxL=256, lite_germs=True,
                                         recompile=True)
 
-
-
     class Test_cliff_rb_oql(unittest.TestCase):
         def test_single_qubit_rb_seq(self):
             p = rb_oql.randomized_benchmarking([0], platf_cfg=config_fn,
-                                       nr_cliffords=[1, 5], nr_seeds=1, cal_points=False)
+                                               nr_cliffords=[1, 5], nr_seeds=1, cal_points=False)
 
         def test_two_qubit_rb_seq(self):
             p = rb_oql.randomized_benchmarking([2, 0], platf_cfg=config_fn,
-                                       nr_cliffords=[1, 5], nr_seeds=1, cal_points=False)
+                                               nr_cliffords=[1, 5], nr_seeds=1, cal_points=False)
 
 
 except ImportError as e:
     print(e)
     raise(e)
+
     class TestMissingDependency(unittest.TestCase):
 
         @unittest.skip('Missing dependency - ' + str(e))
