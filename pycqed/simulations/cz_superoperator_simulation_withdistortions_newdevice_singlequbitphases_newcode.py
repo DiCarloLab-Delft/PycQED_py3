@@ -804,7 +804,8 @@ def simulate_quantities_of_interest_superoperator(tlist, c_ops, noise_parameters
     #	                                            alpha_q0=-2*w_q0, alpha_q1=-2*w_q1, J=0)
     #U_final_new = rotating_frame_transformation_new(U_final, fluxlutman.cz_length(), H_twoqubits)         ### old method rotating away also the phase of the |2> state
 
-    U_final_new = correct_reference(U=U_final,w_q1=w_q1,w_q0=w_q0,t=fluxlutman.cz_length())
+    t = tlist[-1]+sim_step
+    U_final_new = correct_reference(U=U_final,w_q1=w_q1,w_q0=w_q0,t=t)
 
     ### Script to check that we are correctly removing the single qubit phases in the rotating frame
     # cz_length = fluxlutman.cz_length()
@@ -823,8 +824,8 @@ def simulate_quantities_of_interest_superoperator(tlist, c_ops, noise_parameters
     # print('phi_cond',phi_cond-phi_cond_bis)
 
     phases = phases_from_superoperator(U_final_new)         # order is phi_00, phi_01, phi_10, phi_11, phi_02, phi_20, phi_cond
-    phase_q0 = phases[1]-phases[0]
-    phase_q1 = phases[2]-phases[0]
+    phase_q0 = (phases[1]-phases[0]) % 360
+    phase_q1 = (phases[2]-phases[0]) % 360
     
 
     return {'phi_cond': phi_cond, 'L1': L1, 'L2': L2, 'avgatefid_pc': avgatefid,
@@ -864,8 +865,6 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
                                                  # but we can use a different step for simulating the time evolution
         tlist = (np.arange(0, self.fluxlutman.cz_length(),
                            sim_step))
-        tlist_new = (np.arange(0, self.fluxlutman.cz_length(),
-                           sim_step_new))
         
         eps_i = self.fluxlutman.calc_amp_to_eps(0, state_A='11', state_B='02')
         self.theta_i = wfl.eps_to_theta(eps_i, g=self.fluxlutman.q_J2())           # Beware theta in radian!
@@ -889,8 +888,13 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         # For better accuracy in simulations, redefine f_pulse and amp in terms of sim_step_new
         if len(tlist) == len(amp):
         	tlist_temp=np.concatenate((tlist,np.array([self.fluxlutman.cz_length()])))
+        	tlist_new = (np.arange(0, self.fluxlutman.cz_length(),
+                           sim_step_new))
         else:
         	tlist_temp=np.concatenate((tlist,np.array([self.fluxlutman.cz_length(),self.fluxlutman.cz_length()+sim_step])))
+        	tlist_new = (np.arange(0, self.fluxlutman.cz_length()+sim_step,
+                           sim_step_new))
+
         f_pulse_temp=np.concatenate((f_pulse,np.array([f_pulse[-1]])))
         amp_temp=np.concatenate((amp,np.array([amp[-1]])))
         f_pulse_interp=interp1d(tlist_temp,f_pulse_temp)
@@ -903,8 +907,9 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         #           title='Freq. of fluxing qubit during pulse',
         #           xlabel='Time (ns)',ylabel='Freq. (GHz)',legend_labels=['omega_B(t)'])
 
-        amp=amp*self.noise_parameters_CZ.voltage_scaling_factor()       # recommended to change discretely the scaling factor
 
+
+        amp=amp*self.noise_parameters_CZ.voltage_scaling_factor()       # recommended to change discretely the scaling factor
 
 
         if self.noise_parameters_CZ.distortions():
@@ -935,7 +940,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             #       xlabel='Time (ns)',ylabel='Amplitude (V)',legend_labels=['Ideal','Distorted'])
 
             amp_final=convolved_amp[0:np.size(tlist_convol1)]
-            f_pulse_convolved_new=self.fluxlutman.calc_amp_to_freq(convolved_amp,'01')
+            f_pulse_convolved_new=self.fluxlutman.calc_amp_to_freq(amp_final,'01')
 
             # plot(x_plot_vec=[tlist_convol1*1e9],
             #       y_plot_vec=[amp_convol, amp_final],
