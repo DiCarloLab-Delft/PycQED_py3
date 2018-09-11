@@ -1,9 +1,6 @@
 import numpy as np
-from os.path import join
-import openql.openql as ql
-from openql.openql import Program, Kernel
-from pycqed.utilities.general import suppress_stdout
-from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
+from pycqed.measurement.randomized_benchmarking import \
+    randomized_benchmarking as rb
 
 import pycqed.measurement.openql_experiments.openql_helpers as oqh
 
