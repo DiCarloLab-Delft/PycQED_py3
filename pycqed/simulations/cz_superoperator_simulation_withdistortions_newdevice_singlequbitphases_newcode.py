@@ -480,6 +480,55 @@ def pro_avfid_superoperator_compsubspace_phasecorrected(U,L1,phases):
         return np.real((dim*(1-L1) + psum) / (dim*(dim + 1)))
 
 
+def pro_avfid_superoperator_compsubspace_phasecorrected_onlystaticqubit(U,L1,phases):
+    """
+    Average process (gate) fidelity in the qubit computational subspace for two qutrits
+    Leakage has to be taken into account, see Woods & Gambetta
+    The phase is corrected with Z rotations considering both transmons as qubits. The correction is done perfectly.
+    The function assumes that the computational subspace (:= the 4 energy levels chosen as the two qubits) is given by 
+            the standard basis |0> /otimes |0>, |0> /otimes |1>, |1> /otimes |0>, |1> /otimes |1>.
+            If this is not the case, one need to change the basis to that one, before calling this function.
+    """
+
+    Ucorrection = qtp.Qobj([[np.exp(-1j*np.deg2rad(phases[0])), 0, 0, 0, 0, 0, 0, 0, 0],
+                     [0, np.exp(-1j*np.deg2rad(phases[0])), 0, 0, 0, 0, 0, 0, 0],
+                     [0, 0, np.exp(-1j*np.deg2rad(phases[0])), 0, 0, 0, 0, 0, 0],
+                     [0, 0, 0, np.exp(-1j*np.deg2rad(phases[2])), 0, 0, 0, 0, 0],
+                     [0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[2])), 0, 0, 0, 0],
+                     [0, 0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[2])), 0, 0, 0],
+                     [0, 0, 0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[0])), 0, 0],
+                     [0, 0, 0, 0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[0])), 0],
+                     [0, 0, 0, 0, 0, 0, 0, 0, np.exp(-1j*np.deg2rad(phases[0]))]],
+                    type='oper',
+                    dims=[[3, 3], [3, 3]])
+
+    if U.type=='oper':
+        U=Ucorrection*U
+        inner = U.dag()*U_target
+        part_idx = [0, 1, 3, 4]  # only computational subspace
+        ptrace = 0
+        for i in part_idx:
+            ptrace += inner[i, i]
+        dim = 4  # 2 qubits comp subspace       
+
+        return np.real(((np.abs(ptrace))**2+dim*(1-L1))/(dim*(dim+1)))
+
+    elif U.type=='super':
+        U=qtp.to_super(Ucorrection)*U
+        kraus_form = qtp.to_kraus(U)
+        dim=4 # 2 qubits in the computational subspace
+        part_idx = [0, 1, 3, 4]  # only computational subspace
+        psum=0
+        for A_k in kraus_form:
+        	ptrace = 0
+        	inner = U_target_diffdims.dag()*A_k # otherwise dimension mismatch
+        	for i in part_idx:
+        		ptrace += inner[i, i]
+        	psum += (np.abs(ptrace))**2
+
+        return np.real((dim*(1-L1) + psum) / (dim*(dim + 1)))
+
+
 def leakage_from_superoperator(U):
     if U.type=='oper':
         """
@@ -826,11 +875,16 @@ def simulate_quantities_of_interest_superoperator(tlist, c_ops, noise_parameters
     phases = phases_from_superoperator(U_final_new)         # order is phi_00, phi_01, phi_10, phi_11, phi_02, phi_20, phi_cond
     phase_q0 = (phases[1]-phases[0]) % 360
     phase_q1 = (phases[2]-phases[0]) % 360
+
+
+    # We now correct only for the phase of qubit left (q1), in the rotating frame
+    avgatefid_compsubspace_pc_onlystaticqubit = pro_avfid_superoperator_compsubspace_phasecorrected_onlystaticqubit(U_final_new,L1,phases)
     
 
     return {'phi_cond': phi_cond, 'L1': L1, 'L2': L2, 'avgatefid_pc': avgatefid,
             'avgatefid_compsubspace_pc': avgatefid_compsubspace, 'phase_q0': phase_q0, 'phase_q1': phase_q1,
-            'avgatefid_compsubspace': avgatefid_compsubspace_notphasecorrected}
+            'avgatefid_compsubspace': avgatefid_compsubspace_notphasecorrected,
+            'avgatefid_compsubspace_pc_onlystaticqubit': avgatefid_compsubspace_pc_onlystaticqubit}
 
 
 
@@ -849,8 +903,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         """
         super().__init__()
         self.value_names = ['Cost func', 'Cond phase', 'L1', 'L2', 'avgatefid_pc', 'avgatefid_compsubspace_pc',
-                            'phase_q0', 'phase_q1', 'avgatefid_compsubspace']
-        self.value_units = ['a.u.', 'deg', '%', '%', '%', '%', 'deg', 'deg', 'a.u.']
+                            'phase_q0', 'phase_q1', 'avgatefid_compsubspace', 'avgatefid_compsubspace_pc_onlystaticqubit']
+        self.value_units = ['a.u.', 'deg', '%', '%', '%', '%', 'deg', 'deg', 'a.u.', 'a.u.']
         self.fluxlutman = fluxlutman
         self.noise_parameters_CZ = noise_parameters_CZ
         self.fitted_stepresponse_ty=fitted_stepresponse_ty      # list of 2 elements: stepresponse (=y)
@@ -1031,7 +1085,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
         return cost_func_val, qoi['phi_cond'], qoi['L1']*100, qoi['L2']*100, qoi['avgatefid_pc']*100, \
                      qoi['avgatefid_compsubspace_pc']*100, qoi['phase_q0'], qoi['phase_q1'], \
-                     qoi['avgatefid_compsubspace']*100
+                     qoi['avgatefid_compsubspace']*100, qoi['avgatefid_compsubspace_pc_onlystaticqubit']*100
 
 
     def get_f_pulse_double_sided(self):
