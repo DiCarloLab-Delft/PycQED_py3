@@ -131,9 +131,27 @@ try:
                               program_name='motzoi_test')
             self.assertEqual(p.name, 'motzoi_test')
 
-        # def test_fast_feedback_control(self):
-        #     p = sqo.FastFeedbackControl(latency=200e-9,
-        #                                 qubit_idx=0, platf_cfg=config_fn)
+        def test_FluxTimingCalibration(self):
+            p = sqo.FluxTimingCalibration(0, platf_cfg=config_fn,
+                                          times=np.arange(0, 80e-9, 20e-9))
+            self.assertEqual(p.name, 'FluxTimingCalibration')
+
+        def test_FluxTimingCalibration_2q(self):
+            p = sqo.FluxTimingCalibration_2q(q0=0, q1=2, platf_cfg=config_fn,
+                                             buffer_time1=40e-9,
+                                             times=np.arange(0, 80e-9, 20e-9))
+            self.assertEqual(p.name, 'FluxTimingCalibration_2q')
+
+        def test_fast_feedback_control(self):
+            p = sqo.FastFeedbackControl(latency=200e-9,
+                                        qubit_idx=0, platf_cfg=config_fn)
+            self.assertEqual(p.name, 'FastFeedbackControl')
+
+        def test_ef_rabi_seq(self):
+            p = sqo.ef_rabi_seq(0, amps=np.linspace(0, 1, 11),
+                                platf_cfg=config_fn)
+            self.assertEqual(p.name, 'ef_rabi_seq')
+
 
 except ImportError as e:
     class Test_single_qubit_seqs_CCL(unittest.TestCase):

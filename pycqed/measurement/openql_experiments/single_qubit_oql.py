@@ -413,7 +413,7 @@ def idle_error_rate_seq(nr_of_idle_gates,
 
     p.set_sweep_points(sweep_points, num_sweep_points=len(sweep_points))
     p.sweep_points = sweep_points
-    p=oqh.compile(p)
+    p = oqh.compile(p)
     return p
 
 
@@ -687,74 +687,64 @@ def FluxTimingCalibration(qubit_idx: int, times, platf_cfg: str,
     """
     A Ramsey sequence with varying waiting times `times` around a flux pulse.
     """
-    p = Program(pname="FluxTimingCalibration", nqubits=platf.get_qubit_number(),
-                p=platf)
+    p = oqh.create_program('FluxTimingCalibration', platf_cfg)
 
     # don't use last 4 points if calibration points are used
     if cal_points:
         times = times[:-4]
     for t in times:
         t_nanoseconds = int(round(t/1e-9))
-
-        k = Kernel("pifluxpi", p=platf)
+        k = oqh.create_kernel('pi-flux-pi', p)
         k.prepz(qubit_idx)
-        k.gate('rx90', qubit_idx)
-        k.gate('fl_cw_02', 2, 0)
+        k.gate('rx90', [qubit_idx])
+        k.gate('fl_cw_02', [2, 0])
         if t_nanoseconds > 10:
             k.gate("wait", [qubit_idx], t_nanoseconds)
-        k.gate('rx90', qubit_idx)
+        k.gate('rx90', [qubit_idx])
         k.measure(qubit_idx)
         p.add_kernel(k)
 
     if cal_points:
         oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx)
-
-    with suppress_stdout():
-        p.compile(verbose=False)
-    # attribute get's added to program to help finding the output files
-    p.output_dir = ql.get_output_dir()
-    p.filename = join(p.output_dir, p.name + '.qisa')
+    p = oqh.compile(p)
     return p
 
 
 def FluxTimingCalibration_2q(q0, q1, buffer_time1, times, platf_cfg: str):
     """
     A Ramsey sequence with varying waiting times `times` around a flux pulse.
+
+    N.B. this function is not consistent with "FluxTimingCalibration".
+    This should be fixed
     """
-    p = Program(pname="FluxTimingCalibration2q", nqubits=platf.get_qubit_number(),
-                p=platf)
+    p = oqh.create_program("FluxTimingCalibration_2q", platf_cfg)
 
     buffer_nanoseconds1 = int(round(buffer_time1/1e-9))
 
     for t in times:
 
         t_nanoseconds = int(round(t/1e-9))
-
-        k = Kernel("pifluxpi", p=platf)
+        k = oqh.create_kernel("pi-flux-pi", p)
         k.prepz(q0)
         k.prepz(q1)
 
-        k.gate('rx180', q0)
-        k.gate('rx180', q1)
+        k.gate('rx180', [q0])
+        k.gate('rx180', [q1])
 
         if buffer_nanoseconds1 > 10:
             k.gate("wait", [2, 0], buffer_nanoseconds1)
-        k.gate('fl_cw_02', 2, 0)
+        k.gate('fl_cw_02', [2, 0])
         if t_nanoseconds > 10:
             k.gate("wait", [2, 0], t_nanoseconds)
-        #k.gate('rx180', q0)
-        #k.gate('rx180', q1)
+        #k.gate('rx180', [q0])
+        #k.gate('rx180', [q1])
         k.gate("wait", [2, 0], 1)
         k.measure(q0)
         k.gate("wait", [2, 0], 1)
 
         p.add_kernel(k)
 
-    with suppress_stdout():
-        p.compile(verbose=False)
-    # attribute get's added to program to help finding the output files
-    p.output_dir = ql.get_output_dir()
-    p.filename = join(p.output_dir, p.name + '.qisa')
+    p = oqh.compile(p)
     return p
 
 
@@ -777,51 +767,46 @@ def FastFeedbackControl(latency, qubit_idx: int, platf_cfg: str):
 
 
     """
-    p = Program(pname="FastFdbkCtrl", nqubits=platf.get_qubit_number(),
-                p=platf)
+    p = oqh.create_program("FastFeedbackControl", platf_cfg)
 
-    k = Kernel("FastFdbkCtrl_nofb", p=platf)
+    k = oqh.create_kernel("FastFdbkCtrl_nofb", p)
     k.prepz(qubit_idx)
-    k.gate('rx90', qubit_idx)
-    # k.gate('rx180', qubit_idx)
+    k.gate('rx90', [qubit_idx])
+    # k.gate('rx180', [qubit_idx])
     k.measure(qubit_idx)
     wait_nanoseconds = int(round(latency/1e-9))
     k.gate("wait", [qubit_idx], wait_nanoseconds)
-    k.gate("i", qubit_idx)
+    k.gate("i", [qubit_idx])
     k.measure(qubit_idx)
 
     p.add_kernel(k)
 
-    k = Kernel("FastFdbkCtrl_fb0", p=platf)
+    k = oqh.create_kernel("FastFdbkCtrl_fb0", p)
     k.prepz(qubit_idx)
-    k.gate('rx90', qubit_idx)
-    # k.gate('rx180', qubit_idx)
+    k.gate('rx90', [qubit_idx])
+    # k.gate('rx180', [qubit_idx])
     k.measure(qubit_idx)
     wait_nanoseconds = int(round(latency/1e-9))
     k.gate("wait", [qubit_idx], wait_nanoseconds)
-    k.gate('C0rx180', qubit_idx)  # fast feedback control here
+    k.gate('C0rx180', [qubit_idx])  # fast feedback control here
     k.measure(qubit_idx)
     p.add_kernel(k)
 
-    k = Kernel("FastFdbkCtrl_fb1", p=platf)
+    k = oqh.create_kernel("FastFdbkCtrl_fb1", p)
     k.prepz(qubit_idx)
-    k.gate('rx90', qubit_idx)
-    # k.gate('rx180', qubit_idx)
+    k.gate('rx90', [qubit_idx])
+    # k.gate('rx180', [qubit_idx])
     k.measure(qubit_idx)
     wait_nanoseconds = int(round(latency/1e-9))
     k.gate("wait", [qubit_idx], wait_nanoseconds)
-    k.gate('C1rx180', qubit_idx)  # fast feedback control here
+    k.gate('C1rx180', [qubit_idx])  # fast feedback control here
     k.measure(qubit_idx)
     p.add_kernel(k)
 
     # adding the calibration points
     oqh.add_single_qubit_cal_points(p,  qubit_idx=qubit_idx)
 
-    with suppress_stdout():
-        p.compile(verbose=False)
-    # attribute get's added to program to help finding the output files
-    p.output_dir = ql.get_output_dir()
-    p.filename = join(p.output_dir, p.name + '.qisa')
+    p = oqh.compile(p)
     return p
 
 
@@ -845,31 +830,27 @@ def ef_rabi_seq(q0: int,
     """
     if len(amps) > 18:
         raise ValueError('Only 18 free codewords available for amp pulses')
-    p = Program(pname="ef_rabi_seq",
-                nqubits=platf.get_qubit_number(),
-                p=platf)
+
+    p = oqh.create_program("ef_rabi_seq", platf_cfg)
     # These angles correspond to special pi/2 pulses in the lutman
     for i, amp in enumerate(amps):
         # cw_idx corresponds to special hardcoded pulses in the lutman
         cw_idx = i + 9
 
-        k = Kernel("ef_A{}".format(amp), p=platf)
+        k = oqh.create_kernel("ef_A{}".format(amp), p)
         k.prepz(q0)
-        k.gate('rx180', q0)
-        k.gate('cw_{:02}'.format(cw_idx), q0)
+        k.gate('rx180', [q0])
+        k.gate('cw_{:02}'.format(cw_idx), [q0])
         if recovery_pulse:
-            k.gate('rx180', q0)
+            k.gate('rx180', [q0])
         k.measure(q0)
         p.add_kernel(k)
     if add_cal_points:
         p = oqh.add_single_qubit_cal_points(p,  qubit_idx=q0)
-    with suppress_stdout():
-        p.compile()
-    # attribute get's added to program to help finding the output files
-    p.output_dir = ql.get_output_dir()
-    p.filename = join(p.output_dir, p.name + '.qisa')
 
-    if add_single_qubit_cal_points:
+    p = oqh.compile(p)
+
+    if add_cal_points:
         cal_pts_idx = [amps[-1]+.1, amps[-1]+.15,
                        amps[-1]+.2, amps[-1]+.25]
     else:
