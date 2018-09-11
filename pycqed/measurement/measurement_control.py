@@ -524,7 +524,6 @@ class MeasurementControl(Instrument):
             self.sweep_pts_y = self.sweep_points_2D
             y_rep = np.repeat(self.sweep_pts_y, self.xlen,axis=0)
             c = np.column_stack((x_tiled, y_rep))
-            print('tiled swppts: ',c)
             self.set_sweep_points(c)
             self.initialize_plot_monitor_2D()
         return

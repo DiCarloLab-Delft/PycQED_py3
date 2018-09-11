@@ -2443,10 +2443,10 @@ class Flux_pulse_CPhase_meas_hard_swf(swf.Hard_Sweep):
 
 class Flux_pulse_CPhase_hard_swf_new(swf.Hard_Sweep):
 
-    def __init__(self, qbc_name, qbt_name,qbr_name,CZ_pulse_name,
+    def __init__(self, phases, qbc_name, qbt_name,qbr_name,CZ_pulse_name,
                  operation_dict,max_flux_length,
                  cal_points=False, upload=True,
-                 reference_measurement=False):
+                 reference_measurements=False):
         '''
             Flexible sweep function class for a single slice of the CPhase
             experiment (hard sweep) that can either sweep the amplitude or
@@ -2467,6 +2467,7 @@ class Flux_pulse_CPhase_hard_swf_new(swf.Hard_Sweep):
                                           e.g. thetas = np.concatenate((thetas,thetas))
         '''
         super().__init__()
+        self.phases = phases
         self.qbc_name = qbc_name
         self.qbt_name = qbt_name
         self.qbr_name = qbr_name
@@ -2474,7 +2475,7 @@ class Flux_pulse_CPhase_hard_swf_new(swf.Hard_Sweep):
         self.CZ_pulse_name = CZ_pulse_name
         self.upload = upload
         self.cal_points = cal_points
-        self.reference_measurement = reference_measurement
+        self.reference_measurements = reference_measurements
         self.name = 'flux_pulse_CPhase_measurement_phase_sweep'
         self.parameter_name ='phase'
         self.max_flux_length = max_flux_length
@@ -2488,7 +2489,7 @@ class Flux_pulse_CPhase_hard_swf_new(swf.Hard_Sweep):
 
         if self.upload:
             fsqs.flux_pulse_CPhase_seq_new(
-                phases=self.sweep_points,
+                phases=self.phases,
                 flux_params=flux_params,
                 max_flux_length = self.max_flux_length,
                 qbc_name=self.qbc_name,
@@ -2498,29 +2499,31 @@ class Flux_pulse_CPhase_hard_swf_new(swf.Hard_Sweep):
                 CZ_pulse_name=self.CZ_pulse_name,
                 cal_points=self.cal_points,
                 reference_measurements=self.reference_measurements,
-                upload=self.upload
+                upload= not self.upload,
+                return_seq= True
                 )
 
-    def set_parameter(self,val,**kw):
+    def set_parameter(self,flux_val,**kw):
         val_type = kw.pop('val_type',None)
         if val_type is None:
-            logging.error('CPhase hard sweeps set_parameter method was called '
+            logging.warning('CPhase hard sweep set_parameter method was called '
                           'without a value type!')
+            return
         elif val_type == 'length':
-            self.flux_length = val
+            self.flux_length = flux_val
         elif val_type == 'amplitude':
-            self.flux_amplitude = val
+            self.flux_amplitude = flux_val
         else:
             logging.error('CPhase hard sweep does not recognize value type handed'
                           'by set_parameter() method!')
         if self.flux_length is not None and self.flux_amplitude is not None:
-            self.prepare(flux_params=[self.flux_length,self.flux_amplitude])
+            self.prepare(flux_params=[self.flux_amplitude,self.flux_length])
 
 class Flux_pulse_CPhase_hard_swf_new2(swf.Hard_Sweep):
 
-    def __init__(self,X90_phase, qbc_name, qbt_name, qbr_name,CZ_pulse_name,
-                 operation_dict,cal_points=False, upload=True,
-                 reference_measurement=False):
+    def __init__(self, len_amp_pairs, X90_phase, qbc_name, qbt_name,
+                 qbr_name, CZ_pulse_name, operation_dict, cal_points=False,
+                 upload=True, reference_measurement=False):
         '''
             Flexible sweep function class for a single slice of the CPhase
             experiment (hard sweep) that can either sweep the amplitude or
@@ -2535,15 +2538,18 @@ class Flux_pulse_CPhase_hard_swf_new2(swf.Hard_Sweep):
             X90_phase: float, phase of the second X90 pulse in rad
             spacing: float, spacing between first and second X90 pulse
             measurement_mode (str): either 'excited_state', 'ground_state'
-            reference_measurement (bool): if True, appends a reference measurement
+            reference_measurement (bool): if True, appends a reference
+                                          measurement.
                                           IMPORTANT: you need to double
                                           the hard sweep points!
-                                          e.g. thetas = np.concatenate((thetas,thetas))
+                                          e.g. thetas =
+                                          np.concatenate((thetas,thetas))
         '''
         super().__init__()
         self.qbc_name = qbc_name
         self.qbt_name = qbt_name
         self.qbr_name = qbr_name
+        self.len_amp_pairs = len_amp_pairs
         self.X90_Phase = X90_phase
         self.operation_dict = operation_dict
         self.CZ_pulse_name = CZ_pulse_name
@@ -2555,16 +2561,16 @@ class Flux_pulse_CPhase_hard_swf_new2(swf.Hard_Sweep):
 
     def prepare(self,**kw):
         if self.upload:
-            fsqs.flux_pulse_CPhase_seq_new2(
-                phases=self.sweep_points,
-                X90_phase=self.X90_Phase,
+         fsqs.flux_pulse_CPhase_seq_new2(
+                len_amp_pairs=self.len_amp_pairs,
+                X90_Phase=self.X90_Phase,
                 qbc_name=self.qbc_name,
                 qbt_name=self.qbt_name,
                 qbr_name=self.qbr_name,
                 operation_dict=self.operation_dict,
                 CZ_pulse_name=self.CZ_pulse_name,
                 cal_points=self.cal_points,
-                reference_measurements=self.reference_measurements,
+                reference_measurement=self.reference_measurement,
                 upload=self.upload
             )
 
@@ -2589,8 +2595,10 @@ class Flux_pulse_CPhase_soft_swf(swf.Soft_Sweep):
         self.sweep_param = sweep_param
         if sweep_param == 'length':
             self.unit = 's'
+            self.parameter_name = 'flux_length'
         elif sweep_param == 'amplitude':
             self.unit = 'V'
+            self.parameter_name = 'flux_amp'
         self.hard_sweep = hard_sweep
         self.upload = upload
 
