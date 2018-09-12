@@ -7,7 +7,7 @@ from os.path import join
 import openql.openql as ql
 from pycqed.utilities.general import suppress_stdout
 from openql.openql import Program, Kernel, Platform
-from pycqed.measurement.openql_experiments.multi_qubit_oql import \
+from pycqed.measurement.openql_experiments.openql_helpers import \
     add_two_q_cal_points, add_multi_q_cal_points
 
 from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
