@@ -1102,33 +1102,32 @@ def grovers_two_qubit_all_inputs(q0: int, q1: int, platf_cfg: str,
         raise NotImplementedError('Currently only precompiled flux pulses '
                                   'are supported.')
 
-    p = oqh.create_program("Grovers_two_qubit_all_inputs",
-                           platf_cfg)
+    p = oqh.create_program("grovers_two_qubit_all_inputs", platf_cfg)
 
     for G0 in ['ry90', 'rym90']:
         for G1 in ['ry90', 'rym90']:
-            k = Kernel('Gr{}_{}'.format(G0, G1),  p=platf)
+            k = oqh.create_kernel('Gr{}_{}'.format(G0, G1),  p)
             k.prepz(q0)
             k.prepz(q1)
-            k.gate(G0, q0)
-            k.gate(G1, q1)
-            k.gate('fl_cw_03', 2, 0)  # flux cw03 is the multi_cz pulse
-            k.gate('ry90', q0)
-            k.gate('ry90', q1)
+            k.gate(G0, [q0])
+            k.gate(G1, [q1])
+            k.gate('fl_cw_03', [2, 0])  # flux cw03 is the multi_cz pulse
+            k.gate('ry90', [q0])
+            k.gate('ry90', [q1])
             # k.gate('fl_cw_00', 2,0)
             k.gate('wait', [2, 0], second_CZ_delay//2)
             if add_echo_pulses:
-                k.gate('rx180', q0)
-                k.gate('rx180', q1)
+                k.gate('rx180', [q0])
+                k.gate('rx180', [q1])
             k.gate('wait', [2, 0], second_CZ_delay//2)
             if add_echo_pulses:
-                k.gate('rx180', q0)
-                k.gate('rx180', q1)
+                k.gate('rx180', [q0])
+                k.gate('rx180', [q1])
 
             k.gate('wait', [2, 0], CZ_duration)
 
-            k.gate('ry90', q0)
-            k.gate('ry90', q1)
+            k.gate('ry90', [q0])
+            k.gate('ry90', [q1])
             k.measure(q0)
             k.measure(q1)
             k.gate('wait', [2, 0], 0)
@@ -1136,7 +1135,7 @@ def grovers_two_qubit_all_inputs(q0: int, q1: int, platf_cfg: str,
 
     if cal_points:
         p = oqh.add_two_q_cal_points(p, q0=q0, q1=q1)
-        p = oqh.compile(p)
+    p = oqh.compile(p)
     return p
 
 
@@ -1155,7 +1154,7 @@ def grovers_tomography(q0: int, q1: int, omega: int, platf_cfg: str,
         raise NotImplementedError('Currently only precompiled flux pulses '
                                   'are supported.')
 
-    p = oqh.create_program("Grovers_tomo_two_qubit_all_inputs",
+    p = oqh.create_program("grovers_tomography",
                            platf_cfg)
 
     tomo_gates = ['i', 'rx180', 'ry90', 'rym90', 'rx90', 'rxm90']
@@ -1177,36 +1176,35 @@ def grovers_tomography(q0: int, q1: int, omega: int, platf_cfg: str,
 
     for p_q1 in tomo_gates:
         for p_q0 in tomo_gates:
-            k = Kernel('Gr{}_{}_tomo_{}_{}'.format(G0, G1, p_q0, p_q1),
-                       p=platf)
-
+            k = oqh.create_kernel('Gr{}_{}_tomo_{}_{}'.format(
+                G0, G1, p_q0, p_q1), p)
             k.prepz(q0)
             k.prepz(q1)
 
             # Oracle
-            k.gate(G0, q0)
-            k.gate(G1, q1)
-            k.gate('fl_cw_03', 2, 0)  # flux cw03 is the multi_cz pulse
+            k.gate(G0, [q0])
+            k.gate(G1, [q1])
+            k.gate('fl_cw_03', [2, 0])  # flux cw03 is the multi_cz pulse
             # Grover's search
-            k.gate('ry90', q0)
-            k.gate('ry90', q1)
-            # k.gate('fl_cw_00', 2,0)
+            k.gate('ry90', [q0])
+            k.gate('ry90', [q1])
+            # k.gate('fl_cw_00', 2[,0])
             k.gate('wait', [2, 0], second_CZ_delay//2)
             if add_echo_pulses:
-                k.gate('rx180', q0)
-                k.gate('rx180', q1)
+                k.gate('rx180', [q0])
+                k.gate('rx180', [q1])
             k.gate('wait', [2, 0], second_CZ_delay//2)
             if add_echo_pulses:
-                k.gate('rx180', q0)
-                k.gate('rx180', q1)
+                k.gate('rx180', [q0])
+                k.gate('rx180', [q1])
             k.gate('wait', [2, 0], CZ_duration)
 
-            k.gate('ry90', q0)
-            k.gate('ry90', q1)
+            k.gate('ry90', [q0])
+            k.gate('ry90', [q1])
 
             # tomo pulses
-            k.gate(p_q1, q0)
-            k.gate(p_q0, q1)
+            k.gate(p_q1, [q0])
+            k.gate(p_q0, [q1])
 
             k.measure(q0)
             k.measure(q1)
@@ -1235,15 +1233,15 @@ def CZ_poisoned_purity_seq(q0, q1, platf_cfg: str,
         k.prepz(q1)
 
         # Create a Bell state:  |00> + |11>
-        k.gate('rym90', q0)
-        k.gate('ry90', q1)
+        k.gate('rym90', [q0])
+        k.gate('ry90', [q1])
         for i in range(nr_of_repeated_gates):
-            k.gate('fl_cw_01', 2, 0)
-        k.gate('rym90', q1)
+            k.gate('fl_cw_01', [2, 0])
+        k.gate('rym90', [q1])
 
         # Perform pulses to measure the purity of both qubits
-        k.gate(p_pulse, q0)
-        k.gate(p_pulse, q1)
+        k.gate(p_pulse, [q0])
+        k.gate(p_pulse, [q1])
 
         k.measure(q0)
         k.measure(q1)
@@ -1253,7 +1251,9 @@ def CZ_poisoned_purity_seq(q0, q1, platf_cfg: str,
         k.gate('wait', [2, 0], 0)
 
         p.add_kernel(k)
+
     if cal_points:
+        # FIXME: replace with standard add cal points function
         k = oqh.create_kernel("Cal 00", p)
         k.prepz(q0)
         k.prepz(q1)
@@ -1264,14 +1264,14 @@ def CZ_poisoned_purity_seq(q0, q1, platf_cfg: str,
         k = oqh.create_kernel("Cal 11", p)
         k.prepz(q0)
         k.prepz(q1)
-        k.gate("rx180", q0)
-        k.gate("rx180", q1)
+        k.gate("rx180", [q0])
+        k.gate("rx180", [q1])
         k.measure(q0)
         k.measure(q1)
         k.gate('wait', [2, 0], 0)
         p.add_kernel(k)
 
-        p = oqh.compile(p)
+    p = oqh.compile(p)
     return p
 
 
@@ -1389,8 +1389,7 @@ def Chevron_first_manifold(qubit_idx: int, qubit_idx_spec: int,
         p:              OpenQL Program object containing
 
     """
-    p = oqh.create_program("Chevron", nqubits=platf.get_qubit_number(),
-                           p=platf)
+    p = oqh.create_program("Chevron", platf_cfg)
 
     buffer_nanoseconds = int(round(buffer_time/1e-9))
     buffer_nanoseconds2 = int(round(buffer_time2/1e-9))

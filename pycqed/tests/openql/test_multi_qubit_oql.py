@@ -156,6 +156,43 @@ try:
                 platf_cfg=config_fn)
             self.assertEqual(p.name, 'conditional_oscillation_seq')
 
+
+        def test_grovers_two_qubit_all_inputs(self):
+            p = mqo.grovers_two_qubit_all_inputs(
+                q0=0,
+                q1=2,
+                platf_cfg=config_fn)
+            self.assertEqual(p.name, 'grovers_two_qubit_all_inputs')
+
+
+        def test_grovers_tomography(self):
+            for omega in range(4):
+                p = mqo.grovers_tomography(
+                    q0=0,
+                    q1=2,
+                    omega=omega,
+                    platf_cfg=config_fn)
+                self.assertEqual(p.name, 'grovers_tomography')
+
+        def test_CZ_poisoned_purity_seq(self):
+            p = mqo.CZ_poisoned_purity_seq(
+                q0=0,
+                q1=2,
+                nr_of_repeated_gates=5,
+                platf_cfg=config_fn)
+            self.assertEqual(p.name, 'CZ_poisoned_purity_seq')
+
+
+        def test_Chevron_first_manifold(self):
+            p = mqo.Chevron_first_manifold(
+                qubit_idx=0,
+                qubit_idx_spec=2,
+                buffer_time=20e-9, buffer_time2=40e-9, flux_cw=1,
+                platf_cfg=config_fn)
+            self.assertEqual(p.name, 'Chevron_first_manifold')
+
+
+
 except ImportError as e:
 
     class Test_multi_qubit_oql(unittest.TestCase):
