@@ -122,6 +122,39 @@ try:
                 self.assertEqual(p.name, 'two_qubit_tomo_bell')
 
 
+        def test_two_qubit_tomo_bell_by_waiting(self):
+            for bell_state in [0, 1, 2, 3]:
+                p = mqo.two_qubit_tomo_bell_by_waiting(
+                    q0=0,
+                    q1=2,
+                    bell_state=bell_state,
+                    platf_cfg=config_fn)
+                self.assertEqual(p.name, 'two_qubit_tomo_bell_by_waiting')
+
+        def test_two_qubit_DJ(self):
+            p = mqo.two_qubit_DJ(
+                q0=0,
+                q1=2,
+                platf_cfg=config_fn)
+            self.assertEqual(p.name, 'two_qubit_DJ')
+
+        def test_two_qubit_repeated_parity_check(self):
+            for initialization_msmt in [False, True]:
+                p = mqo.two_qubit_repeated_parity_check(
+                    qD=0,
+                    qA=2,
+                    initialization_msmt=initialization_msmt,
+                    platf_cfg=config_fn)
+                self.assertEqual(p.name, 'two_qubit_repeated_parity_check')
+
+        def test_conditional_oscillation_seq(self):
+            # N.B. this does not check the many different variants of this
+            # function
+            p = mqo.conditional_oscillation_seq(
+                q0=0,
+                q1=2,
+                platf_cfg=config_fn)
+            self.assertEqual(p.name, 'conditional_oscillation_seq')
 
 except ImportError as e:
 
