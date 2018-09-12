@@ -1389,7 +1389,7 @@ def Chevron_first_manifold(qubit_idx: int, qubit_idx_spec: int,
         p:              OpenQL Program object containing
 
     """
-    p = oqh.create_program("Chevron", platf_cfg)
+    p = oqh.create_program("Chevron_first_manifold", platf_cfg)
 
     buffer_nanoseconds = int(round(buffer_time/1e-9))
     buffer_nanoseconds2 = int(round(buffer_time2/1e-9))
@@ -1398,9 +1398,9 @@ def Chevron_first_manifold(qubit_idx: int, qubit_idx_spec: int,
 
     k = oqh.create_kernel("Chevron", p)
     k.prepz(qubit_idx)
-    k.gate('rx180', qubit_idx)
+    k.gate('rx180', [qubit_idx])
     k.gate("wait", [qubit_idx], buffer_nanoseconds)
-    k.gate('fl_cw_{:02}'.format(flux_cw), 2, 0)
+    k.gate('fl_cw_{:02}'.format(flux_cw), [2, 0])
     k.gate('wait', [qubit_idx], buffer_nanoseconds2)
     k.measure(qubit_idx)
     k.measure(qubit_idx_spec)
@@ -1426,7 +1426,7 @@ def partial_tomography_cardinal(q0: int, q1: int, cardinal: int, platf_cfg: str,
         raise NotImplementedError('Currently only precompiled flux pulses '
                                   'are supported.')
 
-    p = oqh.create_program("partial_tomography_cardinal_seq",
+    p = oqh.create_program("partial_tomography_cardinal",
                            platf_cfg)
 
     cardinal_gates = ['i', 'rx180', 'ry90', 'rym90', 'rx90', 'rxm90']
@@ -1447,19 +1447,19 @@ def partial_tomography_cardinal(q0: int, q1: int, cardinal: int, platf_cfg: str,
         SP1 = cardinal_gates[idx_p1]
         t_q0 = gates[1]
         t_q1 = gates[0]
-        k = Kernel('PT_{}_tomo_{}_{}'.format(cardinal, idx_p0, idx_p1),
-                   p=platf)
+        k = oqh.create_kernel(
+            'PT_{}_tomo_{}_{}'.format(cardinal, idx_p0, idx_p1), p)
 
         k.prepz(q0)
         k.prepz(q1)
 
         # Cardinal state preparation
-        k.gate(SP0, q0)
-        k.gate(SP1, q1)
+        k.gate(SP0, [q0])
+        k.gate(SP1, [q1])
         # tomo pulses
         # to be taken from list of tuples
-        k.gate(t_q1, q0)
-        k.gate(t_q0, q1)
+        k.gate(t_q1, [q0])
+        k.gate(t_q0, [q1])
 
         k.measure(q0)
         k.measure(q1)
@@ -1482,8 +1482,7 @@ def two_qubit_VQE(q0: int, q1: int, platf_cfg: str):
     tomo_list_q0 = tomo_pulses
     tomo_list_q1 = tomo_pulses
 
-    p = oqh.create_program("VQE_full_tomo",
-                           platf_cfg)
+    p = oqh.create_program("two_qubit_VQE", platf_cfg)
 
     # Tomography pulses
     i = 0
@@ -1491,16 +1490,16 @@ def two_qubit_VQE(q0: int, q1: int, platf_cfg: str):
         for p_q0 in tomo_list_q0:
             i += 1
             kernel_name = '{}_{}_{}'.format(i, p_q0, p_q1)
-            k = Kernel(kernel_name, p=platf)
+            k = oqh.create_kernel(kernel_name, p)
             k.prepz(q0)
             k.prepz(q1)
-            k.gate('ry180', q0)  # Y180 gate without compilation
-            k.gate('i', q0)  # Y180 gate without compilation
+            k.gate('ry180', [q0])  # Y180 gate without compilation
+            k.gate('i', [q0])  # Y180 gate without compilation
             k.gate("wait", [q1], 40)
-            k.gate('fl_cw_02', 2, 0)
+            k.gate('fl_cw_02', [2, 0])
             k.gate("wait", [q1], 40)
-            k.gate(p_q0, q0)  # compiled z gate+pre_rotation
-            k.gate(p_q1, q1)  # pre_rotation
+            k.gate(p_q0, [q0])  # compiled z gate+pre_rotation
+            k.gate(p_q1, [q1])  # pre_rotation
             k.measure(q0)
             k.measure(q1)
             p.add_kernel(k)
@@ -1539,9 +1538,7 @@ def sliding_flux_pulses_seq(
         add_cal_points : if True adds calibration points at the end
     """
 
-    p = oqh.create_program("sliding_flux_pulses_seq",
-                           nqubits=platf.get_qubit_number(),
-                           p=platf)
+    p = oqh.create_program("sliding_flux_pulses_seq", platf_cfg)
     k = oqh.create_kernel("sliding_flux_pulses_seq", p)
     q0 = qubits[-1]
     q1 = qubits[-2]
@@ -1554,16 +1551,16 @@ def sliding_flux_pulses_seq(
         k.gate(flux_codeword_a, [2, 0])
         # hardcoded because of flux_tuples, [q1, q0])
         k.gate('wait', [q0, q1], wait_time)
-        k.gate('rx90', q0)
+        k.gate('rx90', [q0])
         k.gate(flux_codeword_b, [2, 0])
         k.gate('wait', [q0, q1], 60)
         # hardcoded because of flux_tuples, [q1, q0])
         # hardcoded angles, must be uploaded to AWG
         if angle == 90:
             # special because the cw phase pulses go in mult of 20 deg
-            k.gate('ry90', q0)
+            k.gate('ry90', [q0])
         else:
-            k.gate('cw_{:02}'.format(cw_idx), q0)
+            k.gate('cw_{:02}'.format(cw_idx), [q0])
         k.measure(q0)
         k.measure(q1)
         # Implements a barrier to align timings

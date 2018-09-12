@@ -182,7 +182,6 @@ try:
                 platf_cfg=config_fn)
             self.assertEqual(p.name, 'CZ_poisoned_purity_seq')
 
-
         def test_Chevron_first_manifold(self):
             p = mqo.Chevron_first_manifold(
                 qubit_idx=0,
@@ -191,6 +190,26 @@ try:
                 platf_cfg=config_fn)
             self.assertEqual(p.name, 'Chevron_first_manifold')
 
+        def test_partial_tomography_cardinal(self):
+            p = mqo.partial_tomography_cardinal(
+                q0=0,
+                q1=2,
+                cardinal=3,
+                platf_cfg=config_fn)
+            self.assertEqual(p.name, 'partial_tomography_cardinal')
+
+        def test_two_qubit_VQE(self):
+            p = mqo.two_qubit_VQE(
+                q0=0,
+                q1=2,
+                platf_cfg=config_fn)
+            self.assertEqual(p.name, 'two_qubit_VQE')
+
+        def test_sliding_flux_pulses_seq(self):
+            p = mqo.sliding_flux_pulses_seq(
+                qubits=[0, 2],
+                platf_cfg=config_fn)
+            self.assertEqual(p.name, 'sliding_flux_pulses_seq')
 
 
 except ImportError as e:
