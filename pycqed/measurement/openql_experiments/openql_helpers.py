@@ -151,23 +151,23 @@ def add_two_q_cal_points(p, q0: int, q1: int,
     return p
 
 
-def add_multi_q_cal_points(p, platf, qubits: list,
+def add_multi_q_cal_points(p, qubits: list,
                            combinations: list):
     """
     Adds calibration points based on a list of state combinations
     """
     kernel_list = []
     for i, comb in enumerate(combinations):
-        k = Kernel('cal{}_{}'.format(i, comb), p=platf)
+        k = create_kernel('cal{}_{}'.format(i, comb), p)
         for q in qubits:
             k.prepz(q)
 
         for j, q in enumerate(qubits):
             if comb[j] == '1':
-                k.gate('rx180', q)
+                k.gate('rx180', [q])
             elif comb[j] == '2':
-                k.gate('rx180', q)
-                k.gate('rx12', q)
+                k.gate('rx180', [q])
+                k.gate('rx12', [q])
             else:
                 pass
         # Used to ensure timing is aligned

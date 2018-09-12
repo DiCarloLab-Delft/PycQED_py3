@@ -4,13 +4,9 @@ OpenQL sequence.
 """
 
 from os.path import join
-import openql.openql as ql
-from pycqed.utilities.general import suppress_stdout
-from openql.openql import Program, Kernel, Platform
-from pycqed.measurement.openql_experiments.openql_helpers import \
-    add_two_q_cal_points, add_multi_q_cal_points
 
-from pycqed.measurement.randomized_benchmarking import randomized_benchmarking as rb
+from pycqed.measurement.randomized_benchmarking import \
+    randomized_benchmarking as rb
 from pycqed.measurement.openql_experiments import openql_helpers as oqh
 from pycqed.measurement.randomized_benchmarking.two_qubit_clifford_group \
     import SingleQubitClifford, TwoQubitClifford
@@ -96,12 +92,9 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                 program_name='Interleaved_RB_s{}_int{}_ncl{}_{}'.format(i))
 
     '''
-    platf = Platform('OpenQL_Platform', platf_cfg)
-    p = Program(pname=program_name, nqubits=platf.get_qubit_number(),
-                p=platf)
+    p = oqh.create_program(program_name, platf_cfg)
 
     # attribute get's added to program to help finding the output files
-    p.output_dir = ql.get_output_dir()
     p.filename = join(p.output_dir, p.name + '.qisa')
 
     if not oqh.check_recompilation_needed(
@@ -124,8 +117,8 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
         for j, n_cl in enumerate(nr_cliffords):
             for interleaving_cl in interleaving_cliffords:
                 for net_clifford in net_cliffords:
-                    k = Kernel('RB_{}Cl_s{}_net{}_inter{}'.format(
-                        n_cl, seed, net_clifford, interleaving_cl), p=platf)
+                    k = oqh.create_kernel('RB_{}Cl_s{}_net{}_inter{}'.format(
+                        n_cl, seed, net_clifford, interleaving_cl), p)
                     if initialize:
                         for qubit_idx in qubit_map.values():
                             k.prepz(qubit_idx)
@@ -139,7 +132,7 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                         gates = Cl(cl).gate_decomposition
                         for g, q in gates:
                             if isinstance(q, str):
-                                k.gate(g, qubit_map[q])
+                                k.gate(g, [qubit_map[q]])
                             elif isinstance(q, list):
                                 # proper codeword
                                 k.gate(g, [qubit_map[q[0]], qubit_map[q[1]]])
@@ -154,7 +147,7 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
         if cal_points:
             if number_of_qubits == 1:
                 p = oqh.add_single_qubit_cal_points(
-                    p, platf=platf, qubit_idx=qubits[0],
+                    p, qubit_idx=qubits[0],
                     f_state_cal_pts=f_state_cal_pts)
             elif number_of_qubits == 2:
 
@@ -162,12 +155,9 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                     combinations = ['00', '01', '10', '11', '02', '20', '22']
                 else:
                     combinations = ['00', '01', '10', '11']
-                p = add_multi_q_cal_points(p, platf=platf,
-                                           qubits=qubits,
+                p = oqh.add_multi_q_cal_points()
+                p = add_multi_q_cal_points(p, qubits=qubits,
                                            combinations=combinations)
 
-
-    with suppress_stdout():
-        p.compile(verbose=False)
-
+    p = oqh.compile(p)
     return p
