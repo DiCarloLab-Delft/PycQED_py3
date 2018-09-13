@@ -136,7 +136,7 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
         qubit_map = {'q0': qubits[0],
                      'q1': qubits[1]}
         # arguments used to generate 2 single qubit sequences
-        number_of_qubits = 1
+        number_of_qubits = 2
         Cl = SingleQubitClifford
     else:
         raise NotImplementedError()
@@ -170,17 +170,38 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                                     # proper codeword
                                     k.gate(g, [qubit_map[q[0]], qubit_map[q[1]]])
                     elif simultaneous_single_qubit_RB: 
-                        for q_idx in qubits: 
+
+                        # Gate seqs is a hack for failing openql scheduling
+                        gate_seqs = [[], []]
+                        for gsi, q_idx in enumerate(qubits): 
                             cl_seq = rb.randomized_benchmarking_sequence(
-                                n_cl, number_of_qubits=number_of_qubits,
+                                n_cl, number_of_qubits=1,
                                 desired_net_cl=net_clifford,
                                 interleaving_cl=interleaving_cl)
                             for cl in cl_seq:
                                 gates = Cl(cl).gate_decomposition
-                                for g, q in gates:
-                                    gates = Cl(cl).gate_decomposition
-                                    k.gate(g, q_idx)
+                                # for g, q in gates:
+                                #     k.gate(g, q_idx)
 
+                                # THIS is a hack because of OpenQL 
+                                # scheduling issues #157
+                                gate_seqs[gsi]+=gates
+                        # OpenQL #157 HACK 
+                        l = max([len(gate_seqs[0]), len(gate_seqs[1])])
+                        # print('\n')
+                        # print(gate_seqs[0])
+                        # print(gate_seqs[1])
+
+                        for gi in range(l): 
+                            for gj, q_idx in enumerate(qubits): 
+                            # gj = 0
+                            # q_idx = 0
+                                try: # for possible different lengths in gate_seqs
+                                    g = gate_seqs[gj][gi]
+                                    k.gate(g[0], q_idx)
+                                except IndexError as e: 
+                                    pass 
+                        # end of #157 HACK 
                     # This hack is required to align multiplexed RO in openQL..
                     k.gate("wait",  list(qubit_map.values()), 0)
                     for qubit_idx in qubit_map.values():
