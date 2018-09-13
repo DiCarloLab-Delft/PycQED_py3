@@ -3,6 +3,7 @@ import json
 import numpy as np
 import os
 import pycqed as pq
+import matplotlib.pyplot as plt
 import pycqed.analysis.analysis_toolbox as a_tools
 import pycqed.analysis_v2.base_analysis as ba
 
@@ -12,6 +13,11 @@ class Test_base_analysis(unittest.TestCase):
     def setUpClass(self):
         self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
         a_tools.datadir = self.datadir
+
+    @classmethod
+    def tearDownClass(self):
+        plt.close('all')
+
 
     def test_save_load_json(self):
         # Load data from file

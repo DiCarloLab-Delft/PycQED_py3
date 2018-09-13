@@ -3,11 +3,14 @@ import pycqed as pq
 import numpy as np
 import os
 from pycqed.analysis_v2 import measurement_analysis as ma
-
+import matplotlib.pyplot as plt
 
 
 
 class Test_VNA_complex_reso_Analysis(unittest.TestCase):
+    @classmethod
+    def tearDownClass(self):
+        plt.close('all')
 
     @classmethod
     def setUpClass(self):

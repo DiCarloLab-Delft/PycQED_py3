@@ -1,11 +1,15 @@
 import unittest
 import pycqed as pq
 import os
+import matplotlib.pyplot as plt
 from pycqed.analysis_v2 import measurement_analysis as ma
 from pycqed.analysis_v2 import Two_state_T1_analysis as Ta
 
 
 class Test_efT1_analysis(unittest.TestCase):
+    @classmethod
+    def tearDownClass(self):
+        plt.close('all')
 
     @classmethod
     def setUpClass(self):

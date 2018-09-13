@@ -1,4 +1,5 @@
 import pycqed as pq
+import matplotlib.pyplot as plt
 import os
 from pycqed.analysis import measurement_analysis as ma
 from numpy.testing import assert_almost_equal
@@ -30,3 +31,7 @@ class TestSSRODiscriminationAnalysis:
 
         assert_almost_equal(a.butterfly_coeffs['F_a_butterfly'], 0.819,
                             decimal=3)
+
+    @classmethod
+    def teardown_class(cls):
+        plt.close('all')
