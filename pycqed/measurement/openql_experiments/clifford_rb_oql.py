@@ -155,9 +155,8 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                     combinations = ['00', '01', '10', '11', '02', '20', '22']
                 else:
                     combinations = ['00', '01', '10', '11']
-                p = oqh.add_multi_q_cal_points()
-                p = add_multi_q_cal_points(p, qubits=qubits,
-                                           combinations=combinations)
+                p = oqh.add_multi_q_cal_points(p, qubits=qubits,
+                                               combinations=combinations)
 
     p = oqh.compile(p)
     return p

@@ -1,12 +1,6 @@
-from os.path import join
 import numpy as np
 from pycqed.utilities.general import int2base
 import pycqed.measurement.openql_experiments.openql_helpers as oqh
-import openql.openql as ql
-from pycqed.utilities.general import suppress_stdout
-import logging
-from openql.openql import Program, Kernel, Platform
-from pycqed.measurement.openql_experiments import single_qubit_oql as sqo
 
 
 def single_flux_pulse_seq(qubit_indices: tuple,
@@ -393,7 +387,7 @@ def residual_coupling_sequence(times, q0: int, q1: int, platf_cfg: str):
 
     for i, time in enumerate(times[:-4]):
 
-        k = oqh.create_kernel("residual_coupling_seq_".format(i), p)
+        k = oqh.create_kernel("residual_coupling_seq_{}".format(i), p)
         k.prepz(q0)
         k.prepz(q1)
         wait_nanoseconds = int(round(time/1e-9/2))
