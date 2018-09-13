@@ -872,7 +872,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
         # sample flux bias from a Gaussian, in units of the flux quantum
         mean = 0
-        sigma = 4e-6    # 4e-6 is the same value as in the surface-17 paper of tom&brian
+        sigma = self.noise_parameters_CZ.sigma()    # 4e-6 is the same value as in the surface-17 paper of tom&brian
         self.fluxbias = np.random.normal(mean,sigma)
 
 

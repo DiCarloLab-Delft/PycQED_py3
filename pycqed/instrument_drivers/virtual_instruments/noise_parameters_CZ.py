@@ -56,7 +56,21 @@ class NoiseParametersCZ(Instrument):
         self.add_parameter('alpha_q1', unit='Hz',
                            label='anharmonicity of the static qubit',
                            parameter_class=ManualParameter,
-                           vals=vals.Numbers(), initial_value=-262e6)     
+                           vals=vals.Numbers(), initial_value=-262e6)
+        # for flux noise simulations
+        self.add_parameter('sigma', unit='flux quanta',
+                           label='standard deviation of the Gaussian from which we sample the flux bias',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(), initial_value=4e-4)
+        self.add_parameter('timestamp', unit='n.a.',
+                           label='timestamp of the file from which we have extracted the optimum lambda2 and theta_f',
+                           parameter_class=ManualParameter,
+                           vals=vals.Strings())
+        self.add_parameter('quantities_optimum',
+                           label='quantities in timestamp corresponding to the optimum avgatefidcompsub_pc',
+                           parameter_class=ManualParameter,
+                           vals=vals.Arrays())
+
 
         # for qdots simulations
         self.add_parameter('detuning', unit='meV',
