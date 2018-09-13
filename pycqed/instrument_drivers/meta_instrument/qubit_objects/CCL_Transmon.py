@@ -2559,9 +2559,10 @@ class CCLight_Transmon(Qubit):
         MC.run('T1'+self.msmt_suffix)
         if analyze:
             a = ma.T1_Analysis(auto=True, close_fig=True)
-        if update:
-            self.T1(a.T1)
-        return a.T1
+            if update:
+                self.T1(a.T1)
+            return a.T1
+
 
     def measure_T1_2nd_excited_state(self, times=None, MC=None,
                                      analyze=True, close_fig=True, update=True,
