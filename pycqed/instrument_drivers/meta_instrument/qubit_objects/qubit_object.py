@@ -1,6 +1,7 @@
 import logging
 import numpy as np
 import time
+import warnings
 
 from qcodes.instrument.base import Instrument
 from qcodes.utils import validators as vals
@@ -269,7 +270,7 @@ class Qubit(Instrument):
             freq_res_par = self.freq_res
             freq_RO_par = self.ro_freq
         except:
-            logging.warning('Rename the f_res parameter to freq_res')
+            warnings.warn("Deprecation warning: rename f_res to freq_res")
             freq_res_par = self.f_res
             freq_RO_par = self.f_RO
 
