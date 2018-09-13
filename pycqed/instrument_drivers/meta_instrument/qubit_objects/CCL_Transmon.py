@@ -2557,7 +2557,8 @@ class CCLight_Transmon(Qubit):
         MC.set_sweep_points(times)
         MC.set_detector_function(d)
         MC.run('T1'+self.msmt_suffix)
-        a = ma.T1_Analysis(auto=True, close_fig=True)
+        if analyze:
+            a = ma.T1_Analysis(auto=True, close_fig=True)
         if update:
             self.T1(a.T1)
         return a.T1

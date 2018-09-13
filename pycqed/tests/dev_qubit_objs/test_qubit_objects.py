@@ -426,7 +426,7 @@ class Test_QO(unittest.TestCase):
         # self.CCL_qubit.measure_echo(times=np.arange(0,2e-6,40e-9))
         time.sleep(1)
         self.CCL_qubit.T2_echo(40e-6)
-        self.CCL_qubit.measure_echo(analyze=False)
+        self.CCL_qubit.measure_echo(analyze=False, update=False)
         time.sleep(1)
         with self.assertRaises(ValueError):
             invalid_times = [0.1e-9, 0.2e-9, 0.3e-9, 0.4e-9]
