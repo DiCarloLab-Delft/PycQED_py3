@@ -101,7 +101,11 @@ build develop testing image:manual:
     - /etc/init.d/xvfb start
   script:
     - pip install -e .
-    - py.test pycqed/tests --cov=pycqed --cov-report xml --cov-config=.coveragerc
+    - py.test pycqed/tests --cov=pycqed --cov-report xml --cov-report html
+      --cov-report term --cov-config=.coveragerc
+  artifacts:
+    paths:
+      - htmlcov
 
 run tests stable:
   image: registry.gitlab.com/dicarlolab/pycqed/testing:latest
