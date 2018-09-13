@@ -164,68 +164,14 @@ def plot(x_plot_vec,y_plot_vec,title='No title',xlabel='No xlabel',ylabel='No yl
 
 
 
-def jump_operators(T1_q0,T1_q1,Tphi_q0_ket0toket0,Tphi_q0_ket1toket1,Tphi_q0_ket2toket2,Tphi_q1_ket0toket0,Tphi_q1_ket1toket1,
-					Tphi_q0_sigmaZ_01,Tphi_q0_sigmaZ_12,Tphi_q0_sigmaZ_02,Tphi_q1_sigmaZ_01,Tphi_q1_sigmaZ_12,Tphi_q1_sigmaZ_02):
-    # time independent case
-    raise NotImplementedError("Unsupported way")
+def jump_operators(T1_q0,T1_q1):
 
-'''c_ops=[]
-	if T1_q0 != 0:
-		c_ops.append(np.sqrt(1/T1_q0)*a)
-	if T1_q1 != 0:
-		c_ops.append(np.sqrt(1/T1_q1)*b)
-	if Tphi_q0_ket0toket0 != 0:
-		collapse=qtp.tensor(qtp.qeye(3),qtp.ket2dm(qtp.basis(3,0)))
-		c_ops.append(np.sqrt(1/Tphi_q0_ket0toket0)*collapse)
-	if Tphi_q0_ket1toket1 != 0:
-		collapse=qtp.tensor(qtp.qeye(3),qtp.ket2dm(qtp.basis(3,1)))
-		c_ops.append(np.sqrt(1/Tphi_q0_ket1toket1)*collapse)
-	if Tphi_q0_ket2toket2 != 0:
-		collapse=qtp.tensor(qtp.qeye(3),qtp.ket2dm(qtp.basis(3,2)))
-		c_ops.append(np.sqrt(1/Tphi_q0_ket2toket2)*collapse)
-	if Tphi_q1_ket0toket0 != 0:
-		collapse=qtp.tensor(qtp.ket2dm(qtp.basis(3,0)),qtp.qeye(3))
-		c_ops.append(np.sqrt(1/Tphi_q1_ket0toket0)*collapse)
-	if Tphi_q1_ket1toket1 != 0:
-		collapse=qtp.tensor(qtp.ket2dm(qtp.basis(3,1)),qtp.qeye(3))
-		c_ops.append(np.sqrt(1/Tphi_q1_ket1toket1)*collapse)
-	if Tphi_q0_sigmaZ_01 != 0:
-		sigmaZinqutrit = qtp.Qobj([[1,0,0],
-									[0,-1,0],
-									[0,0,0]])
-		collapse=qtp.tensor(qtp.qeye(3),sigmaZinqutrit)
-		c_ops.append(np.sqrt(1/(2*Tphi_q0_sigmaZ_01))*collapse)
-	if Tphi_q0_sigmaZ_12 != 0:
-		sigmaZinqutrit = qtp.Qobj([[0,0,0],
-									[0,1,0],
-									[0,0,-1]])
-		collapse=qtp.tensor(qtp.qeye(3),sigmaZinqutrit)
-		c_ops.append(np.sqrt(1/(2*Tphi_q0_sigmaZ_12))*collapse)
-	if Tphi_q0_sigmaZ_02 != 0:
-		sigmaZinqutrit = qtp.Qobj([[1,0,0],
-									[0,0,0],
-									[0,0,-1]])
-		collapse=qtp.tensor(qtp.qeye(3),sigmaZinqutrit)
-		c_ops.append(np.sqrt(1/(2*Tphi_q0_sigmaZ_02))*collapse)
-	if Tphi_q1_sigmaZ_01 != 0:
-		sigmaZinqutrit = qtp.Qobj([[1,0,0],
-									[0,-1,0],
-									[0,0,0]])
-		collapse=qtp.tensor(sigmaZinqutrit,qtp.qeye(3))
-		c_ops.append(np.sqrt(1/(2*Tphi_q1_sigmaZ_01))*collapse)
-	if Tphi_q1_sigmaZ_12 != 0:
-		sigmaZinqutrit = qtp.Qobj([[0,0,0],
-									[0,1,0],
-									[0,0,-1]])
-		collapse=qtp.tensor(sigmaZinqutrit,qtp.qeye(3))
-		c_ops.append(np.sqrt(1/(2*Tphi_q1_sigmaZ_12))*collapse)
-	if Tphi_q1_sigmaZ_02 != 0:
-		sigmaZinqutrit = qtp.Qobj([[1,0,0],
-									[0,0,0],
-									[0,0,-1]])
-		collapse=qtp.tensor(sigmaZinqutrit,qtp.qeye(3))
-		c_ops.append(np.sqrt(1/(2*Tphi_q1_sigmaZ_02))*collapse)
-	return c_ops'''
+    c_ops=[]
+    if T1_q0 != 0:
+        c_ops.append(np.sqrt(1/T1_q0)*a)
+    if T1_q1 != 0:
+        c_ops.append(np.sqrt(1/T1_q1)*b)
+    return c_ops
 
 
 
@@ -923,6 +869,13 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         eps_i = self.fluxlutman.calc_amp_to_eps(0, state_A='11', state_B='02')
         self.theta_i = wfl.eps_to_theta(eps_i, g=self.fluxlutman.q_J2())           # Beware theta in radian!
 
+
+        # sample flux bias from a Gaussian, in units of the flux quantum
+        mean = 0
+        sigma = 4e-6    # 4e-6 is the same value as in the surface-17 paper of tom&brian
+        self.fluxbias = np.random.normal(mean,sigma)
+
+
         if not self.fluxlutman.czd_double_sided():
             thetawave = wfl.martinis_flux_pulse(
                 length=self.fluxlutman.cz_length(),
@@ -935,6 +888,17 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             amp = self.fluxlutman.calc_eps_to_amp(epsilon, state_A='11', state_B='02')
                      # transform detuning frequency to (positive) amplitude
             f_pulse = self.fluxlutman.calc_amp_to_freq(amp,'01')
+
+            omega_0 = self.fluxlutman.calc_amp_to_freq(0,'01')
+            f_pulse = f_pulse - np.pi/2 * (omega_0**2/f_pulse) * np.sqrt(1 - (f_pulse**4/omega_0**4)) * self.fluxbias - \
+                                  - np.pi**2/2 * omega_0 * (1+(f_pulse**4/omega_0**4)) / (f_pulse/omega_0)**3 * self.fluxbias**2
+                                  # with sigma 4e-6 the second order is irrelevant
+            amp = self.fluxlutman.calc_freq_to_amp(f_pulse,state='01')
+
+            # plot(x_plot_vec=[tlist*1e9],
+            #       y_plot_vec=[f_pulse-f_pulse_new],
+            #       title='Diff. of freq. of fluxing qubit w/o flux bias',
+            #       xlabel='Time (ns)',ylabel='Freq. (GHz)',legend_labels=['diff'])
         else:
             f_pulse,amp = self.get_f_pulse_double_sided()
             
@@ -1046,32 +1010,11 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
             c_ops = c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1)
 
-        else:
-            def omega_prime(omega):                                   # derivative of f_pulse
-                '''
-                frequency is w = w_0 * cos(phi_e/2)    where phi_e is the external flux through the SQUID.
-                So the derivative wrt phi_e is
-                     w_prime = - w_0/2 sin(phi_e/2) = - w_0/2 * sqrt(1-cos(phi_e/2)**2) = - w_0/2 * sqrt(1-(w/w_0)**2)
-                Note: no need to know what phi_e is.
-                '''
-                return np.abs((self.fluxlutman.q_freq_01()/2)*np.sqrt(1-(omega/self.fluxlutman.q_freq_01())**2))    # we actually return the absolute value because it's the only one who matters later
-
-            if Tphi01_q0_interaction_point != 0:       # mode where the pure dephazing is amplitude-dependent
-                w_min = np.nanmin(f_pulse_convolved_new)        
-                omega_prime_min = omega_prime(w_min)
-
-                f_pulse_convolved_new=np.clip(f_pulse_convolved_new,0,self.fluxlutman.q_freq_01())
-                f_pulse_convolved_new_prime = omega_prime(f_pulse_convolved_new)
-                Tphi01_q0_vec = Tphi01_q0_sweetspot - f_pulse_convolved_new_prime/omega_prime_min*(Tphi01_q0_sweetspot-Tphi01_q0_interaction_point)
-                         # we interpolate Tphi from the sweetspot to the interaction point (=worst point in terms of Tphi)
-                         # by weighting depending on the derivative of f_pulse compared to the derivative at the interaction point
-                c_ops = c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1)
-            else:                                       # mode where the collapse operators are time-independent, and possibly are 0
-                if T1_q1 != 0:
-                    c_ops=jump_operators(T1_q0,T1_q1,0,0,0,0,0,
-                      Tphi01_q0_sweetspot,Tphi01_q0_sweetspot,Tphi01_q0_sweetspot/2,Tphi01_q1,Tphi01_q1,Tphi01_q1/2)
-                else:
-                	c_ops=[]
+        else:                                      # mode where the collapse operators are time-independent, and possibly are 0
+            if T1_q1 != 0:
+                c_ops=jump_operators(T1_q0,T1_q1)
+            else:
+                c_ops=[]
 
 
 
@@ -1080,7 +1023,9 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
             fluxlutman=self.fluxlutman, amp=amp_final,
             sim_step=sim_step_new, verbose=False)
 
-        cost_func_val = -np.log10(1-qoi['avgatefid_compsubspace_pc'])   
+        cost_func_val = -np.log10(1-qoi['avgatefid_compsubspace_pc'])
+
+
 
 
         return cost_func_val, qoi['phi_cond'], qoi['L1']*100, qoi['L2']*100, qoi['avgatefid_pc']*100, \
@@ -1101,6 +1046,12 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         amp_A = self.fluxlutman.calc_eps_to_amp(epsilon_A, state_A='11', state_B='02')
                      # transform detuning frequency to positive amplitude
         f_pulse_A = self.fluxlutman.calc_amp_to_freq(amp_A,'01')
+
+        omega_0 = self.fluxlutman.calc_amp_to_freq(0,'01')
+        f_pulse_A = f_pulse_A - np.pi/2 * (omega_0**2/f_pulse_A) * np.sqrt(1 - (f_pulse_A**4/omega_0**4)) * self.fluxbias - \
+                                  - np.pi**2/2 * omega_0 * (1+(f_pulse_A**4/omega_0**4)) / (f_pulse_A/omega_0)**3 * self.fluxbias**2
+                                  # with sigma 4e-6 the second order is irrelevant
+        amp_A = self.fluxlutman.calc_freq_to_amp(f_pulse_A,state='01')
 
 
         # Generate the second CZ pulse. If the params are np.nan, default
@@ -1130,6 +1081,11 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         amp_B = self.fluxlutman.calc_eps_to_amp(epsilon_B, state_A='11', state_B='02', positive_branch=False)
                      # transform detuning frequency to negative amplitude
         f_pulse_B = self.fluxlutman.calc_amp_to_freq(amp_B,'01')
+
+        f_pulse_B = f_pulse_B - np.pi/2 * (omega_0**2/f_pulse_B) * np.sqrt(1 - (f_pulse_B**4/omega_0**4)) * self.fluxbias * (-1) - \
+                                  - np.pi**2/2 * omega_0 * (1+(f_pulse_B**4/omega_0**4)) / (f_pulse_B/omega_0)**3 * self.fluxbias**2
+                                  # with sigma 4e-6 the second order is irrelevant
+        amp_B = self.fluxlutman.calc_freq_to_amp(f_pulse_B,state='01',positive_branch=False)
 
 
         # N.B. No amp scaling and offset present
