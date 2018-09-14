@@ -58,7 +58,7 @@ RUN pip install --upgrade --no-cache-dir pip && \
 RUN pip install --no-cache-dir \
         coverage \
         pytest-cov \
-        coveralls \
+        codecov \
         codacy-coverage
 
 ADD docker/xvfb_init /etc/init.d/xvfb
