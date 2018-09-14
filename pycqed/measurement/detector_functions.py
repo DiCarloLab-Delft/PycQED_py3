@@ -1414,8 +1414,11 @@ class UHFQC_input_average_detector(Hard_Detector):
         self.nr_samples = nr_samples
         self.nr_averages = nr_averages
 
+    def _get_readout(self):
+        return sum([(1 << c) for c in self.channels])
+
     def get_values(self):
-        self.UHFQC.quex_rl_readout(0)  # resets UHFQC internal readout counters
+        self.UHFQC.quex_rl_readout(self._get_readout())  # resets UHFQC internal readout counters
 
         self.UHFQC.acquisition_arm()
         # starting AWG
@@ -1633,12 +1636,15 @@ class UHFQC_integrated_average_detector(Hard_Detector):
                 self.value_names[2*i+1] = 'Phase'
                 self.value_units[2*i+1] = 'deg'
 
+    def _get_readout(self):
+        return sum([(1 << c) for c in self.channels])
+
     def get_values(self):
         if self.always_prepare:
             self.prepare()
         if self.AWG is not None:
             self.AWG.stop()
-        self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
+        self.UHFQC.quex_rl_readout(self._get_readout())  # resets UHFQC internal readout counters
         self.UHFQC.acquisition_arm()
         # starting AWG
 
@@ -1892,7 +1898,7 @@ class UHFQC_correlation_detector(UHFQC_integrated_average_detector):
 
         if self.AWG is not None:
             self.AWG.stop()
-        self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
+        self.UHFQC.quex_rl_readout(self._get_readout())  # resets UHFQC internal readout counters
         self.UHFQC.acquisition_arm()
         # starting AWG
         if self.AWG is not None:
@@ -1989,12 +1995,15 @@ class UHFQC_integration_logging_det(Hard_Detector):
         self.prepare_function = prepare_function
         self.prepare_function_kwargs = prepare_function_kwargs
 
+    def _get_readout(self):
+        return sum([(1 << c) for c in self.channels])
+
     def get_values(self):
         if self.always_prepare:
             self.prepare()
         if self.AWG is not None:
             self.AWG.stop()
-        self.UHFQC.quex_rl_readout(1)  # resets UHFQC internal readout counters
+        self.UHFQC.quex_rl_readout(self._get_readout())  # resets UHFQC internal readout counters
         self.UHFQC.acquisition_arm()
         # starting AWG
         if self.AWG is not None:
@@ -2165,13 +2174,16 @@ class UHFQC_statistics_logging_det(Soft_Detector):
             self.AWG.stop()
         self.UHFQC.acquisition_finalize()
 
+    def _get_readout(self):
+        return sum([(1 << c) for c in self.channels])
+
     def acquire_data_point(self, **kw):
         if self.AWG is not None:
             self.AWG.stop()
         data_concat = np.zeros(7)
         for i in range(self.nr_chunks):
             # resets UHFQC internal readout counters
-            self.UHFQC.quex_rl_readout(1)
+            self.UHFQC.quex_rl_readout(self._get_readout())
             # resets UHFQC internal sl counters ?
             self.UHFQC.quex_sl_readout(0)
 
