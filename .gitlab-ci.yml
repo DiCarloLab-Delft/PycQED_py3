@@ -112,6 +112,7 @@ build develop testing image:manual:
   artifacts:
     paths:
       - htmlcov
+      - coverage.xml
 
 run tests stable:
   extends: .run-tests-template
