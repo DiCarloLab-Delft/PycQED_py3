@@ -2022,7 +2022,157 @@ def calculate_transmon_and_resonator_transitions(EC, EJ, f_r, g_01,
 
     return f_01_d, f_12_d, f_r_d, f_01_res_shifted, f_r_qubit_shifted
 
+def calculate_transmon_RR_PF_transitions(EC, EJ, f_r, f_PF, g_1, J_1,
+                                   dim=None, ng=0, f_01=None, f_12=None,
+                                            g_12_approximation=1):
+    '''
+    Calculates transmon energy levels and resonator from the full transmon qubit Hamiltonian.
+    '''
 
+    #calculate the bare transmon transitions, hardcoded to three levels only
+    [f_01, f_12], injs = calculate_transmon_transitions(EC, EJ, asym=0, reduced_flux=0,
+                                            no_transitions=2, dim=dim, ng=ng,
+                                            return_injs=True)
+
+    #problem can be cut up in th 0, 1 and 2-excitation manifold with E_ij, i excitations in the qubit and j of the resonator
+    try:
+        E000 = 0
+        g_1 = np.abs(g_1)
+        J_1 = np.abs(J_1)
+        H1 = np.array([[f_01,   g_1, 0],
+                       [g_1,   f_r,  J_1],
+                       [0,      J_1, f_PF]])
+        E100, E010, E001 = np.linalg.eigvalsh(H1)
+        g_2_trm = abs(g_1*injs[1,2]/injs[0,1])
+        g_2_r_trm = abs(g_1*np.sqrt(2))
+        g_2_r_PF = abs(J_1*np.sqrt(2))
+        # print('g_12_correction',g_2_trm/g_2_r_trm)
+        H2 = np.zeros([6,6])
+        H2[0, 0] = f_01+f_12
+        H2[0, 1] = H2[1, 0] = g_2_trm
+
+        H2[1, 1] = f_01+f_r
+        H2[1, 2] = H2[2, 1] = J_1
+        H2[1, 3] = H2[3, 1] = g_2_r_trm
+
+        H2[2, 2] = f_01+f_PF
+        H2[2, 4] = H2[4, 2] = g_1
+        
+        H2[3, 3] = 2*f_r
+        H2[3, 4] = H2[4, 3] = g_2_r_PF
+
+        H2[4, 4] = f_r + f_PF
+        H2[4, 5] = H2[5, 4] = g_2_r_PF
+
+        H2[5, 5] = 2*f_PF
+
+        E200, E110, E101, E020, E011, E002 = np.linalg.eigvalsh(H2)
+        # print(E200/1e9, E110/1e9, E101/1e9, E020/1e9, E011/1e9, E002/1e9)
+        # print(H2)
+        #print(EC/1e6, EJ/1e9, f_r/1e9, g_1/1e6, f_01/1e9, f_12/1e9)
+    except np.linalg.LinAlgError:
+        print(EC/1e6, EJ/1e9, f_r/1e9, g_1/1e6, f_01/1e9, f_12/1e9)
+
+    f_q_01 = E100 
+    f_q_12 = E200 - E100
+
+    f_r1 = E010
+    f_r2 = E001
+
+    f_disp_r1 = E110 - E100
+    f_disp_r2 = E101 - E100
+
+    f_nrsplt_r1 = E110 - E010
+    f_nrsplt_r2 = E101 - E001
+
+    return f_q_01, f_r1, f_r2, f_q_12, f_disp_r1, f_disp_r2, f_nrsplt_r1, f_nrsplt_r2
+
+
+def calculate_transmon_RR_PF_bus_transitions(EC, EJ, f_r, f_PF, f_bus, g_trm_RR, g_RR_PF, g_trm_bus,
+                                   dim=None, ng=0, f_01=None, f_12=None):
+    '''
+    Calculates transmon energy levels and resonator from the full transmon qubit Hamiltonian.
+    '''
+
+    #calculate the bare transmon transitions, hardcoded to three levels only
+    [f_01, f_12], injs = calculate_transmon_transitions(EC, EJ, asym=0, reduced_flux=0,
+                                            no_transitions=2, dim=dim, ng=ng,
+                                            return_injs=True)
+
+    #problem can be cut up in th 0, 1 and 2-excitation manifold with E_ij, i excitations in the qubit and j of the resonator
+    # try:
+    #E0000 = 0
+    g_trm_RR = np.abs(g_trm_RR)
+    g_RR_PF = np.abs(g_RR_PF)
+    H1 = np.array([[f_01,       g_trm_RR,      0,       g_trm_bus],
+                   [g_trm_RR,   f_r,           g_RR_PF, 0],
+                   [0,          g_RR_PF,       f_PF,    0],
+                   [g_trm_bus,  0,             0,       f_bus]])
+
+    E1000, E0100, E0010, E0001 = np.linalg.eigvalsh(H1)
+    g_2_trm_r = abs(g_trm_RR*injs[1,2]/injs[0,1])
+    g_2_r_trm = abs(g_trm_RR*np.sqrt(2))
+    g_2_r_PF = abs(g_RR_PF*np.sqrt(2))
+    g_2_bus_trm = abs(g_trm_bus*np.sqrt(2))
+    g_2_trm_bus = abs(g_trm_bus*injs[1,2]/injs[0,1])
+
+    # print('g_trm_RR2_correction',g_2_trm/g_2_r_trm)
+    H2 = np.zeros([10,10])
+    H2[0, 0] = f_01 + f_12
+    H2[0, 1] = H2[1, 0] = g_2_trm_r
+    H2[0, 3] = H2[3, 0] = g_2_trm_bus
+
+    H2[1, 1] = f_01 + f_r
+    H2[1, 2] = H2[2, 1] = g_RR_PF
+    H2[1, 4] = H2[4, 1] = g_2_r_trm
+    H2[1, 6] = H2[6, 1] = g_trm_bus
+
+    H2[2, 2] = f_01 + f_PF
+    H2[2, 5] = H2[5, 2] = g_trm_RR
+    H2[2, 8] = H2[8, 2] = g_trm_bus
+    
+    H2[3, 3] = f_bus + f_01
+    H2[3, 6] = H2[6, 3] = g_trm_RR
+    H2[3, 9] = H2[9, 3] = g_2_bus_trm
+
+    H2[4, 4] = 2*f_r
+    H2[4, 5] = H2[5, 4] = g_2_r_PF
+
+    H2[5, 5] = f_r + f_PF
+    H2[5, 7] = H2[7, 5] = g_2_r_PF
+
+    H2[6, 6] = f_r + f_bus
+    H2[6, 8] = H2[8, 6] = g_RR_PF
+
+    H2[7, 7] = 2*f_PF
+
+    H2[8, 8] = f_PF + f_bus
+
+    H2[9, 9] = f_bus + f_bus
+
+    E2000, E1100, E1010, E1001, E0200, E0110, E0101, E0020, E0011, E0002 = np.linalg.eigvalsh(H2)
+        # print(E200/1e9, E110/1e9, E101/1e9, E020/1e9, E011/1e9, E002/1e9)
+        # print(H2)
+        #print(EC/1e6, EJ/1e9, f_r/1e9, g_1/1e6, f_01/1e9, f_12/1e9)
+    # except np.linalg.LinAlgError:
+    #     print(EC/1e6, EJ/1e9, f_r/1e9, g_trm_RR/1e6, f_01/1e9, f_12/1e9)
+
+    f_q_01 = E1000 
+    f_q_12 = E2000 - E1000
+
+    f_r1 = E0100
+    f_r2 = E0010
+    f_r3 = E0001
+
+    f_disp_r1 = E1100 - E1000
+    f_disp_r2 = E1010 - E1000
+    f_disp_r3 = E1001 - E1000
+
+    f_nrsplt_r1 = E1100 - E0100
+    f_nrsplt_r2 = E1010 - E0010
+    f_nrsplt_r3 = E1001 - E0010
+
+    return f_q_01, f_r1, f_r2, f_q_12, f_disp_r1, f_disp_r2, f_nrsplt_r1, f_nrsplt_r2
 
 
 def fit_EC_EJ_g_f_res_ng(flux_01, f_01, flux_12, f_12, flux_r, f_r, ng=0, asym=0):
