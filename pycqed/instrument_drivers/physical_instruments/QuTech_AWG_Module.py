@@ -57,11 +57,19 @@ class QuTech_AWG_Module(SCPI):
         self.device_descriptor.numMarkers = 8
         self.device_descriptor.numTriggers = 8
         # Commented out until bug fixed
-        self.device_descriptor.numCodewords = 128
+        self.device_descriptor.numCodewords = 16384 # TODO [versloot] get from device,
+                                                    # is based on IORear_markerTrigger or IORead_DIO
 
         # valid values
         self.device_descriptor.mvals_trigger_impedance = vals.Enum(50),
         self.device_descriptor.mvals_trigger_level = vals.Numbers(0, 5.0)
+
+        self.codeword_protocols = {
+            # Name          Ch1,    Ch2,    Ch3,    Ch4
+            'Flux' :        [0x03,  0x0C,   0x30,   0xC0],
+            'Microwave' :   [0x3F,  0x3F,   0x3F,   0x3F]
+        }
+
         # FIXME: not in [V]
 
         self.add_parameters()
@@ -73,6 +81,7 @@ class QuTech_AWG_Module(SCPI):
         # QWG specific
         #######################################################################
 
+        # Channel pair paramaters
         for i in range(self.device_descriptor.numChannels//2):
             ch_pair = i*2+1
             sfreq_cmd = 'qutech:output{}:frequency'.format(ch_pair)
@@ -108,6 +117,7 @@ class QuTech_AWG_Module(SCPI):
                 # NB range is not a hardware limit
                 vals=vals.Arrays(-2, 2, shape=(2, 2)))
 
+        # Triggers parameter
         for i in range(1, self.device_descriptor.numTriggers+1):
             triglev_cmd = 'qutech:trigger{}:level'.format(i)
             # individual trigger level per trigger input:
@@ -135,6 +145,7 @@ class QuTech_AWG_Module(SCPI):
             dac_temperature_cmd = 'STATus:DAC{}:TEMperature'.format(ch)
             gain_adjust_cmd = 'DAC{}:GAIn:DRIFt:ADJust'.format(ch)
             dac_digital_value_cmd = 'DAC{}:DIGitalvalue'.format(ch)
+            dac_bit_select_cmd = 'DAC{}:BITSelect'.format(ch)
             # Set channel first to ensure sensible sorting of pars
             # Compatibility: 5014, QWG
             self.add_parameter('ch{}_state'.format(ch),
@@ -218,6 +229,36 @@ class QuTech_AWG_Module(SCPI):
                                  +'Set parameter:\n\tInteger: Value to write to the DAC, min: 0, max: 4095\n' \
                                  +'\tWhere 0 is minimal DAC scale and 4095 is maximal DAC scale \n')
 
+            self.add_parameter('ch{}_bit_select'.format(ch),
+                               unit='',
+                               label=('Channel {}, set bit selection for this channel').format(ch),
+                               get_cmd=dac_bit_select_cmd + '?',
+                               set_cmd=dac_bit_select_cmd + ' {}',
+                               vals=vals.Ints(0, 1<<self.device_descriptor.numTriggers),
+                               get_parser=np.uint32,
+                               docstring='Codeword bit select for a channel\n' \
+                                 +'Set: \n' \
+                                 +'\tParamater: Integer, the bit select\n' \
+                                 +'\nWhen a bit is enabled (1) in the bitSelect, this bit is used as part of the codeword for that channel ' \
+                                 +' If a bit is disabled, it will be ignored.\n' \
+                                 +'This can be used to control individual channels with a their own codeword\n ' \
+                                 +'Note that codeword 1 will start on the first enabled bit. Bit endianness: LSB, lowest bit right \n' \
+                                 +'Examples:\n' \
+                                 +'\tCh1: 0b000011(0x03); Only the first and second bit will be used as codeword for channel 1. '\
+                                 + 'Codeword 1 set by `codeword_1_ch1_waveform(...)` is on bit 1\n' \
+                                 +'\tCh2: 0b001100(0x0C); Only the third and forth bit will be used as codeword for channel 2. '\
+                                 + 'Codeword 1 set by `codeword_1_ch2_waveform(...)` is on bit 3\n' \
+                                 +'\tCh3: 0b110000(0x30); Only the fifth and sixth bit will be used as codeword for channel 3. '\
+                                 + 'Codeword 1 set by `codeword_1_ch3_waveform(...)` is on bit 5\n' \
+                                 +'\tCh4: 0b110000(0x30); Only the fifth and sixth bit will be used as codeword for channel 4, cw1 is on bit 5. '\
+                                 + 'Codeword 1 set by `codeword_1_ch3_waveform(...)` is on bit 5\n' \
+                                 +'The bit select of different channels are only allowed to overlap eachother if their least significant bit is the same. ' \
+                         +'So a bitSelect of ch1: 0b011, and ch2: 0b010 is not allowed. This will be checked on `start()`. Error are reported by `getError()`/`getErrors()`.' \
+                                 +'\n\n Get:\n' \
+                                 +'\tParamater: Channel to get the bit select from\n' \
+                                 +'\tResult:  Integer that represent the bit select of the channel\n')
+
+        # Signle paramaters
         self.add_parameter('status_frontIO_temperature',
                            unit='C',
                            label=('FrontIO temperature'),
@@ -236,6 +277,7 @@ class QuTech_AWG_Module(SCPI):
                              +'Temperature measurement interval is 10 seconds\n' \
                              +'Return:\n     float with temperature in Celsius')
 
+        # Paramater for codeword per channel
         for cw in range(self.device_descriptor.numCodewords):
             for j in range(self.device_descriptor.numChannels):
                 ch = j+1
@@ -282,6 +324,16 @@ class QuTech_AWG_Module(SCPI):
                                                  # string because a uint32 is more
                                                  # usefull when other logic is needed
                            docstring=doc_trgs_log_inp)
+
+        self.add_parameter('codeword_protocol',
+                           unit='',
+                           label='Codeword protocol',
+                           get_cmd=self._getCodewordProtocol,
+                           set_cmd=self._setCodewordProtocol,
+                           vals=vals.Enum('Microwave', 'Flux'),
+                           docstring='Reads the current system status. E.q. channel ' \
+                             +'status: on or off, overflow, underdrive.\n' \
+                             +'Return:\n     JSON object with system status')
 
         self._add_codeword_parameters()
 
@@ -372,6 +424,32 @@ class QuTech_AWG_Module(SCPI):
             M[i] = x
         M = M.reshape(2, 2, order='F')
         return(M)
+
+    def _setCodewordProtocol(self, protocol_name):
+        '''
+        Args:
+            protocol_name(string): Name of the predefined protocol
+        '''
+        # function used internally for the parameters because of formatting
+        protocol = self.codeword_protocols.get(protocol_name)
+        if protocol is None:
+            raise RuntimeError("Invalid protocol")
+
+        for ch, bitSelect in enumerate(protocol):
+            self.set("ch{}_bit_select".format(ch+1), bitSelect)
+
+    def _getCodewordProtocol(self):
+        channels_bit_sels = [];
+        result = "Custom" # Default, if no protocol matches
+        for ch in range(1, self.device_descriptor.numChannels + 1):
+            channels_bit_sels.append(self.get("ch{}_bit_select".format(ch)))
+
+        for prtc_name, prtc_bitSels in self.codeword_protocols.items():
+            if channels_bit_sels == prtc_bitSels:
+                result = prtc_name;
+                break;
+
+        return result
 
     def detect_overflow(self):
         '''
