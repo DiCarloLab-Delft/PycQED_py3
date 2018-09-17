@@ -1138,26 +1138,20 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
             k.gate('rx90', q0)
             if not CZ_disabled:
                 for j in range(nr_of_repeated_gates):
-                    if j!=0 and wait_time_between>0:
-                        k.gate('wait', [2, 0], wait_time_between)
+                    k.gate('wait', [2, 0], wait_time_between)
                     k.gate(flux_codeword, 2, 0)
                 if fixed_max_nr_of_repeated_gates is not None:
                     for l in range(fixed_max_nr_of_repeated_gates-j):
-                        if wait_time_between>0:
-                            k.gate('wait', [2, 0], wait_time_between)
+                        k.gate('wait', [2, 0], wait_time_between)
                         k.gate('fl_cw_00', 2,0)
             else:
                 for j in range(nr_of_repeated_gates):
-                    if j!=0 and wait_time_between>0:
-                        k.gate('wait', [2, 0], wait_time_between)
-                    if CZ_duration>0:
-                        k.gate('wait', [2, 0], CZ_duration)  # in ns
+                    k.gate('wait', [2, 0], wait_time_between)
+                    k.gate('wait', [2, 0], CZ_duration)  # in ns
                 if fixed_max_nr_of_repeated_gates is not None:
                     for l in range(fixed_max_nr_of_repeated_gates-j):
-                        if wait_time_between>0:
-                            k.gate('wait', [2, 0], wait_time_between)
-                        if CZ_duration>0:
-                            k.gate('wait', [2, 0], CZ_duration)
+                        k.gate('wait', [2, 0], wait_time_between)
+                        k.gate('wait', [2, 0], CZ_duration)
             try:
                 if wait_time_after>0:
                     k.gate('wait', [2, 0], (wait_time_after))
@@ -1176,6 +1170,7 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
             if case == 'excitation':
                 k.gate('rx180', q1)
 
+            k.gate('wait', [q1,q0], 0)
             k.measure(q0)
             k.measure(q1)
             # Implements a barrier to align timings
