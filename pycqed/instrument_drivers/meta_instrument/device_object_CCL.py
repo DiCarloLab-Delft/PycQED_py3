@@ -187,15 +187,32 @@ class DeviceCCL(Instrument):
         # Substract lowest value to ensure minimal latency is used.
         # note that this also supports negative delays (which is useful for
         # calibrating)
+
         lowest_value = min(latencies.values())
         for key, val in latencies.items():
             latencies[key] = val - lowest_value
 
+        # ensuring that RO latency is a multiple of 20 ns
+        ro_latency_modulo_20 = latencies['ro_latency_0']%20e-9
+        for key, val in latencies.items():
+            latencies[key] = val + (20e-9 - ro_latency_modulo_20)%20e-9
+
         # Setting the latencies in the CCL
         CCL = self.instr_CC.get_instr()
-        for i, val in enumerate(latencies.values()):
+        for i, (key, val) in enumerate(latencies.items()):
             CCL.set('dio{}_out_delay'.format(i+1), val //
                     20e-9)  # Convert to CCL dio value
+
+            for qbt in self.qubits():
+                # get qubit objects
+                q  = self.find_instrument(qbt)
+                # set delay AWGs and channels
+                if key in ('ro_latency_0'):
+                    pass
+                elif key in ('flux_latency_0'):
+                    q.flux_fine_delay(val%20e-9)
+                elif key in ('mw_latency_0'):
+                    q.mw_fine_delay(val%20e-9)
 
     def prepare_readout(self):
         self._prep_ro_setup_qubits()
