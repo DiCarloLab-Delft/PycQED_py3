@@ -575,7 +575,8 @@ class DeviceCCL(Instrument):
                                         flux_codeword='fl_cw_01',
                                         nr_of_repeated_gates: int =1,
                                         fixed_max_nr_of_repeated_gates: int=None,
-                                        verbose=True, disable_metadata=False):
+                                        verbose=True, disable_metadata=False,
+                                        extract_only=False):
         """
         Measures the "conventional cost function" for the CZ gate that
         is a conditional oscillation.
@@ -615,7 +616,8 @@ class DeviceCCL(Instrument):
 
         a = ma2.Conditional_Oscillation_Analysis(
             options_dict={'ch_idx_osc': self.qubits().index(q0),
-                          'ch_idx_spec': self.qubits().index(q1)})
+                          'ch_idx_spec': self.qubits().index(q1)},
+                          extract_only=extract_only)
 
         if verbose:
             info_msg = (print(a.plot_dicts['phase_message']['text_string']))
@@ -1130,6 +1132,8 @@ class DeviceCCL(Instrument):
             value_units=['deg', 'deg'],
             msmt_kw={'disable_initial_pulse': disable_initial_pulse,
                      'qubits': qubits,
+                     'counter_par':[counter_par], 
+                     'gate_separation_par':[gate_separation_par], 
                      'nested_MC': nested_MC,
                      'flux_cw': flux_cw})
 
@@ -1150,6 +1154,9 @@ class DeviceCCL(Instrument):
         It is defined as a private method as it should not be used
         independently.
         """
+        # FXIME passing as a list is a hack to work around Function detector
+        counter_par = counter_par[0]
+        gate_separation_par = gate_separation_par[0]
 
         if disable_initial_pulse:
             flux_codeword_a = 'fl_cw_00'
@@ -1195,7 +1202,7 @@ class DeviceCCL(Instrument):
             nr_cliffords=np.array([1.,  2.,  3.,  4.,  5.,  6.,  7.,  9., 12.,
                                   15., 20., 25., 30., 50.]), nr_seeds=100,
             interleaving_cliffords=[None], label='TwoQubit_RB_{}seeds_{}_{}',
-            recompile: bool =False, cal_points=True):
+            recompile: bool ='as needed', cal_points=True):
 
         # Settings that have to be preserved, change is required for
         # 2-state readout and postprocessing
@@ -1234,7 +1241,9 @@ class DeviceCCL(Instrument):
                 nr_seeds=1,
                 platf_cfg=self.cfg_openql_platform_fn(),
                 program_name='TwoQ_RB_int_cl{}_s{}_ncl{}_{}_{}_double'.format(
-                    i, nr_cliffords, interleaving_cliffords,
+                    i,
+                    list(map(int,nr_cliffords)),
+                    interleaving_cliffords,
                     qubits[0], qubits[1]),
                 interleaving_cliffords=interleaving_cliffords,
                 cal_points=cal_points,
@@ -1282,6 +1291,203 @@ class DeviceCCL(Instrument):
                exp_metadata={'bins': sweep_points})
         # N.B. if interleaving cliffords are used, this won't work
         ma2.RandomizedBenchmarking_TwoQubit_Analysis()
+
+    def measure_two_qubit_purity_benchmarking(
+            self, qubits, MC,
+            nr_cliffords=np.array([1.,  2.,  3.,  4.,  5.,  6.,  7.,  9., 12.,
+                                  15., 20., 25., 30., 50.]), nr_seeds=100,
+            interleaving_cliffords=[None], label='TwoQubit_purityB_{}seeds_{}_{}',
+            recompile: bool ='as needed', cal_points=True):
+
+        # Settings that have to be preserved, change is required for
+        # 2-state readout and postprocessing
+        old_weight_type = self.ro_acq_weight_type()
+        old_digitized = self.ro_acq_digitized()
+        self.ro_acq_weight_type('SSB')
+        self.ro_acq_digitized(False)
+
+        self.prepare_for_timedomain()
+
+        MC.soft_avg(1)
+        # set back the settings
+        self.ro_acq_weight_type(old_weight_type)
+        self.ro_acq_digitized(old_digitized)
+
+        for q in qubits:
+            q_instr = self.find_instrument(q)
+            mw_lutman = q_instr.instr_LutMan_MW.get_instr()
+            mw_lutman.load_ef_rabi_pulses_to_AWG_lookuptable()
+
+        MC.soft_avg(1)
+
+        programs = []
+        t0 = time.time()
+        print('Generating {} PB programs'.format(nr_seeds))
+        qubit_idxs = [self.find_instrument(q).cfg_qubit_nr() for q in qubits]
+        for i in range(nr_seeds):
+            # check for keyboard interrupt q because generating can be slow
+            check_keyboard_interrupt()
+            sweep_points = np.concatenate(
+                [nr_cliffords, [nr_cliffords[-1]+.5]*4])
+
+            p = cl_oql.purity_benchmarking(
+                qubits=qubit_idxs,
+                nr_cliffords=nr_cliffords,
+                nr_seeds=1,
+                platf_cfg=self.cfg_openql_platform_fn(),
+                program_name='TwoQ_RB_int_cl{}_s{}_ncl{}_{}_{}_double'.format(
+                    i,
+                    list(map(int,nr_cliffords)),
+                    interleaving_cliffords,
+                    qubits[0], qubits[1]),
+                interleaving_cliffords=interleaving_cliffords,
+                cal_points=cal_points,
+                net_cliffords=[0, 3*24+3],  # measures with and without inverting
+                f_state_cal_pts=True,
+                recompile=recompile)
+            p.sweep_points = sweep_points
+            programs.append(p)
+            print('Generated {} PB programs in {:.1f}s'.format(
+                i+1, time.time()-t0), end='\r')
+        print('Succesfully generated {} PB programs in {:.1f}s'.format(
+            nr_seeds, time.time()-t0))
+
+        # to include calibration points
+        if cal_points:
+            sweep_points = np.append(
+                np.repeat(nr_cliffords, 2),
+                [nr_cliffords[-1]+.5]*2 + [nr_cliffords[-1]+1.5]*2 +
+                [nr_cliffords[-1]+2.5]*3)
+        else:
+            sweep_points = np.repeat(nr_cliffords, 2)
+
+        d = self.get_int_logging_detector(qubits=qubits)
+
+        counter_param = ManualParameter('name_ctr', initial_value=0)
+        prepare_function_kwargs = {
+            'counter_param': counter_param,
+            'programs': programs,
+            'CC': self.instr_CC.get_instr()}
+
+        d.prepare_function = oqh.load_range_of_oql_programs
+        d.prepare_function_kwargs = prepare_function_kwargs
+        # d.nr_averages = 128
+
+        reps_per_seed = 4094//len(sweep_points)
+        d.nr_shots = reps_per_seed*len(sweep_points)
+
+        s = swf.None_Sweep(parameter_name='Number of Cliffords', unit='#')
+
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.tile(sweep_points, reps_per_seed*nr_seeds))
+
+        MC.set_detector_function(d)
+        MC.run(label.format(nr_seeds, qubits[0], qubits[1]),
+               exp_metadata={'bins': sweep_points})
+        # N.B. if interleaving cliffords are used, this won't work
+        ma2.RandomizedBenchmarking_TwoQubit_Analysis()
+
+    def measure_two_qubit_simultaneous_randomized_benchmarking(
+            self, qubits, MC,
+            nr_cliffords=2**np.arange(11), nr_seeds=100,
+            interleaving_cliffords=[None], label='TwoQubit_sim_RB_{}seeds_{}_{}',
+            recompile: bool ='as needed', cal_points=True):
+        """
+        Performs simultaneous RB on two qubits. 
+        The data of this experiment should be compared to the results of single 
+        qubit RB 
+        """
+
+        # Settings that have to be preserved, change is required for
+        # 2-state readout and postprocessing
+        old_weight_type = self.ro_acq_weight_type()
+        old_digitized = self.ro_acq_digitized()
+        self.ro_acq_weight_type('SSB')
+        self.ro_acq_digitized(False)
+
+        self.prepare_for_timedomain()
+
+        MC.soft_avg(1)
+        # set back the settings
+        self.ro_acq_weight_type(old_weight_type)
+        self.ro_acq_digitized(old_digitized)
+
+        for q in qubits:
+            q_instr = self.find_instrument(q)
+            mw_lutman = q_instr.instr_LutMan_MW.get_instr()
+            mw_lutman.load_ef_rabi_pulses_to_AWG_lookuptable()
+
+        MC.soft_avg(1)
+
+        programs = []
+        t0 = time.time()
+        print('Generating {} RB programs'.format(nr_seeds))
+        qubit_idxs = [self.find_instrument(q).cfg_qubit_nr() for q in qubits]
+        for i in range(nr_seeds):
+            # check for keyboard interrupt q because generating can be slow
+            check_keyboard_interrupt()
+            sweep_points = np.concatenate(
+                [nr_cliffords, [nr_cliffords[-1]+.5]*4])
+
+            p = cl_oql.randomized_benchmarking(
+                qubits=qubit_idxs,
+                nr_cliffords=nr_cliffords,
+                nr_seeds=1,
+                platf_cfg=self.cfg_openql_platform_fn(),
+                program_name='TwoQ_Sim_RB_int_cl{}_s{}_ncl{}_{}_{}_double'.format(
+                    i,
+                    list(map(int,nr_cliffords)),
+                    interleaving_cliffords,
+                    qubits[0], qubits[1]),
+                interleaving_cliffords=interleaving_cliffords,
+                simultaneous_single_qubit_RB=True, 
+                cal_points=cal_points,
+                net_cliffords=[0, 3],  # measures with and without inverting
+                f_state_cal_pts=True,
+                recompile=recompile)
+            p.sweep_points = sweep_points
+            programs.append(p)
+            print('Generated {} RB programs in {:.1f}s'.format(
+                i+1, time.time()-t0), end='\r')
+        print('Succesfully generated {} RB programs in {:.1f}s'.format(
+            nr_seeds, time.time()-t0))
+
+        # to include calibration points
+        if cal_points:
+            sweep_points = np.append(
+                np.repeat(nr_cliffords, 2),
+                [nr_cliffords[-1]+.5]*2 + [nr_cliffords[-1]+1.5]*2 +
+                [nr_cliffords[-1]+2.5]*3)
+        else:
+            sweep_points = np.repeat(nr_cliffords, 2)
+
+        d = self.get_int_logging_detector(qubits=qubits)
+
+        counter_param = ManualParameter('name_ctr', initial_value=0)
+        prepare_function_kwargs = {
+            'counter_param': counter_param,
+            'programs': programs,
+            'CC': self.instr_CC.get_instr()}
+
+        d.prepare_function = oqh.load_range_of_oql_programs
+        d.prepare_function_kwargs = prepare_function_kwargs
+        # d.nr_averages = 128
+
+        reps_per_seed = 4094//len(sweep_points)
+        d.nr_shots = reps_per_seed*len(sweep_points)
+
+        s = swf.None_Sweep(parameter_name='Number of Cliffords', unit='#')
+
+        MC.set_sweep_function(s)
+        MC.set_sweep_points(np.tile(sweep_points, reps_per_seed*nr_seeds))
+
+        MC.set_detector_function(d)
+        MC.run(label.format(nr_seeds, qubits[0], qubits[1]),
+               exp_metadata={'bins': sweep_points})
+        # N.B. if interleaving cliffords are used, this won't work
+        # FIXME: write a proper analysis for simultaneous RB 
+        # ma2.RandomizedBenchmarking_TwoQubit_Analysis()
+
 
     ########################################################
     # Calibration methods

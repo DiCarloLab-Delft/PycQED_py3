@@ -354,6 +354,26 @@ class CCLight_Transmon(Qubit):
             set_cmd=self._set_mw_vsm_delay,
             get_cmd=self._get_mw_vsm_delay)
 
+        self.add_parameter('mw_fine_delay', label='fine delay of the AWG channel',
+            unit='s',
+            docstring='This parameters serves for fine tuning of '
+                    'the RO, MW and flux pulses. It should be kept '
+                    'positive and below 20e-9. Any larger adjustments'
+                    'should be done by changing CCL dio delay'
+                    'through device object.',
+            set_cmd=self._set_mw_fine_delay,
+            get_cmd=self._get_mw_fine_delay)
+
+        self.add_parameter('flux_fine_delay', label='fine delay of the AWG channel',
+            unit='s',
+            docstring='This parameters serves for fine tuning of '
+                    'the RO, MW and flux pulses. It should be kept '
+                    'positive and below 20e-9. Any larger adjustments'
+                    'should be done by changing CCL dio delay'
+                    'through device object.',
+            set_cmd=self._set_flux_fine_delay,
+            get_cmd=self._get_flux_fine_delay)
+
         self.add_parameter('mw_vsm_ch_in',
                            label='VSM input channel Gaussian component',
                            vals=vals.Ints(1, 4),
@@ -396,6 +416,44 @@ class CCLight_Transmon(Qubit):
 
     def _get_mw_vsm_delay(self):
         return self._mw_vsm_delay
+
+    def _set_mw_fine_delay(self,val):
+        if self.cfg_with_vsm():
+            logging.warning('CCL transmon is using VSM. Use mw_vsm_delay to'
+                            'adjust delay')
+        else:
+            lutman = self.find_instrument(self.instr_LutMan_MW())
+            AWG = lutman.find_instrument(lutman.AWG())
+            using_QWG = (AWG.__class__.__name__ == 'QuTech_AWG_Module')
+            if using_QWG:
+                logging.warning('CCL transmon is using QWG. Not implemented.')
+            else:
+                AWG.set('sigouts_{}_delay'.format(lutman.channel_I()-1), val)
+                AWG.set('sigouts_{}_delay'.format(lutman.channel_Q()-1), val)
+        self._mw_fine_delay = val
+
+
+    def _get_mw_fine_delay(self):
+        return self._mw_fine_delay
+
+    def _set_flux_fine_delay(self,val):
+        if self.cfg_with_vsm():
+            logging.warning('CCL transmon is using VSM. Use mw_vsm_delay to'
+                            'adjust delay')
+        else:
+            lutman = self.find_instrument(self.instr_LutMan_Flux())
+            AWG = lutman.find_instrument(lutman.AWG())
+            using_QWG = (AWG.__class__.__name__ == 'QuTech_AWG_Module')
+            if using_QWG:
+                logging.warning('CCL transmon is using QWG. Not implemented.')
+            else:
+                AWG.set('sigouts_{}_delay'.format(lutman.cfg_awg_channel()-1), val)
+                # val = AWG.get('sigouts_{}_delay'.format(lutman.cfg_awg_channel()-1))
+        self._flux_fine_delay = val
+
+
+    def _get_flux_fine_delay(self):
+        return self._flux_fine_delay
 
     def add_spec_parameters(self):
         self.add_parameter('spec_vsm_amp',
