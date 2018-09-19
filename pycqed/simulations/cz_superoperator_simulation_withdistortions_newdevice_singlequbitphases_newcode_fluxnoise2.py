@@ -17,7 +17,7 @@ from pycqed.measurement.waveform_control_CC import waveforms_flux as wfl
 import scipy
 import matplotlib.pyplot as plt
 import logging
-np.set_printoptions(threshold=np.inf)
+#np.set_printoptions(threshold=np.inf)
 
 
 
@@ -757,15 +757,11 @@ def simulate_quantities_of_interest_superoperator(tlist, c_ops, noise_parameters
     for i in range(len(amp)):
         H=calc_hamiltonian(amp[i],fluxlutman,noise_parameters_CZ)
         H=S.dag()*H*S
-        S_H = qtp.Qobj(matrix_change_of_variables(H),dims=[[3, 3], [3, 3]])     # change of basis from H_0 to H
         if c_ops != []:
             c_ops_temp=[]
             for c in range(len(c_ops)):
                 if isinstance(c_ops[c],list):
-                    c_ops_temp.append(S_H * c_ops[c][0]*c_ops[c][1][i] * S_H.dag())    # c_ops are already in the H_0 basis
-                                                                                       # but for each point they couple the actual eigenstates of H(t)
-                                                                                       # so we need to transform them.
-                    # the formula is c_H = |1_H><0_H| = S |1><0| S.dag()
+                    c_ops_temp.append(c_ops[c][0]*c_ops[c][1][i])    # c_ops are already in the H_0 basis
                 else:
                     c_ops_temp.append(S_H * c_ops[c] * S_H.dag())
             liouville_exp_t=(qtp.liouvillian(H,c_ops_temp)*sim_step).expm()
@@ -884,13 +880,17 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         	# If sigma=0 there's no need for sampling
 	        if sigma != 0:
 	            samplingpoints_gaussian = np.linspace(-5*sigma,5*sigma,n_sampling_gaussian)    # after 5 sigmas we cut the integral
+	            delta_x = samplingpoints_gaussian[1]-samplingpoints_gaussian[0]
+	            values_gaussian = gaussian(samplingpoints_gaussian,mean,sigma)
+	            weights = values_gaussian*delta_x
 	        else:
 	        	samplingpoints_gaussian = np.array([0])
+	        	delta_x = 1
+	        	values_gaussian = np.array([1])
+	        	weights = np.array([1])
 
 
-	        delta_x = samplingpoints_gaussian[1]-samplingpoints_gaussian[0]
-	        values_gaussian = gaussian(samplingpoints_gaussian,mean,sigma)
-	        weights = values_gaussian*delta_x
+	        
 
 	        qoi_vec = list()
 	        U_final_vec = list()
@@ -1030,7 +1030,10 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 		                return gc+gc*amp*np.exp(-x/tau)         # formula used to fit the experimental data
 
 		            T2_q0_vec=expT2(f_pulse_convolved_new,T2_q0_amplitude_dependent[0],T2_q0_amplitude_dependent[1],T2_q0_amplitude_dependent[2])
-		            Tphi01_q0_vec = Tphi_from_T1andT2(T1_q0,T2_q0_vec)
+		            if T1_q0 != 0:
+		                Tphi01_q0_vec = Tphi_from_T1andT2(T1_q0,T2_q0_vec)
+		            else:
+		                Tphi01_q0_vec = T2_q0_vec     # in the case where we don't want T1 and we are inputting Tphi and not T2
 
 		            c_ops = c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1)
 
@@ -1047,15 +1050,20 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 		            fluxlutman=self.fluxlutman, amp=amp_final,
 		            sim_step=sim_step_new, verbose=False)
 
-		        cost_func_val = -np.log10(1-qoi['avgatefid_compsubspace_pc'])
+		        cost_func_val = -np.log10(1-qoi['avgatefid_compsubspace_pc'])    # this is actually not used in the following
 
 		        
-		        qoi_vec.append(np.array([cost_func_val, qoi['phi_cond'], qoi['L1']*100, qoi['L2']*100, qoi['avgatefid_pc']*100, 
+		        quantities_of_interest = [cost_func_val, qoi['phi_cond'], qoi['L1']*100, qoi['L2']*100, qoi['avgatefid_pc']*100, 
 	                     qoi['avgatefid_compsubspace_pc']*100, qoi['phase_q0'], qoi['phase_q1'], 
-	                     qoi['avgatefid_compsubspace']*100, qoi['avgatefid_compsubspace_pc_onlystaticqubit']*100]))
+	                     qoi['avgatefid_compsubspace']*100, qoi['avgatefid_compsubspace_pc_onlystaticqubit']*100]
+		        qoi_vec.append(np.array(quantities_of_interest))
 		        U_final_vec.append(qoi['U_final_new'])
 
-	        qoi_average = np.average(qoi_vec, axis=0, weights=weights)   # NB: the average of various quantities is re-done appropriately in the following.
+	        
+	        qoi_average = np.zeros(len(quantities_of_interest))
+	        for index in [2,3,4,8]:    # 4 is not trustable here, and we don't care anyway
+	        	qoi_average[index] = np.average(np.array(qoi_vec)[:,index], weights=weights)   # NB: the average of various quantities is re-done appropriately in the following.
+
 
 	        ## phases need to be averaged carefully, e.g. average of 45 and 315 degrees is 0, not 180
 	        def average_phases(phases,weights):
@@ -1085,6 +1093,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 		        	logging.warning('Something wrong with averaging the phases.')
 	        	return np.rad2deg(angle) % 360
 
+
 	        for index in [1,6,7]:
 	        	qoi_average[index]=average_phases(np.array(qoi_vec)[:,index],weights)
 
@@ -1092,12 +1101,16 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 	        # The correction for avgatefid_pc should be always the same. We choose to correct an angle equal to the average angle
 	        phases=[0,qoi_average[6],qoi_average[7],qoi_average[6]+qoi_average[7],0,0,0]
 	        average=0
+	        average_partial=0
 	        for j in range(len(U_final_vec)):
 	        	U_final=U_final_vec[j]
 	        	L1=leakage_from_superoperator(U_final)
 	        	avgatefid_compsubspace_pc=pro_avfid_superoperator_compsubspace_phasecorrected(U_final,L1,phases)
+	        	avgatefid_compsubspace_partial=pro_avfid_superoperator_compsubspace_phasecorrected_onlystaticqubit(U_final,L1,phases)
 	        	average+=avgatefid_compsubspace_pc * weights[j]
+	        	average_partial+=avgatefid_compsubspace_partial * weights[j]
 	        qoi_average[5]=average*100
+	        qoi_average[9]=average_partial*100
 
 	        qoi_average[0] = -np.log10(1-qoi_average[5]/100)    # we want log of the average and not average of the log
 
