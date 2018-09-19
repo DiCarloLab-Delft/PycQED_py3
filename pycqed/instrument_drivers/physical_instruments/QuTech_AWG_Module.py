@@ -239,23 +239,18 @@ class QuTech_AWG_Module(SCPI):
                                docstring='Codeword bit select for a channel\n' \
                                  +'Set: \n' \
                                  +'\tParamater: Integer, the bit select\n' \
-                                 +'\nWhen a bit is enabled (1) in the bitSelect, this bit is used as part of the codeword for that channel ' \
-                                 +' If a bit is disabled, it will be ignored.\n' \
-                                 +'This can be used to control individual channels with a their own codeword\n ' \
+                                 +'\nWhen a bit is enabled (1) in the bitSelect, this bit is used as part of the codeword for that channel. ' \
+                                 +' If a bit is disabled (0), it will be ignored.\n' \
+                                 +'This can be used to control individual channels with a their own codeword.\n' \
                                  +'Note that codeword 1 will start on the first enabled bit. Bit endianness: LSB, lowest bit right \n' \
-                                 +'Examples:\n' \
-                                 +'\tCh1: 0b000011(0x03); Only the first and second bit will be used as codeword for channel 1. '\
-                                 + 'Codeword 1 set by `codeword_1_ch1_waveform(...)` is on bit 1\n' \
-                                 +'\tCh2: 0b001100(0x0C); Only the third and forth bit will be used as codeword for channel 2. '\
-                                 + 'Codeword 1 set by `codeword_1_ch2_waveform(...)` is on bit 3\n' \
-                                 +'\tCh3: 0b110000(0x30); Only the fifth and sixth bit will be used as codeword for channel 3. '\
-                                 + 'Codeword 1 set by `codeword_1_ch3_waveform(...)` is on bit 5\n' \
-                                 +'\tCh4: 0b110000(0x30); Only the fifth and sixth bit will be used as codeword for channel 4, cw1 is on bit 5. '\
-                                 + 'Codeword 1 set by `codeword_1_ch3_waveform(...)` is on bit 5\n' \
-                                 +'The bit select of different channels are only allowed to overlap eachother if their least significant bit is the same. ' \
-                         +'So a bitSelect of ch1: 0b011, and ch2: 0b010 is not allowed. This will be checked on `start()`. Error are reported by `getError()`/`getErrors()`.' \
+                                 +'\nExamples:\n' \
+                                 +'\tCh1: 0b000011(0x03); Only the first and second bit will be used as codeword for channel 1.\n'\
+                                 +'\tCh2: 0b001100(0x0C); Only the third and forth bit will be used as codeword for channel 2.\n'\
+                                 +'\tCh3: 0b110000(0x30); Only the fifth and sixth bit will be used as codeword for channel 3.\n'\
+                                 +'\tCh4: 0b110000(0x30); Only the fifth and sixth bit will be used as codeword for channel 4.\n'\
+                                 +'The bit select of different channels are only allowed to overlap each other if their least significant bit is the same.\n' \
+                                 +'So a bitSelect of ch1: 0b011, and ch2: 0b010 is not allowed. This will be checked on `start()`. Errors are reported by `getError()` or `getErrors()`.' \
                                  +'\n\n Get:\n' \
-                                 +'\tParamater: Channel to get the bit select from\n' \
                                  +'\tResult:  Integer that represent the bit select of the channel\n')
 
         # Signle paramaters
