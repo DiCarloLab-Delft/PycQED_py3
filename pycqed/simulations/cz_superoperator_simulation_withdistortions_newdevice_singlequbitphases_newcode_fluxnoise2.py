@@ -764,7 +764,7 @@ def simulate_quantities_of_interest_superoperator(tlist, c_ops, noise_parameters
                 if isinstance(c_ops[c],list):
                     c_ops_temp.append(c_ops[c][0]*c_ops[c][1][i])    # c_ops are already in the H_0 basis
                 else:
-                    c_ops_temp.append(S_H * c_ops[c] * S_H.dag())
+                    c_ops_temp.append(c_ops[c])
             liouville_exp_t=(qtp.liouvillian(H,c_ops_temp)*sim_step).expm()
         else:
         	liouville_exp_t=(-1j*H*sim_step).expm()
@@ -1112,7 +1112,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 	        qoi_average[5]=average*100
 	        qoi_average[9]=average_partial*100
 
-	        qoi_average[0] = -np.log10(1-qoi_average[5]/100)    # we want log of the average and not average of the log
+	        qoi_average[0] = (-np.log10(1-qoi_average[5]/100))**4    # we want log of the average and not average of the log
 
 	        qoi_plot.append(qoi_average)
 
