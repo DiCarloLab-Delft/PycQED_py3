@@ -7,6 +7,9 @@ Included noise in the simulation.
 
 July 2018
 Added distortions to simulation.
+
+September 2018
+Added flux noise as a quasi-static component with Gaussian distribution
 """
 import time
 import numpy as np
@@ -336,8 +339,6 @@ def phases_from_superoperator(U):
         phi_20 = np.rad2deg(np.angle(U[6, 6]))
 
     phi_cond = (phi_11 - phi_01 - phi_10 + phi_00) % 360  # still the right formula independently from phi_00
-    # !!! check that this is a good formula for superoperators: there is a lot of redundancy there,
-    #     if the evolution is unitary, but not necessarily if it's noisy!
 
     return phi_00, phi_01, phi_10, phi_11, phi_02, phi_20, phi_cond
 
@@ -849,7 +850,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         super().__init__()
         self.value_names = ['Cost func', 'Cond phase', 'L1', 'L2', 'avgatefid_pc', 'avgatefid_compsubspace_pc',
                             'phase_q0', 'phase_q1', 'avgatefid_compsubspace', 'avgatefid_compsubspace_pc_onlystaticqubit']
-        self.value_units = ['a.u.', 'deg', '%', '%', '%', '%', 'deg', 'deg', 'a.u.', 'a.u.']
+        self.value_units = ['a.u.', 'deg', '%', '%', '%', '%', 'deg', 'deg', '%', '%']
         self.fluxlutman = fluxlutman
         self.noise_parameters_CZ = noise_parameters_CZ
         self.fitted_stepresponse_ty=fitted_stepresponse_ty      # list of 2 elements: stepresponse (=y)
@@ -859,7 +860,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
     def acquire_data_point(self, **kw):
 
         sim_step=1/self.fluxlutman.sampling_rate()
-        subdivisions_of_simstep=4      # 4 is a good one
+        subdivisions_of_simstep=4      # 4 is a good one, corresponding to a time step of 0.1 ns
         sim_step_new=sim_step/subdivisions_of_simstep      # waveform is generated according to sampling rate of AWG,
                                                            # but we can use a different step for simulating the time evolution
         tlist = (np.arange(0, self.fluxlutman.cz_length(),
@@ -869,7 +870,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         self.theta_i = wfl.eps_to_theta(eps_i, g=self.fluxlutman.q_J2())           # Beware theta in radian!
 
 
-        ### Discretize avarage (integral) over a Gaussian distribution
+        ### Discretize average (integral) over a Gaussian distribution
         mean = 0
         sigma = self.noise_parameters_CZ.sigma()    # 4e-6 is the same value as in the surface-17 paper of tom&brian
 
@@ -890,13 +891,10 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 	        	weights = np.array([1])
 
 
-	        
-
 	        qoi_vec = list()
 	        U_final_vec = list()
 	        for point_j in range(len(samplingpoints_gaussian)):
 	        	self.fluxbias = samplingpoints_gaussian[point_j]
-
 
 		        if not self.fluxlutman.czd_double_sided():
 		            thetawave = wfl.martinis_flux_pulse(
@@ -915,9 +913,10 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 		            # Correction up to second order of the frequency due to flux noise, computed from w_q0(phi) = w_q0^sweetspot * sqrt(cos(pi * phi/phi_0))
 		            f_pulse = f_pulse - np.pi/2 * (omega_0**2/f_pulse) * np.sqrt(1 - (f_pulse**4/omega_0**4)) * self.fluxbias - \
 		                                  - np.pi**2/2 * omega_0 * (1+(f_pulse**4/omega_0**4)) / (f_pulse/omega_0)**3 * self.fluxbias**2
-		                                  # with sigma 4e-6 the second order is irrelevant
+		                                  # with sigma up to circa 1e-3 \mu\Phi_0 the second order is irrelevant
 		            amp = self.fluxlutman.calc_freq_to_amp(f_pulse,state='01')
 
+		            ### Script to check how the pulse is affected by the flux bias
 		            # plot(x_plot_vec=[tlist*1e9],
 		            #       y_plot_vec=[f_pulse-f_pulse_new],
 		            #       title='Diff. of freq. of fluxing qubit w/o flux bias',
@@ -927,7 +926,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 		            
 
 		        # For better accuracy in simulations, redefine f_pulse and amp in terms of sim_step_new.
-		        # We split here below in two cases to keep into account that certain times net-zero is one AWG time-step londer than the conventional with the same pulse length
+		        # We split here below in two cases to keep into account that certain times net-zero is one AWG time-step longer than the conventional with the same pulse length
 		        if len(tlist) == len(amp):
 		        	tlist_temp=np.concatenate((tlist,np.array([self.fluxlutman.cz_length()])))
 		        	tlist_new = (np.arange(0, self.fluxlutman.cz_length(),
@@ -944,11 +943,11 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 		        f_pulse=f_pulse_interp(tlist_new)
 		        amp=amp_interp(tlist_new)
 
+		        ### Script to plot the waveform
 		        # plot(x_plot_vec=[tlist_new*1e9],
 		        #           y_plot_vec=[f_pulse/1e9],
 		        #           title='Freq. of fluxing qubit during pulse',
 		        #           xlabel='Time (ns)',ylabel='Freq. (GHz)',legend_labels=['omega_B(t)'])
-
 
 
 		        amp=amp*self.noise_parameters_CZ.voltage_scaling_factor()       # recommended to change discretely the scaling factor
@@ -1057,16 +1056,17 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 	                     qoi['avgatefid_compsubspace_pc']*100, qoi['phase_q0'], qoi['phase_q1'], 
 	                     qoi['avgatefid_compsubspace']*100, qoi['avgatefid_compsubspace_pc_onlystaticqubit']*100]
 		        qoi_vec.append(np.array(quantities_of_interest))
-		        U_final_vec.append(qoi['U_final_new'])
+		        U_final_vec.append(qoi['U_final_new'])            # note that this is the propagator in the rotating frame
 
 	        
 	        qoi_average = np.zeros(len(quantities_of_interest))
 	        for index in [2,3,4,8]:    # 4 is not trustable here, and we don't care anyway
-	        	qoi_average[index] = np.average(np.array(qoi_vec)[:,index], weights=weights)   # NB: the average of various quantities is re-done appropriately in the following.
+	        	qoi_average[index] = np.average(np.array(qoi_vec)[:,index], weights=weights)
 
 
 	        ## phases need to be averaged carefully, e.g. average of 45 and 315 degrees is 0, not 180
 	        def average_phases(phases,weights):
+	        	# phases has to be passed in degrees
 	        	sines=np.sin(np.deg2rad(phases))
 	        	cosines=np.cos(np.deg2rad(phases))
 	        	# we separately average sine and cosine
@@ -1149,7 +1149,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         omega_0 = self.fluxlutman.calc_amp_to_freq(0,'01')
         f_pulse_A = f_pulse_A - np.pi/2 * (omega_0**2/f_pulse_A) * np.sqrt(1 - (f_pulse_A**4/omega_0**4)) * self.fluxbias - \
                                   - np.pi**2/2 * omega_0 * (1+(f_pulse_A**4/omega_0**4)) / (f_pulse_A/omega_0)**3 * self.fluxbias**2
-                                  # with sigma 4e-6 the second order is irrelevant
+                                  # with sigma up to circa 1e-3 \mu\Phi_0 the second order is irrelevant
         amp_A = self.fluxlutman.calc_freq_to_amp(f_pulse_A,state='01')
 
 
@@ -1183,7 +1183,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
         f_pulse_B = f_pulse_B - np.pi/2 * (omega_0**2/f_pulse_B) * np.sqrt(1 - (f_pulse_B**4/omega_0**4)) * self.fluxbias * (-1) - \
                                   - np.pi**2/2 * omega_0 * (1+(f_pulse_B**4/omega_0**4)) / (f_pulse_B/omega_0)**3 * self.fluxbias**2
-                                  # with sigma 4e-6 the second order is irrelevant
+                                  # with sigma up to circa 1e-3 \mu\Phi_0 the second order is irrelevant
         amp_B = self.fluxlutman.calc_freq_to_amp(f_pulse_B,state='01',positive_branch=False)
 
 
