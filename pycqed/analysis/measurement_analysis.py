@@ -849,6 +849,7 @@ class MeasurementAnalysis(object):
             self.value_units = self.get_key('value_units')
 
             self.data = self.get_values('Data').transpose()
+            print(np.shape(self.data)) ##############################
             x = self.data[0]
             y = self.data[1]
             cols = np.unique(x).shape[0]
@@ -6243,6 +6244,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
             - 'hanger' = amplitude fit with slope
             - 'complex' = complex transmission fit WITHOUT slope
             - 'lorentzian' = fit to a Lorentzian lineshape
+            - 'HalfFeedlineS21' = fit to an apropriate J model
 
         'fit_window': allows to select the windows of data to fit.
                       Example: fit_window=[100,-100]
@@ -6296,7 +6298,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
             else:
                 raise ValueError(
                     'The fitting model specified is not available')
-            # added reject outliers to be robust agains CBox data acq bug.
+            # added reject outliers to be robust against CBox data acq bug.
             # this should have no effect on regular data acquisition and is
             # only used in the guess.
             amplitude_guess = max(
@@ -6415,6 +6417,22 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                 f=self.sweep_points,
                                 params=self.params)
 
+        elif fitting_model == 'HalfFeedlineS21':
+            Model = fit_mods.half_Feed_lineS12_J_Model
+            fit_mods.half_Feed_lineS12_J_Model.guess(Model,np.transpose([self.sweep_points,self.measured_powers)])
+
+            #checking which choice of PF-RR results in the better fit
+            fit=Model.fit(data=self.measured_powers,omega=self.sweep_points)
+            fRR=Model.param_hints['omegaRR']['value']
+            Model.set_param_hint('omegaRR',value=Model.param_hints['omegaPF']['value'],min=Model.param_hints['omegaPF']['value']-2e7,max=Model.param_hints['omegaPF']['value']+2e7)
+            Model.set_param_hint('omegaPF',value=fRR,min=fRR-2e7,max=fRR+2e7)
+            fit2=Model.fit(data=self.measured_powers,omega=self.sweep_points)
+            if (sum(fit.eval_uncertainty(omega=self.sweep_points))/len(fit.eval_uncertainty(omega=self.sweep_points))>=sum(fit2.eval_uncertainty(omega=self.sweep_points))/len(fit2.eval_uncertainty(omega=self.sweep_points))):
+                fit_res = fit2
+            else:
+                fit_res = fit
+
+
 
         else:
             raise ValueError('fitting model "{}" not recognized'.format(
@@ -6462,6 +6480,15 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                             xlabel=self.sweep_name,
                                             x_unit=self.sweep_unit[0],
                                             ylabel=str('Power (arb. units)'),
+                                            save=False)
+
+        elif fitting_model == 'HalfFeedlineS21':
+            self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                            y=self.measured_powers,
+                                            fig=fig, ax=ax,
+                                            xlabel=self.sweep_name,
+                                            x_unit=self.sweep_unit[0],
+                                            ylabel=str('magn (mVpeak)'),
                                             save=False)
 
         scale = SI_prefix_and_scale_factor(val=max(abs(ax.get_xticks())),
