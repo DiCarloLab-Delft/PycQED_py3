@@ -111,7 +111,9 @@ def bounce_correction(ysig, tau: float, amp: float,
 
 def exponential_decay_correction_hw_friendly(ysig, tau: float, amp: float,
                                              sampling_rate: float=1,
-                                             inverse: bool=False):
+                                             inverse: bool=False,
+                                             paths = 8,
+                                             ppl = 2):
     """
     Corrects for an exponential decay using "multipath_filter2".
 
@@ -137,7 +139,7 @@ def exponential_decay_correction_hw_friendly(ysig, tau: float, amp: float,
         k = amp/(1+amp)/(1-alpha)
 
 
-    filtered_signal = multipath_filter2(sig=ysig, alpha=alpha, k=k, paths=8)
+    filtered_signal = multipath_filter2(sig=ysig, alpha=alpha, k=k, paths=paths, ppl=ppl)
 
     if inverse:
         raise NotImplementedError()
@@ -173,8 +175,11 @@ def coef_round(value, force_bshift=None):
         # to simplify the cores we allow 4 discrete shifts by 4 bits: 0, -4, -8
         # and -12
         if force_bshift is None:
-            bshift = np.max(
-                [np.min([np.floor(-np.log2(np.abs(value))/4.)*4., 12.]), 0.])
+            if value == 0.0:
+                bshift = 0
+            else:
+                bshift = np.max(
+                    [np.min([np.floor(-np.log2(np.abs(value))/4.)*4., 12.]), 0.])
         else:
             bshift = force_bshift
         # 18 bits within the multiplication itself
@@ -217,9 +222,8 @@ def multipath_filter(sig, alpha, k, paths):
 
 
 
-def multipath_filter2(sig, alpha, k, paths,
-                      hw_rounding: bool=True,
-                      ppl = 2):
+def multipath_filter2(sig, alpha, k, paths, ppl,
+                      hw_rounding: bool=True):
     """
     hardware friendly
     exponential moving average correction filter with pipeline simulation
