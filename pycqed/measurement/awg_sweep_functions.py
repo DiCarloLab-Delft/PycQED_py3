@@ -2488,6 +2488,7 @@ class Flux_pulse_CPhase_hard_swf_new(swf.Hard_Sweep):
             return
 
         if self.upload:
+            print('Uploaded CPhase Sequence')
             fsqs.flux_pulse_CPhase_seq_new(
                 phases=self.phases,
                 flux_params=flux_params,
@@ -2499,7 +2500,7 @@ class Flux_pulse_CPhase_hard_swf_new(swf.Hard_Sweep):
                 CZ_pulse_name=self.CZ_pulse_name,
                 cal_points=self.cal_points,
                 reference_measurements=self.reference_measurements,
-                upload= not self.upload,
+                upload=self.upload,
                 return_seq= True
                 )
 

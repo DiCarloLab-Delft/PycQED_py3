@@ -1874,13 +1874,14 @@ def measure_cphase_new( qbc, qbt, qbr, amps, lengths,
 
     t1 = time.time()
     print('Routine 1 with ',len(amps)*len(phases),' sweeppoints in T=',t1-t0,' s.')
-    return t1-t0
     # ma.TwoD_Analysis(close_file=True)
-    # flux_pulse_ma = ma.Fluxpulse_Ramsey_2D_Analysis(
-    #     label='CPhase_measurement_{}_{}'.format(qbc.name,qbt.name),
-    #     qb_name=qbc.name, cal_points=cal_points,
-    #     reference_measurements=True, auto=False
-    #     )
+    flux_pulse_ma = ma.Fluxpulse_Ramsey_2D_Analysis(
+         label='CPhase_measurement_{}_{}'.format(qbc.name,qbt.name),
+         qb_name=qbc.name, cal_points=cal_points,
+         reference_measurements=False, auto=True
+         )
+    return t1-t0,flux_pulse_ma
+
     # fitted_phases, fitted_amps = \
     #     flux_pulse_ma.fit_all(plot=False,
     #                           cal_points=cal_points,

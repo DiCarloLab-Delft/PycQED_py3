@@ -6419,7 +6419,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
 
         elif fitting_model == 'HalfFeedlineS21':
             Model = fit_mods.half_Feed_lineS12_J_Model
-            fit_mods.half_Feed_lineS12_J_Model.guess(Model,np.transpose([self.sweep_points,self.measured_powers)])
+            fit_mods.half_Feed_lineS12_J_Model.guess(Model,np.transpose([self.sweep_points,self.measured_powers]))
 
             #checking which choice of PF-RR results in the better fit
             fit=Model.fit(data=self.measured_powers,omega=self.sweep_points)
