@@ -253,6 +253,25 @@ class QuTech_AWG_Module(SCPI):
                                  +'\n\n Get:\n' \
                                  +'\tResult:  Integer that represent the bit select of the channel\n')
 
+            # Trigger parameters
+            doc_trgs_log_inp = 'Reads the current input values on the all the trigger ' \
+                        +'inputs for a channel, after the bitSelect.\nReturn:\n    uint32 where trigger 1 (T1) ' \
+                        +'is on the Least significant bit (LSB), T2 on the second  ' \
+                        +'bit after LSB, etc.\n\n For example, if only T3 is ' \
+                        +'connected to a high signal, the return value is: ' \
+                        +'4 (0b0000100)\n\n Note: To convert the return value ' \
+                        +'to a readable ' \
+                        +'binary output use: `print(\"{0:#010b}\".format(qwg.' \
+                        +'triggers_logic_input()))`'
+            self.add_parameter('ch{}_triggers_logic_input'.format(ch),
+                               label='Read triggers input value',
+                               get_cmd='QUTEch:TRIGgers{}:LOGIcinput?'.format(ch),
+                               get_parser=np.uint32, # Did not convert to readable
+                                                     # string because a uint32 is more
+                                                     # usefull when other logic is needed
+                               docstring=doc_trgs_log_inp)
+
+
         # Signle paramaters
         self.add_parameter('status_frontIO_temperature',
                            unit='C',
@@ -301,24 +320,6 @@ class QuTech_AWG_Module(SCPI):
                            docstring='Reads the current system status. E.q. channel ' \
                              +'status: on or off, overflow, underdrive.\n' \
                              +'Return:\n     JSON object with system status')
-
-        # Trigger parameters
-        doc_trgs_log_inp = 'Reads the current input values on the all the trigger ' \
-                    +'inputs.\nReturn:\n    uint32 where trigger 1 (T1) ' \
-                    +'is on the Least significant bit (LSB), T2 on the second  ' \
-                    +'bit after LSB, etc.\n\n For example, if only T3 is ' \
-                    +'connected to a high signal, the return value is: ' \
-                    +'4 (0b0000100)\n\n Note: To convert the return value ' \
-                    +'to a readable ' \
-                    +'binary output use: `print(\"{0:#010b}\".format(qwg.' \
-                    +'triggers_logic_input()))`'
-        self.add_parameter('triggers_logic_input',
-                           label='Read triggers input value',
-                           get_cmd='QUTEch:TRIGgers:LOGIcinput?',
-                           get_parser=np.uint32, # Did not convert to readable
-                                                 # string because a uint32 is more
-                                                 # usefull when other logic is needed
-                           docstring=doc_trgs_log_inp)
 
         self.add_parameter('codeword_protocol',
                            unit='',
