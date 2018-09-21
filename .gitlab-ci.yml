@@ -108,7 +108,7 @@ build develop testing image:manual:
   script:
     - pip install -e .
     - py.test pycqed/tests --cov=pycqed --cov-report xml --cov-report html
-      --cov-report term --cov-config=.coveragerc
+      --cov-config=.coveragerc
   artifacts:
     paths:
       - htmlcov
