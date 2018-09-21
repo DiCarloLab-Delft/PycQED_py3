@@ -1409,7 +1409,7 @@ class TD_Analysis(MeasurementAnalysis):
     def __init__(self, NoCalPoints=4, center_point=31, make_fig=True,
                  zero_coord=None, one_coord=None, cal_points=None,
                  rotate_and_normalize=True, plot_cal_points=True,
-                 for_ef=False, qb_name=None, **kw):
+                 for_ef=False, qb_name=None, RO_channel=0, **kw):
         self.NoCalPoints = NoCalPoints
         self.normalized_values = []
         self.normalized_cal_vals = []
@@ -1422,6 +1422,7 @@ class TD_Analysis(MeasurementAnalysis):
         self.center_point = center_point
         self.plot_cal_points = plot_cal_points
         self.for_ef = for_ef
+        self.RO_channel = RO_channel
 
         super().__init__(qb_name=qb_name, **kw)
 
@@ -1610,7 +1611,7 @@ class TD_Analysis(MeasurementAnalysis):
             cal_one_points = None
 
         # Rotate and normalize data
-        if len(self.measured_values) == 1:
+        if len(self.measured_values) == 1 or self.RO_channel != 0:
             # Only one quadrature was measured
             if cal_zero_points is None and cal_one_points is None:
                 # a_tools.normalize_data_v3 does not work with 0 cal_points. Use
@@ -1619,11 +1620,14 @@ class TD_Analysis(MeasurementAnalysis):
                                 ' for 0 cal_points. Setting NoCalPoints to 4.')
                 self.NoCalPoints = 4
                 calsteps = 4
-                cal_zero_points = list(range(NoPts - int(self.NoCalPoints),
-                                             int(NoPts - int(self.NoCalPoints) / 2)))
-                cal_one_points = list(range(int(NoPts - int(self.NoCalPoints) / 2), NoPts))
+                cal_zero_points = \
+                    list(range(NoPts - int(self.NoCalPoints),
+                             int(NoPts - int(self.NoCalPoints) / 2)))
+                cal_one_points = \
+                    list(range(int(NoPts - int(self.NoCalPoints) / 2), NoPts))
             self.corr_data = a_tools.normalize_data_v3(
-                self.measured_values[0], cal_zero_points, cal_one_points)
+                self.measured_values[self.RO_channel],
+                cal_zero_points, cal_one_points)
         else:
             if (calsteps == 6) and (not last_ge_pulse):
                 # For this case we pass in the calibration data, not the indices

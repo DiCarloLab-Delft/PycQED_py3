@@ -1368,3 +1368,319 @@ def cphase_gate_tuneup(qb_control, qb_target,
     pulse_amplitude_best_value = a1.optimization_result[0][1]
 
     return pulse_length_best_value, pulse_amplitude_best_value
+
+
+def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
+                       artificial_detuning=None,
+                       cal_points=True, no_cal_points=4, upload=True,
+                       MC=None, soft_avgs=1,
+                       thresholded=False, #analyses can't handle it!
+                       analyze=True, update=False,
+                       UHFQC=None, pulsar=None, **kw):
+
+    # sweep_points_dict of the form:
+    # {msmt_name: sweep_points_array}
+    # where msmt_name must be one of the following:
+    # ['rabi', 'ramsey', 'qscale', 'T1', 'T2'}
+
+    if MC is None:
+        MC = qubits[0].MC
+    if UHFQC is None:
+        UHFQC = qubits[0].UHFQC
+    if pulsar is None:
+        pulsar = qubits[0].pulsar
+
+    # set up multiplexed readout
+    multiplexed_pulse(qubits, f_LO, upload=True)
+
+    operation_dict = get_operation_dict(qubits)
+
+    if thresholded:
+        key = 'dig'
+    else:
+        key = 'int'
+
+    df = get_multiplexed_readout_detector_functions(
+        qubits, UHFQC=UHFQC, pulsar=pulsar)[key + '_avg_det']
+
+    qubit_names = [qb.name for qb in qubits]
+
+    if len(qubit_names) > 5:
+        msmt_suffix = '_{}qubits'.format(len(qubit_names))
+    else:
+        msmt_suffix = '_qb{}'.format(''.join([i[-1] for i in qubit_names]))
+
+    if cal_points:
+        for key, spts in sweep_points_dict.items():
+            if key != 'qscale':
+                step = np.abs(spts[-1]-spts[-2])
+                if no_cal_points == 4:
+                    sweep_points_dict[key] = np.concatenate(
+                        [spts, [spts[-1]+step, spts[-1]+2*step, spts[-1]+3*step,
+                                spts[-1]+4*step]])
+                elif no_cal_points == 2:
+                    sweep_points_dict[key] = np.concatenate(
+                        [spts, [spts[-1]+step, spts[-1]+2*step]])
+                else:
+                    sweep_points_dict[key] = spts
+
+    # Generate the sweep params
+    if 'rabi' in sweep_points_dict:
+        sweep_points = sweep_points_dict['rabi']
+        if sweep_params is None:
+            sweep_params = (
+                ('X180', {'pulse_pars': {'amplitude': (lambda sp: sp),
+                                         'repeat': 3}}),
+            )
+
+        sf = calibrate_n_qubits(sweep_params=sweep_params,
+                                sweep_points=sweep_points,
+                                qb_names=qubit_names,
+                                operation_dict=operation_dict,
+                                cal_points=cal_points,
+                                upload=upload,
+                                parameter_name='amplitude',
+                                unit='V')
+
+        MC.soft_avg(soft_avgs)
+        MC.set_sweep_function(sf)
+        MC.set_sweep_points(sweep_points)
+        MC.set_detector_function(df)
+        label = 'Rabi' + msmt_suffix
+        MC.run(label)
+
+        if analyze:
+            for qb in qubits:
+                RabiA = ma.Rabi_Analysis(
+                    label=label, qb_name=qb.name,
+                    RO_channel=qb.RO_acq_weight_function_I(),
+                    NoCalPoints=4, close_fig=True, **kw)
+
+                if update:
+                    rabi_amps = RabiA.rabi_amplitudes
+                    amp180 = rabi_amps['piPulse']
+                    amp90 = rabi_amps['piHalfPulse']
+                    try:
+                        qb.amp180(amp180)
+                        qb.amp90_scale(amp90/amp180)
+                    except AttributeError as e:
+                        logging.warning('%s. This parameter will not be '
+                                        'updated.'%e)
+
+    if 'ramsey' in sweep_points_dict:
+        if artificial_detuning is None:
+            raise ValueError('Specify an artificial_detuning for the Ramsey '
+                             'measurement.')
+        sweep_points = sweep_points_dict['ramsey']
+        if sweep_params is None:
+            sweep_params = (
+                ('X90', {}),
+                ('X90', {
+                    'pulse_pars': {
+                        'refpoint': 'start',
+                        'pulse_delay': (lambda sp: sp),
+                        'phase': (lambda sp:
+                                  ((sp-sweep_points[0]) * artificial_detuning *
+                                   360) % 360)}})
+            )
+
+        sf = calibrate_n_qubits(sweep_params=sweep_params,
+                                sweep_points=sweep_points_dict['rabi'],
+                                qb_names=qubit_names,
+                                operation_dict=operation_dict,
+                                cal_points=cal_points,
+                                upload=upload,
+                                parameter_name='time',
+                                unit='s')
+
+        MC.soft_avg(soft_avgs)
+        MC.set_sweep_function(sf)
+        MC.set_sweep_points(sweep_points)
+        MC.set_detector_function(df)
+        label = 'Ramsey' + msmt_suffix
+        MC.run(label)
+
+        if analyze:
+            for qb in qubits:
+                RamseyA = ma.Ramsey_Analysis(
+                    label=label, qb_name=qb.name,
+                    NoCalPoints=4, RO_channel=qb.RO_acq_weight_function_I(),
+                    artificial_detuning=artificial_detuning, **kw)
+
+                if update:
+                    new_qubit_freq = RamseyA.qubit_frequency
+                    T2_star = RamseyA.T2_star
+                    try:
+                        qb.f_qubit(new_qubit_freq)
+                    except AttributeError as e:
+                        logging.warning('%s. This parameter will not be '
+                                        'updated.'%e)
+                    try:
+                        qb.T2_star(T2_star['T2_star'])
+                    except AttributeError as e:
+                        logging.warning('%s. This parameter will not be '
+                                        'updated.'%e)
+
+    if 'qscale' in sweep_points_dict:
+        sweep_points = sweep_points_dict['qscale']
+        temp_array = np.zeros(3*sweep_points.size)
+        np.put(temp_array,list(range(0,temp_array.size,3)),sweep_points)
+        np.put(temp_array,list(range(1,temp_array.size,3)),sweep_points)
+        np.put(temp_array,list(range(2,temp_array.size,3)),sweep_points)
+        sweep_points = temp_array
+
+        if cal_points:
+            step = np.abs(sweep_points[-1]-sweep_points[-2])
+            if no_cal_points == 4:
+                sweep_points = np.concatenate(
+                    [sweep_points, [sweep_points[-1]+step,
+                                    sweep_points[-1]+2*step,
+                                    sweep_points[-1]+3*step,
+                                    sweep_points[-1]+4*step]])
+            elif no_cal_points == 2:
+                sweep_points = np.concatenate(
+                    [sweep_points, [sweep_points[-1]+step,
+                                    sweep_points[-1]+2*step]])
+            else:
+                pass
+
+        if sweep_params is None:
+            sweep_params = (
+                ('X90', {'pulse_pars': {'motzoi': (lambda sp: sp)},
+                         'condition': (lambda i: i%3==0)}),
+                ('X180', {'pulse_pars': {'motzoi': (lambda sp: sp)},
+                          'condition': (lambda i: i%3==0)}),
+                ('X90', {'pulse_pars': {'motzoi': (lambda sp: sp)},
+                         'condition': (lambda i: i%3==1)}),
+                ('Y180', {'pulse_pars': {'motzoi': (lambda sp: sp)},
+                          'condition': (lambda i: i%3==1)}),
+                ('X90', {'pulse_pars': {'motzoi': (lambda sp: sp)},
+                         'condition': (lambda i: i%3==2)}),
+                ('mY180', {'pulse_pars': {'motzoi': (lambda sp: sp)},
+                           'condition': (lambda i: i%3==2)}),
+                ('RO', {})
+            )
+
+        sf = calibrate_n_qubits(sweep_params=sweep_params,
+                                sweep_points=sweep_points_dict['qscale'],
+                                qb_names=qubit_names,
+                                operation_dict=operation_dict,
+                                cal_points=cal_points,
+                                upload=upload,
+                                parameter_name='qscale_factor',
+                                unit='')
+
+        MC.soft_avg(soft_avgs)
+        MC.set_sweep_function(sf)
+        MC.set_sweep_points(sweep_points)
+        MC.set_detector_function(df)
+        label = 'QScale' + msmt_suffix
+        MC.run(label)
+
+        if analyze:
+            for qb in qubits:
+                qscaleA = ma.QScale_Analysis(
+                    label=label, qb_name=qb.name,
+                    NoCalPoints=4,
+                    RO_channel=qb.RO_acq_weight_function_I(), **kw)
+
+                if update:
+                    qscale_dict = qscaleA.optimal_qscale #dictionary of value, stderr
+                    qscale_value = qscale_dict['qscale']
+
+                    try:
+                        qb.motzoi(qscale_value)
+                    except AttributeError as e:
+                        logging.warning('%s. This parameter will not be '
+                                        'updated.'%e)
+
+
+    if 'T1' in sweep_points_dict:
+        sweep_points = sweep_points_dict['T1']
+        if sweep_params is None:
+            sweep_params = (
+                ('X180', {}),
+                ('RO_mux', {'pulse_pars': {'pulse_delay': (lambda sp: sp)}})
+            )
+
+        sf = calibrate_n_qubits(sweep_params=sweep_params,
+                                sweep_points=sweep_points_dict['qscale'],
+                                qb_names=qubit_names,
+                                operation_dict=operation_dict,
+                                cal_points=cal_points,
+                                upload=upload,
+                                parameter_name='time',
+                                unit='s')
+
+        MC.soft_avg(soft_avgs)
+        MC.set_sweep_function(sf)
+        MC.set_sweep_points(sweep_points)
+        MC.set_detector_function(df)
+        label = 'T1_echo' + msmt_suffix
+        MC.run(label)
+
+        if analyze:
+            for qb in qubits:
+                T1_Analysis = ma.T1_Analysis(
+                    label=label, qb_name=qb.name, NoCalPoints=4,
+                    RO_channel=qb.RO_acq_weight_function_I(), **kw)
+
+                if update:
+                    try:
+                        qb.T1(T1_Analysis.T1_dict['T1'])
+                    except AttributeError as e:
+                        logging.warning('%s. This parameter will not be '
+                                        'updated.'%e)
+
+
+    if 'T2' in sweep_points_dict:
+        if artificial_detuning is None:
+            raise ValueError('Specify an artificial_detuning for the Ramsey '
+                             'measurement.')
+        sweep_points = sweep_points_dict['T2']
+        if sweep_params is None:
+            sweep_params = (
+                ('X90', {}),
+                ('X180', {'pulse_pars': {'refpoint': 'start',
+                                         'pulse_delay': (lambda sp: sp/2)}}),
+                ('X90', {'pulse_pars': {
+                    'refpoint': 'start',
+                    'pulse_delay': (lambda sp: sp/2),
+                    'phase': (lambda sp:
+                              ((sp-sweep_points[0]) * artificial_detuning *
+                               360) % 360)}})
+
+            )
+
+        sf = calibrate_n_qubits(sweep_params=sweep_params,
+                                sweep_points=sweep_points_dict['qscale'],
+                                qb_names=qubit_names,
+                                operation_dict=operation_dict,
+                                cal_points=cal_points,
+                                upload=upload,
+                                parameter_name='time',
+                                unit='s')
+
+        MC.soft_avg(soft_avgs)
+        MC.set_sweep_function(sf)
+        MC.set_sweep_points(sweep_points)
+        MC.set_detector_function(df)
+        label = 'T1_echo' + msmt_suffix
+        MC.run(label)
+
+        if analyze:
+            for qb in qubits:
+                RamseyA = ma.Ramsey_Analysis(
+                    label=label, qb_name=qb.name,
+                    NoCalPoints=4, RO_channel=qb.RO_acq_weight_function_I(),
+                    artificial_detuning=artificial_detuning, **kw)
+
+                if update:
+                    T2_star = RamseyA.T2_star
+                    try:
+                        qb.T2_star(T2_star['T2_star'])
+                    except AttributeError as e:
+                        logging.warning('%s. This parameter will not be '
+                                        'updated.'%e)
+
+
