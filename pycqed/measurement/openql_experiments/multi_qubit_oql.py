@@ -663,10 +663,12 @@ def Chevron(qubit_idx: int, qubit_idx_spec: int,
             'Keeping target qubit in a ground state.')
     k.gate('rx180', qubit_idx)
 
-    k.gate("wait", [qubit_idx], buffer_nanoseconds)
+    if buffer_nanoseconds > 0:
+        k.gate("wait", [qubit_idx], buffer_nanoseconds)
     k.gate('fl_cw_{:02}'.format(flux_cw), 2, 0)
 
-    k.gate('wait', [qubit_idx], buffer_nanoseconds2)
+    if buffer_nanoseconds2>0:
+        k.gate('wait', [qubit_idx], buffer_nanoseconds2)
     k.gate('rx180', qubit_idx)
 
     k.measure(qubit_idx)
@@ -1138,27 +1140,14 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
             k.gate('rx90', q0)
             if not CZ_disabled:
                 for j in range(nr_of_repeated_gates):
-                    k.gate('wait', [2, 0], wait_time_between)
-                    k.gate(flux_codeword, 2, 0)
-                if fixed_max_nr_of_repeated_gates is not None:
-                    for l in range(fixed_max_nr_of_repeated_gates-j):
+                    if wait_time_between>0:
                         k.gate('wait', [2, 0], wait_time_between)
-                        k.gate('fl_cw_00', 2,0)
+                    k.gate(flux_codeword, 2, 0)
             else:
                 for j in range(nr_of_repeated_gates):
-                    k.gate('wait', [2, 0], wait_time_between)
-                    k.gate('wait', [2, 0], CZ_duration)  # in ns
-                if fixed_max_nr_of_repeated_gates is not None:
-                    for l in range(fixed_max_nr_of_repeated_gates-j):
-                        k.gate('wait', [2, 0], wait_time_between)
-                        k.gate('wait', [2, 0], CZ_duration)
-            try:
-                if wait_time_after>0:
-                    k.gate('wait', [2, 0], (wait_time_after))
-            except Exception as e:
-                print('Wait time after-between',
-                      (wait_time_after-wait_time_between))
-                raise(e)
+                    k.gate('wait', [2, 0], wait_time_between + CZ_duration)
+            if wait_time_after>0:
+                k.gate('wait', [2, 0], (wait_time_after))
             # hardcoded angles, must be uploaded to AWG
             if angle == 90:
                 # special because the cw phase pulses go in mult of 20 deg
@@ -1170,9 +1159,9 @@ def conditional_oscillation_seq(q0: int, q1: int, platf_cfg: str,
             if case == 'excitation':
                 k.gate('rx180', q1)
 
-            k.gate('wait', [q1,q0], 0)
             k.measure(q0)
             k.measure(q1)
+            k.gate('wait', [q1,q0], 0)
             # Implements a barrier to align timings
             # k.gate('wait', [q0, q1], 0)
             # hardcoded barrier because of openQL #104
