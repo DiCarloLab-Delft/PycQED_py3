@@ -515,6 +515,10 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
             unit='dac value * samples',
             vals=vals.MultiType(vals.Numbers(), NP_NANs()),
             parameter_class=ManualParameter)
+        self.add_parameter('disable_cz_only_z',
+                           initial_value=False,
+                           vals=vals.Bool(),
+                           parameter_class=ManualParameter)
 
         self.add_parameter('czd_double_sided',
                            initial_value=False,
@@ -929,7 +933,7 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         cost_val = cv_2 + cv_4+cv_5
 
     #     if print_result:
-    #         print("Cost function value")
+    #         print("Cost function value")''
 
     # #         print("cv_1 net_zero_character: {:.6f}".format(cv_1))
     #         print("cv_2 phase corr pulse  : {:.6f}".format(cv_2))
@@ -961,11 +965,17 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
         else:
             corr_pulse = np.zeros(corr_samples)
 
-        corr_pulse += phase_corr_sine_series([self.cz_phase_corr_amp()],
-                                             corr_samples)
+        if self.czd_double_sided():
+            corr_pulse += phase_corr_sine_series([self.cz_phase_corr_amp()],
+                                                     corr_samples)
+        else: 
+            corr_pulse += phase_corr_sine_series_half([self.cz_phase_corr_amp()],
+                                         corr_samples)
 
-        modified_wf = np.concatenate([base_wf, corr_pulse])
-
+        if self.disable_cz_only_z():
+            modified_wf = np.concatenate([base_wf*0, corr_pulse])
+        else:
+            modified_wf = np.concatenate([base_wf, corr_pulse])
         return modified_wf
 
     #################################
@@ -1526,4 +1536,19 @@ def phase_corr_sine_series(a_i, nr_samples):
 
     for i, a in enumerate(a_i):
         s += a*np.sin((i+1)*x)
+    return s
+
+def phase_corr_sine_series_half(a_i, nr_samples):
+    """
+    Phase correction pulse as a fourier sine series.
+
+    The integeral (sum) of this waveform is
+    gauranteed to be equal to zero (within rounding error)
+    by the choice of function.
+    """
+    x = np.linspace(0, 2*np.pi, nr_samples)
+    s = np.zeros(nr_samples)
+
+    for i, a in enumerate(a_i):
+        s += a*np.sin(((i+1)*x)/2)
     return s
