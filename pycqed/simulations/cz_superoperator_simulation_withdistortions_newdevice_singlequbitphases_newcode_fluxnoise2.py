@@ -236,7 +236,7 @@ def c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1):
 
 
 
-def rotating_frame_transformation(U, t: float,
+def rotating_frame_transformation_propagator(U, t: float,
                                   w_q0: float=0, w_q1: float =0):
     """
     Transforms the frame of the unitary according to
@@ -268,10 +268,10 @@ def rotating_frame_transformation(U, t: float,
     return U_prime
 
 
-def rotating_frame_transformation_new(U, t: float, H):
+def rotating_frame_transformation_propagator_new(U, t: float, H):
     """
     Transforms the frame of the unitary according to
-        U' = U_{RF}*U*U_{RF}^dag
+        U' = U_{RF}*U
         NOTE: remember that this is how the time evolution operator changes from one picture to another
 
     Args:
@@ -281,7 +281,7 @@ def rotating_frame_transformation_new(U, t: float, H):
 
     """
 
-    U_RF = (1j*H*t).expm()     #wrong: it shouldn't affect avgatefid_compsubspace though
+    U_RF = (1j*H*t).expm()
     if U.type=='super':
     	U_RF=qtp.to_super(U_RF)
 
@@ -291,6 +291,23 @@ def rotating_frame_transformation_new(U, t: float, H):
     """
 
     return U_prime
+
+
+def rotating_frame_transformation_operators(operator, t: float, H):
+    """
+    Transforms the frame of an operator (hamiltonian, or jump operator) according to
+        O' = U_{RF}*O*U_{RF}^dag
+
+    Args:
+        operator (QObj): operator to be transformed
+        t (float): time at which to transform
+        H (QObj): hamiltonian to be rotated away
+
+    """
+
+    U_RF = (1j*H*t).expm()
+
+    return U_RF * H * U_RF.dag()
 
 
 def correct_reference(U,w_q1,w_q0,t):
@@ -744,12 +761,21 @@ def simulate_quantities_of_interest_superoperator(tlist, c_ops, noise_parameters
     H_0=calc_hamiltonian(0,fluxlutman,noise_parameters_CZ)   # computed at 0 amplitude
     # NOTE: parameters of H_0 could be not exactly e.g. the bare frequencies
 
-
     # We change the basis from the standard basis to the basis of eigenvectors of H_0
     # The columns of S are the eigenvectors of H_0, appropriately ordered
     S = qtp.Qobj(matrix_change_of_variables(H_0),dims=[[3, 3], [3, 3]])
     #S = qtp.tensor(qtp.qeye(3),qtp.qeye(3))       # line here to quickly switch off the use of S
     H_0_diag = S.dag()*H_0*S
+
+    #w_q0 = fluxlutman.q_freq_01()
+    w_q0 = (H_0_diag[1,1]-H_0_diag[0,0]) / (2*np.pi)
+    #w_q1 = fluxlutman.q_freq_10()
+    w_q1 = (H_0_diag[3,3]-H_0_diag[0,0]) / (2*np.pi)
+
+
+
+    # H_rotateaway = coupled_transmons_hamiltonian_new(w_q0=w_q0, w_q1=w_q1, 
+    # 	                                            alpha_q0=-2*w_q0, alpha_q1=-2*w_q1, J=0)
 
 
     t0 = time.time()
@@ -785,12 +811,7 @@ def simulate_quantities_of_interest_superoperator(tlist, c_ops, noise_parameters
     avgatefid_compsubspace = pro_avfid_superoperator_compsubspace_phasecorrected(U_final,L1,phases)     # leakage has to be taken into account, see Woods & Gambetta
     #print('avgatefid_compsubspace',avgatefid_compsubspace)
 
-    #w_q0 = fluxlutman.q_freq_01()
-    w_q0 = (H_0_diag[1,1]-H_0_diag[0,0]) / (2*np.pi)
-    #w_q1 = fluxlutman.q_freq_10()
-    w_q1 = (H_0_diag[3,3]-H_0_diag[0,0]) / (2*np.pi)
-    #print(w_q0,fluxlutman.q_freq_01())                 # rougly 2 MHz difference, it shouldn't matter very much anyway
-    #print(w_q1,fluxlutman.q_freq_10())
+    
     
     #H_twoqubits = coupled_transmons_hamiltonian_new(w_q0=w_q0, w_q1=w_q1, 
     #	                                            alpha_q0=-2*w_q0, alpha_q1=-2*w_q1, J=0)
@@ -907,22 +928,8 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 		            epsilon = wfl.theta_to_eps(thetawave, self.fluxlutman.q_J2())
 		            amp = self.fluxlutman.calc_eps_to_amp(epsilon, state_A='11', state_B='02')
 		                     # transform detuning frequency to (positive) amplitude
-		            f_pulse = self.fluxlutman.calc_amp_to_freq(amp,'01')
-
-		            omega_0 = self.fluxlutman.calc_amp_to_freq(0,'01')
-		            # Correction up to second order of the frequency due to flux noise, computed from w_q0(phi) = w_q0^sweetspot * sqrt(cos(pi * phi/phi_0))
-		            f_pulse = f_pulse - np.pi/2 * (omega_0**2/f_pulse) * np.sqrt(1 - (f_pulse**4/omega_0**4)) * self.fluxbias - \
-		                                  - np.pi**2/2 * omega_0 * (1+(f_pulse**4/omega_0**4)) / (f_pulse/omega_0)**3 * self.fluxbias**2
-		                                  # with sigma up to circa 1e-3 \mu\Phi_0 the second order is irrelevant
-		            amp = self.fluxlutman.calc_freq_to_amp(f_pulse,state='01')
-
-		            ### Script to check how the pulse is affected by the flux bias
-		            # plot(x_plot_vec=[tlist*1e9],
-		            #       y_plot_vec=[f_pulse-f_pulse_new],
-		            #       title='Diff. of freq. of fluxing qubit w/o flux bias',
-		            #       xlabel='Time (ns)',ylabel='Freq. (GHz)',legend_labels=['diff'])
 		        else:
-		            f_pulse,amp = self.get_f_pulse_double_sided()
+		            amp = self.get_f_pulse_double_sided()
 		            
 
 		        # For better accuracy in simulations, redefine f_pulse and amp in terms of sim_step_new.
@@ -936,18 +943,10 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 		        	tlist_new = (np.arange(0, self.fluxlutman.cz_length()+sim_step,
 		                           sim_step_new))
 
-		        f_pulse_temp=np.concatenate((f_pulse,np.array([f_pulse[-1]])))
 		        amp_temp=np.concatenate((amp,np.array([amp[-1]])))
-		        f_pulse_interp=interp1d(tlist_temp,f_pulse_temp)
 		        amp_interp=interp1d(tlist_temp,amp_temp)
-		        f_pulse=f_pulse_interp(tlist_new)
 		        amp=amp_interp(tlist_new)
 
-		        ### Script to plot the waveform
-		        # plot(x_plot_vec=[tlist_new*1e9],
-		        #           y_plot_vec=[f_pulse/1e9],
-		        #           title='Freq. of fluxing qubit during pulse',
-		        #           xlabel='Time (ns)',ylabel='Freq. (GHz)',legend_labels=['omega_B(t)'])
 
 
 		        amp=amp*self.noise_parameters_CZ.voltage_scaling_factor()       # recommended to change discretely the scaling factor
@@ -981,7 +980,6 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 		            #       xlabel='Time (ns)',ylabel='Amplitude (V)',legend_labels=['Ideal','Distorted'])
 
 		            amp_final=convolved_amp[0:np.size(tlist_convol1)]    # consider only amp during the gate time
-		            f_pulse_convolved_new=self.fluxlutman.calc_amp_to_freq(amp_final,'01')
 
 		            # plot(x_plot_vec=[tlist_convol1*1e9],
 		            #       y_plot_vec=[amp_convol, amp_final],
@@ -990,9 +988,67 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
 		        else:
 		            amp_final=amp
-		            f_pulse_convolved_new=self.fluxlutman.calc_amp_to_freq(amp_final,'01')
 
 
+
+		        ### the fluxbias affects the pulse shape after the distortions have been taken into account
+		        if not self.fluxlutman.czd_double_sided():
+		            omega_0 = self.fluxlutman.calc_amp_to_freq(0,'01')
+
+		            f_pulse = self.fluxlutman.calc_amp_to_freq(amp_final,'01')
+		            f_pulse = np.clip(f_pulse,a_min=None,a_max=omega_0)					# necessary otherwise the sqrt below gives nan
+
+		            # Correction up to second order of the frequency due to flux noise, computed from w_q0(phi) = w_q0^sweetspot * sqrt(cos(pi * phi/phi_0))
+		            f_pulse_final = f_pulse - np.pi/2 * (omega_0**2/f_pulse) * np.sqrt(1 - (f_pulse**4/omega_0**4)) * self.fluxbias - \
+		                                  - np.pi**2/2 * omega_0 * (1+(f_pulse**4/omega_0**4)) / (f_pulse/omega_0)**3 * self.fluxbias**2
+		                                  # with sigma up to circa 1e-3 \mu\Phi_0 the second order is irrelevant
+
+		            amp_final = self.fluxlutman.calc_freq_to_amp(f_pulse_final,state='01')
+
+		        else:
+		        	half_length = int(np.size(amp_final)/2)
+		        	amp_A = amp_final[0:half_length]				# positive and negative parts
+		        	amp_B = amp_final[half_length:]
+
+
+		        	omega_0 = self.fluxlutman.calc_amp_to_freq(0,'01')
+
+		        	f_pulse_A = self.fluxlutman.calc_amp_to_freq(amp_A,'01')
+		        	f_pulse_A = np.clip(f_pulse_A,a_min=None,a_max=omega_0)
+
+
+		        	f_pulse_A = f_pulse_A - np.pi/2 * (omega_0**2/f_pulse_A) * np.sqrt(1 - (f_pulse_A**4/omega_0**4)) * self.fluxbias - \
+		                                  - np.pi**2/2 * omega_0 * (1+(f_pulse_A**4/omega_0**4)) / (f_pulse_A/omega_0)**3 * self.fluxbias**2
+		                                  # with sigma up to circa 1e-3 \mu\Phi_0 the second order is irrelevant
+		        	amp_A = self.fluxlutman.calc_freq_to_amp(f_pulse_A,state='01')
+
+
+		        	f_pulse_B = self.fluxlutman.calc_amp_to_freq(amp_B,'01')
+		        	f_pulse_B = np.clip(f_pulse_B,a_min=None,a_max=omega_0)
+
+		        	f_pulse_B = f_pulse_B - np.pi/2 * (omega_0**2/f_pulse_B) * np.sqrt(1 - (f_pulse_B**4/omega_0**4)) * self.fluxbias * (-1) - \
+                                  - np.pi**2/2 * omega_0 * (1+(f_pulse_B**4/omega_0**4)) / (f_pulse_B/omega_0)**3 * self.fluxbias**2
+                                  # with sigma up to circa 1e-3 \mu\Phi_0 the second order is irrelevant
+		        	amp_B = self.fluxlutman.calc_freq_to_amp(f_pulse_B,state='01',positive_branch=False)
+
+
+		        	amp_final = np.concatenate([amp_A, amp_B])
+		        	f_pulse_final=np.concatenate([f_pulse_A, f_pulse_B])
+
+
+
+		        ### Script to plot the waveform
+		        # plot(x_plot_vec=[tlist_new*1e9],
+		        #           y_plot_vec=[f_pulse_final/1e9],
+		        #           title='Freq. of fluxing qubit during pulse',
+		        #           xlabel='Time (ns)',ylabel='Freq. (GHz)',legend_labels=['omega_B(t)'])
+
+
+		        ### Script to check how the pulse is affected by the flux bias
+		        # plot(x_plot_vec=[tlist_new*1e9],
+		        #           y_plot_vec=[f_pulse-f_pulse_final],
+		        #           title='Diff. of freq. of fluxing qubit w/o flux bias',
+		        #           xlabel='Time (ns)',ylabel='Freq. (GHz)',legend_labels=['diff'])
 
 
 
@@ -1028,7 +1084,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 		            def expT2(x,gc,amp,tau):
 		                return gc+gc*amp*np.exp(-x/tau)         # formula used to fit the experimental data
 
-		            T2_q0_vec=expT2(f_pulse_convolved_new,T2_q0_amplitude_dependent[0],T2_q0_amplitude_dependent[1],T2_q0_amplitude_dependent[2])
+		            T2_q0_vec=expT2(f_pulse_final,T2_q0_amplitude_dependent[0],T2_q0_amplitude_dependent[1],T2_q0_amplitude_dependent[2])
 		            if T1_q0 != 0:
 		                Tphi01_q0_vec = Tphi_from_T1andT2(T1_q0,T2_q0_vec)
 		            else:
@@ -1112,7 +1168,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 	        qoi_average[5]=average*100
 	        qoi_average[9]=average_partial*100
 
-	        qoi_average[0] = (-np.log10(1-qoi_average[5]/100))**4    # we want log of the average and not average of the log
+	        qoi_average[0] = (-np.log10(1-qoi_average[5]/100))    # we want log of the average and not average of the log
 
 	        qoi_plot.append(qoi_average)
 
@@ -1144,14 +1200,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         epsilon_A = wfl.theta_to_eps(thetawave_A, self.fluxlutman.q_J2())
         amp_A = self.fluxlutman.calc_eps_to_amp(epsilon_A, state_A='11', state_B='02')
                      # transform detuning frequency to positive amplitude
-        f_pulse_A = self.fluxlutman.calc_amp_to_freq(amp_A,'01')
-
-        omega_0 = self.fluxlutman.calc_amp_to_freq(0,'01')
-        f_pulse_A = f_pulse_A - np.pi/2 * (omega_0**2/f_pulse_A) * np.sqrt(1 - (f_pulse_A**4/omega_0**4)) * self.fluxbias - \
-                                  - np.pi**2/2 * omega_0 * (1+(f_pulse_A**4/omega_0**4)) / (f_pulse_A/omega_0)**3 * self.fluxbias**2
-                                  # with sigma up to circa 1e-3 \mu\Phi_0 the second order is irrelevant
-        amp_A = self.fluxlutman.calc_freq_to_amp(f_pulse_A,state='01')
-
+        
 
         # Generate the second CZ pulse. If the params are np.nan, default
         # to the main parameter
@@ -1179,15 +1228,7 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
         epsilon_B = wfl.theta_to_eps(thetawave_B, self.fluxlutman.q_J2())
         amp_B = self.fluxlutman.calc_eps_to_amp(epsilon_B, state_A='11', state_B='02', positive_branch=False)
                      # transform detuning frequency to negative amplitude
-        f_pulse_B = self.fluxlutman.calc_amp_to_freq(amp_B,'01')
-
-        f_pulse_B = f_pulse_B - np.pi/2 * (omega_0**2/f_pulse_B) * np.sqrt(1 - (f_pulse_B**4/omega_0**4)) * self.fluxbias * (-1) - \
-                                  - np.pi**2/2 * omega_0 * (1+(f_pulse_B**4/omega_0**4)) / (f_pulse_B/omega_0)**3 * self.fluxbias**2
-                                  # with sigma up to circa 1e-3 \mu\Phi_0 the second order is irrelevant
-        amp_B = self.fluxlutman.calc_freq_to_amp(f_pulse_B,state='01',positive_branch=False)
-
 
         # N.B. No amp scaling and offset present
-        f_pulse = np.concatenate([f_pulse_A, f_pulse_B])
         amp = np.concatenate([amp_A, amp_B])
-        return f_pulse,amp
+        return amp
