@@ -5,6 +5,7 @@ Hacked together by Rene Vollmer
 import datetime
 import pycqed.analysis_v2.base_analysis as ba
 from pycqed.analysis_v2.base_analysis import plot_scatter_errorbar_fit, plot_scatter_errorbar
+from pycqed.analysis import measurement_analysis as ma_old
 
 import numpy as np
 import lmfit
@@ -226,6 +227,130 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
 
         self.plot_dicts[ax_id] = plot_scatter_errorbar(self=self, ax_id=ax_id, xdata=xvals, ydata=yvals,
                                                        xerr=None, yerr=yerr, pdict=plot_dict)
+
+
+class AliasedCoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
+    # todo docstring
+
+    def __init__(self, t_start: str=None, t_stop: str=None,
+                label: str='', data_file_path: str=None,
+                options_dict: dict=None, extract_only: bool=False,
+                do_fitting: bool=True, auto=True,
+                ch_idxs: list =[0, 1],
+                ch_amp_key: str='Snapshot/instruments/AWG8_8014'
+                '/parameters/awgs_0_outputs_1_amplitude',
+                ch_range_key: str='Snapshot/instruments/AWG8_8014'
+                '/parameters/sigouts_0_range',
+                waveform_amp_key: str='Snapshot/instruments/FL_LutMan_QR'
+                '/parameters/sq_amp'):
+        super().__init__(t_start=t_start, t_stop=t_stop,
+                        label=label,
+                        data_file_path=data_file_path,
+                        options_dict=options_dict,
+                        extract_only=extract_only, do_fitting=do_fitting)
+
+        self.params_dict = {'xlabel': 'sweep_name',
+                            'xunit': 'sweep_unit',
+                            'xvals': 'sweep_points',
+                            'measurementstring': 'measurementstring',
+                            'value_names': 'value_names',
+                            'value_units': 'value_units',
+                            'measured_values': 'measured_values'}
+        self.numeric_params = []
+        self.ch_idxs = ch_idxs
+        self.ch_amp_key = ch_amp_key
+        self.ch_range_key = ch_range_key
+        self.waveform_amp_key = waveform_amp_key
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        super().extract_data()
+        
+        a = ma_old.MeasurementAnalysis(
+            timestamp=self.t_start, auto=False, close_file=False)
+        a.get_naming_and_values()
+
+        ch_amp = a.data_file[self.ch_amp_key].attrs['value']
+        if self.ch_range_key is None:
+            ch_range = 2  # corresponds to a scale factor of 1
+        else:
+            ch_range = a.data_file[self.ch_range_key].attrs['value']
+        waveform_amp = a.data_file[self.waveform_amp_key].attrs['value']
+        amp = ch_amp*ch_range/2*waveform_amp
+        self.proc_data_dict['sq_amp'] = amp
+
+    def process_data(self):
+        self.proc_data_dict
+
+        xlab = self.raw_data_dict['value_names'][0][self.ch_idxs[0]]
+        ylab = self.raw_data_dict['value_names'][0][self.ch_idxs[1]]
+        xs = self.raw_data_dict['measured_values'][0][self.ch_idxs[0]]
+        ys = self.raw_data_dict['measured_values'][0][self.ch_idxs[1]]
+
+        mn = (np.mean(xs) + np.mean(ys))/2
+        self.proc_data_dict['mean'] = mn
+        amp = np.sqrt((xs-mn)**2 + (ys-mn)**2)*2
+        self.proc_data_dict['amp'] = amp
+
+    def run_fitting(self):
+        super().run_fitting()
+
+        decay_fit = lmfit.Model(lambda t, tau, A, n: A*np.exp(-(t/tau)**n))
+
+        tau0 = self.raw_data_dict['xvals'][0][-1]/2
+        decay_fit.set_param_hint('tau', value=tau0, min=0, vary=True)
+        decay_fit.set_param_hint('A', value=0.7, vary=True)
+        decay_fit.set_param_hint('n', value=1.2, min=1, max=2, vary=True)
+        params = decay_fit.make_params()
+        decay_fit = decay_fit.fit(data=self.proc_data_dict['amp'],
+                                    t=self.raw_data_dict['xvals'][0],
+                                    params=params)
+        self.fit_res['coherence_decay'] = decay_fit
+
+        text_msg = 'Summary\n'
+        text_msg += r'Square pulse amp {:.3g}'.format(self.proc_data_dict['sq_amp'])+' V\n'
+        text_msg += r'$A \exp(-(t/\tau)^n)$' + '\n'
+        text_msg += format_value_string(r'$A$', decay_fit.params['A'], '\n')
+        text_msg += format_value_string(r'$\tau$', decay_fit.params['tau'], '\n')
+        text_msg += format_value_string(r'$n$', decay_fit.params['n'], '')
+
+        self.proc_data_dict['decay_fit_msg'] = text_msg
+                    
+
+    def save_fit_results(self):
+        # todo: if you want to save some results to a hdf5, do it here
+        pass
+
+    def prepare_plots(self):
+        self.plot_dicts['main'] = {
+            'plotfn': self.plot_line,
+            'xvals': self.raw_data_dict['xvals'][0],
+            'xlabel': self.raw_data_dict['xlabel'][0],
+            'xunit': 's',
+            'yvals': self.proc_data_dict['amp'],
+            'ylabel': r'$\sqrt{\langle \sigma_X \rangle^2 + \langle \sigma_Y \rangle^2}$',
+            'title': (self.raw_data_dict['timestamps'][0] + ' \n' +
+                      self.raw_data_dict['measurementstring'][0]),
+            'setlabel': 'data',
+            'color': 'C0',
+        }
+
+        self.plot_dicts['decay_fit'] = {
+            'plotfn': self.plot_fit,
+            'ax_id': 'main',
+            'fit_res': self.fit_res['coherence_decay'],
+            'setlabel': 'Decay fit',
+            'do_legend': True,
+            'color': 'C1',
+        }
+
+        self.plot_dicts['decay_text'] = {
+            'plotfn': self.plot_text,
+            'ax_id': 'main',
+            'text_string': self.proc_data_dict['decay_fit_msg'],
+            'xpos': 1.05, 'ypos': .5,
+            'horizontalalignment': 'left'}
 
 
 class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
@@ -913,3 +1038,17 @@ def fit_gammas(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo, verbose: bool = Fa
     if verbose:
         lmfit.printfuncs.report_fit(fit_result_gammas.params)
     return fit_result_gammas
+
+
+def format_value_string(par_name: str, lmfit_par, end_char=''):
+    """
+    Formats an lmfit par to a  string of value with uncertainty.
+    """
+    val_string = par_name
+    val_string += ': {:.3g}'.format(lmfit_par.value)
+    if lmfit_par.stderr is not None:
+        val_string += r'$\pm$' + '{:.3g}'.format(lmfit_par.stderr)
+    else:
+        val_string += r'$\pm$' + 'NaN'
+    val_string += end_char
+    return val_string
