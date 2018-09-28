@@ -144,32 +144,53 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
     for seed in range(nr_seeds):
         for j, n_cl in enumerate(nr_cliffords):
             for interleaving_cl in interleaving_cliffords:
-                for net_clifford in net_cliffords:
-                    k = Kernel('RB_{}Cl_s{}_net{}_inter{}'.format(
-                        n_cl, seed, net_clifford, interleaving_cl), p=platf)
-                    if initialize:
-                        for qubit_idx in qubit_map.values():
-                            k.prepz(qubit_idx)
-                    if not simultaneous_single_qubit_RB:
-                        cl_seq = rb.randomized_benchmarking_sequence(
+                if not simultaneous_single_qubit_RB:
+                    cl_seq = rb.randomized_benchmarking_sequence(
                             n_cl, number_of_qubits=number_of_qubits,
-                            desired_net_cl=net_clifford,
+                            desired_net_cl=None,#net_clifford,
                             max_clifford_idx=max_clifford_idx,
-                            interleaving_cl=interleaving_cl)
-                        for cl in cl_seq:
-                            # hacking in exception for benchmarking only CZ
-                            # (not as a member of CNOT group)
-                            if cl == -4368:
-                                gates = [('CZ', ['q0', 'q1'])]
-                            else:
-                                gates = Cl(cl).gate_decomposition
+                            interleaving_cl=interleaving_cl
+                            )
+                    net_cl_seq = rb.calculate_net_clifford(cl_seq,Cl)
+                    cl_seq_decomposed = []
+                    for cl in cl_seq:
+                        # hacking in exception for benchmarking only CZ
+                        # (not as a member of CNOT group)
+                        if cl == -4368:
+                            cl_seq_decomposed.append([('CZ', ['q0', 'q1'])])
+                        else:
+                            cl_seq_decomposed.append(Cl(cl).gate_decomposition)
+                    for net_clifford in net_cliffords:
+                        recovery_to_idx_clifford = net_cl_seq.get_inverse()
+                        recovery_clifford = Cl(net_clifford)*recovery_to_idx_clifford
+                        cl_seq_decomposed_with_net = cl_seq_decomposed+[recovery_clifford.gate_decomposition]
+
+                        k = Kernel('RB_{}Cl_s{}_net{}_inter{}'.format(
+                            n_cl, seed, net_clifford, interleaving_cl), p=platf)
+                        if initialize:
+                            for qubit_idx in qubit_map.values():
+                                k.prepz(qubit_idx)
+
+                        for gates in cl_seq_decomposed_with_net:
                             for g, q in gates:
                                 if isinstance(q, str):
                                     k.gate(g, qubit_map[q])
                                 elif isinstance(q, list):
                                     # proper codeword
                                     k.gate(g, [qubit_map[q[0]], qubit_map[q[1]]])
-                    elif simultaneous_single_qubit_RB: 
+                        # This hack is required to align multiplexed RO in openQL..
+                        k.gate("wait",  list(qubit_map.values()), 0)
+                        for qubit_idx in qubit_map.values():
+                            k.measure(qubit_idx)
+                        k.gate("wait",  list(qubit_map.values()), 0)
+                        p.add_kernel(k)
+                elif simultaneous_single_qubit_RB: 
+                    for net_clifford in net_cliffords:
+                        k = Kernel('RB_{}Cl_s{}_net{}_inter{}'.format(
+                            n_cl, seed, net_clifford, interleaving_cl), p=platf)
+                        if initialize:
+                            for qubit_idx in qubit_map.values():
+                                k.prepz(qubit_idx)
 
                         # Gate seqs is a hack for failing openql scheduling
                         gate_seqs = [[], []]
@@ -202,12 +223,12 @@ def randomized_benchmarking(qubits: list, platf_cfg: str,
                                 except IndexError as e: 
                                     pass 
                         # end of #157 HACK 
-                    # This hack is required to align multiplexed RO in openQL..
-                    k.gate("wait",  list(qubit_map.values()), 0)
-                    for qubit_idx in qubit_map.values():
-                        k.measure(qubit_idx)
-                    k.gate("wait",  list(qubit_map.values()), 0)
-                    p.add_kernel(k)
+                        # This hack is required to align multiplexed RO in openQL..
+                        k.gate("wait",  list(qubit_map.values()), 0)
+                        for qubit_idx in qubit_map.values():
+                            k.measure(qubit_idx)
+                        k.gate("wait",  list(qubit_map.values()), 0)
+                        p.add_kernel(k)
 
         if cal_points:
             if number_of_qubits == 1:
