@@ -323,8 +323,12 @@ class AWG8_Flux_LutMan(Base_Flux_LutMan):
                 positive_branch=positive_branch) for e in eps])
 
         polycoeffs_A = self.get_polycoeffs_state(state=state_A)
-        polycoeffs_B = self.get_polycoeffs_state(state=state_B)
-        polycoeffs = polycoeffs_B - polycoeffs_A
+        if state_B is not None:
+            polycoeffs_B = self.get_polycoeffs_state(state=state_B)
+            polycoeffs = polycoeffs_B - polycoeffs_A
+        else:
+            polycoeffs = copy(polycoeffs_A)
+            polycoeffs[-1] = 0
 
         p = np.poly1d(polycoeffs)
         sols = (p-eps).roots
