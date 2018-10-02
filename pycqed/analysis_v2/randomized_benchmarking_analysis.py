@@ -23,6 +23,7 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
                  ):
         """
         Analysis for single qubit randomized benchmarking.
+
         For basic options see docstring of BaseDataAnalysis
 
         Args:
@@ -260,7 +261,7 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
                 'xvals': self.raw_data_dict['bins'],
                 'yvals': np.nanmean(self.raw_data_dict['binned_vals'][val_name], axis=1),
                 'yerr':  sem(self.raw_data_dict['binned_vals'][val_name], axis=1),
-                'xlabel': 'Number of Cliffrods',
+                'xlabel': 'Number of Cliffords',
                 'xunit': '#',
                 'ylabel': val_name,
                 'yunit': self.raw_data_dict['value_units'][i],
@@ -294,7 +295,7 @@ class RandomizedBenchmarking_SingleQubit_Analysis(ba.BaseDataAnalysis):
                 'V1': self.proc_data_dict['V1'][val_name],
                 'V2': self.proc_data_dict['V2'][val_name],
 
-                'xlabel': 'Number of Cliffrods',
+                'xlabel': 'Number of Cliffords',
                 'xunit': '#',
                 'ylabel': val_name,
                 'yunit': self.proc_data_dict['value_units'][i],
@@ -528,7 +529,7 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
                 'xvals': self.proc_data_dict['bins'],
                 'yvals': np.nanmean(self.proc_data_dict['binned_vals'][val_name], axis=1),
                 'yerr':  sem(self.proc_data_dict['binned_vals'][val_name], axis=1),
-                'xlabel': 'Number of Cliffrods',
+                'xlabel': 'Number of Cliffords',
                 'xunit': '#',
                 'ylabel': val_name,
                 'yunit': self.proc_data_dict['value_units'][i],
@@ -650,13 +651,17 @@ class RandomizedBenchmarking_TwoQubit_Analysis(
             'horizontalalignment': 'left'}
 
 
-class PurityBenchmarking_TwoQubit_Analysis(
+class UnitarityBenchmarking_TwoQubit_Analysis(
         RandomizedBenchmarking_SingleQubit_Analysis):
     def __init__(self, t_start: str=None, t_stop: str=None, label='',
                  options_dict: dict=None, auto=True, close_figs=True,
                  classification_method='rates', rates_ch_idxs: list =[0, 2],
                  ignore_f_cal_pts: bool=False, nseeds: int=None, **kwargs
                  ):
+        """Analysis for unitarity benchmarking.
+
+        This analysis is based on
+        """
         if nseeds is None:
             raise TypeError('You must specify number of seeds!')
         self.nseeds = nseeds
@@ -786,7 +791,7 @@ class PurityBenchmarking_TwoQubit_Analysis(
                  'XX_sq', 'XY_sq', 'XZ_sq',
                  'YX_sq', 'YY_sq', 'YZ_sq',
                  'ZX_sq', 'ZY_sq', 'ZZ_sq',
-                 'Purity_shots', 'Purity']
+                 'unitarity_shots', 'unitarity']
         keys += ['XX_q0', 'XY_q0', 'XZ_q0',
                  'YX_q0', 'YY_q0', 'YZ_q0',
                  'ZX_q0', 'ZY_q0', 'ZZ_q0']
@@ -860,7 +865,7 @@ class PurityBenchmarking_TwoQubit_Analysis(
                 1-self.proc_data_dict['Px2'][val_name_q0]
                 - self.proc_data_dict['P2x'][val_name_q1])
 
-            self.proc_data_dict['Purity_shots'] = self.proc_data_dict['ZZ_q0'][val_name_q0]*0
+            self.proc_data_dict['unitarity_shots'] = self.proc_data_dict['ZZ_q0'][val_name_q0]*0
             for key in ['XX', 'XY', 'XZ',
                         'YX', 'YY', 'YZ',
                         'ZX', 'ZY', 'ZZ']:
@@ -868,47 +873,49 @@ class PurityBenchmarking_TwoQubit_Analysis(
                     self.proc_data_dict[key+'_q0'][val_name_q0]
                     * self.proc_data_dict[key+'_q1'][val_name_q1])
                 self.proc_data_dict[key+'_sq'] = self.proc_data_dict[key]**2
-                self.proc_data_dict['Purity_shots'] += self.proc_data_dict[key+'_sq']
+                self.proc_data_dict['unitarity_shots'] += self.proc_data_dict[key+'_sq']
 
-            self.proc_data_dict['Purity'] = np.mean(
-                self.proc_data_dict['Purity_shots'], axis=1)
+            self.proc_data_dict['unitarity'] = np.mean(
+                self.proc_data_dict['unitarity_shots'], axis=1)
         else:
             raise NotImplementedError()
 
     def run_fitting(self):
         super().run_fitting()
 
-        fit_mod_purity = self.fit_purity_decay()
-        self.fit_res['purity_decay'] = fit_mod_purity
+        self.fit_res['unitarity_decay'] = self.fit_unitarity_decay()
 
-        purity_dec = self.fit_res['purity_decay'].params
+        unitarity_dec = self.fit_res['unitarity_decay'].params
 
         text_msg = 'Summary: \n'
         text_msg += format_value_string('Unitarity\n' +
-                                        r'$u$', purity_dec['u'], '\n')
+                                        r'$u$', unitarity_dec['u'], '\n')
         text_msg += format_value_string(
             'Error due to\nincoherent mechanisms\n'+r'$\epsilon$',
-            purity_dec['eps'])
+            unitarity_dec['eps'])
 
-        self.proc_data_dict['purity_msg'] = text_msg
+        self.proc_data_dict['unitarity_msg'] = text_msg
 
-    def fit_purity_decay(self):
-        """Fits the data using the purity model."""
-        fit_mod_purity = lmfit.Model(purity_decay, independent_vars='m')
-        fit_mod_purity.set_param_hint('A', value=.1, min=0, max=1, vary=True)
-        fit_mod_purity.set_param_hint('B', value=.8, min=0, max=1, vary=True)
+    def fit_unitarity_decay(self):
+        """Fits the data using the unitarity model."""
+        fit_mod_unitarity = lmfit.Model(unitarity_decay, independent_vars='m')
+        fit_mod_unitarity.set_param_hint(
+            'A', value=.1, min=0, max=1, vary=True)
+        fit_mod_unitarity.set_param_hint(
+            'B', value=.8, min=0, max=1, vary=True)
 
-        fit_mod_purity.set_param_hint('u', value=.9, min=0, max=1, vary=True)
+        fit_mod_unitarity.set_param_hint(
+            'u', value=.9, min=0, max=1, vary=True)
 
-        fit_mod_purity.set_param_hint('d1', value=self.d1, vary=False)
-        fit_mod_purity.set_param_hint('eps', expr='((d1-1)/d1)*(1-u**0.5)')
+        fit_mod_unitarity.set_param_hint('d1', value=self.d1, vary=False)
+        fit_mod_unitarity.set_param_hint('eps', expr='((d1-1)/d1)*(1-u**0.5)')
 
-        params = fit_mod_purity.make_params()
-        fit_mod_purity = fit_mod_purity.fit(data=self.proc_data_dict['Purity'],
-                                            m=self.proc_data_dict['ncl'],
-                                            params=params)
+        params = fit_mod_unitarity.make_params()
+        fit_mod_unitarity = fit_mod_unitarity.fit(
+            data=self.proc_data_dict['unitarity'],
+            m=self.proc_data_dict['ncl'], params=params)
 
-        return fit_mod_purity
+        return fit_mod_unitarity
 
     def prepare_plots(self):
         val_names = self.proc_data_dict['value_names']
@@ -921,7 +928,7 @@ class PurityBenchmarking_TwoQubit_Analysis(
                     self.proc_data_dict['binned_vals'][val_name], axis=1),
                 'yerr':  sem(self.proc_data_dict['binned_vals'][val_name],
                              axis=1),
-                'xlabel': 'Number of Cliffrods',
+                'xlabel': 'Number of Cliffords',
                 'xunit': '#',
                 'ylabel': val_name,
                 'yunit': self.proc_data_dict['value_units'][i],
@@ -1043,41 +1050,41 @@ class PurityBenchmarking_TwoQubit_Analysis(
             'horizontalalignment': 'left'}
 
         self.plot_dicts['correlated_readouts'] = {
-            'plotfn': plot_purity_shots,
+            'plotfn': plot_unitarity_shots,
             'ncl': self.proc_data_dict['ncl'],
-            'Purity_shots': self.proc_data_dict['Purity_shots'],
-            'xlabel': 'Number of Cliffrods',
+            'unitarity_shots': self.proc_data_dict['unitarity_shots'],
+            'xlabel': 'Number of Cliffords',
             'xunit': '#',
-            'ylabel': 'Purity',
+            'ylabel': 'Unitarity',
             'yunit': '',
             'title': self.proc_data_dict['timestamp_string'] +
             '\n'+self.proc_data_dict['measurementstring'],
         }
 
-        self.figs['purity'] = plt.subplots(nrows=1)
-        self.plot_dicts['purity'] = {
-            'plotfn': plot_purity,
-            'ax_id': 'purity',
+        self.figs['unitarity'] = plt.subplots(nrows=1)
+        self.plot_dicts['unitarity'] = {
+            'plotfn': plot_unitarity,
+            'ax_id': 'unitarity',
             'ncl': self.proc_data_dict['ncl'],
-            'P': self.proc_data_dict['Purity'],
-            'xlabel': 'Number of Cliffrods',
+            'P': self.proc_data_dict['unitarity'],
+            'xlabel': 'Number of Cliffords',
             'xunit': '#',
-            'ylabel': 'Putiry',
+            'ylabel': 'Unitarity',
             'yunit': 'frac',
             'title': self.proc_data_dict['timestamp_string'] +
             '\n'+self.proc_data_dict['measurementstring'],
         }
-        self.plot_dicts['fit_purity'] = {
+        self.plot_dicts['fit_unitarity'] = {
             'plotfn': self.plot_fit,
-            'ax_id': 'purity',
-            'fit_res': self.fit_res['purity_decay'],
-            'setlabel': 'Simple purity fit',
+            'ax_id': 'unitarity',
+            'fit_res': self.fit_res['unitarity_decay'],
+            'setlabel': 'Simple unitarity fit',
             'do_legend': True,
         }
-        self.plot_dicts['purity_text'] = {
+        self.plot_dicts['unitarity_text'] = {
             'plotfn': self.plot_text,
-            'text_string': self.proc_data_dict['purity_msg'],
-            'xpos': 0.6, 'ypos': .8, 'ax_id': 'purity',
+            'text_string': self.proc_data_dict['unitarity_msg'],
+            'xpos': 0.6, 'ypos': .8, 'ax_id': 'unitarity',
             'horizontalalignment': 'left'}
 
 
@@ -1149,24 +1156,24 @@ def plot_populations_RB_curve(ncl, P0, P1, P2, title, ax, **kw):
     ax.set_title(title)
 
 
-def plot_purity_shots(ncl, Purity_shots, title, ax=None, **kw):
+def plot_unitarity_shots(ncl, unitarity_shots, title, ax=None, **kw):
     ax.axhline(.5, c='k', lw=.5, ls='--')
 
-    ax.plot(ncl, Purity_shots, '.')
+    ax.plot(ncl, unitarity_shots, '.')
 
     ax.set_xlabel('Number of Cliffords (#)')
-    ax.set_ylabel('Purity')
+    ax.set_ylabel('unitarity')
     ax.grid(axis='y')
     ax.legend()
     ax.set_ylim(-1.05, 1.05)
     ax.set_title(title)
 
 
-def plot_purity(ncl, P, title, ax=None, **kw):
+def plot_unitarity(ncl, P, title, ax=None, **kw):
     ax.plot(ncl, P, 'o')
 
     ax.set_xlabel('Number of Cliffords (#)')
-    ax.set_ylabel('Purity')
+    ax.set_ylabel('unitarity')
     ax.grid(axis='y')
     ax.legend()
     ax.set_ylim(-.05, 1.05)
@@ -1312,7 +1319,7 @@ def full_rb_decay(A, B, C, lambda_1, lambda_2, m):
     return A + B*lambda_1**m+C*lambda_2**m
 
 
-def purity_decay(A, B, u, m):
+def unitarity_decay(A, B, u, m):
     """
     Eq. (8) of Wallman et al. New J. Phys. 2015
     """

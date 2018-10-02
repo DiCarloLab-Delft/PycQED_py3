@@ -1,4 +1,5 @@
 import unittest
+from matplotlib import rcParams
 import pycqed as pq
 import os
 from pycqed.analysis_v2 import measurement_analysis as ma
@@ -10,6 +11,9 @@ class Test_RBAnalysis(unittest.TestCase):
     def setUpClass(self):
         self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
         ma.a_tools.datadir = self.datadir
+        # to have fast tests
+        rcParams['figure.dpi'] = 80
+
 
     def test_single_qubit_RB_analysis(self):
         a = ma.RandomizedBenchmarking_SingleQubit_Analysis(
@@ -56,7 +60,12 @@ class Test_RBAnalysis(unittest.TestCase):
         self.assertAlmostEqual(eps, 0.157, places=3)
 
     def test_UnitarityBenchmarking_TwoQubit_Analysis(self):
-        a = ma.PurityBenchmarking_TwoQubit_Analysis(
+        a = ma.UnitarityBenchmarking_TwoQubit_Analysis(
             t_start='20180926_110112',
             classification_method='rates', rates_ch_idxs=[0, 3],
             nseeds=200)
+        u_dec = a.fit_res['unitarity_decay'].params
+        self.assertAlmostEqual(u_dec['u'].value, 0.7354, places=3)
+        self.assertAlmostEqual(u_dec['eps'].value, 0.1068, places=3)
+
+
