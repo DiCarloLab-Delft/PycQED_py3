@@ -1218,8 +1218,8 @@ class DeviceCCL(Instrument):
             value_units=['deg', 'deg'],
             msmt_kw={'disable_initial_pulse': disable_initial_pulse,
                      'qubits': qubits,
-                     'counter_par':[counter_par], 
-                     'gate_separation_par':[gate_separation_par], 
+                     'counter_par':[counter_par],
+                     'gate_separation_par':[gate_separation_par],
                      'nested_MC': nested_MC,
                      'flux_cw': flux_cw})
 
@@ -1480,7 +1480,7 @@ class DeviceCCL(Instrument):
         MC.run(label.format(nr_seeds, qubits[0], qubits[1]),
                exp_metadata={'bins': sweep_points})
         # N.B. if measurement was interrupted this wont work
-        ma2.PurityBenchmarking_TwoQubit_Analysis(nseeds=nr_seeds)
+        ma2.UnitarityBenchmarking_TwoQubit_Analysis(nseeds=nr_seeds)
 
     def measure_two_qubit_simultaneous_randomized_benchmarking(
             self, qubits, MC,
@@ -1488,9 +1488,9 @@ class DeviceCCL(Instrument):
             interleaving_cliffords=[None], label='TwoQubit_sim_RB_{}seeds_{}_{}',
             recompile: bool ='as needed', cal_points=True):
         """
-        Performs simultaneous RB on two qubits. 
-        The data of this experiment should be compared to the results of single 
-        qubit RB 
+        Performs simultaneous RB on two qubits.
+        The data of this experiment should be compared to the results of single
+        qubit RB
         """
 
         # Settings that have to be preserved, change is required for
@@ -1535,7 +1535,7 @@ class DeviceCCL(Instrument):
                     interleaving_cliffords,
                     qubits[0], qubits[1]),
                 interleaving_cliffords=interleaving_cliffords,
-                simultaneous_single_qubit_RB=True, 
+                simultaneous_single_qubit_RB=True,
                 cal_points=cal_points,
                 net_cliffords=[0, 3],  # measures with and without inverting
                 f_state_cal_pts=True,
@@ -1580,7 +1580,7 @@ class DeviceCCL(Instrument):
         MC.run(label.format(nr_seeds, qubits[0], qubits[1]),
                exp_metadata={'bins': sweep_points})
         # N.B. if interleaving cliffords are used, this won't work
-        # FIXME: write a proper analysis for simultaneous RB 
+        # FIXME: write a proper analysis for simultaneous RB
         # ma2.RandomizedBenchmarking_TwoQubit_Analysis()
 
 
