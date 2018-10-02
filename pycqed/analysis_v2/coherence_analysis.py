@@ -3,12 +3,14 @@ Hacked together by Rene Vollmer
 '''
 
 import datetime
+from copy import deepcopy
 import pycqed.analysis_v2.base_analysis as ba
 from pycqed.analysis_v2.base_analysis import plot_scatter_errorbar_fit, plot_scatter_errorbar
 from pycqed.analysis import measurement_analysis as ma_old
 
 import numpy as np
 import lmfit
+from pycqed.analysis.tools.plotting import SI_val_to_msg_str
 
 from pycqed.analysis import analysis_toolbox as a_tools
 
@@ -241,13 +243,7 @@ class AliasedCoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                  label: str='', data_file_path: str=None,
                  options_dict: dict=None, extract_only: bool=False,
                  do_fitting: bool=True, auto=True,
-                 ch_idxs: list =[0, 1],
-                 ch_amp_key: str='Snapshot/instruments/AWG8_8014'
-                 '/parameters/awgs_0_outputs_1_amplitude',
-                 ch_range_key: str='Snapshot/instruments/AWG8_8014'
-                 '/parameters/sigouts_0_range',
-                 waveform_amp_key: str='Snapshot/instruments/FL_LutMan_QR'
-                 '/parameters/sq_amp'):
+                 ch_idxs: list =[0, 1]):
         """
 
         Args:
@@ -265,41 +261,18 @@ class AliasedCoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
         self.params_dict = {'xlabel': 'sweep_name',
                             'xunit': 'sweep_unit',
                             'xvals': 'sweep_points',
+                            'detuning': 'Experimental Data.Experimental Metadata.sq_eps',
                             'measurementstring': 'measurementstring',
                             'value_names': 'value_names',
                             'value_units': 'value_units',
                             'measured_values': 'measured_values'}
-        self.numeric_params = []
+        self.numeric_params = ['detuning']
         self.ch_idxs = ch_idxs
-        self.ch_amp_key = ch_amp_key
-        self.ch_range_key = ch_range_key
-        self.waveform_amp_key = waveform_amp_key
         if auto:
             self.run_analysis()
 
-    def extract_data(self):
-        super().extract_data()
-
-        a = ma_old.MeasurementAnalysis(
-            timestamp=self.t_start, auto=False, close_file=False)
-        a.get_naming_and_values()
-
-        # TODO: amplitude calculation should be removed, instead the
-        # MC metadata should be used and passed along.
-        ch_amp = a.data_file[self.ch_amp_key].attrs['value']
-        if self.ch_range_key is None:
-            ch_range = 2  # corresponds to a scale factor of 1
-        else:
-            ch_range = a.data_file[self.ch_range_key].attrs['value']
-        waveform_amp = a.data_file[self.waveform_amp_key].attrs['value']
-        amp = ch_amp*ch_range/2*waveform_amp
-        self.proc_data_dict['sq_amp'] = amp
-
     def process_data(self):
-        self.proc_data_dict
-
-        xlab = self.raw_data_dict['value_names'][0][self.ch_idxs[0]]
-        ylab = self.raw_data_dict['value_names'][0][self.ch_idxs[1]]
+        self.proc_data_dict = deepcopy(self.raw_data_dict)
         xs = self.raw_data_dict['measured_values'][0][self.ch_idxs[0]]
         ys = self.raw_data_dict['measured_values'][0][self.ch_idxs[1]]
 
@@ -326,20 +299,19 @@ class AliasedCoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
         self.fit_res['coherence_decay'] = decay_fit
 
         text_msg = 'Summary\n'
-        text_msg += r'Square pulse amp {:.3g}'.format(
-            self.proc_data_dict['sq_amp'])+' V\n'
-        text_msg += r'$A \exp(-(t/\tau)^n)+o$' + '\n'
-        text_msg += format_value_string(r'$A$', decay_fit.params['A'], '\n')
+
+        det, unit = SI_val_to_msg_str(self.raw_data_dict['detuning'][0], 'Hz',
+                                      return_type=float)
+        text_msg += 'Square pulse detuning {:.3f} {}\n'.format(det, unit)
+
+        text_msg += r'Fitting to : $A e^{(-(t/\tau)^n)}+o$' + '\n\t'
+        text_msg += format_value_string(r'$A$', decay_fit.params['A'], '\n\t')
         text_msg += format_value_string(r'$\tau$',
-                                        decay_fit.params['tau'], '\n')
-        text_msg += format_value_string(r'$n$', decay_fit.params['n'], '\n')
+                                        decay_fit.params['tau'], '\n\t')
+        text_msg += format_value_string(r'$n$', decay_fit.params['n'], '\n\t')
         text_msg += format_value_string(r'$o$', decay_fit.params['o'], '')
 
         self.proc_data_dict['decay_fit_msg'] = text_msg
-
-    def save_fit_results(self):
-        # todo: if you want to save some results to a hdf5, do it here
-        pass
 
     def prepare_plots(self):
         self.plot_dicts['main'] = {

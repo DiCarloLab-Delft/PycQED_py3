@@ -78,3 +78,6 @@ class Test_AliasedCoherenceTimesAnalysis(unittest.TestCase):
         self.assertAlmostEqual(pars['A'], 0.741, places=3)
         self.assertAlmostEqual(pars['n'], 1.93, places=2)
         self.assertAlmostEqual(pars['o'], 0.0254, places=3)
+
+        self.assertEqual(a.raw_data_dict['detuning'][0], -800e6)
+
