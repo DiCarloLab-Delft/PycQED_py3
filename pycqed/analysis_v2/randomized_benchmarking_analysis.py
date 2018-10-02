@@ -680,8 +680,10 @@ class UnitarityBenchmarking_TwoQubit_Analysis(
             self.run_analysis()
 
     def extract_data(self):
-        """
-        Custom data extraction for this specific experiment.
+        """Custom data extraction for Unitarity benchmarking.
+
+        To determine the unitarity data is acquired in different bases.
+        This method extracts that data and puts it in specific bins.
         """
         self.raw_data_dict = OrderedDict()
 
@@ -779,6 +781,13 @@ class UnitarityBenchmarking_TwoQubit_Analysis(
         a.finish()  # closes data file
 
     def process_data(self):
+        """Averages shot data and calculates unitarity from raw_data_dict.
+
+        Note: this doe not correct the outcomes for leakage.
+
+
+
+        """
         self.proc_data_dict = deepcopy(self.raw_data_dict)
 
         keys = ['Vx0', 'V0x', 'Vx1', 'V1x', 'Vx2', 'V2x',
@@ -845,8 +854,10 @@ class UnitarityBenchmarking_TwoQubit_Analysis(
                 P2x = self.proc_data_dict['P2x'][val_name]
                 V0 = self.proc_data_dict['V0x'][val_name]
                 V1 = self.proc_data_dict['V1x'][val_name]
-                V2 = self.proc_data_dict['V2x'][val_name]
-                val = Vmeas+0  # - (P2x*V2 - (1-P2x)*V1)[:,None]
+
+                # Leakage is ignored in this analysis.
+                # V2 = self.proc_data_dict['V2x'][val_name]
+                val = Vmeas + 0  # - (P2x*V2 - (1-P2x)*V1)[:,None]
                 val -= V1
                 val /= V0 - V1
                 val = np.mean(np.reshape(
@@ -865,7 +876,14 @@ class UnitarityBenchmarking_TwoQubit_Analysis(
                 1-self.proc_data_dict['Px2'][val_name_q0]
                 - self.proc_data_dict['P2x'][val_name_q1])
 
-            self.proc_data_dict['unitarity_shots'] = self.proc_data_dict['ZZ_q0'][val_name_q0]*0
+            # The unitarity is calculated here.
+            self.proc_data_dict['unitarity_shots'] = \
+                self.proc_data_dict['ZZ_q0'][val_name_q0]*0
+
+            # Unitarity according to Eq. (10) Wallman et al. New J. Phys. 2015
+            # Pj = d/(d-1)*|n(rho_j)|^2
+            # Note that the dimensionality prefix is ignored here as it
+            # should drop out in the fits.
             for key in ['XX', 'XY', 'XZ',
                         'YX', 'YY', 'YZ',
                         'ZX', 'ZY', 'ZZ']:
@@ -873,7 +891,9 @@ class UnitarityBenchmarking_TwoQubit_Analysis(
                     self.proc_data_dict[key+'_q0'][val_name_q0]
                     * self.proc_data_dict[key+'_q1'][val_name_q1])
                 self.proc_data_dict[key+'_sq'] = self.proc_data_dict[key]**2
-                self.proc_data_dict['unitarity_shots'] += self.proc_data_dict[key+'_sq']
+
+                self.proc_data_dict['unitarity_shots'] += \
+                    self.proc_data_dict[key+'_sq']
 
             self.proc_data_dict['unitarity'] = np.mean(
                 self.proc_data_dict['unitarity_shots'], axis=1)
@@ -882,7 +902,6 @@ class UnitarityBenchmarking_TwoQubit_Analysis(
 
     def run_fitting(self):
         super().run_fitting()
-
         self.fit_res['unitarity_decay'] = self.fit_unitarity_decay()
 
         unitarity_dec = self.fit_res['unitarity_decay'].params
@@ -908,6 +927,7 @@ class UnitarityBenchmarking_TwoQubit_Analysis(
             'u', value=.9, min=0, max=1, vary=True)
 
         fit_mod_unitarity.set_param_hint('d1', value=self.d1, vary=False)
+        # FIXME: Add reference to equation used here.
         fit_mod_unitarity.set_param_hint('eps', expr='((d1-1)/d1)*(1-u**0.5)')
 
         params = fit_mod_unitarity.make_params()
@@ -1204,12 +1224,14 @@ def populations_using_rate_equations(SI: np.array, SX: np.array,
     values <Pi>. To do this, we calibrate the average signal levels Vi for
     the transmons in level i, and perform each measurement twice, the second
     time with an added final π pulse on the 0–1 transition. This final π
-    pulse swaps P0 and P1, leaving P2 unaffected. Under the assumption that higher levels are unpopulated (P0 +P1 +P2 = 1),
+    pulse swaps P0 and P1, leaving P2 unaffected. Under the assumption that
+    higher levels are unpopulated (P0 +P1 +P2 = 1),
 
      [V0 −V2,   V1 −V2] [P0]  = [S −V2]
      [V1 −V2,   V0 −V2] [P1]  = [S' −V2]
 
-    where S (S') is the measured signal level without (with) final π pulse. The populations are extracted by matrix inversion.
+    where S (S') is the measured signal level without (with) final π pulse.
+    The populations are extracted by matrix inversion.
     """
     M = np.array([[V0-V2, V1-V2], [V1-V2, V0-V2]])
     M_inv = np.linalg.inv(M)
@@ -1262,8 +1284,7 @@ def plot_classifier_decission_boundary(shots_0, shots_1, shots_2,
                                        ylabel: str, yunit: str,
                                        title: str, ax, **kw):
     """
-    Plots decision boundary on top of the hexbin plot of the training dataset
-    (usually the calibration points).
+    Plot decision boundary on top of the hexbin plot of the training dataset.
     """
     grid_points = 200
 
@@ -1302,7 +1323,7 @@ def plot_rb_decay_woods_gambetta(ncl, M0, X1, ax, ax1, title='', **kw):
 
 def leak_decay(A, B, lambda_1, m):
     """
-    Eq. (9) of Wood Gambetta 2018
+    Eq. (9) of Wood Gambetta 2018.
 
         A ~= L2/ (L1+L2)
         B ~= L1/ (L1+L2) + eps_m
@@ -1313,23 +1334,17 @@ def leak_decay(A, B, lambda_1, m):
 
 
 def full_rb_decay(A, B, C, lambda_1, lambda_2, m):
-    """
-    Eq. (15) of Wood Gambetta 2018
-    """
+    """Eq. (15) of Wood Gambetta 2018."""
     return A + B*lambda_1**m+C*lambda_2**m
 
 
 def unitarity_decay(A, B, u, m):
-    """
-    Eq. (8) of Wallman et al. New J. Phys. 2015
-    """
+    """Eq. (8) of Wallman et al. New J. Phys. 2015."""
     return A + B*u**m
 
 
 def format_value_string(par_name: str, lmfit_par, end_char=''):
-    """
-    Formats an lmfit par to a  string of value with uncertainty.
-    """
+    """Format an lmfit par to a  string of value with uncertainty."""
     val_string = par_name
     val_string += ': {:.4f}'.format(lmfit_par.value)
     if lmfit_par.stderr is not None:
