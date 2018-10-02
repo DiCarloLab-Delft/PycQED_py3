@@ -39,7 +39,7 @@ class Test_RBAnalysis(unittest.TestCase):
     def test_two_qubit_RB_analysis_missing_f_cal(self):
         a = ma.RandomizedBenchmarking_TwoQubit_Analysis(
             t_start='20180727_182529',
-            classification_method='rates', rates_ch_idxs=[1,3])
+            classification_method='rates', rates_ch_idxs=[1, 3])
 
         leak_pars = a.fit_res['leakage_decay'].params
         L1 = leak_pars['L1'].value
@@ -55,7 +55,8 @@ class Test_RBAnalysis(unittest.TestCase):
         eps = rb_pars['eps'].value
         self.assertAlmostEqual(eps, 0.157, places=3)
 
-
-
-
-
+    def test_UnitarityBenchmarking_TwoQubit_Analysis(self):
+        a = ma.PurityBenchmarking_TwoQubit_Analysis(
+            t_start='20180926_110112',
+            classification_method='rates', rates_ch_idxs=[0, 3],
+            nseeds=200)
