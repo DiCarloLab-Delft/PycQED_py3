@@ -732,7 +732,8 @@ def verify_phicond(U):          # benchmark to check that cond phase is computed
 
 
 
-def simulate_quantities_of_interest_superoperator(tlist, c_ops, noise_parameters_CZ, fluxlutman, amp,
+def simulate_quantities_of_interest_superoperator(tlist, c_ops, noise_parameters_CZ, fluxlutman,
+									fluxbias_q1, amp,
                                     sim_step,
                                     verbose: bool=True):
     """
@@ -772,17 +773,22 @@ def simulate_quantities_of_interest_superoperator(tlist, c_ops, noise_parameters
     #w_q1 = fluxlutman.q_freq_10()
     w_q1 = (H_0_diag[3,3]-H_0_diag[0,0]) / (2*np.pi)
 
-
-
     # H_rotateaway = coupled_transmons_hamiltonian_new(w_q0=w_q0, w_q1=w_q1, 
     # 	                                            alpha_q0=-2*w_q0, alpha_q1=-2*w_q1, J=0)
+
+    w_q1_sweetspot = noise_parameters_CZ.w_q1_sweetspot()
+    # Correction up to second order of the frequency due to flux noise, computed from w_q0(phi) = w_q0^sweetspot * sqrt(cos(pi * phi/phi_0))
+    w_q1_biased = w_q1 - np.pi/2 * (w_q1_sweetspot**2/w_q1) * np.sqrt(1 - (w_q1**4/w_q1_sweetspot**4)) * fluxbias_q1 - \
+			         - np.pi**2/2 * w_q1_sweetspot * (1+(w_q1**4/w_q1_sweetspot**4)) / (w_q1/w_q1_sweetspot)**3 * fluxbias_q1**2
+			         # with sigma up to circa 1e-3 \mu\Phi_0 the second order is irrelevant
+    correction_to_H = coupled_transmons_hamiltonian_new(w_q0=0, w_q1=np.real(w_q1_biased-w_q1), alpha_q0=0, alpha_q1=0, J=0)
 
 
     t0 = time.time()
 
     exp_L_total=1
     for i in range(len(amp)):
-        H=calc_hamiltonian(amp[i],fluxlutman,noise_parameters_CZ)
+        H=calc_hamiltonian(amp[i],fluxlutman,noise_parameters_CZ) + correction_to_H
         H=S.dag()*H*S
         if c_ops != []:
             c_ops_temp=[]
@@ -856,6 +862,36 @@ def gaussian(x,mean,sigma):    # normalized Gaussian
 	return 1/np.sqrt(2*np.pi)/sigma * np.exp(-(x-mean)**2/(2*sigma**2))
 
 
+## phases need to be averaged carefully, e.g. average of 45 and 315 degrees is 0, not 180
+def average_phases(phases,weights):
+	# phases has to be passed in degrees
+	sines=np.sin(np.deg2rad(phases))
+	cosines=np.cos(np.deg2rad(phases))
+	# we separately average sine and cosine
+	av_sines=np.average(sines,weights=weights)
+	av_cosines=np.average(cosines,weights=weights)
+	# need to normalize
+	av_sines=av_sines/(av_sines**2+av_cosines**2)
+	av_cosines=av_cosines/(av_sines**2+av_cosines**2)
+	angle_temp_sin = np.arcsin(av_sines)
+	angle_temp_cos = np.arccos(av_cosines)
+	# then we combine them to give the unique angle with such sine and cosine
+	# To avoid problems with the discontinuities of arcsin and arccos, we choose to use the average which is not very close to such discontinuities
+	if np.abs(angle_temp_sin)<np.pi/3:
+		if av_cosines >= 0:
+			angle = angle_temp_sin
+		else:
+			angle = np.pi-angle_temp_sin
+	elif np.abs(angle_temp_cos-np.pi/2)<np.pi/3:
+		if av_sines >= 0:
+			angle = angle_temp_cos
+		else:
+			angle = 2*np.pi-angle_temp_cos
+	else:
+		logging.warning('Something wrong with averaging the phases.')
+	return np.rad2deg(angle) % 360
+
+
 
 class CZ_trajectory_superoperator(det.Soft_Detector):
     def __init__(self, fluxlutman, noise_parameters_CZ, fitted_stepresponse_ty):
@@ -893,261 +929,241 @@ class CZ_trajectory_superoperator(det.Soft_Detector):
 
         ### Discretize average (integral) over a Gaussian distribution
         mean = 0
-        sigma = self.noise_parameters_CZ.sigma()    # 4e-6 is the same value as in the surface-17 paper of tom&brian
+        sigma = self.noise_parameters_CZ.sigma()    # one for each qubit
+        				# 4e-6 is the same value as in the surface-17 paper of tom&brian
 
         qoi_plot = list()    # used to verify convergence properties. If len(n_sampling_gaussian_vec)==1, it is useless
         n_sampling_gaussian_vec = [11]  # 11 guarantees excellent convergence. We choose it odd so that the central point of the Gaussian is included.
         								# ALWAYS choose it odd
         for n_sampling_gaussian in n_sampling_gaussian_vec:
         	# If sigma=0 there's no need for sampling
+        	weights=[]
 	        if sigma != 0:
 	            samplingpoints_gaussian = np.linspace(-5*sigma,5*sigma,n_sampling_gaussian)    # after 5 sigmas we cut the integral
 	            delta_x = samplingpoints_gaussian[1]-samplingpoints_gaussian[0]
 	            values_gaussian = gaussian(samplingpoints_gaussian,mean,sigma)
-	            weights = values_gaussian*delta_x
 	        else:
 	        	samplingpoints_gaussian = np.array([0])
 	        	delta_x = 1
 	        	values_gaussian = np.array([1])
-	        	weights = np.array([1])
 
 
 	        qoi_vec = list()
 	        U_final_vec = list()
-	        for point_j in range(len(samplingpoints_gaussian)):
-	        	self.fluxbias = samplingpoints_gaussian[point_j]
+	        for j_q0 in range(len(samplingpoints_gaussian)):
+	        	self.fluxbias_q0 = samplingpoints_gaussian[j_q0]
+	        	for j_q1 in range(len(samplingpoints_gaussian)):
+	        		self.fluxbias_q1 = samplingpoints_gaussian[j_q1]
+	        		if sigma != 0:
+	        			weights.append(values_gaussian[j_q0]*delta_x * values_gaussian[j_q1]*delta_x)
+	        		else:
+	        			weights=np.array([1])
 
-		        if not self.fluxlutman.czd_double_sided():
-		            thetawave = wfl.martinis_flux_pulse(
-		                length=self.fluxlutman.cz_length(),
-		                lambda_2=self.fluxlutman.cz_lambda_2(),
-		                lambda_3=self.fluxlutman.cz_lambda_3(),
-		                theta_i=self.theta_i,
-		                theta_f=np.deg2rad(self.fluxlutman.cz_theta_f()),
-		                sampling_rate=self.fluxlutman.sampling_rate())    # return in terms of theta
-		            epsilon = wfl.theta_to_eps(thetawave, self.fluxlutman.q_J2())
-		            amp = self.fluxlutman.calc_eps_to_amp(epsilon, state_A='11', state_B='02')
-		                     # transform detuning frequency to (positive) amplitude
-		        else:
-		            amp = self.get_f_pulse_double_sided()
-		            
+			        if not self.fluxlutman.czd_double_sided():
+			            thetawave = wfl.martinis_flux_pulse(
+			                length=self.fluxlutman.cz_length(),
+			                lambda_2=self.fluxlutman.cz_lambda_2(),
+			                lambda_3=self.fluxlutman.cz_lambda_3(),
+			                theta_i=self.theta_i,
+			                theta_f=np.deg2rad(self.fluxlutman.cz_theta_f()),
+			                sampling_rate=self.fluxlutman.sampling_rate())    # return in terms of theta
+			            epsilon = wfl.theta_to_eps(thetawave, self.fluxlutman.q_J2())
+			            amp = self.fluxlutman.calc_eps_to_amp(epsilon, state_A='11', state_B='02')
+			                     # transform detuning frequency to (positive) amplitude
+			        else:
+			            amp = self.get_f_pulse_double_sided()
+			            
 
-		        # For better accuracy in simulations, redefine f_pulse and amp in terms of sim_step_new.
-		        # We split here below in two cases to keep into account that certain times net-zero is one AWG time-step longer than the conventional with the same pulse length
-		        if len(tlist) == len(amp):
-		        	tlist_temp=np.concatenate((tlist,np.array([self.fluxlutman.cz_length()])))
-		        	tlist_new = (np.arange(0, self.fluxlutman.cz_length(),
-		                           sim_step_new))
-		        else:
-		        	tlist_temp=np.concatenate((tlist,np.array([self.fluxlutman.cz_length(),self.fluxlutman.cz_length()+sim_step])))
-		        	tlist_new = (np.arange(0, self.fluxlutman.cz_length()+sim_step,
-		                           sim_step_new))
+			        # For better accuracy in simulations, redefine f_pulse and amp in terms of sim_step_new.
+			        # We split here below in two cases to keep into account that certain times net-zero is one AWG time-step longer than the conventional with the same pulse length
+			        if len(tlist) == len(amp):
+			        	tlist_temp=np.concatenate((tlist,np.array([self.fluxlutman.cz_length()])))
+			        	tlist_new = (np.arange(0, self.fluxlutman.cz_length(),
+			                           sim_step_new))
+			        else:
+			        	tlist_temp=np.concatenate((tlist,np.array([self.fluxlutman.cz_length(),self.fluxlutman.cz_length()+sim_step])))
+			        	tlist_new = (np.arange(0, self.fluxlutman.cz_length()+sim_step,
+			                           sim_step_new))
 
-		        amp_temp=np.concatenate((amp,np.array([amp[-1]])))
-		        amp_interp=interp1d(tlist_temp,amp_temp)
-		        amp=amp_interp(tlist_new)
-
-
-
-		        amp=amp*self.noise_parameters_CZ.voltage_scaling_factor()       # recommended to change discretely the scaling factor
-
-
-		        if self.noise_parameters_CZ.distortions():
-		            impulse_response=np.gradient(self.fitted_stepresponse_ty[1])
-
-		            # plot(x_plot_vec=[np.array(self.fitted_stepresponse_ty[0])*1e9],y_plot_vec=[self.fitted_stepresponse_ty[1]],
-		            # 	  title='Step response',
-		            #       xlabel='Time (ns)')
-		            # plot(x_plot_vec=[np.array(self.fitted_stepresponse_ty[0])*1e9],y_plot_vec=[impulse_response],
-		            # 	  title='Impulse response',
-		            #       xlabel='Time (ns)')
-
-		            # use interpolation to be sure that amp and impulse_response have the same delta_t separating two values
-		            amp_interp = interp1d(tlist_new,amp)
-		            impulse_response_interp = interp1d(self.fitted_stepresponse_ty[0],impulse_response)
-
-		            tlist_convol1 = tlist_new
-		            tlist_convol2 = np.arange(0, self.fitted_stepresponse_ty[0][-1],
-		                               sim_step_new)
-		            amp_convol = amp_interp(tlist_convol1)
-		            impulse_response_convol = impulse_response_interp(tlist_convol2)
-
-		            convolved_amp=scipy.signal.convolve(amp_convol,impulse_response_convol)/sum(impulse_response_convol)
-
-		            # plot(x_plot_vec=[tlist_convol1*1e9,np.arange(np.size(convolved_amp))*sim_step_new*1e9],
-		            # 	  y_plot_vec=[amp_convol, convolved_amp],
-		            # 	  title='Pulse_length= {} ns'.format(self.fluxlutman.cz_length()*1e9),
-		            #       xlabel='Time (ns)',ylabel='Amplitude (V)',legend_labels=['Ideal','Distorted'])
-
-		            amp_final=convolved_amp[0:np.size(tlist_convol1)]    # consider only amp during the gate time
-
-		            # plot(x_plot_vec=[tlist_convol1*1e9],
-		            #       y_plot_vec=[amp_convol, amp_final],
-		            #       title='Pulse_length= {} ns'.format(self.fluxlutman.cz_length()*1e9),
-		            #       xlabel='Time (ns)',ylabel='Amplitude (V)',legend_labels=['Ideal','Distorted'])
-
-		        else:
-		            amp_final=amp
+			        amp_temp=np.concatenate((amp,np.array([amp[-1]])))
+			        amp_interp=interp1d(tlist_temp,amp_temp)
+			        amp=amp_interp(tlist_new)
 
 
 
-		        ### the fluxbias affects the pulse shape after the distortions have been taken into account
-		        if not self.fluxlutman.czd_double_sided():
-		            omega_0 = self.fluxlutman.calc_amp_to_freq(0,'01')
-
-		            f_pulse = self.fluxlutman.calc_amp_to_freq(amp_final,'01')
-		            f_pulse = np.clip(f_pulse,a_min=None,a_max=omega_0)					# necessary otherwise the sqrt below gives nan
-
-		            # Correction up to second order of the frequency due to flux noise, computed from w_q0(phi) = w_q0^sweetspot * sqrt(cos(pi * phi/phi_0))
-		            f_pulse_final = f_pulse - np.pi/2 * (omega_0**2/f_pulse) * np.sqrt(1 - (f_pulse**4/omega_0**4)) * self.fluxbias - \
-		                                  - np.pi**2/2 * omega_0 * (1+(f_pulse**4/omega_0**4)) / (f_pulse/omega_0)**3 * self.fluxbias**2
-		                                  # with sigma up to circa 1e-3 \mu\Phi_0 the second order is irrelevant
-
-		            amp_final = self.fluxlutman.calc_freq_to_amp(f_pulse_final,state='01')
-
-		        else:
-		        	half_length = int(np.size(amp_final)/2)
-		        	amp_A = amp_final[0:half_length]				# positive and negative parts
-		        	amp_B = amp_final[half_length:]
+			        amp=amp*self.noise_parameters_CZ.voltage_scaling_factor()       # recommended to change discretely the scaling factor
 
 
-		        	omega_0 = self.fluxlutman.calc_amp_to_freq(0,'01')
+			        if self.noise_parameters_CZ.distortions():
+			            fitted_stepresponse_ty_temp=np.concatenate([np.zeros(1),self.fitted_stepresponse_ty[1]])    # to make gradient work properly
+			            impulse_response_temp=np.gradient(fitted_stepresponse_ty_temp)
+			            impulse_response= np.delete(impulse_response_temp,-1)     # to have t and y of the same length for interpolation
 
-		        	f_pulse_A = self.fluxlutman.calc_amp_to_freq(amp_A,'01')
-		        	f_pulse_A = np.clip(f_pulse_A,a_min=None,a_max=omega_0)
+			            # plot(x_plot_vec=[np.array(self.fitted_stepresponse_ty[0])*1e9],y_plot_vec=[self.fitted_stepresponse_ty[1]],
+			            # 	  title='Step response',
+			            #       xlabel='Time (ns)')
+			            # plot(x_plot_vec=[np.array(self.fitted_stepresponse_ty[0])*1e9],y_plot_vec=[impulse_response],
+			            # 	  title='Impulse response',
+			            #       xlabel='Time (ns)')
 
+			            # use interpolation to be sure that amp and impulse_response have the same delta_t separating two values
+			            amp_interp = interp1d(tlist_new,amp)
+			            impulse_response_interp = interp1d(self.fitted_stepresponse_ty[0],impulse_response)
 
-		        	f_pulse_A = f_pulse_A - np.pi/2 * (omega_0**2/f_pulse_A) * np.sqrt(1 - (f_pulse_A**4/omega_0**4)) * self.fluxbias - \
-		                                  - np.pi**2/2 * omega_0 * (1+(f_pulse_A**4/omega_0**4)) / (f_pulse_A/omega_0)**3 * self.fluxbias**2
-		                                  # with sigma up to circa 1e-3 \mu\Phi_0 the second order is irrelevant
-		        	amp_A = self.fluxlutman.calc_freq_to_amp(f_pulse_A,state='01')
+			            tlist_convol1 = tlist_new
+			            tlist_convol2 = np.arange(0, self.fitted_stepresponse_ty[0][-1],
+			                               sim_step_new)
+			            amp_convol = amp_interp(tlist_convol1)
+			            impulse_response_convol = impulse_response_interp(tlist_convol2)
 
+			            convolved_amp=scipy.signal.convolve(amp_convol,impulse_response_convol)/sum(impulse_response_convol)
 
-		        	f_pulse_B = self.fluxlutman.calc_amp_to_freq(amp_B,'01')
-		        	f_pulse_B = np.clip(f_pulse_B,a_min=None,a_max=omega_0)
+			            # plot(x_plot_vec=[tlist_convol1*1e9,np.arange(np.size(convolved_amp))*sim_step_new*1e9],
+			            # 	  y_plot_vec=[amp_convol, convolved_amp],
+			            # 	  title='Pulse_length= {} ns'.format(self.fluxlutman.cz_length()*1e9),
+			            #       xlabel='Time (ns)',ylabel='Amplitude (V)',legend_labels=['Ideal','Distorted'])
 
-		        	f_pulse_B = f_pulse_B - np.pi/2 * (omega_0**2/f_pulse_B) * np.sqrt(1 - (f_pulse_B**4/omega_0**4)) * self.fluxbias * (-1) - \
-                                  - np.pi**2/2 * omega_0 * (1+(f_pulse_B**4/omega_0**4)) / (f_pulse_B/omega_0)**3 * self.fluxbias**2
-                                  # with sigma up to circa 1e-3 \mu\Phi_0 the second order is irrelevant
-		        	amp_B = self.fluxlutman.calc_freq_to_amp(f_pulse_B,state='01',positive_branch=False)
+			            amp_final=convolved_amp[0:np.size(tlist_convol1)]    # consider only amp during the gate time
 
+			            # plot(x_plot_vec=[tlist_convol1*1e9],
+			            #       y_plot_vec=[amp_convol, amp_final],
+			            #       title='Pulse_length= {} ns'.format(self.fluxlutman.cz_length()*1e9),
+			            #       xlabel='Time (ns)',ylabel='Amplitude (V)',legend_labels=['Ideal','Distorted'])
 
-		        	amp_final = np.concatenate([amp_A, amp_B])
-		        	f_pulse_final=np.concatenate([f_pulse_A, f_pulse_B])
+			        else:
+			            amp_final=amp
 
 
 
-		        ### Script to plot the waveform
-		        # plot(x_plot_vec=[tlist_new*1e9],
-		        #           y_plot_vec=[f_pulse_final/1e9],
-		        #           title='Freq. of fluxing qubit during pulse',
-		        #           xlabel='Time (ns)',ylabel='Freq. (GHz)',legend_labels=['omega_B(t)'])
+			        ### the fluxbias_q0 affects the pulse shape after the distortions have been taken into account
+			        if not self.fluxlutman.czd_double_sided():
+			            omega_0 = self.fluxlutman.calc_amp_to_freq(0,'01')
+
+			            f_pulse = self.fluxlutman.calc_amp_to_freq(amp_final,'01')
+			            f_pulse = np.clip(f_pulse,a_min=None,a_max=omega_0)					# necessary otherwise the sqrt below gives nan
+
+			            # Correction up to second order of the frequency due to flux noise, computed from w_q0(phi) = w_q0^sweetspot * sqrt(cos(pi * phi/phi_0))
+			            f_pulse_final = f_pulse - np.pi/2 * (omega_0**2/f_pulse) * np.sqrt(1 - (f_pulse**4/omega_0**4)) * self.fluxbias_q0 - \
+			                                  - np.pi**2/2 * omega_0 * (1+(f_pulse**4/omega_0**4)) / (f_pulse/omega_0)**3 * self.fluxbias_q0**2
+			                                  # with sigma up to circa 1e-3 \mu\Phi_0 the second order is irrelevant
+
+			            amp_final = self.fluxlutman.calc_freq_to_amp(f_pulse_final,state='01')
+
+			        else:
+			        	half_length = int(np.size(amp_final)/2)
+			        	amp_A = amp_final[0:half_length]				# positive and negative parts
+			        	amp_B = amp_final[half_length:]
 
 
-		        ### Script to check how the pulse is affected by the flux bias
-		        # plot(x_plot_vec=[tlist_new*1e9],
-		        #           y_plot_vec=[f_pulse-f_pulse_final],
-		        #           title='Diff. of freq. of fluxing qubit w/o flux bias',
-		        #           xlabel='Time (ns)',ylabel='Freq. (GHz)',legend_labels=['diff'])
+			        	omega_0 = self.fluxlutman.calc_amp_to_freq(0,'01')
+
+			        	f_pulse_A = self.fluxlutman.calc_amp_to_freq(amp_A,'01')
+			        	f_pulse_A = np.clip(f_pulse_A,a_min=None,a_max=omega_0)
 
 
-
-		        # Noise
-		        T1_q0 = self.noise_parameters_CZ.T1_q0()
-		        T1_q1 = self.noise_parameters_CZ.T1_q1()
-		        T2_q0_sweetspot = self.noise_parameters_CZ.T2_q0_sweetspot()                   # deprecated
-		        T2_q0_interaction_point = self.noise_parameters_CZ.T2_q0_interaction_point()   # deprecated
-		        T2_q0_amplitude_dependent = self.noise_parameters_CZ.T2_q0_amplitude_dependent()
-		        T2_q1 = self.noise_parameters_CZ.T2_q1()
-
-		        def Tphi_from_T1andT2(T1,T2):
-		            return 1/(-1/(2*T1)+1/T2)
-
-		        if T2_q0_sweetspot != 0:
-		            Tphi01_q0_sweetspot=Tphi_from_T1andT2(T1_q0,T2_q0_sweetspot)
-		        else:
-		            Tphi01_q0_sweetspot=0
-		        if T2_q0_interaction_point != 0:
-		            Tphi01_q0_interaction_point=Tphi_from_T1andT2(T1_q0,T2_q0_interaction_point)
-		        else:
-		            Tphi01_q0_interaction_point=0
-		        # Tphi01=Tphi12=2*Tphi02
-		        if T2_q1 != 0:
-		            Tphi01_q1 = Tphi_from_T1andT2(T1_q1,T2_q1)
-		        else:
-		            Tphi01_q1=0
+			        	f_pulse_A = f_pulse_A - np.pi/2 * (omega_0**2/f_pulse_A) * np.sqrt(1 - (f_pulse_A**4/omega_0**4)) * self.fluxbias_q0 - \
+			                                  - np.pi**2/2 * omega_0 * (1+(f_pulse_A**4/omega_0**4)) / (f_pulse_A/omega_0)**3 * self.fluxbias_q0**2
+			                                  # with sigma up to circa 1e-3 \mu\Phi_0 the second order is irrelevant
+			        	amp_A = self.fluxlutman.calc_freq_to_amp(f_pulse_A,state='01')
 
 
+			        	f_pulse_B = self.fluxlutman.calc_amp_to_freq(amp_B,'01')
+			        	f_pulse_B = np.clip(f_pulse_B,a_min=None,a_max=omega_0)
 
-		        if T2_q0_amplitude_dependent[0] != -1:    # preferred way to handle T2 amplitude-dependent
+			        	f_pulse_B = f_pulse_B - np.pi/2 * (omega_0**2/f_pulse_B) * np.sqrt(1 - (f_pulse_B**4/omega_0**4)) * self.fluxbias_q0 * (-1) - \
+	                                  - np.pi**2/2 * omega_0 * (1+(f_pulse_B**4/omega_0**4)) / (f_pulse_B/omega_0)**3 * self.fluxbias_q0**2
+	                                  # with sigma up to circa 1e-3 \mu\Phi_0 the second order is irrelevant
+			        	amp_B = self.fluxlutman.calc_freq_to_amp(f_pulse_B,state='01',positive_branch=False)
 
-		            def expT2(x,gc,amp,tau):
-		                return gc+gc*amp*np.exp(-x/tau)         # formula used to fit the experimental data
 
-		            T2_q0_vec=expT2(f_pulse_final,T2_q0_amplitude_dependent[0],T2_q0_amplitude_dependent[1],T2_q0_amplitude_dependent[2])
-		            if T1_q0 != 0:
-		                Tphi01_q0_vec = Tphi_from_T1andT2(T1_q0,T2_q0_vec)
-		            else:
-		                Tphi01_q0_vec = T2_q0_vec     # in the case where we don't want T1 and we are inputting Tphi and not T2
-
-		            c_ops = c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1)
-
-		        else:                                      # mode where the collapse operators are time-independent, and possibly are 0
-		            if T1_q1 != 0:
-		                c_ops=jump_operators(T1_q0,T1_q1)
-		            else:
-		                c_ops=[]
+			        	amp_final = np.concatenate([amp_A, amp_B])
+			        	f_pulse_final=np.concatenate([f_pulse_A, f_pulse_B])
 
 
 
-		        qoi = simulate_quantities_of_interest_superoperator(
-		            tlist=tlist_new, c_ops=c_ops, noise_parameters_CZ=self.noise_parameters_CZ, 
-		            fluxlutman=self.fluxlutman, amp=amp_final,
-		            sim_step=sim_step_new, verbose=False)
+			        ### Script to plot the waveform
+			        # plot(x_plot_vec=[tlist_new*1e9],
+			        #           y_plot_vec=[f_pulse_final/1e9],
+			        #           title='Freq. of fluxing qubit during pulse',
+			        #           xlabel='Time (ns)',ylabel='Freq. (GHz)',legend_labels=['omega_B(t)'])
 
-		        cost_func_val = -np.log10(1-qoi['avgatefid_compsubspace_pc'])    # this is actually not used in the following
 
-		        
-		        quantities_of_interest = [cost_func_val, qoi['phi_cond'], qoi['L1']*100, qoi['L2']*100, qoi['avgatefid_pc']*100, 
-	                     qoi['avgatefid_compsubspace_pc']*100, qoi['phase_q0'], qoi['phase_q1'], 
-	                     qoi['avgatefid_compsubspace']*100, qoi['avgatefid_compsubspace_pc_onlystaticqubit']*100]
-		        qoi_vec.append(np.array(quantities_of_interest))
-		        U_final_vec.append(qoi['U_final_new'])            # note that this is the propagator in the rotating frame
+			        ### Script to check how the pulse is affected by the flux bias
+			        # plot(x_plot_vec=[tlist_new*1e9],
+			        #           y_plot_vec=[f_pulse-f_pulse_final],
+			        #           title='Diff. of freq. of fluxing qubit w/o flux bias',
+			        #           xlabel='Time (ns)',ylabel='Freq. (GHz)',legend_labels=['diff'])
 
-	        
+
+
+			        # Noise
+			        T1_q0 = self.noise_parameters_CZ.T1_q0()
+			        T1_q1 = self.noise_parameters_CZ.T1_q1()
+			        T2_q0_sweetspot = self.noise_parameters_CZ.T2_q0_sweetspot()                   # deprecated
+			        T2_q0_interaction_point = self.noise_parameters_CZ.T2_q0_interaction_point()   # deprecated
+			        T2_q0_amplitude_dependent = self.noise_parameters_CZ.T2_q0_amplitude_dependent()
+			        T2_q1 = self.noise_parameters_CZ.T2_q1()
+
+			        def Tphi_from_T1andT2(T1,T2):
+			            return 1/(-1/(2*T1)+1/T2)
+
+			        if T2_q0_sweetspot != 0:
+			            Tphi01_q0_sweetspot=Tphi_from_T1andT2(T1_q0,T2_q0_sweetspot)
+			        else:
+			            Tphi01_q0_sweetspot=0
+			        if T2_q0_interaction_point != 0:
+			            Tphi01_q0_interaction_point=Tphi_from_T1andT2(T1_q0,T2_q0_interaction_point)
+			        else:
+			            Tphi01_q0_interaction_point=0
+			        # Tphi01=Tphi12=2*Tphi02
+			        if T2_q1 != 0:
+			            Tphi01_q1 = Tphi_from_T1andT2(T1_q1,T2_q1)
+			        else:
+			            Tphi01_q1=0
+
+
+
+			        if T2_q0_amplitude_dependent[0] != -1:    # preferred way to handle T2 amplitude-dependent
+
+			            def expT2(x,gc,amp,tau):
+			                return gc+gc*amp*np.exp(-x/tau)         # formula used to fit the experimental data
+
+			            T2_q0_vec=expT2(f_pulse_final,T2_q0_amplitude_dependent[0],T2_q0_amplitude_dependent[1],T2_q0_amplitude_dependent[2])
+			            if T1_q0 != 0:
+			                Tphi01_q0_vec = Tphi_from_T1andT2(T1_q0,T2_q0_vec)
+			            else:
+			                Tphi01_q0_vec = T2_q0_vec     # in the case where we don't want T1 and we are inputting Tphi and not T2
+
+			            c_ops = c_ops_amplitudedependent(T1_q0,T1_q1,Tphi01_q0_vec,Tphi01_q1)
+
+			        else:                                      # mode where the collapse operators are time-independent, and possibly are 0
+			            if T1_q1 != 0:
+			                c_ops=jump_operators(T1_q0,T1_q1)
+			            else:
+			                c_ops=[]
+
+
+
+			        qoi = simulate_quantities_of_interest_superoperator(
+			            tlist=tlist_new, c_ops=c_ops, noise_parameters_CZ=self.noise_parameters_CZ, 
+			            fluxlutman=self.fluxlutman, fluxbias_q1=self.fluxbias_q1, amp=amp_final,
+			            sim_step=sim_step_new, verbose=False)
+
+			        cost_func_val = -np.log10(1-qoi['avgatefid_compsubspace_pc'])    # this is actually not used in the following
+
+			        
+			        quantities_of_interest = [cost_func_val, qoi['phi_cond'], qoi['L1']*100, qoi['L2']*100, qoi['avgatefid_pc']*100, 
+		                     qoi['avgatefid_compsubspace_pc']*100, qoi['phase_q0'], qoi['phase_q1'], 
+		                     qoi['avgatefid_compsubspace']*100, qoi['avgatefid_compsubspace_pc_onlystaticqubit']*100]
+			        qoi_vec.append(np.array(quantities_of_interest))
+			        U_final_vec.append(qoi['U_final_new'])            # note that this is the propagator in the rotating frame
+
+	        weights = np.array(weights)
+
+
 	        qoi_average = np.zeros(len(quantities_of_interest))
 	        for index in [2,3,4,8]:    # 4 is not trustable here, and we don't care anyway
 	        	qoi_average[index] = np.average(np.array(qoi_vec)[:,index], weights=weights)
-
-
-	        ## phases need to be averaged carefully, e.g. average of 45 and 315 degrees is 0, not 180
-	        def average_phases(phases,weights):
-	        	# phases has to be passed in degrees
-	        	sines=np.sin(np.deg2rad(phases))
-	        	cosines=np.cos(np.deg2rad(phases))
-	        	# we separately average sine and cosine
-	        	av_sines=np.average(sines,weights=weights)
-	        	av_cosines=np.average(cosines,weights=weights)
-	        	# need to normalize
-	        	av_sines=av_sines/(av_sines**2+av_cosines**2)
-	        	av_cosines=av_cosines/(av_sines**2+av_cosines**2)
-	        	angle_temp_sin = np.arcsin(av_sines)
-	        	angle_temp_cos = np.arccos(av_cosines)
-	        	# then we combine them to give the unique angle with such sine and cosine
-	        	# To avoid problems with the discontinuities of arcsin and arccos, we choose to use the average which is not very close to such discontinuities
-	        	if np.abs(angle_temp_sin)<np.pi/3:
-		        	if av_cosines >= 0:
-		        		angle = angle_temp_sin
-		        	else:
-		        		angle = np.pi-angle_temp_sin
-		        elif np.abs(angle_temp_cos-np.pi/2)<np.pi/3:
-		        	if av_sines >= 0:
-		        		angle = angle_temp_cos
-		        	else:
-		        		angle = 2*np.pi-angle_temp_cos
-		        else:
-		        	logging.warning('Something wrong with averaging the phases.')
-	        	return np.rad2deg(angle) % 360
 
 
 	        for index in [1,6,7]:

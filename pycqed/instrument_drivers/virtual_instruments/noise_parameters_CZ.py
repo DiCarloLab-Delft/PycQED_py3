@@ -70,6 +70,10 @@ class NoiseParametersCZ(Instrument):
                            label='quantities in timestamp corresponding to the optimum avgatefidcompsub_pc',
                            parameter_class=ManualParameter,
                            vals=vals.Arrays())
+        self.add_parameter('w_q1_sweetspot',
+                           label='NB: different from the operating point in general',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers())
 
 
         # for qdots simulations
