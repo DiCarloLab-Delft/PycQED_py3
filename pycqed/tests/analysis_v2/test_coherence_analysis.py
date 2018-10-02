@@ -30,7 +30,7 @@ t_start = '20180412_190000'
 t_stop = '20180412_210000'
 
 
-class Test_Cryoscope_analysis(unittest.TestCase):
+class Test_CoherenceTimesAnalysis(unittest.TestCase):
 
     @classmethod
     def setUpClass(self):
@@ -40,12 +40,13 @@ class Test_Cryoscope_analysis(unittest.TestCase):
     def test_CoherenceTimesAnalysisSingle(self):
         key = ma.CoherenceTimesAnalysis.T2_star
 
-        a = ma.CoherenceTimesAnalysisSingle(t_start=t_start, t_stop=t_stop, label=labels[key],
-                                            auto=True, extract_only=False,
-                                            tau_key=tau_keys[key], tau_std_key=tau_std_keys[key],
-                                            plot_versus_dac=True, dac_key='Instrument settings.fluxcurrent.' + dac,
-                                            plot_versus_frequency=True,
-                                            frequency_key='Instrument settings.' + qubit + '.freq_qubit')
+        a = ma.CoherenceTimesAnalysisSingle(
+            t_start=t_start, t_stop=t_stop, label=labels[key],
+            auto=True, extract_only=False,
+            tau_key=tau_keys[key], tau_std_key=tau_std_keys[key],
+            plot_versus_dac=True, dac_key='Instrument settings.fluxcurrent.' + dac,
+            plot_versus_frequency=True,
+            frequency_key='Instrument settings.' + qubit + '.freq_qubit')
 
         #np.testing.assert_('dac_arc_fitfct' in a.fit_res.keys())
         #np.testing.assert_('flux_values' in a.fit_res.keys())
@@ -63,3 +64,17 @@ class Test_Cryoscope_analysis(unittest.TestCase):
                                       frequency_key_pattern='Instrument settings.{Q}.freq_qubit',
                                       auto=True, extract_only=False, close_figs=False, options_dict={'verbose': False})
 
+class Test_AliasedCoherenceTimesAnalysis(unittest.TestCase):
+    @classmethod
+    def setUpClass(self):
+        self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
+        ma.a_tools.datadir = self.datadir
+
+    def test_AliasedCoherenceTimesAnalysisSingle(self):
+        a = ma.AliasedCoherenceTimesAnalysisSingle(t_start='20181002_153626',
+                                                   ch_idxs=[2, 3])
+        pars = a.fit_res['coherence_decay'].params
+        self.assertAlmostEqual(pars['tau'], 3.43e-6, places=7)
+        self.assertAlmostEqual(pars['A'], 0.741, places=3)
+        self.assertAlmostEqual(pars['n'], 1.93, places=2)
+        self.assertAlmostEqual(pars['o'], 0.0254, places=3)
