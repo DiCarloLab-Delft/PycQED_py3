@@ -927,7 +927,8 @@ class UnitarityBenchmarking_TwoQubit_Analysis(
             'u', value=.9, min=0, max=1, vary=True)
 
         fit_mod_unitarity.set_param_hint('d1', value=self.d1, vary=False)
-        # FIXME: Add reference to equation used here.
+        # Error due to incoherent sources
+        # Feng Phys. Rev. Lett. 117, 260501 (2016) eq. (4)
         fit_mod_unitarity.set_param_hint('eps', expr='((d1-1)/d1)*(1-u**0.5)')
 
         params = fit_mod_unitarity.make_params()
