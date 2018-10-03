@@ -19,7 +19,8 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
     # todo docstring
     def __init__(self, t_start: str = None, t_stop: str = None,
                  label: str = '',
-                 options_dict: dict = None, extract_only: bool = False, auto: bool = True,
+                 options_dict: dict = None, extract_only: bool = False,
+                 auto: bool = True,
                  close_figs: bool = True, do_fitting: bool = True,
                  tau_key='Analysis.Fitted Params F|1>.tau.value',
                  tau_std_key='Analysis.Fitted Params F|1>.tau.stderr',

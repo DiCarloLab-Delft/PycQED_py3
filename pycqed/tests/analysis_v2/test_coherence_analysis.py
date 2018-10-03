@@ -1,9 +1,9 @@
 '''
 Hacked together by Rene Vollmer
+Edited by Adriaan
 '''
 
 import unittest
-import numpy as np
 import pycqed as pq
 import os
 from pycqed.analysis_v2 import measurement_analysis as ma
@@ -48,21 +48,30 @@ class Test_CoherenceTimesAnalysis(unittest.TestCase):
             plot_versus_frequency=True,
             frequency_key='Instrument settings.' + qubit + '.freq_qubit')
 
-        #np.testing.assert_('dac_arc_fitfct' in a.fit_res.keys())
-        #np.testing.assert_('flux_values' in a.fit_res.keys())
-        #np.testing.assert_('Ec' in a.fit_res.keys())
-        #np.testing.assert_('Ej' in a.fit_res.keys())
-        #np.testing.assert_('sensitivity_values' in a.fit_res.keys())
-
     def test_CoherenceTimesAnalysis(self):
-        b = ma.CoherenceTimesAnalysis(dac_instr_names=[dac], qubit_instr_names=[qubit],
-                                      t_start=t_start, t_stop=t_stop, labels=labels,
-                                      tau_keys=tau_keys, tau_std_keys=tau_std_keys,
-                                      plot_versus_dac=True,
-                                      dac_key_pattern='Instrument settings.fluxcurrent.{DAC}',
-                                      plot_versus_frequency=True,
-                                      frequency_key_pattern='Instrument settings.{Q}.freq_qubit',
-                                      auto=True, extract_only=False, close_figs=False, options_dict={'verbose': False})
+        a = ma.CoherenceTimesAnalysis(
+            t_start='20181002_190542', t_stop='20181002_203700',
+            dac_instr_names=['FBL_D1'], qubit_instr_names=['D1'],
+            use_chisqr=False)
+
+        expected_fig_keys = {'D1_coherence_gamma',
+                             'D1_coherence_times_dac_relation',
+                             'D1_coherence_times_flux_relation',
+                             'D1_coherence_times_freq_relation',
+                             'D1_coherence_times_sensitivity_relation',
+                             'D1_coherence_times_time_stability',
+                             'coherence_ratios_flux',
+                             'coherence_ratios_sensitivity'}
+
+        self.assertTrue(set(a.figs.keys()).issubset(expected_fig_keys))
+
+        self.assertAlmostEqual(a.fit_res['D1']['gamma_intercept'],
+                               62032.192, places=2)
+        self.assertAlmostEqual(a.fit_res['D1']['sqrtA_echo'],
+                               -0.058470, places=4)
+
+
+
 
 class Test_AliasedCoherenceTimesAnalysis(unittest.TestCase):
     @classmethod
@@ -80,4 +89,3 @@ class Test_AliasedCoherenceTimesAnalysis(unittest.TestCase):
         self.assertAlmostEqual(pars['o'], 0.0254, places=3)
 
         self.assertEqual(a.raw_data_dict['detuning'][0], -800e6)
-

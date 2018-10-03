@@ -8,6 +8,7 @@ from pycqed.analysis.tools.plotting import SI_val_to_msg_str
 
 from pycqed.analysis.tools.plotting import format_lmfit_par
 
+
 class Test_SI_prefix_scale_factor(unittest.TestCase):
 
     def test_non_SI(self):
