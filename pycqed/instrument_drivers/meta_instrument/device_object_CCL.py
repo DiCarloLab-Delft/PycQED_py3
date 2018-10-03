@@ -1523,7 +1523,7 @@ class DeviceCCL(Instrument):
         MC.run(label.format(nr_seeds, qubits[0], qubits[1]),
                exp_metadata={'bins': sweep_points})
         # N.B. if measurement was interrupted this wont work
-        ma2.PurityBenchmarking_TwoQubit_Analysis(nseeds=nr_seeds)
+        ma2.UnitarityBenchmarking_TwoQubit_Analysis(nseeds=nr_seeds)
 
     def measure_two_qubit_simultaneous_randomized_benchmarking(
             self, qubits, MC,
@@ -1531,9 +1531,9 @@ class DeviceCCL(Instrument):
             interleaving_cliffords=[None], label='TwoQubit_sim_RB_{}seeds_{}_{}',
             recompile: bool ='as needed', cal_points=True):
         """
-        Performs simultaneous RB on two qubits. 
-        The data of this experiment should be compared to the results of single 
-        qubit RB 
+        Performs simultaneous RB on two qubits.
+        The data of this experiment should be compared to the results of single
+        qubit RB
         """
 
         # Settings that have to be preserved, change is required for
