@@ -5,8 +5,8 @@ Hacked together by Rene Vollmer
 import datetime
 from copy import deepcopy
 import pycqed.analysis_v2.base_analysis as ba
-from pycqed.analysis_v2.base_analysis import plot_scatter_errorbar_fit, plot_scatter_errorbar
-from pycqed.analysis import measurement_analysis as ma_old
+from pycqed.analysis_v2.base_analysis import plot_scatter_errorbar_fit,\
+    plot_scatter_errorbar
 
 import numpy as np
 import lmfit
@@ -973,7 +973,7 @@ def prepare_input_table(dac: list, frequency: list, T1: list, T2_star: list, T2_
 
 def arch(dac, Ec, Ej, offset, dac0):
     '''
-    Function for frequency vs flux (in dac) for the transmon
+    Function for frequency vs flux (in dac) for the transmon.
 
     Input:
         - dac: voltage used in the DAC to generate the flux
