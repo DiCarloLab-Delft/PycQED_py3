@@ -10,7 +10,7 @@ from pycqed.analysis_v2.base_analysis import plot_scatter_errorbar_fit,\
 
 import numpy as np
 import lmfit
-from pycqed.analysis.tools.plotting import SI_val_to_msg_str, format_lmfit_par
+from pycqed.analysis.tools.plotting import SI_val_to_msg_str
 
 from pycqed.analysis import analysis_toolbox as a_tools
 
@@ -19,8 +19,7 @@ class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
     # todo docstring
     def __init__(self, t_start: str = None, t_stop: str = None,
                  label: str = '',
-                 options_dict: dict = None, extract_only: bool = False,
-                 auto: bool = True,
+                 options_dict: dict = None, extract_only: bool = False, auto: bool = True,
                  close_figs: bool = True, do_fitting: bool = True,
                  tau_key='Analysis.Fitted Params F|1>.tau.value',
                  tau_std_key='Analysis.Fitted Params F|1>.tau.stderr',
@@ -306,11 +305,11 @@ class AliasedCoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
         text_msg += 'Square pulse detuning {:.3f} {}\n'.format(det, unit)
 
         text_msg += r'Fitting to : $A e^{(-(t/\tau)^n)}+o$' + '\n\t'
-        text_msg += format_lmfit_par(r'$A$', decay_fit.params['A'], '\n\t')
-        text_msg += format_lmfit_par(r'$\tau$',
+        text_msg += format_value_string(r'$A$', decay_fit.params['A'], '\n\t')
+        text_msg += format_value_string(r'$\tau$',
                                         decay_fit.params['tau'], '\n\t')
-        text_msg += format_lmfit_par(r'$n$', decay_fit.params['n'], '\n\t')
-        text_msg += format_lmfit_par(r'$o$', decay_fit.params['o'], '')
+        text_msg += format_value_string(r'$n$', decay_fit.params['n'], '\n\t')
+        text_msg += format_value_string(r'$o$', decay_fit.params['o'], '')
 
         self.proc_data_dict['decay_fit_msg'] = text_msg
 
@@ -974,7 +973,7 @@ def prepare_input_table(dac: list, frequency: list, T1: list, T2_star: list, T2_
 
 def arch(dac, Ec, Ej, offset, dac0):
     '''
-    Function for frequency vs flux (in dac) for the transmon.
+    Function for frequency vs flux (in dac) for the transmon
 
     Input:
         - dac: voltage used in the DAC to generate the flux
@@ -1052,3 +1051,16 @@ def fit_gammas(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo, verbose: bool = Fa
         lmfit.printfuncs.report_fit(fit_result_gammas.params)
     return fit_result_gammas
 
+
+def format_value_string(par_name: str, lmfit_par, end_char=''):
+    """
+    Formats an lmfit par to a  string of value with uncertainty.
+    """
+    val_string = par_name
+    val_string += ': {:.3g}'.format(lmfit_par.value)
+    if lmfit_par.stderr is not None:
+        val_string += r'$\pm$' + '{:.3g}'.format(lmfit_par.stderr)
+    else:
+        val_string += r'$\pm$' + 'NaN'
+    val_string += end_char
+    return val_string
