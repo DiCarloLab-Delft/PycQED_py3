@@ -12,7 +12,7 @@ import hsluv
 
 def set_xlabel(axis, label, unit=None, **kw):
     """
-    Takes in an axis object and add a unit aware label to it.
+    Add a unit aware x-label to an axis object.
 
     Args:
         axis: matplotlib axis object to set label on
@@ -38,7 +38,7 @@ def set_xlabel(axis, label, unit=None, **kw):
 
 def set_ylabel(axis, label, unit=None, **kw):
     """
-    Takes in an axis object and add a unit aware label to it.
+    Add a unit aware y-label to an axis object.
 
     Args:
         axis: matplotlib axis object to set label on
@@ -115,6 +115,19 @@ def SI_val_to_msg_str(val: float, unit: str=None, return_type=str):
         return return_type(val), unit
 
     return return_type(new_val), new_unit
+
+
+def format_lmfit_par(par_name: str, lmfit_par, end_char=''):
+    """Format an lmfit par to a string of value with uncertainty."""
+    val_string = par_name
+    val_string += ': {:.4f}'.format(lmfit_par.value)
+    if lmfit_par.stderr is not None:
+        val_string += r'$\pm$' + '{:.4f}'.format(lmfit_par.stderr)
+    else:
+        val_string += r'$\pm$' + 'NaN'
+    val_string += end_char
+    return val_string
+
 
 
 def data_to_table_png(data: list, filename: str, title: str='',

@@ -1,10 +1,12 @@
 import unittest
 import numpy as np
 import matplotlib.pyplot as plt
+import lmfit
 from pycqed.analysis.tools.plotting import SI_prefix_and_scale_factor
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str
 
+from pycqed.analysis.tools.plotting import format_lmfit_par
 
 class Test_SI_prefix_scale_factor(unittest.TestCase):
 
@@ -55,5 +57,22 @@ class test_SI_unit_aware_labels(unittest.TestCase):
         val, unit = SI_val_to_msg_str(1030, 'm')
         self.assertEqual(val, str(1.03))
         self.assertEqual(unit, 'km')
+
+
+class test_format_lmfit_par(unittest.TestCase):
+    def test_format_lmfit_par(self):
+        p = lmfit.Parameter()
+        p.value = 5.12
+        p.stderr = 0.024
+        test_str = format_lmfit_par('test_par', p, end_char='\n')
+        self.assertEqual(test_str, 'test_par: 5.1200$\\pm$0.0240\n')
+
+    def test_format_lmfit_par_missing_stderr(self):
+        p = lmfit.Parameter()
+        p.value = 5.12
+        test_str = format_lmfit_par('test_par', p, end_char='')
+        self.assertEqual(test_str, 'test_par: 5.1200$\\pm$NaN')
+
+
 
 
