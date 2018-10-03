@@ -2,11 +2,12 @@
 Hacked together by Rene Vollmer
 Edited by Adriaan
 '''
-
+import numpy as np
 import unittest
 import pycqed as pq
 import os
 from pycqed.analysis_v2 import measurement_analysis as ma
+import pycqed.analysis_v2.coherence_analysis as ca
 
 tau_keys = {
     ma.CoherenceTimesAnalysis.T1: 'Analysis.Fitted Params F|1>.tau.value',
@@ -28,6 +29,45 @@ dac = 'VFCQ6'
 qubit = 'Q2'
 t_start = '20180412_190000'
 t_stop = '20180412_210000'
+
+class Test_CoherenceAnalysis_Helpers(unittest.TestCase):
+    def test_calculate_n_avg(self):
+        pass
+
+    def test_arch(self):
+        freq = ca.arch(0, 300e6, 10e9, 0, .5)
+        self.assertAlmostEqual(freq, 4598979485.566357, places=2)
+
+    def test_partial_omega_over_flux(self):
+        deriv = ca.partial_omega_over_flux(0, 300e6, 10e9)
+        self.assertAlmostEqual(deriv, 0)
+
+        deriv = ca.partial_omega_over_flux(0.3, 300e6, 10e9)
+        self.assertLess(deriv, 0)
+
+        deriv = ca.partial_omega_over_flux(-0.3, 300e6, 10e9)
+        self.assertGreater(deriv, 0)
+
+        deriv = ca.partial_omega_over_flux(0.75, 300e6, 10e9)
+        self.assertGreater(deriv, 0)
+
+    def test_fit_frequencies(self):
+        dac_vals = np.linspace(-.3, .4, 41)
+        Ec = 300e6
+        Ej = 10e9
+        offset = 0
+        dac0 = .5
+        freqs = ca.arch(dac_vals, Ec, Ej, offset, dac0)
+
+        fit_res = ca.fit_frequencies(dac_vals, freqs)
+
+        fit_res.plot_fit(show_init=True)
+        pars = fit_res.params
+        self.assertAlmostEqual(Ec, pars['Ec'].value, places=-2)
+        self.assertAlmostEqual(Ej, pars['Ej'].value, places=-2)
+        self.assertAlmostEqual(offset, pars['offset'].value, places=2)
+        self.assertAlmostEqual(dac0, pars['dac0'].value, places=2)
+
 
 
 class Test_CoherenceTimesAnalysis(unittest.TestCase):
@@ -69,8 +109,6 @@ class Test_CoherenceTimesAnalysis(unittest.TestCase):
                                62032.192, places=2)
         self.assertAlmostEqual(a.fit_res['D1']['sqrtA_echo'],
                                -0.058470, places=4)
-
-
 
 
 class Test_AliasedCoherenceTimesAnalysis(unittest.TestCase):
