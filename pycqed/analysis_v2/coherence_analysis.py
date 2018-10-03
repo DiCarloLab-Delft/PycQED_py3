@@ -296,12 +296,13 @@ class AliasedCoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
     def run_fitting(self):
         super().run_fitting()
 
-        decay_fit = lmfit.Model(lambda t, tau, A, n: A*np.exp(-(t/tau)**n))
+        decay_fit = lmfit.Model(lambda t, tau, A, n, o: A*np.exp(-(t/tau)**n)+o)
 
-        tau0 = self.raw_data_dict['xvals'][0][-1]/2
+        tau0 = self.raw_data_dict['xvals'][0][-1]/3
         decay_fit.set_param_hint('tau', value=tau0, min=0, vary=True)
         decay_fit.set_param_hint('A', value=0.7, vary=True)
         decay_fit.set_param_hint('n', value=1.2, min=1, max=2, vary=True)
+        decay_fit.set_param_hint('o', value=0.1, min=0, max=0.3, vary=True)
         params = decay_fit.make_params()
         decay_fit = decay_fit.fit(data=self.proc_data_dict['amp'],
                                     t=self.raw_data_dict['xvals'][0],
@@ -310,10 +311,11 @@ class AliasedCoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
 
         text_msg = 'Summary\n'
         text_msg += r'Square pulse amp {:.3g}'.format(self.proc_data_dict['sq_amp'])+' V\n'
-        text_msg += r'$A \exp(-(t/\tau)^n)$' + '\n'
+        text_msg += r'$A \exp(-(t/\tau)^n)+o$' + '\n'
         text_msg += format_value_string(r'$A$', decay_fit.params['A'], '\n')
         text_msg += format_value_string(r'$\tau$', decay_fit.params['tau'], '\n')
-        text_msg += format_value_string(r'$n$', decay_fit.params['n'], '')
+        text_msg += format_value_string(r'$n$', decay_fit.params['n'], '\n')
+        text_msg += format_value_string(r'$o$', decay_fit.params['o'], '')
 
         self.proc_data_dict['decay_fit_msg'] = text_msg
                     

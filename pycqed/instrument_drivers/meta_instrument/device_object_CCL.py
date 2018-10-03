@@ -197,9 +197,9 @@ class DeviceCCL(Instrument):
             latencies[key] = val - lowest_value
 
         # ensuring that RO latency is a multiple of 20 ns
-        ro_latency_modulo_20 = latencies['ro_latency_0']%20e-9
+        ro_latency_modulo_20 = latencies['ro_latency_0'] % 20e-9
         for key, val in latencies.items():
-            latencies[key] = val + (20e-9 - ro_latency_modulo_20)%20e-9
+            latencies[key] = val + (20e-9 - ro_latency_modulo_20) % 20e-9
 
         # Setting the latencies in the CCL
         CCL = self.instr_CC.get_instr()
@@ -209,14 +209,14 @@ class DeviceCCL(Instrument):
 
             for qbt in self.qubits():
                 # get qubit objects
-                q  = self.find_instrument(qbt)
+                q = self.find_instrument(qbt)
                 # set delay AWGs and channels
                 if key in ('ro_latency_0'):
                     pass
                 elif key in ('flux_latency_0'):
-                    q.flux_fine_delay(val%20e-9)
+                    q.flux_fine_delay(val % 20e-9)
                 elif key in ('mw_latency_0'):
-                    q.mw_fine_delay(val%20e-9)
+                    q.mw_fine_delay(val % 20e-9)
 
     def prepare_readout(self):
         self._prep_ro_setup_qubits()
@@ -635,7 +635,7 @@ class DeviceCCL(Instrument):
         a = ma2.Conditional_Oscillation_Analysis(
             options_dict={'ch_idx_osc': self.qubits().index(q0),
                           'ch_idx_spec': self.qubits().index(q1)},
-                          extract_only=extract_only)
+            extract_only=extract_only)
 
         if verbose:
             info_msg = (print(a.plot_dicts['phase_message']['text_string']))
@@ -1112,7 +1112,6 @@ class DeviceCCL(Instrument):
         self.instr_CC.get_instr().eqasm_program(p.filename)
         self.instr_CC.get_instr().start()
 
-
         MC.set_sweep_function(sw)
         MC.set_sweep_points(times)
         d = self.get_int_avg_det(values_per_point=2,
@@ -1123,9 +1122,11 @@ class DeviceCCL(Instrument):
         MC.run(label)
 
     def measure_ramsey_with_flux_pulse(self, q0: str, times,
-                          MC=None,
-                          label='Fluxed_ramsey',
-                          prepare_for_timedomain: bool=True):
+                                       MC=None,
+                                       label='Fluxed_ramsey',
+                                       prepare_for_timedomain: bool=True,
+                                       pulse_shape: str='square',
+                                       sq_eps: float=None):
         """
         Performs a cryoscope experiment to measure the shape of a flux pulse.
 
@@ -1141,6 +1142,9 @@ class DeviceCCL(Instrument):
 
             prepare_for_timedomain (bool):
                 calls self.prepare_for_timedomain on start
+
+        Note: the amplitude and (expected) detuning of the flux pulse is saved
+         in experimental metadata. 
         """
         if MC is None:
             MC = self.instr_MC.get_instr()
@@ -1154,23 +1158,57 @@ class DeviceCCL(Instrument):
         old_sq_length = fl_lutman.sq_length()
         fl_lutman.cfg_max_wf_length(max(times)+200e-9)
         partner_lutman.cfg_max_wf_length(max(times)+200e-9)
-        fl_lutman.load_waveforms_onto_AWG_lookuptable(force_load_sequencer_program=True)
-
-        flux_cw = 'fl_cw_02'
+        fl_lutman.custom_wf_length(max(times)+200e-9)
+        partner_lutman.custom_wf_length(max(times)+200e-9)
+        fl_lutman.load_waveforms_onto_AWG_lookuptable(
+            force_load_sequencer_program=True)
 
         def set_flux_pulse_time(value):
-            fl_lutman.sq_length(value)
-            fl_lutman.load_waveform_realtime('square',
-                                       regenerate_waveforms=True)
-            p = mqo.Fluxed_Ramsey(q0idx, wait_time=value,
-                          flux_cw=flux_cw,
-                          platf_cfg=self.cfg_openql_platform_fn())
+            if pulse_shape == 'square':
+                flux_cw = 'fl_cw_02'
+                fl_lutman.sq_length(value)
+                fl_lutman.load_waveform_realtime('square',
+                                                 regenerate_waveforms=True)
+            elif pulse_shape == 'single_sided_square':
+                flux_cw = 'fl_cw_05'
+                
+                dac_scalefactor = fl_lutman.get_amp_to_dac_val_scalefactor()
+                dacval = dac_scalefactor * fl_lutman.calc_eps_to_amp(
+                    sq_eps, state_A='01', state_B=None, positive_branch=True)
+               
+                sq_pulse = dacval* \
+                    np.ones(int(value*fl_lutman.sampling_rate()))
+
+                fl_lutman.custom_wf(sq_pulse )
+                fl_lutman.load_waveform_realtime('custom_wf',
+                                                 regenerate_waveforms=True)
+            elif pulse_shape == 'double_sided_square':
+                flux_cw = 'fl_cw_05'
+
+                dac_scalefactor = fl_lutman.get_amp_to_dac_val_scalefactor()
+                pos_dacval = dac_scalefactor * fl_lutman.calc_eps_to_amp(
+                    sq_eps, state_A='01', state_B=None, positive_branch=True)
+
+                neg_dacval = dac_scalefactor * fl_lutman.calc_eps_to_amp(
+                    sq_eps, state_A='01', state_B=None, positive_branch=False)
+
+                
+                sq_pulse_half = np.ones(int(value/2*fl_lutman.sampling_rate()))
+
+                sq_pulse = np.concatenate(
+                    [pos_dacval*sq_pulse_half, neg_dacval*sq_pulse_half])
+                fl_lutman.custom_wf(sq_pulse)
+                fl_lutman.load_waveform_realtime('custom_wf',
+                                                 regenerate_waveforms=True)
+
+            p = mqo.fluxed_ramsey(q0idx, wait_time=value,
+                                  flux_cw=flux_cw,
+                                  platf_cfg=self.cfg_openql_platform_fn())
             self.instr_CC.get_instr().eqasm_program(p.filename)
             self.instr_CC.get_instr().start()
 
         flux_pulse_time = Parameter('flux_pulse_time',
-                set_cmd=set_flux_pulse_time)
-
+                                    set_cmd=set_flux_pulse_time)
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
@@ -1178,16 +1216,21 @@ class DeviceCCL(Instrument):
         MC.set_sweep_function(flux_pulse_time)
         MC.set_sweep_points(times)
         d = self.get_int_avg_det(values_per_point=2,
-                                 values_per_point_suffex=['final x90', 'final y90'],
+                                 values_per_point_suffex=[
+                                     'final x90', 'final y90'],
                                  single_int_avg=True,
                                  always_prepare=True)
         MC.set_detector_function(d)
-        MC.run(label)
+        metadata_dict = {
+            'sq_eps': sq_eps
+        }
+        MC.run(label, exp_metadata=metadata_dict)
 
         fl_lutman.cfg_max_wf_length(old_max_length)
         partner_lutman.cfg_max_wf_length(old_max_length)
         fl_lutman.sq_length(old_sq_length)
-        fl_lutman.load_waveforms_onto_AWG_lookuptable(force_load_sequencer_program=True)
+        fl_lutman.load_waveforms_onto_AWG_lookuptable(
+            force_load_sequencer_program=True)
 
     def measure_sliding_flux_pulses(self, qubits: list,
                                     times: list,
@@ -1218,8 +1261,8 @@ class DeviceCCL(Instrument):
             value_units=['deg', 'deg'],
             msmt_kw={'disable_initial_pulse': disable_initial_pulse,
                      'qubits': qubits,
-                     'counter_par':[counter_par],
-                     'gate_separation_par':[gate_separation_par],
+                     'counter_par': [counter_par],
+                     'gate_separation_par': [gate_separation_par],
                      'nested_MC': nested_MC,
                      'flux_cw': flux_cw})
 
@@ -1286,7 +1329,7 @@ class DeviceCCL(Instrument):
     def measure_two_qubit_randomized_benchmarking(
             self, qubits, MC,
             nr_cliffords=np.array([1.,  2.,  3.,  4.,  5.,  6.,  7.,  9., 12.,
-                                  15., 20., 25., 30., 50.]), nr_seeds=100,
+                                   15., 20., 25., 30., 50.]), nr_seeds=100,
             interleaving_cliffords=[None], label='TwoQubit_RB_{}seeds_{}_{}',
             recompile: bool ='as needed', cal_points=True):
 
@@ -1329,9 +1372,9 @@ class DeviceCCL(Instrument):
                 platf_cfg=self.cfg_openql_platform_fn(),
                 program_name='TwoQ_RB_int_cl_s{}_ncl{}_icl{}_netcl{}_{}_{}_double'.format(
                     i,
-                    list(map(int,nr_cliffords)),
+                    list(map(int, nr_cliffords)),
                     interleaving_cliffords,
-                    list(map(int,net_cliffords)),
+                    list(map(int, net_cliffords)),
                     qubits[0], qubits[1]),
                 interleaving_cliffords=interleaving_cliffords,
                 cal_points=cal_points,
@@ -1383,7 +1426,7 @@ class DeviceCCL(Instrument):
     def measure_two_qubit_purity_benchmarking(
             self, qubits, MC,
             nr_cliffords=np.array([1.,  2.,  3.,  4.,  5.,  6.,  7.,  9., 12.,
-                                  15., 20., 25.]), nr_seeds=100,
+                                   15., 20., 25.]), nr_seeds=100,
             interleaving_cliffords=[None], label='TwoQubit_purityB_{}seeds_{}_{}',
             recompile: bool ='as needed', cal_points=True):
 
@@ -1425,19 +1468,19 @@ class DeviceCCL(Instrument):
                 platf_cfg=self.cfg_openql_platform_fn(),
                 program_name='TwoQ_PB_int_cl{}_s{}_ncl{}_{}_{}_double'.format(
                     i,
-                    list(map(int,nr_cliffords)),
+                    list(map(int, nr_cliffords)),
                     interleaving_cliffords,
                     qubits[0], qubits[1]),
                 interleaving_cliffords=interleaving_cliffords,
                 cal_points=cal_points,
-                net_cliffords=[ 0*24 +0, 0*24 +21, 0*24 +16,
-                                21*24+0, 21*24+21, 21*24+16,
-                                16*24+0, 16*24+21, 16*24+16,
-                                3*24 +3],
-                                # ZZ, XZ, YZ,
-                                # ZX, XX, YX
-                                # ZY, XY, YY
-                                # (-Z)(-Z) (for f state calibration)
+                net_cliffords=[0*24 + 0, 0*24 + 21, 0*24 + 16,
+                               21*24+0, 21*24+21, 21*24+16,
+                               16*24+0, 16*24+21, 16*24+16,
+                               3*24 + 3],
+                # ZZ, XZ, YZ,
+                # ZX, XX, YX
+                # ZY, XY, YY
+                # (-Z)(-Z) (for f state calibration)
                 f_state_cal_pts=True,
                 recompile=recompile)
             p.sweep_points = sweep_points
@@ -1531,7 +1574,7 @@ class DeviceCCL(Instrument):
                 platf_cfg=self.cfg_openql_platform_fn(),
                 program_name='TwoQ_Sim_RB_int_cl{}_s{}_ncl{}_{}_{}_double'.format(
                     i,
-                    list(map(int,nr_cliffords)),
+                    list(map(int, nr_cliffords)),
                     interleaving_cliffords,
                     qubits[0], qubits[1]),
                 interleaving_cliffords=interleaving_cliffords,
@@ -1582,7 +1625,6 @@ class DeviceCCL(Instrument):
         # N.B. if interleaving cliffords are used, this won't work
         # FIXME: write a proper analysis for simultaneous RB
         # ma2.RandomizedBenchmarking_TwoQubit_Analysis()
-
 
     ########################################################
     # Calibration methods

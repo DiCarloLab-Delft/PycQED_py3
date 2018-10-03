@@ -70,6 +70,18 @@ class NoiseParametersCZ(Instrument):
                            label='quantities in timestamp corresponding to the optimum avgatefidcompsub_pc',
                            parameter_class=ManualParameter,
                            vals=vals.Arrays())
+        self.add_parameter('w_q1_sweetspot',
+                           label='NB: different from the operating point in general',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers())
+        self.add_parameter('Z_rotations_length', unit='s',
+                           label='duration of the single qubit Z rotations at the end of the pulse',
+                           parameter_class=ManualParameter,
+                           vals=vals.Numbers(), initial_value=0)
+        self.add_parameter('dressed_compsub',
+                           label='true if we use the definition of the comp subspace that uses the dressed 00,01,10,11 states',
+                           parameter_class=ManualParameter,
+                           vals=vals.Bool())
 
 
         # for qdots simulations
