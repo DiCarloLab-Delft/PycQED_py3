@@ -68,6 +68,8 @@ class Test_CoherenceAnalysis_Helpers(unittest.TestCase):
         self.assertAlmostEqual(offset, pars['offset'].value, places=2)
         self.assertAlmostEqual(dac0, pars['dac0'].value, places=2)
 
+    def test_residual_Gamma(self):
+        print('test not implemented')
 
 
 class Test_CoherenceTimesAnalysis(unittest.TestCase):

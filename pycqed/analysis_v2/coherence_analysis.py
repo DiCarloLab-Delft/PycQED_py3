@@ -927,7 +927,6 @@ class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
             # self.raw_data_dict[qubit][typ] = a.raw_data_dict
 
 
-
 def calculate_n_avg(freq_resonator: float, Qc: float,
                     chi_shift: float, intercept: float):
     """
@@ -987,8 +986,6 @@ def calculate_n_avg(freq_resonator: float, Qc: float,
 #     return table
 
 
-
-
 def arch(dac, Ec, Ej, offset, dac0):
     '''
     Convert flux (in dac) to frequency for a transmon.
@@ -1014,7 +1011,6 @@ def arch(dac, Ec, Ej, offset, dac0):
 # arch_model = lmfit.Model(arch)
 
 
-
 def partial_omega_over_flux(flux, Ec, Ej):
     '''
     Derivative of flux arc in units of omega/Phi0.
@@ -1032,11 +1028,9 @@ def partial_omega_over_flux(flux, Ec, Ej):
     return model
 
 
-
-
 def fit_frequencies(dac, freq,
                     Ec_guess=260e6, Ej_guess=19e9, offset_guess=0,
-                    dac0_guess=0.5 ):
+                    dac0_guess=0.5):
     """
     Perform fit against the transmon flux arc model.
 
@@ -1054,7 +1048,8 @@ def fit_frequencies(dac, freq,
     # set some hardcoded guesses
     arch_model.set_param_hint('Ec', value=Ec_guess, min=100e6, max=350e6)
     arch_model.set_param_hint('Ej', value=Ej_guess, min=0.1e9, max=30e9)
-    arch_model.set_param_hint('offset', value=offset_guess, min=-0.05, max=0.05)
+    arch_model.set_param_hint(
+        'offset', value=offset_guess, min=-0.05, max=0.05)
     arch_model.set_param_hint('dac0', value=dac0_guess, min=0)
 
     params = arch_model.make_params()
@@ -1062,37 +1057,53 @@ def fit_frequencies(dac, freq,
     return fit_result_arch
 
 
+def residual_Gamma(pars_dict, sensitivity, Gamma_phi_ramsey, Gamma_phi_echo):
+    """
+    Residual function for fitting dephasing rates.
+    """
+    # FIXME: this really needs a dostring to explain what it does
+    slope_ramsey = pars_dict['slope_ramsey']
+    slope_echo = pars_dict['slope_echo']
+    intercept = pars_dict['intercept']
 
-# def residual_Gamma(pars_dict, sensitivity, Gamma_phi_ramsey, Gamma_phi_echo):
-#     slope_ramsey = pars_dict['slope_ramsey']
-#     slope_echo = pars_dict['slope_echo']
-#     intercept = pars_dict['intercept']
+    gamma_values_ramsey = slope_ramsey*np.abs(sensitivity) + intercept
+    residual_ramsey = Gamma_phi_ramsey - gamma_values_ramsey
 
-#     gamma_values_ramsey = slope_ramsey * np.abs(sensitivity) + intercept
-#     # print(len(Gamma_phi_ramsey), len(gamma_values_ramsey))
-#     residual_ramsey = Gamma_phi_ramsey - gamma_values_ramsey
+    gamma_values_echo = slope_echo*np.abs(sensitivity) + intercept
+    residual_echo = Gamma_phi_echo - gamma_values_echo
 
-#     gamma_values_echo = slope_echo * np.abs(sensitivity) + intercept
-#     residual_echo = Gamma_phi_echo - gamma_values_echo
-
-#     return np.concatenate((residual_ramsey, residual_echo))
+    return np.concatenate((residual_ramsey, residual_echo))
 
 
-# def fit_gammas(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo, verbose: bool = False):
-#     # create a parametrrer set for the initial guess
-#     p = lmfit.Parameters()
-#     p.add('slope_ramsey', value=100.0, vary=True)
-#     p.add('slope_echo', value=100.0, vary=True)
-#     p.add('intercept', value=100.0, vary=True)
+def fit_gammas(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo,
+               verbose:int=0):
+    """
+    Perform a fit to the residual_Gamma using hardcoded guesses.
 
-#     def wrap_residual(p): return residual_Gamma(p,
-#                                                 sensitivity=sensitivity,
-#                                                 Gamma_phi_ramsey=Gamma_phi_ramsey,
-#                                                 Gamma_phi_echo=Gamma_phi_echo)
-#     fit_result_gammas = lmfit.minimize(wrap_residual, p)
-#     if verbose:
-#         lmfit.printfuncs.report_fit(fit_result_gammas.params)
-#     return fit_result_gammas
+    Args:
+        sensitivity         x-values
+        Gamma_phi_ramsey    dephasing rate of Ramsey experiment
+        gamma_phi_echo      dephasing rate of echo experiment
+        verbose (int)       verbosity level
+    Returns:
+        fit_result_gammas  an lmfit fit_res object
+    """
+    # create a parameter set for the initial guess
+    p = lmfit.Parameters()
+    p.add('slope_ramsey', value=100.0, vary=True)
+    p.add('slope_echo', value=100.0, vary=True)
+    p.add('intercept', value=100.0, vary=True)
+
+    # mi = lmfit.minimize(super_residual, p)
+    def wrap_residual(p): return residual_Gamma(
+        p,
+        sensitivity=sensitivity,
+        Gamma_phi_ramsey=Gamma_phi_ramsey,
+        Gamma_phi_echo=Gamma_phi_echo)
+    fit_result_gammas = lmfit.minimize(wrap_residual, p)
+    if verbose > 0:
+        lmfit.printfuncs.report_fit(fit_result_gammas.params)
+    return fit_result_gammas
 
 
 def PSD_Analysis(table, freq_resonator=None, Qc=None, chi_shift=None, path=None):
@@ -1213,10 +1224,6 @@ def prepare_input_table(dac, frequency, T1, T2_star, T2_echo,
     return table
 
 
-
-
-
-
 def plot_coherence_times_freq(flux, freq, sensitivity,
                               T1, Tramsey, Techo, path,
                               figname='Coherence_times.PNG'):
@@ -1305,43 +1312,10 @@ def plot_ratios(flux, freq, sensitivity,
         f.savefig(savename, format='PNG', dpi=450)
 
 
-def residual_Gamma(pars_dict, sensitivity, Gamma_phi_ramsey, Gamma_phi_echo):
-    slope_ramsey = pars_dict['slope_ramsey']
-    slope_echo = pars_dict['slope_echo']
-    intercept = pars_dict['intercept']
-
-    gamma_values_ramsey = slope_ramsey*np.abs(sensitivity) + intercept
-    residual_ramsey = Gamma_phi_ramsey - gamma_values_ramsey
-
-    gamma_values_echo = slope_echo*np.abs(sensitivity) + intercept
-    residual_echo = Gamma_phi_echo - gamma_values_echo
-
-    return np.concatenate((residual_ramsey, residual_echo))
-
-
 def super_residual(p):
     data = residual_Gamma(p)
     # print(type(data))
     return data.astype(float)
-
-
-def fit_gammas(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo, verbose=0):
-    # create a parametrrer set for the initial guess
-    p = lmfit.Parameters()
-    p.add('slope_ramsey', value=100.0, vary=True)
-    p.add('slope_echo', value=100.0, vary=True)
-    p.add('intercept', value=100.0, vary=True)
-
-    # mi = lmfit.minimize(super_residual, p)
-    def wrap_residual(p): return residual_Gamma(p,
-                                                sensitivity=sensitivity,
-                                                Gamma_phi_ramsey=Gamma_phi_ramsey,
-                                                Gamma_phi_echo=Gamma_phi_echo)
-    fit_result_gammas = lmfit.minimize(wrap_residual, p)
-    verbose = 1
-    if verbose > 0:
-        lmfit.printfuncs.report_fit(fit_result_gammas.params)
-    return fit_result_gammas
 
 
 def plot_gamma_fit(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo,
