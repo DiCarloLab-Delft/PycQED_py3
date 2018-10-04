@@ -95,6 +95,22 @@ class Test_PSD_Analysis(unittest.TestCase):
         self.assertAlmostEqual(sqrtA_echo,
                                -0.058470, places=4)
 
+class Test_CoherenceAnalysis(unittest.TestCase):
+    @classmethod
+    def setUpClass(self):
+        self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
+        ma.a_tools.datadir = self.datadir
+
+        with open(os.path.join(self.datadir, 'coherence_table.json')) as f:
+            self.testdata_table = np.array(json.load(f))
+
+    def test_CoherenceAnalysis(self):
+        a = ca.CoherenceAnalysis(
+            self.testdata_table,
+            options_dict={'tag_tstamp':False, 'save_figs':False})
+        self.assertAlmostEqual(a.proc_data_dict['sqrtA_echo']*1e6,
+                               -0.058470, places=4)
+
 
 class Test_CoherenceTimesAnalysis(unittest.TestCase):
 

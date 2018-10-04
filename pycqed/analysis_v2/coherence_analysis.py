@@ -4,6 +4,7 @@ Cleaned up (a bit) by Adriaan
 '''
 import matplotlib.pyplot as plt
 import datetime
+from collections import OrderedDict
 from copy import deepcopy
 import pycqed.analysis_v2.base_analysis as ba
 from pycqed.analysis_v2.base_analysis import plot_scatter_errorbar_fit,\
@@ -15,6 +16,166 @@ from pycqed.analysis.tools.plotting import SI_val_to_msg_str, \
     format_lmfit_par, plot_lmfit_res
 
 from pycqed.analysis import analysis_toolbox as a_tools
+
+
+class CoherenceAnalysis(ba.BaseDataAnalysis):
+    """
+    Power spectral density analysis of transmon coherence.
+
+    Note, analysis of the coherence times is separated from data extraction
+    as that can be a complicated process that is highly experiment dependent.
+
+    Args:
+        table : table containing the data, see below for specification.
+        freq_resonator: readout resonator frequency (in Hz)
+        Qc:             coupling Q of the readout resonator
+        chi_shift       in Hz
+        path:           filepath, if provided is used for saving the plots
+
+
+    Input table specification:
+           Row  | Content (arrays)
+        --------+--------
+            1   | dac
+            2   | frequency (Hz)
+            3   | T1 (s)
+            4   | T2 star (s)
+            5   | T2 echo (s)
+            6   | Exclusion mask (True where data is to be excluded)
+
+    Generates 8 plots:
+        > T1, T2, Echo vs flux
+        > T1, T2, Echo vs frequency
+        > T1, T2, Echo vs flux sensitivity
+        > ratio Ramsey/Echo vs flux
+        > ratio Ramsey/Echo vs frequency
+        > ratio Ramsey/Echo vs flux sensitivity
+        > Dephasing rates Ramsey and Echo vs flux sensitivity
+        > Dac arc fit, use to assess if sensitivity calculation is correct.
+
+    If properties of resonator are provided (freq_resonator, Qc, chi_shift),
+    it also calculates the number of noise photons.
+    """
+
+    def __init__(self, coherence_table,
+                 t_start: str=None, t_stop: str=None, label='',
+                 options_dict: dict=None, auto: bool=True, close_figs=True,
+                 freq_resonator: float=None, Qc: float=None,
+                 chi_shift: float=None, **kwargs):
+        super().__init__(t_start=t_start, t_stop=t_stop, label=label,
+                         options_dict=options_dict, close_figs=close_figs,
+                         **kwargs)
+        self._coherence_table = coherence_table
+        self._freq_resonator = freq_resonator
+        self._Qc = Qc
+        self._chi_shift = chi_shift
+
+        if auto:
+            self.run_analysis()
+
+    def extract_data(self):
+        """Put data from the coherence table in the raw data dict."""
+        self.raw_data_dict = OrderedDict()
+        rdd = self.raw_data_dict
+        rdd['dac'], rdd['freq'], rdd['T1'], rdd['Tramsey'],\
+            rdd['Techo'], rdd['exclusion_mask'] = self._coherence_table
+        # Externally loaded tables my be cast to ints.
+        rdd['exclusion_mask'] = rdd['exclusion_mask'].astype(bool)
+
+        # Resonator information
+        rdd['freq_resonator'] = self._freq_resonator
+        rdd['Qc'] = self._Qc
+        rdd['chi_shift'] = self._chi_shift
+
+
+
+    def process_data(self):
+        """
+        Process data.
+
+        Performs the following:
+            - fit dac-arc
+            - convert dac to flux
+            - calculate sensitivity
+            - calculate dephasing rates
+            - fit dephasing rates
+            - determine derived quantities
+        """
+        self.fit_res = OrderedDict()
+        self.proc_data_dict = deepcopy(self.raw_data_dict)
+        pdd = self.proc_data_dict
+
+        # Extract the dac arcs required for getting the sensitivities
+        # FIXME: add a proper guess function to make the fit more robust
+        self.fit_res['dac_arc'] = fit_frequencies(pdd['dac'], pdd['freq'],
+                                                  dac0_guess=.1)
+
+        # convert dac in flux as unit of Phi_0
+        flux = (pdd['dac'] - self.fit_res['dac_arc'].best_values['offset'])\
+            / self.fit_res['dac_arc'].best_values['dac0']
+        pdd['flux'] = flux
+
+        # calculate the derivative vs flux
+        sensitivity_angular = partial_omega_over_flux(
+            flux, self.fit_res['dac_arc'].best_values['Ec'],
+            self.fit_res['dac_arc'].best_values['Ej'])
+        pdd['sensitivity'] = sensitivity_angular/(2*np.pi)
+
+        # Pure dephasing times
+        # Calculate pure dephasing rates
+        pdd['Gamma_1'] = 1.0/pdd['T1'][~pdd['exclusion_mask']]
+        pdd['Gamma_ramsey'] = 1.0/pdd['Tramsey'][~pdd['exclusion_mask']]
+        pdd['Gamma_echo'] = 1.0/pdd['Techo'][~pdd['exclusion_mask']]
+
+        pdd['Gamma_phi_ramsey'] = pdd['Gamma_ramsey'] - pdd['Gamma_1']/2.0
+        pdd['Gamma_phi_echo'] = pdd['Gamma_echo'] - pdd['Gamma_1']/2.0
+
+        # Fit dephasing rates as a function of sensitivity to a linear model.
+        self.fit_res['gammas'] = fit_gammas(
+            pdd['sensitivity'], pdd['Gamma_phi_ramsey'], pdd['Gamma_phi_echo'])
+
+        pdd['intercept'] = self.fit_res['gammas'].params['intercept'].value
+        pdd['slope_ramsey'] = self.fit_res['gammas'].params['slope_ramsey'].value
+        pdd['slope_echo'] = self.fit_res['gammas'].params['slope_echo'].value
+
+        # after fitting gammas
+        # from flux noise
+        # Martinis PRA 2003
+        pdd['sqrtA_rams'] = pdd['slope_ramsey']/(np.pi*np.sqrt(30))
+        pdd['sqrtA_echo'] = pdd['slope_echo']/(np.pi*np.sqrt(1.386))
+
+        # from white noise
+        # using Eq 5 in Nat. Comm. 7,12964 (The flux qubit revisited to enhance
+        # coherence and reproducability)
+        if not ((pdd['freq_resonator'] is None) and (pdd['Qc'] is None)
+                and (pdd['chi_shift'] is None)):
+            pdd['n_avg'] = calculate_n_avg(pdd['freq_resonator'], pdd['Qc'],
+                                           pdd['chi_shift'], pdd['intercept'])
+            print('Estimated residual photon number: %s' % pdd['n_avg'])
+
+    def prepare_fitting(self):
+        pass
+
+    def run_fitting(self):
+        # Overwritten to prevent overwriting fit_res dict.
+        pass
+
+    def analyze_fit_results(self):
+        pass
+
+    def prepare_plots(self):
+
+        # plot_dac_arc(dac, freq, fit_result_arch)
+        # plot_coherence_times(flux, freq, sensitivity,
+        #                      T1, Tramsey, Techo, path)
+        # plot_ratios(flux, freq, sensitivity,
+        #             Gamma_phi_ramsey, Gamma_phi_echo, path)
+
+
+        # plot_gamma_fit(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo,
+        #        slope_ramsey, slope_echo, intercept, path)
+
+        pass
 
 
 class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
@@ -348,6 +509,14 @@ class AliasedCoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
 
 
 class CoherenceTimesAnalysis_old(ba.BaseDataAnalysis):
+    """
+    Old version of Coherence times analysis.
+
+    This is in essence a messy combination of data extraction and the PSD
+    analysis of the coherence.
+
+    I am now separating these two out so that it is easier to use.
+    """
     T1 = 't1'
     T2 = 't2'  # e.g. echo
     T2_star = 't2s'  # e.g. ramsey
@@ -951,7 +1120,6 @@ def calculate_n_avg(freq_resonator: float, Qc: float,
     return n_avg
 
 
-
 def arch(dac, Ec, Ej, offset, dac0):
     """
     Convert flux (in dac) to frequency for a transmon.
@@ -1075,8 +1243,6 @@ def fit_gammas(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo,
     return fit_result_gammas
 
 
-class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
-    pass
 
 def PSD_Analysis(table, freq_resonator=None, Qc=None, chi_shift=None,
                  path=None):
