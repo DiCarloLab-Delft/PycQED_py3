@@ -2,16 +2,17 @@
 Hacked together by Rene Vollmer
 Cleaned up (a bit) by Adriaan
 '''
-
+import matplotlib.pyplot as plt
 import datetime
 from copy import deepcopy
 import pycqed.analysis_v2.base_analysis as ba
 from pycqed.analysis_v2.base_analysis import plot_scatter_errorbar_fit,\
-    plot_scatter_errorbar
+    plot_scatter_errorbar, set_xlabel, set_ylabel
 
 import numpy as np
 import lmfit
-from pycqed.analysis.tools.plotting import SI_val_to_msg_str, format_lmfit_par
+from pycqed.analysis.tools.plotting import SI_val_to_msg_str, \
+    format_lmfit_par, plot_lmfit_res
 
 from pycqed.analysis import analysis_toolbox as a_tools
 
@@ -987,7 +988,7 @@ def calculate_n_avg(freq_resonator: float, Qc: float,
 
 
 def arch(dac, Ec, Ej, offset, dac0):
-    '''
+    """
     Convert flux (in dac) to frequency for a transmon.
 
     Args:
@@ -1000,7 +1001,7 @@ def arch(dac, Ec, Ej, offset, dac0):
     Note: the Phi_0 (periodicity) dac0.
 
     N.B. I believe we have a cleaner version of this somewhere...
-    '''
+    """
     d = np.abs(np.cos((np.pi * (dac - offset)) / dac0))
     model = np.sqrt(8 * Ec * Ej * d) - Ec
 
@@ -1012,18 +1013,19 @@ def arch(dac, Ec, Ej, offset, dac0):
 
 
 def partial_omega_over_flux(flux, Ec, Ej):
-    '''
-    Derivative of flux arc in units of omega/Phi0.
+    """
+    Calculate derivative of flux arc in units of omega/Phi0.
 
     Args:
         flux  (units of phi0)
         Ec: charging energy (Hz)
         Ej: josephson energy (Hz)
 
-    Returns:
+    Return:
         frequency/flux in units of omega/Phi0
-    '''
-    model = -np.sign(np.cos(np.pi * flux)) * (np.pi ** 2) * np.sqrt(8 * Ec * Ej) * \
+    """
+    model = -np.sign(np.cos(np.pi * flux)) * (np.pi ** 2) * \
+        np.sqrt(8 * Ec * Ej) * \
         np.sin(np.pi * flux) / np.sqrt(np.abs(np.cos(np.pi * flux)))
     return model
 
@@ -1041,7 +1043,6 @@ def fit_frequencies(dac, freq,
     return:
         fit_result_arch: an lmfit fit_result object.
     """
-
     # define the model (from the function) used to fit data
     arch_model = lmfit.Model(arch)
 
@@ -1059,7 +1060,10 @@ def fit_frequencies(dac, freq,
 
 def residual_Gamma(pars_dict, sensitivity, Gamma_phi_ramsey, Gamma_phi_echo):
     """
-    Residual function for fitting dephasing rates.
+    Residual function for fitting dephasing rates (Gamma).
+
+    Two separate linear models are used for the ramsey and echo dephasing
+    rates.
     """
     # FIXME: this really needs a dostring to explain what it does
     slope_ramsey = pars_dict['slope_ramsey']
@@ -1076,7 +1080,7 @@ def residual_Gamma(pars_dict, sensitivity, Gamma_phi_ramsey, Gamma_phi_echo):
 
 
 def fit_gammas(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo,
-               verbose:int=0):
+               verbose: int=0):
     """
     Perform a fit to the residual_Gamma using hardcoded guesses.
 
@@ -1153,6 +1157,7 @@ def PSD_Analysis(table, freq_resonator=None, Qc=None, chi_shift=None, path=None)
     Gamma_phi_ramsey = Gamma_ramsey - Gamma_1/2.0
     Gamma_phi_echo = Gamma_echo - Gamma_1/2.0
 
+    plot_dac_arc(dac, freq, fit_result_arch)
     plot_coherence_times(flux, freq, sensitivity,
                          T1, Tramsey, Techo, path)
     plot_ratios(flux, freq, sensitivity,
@@ -1185,7 +1190,7 @@ def PSD_Analysis(table, freq_resonator=None, Qc=None, chi_shift=None, path=None)
     else:
         n_avg = np.nan
 
-    return (sqrtA_echo/1e-6), n_avg
+    return (sqrtA_echo/1e-6), n_avg, fit_result_arch
 
 
 def prepare_input_table(dac, frequency, T1, T2_star, T2_echo,
@@ -1222,6 +1227,19 @@ def prepare_input_table(dac, frequency, T1, T2_star, T2_echo,
                                             T2_echo_mask)
 
     return table
+
+
+def plot_dac_arc(dac, freq, fit_res,
+                 figname='dac_arc.PNG'):
+    f, ax = plt.subplots()
+    ax.plot(dac, freq, 'o', label='data')
+    plot_lmfit_res(ax=ax, fit_res=fit_res, plot_init=True,
+                   plot_kw={'label': 'arc-fit'},
+                   plot_init_kw={'label': 'init-fit', 'ls': '--'})
+
+    ax.legend(loc=0)
+    ax.set_xlabel('dac')
+    set_ylabel(ax, 'Frequency', 'Hz')
 
 
 def plot_coherence_times_freq(flux, freq, sensitivity,
@@ -1314,7 +1332,6 @@ def plot_ratios(flux, freq, sensitivity,
 
 def super_residual(p):
     data = residual_Gamma(p)
-    # print(type(data))
     return data.astype(float)
 
 

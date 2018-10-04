@@ -1293,6 +1293,8 @@ class BaseDataAnalysis(object):
                 # The initial guess
                 pdict_init['yvals'] = model.eval(
                     **pdict_init['fit_res'].init_values,
+                    #This is probably a bug .init_values should be .init_params
+                    # not changing as I cannot test it right now.
                     **{independent_var: pdict_init['xvals']})
             else:
                 output = fit_fn(**pdict_init['fit_res'].initial_params,

@@ -74,6 +74,7 @@ class test_format_lmfit_par(unittest.TestCase):
         test_str = format_lmfit_par('test_par', p, end_char='')
         self.assertEqual(test_str, 'test_par: 5.1200$\\pm$NaN')
 
+
 class test_plot_lmfit_res(unittest.TestCase):
 
     def test_plot_model_result(self):
@@ -91,7 +92,6 @@ class test_plot_lmfit_res(unittest.TestCase):
         params = line_model.make_params()
         fit_res = line_model.fit(y, x=x, params=params)
 
-        f, ax= plt.subplots()
-        plot_lmfit_res(fit_res, ax=ax, plot_kws={'color':'C1'},
-                       plot_init=True, plot_init_kws={'ls':'--'})
-
+        f, ax = plt.subplots()
+        plot_lmfit_res(fit_res, ax=ax, plot_kws={'color': 'C1'},
+                       plot_init=True, plot_init_kws={'ls': '--'})

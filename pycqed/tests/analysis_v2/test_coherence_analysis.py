@@ -69,7 +69,10 @@ class Test_CoherenceAnalysis_Helpers(unittest.TestCase):
         self.assertAlmostEqual(dac0, pars['dac0'].value, places=2)
 
     def test_residual_Gamma(self):
-        print('test not implemented')
+        pass
+
+    def test_fit_gammas(self):
+        pass
 
 
 class Test_CoherenceTimesAnalysis(unittest.TestCase):
