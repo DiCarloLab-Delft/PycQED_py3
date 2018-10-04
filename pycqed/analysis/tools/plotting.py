@@ -2,6 +2,7 @@
 Currently empty should contain the plotting tools portion of the
 analysis toolbox
 '''
+import lmfit
 import matplotlib.pyplot as plt
 import matplotlib
 from matplotlib import cm
@@ -129,7 +130,6 @@ def format_lmfit_par(par_name: str, lmfit_par, end_char=''):
     return val_string
 
 
-
 def data_to_table_png(data: list, filename: str, title: str='',
                       close_fig: bool=True):
     """
@@ -206,6 +206,75 @@ def get_color_order(i, max_num, cmap='viridis'):
 
 def get_color_from_cmap(i, max_num):
     pass
+
+
+def plot_lmfit_res(fit_res, ax, plot_init: bool=False,
+                   plot_numpoints: int=1000,
+                   plot_kw: dict ={}, plot_init_kw: dict = {}, **kw):
+    """
+    Plot the result of an lmfit optimization.
+
+    Args:
+        fit_res:        lmfit result object.
+        ax:             matplotlib axis object to plot on.
+        plot_init:      if True plots the initial guess of the fit.
+        plot_numpoints: number of points to use for interpolating the fit.
+        plot_kw:        dictionary of options to pass to the plot of the fit.
+        plot_init_kw    dictionary of options to pass to the plot of the
+                        initial guess.
+        **kw            **kwargs, unused only here to match call signature.
+
+    Return:
+        axis :          Returns matplotlib axis object on which the plot
+                        was performed.
+
+    """
+    if hasattr(fit_res, 'model'):
+        model = fit_res.model
+        # Testing input
+        if not (isinstance(model, lmfit.model.Model) or
+                isinstance(model, lmfit.model.ModelResult)):
+            raise TypeError(
+                'The passed item in "fit_res" needs to be'
+                ' a fitting model, but is {}'.format(type(model)))
+        if len(model.independent_vars) == 1:
+            independent_var = model.independent_vars[0]
+        else:
+            raise ValueError('Fit can only be plotted if the model function'
+                             ' has one independent variable.')
+
+        x_arr = fit_res.userkws[independent_var]
+        xvals = np.linspace(np.min(x_arr), np.max(x_arr),
+                            plot_numpoints)
+        yvals = model.eval(fit_res.params,
+                           **{independent_var: xvals})
+        if plot_init:
+            yvals_init = model.eval(fit_res.init_params,
+                                    **{independent_var: xvals})
+
+    else:  # case for the minimizer fit
+        # testing input
+        fit_xvals = fit_res.userkws
+        if len(fit_xvals.keys()) == 1:
+            independent_var = list(fit_xvals.keys())[0]
+        else:
+            raise ValueError('Fit can only be plotted if the model function'
+                             ' has one independent variable.')
+
+        x_arr = fit_res.userkws[independent_var]
+        xvals = np.linspace(np.min(x_arr), np.max(x_arr),
+                            plot_numpoints)
+        fit_fn = fit_res.fit_fn
+        yvals = fit_fn(**fit_res.params,
+                       **{independent_var: xvals})
+        if plot_init:
+            yvals_init = fit_fn(**fit_res.init_params,
+                                **{independent_var: xvals})
+    # acutal plotting
+    ax.plot(xvals, yvals, **plot_kw)
+    if plot_init:
+        ax.plot(xvals, yvals_init, **plot_init_kw)
+    return ax
 
 
 def flex_color_plot_vs_x(xvals, yvals, zvals, ax=None,

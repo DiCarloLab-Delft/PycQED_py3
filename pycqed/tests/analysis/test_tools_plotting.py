@@ -6,7 +6,7 @@ from pycqed.analysis.tools.plotting import SI_prefix_and_scale_factor
 from pycqed.analysis.tools.plotting import set_xlabel, set_ylabel
 from pycqed.analysis.tools.plotting import SI_val_to_msg_str
 
-from pycqed.analysis.tools.plotting import format_lmfit_par
+from pycqed.analysis.tools.plotting import format_lmfit_par, plot_lmfit_res
 
 
 class Test_SI_prefix_scale_factor(unittest.TestCase):
@@ -74,6 +74,24 @@ class test_format_lmfit_par(unittest.TestCase):
         test_str = format_lmfit_par('test_par', p, end_char='')
         self.assertEqual(test_str, 'test_par: 5.1200$\\pm$NaN')
 
+class test_plot_lmfit_res(unittest.TestCase):
 
+    def test_plot_model_result(self):
+        def line(a, b, x):
+            return a*x+b
 
+        a = .1
+        b = 5
+        x = np.linspace(0, 20, 31)
+        y = line(a, b, x)
+
+        line_model = lmfit.Model(line, independent_vars='x')
+        line_model.set_param_hint('a', value=a)
+        line_model.set_param_hint('b', value=b)
+        params = line_model.make_params()
+        fit_res = line_model.fit(y, x=x, params=params)
+
+        f, ax= plt.subplots()
+        plot_lmfit_res(fit_res, ax=ax, plot_kws={'color':'C1'},
+                       plot_init=True, plot_init_kws={'ls':'--'})
 
