@@ -142,7 +142,6 @@ class BaseDataAnalysis(object):
         else:
             self.labels = scan_label
 
-
         # Initialize to None such that the attribute always exists.
         self.data_file_path = None
         if t_start is None and t_stop is None and data_file_path is None:

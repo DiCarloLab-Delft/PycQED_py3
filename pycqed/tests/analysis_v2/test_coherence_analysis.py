@@ -103,13 +103,18 @@ class Test_CoherenceAnalysis(unittest.TestCase):
 
         with open(os.path.join(self.datadir, 'coherence_table.json')) as f:
             self.testdata_table = np.array(json.load(f))
-
-    def test_CoherenceAnalysis(self):
-        a = ca.CoherenceAnalysis(
+        self.a = ca.CoherenceAnalysis(
             self.testdata_table,
             options_dict={'tag_tstamp':False, 'save_figs':False})
-        self.assertAlmostEqual(a.proc_data_dict['sqrtA_echo']*1e6,
+
+    def test_CoherenceAnalysis_quantities(self):
+        self.assertAlmostEqual(self.a.proc_data_dict['sqrtA_echo']*1e6,
                                -0.058470, places=4)
+
+    def test_CoherenceAnalysis_figs(self):
+        expected_fig_keys = {'coherence_times', 'coherence_ratios',
+                             'dac_arc', 'gamma_fit'}
+        self.assertTrue(set(self.a.figs.keys()).issubset(expected_fig_keys))
 
 
 class Test_CoherenceTimesAnalysis(unittest.TestCase):
