@@ -11,19 +11,19 @@ from pycqed.analysis_v2 import measurement_analysis as ma
 import pycqed.analysis_v2.coherence_analysis as ca
 
 tau_keys = {
-    ma.CoherenceTimesAnalysis.T1: 'Analysis.Fitted Params F|1>.tau.value',
-    ma.CoherenceTimesAnalysis.T2: 'Analysis.Fitted Params corr_data.tau.value',
-    ma.CoherenceTimesAnalysis.T2_star: 'Analysis.Fitted Params raw w0.tau.value',
+    ca.CoherenceTimesAnalysis_old.T1: 'Analysis.Fitted Params F|1>.tau.value',
+    ca.CoherenceTimesAnalysis_old.T2: 'Analysis.Fitted Params corr_data.tau.value',
+    ca.CoherenceTimesAnalysis_old.T2_star: 'Analysis.Fitted Params raw w0.tau.value',
 }
 tau_std_keys = {
-    ma.CoherenceTimesAnalysis.T1: 'Analysis.Fitted Params F|1>.tau.stderr',
-    ma.CoherenceTimesAnalysis.T2: 'Analysis.Fitted Params corr_data.tau.stderr',
-    ma.CoherenceTimesAnalysis.T2_star: 'Analysis.Fitted Params raw w0.tau.stderr',
+    ca.CoherenceTimesAnalysis_old.T1: 'Analysis.Fitted Params F|1>.tau.stderr',
+    ca.CoherenceTimesAnalysis_old.T2: 'Analysis.Fitted Params corr_data.tau.stderr',
+    ca.CoherenceTimesAnalysis_old.T2_star: 'Analysis.Fitted Params raw w0.tau.stderr',
 }
 labels = {
-    ma.CoherenceTimesAnalysis.T1: '_T1-VFC_res1_dac_channel_VFCQ6_',
-    ma.CoherenceTimesAnalysis.T2: '_echo-VFC_res1_dac_channel_VFCQ6_',
-    ma.CoherenceTimesAnalysis.T2_star: '_Ramsey-VFC_res1_dac_channel_VFCQ6_',
+    ca.CoherenceTimesAnalysis_old.T1: '_T1-VFC_res1_dac_channel_VFCQ6_',
+    ca.CoherenceTimesAnalysis_old.T2: '_echo-VFC_res1_dac_channel_VFCQ6_',
+    ca.CoherenceTimesAnalysis_old.T2_star: '_Ramsey-VFC_res1_dac_channel_VFCQ6_',
 }
 
 dac = 'VFCQ6'
@@ -95,6 +95,7 @@ class Test_PSD_Analysis(unittest.TestCase):
         self.assertAlmostEqual(sqrtA_echo,
                                -0.058470, places=4)
 
+
 class Test_CoherenceTimesAnalysis(unittest.TestCase):
 
     @classmethod
@@ -103,7 +104,7 @@ class Test_CoherenceTimesAnalysis(unittest.TestCase):
         ma.a_tools.datadir = self.datadir
 
     def test_CoherenceTimesAnalysisSingle(self):
-        key = ma.CoherenceTimesAnalysis.T2_star
+        key = ca.CoherenceTimesAnalysis_old.T2_star
 
         a = ma.CoherenceTimesAnalysisSingle(
             t_start=t_start, t_stop=t_stop, label=labels[key],
@@ -113,8 +114,8 @@ class Test_CoherenceTimesAnalysis(unittest.TestCase):
             plot_versus_frequency=True,
             frequency_key='Instrument settings.' + qubit + '.freq_qubit')
 
-    def test_CoherenceTimesAnalysis(self):
-        a = ma.CoherenceTimesAnalysis(
+    def test_CoherenceTimesAnalysis_old(self):
+        a = ca.CoherenceTimesAnalysis_old(
             t_start='20181002_190542', t_stop='20181002_203700',
             dac_instr_names=['FBL_D1'], qubit_instr_names=['D1'],
             use_chisqr=False)

@@ -347,7 +347,7 @@ class AliasedCoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
             'horizontalalignment': 'left'}
 
 
-class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
+class CoherenceTimesAnalysis_old(ba.BaseDataAnalysis):
     T1 = 't1'
     T2 = 't2'  # e.g. echo
     T2_star = 't2s'  # e.g. ramsey
@@ -951,41 +951,6 @@ def calculate_n_avg(freq_resonator: float, Qc: float,
     return n_avg
 
 
-# def prepare_input_table(dac: list, frequency: list, T1: list, T2_star: list, T2_echo: list,
-#                         T1_mask: list = None, T2_star_mask: list = None, T2_echo_mask: list = None):
-#     """
-#     Returns a table ready for PSD_Analysis input
-#     If sizes are different, it adds nans on the end.
-#     """
-#     assert (len(dac) == len(frequency))
-#     assert (len(dac) == len(T1))
-#     assert (len(dac) == len(T2_star))
-#     assert (len(dac) == len(T2_echo))
-
-#     if T1_mask is None:
-#         T1_mask = np.zeros(len(T1), dtype=bool)
-#     if T2_star_mask is None:
-#         T2_star_mask = np.zeros(len(T2_star), dtype=bool)
-#     if T2_echo_mask is None:
-#         T2_echo_mask = np.zeros(len(T2_echo), dtype=bool)
-
-#     assert (len(T1) == len(T1_mask))
-#     assert (len(T2_star) == len(T2_star_mask))
-#     assert (len(T2_echo) == len(T2_echo_mask))
-
-#     table = np.ones((6, len(dac)))
-#     table = table * np.nan
-#     table[0, :] = dac
-#     table[1, :len(frequency)] = frequency
-#     table[2, :len(T1)] = T1
-#     table[3, :len(T2_star)] = T2_star
-#     table[4, :len(T2_echo)] = T2_echo
-#     table[5, :len(T1_mask)] = np.logical_or(np.logical_or(T1_mask,
-#                                                           T2_star_mask),
-#                                             T2_echo_mask)
-
-#     return table
-
 
 def arch(dac, Ec, Ej, offset, dac0):
     """
@@ -1110,7 +1075,11 @@ def fit_gammas(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo,
     return fit_result_gammas
 
 
-def PSD_Analysis(table, freq_resonator=None, Qc=None, chi_shift=None, path=None):
+class CoherenceTimesAnalysis(ba.BaseDataAnalysis):
+    pass
+
+def PSD_Analysis(table, freq_resonator=None, Qc=None, chi_shift=None,
+                 path=None):
     """
     Power spectral density analysis of transmon coherence.
 
@@ -1204,7 +1173,7 @@ def PSD_Analysis(table, freq_resonator=None, Qc=None, chi_shift=None, path=None)
     else:
         n_avg = np.nan
 
-    return (sqrtA_echo/1e-6), n_avg, fit_result_arch
+    return (sqrtA_echo/1e-6), n_avg
 
 
 def prepare_input_table(dac, frequency, T1, T2_star, T2_echo,
