@@ -72,6 +72,44 @@ def block_pulse(amp, length, sampling_rate=2e8, delay=0, phase=0):
     pulse_Q = list(Zeros)+list(block_Q)
     return pulse_I, pulse_Q
 
+def CLEAR_pulse(amp_base, length_total, delta_amp_segments, length_segments,
+                sampling_rate=2e8, delay=0, phase=0):
+    '''
+    Generates the envelope of a block pulse.
+        length_total in s
+        length_segments list of length 4 in s
+        amp_base in V
+        delta_amp_segments list of length 4 in V
+        sampling_rate in Hz
+        empty delay in s
+        phase in degrees
+    '''
+
+    if len(delta_amp_segments)==len( length_segments)==4:
+        pass
+    else:
+        raise ValueError('delta_amp_segments and length_segments need to be lists of length 4')
+
+
+    nr_samples = (length_total+delay)*sampling_rate
+    delay_samples = int(delay*sampling_rate)
+    pulse_samples = int(nr_samples - delay_samples)
+    segments_samples = list(map(lambda x: int(x*sampling_rate),length_segments))
+
+    amp_pulse=np.concatenate(((np.ones(segments_samples[0])*(amp_base+delta_amp_segments[0])),\
+                              (np.ones(segments_samples[2])*(amp_base+delta_amp_segments[1])),\
+                              (np.ones(pulse_samples-sum(segments_samples))*amp_base),\
+                              (np.ones(segments_samples[2])*(amp_base+delta_amp_segments[2])),\
+                              (np.ones(segments_samples[3])*(amp_base+delta_amp_segments[3]))))
+    amp_I=amp_pulse*np.cos(phase*2*np.pi/360)
+    amp_Q=amp_pulse*np.sin(phase*2*np.pi/360)
+    block_I = amp_I * np.ones(pulse_samples)
+    block_Q = amp_Q * np.ones(pulse_samples)
+    Zeros = np.zeros(delay_samples)
+    pulse_I = list(Zeros)+list(block_I)
+    pulse_Q = list(Zeros)+list(block_Q)
+    return pulse_I, pulse_Q
+
 ####################
 # Pulse modulation #
 ####################
