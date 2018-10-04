@@ -1112,7 +1112,18 @@ def fit_gammas(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo,
 
 def PSD_Analysis(table, freq_resonator=None, Qc=None, chi_shift=None, path=None):
     """
-    Requires a table as input:
+    Power spectral density analysis of transmon coherence.
+
+    Args:
+        table : table containing the data, see below for specification.
+        freq_resonator: readout resonator frequency (in Hz)
+        Qc:             coupling Q of the readout resonator
+        chi_shift       in Hz
+        path:           filepath, if provided is used for saving the plots
+
+
+
+    Input table specification:
            Row  | Content
         --------+--------
             1   | dac
@@ -1121,7 +1132,8 @@ def PSD_Analysis(table, freq_resonator=None, Qc=None, chi_shift=None, path=None)
             4   | T2 star
             5   | T2 echo
             6   | Exclusion mask (True where data is to be excluded)
-    Generates 7 plots:
+
+    Generates 8 plots:
         > T1, T2, Echo vs flux
         > T1, T2, Echo vs frequency
         > T1, T2, Echo vs flux sensitivity
@@ -1129,14 +1141,16 @@ def PSD_Analysis(table, freq_resonator=None, Qc=None, chi_shift=None, path=None)
         > ratio Ramsey/Echo vs frequency
         > ratio Ramsey/Echo vs flux sensitivity
         > Dephasing rates Ramsey and Echo vs flux sensitivity
-        If properties of resonator are provided (freq_resonator, Qc, chi_shift),
-        it also calculates the number of noise photons.
+        > Dac arc fit, use to assess if sensitivity calculation is correct.
+
+    If properties of resonator are provided (freq_resonator, Qc, chi_shift),
+    it also calculates the number of noise photons.
     """
     dac, freq, T1, Tramsey, Techo, exclusion_mask = table
     exclusion_mask = np.array(exclusion_mask, dtype=bool)
 
     # Extract the dac arcs required for getting the sensitivities
-    fit_result_arch = fit_frequencies(dac, freq)
+    fit_result_arch = fit_frequencies(dac, freq, dac0_guess=.1)
 
     # convert dac in flux as unit of Phi_0
     flux = (dac-fit_result_arch.best_values['offset'])\

@@ -2,6 +2,7 @@
 Hacked together by Rene Vollmer
 Edited by Adriaan
 '''
+import json
 import numpy as np
 import unittest
 import pycqed as pq
@@ -29,6 +30,7 @@ dac = 'VFCQ6'
 qubit = 'Q2'
 t_start = '20180412_190000'
 t_stop = '20180412_210000'
+
 
 class Test_CoherenceAnalysis_Helpers(unittest.TestCase):
     def test_calculate_n_avg(self):
@@ -74,6 +76,24 @@ class Test_CoherenceAnalysis_Helpers(unittest.TestCase):
     def test_fit_gammas(self):
         pass
 
+
+class Test_PSD_Analysis(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(self):
+        self.datadir = os.path.join(pq.__path__[0], 'tests', 'test_data')
+        ma.a_tools.datadir = self.datadir
+
+        with open(os.path.join(self.datadir, 'coherence_table.json')) as f:
+            self.testdata_table = np.array(json.load(f))
+
+    def test_PSD_Analysis_gamma_intercept(self):
+        a = ca.PSD_Analysis(self.testdata_table)
+
+        # fixme: this value is based on a hardcoded constant
+        sqrtA_echo = a[0]
+        self.assertAlmostEqual(sqrtA_echo,
+                               -0.058470, places=4)
 
 class Test_CoherenceTimesAnalysis(unittest.TestCase):
 
