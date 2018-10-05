@@ -17,7 +17,6 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import h5py
 from scipy.signal import argrelextrema
 # to allow backwards compatibility with old a_tools code
-from .tools.file_handling import *
 from .tools.data_manipulation import *
 from .tools.plotting import *
 import colorsys as colors
@@ -2057,7 +2056,7 @@ def calculate_transmon_RR_PF_transitions(EC, EJ, f_r, f_PF, g_1, J_1,
 
         H2[2, 2] = f_01+f_PF
         H2[2, 4] = H2[4, 2] = g_1
-        
+
         H2[3, 3] = 2*f_r
         H2[3, 4] = H2[4, 3] = g_2_r_PF
 
@@ -2073,7 +2072,7 @@ def calculate_transmon_RR_PF_transitions(EC, EJ, f_r, f_PF, g_1, J_1,
     except np.linalg.LinAlgError:
         print(EC/1e6, EJ/1e9, f_r/1e9, g_1/1e6, f_01/1e9, f_12/1e9)
 
-    f_q_01 = E100 
+    f_q_01 = E100
     f_q_12 = E200 - E100
 
     f_r1 = E010
@@ -2130,7 +2129,7 @@ def calculate_transmon_RR_PF_bus_transitions(EC, EJ, f_r, f_PF, f_bus, g_trm_RR,
     H2[2, 2] = f_01 + f_PF
     H2[2, 5] = H2[5, 2] = g_trm_RR
     H2[2, 8] = H2[8, 2] = g_trm_bus
-    
+
     H2[3, 3] = f_bus + f_01
     H2[3, 6] = H2[6, 3] = g_trm_RR
     H2[3, 9] = H2[9, 3] = g_2_bus_trm
@@ -2157,7 +2156,7 @@ def calculate_transmon_RR_PF_bus_transitions(EC, EJ, f_r, f_PF, f_bus, g_trm_RR,
     # except np.linalg.LinAlgError:
     #     print(EC/1e6, EJ/1e9, f_r/1e9, g_trm_RR/1e6, f_01/1e9, f_12/1e9)
 
-    f_q_01 = E1000 
+    f_q_01 = E1000
     f_q_12 = E2000 - E1000
 
     f_r1 = E0100
@@ -2177,7 +2176,7 @@ def calculate_transmon_RR_PF_bus_transitions(EC, EJ, f_r, f_PF, f_bus, g_trm_RR,
 
 def fit_EC_EJ_g_f_res_ng(flux_01, f_01, flux_12, f_12, flux_r, f_r, ng=0, asym=0):
     '''
-    Fits EC, EJ, g and f_res from a list of f01, f12 and f resonators 
+    Fits EC, EJ, g and f_res from a list of f01, f12 and f resonators
     as a function of thier respective flux settings by numerical optimization.
     for initial guess it takes the maximum of the inputs
     '''
@@ -2187,7 +2186,7 @@ def fit_EC_EJ_g_f_res_ng(flux_01, f_01, flux_12, f_12, flux_r, f_r, ng=0, asym=0
     EC_guess = np.max(f_01)-np.max(f_12)
     print('EC_guess',EC_guess/1e6)
     EJmax_guess = (np.max(f_01)+EC_guess)**2/(8*EC_guess)
-    
+
     f_r_guess = np.min(f_r)
     asym_guess = 0.1
 

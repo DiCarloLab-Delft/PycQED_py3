@@ -105,6 +105,7 @@ class Test_CoherenceAnalysis(unittest.TestCase):
             self.testdata_table = np.array(json.load(f))
         self.a = ca.CoherenceAnalysis(
             self.testdata_table,
+            t_start='20181002_190542', t_stop='20181002_203700',
             options_dict={'tag_tstamp':False, 'save_figs':False})
 
     def test_CoherenceAnalysis_quantities(self):

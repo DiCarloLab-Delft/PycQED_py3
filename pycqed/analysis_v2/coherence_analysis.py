@@ -26,14 +26,15 @@ class CoherenceAnalysis(ba.BaseDataAnalysis):
     as that can be a complicated process that is highly experiment dependent.
 
     Args:
-        table : table containing the data, see below for specification.
+        coherence_table : table containing the data, see below for
+            specification.
         freq_resonator: readout resonator frequency (in Hz)
         Qc:             coupling Q of the readout resonator
         chi_shift       in Hz
         path:           filepath, if provided is used for saving the plots
 
 
-    Input table specification:
+    Coherence_table specification:
            Row  | Content (arrays)
         --------+--------
             1   | dac
@@ -58,7 +59,7 @@ class CoherenceAnalysis(ba.BaseDataAnalysis):
     """
 
     def __init__(self, coherence_table,
-                 t_start: str=None, t_stop: str=None, label='',
+                 t_start: str, t_stop: str=None, label='',
                  options_dict: dict=None, auto: bool=True, close_figs=True,
                  freq_resonator: float=None, Qc: float=None,
                  chi_shift: float=None, **kwargs):
@@ -94,8 +95,8 @@ class CoherenceAnalysis(ba.BaseDataAnalysis):
         Performs the following:
             - fit dac-arc
             - convert dac to flux
-            - calculate sensitivity
-            - calculate dephasing rates
+            - calculate sensitivity δf/δΦ
+            - calculate dephasing rates Γ
             - fit dephasing rates
             - determine derived quantities
         """
@@ -119,28 +120,39 @@ class CoherenceAnalysis(ba.BaseDataAnalysis):
             self.fit_res['dac_arc'].best_values['Ej'])
         pdd['sensitivity'] = sensitivity_angular/(2*np.pi)
 
-        # Pure dephasing times
         # Calculate pure dephasing rates
-        pdd['Gamma_1'] = 1.0/pdd['T1'][~pdd['exclusion_mask']]
-        pdd['Gamma_ramsey'] = 1.0/pdd['Tramsey'][~pdd['exclusion_mask']]
-        pdd['Gamma_echo'] = 1.0/pdd['Techo'][~pdd['exclusion_mask']]
+        pdd['Gamma_phi_ramsey'] = calc_dephasing_rate(
+            T1=pdd['T1'], T2=pdd['Tramsey'])[~pdd['exclusion_mask']]
+        pdd['Gamma_phi_echo'] = calc_dephasing_rate(
+            T1=pdd['T1'], T2=pdd['Techo'])[~pdd['exclusion_mask']]
 
-        pdd['Gamma_phi_ramsey'] = pdd['Gamma_ramsey'] - pdd['Gamma_1']/2.0
-        pdd['Gamma_phi_echo'] = pdd['Gamma_echo'] - pdd['Gamma_1']/2.0
+        # Often, flux noise is well described by a power spectral density
+        # PSD of the form S_Φ = A*1/f (single sided), where A is a scaling
+        # factor (units of Φ_0^2).
 
         # Fit dephasing rates as a function of sensitivity to a linear model.
         self.fit_res['gammas'] = fit_gammas(
             pdd['sensitivity'], pdd['Gamma_phi_ramsey'], pdd['Gamma_phi_echo'])
 
-        pdd['intercept'] = self.fit_res['gammas'].params['intercept'].value
-        pdd['slope_ramsey'] = self.fit_res['gammas'].params['slope_ramsey'].value
+        # There is special significance in the slope and the intercept of
+        # these distributions.
+        # The slope can be related to the magnitude (scale factor) of the
+        # flux noise. Both are typically expressed in units of μΦ_0.
+        pdd['slope_ramsey'] = \
+            self.fit_res['gammas'].params['slope_ramsey'].value
         pdd['slope_echo'] = self.fit_res['gammas'].params['slope_echo'].value
+        # The intercept with the y-axis (zero sensitivity) relates to the
+        # white noise contribution to the spectrum. The white noise
+        # contribution can be linked to the photon number in the resonator.
+        pdd['intercept'] = self.fit_res['gammas'].params['intercept'].value
 
-        # after fitting gammas
-        # from flux noise
-        # Martinis PRA 2003
+        # Martinis PRB 2003
+        # Not able to understand what these magic numbers mean from
+        # the paper.
         pdd['sqrtA_rams'] = pdd['slope_ramsey']/(np.pi*np.sqrt(30))
         pdd['sqrtA_echo'] = pdd['slope_echo']/(np.pi*np.sqrt(1.386))
+        # Note: these are two methods that are expected to give the
+        # same number.
 
         # from white noise
         # using Eq 5 in Nat. Comm. 7,12964 (The flux qubit revisited to enhance
@@ -163,14 +175,14 @@ class CoherenceAnalysis(ba.BaseDataAnalysis):
 
     def prepare_plots(self):
         """
-        Prepare data for the plots. The plots that are created are
+        Prepare data for the plots.
 
+        The plots that are created are:
             - dac-arc fit
             - coherence times (3x)
             - dephasing ratios (3x)
             - dephasing rates fit
         """
-
         self.plot_dicts['dac_arc'] = {
             'plotfn': plot_dac_arc,
             'dac': self.proc_data_dict['dac'],
@@ -231,11 +243,6 @@ class CoherenceAnalysis(ba.BaseDataAnalysis):
             'freq': self.proc_data_dict['freq'],
             'fit_res': self.fit_res['gammas']
         }
-
-        # plot_gamma_fit(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo,
-        #        slope_ramsey, slope_echo, intercept, path)
-
-        pass
 
 
 class CoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
@@ -1303,6 +1310,12 @@ def fit_gammas(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo,
     return fit_result_gammas
 
 
+def calc_dephasing_rate(T1, T2):
+    """Calculate pure dephasing rate based on T1 and T2."""
+    gamma = 1/T2 - 1/(2*T1)
+    return gamma
+
+
 def PSD_Analysis(table, freq_resonator=None, Qc=None, chi_shift=None,
                  path=None):
     """
@@ -1517,6 +1530,7 @@ def plot_ratios(flux, freq, sensitivity,
         '$T_\phi^{\mathrm{Echo}}/T_\phi^{\mathrm{Ramsey}}$ vs sensitivity', size=16)
     axs[2].set_xlabel(r'$|\partial\nu/\partial\Phi|$ (GHz/$\Phi_0$)', size=16)
 
+
 def super_residual(p):
     data = residual_Gamma(p)
     return data.astype(float)
@@ -1542,4 +1556,3 @@ def plot_gamma_fit(sensitivity, Gamma_phi_ramsey, Gamma_phi_echo,
     ax.set_xlabel(r'$|\partial f/\partial\Phi|$ (GHz/$\Phi_0$)')
     set_ylabel(ax, '$\Gamma_{\phi}$', 'Hz')
     ax.set_ylim(0, np.max(Gamma_phi_ramsey)*1.05)
-
