@@ -1111,30 +1111,11 @@ def Randomized_Benchmarking_seq_one_length(pulse_pars, RO_pars,
                 cl_seq,
                 gate_decomp=gate_decomposition)
 
-            # pulse_keys_list.append(pulse_keys)
-
             pulse_list = [pulses[x] for x in pulse_keys]
-            # print('\n',pulse_keys)
-            # a = [j for j in pulse_keys if 'Z' not in j]
-            # print(len(pulse_keys))
-            # print(len(a))
             pulse_list += [RO_pars]
-            # find index of first pulse in pulse_list that is not a Z pulse
-            # copy this pulse and set extra wait
-
-            # try:
-            #     first_x_pulse = next(j for j in pulse_list if 'Z' not in j['pulse_type'])
-            #     first_x_pulse_idx = pulse_list.index(first_x_pulse)
-            #     #print('first_x_pulse_idx = ', first_x_pulse_idx)
-            # except:
-            #     first_x_pulse_idx = 0
-            # pulse_list[first_x_pulse_idx] = deepcopy(pulse_list[first_x_pulse_idx])
-            # pulse_list[first_x_pulse_idx]['pulse_delay'] += post_msmt_delay
             el = multi_pulse_elt(i, station, pulse_list)
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-
-        # print(pulse_keys)
 
         # If the element is too long, add in an extra wait elt
         # to skip a trigger
@@ -1147,7 +1128,6 @@ def Randomized_Benchmarking_seq_one_length(pulse_pars, RO_pars,
         return seq, el_list
     else:
         return seq, el_list
-        # return pulse_keys_list
 
 
 def Freq_XY(freqs, pulse_pars, RO_pars,

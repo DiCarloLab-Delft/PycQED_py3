@@ -11,6 +11,7 @@ import pycqed.measurement.pulse_sequences.fluxing_sequences as fsqs
 import pycqed.measurement.detector_functions as det
 import pycqed.measurement.composite_detector_functions as cdet
 import pycqed.analysis.measurement_analysis as ma
+import pycqed.analysis.randomized_benchmarking_analysis as rbma
 import pycqed.analysis_v2.readout_analysis as ra
 import pycqed.analysis.tomography as tomo
 from pycqed.measurement.optimization import nelder_mead
@@ -832,6 +833,94 @@ def measure_tomography(qubits, prep_sequence, state_name, f_LO,
 
     return elts
 
+
+def measure_two_qubit_randomized_benchmarking(qb1, qb2, f_LO,
+                                              nr_cliffords_array,
+                                              nr_seeds_value,
+                                              CZ_pulse_name=None,
+                                              net_clifford=0,
+                                              nr_averages=1024,
+                                              clifford_decomposition_name='HZ',
+                                              interleaved_gate=None,
+                                              MC=None, UHFQC=None,
+                                              pulsar=None, label=None, run=True,
+                                              analyze_RB=True):
+
+    qb1n = qb1.name
+    qb2n = qb2.name
+    qubits = [qb1, qb2]
+
+    if label is None:
+        if interleaved_gate is None:
+            label = 'RB_{}_{}_seeds_{}_cliffords_{}{}'.format(
+                clifford_decomposition_name, nr_seeds_value,
+                nr_cliffords_array[-1], qb1n, qb2n)
+        else:
+            label = 'IRB_{}_{}_{}_seeds_{}_cliffords'.format(
+                interleaved_gate, clifford_decomposition_name, nr_seeds_value,
+                nr_cliffords_array[-1], qb1n, qb2n)
+
+    if UHFQC is None:
+        UHFQC = qb1.UHFQC
+        logging.warning("Unspecified UHFQC instrument. Using qb1.UHFQC.")
+    if pulsar is None:
+        pulsar = qb1.AWG
+        logging.warning("Unspecified pulsar instrument. Using qb1.AWG.")
+    if MC is None:
+        MC = qb1.MC
+        logging.warning("Unspecified MC object. Using qb1.MC.")
+
+    if CZ_pulse_name is None:
+        logging.warning('"CZ_pulse_name" is not specified. Using '
+                        '"CZ_pulse_name = CZ {} {}".'.format(qb2n, qb1n))
+        CZ_pulse_name = 'CZ ' + qb2n + ' ' + qb1n
+
+    for qb in qubits:
+        qb.RO_acq_averages(nr_averages)
+        qb.prepare_for_timedomain(multiplexed=True)
+
+    multiplexed_pulse(qubits, f_LO, upload=True)
+    operation_dict = get_multiplexed_readout_pulse_dictionary(qubits)
+
+    hard_sweep_points = np.arange(nr_seeds_value)
+    hard_sweep_func = awg_swf2.two_qubit_randomized_benchmarking_one_length(
+        qb1n=qb1n, qb2n=qb2n, operation_dict=operation_dict,
+        nr_cliffords_value=nr_cliffords_array[0],
+        CZ_pulse_name=CZ_pulse_name,
+        net_clifford=net_clifford,
+        clifford_decomposition_name=clifford_decomposition_name,
+        interleaved_gate=interleaved_gate,
+        upload=False)
+
+    soft_sweep_points = nr_cliffords_array
+    soft_sweep_func = awg_swf2.two_qubit_randomized_benchmarking_nr_cliffords(
+        two_qubit_RB_sweepfunction=hard_sweep_func)
+
+    MC.set_sweep_function(hard_sweep_func)
+    MC.set_sweep_points(hard_sweep_points)
+    MC.set_sweep_function_2D(soft_sweep_func)
+    MC.set_sweep_points_2D(soft_sweep_points)
+
+    correlations = [(qb1.RO_acq_weight_function_I(),
+                     qb2.RO_acq_weight_function_I())]
+
+    det_func = get_multiplexed_readout_detector_functions(
+        qubits, nr_averages=nr_averages, UHFQC=UHFQC, pulsar=pulsar,
+        correlations=correlations)['dig_corr_det']
+
+    MC.set_detector_function(det_func)
+    if run:
+        MC.run(label, mode='2D')
+        ma.MeasurementAnalysis(label=label, TwoD=True, close_file=True)
+
+        if analyze_RB:
+            rbma.Simultaneous_RB_Analysis(
+                qb_names=[qb1n, qb2n],
+                use_latest_data=True,
+                gate_decomp=clifford_decomposition_name,
+                add_correction=True)
+
+
 def measure_n_qubit_simultaneous_randomized_benchmarking(
         qubits, f_LO,
         nr_cliffords=None, nr_seeds=50,
@@ -977,7 +1066,7 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
 
         hard_sweep_points = np.arange(nr_seeds)
         hard_sweep_func = \
-            awg_swf2.two_qubit_Simultaneous_RB_fixed_length(
+            awg_swf2.n_qubit_Simultaneous_RB_fixed_length(
                 nr_seeds_array=np.arange(nr_seeds),
                 qubit_list=qubits, RO_pars=RO_pars,
                 nr_cliffords_value=nr_cliffords[0], CxC_RB=CxC_RB,
@@ -989,7 +1078,7 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
 
         soft_sweep_points = nr_cliffords
         soft_sweep_func = \
-            awg_swf2.two_qubit_Simultaneous_RB_sequence_lengths(
+            awg_swf2.n_qubit_Simultaneous_RB_sequence_lengths(
             n_qubit_RB_sweepfunction=hard_sweep_func)
 
     else:
@@ -1011,7 +1100,7 @@ def measure_n_qubit_simultaneous_randomized_benchmarking(
 
         # hard_sweep_points = np.arange(nr_seeds)
         hard_sweep_func = \
-            awg_swf2.two_qubit_Simultaneous_RB_fixed_length(
+            awg_swf2.n_qubit_Simultaneous_RB_fixed_length(
                 nr_seeds_array=np.arange(nr_seeds),
                 qubit_list=qubits, RO_pars=RO_pars,
                 nr_cliffords_value=nr_cliffords, CxC_RB=CxC_RB,

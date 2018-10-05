@@ -5,7 +5,8 @@ from pycqed.measurement.randomized_benchmarking.clifford_group import(
 import pycqed.measurement.randomized_benchmarking.two_qubit_clifford_group as tqc
 
 from pycqed.measurement.randomized_benchmarking.clifford_decompositions \
-    import (HZ_gate_decomposition, XY_gate_decomposition)
+    import (HZ_gate_decomposition, XY_gate_decomposition,
+            Five_primitives_decomposition)
 
 
 def calculate_net_clifford(cliffords):
@@ -192,6 +193,19 @@ def randomized_benchmarking_sequence(n_cl, desired_net_cl=0,
     rb_cliffords = np.append(rb_cliffords, recovery_clifford)
     return rb_cliffords
 
+
+def get_clifford_decomposition(decomposition_name: str):
+
+    if decomposition_name is 'HZ':
+        return HZ_gate_decomposition
+    elif decomposition_name is 'XY':
+        return XY_gate_decomposition
+    elif decomposition_name is '5Primitives':
+        return Five_primitives_decomposition
+    else:
+        raise ValueError('Specify a valid gate decomposition, "HZ", "XY",'
+                         'or "5Primitives".')
+
 ##############################################################################
 # New style RB sequences (using the hash-table method) compatible
 # with Clifford object.
@@ -232,6 +246,8 @@ def randomized_benchmarking_sequence_new(
     The old method exists to establish the equivalence between the two methods.
 
     """
+
+    # Define Clifford group
     if number_of_qubits == 1:
         Cl = tqc.SingleQubitClifford
         group_size = np.min([24, max_clifford_idx])
