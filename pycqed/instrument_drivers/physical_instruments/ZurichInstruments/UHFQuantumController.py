@@ -1045,7 +1045,7 @@ setTrigger(0);"""
         self.awg_string(string)
 
     def awg_update_waveform(self, index, data1, data2=None):
-        """Immideately updates the waveform with the given index.
+        """Immediately updates the waveform with the given index.
 
         The waveform in the waveform viewer in the LabOne web interface is not
         updated. If data for both AWG channels is given, then the lengths must
@@ -1107,6 +1107,94 @@ setTrigger(0);"""
                 np.arange(len(waveFiltered)) * f_RO_mod / f_sampling)
 
         self.awg_sequence_acquisition_and_pulse(Iwave, Qwave)
+
+    def awg_sequence_acquisition_and_pulse_SSB_CLEAR_pulse(
+            self, amp_base, length_total, delta_amp_segments, length_segments,
+            sampling_rate=2e8, delay=0, phase=0):
+        '''
+        Generates the envelope of a CLEAR pulse.
+            length_total in s
+            length_segments list of length 4 in s
+            amp_base in V
+            delta_amp_segments list of length 4 in V
+            sampling_rate in Hz
+            empty delay in s
+            phase in degrees
+        '''
+
+        if len(delta_amp_segments)==len( length_segments)==4:
+            pass
+        else:
+            raise ValueError('delta_amp_segments and length_segments need to be lists of length 4')
+
+
+        nr_samples = (length_total+delay)*sampling_rate
+        delay_samples = int(delay*sampling_rate)
+        pulse_samples = int(nr_samples - delay_samples)
+        segments_samples = list(map(lambda x: int(x*sampling_rate),length_segments))
+
+        amp_pulse=np.concatenate(((np.ones(segments_samples[0])*(amp_base+delta_amp_segments[0])),
+                                  (np.ones(segments_samples[2])*(amp_base+delta_amp_segments[1])),
+                                  (np.ones(pulse_samples-sum(segments_samples))*amp_base),
+                                  (np.ones(segments_samples[2])*(amp_base+delta_amp_segments[2])),
+                                  (np.ones(segments_samples[3])*(amp_base+delta_amp_segments[3]))))
+        amp_I=amp_pulse*np.cos(phase*2*np.pi/360)
+        amp_Q=amp_pulse*np.sin(phase*2*np.pi/360)
+        block_I = amp_I * np.ones(pulse_samples)
+        block_Q = amp_Q * np.ones(pulse_samples)
+        Zeros = np.zeros(delay_samples)
+        pulse_I = list(Zeros)+list(block_I)
+        pulse_Q = list(Zeros)+list(block_Q)
+        self.awg_sequence_acquisition_and_pulse(pulse_I, pulse_Q)
+
+
+    def awg_sequence_acquisition_and_pulse_SSB_gauss_CLEAR_pulse(self,amp_base, length_total, delta_amp_segments, length_segments,
+                          gauss_amp, sigma, sampling_rate=2e8, delay=0, phase=0):
+        '''
+        Generates the envelope of a gaussian filtered CLEAR pulse.
+            length_total in s
+            length_segments list of length 4 in s
+            amp_base in V
+            delta_amp_segments list of length 4 in V
+            gauss_amp in V
+            sigma in s
+            sampling_rate in Hz
+            empty delay in s
+            phase in degrees
+        '''
+
+        if len(delta_amp_segments)==len( length_segments)==4:
+            pass
+        else:
+            raise ValueError('delta_amp_segments and length_segments need to be lists of length 4')
+
+
+        nr_samples = (length_total+delay)*sampling_rate
+        delay_samples = int(delay*sampling_rate)
+        pulse_samples = int(nr_samples - delay_samples)
+        segments_samples = list(map(lambda x: int(x*sampling_rate),length_segments))
+
+        amp_pulse=np.concatenate(((np.ones(segments_samples[0])*(amp_base+delta_amp_segments[0])),
+                                  (np.ones(segments_samples[2])*(amp_base+delta_amp_segments[1])),
+                                  (np.ones(pulse_samples-sum(segments_samples))*amp_base),
+                                  (np.ones(segments_samples[2])*(amp_base+delta_amp_segments[2])),
+                                  (np.ones(segments_samples[3])*(amp_base+delta_amp_segments[3]))))
+
+
+        gaussian=gauss_amp*np.exp(-0.5*np.square(((np.linspace(0,length_total, pulse_samples))
+                                                  -length_total/2)/sigma))
+
+        amp_pulse=np.convolve(amp_pulse,gaussian,mode='same')
+
+
+        amp_I=amp_pulse*np.cos(phase*2*np.pi/360)
+        amp_Q=amp_pulse*np.sin(phase*2*np.pi/360)
+        block_I = amp_I * np.ones(pulse_samples)
+        block_Q = amp_Q * np.ones(pulse_samples)
+        Zeros = np.zeros(delay_samples)
+        pulse_I = list(Zeros)+list(block_I)
+        pulse_Q = list(Zeros)+list(block_Q)
+        self.awg_sequence_acquisition_and_pulse(pulse_I, pulse_Q)
 
     def upload_transformation_matrix(self, matrix):
         for i in range(np.shape(matrix)[0]):  # looping over the rows
