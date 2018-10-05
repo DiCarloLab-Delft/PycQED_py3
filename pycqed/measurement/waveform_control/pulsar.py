@@ -365,18 +365,18 @@ class HDAWG8Pulsar:
                         # thus it would be better to restructure the code
                         # and hash before evaluating numerically - JH
                         wfhashable = tuple(cid_wf)
-                        # if wfhashable in unique_waveforms:
-                        #     # we already have such a waveform
-                        #     wf_name_map[wfname] = \
-                        #         unique_waveforms[wfhashable]
-                        # else:
-                        #     # new waveform for this subAWG
-                        #     unique_waveforms[wfhashable] = wfname
-                        #     wf_name_map[wfname] = wfname
+                        if wfhashable in unique_waveforms:
+                            # we already have such a waveform
+                            wf_name_map[wfname] = \
+                                unique_waveforms[wfhashable]
+                        else:
+                            # new waveform for this subAWG
+                            unique_waveforms[wfhashable] = wfname
+                            wf_name_map[wfname] = wfname
 
-                        # add all waveforms
-                        unique_waveforms[wfname] = wfhashable
-                        wf_name_map[wfname] = wfname
+                        # # add all waveforms
+                        # unique_waveforms[wfname] = wfhashable
+                        # wf_name_map[wfname] = wfname
 
                         if len(cid_wf) > 0 and cid_wf[0] != 0.:
                             elements_with_non_zero_first_points.append(el)
@@ -463,8 +463,8 @@ class HDAWG8Pulsar:
             awg_str = header + waveform_table + main_loop + footer
 
             # write the waveforms to csv files
-            # for data, wfname in unique_waveforms.items():
-            for wfname, data in unique_waveforms.items():
+            for data, wfname in unique_waveforms.items():
+            # for wfname, data in unique_waveforms.items():
                 obj._write_csv_waveform(simplify_name(wfname), np.array(data))
 
             print("Programming {} vawg{} sequence '{}' ({} "

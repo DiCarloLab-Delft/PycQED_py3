@@ -1053,7 +1053,7 @@ class ziShellDevice:
             # Success is set to False when either a timeout or a bad compilation
             # message is encountered.
             success = True
-            # while ("compilation not completft1ed"):
+            # while ("compilation not completed"):
             while len(self.awgModule.get('awgModule/compiler/sourcestring')
                       ['compiler']['sourcestring'][0]) > 0:
                 time.sleep(0.01)
@@ -1069,45 +1069,53 @@ class ziShellDevice:
             if not comp_msg.endswith(succes_msg):
                 success = False
 
-            # print('Reenabling codeword triggering')
-            # self.seti('awgs/' + str(awg_nr) + '/dio/valid/polarity', 2)
-            # self.seti('awgs/' + str(awg_nr) + '/dio/strobe/slope', 2)
-
-            if not success:
-                print(repr(program_string))
-                for i in range(5):
-                    self.awgModule.set('awgModule/compiler/sourcestring',
-                                       program_string + ''.join(i*[' ']))
-                    while len(self.awgModule.get('awgModule/compiler/sourcestring')
-                              ['compiler']['sourcestring'][0]) > 0:
-                        time.sleep(0.01)
-                        comp_msg = (self.awgModule.get(
-                            'awgModule/compiler/statusstring')['compiler']
-                                    ['statusstring'][0])
-                        if (time.time()-t0 >= timeout):
-                            success = False
-                            # print('Timeout encountered during compilation.')
-                            raise TimeoutError()
-                            break
-
-                        if comp_msg.endswith(succes_msg):
-                            success = True
-                            break
-
-                # if not comp_msg.endswith(succes_msg):
-                if not success:
-                    print("Compilation failed, printing program:")
-                    for i, line in enumerate(program_string.splitlines()):
-                        print(i+1, '\t', line)
-                    print('\n')
-                    raise ziShellCompilationError(comp_msg)
+            # # print('Reenabling codeword triggering')
+            # # self.seti('awgs/' + str(awg_nr) + '/dio/valid/polarity', 2)
+            # # self.seti('awgs/' + str(awg_nr) + '/dio/strobe/slope', 2)
+            #
+            # if not success:
+            #     print(repr(program_string))
+            #     for i in range(5):
+            #         self.awgModule.set('awgModule/compiler/sourcestring',
+            #                            program_string + ''.join(i*[' ']))
+            #         while len(self.awgModule.get('awgModule/compiler/sourcestring')
+            #                   ['compiler']['sourcestring'][0]) > 0:
+            #             time.sleep(0.01)
+            #             comp_msg = (self.awgModule.get(
+            #                 'awgModule/compiler/statusstring')['compiler']
+            #                         ['statusstring'][0])
+            #             if (time.time()-t0 >= timeout):
+            #                 success = False
+            #                 # print('Timeout encountered during compilation.')
+            #                 raise TimeoutError()
+            #                 break
+            #
+            #             if comp_msg.endswith(succes_msg):
+            #                 success = True
+            #                 break
+            #
+            #     # if not comp_msg.endswith(succes_msg):
+            #     if not success:
+            #         print("Compilation failed, printing program:")
+            #         for i, line in enumerate(program_string.splitlines()):
+            #             print(i+1, '\t', line)
+            #         print('\n')
+            #         raise ziShellCompilationError(comp_msg)
 
             print('Reenabling codeword triggering')
             self.seti('awgs/' + str(awg_nr) + '/dio/valid/polarity', 2)
             self.seti('awgs/' + str(awg_nr) + '/dio/strobe/slope', 2)
 
+            # if not comp_msg.endswith(succes_msg):
+            if not success:
+                print("Compilation failed, printing program:")
+                for i, line in enumerate(program_string.splitlines()):
+                    print(i+1, '\t', line)
+                print('\n')
+                raise ziShellCompilationError(comp_msg)
 
-        # This check (and while loop) is added as a workaround for #9
+
+                # This check (and while loop) is added as a workaround for #9
             if self.geti('awgs/'+str(awg_nr)+'/ready')!= 1:
                 logging.warning('AWG not ready')
                 success_and_ready = False
