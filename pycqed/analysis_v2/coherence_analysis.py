@@ -142,17 +142,19 @@ class CoherenceAnalysis(ba.BaseDataAnalysis):
             self.fit_res['gammas'].params['slope_ramsey'].value
         pdd['slope_echo'] = self.fit_res['gammas'].params['slope_echo'].value
         # The intercept with the y-axis (zero sensitivity) relates to the
-        # white noise contribution to the spectrum. The white noise
+        # flux insensitive contribution to the spectrum. The flux insensitive
         # contribution can be linked to the photon number in the resonator.
+        # White noise shows up as a quadratic
         pdd['intercept'] = self.fit_res['gammas'].params['intercept'].value
 
-        # Martinis PRB 2003
-        # Not able to understand what these magic numbers mean from
-        # the paper.
+        # Based on Martinis PRB 2003. Magic numbers are found by evaluating
+        # integral of eq. 10 with different filter spectra.
+        # filter spectrum of Ramsey is described in eq. 11, Echo in eq. 35
+        # Note that magic numbers are for *single* sided PSDs.
         pdd['sqrtA_rams'] = pdd['slope_ramsey']/(np.pi*np.sqrt(30))
         pdd['sqrtA_echo'] = pdd['slope_echo']/(np.pi*np.sqrt(1.386))
-        # Note: these are two methods that are expected to give the
-        # same number.
+        # Note: both methods that are expected to give the same number.
+        # More details can be found in Luthi PRL (2018) and month report M11
 
         # from white noise
         # using Eq 5 in Nat. Comm. 7,12964 (The flux qubit revisited to enhance
