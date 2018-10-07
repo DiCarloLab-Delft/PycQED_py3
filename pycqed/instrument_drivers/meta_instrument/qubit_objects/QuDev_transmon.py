@@ -1633,7 +1633,7 @@ class QuDev_transmon(Qubit):
             MC.run(name='drive_carrier_calibration' + self.msmt_suffix)
             self.AWG.stop()
             a = ma.OptimizationAnalysisNN(label='drive_carrier_calibration',
-                                          meas_grid=meas_grid,
+                                          meas_grid=meas_grid.T,
                                           estimator=est,
                                           hyper_parameter_dict=hyper_parameter_dict,
                                           round=runs,make_fig=make_fig)
@@ -1875,7 +1875,7 @@ class QuDev_transmon(Qubit):
 
             a = ma.OptimizationAnalysisNN(label='drive_skewness_calibration',
                                       hyper_parameter_dict=hyper_parameter_dict,
-                                      meas_grid=meas_grid,
+                                      meas_grid=meas_grid.T,
                                       estimator=est,
                                       two_rounds = two_rounds,
                                       round=runs,make_fig=make_fig)

@@ -20,6 +20,7 @@ import pylab
 from pycqed.analysis.tools import data_manipulation as dm_tools
 import importlib
 import math
+from time import time
 
 try:
     import pygsti
@@ -1099,7 +1100,7 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
             self.abs_vals = np.sqrt(self.measured_values[0,:]**2 + self.measured_values[1,:]**2)
         result,est,opti_flag\
                                   = opt.neural_network_opt(None, self.meas_grid,
-                                      self.abs_vals,
+                                      np.array([self.abs_vals]).T,
                                       estimator=self.estimator_name,
                                       hyper_paramter_dict=self.hyper_parameter_dict)
         #test_grid and test_target values. Centered and scaled to [-1,1] since
@@ -10223,7 +10224,7 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
             np.array([self.data[2], self.data[3]]))
         if fit_range is None:
             i_start = 0
-            i_end = length_single*len(self.sweep_points_2D)
+            i_end = length_single*len(self.sweep_points_2D) ##should work
         else:
             i_start = length_single*fit_range[0]
             i_end = length_single*fit_range[1]
@@ -10607,6 +10608,130 @@ class Fluxpulse_Ramsey_2D_Analysis_new(MeasurementAnalysis):
             return phase_list
 
 
+class OptimizationAnalysis_Predictive2D:
+
+    def __init__(self,training_grid : np.ndarray ,
+                 target_values : np.ndarray,
+                 ma : MeasurementAnalysis,
+                 estimator='GRNN_neupy',
+                 hyper_parameter_dict=None,
+                 **kw):
+        self.x_init = kw.pop('x_init',None)
+        self.ma = ma
+        self.save_folder = ma.folder
+        self.time_stamp = ma.timestamp_string
+        self.training_grid = training_grid
+        self.target_values = target_values
+        self.output_dim = target_values.ndim
+        if self.training_grid.ndim == 1:
+            self.training_grid.shape = (np.size(self.training_grid),
+                                        self.training_grid.ndim)
+        if self.output_dim == 1:
+            self.target_values.shape = (np.size(self.target_values),
+                                        self.output_dim)
+        self.estimator_name = estimator
+        self.hyper_parameter_dict = hyper_parameter_dict
+        print('OptimizationAnalysis_Predictive initialized.')
+        print('Measurement Type: ',ma.measurementstring)
+        print('Estimator type: ',self.estimator_name)
+        t0 = time()
+        self.train_and_minimize()
+        t1 = time()
+        print('Fitting estimator completed in %.2g sec. \nCreating plots...'\
+              %(t1-t0))
+        self.make_figures()
+        print('Plots created and saved.')
+    def train_and_minimize(self):
+
+        result,est,opti_flag \
+            = opt.neural_network_opt(None, self.training_grid,self.target_vals,
+                                     estimator=self.estimator_name,
+                                     hyper_paramter_dict=self.hyper_parameter_dict,
+                                     x_ini=self.x_init)
+        self.opti_flag = opti_flag
+        self.estimator = est
+        self.optimization_result = result
+
+        return result,est
+
+    def make_figures(self,**kw):
+        fontsize = kw.pop('label_fontsize',16.)
+        try:
+            optimization_method = self.ma.data_file['Instrument settings'] \
+                ['MC'].attrs['optimization_method']
+        except:
+            optimization_method = 'Numerical'
+
+        pre_proc_dict = self.estimator.pre_proc_dict
+        output_scale = pre_proc_dict.get('output',{}).get('scaling',1.)
+        output_means = pre_proc_dict.get('output',{}).get('centering',0.)
+        input_scale = pre_proc_dict.get('input',{}).get('scaling',1.)
+        input_means = pre_proc_dict.get('input',{}).get('centering',0.)
+
+        #Create data grid for contour plot in case of more than 3 sweep variables,
+        #contour plots are only created for the first two variables, one plot for
+        #each output variable.
+        lower_x = np.min(self.training_grid[:,0])-np.std(self.training_grid[:,0])
+        upper_x = np.max(self.training_grid[:,0])-np.std(self.training_grid[:,0])
+        lower_y = np.min(self.training_grid[:,1])-np.std(self.training_grid[:,1])
+        upper_y = np.max(self.training_grid[:,1])-np.std(self.training_grid[:,1])
+        x_mesh = (np.linspace(lower_x,upper_x,200)-input_means[0])/input_scale[0]
+        y_mesh = (np.linspace(lower_y,upper_y,200)-input_means[1])/input_scale[1]
+        Xm,Ym = np.meshgrid(x_mesh,y_mesh)
+        Zm = np.zeros((self.output_dim,200,200))
+        for k in range(np.size(x_mesh)):
+            for l in range(np.size(y_mesh)):
+                pred = self.estimator.predict([[Xm[k,l],Ym[k,l]]])
+                for j in range(self.output_dim):
+                    Zm[j,k,l] = pred[j]*output_scale[j]+output_means[j]
+        Xm = Xm*input_scale[0] + input_means[0]
+        Ym = Ym*input_scale[1] + input_means[1]
+
+
+        reminder = self.output_dim % 2
+        div = int(self.output_dim/2.)
+        fig = plt.figure(figsize=(20,(reminder+div)*6))
+        plt_grid = plt.GridSpec(div+reminder,2,hspace=0.5,wspace=0.4)
+        textstr = 'Optimization converged to: \n'
+        base_figname = 'predictive optimization of '
+        for it in range(len(self.ma.parameter_names)):
+            textstr+='%s: %.3g %s' % (self.ma.parameter_names[it],
+                                      self.optimization_result[it],
+                                      self.ma.parameter_units[it])
+            textstr+='\n'
+            base_figname += self.ma.parameter_names[it]+'_'
+        textstr+='Empirical error: '+'%.2f' % ((1.-self.estimator.score)*100.) +'%'
+        figname = self.ma.timestamp_string+' '
+        figname += self.estimator_name+' fitted landscape'
+        savename = self.ma.timestamp_string + '_' + base_figname
+        for it in range(div+reminder):
+            for jt in range(2):
+                tot = it+jt
+                if reminder and it == (div+reminder-1) and jt == 1:
+                    continue
+                ax = plt.subplot(plt_grid[it,jt])
+                if it == 0 and jt == 0:
+                    ax.text(0.98, 0.05, textstr,
+                            transform=ax.transAxes,
+                            fontsize=11, verticalalignment='bottom',
+                            horizontalalignment='right',
+                            bbox=dict(facecolor='white',edgecolor='None',
+                            alpha=0.75, boxstyle='round'))
+                levels = np.linspace(np.min(Zm[tot]),np.max(Zm[tot]),20)
+                CP = ax.contourf(Xm,Ym,Zm[tot],levels,extend='both')
+                ax.scatter(self.optimization_result[0],self.optimization_result[1],
+                            marker='o',c='white',label='network minimum')
+                ax.scatter(self.training_grid[:,0],self.training_grid[:,1],
+                            marker='o',c='r',label='training data',s=10)
+                ax.tick_params(axis='both',which='minor',labelsize=14)
+                ax.set_ylabel(self.ma.parameter_labels[1],fontsize=fontsize)
+                ax.set_xlabel(self.ma.parameter_labels[0],fontsize=fontsize)
+                cbar = plt.colorbar(CP,ax=ax,orientation='vertical')
+                cbar.ax.set_ylabel(self.ma.ylabels[tot],fontsize=fontsize)
+                ax.legend(loc='upper left',framealpha=0.75,fontsize=fontsize)
+                ax.set_title('{} fitted landscape'.format(self.ma.ylabels[tot]))
+        fig.suptitle(figname,fontsize=16.)
+        self.ma.save_fig(fig,figname=savename,**kw)
 
 class Dynamic_phase_Analysis(MeasurementAnalysis):
 

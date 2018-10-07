@@ -5,7 +5,7 @@ from pycqed.analysis import machine_learning_toolbox as ml
 
 from sklearn.model_selection import GridSearchCV as gcv, train_test_split
 
-from scipy.optimize import fmin_l_bfgs_b
+from scipy.optimize import fmin_l_bfgs_b,fmin
 
 def nelder_mead(fun, x0,
                 initial_step=0.1,
@@ -242,7 +242,7 @@ def SPSA(fun, x0,
     fun(res[0][0])
     return res[0]
 
-def center_and_scale(X,y):
+def center_and_scale(X_in,y_in):
     '''
     Preprocessing of Data. Mainly transform the data to mean 0 and interval [-1,1]
     :param X: training data list of parameters (each equally long)
@@ -255,6 +255,19 @@ def center_and_scale(X,y):
         :input_feature_ext: abs(max-min) of initial training data parameters
         :output_feature_ext: abs(max-min) of initial validation data parameters
     '''
+    if not isinstance(X_in,np.ndarray):
+        X_in = np.array(X_in)
+    if X_in.ndim == 1:
+        X_in.shape = (np.size(X_in),X_in.ndim)
+        #X_in.reshape((np.size(X_in),X_in.ndim))
+    if not isinstance(y_in,np.ndarray):
+        y_in= np.array(y_in)
+    if y_in.ndim == 1:
+        #y_in.reshape((np.size(y_in),y_in.ndim))
+        y_in.shape = (np.size(y_in),y_in.ndim)
+
+    X = copy.deepcopy(X_in)
+    y = copy.deepcopy(y_in)
     input_feature_means = np.zeros(np.size(X,1))       #saving means of training
     output_feature_means = np.zeros(np.size(y,1))     #and target features
     input_feature_ext= np.zeros(np.size(X,1))
@@ -281,11 +294,11 @@ def center_and_scale(X,y):
         y /= output_feature_ext   #rescale to [-1,1]
     else:
         for it in range(np.size(y,1)):
-            output_feature_means[it]= np.mean(y)
-            output_feature_ext[it] = np.max(y) \
-                                     -np.min(y)
-            y -= output_feature_means[it] #offset to mean 0
-            y /= output_feature_ext[it]   #rescale to [-1,1]
+            output_feature_means[it]= np.mean(y[:,it])
+            output_feature_ext[it] = np.max(y[:,it]) \
+                                     -np.min(y[:,it])
+            y[:,it] -= output_feature_means[it] #offset to mean 0
+            y[:,it] /= output_feature_ext[it]   #rescale to [-1,1]
     return X,y,\
            input_feature_means,input_feature_ext,\
            output_feature_means,output_feature_ext
@@ -293,31 +306,26 @@ def center_and_scale(X,y):
 
 def neural_network_opt(fun, training_grid, target_values = None,
                        estimator='GRNN_neupy',hyper_parameter_dict=None,
-                       test_size=0.1,
+                       x_init = None,
                        **kwargs):
     """
     parameters:
-        fun:           Function that can be used to get data points
+        fun:           Function that can be used to get data points if None,
+                       target_values have to be provided instead.
         training_grid: The values on which to train the Neural Network. It
                        contains features as column vectors of length as the
                        number of datapoints in the training set.
         target_values: The target values measured during data acquisition by a
                        hard sweep over the traning grid.
-        hidden_layers: List of tuples containing the number of units for every
-                            hidden layer of the network. E.g (5,5) would be a
-                            network with two hidden layers with 5 units each.
-                            Crossvalidation is used to determine the best
-                            network architecture within this list.
-
-        alphas: List of values for the learning parameter alpha (learning rate)
-        beta: L1 regularization factor for tensorflow NN implementation. If 0, no
-              regularization will be used.
-        gamma: multiplier for the standard deviation used in the neupy GRNN estimator.
-               Gamma=1 refers to the regular standard deviation,
-               Gamma=2 to 2*sigma, ect.
-        solver: optimization function used for the gradient descent during the
-                learning process. 'adam' is the default solver of MLPRegressor
-
+        estimator: The estimator used to model the function mapping the
+                   training_grid on the target_values.
+        hyper_parameter_dict: if None, the default hyperparameters
+                              of the selected estimator are used. Should contain
+                              estimator dependent hyperparameters such as hidden
+                              layer sizes for a neural network. See
+                              <machine_learning_toolbox> for specific
+                              information on available estimators.
+        x_ini: Initial values for the minimization of the fitted function.
     output:
         optimal points where network is minimized.
         est: estimator instance representing the trained model. Consists of a
@@ -327,20 +335,14 @@ def neural_network_opt(fun, training_grid, target_values = None,
     ###############################################################
     ###          create measurement data from test_grid         ###
     ###############################################################
-    n_fold = hyper_parameter_dict.get('cv_n_fold',5)
-    training_grid = np.transpose(training_grid)
-    #get input dimension, training grid contains parameters as row!! vectors
+    #get input dimension, training grid contains parameters as row(!!) vectors
     if len(np.shape(training_grid)) == 1:
         training_grid = np.transpose(np.array([training_grid]))
     n_samples = np.size(training_grid,0)
     n_features = np.size(training_grid,1)
 
-    # np.size(training_grid,1)
-
     if fun is None:
-        target_values = np.transpose(np.array([target_values]))
         output_dim = np.size(target_values,1)
-
     else:
         #if the sweep is adaptive, acquire data points by applying fun
         first_value = fun(training_grid[0])
@@ -351,15 +353,10 @@ def neural_network_opt(fun, training_grid, target_values = None,
             target_values[i,:]=fun(training_grid[i])
 
     #Preprocessing of Data. Mainly transform the data to mean 0 and interval [-1,1]
-    training_grid,target_values,\
+    training_grid_centered,target_values_centered,\
     input_feature_means,input_feature_ext,\
     output_feature_means,output_feature_ext \
                  = center_and_scale(training_grid,target_values)
-
-    # training_grid, test_grid,target_values,test_values = \
-    #                                     train_test_split(training_grid,target_values,
-    #                                                      test_size=test_size)
-
 
     #Save the preprocessing information in order to be able to rescale the values later.
     pre_processing_dict ={'output': {'scaling': output_feature_ext,
@@ -376,7 +373,7 @@ def neural_network_opt(fun, training_grid, target_values = None,
                                       output_dim=output_dim,
                                       n_feature=n_samples,
                                       pre_proc_dict=pre_processing_dict)
-        est.fit(training_grid, np.ravel(target_values))
+        est.fit(training_grid_centered, np.ravel(target_values_centered))
         est.print_best_params()
         return est
 
@@ -385,20 +382,20 @@ def neural_network_opt(fun, training_grid, target_values = None,
                                output_dim=output_dim,
                                n_feature=n_features,
                                pre_proc_dict=pre_processing_dict)
-        est.fit(training_grid,target_values)
+        est.fit(training_grid_centered,target_values_centered)
         return est
 
     def grnn():
         est = ml.GRNN_neupy(hyper_parameter_dict,
                             pre_proc_dict=pre_processing_dict)
         cv_est = ml.CrossValidationEstimator(hyper_parameter_dict,est)
-        cv_est.fit(training_grid,target_values)
+        cv_est.fit(training_grid_centered,target_values_centered)
         return cv_est
 
     def polyreg():
         est = ml.Polynomial_Regression(hyper_parameter_dict,
                                        pre_proc_dict=pre_processing_dict)
-        est.fit(training_grid,target_values)
+        est.fit(training_grid_centered,target_values_centered)
         return est
 
     estimators = {'MLP_Regressor_scikit': mlpr, #defines all current estimators currently implemented
@@ -409,16 +406,27 @@ def neural_network_opt(fun, training_grid, target_values = None,
     est = estimators[estimator]()       #create and fit instance of the chosen estimator
 
     def estimator_wrapper(X):
-        return est.predict([X])
+        pred = est.predict([X])
+        if output_dim==1.:
+            return pred
+        else:
+            pred = pred[0]
+            norm = 0.
+            for it in len(pred):
+                norm += pred[it]**2
+            return np.sqrt(norm)
     ###################################################################
     ###     perform gradient descent to minimize modeled landscape  ###
     ###################################################################
-    x_ini = np.zeros(n_features)
-    #The data is centered. No values above -1,1 should be encountered
-    bounds=[(-1.,1.) for i in range(n_features)]
-    #minimize network predictor with on bounded set, approximate gradient
-    res = fmin_l_bfgs_b(estimator_wrapper, x_ini,bounds=bounds,approx_grad=True)
-    result = res[0]
+    if x_init is None:
+        x_init = np.zeros(n_features)
+        #The data is centered. No values above -1,1 should be encountered
+        bounds=[(-1.,1.) for i in range(n_features)]
+        res = fmin_l_bfgs_b(estimator_wrapper, x_init,bounds=bounds,
+                            approx_grad=True)
+    else:
+        res = fmin(estimator_wrapper,x_init,full_output=True)
+        result = res[0]
     opti_flag = True
     for it in range(n_features):
         if not opti_flag:
@@ -428,13 +436,16 @@ def neural_network_opt(fun, training_grid, target_values = None,
     if not opti_flag:
         print('optimization most likely failed. Results outside 2-sigma surrounding'
               'of at least one data feature mean value! Values will still be updated.')
-    amp = res[1]
     #Rescale values
-    for it in range(output_dim):
-         amp[it]=amp[it]* output_feature_ext[it] + output_feature_means[it]
+    amp = est.predict(result)
+    if output_dim==1.:
+        amp = amp*output_feature_ext+output_feature_means
+    else:
+        for it in range(output_dim):
+            amp[it] = amp[it]*output_feature_ext[it]+output_feature_ext[it]
     for it in range(n_features):
         result[it] = result[it]*input_feature_ext[it]+input_feature_means[it]
-    print('minimization results: ',result,'::',amp)
+    print('minimization results: ',result,' :: ',amp)
 
     return np.array(result), est,opti_flag
 

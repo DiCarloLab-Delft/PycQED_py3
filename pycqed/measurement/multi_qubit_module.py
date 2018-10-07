@@ -1393,13 +1393,9 @@ def cphase_gate_tuneup_predictive(qbc, qbt, qbr,n_meas,flux_lengths=None,
         logging.warning('\n No hyperparameters passed to predictive mixer '
                         'calibration routine. Default values for the estimator'
                         'will be used!\n')
-        hyper_paramter_dict={'hidden_layers':[10],
-                             'learning_rate': 1e-3,
-                             'regularization_coefficient': 0.,
-                             'std_scaling':0.6,
-                             'learning_steps':5000,
-                             'cv_n_fold':5,
-                             'polynomial_dimension':2}
+        hyper_paramter_dict={'cv_n_fold':10,
+                             'std_scaling':[0.45,0.13]
+                             }
     if MC is None:
         MC= qbc.MC
     if flux_lengths is None:
@@ -1407,13 +1403,23 @@ def cphase_gate_tuneup_predictive(qbc, qbt, qbr,n_meas,flux_lengths=None,
     if flux_amps is None:
         flux_amps = np.random.normal(0.1325,0.003,n_meas)
 
-    cphases, population_losses = measure_cphase_new2(qbc,qbt,qbr,
+    cphases, population_losses, ma_ram2D = measure_cphase_new(qbc,qbt,qbr,
                                                      flux_lengths,flux_amps,
                                                      return_population_loss=True,
                                                      plot=False,MC=MC)
-
-
-    a_pred = ma.Cphase_Predictive_Analysis(...) ##Not implemented
+    target_phases = (cphases/(np.pi)) % 2
+    target_phases =np.abs(target_phases-1.)
+    target_pops = 1.-np.abs(population_losses)
+    target_norm = np.sqrtt(target_phases**2+target_pops**2)
+    min_ind = np.argmin(target_norm)
+    x_ini = [flux_lengths[min_ind],flux_amps[min_ind]]
+    training_grid = np.array([flux_lengths,flux_amps]).T
+    target_values = np.array([target_pops,target_phases]).T
+    ##continue here
+    a_pred = ma.OptimizationAnalysis_Predictive2D(training_grid,target_values,
+                                    ma_ram2D,
+                                    hyper_parameter_dict=hyper_parameter_dict,
+                                                  )
     pulse_length_best_value = a_pred.optimization_result[0]
     pulse_amplitude_best_value = a_pred.optimization_result[1]
 
@@ -1853,7 +1859,7 @@ def measure_cphase_new( qbc, qbt, qbr, amps, lengths,
                                                 operation_dict,
                                                 max_flux_length,
                                                 cal_points=cal_points,
-                                                reference_measurements=False, #########################
+                                                reference_measurements=True,
                                                 upload=upload)
     s2 = awg_swf.Flux_pulse_CPhase_soft_swf(s1,sweep_param='amplitude',
                                                   upload=upload)
@@ -1873,8 +1879,10 @@ def measure_cphase_new( qbc, qbt, qbr, amps, lengths,
     MC.run_2D('CPhase_measurement_{}_{}'.format(qbc.name,qbt.name))
 
     t1 = time.time()
-    print('Routine 1 with ',len(amps)*len(phases),' sweeppoints in T=',t1-t0,' s.')
-    return t1-t0
+    print('Measured Cphases with ',
+          len(amps)*len(phases),
+          ' sweeppoints in T=',t1-t0,' s.')
+
     # ma.TwoD_Analysis(close_file=True)
     flux_pulse_ma = ma.Fluxpulse_Ramsey_2D_Analysis_new(
         label='CPhase_measurement_{}_{}'.format(qbc.name,qbt.name),
@@ -1894,6 +1902,7 @@ def measure_cphase_new( qbc, qbt, qbr, amps, lengths,
     #
     pop_loss = np.abs(fitted_amps_ground - fitted_amps_exited) \
                /fitted_amps_ground
+    return cphases, pop_loss, flux_pulse_ma
 
     # cphase_all.append(cphases[0])
     # population_loss_all.append(pop_loss[0])

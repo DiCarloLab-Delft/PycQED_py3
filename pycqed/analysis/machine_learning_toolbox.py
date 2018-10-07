@@ -371,12 +371,14 @@ class GRNN_neupy(Estimator):
     def fit(self,x_train,y_train):
         if not isinstance(x_train,np.ndarray):
             x_train = np.array(x_train)
-            if x_train.ndim == 1:
-                x_train.reshape((np.size(x_train),x_train.ndim))
+        if x_train.ndim == 1:
+            x_train.shape = (np.size(x_train),x_train.ndim)
+            #x_train.reshape((np.size(x_train),x_train.ndim))
         if not isinstance(y_train,np.ndarray):
             y_train = np.array(y_train)
-            if y_train.ndim == 1:
-                y_train.reshape((np.size(y_train),y_train.ndim))
+        if y_train.ndim == 1:
+            #y_train.reshape((np.size(y_train),y_train.ndim))
+            y_train.shape = (np.size(y_train),y_train.ndim)
         if len(self._gamma) != y_train.ndim:
             logging.warning('Hyperparameter gamma contains only '
                             +str(len(self._gamma))+
@@ -388,29 +390,32 @@ class GRNN_neupy(Estimator):
 
         if self._std is None:
             std_x = 0.
-            for it in range(x_train.ndim):
+            for it in range(np.shape(x_train)[1]):
                 std_x += np.std(x_train[:,it])
             self._std = std_x/x_train.ndim
         self._grnn = []
-        for it in range(y_train.ndim):
+        for it in range(np.shape(y_train)[1]):
             new_grnn =grnn(std=self._gamma[it]*self._std)
             print('GRNN initialized with std: ',self._std)
             new_grnn.train(x_train,y_train[:,it])
             self._grnn.append(new_grnn)
 
     def predict(self,samples):
-
         if not isinstance(samples,np.ndarray):
             samples = np.array(samples)
-        predictions = []
+        predictions = np.zeros((np.shape(samples)[0],len(self._grnn)))
         for it in range(len(self._grnn)):
-            predictions.append(self._grnn[it].predict(samples))
+            pred = self._grnn[it].predict(samples)
+#            print('pred: ',np.reshape(pred,(len(pred),)))
+            predictions[:,it] = np.reshape(pred,(len(pred),))
+            if np.shape(samples)[0] == 1.:  #unwrap output if single sample
+                predictions=predictions[0]
         return predictions
 
     def evaluate(self,x,y):
         pred = self.predict(x)
-        print('Pred: ',pred,'\n')
-        print('Y: ',y,'\n')
+ #       print('Pred: ',pred,'\n')
+ #       print('Y: ',y,'\n')
         self.score = 1. - np.linalg.norm(pred-y)**2 \
                    / np.linalg.norm(y-np.mean(y,axis=0))**2
         return self.score
@@ -446,12 +451,16 @@ class CrossValidationEstimator(Estimator):
     def fit(self,x_train,y_train):
         if not isinstance(x_train,np.ndarray):
             x_train = np.array(x_train)
-            if x_train.ndim == 1:
-                x_train.reshape((np.size(x_train),x_train.ndim))
+        if x_train.ndim == 1:
+            print(x_train.ndim)
+            x_train.shape = (np.size(x_train),x_train.ndim)
+            #x_train.reshape((np.size(x_train),x_train.ndim))
+            print(x_train)
         if not isinstance(y_train,np.ndarray):
             y_train = np.array(y_train)
-            if y_train.ndim == 1:
-                y_train.reshape((np.size(y_train),y_train.ndim))
+        if y_train.ndim == 1:
+            y_train.shape = (np.size(y_train),y_train.ndim)
+        #   y_train.reshape((np.size(y_train),y_train.ndim))
         sample_number = np.shape(x_train)[0]
         if sample_number != np.shape(y_train)[0]:
             logging.error('training and target values have different first dimension'
