@@ -530,7 +530,6 @@ def ErfWindow(t, t_start, t_end, t_rise, amplitude, offset):
                                  - scipy.special.erf((t - t_end)/(t_rise/2.6)))
 
 
-
 ######################
 # Residual functions #
 ######################
@@ -966,16 +965,53 @@ def Gaussian(freq,sigma,mu,ampl,offset):
     return ampl/(sigma*np.sqrt(2*np.pi))*np.exp(-0.5*((freq - mu)/sigma)**2) + offset
 
 
+def half_feed_line_S12_J_func(omega, J, kappaPF, gammaPF, gammaRR, omegaPF, omegaRR, phi, A , B, alpha):
+    return abs( A+np.exp(-1j*phi)*2*B*((-1+np.exp(1j*alpha))*(4*J**2+(gammaPF-2*1j*(omegaPF-omega))*(gammaRR-2j*omegaRR+2j*omega)))/(16*J**2+(4*gammaPF+(3+np.exp(1j*alpha))*kappaPF-8j*(omegaPF-omega))*(gammaRR-2j*omegaRR+2j*omega)) )
+
+
+def half_feed_line_S12_J_guess(model,data):
+    '''
+    data should have the frequencies in Hz in the first column and the transmission in the second column
+    '''
+
+    background_guess = max(data,key=lambda item:item[1])[1]/2
+    amp_guess = max(data,key=lambda item:item[1])[0]-min(data,key=lambda item:item[1])[0]
+
+    omegaPF_guess = min(data,key=lambda item:item[1])[0]
+
+    #Remove the PF dip to find the second smallest feature at the RR frequency
+    kappaPF_guess_data = np.extract(  (data[:,1]<=(min(data,key=lambda item:item[1])[1]+ background_guess/2)),data[:,0])
+    kappaPF_guess = min(abs( kappaPF_guess_data[0]-omegaPF_guess),abs( kappaPF_guess_data[-1]-omegaPF_guess),5e10)
+
+    omegaRR_guess =  min( np.transpose([np.extract(abs(data[:,0]- omegaPF_guess) >= kappaPF_guess/2,data[:,0]),np.extract(abs(data[:,0]- omegaPF_guess) >= kappaPF_guess/2,data[:,1])]),key=lambda item:item[1])[0]
+    J_guess = kappaPF_guess/4
+
+    model.set_param_hint('J',value=J_guess,min=0,max=2e7)
+    model.set_param_hint('kappaPF',value=kappaPF_guess,min=1e6,max=1e8)
+    model.set_param_hint('gammaPF',value=0.001,min=0,max=1e6)
+    model.set_param_hint('gammaRR',value=0.001,min=0,max=1e6)
+    model.set_param_hint('omegaPF',value=omegaPF_guess,min=omegaPF_guess-2e7,max=omegaPF_guess+2e7)
+    model.set_param_hint('omegaRR',value=omegaRR_guess,min=omegaRR_guess-2e7,max=omegaRR_guess+2e7)
+    model.set_param_hint('phi',value=(data[0,1]-data[-1,1])/background_guess)
+    model.set_param_hint('A',value=background_guess,min=(background_guess)-5,max=(2000*background_guess)+5)
+    model.set_param_hint('B',value=background_guess,min=(background_guess)-5,max=(2000*background_guess)+5)
+    model.set_param_hint('alpha',value=3,min=0,max=10)
+
+    params=model.make_params()
+    return params
+
 
 #################################
 #     User defined Models       #
 #################################
 # NOTE: it is actually better to instantiate the model within your analysis
 # file, this prevents the model params having a memory.
-# A valid reason to define it here would beexp_dec_guess if you want to add a guess function
+# A valid reason to define it here would be exp_dec_guess if you want to add a guess function
 CosModel = lmfit.Model(CosFunc)
 CosModel.guess = Cos_guess
 
+half_Feed_lineS12_J_Model = lmfit.Model(half_feed_line_S12_J_func)
+half_Feed_lineS12_J_Model.guess = half_feed_line_S12_J_guess
 ExpDecayModel = lmfit.Model(ExpDecayFunc)
 TripleExpDecayModel = lmfit.Model(TripleExpDecayFunc)
 ExpDecayModel.guess = exp_dec_guess  # todo: fix

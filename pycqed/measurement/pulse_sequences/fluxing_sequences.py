@@ -2141,10 +2141,13 @@ def flux_pulse_CPhase_seq_new(phases,flux_params,max_flux_length,
     RO_pulse = operation_dict['RO ' + qbr_name]
     RO_pulse['pulse_delay'] = max_flux_length
 
-    buffer_pulse = operation_dict['flux' + qbc_name]
-    buffer_pulse['length'] = max_flux_length-flux_length
-
     X180_control = operation_dict['X180 ' + qbc_name]
+
+    buffer_pulse = operation_dict['flux ' + qbc_name]
+    buffer_pulse['length'] = max_flux_length-flux_length
+    buffer_pulse['amplitude'] = 0.
+    #The virtual flux pulse is uploaded to the I_channel of control qb
+    buffer_pulse['channel'] = X180_control['I_channel']
 
     X90_target_2 = operation_dict['X90 ' + qbt_name]
     X90_target  =operation_dict['X90s '+ qbt_name]
@@ -2206,6 +2209,7 @@ def flux_pulse_CPhase_seq_new(phases,flux_params,max_flux_length,
                                     AWGs=upload_AWGs,
                                     channels=upload_channels,
                                     verbose=verbose)
+
     if return_seq:
         return seq, el_list
     else:

@@ -2490,6 +2490,7 @@ class Flux_pulse_CPhase_hard_swf_new(swf.Hard_Sweep):
             return
 
         if self.upload:
+            print('Uploaded CPhase Sequence')
             fsqs.flux_pulse_CPhase_seq_new(
                 phases=self.phases,
                 flux_params=flux_params,
@@ -2501,7 +2502,7 @@ class Flux_pulse_CPhase_hard_swf_new(swf.Hard_Sweep):
                 CZ_pulse_name=self.CZ_pulse_name,
                 cal_points=self.cal_points,
                 reference_measurements=self.reference_measurements,
-                upload= not self.upload,
+                upload=self.upload,
                 return_seq= True,
                 first_data_point = self.first_data_point
                 )
@@ -2524,7 +2525,6 @@ class Flux_pulse_CPhase_hard_swf_new(swf.Hard_Sweep):
             self.prepare(flux_params=[self.flux_amplitude,self.flux_length])
             self.flux_length=None
             self.flux_amplitude=None
-
 
 class Flux_pulse_CPhase_soft_swf(swf.Soft_Sweep):
 
@@ -2550,7 +2550,6 @@ class Flux_pulse_CPhase_soft_swf(swf.Soft_Sweep):
             self.parameter_name = 'flux_amp'
         self.hard_sweep = hard_sweep
         self.upload = upload
-
     def prepare(self):
         pass
 
@@ -2561,8 +2560,6 @@ class Flux_pulse_CPhase_soft_swf(swf.Soft_Sweep):
 
     def finish(self):
         pass
-
-
 class Flux_pulse_CPhase_meas_2D(swf.Soft_Sweep):
 
     def __init__(self, qb_control, qb_target, hard_sweep,
@@ -2586,6 +2583,7 @@ class Flux_pulse_CPhase_meas_2D(swf.Soft_Sweep):
         self.sweep_mode = sweep_mode
         if self.sweep_mode == 'length':
             self.unit = 's'
+
         elif self.sweep_mode == 'amplitude':
             self.unit = 'V'
         elif self.sweep_mode == 'phase':
