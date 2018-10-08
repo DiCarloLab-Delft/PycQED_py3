@@ -560,7 +560,7 @@ def CryoscopeGoogle(qubit_idx: int, buffer_time1, times, platf_cfg: str):
     p.filename = join(p.output_dir, p.name + '.qisa')
     return p
 
-def Fluxed_Ramsey(qubit_idx: int, wait_time: float,
+def fluxed_ramsey(qubit_idx: int, wait_time: float,
                     flux_cw: str='fl_cw_02',
                     platf_cfg: str=''):
     """
@@ -577,11 +577,11 @@ def Fluxed_Ramsey(qubit_idx: int, wait_time: float,
 
     """
     platf = Platform('OpenQL_Platform', platf_cfg)
-    p = Program(pname="Fluxed_Ramsey", nqubits=platf.get_qubit_number(),
+    p = Program(pname="fluxed_ramsey", nqubits=platf.get_qubit_number(),
                 p=platf)
     wait_time = wait_time/1e-9
 
-    k = Kernel("Fluxed_Ramsey", p=platf)
+    k = Kernel("fluxed_ramsey_2", p=platf)
     k.prepz(qubit_idx)
     k.gate('rx90', qubit_idx)
     k.gate(flux_cw, 2, 0)
@@ -590,7 +590,7 @@ def Fluxed_Ramsey(qubit_idx: int, wait_time: float,
     k.measure(qubit_idx)
     p.add_kernel(k)
 
-    k = Kernel("Fluxed_Ramsey", p=platf)
+    k = Kernel("fluxed_ramsey_2", p=platf)
     k.prepz(qubit_idx)
     k.gate('rx90', qubit_idx)
     k.gate(flux_cw, 2, 0)
