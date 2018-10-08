@@ -2,6 +2,7 @@
 Hacked together by Rene Vollmer
 Cleaned up (a bit) by Adriaan
 '''
+import os
 import matplotlib.pyplot as plt
 import datetime
 from collections import OrderedDict
@@ -31,7 +32,9 @@ class CoherenceAnalysis(ba.BaseDataAnalysis):
         freq_resonator: readout resonator frequency (in Hz)
         Qc:             coupling Q of the readout resonator
         chi_shift       in Hz
-        path:           filepath, if provided is used for saving the plots
+        savename:       figures are saved in a folder created based on the
+            provided t_stop in the datadir. `savename` is used to name
+            this folder.
 
 
     Coherence_table specification:
@@ -59,13 +62,17 @@ class CoherenceAnalysis(ba.BaseDataAnalysis):
     """
 
     def __init__(self, coherence_table,
-                 t_start: str, t_stop: str=None, label='',
+                 t_start: str=None, t_stop: str=None, label='',
                  options_dict: dict=None, auto: bool=True, close_figs=True,
                  freq_resonator: float=None, Qc: float=None,
-                 chi_shift: float=None, **kwargs):
+                 chi_shift: float=None, savename: str= 'coherence_analysis',
+                 **kwargs):
+
         super().__init__(t_start=t_start, t_stop=t_stop, label=label,
                          options_dict=options_dict, close_figs=close_figs,
                          **kwargs)
+        if t_stop is not None:
+            self.options_dict['save_figs'] = False
         self._coherence_table = coherence_table
         self._freq_resonator = freq_resonator
         self._Qc = Qc
@@ -87,6 +94,15 @@ class CoherenceAnalysis(ba.BaseDataAnalysis):
         rdd['freq_resonator'] = self._freq_resonator
         rdd['Qc'] = self._Qc
         rdd['chi_shift'] = self._chi_shift
+
+        # Extra info for datasaving etc.
+        rdd['timestamps'] = [self.t_start, self.t_stop]
+        t_stop = self.t_stop.split('_')
+        folder = os.path.join(
+            a_tools.datadir, t_stop[0],
+            '{}_coherence_analysis'.format(t_stop[1]))
+        self.raw_data_dict['folder'] = [folder]
+        print(folder)
 
     def process_data(self):
         """
