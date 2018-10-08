@@ -157,8 +157,8 @@ class CoherenceAnalysis(ba.BaseDataAnalysis):
         # More details can be found in Luthi PRL (2018) and month report M11
 
         # from white noise
-        # using Eq 5 in Nat. Comm. 7,12964 (The flux qubit revisited to enhance
-        # coherence and reproducability)
+        # using Eq 5 Yan et al. Nat. Comm. 7,12964  (The flux qubit revisited
+        # to enhance coherence and reproducability)
         if not ((pdd['freq_resonator'] is None) and (pdd['Qc'] is None)
                 and (pdd['chi_shift'] is None)):
             pdd['n_avg'] = calculate_n_avg(pdd['freq_resonator'], pdd['Qc'],

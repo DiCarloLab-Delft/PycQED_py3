@@ -156,7 +156,7 @@ def meter(ax, x0, y0, y_offs=0,  w=1.1, h=.8, color='black', fillcolor=None):
         fill=fill, zorder=5)
     ax.add_patch(p1)
     p0 = matplotlib.patches.Wedge(
-        (x0, y0-h/4+y_offs), .35, theta1=40, theta2=180-40, color=color, lw=2,
+        (x0, y0-h/4+y_offs), .4, theta1=40, theta2=180-40, color=color, lw=2,
         width=.01, zorder=5)
     ax.add_patch(p0)
     ax.arrow(x0, y0-h/4+y_offs, dx=.5*np.cos(np.deg2rad(70)),
