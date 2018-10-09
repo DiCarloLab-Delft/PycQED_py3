@@ -678,33 +678,38 @@ class Simultaneous_RB_Analysis(RandomizedBenchmarking_Analysis):
         """
         self.use_cal_points = use_cal_points
         self.qb_names = qb_names
+        use_latest_data = kw.pop('use_latest_data', False)
 
         if self.qb_names is None:
             raise ValueError('qb_names is not specified.')
         if type(self.qb_names) != list:
             self.qb_names = list(self.qb_names)
 
-        if timestamp is None:
-            raise ValueError('timestamp is not specified.')
-        if not isinstance(timestamp, list):
-            timestamp = [timestamp]
+        if use_latest_data:
+            folder = a_tools.latest_data()
+            self.folders = [folder]
+        else:
+            if timestamp is None:
+                raise ValueError('timestamp is not specified.')
+            if not isinstance(timestamp, list):
+                timestamp = [timestamp]
 
-        self.folders = []
-        if len(timestamp)==2:
-            qb_idxs = ''.join([i[-1] for i in self.qb_names])
-            msmt_label = 'qubits' + qb_idxs
-            timestamp = a_tools.get_timestamps_in_range(
-                            timestamp_start=timestamp[0],
-                            timestamp_end=timestamp[1],
-                            label=msmt_label, exact_label_match=True)
+            self.folders = []
+            if len(timestamp)==2:
+                qb_idxs = ''.join([i[-1] for i in self.qb_names])
+                msmt_label = 'qubits' + qb_idxs
+                timestamp = a_tools.get_timestamps_in_range(
+                                timestamp_start=timestamp[0],
+                                timestamp_end=timestamp[1],
+                                label=msmt_label, exact_label_match=True)
 
-        for ts in timestamp:
-            folder = a_tools.get_folder(timestamp=ts)
-            self.folders.append(folder)
+            for ts in timestamp:
+                folder = a_tools.get_folder(timestamp=ts)
+                self.folders.append(folder)
 
-        folder = self.folders[0]
-        if not isinstance(folder, str):
-            folder = folder[0]
+            folder = self.folders[0]
+            if not isinstance(folder, str):
+                folder = folder[0]
 
         super().__init__(TwoD=True, folder=folder, **kw)
 
