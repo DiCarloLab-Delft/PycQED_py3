@@ -5,7 +5,7 @@ from pycqed.analysis import machine_learning_toolbox as ml
 
 from sklearn.model_selection import GridSearchCV as gcv, train_test_split
 
-from scipy.optimize import fmin_l_bfgs_b,fmin
+from scipy.optimize import fmin_l_bfgs_b,fmin,minimize,fsolve
 
 def nelder_mead(fun, x0,
                 initial_step=0.1,
@@ -306,8 +306,7 @@ def center_and_scale(X_in,y_in):
 
 def neural_network_opt(fun, training_grid, target_values = None,
                        estimator='GRNN_neupy',hyper_parameter_dict=None,
-                       x_init = None,
-                       **kwargs):
+                       x_init = None):
     """
     parameters:
         fun:           Function that can be used to get data points if None,
@@ -357,7 +356,6 @@ def neural_network_opt(fun, training_grid, target_values = None,
     input_feature_means,input_feature_ext,\
     output_feature_means,output_feature_ext \
                  = center_and_scale(training_grid,target_values)
-
     #Save the preprocessing information in order to be able to rescale the values later.
     pre_processing_dict ={'output': {'scaling': output_feature_ext,
                                      'centering':output_feature_means},
@@ -407,14 +405,17 @@ def neural_network_opt(fun, training_grid, target_values = None,
 
     def estimator_wrapper(X):
         pred = est.predict([X])
-        if output_dim==1.:
-            return pred
+        if output_dim == 1.:
+            return np.abs(pred+1.)
         else:
             pred = pred[0]
             norm = 0.
-            for it in len(pred):
-                norm += pred[it]**2
-            return np.sqrt(norm)
+            for it in range(len(pred)):
+                norm += np.abs(pred[it] + 1.)
+            output = norm
+
+            return output
+
     ###################################################################
     ###     perform gradient descent to minimize modeled landscape  ###
     ###################################################################
@@ -422,30 +423,35 @@ def neural_network_opt(fun, training_grid, target_values = None,
         x_init = np.zeros(n_features)
         #The data is centered. No values above -1,1 should be encountered
         bounds=[(-1.,1.) for i in range(n_features)]
-        res = fmin_l_bfgs_b(estimator_wrapper, x_init,bounds=bounds,
+        res = fmin_l_bfgs_b(estimator_wrapper, x_init, bounds=bounds,
                             approx_grad=True)
     else:
-        res = fmin(estimator_wrapper,x_init,full_output=True)
-        result = res[0]
+        for it in range(n_features):
+            x_init[it] = (x_init[it]-input_feature_means[it])/input_feature_ext[it] # scale initial value
+        res = fmin_l_bfgs_b(estimator_wrapper, x_init, approx_grad=True)
+
+    result = res[0]
     opti_flag = True
+
     for it in range(n_features):
         if not opti_flag:
             break
-        if np.abs(result[it]) >= 2*np.std(training_grid,0)[it]:
+        if np.abs(result[it]) >= 2*np.std(training_grid_centered, 0)[it]:
             opti_flag = False
     if not opti_flag:
         print('optimization most likely failed. Results outside 2-sigma surrounding'
               'of at least one data feature mean value! Values will still be updated.')
-    #Rescale values
-    amp = est.predict(result)
-    if output_dim==1.:
+    # Rescale values
+    amp = est.predict([result])[0]
+    print('amp: ',amp)
+    if output_dim == 1.:
         amp = amp*output_feature_ext+output_feature_means
     else:
         for it in range(output_dim):
             amp[it] = amp[it]*output_feature_ext[it]+output_feature_ext[it]
     for it in range(n_features):
         result[it] = result[it]*input_feature_ext[it]+input_feature_means[it]
-    print('minimization results: ',result,' :: ',amp)
+    print('minimization results: ', result, ' :: ', amp)
 
     return np.array(result), est,opti_flag
 

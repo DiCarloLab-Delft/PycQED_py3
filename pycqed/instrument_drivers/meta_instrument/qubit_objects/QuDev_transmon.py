@@ -1575,13 +1575,13 @@ class QuDev_transmon(Qubit):
             logging.warning('\n No hyperparameters passed to predictive mixer '
                             'calibration routine. Default values for the estimator'
                             'will be used!\n')
-            hyper_paramter_dict={'hidden_layers':[10],
-                                 'learning_rate': 1e-3,
-                                 'regularization_coefficient': 0.,
-                                 'std_scaling':0.6,
-                                 'learning_steps':5000,
-                                 'cv_n_fold':5,
-                                 'polynomial_dimension':2}
+            hyper_parameter_dict = {'hidden_layers':[10],
+                                    'learning_rate': 1e-3,
+                                    'regularization_coefficient': 0.,
+                                    'std_scaling':0.6,
+                                    'learning_steps':5000,
+                                    'cv_n_fold':5,
+                                    'polynomial_dimension':2}
         if MC is None:
             MC = self.MC
 
@@ -1589,7 +1589,7 @@ class QuDev_transmon(Qubit):
         c = kwargs.pop('second_round_std_scale',0.3)
         first_round_limits = kwargs.pop('first_round_limits',[-1.,0.5,-1.,0.5])
 
-        ch_1_min =0.         #might be redundant
+        ch_1_min =0.
         ch_2_min =0.
         if isinstance(std_devs,list) or isinstance(std_devs,np.ndarray):
             if(len(std_devs) != 2 ):
@@ -1636,7 +1636,7 @@ class QuDev_transmon(Qubit):
                                           meas_grid=meas_grid.T,
                                           estimator=est,
                                           hyper_parameter_dict=hyper_parameter_dict,
-                                          round=runs,make_fig=make_fig)
+                                          round=runs, make_fig=make_fig)
             ch_1_min = a.optimization_result[0]
             ch_2_min = a.optimization_result[1]
 
@@ -1754,7 +1754,7 @@ class QuDev_transmon(Qubit):
                                                 update=True,
                                                 make_fig=True,
                                                 meas_grid=None,
-                                                n_meas=100,
+                                                n_meas=150,
                                                 trigger_sep=4e-6,
                                                 two_rounds=False,
                                                 estimator='GRNN_neupy',
@@ -1810,7 +1810,7 @@ class QuDev_transmon(Qubit):
             logging.warning('\n No hyperparameters passed to predictive mixer '
                             'calibration routine. Default values for the estimator'
                             'will be used!\n')
-            hyper_paramter_dict={'hidden_layers':[10],
+            hyper_parameter_dict={'hidden_layers':[10],
                                  'learning_rate': 1e-3,
                                  'regularization_coefficient': 0.,
                                  'std_scaling':0.6,

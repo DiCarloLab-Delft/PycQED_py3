@@ -1793,11 +1793,15 @@ def Chevron_length_seq_new(lengths, flux_pulse_amp,
     max_length = np.max(lengths)
 
     CZ_pulse['amplitude'] = flux_pulse_amp
+    X180_c = operation_dict['X180 ' + qbc_name]
+    X180_t = operation_dict['X180s ' + qbt_name]
+    pulse_list = []
     if upload_all:
         upload_AWGs = 'all'
         upload_channels = 'all'
     else:
-        upload_AWGs = station.pulsar.get(CZ_pulse['channel'] + '_AWG')
+        upload_AWGs = [station.pulsar.get(CZ_pulse['channel'] + '_AWG'),
+                       station.pulsar.master_AWG()]
         upload_channels = [station.pulsar.get(CZ_pulse['channel'] + '_id')]
 
     for i, length in enumerate(lengths):
@@ -2096,6 +2100,7 @@ def flux_pulse_CPhase_seq_new(phases,flux_params,max_flux_length,
                               qbc_name, qbt_name,qbr_name,
                               operation_dict,
                               CZ_pulse_name,
+                              CZ_pulse_channel,
                               verbose=False,cal_points=False,
                               upload=True, return_seq=False,
                               reference_measurements=False,
@@ -2147,7 +2152,7 @@ def flux_pulse_CPhase_seq_new(phases,flux_params,max_flux_length,
     buffer_pulse['length'] = max_flux_length-flux_length
     buffer_pulse['amplitude'] = 0.
     #The virtual flux pulse is uploaded to the I_channel of control qb
-    buffer_pulse['channel'] = X180_control['I_channel']
+    buffer_pulse['channel'] = CZ_pulse_channel
 
     X90_target_2 = operation_dict['X90 ' + qbt_name]
     X90_target  =operation_dict['X90s '+ qbt_name]
@@ -2155,6 +2160,7 @@ def flux_pulse_CPhase_seq_new(phases,flux_params,max_flux_length,
     CZ_pulse = operation_dict[CZ_pulse_name]
     CZ_pulse['amplitude'] = flux_amplitude
     CZ_pulse['pulse_length'] = flux_length
+    CZ_pulse['channel'] = CZ_pulse_channel
 
     pulse_list.append(X180_control)
     pulse_list.append(X90_target)
@@ -2164,13 +2170,13 @@ def flux_pulse_CPhase_seq_new(phases,flux_params,max_flux_length,
     pulse_list.append(RO_pulse)
 
     if not first_data_point:
-        reduced_pulse_list = [X180_control,buffer_pulse,CZ_pulse,RO_pulse]
-
+        reduced_pulse_list = [buffer_pulse,CZ_pulse]
         upload_channels,upload_AWGs = get_required_upload_information\
                                             (reduced_pulse_list,station)
         if X90_target['I_channel'].split('_')[0] in upload_AWGs:
-            upload_channels += X90_target['I_channel']
-            upload_channels += X90_target['Q_channel']
+            upload_channels.append(X90_target['I_channel'])
+            upload_channels.append(X90_target['Q_channel'])
+
 
     else:
         upload_channels,upload_AWGs = get_required_upload_information(pulse_list,

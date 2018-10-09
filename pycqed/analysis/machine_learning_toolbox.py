@@ -120,10 +120,10 @@ class MLP_Regressor_scikit(Estimator):
         self.score = -np.infty
 
     def extract_hyper_params_from_dict(self):
-        self._hidden_layers= self.hyper_parameter_dict.pop('hidden_layers',[10])
+        self._hidden_layers= self.hyper_parameter_dict.get('hidden_layers',[10])
         self._hidden_layers= tuple(self._hidden_layers)
-        self.alpha = self.hyper_parameter_dict.pop('regularization_coefficient',0.5)
-        self.activation = self.hyper_parameter_dict.pop('activation_function','relu')
+        self.alpha = self.hyper_parameter_dict.get('regularization_coefficient',0.5)
+        self.activation = self.hyper_parameter_dict.get('activation_function','relu')
 
 
     def fit(self, x_train, y_train):
@@ -183,10 +183,10 @@ class DNN_Regressor_tf(Estimator):
         self.extract_hyper_params_from_dict()
 
     def extract_hyper_params_from_dict(self):
-        self._hidden_layers= self.hyper_parameter_dict.pop('hidden_layers',[10])
-        self.alpha = self.hyper_parameter_dict.pop('learning_rate',0.5)
-        self.beta = self.hyper_parameter_dict.pop('regularization_coefficient',0.)
-        self.iters = self.hyper_parameter_dict.pop('learning_steps',200)
+        self._hidden_layers= self.hyper_parameter_dict.get('hidden_layers',[10])
+        self.alpha = self.hyper_parameter_dict.get('learning_rate',0.5)
+        self.beta = self.hyper_parameter_dict.get('regularization_coefficient',0.)
+        self.iters = self.hyper_parameter_dict.get('learning_steps',200)
 
     def get_stddev(self, inp_dim, out_dim):
         std = 1.3 / math.sqrt(float(inp_dim) + float(out_dim))
@@ -303,7 +303,7 @@ class Polynomial_Regression(Estimator):
         self.extract_hyper_params_from_dict()
 
     def extract_hyper_params_from_dict(self):
-        self.ndim = self.hyper_parameter_dict.pop('polynomial_dimension',1)
+        self.ndim = self.hyper_parameter_dict.get('polynomial_dimension',1)
 
     def poly_features_transform(self,X):
         if X.ndim==1:
@@ -352,19 +352,19 @@ class GRNN_neupy(Estimator):
                    1.--> use std (or -if None- the regular std dev of
                    the input data)
     '''
-    def __init__(self,hyper_paramter_dict,verbose =False,
+    def __init__(self,hyper_parameter_dict,verbose =False,
                  pre_proc_dict=None):
 
         super().__init__(name='GRNN_neupy',pre_proc_dict=pre_proc_dict,
                        type='Regressor')
-        self.hyper_parameter_dict = hyper_paramter_dict
+        self.hyper_parameter_dict = hyper_parameter_dict
         self.extract_hyper_params_from_dict()
         self._verbose = verbose
         self._grnn = None
 
     def extract_hyper_params_from_dict(self):
-        self._std= self.hyper_parameter_dict.pop('standard_deviations',None)
-        self._gamma = self.hyper_parameter_dict.pop('std_scaling',[1.])
+        self._std= self.hyper_parameter_dict.get('standard_deviations',None)
+        self._gamma = self.hyper_parameter_dict.get('std_scaling',[1.])
         if not isinstance(self._gamma,list):
             self._gamma = [self._gamma]
 
@@ -395,7 +395,7 @@ class GRNN_neupy(Estimator):
             self._std = std_x/x_train.ndim
         self._grnn = []
         for it in range(np.shape(y_train)[1]):
-            new_grnn =grnn(std=self._gamma[it]*self._std)
+            new_grnn = grnn(std=self._gamma[it]*self._std)
             print('GRNN initialized with std: ',self._std)
             new_grnn.train(x_train,y_train[:,it])
             self._grnn.append(new_grnn)
@@ -404,18 +404,16 @@ class GRNN_neupy(Estimator):
         if not isinstance(samples,np.ndarray):
             samples = np.array(samples)
         predictions = np.zeros((np.shape(samples)[0],len(self._grnn)))
+
         for it in range(len(self._grnn)):
             pred = self._grnn[it].predict(samples)
-#            print('pred: ',np.reshape(pred,(len(pred),)))
-            predictions[:,it] = np.reshape(pred,(len(pred),))
-            if np.shape(samples)[0] == 1.:  #unwrap output if single sample
+            predictions[:,it] = np.reshape(pred,(len(pred)))
+            if np.shape(samples)[1] == 1.:  #unwrap output if single sample
                 predictions=predictions[0]
         return predictions
 
     def evaluate(self,x,y):
         pred = self.predict(x)
- #       print('Pred: ',pred,'\n')
- #       print('Y: ',y,'\n')
         self.score = 1. - np.linalg.norm(pred-y)**2 \
                    / np.linalg.norm(y-np.mean(y,axis=0))**2
         return self.score
@@ -446,21 +444,17 @@ class CrossValidationEstimator(Estimator):
         self.batch_errors = None
 
     def extract_hyper_params_from_dict(self):
-        self.n_fold= self.hyper_parameter_dict.pop('cv_n_fold',1)
+        self.n_fold= self.hyper_parameter_dict.get('cv_n_fold',1)
 
     def fit(self,x_train,y_train):
         if not isinstance(x_train,np.ndarray):
             x_train = np.array(x_train)
         if x_train.ndim == 1:
-            print(x_train.ndim)
             x_train.shape = (np.size(x_train),x_train.ndim)
-            #x_train.reshape((np.size(x_train),x_train.ndim))
-            print(x_train)
         if not isinstance(y_train,np.ndarray):
             y_train = np.array(y_train)
         if y_train.ndim == 1:
             y_train.shape = (np.size(y_train),y_train.ndim)
-        #   y_train.reshape((np.size(y_train),y_train.ndim))
         sample_number = np.shape(x_train)[0]
         if sample_number != np.shape(y_train)[0]:
             logging.error('training and target values have different first dimension'
@@ -469,8 +463,7 @@ class CrossValidationEstimator(Estimator):
         batch_size = int((sample_number-reminder)/self.n_fold)
         self.batch_errors = []
         for it in range(0,sample_number-reminder,batch_size):
-
-            test_batch = x_train[it:it+batch_size-1,:]
+            test_batch = x_train[it:(it+batch_size-1),:]
             train_batch = np.concatenate((x_train[:it,:],x_train[it+batch_size:,:]),
                                          axis=0)
             test_target = y_train[it:it+batch_size-1,:]

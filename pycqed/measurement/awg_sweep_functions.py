@@ -2444,9 +2444,9 @@ class Flux_pulse_CPhase_meas_hard_swf(swf.Hard_Sweep):
 class Flux_pulse_CPhase_hard_swf_new(swf.Hard_Sweep):
 
     def __init__(self, phases, qbc_name, qbt_name,qbr_name,CZ_pulse_name,
-                 operation_dict,max_flux_length,
-                 cal_points=False, upload=True,
-                 reference_measurements=False):
+                 CZ_pulse_channel,operation_dict,
+                 max_flux_length,cal_points=False,
+                 upload=True,reference_measurements=False):
         '''
             Flexible sweep function class for a single slice of the CPhase
             experiment (hard sweep) that can either sweep the amplitude or
@@ -2473,6 +2473,7 @@ class Flux_pulse_CPhase_hard_swf_new(swf.Hard_Sweep):
         self.qbr_name = qbr_name
         self.operation_dict = operation_dict
         self.CZ_pulse_name = CZ_pulse_name
+        self.CZ_pulse_channel = CZ_pulse_channel
         self.upload = upload
         self.cal_points = cal_points
         self.reference_measurements = reference_measurements
@@ -2500,6 +2501,7 @@ class Flux_pulse_CPhase_hard_swf_new(swf.Hard_Sweep):
                 qbr_name=self.qbr_name,
                 operation_dict=self.operation_dict,
                 CZ_pulse_name=self.CZ_pulse_name,
+                CZ_pulse_channel=self.CZ_pulse_channel,
                 cal_points=self.cal_points,
                 reference_measurements=self.reference_measurements,
                 upload=self.upload,

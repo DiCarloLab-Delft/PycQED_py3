@@ -610,13 +610,10 @@ def get_required_upload_information(pulses : list, station):
 
     #Have to add all master AWG channels such that trigger channels are not empty
     master_AWG = station.pulsar.master_AWG()
-    required_AWGs = [master_AWG]
+    required_AWGs = []
     required_channels = []
     used_AWGs = station.pulsar.used_AWGs()
 
-    for c in station.pulsar.channels:
-        if master_AWG in c:
-            required_channels.append(c)
 
     for pulse in pulses:
         for key in pulse.keys():
@@ -626,6 +623,13 @@ def get_required_upload_information(pulses : list, station):
             if not 'AWG' in channel:
                 continue
             AWG = channel.split('_')[0]
+            if AWG==master_AWG:
+                for c in station.pulsar.channels:
+                    if master_AWG in c and c not in required_channels:
+                        required_channels.append(c)
+                    if AWG in used_AWGs and AWG not in required_AWGs:
+                        required_AWGs.append(AWG)
+                    continue
             if AWG in used_AWGs and AWG not in required_AWGs:
                 required_AWGs.append(AWG)
             if not channel in required_channels:

@@ -1078,7 +1078,7 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
         except:
             optimization_method = 'Numerical'
         self.meas_grid = kw.pop('meas_grid')
-        self.hyper_parameter_dict = kw.pop('hyper_parameter_dict')
+        self.hyper_parameter_dict = kw.pop('hyper_parameter_dict',None)
         self.two_rounds = kw.pop('two_rounds',False)
         self.round = kw.pop('round',1)
         self.estimator_name = kw.pop('estimator','GRNN_neupy')
@@ -1101,9 +1101,9 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
             self.abs_vals = np.sqrt(self.measured_values[0,:]**2 + self.measured_values[1,:]**2)
         result,est,opti_flag\
                                   = opt.neural_network_opt(None, self.meas_grid,
-                                      np.array([self.abs_vals]).T,
+                                      target_values=np.array([self.abs_vals]).T,
                                       estimator=self.estimator_name,
-                                      hyper_paramter_dict=self.hyper_parameter_dict)
+                                      hyper_parameter_dict=self.hyper_parameter_dict)
         #test_grid and test_target values. Centered and scaled to [-1,1] since
         #only used for performance estimation of estimator
         self.opti_flag = opti_flag
@@ -2677,59 +2677,6 @@ class CPhase_2Q_amp_cost_analysis(Rabi_Analysis):
         self.fit_result['exc_offset'] = fit_res.values['offset']
 
         # TODO: save fit params
-
-class CPhase_Predictive_Analysis(MeasurementAnalysis):
-
-    def __init__(self, lengths,amps,cphases,populations,estimator='GRNN_neupy',
-                 hyper_parameter_dict=None):
-
-        self.meas_grid = np.array([lengths,amps]).T
-        self.target_vals = np.array([populations,cphases]).T
-        self.estimator_name = estimator
-        self.hyper_parameter_dict= hyper_parameter_dict
-
-
-    def train_estimator(self):
-
-
-        result,est,opti_flag \
-            = opt.neural_network_opt(None, self.meas_grid,
-                                     self.target_vals,
-                                     estimator=self.estimator_name,
-                                     hyper_paramter_dict=self.hyper_parameter_dict)
-        self.opti_flag = opti_flag
-        self.estimator = est
-        self.optimization_result = result
-
-        return result,est
-
-    def make_figures(self,**kw):
-
-        #interpolation plot with only measurement points
-        base_figname = 'optimization of '
-        for i in range(len(self.value_names)):
-            base_figname+= self.value_names[i]
-        base_figname += '_it_'+str(self.round)
-        if np.shape(self.sweep_points)[0] == 2:
-            f, ax = plt.subplots()
-            a_tools.color_plot_interpolated(
-                x=self.sweep_points[0], y=self.sweep_points[1],
-                z=self.abs_vals, ax=ax,N_levels=25,
-                zlabel=self.ylabels[0])
-            ax.plot(self.sweep_points[0],
-                    self.sweep_points[1], 'o', c='grey')
-            ax.plot(self.optimization_result[0],
-                    self.optimization_result[1],
-                    'o', markersize=5, c='w')
-            plot_title = self.timestamp_string + '_' +self.measurementstring
-            ax.set_title(plot_title)
-            textstr = '%s ( %s )' % (self.parameter_names[0],
-                                     self.parameter_units[0])
-            set_xlabel(ax, textstr)
-            textstr = '%s ( %s )' % (self.parameter_names[1],
-                                     self.parameter_units[1])
-            set_ylabel(ax, textstr)
-            self.save_fig(f, figname=base_figname, **kw)
 
 
 class Motzoi_XY_analysis(TD_Analysis):
@@ -10321,14 +10268,14 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
             return phase_list
 
 
-class Fluxpulse_Ramsey_2D_Analysis_new(MeasurementAnalysis):
+class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
 
     def __init__(self, X90_separation=None, flux_pulse_length=None,
                  drive_pulse_length=None,
                  qb_name=None, label=None,
                  cal_points=False,
                  reference_measurements=False,
-                 auto=True,
+                 plot=False,
                  **kw):
         """
         Measurement analysis class to analyse Ramsey type measrements
@@ -10358,15 +10305,15 @@ class Fluxpulse_Ramsey_2D_Analysis_new(MeasurementAnalysis):
         self.cal_points = cal_points
         self.reference_measurements=reference_measurements
 
-        super(Fluxpulse_Ramsey_2D_Analysis_new, self).__init__(TwoD=True,
+        super(Fluxpulse_Ramsey_2D_Analysis_Predictive, self).__init__(TwoD=True,
                                                            start_at_zero=True,
                                                            qb_name=qb_name,
                                                            auto=False,
                                                            **kw)
         self.get_naming_and_values_2D()
         self.fitted_phases,self.fitted_amps = self.fit_all(return_ampl=True,
+                                                           plot=plot,
                                                            **kw)
-
 
     def get_naming_and_values_2D(self):
         if 'datasaving_format' in list(self.g.attrs.keys()):
@@ -10418,7 +10365,7 @@ class Fluxpulse_Ramsey_2D_Analysis_new(MeasurementAnalysis):
             nr_missing_values = 0
             if len(x) % cols != 0:
                 nr_missing_values = cols - len(x) % cols
-            x = np.append(x,np.zeros((1,nr_missing_values))+np.nan,axis=1)
+            x = np.append(x,np.zeros((1,nr_missing_values))+np.nan)
             self.X = x.reshape(-1,cols)
             self.sweep_points = self.X[0]
 
@@ -10430,8 +10377,6 @@ class Fluxpulse_Ramsey_2D_Analysis_new(MeasurementAnalysis):
                 Y = y.reshape(-1,cols)
                 self.Y.append(Y)
                 self.sweep_points_2D.append(Y.T[0])
-            print('1D swppts: ',self.X[0])
-            print('2D swppts: ',self.sweep_points_2D)
 
             if len(self.value_names) == 1:
                 z = self.data[3]
@@ -10441,26 +10386,24 @@ class Fluxpulse_Ramsey_2D_Analysis_new(MeasurementAnalysis):
             else:
                 self.Z = []
                 self.measured_values = []
-                for i in range(len(self.values_names)):
+                for i in range(len(self.value_names)):
                     z = self.data[3 + i]
                     z = np.append(z,np.zeros(nr_missing_values)+np.nan)
                     Z = z.reshape(-1,cols)
                     self.Z.append(Z)
                     self.measured_values.append(Z.T)
-
             self.xlabel = self.parameter_names[0] + ' (' + \
                           self.parameter_units[0] + ')'
             self.ylabel = self.parameter_names[1] + ' (' + \
                           self.parameter_units[1] + ')' + '_' + \
                           self.parameter_names[2] + ' (' + \
-                          self.paramter_units[2] + ')'
+                          self.parameter_units[2] + ')'
 
             self.parameter_labels = [a + ' (' + b + ')' for a, b in zip(
                                                         self.parameter_names,
                                                         self.parameter_units)]
-
             self.zlabels = [a + ' (' + b + ')' for a, b in zip(self.value_names,
-                                                               self.value_unit)]
+                                                               self.value_units)]
 
     def run_default_analysis(self, TwoD=False, close_file=True,
                              show=False, transpose=False,
@@ -10537,7 +10480,7 @@ class Fluxpulse_Ramsey_2D_Analysis_new(MeasurementAnalysis):
                 return_ampl=False,
                 cal_points=None,
                 fit_range=None,
-                predict_phase=True,
+                predict_phase=False,
                 save_plot=False,
                 plot_title=None, **kw):
 
@@ -10601,20 +10544,19 @@ class Fluxpulse_Ramsey_2D_Analysis_new(MeasurementAnalysis):
             phase_list = self.unwrap_phases_extrapolation(phase_list)
 
         if plot:
-            ax.set_title('Cosine fits')
+            ax.set_title('Cosine fits_'+self.timestamp_string)
             ax.set_xlabel('theta (rad)')
             ax.set_ylabel('|S21| (arb. units)')
             ax.legend(['data','fits'])
 
             if not only_cos_fits:
                 if fit_range is None:
-                    self.ax[1].plot(self.sweep_points_2D,phase_list)
+                    self.ax[1].plot(range(len(self.sweep_points_2D[0])),phase_list)
                 else:
-                    self.ax[1].plot(self.sweep_points_2D[fit_range[0]:fit_range[1]],phase_list)
+                    self.ax[1].plot(range(len(self.sweep_points_2D[0,fit_range[0]:fit_range[1]])),phase_list)
                 self.ax[1].set_title('fitted phases')
-                self.ax[1].set_xlabel(self.parameter_names[1]
-                                      +' '+self.parameter_units[1])
-                self.ax[1].set_ylabel('phase (rad)')
+                self.ax[1].set_xlabel('Date point #')
+                self.ax[1].set_ylabel('Phase (rad)')
 
                 self.fig.subplots_adjust(hspace=0.7)
 
@@ -10642,8 +10584,10 @@ class OptimizationAnalysis_Predictive2D:
                  ma : MeasurementAnalysis,
                  estimator='GRNN_neupy',
                  hyper_parameter_dict=None,
+                 x_init = None,
+                 target_value_names=None,
                  **kw):
-        self.x_init = kw.pop('x_init',None)
+        self.x_init = x_init
         self.ma = ma
         self.save_folder = ma.folder
         self.time_stamp = ma.timestamp_string
@@ -10658,23 +10602,26 @@ class OptimizationAnalysis_Predictive2D:
                                         self.output_dim)
         self.estimator_name = estimator
         self.hyper_parameter_dict = hyper_parameter_dict
+        self.target_value_names = target_value_names
         print('OptimizationAnalysis_Predictive initialized.')
-        print('Measurement Type: ',ma.measurementstring)
-        print('Estimator type: ',self.estimator_name)
+        print('Measurement Type: ', ma.measurementstring)
+        print('Estimator type: ', self.estimator_name)
+
         t0 = time()
         self.train_and_minimize()
         t1 = time()
-        print('Fitting estimator completed in %.2g sec. \nCreating plots...'\
-              %(t1-t0))
+
+        print('Fitting estimator completed in %.2g sec. \nCreating plots...' \
+              % (t1-t0))
         self.make_figures()
         print('Plots created and saved.')
     def train_and_minimize(self):
 
         result,est,opti_flag \
-            = opt.neural_network_opt(None, self.training_grid,self.target_vals,
+            = opt.neural_network_opt(None, self.training_grid,self.target_values,
                                      estimator=self.estimator_name,
-                                     hyper_paramter_dict=self.hyper_parameter_dict,
-                                     x_ini=self.x_init)
+                                     hyper_parameter_dict=self.hyper_parameter_dict,
+                                     x_init=self.x_init)
         self.opti_flag = opti_flag
         self.estimator = est
         self.optimization_result = result
@@ -10688,7 +10635,9 @@ class OptimizationAnalysis_Predictive2D:
                 ['MC'].attrs['optimization_method']
         except:
             optimization_method = 'Numerical'
-
+        if self.target_value_names is None:
+            self.target_value_names  =['none_label' for i in range(self.output_dim)]
+        self.target_value_names.append(r"$||z||_2 [a.u]$")
         pre_proc_dict = self.estimator.pre_proc_dict
         output_scale = pre_proc_dict.get('output',{}).get('scaling',1.)
         output_means = pre_proc_dict.get('output',{}).get('centering',0.)
@@ -10699,41 +10648,46 @@ class OptimizationAnalysis_Predictive2D:
         #contour plots are only created for the first two variables, one plot for
         #each output variable.
         lower_x = np.min(self.training_grid[:,0])-np.std(self.training_grid[:,0])
-        upper_x = np.max(self.training_grid[:,0])-np.std(self.training_grid[:,0])
+        upper_x = np.max(self.training_grid[:,0])+np.std(self.training_grid[:,0])
         lower_y = np.min(self.training_grid[:,1])-np.std(self.training_grid[:,1])
-        upper_y = np.max(self.training_grid[:,1])-np.std(self.training_grid[:,1])
+        upper_y = np.max(self.training_grid[:,1])+np.std(self.training_grid[:,1])
         x_mesh = (np.linspace(lower_x,upper_x,200)-input_means[0])/input_scale[0]
         y_mesh = (np.linspace(lower_y,upper_y,200)-input_means[1])/input_scale[1]
         Xm,Ym = np.meshgrid(x_mesh,y_mesh)
-        Zm = np.zeros((self.output_dim,200,200))
+        Zm = np.zeros((self.output_dim+1,200,200))
         for k in range(np.size(x_mesh)):
             for l in range(np.size(y_mesh)):
-                pred = self.estimator.predict([[Xm[k,l],Ym[k,l]]])
-                for j in range(self.output_dim):
-                    Zm[j,k,l] = pred[j]*output_scale[j]+output_means[j]
+                pred = self.estimator.predict([[Xm[k,l],Ym[k,l]]])[0]
+                for j in range(self.output_dim+1):
+                    if j==self.output_dim:
+                        new_val = 0.
+                        for m in range(1,self.output_dim+1):
+                            new_val += Zm[j-m,k,l]**2
+                        new_val = np.sqrt(new_val)
+                    else:
+                        new_val = pred[j]*output_scale[j]+output_means[j]
+                    Zm[j,k,l] = new_val
         Xm = Xm*input_scale[0] + input_means[0]
         Ym = Ym*input_scale[1] + input_means[1]
-
-
-        reminder = self.output_dim % 2
-        div = int(self.output_dim/2.)
+        reminder = (self.output_dim+1) % 2
+        div = int((self.output_dim+1)/2.)
         fig = plt.figure(figsize=(20,(reminder+div)*6))
-        plt_grid = plt.GridSpec(div+reminder,2,hspace=0.5,wspace=0.4)
+        plt_grid = plt.GridSpec(div+reminder,2,hspace=0.4,wspace=0.3)
         textstr = 'Optimization converged to: \n'
         base_figname = 'predictive optimization of '
-        for it in range(len(self.ma.parameter_names)):
-            textstr+='%s: %.3g %s' % (self.ma.parameter_names[it],
+        for it in range(len(self.ma.parameter_names)-1):
+            textstr+='%s: %.3g %s' % (self.ma.parameter_names[it+1],
                                       self.optimization_result[it],
-                                      self.ma.parameter_units[it])
+                                      self.ma.parameter_units[it+1])
             textstr+='\n'
             base_figname += self.ma.parameter_names[it]+'_'
         textstr+='Empirical error: '+'%.2f' % ((1.-self.estimator.score)*100.) +'%'
         figname = self.ma.timestamp_string+' '
         figname += self.estimator_name+' fitted landscape'
         savename = self.ma.timestamp_string + '_' + base_figname
+        tot = 0
         for it in range(div+reminder):
             for jt in range(2):
-                tot = it+jt
                 if reminder and it == (div+reminder-1) and jt == 1:
                     continue
                 ax = plt.subplot(plt_grid[it,jt])
@@ -10744,21 +10698,62 @@ class OptimizationAnalysis_Predictive2D:
                             horizontalalignment='right',
                             bbox=dict(facecolor='white',edgecolor='None',
                             alpha=0.75, boxstyle='round'))
-                levels = np.linspace(np.min(Zm[tot]),np.max(Zm[tot]),20)
+
+                levels = np.linspace(np.min(Zm[tot]),np.max(Zm[tot]),25)
                 CP = ax.contourf(Xm,Ym,Zm[tot],levels,extend='both')
                 ax.scatter(self.optimization_result[0],self.optimization_result[1],
-                            marker='o',c='white',label='network minimum')
+                            marker='*',c='white',label='network minimum',s=14)
+                ax.scatter((self.x_init[0]*input_scale[0])+input_means[0],
+                           (self.x_init[1]*input_scale[1])+input_means[1],
+                           marker='o',c='black',s=14,label='initial point')
                 ax.scatter(self.training_grid[:,0],self.training_grid[:,1],
                             marker='o',c='r',label='training data',s=10)
                 ax.tick_params(axis='both',which='minor',labelsize=14)
                 ax.set_ylabel(self.ma.parameter_labels[1],fontsize=fontsize)
-                ax.set_xlabel(self.ma.parameter_labels[0],fontsize=fontsize)
+                ax.set_xlabel(self.ma.parameter_labels[2],fontsize=fontsize)
                 cbar = plt.colorbar(CP,ax=ax,orientation='vertical')
-                cbar.ax.set_ylabel(self.ma.ylabels[tot],fontsize=fontsize)
+                cbar.ax.set_ylabel(self.target_value_names[tot],fontsize=fontsize)
+                ax.set_title('{} fitted landscape'.format(self.target_value_names[tot]))
                 ax.legend(loc='upper left',framealpha=0.75,fontsize=fontsize)
-                ax.set_title('{} fitted landscape'.format(self.ma.ylabels[tot]))
+                tot = tot+1
+
         fig.suptitle(figname,fontsize=16.)
         self.ma.save_fig(fig,figname=savename,**kw)
+
+        base_figname = 'CPhase_interpolated landscapes_'+self.ma.timestamp_string
+        f, (ax1,ax2) = plt.subplots(1,2)
+        f.subplots_adjust(wspace=0.8)
+        a_tools.color_plot_interpolated(
+            x=self.training_grid[:,0], y=self.training_grid[:,1],
+            z=1.-self.target_values[:,0], ax=ax1,N_levels=25,
+            zlabel=self.target_value_names[0])
+        ax1.plot(self.training_grid[:,0],
+                 self.training_grid[:,1], 'o', c='grey')
+        ax1.plot(self.optimization_result[0],
+                self.optimization_result[1],
+                'o', markersize=5, c='w')
+        plot_title = self.ma.timestamp_string + '_' +self.ma.measurementstring
+        ax1.set_title('Population loss Interpolated')
+        textstr = '%s ( %s )' % (self.ma.parameter_names[1],
+                                 self.ma.parameter_units[1])
+        set_xlabel(ax1, textstr)
+        set_xlabel(ax2, textstr)
+        textstr = '%s ( %s )' % (self.ma.parameter_names[2],
+                                 self.ma.parameter_units[2])
+        set_ylabel(ax1, textstr)
+        set_ylabel(ax2, textstr)
+        ax2.set_title(r"| \phi_C/$\pi$-1| Interpolated")
+        a_tools.color_plot_interpolated(
+            x=self.training_grid[:,0], y=self.training_grid[:,1],
+            z=self.target_values[:,1], ax=ax2,N_levels=25,
+            zlabel=self.target_value_names[1])
+        ax2.plot(self.training_grid[:,0],
+                 self.training_grid[:,1], 'o', c='grey')
+        ax2.plot(self.optimization_result[0],
+                 self.optimization_result[1],
+                 'o', markersize=5, c='w')
+        fig.suptitle(plot_title,fontsize=16.)
+        self.ma.save_fig(f, figname=base_figname, **kw)
 
 class Dynamic_phase_Analysis(MeasurementAnalysis):
 
