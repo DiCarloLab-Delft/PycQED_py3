@@ -7,7 +7,7 @@ stages:
   - deploy
 
 variables:
-  OPENQL_STABLE_TAG: "0.5"
+  OPENQL_STABLE_TAG: "0.5.3"
   QCODES_STABLE_TAG: "v0.1.11"
 
 before_script:
