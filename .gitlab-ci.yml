@@ -2,6 +2,7 @@ image:
   name: registry.gitlab.com/dicarlolab/pycqed/testing:latest
 
 stages:
+  - build_base
   - build
   - test
   - deploy
@@ -26,7 +27,7 @@ before_script:
   image:
     name: gcr.io/kaniko-project/executor:debug
     entrypoint: [""]
-  stage: build
+  stage: build_base
   script:
   - /kaniko/executor
     --context $CI_PROJECT_DIR
