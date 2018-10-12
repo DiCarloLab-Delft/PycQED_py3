@@ -48,7 +48,7 @@ def time_evolution(H_vec, c_ops, sim_step):
 def freq_shift_from_fluxbias(frequency,frequency_target,fluxbias_q0,positive_arc):
 
     '''
-    frequency_tanoise_parameters.CZrget = max frequency of the qubit
+    frequency_target = max frequency of the qubit
     positive_arc (bool) for single and double-sided
     '''
 
@@ -61,6 +61,7 @@ def freq_shift_from_fluxbias(frequency,frequency_target,fluxbias_q0,positive_arc
     else:
         sign = -1
 
+    # formula obtained for omega = omega_0 * sqrt(abs(cos(pi Phi/Phi_0)))
     frequency_biased = frequency - np.pi/2 * (frequency_target**2/frequency) * np.sqrt(1 - (frequency**4/frequency_target**4)) * fluxbias_q0 * sign - \
                                               - np.pi**2/2 * frequency_target * (1+(frequency**4/frequency_target**4)) / (frequency/frequency_target)**3 * fluxbias_q0**2
                                               # with sigma up to circa 1e-3 \mu\Phi_0 the second order is irrelevant
@@ -75,9 +76,14 @@ def calc_populations(U):
                                     [0,0,0]])/np.sqrt(2)
     hadamard_q0 = qtp.tensor(qtp.qeye(3),hadamard_singleq)
 
-    U_pi2_pulsed = hadamard_q0 * U * hadamard_q0
+    if U.type == 'oper':
+        U_pi2_pulsed = hadamard_q0 * U * hadamard_q0
+        populations = {'population_in_0': np.abs(U_pi2_pulsed[0,0])**2, 'population_in_1': np.abs(U_pi2_pulsed[0,1])**2}
+    elif U.type == 'super':
+        U_pi2_pulsed = qtp.to_super(hadamard_q0) * U * qtp.to_super(hadamard_q0)
+        populations = {'population_in_0': np.real(U_pi2_pulsed[0,0]), 'population_in_1': np.real(U_pi2_pulsed[0,10])}
 
-    return {'population_in_0': np.abs(U_pi2_pulsed[0,0])**2, 'population_in_1': np.abs(U_pi2_pulsed[0,1])**2}
+    return populations
 
 
 
@@ -92,6 +98,7 @@ class ramsey_experiment(det.Soft_Detector):
             fluxlutman (instr): an instrument that contains the parameters
                 required to generate the waveform for the trajectory, and the hamiltonian as well.
             noise_parameters_CZ: instrument that contains the noise parameters, plus some more
+            control_parameters_ramsey: instrument containing some parameters for ramsey that are passed via notebook
         """
         super().__init__()
         self.value_names = ['population_in_0','population_in_1']
@@ -100,23 +107,19 @@ class ramsey_experiment(det.Soft_Detector):
         self.noise_parameters_CZ = noise_parameters_CZ
         self.control_parameters_ramsey = control_parameters_ramsey
 
-        # instr_list=[self.fluxlutman,self.noise_parameters_CZ,self.control_parameters_ramsey]
-        # for instr in instr_list:
-        #     instr.print_readable_snapshot()
-
 
 
     def acquire_data_point(self, **kw):
 
-        ramsey = self.control_parameters_ramsey.ramsey()
-        sigma = self.control_parameters_ramsey.sigma()
-        detuning = self.control_parameters_ramsey.detuning_ramsey()
+        ramsey = self.control_parameters_ramsey.ramsey()                # True for Ram-Z, False for Echo-Z
+        sigma = self.control_parameters_ramsey.sigma()                  # width of the Gaussian distribution of the fluxbias
+        detuning = self.control_parameters_ramsey.detuning_ramsey()     # how much the freq of q0 is offset from the sweetspot
 
-        t = self.control_parameters_ramsey.pulse_length()
+        t = self.control_parameters_ramsey.pulse_length()               # separation time between the two pi/2 pulses
 
 
         qoi_plot = list()    # used to verify convergence properties. If len(n_sampling_gaussian_vec)==1, it is useless
-        n_sampling_gaussian_vec = [11]  # 11 guarantees excellent convergence. We choose it odd so that the central point of the Gaussian is included.
+        n_sampling_gaussian_vec = [101]  # 11 guarantees excellent convergence. We choose it odd so that the central point of the Gaussian is included.
                                         # ALWAYS choose it odd
         for n_sampling_gaussian in n_sampling_gaussian_vec:
             # If sigma=0 there's no need for sampling
@@ -131,14 +134,16 @@ class ramsey_experiment(det.Soft_Detector):
                 values_gaussian = np.array([1])
 
 
-            qoi_vec = list()
+            U_final_vec = list()
 
             for j_q0 in range(len(samplingpoints_gaussian)):
                 fluxbias_q0 = samplingpoints_gaussian[j_q0]
                 if sigma != 0:
-                    weights.append(values_gaussian[j_q0]*delta_x)
+                    weight=values_gaussian[j_q0]*delta_x
+                    weights.append(weight)
                 else:
-                    weights=[1]
+                    weight=1
+                    weights.append(weight)
 
 
                 f_q0_sweetspot = self.fluxlutman.q_freq_01()
@@ -146,35 +151,34 @@ class ramsey_experiment(det.Soft_Detector):
 
 
                 H=[]
-                if ramsey:
-
-                    f_q0_biased = freq_shift_from_fluxbias(f_q0_detuned,f_q0_sweetspot,fluxbias_q0,positive_arc=True)
-                    freq_rotating_frame = f_q0_biased-f_q0_sweetspot
-                    H.append(czu.coupled_transmons_hamiltonian_new(w_q0=freq_rotating_frame, w_q1=0, alpha_q0=-2*freq_rotating_frame, alpha_q1=0, J=0))
-                    sim_step = t
-
+                if ramsey:                         # the freq shift takes a different sign at first order on the two sides of Echo-Z
+                    positive = [True]
                 else:
+                    positive = [True, False]
 
-                    for positive in [True, False]:
-                        f_q0_biased = freq_shift_from_fluxbias(f_q0_detuned,f_q0_sweetspot,fluxbias_q0,positive_arc=positive)
-                        freq_rotating_frame = f_q0_biased-f_q0_sweetspot
-                        H.append(czu.coupled_transmons_hamiltonian_new(w_q0=freq_rotating_frame, w_q1=0, alpha_q0=-2*freq_rotating_frame, alpha_q1=0, J=0))
-                    sim_step = t/2
+                for pos in positive:
+                    f_q0_biased = freq_shift_from_fluxbias(f_q0_detuned,f_q0_sweetspot,fluxbias_q0,positive_arc=pos)
+                    freq_rotating_frame_detuned = f_q0_biased-f_q0_sweetspot-detuning
+                    H.append(czu.coupled_transmons_hamiltonian_new(w_q0=freq_rotating_frame_detuned, w_q1=0, alpha_q0=-2*freq_rotating_frame_detuned, alpha_q1=0, J=0))
+                                                                    # convenient way of getting the uncpupled Hamiltonian for one qubit
+                sim_step = t/len(positive)
 
                 c_ops=[]
 
                 U_final = time_evolution(H, c_ops, sim_step)
-
-                qoi = calc_populations(U_final)
-                quantities_of_interest = [qoi['population_in_0']*100, qoi['population_in_1']*100]
-                qoi_vec.append(np.array(quantities_of_interest))
+                if U_final.type == 'oper':
+                    U_final = qtp.to_super(U_final)
+                U_final_vec.append(U_final*weight)
 
             weights = np.array(weights)
 
-            qoi_average = np.zeros(len(quantities_of_interest))
-            for index in [0,1]:    # 4 is not trustable here, and we don't care anyway
-                qoi_average[index] = np.average(np.array(qoi_vec)[:,index], weights=weights)
-            qoi_plot.append(qoi_average)
+            U_superop_average = np.sum(np.array(U_final_vec))               # computing resulting superoperator
+
+            qoi = calc_populations(U_superop_average)
+            quantities_of_interest = [qoi['population_in_0']*100, qoi['population_in_1']*100]
+            qoi_vec=np.array(quantities_of_interest)
+
+            qoi_plot.append(qoi_vec)
 
         qoi_plot = np.array(qoi_plot)
 
