@@ -1394,7 +1394,7 @@ class TD_Analysis(MeasurementAnalysis):
     def __init__(self, NoCalPoints=4, center_point=31, make_fig=True,
                  zero_coord=None, one_coord=None, cal_points=None,
                  rotate_and_normalize=True, plot_cal_points=True,
-                 for_ef=False, qb_name=None, RO_channel=0, **kw):
+                 for_ef=False, qb_name=None, RO_channels=(0, 1), **kw):
         self.NoCalPoints = NoCalPoints
         self.normalized_values = []
         self.normalized_cal_vals = []
@@ -1407,7 +1407,7 @@ class TD_Analysis(MeasurementAnalysis):
         self.center_point = center_point
         self.plot_cal_points = plot_cal_points
         self.for_ef = for_ef
-        self.RO_channel = RO_channel
+        self.RO_channels = RO_channels
 
         super().__init__(qb_name=qb_name, **kw)
 
@@ -1507,6 +1507,7 @@ class TD_Analysis(MeasurementAnalysis):
 
         # Plotting
         if self.make_fig:
+            plot_title_suffix = kw.get('plot_title_suffix', '')
             self.fig, self.ax = self.default_ax()
 
             if self.for_ef:
@@ -1515,7 +1516,8 @@ class TD_Analysis(MeasurementAnalysis):
                 # ylabel = r'$F$ $\left(|e \rangle \right) (arb. units)$'
                 ylabel = r'$F$ $|1 \rangle$'
 
-            plot_title = kw.pop('plot_title', self.measurementstring + '\n' +
+            plot_title = kw.pop('plot_title', self.measurementstring
+                                + plot_title_suffix + '\n' +
                                self.timestamp_string)
             self.plot_results_vs_sweepparam(x=self.sweep_points,
                                             y=self.normalized_values,
@@ -1549,7 +1551,7 @@ class TD_Analysis(MeasurementAnalysis):
         values: array of measured values, uses only the length of this
         calsteps: number of points that corresponds to calibration points
         '''
-
+        print('RO_channels ', self.RO_channels)
         last_ge_pulse = kw.pop('last_ge_pulse', False)
 
         # Extract the indices of the cal points
@@ -1596,42 +1598,48 @@ class TD_Analysis(MeasurementAnalysis):
             cal_one_points = None
 
         # Rotate and normalize data
-        if len(self.measured_values) == 1 or self.RO_channel != 0:
-            # Only one quadrature was measured
-            if cal_zero_points is None and cal_one_points is None:
-                # a_tools.normalize_data_v3 does not work with 0 cal_points. Use
-                # 4 cal_points.
-                logging.warning('a_tools.normalize_data_v3 does not have support'
-                                ' for 0 cal_points. Setting NoCalPoints to 4.')
-                self.NoCalPoints = 4
-                calsteps = 4
-                cal_zero_points = \
-                    list(range(NoPts - int(self.NoCalPoints),
-                             int(NoPts - int(self.NoCalPoints) / 2)))
-                cal_one_points = \
-                    list(range(int(NoPts - int(self.NoCalPoints) / 2), NoPts))
-            self.corr_data = a_tools.normalize_data_v3(
-                self.measured_values[self.RO_channel],
-                cal_zero_points, cal_one_points)
+        if (calsteps == 6) and (not last_ge_pulse):
+            # ONLY WORKS FOR SINGLE QUBIT MEASUREMENTS
+            # For this case we pass in the calibration data, not the indices
+            # of the cal points.
+            # zero_coord takes the cal_one_points and one_coord takes the
+            # cal_zero_points because in a_tools.rotate_and_normalize_data
+            # we must have for this case "calculate_rotation_matrix(
+            # -(I_one-I_zero), -(Q_one-Q_zero))" in order to get
+            # correct rotation
+            zero_coord = [np.mean(self.measured_values[0][cal_one_points]),
+                          np.mean(self.measured_values[1][cal_one_points])]
+            one_coord = [np.mean(self.measured_values[0][cal_zero_points]),
+                         np.mean(self.measured_values[1][cal_zero_points])]
+            self.corr_data = a_tools.rotate_and_normalize_data(
+                data=self.measured_values[0:2],
+                zero_coord=zero_coord, one_coord=one_coord)[0]
         else:
-            if (calsteps == 6) and (not last_ge_pulse):
-                # For this case we pass in the calibration data, not the indices
-                # of the cal points.
-                # zero_coord takes the cal_one_points and one_coord takes the
-                # cal_zero_points because in a_tools.rotate_and_normalize_data
-                # we must have for this case "calculate_rotation_matrix(
-                # -(I_one-I_zero), -(Q_one-Q_zero))" in order to get
-                # correct rotation
-                zero_coord = [np.mean(self.measured_values[0][cal_one_points]),
-                              np.mean(self.measured_values[1][cal_one_points])]
-                one_coord = [np.mean(self.measured_values[0][cal_zero_points]),
-                             np.mean(self.measured_values[1][cal_zero_points])]
-                self.corr_data = a_tools.rotate_and_normalize_data(
-                    data=self.measured_values[0:2],
-                    zero_coord=zero_coord, one_coord=one_coord)[0]
+            if len(self.measured_values) == 1 or len(self.RO_channels) == 1:
+                # Only one quadrature was measured
+                if cal_zero_points is None and cal_one_points is None:
+                    # a_tools.normalize_data_v3 does not work with 0 cal_points. Use
+                    # 4 cal_points.
+                    logging.warning('a_tools.normalize_data_v3 does not have support'
+                                    ' for 0 cal_points. Setting NoCalPoints to 4.')
+                    self.NoCalPoints = 4
+                    calsteps = 4
+                    cal_zero_points = \
+                        list(range(NoPts - int(self.NoCalPoints),
+                                   int(NoPts - int(self.NoCalPoints) / 2)))
+                    cal_one_points = \
+                        list(range(int(NoPts - int(self.NoCalPoints) / 2), NoPts))
+                ch_to_measure = \
+                    0 if len(self.measured_values) == 1 else self.RO_channels[0]
+                print('ch to measure ', ch_to_measure)
+                self.corr_data = a_tools.normalize_data_v3(
+                    self.measured_values[ch_to_measure],
+                    cal_zero_points, cal_one_points)
             else:
                 self.corr_data = a_tools.rotate_and_normalize_data(
-                    self.measured_values[0:2], cal_zero_points,
+                    self.measured_values[
+                    self.RO_channels[0]:self.RO_channels[1] + 1],
+                    cal_zero_points,
                     cal_one_points)[0]
 
         if save_norm_to_data_file:
@@ -2072,6 +2080,7 @@ class Rabi_Analysis(TD_Analysis):
         plot_errorbars = kw.get('plot_errorbars', False)
         print_fit_results = kw.get('print_fit_results', False)
         separate_fits = kw.get('separate_fits', False)
+        plot_title_suffix= kw.get('plot_title_suffix', '')
 
         self.nr_quadratures = len(self.ylabels)  # for legacy reasons
         # Create new sweep points without cal pts variable. Needed here because
@@ -2097,7 +2106,8 @@ class Rabi_Analysis(TD_Analysis):
             self.make_figures(show=show, show_guess=show_guess,
                               plot_amplitudes=plot_amplitudes,
                               plot_errorbars=plot_errorbars,
-                              separate_fits=separate_fits)
+                              separate_fits=separate_fits,
+                              plot_title_suffix=plot_title_suffix)
 
         if close_file:
             self.data_file.close()
@@ -2106,6 +2116,8 @@ class Rabi_Analysis(TD_Analysis):
 
     def make_figures(self, show=False, show_guess=False, plot_amplitudes=True,
                      plot_errorbars=True, separate_fits=False, **kw):
+
+        plot_title_suffix = kw.pop('plot_title_suffix', '')
 
         if not separate_fits:
             pi_pulse = self.rabi_amplitudes['piPulse']
@@ -2164,7 +2176,8 @@ class Rabi_Analysis(TD_Analysis):
             # Plot with initial guess
             if show_guess:
                 self.ax.plot(self.sweep_pts_wo_cal_pts,
-                             self.fit_result.init_fit, 'k--', linewidth=self.line_width)
+                             self.fit_result.init_fit, 'k--',
+                             linewidth=self.line_width)
 
             # Plot the calculated pi and pi/2 amplitudes
             if plot_amplitudes:
@@ -2199,7 +2212,8 @@ class Rabi_Analysis(TD_Analysis):
                 plt.show()
             self.ax.set_ylabel('V_homodyne (a.u)')
             # save figure
-            self.save_fig(self.fig, figname=self.measurementstring + '_Rabi_fit',
+            self.save_fig(self.fig, figname=(self.measurementstring +
+                                            '_Rabi_fit' + plot_title_suffix),
                           **kw)
 
         else:
@@ -2899,8 +2913,10 @@ class QScale_Analysis(TD_Analysis):
                 plt.show()
 
             if kw.pop('save_fig', True):
+                plot_title_suffix = kw.pop('plot_title_suffix', '')
                 self.save_fig(fig,
-                              figname=self.measurementstring + '_Qscale_fit', **kw)
+                              figname=self.measurementstring + '_Qscale_fit' +
+                                      plot_title_suffix, **kw)
 
         if close_file:
             self.data_file.close()
@@ -4405,6 +4421,7 @@ class T1_Analysis(TD_Analysis):
 
         # Plot best fit and initial fit + data
         if self.make_fig:
+            plot_title_suffix = kw.pop('plot_title_suffix', '')
 
             units = SI_prefix_and_scale_factor(val=max(abs(self.ax.get_xticks())),
                                                unit=self.sweep_unit[0])[1]
@@ -4454,7 +4471,8 @@ class T1_Analysis(TD_Analysis):
             if show:
                 plt.show()
 
-            self.save_fig(self.fig, figname=self.measurementstring + '_Fit', **kw)
+            self.save_fig(self.fig, figname=self.measurementstring + '_Fit'+
+                                            plot_title_suffix, **kw)
 
         if close_file:
             self.data_file.close()
@@ -4845,6 +4863,8 @@ class Ramsey_Analysis(TD_Analysis):
             show_guess = kw.pop('show_guess', False)
             show = kw.pop('show', False)
             plot_gaussian = kw.pop('plot_gaussian', True)
+            plot_title_suffix = kw.pop('plot_title_suffix', '')
+
             self.plot_results(self.fit_res, show_guess=show_guess,
                               art_det=self.artificial_detuning,
                               fig=self.fig, ax=self.ax,
@@ -4857,7 +4877,8 @@ class Ramsey_Analysis(TD_Analysis):
             #save figure
             fig_name_suffix = kw.pop('fig_name_suffix', 'Ramsey_fit')
             self.save_fig(self.fig, figname=(self.measurementstring+'_'+
-                                             fig_name_suffix), **kw)
+                                             fig_name_suffix +
+                                             plot_title_suffix), **kw)
 
     def two_art_dets_analysis(self, **kw):
 
@@ -4938,6 +4959,7 @@ class Ramsey_Analysis(TD_Analysis):
         if self.make_fig_two_dets:
             show_guess = kw.pop('show_guess', False)
             show = kw.pop('show', False)
+            plot_title_suffix = kw.pop('plot_title_suffix', '')
 
             if self.for_ef:
                 ylabel = r'$F$ $\left(|f \rangle \right) (arb. units)$'
@@ -5007,7 +5029,8 @@ class Ramsey_Analysis(TD_Analysis):
             #save figure
             fig_name_suffix = kw.pop('fig_name_suffix', 'Ramsey_fit')
             self.save_fig(self.fig, figname=(self.measurementstring+
-                                             '_'+fig_name_suffix), **kw)
+                                             '_'+fig_name_suffix+
+                                             plot_title_suffix), **kw)
 
     def get_measured_freq(self, fit_res, **kw):
         freq = fit_res.params['frequency'].value
@@ -10313,7 +10336,7 @@ class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
                                                            auto=False,
                                                            **kw)
         self.get_naming_and_values_2D()
-        self.fitted_phases,self.fitted_amps = self.fit_all(return_ampl=True,
+        self.fitted_phases, self.fitted_amps = self.fit_all(return_ampl=True,
                                                            plot=plot,
                                                            **kw)
 
@@ -10546,16 +10569,27 @@ class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
             phase_list = self.unwrap_phases_extrapolation(phase_list)
 
         if plot:
-            ax.set_title('Cosine fits_'+self.timestamp_string)
-            ax.set_xlabel('theta (rad)')
-            ax.set_ylabel('|S21| (arb. units)')
-            ax.legend(['data','fits'])
+            if len(self.sweep_points_2D[0]) == 2:
+                ax.set_title('Cphase = {:0.2f} deg \n {:0.4f} ns, '
+                             '{:0.4f} V \n {}'.format(
+                    (phase_list[1]-phase_list[0])*180/np.pi,
+                    self.sweep_points_2D[1][0]*1e9,
+                    self.sweep_points_2D[0][0],
+                    self.timestamp_string))
+            else:
+                ax.set_title('Cosine fits \n' + self.timestamp_string)
+            ax.set_xlabel(r'Phase of 2nd pi/2 pulse, $\theta$[rad]')
+            ax.set_ylabel('Response (arb. units)')
+            ax.legend(['data', 'fits'])
 
             if not only_cos_fits:
                 if fit_range is None:
-                    self.ax[1].plot(range(len(self.sweep_points_2D[0])),phase_list)
+                    self.ax[1].plot(range(len(self.sweep_points_2D[0])),
+                                    phase_list)
                 else:
-                    self.ax[1].plot(range(len(self.sweep_points_2D[0,fit_range[0]:fit_range[1]])),phase_list)
+                    self.ax[1].plot(range(len(self.sweep_points_2D[0,
+                                              fit_range[0]:fit_range[1]])),
+                                    phase_list)
                 self.ax[1].set_title('fitted phases')
                 self.ax[1].set_xlabel('Date point #')
                 self.ax[1].set_ylabel('Phase (rad)')
@@ -10891,7 +10925,7 @@ class Dynamic_phase_Analysis(MeasurementAnalysis):
             self.qb_name, self.flux_pulse_length*1e9,
             self.flux_pulse_amp, self.timestamp_string))
         ax.set_xlabel(r'Phase of 2nd pi/2 pulse, $\theta$[rad]')
-        ax.set_ylabel('Response (V)')
+        ax.set_ylabel('Response (arb. units)')
 
         ax.legend()
         self.fit_res[dict_label] = fit_res

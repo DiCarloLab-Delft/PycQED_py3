@@ -445,7 +445,7 @@ def get_multiplexed_readout_pulse_dictionary(qubits):
 
 def get_operation_dict(qubits):
     operation_dict = {'RO mux':
-                          get_multiplexed_readout_pulse_dictionary(qubits)}
+                      get_multiplexed_readout_pulse_dictionary(qubits)}
     for qb in qubits:
         operation_dict.update(qb.get_operation_dict())
     return operation_dict
@@ -773,7 +773,8 @@ def measure_tomography(qubits, prep_sequence, state_name, f_LO,
 
     # from this point on number of segments is fixed
     sf = awg_swf2.n_qubit_seq_sweep(seq_len=n_segments)
-    shots = 4094 - 4094 % n_segments
+    # shots = 4094 - 4094 % n_segments
+    shots = 600000
 
     if thresholded:
         df = get_multiplexed_readout_detector_functions(qubits,
@@ -828,8 +829,14 @@ def measure_tomography(qubits, prep_sequence, state_name, f_LO,
     MC.set_sweep_points_2D(np.arange(nreps))
     MC.set_detector_function(df)
     if run:
-        MC.run_2D('{}_tomography_ssro_{}'.format(state_name, '-'.join(
-            [qb.name for qb in qubits])), exp_metadata=exp_metadata)
+        if preselection:
+            label = '{}_tomography_ssro_preselection_{}'.format(state_name, '-'.join(
+                [qb.name for qb in qubits]))
+        else:
+            label = '{}_tomography_ssro_{}'.format(state_name, '-'.join(
+                [qb.name for qb in qubits]))
+
+        MC.run_2D(label, exp_metadata=exp_metadata)
 
     return elts
 
@@ -839,7 +846,7 @@ def measure_two_qubit_randomized_benchmarking(qb1, qb2, f_LO,
                                               nr_seeds_value,
                                               CZ_pulse_name=None,
                                               net_clifford=0,
-                                              nr_averages=1024,
+                                              nr_averages=4096,
                                               clifford_decomposition_name='HZ',
                                               interleaved_gate=None,
                                               MC=None, UHFQC=None,
@@ -880,7 +887,7 @@ def measure_two_qubit_randomized_benchmarking(qb1, qb2, f_LO,
         qb.prepare_for_timedomain(multiplexed=True)
 
     multiplexed_pulse(qubits, f_LO, upload=True)
-    operation_dict = get_multiplexed_readout_pulse_dictionary(qubits)
+    operation_dict = get_operation_dict(qubits)
 
     hard_sweep_points = np.arange(nr_seeds_value)
     hard_sweep_func = awg_swf2.two_qubit_randomized_benchmarking_one_length(
@@ -1459,85 +1466,86 @@ def cphase_gate_tuneup(qb_control, qb_target,
     return pulse_length_best_value, pulse_amplitude_best_value
 
 
-def cphase_gate_tuneup_predictive(qbc, qbt, qbr,flux_lengths=None,
+def cphase_gate_tuneup_predictive(qbc, qbt, qbr, flux_lengths=None,
                                   flux_amps=None,MC=None,phases=None,
                                   hyper_parameter_dict=None,
-                                  n_meas=100):
+                                  n_meas=100, update=False,full_output=False):
 
-    '''
-    function that runs the nelder mead algorithm to optimize the CPhase gate
-    parameters (pulse lengths and pulse amplitude)
+    if not update:
+        logging.warning("Does not automatically update the CZ pulse length "
+                        "and amplitude. "
+                        "Set update=True if you want this!")
 
-    Args:
-        qb_control (QuDev_Transmon): control qubit (with flux pulses)
-        qb_target (QuDev_Transmon): target qubit
-        spacing (float): safety spacing between drive pulses and flux pulse
-        ramsey_phases (numpy array): phases used in the Ramsey measurement
-
-    Returns:
-        pulse_length_best_value, pulse_amplitude_best_value
-
-    '''
     if hyper_parameter_dict is None:
         logging.warning('\n No hyperparameters passed to predictive mixer '
                         'calibration routine. Default values for the estimator'
                         'will be used!\n')
-        hyper_parameter_dict={'cv_n_fold':10,
-                             'std_scaling':[0.3,0.3]
-                             }
+        hyper_parameter_dict = {'cv_n_fold': 10,
+                                'std_scaling': [0.3, 0.3]}
     if MC is None:
-        MC= qbc.MC
+        MC = qbc.MC
     if flux_lengths is None:
-        flux_lengths = np.random.normal(100e-9,20e-9,n_meas)   #hardcoded so far
+        flux_lengths = np.random.normal(100e-9, 20e-9, n_meas)   #hardcoded so far
     if flux_amps is None:
-        flux_amps = np.random.normal(1.15,0.02,n_meas)
-    if phases is None:
-        phases = np.linspace(0,2*np.pi,16,endpoint=False)
-        np.concatenate((phases,phases))
+        flux_amps = np.random.normal(1.15, 0.02, n_meas)
 
-    cphases, population_losses, ma_ram2D = measure_cphase_new(qbc,qbt,qbr,
-                                                     flux_lengths,flux_amps,
+    if phases is None:
+        phases = np.linspace(0, 2*np.pi, 16, endpoint=False)
+
+    phases = np.concatenate((phases, phases))
+
+    cphases, population_losses, ma_ram2D = measure_cphase_new(qbc, qbt, qbr,
+                                                     flux_lengths, flux_amps,
                                                      phases=phases,
-                                                     plot=False,MC=MC)
+                                                     plot=False, MC=MC)
     target_phases = np.abs(np.abs(cphases/np.pi) - 1.)
     target_pops = np.abs(population_losses)
     target_norm = np.sqrt(target_phases**2+target_pops**2)
     min_ind = np.argmin(target_norm)
-    x_init = [flux_lengths[min_ind],flux_amps[min_ind]]
-    training_grid = np.array([flux_lengths,flux_amps]).T
-    target_values = np.array([target_pops,target_phases]).T
+    x_init = [flux_lengths[min_ind], flux_amps[min_ind]]
+    training_grid = np.array([flux_lengths, flux_amps]).T
+    target_values = np.array([target_pops, target_phases]).T
 
     target_value_names = ['Population Loss [%]','|Phase/pi - 1| [a.u]']
     a_pred = ma.OptimizationAnalysis_Predictive2D(training_grid,target_values,
                                     ma_ram2D,x_init=x_init,
                                     hyper_parameter_dict=hyper_parameter_dict,
-                                    target_value_names=target_value_names
-                                                  )
+                                    target_value_names=target_value_names)
+
     pulse_length_best_value = a_pred.optimization_result[0]
     pulse_amplitude_best_value = a_pred.optimization_result[1]
 
-    cphases_opt,population_losses_opt,ma_ram2D_opt = measure_cphase_new(qbc,qbt,qbr,
-                                                                    [pulse_length_best_value],
-                                                                    [pulse_amplitude_best_value],
-                                                                    phases=phases,
-                                                                    plot=True)
+    cphases_opt, population_losses_opt, ma_ram2D_opt = \
+        measure_cphase_new(qbc, qbt, qbr, [pulse_length_best_value],
+                           [pulse_amplitude_best_value], phases=phases,
+                           plot=True)
     cphases_opt = np.abs(cphases_opt/np.pi)
-    population_losses_opt = np.abs(1.-population_losses)*100
+    population_losses_opt = np.abs(1.-population_losses_opt)*100
 
     print('CPhase optimization finished with optimal values: \n',
-          'Controlled Phase QBc={} QBt={}: '.format(qbc.name,qbt.name),cphases_opt,r"$\pi$",'\n',
-          'Population Recovery |e> QBt: ',population_losses_opt,'[%]\n',
+          'Controlled Phase QBc={} QBt={}: '.format(qbc.name, qbt.name),
+          cphases_opt, r"$\pi$", '\n',
+          'Population Recovery |e> QBt: ', population_losses_opt, '[%]\n',
           '@ flux pulse Paramters: \n',
-          'Pulse Length: %3.g ns \n' % pulse_length_best_value*1e9,
-          'Pulse Length: %3.g V \n' % pulse_amplitude_best_value)
+          'Pulse Length: {:0.1f} ns \n'.format(pulse_length_best_value*1e9),
+          'Pulse Length: {:0.4f} V \n'.format(pulse_amplitude_best_value))
 
-    return pulse_length_best_value, pulse_amplitude_best_value
+
+    if update:
+        qbc.set('CZ_{}_amp'.format(qbt.name), pulse_amplitude_best_value)
+        qbc.set('CZ_{}_length'.format(qbt.name), pulse_length_best_value)
+
+    if full_output:
+        return pulse_length_best_value, pulse_amplitude_best_value,\
+               [population_losses_opt,cphases_opt]
+    else:
+        return pulse_length_best_value, pulse_amplitude_best_value
 
 
 def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
                        artificial_detuning=None,
                        cal_points=True, no_cal_points=4, upload=True,
-                       MC=None, soft_avgs=1,
+                       MC=None, soft_avgs=1, n_rabi_pulses=1,
                        thresholded=False, #analyses can't handle it!
                        analyze=True, update=False,
                        UHFQC=None, pulsar=None, **kw):
@@ -1552,27 +1560,31 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
     if UHFQC is None:
         UHFQC = qubits[0].UHFQC
     if pulsar is None:
-        pulsar = qubits[0].pulsar
+        pulsar = qubits[0].AWG
 
     # set up multiplexed readout
     multiplexed_pulse(qubits, f_LO, upload=True)
-
     operation_dict = get_operation_dict(qubits)
-
     if thresholded:
         key = 'dig'
     else:
         key = 'int'
-
     df = get_multiplexed_readout_detector_functions(
         qubits, UHFQC=UHFQC, pulsar=pulsar)[key + '_avg_det']
+
+    RO_channels_dict = {}
+    for qb in qubits:
+        RO_channels_dict[qb.name] = [qb.RO_acq_weight_function_I()]
+        if qb.ro_acq_weight_type() in ['SSB', 'DSB']:
+            RO_channels_dict[qb.name] += [qb.RO_acq_weight_function_Q()]
+        qb.prepare_for_timedomain(multiplexed=True)
 
     qubit_names = [qb.name for qb in qubits]
 
     if len(qubit_names) > 5:
         msmt_suffix = '_{}qubits'.format(len(qubit_names))
     else:
-        msmt_suffix = '_qb{}'.format(''.join([i[-1] for i in qubit_names]))
+        msmt_suffix = '_qbs{}'.format(''.join([i[-1] for i in qubit_names]))
 
     if cal_points:
         for key, spts in sweep_points_dict.items():
@@ -1588,18 +1600,20 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
                 else:
                     sweep_points_dict[key] = spts
 
-    # Generate the sweep params
+    # Do measurements
+    # RABI
     if 'rabi' in sweep_points_dict:
         sweep_points = sweep_points_dict['rabi']
+
         if sweep_params is None:
             sweep_params = (
-                ('X180', {'pulse_pars': {'amplitude': (lambda sp: sp),
-                                         'repeat': 3}}),
+                ('X180', {'pulse_pars': {'amplitude': (lambda sp: sp)},
+                          'repeat': 1}),
             )
 
-        sf = calibrate_n_qubits(sweep_params=sweep_params,
+        sf = awg_swf2.calibrate_n_qubits(sweep_params=sweep_params,
                                 sweep_points=sweep_points,
-                                qb_names=qubit_names,
+                                qubit_names=qubit_names,
                                 operation_dict=operation_dict,
                                 cal_points=cal_points,
                                 upload=upload,
@@ -1611,26 +1625,78 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
         MC.set_sweep_points(sweep_points)
         MC.set_detector_function(df)
         label = 'Rabi' + msmt_suffix
+
         MC.run(label)
 
         if analyze:
             for qb in qubits:
                 RabiA = ma.Rabi_Analysis(
                     label=label, qb_name=qb.name,
-                    RO_channel=qb.RO_acq_weight_function_I(),
-                    NoCalPoints=4, close_fig=True, **kw)
+                    RO_channels=RO_channels_dict[qb.name],
+                    NoCalPoints=4, close_fig=True,
+                    plot_title_suffix='_'+qb.name, **kw)
 
+                print(qb.name,  RabiA.rabi_amplitudes['piPulse'])
                 if update:
                     rabi_amps = RabiA.rabi_amplitudes
                     amp180 = rabi_amps['piPulse']
                     amp90 = rabi_amps['piHalfPulse']
                     try:
                         qb.amp180(amp180)
-                        qb.amp90_scale(amp90/amp180)
+                        qb.amp90_scale(0.5)
                     except AttributeError as e:
                         logging.warning('%s. This parameter will not be '
-                                        'updated.'%e)
+                                        'updated.' % e)
 
+    # N-RABI
+    if 'n_rabi' in sweep_points_dict:
+        sweep_points = sweep_points_dict['n_rabi']
+
+        if sweep_params is None:
+            sweep_params = (
+                ('X180', {'pulse_pars': {'amplitude': (lambda sp: sp)},
+                          'repeat': n_rabi_pulses}),
+            )
+
+        sf = awg_swf2.calibrate_n_qubits(sweep_params=sweep_params,
+                                         sweep_points=sweep_points,
+                                         qubit_names=qubit_names,
+                                         operation_dict=operation_dict,
+                                         cal_points=cal_points,
+                                         upload=upload,
+                                         parameter_name='amplitude',
+                                         unit='V')
+
+        MC.soft_avg(soft_avgs)
+        MC.set_sweep_function(sf)
+        MC.set_sweep_points(sweep_points)
+        MC.set_detector_function(df)
+
+        label = 'Rabi-n{}'.format(n_rabi_pulses) + msmt_suffix
+
+        MC.run(label)
+
+        if analyze:
+            for qb in qubits:
+                RabiA = ma.Rabi_Analysis(
+                    label=label, qb_name=qb.name,
+                    RO_channels=RO_channels_dict[qb.name],
+                    NoCalPoints=4, close_fig=True,
+                    plot_title_suffix='_'+qb.name, **kw)
+
+                print(qb.name,  RabiA.rabi_amplitudes['piPulse'])
+                if update:
+                    rabi_amps = RabiA.rabi_amplitudes
+                    amp180 = rabi_amps['piPulse']
+                    amp90 = rabi_amps['piHalfPulse']
+                    try:
+                        qb.amp180(amp180)
+                        qb.amp90_scale(0.5)
+                    except AttributeError as e:
+                        logging.warning('%s. This parameter will not be '
+                                        'updated.' % e)
+
+    # RAMSEY
     if 'ramsey' in sweep_points_dict:
         if artificial_detuning is None:
             raise ValueError('Specify an artificial_detuning for the Ramsey '
@@ -1648,9 +1714,9 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
                                    360) % 360)}})
             )
 
-        sf = calibrate_n_qubits(sweep_params=sweep_params,
-                                sweep_points=sweep_points_dict['rabi'],
-                                qb_names=qubit_names,
+        sf = awg_swf2.calibrate_n_qubits(sweep_params=sweep_params,
+                                sweep_points=sweep_points_dict['ramsey'],
+                                qubit_names=qubit_names,
                                 operation_dict=operation_dict,
                                 cal_points=cal_points,
                                 upload=upload,
@@ -1668,8 +1734,9 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
             for qb in qubits:
                 RamseyA = ma.Ramsey_Analysis(
                     label=label, qb_name=qb.name,
-                    NoCalPoints=4, RO_channel=qb.RO_acq_weight_function_I(),
-                    artificial_detuning=artificial_detuning, **kw)
+                    NoCalPoints=4, RO_channels=RO_channels_dict[qb.name],
+                    artificial_detuning=artificial_detuning,
+                    plot_title_suffix='_'+qb.name, **kw)
 
                 if update:
                     new_qubit_freq = RamseyA.qubit_frequency
@@ -1685,6 +1752,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
                         logging.warning('%s. This parameter will not be '
                                         'updated.'%e)
 
+    # QSCALE
     if 'qscale' in sweep_points_dict:
         sweep_points = sweep_points_dict['qscale']
         temp_array = np.zeros(3*sweep_points.size)
@@ -1725,9 +1793,9 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
                 ('RO', {})
             )
 
-        sf = calibrate_n_qubits(sweep_params=sweep_params,
+        sf = awg_swf2.calibrate_n_qubits(sweep_params=sweep_params,
                                 sweep_points=sweep_points_dict['qscale'],
-                                qb_names=qubit_names,
+                                         qubit_names=qubit_names,
                                 operation_dict=operation_dict,
                                 cal_points=cal_points,
                                 upload=upload,
@@ -1746,7 +1814,8 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
                 qscaleA = ma.QScale_Analysis(
                     label=label, qb_name=qb.name,
                     NoCalPoints=4,
-                    RO_channel=qb.RO_acq_weight_function_I(), **kw)
+                    RO_channels=RO_channels_dict[qb.name],
+                    plot_title_suffix='_'+qb.name, **kw)
 
                 if update:
                     qscale_dict = qscaleA.optimal_qscale #dictionary of value, stderr
@@ -1758,7 +1827,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
                         logging.warning('%s. This parameter will not be '
                                         'updated.'%e)
 
-
+    # T1
     if 'T1' in sweep_points_dict:
         sweep_points = sweep_points_dict['T1']
         if sweep_params is None:
@@ -1767,9 +1836,9 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
                 ('RO_mux', {'pulse_pars': {'pulse_delay': (lambda sp: sp)}})
             )
 
-        sf = calibrate_n_qubits(sweep_params=sweep_params,
+        sf = awg_swf2.calibrate_n_qubits(sweep_params=sweep_params,
                                 sweep_points=sweep_points_dict['qscale'],
-                                qb_names=qubit_names,
+                                qubit_names=qubit_names,
                                 operation_dict=operation_dict,
                                 cal_points=cal_points,
                                 upload=upload,
@@ -1787,7 +1856,8 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
             for qb in qubits:
                 T1_Analysis = ma.T1_Analysis(
                     label=label, qb_name=qb.name, NoCalPoints=4,
-                    RO_channel=qb.RO_acq_weight_function_I(), **kw)
+                    RO_channels=RO_channels_dict[qb.name],
+                    plot_title_suffix='_'+qb.name, **kw)
 
                 if update:
                     try:
@@ -1796,7 +1866,7 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
                         logging.warning('%s. This parameter will not be '
                                         'updated.'%e)
 
-
+    # T2 ECHO
     if 'T2' in sweep_points_dict:
         if artificial_detuning is None:
             raise ValueError('Specify an artificial_detuning for the Ramsey '
@@ -1816,9 +1886,9 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
 
             )
 
-        sf = calibrate_n_qubits(sweep_params=sweep_params,
+        sf = awg_swf2.calibrate_n_qubits(sweep_params=sweep_params,
                                 sweep_points=sweep_points_dict['qscale'],
-                                qb_names=qubit_names,
+                                qubit_names=qubit_names,
                                 operation_dict=operation_dict,
                                 cal_points=cal_points,
                                 upload=upload,
@@ -1836,8 +1906,9 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
             for qb in qubits:
                 RamseyA = ma.Ramsey_Analysis(
                     label=label, qb_name=qb.name,
-                    NoCalPoints=4, RO_channel=qb.RO_acq_weight_function_I(),
-                    artificial_detuning=artificial_detuning, **kw)
+                    NoCalPoints=4, RO_channels=RO_channels_dict[qb.name],
+                    artificial_detuning=artificial_detuning,
+                    plot_title_suffix='_'+qb.name, **kw)
 
                 if update:
                     T2_star = RamseyA.T2_star
@@ -1885,18 +1956,16 @@ def measure_chevron(qbc, qbt, qbr, lengths, amplitudes,
     sf1 = awg_swf.Chevron_length_swf_new(
                 lengths=lengths,
                 flux_pulse_amp=amplitudes[0],
-                qb_name_c=qbc.name,
-                qb_name_t=qbt.name,
+                qbc_name=qbc.name,
+                qbt_name=qbt.name,
+                qbr_name=qbr.name,
                 readout_qbt=qbr.name,
                 CZ_pulse_name=CZ_pulse_name,
                 operation_dict=operation_dict,
                 verbose=verbose, cal_points=cal_points,
                 upload=False, return_seq=return_seq)
 
-    sf2 = awg_swf.Chevron_ampl_swf_new(hard_sweep=sf1,
-                                       upload_channel=flux_channel,
-                                       upload_AWG=flux_AWG,
-                                       upload=upload)
+    sf2 = awg_swf.Chevron_ampl_swf_new(hard_sweep=sf1)
 
     MC.soft_avg(soft_averages)
     MC.set_sweep_function(sf1)
@@ -1904,11 +1973,16 @@ def measure_chevron(qbc, qbt, qbr, lengths, amplitudes,
     MC.set_sweep_function_2D(sf2)
     MC.set_sweep_points_2D(amplitudes)
     MC.set_detector_function(qbr.int_avg_det)
+    MC.run_2D('Chevron_{}{}'.format(qbc.name, qbt.name))
+
+    ma.MeasurementAnalysis(TwoD=True)
 
 
-def measure_cphase_new( qbc, qbt, qbr, lengths, amps,
-                       phases=None,MC=None, cal_points=False, plot=False, save_plot=True,
-                       prepare_for_timedomain=True,output_measured_values=False,
+def measure_cphase_new(qbc, qbt, qbr, lengths, amps,
+                       phases=None,MC=None, cal_points=False, plot=False,
+                       save_plot=True,
+                       prepare_for_timedomain=True,
+                       output_measured_values=False,
                        upload=True):
     '''
     method to measure the phase acquired during a flux pulse conditioned on the state
@@ -1945,9 +2019,11 @@ def measure_cphase_new( qbc, qbt, qbr, lengths, amps,
 
     if MC is None:
         MC = qbc.MC
+
     if phases is None:
         phases = np.linspace(0, 2*np.pi, 16, endpoint=False)
         phases = np.concatenate((phases,phases))
+
 
     operation_dict = get_operation_dict([qbc, qbt, qbr])
     CZ_pulse_name = 'CZ ' + qbt.name + ' ' + qbc.name
@@ -1970,7 +2046,7 @@ def measure_cphase_new( qbc, qbt, qbr, lengths, amps,
     s3 = awg_swf.Flux_pulse_CPhase_soft_swf(s1,sweep_param='length',
                                     upload=upload)
 
-    t0= time.time()
+    t0 = time.time()
     if prepare_for_timedomain:
         for qb in [qbc, qbt, qbr]:
              qb.prepare_for_timedomain()
@@ -1978,7 +2054,7 @@ def measure_cphase_new( qbc, qbt, qbr, lengths, amps,
     MC.set_sweep_points(phases)
     #Here the order of the parameters matters! Paramters must be
     #set in the same order as their sweepfunctions!
-    MC.set_sweep_points_2D(np.array([amps,lengths]).T)
+    MC.set_sweep_points_2D(np.array([amps, lengths]).T)
     MC.set_detector_function(qbr.int_avg_det)
     MC.run_2D('CPhase_measurement_{}_{}'.format(qbc.name,qbt.name))
 
@@ -1996,10 +2072,11 @@ def measure_cphase_new( qbc, qbt, qbr, lengths, amps,
     fitted_amps = flux_pulse_ma.fitted_amps
 
     #
-    fitted_phases_exited = fitted_phases[:: 2]
-    fitted_phases_ground = fitted_phases[1:: 2]
+    fitted_phases_excited = fitted_phases[::2]
+    fitted_phases_ground = fitted_phases[1::2]
 
-    cphases = fitted_phases_exited - fitted_phases_ground
+    # cphases = fitted_phases_excited - fitted_phases_ground
+    cphases = fitted_phases_ground- fitted_phases_excited
 
     fitted_amps_exited = fitted_amps[:: 2]
     fitted_amps_ground = fitted_amps[1:: 2]

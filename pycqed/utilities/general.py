@@ -635,7 +635,7 @@ def get_required_upload_information(pulses : list, station):
             if not channel in required_channels:
                 required_channels.append(channel)
 
-    return required_channels,required_AWGs
+    return required_channels, required_AWGs
 
 
 class NumpyJsonEncoder(json.JSONEncoder):

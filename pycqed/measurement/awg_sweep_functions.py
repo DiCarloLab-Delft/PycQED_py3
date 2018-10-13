@@ -2137,7 +2137,7 @@ class Chevron_length_hard_swf(swf.Hard_Sweep):
 
 class Chevron_length_swf_new(swf.Hard_Sweep):
 
-    def __init__(self, lengths, flux_pulse_amp, qb_name_c, qb_name_t,
+    def __init__(self, lengths, flux_pulse_amp, qbc_name, qbt_name, qbr_name,
                  CZ_pulse_name, operation_dict, readout_qbt=None,
                  verbose=False, cal_points=False,
                  upload=True, return_seq=False):
@@ -2150,8 +2150,9 @@ class Chevron_length_swf_new(swf.Hard_Sweep):
         super().__init__()
         self.lengths = lengths
         self.flux_pulse_amp = flux_pulse_amp
-        self.qb_name_c = qb_name_c
-        self.qb_name_t = qb_name_t
+        self.qbc_name = qbc_name
+        self.qbt_name = qbt_name
+        self.qbr_name = qbr_name
         self.readout_qbt = readout_qbt
         self.CZ_pulse_name = CZ_pulse_name
         self.operation_dict = operation_dict
@@ -2169,8 +2170,9 @@ class Chevron_length_swf_new(swf.Hard_Sweep):
             fsqs.Chevron_length_seq_new(
                 lengths=self.lengths,
                 flux_pulse_amp=self.flux_pulse_amp,
-                qb_name_c=self.qbc_name,
-                qb_name_t=self.qbt_name,
+                qbc_name=self.qbc_name,
+                qbt_name=self.qbt_name,
+                qbr_name=self.qbr_name,
                 upload_all=upload_all,
                 CZ_pulse_name=self.CZ_pulse_name,
                 operation_dict=self.operation_dict,
@@ -2202,7 +2204,8 @@ class Chevron_ampl_swf_new(swf.Soft_Sweep):
         pass
 
     def set_parameter(self, val, **kw):
-        self.hard_sweep.flux_pulse_amp(val)
+        self.hard_sweep.flux_pulse_amp = val
+        self.hard_sweep.upload = True
         self.hard_sweep.prepare(upload_all=self.is_first_sweeppoint)
         self.is_first_sweeppoint = False
 

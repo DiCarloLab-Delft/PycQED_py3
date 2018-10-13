@@ -1800,13 +1800,12 @@ def Chevron_length_seq_new(lengths, flux_pulse_amp,
         upload_AWGs = 'all'
         upload_channels = 'all'
     else:
-        upload_AWGs = [station.pulsar.get(CZ_pulse['channel'] + '_AWG'),
-                       station.pulsar.master_AWG()]
-        upload_channels = [station.pulsar.get(CZ_pulse['channel'] + '_id')]
+        upload_AWGs = [station.pulsar.get(CZ_pulse['channel'] + '_AWG')]
+        upload_channels = [CZ_pulse['channel']]
 
     for i, length in enumerate(lengths):
         RO_pulse['pulse_delay'] = max_length - length
-        CZ_pulse['length'] = length
+        CZ_pulse['pulse_length'] = length
 
         if cal_points and (i == (len(lengths)-4) or i == (len(lengths)-3)):
             el = multi_pulse_elt(i, station, [RO_pulse])
