@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import logging
 import itertools
 import time
+import copy
 
 import pycqed.measurement.sweep_functions as swf
 import pycqed.measurement.awg_sweep_functions as awg_swf
@@ -1466,75 +1467,206 @@ def cphase_gate_tuneup(qb_control, qb_target,
     return pulse_length_best_value, pulse_amplitude_best_value
 
 
-def cphase_gate_tuneup_predictive(qbc, qbt, qbr, flux_lengths=None,
-                                  flux_amps=None,MC=None,phases=None,
-                                  hyper_parameter_dict=None,
-                                  n_meas=100, update=False,full_output=False):
+def cphase_gate_tuneup_predictive(qbc, qbt, qbr,flux_lengths =None,
+                                  flux_amps =None, phases =None, MC =None,
+                                  estimator = 'GRNN_neupy',
+                                  hyper_parameter_dict : dict =None,
+                                  sampling_numbers: list =[75,30],
+                                  initial_values: list =[100e-9,1.15],
+                                  std_deviations: list =[20e-9,0.001],
+                                  max_iter =2,
+                                  tol = [0.005,0.01],
+                                  timestamps : list =None):
 
     if not update:
         logging.warning("Does not automatically update the CZ pulse length "
                         "and amplitude. "
                         "Set update=True if you want this!")
 
+    Args:
+        qb_control (QuDev_Transmon): control qubit (with flux pulses)
+        qb_target (QuDev_Transmon): target qubit
+        phases (numpy array): phases used in the Ramsey measurement
+        timestamps (list): measurement history. Enables collecting
+                           datapoints from existing measurements and add them
+                           to the training set. If there are existing timestamps,
+                           cphases and population losses will be extracted from
+                           all timestamps in the list. It will be optimized for
+                           the combined data then and a cphase measurement will
+                           be run with the optimal parameters. Possibly more data
+                           will be taken after the first optimization round.
+    Returns:
+        pulse_length_best_value, pulse_amplitude_best_value
+
+    '''
+    ############## CHECKING INPUT #######################
+
+    if not (isinstance(sampling_numbers,list) or
+            isinstance(sampling_numbers,np.ndarray)):
+        sampling_numbers = [sampling_numbers]
+    if max_iter != len(sampling_numbers):
+        logging.warning('Did not provide sampling number for each iteration '
+                        'step! Additional iterations will be carried out with the'
+                        'last value in sampling numbers ')
+    if len(initial_values) != 2:
+        logging.error('Incorrect number of input mean values for Gaussian '
+                      'sampling provided!')
+    if len(std_deviations) != 2:
+        logging.error('Incorrect number of standard deviations for Gaussian '
+                      'sampling provided!')
     if hyper_parameter_dict is None:
         logging.warning('\n No hyperparameters passed to predictive mixer '
                         'calibration routine. Default values for the estimator'
                         'will be used!\n')
         hyper_parameter_dict = {'cv_n_fold': 10,
                                 'std_scaling': [0.3, 0.3]}
+    if phases is None:
+        phases = np.linspace(0,2*np.pi,16,endpoint=False)
+    phases = np.concatenate((phases,phases))
+    phases_test = np.linspace(0,2*np.pi,32,endpoint=False)
+    phases_test = np.concatenate((phases_test,phases_test))
+
+    if phases is None:
+        phases = np.linspace(0,2*np.pi,16,endpoint=False)
+    phases = np.concatenate((phases,phases))
+    phases_test = np.linspace(0,2*np.pi,32,endpoint=False)
+    phases_test = np.concatenate((phases_test,phases_test))
+
     if MC is None:
         MC = qbc.MC
     if flux_lengths is None:
-        flux_lengths = np.random.normal(100e-9, 20e-9, n_meas)   #hardcoded so far
+        flux_lengths = np.random.normal(initial_values[0],std_deviations[0],
+                                        sampling_numbers[0])
     if flux_amps is None:
-        flux_amps = np.random.normal(1.15, 0.02, n_meas)
-
-    if phases is None:
-        phases = np.linspace(0, 2*np.pi, 16, endpoint=False)
-
-    phases = np.concatenate((phases, phases))
-
-    cphases, population_losses, ma_ram2D = measure_cphase_new(qbc, qbt, qbr,
-                                                     flux_lengths, flux_amps,
-                                                     phases=phases,
-                                                     plot=False, MC=MC)
-    target_phases = np.abs(np.abs(cphases/np.pi) - 1.)
-    target_pops = np.abs(population_losses)
-    target_norm = np.sqrt(target_phases**2+target_pops**2)
-    min_ind = np.argmin(target_norm)
-    x_init = [flux_lengths[min_ind], flux_amps[min_ind]]
-    training_grid = np.array([flux_lengths, flux_amps]).T
-    target_values = np.array([target_pops, target_phases]).T
-
+        flux_amps = np.random.normal(initial_values[1],std_deviations[1],
+                                     sampling_numbers[0])
+    if not isinstance(timestamps,list):
+        if timestamps is None:
+            timestamps = []
+        else:
+            timestamps = [timestamps]
+    timestamps_iter = copy.deepcopy(timestamps)
     target_value_names = ['Population Loss [%]','|Phase/pi - 1| [a.u]']
-    a_pred = ma.OptimizationAnalysis_Predictive2D(training_grid,target_values,
-                                    ma_ram2D,x_init=x_init,
-                                    hyper_parameter_dict=hyper_parameter_dict,
-                                    target_value_names=target_value_names)
+    ################## START ROUTINE ######################
+    cphases_opt = []
+    population_recoveries_opt = []
+    lengths_opt =[]
+    amps_opt = []
+    iteration = 0
+    converged = False
+    while not converged:
+        training_grid = None
+        target_values = None
+        new_timestamp = None
 
-    pulse_length_best_value = a_pred.optimization_result[0]
-    pulse_amplitude_best_value = a_pred.optimization_result[1]
+        for t,i in enumerate(timestamps_iter):
+            flux_pulse_ma = ma.Fluxpulse_Ramsey_2D_Analysis_Predictive(
+                timestamp=t,
+                label='CPhase_measurement_{}_{}'.format(qbc.name,qbt.name),
+                qb_name=qbc.name, cal_points=False, plot=False,
+                save_plot=False,
+                reference_measurements=True, only_cos_fits=True)
+            cphases = flux_pulse_ma.cphases
+            population_losses = flux_pulse_ma.population_losses
 
-    cphases_opt, population_losses_opt, ma_ram2D_opt = \
-        measure_cphase_new(qbc, qbt, qbr, [pulse_length_best_value],
-                           [pulse_amplitude_best_value], phases=phases,
-                           plot=True)
-    cphases_opt = np.abs(cphases_opt/np.pi)
-    population_losses_opt = np.abs(1.-population_losses_opt)*100
+            target_phases = np.abs(np.abs(cphases/np.pi) - 1.)
+            target_pops = np.abs(population_losses)
+            new_train_values = np.array([flux_pulse_ma.sweep_points_2D[0],
+                                         flux_pulse_ma.sweep_points_2D[1]]).T
+            new_target_values = np.array([target_phases,target_pops]).T
+            if training_grid is None:
+                training_grid =new_train_values
+                target_values = new_target_values
+            else:
+                training_grid = np.append(training_grid,new_train_values,axis=0)
+                target_values = np.append(target_values,new_target_values,axis=0)
+
+        if not (iteration == 0 and timestamps_iter):
+            initial_length = initial_values[0]
+            std_length = std_deviations[0]
+            initial_amp = initial_values[1]
+            std_amp = std_deviations[1]
+            if iteration >= len(sampling_numbers):
+                sampling_number= sampling_numbers[-1]
+            else:
+                sampling_number= sampling_numbers[iteration]
+            new_flux_lengths = np.linspace(initial_length,std_length,
+                                           sampling_number)
+            new_flux_amps = np.linspace(initial_amp,std_amp,
+                                        sampling_number)
+            cphases, population_losses, flux_pulse_ma = \
+                measure_cphase_new(qbc,qbt,qbr,new_flux_lengths,new_flux_amps,
+                                   phases=phases,
+                                   plot=False,
+                                   MC=MC)
+            target_phases = np.abs(np.abs(cphases/np.pi) - 1.)
+            target_pops = np.abs(population_losses)
+            new_train_values = np.array([flux_pulse_ma.sweep_points_2D[0],
+                                         flux_pulse_ma.sweep_points_2D[1]]).T
+            new_target_values = np.array([target_phases,target_pops]).T
+
+            if training_grid is None:
+                training_grid =new_train_values
+                target_values = new_target_values
+            else:
+                training_grid = np.append(training_grid,new_train_values,axis=0)
+                target_values = np.append(target_values,new_target_values,axis=0)
+            new_timestamp = flux_pulse_ma.timestamp_string
+
+    #train and test
+        target_norm = np.sqrt(target_values[:,0]**2+target_values[:,1]**2)
+        min_ind = np.argmin(target_norm)
+        x_init = [training_grid[min_ind,0],training_grid[min_ind,1]]
+        a_pred = ma.OptimizationAnalysis_Predictive2D(training_grid,
+                                        target_values,
+                                        flux_pulse_ma,
+                                        x_init=x_init,
+                                        hyper_parameter_dict=hyper_parameter_dict,
+                                        target_value_names=target_value_names)
+        pulse_length_best_value = a_pred.optimization_result[0]
+        pulse_amplitude_best_value = a_pred.optimization_result[1]
+        #Get cphase with optimized values
+        cphase_opt, population_loss_opt, ma_ram2D_opt = \
+                                                measure_cphase_new(qbc,qbt,qbr,
+                                                   [pulse_length_best_value],
+                                                   [pulse_amplitude_best_value],
+                                                   phases=phases_test,
+                                                   plot=True,
+                                                   MC=MC)
+        cphase_opt = np.abs(cphase_opt[0]/np.pi)
+        population_recovery_opt = np.abs(1.-population_loss_opt[0])*100 #in percent
+        if np.abs(cphase_opt-1) < tol[1]\
+          and population_loss_opt < tol[0]:
+            converged = True
+        elif iteration == max_iter:
+            converged = True
+            logging.warning('\n maximum iterations exceeded without hitting'
+                            ' specified tolerance levels for optimization!\n')
+        cphases_opt.append(cphase_opt)
+        population_recoveries_opt.append(population_recovery_opt)
+        lengths_opt.append(pulse_length_best_value)
+        amps_opt.append(pulse_amplitude_best_value)
+
+        iteration += 1
+        if new_timestamp is not None:
+            timestamps_iter.append(new_timestamp)
+
+
+    cphase_opt = cphases_opt[-1]
+    population_loss_opt = population_recoveries_opt[-1]
+    pulse_length_best_value = lengths_opt[-1]
+    pulse_amplitude_best_value = amps_opt[-1]
 
     print('CPhase optimization finished with optimal values: \n',
-          'Controlled Phase QBc={} QBt={}: '.format(qbc.name, qbt.name),
-          cphases_opt, r"$\pi$", '\n',
-          'Population Recovery |e> QBt: ', population_losses_opt, '[%]\n',
+          'Controlled Phase QBc={} QBt={}: '.format(qbc.name,qbt.name),
+          cphase_opt,r"$\pi$",'\n',
+          'Population Recovery |e> QBt: ',population_loss_opt,'[%]\n',
           '@ flux pulse Paramters: \n',
           'Pulse Length: {:0.1f} ns \n'.format(pulse_length_best_value*1e9),
           'Pulse Length: {:0.4f} V \n'.format(pulse_amplitude_best_value))
-
-
     if update:
         qbc.set('CZ_{}_amp'.format(qbt.name), pulse_amplitude_best_value)
         qbc.set('CZ_{}_length'.format(qbt.name), pulse_length_best_value)
-
     if full_output:
         return pulse_length_best_value, pulse_amplitude_best_value,\
                [population_losses_opt,cphases_opt]
@@ -1607,10 +1739,13 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
 
         if sweep_params is None:
             sweep_params = (
+     #           ('X180', {'pulse_pars': {'amplitude': (lambda sp: sp),
+     #                                   'repeat': 3}}),
                 ('X180', {'pulse_pars': {'amplitude': (lambda sp: sp)},
                           'repeat': 1}),
             )
 
+     #   sf = calibrate_n_qubits(sweep_params=sweep_params,
         sf = awg_swf2.calibrate_n_qubits(sweep_params=sweep_params,
                                 sweep_points=sweep_points,
                                 qubit_names=qubit_names,
@@ -1625,7 +1760,6 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
         MC.set_sweep_points(sweep_points)
         MC.set_detector_function(df)
         label = 'Rabi' + msmt_suffix
-
         MC.run(label)
 
         if analyze:
@@ -1713,7 +1847,6 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
                                   ((sp-sweep_points[0]) * artificial_detuning *
                                    360) % 360)}})
             )
-
         sf = awg_swf2.calibrate_n_qubits(sweep_params=sweep_params,
                                 sweep_points=sweep_points_dict['ramsey'],
                                 qubit_names=qubit_names,
@@ -1865,7 +1998,6 @@ def calibrate_n_qubits(qubits, f_LO, sweep_points_dict, sweep_params=None,
                     except AttributeError as e:
                         logging.warning('%s. This parameter will not be '
                                         'updated.'%e)
-
     # T2 ECHO
     if 'T2' in sweep_points_dict:
         if artificial_detuning is None:
@@ -1964,7 +2096,6 @@ def measure_chevron(qbc, qbt, qbr, lengths, amplitudes,
                 operation_dict=operation_dict,
                 verbose=verbose, cal_points=cal_points,
                 upload=False, return_seq=return_seq)
-
     sf2 = awg_swf.Chevron_ampl_swf_new(hard_sweep=sf1)
 
     MC.soft_avg(soft_averages)
@@ -1976,8 +2107,6 @@ def measure_chevron(qbc, qbt, qbr, lengths, amplitudes,
     MC.run_2D('Chevron_{}{}'.format(qbc.name, qbt.name))
 
     ma.MeasurementAnalysis(TwoD=True)
-
-
 def measure_cphase_new(qbc, qbt, qbr, lengths, amps,
                        phases=None,MC=None, cal_points=False, plot=False,
                        save_plot=True,
@@ -2054,7 +2183,7 @@ def measure_cphase_new(qbc, qbt, qbr, lengths, amps,
     MC.set_sweep_points(phases)
     #Here the order of the parameters matters! Paramters must be
     #set in the same order as their sweepfunctions!
-    MC.set_sweep_points_2D(np.array([amps, lengths]).T)
+    MC.set_sweep_points_2D(np.array([lengths,amps]).T)
     MC.set_detector_function(qbr.int_avg_det)
     MC.run_2D('CPhase_measurement_{}_{}'.format(qbc.name,qbt.name))
 
@@ -2068,23 +2197,9 @@ def measure_cphase_new(qbc, qbt, qbr, lengths, amps,
         label='CPhase_measurement_{}_{}'.format(qbc.name,qbt.name),
         qb_name=qbc.name, cal_points=cal_points, plot=plot, save_plot=save_plot,
         reference_measurements=True, only_cos_fits=True)
-    fitted_phases = flux_pulse_ma.fitted_phases
-    fitted_amps = flux_pulse_ma.fitted_amps
-
-    #
-    fitted_phases_excited = fitted_phases[::2]
-    fitted_phases_ground = fitted_phases[1::2]
-
-    # cphases = fitted_phases_excited - fitted_phases_ground
-    cphases = fitted_phases_ground- fitted_phases_excited
-
-    fitted_amps_exited = fitted_amps[:: 2]
-    fitted_amps_ground = fitted_amps[1:: 2]
-    #
-    pop_loss = np.abs(fitted_amps_ground - fitted_amps_exited) \
-               /fitted_amps_ground
+    cphases = flux_pulse_ma.cphases
+    population_losses = flux_pulse_ma.population_losses
     if output_measured_values:
         print('fitted phases: ', cphases)
-        print('pop loss: ', pop_loss)
-
-    return cphases, pop_loss, flux_pulse_ma
+        print('pop loss: ', population_losses)
+    return cphases, population_losses, flux_pulse_ma

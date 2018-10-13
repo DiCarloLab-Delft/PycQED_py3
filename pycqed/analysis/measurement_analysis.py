@@ -10339,6 +10339,16 @@ class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
         self.fitted_phases, self.fitted_amps = self.fit_all(return_ampl=True,
                                                            plot=plot,
                                                            **kw)
+        fitted_phases_exited = self.fitted_phases[:: 2]
+        fitted_phases_ground = self.fitted_phases[1:: 2]
+        fitted_amps_exited = self.fitted_amps[:: 2]
+        fitted_amps_ground = self.fitted_amps[1:: 2]
+
+        cphases = fitted_phases_exited - fitted_phases_ground
+        population_losses = np.abs(fitted_amps_ground - fitted_amps_exited) \
+                            /fitted_amps_ground
+        self.cphases = cphases
+        self.population_losses = population_losses
 
     def get_naming_and_values_2D(self):
         if 'datasaving_format' in list(self.g.attrs.keys()):
@@ -10530,7 +10540,7 @@ class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
             self.fig, self.ax = (None, None)
 
         data_rotated = a_tools.rotate_and_normalize_data_no_cal_points(
-            np.array([self.data[3], self.data[4]])) ####### changed
+            np.array([self.data[3], self.data[4]]))
         if fit_range is None:
             i_start = 0
             i_end = length_single*len(self.sweep_points_2D[0])

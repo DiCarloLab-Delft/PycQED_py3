@@ -1793,9 +1793,7 @@ def Chevron_length_seq_new(lengths, flux_pulse_amp,
     max_length = np.max(lengths)
 
     CZ_pulse['amplitude'] = flux_pulse_amp
-    X180_c = operation_dict['X180 ' + qbc_name]
-    X180_t = operation_dict['X180s ' + qbt_name]
-    pulse_list = []
+
     if upload_all:
         upload_AWGs = 'all'
         upload_channels = 'all'
