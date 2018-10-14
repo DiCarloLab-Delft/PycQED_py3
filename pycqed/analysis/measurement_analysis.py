@@ -10318,7 +10318,6 @@ class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
         kw['label'] = label
         kw['h5mode'] = 'r+'
         kw['close_file'] = False
-
         self.label = label
         self.fitted_phases = None
         self.fitted_delay = 0
@@ -10337,8 +10336,7 @@ class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
                                                            **kw)
         self.get_naming_and_values_2D()
         self.fitted_phases, self.fitted_amps = self.fit_all(return_ampl=True,
-                                                           plot=plot,
-                                                           **kw)
+                                                           plot=plot, **kw)
         fitted_phases_exited = self.fitted_phases[:: 2]
         fitted_phases_ground = self.fitted_phases[1:: 2]
         fitted_amps_exited = self.fitted_amps[:: 2]
@@ -10520,15 +10518,20 @@ class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
                 plot_title=None, **kw):
 
         only_cos_fits = kw.pop('only_cos_fits', False)
+        fit_statistics = kw.pop('fit_statistics',False)
 
         if cal_points is None:
             cal_points = self.cal_points
 
         phase_list = [0]
         amplitude_list = []
+        frequency_list = []
+        offset_list = []
 
         length_single = len(self.sweep_points)
-
+        if fit_statistics:
+            amps_all = np.zeros((len(self.sweep_points_2D[0]),length_single))
+            thetas_all = self.data[0,:length_single]
         if plot:
             if only_cos_fits:
                 self.fig, self.ax = plt.subplots()
@@ -10547,8 +10550,7 @@ class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
         else:
             i_start = length_single*fit_range[0]
             i_end = length_single*fit_range[1]
-        for i in np.arange(i_start, i_end, length_single):
-
+        for mod,i in enumerate(np.arange(i_start, i_end, length_single)):
             thetas = self.data[0, i:i+length_single]
             ampls = data_rotated[i:i+length_single]
 
@@ -10564,33 +10566,147 @@ class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
 
             phase_list.append(fit_res.best_values['phase'])
             amplitude_list.append(fit_res.best_values['amplitude'])
+            frequency_list.append(fit_res.best_values['frequency'])
+            offset_list.append(fit_res.best_values['offset'])
 
             if plot:
-                ax.plot(thetas, ampls, 'k.')
-                thetas_fit = np.linspace(thetas[0],thetas[-1], 128)
-                ampls_fit = fit_res.eval(t=thetas_fit)
-                ax.plot(thetas_fit, ampls_fit, 'r-')
+                if not fit_statistics:
+                    if mod % 2 == 0:
+                        linecolor_inter = 'orange'
+                    else:
+                        linecolor_inter = 'darkblue'
+                    linestyle_inter = '-'
+                    linestyle_meas = ''
+                    linecolor_meas = 'black'
+                    linewidth_inter = 2.
+                    linewidth_meas = 1.
+                    marker_size_meas = 2.
+                    marker_style_meas = 'x'
+                    ax.plot(thetas, ampls,color=linecolor_meas,
+                            linestyle=linestyle_meas,linewidth=linewidth_meas,
+                            markersize=marker_size_meas,marker=marker_style_meas,
+                            alpha=0.7)
+                    thetas_fit = np.linspace(thetas[0],thetas[-1], 128)
+                    ampls_fit = fit_res.eval(t=thetas_fit)
+                    ax.plot(thetas_fit, ampls_fit,color=linecolor_inter,
+                            linestyle=linestyle_inter,linewidth=linewidth_inter)
+                else:
+                    amps_all[mod, :] = ampls
 
         phase_list.pop(0)
-
         phase_list = np.array(phase_list)
         amplitude_list = np.array(amplitude_list)
+        cphase = phase_list[1]-phase_list[0]
+
+        if plot and fit_statistics:
+
+            amps_avg_ex = np.mean(amps_all[::2,:],axis=0)
+            amps_avg_gr = np.mean(amps_all[1::2,:],axis=0)
+            fitted_phases_ex = phase_list[::2]
+            avg_phases_ex = np.mean(fitted_phases_ex)
+            std_phases_ex = np.std(fitted_phases_ex)
+            fitted_phases_gr = phase_list[1::2]
+            std_cphases = np.std(fitted_phases_ex-fitted_phases_gr)
+            avg_phases_gr = np.mean(fitted_phases_gr)
+            std_phases_gr = np.std(fitted_phases_gr)
+            fitted_amps_ex = amplitude_list[::2]
+            avg_amps_ex = np.mean(fitted_amps_ex)
+            std_amps_ex = np.std(fitted_amps_ex)
+            fitted_amps_gr = amplitude_list[1::2]
+            avg_amps_gr = np.mean(fitted_amps_gr)
+            std_amps_gr = np.std(fitted_amps_gr)
+            std_rel_amps = np.std(fitted_amps_ex-fitted_amps_gr)
+            fitted_offsets_ex = offset_list[::2]
+            avg_offsets_ex = np.mean(fitted_offsets_ex)
+            std_offsets_ex = np.std(fitted_offsets_ex)
+            fitted_offsets_gr = offset_list[1::2]
+            avg_offsets_gr = np.mean(fitted_offsets_gr)
+            std_offsets_gr = np.std(fitted_offsets_gr)
+            fitted_freqs_ex = frequency_list[::2]
+            avg_freqs_ex = np.mean(fitted_freqs_ex)
+            std_freqs_ex = np.std(fitted_freqs_ex)
+            fitted_freqs_gr = frequency_list[1::2]
+            avg_freqs_gr = np.mean(fitted_freqs_gr)
+            std_freqs_gr = np.std(fitted_freqs_gr)
+
+            f_fit = avg_freqs_ex
+            avg_fit_ex = lambda t: avg_amps_ex * np.cos(
+                                    2 * np.pi * f_fit * t + avg_phases_ex)\
+                                    + avg_offsets_ex
+            f_fit = avg_freqs_gr
+            avg_fit_gr = lambda t: avg_amps_gr * np.cos(
+                                    2 * np.pi * f_fit * t + avg_phases_gr) \
+                                    + avg_offsets_gr
+            f_fit = avg_freqs_ex + std_freqs_ex
+            high_fit_ex = lambda t: (avg_amps_ex+std_amps_ex)*np.cos(
+                                    2 * np.pi * f_fit * t
+                                    + avg_phases_ex + std_phases_ex) \
+                                    + avg_offsets_ex+std_offsets_ex
+            f_fit = avg_freqs_ex - std_freqs_ex
+            low_fit_ex = lambda t: (avg_amps_ex-std_amps_ex) * np.cos(
+                                    2 * np.pi * f_fit * t
+                                    + avg_phases_ex - std_phases_ex) \
+                                    + avg_offsets_ex - std_offsets_ex
+            f_fit = avg_freqs_gr + std_freqs_gr
+            high_fit_gr = lambda t: (avg_amps_gr + std_amps_gr) * np.cos(
+                                    2 * np.pi * f_fit * t
+                                   + avg_phases_gr + std_phases_gr)\
+                                   + avg_offsets_gr + std_offsets_gr
+            f_fit = avg_freqs_gr - std_freqs_gr
+            low_fit_gr = lambda t: (avg_amps_gr-std_amps_gr) * np.cos(
+                                    2 * np.pi * f_fit * t
+                                   + avg_phases_gr - std_phases_gr) \
+                                   + avg_offsets_gr - std_offsets_gr
+
+            func_list = [avg_fit_ex,low_fit_ex,high_fit_ex,avg_fit_gr,low_fit_gr
+                         ,high_fit_gr]
+            thetas_plot = np.linspace(thetas_all[0],thetas_all[-1], 128)
+            ax.plot(thetas_all,amps_avg_ex,linestyle='',
+                    marker='d', color='black',
+                    markersize=3., label='Avg Data')
+            ax.plot(thetas_all, amps_avg_gr,linestyle='',
+                    marker='d', color='black',
+                    markersize=3.)
+            for i,func in enumerate(func_list):
+                amps_plot = func(thetas_plot)
+                linecolor= 'orange'
+                label=None
+                if (i == 1 or i == 4):
+                    label_0 = r"$1\sigma$ param "
+                    label= label_0 + '|e>' if i == 1 else label_0 + '|g>'
+                if(i == 0 or i == 3 ):
+                    label_1='Avg Param '
+                    label= label_1 + '|e>' if i == 0 else label_1 + '|g>'
+                if i>=(len(func_list)/2):
+                    linecolor = 'darkblue'
+                linestyle = '--'
+                linewidth = 1.5
+                if (i == 0 or i==3 ):
+                    linestyle = '-'
+                    linewidth = 2.5
+                ax.plot(thetas_plot,amps_plot,linestyle=linestyle,color=linecolor,
+                        linewidth=linewidth,label=label)
+            cphase = avg_phases_ex-avg_phases_gr
+            ax.legend(loc='Best')
+
         if extrapolate_phase:
             phase_list = self.unwrap_phases_extrapolation(phase_list)
 
         if plot:
-            if len(self.sweep_points_2D[0]) == 2:
-                ax.set_title('Cphase = {:0.2f} deg \n {:0.4f} ns, '
-                             '{:0.4f} V \n {}'.format(
-                    (phase_list[1]-phase_list[0])*180/np.pi,
-                    self.sweep_points_2D[1][0]*1e9,
-                    self.sweep_points_2D[0][0],
+            if len(self.sweep_points_2D[0]) == 2 or fit_statistics:
+                ax.set_title(r"Cphase $= {:0.2f}\pm {:0.2f}$ deg, "
+                             '\n{:0.4f} ns{:0.4f} V \n {}'.format(
+                    cphase*180/np.pi,std_cphases*180/np.pi,
+                    self.sweep_points_2D[0][0]*1e9,
+                    self.sweep_points_2D[1][0],
                     self.timestamp_string))
             else:
                 ax.set_title('Cosine fits \n' + self.timestamp_string)
             ax.set_xlabel(r'Phase of 2nd pi/2 pulse, $\theta$[rad]')
             ax.set_ylabel('Response (arb. units)')
-            ax.legend(['data', 'fits'])
+
+            if not fit_statistics:
+                ax.legend(['data', 'fits |e>', 'fits |g>'])
 
             if not only_cos_fits:
                 if fit_range is None:
@@ -10618,7 +10734,7 @@ class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
         self.fitted_amplitudes = amplitude_list
 
         if return_ampl:
-            return phase_list, amplitude_list
+            return phase_list, amplitude_list,
         else:
             return phase_list
 
@@ -10753,7 +10869,7 @@ class OptimizationAnalysis_Predictive2D:
                            (self.x_init[1]*input_scale[1])+input_means[1],
                            marker='o',c='black',s=14,label='initial point')
                 ax.scatter(self.training_grid[:,0],self.training_grid[:,1],
-                            marker='o',c='r',label='training data',s=10)
+                            marker='o',c='r',label='training data',s=8)
                 ax.tick_params(axis='both',which='minor',labelsize=14)
                 ax.set_ylabel(self.ma.parameter_labels[1],fontsize=fontsize)
                 ax.set_xlabel(self.ma.parameter_labels[2],fontsize=fontsize)
@@ -10779,16 +10895,16 @@ class OptimizationAnalysis_Predictive2D:
                 self.optimization_result[1],
                 'o', markersize=5, c='w')
         plot_title = self.ma.timestamp_string + '_' +self.ma.measurementstring
-        ax1.set_title('Population loss Interpolated')
-        textstr = '%s ( %s )' % (self.ma.parameter_names[1],
-                                 self.ma.parameter_units[1])
-        set_xlabel(ax1, textstr)
-        set_xlabel(ax2, textstr)
+        ax2.set_title('Population loss Interpolated')
         textstr = '%s ( %s )' % (self.ma.parameter_names[2],
                                  self.ma.parameter_units[2])
+        set_xlabel(ax1, textstr)
+        set_xlabel(ax2, textstr)
+        textstr = '%s ( %s )' % (self.ma.parameter_names[1],
+                                 self.ma.parameter_units[1])
         set_ylabel(ax1, textstr)
         set_ylabel(ax2, textstr)
-        ax2.set_title(r"| \phi_C/$\pi$-1| Interpolated")
+        ax1.set_title(r"$|\phi_C/\pi-1|$ Interpolated")
         a_tools.color_plot_interpolated(
             x=self.training_grid[:,0], y=self.training_grid[:,1],
             z=self.target_values[:,1], ax=ax2,N_levels=25,

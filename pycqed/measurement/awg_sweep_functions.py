@@ -2527,7 +2527,7 @@ class Flux_pulse_CPhase_hard_swf_new(swf.Hard_Sweep):
             logging.error('CPhase hard sweep does not recognize value type handed'
                           'by set_parameter() method!')
         if self.flux_length is not None and self.flux_amplitude is not None:
-            self.prepare(flux_params=[self.flux_amplitude,self.flux_length])
+            self.prepare(flux_params=[self.flux_length,self.flux_amplitude])
             self.flux_length=None
             self.flux_amplitude=None
 
@@ -2559,7 +2559,6 @@ class Flux_pulse_CPhase_soft_swf(swf.Soft_Sweep):
         pass
 
     def set_parameter(self, val, **kw):
-
         self.hard_sweep.upload = self.upload
         self.hard_sweep.set_parameter(flux_val=val,val_type=self.sweep_param)
 

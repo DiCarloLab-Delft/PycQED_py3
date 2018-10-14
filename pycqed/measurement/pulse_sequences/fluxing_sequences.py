@@ -2137,8 +2137,8 @@ def flux_pulse_CPhase_seq_new(phases,flux_params,max_flux_length,
     el_list = []
     pulse_list = []
 
-    flux_amplitude = flux_params[0]
-    flux_length = flux_params[1]
+    flux_amplitude = flux_params[1]
+    flux_length = flux_params[0]
 
     RO_pulse = operation_dict['RO ' + qbr_name]
     RO_pulse['pulse_delay'] = max_flux_length
@@ -2204,7 +2204,6 @@ def flux_pulse_CPhase_seq_new(phases,flux_params,max_flux_length,
                                   RO_pulse])
         el_list.append(el)
         seq.append_element(el, trigger_wait=True)
-
     if upload:
         print('uploading channels: ',upload_channels)
         print('of AWGs: ',upload_AWGs)
