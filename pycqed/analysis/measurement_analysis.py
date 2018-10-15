@@ -20,6 +20,7 @@ import pylab
 from pycqed.analysis.tools import data_manipulation as dm_tools
 import importlib
 import math
+from time import time
 
 try:
     import pygsti
@@ -59,6 +60,7 @@ except ImportError as e:
         raise
 
 importlib.reload(dm_tools)
+
 
 class MeasurementAnalysis(object):
 
@@ -849,6 +851,7 @@ class MeasurementAnalysis(object):
             self.value_units = self.get_key('value_units')
 
             self.data = self.get_values('Data').transpose()
+            print(np.shape(self.data)) ##############################
             x = self.data[0]
             y = self.data[1]
             cols = np.unique(x).shape[0]
@@ -1021,7 +1024,9 @@ class Mixer_calibration_evaluation(MeasurementAnalysis):
         ind_lo_f = np.where(np.abs((self.sweep_pts1-self.v_peaks[1])) < sweep_pts_spacing1)
         ind_right_sb = np.where(np.abs((self.sweep_pts1-self.v_peaks[2])) < sweep_pts_spacing1)
         self.peak_inds = [ind_left_sb,ind_lo_f,ind_right_sb]
-        print(self.peak_inds)
+        self.pre_calib_amps = [self.meas_vals1[ind_left_sb],
+                               self.meas_vals1[ind_lo_f],
+                               self.meas_vals1[ind_right_sb]]
         left_sb_supp = self.meas_vals2[ind_left_sb]/self.meas_vals1[ind_left_sb]
         left_sb_supp = 20*np.log10(left_sb_supp)
         lo_supp = self.meas_vals2[ind_lo_f]/self.meas_vals1[ind_lo_f]
@@ -1076,27 +1081,15 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
                 ['MC'].attrs['optimization_method']
         except:
             optimization_method = 'Numerical'
-        self.meas_grid = kw.pop('meas_grid',None)
-        if self.meas_grid is None:
-            self.meas_grid = np.array([self.sweep_points[0],self.sweep_points[1]])
-        self.ad_func_pars = kw.pop('ad_func_pars',{})
+        self.meas_grid = kw.pop('meas_grid')
+        self.hyper_parameter_dict = kw.pop('hyper_parameter_dict',None)
         self.two_rounds = kw.pop('two_rounds',False)
-        self.hidden_layers = self.ad_func_pars.pop('hidden_layers',[10.,10.])
         self.round = kw.pop('round',1)
-        self.alpha = self.ad_func_pars.pop('alpha',1e-2)
-        self.estimator_name = self.ad_func_pars.pop('estimator','GRNN_neupy')
-        self.beta = self.ad_func_pars.pop('beta',0.)
-        self.gamma = self.ad_func_pars.pop('gamma',0.5)
-        self.iters = self.ad_func_pars.pop('iters',200)
-        self.ndim = self.ad_func_pars.pop('ndim',2)
-        self.n_fold = self.ad_func_pars.pop('n_fold',5)
+        self.estimator_name = kw.pop('estimator','GRNN_neupy')
+
         self.accuracy= -np.infty
         self.make_fig = kw.pop('make_fig',True)
-        #already rescaled to original average,interval.
-        # self.optimization_result,\
-        # self.estimator,\
-        # test_vals =    self.train_NN(**kw)
-        #self.test_data = test_vals[:2]
+
         self.train_NN(**kw)
 
         if self.round > int(self.two_rounds) or self.round==0:     #only create figures in the last iteration
@@ -1113,16 +1106,9 @@ class OptimizationAnalysisNN(MeasurementAnalysis):
             self.abs_vals = np.sqrt(self.measured_values[0,:]**2 + self.measured_values[1,:]**2)
         result,est,opti_flag\
                                   = opt.neural_network_opt(None, self.meas_grid,
-                                          self.abs_vals,
-                                          hidden_layers = self.hidden_layers,
-                                          alpha= self.alpha,
-                                          solver='lbfgs',
-                                          estimator=self.estimator_name,
-                                          iters = self.iters,
-                                          beta=self.beta,
-                                          gamma=self.gamma,
-                                          ndim=self.ndim,
-                                          n_fold = self.n_fold)
+                                      target_values=np.array([self.abs_vals]).T,
+                                      estimator=self.estimator_name,
+                                      hyper_parameter_dict=self.hyper_parameter_dict)
         #test_grid and test_target values. Centered and scaled to [-1,1] since
         #only used for performance estimation of estimator
         self.opti_flag = opti_flag
@@ -1411,7 +1397,7 @@ class TD_Analysis(MeasurementAnalysis):
     def __init__(self, NoCalPoints=4, center_point=31, make_fig=True,
                  zero_coord=None, one_coord=None, cal_points=None,
                  rotate_and_normalize=True, plot_cal_points=True,
-                 for_ef=False, qb_name=None, RO_channel=0, **kw):
+                 for_ef=False, qb_name=None, RO_channels=(0, 1), **kw):
         self.NoCalPoints = NoCalPoints
         self.normalized_values = []
         self.normalized_cal_vals = []
@@ -1424,7 +1410,7 @@ class TD_Analysis(MeasurementAnalysis):
         self.center_point = center_point
         self.plot_cal_points = plot_cal_points
         self.for_ef = for_ef
-        self.RO_channel = RO_channel
+        self.RO_channels = RO_channels
 
         super().__init__(qb_name=qb_name, **kw)
 
@@ -1524,6 +1510,7 @@ class TD_Analysis(MeasurementAnalysis):
 
         # Plotting
         if self.make_fig:
+            plot_title_suffix = kw.get('plot_title_suffix', '')
             self.fig, self.ax = self.default_ax()
 
             if self.for_ef:
@@ -1532,7 +1519,8 @@ class TD_Analysis(MeasurementAnalysis):
                 # ylabel = r'$F$ $\left(|e \rangle \right) (arb. units)$'
                 ylabel = r'$F$ $|1 \rangle$'
 
-            plot_title = kw.pop('plot_title', self.measurementstring + '\n' +
+            plot_title = kw.pop('plot_title', self.measurementstring
+                                + plot_title_suffix + '\n' +
                                self.timestamp_string)
             self.plot_results_vs_sweepparam(x=self.sweep_points,
                                             y=self.normalized_values,
@@ -1566,7 +1554,7 @@ class TD_Analysis(MeasurementAnalysis):
         values: array of measured values, uses only the length of this
         calsteps: number of points that corresponds to calibration points
         '''
-
+        print('RO_channels ', self.RO_channels)
         last_ge_pulse = kw.pop('last_ge_pulse', False)
 
         # Extract the indices of the cal points
@@ -1613,42 +1601,48 @@ class TD_Analysis(MeasurementAnalysis):
             cal_one_points = None
 
         # Rotate and normalize data
-        if len(self.measured_values) == 1 or self.RO_channel != 0:
-            # Only one quadrature was measured
-            if cal_zero_points is None and cal_one_points is None:
-                # a_tools.normalize_data_v3 does not work with 0 cal_points. Use
-                # 4 cal_points.
-                logging.warning('a_tools.normalize_data_v3 does not have support'
-                                ' for 0 cal_points. Setting NoCalPoints to 4.')
-                self.NoCalPoints = 4
-                calsteps = 4
-                cal_zero_points = \
-                    list(range(NoPts - int(self.NoCalPoints),
-                             int(NoPts - int(self.NoCalPoints) / 2)))
-                cal_one_points = \
-                    list(range(int(NoPts - int(self.NoCalPoints) / 2), NoPts))
-            self.corr_data = a_tools.normalize_data_v3(
-                self.measured_values[self.RO_channel],
-                cal_zero_points, cal_one_points)
+        if (calsteps == 6) and (not last_ge_pulse):
+            # ONLY WORKS FOR SINGLE QUBIT MEASUREMENTS
+            # For this case we pass in the calibration data, not the indices
+            # of the cal points.
+            # zero_coord takes the cal_one_points and one_coord takes the
+            # cal_zero_points because in a_tools.rotate_and_normalize_data
+            # we must have for this case "calculate_rotation_matrix(
+            # -(I_one-I_zero), -(Q_one-Q_zero))" in order to get
+            # correct rotation
+            zero_coord = [np.mean(self.measured_values[0][cal_one_points]),
+                          np.mean(self.measured_values[1][cal_one_points])]
+            one_coord = [np.mean(self.measured_values[0][cal_zero_points]),
+                         np.mean(self.measured_values[1][cal_zero_points])]
+            self.corr_data = a_tools.rotate_and_normalize_data(
+                data=self.measured_values[0:2],
+                zero_coord=zero_coord, one_coord=one_coord)[0]
         else:
-            if (calsteps == 6) and (not last_ge_pulse):
-                # For this case we pass in the calibration data, not the indices
-                # of the cal points.
-                # zero_coord takes the cal_one_points and one_coord takes the
-                # cal_zero_points because in a_tools.rotate_and_normalize_data
-                # we must have for this case "calculate_rotation_matrix(
-                # -(I_one-I_zero), -(Q_one-Q_zero))" in order to get
-                # correct rotation
-                zero_coord = [np.mean(self.measured_values[0][cal_one_points]),
-                              np.mean(self.measured_values[1][cal_one_points])]
-                one_coord = [np.mean(self.measured_values[0][cal_zero_points]),
-                             np.mean(self.measured_values[1][cal_zero_points])]
-                self.corr_data = a_tools.rotate_and_normalize_data(
-                    data=self.measured_values[0:2],
-                    zero_coord=zero_coord, one_coord=one_coord)[0]
+            if len(self.measured_values) == 1 or len(self.RO_channels) == 1:
+                # Only one quadrature was measured
+                if cal_zero_points is None and cal_one_points is None:
+                    # a_tools.normalize_data_v3 does not work with 0 cal_points. Use
+                    # 4 cal_points.
+                    logging.warning('a_tools.normalize_data_v3 does not have support'
+                                    ' for 0 cal_points. Setting NoCalPoints to 4.')
+                    self.NoCalPoints = 4
+                    calsteps = 4
+                    cal_zero_points = \
+                        list(range(NoPts - int(self.NoCalPoints),
+                                   int(NoPts - int(self.NoCalPoints) / 2)))
+                    cal_one_points = \
+                        list(range(int(NoPts - int(self.NoCalPoints) / 2), NoPts))
+                ch_to_measure = \
+                    0 if len(self.measured_values) == 1 else self.RO_channels[0]
+                print('ch to measure ', ch_to_measure)
+                self.corr_data = a_tools.normalize_data_v3(
+                    self.measured_values[ch_to_measure],
+                    cal_zero_points, cal_one_points)
             else:
                 self.corr_data = a_tools.rotate_and_normalize_data(
-                    self.measured_values[0:2], cal_zero_points,
+                    self.measured_values[
+                    self.RO_channels[0]:self.RO_channels[1] + 1],
+                    cal_zero_points,
                     cal_one_points)[0]
 
         if save_norm_to_data_file:
@@ -2089,6 +2083,7 @@ class Rabi_Analysis(TD_Analysis):
         plot_errorbars = kw.get('plot_errorbars', False)
         print_fit_results = kw.get('print_fit_results', False)
         separate_fits = kw.get('separate_fits', False)
+        plot_title_suffix= kw.get('plot_title_suffix', '')
 
         self.nr_quadratures = len(self.ylabels)  # for legacy reasons
         # Create new sweep points without cal pts variable. Needed here because
@@ -2114,7 +2109,8 @@ class Rabi_Analysis(TD_Analysis):
             self.make_figures(show=show, show_guess=show_guess,
                               plot_amplitudes=plot_amplitudes,
                               plot_errorbars=plot_errorbars,
-                              separate_fits=separate_fits)
+                              separate_fits=separate_fits,
+                              plot_title_suffix=plot_title_suffix)
 
         if close_file:
             self.data_file.close()
@@ -2123,6 +2119,8 @@ class Rabi_Analysis(TD_Analysis):
 
     def make_figures(self, show=False, show_guess=False, plot_amplitudes=True,
                      plot_errorbars=True, separate_fits=False, **kw):
+
+        plot_title_suffix = kw.pop('plot_title_suffix', '')
 
         if not separate_fits:
             pi_pulse = self.rabi_amplitudes['piPulse']
@@ -2181,7 +2179,8 @@ class Rabi_Analysis(TD_Analysis):
             # Plot with initial guess
             if show_guess:
                 self.ax.plot(self.sweep_pts_wo_cal_pts,
-                             self.fit_result.init_fit, 'k--', linewidth=self.line_width)
+                             self.fit_result.init_fit, 'k--',
+                             linewidth=self.line_width)
 
             # Plot the calculated pi and pi/2 amplitudes
             if plot_amplitudes:
@@ -2216,7 +2215,8 @@ class Rabi_Analysis(TD_Analysis):
                 plt.show()
             self.ax.set_ylabel('V_homodyne (a.u)')
             # save figure
-            self.save_fig(self.fig, figname=self.measurementstring + '_Rabi_fit',
+            self.save_fig(self.fig, figname=(self.measurementstring +
+                                            '_Rabi_fit' + plot_title_suffix),
                           **kw)
 
         else:
@@ -2916,8 +2916,10 @@ class QScale_Analysis(TD_Analysis):
                 plt.show()
 
             if kw.pop('save_fig', True):
+                plot_title_suffix = kw.pop('plot_title_suffix', '')
                 self.save_fig(fig,
-                              figname=self.measurementstring + '_Qscale_fit', **kw)
+                              figname=self.measurementstring + '_Qscale_fit' +
+                                      plot_title_suffix, **kw)
 
         if close_file:
             self.data_file.close()
@@ -4422,6 +4424,7 @@ class T1_Analysis(TD_Analysis):
 
         # Plot best fit and initial fit + data
         if self.make_fig:
+            plot_title_suffix = kw.pop('plot_title_suffix', '')
 
             units = SI_prefix_and_scale_factor(val=max(abs(self.ax.get_xticks())),
                                                unit=self.sweep_unit[0])[1]
@@ -4471,7 +4474,8 @@ class T1_Analysis(TD_Analysis):
             if show:
                 plt.show()
 
-            self.save_fig(self.fig, figname=self.measurementstring + '_Fit', **kw)
+            self.save_fig(self.fig, figname=self.measurementstring + '_Fit'+
+                                            plot_title_suffix, **kw)
 
         if close_file:
             self.data_file.close()
@@ -4862,6 +4866,8 @@ class Ramsey_Analysis(TD_Analysis):
             show_guess = kw.pop('show_guess', False)
             show = kw.pop('show', False)
             plot_gaussian = kw.pop('plot_gaussian', True)
+            plot_title_suffix = kw.pop('plot_title_suffix', '')
+
             self.plot_results(self.fit_res, show_guess=show_guess,
                               art_det=self.artificial_detuning,
                               fig=self.fig, ax=self.ax,
@@ -4874,7 +4880,8 @@ class Ramsey_Analysis(TD_Analysis):
             #save figure
             fig_name_suffix = kw.pop('fig_name_suffix', 'Ramsey_fit')
             self.save_fig(self.fig, figname=(self.measurementstring+'_'+
-                                             fig_name_suffix), **kw)
+                                             fig_name_suffix +
+                                             plot_title_suffix), **kw)
 
     def two_art_dets_analysis(self, **kw):
 
@@ -4955,6 +4962,7 @@ class Ramsey_Analysis(TD_Analysis):
         if self.make_fig_two_dets:
             show_guess = kw.pop('show_guess', False)
             show = kw.pop('show', False)
+            plot_title_suffix = kw.pop('plot_title_suffix', '')
 
             if self.for_ef:
                 ylabel = r'$F$ $\left(|f \rangle \right) (arb. units)$'
@@ -5024,7 +5032,8 @@ class Ramsey_Analysis(TD_Analysis):
             #save figure
             fig_name_suffix = kw.pop('fig_name_suffix', 'Ramsey_fit')
             self.save_fig(self.fig, figname=(self.measurementstring+
-                                             '_'+fig_name_suffix), **kw)
+                                             '_'+fig_name_suffix+
+                                             plot_title_suffix), **kw)
 
     def get_measured_freq(self, fit_res, **kw):
         freq = fit_res.params['frequency'].value
@@ -6212,6 +6221,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
             - 'hanger' = amplitude fit with slope
             - 'complex' = complex transmission fit WITHOUT slope
             - 'lorentzian' = fit to a Lorentzian lineshape
+            - 'HalfFeedlineS21' = fit to an apropriate J model
 
         'fit_window': allows to select the windows of data to fit.
                       Example: fit_window=[100,-100]
@@ -6265,7 +6275,7 @@ class Homodyne_Analysis(MeasurementAnalysis):
             else:
                 raise ValueError(
                     'The fitting model specified is not available')
-            # added reject outliers to be robust agains CBox data acq bug.
+            # added reject outliers to be robust against CBox data acq bug.
             # this should have no effect on regular data acquisition and is
             # only used in the guess.
             amplitude_guess = max(
@@ -6384,6 +6394,22 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                 f=self.sweep_points,
                                 params=self.params)
 
+        elif fitting_model == 'HalfFeedlineS21':
+            Model = fit_mods.half_Feed_lineS12_J_Model
+            fit_mods.half_Feed_lineS12_J_Model.guess(Model,np.transpose([self.sweep_points,self.measured_powers]))
+
+            #checking which choice of PF-RR results in the better fit
+            fit=Model.fit(data=self.measured_powers,omega=self.sweep_points)
+            fRR=Model.param_hints['omegaRR']['value']
+            Model.set_param_hint('omegaRR',value=Model.param_hints['omegaPF']['value'],min=Model.param_hints['omegaPF']['value']-2e7,max=Model.param_hints['omegaPF']['value']+2e7)
+            Model.set_param_hint('omegaPF',value=fRR,min=fRR-2e7,max=fRR+2e7)
+            fit2=Model.fit(data=self.measured_powers,omega=self.sweep_points)
+            if (sum(fit.eval_uncertainty(omega=self.sweep_points))/len(fit.eval_uncertainty(omega=self.sweep_points))>=sum(fit2.eval_uncertainty(omega=self.sweep_points))/len(fit2.eval_uncertainty(omega=self.sweep_points))):
+                fit_res = fit2
+            else:
+                fit_res = fit
+
+
 
         else:
             raise ValueError('fitting model "{}" not recognized'.format(
@@ -6431,6 +6457,15 @@ class Homodyne_Analysis(MeasurementAnalysis):
                                             xlabel=self.sweep_name,
                                             x_unit=self.sweep_unit[0],
                                             ylabel=str('Power (arb. units)'),
+                                            save=False)
+
+        elif fitting_model == 'HalfFeedlineS21':
+            self.plot_results_vs_sweepparam(x=self.sweep_points,
+                                            y=self.measured_powers,
+                                            fig=fig, ax=ax,
+                                            xlabel=self.sweep_name,
+                                            x_unit=self.sweep_unit[0],
+                                            ylabel=str('magn (mVpeak)'),
                                             save=False)
 
         scale = SI_prefix_and_scale_factor(val=max(abs(ax.get_xticks())),
@@ -10155,7 +10190,7 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
             #             print('corrected: ',  phase_list[i])
             elif phase_diff_extrapolation < np.pi:
                 phases[i] += round(phase_diff_extrapolation/(2*np.pi))*2*np.pi
-            #             print('corrected: ',  phase_list[i])
+                #             print('corrected: ',  phase_list[i])
         return phases
 
     def fit_all(self, plot=False,
@@ -10249,7 +10284,7 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
 
             if save_plot:
                 self.fig.savefig(self.folder +
-                            '\\Phase_fits_{}.png'.format(self.timestamp_string))
+                                 '\\Phase_fits_{}.png'.format(self.timestamp_string))
             plt.show()
 
         self.fitted_phases = phase_list
@@ -10261,6 +10296,630 @@ class Fluxpulse_Ramsey_2D_Analysis(MeasurementAnalysis):
             return phase_list
 
 
+class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
+
+    def __init__(self, X90_separation=None, flux_pulse_length=None,
+                 drive_pulse_length=None,
+                 qb_name=None, label=None,
+                 cal_points=False,
+                 reference_measurements=False,
+                 plot=False,
+                 **kw):
+        """
+        Measurement analysis class to analyse Ramsey type measrements
+        with an interleaved flux pulse
+
+        Args:
+            X90_separation (float): separation between the two X90 pulses
+            flux_pulse_length (float): length of the flux pulse in seconds
+                                        (used to calculate freq. shifts)
+            qb_name (str): qubit name
+            label (str): measurement label
+            **kw:
+        """
+
+        kw['label'] = label
+        kw['h5mode'] = 'r+'
+        kw['close_file'] = False
+        self.label = label
+        self.fitted_phases = None
+        self.fitted_delay = 0
+        self.delay_fit_res = None
+        self.X90_separation = X90_separation
+        self.flux_pulse_length = flux_pulse_length
+        self.drive_pulse_length = drive_pulse_length
+        self.return_fit = kw.pop('return_fit', False)
+        self.cal_points = cal_points
+        self.reference_measurements=reference_measurements
+
+        super(Fluxpulse_Ramsey_2D_Analysis_Predictive, self).__init__(TwoD=True,
+                                                           start_at_zero=True,
+                                                           qb_name=qb_name,
+                                                           auto=False,
+                                                           **kw)
+        self.get_naming_and_values_2D()
+        self.fitted_phases, self.fitted_amps = self.fit_all(return_ampl=True,
+                                                           plot=plot, **kw)
+        fitted_phases_exited = self.fitted_phases[:: 2]
+        fitted_phases_ground = self.fitted_phases[1:: 2]
+        fitted_amps_exited = self.fitted_amps[:: 2]
+        fitted_amps_ground = self.fitted_amps[1:: 2]
+
+        cphases = fitted_phases_exited - fitted_phases_ground
+        population_losses = np.abs(fitted_amps_ground - fitted_amps_exited) \
+                            /fitted_amps_ground
+        self.cphases = cphases
+        self.population_losses = population_losses
+
+    def get_naming_and_values_2D(self):
+        if 'datasaving_format' in list(self.g.attrs.keys()):
+            datasaving_format = self.get_key('datasaving_format')
+        else:
+            print('Using legacy data loading, assuming old formatting')
+            datasaving_format = 'Version 1'
+
+        if datasaving_format == 'Version 1':
+        # Get naming
+            self.sweep_name = self.get_key('sweep_parameter_name')
+            self.sweep_unit = self.get_key('sweep_parameter_unit')
+            self.sweep_name_2D = self.get_key('sweep_parameter_2D_name')
+            self.sweep_unit_2D = self.get_key('sweep_parameter_2D_unit')
+            self.value_names = self.get_key('value_names')
+
+            value_units = self.get_key('value_units')
+
+        # get values
+            self.sweep_points = self.get_values(self.sweep_name)
+            self.sweep_points_2D = self.get_values(self.sweep_name_2D)
+            self.measured_values = []
+            self.zlabels = []
+            for i in range(len(self.value_names)):
+                self.measured_values.append(
+                    self.get_values(self.value_names[i]))
+                self.zlabels.append(str(
+                    self.value_names[i] + '(' + value_units[i] + ')'))
+            self.xlabel = str(self.sweep_name + '(' + self.sweep_unit + ')')
+            self.ylabel = str(self.sweep_name_2D + '(' + self.sweep_unit_2D + ')')
+
+        elif datasaving_format == 'Version 2':
+            self.parameter_names = self.get_key('sweep_parameter_names')
+            self.parameter_units = self.get_key('sweep_parameter_units')
+            if len(self.parameter_names) != len(self.parameter_units):
+                logging.error(' Number of parameter names does not match number'
+                              'of parameter units! Check sweep configuration!')
+            self.sweep_names = []
+            self.sweep_units =[]
+            for it in range(len(self.parameter_names)):
+                self.sweep_names.append(self.parameter_names[it])
+                self.sweep_units.append(self.parameter_units[it])
+            self.value_names = self.get_key('value_names')
+            self.value_units = self.get_key('value_units')
+            self.data = self.get_values('Data').transpose()
+
+            x = self.data[0]
+            cols = np.unique(x).shape[0]
+            nr_missing_values = 0
+            if len(x) % cols != 0:
+                nr_missing_values = cols - len(x) % cols
+            x = np.append(x,np.zeros((1,nr_missing_values))+np.nan)
+            self.X = x.reshape(-1,cols)
+            self.sweep_points = self.X[0]
+
+            self.sweep_points_2D = []
+            self.Y = []
+            for i in range(1,len(self.parameter_names)):
+                y = self.data[i]
+                y = np.append(y,np.zeros((1,nr_missing_values)))
+                Y = y.reshape(-1,cols)
+                self.Y.append(Y)
+                self.sweep_points_2D.append(Y.T[0])
+
+            if len(self.value_names) == 1:
+                z = self.data[3]
+                z = np.append(z,np.zeros(nr_missing_values)+np.nan)
+                self.Z = z.reshape(-1,cols)
+                self.measured_values = [self.Z.T]
+            else:
+                self.Z = []
+                self.measured_values = []
+                for i in range(len(self.value_names)):
+                    z = self.data[3 + i]
+                    z = np.append(z,np.zeros(nr_missing_values)+np.nan)
+                    Z = z.reshape(-1,cols)
+                    self.Z.append(Z)
+                    self.measured_values.append(Z.T)
+            self.xlabel = self.parameter_names[0] + ' (' + \
+                          self.parameter_units[0] + ')'
+            self.ylabel = self.parameter_names[1] + ' (' + \
+                          self.parameter_units[1] + ')' + '_' + \
+                          self.parameter_names[2] + ' (' + \
+                          self.parameter_units[2] + ')'
+
+            self.parameter_labels = [a + ' (' + b + ')' for a, b in zip(
+                                                        self.parameter_names,
+                                                        self.parameter_units)]
+            self.zlabels = [a + ' (' + b + ')' for a, b in zip(self.value_names,
+                                                               self.value_units)]
+
+    def run_default_analysis(self, TwoD=False, close_file=True,
+                             show=False, transpose=False,
+                             plot_args=None, **kw):
+        super().run_default_analysis(TwoD, close_file, show, transpose,
+                                     plot_args, **kw)
+
+        self.fit_all(self, return_ampl=True, **kw)
+
+    def fit_single_cos(self, thetas, ampls,
+                       print_fit_results=True, phase_guess=0,
+                       cal_points=False):
+        if cal_points:
+            thetas = thetas[:-4]
+            ampls = ampls[:-4]
+        cos_mod = fit_mods.CosModel
+        average = np.mean(ampls)
+
+        diff = 0.5*(max(ampls) -
+                    min(ampls))
+        amp_guess = -diff
+        # offset guess
+        offset_guess = average
+
+        # Set up fit parameters and perform fit
+        cos_mod.set_param_hint('amplitude',
+                               value=amp_guess,
+                               vary=True)
+        cos_mod.set_param_hint('phase',
+                               value=phase_guess,
+                               vary=True)
+        cos_mod.set_param_hint('frequency',
+                               value=1./(2*np.pi),
+                               vary=False)
+        cos_mod.set_param_hint('offset',
+                               value=offset_guess,
+                               vary=True)
+        self.params = cos_mod.make_params()
+        fit_res = cos_mod.fit(data=ampls,
+                              t=thetas,
+                              params=self.params)
+
+        if fit_res.chisqr > 0.35:
+            logging.warning('Fit did not converge, chi-square > 0.35')
+
+        if print_fit_results:
+            print(fit_res.fit_report())
+
+        if fit_res.best_values['amplitude'] < 0.:
+            fit_res.best_values['phase'] += np.pi
+            fit_res.best_values['amplitude'] *= -1
+
+        return fit_res
+
+
+    def unwrap_phases_extrapolation(self,phases):
+        for i in range(2,len(phases)):
+            phase_diff_extrapolation = (phases[i-1]
+                                        + (phases[i-1]
+                                           - phases[i-2]) - phases[i])
+            #         print(i,abs(phase_diff_extrapolation)>np.pi)
+            #         print(phase_list[i],phase_diff_
+            #           extrapolation + phase_list[i])
+            if phase_diff_extrapolation > np.pi:
+                phases[i] += round(phase_diff_extrapolation/(2*np.pi))*2*np.pi
+            #             print('corrected: ',  phase_list[i])
+            elif phase_diff_extrapolation < np.pi:
+                phases[i] += round(phase_diff_extrapolation/(2*np.pi))*2*np.pi
+            #             print('corrected: ',  phase_list[i])
+        return phases
+
+    def fit_all(self, plot=False,
+                extrapolate_phase=False,
+                return_ampl=False,
+                cal_points=None,
+                fit_range=None,
+                predict_phase=False,
+                save_plot=False,
+                plot_title=None, **kw):
+
+        only_cos_fits = kw.pop('only_cos_fits', False)
+        fit_statistics = kw.pop('fit_statistics',False)
+
+        if cal_points is None:
+            cal_points = self.cal_points
+
+        phase_list = [0]
+        amplitude_list = []
+        frequency_list = []
+        offset_list = []
+
+        length_single = len(self.sweep_points)
+        if fit_statistics:
+            amps_all = np.zeros((len(self.sweep_points_2D[0]),length_single))
+            thetas_all = self.data[0,:length_single]
+        if plot:
+            if only_cos_fits:
+                self.fig, self.ax = plt.subplots()
+                ax = self.ax
+            else:
+                self.fig, self.ax = plt.subplots(2, 1)
+                ax = self.ax[0]
+        else:
+            self.fig, self.ax = (None, None)
+
+        data_rotated = a_tools.rotate_and_normalize_data_no_cal_points(
+            np.array([self.data[3], self.data[4]]))
+        if fit_range is None:
+            i_start = 0
+            i_end = length_single*len(self.sweep_points_2D[0])
+        else:
+            i_start = length_single*fit_range[0]
+            i_end = length_single*fit_range[1]
+        for mod,i in enumerate(np.arange(i_start, i_end, length_single)):
+            thetas = self.data[0, i:i+length_single]
+            ampls = data_rotated[i:i+length_single]
+
+            if predict_phase:
+                phase_guess = phase_list[-1]
+            else:
+                phase_guess = 0
+
+            fit_res = self.fit_single_cos(thetas, ampls,
+                                          print_fit_results=False,
+                                          phase_guess=phase_guess,
+                                          cal_points=cal_points)
+
+            phase_list.append(fit_res.best_values['phase'])
+            amplitude_list.append(fit_res.best_values['amplitude'])
+            frequency_list.append(fit_res.best_values['frequency'])
+            offset_list.append(fit_res.best_values['offset'])
+
+            if plot:
+                if not fit_statistics:
+                    if mod % 2 == 0:
+                        linecolor_inter = 'orange'
+                    else:
+                        linecolor_inter = 'darkblue'
+                    linestyle_inter = '-'
+                    linestyle_meas = ''
+                    linecolor_meas = 'black'
+                    linewidth_inter = 2.
+                    linewidth_meas = 1.
+                    marker_size_meas = 2.
+                    marker_style_meas = 'x'
+                    ax.plot(thetas, ampls,color=linecolor_meas,
+                            linestyle=linestyle_meas,linewidth=linewidth_meas,
+                            markersize=marker_size_meas,marker=marker_style_meas,
+                            alpha=0.7)
+                    thetas_fit = np.linspace(thetas[0],thetas[-1], 128)
+                    ampls_fit = fit_res.eval(t=thetas_fit)
+                    ax.plot(thetas_fit, ampls_fit,color=linecolor_inter,
+                            linestyle=linestyle_inter,linewidth=linewidth_inter)
+                else:
+                    amps_all[mod, :] = ampls
+
+        phase_list.pop(0)
+        phase_list = np.array(phase_list)
+        amplitude_list = np.array(amplitude_list)
+        cphase = phase_list[1]-phase_list[0]
+
+        if plot and fit_statistics:
+
+            amps_avg_ex = np.mean(amps_all[::2,:],axis=0)
+            amps_avg_gr = np.mean(amps_all[1::2,:],axis=0)
+            fitted_phases_ex = phase_list[::2]
+            avg_phases_ex = np.mean(fitted_phases_ex)
+            std_phases_ex = np.std(fitted_phases_ex)
+            fitted_phases_gr = phase_list[1::2]
+            std_cphases = np.std(fitted_phases_ex-fitted_phases_gr)
+            avg_phases_gr = np.mean(fitted_phases_gr)
+            std_phases_gr = np.std(fitted_phases_gr)
+            fitted_amps_ex = amplitude_list[::2]
+            avg_amps_ex = np.mean(fitted_amps_ex)
+            std_amps_ex = np.std(fitted_amps_ex)
+            fitted_amps_gr = amplitude_list[1::2]
+            avg_amps_gr = np.mean(fitted_amps_gr)
+            std_amps_gr = np.std(fitted_amps_gr)
+            std_rel_amps = np.std(fitted_amps_ex-fitted_amps_gr)
+            fitted_offsets_ex = offset_list[::2]
+            avg_offsets_ex = np.mean(fitted_offsets_ex)
+            std_offsets_ex = np.std(fitted_offsets_ex)
+            fitted_offsets_gr = offset_list[1::2]
+            avg_offsets_gr = np.mean(fitted_offsets_gr)
+            std_offsets_gr = np.std(fitted_offsets_gr)
+            fitted_freqs_ex = frequency_list[::2]
+            avg_freqs_ex = np.mean(fitted_freqs_ex)
+            std_freqs_ex = np.std(fitted_freqs_ex)
+            fitted_freqs_gr = frequency_list[1::2]
+            avg_freqs_gr = np.mean(fitted_freqs_gr)
+            std_freqs_gr = np.std(fitted_freqs_gr)
+
+            f_fit = avg_freqs_ex
+            avg_fit_ex = lambda t: avg_amps_ex * np.cos(
+                                    2 * np.pi * f_fit * t + avg_phases_ex)\
+                                    + avg_offsets_ex
+            f_fit = avg_freqs_gr
+            avg_fit_gr = lambda t: avg_amps_gr * np.cos(
+                                    2 * np.pi * f_fit * t + avg_phases_gr) \
+                                    + avg_offsets_gr
+            f_fit = avg_freqs_ex + std_freqs_ex
+            high_fit_ex = lambda t: (avg_amps_ex+std_amps_ex)*np.cos(
+                                    2 * np.pi * f_fit * t
+                                    + avg_phases_ex + std_phases_ex) \
+                                    + avg_offsets_ex+std_offsets_ex
+            f_fit = avg_freqs_ex - std_freqs_ex
+            low_fit_ex = lambda t: (avg_amps_ex-std_amps_ex) * np.cos(
+                                    2 * np.pi * f_fit * t
+                                    + avg_phases_ex - std_phases_ex) \
+                                    + avg_offsets_ex - std_offsets_ex
+            f_fit = avg_freqs_gr + std_freqs_gr
+            high_fit_gr = lambda t: (avg_amps_gr + std_amps_gr) * np.cos(
+                                    2 * np.pi * f_fit * t
+                                   + avg_phases_gr + std_phases_gr)\
+                                   + avg_offsets_gr + std_offsets_gr
+            f_fit = avg_freqs_gr - std_freqs_gr
+            low_fit_gr = lambda t: (avg_amps_gr-std_amps_gr) * np.cos(
+                                    2 * np.pi * f_fit * t
+                                   + avg_phases_gr - std_phases_gr) \
+                                   + avg_offsets_gr - std_offsets_gr
+
+            func_list = [avg_fit_ex,low_fit_ex,high_fit_ex,avg_fit_gr,low_fit_gr
+                         ,high_fit_gr]
+            thetas_plot = np.linspace(thetas_all[0],thetas_all[-1], 128)
+            ax.plot(thetas_all,amps_avg_ex,linestyle='',
+                    marker='d', color='black',
+                    markersize=3., label='Avg Data')
+            ax.plot(thetas_all, amps_avg_gr,linestyle='',
+                    marker='d', color='black',
+                    markersize=3.)
+            for i,func in enumerate(func_list):
+                amps_plot = func(thetas_plot)
+                linecolor= 'orange'
+                label=None
+                if (i == 1 or i == 4):
+                    label_0 = r"$1\sigma$ param "
+                    label= label_0 + '|e>' if i == 1 else label_0 + '|g>'
+                if(i == 0 or i == 3 ):
+                    label_1='Avg Param '
+                    label= label_1 + '|e>' if i == 0 else label_1 + '|g>'
+                if i>=(len(func_list)/2):
+                    linecolor = 'darkblue'
+                linestyle = '--'
+                linewidth = 1.5
+                if (i == 0 or i==3 ):
+                    linestyle = '-'
+                    linewidth = 2.5
+                ax.plot(thetas_plot,amps_plot,linestyle=linestyle,color=linecolor,
+                        linewidth=linewidth,label=label)
+            cphase = avg_phases_ex-avg_phases_gr
+            ax.legend(loc='best')
+
+        if extrapolate_phase:
+            phase_list = self.unwrap_phases_extrapolation(phase_list)
+
+        if plot:
+            if len(self.sweep_points_2D[0]) == 2 or fit_statistics:
+                std_cphases = 0
+                ax.set_title(r"Cphase $= {:0.2f}\pm {:0.2f}$ deg, "
+                             '\n{:0.4f} ns{:0.4f} V \n {}'.format(
+                    cphase*180/np.pi, std_cphases*180/np.pi,
+                    self.sweep_points_2D[0][0]*1e9,
+                    self.sweep_points_2D[1][0],
+                    self.timestamp_string))
+            else:
+                ax.set_title('Cosine fits \n' + self.timestamp_string)
+            ax.set_xlabel(r'Phase of 2nd pi/2 pulse, $\theta$[rad]')
+            ax.set_ylabel('Response (arb. units)')
+
+            if not fit_statistics:
+                ax.legend(['data', 'fits |e>', 'fits |g>'])
+
+            if not only_cos_fits:
+                if fit_range is None:
+                    self.ax[1].plot(range(len(self.sweep_points_2D[0])),
+                                    phase_list)
+                else:
+                    self.ax[1].plot(range(len(self.sweep_points_2D[0,
+                                              fit_range[0]:fit_range[1]])),
+                                    phase_list)
+                self.ax[1].set_title('fitted phases')
+                self.ax[1].set_xlabel('Date point #')
+                self.ax[1].set_ylabel('Phase (rad)')
+
+                self.fig.subplots_adjust(hspace=0.7)
+
+            if plot_title is not None:
+                ax.set_title(plot_title)
+
+            if save_plot:
+                self.fig.savefig(self.folder +
+                            '\\Phase_fits_{}.png'.format(self.timestamp_string))
+            plt.show()
+
+        self.fitted_phases = phase_list
+        self.fitted_amplitudes = amplitude_list
+
+        if return_ampl:
+            return phase_list, amplitude_list,
+        else:
+            return phase_list
+
+
+class OptimizationAnalysis_Predictive2D:
+
+    def __init__(self,training_grid : np.ndarray ,
+                 target_values : np.ndarray,
+                 ma : MeasurementAnalysis,
+                 estimator='GRNN_neupy',
+                 hyper_parameter_dict=None,
+                 x_init = None,
+                 target_value_names=None,
+                 **kw):
+        self.x_init = x_init
+        self.ma = ma
+        self.save_folder = ma.folder
+        self.time_stamp = ma.timestamp_string
+        self.training_grid = training_grid
+        self.target_values = target_values
+        self.output_dim = target_values.ndim
+        if self.training_grid.ndim == 1:
+            self.training_grid.shape = (np.size(self.training_grid),
+                                        self.training_grid.ndim)
+        if self.output_dim == 1:
+            self.target_values.shape = (np.size(self.target_values),
+                                        self.output_dim)
+        self.estimator_name = estimator
+        self.hyper_parameter_dict = hyper_parameter_dict
+        self.target_value_names = target_value_names
+        print('OptimizationAnalysis_Predictive initialized.')
+        print('Measurement Type: ', ma.measurementstring)
+        print('Estimator type: ', self.estimator_name)
+
+        t0 = time()
+        self.train_and_minimize()
+        t1 = time()
+
+        print('Fitting estimator completed in %.2g sec. \nCreating plots...' \
+              % (t1-t0))
+        self.make_figures()
+        print('Plots created and saved.')
+    def train_and_minimize(self):
+
+        result,est,opti_flag \
+            = opt.neural_network_opt(None, self.training_grid,self.target_values,
+                                     estimator=self.estimator_name,
+                                     hyper_parameter_dict=self.hyper_parameter_dict,
+                                     x_init=self.x_init)
+        self.opti_flag = opti_flag
+        self.estimator = est
+        self.optimization_result = result
+
+        return result,est
+
+    def make_figures(self,**kw):
+        fontsize = kw.pop('label_fontsize',16.)
+        try:
+            optimization_method = self.ma.data_file['Instrument settings'] \
+                ['MC'].attrs['optimization_method']
+        except:
+            optimization_method = 'Numerical'
+        if self.target_value_names is None:
+            self.target_value_names  =['none_label' for i in range(self.output_dim)]
+        self.target_value_names.append(r"$||z||_2 [a.u]$")
+        pre_proc_dict = self.estimator.pre_proc_dict
+        output_scale = pre_proc_dict.get('output',{}).get('scaling',1.)
+        output_means = pre_proc_dict.get('output',{}).get('centering',0.)
+        input_scale = pre_proc_dict.get('input',{}).get('scaling',1.)
+        input_means = pre_proc_dict.get('input',{}).get('centering',0.)
+
+        #Create data grid for contour plot in case of more than 3 sweep variables,
+        #contour plots are only created for the first two variables, one plot for
+        #each output variable.
+        lower_x = np.min(self.training_grid[:,0])-np.std(self.training_grid[:,0])
+        upper_x = np.max(self.training_grid[:,0])+np.std(self.training_grid[:,0])
+        lower_y = np.min(self.training_grid[:,1])-np.std(self.training_grid[:,1])
+        upper_y = np.max(self.training_grid[:,1])+np.std(self.training_grid[:,1])
+        x_mesh = (np.linspace(lower_x,upper_x,200)-input_means[0])/input_scale[0]
+        y_mesh = (np.linspace(lower_y,upper_y,200)-input_means[1])/input_scale[1]
+        Xm,Ym = np.meshgrid(x_mesh,y_mesh)
+        Zm = np.zeros((self.output_dim+1,200,200))
+        for k in range(np.size(x_mesh)):
+            for l in range(np.size(y_mesh)):
+                pred = self.estimator.predict([[Xm[k,l],Ym[k,l]]])[0]
+                for j in range(self.output_dim+1):
+                    if j==self.output_dim:
+                        new_val = 0.
+                        for m in range(1,self.output_dim+1):
+                            new_val += Zm[j-m,k,l]**2
+                        new_val = np.sqrt(new_val)
+                    else:
+                        new_val = pred[j]*output_scale[j]+output_means[j]
+                    Zm[j,k,l] = new_val
+        Xm = Xm*input_scale[0] + input_means[0]
+        Ym = Ym*input_scale[1] + input_means[1]
+        reminder = (self.output_dim+1) % 2
+        div = int((self.output_dim+1)/2.)
+        fig = plt.figure(figsize=(20,(reminder+div)*6))
+        plt_grid = plt.GridSpec(div+reminder,2,hspace=0.4,wspace=0.3)
+        textstr = 'Optimization converged to: \n'
+        base_figname = 'predictive optimization of '
+        for it in range(len(self.ma.parameter_names)-1):
+            textstr+='%s: %.3g %s' % (self.ma.parameter_names[it+1],
+                                      self.optimization_result[it],
+                                      self.ma.parameter_units[it+1])
+            textstr+='\n'
+            base_figname += self.ma.parameter_names[it]+'_'
+        textstr+='Empirical error: '+'%.2f' % ((1.-self.estimator.score)*100.) +'%'
+        figname = self.ma.timestamp_string+' '
+        figname += self.estimator_name+' fitted landscape'
+        savename = self.ma.timestamp_string + '_' + base_figname
+        tot = 0
+        for it in range(div+reminder):
+            for jt in range(2):
+                if reminder and it == (div+reminder-1) and jt == 1:
+                    continue
+                ax = plt.subplot(plt_grid[it,jt])
+                if it == 0 and jt == 0:
+                    ax.text(0.98, 0.05, textstr,
+                            transform=ax.transAxes,
+                            fontsize=11, verticalalignment='bottom',
+                            horizontalalignment='right',
+                            bbox=dict(facecolor='white',edgecolor='None',
+                            alpha=0.75, boxstyle='round'))
+
+                levels = np.linspace(np.min(Zm[tot]),np.max(Zm[tot]),25)
+                CP = ax.contourf(Xm,Ym,Zm[tot],levels,extend='both')
+                ax.scatter(self.optimization_result[0],self.optimization_result[1],
+                            marker='*',c='white',label='network minimum',s=14)
+                ax.scatter((self.x_init[0]*input_scale[0])+input_means[0],
+                           (self.x_init[1]*input_scale[1])+input_means[1],
+                           marker='o',c='black',s=14,label='initial point')
+                ax.scatter(self.training_grid[:,0],self.training_grid[:,1],
+                            marker='o',c='r',label='training data',s=8)
+                ax.tick_params(axis='both',which='minor',labelsize=14)
+                ax.set_ylabel(self.ma.parameter_labels[1],fontsize=fontsize)
+                ax.set_xlabel(self.ma.parameter_labels[2],fontsize=fontsize)
+                cbar = plt.colorbar(CP,ax=ax,orientation='vertical')
+                cbar.ax.set_ylabel(self.target_value_names[tot],fontsize=fontsize)
+                ax.set_title('{} fitted landscape'.format(self.target_value_names[tot]))
+                ax.legend(loc='upper left',framealpha=0.75,fontsize=fontsize)
+                tot = tot+1
+
+        fig.suptitle(figname,fontsize=16.)
+        self.ma.save_fig(fig,figname=savename,**kw)
+
+        base_figname = 'CPhase_interpolated landscapes_'+self.ma.timestamp_string
+        f, (ax1,ax2) = plt.subplots(1,2)
+        f.subplots_adjust(wspace=0.8)
+        a_tools.color_plot_interpolated(
+            x=self.training_grid[:,0], y=self.training_grid[:,1],
+            z=1.-self.target_values[:,0], ax=ax1,N_levels=25,
+            zlabel=self.target_value_names[0])
+        ax1.plot(self.training_grid[:,0],
+                 self.training_grid[:,1], 'o', c='grey')
+        ax1.plot(self.optimization_result[0],
+                self.optimization_result[1],
+                'o', markersize=5, c='w')
+        plot_title = self.ma.timestamp_string + '_' +self.ma.measurementstring
+        ax2.set_title('Population loss Interpolated')
+        textstr = '%s ( %s )' % (self.ma.parameter_names[2],
+                                 self.ma.parameter_units[2])
+        set_xlabel(ax1, textstr)
+        set_xlabel(ax2, textstr)
+        textstr = '%s ( %s )' % (self.ma.parameter_names[1],
+                                 self.ma.parameter_units[1])
+        set_ylabel(ax1, textstr)
+        set_ylabel(ax2, textstr)
+        ax1.set_title(r"$|\phi_C/\pi-1|$ Interpolated")
+        a_tools.color_plot_interpolated(
+            x=self.training_grid[:,0], y=self.training_grid[:,1],
+            z=self.target_values[:,1], ax=ax2,N_levels=25,
+            zlabel=self.target_value_names[1])
+        ax2.plot(self.training_grid[:,0],
+                 self.training_grid[:,1], 'o', c='grey')
+        ax2.plot(self.optimization_result[0],
+                 self.optimization_result[1],
+                 'o', markersize=5, c='w')
+        fig.suptitle(plot_title,fontsize=16.)
+        self.ma.save_fig(f, figname=base_figname, **kw)
 
 class Dynamic_phase_Analysis(MeasurementAnalysis):
 
@@ -10396,7 +11055,7 @@ class Dynamic_phase_Analysis(MeasurementAnalysis):
             self.qb_name, self.flux_pulse_length*1e9,
             self.flux_pulse_amp, self.timestamp_string))
         ax.set_xlabel(r'Phase of 2nd pi/2 pulse, $\theta$[rad]')
-        ax.set_ylabel('Response (V)')
+        ax.set_ylabel('Response (arb. units)')
 
         ax.legend()
         self.fit_res[dict_label] = fit_res

@@ -7,6 +7,7 @@ from pycqed.utilities.general import add_suffix_to_dict_keys
 from pycqed.measurement.pulse_sequences.standard_elements import \
     multi_pulse_elt, distort_and_compensate
 import pycqed.measurement.randomized_benchmarking.randomized_benchmarking as rb
+import pycqed.measurement.randomized_benchmarking.two_qubit_clifford_group as tqc
 import pycqed.measurement.waveform_control.fluxpulse_predistortion as \
     fluxpulse_predistortion
 from pycqed.measurement.pulse_sequences.single_qubit_tek_seq_elts import \
@@ -1011,6 +1012,86 @@ def n_qubit_off_on(pulse_pars_list, RO_pars, return_seq=False, verbose=False,
         return seq, el_list
     else:
         return seq_name
+
+
+def two_qubit_randomized_benchmarking_seq(qb1n, qb2n, operation_dict,
+                                      nr_cliffords_value, #scalar
+                                      nr_seeds,           #array
+                                      CZ_pulse_name=None,
+                                      net_clifford=0,
+                                      clifford_decomposition_name='HZ',
+                                      interleaved_gate=None,
+                                      seq_name=None, upload=True,
+                                      return_seq=False, verbose=False):
+
+    """
+    Args
+        qb1n (str): name of qb1
+        qb2n (str): name of qb2
+        operation_dict (dict): dict with all operations from both qubits and
+            with the multiplexed RO pulse pars
+        nr_cliffords_value (int): number of random Cliffords to generate
+        nr_seeds (array): array of the form np.arange(nr_seeds_value)
+        CZ_pulse_name (str): pycqed name of the CZ pulse
+        net_clifford (int): 0 or 1; whether the recovery Clifford returns
+            qubits to ground statea (0) or puts them in the excited states (1)
+        clifford_decomp_name (str): the decomposition of Clifford gates
+            into primitives; can be "XY", "HZ", or "5Primitives"
+        interleaved_gate (str): pycqed name for a gate
+        seq_name (str): sequence name
+        upload (bool): whether to upload sequence to AWGs
+        return_seq (bool): whether to return seq and el_list or just seq
+        verbose (bool): print detailed runtime information
+    """
+
+    if seq_name is None:
+        seq_name = '2Qb_RB_sequence'
+    seq = sequence.Sequence(seq_name)
+    el_list = []
+
+
+    # Set Clifford decomposition
+    tqc.gate_decomposition = rb.get_clifford_decomposition(
+        clifford_decomposition_name)
+
+    for i in nr_seeds:
+        cl_seq = rb.randomized_benchmarking_sequence_new(
+            nr_cliffords_value,
+            number_of_qubits=2,
+            clifford_decomp_name=clifford_decomposition_name,
+            interleaved_gate=interleaved_gate,
+            desired_net_cl=net_clifford)
+
+        pulse_list = []
+        previous_qbname = None
+        for idx in cl_seq:
+            pulse_tuples_list = tqc.TwoQubitClifford(idx).gate_decomposition
+            for j, pulse_tuple in enumerate(pulse_tuples_list):
+                if isinstance(pulse_tuple[1], list):
+                    pulse_list += [operation_dict[CZ_pulse_name]]
+                    previous_qbname = pulse_tuple[0]
+                else:
+                    qb_name = qb1n if '0' in pulse_tuple[1] else qb2n
+                    if qb_name == previous_qbname or j == 0:
+                        pulse_name = pulse_tuple[0]
+                    else:
+                        pulse_name = pulse_tuple[0]+'s'
+                    pulse_list += [pulse_name + ' ' + qb_name]
+                    previous_qbname = qb_name
+
+        pulse_list += [operation_dict['RO mux']]
+
+        el = multi_pulse_elt(i, station, pulse_list)
+        el_list.append(el)
+        seq.append_element(el, trigger_wait=True)
+
+    if upload:
+        station.pulsar.program_awgs(seq, *el_list, verbose=verbose)
+
+    if return_seq:
+        return seq, el_list
+    else:
+        return seq
 
 
 def n_qubit_simultaneous_randomized_benchmarking_seq(qubit_list, RO_pars,
