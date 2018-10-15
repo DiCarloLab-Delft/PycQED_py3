@@ -10687,16 +10687,17 @@ class Fluxpulse_Ramsey_2D_Analysis_Predictive(MeasurementAnalysis):
                 ax.plot(thetas_plot,amps_plot,linestyle=linestyle,color=linecolor,
                         linewidth=linewidth,label=label)
             cphase = avg_phases_ex-avg_phases_gr
-            ax.legend(loc='Best')
+            ax.legend(loc='best')
 
         if extrapolate_phase:
             phase_list = self.unwrap_phases_extrapolation(phase_list)
 
         if plot:
             if len(self.sweep_points_2D[0]) == 2 or fit_statistics:
+                std_cphases = 0
                 ax.set_title(r"Cphase $= {:0.2f}\pm {:0.2f}$ deg, "
                              '\n{:0.4f} ns{:0.4f} V \n {}'.format(
-                    cphase*180/np.pi,std_cphases*180/np.pi,
+                    cphase*180/np.pi, std_cphases*180/np.pi,
                     self.sweep_points_2D[0][0]*1e9,
                     self.sweep_points_2D[1][0],
                     self.timestamp_string))
