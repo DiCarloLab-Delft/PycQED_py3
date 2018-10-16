@@ -242,7 +242,8 @@ class AliasedCoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                 ch_range_key: str='Snapshot/instruments/AWG8_8014'
                 '/parameters/sigouts_0_range',
                 waveform_amp_key: str='Snapshot/instruments/FL_LutMan_QR'
-                '/parameters/sq_amp'):
+                '/parameters/sq_amp',
+                vary_offset=True):
         super().__init__(t_start=t_start, t_stop=t_stop,
                         label=label,
                         data_file_path=data_file_path,
@@ -256,6 +257,7 @@ class AliasedCoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
                             'value_names': 'value_names',
                             'value_units': 'value_units',
                             'measured_values': 'measured_values'}
+        self.vary_offset = vary_offset
         self.numeric_params = []
         self.ch_idxs = ch_idxs
         self.ch_amp_key = ch_amp_key
@@ -302,7 +304,7 @@ class AliasedCoherenceTimesAnalysisSingle(ba.BaseDataAnalysis):
         decay_fit.set_param_hint('tau', value=tau0, min=0, vary=True)
         decay_fit.set_param_hint('A', value=0.7, vary=True)
         decay_fit.set_param_hint('n', value=1.2, min=1, max=2, vary=True)
-        decay_fit.set_param_hint('o', value=0.1, min=0, max=0.3, vary=True)
+        decay_fit.set_param_hint('o', value=0.01, min=0, max=0.3, vary=self.vary_offset)
         params = decay_fit.make_params()
         decay_fit = decay_fit.fit(data=self.proc_data_dict['amp'],
                                     t=self.raw_data_dict['xvals'][0],
