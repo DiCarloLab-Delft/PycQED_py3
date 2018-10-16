@@ -116,8 +116,8 @@ class Flux_Control_IVVI(Flux_Control):
         currents = np.zeros(len(self.dac_mapping()))
         for i in range(len(self.dac_mapping())):
             currents[i] = IVVI._get_dac(self.dac_mapping()[i])
-        self._flux_vector = np.dot(
-            self._transfer_matrix, currents - self.dac_offsets())
+        self.flux_vector = np.dot(
+            self.transfer_matrix, currents - self.dac_offsets())
 
         return self._flux_vector
 
