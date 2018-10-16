@@ -644,9 +644,10 @@ class DeviceCCL(Instrument):
         return a
 
     def measure_two_qubit_tomo_bell(self, q0: str, q1: str,
-                                    bell_state=0,
+                                    bell_state=0, wait_after_flux=None,
                                     analyze=True, close_fig=True,
-                                    prepare_for_timedomain=True, MC=None):
+                                    prepare_for_timedomain=True, MC=None,
+                                    label=''):
 
         if prepare_for_timedomain:
             self.prepare_for_timedomain()
@@ -660,6 +661,7 @@ class DeviceCCL(Instrument):
         q1idx = self.find_instrument(q1).cfg_qubit_nr()
 
         p = mqo.two_qubit_tomo_bell(bell_state, q0idx, q1idx,
+            wait_after_flux=wait_after_flux,
                                     platf_cfg=self.cfg_openql_platform_fn())
         s = swf.OpenQL_Sweep(openql_program=p,
                              CCL=self.instr_CC.get_instr())
@@ -668,7 +670,7 @@ class DeviceCCL(Instrument):
         # 36 tomo rotations + 7*4 calibration points
         MC.set_sweep_points(np.arange(36+7*4))
         MC.set_detector_function(d)
-        MC.run('TwoQubitBellTomo_{}_{}{}'.format(q0, q1, self.msmt_suffix))
+        MC.run('TwoQubitBellTomo_{}_{}{}'.format(q0, q1, self.msmt_suffix)+label)
         if analyze:
             a = tomo.Tomo_Multiplexed(
                 label='Tomo',

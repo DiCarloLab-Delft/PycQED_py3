@@ -807,20 +807,15 @@ def two_qubit_ramsey(times, qubit_idx: int, qubit_idx_spec: int,
 
 
 def two_qubit_tomo_bell(bell_state, q0, q1,
-                        platf_cfg):
+                        platf_cfg, wait_after_flux: float=None):
     '''
     Two qubit bell state tomography.
 
     Args:
         bell_state      (int): index of prepared bell state
         q0, q1          (str): names of the target qubits
-        wait_after_trigger (float): delay time in seconds after sending the
-                                    trigger for the flux pulse
-        clock_cycle     (float): period of the internal AWG clock
-        wait_during_flux (int): wait time during the flux pulse
-        single_qubit_compiled_phase (bool): wether to do single qubit phase
-            correction in the recovery pulse
-        RO_target   (str): can be q0, q1, or 'all'
+        wait_after_flux (float): wait time after the flux pulse and
+            after-rotation before tomographic rotations
     '''
     tomo_gates = ['i', 'rx180', 'ry90', 'rym90', 'rx90', 'rxm90']
 
@@ -863,15 +858,18 @@ def two_qubit_tomo_bell(bell_state, q0, q1,
             k.gate('fl_cw_01', 2, 0)
             # after-rotations
             k.gate(after_pulse_q1, q1)
+            # possibly wait
+            if wait_after_flux is not None:
+                k.gate("wait", [q0,q1], round(wait_after_flux*1e9))
             # tomo pulses
-            k.gate(p_q1, q0)
             k.gate(p_q0, q1)
+            k.gate(p_q1, q0)
             # measure
             k.measure(q0)
             k.measure(q1)
             # sync barrier before tomo
             # k.gate("wait", [q0, q1], 0)
-            k.gate("wait", [2, 0], 0)
+            # k.gate("wait", [2, 0], 0)
             p.add_kernel(k)
     # 7 repetitions is because of assumptions in tomo analysis
     p = add_two_q_cal_points(p, platf=platf, q0=q0, q1=q1, reps_per_cal_pt=7)
@@ -1789,6 +1787,7 @@ def sliding_flux_pulses_seq(
         qubits: list, platf_cfg: str,
         angles=np.arange(0, 360, 20), wait_time: int=0,
         flux_codeword_a: str='fl_cw_01', flux_codeword_b: str='fl_cw_01',
+        ramsey_axis: str='x',
         add_cal_points: bool=True):
     """
     Experiment to measure effect flux pulses on each other.
@@ -1809,6 +1808,8 @@ def sliding_flux_pulses_seq(
             first microwave pulse.
         flux_codeword_a : flux codeword of the stimulus (1st) pulse
         flux_codeword_b : flux codeword of the spectator (2nd) pulse
+        ramsey_axis : chooses between doing x90 or y90 rotation at the
+            beginning of Ramsey sequence
         add_cal_points : if True adds calibration points at the end
     """
 
@@ -1828,7 +1829,12 @@ def sliding_flux_pulses_seq(
         k.gate(flux_codeword_a, [2, 0])
         # hardcoded because of flux_tuples, [q1, q0])
         k.gate('wait', [q0, q1], wait_time)
-        k.gate('rx90', q0)
+        if ramsey_axis == 'x':
+            k.gate('rx90', q0)
+        elif ramsey_axis == 'y':
+            k.gate('ry90', q0)
+        else:
+            raise ValueError('ramsey_axis must be "x" ot "y"')
         k.gate(flux_codeword_b, [2, 0])
         k.gate('wait', [q0, q1], 60)
         # hardcoded because of flux_tuples, [q1, q0])
