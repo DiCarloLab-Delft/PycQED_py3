@@ -5,7 +5,8 @@ import numpy as np
 import adaptive
 import pycqed.analysis.analysis_toolbox as a_tools
 from pycqed.measurement import measurement_control
-from pycqed.measurement.sweep_functions import None_Sweep, None_Sweep_idx
+from pycqed.measurement.sweep_functions import None_Sweep, None_Sweep_idx, \
+    None_Sweep_With_Parameter_Returned
 import pycqed.measurement.detector_functions as det
 from pycqed.instrument_drivers.physical_instruments.dummy_instruments \
     import DummyParHolder
@@ -167,9 +168,9 @@ class Test_MeasurementControl(unittest.TestCase):
         sweep_pts = np.linspace(0, 10, 30)
         sweep_pts_2D = np.linspace(0, 10, 5)
         self.MC.set_sweep_function(None_Sweep_With_Parameter_Returned(
-                                                    sweep_control='soft'))
+            sweep_control='soft'))
         self.MC.set_sweep_function_2D(None_Sweep_With_Parameter_Returned(
-                                                    sweep_control='soft'))
+            sweep_control='soft'))
         self.MC.set_sweep_points(sweep_pts)
         self.MC.set_sweep_points_2D(sweep_pts_2D)
         self.MC.set_detector_function(det.Dummy_Detector_Soft())
@@ -182,6 +183,7 @@ class Test_MeasurementControl(unittest.TestCase):
         z0 = dset[:, 2]
         z1 = dset[:, 3]
 
+        # The +0.1 is to test if the return value is matching
         x_tiled = np.tile(sweep_pts+0.1, len(sweep_pts_2D))
         y_rep = np.repeat(sweep_pts_2D+0.1, len(sweep_pts))
         np.testing.assert_array_almost_equal(x, x_tiled)
@@ -556,7 +558,6 @@ class Test_MeasurementControl(unittest.TestCase):
             self.assertLess(x_opt[i], 0.5)
             self.assertLess(x_mean[i], 0.5)
 
-
     def test_adaptive_measurement_SPSA(self):
         self.MC.soft_avg(1)
         self.mock_parabola.noise(0)
@@ -588,13 +589,11 @@ class Test_MeasurementControl(unittest.TestCase):
         self.MC.set_sweep_functions(
             [self.mock_parabola.x, self.mock_parabola.y])
         self.MC.set_adaptive_function_parameters({'adaptive_function': adaptive.Learner2D,
-                                     'goal':lambda l: l.npoints>20*20,
-                                     'bounds':((-50, +50),
-                                               (-20, +30))})
+                                                  'goal': lambda l: l.npoints > 20*20,
+                                                  'bounds': ((-50, +50),
+                                                             (-20, +30))})
         self.MC.set_detector_function(self.mock_parabola.parabola)
         dat = self.MC.run('2D adaptive sampling test', mode='adaptive')
-
-
 
     @classmethod
     def tearDownClass(self):

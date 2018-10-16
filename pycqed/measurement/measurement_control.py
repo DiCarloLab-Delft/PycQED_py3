@@ -419,13 +419,13 @@ class MeasurementControl(Instrument):
                             logging.warning(e)
                         else:
                             raise e
-                if isinstance(set_val, float):
-                    # The Value in x is overwritten by the value that the
-                    # sweep function returns. This allows saving the value
-                    # that was actually set rather than the one that was
-                    # intended. This does require custom support from
-                    # a sweep function.
-                    x[-i-1] = set_val
+            if isinstance(set_val, float):
+                # The Value in x is overwritten by the value that the
+                # sweep function returns. This allows saving the value
+                # that was actually set rather than the one that was
+                # intended. This does require custom support from
+                # a sweep function.
+                x[-i-1] = set_val
 
         # used for next iteration
         self.last_sweep_pts = x
