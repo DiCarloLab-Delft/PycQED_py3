@@ -28,13 +28,13 @@ def calculate_net_clifford(rb_clifford_indices,
     '''
 
     # Calculate the net clifford
-    net_clifford = Cl(0)  # assumes element 0 is the Identity
+    net_clifford = Clifford(0)  # assumes element 0 is the Identity
     for idx in rb_clifford_indices:
         # hacking in exception for benchmarking only CZ
         # (not as a member of CNOT group)
         # abs is to remove the sign that is used to treat CZ ac CZ
         # and not member of CNOT-like set of gates
-        cliff = Cl(abs(idx))
+        cliff = Clifford(abs(idx))
         # order of operators applied in is right to left, therefore
         # the new operator is applied on the left side.
         net_clifford = cliff*net_clifford
